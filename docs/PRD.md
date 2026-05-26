@@ -1,0 +1,1000 @@
+# PRD: FSI PCI DSS Payment Security Demo
+
+| Field | Value |
+|---|---|
+| **Version** | 1.0 |
+| **Status** | Draft |
+| **Author** | Antonio Membrides Espinosa |
+| **Date** | 2026-05-26 |
+| **Repository** | sec-fsi-pci-dss |
+| **Demo Type** | IST Standalone Demo — FSI / Security |
+
+---
+
+## Table of Contents
+
+1. [Executive Summary](#1-executive-summary)
+2. [Problem Statement](#2-problem-statement)
+3. [Solution Overview](#3-solution-overview)
+4. [Target Audience & Personas](#4-target-audience--personas)
+5. [Demo Storyline](#5-demo-storyline)
+6. [BIAN Data Architecture](#6-bian-data-architecture)
+7. [Queryable Encryption Design](#7-queryable-encryption-design)
+8. [Technical Architecture](#8-technical-architecture)
+9. [Product Roadmap](#9-product-roadmap)
+10. [Feature Requirements by Iteration](#10-feature-requirements-by-iteration)
+11. [PCI DSS Alignment](#11-pci-dss-alignment)
+12. [Q&A Coverage Matrix](#12-qa-coverage-matrix)
+13. [Installation & DevOps](#13-installation--devops)
+14. [Success Metrics](#14-success-metrics)
+15. [Open Questions & Decisions Log](#15-open-questions--decisions-log)
+
+---
+
+## 1. Executive Summary
+
+This demo showcases MongoDB as a **PCI DSS-aligned data platform** for financial institutions. It demonstrates how a digital bank or card issuer can simulate a complete card payment lifecycle — from checkout to fraud investigation — while keeping sensitive cardholder data encrypted end-to-end using **MongoDB Queryable Encryption (QE)** with **AWS KMS**, all structured according to **BIAN (Banking Industry Architecture Network)** Service Domain naming conventions.
+
+The demo answers the most critical question FSI prospects ask:
+
+> *"How can we keep payment data fully encrypted and still perform fraud investigations at operational speed?"*
+
+**Core MongoDB capability demonstrated:** Queryable Encryption (QE) — encrypt fields client-side, query them without server-side decryption, with keys managed by the customer in AWS KMS.
+
+**Regulatory framework:** PCI DSS v4.0 aligned architecture  
+**Data architecture standard:** BIAN Service Domains  
+**Delivery model:** Standalone demo, designed for future integration with Leafy Bank
+
+---
+
+## 2. Problem Statement
+
+### Business Problem
+
+Banks and payment providers must investigate suspicious transactions in minutes, not hours. Traditional architectures force a trade-off: either expose sensitive payment data to internal systems for operability, or lock it down so tightly that fraud teams cannot function.
+
+This creates three compounding risks:
+
+1. **PCI scope expansion** — Storing or transmitting cardholder data in plaintext across internal systems brings every component into PCI DSS scope.
+2. **Insider threat exposure** — Database administrators, support tooling, and logging pipelines see cardholder data they should not.
+3. **Investigative friction** — Encrypted data that cannot be queried forces teams to decrypt entire datasets, which defeats the purpose of encryption.
+
+### Why MongoDB and Why Now
+
+PCI DSS v4.0 (effective March 2025) increases requirements for encryption, cryptographic key management, and data minimization. MongoDB Atlas achieved PCI DSS 4.0 certification in September 2023.
+
+MongoDB's **Queryable Encryption** solves the trade-off: fields are encrypted **before** reaching the server. The server never sees plaintext. Yet applications can still run equality and range queries on ciphertext using client-side metadata — without server-side decryption.
+
+This is the only capability on the market that allows a fraud analyst to search `customerEmailAddress = "john@bank.com"` while that field is stored as an encrypted blob on the database server.
+
+---
+
+## 3. Solution Overview
+
+### Concept
+
+A synthetic digital bank (standalone, Leafy Bank-ready) runs a payment flow where sensitive cardholder data is encrypted client-side before it reaches MongoDB Atlas. A fraud or compliance event triggers an investigation case. Analysts query encrypted fields to locate records. Role-based access controls determine which fields are revealed and under what conditions.
+
+### Architecture Principles
+
+| Principle | Application |
+|---|---|
+| **Data minimization** | Full PAN, CVV, and PIN are never stored. Only tokenized card references and masked PAN for display. |
+| **Encryption at origin** | QE encrypts fields in the application layer before the MongoDB driver sends data to Atlas. |
+| **Least privilege** | Each service role has a distinct MongoDB Atlas database user with scoped QE key access. |
+| **BIAN alignment** | Collections, field names, and relationships follow BIAN Service Domain vocabulary. |
+| **Customer-controlled keys** | AWS KMS manages the Customer Master Key (CMK). MongoDB never has key access. |
+| **Simplicity first** | Each iteration delivers runnable, explainable results. No half-implemented features reach staging. |
+
+### MongoDB Features Demonstrated
+
+| Feature | Purpose in Demo |
+|---|---|
+| Queryable Encryption — equality | Search encrypted email, phone, account reference, card token |
+| Queryable Encryption — range (v2) | Search by encrypted transaction amount band |
+| Queryable Encryption — none mode | Protect sensitive PII (address, government ID) that only escalated roles see |
+| AWS KMS integration | Customer-controlled key management, key rotation simulation |
+| Atlas RBAC | Role-based collection and field access per analyst persona |
+| Database Auditing | Trace every access event to encrypted fields |
+| TLS 1.3 default | Wire encryption for all Atlas connections |
+| Private Endpoint (documented) | Network isolation architecture pattern shown in diagrams |
+
+---
+
+## 4. Target Audience & Personas
+
+### Primary Demo Audience
+
+| Persona | Role | What They Need to See |
+|---|---|---|
+| **CISO / Security Architect** | Evaluates security controls, compliance posture, key management | QE technical depth, AWS KMS integration, PCI DSS requirement mapping, audit trail |
+| **Sales / Pre-sales (AE/SE)** | Runs the demo live, builds the narrative | Clear visual story, explainable flow, 10-minute walkthrough path, talking points |
+
+### Demo Internal Personas (roles within the demo itself)
+
+| Persona | Access Level | Actions Available |
+|---|---|---|
+| **Payment Service** | Write — Card Transaction SD, Customer Agreement SD | Submit card payment, encrypt fields |
+| **Level 1 Analyst** | Read — equality QE fields only | Search by email, phone, account ref, card token |
+| **Level 2 Investigator** | Read — equality + `none` mode QE fields | Full record reveal after escalation approval |
+| **Security Auditor** | Read — audit log, case history only | Review access events, export case timeline |
+
+---
+
+## 5. Demo Storyline
+
+### Narrative Arc
+
+```
+[1. Customer Checkout]
+   Customer pays with a credit card on the digital banking app.
+   Sensitive fields are encrypted by the client before reaching MongoDB Atlas.
+   The payment card token is stored — never the full PAN, CVV, or PIN.
+
+        ↓
+
+[2. Fraud Alert Triggered]
+   A Financial Transaction Assessment flags the payment as suspicious:
+   unusual merchant category, different country, rapid-succession transactions.
+   A Fraud Diagnosis Case is automatically created.
+
+        ↓
+
+[3. Level 1 Investigation]
+   Analyst searches by encrypted email or account reference.
+   MongoDB returns the matching record — the server never decrypted the field.
+   The UI reveals: transaction metadata, masked PAN, merchant info.
+   Sensitive fields (address, government ID) remain encrypted and hidden.
+
+        ↓
+
+[4. Escalation (v2)]
+   Analyst escalates the case to Level 2.
+   The escalation workflow authenticates the investigator's role.
+   The application decrypts QE-none fields (address, government ID) client-side.
+   An audit event is written to the Atlas audit log.
+
+        ↓
+
+[5. Case Resolution]
+   Investigator marks the transaction as confirmed fraud or false positive.
+   Case status updates. Audit trail is complete and exportable.
+```
+
+### Key Demo Moments (Explainability)
+
+1. **"Watch the wire"** — Show the raw MongoDB document in Atlas Data Explorer. The encrypted fields are opaque ciphertext blobs. The analyst found the record without the server ever seeing plaintext.
+2. **"Same query, different privilege"** — Run the same search as Level 1 and Level 2. Level 2 sees additional fields decrypted. Same encrypted document in Atlas; different application-layer key access.
+3. **"Keys are yours"** — Open the AWS KMS console. Show the Customer Master Key. MongoDB has zero access to it.
+
+---
+
+## 6. BIAN Data Architecture
+
+### 6.1 Why BIAN
+
+BIAN (Banking Industry Architecture Network) provides a standardized vocabulary for banking business capabilities. Using BIAN naming for collections and fields immediately communicates credibility to FSI architects and compliance teams. It also ensures the demo data model is extensible into broader banking scenarios (Leafy Bank integration, future SDs).
+
+### 6.2 BIAN Service Domains in Scope
+
+| # | BIAN Service Domain | SD Reference | Role in Demo | Collection |
+|---|---|---|---|---|
+| 1 | **Card Transaction** | SD-254 | Records card payment events | `cardTransactionQE` |
+| 2 | **Card Transaction — Sensitive** | SD-254 (sensitive) | Stores non-searchable gateway payload | `cardTransactionSensitiveQE` |
+| 3 | **Customer Agreement** | SD-53 | Customer profile, searchable PII | `customerAgreementQE` |
+| 4 | **Customer Agreement — Sensitive** | SD-53 (sensitive) | Non-searchable PII (address, gov ID) | `customerAgreementSensitiveQE` |
+| 5 | **Payment Card** | SD-88 | Stored card instruments (tokens) | `paymentCardQE` |
+| 6 | **Fraud Diagnosis** | SD-83 | Investigation cases and workflow | `fraudDiagnosisCase` |
+
+> **Note:** BIAN does not define separate "sensitive" collections; the split is an architectural pattern for separating searchable QE fields from non-searchable QE fields, as required by MongoDB QE design constraints.
+
+### 6.3 Collection Schemas
+
+#### Collection 1: `cardTransactionQE`
+*BIAN SD-254 — Card Transaction Log Control Record*
+
+```typescript
+interface CardTransactionLogControlRecord {
+  // Identifiers (plaintext)
+  cardTransactionInstanceReference: string;       // primary key, UUID
+  cardTransactionExternalReference?: string;      // gateway transaction ID
+
+  // Encrypted — QE equality (searchable)
+  paymentCardReference: string;                   // QE:equality — tokenized card ID
+  cardTransactionAccountReference: string;        // QE:equality — account reference
+
+  // Transaction metadata (plaintext)
+  transactionAmount: {
+    amount: number;                               // QE:range in v2
+    currency: string;                             // ISO 4217
+  };
+  transactionDateTime: Date;
+  transactionStatus: 'authorized' | 'declined' | 'pending' | 'settled' | 'disputed';
+  transactionChannel: 'online' | 'pos' | 'contactless' | 'atm';
+  merchantCategoryCode: string;                   // MCC code (plaintext)
+  merchantName: string;                           // plaintext
+  maskedPanDisplay: string;                       // plaintext — display only: ****-****-****-1234
+
+  // BIAN metadata
+  bianServiceDomain: 'CardTransaction';
+  bianControlRecordType: 'CardTransactionLog';
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+}
+```
+
+#### Collection 2: `cardTransactionSensitiveQE`
+*BIAN SD-254 — Sensitive / Non-searchable attributes*
+
+```typescript
+interface CardTransactionSensitiveRecord {
+  // Linking key (plaintext by policy)
+  cardTransactionInstanceReference: string;       // FK to cardTransactionQE
+
+  // Encrypted — QE none (non-searchable, retrieval only under Level 2)
+  rawGatewayPayload: object;                      // QE:none — full gateway response
+  processorTransactionMetadata: object;           // QE:none — processor-specific metadata
+
+  // NEVER store:
+  // fullPan, cvv, pin, magneticStripeData — prohibited by PCI DSS SAD rules
+}
+```
+
+#### Collection 3: `customerAgreementQE`
+*BIAN SD-53 — Customer Agreement Control Record (searchable PII)*
+
+```typescript
+interface CustomerAgreementControlRecord {
+  // Identifiers (plaintext)
+  customerAgreementInstanceReference: string;    // primary key, UUID
+
+  // Encrypted — QE equality (searchable by Level 1+)
+  customerEmailAddress: string;                  // QE:equality
+  customerMobilePhoneNumber: string;             // QE:equality
+  customerAgreementReference: string;            // QE:equality — account number reference
+
+  // Display fields (plaintext — non-sensitive)
+  customerName: string;                          // plaintext in v1; QE:equality in v2
+  customerSegment: 'retail' | 'premium' | 'corporate' | 'sme';
+  agreementStatus: 'active' | 'suspended' | 'closed';
+  enrollmentDateTime: Date;
+  preferredLanguage: string;                     // ISO 639-1
+
+  // BIAN metadata
+  bianServiceDomain: 'CustomerAgreement';
+  bianControlRecordType: 'CustomerAgreement';
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+}
+```
+
+#### Collection 4: `customerAgreementSensitiveQE`
+*BIAN SD-53 — Non-searchable PII (escalation-only access)*
+
+```typescript
+interface CustomerAgreementSensitiveRecord {
+  // Linking key (plaintext by policy)
+  customerAgreementInstanceReference: string;   // FK to customerAgreementQE
+
+  // Encrypted — QE none (non-searchable, Level 2 escalation only)
+  residentialAddressFull: {                      // QE:none
+    streetAddress: string;
+    city: string;
+    postalCode: string;
+    countryCode: string;
+  };
+  governmentIdentificationReference: string;    // QE:none — national ID / passport
+  internalRiskProfileNotes: string;             // QE:none — internal fraud notes
+}
+```
+
+#### Collection 5: `paymentCardQE`
+*BIAN SD-88 — Payment Card Management Control Record*
+
+```typescript
+interface PaymentCardManagementControlRecord {
+  // Identifiers (plaintext)
+  paymentCardInstanceReference: string;          // primary key, UUID
+  customerAgreementInstanceReference: string;    // FK to customerAgreementQE (plaintext)
+
+  // Encrypted — QE equality (searchable)
+  paymentCardReference: string;                  // QE:equality — token (same as in cardTransactionQE)
+
+  // Encrypted — QE none (non-searchable)
+  cardExpirationDate: string;                    // QE:none — MM/YY format
+
+  // Display fields (plaintext — non-sensitive)
+  maskedPanDisplay: string;                      // ****-****-****-1234
+  cardNetwork: 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
+  cardStatus: 'active' | 'blocked' | 'expired' | 'pending_activation';
+  cardIssuanceDateTime: Date;
+  isPreferredCard: boolean;
+
+  // BIAN metadata
+  bianServiceDomain: 'PaymentCard';
+  bianControlRecordType: 'PaymentCardManagement';
+  recordCreatedDateTime: Date;
+}
+```
+
+#### Collection 6: `fraudDiagnosisCase`
+*BIAN SD-83 — Fraud Diagnosis Control Record (no QE — operational metadata)*
+
+```typescript
+interface FraudDiagnosisControlRecord {
+  // Identifiers (plaintext)
+  fraudDiagnosisInstanceReference: string;       // primary key, UUID
+  caseReference: string;                         // human-readable case number: FD-2026-001234
+
+  // Links to protected records (plaintext keys by design)
+  linkedCardTransactionReference: string;        // FK to cardTransactionQE
+  linkedCustomerAgreementReference: string;      // FK to customerAgreementQE
+
+  // Case workflow (plaintext)
+  caseStatus: 'open' | 'in_review' | 'escalated' | 'pending_closure' | 'closed';
+  riskSeverity: 'low' | 'medium' | 'high' | 'critical';
+  assignedAnalystRole: 'level1_analyst' | 'level2_investigator';
+  escalationFlag: boolean;
+  escalationDateTime?: Date;
+  caseResolutionOutcome?: 'fraud_confirmed' | 'false_positive' | 'chargeback_initiated' | 'under_review';
+  caseNotes: string;                             // non-sensitive operational notes
+
+  // Audit log (embedded — append-only)
+  diagnosisActionLog: Array<{
+    actionDateTime: Date;
+    actionType: 'case_opened' | 'field_accessed' | 'escalated' | 'note_added' | 'case_closed';
+    performedByRole: string;
+    actionDetails: string;
+  }>;
+
+  // BIAN metadata
+  bianServiceDomain: 'FraudDiagnosis';
+  bianControlRecordType: 'FraudDiagnosis';
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+}
+```
+
+### 6.4 Collection Relationships
+
+```
+customerAgreementQE ──────────────── 1 : 1 ──────────────── customerAgreementSensitiveQE
+        │                               via: customerAgreementInstanceReference
+        │
+        │ 1 : many
+        ↓
+paymentCardQE ──────────────────────────────────────────────────────────────────────────
+        │ (via paymentCardReference token)
+        │ many : 1
+        ↓
+cardTransactionQE ─────────────────── 1 : 1 ──────────────── cardTransactionSensitiveQE
+        │                               via: cardTransactionInstanceReference
+        │
+        │ 1 : many
+        ↓
+fraudDiagnosisCase ─── also links to ──► customerAgreementQE
+        (via linkedCardTransactionReference + linkedCustomerAgreementReference)
+```
+
+**Join strategy:** Application-side joins only. No `$lookup` across QE collections (not supported for encrypted fields). The API service performs sequential queries and assembles the response.
+
+### 6.5 Index Strategy
+
+| Collection | Index | Type | Purpose |
+|---|---|---|---|
+| `cardTransactionQE` | `cardTransactionInstanceReference` | Unique | Primary lookup |
+| `cardTransactionQE` | `transactionDateTime` | Single field | Time-range filtering |
+| `cardTransactionQE` | `transactionStatus` | Single field | Status filtering |
+| `cardTransactionSensitiveQE` | `cardTransactionInstanceReference` | Unique | 1:1 join |
+| `customerAgreementQE` | `customerAgreementInstanceReference` | Unique | Primary lookup |
+| `customerAgreementQE` | `agreementStatus` | Single field | Active customer filtering |
+| `customerAgreementSensitiveQE` | `customerAgreementInstanceReference` | Unique | 1:1 join |
+| `paymentCardQE` | `customerAgreementInstanceReference` | Single field | Cards by customer |
+| `paymentCardQE` | `paymentCardInstanceReference` | Unique | Primary lookup |
+| `fraudDiagnosisCase` | `fraudDiagnosisInstanceReference` | Unique | Primary lookup |
+| `fraudDiagnosisCase` | `linkedCardTransactionReference` | Single field | Case by transaction |
+| `fraudDiagnosisCase` | `caseStatus, riskSeverity` | Compound | Dashboard filtering |
+
+> QE encrypted fields (`paymentCardReference`, `customerEmailAddress`, etc.) use QE metadata indexes automatically managed by the driver — do not create manual indexes on these fields.
+
+---
+
+## 7. Queryable Encryption Design
+
+### 7.1 QE Field Classification Table
+
+| Field | BIAN SD | PCI Classification | QE Mode | Collection | Demo Version |
+|---|---|---|---|---|---|
+| `paymentCardReference` | Card Transaction | CHD (token) | `equality` | `cardTransactionQE` | v1 |
+| `cardTransactionAccountReference` | Card Transaction | CHD-adjacent | `equality` | `cardTransactionQE` | v1 |
+| `customerEmailAddress` | Customer Agreement | PII | `equality` | `customerAgreementQE` | v1 |
+| `customerMobilePhoneNumber` | Customer Agreement | PII | `equality` | `customerAgreementQE` | v1 |
+| `customerAgreementReference` | Customer Agreement | CHD-adjacent | `equality` | `customerAgreementQE` | v1 |
+| `paymentCardReference` | Payment Card | CHD (token) | `equality` | `paymentCardQE` | v1 |
+| `cardExpirationDate` | Payment Card | CHD | `none` | `paymentCardQE` | v1 |
+| `rawGatewayPayload` | Card Transaction | Internal | `none` | `cardTransactionSensitiveQE` | v1 |
+| `processorTransactionMetadata` | Card Transaction | Internal | `none` | `cardTransactionSensitiveQE` | v1 |
+| `residentialAddressFull` | Customer Agreement | PII | `none` | `customerAgreementSensitiveQE` | v1 |
+| `governmentIdentificationReference` | Customer Agreement | PII | `none` | `customerAgreementSensitiveQE` | v1 |
+| `internalRiskProfileNotes` | Customer Agreement | Internal | `none` | `customerAgreementSensitiveQE` | v1 |
+| `transactionAmount.amount` | Card Transaction | — | `range` | `cardTransactionQE` | **v2** |
+| `customerName` | Customer Agreement | CHD | `equality` | `customerAgreementQE` | **v2** |
+| **`fullPan`** | — | CHD — **PROHIBITED** | **never store** | — | — |
+| **`cvv` / `pin`** | — | SAD — **PROHIBITED** | **never store** | — | — |
+| **`magneticStripeData`** | — | SAD — **PROHIBITED** | **never store** | — | — |
+
+### 7.2 Key Management Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    AWS KMS                              │
+│  Customer Master Key (CMK)                              │
+│  arn:aws:kms:<region>:<account>:key/<key-id>            │
+│                         ↑                               │
+│              Customer controls, MongoDB has NO access   │
+└──────────────────────────┬──────────────────────────────┘
+                           │ wraps / unwraps
+┌──────────────────────────▼──────────────────────────────┐
+│              MongoDB Key Vault Collection               │
+│  Database: encryption   Collection: __keyVault          │
+│                                                         │
+│  Key Vault documents:                                   │
+│  ├── DEK-lookup   (for equality-searchable collections) │
+│  └── DEK-sensitive (for QE:none sensitive collections)  │
+└──────────────────────────┬──────────────────────────────┘
+                           │ encrypts fields
+┌──────────────────────────▼──────────────────────────────┐
+│                 MongoDB Atlas Cluster                   │
+│                                                         │
+│  cardTransactionQE        ← DEK-lookup                  │
+│  customerAgreementQE      ← DEK-lookup                  │
+│  paymentCardQE            ← DEK-lookup                  │
+│  cardTransactionSensitiveQE ← DEK-sensitive             │
+│  customerAgreementSensitiveQE ← DEK-sensitive           │
+│  fraudDiagnosisCase       ← plaintext (no QE)           │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Two DEKs by design:**
+- `DEK-lookup` — shared by equality-searchable collections. Rotation impacts all lookup collections simultaneously (acceptable for demo).
+- `DEK-sensitive` — exclusive to sensitive/non-searchable collections. Level 2 investigator role requires access to this key only.
+
+In production, each collection should have a dedicated DEK. The two-key model is a simplification for demo clarity.
+
+### 7.3 KMS Configuration (Node.js / TypeScript)
+
+```typescript
+const kmsProviders = {
+  aws: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    sessionToken: process.env.AWS_SESSION_TOKEN,  // for temporary credentials
+  }
+};
+
+const keyVaultNamespace = 'encryption.__keyVault';
+
+const cmkOptions = {
+  masterKey: {
+    key: process.env.AWS_CMK_ARN!,   // arn:aws:kms:...
+    region: process.env.AWS_REGION!,
+  }
+};
+```
+
+**Local KMS fallback for development (docker-compose only):**
+
+```typescript
+// packages/db/src/encryption/kms.ts
+const kmsProviders = process.env.KMS_PROVIDER === 'local'
+  ? { local: { key: Buffer.from(process.env.LOCAL_MASTER_KEY_BASE64!, 'base64') } }
+  : { aws: { accessKeyId: ..., secretAccessKey: ... } };
+```
+
+---
+
+## 8. Technical Architecture
+
+### 8.1 Stack Summary
+
+| Layer | Technology | Rationale |
+|---|---|---|
+| **Frontend** | Next.js 14 App Router + TypeScript | IST standard, SSR, Leafy Bank-compatible |
+| **Backend API** | Fastify 4 + TypeScript | TypeScript-native, schema-first, performance |
+| **Database** | MongoDB Atlas (M10+) | QE requires Atlas or Enterprise Advanced |
+| **Encryption** | MongoDB QE auto-encryption + `crypt_shared` | No `mongocryptd` daemon needed with auto mode |
+| **Key Management** | AWS KMS | Customer-controlled CMK, production-realistic |
+| **Monorepo** | npm workspaces + Turborepo | Build caching, parallel tasks |
+| **Containerization** | Docker + Docker Compose | One-command environment |
+| **UI Design** | LeafyGreen Design System | MongoDB IST standard |
+
+### 8.2 Monorepo Structure
+
+```
+sec-fsi-pci-dss/
+├── apps/
+│   ├── web/                        # Next.js App Router (frontend)
+│   │   ├── src/
+│   │   │   ├── app/
+│   │   │   │   ├── (demo)/
+│   │   │   │   │   ├── payment/    # Card payment simulation flow
+│   │   │   │   │   ├── investigation/ # Fraud investigation dashboard
+│   │   │   │   │   └── audit/      # Audit trail viewer (v2)
+│   │   │   │   ├── layout.tsx
+│   │   │   │   └── page.tsx        # Demo landing / scenario selector
+│   │   │   ├── components/         # LeafyGreen-based components
+│   │   │   └── lib/
+│   │   │       └── api-client.ts   # HTTP client for Fastify API
+│   │   ├── public/
+│   │   └── package.json
+│   │
+│   └── api/                        # Fastify REST API (backend)
+│       ├── src/
+│       │   ├── plugins/
+│       │   │   ├── mongodb.ts      # MongoDB QE client plugin
+│       │   │   └── cors.ts
+│       │   ├── routes/
+│       │   │   ├── cardTransaction/
+│       │   │   │   ├── index.ts    # POST /card-transactions
+│       │   │   │   └── schema.ts   # Fastify JSON schema
+│       │   │   ├── customerAgreement/
+│       │   │   ├── paymentCard/
+│       │   │   └── fraudDiagnosis/
+│       │   ├── services/
+│       │   │   ├── cardTransactionService.ts
+│       │   │   ├── customerAgreementService.ts
+│       │   │   └── fraudDiagnosisService.ts
+│       │   └── server.ts
+│       └── package.json
+│
+├── packages/
+│   ├── db/                         # MongoDB QE client + schemas + indexes
+│   │   ├── src/
+│   │   │   ├── client.ts           # MongoClient with QE auto-encryption
+│   │   │   ├── encryption/
+│   │   │   │   ├── kms.ts          # KMS provider factory (AWS / local)
+│   │   │   │   ├── keyVault.ts     # DEK provisioning
+│   │   │   │   └── encryptedFieldsMaps.ts  # QE schemas per collection
+│   │   │   ├── collections/
+│   │   │   │   ├── cardTransactionQE.ts
+│   │   │   │   ├── customerAgreementQE.ts
+│   │   │   │   ├── paymentCardQE.ts
+│   │   │   │   └── fraudDiagnosisCase.ts
+│   │   │   └── indexes/
+│   │   │       └── createIndexes.ts
+│   │   └── package.json
+│   │
+│   └── types/                      # Shared TypeScript types (BIAN DTOs)
+│       ├── src/
+│       │   ├── bian/
+│       │   │   ├── cardTransaction.ts
+│       │   │   ├── customerAgreement.ts
+│       │   │   ├── paymentCard.ts
+│       │   │   └── fraudDiagnosis.ts
+│       │   └── api/                # Request/Response DTOs
+│       └── package.json
+│
+├── bin/
+│   ├── setup.ts                    # DB setup: collections, indexes, QE key vault
+│   └── seed/
+│       ├── index.ts                # Entry point, accepts --reset flag
+│       ├── cardTransactions.seed.ts
+│       ├── customerAgreements.seed.ts
+│       ├── paymentCards.seed.ts
+│       └── fraudCases.seed.ts
+│
+├── docs/
+│   ├── PRD.md                      # This document
+│   ├── q&a.md                      # FSI client Q&A
+│   └── data-model.md               # Visual ERD + BIAN mapping (v2)
+│
+├── docker-compose.yml              # Full stack: web + api → Atlas
+├── docker-compose.dev.yml          # Development with hot reload + local KMS
+├── .env.example                    # Environment variable template
+├── package.json                    # Root: workspaces + global commands
+├── turbo.json                      # Turborepo pipeline config
+└── tsconfig.base.json              # Shared TypeScript config
+```
+
+### 8.3 Root `package.json` Global Commands
+
+```json
+{
+  "name": "sec-fsi-pci-dss",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:web": "turbo run dev --filter=web",
+    "dev:api": "turbo run dev --filter=api",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "type-check": "turbo run type-check",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+
+    "db:setup": "ts-node bin/setup.ts",
+    "db:seed": "ts-node bin/seed/index.ts",
+    "db:seed:reset": "ts-node bin/seed/index.ts --reset",
+
+    "install:full": "npm install && npm run db:setup && npm run db:seed",
+
+    "docker:up": "docker-compose up --build",
+    "docker:down": "docker-compose down",
+    "docker:dev": "docker-compose -f docker-compose.dev.yml up --build",
+    "docker:logs": "docker-compose logs -f"
+  }
+}
+```
+
+### 8.4 Environment Variables
+
+```bash
+# .env.example
+
+# MongoDB Atlas
+MONGODB_URI=mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/?retryWrites=true&w=majority
+MONGODB_DB_NAME=pci_dss_demo
+
+# AWS KMS
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_SESSION_TOKEN=
+AWS_REGION=us-east-1
+AWS_CMK_ARN=arn:aws:kms:us-east-1:<account>:key/<key-id>
+
+# Local KMS (docker-compose development only — overrides AWS when set)
+KMS_PROVIDER=aws               # 'aws' | 'local'
+LOCAL_MASTER_KEY_BASE64=       # 96-byte key, base64 encoded
+
+# API
+API_PORT=3001
+API_HOST=0.0.0.0
+CORS_ORIGIN=http://localhost:3000
+
+# Next.js
+NEXT_PUBLIC_API_URL=http://localhost:3001
+```
+
+### 8.5 Docker Compose
+
+**`docker-compose.yml`** (production-like, connects to Atlas):
+
+```yaml
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    ports:
+      - "3001:3001"
+    env_file: .env
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "3000:3000"
+    env_file: .env
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NEXT_PUBLIC_API_URL: http://api:3001
+```
+
+**`docker-compose.dev.yml`** (development, local KMS, hot reload):
+
+```yaml
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile.dev
+    volumes:
+      - ./apps/api/src:/app/apps/api/src
+      - ./packages:/app/packages
+    environment:
+      KMS_PROVIDER: local
+      LOCAL_MASTER_KEY_BASE64: <generated-at-setup>
+    ports:
+      - "3001:3001"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile.dev
+    volumes:
+      - ./apps/web/src:/app/apps/web/src
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+```
+
+---
+
+## 9. Product Roadmap
+
+### Iteration Overview
+
+```
+v1 — Security Foundation    (2-3 weeks)
+  Core payment simulation + QE encryption visible + basic investigation
+  Goal: "something real you can show" — the encryption story works end-to-end
+
+v2 — Investigation & Control  (4-6 weeks after v1)
+  Multi-role RBAC, escalation workflow, audit trail, KMS key rotation
+  Goal: answer the CISO's hardest questions — access control and auditability
+
+v3 — Advanced Capabilities  (TBD — after v2 validated)
+  Range queries, tokenization for recurring payments, performance visualization
+  Goal: Leafy Bank integration-ready, Solutions Library publishable
+```
+
+### v1 — Security Foundation
+
+**Theme:** Show that QE works. A user submits a payment, fields are encrypted on the client, and a fraud analyst finds the record by searching an encrypted field.
+
+**Deliverables:**
+- Runnable monorepo (npm install + npm run docker:up)
+- Payment simulation screen with 3-step checkout
+- Fraud investigation dashboard with encrypted-field search
+- Visual encryption explainer: "before/after" document view
+- Synthetic seed data: 50 customers, 200 transactions, 20 fraud cases
+- AWS KMS integration (local KMS fallback for offline demos)
+- README with setup instructions
+
+**Out of scope for v1:** RBAC, escalation, audit viewer, range queries, card save/tokenization
+
+### v2 — Investigation & Control
+
+**Theme:** Show that access control and auditability are built into the architecture.
+
+**Deliverables:**
+- Multi-role login simulation (Level 1 Analyst, Level 2 Investigator, Security Auditor)
+- Escalation workflow: request + approve + reveal sensitive fields
+- Audit trail UI: event timeline per case
+- KMS key rotation demo flow
+- Range queries on `transactionAmount.amount` (QE range)
+- Atlas database audit log integration (read audit events into the UI)
+- Data model documentation (`docs/data-model.md` with ERD)
+
+### v3 — Advanced Capabilities
+
+**Theme:** Production-realism and integration readiness.
+
+**Deliverables:**
+- Save card for recurring payment (tokenization flow — addresses expert's browser cache scenario)
+- Performance visualization: query time with QE vs plaintext index
+- QE substring/prefix queries (if GA by then — MongoDB 8.2+)
+- Leafy Bank integration scaffold (shared auth, shared API contracts)
+- Solutions Library article draft
+- Slide deck (ks-mongodb-writer-deck standard)
+
+---
+
+## 10. Feature Requirements by Iteration
+
+### v1 Feature Requirements
+
+#### FE-01: Payment Simulation Flow (Frontend)
+- 3-step checkout form: Card Details → Review → Confirm
+- Card fields: card number (displayed as masked), cardholder name, expiry, billing email, phone
+- Card number input: accepts 16-digit format, displays `****-****-****-XXXX` immediately
+- Never send raw PAN to the API — the frontend generates a token before submission
+- Visual indicator: "Fields encrypted before leaving your browser" with a lock icon
+- On success: display Transaction ID, masked PAN, timestamp, and auto-triggered fraud alert
+
+#### FE-02: Fraud Investigation Dashboard (Frontend)
+- Search bar with field selector: `email` | `phone` | `account reference` | `card token`
+- Results table: Transaction ID, Masked PAN, Amount, Merchant, Status, Risk Severity
+- Case detail view: encrypted field indicators (lock icon on QE fields), plaintext metadata
+- "Encrypted in Atlas" toggle: shows raw document with ciphertext blobs side-by-side
+- Case action: Mark as Reviewed / Escalate (v1: visual only, no backend state change for escalation)
+
+#### BE-01: Payment API (Backend)
+- `POST /api/v1/card-transactions` — receives payment, writes to `cardTransactionQE` and `cardTransactionSensitiveQE` via QE auto-encryption
+- `POST /api/v1/payment-cards` — registers tokenized card in `paymentCardQE`
+- `GET /api/v1/card-transactions/:id` — retrieve transaction by ID
+- Auto-creates fraud diagnosis case when transaction amount > threshold or MCC matches risk list
+
+#### BE-02: Investigation API (Backend)
+- `GET /api/v1/customer-agreements?email=<value>` — equality search on QE field
+- `GET /api/v1/customer-agreements?phone=<value>` — equality search on QE field
+- `GET /api/v1/customer-agreements?accountRef=<value>` — equality search on QE field
+- `GET /api/v1/card-transactions?cardToken=<value>` — equality search on QE field
+- `GET /api/v1/fraud-diagnosis-cases` — list cases with filters (status, severity)
+- `GET /api/v1/fraud-diagnosis-cases/:id` — case detail
+
+#### BE-03: Setup & Seeding (bin/)
+- `bin/setup.ts` — creates all 6 collections via `createEncryptedCollection()`, provisions DEKs in key vault, creates indexes
+- `bin/seed/index.ts` — inserts synthetic BIAN-compliant data; accepts `--reset` flag to drop and re-seed
+- Seed data: 50 `customerAgreementQE`, 50 `customerAgreementSensitiveQE`, 50 `paymentCardQE`, 200 `cardTransactionQE`, 200 `cardTransactionSensitiveQE`, 20 `fraudDiagnosisCase`
+
+#### BE-04: Health & Configuration
+- `GET /health` — returns service status and Atlas connection status
+- Environment-based KMS provider selection (AWS / local)
+- `crypt_shared` auto-loaded from `node_modules/mongodb-client-encryption`
+
+### v2 Feature Requirements
+
+#### FE-10: Role Simulation
+- Login screen with persona selector: Level 1 Analyst / Level 2 Investigator / Security Auditor
+- Role badge visible throughout the session
+- Field visibility controlled by role: sensitive fields show lock icon for Level 1, reveal button for Level 2
+
+#### FE-11: Escalation Workflow
+- Level 1 triggers escalation request on a case
+- Level 2 sees pending escalation, approves, and sensitive fields are decrypted and displayed
+- Escalation approval writes an audit event
+
+#### FE-12: Audit Trail Viewer
+- Per-case timeline: who accessed what field, when, under what role
+- Sortable by datetime, filterable by action type
+
+#### BE-10: RBAC API Layer
+- Middleware validates `X-Demo-Role` header and applies field projection accordingly
+- Level 1: only equality QE fields returned (sensitive collections never queried)
+- Level 2: full access including sensitive QE collections after escalation token validation
+
+#### BE-11: Audit Log API
+- `GET /api/v1/audit-events?caseId=<id>` — returns action log for a case
+- `POST /api/v1/fraud-diagnosis-cases/:id/escalate` — creates escalation record, writes audit event
+
+### v3 Feature Requirements
+
+#### FE-20: Save Card Flow
+- After successful payment, option: "Save this card for future payments"
+- Stores tokenized card reference in `paymentCardQE` with `isPreferredCard: true`
+- Simulates browser-side storage concern: shows that no sensitive data is stored locally — only the token
+- On next payment: "Use saved card ****-1234" — retrieves `paymentCardQE` by token
+
+#### BE-20: Performance Visualization
+- `GET /api/v1/diagnostics/query-timing` — runs the same query on an encrypted vs. a plaintext shadow collection, returns timing comparison
+- Demonstrates QE performance overhead is acceptable for the use case
+
+---
+
+## 11. PCI DSS Alignment
+
+The demo is positioned as a **PCI DSS-aligned reference architecture**, not a compliance certification. MongoDB Atlas holds PCI DSS 4.0 certification (September 2023). The customer remains responsible for their own PCI DSS program.
+
+| PCI DSS v4.0 Requirement | How the Demo Addresses It | MongoDB Feature |
+|---|---|---|
+| **Req 3: Protect stored account data** | Cardholder data encrypted before storage; SAD never stored | Queryable Encryption |
+| **Req 3.5: Protect primary account numbers** | Full PAN never stored; only tokenized reference and masked display value | Data minimization by design |
+| **Req 3.6: Cryptographic key management** | AWS KMS CMK; separate DEKs for lookup vs sensitive; key rotation demonstrated (v2) | QE + AWS KMS |
+| **Req 4: Protect data in transit** | TLS 1.3 default on all Atlas connections | Atlas TLS by default |
+| **Req 7: Restrict access by business need** | Role-based field projection; Level 1 cannot see sensitive collections | RBAC + API-layer projection (v2) |
+| **Req 8: Identify and authenticate users** | Atlas RBAC, database users scoped per service role | Atlas Database Users |
+| **Req 10: Log and monitor access** | Audit log for every field access event in investigation workflow | Atlas Audit Log (v2) |
+
+**Key message for the demo:**
+> MongoDB Atlas reduces PCI scope by ensuring that server-side infrastructure — Atlas nodes, cloud provider infrastructure, MongoDB support — never handles plaintext cardholder data. The encryption boundary is the application client.
+
+**What the demo does NOT address (out of scope):**
+- Requirement 5 (anti-malware), 6 (secure software dev), 9 (physical access), 11 (penetration testing), 12 (policies) — these are operational/organizational requirements outside the data platform layer.
+
+---
+
+## 12. Q&A Coverage Matrix
+
+The demo directly addresses the following questions from `docs/q&a.md`:
+
+| Q&A ID | Question | Demo Coverage | Feature |
+|---|---|---|---|
+| Q1 | What is PCI DSS? | Covered in UI explainer panel | Onboarding screen |
+| Q2 | Is MongoDB Atlas PCI DSS certified? | Yes — PCI DSS 4.0 (Sept 2023). Shown in demo trust panel | Static content |
+| Q3 | Can I store cardholder data on MongoDB Cloud? | Yes, demonstrated live | QE storage flow |
+| Q4 | Will I be automatically compliant? | No — shared responsibility model explained in UI | Explainer card |
+| Q5 | Where to download AOC? | Link to Trust Portal in UI | Static link |
+| Q6 | Which security features help PCI compliance? | QE, TLS, Private Endpoint (diagram), federated identity, audit log | All features |
+| Q7 | Who is the QSA? | Schellman Compliance LLC — shown in trust panel | Static content |
+| Q8 | Which services are in PCI scope? | Atlas, App Services, Charts, Serverless, Cloud Manager, Data Federation, Search | Static content |
+
+---
+
+## 13. Installation & DevOps
+
+### Quick Start (3 commands)
+
+```bash
+# 1. Clone and install dependencies
+git clone <repo-url> && cd sec-fsi-pci-dss
+cp .env.example .env      # fill in MONGODB_URI + AWS KMS or use local KMS
+
+# 2. Full system setup (DB + seed data)
+npm run install:full      # npm install + db:setup + db:seed
+
+# 3. Start the full stack
+npm run docker:up         # OR: npm run dev (for hot reload without Docker)
+```
+
+### Individual Commands
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start all apps in development mode (hot reload) |
+| `npm run dev:web` | Start only the Next.js frontend |
+| `npm run dev:api` | Start only the Fastify API |
+| `npm run build` | Build all apps for production |
+| `npm run db:setup` | Create collections, indexes, provision QE key vault and DEKs |
+| `npm run db:seed` | Insert synthetic demo data (non-destructive) |
+| `npm run db:seed:reset` | Drop and re-insert all seed data |
+| `npm run docker:up` | Build and start full stack with Docker Compose |
+| `npm run docker:dev` | Start development stack with hot reload volumes |
+| `npm run docker:down` | Stop and remove containers |
+| `npm run type-check` | TypeScript validation across all packages |
+| `npm run lint` | ESLint across all packages |
+| `npm run test` | Run tests across all packages |
+
+### `bin/setup.ts` Responsibilities
+
+1. Validate environment variables (fail fast with helpful error if missing)
+2. Connect to MongoDB Atlas
+3. Provision KMS provider (AWS or local based on `KMS_PROVIDER`)
+4. Create or retrieve `DEK-lookup` and `DEK-sensitive` in `encryption.__keyVault`
+5. Create all 6 collections using `createEncryptedCollection()` with QE schemas
+6. Create all indexes per the index strategy in §6.5
+7. Apply JSON Schema validation on `fraudDiagnosisCase` (plaintext collection)
+8. Print setup summary: collections created, DEKs provisioned, indexes applied
+
+### `bin/seed/index.ts` Responsibilities
+
+1. Accept `--reset` flag: if set, drop all collections before re-seeding
+2. Generate synthetic BIAN-compliant data (no real PII — Faker.js)
+3. Insert in dependency order: customers → cards → transactions → fraud cases
+4. Respect QE encryption: use the QE-enabled client (not the plain client) for writes
+5. Print seed summary: documents inserted per collection
+
+---
+
+## 14. Success Metrics
+
+### Demo Quality Criteria
+
+| Criterion | Measure |
+|---|---|
+| **Setup time** | `npm run install:full` + `docker:up` completes in < 5 minutes on a clean machine |
+| **Demo flow** | CISO persona walkthrough completes in ≤ 10 minutes |
+| **Explainability** | Non-technical AE can run the demo without engineering support after 1 practice session |
+| **Offline capability** | Demo runs fully offline with `KMS_PROVIDER=local` for travel/conference scenarios |
+| **Type safety** | Zero TypeScript errors at build time |
+| **BIAN fidelity** | All 6 collections use BIAN Service Domain naming; mapping documented |
+
+### PCI DSS Narrative Metrics
+
+| Message | Demo Moment |
+|---|---|
+| "Server never sees plaintext" | Raw document view in Atlas Data Explorer shows ciphertext |
+| "Keys are yours" | AWS KMS CMK shown; MongoDB has no access |
+| "Search without decryption" | QE equality query on email/phone returns result |
+| "Least privilege works" | Level 1 search returns masked result; Level 2 reveals sensitive fields |
+
+---
+
+## 15. Open Questions & Decisions Log
+
+| # | Question | Decision | Date |
+|---|---|---|---|
+| 1 | Use CSFLE or QE only? | QE only — simplifies the architecture and the explainability narrative | 2026-05-26 |
+| 2 | Standalone or Leafy Bank? | Standalone v1, designed for future Leafy Bank integration | 2026-05-26 |
+| 3 | KMS provider | AWS KMS (local KMS fallback for offline demos) | 2026-05-26 |
+| 4 | Backend framework | Fastify (TypeScript-native, schema-first) | 2026-05-26 |
+| 5 | BIAN naming depth | Full BIAN naming — Service Domain, Control Record, field vocabulary | 2026-05-26 |
+| 6 | Demo entry point v1 | Payment simulation flow (card checkout → alert → investigation) | 2026-05-26 |
+| 7 | Store full PAN? | Never. Tokenized reference (`paymentCardReference`) only | 2026-05-26 |
+| 8 | `$lookup` across QE collections? | Not supported. Application-side joins only | 2026-05-26 |
+| 9 | Monorepo tool | npm workspaces + Turborepo | 2026-05-26 |
+| 10 | customerName encryption | Plaintext in v1 for display simplicity; QE:equality in v2 | 2026-05-26 |
+
+---
+
+*This document is a living artifact. Update the Decisions Log with any architectural or scope change agreed during development.*
