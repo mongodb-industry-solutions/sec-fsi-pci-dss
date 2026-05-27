@@ -54,6 +54,7 @@ export interface CardTransactionLogControlRecord {
   transactionDateTime: Date;
   transactionStatus: CardTransactionStatus;
   transactionChannel: CardTransactionChannel;
+  cardTransactionInitiationType: CardTransactionInitiationType; // v4: MIT vs CIT for Visa/MC recurring rules
   merchantCategoryCode: string;                   // MCC code
   merchantName: string;
   maskedPanDisplay: string;                       // Display only: ****-****-****-1234
@@ -76,6 +77,8 @@ export type CardTransactionStatus =
 
 export type CardTransactionChannel =
   'online' | 'pos' | 'contactless' | 'atm';
+
+export type CardTransactionInitiationType = 'customerInitiated' | 'merchantInitiated';
 ```
 
 ### `customerAgreement.model.ts`
@@ -101,6 +104,9 @@ export interface CustomerAgreementControlRecord {
   agreementStatus: AgreementStatus;
   enrollmentDateTime: Date;
   preferredLanguage: string;                     // ISO 639-1
+
+  // v4: recurring payment mandate
+  preferredPaymentCardReference?: string;        // FK: paymentCardReference of the saved card
 
   // BIAN metadata
   bianServiceDomain: 'CustomerAgreement';
@@ -152,7 +158,12 @@ export interface PaymentCardManagementControlRecord {
   cardNetwork: CardNetwork;
   cardStatus: CardStatus;
   cardIssuanceDateTime: Date;
-  isPreferredCard: boolean;
+  isPreferredCard: boolean;                      // true when saved as preferred payment method
+
+  // v4: recurring payment mandate (PCI DSS Req 3.1 + 3.7)
+  mandateStatus?: 'active' | 'cancelled' | 'expired';
+  cardholderConsentTimestamp?: Date;             // Req 3.1: explicit consent recorded at save-card time
+  mandateExpiryDate?: Date;                      // Req 3.7: auto-purge trigger
 
   // BIAN metadata
   bianServiceDomain: 'PaymentCard';

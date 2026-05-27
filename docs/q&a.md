@@ -66,7 +66,7 @@ For more details, visit MongoDB's official page: [Trust Center - PCI DSS](https:
 
 ### Technical Q&A: QE Design, Certification Architecture, and Payment Data Compliance
 
-*These questions emerged from expert review of the demo architecture. They are likely to surface from security architects, QSAs, and technically sophisticated FSI prospects.*
+*These questions emerged from expert review of the demo architecture. They are likely to surface from security architects, QSAs, and technically sophisticated FSI (Financial Services Industry) prospects.*
 
 ---
 
@@ -141,7 +141,7 @@ This demo uses QE only (not CSFLE) to simplify the architecture and the explaina
 #### **14. If the token is not CHD, why does the demo use tokenization at all? What security problem does it solve?**
 
 **Answer:**  
-Tokenization solves a different problem than encryption. The goal of tokenization is to **remove the PAN from the payment flow entirely**: the merchant, the issuing bank's application layer, and all downstream systems that do not need the actual card number receive only a token. This limits the number of systems that ever touch the real PAN to the token vault (typically operated by the payment network or a PSP), which dramatically reduces PCI DSS scope.
+Tokenization solves a different problem than encryption. The goal of tokenization is to **remove the PAN from the payment flow entirely**: the merchant, the issuing bank's application layer, and all downstream systems that do not need the actual card number receive only a token. This limits the number of systems that ever touch the real PAN to the token vault (typically operated by the payment network or a PSP (Payment Service Provider)), which dramatically reduces PCI DSS scope.
 
 In this demo, the client-side code generates a token before the API call. The raw PAN never travels over the network and is never stored anywhere in the system. The token is then used as the card identifier for all subsequent operations: transaction lookup, fraud investigation, recurring payment. QE encryption handles the PII fields (email, phone, account reference) that remain in scope for privacy protection even after tokenization removes the PAN risk.
 
@@ -168,7 +168,7 @@ The demo is designed to demonstrate all of these controls in a way that supports
 #### **16. Does encrypting PII fields with QE put them outside PCI DSS scope?**
 
 **Answer:**  
-Not automatically. PCI DSS scope is primarily determined by the presence of **cardholder data (CHD)**, specifically the PAN. Fields like email address and phone number are PII but are not CHD under PCI DSS. They would be in scope for other regulatory frameworks (GDPR, CCPA) but their presence does not extend your PCI CDE.
+Not automatically. PCI DSS scope is primarily determined by the presence of **cardholder data (CHD)**, specifically the PAN. Fields like email address and phone number are PII but are not CHD under PCI DSS. They would be in scope for other regulatory frameworks such as GDPR (General Data Protection Regulation) and CCPA (California Consumer Privacy Act), but their presence does not extend your PCI CDE.
 
 If the QE-encrypted fields contain a PAN (even tokenized), the collection would still be evaluated as part of the CDE. If those fields contain only PII (email, phone), they are subject to privacy regulation but do not expand PCI scope. The design choice to encrypt PII with QE in this demo is primarily a privacy and defense-in-depth decision, not a PCI scoping reduction strategy.
 
@@ -292,7 +292,7 @@ The demo satisfies Requirement 3.4 through non-storage: the PAN never enters the
 | `cardExpirationDate` | `[ciphertext]` | CHD | QE:none (encrypted, non-searchable) |
 | CVV / PIN | not present | SAD | Never accepted at any endpoint |
 
-Someone does hold the PAN, but it is the token vault operated by the PSP (Payment Service Provider) or payment network (Visa Token Service, Mastercard MDES). That system is a separately PCI DSS certified environment outside the scope of this demo. This demo represents the issuing bank's application layer, which receives a token after the PSP has already removed the PAN from the flow.
+Someone does hold the PAN, but it is the token vault operated by the PSP or payment network, such as Visa Token Service or Mastercard MDES (Mastercard Digital Enablement Service). That system is a separately PCI DSS certified environment outside the scope of this demo. This demo represents the issuing bank's application layer, which receives a token after the PSP has already removed the PAN from the flow.
 
 ---
 
@@ -327,7 +327,7 @@ Only the payment processing service should be able to initiate a new charge with
 Stored card data must be deleted when the customer cancels the mandate, when the card expires and no replacement token is received, or when the agreed retention period ends. The `paymentCardQE` collection needs a `mandateStatus` field and a scheduled cleanup job.
 
 **4. Token lifecycle and automatic card update:**
-Network tokens issued by Visa Token Service or Mastercard MDES (Mastercard Digital Enablement Service) can auto-update when the underlying physical card is reissued. This is handled by Visa Account Updater (VAU) and Mastercard Automatic Billing Updater (ABU). The PSP manages this transparently; the bank stores the same `paymentCardReference` and it remains valid even after the physical card number changes.
+Network tokens issued by Visa Token Service or Mastercard MDES can auto-update when the underlying physical card is reissued. This is handled by Visa Account Updater (VAU) and Mastercard Automatic Billing Updater (ABU). The PSP manages this transparently; the bank stores the same `paymentCardReference` and it remains valid even after the physical card number changes.
 
 **What v4 needs to add:**
 `cardholderConsentTimestamp` and `mandateStatus` in `paymentCardQE`, a `preferredPaymentCardReference` link in `customerAgreementQE`, a `cardTransactionInitiationType` field in `cardTransactionQE`, and the charge-trigger endpoint with a restricted RBAC scope. See Q22 for how these map to BIAN (Banking Industry Architecture Network) Service Domains.

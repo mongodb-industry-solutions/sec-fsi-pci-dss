@@ -284,11 +284,13 @@ Make the demo Leafy Bank integration-ready and Solutions Library publishable. Ad
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 20.1 | After successful payment, "Save this card for future payments" checkbox appears | Checkbox is visible on the confirmation screen |
-| 20.2 | Saving a card stores the tokenized reference in `paymentCardQE` with `isPreferredCard: true` | `paymentCardQE` document exists in Atlas with correct customer link |
-| 20.3 | On next payment, "Use saved card ****-1234" option appears | Previously saved card tokens are retrieved via QE equality search by `customerAgreementInstanceReference` |
-| 20.4 | Selecting a saved card completes checkout without the user re-entering card details | Payment transaction is created using the stored card token |
-| 20.5 | Explainer panel: "No card data is stored in your browser: only a token, encrypted in Atlas" | Panel is visible on the saved card selection screen |
+| 20.1 | After successful payment, a consent checkbox "Save this card for future payments" appears unchecked by default | Checkbox is visible on the confirmation screen; requires explicit opt-in |
+| 20.2 | Accepting consent records `isPreferredCard: true`, `mandateStatus: 'active'`, and `cardholderConsentTimestamp` in `paymentCardQE` | All three mandate fields are present in the Atlas document |
+| 20.3 | `customerAgreementQE.preferredPaymentCardReference` is updated to link to the saved card token | Field equals the `paymentCardReference` of the saved card |
+| 20.4 | On next payment, "Use saved card ****-1234" option appears | Saved card is retrieved via `preferredPaymentCardReference` from the customer agreement |
+| 20.5 | Selecting a saved card completes checkout without re-entering card details; CVV is never requested | Card transaction is created with `cardTransactionInitiationType: 'merchantInitiated'`; no CVV field in the flow |
+| 20.6 | Mandate can be cancelled: `mandateStatus` updates to `'cancelled'` and the card is no longer offered | Cancelled card does not appear on next payment; `preferredPaymentCardReference` is cleared |
+| 20.7 | Explainer panel: "No card data is stored in your browser: only a token, encrypted in Atlas" | Panel is visible on the saved card selection screen |
 
 #### FR-v4-21: Performance Visualization (Backend + Frontend)
 
