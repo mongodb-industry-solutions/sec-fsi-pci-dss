@@ -82,6 +82,10 @@ out
 .nuxt
 dist
 .output
+CLAUDE.md
+.claude
+.agents
+tmp
 
 # Gatsby files
 .cache/
