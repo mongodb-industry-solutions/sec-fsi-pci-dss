@@ -64,9 +64,9 @@ For more details, visit MongoDB's official page: [Trust Center - PCI DSS](https:
 
 ---
 
-### Questions and Answers about MongoDB Queryable Encryption and Payment Data Design
+### Technical Q&A: QE Design, Certification Architecture, and Payment Data Compliance
 
-*These questions emerged from expert and technical review of the demo architecture. They are likely to surface from security architects, QSAs, and technically sophisticated FSI prospects.*
+*These questions emerged from expert review of the demo architecture. They are likely to surface from security architects, QSAs, and technically sophisticated FSI prospects.*
 
 ---
 
@@ -176,9 +176,7 @@ Scope reduction in PCI DSS is better achieved through tokenization (removing the
 
 ---
 
-### Questions and Answers about Atlas PCI DSS Certification and QE Architecture
-
-*These questions address how the Atlas platform certification and application-side QE relate to each other. They are likely to arise from QSAs, CISOs (Chief Information Security Officers), and security architects who want to understand exactly where MongoDB's responsibility ends and the customer's begins.*
+*Atlas PCI DSS certification and QE architecture*
 
 ---
 
@@ -276,76 +274,82 @@ This toggle is the single most effective moment in the demo for answering the qu
 
 ---
 
-### Questions and Answers about PAN Storage and Recurring Payment Compliance
-
-*These questions address how Requirement 3.4 (PAN unreadable) is satisfied in the demo and how a PCI DSS compliant save-card feature should be designed.*
+*PAN storage, recurring payment, and BIAN alignment*
 
 ---
 
 #### **20. How does the demo satisfy PCI DSS Requirement 3.4 (PAN must be rendered unreadable wherever it is stored)?**
 
 **Answer:**
-The demo satisfies Requirement 3.4 through non-storage, which is the strongest possible form of compliance: the PAN (Primary Account Number) never enters the system at all.
+The demo satisfies Requirement 3.4 through non-storage: the PAN never enters the system at all. The standard requires the PAN to be rendered unreadable wherever it is *stored*; this demo removes it from the flow before any storage decision is needed. See Q14 for how client-side tokenization achieves this.
 
-The payment flow works as follows:
-
-1. The customer enters their card number in the browser.
-2. The frontend generates a synthetic token (`tok_7xB2kp1q`) client-side before making any API call.
-3. The PAN is discarded in the browser. It never travels over the network, never reaches the Fastify backend, and never reaches Atlas.
-4. The backend receives only the token and processes the transaction using that token as the card identifier.
-
-**What the system stores for a card:**
+**What the system stores per card:**
 
 | Field | Value example | Classification | Storage |
 |---|---|---|---|
 | `paymentCardReference` | `tok_7xB2kp1q` | Card surrogate, not CHD | Plaintext, standard index |
-| `maskedPanDisplay` | `**** **** **** 4242` | Allowed for display (PCI DSS permits last 4 digits) | Plaintext |
-| `cardExpirationDate` | `[ciphertext]` | CHD, must be protected | QE:none (encrypted, non-searchable) |
-| CVV / PIN | not present | SAD, must never be stored | Never accepted by any endpoint |
+| `maskedPanDisplay` | `**** **** **** 4242` | Permitted for display (last 4 digits) | Plaintext |
+| `cardExpirationDate` | `[ciphertext]` | CHD | QE:none (encrypted, non-searchable) |
+| CVV / PIN | not present | SAD | Never accepted at any endpoint |
 
-The PAN is absent from every layer: no API request body, no database document, no log, no backup. This takes the entire system out of scope for the PAN-related controls in Requirement 3.4.
-
-**The important nuance:** someone does hold the PAN, but it is the token vault operated by the PSP (Payment Service Provider) or payment network (Visa Token Service, Mastercard MDES). That system is a high-security, independently PCI DSS certified environment that is outside the scope of this demo. This demo represents the issuing bank's application layer, which receives a token after the PSP has already removed the PAN from the flow.
+Someone does hold the PAN, but it is the token vault operated by the PSP (Payment Service Provider) or payment network (Visa Token Service, Mastercard MDES). That system is a separately PCI DSS certified environment outside the scope of this demo. This demo represents the issuing bank's application layer, which receives a token after the PSP has already removed the PAN from the flow.
 
 ---
 
 #### **21. The demo mentions "save card" as a future feature. How should recurring payment / saved card be implemented to be PCI DSS compliant?**
 
 **Answer:**
-Save card for recurring payment is a v4 feature in this demo (not yet implemented). The current architecture already has the correct foundation. Here is what a compliant implementation requires.
+Save card for recurring payment is a v4 feature in this demo (not yet implemented). The current architecture already has the correct foundation; v4 needs four additions to existing collections and one new endpoint scope.
 
-**Core principle:** the network token IS the saved card. The merchant or bank never stores the PAN. The PSP or payment network issues a persistent token that represents the card for future charges, and that token is what gets stored in `paymentCardReference`.
-
-**What to store per saved card (PCI DSS compliant):**
+**What to store per saved card:**
 
 | Field | Value | Requirement |
 |---|---|---|
-| `paymentCardReference` | PSP/network token | Not CHD; plaintext storage is correct |
+| `paymentCardReference` | PSP/network token | Not CHD; plaintext storage is correct (see Q9) |
 | `maskedPanDisplay` | `**** **** **** 4242` | Permitted for UI display |
 | `cardExpirationDate` | `[ciphertext]` | CHD; QE:none already correct |
 | `billingAddress` | `[ciphertext]` | PII; QE:none for privacy |
 | `cardholderConsentTimestamp` | ISO 8601 datetime | Required: Req 3.1 + network rules |
 | `mandateStatus` | `active / cancelled / expired` | Required for Req 3.7 purge logic |
 
-**What must never be stored (Requirement 3.3):**
-CVV and PIN are prohibited after authorization under any circumstances. Recurring transactions are "merchant-initiated transactions" under Visa and Mastercard rules: they do not require CVV re-entry because the customer's consent is captured in the mandate, not re-verified on each charge. Any system design that stores CVV "to avoid asking again" is a PCI DSS violation regardless of how it is encrypted.
+**CVV on file is always prohibited (Requirement 3.3):**
+Recurring transactions are "merchant-initiated transactions" under Visa and Mastercard rules and do not require CVV re-entry. The customer's consent is captured once at save-card time; subsequent charges do not re-verify card credentials.
 
-**Five requirements specific to recurring payment:**
+**Four requirements specific to recurring payment:**
 
 **1. Explicit cardholder consent (Req 3.1 + network rules):**
-The save-card step must present an explicit consent checkbox and record the consent timestamp. Without documented consent, storing card data for future charges violates both PCI DSS and payment network rules.
+The save-card step must present an explicit consent checkbox and record the `cardholderConsentTimestamp`. Without documented consent, storing card data for future charges violates both PCI DSS and payment network rules.
 
 **2. Scope-limited access to the charge trigger (Req 7):**
-Only the payment processing service should be able to initiate a new charge using a stored token. The fraud investigation system, the analytics system, and Level 1 and Level 2 analysts must not have access to the recurring charge endpoint. In the demo's RBAC model, the charge-with-saved-card endpoint needs a distinct authorization scope separate from investigation roles.
+Only the payment processing service should be able to initiate a new charge with a stored token. The fraud investigation system, analytics, and Level 1 and Level 2 analysts must not have access to the recurring charge endpoint. In this demo's RBAC model, that endpoint needs a distinct authorization scope separate from investigation roles.
 
 **3. Periodic purge of unused stored cards (Req 3.7):**
-Stored card data must be deleted when the customer cancels the mandate, when the card expires and no replacement token is received, or when the data has been stored beyond the agreed retention period. The `paymentCardQE` collection needs a `mandateStatus` field and a scheduled cleanup job.
+Stored card data must be deleted when the customer cancels the mandate, when the card expires and no replacement token is received, or when the agreed retention period ends. The `paymentCardQE` collection needs a `mandateStatus` field and a scheduled cleanup job.
 
 **4. Token lifecycle and automatic card update:**
-Network tokens issued by Visa Token Service or Mastercard MDES can auto-update when the underlying physical card is replaced (reissued after loss, theft, or expiry). This is handled by Visa Account Updater (VAU) and Mastercard Automatic Billing Updater (ABU). The PSP manages this transparently: the bank or merchant stores the same `paymentCardReference` and it remains valid even after the physical card number changes. No PAN handling is required on the bank or merchant side.
+Network tokens issued by Visa Token Service or Mastercard MDES (Mastercard Digital Enablement Service) can auto-update when the underlying physical card is reissued. This is handled by Visa Account Updater (VAU) and Mastercard Automatic Billing Updater (ABU). The PSP manages this transparently; the bank stores the same `paymentCardReference` and it remains valid even after the physical card number changes.
 
-**5. Scope reduction through tokenization:**
-Using a PSP-issued network token for recurring payments keeps the bank or merchant entirely out of scope for PAN storage. If instead the bank were to store the PAN encrypted (even with QE), the collection and all systems that access it become part of the PCI CDE (Cardholder Data Environment), requiring full PCI DSS assessment. Storing only the token eliminates that scope entirely.
+**What v4 needs to add:**
+`cardholderConsentTimestamp` and `mandateStatus` in `paymentCardQE`, a `preferredPaymentCardReference` link in `customerAgreementQE`, a `cardTransactionInitiationType` field in `cardTransactionQE`, and the charge-trigger endpoint with a restricted RBAC scope. See Q22 for how these map to BIAN (Banking Industry Architecture Network) Service Domains.
 
-**How the current demo architecture supports this:**
-The `paymentCardQE` collection is already structured correctly for a compliant save-card implementation. `paymentCardReference` as a plaintext indexed field is the right design. `cardExpirationDate` as QE:none is the right protection level. The v4 implementation needs to add `cardholderConsentTimestamp`, `mandateStatus`, the charge-trigger endpoint with its restricted RBAC scope, and the mandate expiry cleanup job.
+---
+
+#### **22. How does the save card / recurring payment feature align with BIAN Service Domains?**
+
+**Answer:**
+The save card feature does not require a new BIAN Service Domain. In the BIAN model, a customer's authorization to charge a card for future payments is a behavioral capability of the Customer Agreement (SD-53), not a standalone entity. The Customer Agreement already represents the product contract between the bank and the customer; the recurring payment mandate is a feature of that contract, not a separate agreement.
+
+**How save card maps to existing service domains:**
+
+| Action | BIAN Service Domain | Collection | Field additions |
+|---|---|---|---|
+| Customer saves a card as preferred payment method | Payment Card (SD-88) | `paymentCardQE` | `isPreferredPaymentMethod`, `mandateStatus`, `cardholderConsentTimestamp`, `mandateExpiryDate` |
+| Customer grants consent for future charges | Customer Agreement (SD-53) | `customerAgreementQE` | `preferredPaymentCardReference` (link to the saved card) |
+| Recurring charge is executed | Card Transaction (SD-254) | `cardTransactionQE` | `cardTransactionInitiationType` (`customerInitiated` / `merchantInitiated`) |
+
+In BIAN terms: saving a card activates a "recurring payment instrument" behavior on the Payment Card service domain. The consent is a qualifier on the Customer Agreement service domain. Merchant-initiated charges are a subtype of Card Transaction.
+
+This means v4 save card is three field extensions across existing collections with no new collection needed. The mandate is expressed through the link between `customerAgreementQE.preferredPaymentCardReference` and `paymentCardQE.mandateStatus`, not through a separate mandate document.
+
+**Why `cardTransactionInitiationType` also matters for compliance:**
+Under Visa and Mastercard rules, merchant-initiated transactions have a different authorization flow than customer-initiated ones: they do not require CVV re-entry, they reference the stored consent instead, and they carry a specific network flag that affects interchange rates and chargeback rules. Storing this field in `cardTransactionQE` makes the transaction type explicit to any downstream compliance, fraud analysis, or dispute resolution system.
