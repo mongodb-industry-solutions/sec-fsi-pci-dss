@@ -2,7 +2,7 @@
 
 #### **1. What is PCI DSS?**  
 **Answer:**  
-PCI DSS is an information security standard developed by the PCI Standards Security Council, and applies to all entities that store, process, and/or transmit cardholder data.
+PCI DSS (Payment Card Industry Data Security Standard) is an information security standard developed by the PCI Security Standards Council, and applies to all entities that store, process, and/or transmit cardholder data.
 
 ---
 
@@ -40,7 +40,7 @@ The MongoDB Cloud PCI Attestation of Compliance (AOC) is available upon request.
 **Answer:**  
 There are several features available in MongoDB Atlas that may help towards PCI DSS compliance, including:  
    - Configure federated identity with an identity provider.  
-   - Create clusters with TLS 1.2 support by default.  
+   - Create clusters with TLS (Transport Layer Security) 1.2 support by default.  
    - Set up network peering or a Private Endpoint so that cardholder data is always encrypted over private networks between your cloud environment and Atlas.  
    - Enable database auditing.  
    - Use client-side field-level encryption to encrypt document fields before they are sent to MongoDB Atlas.
@@ -176,69 +176,100 @@ Scope reduction in PCI DSS is better achieved through tokenization (removing the
 
 ---
 
-#### **17. What does the MongoDB Atlas PCI DSS certification actually cover, and what remains the customer's responsibility?**
+### Questions and Answers about Atlas PCI DSS Certification and QE Architecture
 
-**Answer:**
-The Atlas PCI DSS 4.0 Attestation of Compliance (AOC) means Schellman Compliance, LLC assessed MongoDB's cloud database service and found it meets PCI DSS requirements for how MongoDB operates the platform. This assessment is done once by MongoDB; customers can rely on it without repeating the same infrastructure tests in their own audit.
-
-**What the AOC covers (MongoDB's responsibility):**
-
-- Physical security: Atlas runs on AWS, GCP, and Azure, each independently PCI DSS certified.
-- Encryption at rest: AES-256 by default on all Atlas storage volumes and backup media.
-- Encryption in transit: TLS 1.2 enforced on all client connections to Atlas.
-- Network isolation: tenant isolation between clusters, MongoDB-managed firewall rules.
-- Platform access controls: Atlas console multi-factor authentication, MongoDB employee access policies, and privileged access management.
-- Vulnerability management: MongoDB's patching program and security scanning.
-- Atlas audit log infrastructure: MongoDB secures and maintains the audit log system itself.
-
-**What the AOC does NOT cover (customer's responsibility):**
-
-- Your application code and its security practices.
-- How you implement QE, CSFLE, or any application-side encryption.
-- Your key management practices for customer-managed keys (CMK in AWS KMS).
-- Your application's access control logic and role-based field visibility.
-- Your network topology outside Atlas (your VPC, your application servers).
-- Whether your application ever accepts or stores CVV, PIN, or full PAN.
-- Any Atlas product currently in beta or preview status.
-
-The customer must run their own PCI DSS compliance program. The AOC reduces the assessment burden for the platform layer so the QSA can focus on the application layer.
+*These questions address how the Atlas platform certification and application-side QE relate to each other. They are likely to arise from QSAs, CISOs (Chief Information Security Officers), and security architects who want to understand exactly where MongoDB's responsibility ends and the customer's begins.*
 
 ---
 
-#### **18. Is Queryable Encryption (QE) required for Atlas to be PCI DSS certified? What PCI DSS requirements does it address?**
+#### **17. What does the MongoDB Atlas PCI DSS certification actually cover, and what remains the customer's responsibility?**
 
 **Answer:**
-QE is not what certifies Atlas as PCI DSS compliant. The certification is based on platform-level controls: encryption at rest, TLS, network security, and MongoDB's operational security program. Atlas was PCI DSS certified before QE existed.
+The Atlas PCI DSS 4.0 AOC (Attestation of Compliance) means Schellman Compliance, LLC assessed MongoDB's cloud database service and found it meets PCI DSS requirements for how MongoDB operates the platform as a service provider. The critical insight is that there are two completely separate layers of responsibility:
 
-QE is an application-side control that the *customer* deploys in their backend service. It is complementary to, not a replacement for, the platform certification. It addresses specific requirements that go beyond what the platform layer can provide:
+```
++----------------------------------------------------------+
+|  LAYER 2: Customer app (customer's responsibility)       |
+|  QE, AWS KMS, app RBAC, SAD prohibition, tokenization    |
+|  NOT covered by the Atlas AOC                            |
++----------------------------------------------------------+
+|  LAYER 1: Atlas platform (MongoDB's responsibility)      |
+|  Encryption at rest, TLS, network, audit infrastructure  |
+|  Covered by the AOC -- assessed by Schellman, not by     |
+|  the customer                                            |
++----------------------------------------------------------+
+```
 
-**Requirement 3.4 (CHD must be unreadable at rest):**
-Atlas AES-256 encryption at rest satisfies this at the storage layer: an attacker who steals a disk volume cannot read the data. QE provides a stronger guarantee: the CHD field is encrypted *before the BSON document leaves the application server*, so the Atlas server never receives the plaintext value. It cannot appear in process memory, query plans, slow query logs, or any internal MongoDB tooling. This is protection even against a fully compromised Atlas account or a malicious insider at MongoDB.
+The AOC covers Layer 1 only. The customer's own PCI DSS compliance program must cover Layer 2 independently.
 
-**Requirement 3.6 (Key management):**
-The Customer Master Key (CMK) lives in AWS KMS under the customer's exclusive control. The DEK is unwrapped only in the application process memory during an active session. MongoDB has zero access to either key. Rotating the CMK or revoking it immediately renders all QE-encrypted data inaccessible to any query, including from Atlas itself.
+**What the AOC covers (Layer 1, MongoDB's responsibility):**
 
-**Requirement 7 (Restrict access to CHD by business need):**
-Atlas RBAC restricts who can connect to a database and run queries. QE adds a cryptographic boundary on top: a user with full Atlas admin credentials who queries the collection without the QE client receives only opaque ciphertext. The access control is mathematical, not policy-based, and cannot be bypassed by any administrative action inside Atlas.
+| PCI DSS Requirement | Atlas feature |
+|---|---|
+| Req 1-2 (Network security) | IP Access Lists, VPC (Virtual Private Cloud) Peering, Private Endpoints (AWS PrivateLink, Azure Private Link, GCP Private Service Connect), tenant isolation between clusters |
+| Req 3.4 (CHD unreadable at rest) | AES-256 (Advanced Encryption Standard) encryption at rest on all storage volumes and backup media |
+| Req 4 (Encryption in transit) | TLS 1.2+ enforced on all client connections |
+| Req 7-8 (Access control and authentication) | Atlas RBAC (Role-Based Access Control), MFA (Multi-Factor Authentication) on Atlas console, LDAP (Lightweight Directory Access Protocol) integration, MongoDB employee privileged access management |
+| Req 10 (Audit logging) | Atlas Audit Log infrastructure, maintained and secured by MongoDB |
+| Req 11-12 (Vulnerability management) | MongoDB patching program, security scanning, and information security policies |
 
-**Requirement 10 (Audit trail):**
-Every decryption event happens in the application layer, where it can be logged with full context: which user, which role, which case, which fields, and at what time. Atlas audit logs record the raw MongoDB operation; the application-level audit trail records the business intent behind it.
+Physical security is inherited from AWS, GCP, and Azure, which are each PCI DSS certified independently.
+
+**What the AOC does NOT cover (Layer 2, customer's responsibility):**
+
+- Application code and its security practices.
+- How QE or CSFLE or any application-side encryption is implemented.
+- Customer-managed key practices: the CMK in AWS KMS, DEK rotation schedules, and the KMS key policy.
+- Application-level access control and field visibility logic (for example, Level 1 vs Level 2 analyst roles in this demo).
+- Network topology outside Atlas: the customer's VPC, application servers, and service mesh.
+- Whether the application ever accepts or stores CVV, PIN, or full PAN.
+- Any Atlas product currently in beta or preview status.
+
+The AOC reduces the QSA assessment burden for the platform layer so the assessor can focus time and effort on the application layer.
+
+---
+
+#### **18. Is Queryable Encryption (QE) required for Atlas to be PCI DSS certified? What specific PCI DSS requirements does it address?**
+
+**Answer:**
+QE is not what certifies Atlas. The certification is based on platform-level controls: AES-256 at rest, TLS in transit, network security, and MongoDB's operational security program. Atlas was PCI DSS certified before QE existed as a product.
+
+QE is an application-side control that the customer deploys in their backend service, on top of the platform certification. To understand why it adds material security value beyond what the AOC already covers, consider what each layer protects against:
+
+| Threat scenario | AES-256 at rest (Layer 1, Atlas) | QE client-side encryption (Layer 2, application) |
+|---|---|---|
+| Attacker steals physical disk or backup media | Protected | Protected |
+| Attacker compromises Atlas account credentials | Not protected: the disk is decrypted to serve any authenticated query | Protected: Atlas stores only ciphertext regardless of who authenticates |
+| MongoDB internal access (employee, support tooling) | Not protected: Atlas decrypts internally before processing queries | Protected: Atlas never receives a decryptable value |
+| Plaintext CHD in slow query logs or explain plans | Not protected | Protected: only ciphertext appears in any server-side log |
+| Application-layer attacker with backend code but no KMS access | Not protected | Protected: without the CMK, the DEK cannot be unwrapped |
+
+QE directly addresses specific PCI DSS v4.0 requirements that the platform layer alone cannot satisfy:
+
+**Req 3.4 (CHD must be unreadable at rest):** Atlas AES-256 encryption satisfies this at the storage layer. QE provides a stronger guarantee: the CHD field is encrypted before the BSON (Binary JSON) document leaves the application server. MongoDB never receives the plaintext, so it cannot appear in any server-side process, memory snapshot, query log, or diagnostic tool.
+
+**Req 3.6 (Key management):** The CMK is held exclusively by the customer in AWS KMS. The DEK is unwrapped in application process memory only during an active session. MongoDB has zero access to either key. Revoking the CMK in AWS KMS immediately renders all QE-encrypted data unreadable from every system, including Atlas itself.
+
+**Req 7 (Restrict access to CHD by business need):** Atlas RBAC controls who can connect and run queries. QE adds a cryptographic boundary on top: a user with full Atlas admin credentials who queries the collection without the QE client receives only opaque binary ciphertext. The restriction is mathematical, not policy-based, and cannot be bypassed by any administrative action inside Atlas.
+
+**Req 10 (Audit trail of access to CHD):** Every decryption event occurs in the application layer, where it can be logged with full business context: which user, which role, which fraud case, which fields were accessed, and at what timestamp. This produces a richer audit trail than Atlas-level database operation logs alone.
 
 In summary: Atlas certification covers the infrastructure contract. QE covers the data contract. A complete PCI DSS posture requires both.
 
 ---
 
-#### **19. How does the "Encrypted in Atlas" toggle in the demo prove that MongoDB cannot read the data?**
+#### **19. How does the "Encrypted in Atlas" toggle in the demo prove that MongoDB cannot read cardholder data?**
 
 **Answer:**
-The toggle demonstrates the encryption boundary by making two different calls to the same document and showing the results side by side.
+The toggle demonstrates the encryption boundary by calling the same document through two different backend paths and showing the results side by side.
 
 **Decrypted view (normal application path):**
 The Fastify backend queries Atlas using the QE-enabled MongoClient. The QE driver contacts AWS KMS to unwrap the DEK, then decrypts the encrypted fields in the application process before returning the document. The response contains readable values: `customerEmailAddress`, `customerMobilePhoneNumber`, `cardTransactionAccountReference`.
 
 **Raw Atlas view (what MongoDB stores):**
-A second backend endpoint queries the same document using a plain MongoClient with no QE configuration and no DEK. It receives the BSON exactly as Atlas stores it on disk. The encrypted fields appear as binary ciphertext. No application, no database administrator, and no MongoDB engineer can recover the plaintext from this blob without the DEK and the CMK.
+A second backend endpoint queries the same document using a plain MongoClient with no QE configuration and no DEK. It receives the BSON document exactly as Atlas stores it on disk. The encrypted fields are opaque binary ciphertext. No MongoDB database administrator, no Atlas console user, and no MongoDB employee can recover the original value from these bytes without the DEK and the CMK.
 
-The presenter talking point: "This is what Atlas sees. Not the email address, not the account reference. Just encrypted bytes. The only system that can read these fields is your backend, using your keys, in your KMS. MongoDB has zero access."
+**Presenter talking point:**
+"This is what Atlas sees. Not the email address. Not the account reference. Just encrypted bytes. The only system that can read these fields is your backend service, using your keys, stored in your KMS. MongoDB has zero access to those keys. This is not a contractual promise. It is a mathematical guarantee."
 
-This toggle is the single most effective moment in the demo for answering the question: *"How do we know MongoDB cannot read our cardholder data?"* The answer is not a policy statement or a contractual guarantee. It is a live query result showing ciphertext in the database and plaintext in the application, with the difference being cryptographic key possession.
+This toggle is the single most effective moment in the demo for answering the question: *"How do we know MongoDB cannot read our cardholder data?"* The answer is not a policy statement. It is a live query result: ciphertext in the database, plaintext in the application, with the only difference being cryptographic key possession.
