@@ -13,11 +13,12 @@
 |---|---|---|---|
 | **v1** | Security Foundation | Working end-to-end: payment → QE encryption → fraud investigation | 2–3 weeks |
 | **v2** | Investigation & Control | CISO-ready: RBAC, escalation, audit trail, KMS key rotation | 4–6 weeks after v1 |
-| **v3** | Advanced Capabilities | Leafy Bank-ready: recurring payment, range queries, performance story | TBD after v2 validated |
+| **v3** | Agentic Fraud Investigation | AI-assisted L1 pre-review using MongoDB Agentic Platform (Magenta preferred) | TBD after v2 validated |
+| **v4** | Advanced Capabilities | Leafy Bank-ready: recurring payment, range queries, performance story | TBD after v3 validated |
 
 ---
 
-## v1 — Security Foundation
+## v1: Security Foundation
 
 ### Objective
 
@@ -37,7 +38,7 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 
 ### FR-v1: Functional Requirements
 
-#### FR-v1-01 — Payment Simulation (Frontend)
+#### FR-v1-01: Payment Simulation (Frontend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -48,7 +49,7 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 | 01.5 | On submission success: show Transaction ID, masked PAN, timestamp, and fraud alert banner | All four elements are displayed on the confirmation screen |
 | 01.6 | Fraud alert links directly to the Investigation dashboard for that case | Clicking the alert opens the case detail view |
 
-#### FR-v1-02 — Fraud Investigation Dashboard (Frontend)
+#### FR-v1-02: Fraud Investigation Dashboard (Frontend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -58,7 +59,7 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 | 02.4 | "Encrypted in Atlas" toggle shows raw document view with ciphertext blobs | Toggle switches between business view and raw document; ciphertext is visible in raw view |
 | 02.5 | Cases list supports filter by status and risk severity | Filters update results without page reload |
 
-#### FR-v1-03 — Payment API (Backend)
+#### FR-v1-03: Payment API (Backend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -68,7 +69,7 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 | 03.4 | Auto-create a `fraudDiagnosisCase` when amount > 500 or MCC is in a risk list | Case is created and linked to the transaction on every triggering event |
 | 03.5 | `GET /health` returns 200 with Atlas connection status | Returns `{ status: "ok", atlas: "connected" }` when Atlas is reachable |
 
-#### FR-v1-04 — Investigation API (Backend)
+#### FR-v1-04: Investigation API (Backend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -79,15 +80,25 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 | 04.5 | `GET /api/v1/fraud-diagnosis-cases` returns paginated list with filters `status` and `severity` | Filtering works; response includes pagination metadata |
 | 04.6 | `GET /api/v1/fraud-diagnosis-cases/:id` returns full case detail | Response includes linked transaction reference and customer reference |
 
-#### FR-v1-05 — Database Setup & Seeding (bin/)
+#### FR-v1-05: Authentication (Backend + Frontend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 05.1 | `bin/setup.ts` creates all 6 collections via `createEncryptedCollection()` | All collections exist in Atlas after setup; QE metadata is provisioned |
-| 05.2 | `bin/setup.ts` provisions `DEK-lookup` and `DEK-sensitive` in `encryption.__keyVault` | Key vault contains exactly two DEK documents after setup |
-| 05.3 | `bin/setup.ts` creates all indexes defined in the Technical Specification | Index exists on every field listed in the index strategy |
-| 05.4 | `bin/seed.ts` inserts synthetic BIAN-compliant data into all collections | 50 customers, 50 sensitive records, 50 cards, 200 transactions, 200 sensitive transactions, 20 fraud cases |
-| 05.5 | `bin/seed.ts` is idempotent — safe to re-run without creating duplicates | Running seed twice produces the same number of documents |
+| 05A.1 | `POST /api/v1/auth/login` validates credentials against `partyAuthenticationQE` and returns a JWT | Valid credentials return `{ token, user: { name, email, role } }`; invalid credentials return 401 |
+| 05A.2 | `GET /api/v1/auth/users` returns list of demo users (name, email, role) without passwords | Response used by frontend user selector dropdown |
+| 05A.3 | Application Mode login screen shows domain selector (`local`) and username dropdown | Selecting a username auto-fills the password field |
+| 05A.4 | JWT is verified on all protected `/api/v1/*` endpoints | Missing or invalid token returns 401 |
+| 05A.5 | Demo user accounts (5 users) are seeded by `bin/seed.ts` | All 5 users exist with correct roles and bcrypt-hashed passwords after seeding |
+
+#### FR-v1-06: Database Setup & Seeding (bin/)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| 06.1 | `bin/setup.ts` creates all 7 collections via `createEncryptedCollection()` (6 domain + `partyAuthenticationQE`) | All collections exist in Atlas after setup; QE metadata is provisioned |
+| 06.2 | `bin/setup.ts` provisions `DEK-lookup` and `DEK-sensitive` in `encryption.__keyVault` | Key vault contains exactly two DEK documents after setup |
+| 06.3 | `bin/setup.ts` creates all indexes defined in the Technical Specification | Index exists on every field listed in the index strategy |
+| 06.4 | `bin/seed.ts` inserts synthetic BIAN-compliant data into all collections | 5 demo users, 50 customers, 50 sensitive records, 50 cards, 200 transactions, 200 sensitive transactions, 20 fraud cases |
+| 06.5 | `bin/seed.ts` is idempotent: safe to re-run without creating duplicates | Running seed twice produces the same number of documents |
 
 ---
 
@@ -106,7 +117,7 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 
 ---
 
-## v2 — Investigation & Control
+## v2: Investigation & Control
 
 ### Objective
 
@@ -126,7 +137,7 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 
 ### FR-v2: Functional Requirements
 
-#### FR-v2-10 — Role Simulation (Frontend)
+#### FR-v2-10: Role Simulation (Frontend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -135,7 +146,7 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 | 10.3 | Sensitive fields (`residentialAddressFull`, `governmentIdentificationReference`) show a lock icon for Level 1 | Fields are hidden and only a lock icon is visible in case detail |
 | 10.4 | Level 2 sees a "Reveal sensitive fields" button after escalation approval | Button appears only in escalated cases for Level 2 role |
 
-#### FR-v2-11 — Escalation Workflow
+#### FR-v2-11: Escalation Workflow
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -144,7 +155,7 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 | 11.3 | Level 2 approves and sensitive QE:none fields are decrypted and displayed | `residentialAddressFull` and `governmentIdentificationReference` are shown after approval |
 | 11.4 | Escalation approval writes an audit event with timestamp, role, and field names accessed | Audit event persists in `fraudDiagnosisCase.diagnosisActionLog` |
 
-#### FR-v2-12 — Audit Trail Viewer (Frontend)
+#### FR-v2-12: Audit Trail Viewer (Frontend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -152,7 +163,7 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 | 12.2 | Timeline is sortable by datetime (ascending / descending) | Clicking the date header toggles sort direction |
 | 12.3 | Timeline is filterable by action type (case_opened, field_accessed, escalated, case_closed) | Filter dropdown updates timeline without page reload |
 
-#### FR-v2-13 — RBAC API Layer (Backend)
+#### FR-v2-13: RBAC API Layer (Backend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -161,14 +172,14 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 | 13.3 | Level 2 access to sensitive collections requires a valid escalation token | Request without escalation token returns 403 |
 | 13.4 | Every sensitive field access writes an audit event | `field_accessed` event is appended to the case action log |
 
-#### FR-v2-14 — Audit Log API
+#### FR-v2-14: Audit Log API
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | 14.1 | `GET /api/v1/audit-events?caseId=<id>` returns action log for the case | Response contains all events in chronological order |
 | 14.2 | `POST /api/v1/fraud-diagnosis-cases/:id/escalate` creates escalation record | Status changes to `escalated`; escalation event is logged |
 
-#### FR-v2-15 — Range Query Support (Backend)
+#### FR-v2-15: Range Query Support (Backend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -189,7 +200,68 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 
 ---
 
-## v3 — Advanced Capabilities
+## v3: Agentic Fraud Investigation
+
+### Objective
+
+Introduce an AI agent (MongoDB Agentic Platform, Magenta preferred) into the fraud investigation workflow. The agent automatically pre-reviews each fraud case when it opens, queries the encrypted QE collections to gather context, produces a structured draft diagnosis, and presents it to the L1 analyst as a suggested action. The human analyst confirms, overrides, or escalates. This demonstrates how Agentic AI integrates with existing encrypted data workflows without relaxing security controls.
+
+### Definition of Done
+
+- [ ] All v1 and v2 DoD criteria still pass
+- [ ] AI agent fires automatically when a `fraudDiagnosisCase` is created
+- [ ] Agent queries `customerAgreementQE` and `cardTransactionQE` via existing QE equality endpoints
+- [ ] Agent produces a structured draft: risk summary, recommended action (`clear` / `escalate` / `investigate`), confidence score 0–100
+- [ ] L1 analyst sees the AI draft inline in the case detail view; can confirm, override, or dismiss
+- [ ] Agent action is logged in `diagnosisActionLog` with `performedByRole: 'ai_agent'`
+- [ ] L2 investigator sees the agent's context note alongside sensitive field reveal
+
+---
+
+### FR-v3: Functional Requirements
+
+#### FR-v3-30: AI Agent Pre-Review (Backend)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| 30.1 | Agent is triggered automatically when a fraud case status transitions to `open` | Agent invocation logged within 2 seconds of case creation |
+| 30.2 | Agent queries `customerAgreementQE` by `cardTransactionAccountReference` to retrieve customer profile | Agent uses existing QE equality search endpoint: `GET /api/v1/customer-agreements?accountRef=<value>` |
+| 30.3 | Agent queries `cardTransactionQE` for prior transactions by same card token | Agent uses `GET /api/v1/card-transactions?cardToken=<value>` |
+| 30.4 | Agent produces a structured JSON draft: `{ riskSummary, recommendedAction, confidenceScore, supportingEvidence[] }` | All four fields are present in the agent output |
+| 30.5 | Agent action is appended to `diagnosisActionLog` with `performedByRole: 'ai_agent'` | Log entry present in MongoDB document after agent completes |
+
+#### FR-v3-31: AI Draft UI (Frontend)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| 31.1 | L1 case detail view shows "AI Pre-Review" panel when a draft is available | Panel appears inline, above the analyst action buttons |
+| 31.2 | Panel displays: risk summary, recommended action badge, confidence percentage, supporting evidence list | All five elements are visible |
+| 31.3 | L1 analyst can click "Accept Recommendation", "Override", or "Dismiss AI draft" | Each action updates case status and logs the event |
+| 31.4 | L2 investigator case detail shows the AI context note alongside sensitive fields | AI summary visible in L2 view |
+| 31.5 | Audit trail includes agent events with `performedByRole: 'ai_agent'` and action type `ai_review` | Events appear in the audit timeline |
+
+#### FR-v3-32: Agent Infrastructure (Backend)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| 32.1 | Agent is implemented as a Magenta tool-calling agent or equivalent Agentic SDK | Agent invokes existing API endpoints as tools: no direct DB access |
+| 32.2 | Agent output is stored in `fraudDiagnosisCase.agentDraftDiagnosis` field | Field is populated after agent completes; readable without QE decryption |
+| 32.3 | Agent API key and configuration are in `.env`; no credentials in source code | `MAGENTA_API_KEY` or equivalent env var used |
+
+---
+
+### NFR-v3: Non-Functional Requirements
+
+| ID | Category | Requirement | Measure |
+|---|---|---|---|
+| NFR-v3-01 | Performance | Agent pre-review completes within acceptable latency for demo | Agent draft available within 5 seconds of case creation |
+| NFR-v3-02 | Security | Agent uses only existing API endpoints: no direct MongoDB connection, no key access | Agent cannot bypass QE or RBAC layer |
+| NFR-v3-03 | Explainability | Non-technical audience can understand what the agent did and why | Agent evidence list uses plain English; no raw JSON shown in UI |
+| NFR-v3-04 | Backward compatibility | v1 and v2 flows work unchanged when agent is disabled (`AGENT_ENABLED=false`) | Full payment-to-investigation flow completes with `AGENT_ENABLED=false` |
+
+---
+
+## v4: Advanced Capabilities
 
 ### Objective
 
@@ -197,7 +269,7 @@ Make the demo Leafy Bank integration-ready and Solutions Library publishable. Ad
 
 ### Definition of Done
 
-- [ ] All v1 and v2 DoD criteria still pass
+- [ ] All v1, v2, and v3 DoD criteria still pass
 - [ ] "Save this card for future payments" flow works end-to-end
 - [ ] Returning customer can select a saved card and complete payment without re-entering card details
 - [ ] Performance comparison panel shows query time with QE vs a plaintext reference collection
@@ -206,9 +278,9 @@ Make the demo Leafy Bank integration-ready and Solutions Library publishable. Ad
 
 ---
 
-### FR-v3: Functional Requirements
+### FR-v4: Functional Requirements
 
-#### FR-v3-20 — Save Card / Recurring Payment (Frontend + Backend)
+#### FR-v4-20: Save Card / Recurring Payment (Frontend + Backend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -216,9 +288,9 @@ Make the demo Leafy Bank integration-ready and Solutions Library publishable. Ad
 | 20.2 | Saving a card stores the tokenized reference in `paymentCardQE` with `isPreferredCard: true` | `paymentCardQE` document exists in Atlas with correct customer link |
 | 20.3 | On next payment, "Use saved card ****-1234" option appears | Previously saved card tokens are retrieved via QE equality search by `customerAgreementInstanceReference` |
 | 20.4 | Selecting a saved card completes checkout without the user re-entering card details | Payment transaction is created using the stored card token |
-| 20.5 | Explainer panel: "No card data is stored in your browser — only a token, encrypted in Atlas" | Panel is visible on the saved card selection screen |
+| 20.5 | Explainer panel: "No card data is stored in your browser: only a token, encrypted in Atlas" | Panel is visible on the saved card selection screen |
 
-#### FR-v3-21 — Performance Visualization (Backend + Frontend)
+#### FR-v4-21: Performance Visualization (Backend + Frontend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -226,7 +298,7 @@ Make the demo Leafy Bank integration-ready and Solutions Library publishable. Ad
 | 21.2 | Response includes timing in milliseconds for both queries | `{ encrypted_ms: number, plaintext_ms: number, overhead_pct: number }` |
 | 21.3 | Frontend displays a side-by-side comparison panel with the timing values | Panel is visible in the investigation dashboard; values update on each search |
 
-#### FR-v3-22 — Leafy Bank Integration Scaffold
+#### FR-v4-22: Leafy Bank Integration Scaffold
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -235,14 +307,14 @@ Make the demo Leafy Bank integration-ready and Solutions Library publishable. Ad
 
 ---
 
-### NFR-v3: Non-Functional Requirements
+### NFR-v4: Non-Functional Requirements
 
 | ID | Category | Requirement | Measure |
 |---|---|---|---|
-| NFR-v3-01 | Performance | QE overhead for equality search is below a defined threshold | Overhead < 20% vs plaintext on Atlas M10 under single-user demo load |
-| NFR-v3-02 | UX | Returning customer payment with saved card completes in fewer steps than first-time payment | Saved card flow requires ≤ 2 steps vs 3 for new card |
-| NFR-v3-03 | Portability | Demo can be embedded into Leafy Bank with ≤ 1 week of integration work | Integration scaffold validated by Leafy Bank team review |
-| NFR-v3-04 | Content readiness | Solutions Library article passes the four-section template check | Validated using ks-mongodb-ist-content checklist |
+| NFR-v4-01 | Performance | QE overhead for equality search is below a defined threshold | Overhead < 20% vs plaintext on Atlas M10 under single-user demo load |
+| NFR-v4-02 | UX | Returning customer payment with saved card completes in fewer steps than first-time payment | Saved card flow requires ≤ 2 steps vs 3 for new card |
+| NFR-v4-03 | Portability | Demo can be embedded into Leafy Bank with ≤ 1 week of integration work | Integration scaffold validated by Leafy Bank team review |
+| NFR-v4-04 | Content readiness | Solutions Library article passes the four-section template check | Validated using ks-mongodb-ist-content checklist |
 
 ---
 
@@ -252,9 +324,10 @@ These requirements apply to all versions from v1 onward:
 
 | ID | Category | Requirement |
 |---|---|---|
-| NFR-X-01 | Data safety | Synthetic data only — no real PAN, CVV, PIN, government ID, or address |
+| NFR-X-01 | Data safety | Synthetic data only: no real PAN, CVV, PIN, government ID, or address |
 | NFR-X-02 | PCI compliance | SAD (CVV, PIN, magnetic stripe) is never stored in any collection at any version |
 | NFR-X-03 | Security | `.env` file is excluded from git; no secrets in source code or committed files |
-| NFR-X-04 | Accessibility | LeafyGreen components used — WCAG 2.1 AA compliance inherited from the design system |
+| NFR-X-04 | Accessibility | LeafyGreen components used: WCAG 2.1 AA compliance inherited from the design system |
 | NFR-X-05 | Documentation | Every new API endpoint added at any version is documented in technical-spec.md before merging |
-| NFR-X-06 | Type safety | `npm run build` exits 0 at every version — no TypeScript `any` escape hatches in production code |
+| NFR-X-06 | Type safety | `npm run build` exits 0 at every version: no TypeScript `any` escape hatches in production code |
+| NFR-X-07 | Agent security | AI agents (v3+) use only the public API layer: no direct MongoDB credentials or DEK access |

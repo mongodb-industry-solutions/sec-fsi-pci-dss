@@ -19,6 +19,7 @@ This document covers the implementation-level detail that the PRD deliberately o
 6. [API Contracts](#6-api-contracts)
 7. [Environment Variables Reference](#7-environment-variables-reference)
 8. [Seed Data Schema](#8-seed-data-schema)
+9. [Backend Source Structure](#9-backend-source-structure)
 
 ---
 
@@ -29,7 +30,7 @@ All models live in `backend/src/models/`. Each file exports the TypeScript inter
 ### `cardTransaction.model.ts`
 
 ```typescript
-// BIAN SD-254 — Card Transaction
+// BIAN SD-254: Card Transaction
 
 export const CARD_TRANSACTION_COLLECTION = 'cardTransactionQE';
 export const CARD_TRANSACTION_SENSITIVE_COLLECTION = 'cardTransactionSensitiveQE';
@@ -39,7 +40,7 @@ export interface CardTransactionLogControlRecord {
   cardTransactionInstanceReference: string;       // UUID, primary key
   cardTransactionExternalReference?: string;      // Gateway transaction ID
 
-  // QE equality — searchable encrypted fields
+  // QE equality: searchable encrypted fields
   paymentCardReference: string;                   // Tokenized card ID
   cardTransactionAccountReference: string;        // Account reference
 
@@ -63,7 +64,7 @@ export interface CardTransactionLogControlRecord {
 }
 
 export interface CardTransactionSensitiveRecord {
-  cardTransactionInstanceReference: string;       // FK — plaintext linking key
+  cardTransactionInstanceReference: string;       // FK: plaintext linking key
   rawGatewayPayload: object;                      // QE none
   processorTransactionMetadata: object;           // QE none
 }
@@ -78,7 +79,7 @@ export type CardTransactionChannel =
 ### `customerAgreement.model.ts`
 
 ```typescript
-// BIAN SD-53 — Customer Agreement
+// BIAN SD-53: Customer Agreement
 
 export const CUSTOMER_AGREEMENT_COLLECTION = 'customerAgreementQE';
 export const CUSTOMER_AGREEMENT_SENSITIVE_COLLECTION = 'customerAgreementSensitiveQE';
@@ -87,12 +88,12 @@ export interface CustomerAgreementControlRecord {
   // Identifiers
   customerAgreementInstanceReference: string;    // UUID, primary key
 
-  // QE equality — searchable encrypted fields
+  // QE equality: searchable encrypted fields
   customerEmailAddress: string;
   customerMobilePhoneNumber: string;
   customerAgreementReference: string;            // Account number reference
 
-  // Plaintext fields (v1) — customerName becomes QE equality in v2
+  // Plaintext fields (v1): customerName becomes QE equality in v2
   customerName: string;
   customerSegment: CustomerSegment;
   agreementStatus: AgreementStatus;
@@ -107,9 +108,9 @@ export interface CustomerAgreementControlRecord {
 }
 
 export interface CustomerAgreementSensitiveRecord {
-  customerAgreementInstanceReference: string;   // FK — plaintext linking key
+  customerAgreementInstanceReference: string;   // FK: plaintext linking key
 
-  // QE none — retrieval only under Level 2 escalation
+  // QE none: retrieval only under Level 2 escalation
   residentialAddressFull: ResidentialAddress;
   governmentIdentificationReference: string;
   internalRiskProfileNotes: string;
@@ -129,14 +130,14 @@ export type AgreementStatus = 'active' | 'suspended' | 'closed';
 ### `paymentCard.model.ts`
 
 ```typescript
-// BIAN SD-88 — Payment Card
+// BIAN SD-88: Payment Card
 
 export const PAYMENT_CARD_COLLECTION = 'paymentCardQE';
 
 export interface PaymentCardManagementControlRecord {
   // Identifiers
   paymentCardInstanceReference: string;          // UUID, primary key
-  customerAgreementInstanceReference: string;    // FK — plaintext linking key
+  customerAgreementInstanceReference: string;    // FK: plaintext linking key
 
   // QE equality
   paymentCardReference: string;                  // Token (same token as in cardTransactionQE)
@@ -164,29 +165,62 @@ export type CardStatus = 'active' | 'blocked' | 'expired' | 'pending_activation'
 ### `fraudDiagnosis.model.ts`
 
 ```typescript
-// BIAN SD-83 — Fraud Diagnosis (no QE — operational metadata only)
+// BIAN SD-83: Fraud Diagnosis (no QE: operational metadata only)
 
 export const FRAUD_DIAGNOSIS_COLLECTION = 'fraudDiagnosisCase';
 
 export interface FraudDiagnosisControlRecord {
   // Identifiers
-  fraudDiagnosisInstanceReference: string;       // UUID, primary key
-  caseReference: string;                         // Human-readable: FD-2026-001234
+  fraudDiagnosisInstanceReference: string;           // UUID, primary key
+  caseReference: string;                             // FD-2026-001234
 
-  // Links to protected records
-  linkedCardTransactionReference: string;        // FK to cardTransactionQE
-  linkedCustomerAgreementReference: string;      // FK to customerAgreementQE
+  // Links to protected records (plaintext keys by design: no PII in these refs)
+  linkedCardTransactionReference: string;            // FK to cardTransactionQE
+  linkedCustomerAgreementReference: string;          // FK to customerAgreementQE
 
-  // Case workflow
-  caseStatus: CaseStatus;
-  riskSeverity: RiskSeverity;
-  assignedAnalystRole: AnalystRole;
-  escalationFlag: boolean;
-  escalationDateTime?: Date;
-  caseResolutionOutcome?: CaseResolutionOutcome;
-  caseNotes: string;
+  // Case lifecycle
+  fraudDiagnosisCaseStatus: FraudDiagnosisCaseStatus;
+  fraudDiagnosisCaseSeverity: RiskSeverity;
+  fraudDiagnosisRequestDateTime: Date;
+  fraudDiagnosisCaseClosingDateTime?: Date;
 
-  // Embedded append-only audit log
+  // Assignment (v2: populated when case is assigned)
+  fraudDiagnosisAnalystInstanceReference?: string;    // FK to partyAuthenticationQE (L1)
+  fraudDiagnosisInvestigatorInstanceReference?: string; // FK to partyAuthenticationQE (L2)
+
+  // Assessment
+  fraudDiagnosisAssessment: {
+    riskIndicators: string[];                         // e.g. ["amount_threshold", "high_risk_mcc"]
+    fraudDiagnosisScore?: number;                     // 0-100
+    fraudDiagnosisConclusion?: string;
+  };
+
+  // Escalation record (populated when status becomes escalated)
+  fraudDiagnosisEscalationRecord?: {
+    escalationDateTime: Date;
+    escalationReason: string;
+    escalatedByInstanceReference: string;
+    escalatedToInstanceReference: string;
+  };
+
+  // Resolution record (populated on close)
+  fraudDiagnosisResolutionRecord?: {
+    resolutionDateTime: Date;
+    resolutionOutcome: ResolutionOutcome;
+    resolutionNotes: string;
+    resolvedByInstanceReference: string;
+  };
+
+  // AI agent draft (populated by v3 agent, null if agent disabled)
+  agentDraftDiagnosis?: {
+    riskSummary: string;
+    recommendedAction: 'clear' | 'escalate' | 'investigate';
+    confidenceScore: number;                          // 0-100
+    supportingEvidence: string[];
+    agentCompletionDateTime: Date;
+  };
+
+  // Append-only audit trail
   diagnosisActionLog: DiagnosisActionEvent[];
 
   // BIAN metadata
@@ -199,23 +233,73 @@ export interface FraudDiagnosisControlRecord {
 export interface DiagnosisActionEvent {
   actionDateTime: Date;
   actionType: ActionType;
+  performedByInstanceReference: string;
   performedByRole: AnalystRole;
-  actionDetails: string;
+  actionDetails: Record<string, unknown>;
 }
 
-export type CaseStatus =
-  'open' | 'in_review' | 'escalated' | 'pending_closure' | 'closed';
+export type FraudDiagnosisCaseStatus =
+  | 'open'
+  | 'under_review'
+  | 'escalated'
+  | 'resolved_cleared'
+  | 'resolved_fraud'
+  | 'closed';
 
 export type RiskSeverity = 'low' | 'medium' | 'high' | 'critical';
 
 export type AnalystRole =
-  'payment_service' | 'level1_analyst' | 'level2_investigator' | 'security_auditor';
+  | 'payment_service'
+  | 'level1_analyst'
+  | 'level2_investigator'
+  | 'security_auditor'
+  | 'ai_agent';
 
 export type ActionType =
-  'case_opened' | 'field_accessed' | 'escalated' | 'note_added' | 'case_closed';
+  | 'case_opened'
+  | 'assigned'
+  | 'note_added'
+  | 'field_accessed'
+  | 'escalated'
+  | 'ai_review'
+  | 'resolved'
+  | 'closed';
 
-export type CaseResolutionOutcome =
-  'fraud_confirmed' | 'false_positive' | 'chargeback_initiated' | 'under_review';
+export type ResolutionOutcome = 'cleared' | 'confirmed_fraud' | 'referred';
+```
+
+### `partyAuthentication.model.ts`
+
+```typescript
+// BIAN SD-16: Party Authentication (demo-only: stores pre-seeded user accounts)
+
+export const PARTY_AUTHENTICATION_COLLECTION = 'partyAuthenticationQE';
+
+export interface PartyAuthenticationControlRecord {
+  // Identifiers
+  partyAuthenticationInstanceReference: string;   // UUID, primary key
+
+  // QE equality: searchable by email (login lookup)
+  authenticationUserEmailAddress: string;          // QE:equality: used as username
+
+  // Plaintext fields (hashed credential, not sensitive after hashing)
+  authenticationPasswordHash: string;              // bcrypt hash: never store plaintext
+  authenticationUserRole: DemoUserRole;
+  authenticationUserName: string;                  // Display name
+  authenticationDomain: 'local' | 'msentra';      // Identity domain
+  accountStatus: 'active' | 'suspended';
+
+  // BIAN metadata
+  bianServiceDomain: 'PartyAuthentication';
+  bianControlRecordType: 'PartyAuthentication';
+  recordCreatedDateTime: Date;
+}
+
+export type DemoUserRole =
+  | 'customer'
+  | 'level1_analyst'
+  | 'level2_investigator'
+  | 'security_auditor';
 ```
 
 ---
@@ -267,7 +351,7 @@ export function buildEncryptedFieldsMaps(
           keyId: dekSensitiveId,
           path: 'rawGatewayPayload',
           bsonType: 'object',
-          // no queries = QE:none — encrypted but not searchable
+          // no queries = QE:none: encrypted but not searchable
         },
         {
           keyId: dekSensitiveId,
@@ -311,7 +395,7 @@ export function buildEncryptedFieldsMaps(
           keyId: dekSensitiveId,
           path: 'residentialAddressFull',
           bsonType: 'object',
-          // QE:none — no queries
+          // QE:none: no queries
         },
         {
           keyId: dekSensitiveId,
@@ -344,7 +428,19 @@ export function buildEncryptedFieldsMaps(
       ],
     },
 
-    // fraudDiagnosisCase — no QE, standard collection
+    // ── partyAuthenticationQE ─────────────────────────────────────
+    partyAuthenticationQE: {
+      fields: [
+        {
+          keyId: dekLookupId,
+          path: 'authenticationUserEmailAddress',
+          bsonType: 'string',
+          queries: { queryType: 'equality' },   // login lookup by email
+        },
+      ],
+    },
+
+    // fraudDiagnosisCase: no QE, standard collection
   };
 }
 ```
@@ -482,6 +578,8 @@ export async function getMongoClient(): Promise<MongoClient> {
           encryptedFieldsMap.customerAgreementSensitiveQE,
         [`${process.env.MONGODB_DB_NAME}.paymentCardQE`]:
           encryptedFieldsMap.paymentCardQE,
+        [`${process.env.MONGODB_DB_NAME}.partyAuthenticationQE`]:
+          encryptedFieldsMap.partyAuthenticationQE,
       },
       // crypt_shared is auto-discovered from node_modules/mongodb-client-encryption
       extraOptions: {
@@ -534,7 +632,12 @@ async function createIndexes(client: MongoClient, dbName: string) {
   await db.collection('fraudDiagnosisCase').createIndexes([
     { key: { fraudDiagnosisInstanceReference: 1 }, unique: true },
     { key: { linkedCardTransactionReference: 1 } },
-    { key: { caseStatus: 1, riskSeverity: -1 } },
+    { key: { fraudDiagnosisCaseStatus: 1, fraudDiagnosisCaseSeverity: -1 } },
+  ]);
+
+  await db.collection('partyAuthenticationQE').createIndexes([
+    { key: { partyAuthenticationInstanceReference: 1 }, unique: true },
+    { key: { authenticationUserRole: 1 } },
   ]);
 }
 ```
@@ -780,7 +883,87 @@ Returns cards linked to a customer (plaintext lookup by FK).
 
 ---
 
-### 6.7 Health
+### 6.7 Authentication
+
+All auth endpoints are public (no JWT required).
+
+#### `POST /auth/login`
+
+Validates credentials against `partyAuthenticationQE` (QE equality search on email). Returns a signed JWT on success.
+
+**Request body:**
+```json
+{
+  "email": "sarah.chen@leafybank.demo",
+  "password": "demo-password",
+  "domain": "local"
+}
+```
+
+**Response 200:**
+```json
+{
+  "token": "<HS256 JWT>",
+  "user": {
+    "partyAuthenticationInstanceReference": "uuid-v4",
+    "name": "Sarah Chen",
+    "email": "sarah.chen@leafybank.demo",
+    "role": "level1_analyst"
+  }
+}
+```
+
+**Response 401:** `{ "error": "Invalid credentials" }`
+
+---
+
+#### `GET /auth/users`
+
+Returns the list of demo users for the login screen dropdown. Passwords are never included.
+
+**Response 200:**
+```json
+{
+  "users": [
+    { "email": "luis.fernandez@leafybank.demo", "name": "Luis Fernandez", "role": "customer" },
+    { "email": "julia.santos@leafybank.demo",   "name": "Julia Santos",   "role": "customer" },
+    { "email": "sarah.chen@leafybank.demo",     "name": "Sarah Chen",     "role": "level1_analyst" },
+    { "email": "michael.obi@leafybank.demo",    "name": "Michael Obi",    "role": "level2_investigator" },
+    { "email": "admin@leafybank.demo",          "name": "Admin",          "role": "security_auditor" }
+  ]
+}
+```
+
+---
+
+### 6.8 Raw Document (Demo Tool)
+
+Available only when `NODE_ENV !== 'production'`. Used by the "Encrypted in Atlas" toggle in both modes.
+
+#### `GET /demo/raw-document/:collection/:id`
+
+Returns the raw BSON document as stored in Atlas (ciphertext visible, no auto-decryption). Uses a plain MongoClient without `autoEncryption`.
+
+**Path params:** `collection` (e.g., `cardTransactionQE`), `id` (document `_id` or primary key value)
+
+**Response 200:**
+```json
+{
+  "collection": "cardTransactionQE",
+  "document": {
+    "_id": "...",
+    "paymentCardReference": { "$binary": { "base64": "BhKJ9KMsA...", "subType": "06" } },
+    "customerEmailAddress": { "$binary": { "base64": "AqF8M9jl...", "subType": "06" } },
+    "transactionAmount": { "amount": 850, "currency": "USD" }
+  }
+}
+```
+
+**Response 403:** Returned if `NODE_ENV === 'production'`.
+
+---
+
+### 6.9 Health
 
 #### `GET /health`
 
@@ -809,7 +992,7 @@ MONGODB_DB_NAME=pci_dss_demo
 # Required when KMS_PROVIDER=aws (default)
 AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
-AWS_SESSION_TOKEN=              # Optional — for temporary IAM credentials
+AWS_SESSION_TOKEN=              # Optional: for temporary IAM credentials
 AWS_REGION=us-east-1
 AWS_CMK_ARN=arn:aws:kms:us-east-1:<account>:key/<key-id>
 
@@ -825,12 +1008,22 @@ API_PORT=3001
 API_HOST=0.0.0.0
 CORS_ORIGIN=http://localhost:3000
 
+# ── Authentication (Application Mode) ────────────────────────────
+# Generate with: node -e "require('crypto').randomBytes(32).toString('hex')"
+JWT_SECRET=
+JWT_EXPIRES_IN=24h
+AUTH_DOMAIN=local               # 'local' | 'msentra' (msentra: v2)
+
 # ── Frontend (Next.js) ────────────────────────────────────────────
 NEXT_PUBLIC_API_URL=http://localhost:3001
 
 # ── Demo configuration ────────────────────────────────────────────
 FRAUD_AMOUNT_THRESHOLD=500      # Transactions above this create a fraud case
 RISK_MCC_LIST=5812,6011,7995    # MCC codes that auto-trigger fraud diagnosis
+
+# ── AI Agent (v3) ─────────────────────────────────────────────────
+AGENT_ENABLED=false             # 'true' | 'false': set true to enable v3 agent
+MAGENTA_API_KEY=                # MongoDB Agentic Platform (Magenta) API key
 ```
 
 ---
@@ -843,6 +1036,7 @@ Seed files live in `data/`. The seed script (`bin/seed.ts`) reads each file and 
 
 | File | Collection | Documents |
 |---|---|---|
+| `data/users.json` | `partyAuthenticationQE` | 5 |
 | `data/customerAgreements.json` | `customerAgreementQE` | 50 |
 | `data/customerAgreementsSensitive.json` | `customerAgreementSensitiveQE` | 50 |
 | `data/paymentCards.json` | `paymentCardQE` | 50 |
@@ -850,10 +1044,22 @@ Seed files live in `data/`. The seed script (`bin/seed.ts`) reads each file and 
 | `data/cardTransactionsSensitive.json` | `cardTransactionSensitiveQE` | 200 |
 | `data/fraudCases.json` | `fraudDiagnosisCase` | 20 |
 
+### Demo users (`data/users.json`)
+
+Passwords are stored as bcrypt hashes (12 rounds). Plaintext passwords are in `.env.example` comments for demo convenience only.
+
+| Email | Role | Display Name |
+|---|---|---|
+| `luis.fernandez@leafybank.demo` | `customer` | Luis Fernandez |
+| `julia.santos@leafybank.demo` | `customer` | Julia Santos |
+| `sarah.chen@leafybank.demo` | `level1_analyst` | Sarah Chen |
+| `michael.obi@leafybank.demo` | `level2_investigator` | Michael Obi |
+| `admin@leafybank.demo` | `security_auditor` | Admin |
+
 ### Synthetic data rules
 
 - All personal data (names, emails, phones, addresses) is generated with `@faker-js/faker`
-- Card tokens use the format `tok_<uuid>` — never a real card number
+- Card tokens use the format `tok_<uuid>`: never a real card number
 - `maskedPanDisplay` format: `****-****-****-XXXX` where XXXX is a random 4-digit suffix
 - `cardExpirationDate` is always a future date (at least 12 months from generation)
 - CVV, PIN, full PAN, and magnetic stripe data are **never included** in seed files
@@ -864,9 +1070,81 @@ Seed files live in `data/`. The seed script (`bin/seed.ts`) reads each file and 
 
 | Collection | Upsert filter key |
 |---|---|
+| `partyAuthenticationQE` | `partyAuthenticationInstanceReference` |
 | `customerAgreementQE` | `customerAgreementInstanceReference` |
 | `customerAgreementSensitiveQE` | `customerAgreementInstanceReference` |
 | `paymentCardQE` | `paymentCardInstanceReference` |
 | `cardTransactionQE` | `cardTransactionInstanceReference` |
 | `cardTransactionSensitiveQE` | `cardTransactionInstanceReference` |
 | `fraudDiagnosisCase` | `fraudDiagnosisInstanceReference` |
+
+---
+
+## 9. Backend Source Structure
+
+```
+backend/src/
+├── controllers/
+│   ├── auth.controller.ts
+│   ├── cardTransaction.controller.ts
+│   ├── customerAgreement.controller.ts
+│   ├── paymentCard.controller.ts
+│   ├── fraudDiagnosis.controller.ts
+│   └── demo.controller.ts               # Raw document endpoint (non-prod only)
+│
+├── services/
+│   ├── auth.service.ts                  # JWT sign/verify, bcrypt compare
+│   ├── cardTransaction.service.ts
+│   ├── customerAgreement.service.ts
+│   ├── paymentCard.service.ts
+│   └── fraudDiagnosis.service.ts
+│
+├── models/
+│   ├── partyAuthentication.model.ts     # BIAN SD-16
+│   ├── cardTransaction.model.ts         # BIAN SD-254
+│   ├── customerAgreement.model.ts       # BIAN SD-53
+│   ├── paymentCard.model.ts             # BIAN SD-88
+│   └── fraudDiagnosis.model.ts          # BIAN SD-83
+│
+├── vendors/
+│   ├── encryption/
+│   │   ├── qeClient.ts                  # MongoClient with autoEncryption
+│   │   ├── rawClient.ts                 # Plain MongoClient (no decryption)
+│   │   ├── kms.ts                       # buildKmsProviders(), buildCmkOptions()
+│   │   ├── keyVault.ts                  # provisionDataEncryptionKeys()
+│   │   └── encryptedFieldsMaps.ts       # buildEncryptedFieldsMaps()
+│   ├── setup/
+│   │   ├── index.ts                     # runSetup(): orchestrates all setup steps
+│   │   ├── createCollections.ts         # createEncryptedCollection() calls
+│   │   ├── createIndexes.ts             # all index definitions
+│   │   └── provisionDEKs.ts             # DEK-lookup + DEK-sensitive
+│   └── seed/
+│       ├── index.ts                     # runSeed(): orchestrates all seed steps
+│       ├── seedUsers.ts                 # partyAuthenticationQE upserts
+│       ├── seedCustomers.ts             # customerAgreementQE + sensitive upserts
+│       ├── seedCards.ts                 # paymentCardQE upserts
+│       ├── seedTransactions.ts          # cardTransactionQE + sensitive upserts
+│       └── seedCases.ts                 # fraudDiagnosisCase upserts
+│
+├── middleware/
+│   ├── auth.ts                          # JWT verification: reads Authorization header
+│   └── rbac.ts                          # Role enforcement: gates sensitive collections
+│
+├── plugins/
+│   ├── mongodb.ts                       # Fastify plugin: registers QE client
+│   └── cors.ts
+│
+└── server.ts                            # Fastify app setup + route registration
+```
+
+`bin/setup.ts` and `bin/seed.ts` are thin wrappers at the repo root:
+
+```typescript
+// bin/setup.ts
+import { runSetup } from '../backend/src/vendors/setup';
+runSetup().then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });
+
+// bin/seed.ts
+import { runSeed } from '../backend/src/vendors/seed';
+runSeed().then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });
+```

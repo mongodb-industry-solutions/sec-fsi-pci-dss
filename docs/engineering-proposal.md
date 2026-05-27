@@ -3,14 +3,14 @@
 ## Status
 
 Draft  
-Version: 1.0 — Author: Antonio Membrides Espinosa — Last updated: 2026-05-26  
+Version: 1.0: Author: Antonio Membrides Espinosa: Last updated: 2026-05-26  
 PRD reference: [docs/PRD.md](PRD.md)
 
 ---
 
 ## 1. Background
 
-A digital bank or card issuer needs to investigate suspicious card transactions quickly, but storing cardholder data in plaintext expands PCI DSS scope and introduces insider threat risk. MongoDB Queryable Encryption (QE) resolves this by allowing the server to search encrypted fields without ever decrypting them. This EP defines how to build the demo that proves that claim end-to-end — from card checkout to fraud investigation — structured around BIAN Service Domain naming and backed by AWS KMS.
+A digital bank or card issuer needs to investigate suspicious card transactions quickly, but storing cardholder data in plaintext expands PCI DSS scope and introduces insider threat risk. MongoDB Queryable Encryption (QE) resolves this by allowing the server to search encrypted fields without ever decrypting them. This EP defines how to build the demo that proves that claim end-to-end: from card checkout to fraud investigation: structured around BIAN Service Domain naming and backed by AWS KMS.
 
 Full business context, problem statement, and storyline are in [PRD.md](PRD.md). This document covers only technical decisions, trade-offs, and implementation phases.
 
@@ -30,10 +30,10 @@ Full business context, problem statement, and storyline are in [PRD.md](PRD.md).
 
 ### Non-goals
 
-- UI/UX design — covered by the IST demo design standards (LeafyGreen).
-- PCI DSS compliance certification — this is a reference architecture, not a compliance audit.
-- Production hardening (rate limiting, DDoS protection, production secret management) — out of scope for a demo.
-- Multi-region Atlas deployment — a single-region cluster is sufficient for the demo story.
+- UI/UX design: covered by the IST demo design standards (LeafyGreen).
+- PCI DSS compliance certification: this is a reference architecture, not a compliance audit.
+- Production hardening (rate limiting, DDoS protection, production secret management): out of scope for a demo.
+- Multi-region Atlas deployment: a single-region cluster is sufficient for the demo story.
 
 ---
 
@@ -43,25 +43,25 @@ Full business context, problem statement, and storyline are in [PRD.md](PRD.md).
 
 ```
 Browser (Next.js App Router)
-    │  HTTP JSON — no DB access, no secrets, no business logic
+    │  HTTP JSON: no DB access, no secrets, no business logic
     ▼
 Fastify API  (:3001)
     │  MongoDB Node.js driver with auto-encryption (crypt_shared)
     │  KMS call on first client init only (DEK unwrap)
     ▼
 MongoDB Atlas  (M10+)
-    │  Stores ciphertext — never sees plaintext for QE fields
+    │  Stores ciphertext: never sees plaintext for QE fields
     ▼
 AWS KMS
-    Customer Master Key — MongoDB has zero access
+    Customer Master Key: MongoDB has zero access
     QE driver contacts KMS only when unwrapping the DEK
 ```
 
 **MACH alignment:**
-- **M** — Backend is modular: controllers, services, encryption layer are independent.
-- **A** — API-first: every UI action maps to a documented endpoint in [technical-spec.md](technical-spec.md) §6.
-- **C** — Cloud-native: MongoDB Atlas, no local MongoDB in production path.
-- **H** — Headless: frontend calls the API; it never touches MongoDB or holds secrets.
+- **M**: Backend is modular: controllers, services, encryption layer are independent.
+- **A**: API-first: every UI action maps to a documented endpoint in [technical-spec.md](technical-spec.md) §6.
+- **C**: Cloud-native: MongoDB Atlas, no local MongoDB in production path.
+- **H**: Headless: frontend calls the API; it never touches MongoDB or holds secrets.
 
 ### 3.2 Repository structure decision
 
@@ -78,7 +78,7 @@ docs/         ← PRD, roadmap, technical-spec, this EP
 No `packages/` shared workspace. The backend owns all MongoDB access and all encryption logic. The frontend is a pure HTTP consumer. Shared TypeScript base config lives in `tsconfig.base.json`.
 
 **Why not a shared `packages/db/` workspace?**  
-The only consumer of the QE client is the backend. A shared package adds workspace overhead and a cross-package build dependency for zero gain. See [§7 — Alternatives considered](#7-alternatives-considered).
+The only consumer of the QE client is the backend. A shared package adds workspace overhead and a cross-package build dependency for zero gain. See [§7: Alternatives considered](#7-alternatives-considered).
 
 ### 3.3 Data model
 
@@ -101,7 +101,7 @@ fraudDiagnosisCase ◄── also links ─────────────�
    (linkedCustomerAgreementReference + linkedCardTransactionReference)
 ```
 
-**Join strategy:** Application-side sequential queries. The backend service layer queries each collection independently and assembles the response. No `$lookup` across QE collections — it is not supported for encrypted fields in the current QE implementation.
+**Join strategy:** Application-side sequential queries. The backend service layer queries each collection independently and assembles the response. No `$lookup` across QE collections: it is not supported for encrypted fields in the current QE implementation.
 
 **QE collection split rationale:** QE requires all encrypted fields in a collection to be defined in the `encryptedFieldsMap` at collection creation time. Mixing equality-searchable and non-searchable (`none`) fields in one collection is permitted, but separating lookup collections from sensitive collections makes the access-control boundary explicit: Level 1 queries only the `*QE` lookup collections; Level 2 additionally queries the `*SensitiveQE` collections after escalation.
 
@@ -116,7 +116,7 @@ Two DEKs:
 
 Complete `encryptedFieldsMap` definitions are in [technical-spec.md §2](technical-spec.md#2-qe-encryptedfieldsmaps).
 
-**v1 query types:** equality only — `paymentCardReference`, `cardTransactionAccountReference`, `customerEmailAddress`, `customerMobilePhoneNumber`, `customerAgreementReference`.
+**v1 query types:** equality only: `paymentCardReference`, `cardTransactionAccountReference`, `customerEmailAddress`, `customerMobilePhoneNumber`, `customerAgreementReference`.
 
 **v2 addition:** range query on `transactionAmount.amount` (`min: 0`, `max: 999999`, `precision: 2`).
 
@@ -158,14 +158,14 @@ GET    /health
 - The frontend never receives MongoDB credentials, AWS credentials, or DEKs.
 
 **PAN / SAD rules enforced by design:**
-- Full PAN is never accepted by the API — the frontend tokenizes before calling.
+- Full PAN is never accepted by the API: the frontend tokenizes before calling.
 - CVV and PIN are not accepted at any API endpoint.
 - Seed data contains no real card numbers; synthetic tokens only.
 
 **v2 RBAC:**
 - `X-Demo-Role` header drives field projection in API responses.
 - Level 2 access to sensitive collections requires an escalation token (generated by the escalation workflow, validated by middleware).
-- The escalation token is a short-lived UUID stored in `fraudDiagnosisCase` — not a JWT (stateless tokens cannot be invalidated if the escalation is revoked).
+- The escalation token is a short-lived UUID stored in `fraudDiagnosisCase`: not a JWT (stateless tokens cannot be invalidated if the escalation is revoked).
 
 ### 3.7 Testing strategy
 
@@ -215,9 +215,9 @@ npm run setup:db   → creates collections + provisions DEKs + creates indexes
 npm run seed       → inserts synthetic data
 ```
 
-Re-seeding uses upsert operations (idempotent). Running `setup:db` twice is safe — `getOrCreate` logic in `keyVault.ts` skips DEK creation if the key already exists.
+Re-seeding uses upsert operations (idempotent). Running `setup:db` twice is safe: `getOrCreate` logic in `keyVault.ts` skips DEK creation if the key already exists.
 
-If a breaking schema change is needed (e.g., adding a QE range field), the collection must be dropped and recreated via `createEncryptedCollection()` — QE does not support `ALTER`-equivalent operations. The `--reset` flag on setup drops and recreates all collections.
+If a breaking schema change is needed (e.g., adding a QE range field), the collection must be dropped and recreated via `createEncryptedCollection()`: QE does not support `ALTER`-equivalent operations. The `--reset` flag on setup drops and recreates all collections.
 
 ---
 
@@ -227,8 +227,8 @@ If a breaking schema change is needed (e.g., adding a QE range field), the colle
 |---|---|---|---|
 | `crypt_shared` library version mismatch with the MongoDB Node.js driver | Medium | High | Pin both `mongodb` and `mongodb-client-encryption` to the same minor version; document in `package.json` peer dependency notes |
 | AWS KMS latency degrades demo flow | Low | Medium | Cache the unwrapped DEK in memory for the process lifetime; only call KMS on startup |
-| Atlas M0 / M2 / M5 (free tier) used by a developer — QE not supported | High | High | Gate `bin/setup.ts` with a cluster tier check; fail fast with a clear error message |
-| QE `$lookup` limitation breaks a planned join | Low | High | All joins are application-side sequential queries — no `$lookup` used. Documented in ADR-001 |
+| Atlas M0 / M2 / M5 (free tier) used by a developer: QE not supported | High | High | Gate `bin/setup.ts` with a cluster tier check; fail fast with a clear error message |
+| QE `$lookup` limitation breaks a planned join | Low | High | All joins are application-side sequential queries: no `$lookup` used. Documented in ADR-001 |
 | Seed data accidentally includes real PAN format | Medium | High | Seed generator always prefixes tokens with `tok_`; grep CI check rejects any string matching `\b\d{13,19}\b` |
 | Key vault DEK reference lost (collection dropped without DEK cleanup) | Low | High | `bin/setup.ts --reset` drops collections then recreates DEKs; order is enforced in script |
 | Demo breaks at conference due to AWS KMS unavailability | Low | High | Local KMS fallback is always available with `KMS_PROVIDER=local`; test it before travel |
@@ -242,7 +242,7 @@ If a breaking schema change is needed (e.g., adding a QE range field), the colle
 A shared MongoDB package used by both `backend/` and `bin/` scripts.
 
 **Pros:** Clean separation of DB concern; `frontend/` cannot accidentally import DB code.  
-**Rejected because:** The frontend never imports DB code regardless (headless principle). The only two consumers of QE client code are `backend/` and `bin/` — which is a thin justification for a shared package with its own `package.json`, version, and build pipeline. Adds build complexity (Turborepo or `tsc -b` project references) with no functional benefit for a demo. If the project scales to multiple backends, this decision should be revisited.
+**Rejected because:** The frontend never imports DB code regardless (headless principle). The only two consumers of QE client code are `backend/` and `bin/`: which is a thin justification for a shared package with its own `package.json`, version, and build pipeline. Adds build complexity (Turborepo or `tsc -b` project references) with no functional benefit for a demo. If the project scales to multiple backends, this decision should be revisited.
 
 ### Alternative B: CSFLE alongside QE
 
@@ -256,7 +256,7 @@ Use CSFLE for non-searchable fields and QE only for equality-searchable fields (
 Use Next.js Route Handlers (App Router) as the API layer, eliminating the need for a separate `backend/` application.
 
 **Pros:** Fewer moving parts; one process; simpler Docker setup.  
-**Rejected because:** IST Engineering Standards require API-first (Headless principle of MACH). A Route Handler inside Next.js couples business logic and database access to the presentation layer. The QE `autoEncryption` client would run inside the Next.js process — making server components, route handlers, and the QE client share the same Node.js process and environment, which complicates credential scoping and makes the RBAC boundary unclear. A separate Fastify process makes the API contract explicit and independently testable.
+**Rejected because:** IST Engineering Standards require API-first (Headless principle of MACH). A Route Handler inside Next.js couples business logic and database access to the presentation layer. The QE `autoEncryption` client would run inside the Next.js process: making server components, route handlers, and the QE client share the same Node.js process and environment, which complicates credential scoping and makes the RBAC boundary unclear. A separate Fastify process makes the API contract explicit and independently testable.
 
 ### Alternative D: Separate DEK per collection
 
@@ -281,15 +281,15 @@ Each of the five QE-protected collections has its own dedicated DEK.
 
 | Phase group | Phases | Estimate | Confidence |
 |---|---|---|---|
-| v1 — Setup + seeding | P1, P2 | 1.5 days | High |
-| v1 — Backend QE + APIs | P3, P4, P5 | 3 days | High |
-| v1 — Frontend | P6, P7 | 3 days | Medium (UI polish varies) |
-| v1 — Docker + QA | P8 | 1 day | High |
+| v1: Setup + seeding | P1, P2 | 1.5 days | High |
+| v1: Backend QE + APIs | P3, P4, P5 | 3 days | High |
+| v1: Frontend | P6, P7 | 3 days | Medium (UI polish varies) |
+| v1: Docker + QA | P8 | 1 day | High |
 | **v1 Total** | | **~8.5 days** | |
-| v2 — RBAC + Escalation + Range | P9, P10, P11 | 3 days | High |
-| v2 — Frontend v2 | P12 | 3 days | Medium |
+| v2: RBAC + Escalation + Range | P9, P10, P11 | 3 days | High |
+| v2: Frontend v2 | P12 | 3 days | Medium |
 | **v2 Total** | | **~6 days** | |
-| v3 — Save card + Performance + Scaffold | P13–P16 | 4 days | Medium |
+| v3: Save card + Performance + Scaffold | P13–P16 | 4 days | Medium |
 | **v3 Total** | | **~4 days** | |
 
 ---
@@ -304,7 +304,7 @@ Each of the five QE-protected collections has its own dedicated DEK.
 **Decision:** Use application-side sequential queries. The backend service fetches each collection independently and assembles the response object in TypeScript.
 
 **Consequences:**  
-+ Compatible with QE — `$lookup` targeting QE collections is not currently supported by the MongoDB QE driver for encrypted fields.  
++ Compatible with QE: `$lookup` targeting QE collections is not currently supported by the MongoDB QE driver for encrypted fields.  
 + Explicit join logic is easier to control with RBAC (skip the sensitive collection query entirely for Level 1).  
 - Slightly more network round-trips to Atlas per request (2–3 sequential queries vs. one aggregation). Acceptable under demo load on M10.
 
@@ -322,5 +322,5 @@ Each of the five QE-protected collections has its own dedicated DEK.
 **Consequences:**  
 + Maps clearly onto the access-control boundary (Level 1 vs Level 2).  
 + Simple to explain in the demo: "lookup key" vs. "sensitive key."  
-- Rotating `DEK-lookup` re-encrypts all three lookup collections simultaneously — acceptable for a demo.  
+- Rotating `DEK-lookup` re-encrypts all three lookup collections simultaneously: acceptable for a demo.  
 - In production, one DEK per collection is recommended for finer-grained rotation control. This recommendation is documented in the technical spec.

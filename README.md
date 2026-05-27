@@ -1,6 +1,6 @@
 # 🏦 FSI PCI DSS Payment Security Demo
 
-> A MongoDB IST demo that shows how a digital bank or card issuer can run a complete card payment lifecycle — from checkout to fraud investigation — while keeping sensitive cardholder data encrypted end-to-end.
+> A MongoDB IST demo that shows how a digital bank or card issuer can run a complete card payment lifecycle: from checkout to fraud investigation: while keeping sensitive cardholder data encrypted end-to-end.
 
 **Core message:** *🔐 Encrypt everything. 🔍 Query anything. 🔑 Keys are yours.*
 
@@ -8,7 +8,7 @@
 
 ## 🎯 What This Demo Shows
 
-A synthetic digital bank uses **MongoDB Queryable Encryption (QE)** with **AWS KMS** to protect cardholder data. The server stores only ciphertext. Fraud analysts still search encrypted fields by email, phone, account reference, or card token — without server-side decryption. Access is controlled by role. Every action is audited.
+A synthetic digital bank uses **MongoDB Queryable Encryption (QE)** with **AWS KMS** to protect cardholder data. The server stores only ciphertext. Fraud analysts still search encrypted fields by email, phone, account reference, or card token: without server-side decryption. Access is controlled by role. Every action is audited.
 
 This answers the most common FSI prospect question:
 
@@ -46,7 +46,7 @@ This answers the most common FSI prospect question:
          ↓
 🚨  Suspicious transaction triggers a Fraud Diagnosis Case
          ↓
-🕵️  Level 1 Analyst searches by encrypted email — finds the record
+🕵️  Level 1 Analyst searches by encrypted email: finds the record
      MongoDB server never decrypted the field
          ↓
 ⬆️  Analyst escalates → Level 2 Investigator reveals sensitive fields (v2)
@@ -75,7 +75,7 @@ This answers the most common FSI prospect question:
 
 - Node.js 20+
 - Docker + Docker Compose
-- MongoDB Atlas cluster (M10 or higher — free tier does not support QE)
+- MongoDB Atlas cluster (M10 or higher: free tier does not support QE)
 - AWS KMS key (or set `KMS_PROVIDER=local` for local development)
 
 ### 1️⃣ Configure Environment
@@ -103,10 +103,10 @@ npm run seed       # Inserts synthetic BIAN-compliant demo data
 ### 4️⃣ Start the Application
 
 ```bash
-# Option A — Docker Compose (recommended)
+# Option A: Docker Compose (recommended)
 npm run docker:up
 
-# Option B — Development mode with hot reload
+# Option B: Development mode with hot reload
 npm run dev
 ```
 
@@ -145,7 +145,7 @@ sec-fsi-pci-dss/
 ├── 🛠️ bin/
 │   ├── setup.ts        # DB bootstrap: collections, indexes, QE key vault
 │   └── seed.ts         # Insert synthetic data from data/
-├── 🌱 data/            # JSON seed files — one per collection
+├── 🌱 data/            # JSON seed files: one per collection
 └── 📚 docs/            # Engineering documentation
 ```
 
@@ -155,7 +155,7 @@ sec-fsi-pci-dss/
 
 | Document | Description |
 |---|---|
-| [PRD](docs/PRD.md) | What and why — audience, storyline, BIAN data model, QE design overview |
+| [PRD](docs/PRD.md) | What and why: audience, storyline, BIAN data model, QE design overview |
 | [Roadmap](docs/roadmap.md) | FR and NFR per iteration (v1 / v2 / v3) with acceptance criteria and Definition of Done |
 | [Technical Specification](docs/technical-spec.md) | BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index strategy |
 | [Engineering Proposal](docs/engineering-proposal.md) | Architecture decisions, implementation phases, risks, alternatives, ADRs |
@@ -170,11 +170,11 @@ The data model follows **BIAN Service Domain** naming conventions across 6 colle
 | Collection | BIAN Service Domain | QE Protection |
 |---|---|---|
 | `cardTransactionQE` | Card Transaction (SD-254) | equality: card token, account reference |
-| `cardTransactionSensitiveQE` | Card Transaction — Sensitive | none: gateway payload, processor metadata |
+| `cardTransactionSensitiveQE` | Card Transaction: Sensitive | none: gateway payload, processor metadata |
 | `customerAgreementQE` | Customer Agreement (SD-53) | equality: email, phone, account reference |
-| `customerAgreementSensitiveQE` | Customer Agreement — Sensitive | none: address, government ID, risk notes |
+| `customerAgreementSensitiveQE` | Customer Agreement: Sensitive | none: address, government ID, risk notes |
 | `paymentCardQE` | Payment Card (SD-88) | equality: card token; none: expiry date |
-| `fraudDiagnosisCase` | Fraud Diagnosis (SD-83) | plaintext — operational metadata only |
+| `fraudDiagnosisCase` | Fraud Diagnosis (SD-83) | plaintext: operational metadata only |
 
 > Full schema definitions, field-level QE modes, index strategy, and collection relationships are in [docs/technical-spec.md](docs/technical-spec.md).
 
