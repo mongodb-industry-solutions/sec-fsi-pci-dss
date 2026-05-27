@@ -20,8 +20,8 @@ This answers the most common FSI prospect question:
 
 | Capability | What the Demo Shows |
 |---|---|
-| 🔐 **Queryable Encryption — equality** | Search encrypted email, phone, account reference, card token |
-| 🔒 **Queryable Encryption — none mode** | Protect address and government ID; reveal only under escalation (v2) |
+| 🔐 **Queryable Encryption (equality)** | Search encrypted email, phone, account reference, card token |
+| 🔒 **Queryable Encryption (none mode)** | Protect address and government ID; reveal only under escalation (v2) |
 | 🔑 **AWS KMS integration** | Customer-controlled master key; MongoDB has zero access |
 | 👤 **RBAC** | Level 1 Analyst vs Level 2 Investigator field visibility (v2) |
 | 📋 **Atlas Audit Log** | Per-field access trail in the investigation workflow (v2) |
@@ -31,8 +31,8 @@ This answers the most common FSI prospect question:
 
 ## 🏛️ Regulatory Alignment
 
-- 🛡️ **PCI DSS v4.0** — MongoDB Atlas certified September 2023
-- 🏦 **BIAN** (Banking Industry Architecture Network) — data model follows BIAN Service Domain naming conventions
+- **PCI DSS v4.0**: MongoDB Atlas certified September 2023
+- **BIAN** (Banking Industry Architecture Network): data model follows BIAN Service Domain naming conventions
 
 ---
 
@@ -42,12 +42,12 @@ This answers the most common FSI prospect question:
 💳  Customer pays with credit card
          ↓
 🔐  Fields encrypted client-side before reaching MongoDB Atlas
-    (paymentCardReference, customerEmailAddress, customerMobilePhoneNumber, ...)
+     (paymentCardReference, customerEmailAddress, customerMobilePhoneNumber, ...)
          ↓
 🚨  Suspicious transaction triggers a Fraud Diagnosis Case
          ↓
 🕵️  Level 1 Analyst searches by encrypted email — finds the record
-    MongoDB server never decrypted the field
+     MongoDB server never decrypted the field
          ↓
 ⬆️  Analyst escalates → Level 2 Investigator reveals sensitive fields (v2)
          ↓
@@ -74,9 +74,9 @@ This answers the most common FSI prospect question:
 ### ✅ Prerequisites
 
 - Node.js 20+
-- 🐳 Docker + Docker Compose
-- ☁️ MongoDB Atlas cluster (M10 or higher — free tier does not support QE)
-- 🔑 AWS KMS key (or set `KMS_PROVIDER=local` for local development)
+- Docker + Docker Compose
+- MongoDB Atlas cluster (M10 or higher — free tier does not support QE)
+- AWS KMS key (or set `KMS_PROVIDER=local` for local development)
 
 ### 1️⃣ Configure Environment
 
@@ -103,10 +103,10 @@ npm run seed       # Inserts synthetic BIAN-compliant demo data
 ### 4️⃣ Start the Application
 
 ```bash
-# Option A — 🐳 Docker Compose (recommended)
+# Option A — Docker Compose (recommended)
 npm run docker:up
 
-# Option B — 🔥 Development mode with hot reload
+# Option B — Development mode with hot reload
 npm run dev
 ```
 
@@ -118,16 +118,16 @@ Open [http://localhost:3000](http://localhost:3000) to view the demo.
 
 | Command | Description |
 |---|---|
-| `npm run install:all` | 📦 Install root + frontend + backend dependencies |
-| `npm run dev` | 🔥 Start frontend and backend concurrently (hot reload) |
-| `npm run dev:frontend` | 💻 Start only the Next.js frontend |
-| `npm run dev:backend` | ⚙️ Start only the Fastify API |
-| `npm run build` | 🏗️ Build frontend and backend for production |
-| `npm run setup:db` | 🗄️ Create collections, indexes, and QE key vault |
-| `npm run seed` | 🌱 Insert synthetic demo data (idempotent) |
-| `npm run docker:up` | 🐳 Build and start full stack with Docker Compose |
-| `npm run docker:down` | 🛑 Stop and remove containers |
-| `npm run docker:logs` | 📜 Tail container logs |
+| `npm run install:all` | Install root + frontend + backend dependencies |
+| `npm run dev` | Start frontend and backend concurrently (hot reload) |
+| `npm run dev:frontend` | Start only the Next.js frontend |
+| `npm run dev:backend` | Start only the Fastify API |
+| `npm run build` | Build frontend and backend for production |
+| `npm run setup:db` | Create collections, indexes, and QE key vault |
+| `npm run seed` | Insert synthetic demo data (idempotent) |
+| `npm run docker:up` | Build and start full stack with Docker Compose |
+| `npm run docker:down` | Stop and remove containers |
+| `npm run docker:logs` | Tail container logs |
 
 ---
 
@@ -155,11 +155,11 @@ sec-fsi-pci-dss/
 
 | Document | Description |
 |---|---|
-| 📋 [PRD](docs/PRD.md) | What and why — audience, storyline, BIAN data model, QE design overview |
-| 🗺️ [Roadmap](docs/roadmap.md) | FR and NFR per iteration (v1 / v2 / v3) with acceptance criteria and Definition of Done |
-| 🔧 [Technical Specification](docs/technical-spec.md) | BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index strategy |
-| 🏗️ [Engineering Proposal](docs/engineering-proposal.md) | Architecture decisions, implementation phases, risks, alternatives, ADRs |
-| ❓ [Q&A: PCI DSS](docs/q&a.md) | Common FSI client questions about MongoDB and PCI DSS compliance |
+| [PRD](docs/PRD.md) | What and why — audience, storyline, BIAN data model, QE design overview |
+| [Roadmap](docs/roadmap.md) | FR and NFR per iteration (v1 / v2 / v3) with acceptance criteria and Definition of Done |
+| [Technical Specification](docs/technical-spec.md) | BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index strategy |
+| [Engineering Proposal](docs/engineering-proposal.md) | Architecture decisions, implementation phases, risks, alternatives, ADRs |
+| [Q&A: PCI DSS](docs/q&a.md) | Common FSI client questions about MongoDB and PCI DSS compliance |
 
 ---
 
@@ -167,14 +167,14 @@ sec-fsi-pci-dss/
 
 The data model follows **BIAN Service Domain** naming conventions across 6 collections:
 
-| Collection | BIAN Service Domain | 🔐 QE Protection |
+| Collection | BIAN Service Domain | QE Protection |
 |---|---|---|
-| `cardTransactionQE` | 💳 Card Transaction (SD-254) | equality: card token, account reference |
-| `cardTransactionSensitiveQE` | 💳 Card Transaction — Sensitive | none: gateway payload, processor metadata |
-| `customerAgreementQE` | 👤 Customer Agreement (SD-53) | equality: email, phone, account reference |
-| `customerAgreementSensitiveQE` | 👤 Customer Agreement — Sensitive | none: address, government ID, risk notes |
-| `paymentCardQE` | 💳 Payment Card (SD-88) | equality: card token; none: expiry date |
-| `fraudDiagnosisCase` | 🕵️ Fraud Diagnosis (SD-83) | plaintext — operational metadata only |
+| `cardTransactionQE` | Card Transaction (SD-254) | equality: card token, account reference |
+| `cardTransactionSensitiveQE` | Card Transaction — Sensitive | none: gateway payload, processor metadata |
+| `customerAgreementQE` | Customer Agreement (SD-53) | equality: email, phone, account reference |
+| `customerAgreementSensitiveQE` | Customer Agreement — Sensitive | none: address, government ID, risk notes |
+| `paymentCardQE` | Payment Card (SD-88) | equality: card token; none: expiry date |
+| `fraudDiagnosisCase` | Fraud Diagnosis (SD-83) | plaintext — operational metadata only |
 
 > Full schema definitions, field-level QE modes, index strategy, and collection relationships are in [docs/technical-spec.md](docs/technical-spec.md).
 
@@ -186,11 +186,11 @@ This demo demonstrates a **PCI DSS-aligned reference architecture**. MongoDB Atl
 
 Key PCI DSS v4.0 requirements addressed:
 
-- ✅ **Req 3** — Cardholder data encrypted before storage; SAD (CVV, PIN) never stored
-- ✅ **Req 3.6** — Customer-controlled key management via AWS KMS
-- ✅ **Req 4** — TLS 1.3 on all Atlas connections
-- ✅ **Req 7** — Role-based field visibility (v2)
-- ✅ **Req 10** — Audit log for all field access events (v2)
+- ✅ **Req 3**: Cardholder data encrypted before storage; SAD (CVV, PIN) never stored
+- ✅ **Req 3.6**: Customer-controlled key management via AWS KMS
+- ✅ **Req 4**: TLS 1.3 on all Atlas connections
+- ✅ **Req 7**: Role-based field visibility (v2)
+- ✅ **Req 10**: Audit log for all field access events (v2)
 
 ---
 
@@ -198,9 +198,9 @@ Key PCI DSS v4.0 requirements addressed:
 
 | Version | Theme | Key Features |
 |---|---|---|
-| 🟢 **v1** | Security Foundation | 💳 Payment simulation, 🔐 QE encryption visible, 🕵️ basic fraud investigation |
-| 🔵 **v2** | Investigation & Control | 👤 RBAC, ⬆️ escalation workflow, 📋 audit trail, 🔑 KMS key rotation |
-| 🟣 **v3** | Advanced Capabilities | 📊 Range queries, 💾 save card / recurring payment, 🏦 Leafy Bank integration prep |
+| 🟢 **v1** | Security Foundation | Payment simulation, QE encryption visible, basic fraud investigation |
+| 🔵 **v2** | Investigation & Control | RBAC, escalation workflow, audit trail, KMS key rotation |
+| 🟣 **v3** | Advanced Capabilities | Range queries, save card / recurring payment, Leafy Bank integration prep |
 
 See [docs/roadmap.md](docs/roadmap.md) for the complete FR, NFR, and acceptance criteria per iteration.
 
