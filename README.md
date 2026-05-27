@@ -137,14 +137,13 @@ Open [http://localhost:3000](http://localhost:3000) to view the demo.
 sec-fsi-pci-dss/
 ├── 💻 frontend/        # Next.js 14 App Router + TypeScript
 ├── ⚙️ backend/         # Fastify 4 + TypeScript
+│   ├── bin/            # Entry points: setup.ts, seed.ts (thin wrappers)
+│   ├── data/           # JSON seed files: one per collection
 │   └── src/
 │       ├── controllers/   # Route handlers
 │       ├── services/      # Business logic
 │       ├── models/        # BIAN interfaces + QE schemas
-│       └── encryption/    # QE client, KMS, key vault
-├── 🛠️ bin/
-│   ├── setup.ts        # DB bootstrap: collections, indexes, QE key vault
-│   └── seed.ts         # Insert synthetic data from data/
+│       └── vendors/       # QE client, KMS, key vault, setup + seed logic
 ├── 🌱 data/            # JSON seed files: one per collection
 └── 📚 docs/            # Engineering documentation
 ```

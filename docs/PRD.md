@@ -554,6 +554,9 @@ sec-fsi-pci-dss/
 │   └── package.json
 │
 ├── backend/                        # Fastify 4 + TypeScript
+│   ├── bin/                        # Thin wrappers: entry points for setup and seed
+│   │   ├── setup.ts                # Calls src/vendors/setup/
+│   │   └── seed.ts                 # Calls src/vendors/seed/
 │   ├── cfg/                        # Non-secret runtime configuration
 │   ├── src/
 │   │   ├── controllers/            # Route handlers: thin, delegate to services
@@ -587,20 +590,15 @@ sec-fsi-pci-dss/
 │   │   │   └── rbac.ts
 │   │   ├── plugins/                # Fastify plugins (mongodb, cors)
 │   │   └── server.ts
-│   └── package.json
-│
-├── bin/                            # Thin wrappers: delegate to backend/src/vendors/
-│   ├── setup.ts                    # Calls backend/src/vendors/setup/
-│   └── seed.ts                     # Calls backend/src/vendors/seed/
-│
-├── data/                           # JSON seed files: one per collection
-│   ├── users.json                  # 10 demo users (hashed passwords, roles)
-│   ├── customerAgreements.json
-│   ├── customerAgreementsSensitive.json
-│   ├── paymentCards.json
-│   ├── cardTransactions.json
-│   ├── cardTransactionsSensitive.json
-│   └── fraudCases.json
+│   ├── data/                       # JSON seed files: one per collection
+│   │   ├── users.json              # 5 demo users (hashed passwords, roles)
+│   │   ├── customerAgreements.json
+│   │   ├── customerAgreementsSensitive.json
+│   │   ├── paymentCards.json
+│   │   ├── cardTransactions.json
+│   │   ├── cardTransactionsSensitive.json
+│   │   └── fraudCases.json
+│   └── package.json                # Owns setup:db and seed scripts
 │
 ├── docs/                           # Engineering documentation
 │   ├── PRD.md                      # This document: what and why
@@ -632,8 +630,8 @@ All commands are accessible from the repository root. No need to navigate into s
     "dev:backend":      "npm run dev --prefix backend",
     "build":            "npm run build --prefix frontend && npm run build --prefix backend",
 
-    "setup:db":         "npx ts-node bin/setup.ts",
-    "seed":             "npx ts-node bin/seed.ts",
+    "setup:db":         "npm run setup:db --prefix backend",
+    "seed":             "npm run seed --prefix backend",
 
     "docker:up":        "docker compose up --build",
     "docker:down":      "docker compose down",
@@ -887,9 +885,9 @@ npm run docker:up         # OR: npm run dev (hot reload without Docker)
 | `npm run docker:down` | Stop and remove containers |
 | `npm run docker:logs` | Tail container logs |
 
-### `bin/setup.ts` Responsibilities
+### `backend/bin/setup.ts` Responsibilities
 
-`bin/setup.ts` is a thin wrapper. All logic lives in `backend/src/vendors/setup/`:
+`backend/bin/setup.ts` is a thin wrapper. All logic lives in `backend/src/vendors/setup/`:
 
 1. Validate environment variables (fail fast with helpful error if missing)
 2. Connect to MongoDB Atlas (plain client for DEK provisioning)
@@ -900,9 +898,9 @@ npm run docker:up         # OR: npm run dev (hot reload without Docker)
 7. Apply JSON Schema validation on `fraudDiagnosisCase` (plaintext collection)
 8. Print setup summary: collections created, DEKs provisioned, indexes applied
 
-### `bin/seed.ts` Responsibilities
+### `backend/bin/seed.ts` Responsibilities
 
-`bin/seed.ts` is a thin wrapper. All logic lives in `backend/src/vendors/seed/`:
+`backend/bin/seed.ts` is a thin wrapper. All logic lives in `backend/src/vendors/seed/`:
 
 1. Upsert demo users into `partyAuthenticationQE` (hashed passwords, roles)
 2. Upsert synthetic BIAN-compliant data (no real PII: Faker.js)

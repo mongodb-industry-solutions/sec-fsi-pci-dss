@@ -799,42 +799,44 @@ In the Simulator mode, requests include a synthetic `X-Demo-Role` header instead
 ## 8. Shared Backend Vendors Structure
 
 ```
-backend/src/
-├── vendors/
-│   ├── encryption/
-│   │   ├── qeClient.ts          # MongoClient with autoEncryption
-│   │   ├── rawClient.ts         # Plain MongoClient (no autoEncryption)
-│   │   ├── kms.ts               # buildKmsProviders()
-│   │   ├── keyVault.ts          # DEK retrieval and creation
-│   │   └── encryptedFieldsMaps.ts
-│   ├── setup/
-│   │   ├── createCollections.ts # createEncryptedCollection() calls
-│   │   ├── createIndexes.ts     # index definitions
-│   │   └── provisionDEKs.ts     # DEK-lookup and DEK-sensitive setup
-│   └── seed/
-│       ├── seedUsers.ts         # partyAuthenticationQE seed
-│       ├── seedCustomers.ts     # customerAgreementQE seed
-│       ├── seedCards.ts         # paymentCardQE seed
-│       ├── seedTransactions.ts  # cardTransactionQE seed
-│       └── seedCases.ts         # fraudDiagnosisCase seed
-├── controllers/
-├── services/
-├── models/
-└── middleware/
-    ├── auth.ts                  # JWT verification
-    └── rbac.ts                  # Role-based access enforcement
+backend/
+├── bin/
+│   ├── setup.ts             # Calls src/vendors/setup/runSetup()
+│   └── seed.ts              # Calls src/vendors/seed/runSeed()
+└── src/
+    ├── vendors/
+    │   ├── encryption/
+    │   │   ├── qeClient.ts          # MongoClient with autoEncryption
+    │   │   ├── rawClient.ts         # Plain MongoClient (no autoEncryption)
+    │   │   ├── kms.ts               # buildKmsProviders()
+    │   │   ├── keyVault.ts          # DEK retrieval and creation
+    │   │   └── encryptedFieldsMaps.ts
+    │   ├── setup/
+    │   │   ├── createCollections.ts # createEncryptedCollection() calls
+    │   │   ├── createIndexes.ts     # index definitions
+    │   │   └── provisionDEKs.ts     # DEK-lookup and DEK-sensitive setup
+    │   └── seed/
+    │       ├── seedUsers.ts         # partyAuthenticationQE seed
+    │       ├── seedCustomers.ts     # customerAgreementQE seed
+    │       ├── seedCards.ts         # paymentCardQE seed
+    │       ├── seedTransactions.ts  # cardTransactionQE seed
+    │       └── seedCases.ts         # fraudDiagnosisCase seed
+    ├── controllers/
+    ├── services/
+    ├── models/
+    └── middleware/
+        ├── auth.ts                  # JWT verification
+        └── rbac.ts                  # Role-based access enforcement
 ```
 
-`bin/setup.ts` and `bin/seed.ts` are thin wrappers:
+`backend/bin/` scripts are thin wrappers; the root `package.json` delegates to `backend/package.json`:
 
-```typescript
-// bin/setup.ts
-import { runSetup } from '../backend/src/vendors/setup';
-runSetup().catch(console.error);
+```json
+// root package.json
+{ "setup:db": "npm run setup:db --prefix backend", "seed": "npm run seed --prefix backend" }
 
-// bin/seed.ts
-import { runSeed } from '../backend/src/vendors/seed';
-runSeed().catch(console.error);
+// backend/package.json
+{ "setup:db": "ts-node bin/setup.ts", "seed": "ts-node bin/seed.ts" }
 ```
 
 ---

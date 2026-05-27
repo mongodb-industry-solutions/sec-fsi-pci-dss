@@ -1030,19 +1030,19 @@ MAGENTA_API_KEY=                # MongoDB Agentic Platform (Magenta) API key
 
 ## 8. Seed Data Schema
 
-Seed files live in `data/`. The seed script (`bin/seed.ts`) reads each file and performs upsert operations using the collection's primary key as the filter.
+Seed files live in `backend/data/`. The seed script (`backend/bin/seed.ts`) reads each file and performs upsert operations using the collection's primary key as the filter.
 
 ### Seed volumes
 
 | File | Collection | Documents |
 |---|---|---|
-| `data/users.json` | `partyAuthenticationQE` | 5 |
-| `data/customerAgreements.json` | `customerAgreementQE` | 50 |
-| `data/customerAgreementsSensitive.json` | `customerAgreementSensitiveQE` | 50 |
-| `data/paymentCards.json` | `paymentCardQE` | 50 |
-| `data/cardTransactions.json` | `cardTransactionQE` | 200 |
-| `data/cardTransactionsSensitive.json` | `cardTransactionSensitiveQE` | 200 |
-| `data/fraudCases.json` | `fraudDiagnosisCase` | 20 |
+| `backend/data/users.json` | `partyAuthenticationQE` | 5 |
+| `backend/data/customerAgreements.json` | `customerAgreementQE` | 50 |
+| `backend/data/customerAgreementsSensitive.json` | `customerAgreementSensitiveQE` | 50 |
+| `backend/data/paymentCards.json` | `paymentCardQE` | 50 |
+| `backend/data/cardTransactions.json` | `cardTransactionQE` | 200 |
+| `backend/data/cardTransactionsSensitive.json` | `cardTransactionSensitiveQE` | 200 |
+| `backend/data/fraudCases.json` | `fraudDiagnosisCase` | 20 |
 
 ### Demo users (`data/users.json`)
 
@@ -1083,7 +1083,19 @@ Passwords are stored as bcrypt hashes (12 rounds). Plaintext passwords are in `.
 ## 9. Backend Source Structure
 
 ```
-backend/src/
+backend/
+├── bin/
+│   ├── setup.ts                         # Calls src/vendors/setup/runSetup()
+│   └── seed.ts                          # Calls src/vendors/seed/runSeed()
+├── data/                                # JSON seed files (consumed by bin/seed.ts only)
+│   ├── users.json
+│   ├── customerAgreements.json
+│   ├── customerAgreementsSensitive.json
+│   ├── paymentCards.json
+│   ├── cardTransactions.json
+│   ├── cardTransactionsSensitive.json
+│   └── fraudCases.json
+├── src/
 ├── controllers/
 │   ├── auth.controller.ts
 │   ├── cardTransaction.controller.ts
@@ -1137,14 +1149,36 @@ backend/src/
 └── server.ts                            # Fastify app setup + route registration
 ```
 
-`bin/setup.ts` and `bin/seed.ts` are thin wrappers at the repo root:
+`backend/bin/setup.ts` and `backend/bin/seed.ts` are thin wrappers inside the backend package:
 
 ```typescript
-// bin/setup.ts
-import { runSetup } from '../backend/src/vendors/setup';
+// backend/bin/setup.ts
+import { runSetup } from '../src/vendors/setup';
 runSetup().then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });
 
-// bin/seed.ts
-import { runSeed } from '../backend/src/vendors/seed';
+// backend/bin/seed.ts
+import { runSeed } from '../src/vendors/seed';
 runSeed().then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });
+```
+
+`backend/package.json` exposes the scripts; the root delegates to them:
+
+```json
+// backend/package.json
+{
+  "scripts": {
+    "setup:db": "ts-node bin/setup.ts",
+    "seed":     "ts-node bin/seed.ts"
+  }
+}
+```
+
+```json
+// root package.json (relevant entries)
+{
+  "scripts": {
+    "setup:db": "npm run setup:db --prefix backend",
+    "seed":     "npm run seed --prefix backend"
+  }
+}
 ```
