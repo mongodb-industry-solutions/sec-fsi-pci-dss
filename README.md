@@ -8,7 +8,7 @@
 
 ## 🎯 What This Demo Shows
 
-A synthetic digital bank uses **MongoDB Queryable Encryption (QE)** with **AWS KMS** to protect cardholder data. The server stores only ciphertext. Fraud analysts still search encrypted fields by email, phone, account reference, or card token: without server-side decryption. Access is controlled by role. Every action is audited.
+A synthetic digital bank uses **MongoDB Queryable Encryption (QE)** with **AWS KMS** to protect cardholder data. The server stores only ciphertext. Fraud analysts still search encrypted fields by email, phone, and account reference: without server-side decryption. Access is controlled by role. Every action is audited.
 
 This answers the most common FSI prospect question:
 
@@ -41,8 +41,10 @@ This answers the most common FSI prospect question:
 ```
 💳  Customer pays with credit card
          ↓
-🔐  Fields encrypted client-side before reaching MongoDB Atlas
-     (paymentCardReference, customerEmailAddress, customerMobilePhoneNumber, ...)
+🔒  PAN tokenized in the browser: never transmitted or stored
+         ↓
+🔐  PII fields encrypted client-side before reaching MongoDB Atlas
+     (customerEmailAddress, customerMobilePhoneNumber, cardTransactionAccountReference, ...)
          ↓
 🚨  Suspicious transaction triggers a Fraud Diagnosis Case
          ↓
@@ -137,14 +139,13 @@ Open [http://localhost:3000](http://localhost:3000) to view the demo.
 sec-fsi-pci-dss/
 ├── 💻 frontend/        # Next.js 14 App Router + TypeScript
 ├── ⚙️ backend/         # Fastify 4 + TypeScript
-│   ├── bin/            # Entry points: setup.ts, seed.ts (thin wrappers)
+│   ├── bin/            # setup.ts + seed.ts (run via npm --prefix backend)
 │   ├── data/           # JSON seed files: one per collection
 │   └── src/
 │       ├── controllers/   # Route handlers
 │       ├── services/      # Business logic
 │       ├── models/        # BIAN interfaces + QE schemas
 │       └── vendors/       # QE client, KMS, key vault, setup + seed logic
-├── 🌱 data/            # JSON seed files: one per collection
 └── 📚 docs/            # Engineering documentation
 ```
 
@@ -155,7 +156,7 @@ sec-fsi-pci-dss/
 | Document | Description |
 |---|---|
 | [PRD](docs/PRD.md) | What and why: audience, storyline, BIAN data model, QE design overview |
-| [Roadmap](docs/roadmap.md) | FR and NFR per iteration (v1 / v2 / v3) with acceptance criteria and Definition of Done |
+| [Roadmap](docs/roadmap.md) | FR and NFR per iteration (v1 / v2 / v3 / v4) with acceptance criteria and Definition of Done |
 | [Technical Specification](docs/technical-spec.md) | BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index strategy |
 | [Engineering Proposal](docs/engineering-proposal.md) | Architecture decisions, implementation phases, risks, alternatives, ADRs |
 | [Q&A: PCI DSS](docs/q&a.md) | Common FSI client questions about MongoDB and PCI DSS compliance |
@@ -164,10 +165,11 @@ sec-fsi-pci-dss/
 
 ## 🗄️ Data Architecture
 
-The data model follows **BIAN Service Domain** naming conventions across 6 collections:
+The data model follows **BIAN Service Domain** naming conventions across 7 collections:
 
 | Collection | BIAN Service Domain | QE Protection |
 |---|---|---|
+| `partyAuthenticationQE` | Party Authentication (SD-16) | equality: user email |
 | `cardTransactionQE` | Card Transaction (SD-254) | equality: account reference; card token is plaintext (not CHD) |
 | `cardTransactionSensitiveQE` | Card Transaction: Sensitive | none: gateway payload, processor metadata |
 | `customerAgreementQE` | Customer Agreement (SD-53) | equality: email, phone, account reference |
@@ -197,9 +199,10 @@ Key PCI DSS v4.0 requirements addressed:
 
 | Version | Theme | Key Features |
 |---|---|---|
-| 🟢 **v1** | Security Foundation | Payment simulation, QE encryption visible, basic fraud investigation |
+| 🟢 **v1** | Security Foundation | Payment simulation, JWT auth, dual-mode UI, QE encryption visible, fraud investigation |
 | 🔵 **v2** | Investigation & Control | RBAC, escalation workflow, audit trail, KMS key rotation |
-| 🟣 **v3** | Advanced Capabilities | Range queries, save card / recurring payment, Leafy Bank integration prep |
+| 🟠 **v3** | Agentic | AI agent (Magenta) for automated fraud pre-review; draft diagnosis with Accept / Override |
+| 🟣 **v4** | Advanced Capabilities | Save card / recurring payment, range queries, performance visualization, Leafy Bank scaffold |
 
 See [docs/roadmap.md](docs/roadmap.md) for the complete FR, NFR, and acceptance criteria per iteration.
 
