@@ -22,12 +22,17 @@
 7. [Queryable Encryption Design](#7-queryable-encryption-design)
 8. [Technical Architecture](#8-technical-architecture)
 9. [Product Roadmap](#9-product-roadmap)
-10. [Feature Requirements by Iteration](#10-feature-requirements-by-iteration)
+10. [Feature Requirements](#10-feature-requirements)
 11. [PCI DSS Alignment](#11-pci-dss-alignment)
 12. [Q&A Coverage Matrix](#12-qa-coverage-matrix)
 13. [Installation & DevOps](#13-installation--devops)
 14. [Success Metrics](#14-success-metrics)
 15. [Open Questions & Decisions Log](#15-open-questions--decisions-log)
+
+**Related documents:**
+- [Roadmap — FR & NFR per iteration](roadmap.md)
+- [Technical Specification](technical-spec.md)
+- [Engineering Proposal](engineering-proposal.md)
 
 ---
 
@@ -485,7 +490,7 @@ const cmkOptions = {
 **Local KMS fallback for development (docker-compose only):**
 
 ```typescript
-// packages/db/src/encryption/kms.ts
+// backend/src/encryption/kms.ts
 const kmsProviders = process.env.KMS_PROVIDER === 'local'
   ? { local: { key: Buffer.from(process.env.LOCAL_MASTER_KEY_BASE64!, 'base64') } }
   : { aws: { accessKeyId: ..., secretAccessKey: ... } };
@@ -504,125 +509,110 @@ const kmsProviders = process.env.KMS_PROVIDER === 'local'
 | **Database** | MongoDB Atlas (M10+) | QE requires Atlas or Enterprise Advanced |
 | **Encryption** | MongoDB QE auto-encryption + `crypt_shared` | No `mongocryptd` daemon needed with auto mode |
 | **Key Management** | AWS KMS | Customer-controlled CMK, production-realistic |
-| **Monorepo** | npm workspaces + Turborepo | Build caching, parallel tasks |
+| **Project setup** | npm workspaces + concurrently | Simple cross-workspace commands, no extra build tools |
 | **Containerization** | Docker + Docker Compose | One-command environment |
 | **UI Design** | LeafyGreen Design System | MongoDB IST standard |
 
-### 8.2 Monorepo Structure
+### 8.2 Repository Structure
+
+Follows the [IST Engineering Standards](../references/engineering-standards.md) — frontend and backend are fully separated, each in its own named folder. The backend owns all database access, encryption logic, and business rules. The frontend is headless: it only calls the API.
 
 ```
 sec-fsi-pci-dss/
-├── apps/
-│   ├── web/                        # Next.js App Router (frontend)
-│   │   ├── src/
-│   │   │   ├── app/
-│   │   │   │   ├── (demo)/
-│   │   │   │   │   ├── payment/    # Card payment simulation flow
-│   │   │   │   │   ├── investigation/ # Fraud investigation dashboard
-│   │   │   │   │   └── audit/      # Audit trail viewer (v2)
-│   │   │   │   ├── layout.tsx
-│   │   │   │   └── page.tsx        # Demo landing / scenario selector
-│   │   │   ├── components/         # LeafyGreen-based components
-│   │   │   └── lib/
-│   │   │       └── api-client.ts   # HTTP client for Fastify API
-│   │   ├── public/
-│   │   └── package.json
-│   │
-│   └── api/                        # Fastify REST API (backend)
-│       ├── src/
-│       │   ├── plugins/
-│       │   │   ├── mongodb.ts      # MongoDB QE client plugin
-│       │   │   └── cors.ts
-│       │   ├── routes/
-│       │   │   ├── cardTransaction/
-│       │   │   │   ├── index.ts    # POST /card-transactions
-│       │   │   │   └── schema.ts   # Fastify JSON schema
-│       │   │   ├── customerAgreement/
-│       │   │   ├── paymentCard/
-│       │   │   └── fraudDiagnosis/
-│       │   ├── services/
-│       │   │   ├── cardTransactionService.ts
-│       │   │   ├── customerAgreementService.ts
-│       │   │   └── fraudDiagnosisService.ts
-│       │   └── server.ts
-│       └── package.json
+├── frontend/                       # Next.js 14 App Router + TypeScript
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── (demo)/
+│   │   │   │   ├── payment/        # Card payment simulation flow
+│   │   │   │   ├── investigation/  # Fraud investigation dashboard
+│   │   │   │   └── audit/          # Audit trail viewer (v2)
+│   │   │   ├── layout.tsx
+│   │   │   └── page.tsx            # Demo landing / scenario selector
+│   │   ├── components/             # LeafyGreen-based UI components
+│   │   └── lib/
+│   │       └── api-client.ts       # HTTP client — only API calls, no DB access
+│   ├── public/
+│   └── package.json
 │
-├── packages/
-│   ├── db/                         # MongoDB QE client + schemas + indexes
-│   │   ├── src/
-│   │   │   ├── client.ts           # MongoClient with QE auto-encryption
-│   │   │   ├── encryption/
-│   │   │   │   ├── kms.ts          # KMS provider factory (AWS / local)
-│   │   │   │   ├── keyVault.ts     # DEK provisioning
-│   │   │   │   └── encryptedFieldsMaps.ts  # QE schemas per collection
-│   │   │   ├── collections/
-│   │   │   │   ├── cardTransactionQE.ts
-│   │   │   │   ├── customerAgreementQE.ts
-│   │   │   │   ├── paymentCardQE.ts
-│   │   │   │   └── fraudDiagnosisCase.ts
-│   │   │   └── indexes/
-│   │   │       └── createIndexes.ts
-│   │   └── package.json
-│   │
-│   └── types/                      # Shared TypeScript types (BIAN DTOs)
-│       ├── src/
-│       │   ├── bian/
-│       │   │   ├── cardTransaction.ts
-│       │   │   ├── customerAgreement.ts
-│       │   │   ├── paymentCard.ts
-│       │   │   └── fraudDiagnosis.ts
-│       │   └── api/                # Request/Response DTOs
-│       └── package.json
+├── backend/                        # Fastify 4 + TypeScript
+│   ├── cfg/                        # Non-secret runtime configuration
+│   ├── src/
+│   │   ├── controllers/            # Route handlers — thin, delegate to services
+│   │   │   ├── cardTransaction.controller.ts
+│   │   │   ├── customerAgreement.controller.ts
+│   │   │   ├── paymentCard.controller.ts
+│   │   │   └── fraudDiagnosis.controller.ts
+│   │   ├── services/               # Business logic and domain operations
+│   │   │   ├── cardTransaction.service.ts
+│   │   │   ├── customerAgreement.service.ts
+│   │   │   └── fraudDiagnosis.service.ts
+│   │   ├── models/                 # BIAN interfaces + QE encryptedFieldsMaps
+│   │   │   ├── cardTransaction.model.ts
+│   │   │   ├── customerAgreement.model.ts
+│   │   │   ├── paymentCard.model.ts
+│   │   │   └── fraudDiagnosis.model.ts
+│   │   ├── encryption/             # QE client, KMS provider, key vault
+│   │   │   ├── client.ts           # MongoClient with auto-encryption
+│   │   │   ├── kms.ts              # KMS provider factory (AWS / local)
+│   │   │   ├── keyVault.ts         # DEK provisioning
+│   │   │   └── encryptedFieldsMaps.ts
+│   │   ├── plugins/                # Fastify plugins (mongodb, cors, auth)
+│   │   └── server.ts
+│   └── package.json
 │
-├── bin/
-│   ├── setup.ts                    # DB setup: collections, indexes, QE key vault
-│   └── seed/
-│       ├── index.ts                # Entry point, accepts --reset flag
-│       ├── cardTransactions.seed.ts
-│       ├── customerAgreements.seed.ts
-│       ├── paymentCards.seed.ts
-│       └── fraudCases.seed.ts
+├── bin/                            # Setup and seed scripts (root-level)
+│   ├── setup.ts                    # Creates collections, indexes, QE key vault
+│   └── seed.ts                     # Reads data/ and upserts into Atlas
 │
-├── docs/
-│   ├── PRD.md                      # This document
-│   ├── q&a.md                      # FSI client Q&A
-│   └── data-model.md               # Visual ERD + BIAN mapping (v2)
+├── data/                           # JSON seed files — one per collection
+│   ├── customerAgreements.json
+│   ├── customerAgreementsSensitive.json
+│   ├── paymentCards.json
+│   ├── cardTransactions.json
+│   ├── cardTransactionsSensitive.json
+│   └── fraudCases.json
 │
-├── docker-compose.yml              # Full stack: web + api → Atlas
-├── docker-compose.dev.yml          # Development with hot reload + local KMS
-├── .env.example                    # Environment variable template
-├── package.json                    # Root: workspaces + global commands
-├── turbo.json                      # Turborepo pipeline config
+├── docs/                           # Engineering documentation
+│   ├── PRD.md                      # This document — what and why
+│   ├── roadmap.md                  # FR + NFR per iteration
+│   ├── technical-spec.md           # BIAN schemas, QE maps, API contracts
+│   ├── engineering-proposal.md     # How to build it — architecture decisions
+│   └── q&a.md                      # FSI client Q&A: PCI DSS + MongoDB
+│
+├── docker-compose.yml              # Full stack: frontend + backend → Atlas
+├── .env.example                    # All required env vars with descriptions
+├── package.json                    # Root command hub
 └── tsconfig.base.json              # Shared TypeScript config
 ```
 
-### 8.3 Root `package.json` Global Commands
+> Full technical detail — BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, and index creation scripts — is in [docs/technical-spec.md](technical-spec.md).
+
+### 8.3 Root `package.json` — Command Hub
+
+All commands are accessible from the repository root. No need to navigate into subdirectories.
 
 ```json
 {
   "name": "sec-fsi-pci-dss",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "dev": "turbo run dev",
-    "dev:web": "turbo run dev --filter=web",
-    "dev:api": "turbo run dev --filter=api",
-    "build": "turbo run build",
-    "start": "turbo run start",
-    "type-check": "turbo run type-check",
-    "lint": "turbo run lint",
-    "test": "turbo run test",
+    "install:all":      "npm install && npm install --prefix frontend && npm install --prefix backend",
+    "dev":              "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend":     "npm run dev --prefix frontend",
+    "dev:backend":      "npm run dev --prefix backend",
+    "build":            "npm run build --prefix frontend && npm run build --prefix backend",
 
-    "db:setup": "ts-node bin/setup.ts",
-    "db:seed": "ts-node bin/seed/index.ts",
-    "db:seed:reset": "ts-node bin/seed/index.ts --reset",
+    "setup:db":         "npx ts-node bin/setup.ts",
+    "seed":             "npx ts-node bin/seed.ts",
 
-    "install:full": "npm install && npm run db:setup && npm run db:seed",
-
-    "docker:up": "docker-compose up --build",
-    "docker:down": "docker-compose down",
-    "docker:dev": "docker-compose -f docker-compose.dev.yml up --build",
-    "docker:logs": "docker-compose logs -f"
+    "docker:up":        "docker compose up --build",
+    "docker:down":      "docker compose down",
+    "docker:logs":      "docker compose logs -f"
+  },
+  "devDependencies": {
+    "concurrently":     "^8.0.0",
+    "ts-node":          "^10.0.0",
+    "typescript":       "^5.0.0"
   }
 }
 ```
@@ -658,14 +648,12 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 
 ### 8.5 Docker Compose
 
-**`docker-compose.yml`** (production-like, connects to Atlas):
+**`docker-compose.yml`** — one command starts the full stack, connects to MongoDB Atlas:
 
 ```yaml
 services:
-  api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
+  backend:
+    build: ./backend
     ports:
       - "3001:3001"
     env_file: .env
@@ -675,47 +663,23 @@ services:
       timeout: 5s
       retries: 3
 
-  web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
+  frontend:
+    build: ./frontend
     ports:
       - "3000:3000"
     env_file: .env
     depends_on:
-      api:
+      backend:
         condition: service_healthy
     environment:
-      NEXT_PUBLIC_API_URL: http://api:3001
-```
+      NEXT_PUBLIC_API_URL: http://backend:3001
 
-**`docker-compose.dev.yml`** (development, local KMS, hot reload):
-
-```yaml
-services:
-  api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile.dev
-    volumes:
-      - ./apps/api/src:/app/apps/api/src
-      - ./packages:/app/packages
-    environment:
-      KMS_PROVIDER: local
-      LOCAL_MASTER_KEY_BASE64: <generated-at-setup>
-    ports:
-      - "3001:3001"
-
-  web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile.dev
-    volumes:
-      - ./apps/web/src:/app/apps/web/src
-    ports:
-      - "3000:3000"
-    depends_on:
-      - api
+# MongoDB is NOT included — IST demos use Atlas, not a local instance.
+# Uncomment only for fully offline scenarios:
+#  mongodb:
+#    image: mongo:8
+#    ports:
+#      - "27017:27017"
 ```
 
 ---
@@ -780,85 +744,21 @@ v3 — Advanced Capabilities  (TBD — after v2 validated)
 
 ---
 
-## 10. Feature Requirements by Iteration
+## 10. Feature Requirements
 
-### v1 Feature Requirements
+> The complete FR and NFR breakdown per iteration — with acceptance criteria and Definition of Done — is in **[docs/roadmap.md](roadmap.md)**.
 
-#### FE-01: Payment Simulation Flow (Frontend)
-- 3-step checkout form: Card Details → Review → Confirm
-- Card fields: card number (displayed as masked), cardholder name, expiry, billing email, phone
-- Card number input: accepts 16-digit format, displays `****-****-****-XXXX` immediately
-- Never send raw PAN to the API — the frontend generates a token before submission
-- Visual indicator: "Fields encrypted before leaving your browser" with a lock icon
-- On success: display Transaction ID, masked PAN, timestamp, and auto-triggered fraud alert
+The following is a high-level summary. Refer to the roadmap for the full specification.
 
-#### FE-02: Fraud Investigation Dashboard (Frontend)
-- Search bar with field selector: `email` | `phone` | `account reference` | `card token`
-- Results table: Transaction ID, Masked PAN, Amount, Merchant, Status, Risk Severity
-- Case detail view: encrypted field indicators (lock icon on QE fields), plaintext metadata
-- "Encrypted in Atlas" toggle: shows raw document with ciphertext blobs side-by-side
-- Case action: Mark as Reviewed / Escalate (v1: visual only, no backend state change for escalation)
+### Summary by Iteration
 
-#### BE-01: Payment API (Backend)
-- `POST /api/v1/card-transactions` — receives payment, writes to `cardTransactionQE` and `cardTransactionSensitiveQE` via QE auto-encryption
-- `POST /api/v1/payment-cards` — registers tokenized card in `paymentCardQE`
-- `GET /api/v1/card-transactions/:id` — retrieve transaction by ID
-- Auto-creates fraud diagnosis case when transaction amount > threshold or MCC matches risk list
+| Version | Key Frontend Features | Key Backend Features |
+|---|---|---|
+| **v1** | Payment checkout (3-step), investigation dashboard, encryption explainer ("before/after" document toggle) | POST /card-transactions (QE write), equality search on QE fields, auto-fraud-case creation, `/health` endpoint |
+| **v2** | Role selector (Level 1 / Level 2 / Auditor), escalation workflow, audit trail timeline | RBAC middleware, escalation endpoint, audit log queries, range queries on amount |
+| **v3** | Save card / recurring payment flow, performance comparison panel | Tokenization endpoint, query-timing diagnostic endpoint, Leafy Bank API contracts |
 
-#### BE-02: Investigation API (Backend)
-- `GET /api/v1/customer-agreements?email=<value>` — equality search on QE field
-- `GET /api/v1/customer-agreements?phone=<value>` — equality search on QE field
-- `GET /api/v1/customer-agreements?accountRef=<value>` — equality search on QE field
-- `GET /api/v1/card-transactions?cardToken=<value>` — equality search on QE field
-- `GET /api/v1/fraud-diagnosis-cases` — list cases with filters (status, severity)
-- `GET /api/v1/fraud-diagnosis-cases/:id` — case detail
-
-#### BE-03: Setup & Seeding (bin/)
-- `bin/setup.ts` — creates all 6 collections via `createEncryptedCollection()`, provisions DEKs in key vault, creates indexes
-- `bin/seed/index.ts` — inserts synthetic BIAN-compliant data; accepts `--reset` flag to drop and re-seed
-- Seed data: 50 `customerAgreementQE`, 50 `customerAgreementSensitiveQE`, 50 `paymentCardQE`, 200 `cardTransactionQE`, 200 `cardTransactionSensitiveQE`, 20 `fraudDiagnosisCase`
-
-#### BE-04: Health & Configuration
-- `GET /health` — returns service status and Atlas connection status
-- Environment-based KMS provider selection (AWS / local)
-- `crypt_shared` auto-loaded from `node_modules/mongodb-client-encryption`
-
-### v2 Feature Requirements
-
-#### FE-10: Role Simulation
-- Login screen with persona selector: Level 1 Analyst / Level 2 Investigator / Security Auditor
-- Role badge visible throughout the session
-- Field visibility controlled by role: sensitive fields show lock icon for Level 1, reveal button for Level 2
-
-#### FE-11: Escalation Workflow
-- Level 1 triggers escalation request on a case
-- Level 2 sees pending escalation, approves, and sensitive fields are decrypted and displayed
-- Escalation approval writes an audit event
-
-#### FE-12: Audit Trail Viewer
-- Per-case timeline: who accessed what field, when, under what role
-- Sortable by datetime, filterable by action type
-
-#### BE-10: RBAC API Layer
-- Middleware validates `X-Demo-Role` header and applies field projection accordingly
-- Level 1: only equality QE fields returned (sensitive collections never queried)
-- Level 2: full access including sensitive QE collections after escalation token validation
-
-#### BE-11: Audit Log API
-- `GET /api/v1/audit-events?caseId=<id>` — returns action log for a case
-- `POST /api/v1/fraud-diagnosis-cases/:id/escalate` — creates escalation record, writes audit event
-
-### v3 Feature Requirements
-
-#### FE-20: Save Card Flow
-- After successful payment, option: "Save this card for future payments"
-- Stores tokenized card reference in `paymentCardQE` with `isPreferredCard: true`
-- Simulates browser-side storage concern: shows that no sensitive data is stored locally — only the token
-- On next payment: "Use saved card ****-1234" — retrieves `paymentCardQE` by token
-
-#### BE-20: Performance Visualization
-- `GET /api/v1/diagnostics/query-timing` — runs the same query on an encrypted vs. a plaintext shadow collection, returns timing comparison
-- Demonstrates QE performance overhead is acceptable for the use case
+See [docs/roadmap.md](roadmap.md) for the complete FR and NFR specification with acceptance criteria per iteration.
 
 ---
 
@@ -906,34 +806,34 @@ The demo directly addresses the following questions from `docs/q&a.md`:
 ### Quick Start (3 commands)
 
 ```bash
-# 1. Clone and install dependencies
+# 1. Clone and configure environment
 git clone <repo-url> && cd sec-fsi-pci-dss
-cp .env.example .env      # fill in MONGODB_URI + AWS KMS or use local KMS
+cp .env.example .env      # fill in MONGODB_URI + AWS KMS credentials (or set KMS_PROVIDER=local)
 
-# 2. Full system setup (DB + seed data)
-npm run install:full      # npm install + db:setup + db:seed
+# 2. Install all dependencies
+npm run install:all
 
-# 3. Start the full stack
-npm run docker:up         # OR: npm run dev (for hot reload without Docker)
+# 3a. Set up the database and seed demo data
+npm run setup:db && npm run seed
+
+# 3b. Start the full stack
+npm run docker:up         # OR: npm run dev (hot reload without Docker)
 ```
 
 ### Individual Commands
 
 | Command | Description |
 |---|---|
-| `npm run dev` | Start all apps in development mode (hot reload) |
-| `npm run dev:web` | Start only the Next.js frontend |
-| `npm run dev:api` | Start only the Fastify API |
-| `npm run build` | Build all apps for production |
-| `npm run db:setup` | Create collections, indexes, provision QE key vault and DEKs |
-| `npm run db:seed` | Insert synthetic demo data (non-destructive) |
-| `npm run db:seed:reset` | Drop and re-insert all seed data |
+| `npm run install:all` | Install root + frontend + backend dependencies |
+| `npm run dev` | Start frontend and backend concurrently (hot reload) |
+| `npm run dev:frontend` | Start only the Next.js frontend |
+| `npm run dev:backend` | Start only the Fastify API |
+| `npm run build` | Build frontend and backend for production |
+| `npm run setup:db` | Create collections, indexes, provision QE key vault and DEKs |
+| `npm run seed` | Insert synthetic demo data (idempotent — safe to re-run) |
 | `npm run docker:up` | Build and start full stack with Docker Compose |
-| `npm run docker:dev` | Start development stack with hot reload volumes |
 | `npm run docker:down` | Stop and remove containers |
-| `npm run type-check` | TypeScript validation across all packages |
-| `npm run lint` | ESLint across all packages |
-| `npm run test` | Run tests across all packages |
+| `npm run docker:logs` | Tail container logs |
 
 ### `bin/setup.ts` Responsibilities
 
@@ -962,7 +862,7 @@ npm run docker:up         # OR: npm run dev (for hot reload without Docker)
 
 | Criterion | Measure |
 |---|---|
-| **Setup time** | `npm run install:full` + `docker:up` completes in < 5 minutes on a clean machine |
+| **Setup time** | `npm run install:all` + `setup:db` + `seed` + `docker:up` completes in < 5 minutes |
 | **Demo flow** | CISO persona walkthrough completes in ≤ 10 minutes |
 | **Explainability** | Non-technical AE can run the demo without engineering support after 1 practice session |
 | **Offline capability** | Demo runs fully offline with `KMS_PROVIDER=local` for travel/conference scenarios |
@@ -992,7 +892,7 @@ npm run docker:up         # OR: npm run dev (for hot reload without Docker)
 | 6 | Demo entry point v1 | Payment simulation flow (card checkout → alert → investigation) | 2026-05-26 |
 | 7 | Store full PAN? | Never. Tokenized reference (`paymentCardReference`) only | 2026-05-26 |
 | 8 | `$lookup` across QE collections? | Not supported. Application-side joins only | 2026-05-26 |
-| 9 | Monorepo tool | npm workspaces + Turborepo | 2026-05-26 |
+| 9 | Project setup tool | npm workspaces + concurrently (no Turborepo) | 2026-05-26 |
 | 10 | customerName encryption | Plaintext in v1 for display simplicity; QE:equality in v2 | 2026-05-26 |
 
 ---
