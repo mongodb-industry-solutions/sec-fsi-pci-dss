@@ -273,3 +273,79 @@ A second backend endpoint queries the same document using a plain MongoClient wi
 "This is what Atlas sees. Not the email address. Not the account reference. Just encrypted bytes. The only system that can read these fields is your backend service, using your keys, stored in your KMS. MongoDB has zero access to those keys. This is not a contractual promise. It is a mathematical guarantee."
 
 This toggle is the single most effective moment in the demo for answering the question: *"How do we know MongoDB cannot read our cardholder data?"* The answer is not a policy statement. It is a live query result: ciphertext in the database, plaintext in the application, with the only difference being cryptographic key possession.
+
+---
+
+### Questions and Answers about PAN Storage and Recurring Payment Compliance
+
+*These questions address how Requirement 3.4 (PAN unreadable) is satisfied in the demo and how a PCI DSS compliant save-card feature should be designed.*
+
+---
+
+#### **20. How does the demo satisfy PCI DSS Requirement 3.4 (PAN must be rendered unreadable wherever it is stored)?**
+
+**Answer:**
+The demo satisfies Requirement 3.4 through non-storage, which is the strongest possible form of compliance: the PAN (Primary Account Number) never enters the system at all.
+
+The payment flow works as follows:
+
+1. The customer enters their card number in the browser.
+2. The frontend generates a synthetic token (`tok_7xB2kp1q`) client-side before making any API call.
+3. The PAN is discarded in the browser. It never travels over the network, never reaches the Fastify backend, and never reaches Atlas.
+4. The backend receives only the token and processes the transaction using that token as the card identifier.
+
+**What the system stores for a card:**
+
+| Field | Value example | Classification | Storage |
+|---|---|---|---|
+| `paymentCardReference` | `tok_7xB2kp1q` | Card surrogate, not CHD | Plaintext, standard index |
+| `maskedPanDisplay` | `**** **** **** 4242` | Allowed for display (PCI DSS permits last 4 digits) | Plaintext |
+| `cardExpirationDate` | `[ciphertext]` | CHD, must be protected | QE:none (encrypted, non-searchable) |
+| CVV / PIN | not present | SAD, must never be stored | Never accepted by any endpoint |
+
+The PAN is absent from every layer: no API request body, no database document, no log, no backup. This takes the entire system out of scope for the PAN-related controls in Requirement 3.4.
+
+**The important nuance:** someone does hold the PAN, but it is the token vault operated by the PSP (Payment Service Provider) or payment network (Visa Token Service, Mastercard MDES). That system is a high-security, independently PCI DSS certified environment that is outside the scope of this demo. This demo represents the issuing bank's application layer, which receives a token after the PSP has already removed the PAN from the flow.
+
+---
+
+#### **21. The demo mentions "save card" as a future feature. How should recurring payment / saved card be implemented to be PCI DSS compliant?**
+
+**Answer:**
+Save card for recurring payment is a v4 feature in this demo (not yet implemented). The current architecture already has the correct foundation. Here is what a compliant implementation requires.
+
+**Core principle:** the network token IS the saved card. The merchant or bank never stores the PAN. The PSP or payment network issues a persistent token that represents the card for future charges, and that token is what gets stored in `paymentCardReference`.
+
+**What to store per saved card (PCI DSS compliant):**
+
+| Field | Value | Requirement |
+|---|---|---|
+| `paymentCardReference` | PSP/network token | Not CHD; plaintext storage is correct |
+| `maskedPanDisplay` | `**** **** **** 4242` | Permitted for UI display |
+| `cardExpirationDate` | `[ciphertext]` | CHD; QE:none already correct |
+| `billingAddress` | `[ciphertext]` | PII; QE:none for privacy |
+| `cardholderConsentTimestamp` | ISO 8601 datetime | Required: Req 3.1 + network rules |
+| `mandateStatus` | `active / cancelled / expired` | Required for Req 3.7 purge logic |
+
+**What must never be stored (Requirement 3.3):**
+CVV and PIN are prohibited after authorization under any circumstances. Recurring transactions are "merchant-initiated transactions" under Visa and Mastercard rules: they do not require CVV re-entry because the customer's consent is captured in the mandate, not re-verified on each charge. Any system design that stores CVV "to avoid asking again" is a PCI DSS violation regardless of how it is encrypted.
+
+**Five requirements specific to recurring payment:**
+
+**1. Explicit cardholder consent (Req 3.1 + network rules):**
+The save-card step must present an explicit consent checkbox and record the consent timestamp. Without documented consent, storing card data for future charges violates both PCI DSS and payment network rules.
+
+**2. Scope-limited access to the charge trigger (Req 7):**
+Only the payment processing service should be able to initiate a new charge using a stored token. The fraud investigation system, the analytics system, and Level 1 and Level 2 analysts must not have access to the recurring charge endpoint. In the demo's RBAC model, the charge-with-saved-card endpoint needs a distinct authorization scope separate from investigation roles.
+
+**3. Periodic purge of unused stored cards (Req 3.7):**
+Stored card data must be deleted when the customer cancels the mandate, when the card expires and no replacement token is received, or when the data has been stored beyond the agreed retention period. The `paymentCardQE` collection needs a `mandateStatus` field and a scheduled cleanup job.
+
+**4. Token lifecycle and automatic card update:**
+Network tokens issued by Visa Token Service or Mastercard MDES can auto-update when the underlying physical card is replaced (reissued after loss, theft, or expiry). This is handled by Visa Account Updater (VAU) and Mastercard Automatic Billing Updater (ABU). The PSP manages this transparently: the bank or merchant stores the same `paymentCardReference` and it remains valid even after the physical card number changes. No PAN handling is required on the bank or merchant side.
+
+**5. Scope reduction through tokenization:**
+Using a PSP-issued network token for recurring payments keeps the bank or merchant entirely out of scope for PAN storage. If instead the bank were to store the PAN encrypted (even with QE), the collection and all systems that access it become part of the PCI CDE (Cardholder Data Environment), requiring full PCI DSS assessment. Storing only the token eliminates that scope entirely.
+
+**How the current demo architecture supports this:**
+The `paymentCardQE` collection is already structured correctly for a compliant save-card implementation. `paymentCardReference` as a plaintext indexed field is the right design. `cardExpirationDate` as QE:none is the right protection level. The v4 implementation needs to add `cardholderConsentTimestamp`, `mandateStatus`, the charge-trigger endpoint with its restricted RBAC scope, and the mandate expiry cleanup job.

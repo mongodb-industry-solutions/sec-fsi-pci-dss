@@ -16,18 +16,18 @@ The demo exposes two entry points from the landing page. Each targets a differen
 ```
 ┌────────────────────────────────────────────────────────────┐
 │                                                            │
-│   🏦  FSI PCI DSS Payment Security Demo                    │
+│       FSI PCI DSS Payment Security Demo                    │
 │       MongoDB Queryable Encryption · AWS KMS               │
 │                                                            │
-│  ┌───────────────────────────┐  ┌──────────────────────┐  │
-│  │  🎬 Simulator Mode        │  │  🔐 Application Mode  │  │
-│  │                           │  │                      │  │
-│  │  Story-driven. No login.  │  │  Real login. Roles.  │  │
+│  ┌───────────────────────────┐  ┌─────────────────────b─┐  │
+│  │   Simulator Mode          │  │   Application Mode    │  │
+│  │                           │  │                       │  │
+│  │  Story-driven. No login.  │  │  Real login. Roles.   │  │
 │  │  Follow Luis's payment    │  │  JWT auth. Full RBAC  │  │
 │  │  to fraud investigation.  │  │  escalation workflow. │  │
-│  │                           │  │                      │  │
-│  │  [▶ Start Demo]           │  │  [→ Sign In]         │  │
-│  └───────────────────────────┘  └──────────────────────┘  │
+│  │                           │  │                       │  │
+│  │  [Start Demo]             │  │  [→ Sign In]          │  │
+│  └───────────────────────────┘  └───────────────────────┘  │
 │                                                            │
 └────────────────────────────────────────────────────────────┘
 ```
@@ -67,18 +67,18 @@ Split-screen is the most effective tool for a technically sophisticated audience
 
 ```
 ┌─────────────────────────┬──────────────────────────────────┐
-│  💳 Customer View       │  🗄️ Atlas · cardTransactionQE   │
+│  Customer View          │  Atlas · cardTransactionQE       │
 │                         │                                  │
 │  Card: **** **** ****   │  {                               │
-│        1234             │    "_id": "txn-001234",           │
-│  Email: john@bank.com   │    "paymentCardReference":        │
+│        1234             │    "_id": "txn-001234",          │
+│  Email: john@bank.com   │    "paymentCardReference":       │
 │                         │      "\x06\x12\x89\xf4...",      │
-│  [Confirm Payment]      │    "customerEmailAddress":        │
+│  [Confirm Payment]      │    "customerEmailAddress":       │
 │                         │      "\x02\xa1\x7c\x33...",      │
-│                         │    "transactionAmount": {         │
-│                         │      "amount": 850.00,            │
-│                         │      "currency": "USD"            │
-│                         │    }                              │
+│                         │    "transactionAmount": {        │
+│                         │      "amount": 850.00,           │
+│                         │      "currency": "USD"           │
+│                         │    }                             │
 │                         │  }                               │
 └─────────────────────────┴──────────────────────────────────┘
 ```
@@ -127,7 +127,7 @@ This means what the presenter shows is the actual Atlas storage state: not a sim
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  💳 New Payment                                    Step 1 of 3   │
+│  New Payment                                    Step 1 of 3      │
 │                                                                  │
 │  Card Number    [ **** **** **** 1234            ]               │
 │                   Masked immediately: raw PAN never sent         │
@@ -135,7 +135,7 @@ This means what the presenter shows is the actual Atlas storage state: not a sim
 │  Expiry         [ 12 / 28  ]  Card token generated client-side   │
 │                                                                  │
 │  Email          [ luis.fernandez@leafybank.demo  ]               │
-│  Phone          [ +44 7700 900123               ]               │
+│  Phone          [ +44 7700 900123                ]               │
 │  Amount         [ $ 850.00                       ]               │
 │  Merchant       [ TechGadgets Ltd.               ]               │
 │  MCC            [ 5734: Computer and Software    ]               │
@@ -365,24 +365,24 @@ All `/demo/*` routes require a valid JWT. Middleware reads role from token and g
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                                                                  │
-│   🏦  PCI DSS Demo · Sign In                                     │
+│   PCI DSS Demo · Sign In                                         │
 │                                                                  │
 │   Authentication domain:   [local ▼]                             │
 │                                ├ local (demo users)              │
 │                                └ (MS Entra ID: coming in v2)     │
 │                                                                  │
 │   Username  [ luis.fernandez@leafybank.demo   ▼ ]                │
-│             ├ luis.fernandez@leafybank.demo  (Customer)           │
-│             ├ julia.santos@leafybank.demo    (Customer)           │
-│             ├ sarah.chen@leafybank.demo      (L1 Analyst)         │
-│             ├ michael.obi@leafybank.demo     (L2 Investigator)    │
-│             └ admin@leafybank.demo           (Security Auditor)   │
+│             ├ luis.fernandez@leafybank.demo  (Customer)          │
+│             ├ julia.santos@leafybank.demo    (Customer)          │
+│             ├ sarah.chen@leafybank.demo      (L1 Analyst)        │
+│             ├ michael.obi@leafybank.demo     (L2 Investigator)   │
+│             └ admin@leafybank.demo           (Security Auditor)  │
 │                                                                  │
 │   Password  [ ••••••••••••••• ]  (auto-filled on selection)      │
 │                                                                  │
 │   [Sign In]                                                      │
 │                                                                  │
-│   ℹ️  Test users and their passwords are pre-seeded.             │
+│   Test users and their passwords are pre-seeded.                 │
 │       Select any user to auto-fill credentials.                  │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘
@@ -454,18 +454,18 @@ The customer sees the outcome state only: `under investigation`, `cleared`, or `
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  🏦 LeafyBank Demo    Sarah Chen [Level 1 Analyst]  [Sign out]  │
+│  LeafyBank Demo    Sarah Chen [Level 1 Analyst]  [Sign out]      │
 │                                                                  │
-│  🕵️ Case Dashboard                  [My Cases]  [All Open Cases] │
+│  Case Dashboard                  [My Cases]  [All Open Cases]    │
 │                                                                  │
-│  Search  [email ▼] [                          ] [🔍 Search]      │
+│  Search  [email ▼] [                          ] [Search]         │
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐    │
-│  │  Case ID       Transaction   Amount    Severity  Status   │    │
+│  │  Case ID       Transaction   Amount    Severity  Status  │    │
 │  │  ──────────    ───────────   ──────    ────────  ─────── │    │
-│  │  FD-2026-0234  TXN-001234    $850.00   HIGH      Open     │    │
-│  │  FD-2026-0198  TXN-001198    $320.00   MEDIUM    Review   │    │
-│  │  FD-2026-0187  TXN-001187    $1200.00  HIGH      Open     │    │
+│  │  FD-2026-0234  TXN-001234    $850.00   HIGH      Open    │    │
+│  │  FD-2026-0198  TXN-001198    $320.00   MEDIUM    Review  │    │
+│  │  FD-2026-0187  TXN-001187    $1200.00  HIGH      Open    │    │
 │  └──────────────────────────────────────────────────────────┘    │
 │                                                                  │
 │  Filter: [All Status ▼]  [All Severity ▼]                        │
@@ -476,7 +476,7 @@ The customer sees the outcome state only: `under investigation`, `cleared`, or `
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  Case FD-2026-001234 · HIGH · Open          [✓ Clear] [⬆ Escalate]│
+│  Case FD-2026-001234 · HIGH · Open        [✓ Clear] [⬆ Escalate] │
 │  Assigned to: Sarah Chen · Opened: 2026-05-27 14:32              │
 │                                                                  │
 │  Transaction                                                     │
@@ -554,10 +554,10 @@ The customer sees the outcome state only: `under investigation`, `cleared`, or `
 │  "Amount over threshold. Merchant category matches recent        │
 │   fraud pattern. Customer has no prior flags."                   │
 │                                                                  │
-│  Sensitive Fields (Level 2 · click to reveal)                   │
+│  Sensitive Fields (Level 2 · click to reveal)                    │
 │  ┌──────────────────────────────────────────────────────────┐    │
-│  │  [🔓 Reveal Sensitive Fields]                             │    │
-│  │  Note: Access will be logged in the audit trail           │    │
+│  │  [🔓 Reveal Sensitive Fields]                            │   │
+│  │  Note: Access will be logged in the audit trail          │    │
 │  └──────────────────────────────────────────────────────────┘    │
 │                                                                  │
 │  [🔐 View Raw Atlas Document]  [📋 View Audit Trail]            │
@@ -570,8 +570,8 @@ The customer sees the outcome state only: `under investigation`, `cleared`, or `
 │  Sensitive Fields (Level 2 · accessed: 2026-05-27 14:40)        │
 │  ✅ Address:    14 Grove Lane, London, EC1A 1BB, UK             │
 │  ✅ Gov. ID:    SYNTH-UK-48291047                               │
-│  ✅ Risk Notes: Previous flag: rapid card reuse                  │
-│                                                                  │
+│  ✅ Risk Notes: Previous flag: rapid card reuse                 │
+│                                                                 │
 │  ⚠️  Field access logged: address, gov_id, risk_notes           │
 ```
 
@@ -579,7 +579,7 @@ The customer sees the outcome state only: `under investigation`, `cleared`, or `
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  ✅ Resolve Case FD-2026-001234                                  │
+│  Resolve Case FD-2026-001234                                     │
 │                                                                  │
 │  Outcome:                                                        │
 │  ○ Confirmed fraud: card blocked                                 │
@@ -587,8 +587,8 @@ The customer sees the outcome state only: `under investigation`, `cleared`, or `
 │  ○ Referred to external authority                                │
 │                                                                  │
 │  Resolution notes:                                               │
-│  [ No prior fraud history. Customer verified by phone.          ]│
-│  [ Transaction consistent with customer profile.                ]│
+│  [ No prior fraud history. Customer verified by phone.         ] │
+│  [ Transaction consistent with customer profile.               ] │
 │                                                                  │
 │  [Cancel]                             [Confirm Resolution]       │
 └──────────────────────────────────────────────────────────────────┘
@@ -599,26 +599,26 @@ After resolution: case status changes to `resolved_cleared`. Customer (Luis) see
 ### 4.7 Role: Security Auditor (Admin)
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│  🏦 LeafyBank Demo        Admin [Security Auditor]  [Sign out]  │
-│                                                                  │
-│  📋 Audit Log                                                    │
-│                                                                  │
-│  Filter: [Case ID: FD-2026-001234  ] [All Actions ▼] [Search]   │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐    │
+┌───────────────────────────────────────────────────────────────────┐
+│  LeafyBank Demo        Admin [Security Auditor]  [Sign out]       │
+│                                                                   │
+│  Audit Log                                                        │
+│                                                                   │
+│  Filter: [Case ID: FD-2026-001234  ] [All Actions ▼] [Search]     │
+│                                                                   │
+│  ┌───────────────────────────────────────────────────────────┐    │
 │  │  Datetime (UTC)     Action         User           Field   │    │
-│  │  ─────────────────  ────────────   ─────────────  ─────  │    │
+│  │  ─────────────────  ────────────   ─────────────  ─────   │    │
 │  │  2026-05-27 14:32   case_opened    payment_svc    auto    │    │
 │  │  2026-05-27 14:35   field_accessed sarah.chen     email   │    │
 │  │  2026-05-27 14:38   escalated      sarah.chen     :       │    │
 │  │  2026-05-27 14:40   field_accessed michael.obi    address │    │
 │  │  2026-05-27 14:40   field_accessed michael.obi    gov_id  │    │
 │  │  2026-05-27 14:42   resolved       michael.obi    :       │    │
-│  └──────────────────────────────────────────────────────────┘    │
-│                                                                  │
-│  [Export CSV]  [Sort: Newest ▼]                                  │
-└──────────────────────────────────────────────────────────────────┘
+│  └───────────────────────────────────────────────────────────┘    │
+│                                                                   │
+│  [Export CSV]  [Sort: Newest ▼]                                   │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
 The auditor role is read-only. No case modification is possible from this view.
