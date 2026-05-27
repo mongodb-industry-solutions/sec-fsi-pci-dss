@@ -40,8 +40,10 @@ export interface CardTransactionLogControlRecord {
   cardTransactionInstanceReference: string;       // UUID, primary key
   cardTransactionExternalReference?: string;      // Gateway transaction ID
 
+  // Plaintext: card token is a surrogate, not CHD under PCI DSS v4.0
+  paymentCardReference: string;                   // Indexed plaintext: standard query, not QE
+
   // QE equality: searchable encrypted fields
-  paymentCardReference: string;                   // Tokenized card ID
   cardTransactionAccountReference: string;        // Account reference
 
   // Plaintext operational fields
@@ -139,10 +141,10 @@ export interface PaymentCardManagementControlRecord {
   paymentCardInstanceReference: string;          // UUID, primary key
   customerAgreementInstanceReference: string;    // FK: plaintext linking key
 
-  // QE equality
-  paymentCardReference: string;                  // Token (same token as in cardTransactionQE)
+  // Plaintext: token is a card surrogate, not CHD under PCI DSS v4.0
+  paymentCardReference: string;                  // Indexed plaintext: standard query, not QE
 
-  // QE none
+  // QE none: expiry date is CHD co-located with card reference
   cardExpirationDate: string;                    // MM/YY format
 
   // Plaintext display fields
@@ -320,14 +322,11 @@ export function buildEncryptedFieldsMaps(
   return {
 
     // ── cardTransactionQE ──────────────────────────────────────────
+    // NOTE: paymentCardReference is NOT in QE. A payment token is a card
+    // surrogate, not CHD under PCI DSS v4.0. It is stored plaintext and
+    // searched via a standard MongoDB index.
     cardTransactionQE: {
       fields: [
-        {
-          keyId: dekLookupId,
-          path: 'paymentCardReference',
-          bsonType: 'string',
-          queries: { queryType: 'equality' },
-        },
         {
           keyId: dekLookupId,
           path: 'cardTransactionAccountReference',
@@ -411,19 +410,16 @@ export function buildEncryptedFieldsMaps(
     },
 
     // ── paymentCardQE ──────────────────────────────────────────────
+    // NOTE: paymentCardReference is NOT in QE (see cardTransactionQE note).
+    // cardExpirationDate IS protected: expiry date is CHD when co-located with
+    // a card reference, and here it travels alongside the token.
     paymentCardQE: {
       fields: [
-        {
-          keyId: dekLookupId,
-          path: 'paymentCardReference',
-          bsonType: 'string',
-          queries: { queryType: 'equality' },
-        },
         {
           keyId: dekSensitiveId,
           path: 'cardExpirationDate',
           bsonType: 'string',
-          // QE:none
+          // QE:none — non-searchable, retrieval only
         },
       ],
     },
@@ -607,6 +603,7 @@ async function createIndexes(client: MongoClient, dbName: string) {
 
   await db.collection('cardTransactionQE').createIndexes([
     { key: { cardTransactionInstanceReference: 1 }, unique: true },
+    { key: { paymentCardReference: 1 } },             // standard index: token is not QE
     { key: { transactionDateTime: -1 } },
     { key: { transactionStatus: 1 } },
   ]);
@@ -626,6 +623,7 @@ async function createIndexes(client: MongoClient, dbName: string) {
 
   await db.collection('paymentCardQE').createIndexes([
     { key: { paymentCardInstanceReference: 1 }, unique: true },
+    { key: { paymentCardReference: 1 } },             // standard index: token is not QE
     { key: { customerAgreementInstanceReference: 1 } },
   ]);
 
@@ -709,7 +707,7 @@ Returns transaction by ID (no QE field values returned to Level 1).
 
 #### `GET /card-transactions?cardToken=<value>`
 
-QE equality search on `paymentCardReference`.
+Standard index query on `paymentCardReference` (plaintext field: token is a card surrogate, not CHD under PCI DSS v4.0).
 
 **Response 200:**
 ```json

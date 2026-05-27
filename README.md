@@ -20,7 +20,7 @@ This answers the most common FSI prospect question:
 
 | Capability | What the Demo Shows |
 |---|---|
-| 🔐 **Queryable Encryption (equality)** | Search encrypted email, phone, account reference, card token |
+| 🔐 **Queryable Encryption (equality)** | Search encrypted email, phone, and account reference (PII fields) |
 | 🔒 **Queryable Encryption (none mode)** | Protect address and government ID; reveal only under escalation (v2) |
 | 🔑 **AWS KMS integration** | Customer-controlled master key; MongoDB has zero access |
 | 👤 **RBAC** | Level 1 Analyst vs Level 2 Investigator field visibility (v2) |
@@ -168,11 +168,11 @@ The data model follows **BIAN Service Domain** naming conventions across 6 colle
 
 | Collection | BIAN Service Domain | QE Protection |
 |---|---|---|
-| `cardTransactionQE` | Card Transaction (SD-254) | equality: card token, account reference |
+| `cardTransactionQE` | Card Transaction (SD-254) | equality: account reference; card token is plaintext (not CHD) |
 | `cardTransactionSensitiveQE` | Card Transaction: Sensitive | none: gateway payload, processor metadata |
 | `customerAgreementQE` | Customer Agreement (SD-53) | equality: email, phone, account reference |
 | `customerAgreementSensitiveQE` | Customer Agreement: Sensitive | none: address, government ID, risk notes |
-| `paymentCardQE` | Payment Card (SD-88) | equality: card token; none: expiry date |
+| `paymentCardQE` | Payment Card (SD-88) | none: expiry date; card token is plaintext (not CHD) |
 | `fraudDiagnosisCase` | Fraud Diagnosis (SD-83) | plaintext: operational metadata only |
 
 > Full schema definitions, field-level QE modes, index strategy, and collection relationships are in [docs/technical-spec.md](docs/technical-spec.md).

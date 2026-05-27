@@ -102,7 +102,7 @@ A synthetic digital bank (standalone, Leafy Bank-ready) runs a payment flow wher
 
 | Feature | Purpose in Demo |
 |---|---|
-| Queryable Encryption: equality | Search encrypted email, phone, account reference, card token |
+| Queryable Encryption: equality | Search encrypted email, phone, and account reference (PII fields) |
 | Queryable Encryption: range (v2) | Search by encrypted transaction amount band |
 | Queryable Encryption: none mode | Protect sensitive PII (address, government ID) that only escalated roles see |
 | AWS KMS integration | Customer-controlled key management, key rotation simulation |
@@ -127,7 +127,7 @@ A synthetic digital bank (standalone, Leafy Bank-ready) runs a payment flow wher
 | Persona | Access Level | Actions Available |
 |---|---|---|
 | **Payment Service** | Write: Card Transaction SD, Customer Agreement SD | Submit card payment, encrypt fields |
-| **Level 1 Analyst** | Read: equality QE fields only | Search by email, phone, account ref, card token |
+| **Level 1 Analyst** | Read: equality QE fields only | Search by email (QE), phone (QE), account ref (QE); card token search via standard index |
 | **Level 2 Investigator** | Read: equality + `none` mode QE fields | Full record reveal after escalation approval |
 | **Security Auditor** | Read: audit log, case history only | Review access events, export case timeline |
 
@@ -214,8 +214,10 @@ interface CardTransactionLogControlRecord {
   cardTransactionInstanceReference: string;       // primary key, UUID
   cardTransactionExternalReference?: string;      // gateway transaction ID
 
+  // Plaintext: payment token is a card surrogate, not CHD under PCI DSS v4.0
+  paymentCardReference: string;                   // indexed plaintext: standard query, not QE
+
   // Encrypted: QE equality (searchable)
-  paymentCardReference: string;                   // QE:equality: tokenized card ID
   cardTransactionAccountReference: string;        // QE:equality: account reference
 
   // Transaction metadata (plaintext)
@@ -312,11 +314,11 @@ interface PaymentCardManagementControlRecord {
   paymentCardInstanceReference: string;          // primary key, UUID
   customerAgreementInstanceReference: string;    // FK to customerAgreementQE (plaintext)
 
-  // Encrypted: QE equality (searchable)
-  paymentCardReference: string;                  // QE:equality: token (same as in cardTransactionQE)
+  // Plaintext: payment token is a card surrogate, not CHD under PCI DSS v4.0
+  paymentCardReference: string;                  // indexed plaintext: standard query, not QE
 
   // Encrypted: QE none (non-searchable)
-  cardExpirationDate: string;                    // QE:none: MM/YY format
+  cardExpirationDate: string;                    // QE:none: MM/YY format — CHD co-located with card reference
 
   // Display fields (plaintext: non-sensitive)
   maskedPanDisplay: string;                      // ****-****-****-1234
@@ -407,8 +409,10 @@ fraudDiagnosisCase ─── also links to ──► customerAgreementQE
 | `customerAgreementQE` | `customerAgreementInstanceReference` | Unique | Primary lookup |
 | `customerAgreementQE` | `agreementStatus` | Single field | Active customer filtering |
 | `customerAgreementSensitiveQE` | `customerAgreementInstanceReference` | Unique | 1:1 join |
-| `paymentCardQE` | `customerAgreementInstanceReference` | Single field | Cards by customer |
 | `paymentCardQE` | `paymentCardInstanceReference` | Unique | Primary lookup |
+| `paymentCardQE` | `paymentCardReference` | Single field | Token lookup (standard index: not QE) |
+| `paymentCardQE` | `customerAgreementInstanceReference` | Single field | Cards by customer |
+| `cardTransactionQE` | `paymentCardReference` | Single field | Transactions by token (standard index: not QE) |
 | `fraudDiagnosisCase` | `fraudDiagnosisInstanceReference` | Unique | Primary lookup |
 | `fraudDiagnosisCase` | `linkedCardTransactionReference` | Single field | Case by transaction |
 | `fraudDiagnosisCase` | `caseStatus, riskSeverity` | Compound | Dashboard filtering |
@@ -425,12 +429,12 @@ fraudDiagnosisCase ─── also links to ──► customerAgreementQE
 
 | Field | BIAN SD | PCI Classification | QE Mode | Collection | Demo Version |
 |---|---|---|---|---|---|
-| `paymentCardReference` | Card Transaction | CHD (token) | `equality` | `cardTransactionQE` | v1 |
+| `paymentCardReference` | Card Transaction | **Card surrogate: not CHD under PCI DSS v4.0** | **plaintext (indexed)** | `cardTransactionQE` | v1 |
 | `cardTransactionAccountReference` | Card Transaction | CHD-adjacent | `equality` | `cardTransactionQE` | v1 |
 | `customerEmailAddress` | Customer Agreement | PII | `equality` | `customerAgreementQE` | v1 |
 | `customerMobilePhoneNumber` | Customer Agreement | PII | `equality` | `customerAgreementQE` | v1 |
 | `customerAgreementReference` | Customer Agreement | CHD-adjacent | `equality` | `customerAgreementQE` | v1 |
-| `paymentCardReference` | Payment Card | CHD (token) | `equality` | `paymentCardQE` | v1 |
+| `paymentCardReference` | Payment Card | **Card surrogate: not CHD under PCI DSS v4.0** | **plaintext (indexed)** | `paymentCardQE` | v1 |
 | `cardExpirationDate` | Payment Card | CHD | `none` | `paymentCardQE` | v1 |
 | `rawGatewayPayload` | Card Transaction | Internal | `none` | `cardTransactionSensitiveQE` | v1 |
 | `processorTransactionMetadata` | Card Transaction | Internal | `none` | `cardTransactionSensitiveQE` | v1 |

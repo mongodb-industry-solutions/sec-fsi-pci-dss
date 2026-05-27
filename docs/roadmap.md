@@ -55,7 +55,7 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 |---|---|---|
 | 02.1 | Search bar with field selector: `email` \| `phone` \| `account reference` \| `card token` | Selector is visible; only one field can be searched at a time |
 | 02.2 | Results table shows: Transaction ID, Masked PAN, Amount, Merchant, Status, Risk Severity | All six columns are present; values are accurate |
-| 02.3 | Case detail panel shows QE field indicators (lock icon on encrypted fields) | Lock icon is shown on `customerEmailAddress`, `paymentCardReference`, `customerAgreementReference` |
+| 02.3 | Case detail panel shows QE field indicators (lock icon on encrypted fields) | Lock icon is shown on `customerEmailAddress`, `customerMobilePhoneNumber`, `cardTransactionAccountReference`; card token shown as plaintext with a label |
 | 02.4 | "Encrypted in Atlas" toggle shows raw document view with ciphertext blobs | Toggle switches between business view and raw document; ciphertext is visible in raw view |
 | 02.5 | Cases list supports filter by status and risk severity | Filters update results without page reload |
 
@@ -76,7 +76,7 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 | 04.1 | `GET /api/v1/customer-agreements?email=<value>` performs QE equality search | Returns matching record when email value matches an encrypted field |
 | 04.2 | `GET /api/v1/customer-agreements?phone=<value>` performs QE equality search | Returns matching record when phone value matches |
 | 04.3 | `GET /api/v1/customer-agreements?accountRef=<value>` performs QE equality search | Returns matching record when account reference matches |
-| 04.4 | `GET /api/v1/card-transactions?cardToken=<value>` performs QE equality search | Returns matching transactions for the given card token |
+| 04.4 | `GET /api/v1/card-transactions?cardToken=<value>` performs standard index query on `paymentCardReference` | Returns matching transactions for the given card token (token is not CHD: standard index, not QE) |
 | 04.5 | `GET /api/v1/fraud-diagnosis-cases` returns paginated list with filters `status` and `severity` | Filtering works; response includes pagination metadata |
 | 04.6 | `GET /api/v1/fraud-diagnosis-cases/:id` returns full case detail | Response includes linked transaction reference and customer reference |
 

@@ -3,7 +3,7 @@
 ## Status
 
 Draft  
-Version: 1.0: Author: Antonio Membrides Espinosa: Last updated: 2026-05-26  
+Version: 1.1: Author: Antonio Membrides Espinosa: Last updated: 2026-05-27  
 PRD reference: [docs/PRD.md](PRD.md)
 
 ---
@@ -22,11 +22,13 @@ Full business context, problem statement, and storyline are in [PRD.md](PRD.md).
 
 - Define the fullstack TypeScript architecture (`frontend/` + `backend/`) and repository layout.
 - Specify the QE encryption design: which collections use QE, which fields, which DEKs, and which query types per iteration.
-- Define the BIAN-aligned MongoDB data model (6 collections) and application-side join strategy.
+- Define the BIAN-aligned MongoDB data model (7 collections) and application-side join strategy.
+- Specify the dual-mode frontend: Simulator Mode (presenter-controlled, no login) and Application Mode (JWT login, role-based routing).
+- Define the JWT authentication design (local HS256 domain, pre-seeded demo users, extensible to MS Entra ID).
 - Specify the Fastify REST API surface and request/response contracts.
-- Define the `bin/setup.ts` and `bin/seed.ts` scripts so the demo is installable in one sequence of commands.
+- Define the `backend/bin/setup.ts` and `backend/bin/seed.ts` scripts so the demo is installable in one sequence of commands.
 - Identify the risks specific to QE implementation and specify mitigations.
-- Break the work into three independently deliverable phases aligned with v1, v2, and v3.
+- Break the work into four independently deliverable phases aligned with v1, v2, v3, and v4.
 
 ### Non-goals
 
@@ -70,10 +72,12 @@ Two named top-level folders per IST Engineering Standards:
 ```
 frontend/     ← Next.js 14 App Router
 backend/      ← Fastify 4 (controllers / services / models / encryption)
-bin/          ← setup.ts + seed.ts (run from root, import backend encryption)
-data/         ← JSON seed files (one per collection)
+  bin/        ← setup.ts + seed.ts (owned by backend; invoked via npm --prefix backend)
+  data/       ← JSON seed files (one per collection; consumed only by backend/bin/seed.ts)
 docs/         ← PRD, roadmap, technical-spec, this EP
 ```
+
+`bin/` and `data/` live inside `backend/` because they call `backend/src/vendors/` directly. The root `package.json` delegates with `npm run setup:db --prefix backend` and `npm run seed --prefix backend`.
 
 No `packages/` shared workspace. The backend owns all MongoDB access and all encryption logic. The frontend is a pure HTTP consumer. Shared TypeScript base config lives in `tsconfig.base.json`.
 
@@ -82,15 +86,17 @@ The only consumer of the QE client is the backend. A shared package adds workspa
 
 ### 3.3 Data model
 
-Six MongoDB collections following BIAN Service Domain naming. Full TypeScript interfaces are in [technical-spec.md §1](technical-spec.md#1-bian-typescript-models).
+Seven MongoDB collections following BIAN Service Domain naming. Full TypeScript interfaces are in [technical-spec.md §1](technical-spec.md#1-bian-typescript-models).
 
 ```
+partyAuthenticationQE  ← BIAN SD-16: demo users + JWT auth (email QE:equality)
+
 customerAgreementQE ──1:1──► customerAgreementSensitiveQE
        │
        │ 1:many (via customerAgreementInstanceReference, plaintext)
        ▼
 paymentCardQE  ──────────────────────────────────────────────────────┐
-       │ (via paymentCardReference token, equality QE)               │
+       │ (via paymentCardReference token, standard index)            │
        │ many:1                                                      │
        ▼                                                             │
 cardTransactionQE ──1:1──► cardTransactionSensitiveQE                │
@@ -100,6 +106,8 @@ cardTransactionQE ──1:1──► cardTransactionSensitiveQE                �
 fraudDiagnosisCase ◄── also links ───────────────────────────────────┘
    (linkedCustomerAgreementReference + linkedCardTransactionReference)
 ```
+
+**Payment token (paymentCardReference):** Stored as plaintext with a standard MongoDB index — not in QE. A payment token is a card surrogate under PCI DSS v4.0: it is not Cardholder Data (CHD) and does not require QE protection. QE equality applies only to genuine PII/CHD fields (`customerEmailAddress`, `customerMobilePhoneNumber`, `cardTransactionAccountReference`, `customerAgreementReference`).
 
 **Join strategy:** Application-side sequential queries. The backend service layer queries each collection independently and assembles the response. No `$lookup` across QE collections: it is not supported for encrypted fields in the current QE implementation.
 
@@ -111,25 +119,28 @@ Two DEKs:
 
 | DEK | Wraps | Collections | Access |
 |---|---|---|---|
-| `DEK-lookup` | AWS CMK | `cardTransactionQE`, `customerAgreementQE`, `paymentCardQE` | All service roles |
+| `DEK-lookup` | AWS CMK | `cardTransactionQE`, `customerAgreementQE`, `paymentCardQE`, `partyAuthenticationQE` | All service roles |
 | `DEK-sensitive` | AWS CMK | `cardTransactionSensitiveQE`, `customerAgreementSensitiveQE` | Level 2 + escalation token only (v2) |
 
 Complete `encryptedFieldsMap` definitions are in [technical-spec.md §2](technical-spec.md#2-qe-encryptedfieldsmaps).
 
-**v1 query types:** equality only: `paymentCardReference`, `cardTransactionAccountReference`, `customerEmailAddress`, `customerMobilePhoneNumber`, `customerAgreementReference`.
+**v1 query types:** equality only: `cardTransactionAccountReference`, `customerEmailAddress`, `customerMobilePhoneNumber`, `customerAgreementReference`, `authenticationUserEmailAddress`.  
+`paymentCardReference` (card token) is **not** a QE field — it is stored plaintext and searched via a standard MongoDB index. See ADR-003.
 
 **v2 addition:** range query on `transactionAmount.amount` (`min: 0`, `max: 999999`, `precision: 2`).
 
-**v3 consideration:** prefix/substring queries on `customerName` if MongoDB 8.2 prefix/suffix QE is GA.
+**v4 consideration:** prefix/substring queries on `customerName` if MongoDB 8.2 prefix/suffix QE is GA.
 
 ### 3.5 API design
 
 Full contracts are in [technical-spec.md §6](technical-spec.md#6-api-contracts). Summary:
 
 ```
+POST   /api/v1/auth/login                      JWT login (returns signed token)
 POST   /api/v1/card-transactions               create transaction (triggers fraud case)
 GET    /api/v1/card-transactions/:id           get transaction by ID
-GET    /api/v1/card-transactions?cardToken=    QE equality search
+GET    /api/v1/card-transactions/:id/raw       raw Atlas document (plain MongoClient, for simulator toggle)
+GET    /api/v1/card-transactions?cardToken=    standard index query (token is not CHD, not QE)
 POST   /api/v1/payment-cards                   register card token
 GET    /api/v1/payment-cards?customerRef=      list cards by customer
 GET    /api/v1/customer-agreements?email=      QE equality search
@@ -139,7 +150,7 @@ GET    /api/v1/fraud-diagnosis-cases           list cases (filter: status, sever
 GET    /api/v1/fraud-diagnosis-cases/:id       case detail
 POST   /api/v1/fraud-diagnosis-cases/:id/escalate  [v2]
 GET    /api/v1/audit-events?caseId=            [v2]
-GET    /api/v1/diagnostics/query-timing        [v3]
+GET    /api/v1/diagnostics/query-timing        [v4]
 GET    /health
 ```
 
@@ -162,8 +173,15 @@ GET    /health
 - CVV and PIN are not accepted at any API endpoint.
 - Seed data contains no real card numbers; synthetic tokens only.
 
+**Authentication (v1):**
+- `POST /api/v1/auth/login` validates email + password against `partyAuthenticationQE` (bcrypt hash). Returns a signed HS256 JWT.
+- Five pre-seeded demo roles: `customer`, `level1Analyst`, `level2Investigator`, `auditor`, `admin`.
+- The frontend's Application Mode shows a user-selector dropdown at the login screen (no password required for demo flow).
+- The auth domain is configurable: `AUTH_DOMAIN=local` (default) uses the seeded users; `AUTH_DOMAIN=msentra` delegates to MS Entra ID (future).
+- `authenticationUserEmailAddress` in `partyAuthenticationQE` is QE:equality for demo completeness — the same QE search story applies to auth lookup.
+
 **v2 RBAC:**
-- `X-Demo-Role` header drives field projection in API responses.
+- JWT `role` claim drives field projection in API responses (replaces the earlier `X-Demo-Role` header pattern).
 - Level 2 access to sensitive collections requires an escalation token (generated by the escalation workflow, validated by middleware).
 - The escalation token is a short-lived UUID stored in `fraudDiagnosisCase`: not a JWT (stateless tokens cannot be invalidated if the escalation is revoked).
 
@@ -187,22 +205,26 @@ GET    /health
 
 | Phase | Scope | Dependency | Version |
 |---|---|---|---|
-| **P1** | `bin/setup.ts`: collections, DEK provisioning, indexes | None | v1 |
-| **P2** | `bin/seed.ts`: synthetic data for all 6 collections | P1 |  v1 |
+| **P1** | `backend/bin/setup.ts`: 7 collections, DEK provisioning, indexes | None | v1 |
+| **P2** | `backend/bin/seed.ts`: synthetic data for all 7 collections (incl. 5 demo users) | P1 | v1 |
 | **P3** | Backend: QE client, KMS provider factory, `encryptedFieldsMap` | P1 | v1 |
+| **P3a** | Backend: JWT auth middleware + `POST /api/v1/auth/login` endpoint | P3 | v1 |
 | **P4** | Backend: payment API (`POST /card-transactions`, `POST /payment-cards`) | P3 | v1 |
-| **P5** | Backend: investigation API (QE equality searches, fraud cases) | P3, P4 | v1 |
-| **P6** | Frontend: payment simulation flow (checkout form, token generation) | P4 | v1 |
-| **P7** | Frontend: investigation dashboard (search, case detail, encryption toggle) | P5 | v1 |
-| **P8** | Docker Compose + `docker compose up` smoke test | P4, P5, P6, P7 | v1 |
-| **P9** | Backend: RBAC middleware + Level 1/2 projection | P5 | v2 |
+| **P5** | Backend: investigation API (QE equality searches, fraud cases, raw document endpoint) | P3, P4 | v1 |
+| **P6** | Frontend: Simulator Mode — payment simulation flow (checkout, token gen, encryption toggle) | P4 | v1 |
+| **P6a** | Frontend: dual-mode landing page + Application Mode shell (login, role selector, JWT flow) | P3a | v1 |
+| **P7** | Frontend: investigation dashboard in Application Mode (search, case detail) | P5, P6a | v1 |
+| **P8** | Docker Compose + `docker compose up` smoke test | P4, P5, P6, P6a, P7 | v1 |
+| **P9** | Backend: RBAC middleware + Level 1/2 field projection driven by JWT role claim | P3a | v2 |
 | **P10** | Backend: escalation endpoint + audit event log | P9 | v2 |
 | **P11** | Backend: QE range query on `transactionAmount.amount` | P3 | v2 |
-| **P12** | Frontend: role selector, role badge, escalation workflow, audit trail | P9, P10 | v2 |
-| **P13** | Backend: `POST /payment-cards` save-card + `GET /payment-cards` | P3 | v3 |
-| **P14** | Frontend: save card flow, returning-customer payment | P13 | v3 |
-| **P15** | Backend: `/diagnostics/query-timing` | P5 | v3 |
-| **P16** | Frontend: performance comparison panel | P15 | v3 |
+| **P12** | Frontend: role badge, escalation workflow UI, audit trail panel | P9, P10 | v2 |
+| **P13** | Backend + Frontend: AI agent integration (Magenta, `agentDraftDiagnosis` field) | P5 | v3 |
+| **P14** | Frontend: AI draft inline panel (Accept / Override / Dismiss) | P13 | v3 |
+| **P15** | Backend: `POST /payment-cards` save-card + returning-customer recurring payment | P3 | v4 |
+| **P16** | Frontend: save card flow, returning-customer payment | P15 | v4 |
+| **P17** | Backend: `/diagnostics/query-timing` | P5 | v4 |
+| **P18** | Frontend: performance comparison panel | P17 | v4 |
 
 ---
 
@@ -271,9 +293,10 @@ Each of the five QE-protected collections has its own dedicated DEK.
 
 | # | Question | Owner | Due |
 |---|---|---|---|
-| 1 | Should the escalation token (v2) be a short-lived UUID or a signed JWT? | Engineering Lead | Before P9 starts |
-| 2 | Is QE prefix/substring available in the Atlas cluster version targeted for v3? | Engineering Lead | Before P3 starts |
-| 3 | Does the Leafy Bank integration require a shared auth service or is the role selector sufficient for v3? | IST Team / Leafy Bank team | Before P13 starts |
+| 1 | Should the escalation token (v2) be a short-lived UUID or a signed JWT? A UUID is preferred: stateless JWTs cannot be invalidated if escalation is revoked mid-session. | Engineering Lead | Before P9 starts |
+| 2 | Is QE prefix/substring available in the Atlas cluster version targeted for v4? | Engineering Lead | Before P17 starts |
+| 3 | Does the Leafy Bank integration require a shared auth service or is the role selector sufficient for v4? | IST Team / Leafy Bank team | Before P15 starts |
+| 4 | What is the Magenta API endpoint and authentication model for the v3 AI agent integration? | IST Team / MongoDB Magenta team | Before P13 starts |
 
 ---
 
@@ -281,16 +304,18 @@ Each of the five QE-protected collections has its own dedicated DEK.
 
 | Phase group | Phases | Estimate | Confidence |
 |---|---|---|---|
-| v1: Setup + seeding | P1, P2 | 1.5 days | High |
-| v1: Backend QE + APIs | P3, P4, P5 | 3 days | High |
-| v1: Frontend | P6, P7 | 3 days | Medium (UI polish varies) |
+| v1: Setup + seeding (7 collections) | P1, P2 | 1.5 days | High |
+| v1: Backend QE + Auth + APIs | P3, P3a, P4, P5 | 3.5 days | High |
+| v1: Frontend (Simulator + App Mode) | P6, P6a, P7 | 4 days | Medium (UI polish varies) |
 | v1: Docker + QA | P8 | 1 day | High |
-| **v1 Total** | | **~8.5 days** | |
+| **v1 Total** | | **~10 days** | |
 | v2: RBAC + Escalation + Range | P9, P10, P11 | 3 days | High |
 | v2: Frontend v2 | P12 | 3 days | Medium |
 | **v2 Total** | | **~6 days** | |
-| v3: Save card + Performance + Scaffold | P13–P16 | 4 days | Medium |
-| **v3 Total** | | **~4 days** | |
+| v3: Agentic (Magenta integration) | P13, P14 | 3 days | Low (API stability TBD) |
+| **v3 Total** | | **~3 days** | |
+| v4: Save card + Performance + Scaffold | P15–P18 | 4 days | Medium |
+| **v4 Total** | | **~4 days** | |
 
 ---
 
@@ -317,10 +342,53 @@ Each of the five QE-protected collections has its own dedicated DEK.
 
 **Context:** QE requires a DEK per encrypted field (or shared DEK across fields). Options: one global DEK, two DEKs, or one DEK per collection.
 
-**Decision:** Two DEKs: `DEK-lookup` for searchable collections, `DEK-sensitive` for non-searchable sensitive collections.
+**Decision:** Two DEKs: `DEK-lookup` for searchable collections (`cardTransactionQE`, `customerAgreementQE`, `paymentCardQE`, `partyAuthenticationQE`), `DEK-sensitive` for non-searchable sensitive collections.
 
 **Consequences:**  
 + Maps clearly onto the access-control boundary (Level 1 vs Level 2).  
 + Simple to explain in the demo: "lookup key" vs. "sensitive key."  
-- Rotating `DEK-lookup` re-encrypts all three lookup collections simultaneously: acceptable for a demo.  
+- Rotating `DEK-lookup` re-encrypts all four lookup collections simultaneously: acceptable for a demo.  
 - In production, one DEK per collection is recommended for finer-grained rotation control. This recommendation is documented in the technical spec.
+
+---
+
+## ADR-003: Payment token stored as plaintext, not QE equality
+
+**Date:** 2026-05-27  
+**Status:** Accepted
+
+**Context:** The initial design placed `paymentCardReference` (the payment token) under QE equality encryption, treating it as CHD (Cardholder Data). An expert review identified this as technically incorrect.
+
+**Decision:** `paymentCardReference` is stored as a plaintext field and searched via a standard MongoDB index. It is explicitly excluded from the `encryptedFieldsMap`.
+
+**Rationale:** Under PCI DSS v4.0, a properly implemented payment token is a surrogate for the PAN. A token that meets the standard's requirements (irreversible, or reversible only through a controlled vault with additional authentication factors) is **not classified as CHD**. Encrypting a non-sensitive field with QE and presenting that as a PCI requirement would mislead technically sophisticated audiences (QSAs, security architects, FSI prospects) and misrepresent the standard.
+
+The correct story is: encrypt what the standard requires, nothing more. QE equality protects genuine PII/CHD fields (`customerEmailAddress`, `customerMobilePhoneNumber`, `cardTransactionAccountReference`). The token's plaintext storage demonstrates scope precision, which is itself a positive QSA talking point.
+
+**Consequences:**  
++ Demo is technically accurate and defensible in expert QSA reviews.  
++ Standard index on `paymentCardReference` is simpler and faster than QE equality.  
++ Removes a distraction from the QE story: the audience focuses on fields that genuinely require encryption.  
+- A reviewer who has not read the PCI DSS standard may initially question why a card-related field is plaintext. This is addressed with the explicit presenter note in `demo-simulator.md` and the Q&A entry in `docs/q&a.md`.
+
+---
+
+## ADR-004: Dual-mode frontend (Simulator + Application)
+
+**Date:** 2026-05-27  
+**Status:** Accepted
+
+**Context:** IST demos need to work both as presenter-led narrated walkthroughs (no audience login required) and as interactive application demonstrations (full login, role-based routing, JWT). A single mode forces a choice between ease of presentation and realism.
+
+**Decision:** The frontend supports two distinct modes selectable from the landing page:
+
+- **Simulator Mode:** No login. Story-driven, presenter-controlled. Each step is a scripted screen with talking points. The "Encrypted in Atlas" toggle calls the raw document endpoint (`GET /api/v1/card-transactions/:id/raw`) via a plain MongoClient to show actual ciphertext. Suitable for conference demos, screen recordings, and low-bandwidth environments.
+- **Application Mode:** Full JWT login via the pre-seeded user selector. Role-based routing: customer → payment flow; Level 1 Analyst → investigation dashboard; Level 2 Investigator → escalation workflow; Auditor → audit trail. Suitable for hands-on prospect workshops and guided evaluations.
+
+Both modes connect to the same Fastify API and the same Atlas cluster. The mode selection is a frontend routing concern only: no backend changes required.
+
+**Consequences:**  
++ Presenter can choose the appropriate mode for the audience.  
++ Simulator mode degrades gracefully without Atlas connectivity for the raw doc toggle (shows a static ciphertext snippet as fallback).  
++ Application mode demonstrates a realistic auth + RBAC flow end-to-end.  
+- Two frontend entrypoints (`/simulator/*` and `/demo/*`) require distinct route trees in the App Router.

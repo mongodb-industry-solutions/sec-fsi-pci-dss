@@ -152,18 +152,20 @@ Card number field: raw digits replaced with `****` on each keystroke. Last 4 dig
 ┌──────────────────────────────────────────────────────────────────┐
 │  💳 Review Payment                                  Step 2 of 3  │
 │                                                                  │
-│  🔐 Fields encrypted before leaving your browser                 │
+│  🔐 PII fields encrypted before leaving your browser             │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │  Field                    Sent to Atlas                    │  │
 │  │  ─────────────────────    ─────────────────────────────── │  │
-│  │  🔒 Card token (QE)   →  \x06\x12\x89\xf4\xa3... (cipher) │  │
 │  │  🔒 Email (QE)        →  \x02\xa1\x7c\x33\xd8... (cipher) │  │
 │  │  🔒 Phone (QE)        →  \x09\xfe\x45\x21\xb2... (cipher) │  │
-│  │  Amount               →  850.00              (plaintext)   │  │
-│  │  Merchant             →  TechGadgets Ltd.    (plaintext)   │  │
+│  │  🔒 Account ref (QE)  →  \x11\xbc\x78\xd2\xe4... (cipher) │  │
+│  │  Card token           →  tok_7xB2kp1q         (plaintext)  │  │
+│  │  Amount               →  850.00               (plaintext)  │  │
+│  │  Merchant             →  TechGadgets Ltd.      (plaintext)  │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                  │
-│  The server stores ciphertext. No plaintext PAN, CVV, or PIN.    │
+│  PII fields are encrypted at origin. No plaintext PAN, CVV, or  │
+│  PIN is ever stored. The card token is a surrogate: not CHD.     │
 │  Your KMS key controls decryption. MongoDB has zero access.      │
 │                                                                  │
 │  [← Back]                             [Confirm Payment →]        │
@@ -217,7 +219,7 @@ After confirmation: auto-switch to Investigation pre-loaded with case FD-2026-00
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-The email search matches `luis.fernandez@leafybank.demo` against the encrypted `customerEmailAddress` field in Atlas. The QE driver computes a deterministic token from the plaintext query value and the DEK, then Atlas matches token-to-token. The server never holds or sees the plaintext value.
+The email search matches `luis.fernandez@leafybank.demo` against the encrypted `customerEmailAddress` field in Atlas. The QE driver computes a deterministic search token from the plaintext query value and the DEK, then Atlas matches token-to-token. The server never holds or sees the plaintext value. Card token search (`cardToken=`) uses a standard MongoDB index: the payment token is a card surrogate, not CHD under PCI DSS v4.0, so QE is not required or appropriate for it.
 
 #### Case Detail: Level 1 View
 
@@ -255,25 +257,31 @@ The email search matches `luis.fernandez@leafybank.demo` against the encrypted `
 │  ─────────────────              ───────────────────────────────  │
 │  Email:  luis@leafybank.demo →  "customerEmailAddress":          │
 │                                   "\x06\x12\x89\xf4\xa3\x2c..."  │
+│                                   🔒 QE ciphertext               │
 │                                                                  │
 │  Phone:  +44 7700 900123     →  "customerMobilePhoneNumber":     │
 │                                   "\x02\xa1\x7c\x33\xd8\x5e..."  │
+│                                   🔒 QE ciphertext               │
 │                                                                  │
 │  Card:   tok_7xB2kp1q        →  "paymentCardReference":          │
-│                                   "\x09\xfe\x45\x21\xb2\x77..."  │
+│                                   "tok_7xB2kp1q"                 │
+│                                   ✅ plaintext (token is not CHD)│
 │                                                                  │
 │  Amount: 850.00                 "transactionAmount.amount": 850  │
 │  (v2: stored as QE range field)   ← plaintext in v1              │
 │                                                                  │
 │  "The analyst searched customerEmailAddress = luis@leafybank.demo│
-│   while Atlas stored only the ciphertext shown above.            │
-│   The server never decrypted the field."                         │
+│   while Atlas stored only ciphertext. The card token is stored   │
+│   plaintext: it is a surrogate, not cardholder data under PCI    │
+│   DSS v4.0. The server never decrypted the email or phone."      │
 │                                                                  │
 │  Source: cardTransactionQE · _id: txn-001234 · fetched live     │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-The raw document is fetched live from Atlas via `GET /api/v1/demo/raw-document/cardTransactionQE/txn-001234`. The backend endpoint uses a plain MongoClient (no autoEncryption) so the stored ciphertext bytes are returned as-is.
+The raw document is fetched live from Atlas via `GET /api/v1/demo/raw-document/cardTransactionQE/txn-001234`. The backend endpoint uses a plain MongoClient (no autoEncryption) so the stored bytes are returned as-is.
+
+**Presenter talking point:** "Notice the token is plaintext — that is intentional and correct. A payment token is a surrogate for the card number; it is not itself cardholder data under PCI DSS v4.0. The fields that ARE cardholder data — email, phone, account reference — those are the ciphertext blobs. We encrypt exactly what the standard requires, and nothing more."
 
 #### Case Detail: Level 2 View (v2)
 
