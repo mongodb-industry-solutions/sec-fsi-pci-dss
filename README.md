@@ -58,96 +58,11 @@ This answers the most common FSI prospect question:
 
 ---
 
-## 🏗️ Technology Stack
-
-| Layer | Technology |
-|---|---|
-| 💻 Frontend | Next.js 14 App Router + TypeScript |
-| ⚙️ Backend API | Fastify 4 + TypeScript |
-| 🗄️ Database | MongoDB Atlas (M10+) with Queryable Encryption |
-| 🔑 Key Management | AWS KMS (local KMS fallback for offline demos) |
-| 📦 Project setup | npm workspaces + concurrently |
-| 🎨 UI Design | LeafyGreen Design System |
-
----
-
 ## 🚀 Quick Start
 
-### ✅ Prerequisites
 
-- Node.js 20+
-- Docker + Docker Compose
-- MongoDB Atlas cluster (M10 or higher: free tier does not support QE)
-- AWS KMS key (or set `KMS_PROVIDER=local` for local development)
+To begin the process of testing, installation, and execution, please follow the instructions in [the installation guide](./docs/installation.md).
 
-### 1️⃣ Configure Environment
-
-```bash
-cp .env.example .env
-# Edit .env: set MONGODB_URI, AWS_CMK_ARN, and AWS credentials
-# For offline/local mode: set KMS_PROVIDER=local
-```
-
-### 2️⃣ Install Dependencies
-
-```bash
-npm run install:all
-# Installs root + frontend + backend dependencies
-```
-
-### 3️⃣ Set Up the Database
-
-```bash
-npm run setup:db   # Creates collections, QE schemas, key vault, indexes
-npm run seed       # Inserts synthetic BIAN-compliant demo data
-```
-
-### 4️⃣ Start the Application
-
-```bash
-# Option A: Docker Compose (recommended)
-npm run docker:up
-
-# Option B: Development mode with hot reload
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) to view the demo.
-
----
-
-## 🛠️ Available Commands
-
-| Command | Description |
-|---|---|
-| `npm run install:all` | Install root + frontend + backend dependencies |
-| `npm run dev` | Start frontend and backend concurrently (hot reload) |
-| `npm run dev:frontend` | Start only the Next.js frontend |
-| `npm run dev:backend` | Start only the Fastify API |
-| `npm run build` | Build frontend and backend for production |
-| `npm run setup:db` | Create collections, indexes, and QE key vault |
-| `npm run seed` | Insert synthetic demo data (idempotent) |
-| `npm run docker:up` | Build and start full stack with Docker Compose |
-| `npm run docker:down` | Stop and remove containers |
-| `npm run docker:logs` | Tail container logs |
-
----
-
-## 📁 Repository Structure
-
-```
-sec-fsi-pci-dss/
-├── 💻 frontend/        # Next.js 14 App Router + TypeScript
-├── ⚙️ backend/         # Fastify 4 + TypeScript
-│   ├── bin/            # setup.ts + seed.ts (run via npm --prefix backend)
-│   ├── data/           # JSON seed files: one per collection
-│   └── src/
-│       ├── controllers/   # Route handlers
-│       ├── services/      # Business logic
-│       ├── models/        # BIAN interfaces + QE schemas
-│       └── vendors/       # QE client, KMS, key vault, setup + seed logic
-└── 📚 docs/            # Engineering documentation
-```
 
 ---
 
@@ -192,6 +107,30 @@ Key PCI DSS v4.0 requirements addressed:
 - ✅ **Req 4**: TLS 1.3 on all Atlas connections
 - ✅ **Req 7**: Role-based field visibility (v2)
 - ✅ **Req 10**: Audit log for all field access events (v2)
+
+---
+
+## 📁 Repository Structure
+
+```
+sec-fsi-pci-dss/
+├── 💻 frontend/        # Next.js 14 App Router + TypeScript
+├── ⚙️ backend/         # Fastify 4 + TypeScript + NPM Tools (setup + seed)
+└── 📚 docs/            # Engineering documentation
+```
+
+---
+
+## 🏗️ Technology Stack
+
+| Layer | Technology |
+|---|---|
+| 💻 Frontend | Next.js 14 App Router + TypeScript |
+| ⚙️ Backend API | Fastify 4 + TypeScript |
+| 🗄️ Database | MongoDB Atlas (M10+) with Queryable Encryption |
+| 🔑 Key Management | AWS KMS (local KMS fallback for offline demos) |
+| 📦 Project setup | npm workspaces + concurrently |
+| 🎨 UI Design | LeafyGreen Design System |
 
 ---
 
