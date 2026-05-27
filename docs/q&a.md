@@ -98,7 +98,7 @@ The existing SAD prohibition list (CVV, PIN) is accurate and sufficient for this
 PCI DSS v4.0 defines two overlapping categories within account data:
 
 **Cardholder Data (CHD):** May be stored after authorization if protected per the standard.
-- Primary Account Number (PAN) — must be rendered unreadable if stored
+- Primary Account Number (PAN), must be rendered unreadable if stored
 - Cardholder name
 - Expiration date
 - Service code
@@ -117,7 +117,7 @@ The critical distinction is that SAD cannot be retained post-authorization under
 **Answer:**  
 The expiry date is different from the token. Under PCI DSS v4.0, the expiration date is classified as **Cardholder Data (CHD)** when stored in conjunction with a PAN. In this demo it is stored alongside `paymentCardReference` (the token) and `maskedPanDisplay`. Whether the token is itself CHD or not, the expiry date co-located with card account data is a more conservative classification, and the cost of protecting it with QE:none is negligible.
 
-The QE:none mode also serves a demo purpose: it illustrates the "non-searchable sensitive field" pattern — data that is encrypted but not queryable, visible only after decryption with the correct DEK. This is the same pattern used for `residentialAddressFull` and `governmentIdentificationReference` in the escalation workflow.
+The QE:none mode also serves a demo purpose: it illustrates the "non-searchable sensitive field" pattern, where data is encrypted but not queryable and is visible only after decryption with the correct DEK. This is the same pattern used for `residentialAddressFull` and `governmentIdentificationReference` in the escalation workflow.
 
 ---
 
@@ -168,8 +168,77 @@ The demo is designed to demonstrate all of these controls in a way that supports
 #### **16. Does encrypting PII fields with QE put them outside PCI DSS scope?**
 
 **Answer:**  
-Not automatically. PCI DSS scope is primarily determined by the presence of **cardholder data (CHD)** — especially the PAN. Fields like email address and phone number are PII but are not CHD under PCI DSS. They would be in scope for other regulatory frameworks (GDPR, CCPA) but their presence does not extend your PCI CDE.
+Not automatically. PCI DSS scope is primarily determined by the presence of **cardholder data (CHD)**, specifically the PAN. Fields like email address and phone number are PII but are not CHD under PCI DSS. They would be in scope for other regulatory frameworks (GDPR, CCPA) but their presence does not extend your PCI CDE.
 
 If the QE-encrypted fields contain a PAN (even tokenized), the collection would still be evaluated as part of the CDE. If those fields contain only PII (email, phone), they are subject to privacy regulation but do not expand PCI scope. The design choice to encrypt PII with QE in this demo is primarily a privacy and defense-in-depth decision, not a PCI scoping reduction strategy.
 
 Scope reduction in PCI DSS is better achieved through tokenization (removing the PAN from downstream systems) and network segmentation (Private Endpoint, VPC peering), both of which this architecture demonstrates.
+
+---
+
+#### **17. What does the MongoDB Atlas PCI DSS certification actually cover, and what remains the customer's responsibility?**
+
+**Answer:**
+The Atlas PCI DSS 4.0 Attestation of Compliance (AOC) means Schellman Compliance, LLC assessed MongoDB's cloud database service and found it meets PCI DSS requirements for how MongoDB operates the platform. This assessment is done once by MongoDB; customers can rely on it without repeating the same infrastructure tests in their own audit.
+
+**What the AOC covers (MongoDB's responsibility):**
+
+- Physical security: Atlas runs on AWS, GCP, and Azure, each independently PCI DSS certified.
+- Encryption at rest: AES-256 by default on all Atlas storage volumes and backup media.
+- Encryption in transit: TLS 1.2 enforced on all client connections to Atlas.
+- Network isolation: tenant isolation between clusters, MongoDB-managed firewall rules.
+- Platform access controls: Atlas console multi-factor authentication, MongoDB employee access policies, and privileged access management.
+- Vulnerability management: MongoDB's patching program and security scanning.
+- Atlas audit log infrastructure: MongoDB secures and maintains the audit log system itself.
+
+**What the AOC does NOT cover (customer's responsibility):**
+
+- Your application code and its security practices.
+- How you implement QE, CSFLE, or any application-side encryption.
+- Your key management practices for customer-managed keys (CMK in AWS KMS).
+- Your application's access control logic and role-based field visibility.
+- Your network topology outside Atlas (your VPC, your application servers).
+- Whether your application ever accepts or stores CVV, PIN, or full PAN.
+- Any Atlas product currently in beta or preview status.
+
+The customer must run their own PCI DSS compliance program. The AOC reduces the assessment burden for the platform layer so the QSA can focus on the application layer.
+
+---
+
+#### **18. Is Queryable Encryption (QE) required for Atlas to be PCI DSS certified? What PCI DSS requirements does it address?**
+
+**Answer:**
+QE is not what certifies Atlas as PCI DSS compliant. The certification is based on platform-level controls: encryption at rest, TLS, network security, and MongoDB's operational security program. Atlas was PCI DSS certified before QE existed.
+
+QE is an application-side control that the *customer* deploys in their backend service. It is complementary to, not a replacement for, the platform certification. It addresses specific requirements that go beyond what the platform layer can provide:
+
+**Requirement 3.4 (CHD must be unreadable at rest):**
+Atlas AES-256 encryption at rest satisfies this at the storage layer: an attacker who steals a disk volume cannot read the data. QE provides a stronger guarantee: the CHD field is encrypted *before the BSON document leaves the application server*, so the Atlas server never receives the plaintext value. It cannot appear in process memory, query plans, slow query logs, or any internal MongoDB tooling. This is protection even against a fully compromised Atlas account or a malicious insider at MongoDB.
+
+**Requirement 3.6 (Key management):**
+The Customer Master Key (CMK) lives in AWS KMS under the customer's exclusive control. The DEK is unwrapped only in the application process memory during an active session. MongoDB has zero access to either key. Rotating the CMK or revoking it immediately renders all QE-encrypted data inaccessible to any query, including from Atlas itself.
+
+**Requirement 7 (Restrict access to CHD by business need):**
+Atlas RBAC restricts who can connect to a database and run queries. QE adds a cryptographic boundary on top: a user with full Atlas admin credentials who queries the collection without the QE client receives only opaque ciphertext. The access control is mathematical, not policy-based, and cannot be bypassed by any administrative action inside Atlas.
+
+**Requirement 10 (Audit trail):**
+Every decryption event happens in the application layer, where it can be logged with full context: which user, which role, which case, which fields, and at what time. Atlas audit logs record the raw MongoDB operation; the application-level audit trail records the business intent behind it.
+
+In summary: Atlas certification covers the infrastructure contract. QE covers the data contract. A complete PCI DSS posture requires both.
+
+---
+
+#### **19. How does the "Encrypted in Atlas" toggle in the demo prove that MongoDB cannot read the data?**
+
+**Answer:**
+The toggle demonstrates the encryption boundary by making two different calls to the same document and showing the results side by side.
+
+**Decrypted view (normal application path):**
+The Fastify backend queries Atlas using the QE-enabled MongoClient. The QE driver contacts AWS KMS to unwrap the DEK, then decrypts the encrypted fields in the application process before returning the document. The response contains readable values: `customerEmailAddress`, `customerMobilePhoneNumber`, `cardTransactionAccountReference`.
+
+**Raw Atlas view (what MongoDB stores):**
+A second backend endpoint queries the same document using a plain MongoClient with no QE configuration and no DEK. It receives the BSON exactly as Atlas stores it on disk. The encrypted fields appear as binary ciphertext. No application, no database administrator, and no MongoDB engineer can recover the plaintext from this blob without the DEK and the CMK.
+
+The presenter talking point: "This is what Atlas sees. Not the email address, not the account reference. Just encrypted bytes. The only system that can read these fields is your backend, using your keys, in your KMS. MongoDB has zero access."
+
+This toggle is the single most effective moment in the demo for answering the question: *"How do we know MongoDB cannot read our cardholder data?"* The answer is not a policy statement or a contractual guarantee. It is a live query result showing ciphertext in the database and plaintext in the application, with the difference being cryptographic key possession.
