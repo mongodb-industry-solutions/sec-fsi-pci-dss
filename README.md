@@ -39,6 +39,7 @@ This answers the most common FSI prospect question:
 | [Technical Specification](docs/technical-spec.md) | BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index strategy |
 | [Engineering Proposal](docs/engineering-proposal.md) | Architecture decisions, implementation phases, risks, alternatives, ADRs |
 | [Q&A: PCI DSS](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki/q&a) | Common FSI client questions about MongoDB and PCI DSS compliance |
+| [🐛 Issues](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/issues) | Bug reports, feature requests, and task tracking |
 
 ---
 
