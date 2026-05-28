@@ -18,8 +18,8 @@ export async function cardTransactionController(fastify: FastifyInstance) {
 - OR \`cardTransactionMerchantCategoryCode\` is in the high-risk list: \`5812\` (restaurants), \`6011\` (ATM/cash), \`7995\` (gambling)
 
 **QE fields:**
-- \`accountReference\` → stored as \`cardTransactionAccountReference\` with QE:equality — encrypted, searchable by exact match
-- \`gatewayPayload\` → stored in \`cardTransactionSensitive.rawGatewayPayload\` as QE:none — encrypted, not searchable, requires DEK-sensitive`,
+- \`accountReference\` → stored as \`cardTransactionAccountReference\` with QE:equality; encrypted, searchable by exact match
+- \`gatewayPayload\` → stored in \`cardTransactionSensitive.rawGatewayPayload\` as QE:none; encrypted, not searchable, requires DEK-sensitive`,
       security: [{ bearerAuth: [] }],
       body: {
         type: 'object',
@@ -29,11 +29,11 @@ export async function cardTransactionController(fastify: FastifyInstance) {
         properties: {
           cardToken: {
             type: 'string',
-            description: 'Card surrogate token — PAN substitute, NOT Cardholder Data under PCI DSS v4.0. Stored in plaintext with a standard index.',
+            description: 'Card surrogate token, PAN substitute, NOT Cardholder Data under PCI DSS v4.0. Stored in plaintext with a standard index.',
           },
           accountReference: {
             type: 'string',
-            description: 'Customer bank account reference (BIAN `customerAgreementReference`). Stored as QE:equality — encrypted at rest, searchable without Atlas seeing the plaintext.',
+            description: 'Customer bank account reference (BIAN `customerAgreementReference`). Stored as QE:equality; encrypted at rest, searchable without Atlas seeing the plaintext.',
           },
           amount: {
             type: 'number',
@@ -62,7 +62,7 @@ export async function cardTransactionController(fastify: FastifyInstance) {
           },
           gatewayPayload: {
             type: 'object',
-            description: 'Raw JSON response from the payment gateway. Stored as QE:none in the `cardTransactionSensitive` collection — requires DEK-sensitive key (Level 2 Investigator role) to read.',
+            description: 'Raw JSON response from the payment gateway. Stored as QE:none in the `cardTransactionSensitive` collection; requires DEK-sensitive key (Level 2 Investigator role) to read.',
             additionalProperties: true,
           },
         },
@@ -187,7 +187,7 @@ token is a PAN surrogate and is NOT Cardholder Data under PCI DSS v4.0.`,
       summary: 'Get a transaction by ID',
       description: `Returns a single \`cardTransaction\` document by its UUID.
 
-**QE note:** \`cardTransactionAccountReference\` is a QE:equality field — it is
+**QE note:** \`cardTransactionAccountReference\` is a QE:equality field; it is
 decrypted in the API process memory and returned as plaintext. Atlas stores only
 ciphertext and never sees the account reference value.
 

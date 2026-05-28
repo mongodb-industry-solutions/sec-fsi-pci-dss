@@ -75,7 +75,7 @@ export interface FraudDiagnosisControlRecord {
   schemaVersion: number;
 }
 
-// Audit event document — stored in fraudDiagnosisCaseEvents (separate collection).
+// Audit event document, stored in fraudDiagnosisCaseEvents (separate collection).
 // Replaces the embedded diagnosisActionLog array (Unbounded Array anti-pattern fix).
 // Indexed on (fraudDiagnosisInstanceReference, actionDateTime) for ordered retrieval.
 export interface FraudDiagnosisCaseEventRecord {

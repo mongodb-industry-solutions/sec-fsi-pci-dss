@@ -16,7 +16,7 @@ declare module 'fastify' {
 function sanitizeUri(uri: string): { server: string; database: string } {
   const dbName = process.env.MONGODB_DB_NAME ?? 'unknown';
   try {
-    // Strip username:password before parsing — never log credentials
+    // Strip username:password before parsing; never log credentials
     const clean = uri.replace(/^(mongodb(?:\+srv)?:\/\/)([^@]+@)/, '$1');
     const parsed = new URL(clean);
     return {
@@ -30,13 +30,13 @@ function sanitizeUri(uri: string): { server: string; database: string } {
 
 async function mongodbPlugin(fastify: FastifyInstance) {
   // Decorators must be registered synchronously before any async work.
-  // Cast null to Db so callers don't need type guards — the 503 guard in
+  // Cast null to Db so callers don't need type guards; the 503 guard in
   // server.ts prevents route handlers from executing when the DB is down.
   fastify.decorate('db', null as unknown as Db);
   fastify.decorate('dbError', null as string | null);
 
   if (!process.env.MONGODB_URI) {
-    const msg = 'MONGODB_URI is not set — server starting in degraded mode';
+    const msg = 'MONGODB_URI is not set; server starting in degraded mode';
     console.error(`[mongodb] ${msg}`);
     fastify.dbError = msg;
     return;
@@ -58,7 +58,7 @@ async function mongodbPlugin(fastify: FastifyInstance) {
     const { server, database } = sanitizeUri(process.env.MONGODB_URI);
     const reason = err instanceof Error ? err.message : String(err);
 
-    console.error(`[mongodb] Connection failed — server=${server} database=${database} — ${reason}`);
+    console.error(`[mongodb] Connection failed: server=${server} database=${database}. ${reason}`);
     fastify.dbError = `Connection failed: server=${server} database=${database}`;
     // Server continues to start; Swagger UI and /health remain accessible.
   }

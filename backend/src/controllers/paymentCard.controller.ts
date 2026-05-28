@@ -15,9 +15,9 @@ export async function paymentCardController(fastify: FastifyInstance) {
 | Field | Classification | Storage |
 |---|---|---|
 | \`cardToken\` | NOT CHD (surrogate) | Plaintext, indexed |
-| \`paymentCardExpirationDate\` | CHD (expiry is CHD when co-located with a card reference) | QE:none — encrypted at rest, requires DEK-sensitive |
-| \`paymentCardMaskedPanDisplay\` | Display only (last 4) | Plaintext — permitted by PCI DSS |
-| CVV / PIN | SAD — **prohibited** | Never stored |`,
+| \`paymentCardExpirationDate\` | CHD (expiry is CHD when co-located with a card reference) | QE:none; encrypted at rest, requires DEK-sensitive |
+| \`paymentCardMaskedPanDisplay\` | Display only (last 4) | Plaintext; permitted by PCI DSS |
+| CVV / PIN | SAD (**prohibited**) | Never stored |`,
       security: [{ bearerAuth: [] }],
       body: {
         type: 'object',
@@ -34,7 +34,7 @@ export async function paymentCardController(fastify: FastifyInstance) {
           },
           paymentCardExpirationDate: {
             type: 'string',
-            description: 'Card expiry date in `MM/YY` format. Classified as CHD — stored as QE:none (encrypted, not searchable).',
+            description: 'Card expiry date in `MM/YY` format. Classified as CHD; stored as QE:none (encrypted, not searchable).',
           },
           paymentCardMaskedPanDisplay: {
             type: 'string',
@@ -101,7 +101,7 @@ export async function paymentCardController(fastify: FastifyInstance) {
 
 The query uses a standard index on \`customerAgreementInstanceReference\`. The encrypted
 expiry date (\`paymentCardExpirationDate\`, QE:none) is **not** included in this list
-response — fetch the individual card record to retrieve it with Level 2 access.`,
+response; fetch the individual card record to retrieve it with Level 2 access.`,
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',

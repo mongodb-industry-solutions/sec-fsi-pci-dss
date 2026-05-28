@@ -68,17 +68,17 @@ export async function buildApp(): Promise<FastifyInstance> {
     return reply.redirect('/doc');
   });
 
-  // Health check — always responds, even when MongoDB is unreachable
+  // Health check; always responds, even when MongoDB is unreachable
   fastify.get('/health', {
     schema: {
       tags: ['health'],
       summary: 'Health check',
       description: `Returns the API and Atlas connectivity status.
-Does not require authentication. Responds even when the database is unreachable —
+Does not require authentication. Responds even when the database is unreachable;
 check \`atlas\` and \`error\` fields to detect a degraded state.`,
       response: {
         200: {
-          description: 'Healthy — Atlas reachable',
+          description: 'Healthy: Atlas reachable',
           type: 'object',
           properties: {
             status: { type: 'string', enum: ['ok'] },
@@ -88,7 +88,7 @@ check \`atlas\` and \`error\` fields to detect a degraded state.`,
           },
         },
         503: {
-          description: 'Degraded — Atlas unreachable or connection failed at startup',
+          description: 'Degraded: Atlas unreachable or connection failed at startup',
           type: 'object',
           properties: {
             status: { type: 'string', enum: ['error'] },
@@ -102,7 +102,7 @@ check \`atlas\` and \`error\` fields to detect a degraded state.`,
   }, async (_request, reply) => {
     const timestamp = new Date().toISOString();
 
-    // Connection failed at startup — skip ping, report stored error
+    // Connection failed at startup; skip ping, report stored error
     if (fastify.dbError !== null) {
       return reply.status(503).send({
         status: 'error',
@@ -157,7 +157,7 @@ async function start() {
     console.log(`Swagger UI: http://${host}:${port}/doc`);
 
     if (app.dbError !== null) {
-      console.warn(`[mongodb] Running in degraded mode — ${app.dbError}`);
+      console.warn(`[mongodb] Running in degraded mode: ${app.dbError}`);
       console.warn('[mongodb] API routes will return 503 until the database becomes reachable.');
     }
   } catch (err) {

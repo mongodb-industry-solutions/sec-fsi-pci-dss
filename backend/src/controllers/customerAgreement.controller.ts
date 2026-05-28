@@ -9,10 +9,10 @@ export async function customerAgreementController(fastify: FastifyInstance) {
       description: `Looks up a \`customerAgreement\` document (BIAN SD-53) by **exactly one**
 search key: \`email\`, \`phone\`, or \`accountRef\`. Omitting all three returns 400.
 
-**QE:equality search — how it works:**
+**QE:equality search: how it works:**
 All three keys are stored as QE:equality-encrypted fields in Atlas. The API driver
 encrypts the search value locally, sends the ciphertext to Atlas for comparison, and
-receives the matching encrypted document. Decryption happens in the API process memory —
+receives the matching encrypted document. Decryption happens in the API process memory;
 Atlas never sees the plaintext PII.
 
 **Role-based data visibility:**
@@ -27,7 +27,7 @@ Atlas never sees the plaintext PII.
 Sensitive fields (\`customerAgreementResidentialAddress\`, \`governmentIdentificationReference\`,
 \`customerAgreementRiskNotes\`) are stored in the \`customerAgreementSensitive\` collection
 with a separate DEK (Data Encryption Key) as QE:none. They are returned only when the
-caller has the DEK-sensitive key — i.e. \`level2_investigator\` role.`,
+caller has the DEK-sensitive key, i.e. \`level2_investigator\` role.`,
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
@@ -81,7 +81,7 @@ caller has the DEK-sensitive key — i.e. \`level2_investigator\` role.`,
             },
             sensitive: {
               type: 'object',
-              description: 'High-sensitivity PII. Returned only for `level2_investigator` and `security_auditor` roles. Fields are QE:none — encrypted at rest, not searchable.',
+              description: 'High-sensitivity PII. Returned only for `level2_investigator` and `security_auditor` roles. Fields are QE:none; encrypted at rest, not searchable.',
               properties: {
                 customerAgreementResidentialAddress: {
                   type: 'object',
@@ -95,11 +95,11 @@ caller has the DEK-sensitive key — i.e. \`level2_investigator\` role.`,
                 },
                 governmentIdentificationReference: {
                   type: 'string',
-                  description: 'National ID or passport reference. QE:none — requires DEK-sensitive to decrypt.',
+                  description: 'National ID or passport reference. QE:none; requires DEK-sensitive to decrypt.',
                 },
                 customerAgreementRiskNotes: {
                   type: 'string',
-                  description: 'Internal analyst risk notes. QE:none — never exposed to Level 1.',
+                  description: 'Internal analyst risk notes. QE:none; never exposed to Level 1.',
                 },
               },
             },

@@ -10,7 +10,7 @@ export const swaggerPlugin = fp(async function (fastify: FastifyInstance) {
     openapi: {
       openapi: '3.0.0',
       info: {
-        title: 'FSI PCI DSS Payment Security Demo — API',
+        title: 'FSI PCI DSS Payment Security Demo API',
         version: '1.0.0',
         description: `
 ## Overview
@@ -21,7 +21,7 @@ enables a PCI DSS-aligned fraud investigation workflow for digital banks and car
 encrypted sensitive fields are searchable client-side without the plaintext ever reaching
 the database server.
 
-## Data model — BIAN Service Domains
+## Data model: BIAN Service Domains
 
 All collections map to [BIAN (Banking Industry Architecture Network)](https://bian.org/)
 Service Domains. Field names follow the BIAN compound naming convention
@@ -57,8 +57,8 @@ Obtain a token via \`POST /api/v1/auth/login\`.
 
 ## Encryption tiers
 
-- **QE:equality** — encrypted client-side, searchable by exact match (email, phone, account ref).
-- **QE:none** — encrypted client-side, not searchable; returned only with the correct DEK
+- **QE:equality**: encrypted client-side, searchable by exact match (email, phone, account ref).
+- **QE:none**: encrypted client-side, not searchable; returned only with the correct DEK
   (Data Encryption Key). Requires \`level2_investigator\` role.
         `.trim(),
         contact: {
@@ -89,13 +89,13 @@ Obtain a token via \`POST /api/v1/auth/login\`.
         // above. @fastify/swagger includes them here automatically.
       },
       tags: [
-        { name: 'auth', description: 'Authentication — Party Authentication SD-16. Public routes, no JWT required.' },
+        { name: 'auth', description: 'Authentication: Party Authentication SD-16. Public routes, no JWT required.' },
         { name: 'card-transactions', description: 'Card Transaction SD-254. Payment event log with QE:equality on account reference.' },
-        { name: 'customer-agreements', description: 'Customer Agreement SD-53. PII search surface — QE:equality on email, phone, and account reference.' },
+        { name: 'customer-agreements', description: 'Customer Agreement SD-53. PII search surface; QE:equality on email, phone, and account reference.' },
         { name: 'payment-cards', description: 'Payment Card SD-88. Card lifecycle management. Expiry date protected as QE:none (CHD).' },
         { name: 'fraud-diagnosis', description: 'Fraud Diagnosis SD-83. Investigation case lifecycle: open → under_review → escalated → resolved.' },
         { name: 'health', description: 'Operational health check. Public, no JWT required.' },
-        { name: 'demo', description: '⚠️ Demo utilities — non-production only. Returns raw (undecrypted) MongoDB documents to illustrate QE ciphertext storage.' },
+        { name: 'demo', description: '⚠️ Demo utilities; non-production only. Returns raw (undecrypted) MongoDB documents to illustrate QE ciphertext storage.' },
       ],
     },
   });

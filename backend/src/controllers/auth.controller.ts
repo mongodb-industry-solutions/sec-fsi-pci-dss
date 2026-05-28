@@ -5,7 +5,7 @@ export async function authController(fastify: FastifyInstance) {
   fastify.post('/login', {
     schema: {
       tags: ['auth'],
-      summary: 'Login — obtain a Bearer JWT',
+      summary: 'Login: obtain a Bearer JWT',
       description: `Authenticates a demo user against the \`partyAuthentication\` collection
 (BIAN SD-16) and returns a signed JWT valid for 24 hours.
 
@@ -16,7 +16,7 @@ The JWT payload contains the \`sub\` (user UUID), \`email\`, \`role\`, \`name\`,
 Authorization: Bearer <token>
 \`\`\`
 
-**QE note:** the \`email\` lookup runs against a \`QE:equality\`-encrypted field —
+**QE note:** the \`email\` lookup runs against a \`QE:equality\`-encrypted field;
 Atlas stores only ciphertext and never sees the plaintext address.
 
 **Available demo users:**
@@ -36,11 +36,11 @@ Password for all demo users: \`demo-password\``,
           email: {
             type: 'string',
             format: 'email',
-            description: 'User email address. Stored as QE:equality — encrypted and searchable without Atlas seeing the plaintext.',
+            description: 'User email address. Stored as QE:equality; encrypted and searchable without Atlas seeing the plaintext.',
           },
           password: {
             type: 'string',
-            description: 'User password. Stored as a 12-round bcrypt hash — the plaintext is never persisted or logged.',
+            description: 'User password. Stored as a 12-round bcrypt hash; the plaintext is never persisted or logged.',
           },
           domain: {
             type: 'string',
@@ -57,7 +57,7 @@ Password for all demo users: \`demo-password\``,
           properties: {
             token: {
               type: 'string',
-              description: 'Signed JWT — valid 24 h. Payload contains sub, email, role, name, domain.',
+              description: 'Signed JWT, valid 24 h. Payload contains sub, email, role, name, domain.',
             },
             user: {
               type: 'object',
@@ -116,7 +116,7 @@ Password for all demo users: \`demo-password\``,
       tags: ['auth'],
       summary: 'List demo users (Simulator mode)',
       description: `Returns all pre-seeded demo user accounts for the Simulator login panel.
-Intended for the UI to display one-click login shortcuts — passwords are **never** returned.`,
+Intended for the UI to display one-click login shortcuts; passwords are **never** returned.`,
       response: {
         200: {
           description: 'List of available demo users.',
@@ -130,7 +130,7 @@ Intended for the UI to display one-click login shortcuts — passwords are **nev
                 properties: {
                   partyAuthenticationInstanceReference: {
                     type: 'string',
-                    description: 'User UUID — use as the `sub` claim reference.',
+                    description: 'User UUID, use as the `sub` claim reference.',
                   },
                   partyAuthenticationUserName: {
                     type: 'string',
@@ -139,7 +139,7 @@ Intended for the UI to display one-click login shortcuts — passwords are **nev
                   partyAuthenticationUserEmailAddress: {
                     type: 'string',
                     format: 'email',
-                    description: 'Login email — submit to POST /api/v1/auth/login.',
+                    description: 'Login email; submit to POST /api/v1/auth/login.',
                   },
                   partyAuthenticationUserRole: {
                     type: 'string',

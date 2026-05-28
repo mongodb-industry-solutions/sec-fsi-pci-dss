@@ -11,7 +11,7 @@ export async function fraudDiagnosisController(fastify: FastifyInstance) {
 **BIAN lifecycle:** \`open\` → \`under_review\` → \`escalated\` → \`resolved_cleared\` / \`resolved_fraud\` → \`closed\`
 
 Each case embeds a \`transactionSnapshot\` with the key display fields from the originating
-\`cardTransaction\` document (Extended Reference Pattern) — the list view requires only a
+\`cardTransaction\` document (Extended Reference Pattern); the list view requires only a
 single collection query with no \`$lookup\`.
 
 **Audit trail:** events (who acted, when, what) are stored in the separate
@@ -108,7 +108,7 @@ single collection query with no \`$lookup\`.
       description: `Returns a single \`fraudDiagnosisCase\` document with the embedded
 \`transactionSnapshot\` and the risk assessment.
 
-**Linked data (not embedded — requires separate requests):**
+**Linked data (not embedded; requires separate requests):**
 - Transaction details: \`GET /api/v1/card-transactions/:linkedCardTransactionReference\`
 - Customer agreement: \`GET /api/v1/customer-agreements?accountRef=<customerAgreementReference>\`
 - Audit events: planned for v2 (\`GET /api/v1/fraud-diagnosis-cases/:id/events\`)`,

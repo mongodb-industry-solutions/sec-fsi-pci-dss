@@ -25,7 +25,7 @@ export function buildEncryptedFieldsMaps(
           keyId: dekSensitiveId,
           path: 'rawGatewayPayload',
           bsonType: 'object',
-          // QE:none — encrypted, not searchable
+          // QE:none; encrypted, not searchable
         },
         {
           keyId: dekSensitiveId,
@@ -88,7 +88,7 @@ export function buildEncryptedFieldsMaps(
           keyId: dekSensitiveId,
           path: 'paymentCardExpirationDate',
           bsonType: 'string',
-          // QE:none — non-searchable, retrieval only
+          // QE:none; non-searchable, retrieval only
         },
       ],
     },
