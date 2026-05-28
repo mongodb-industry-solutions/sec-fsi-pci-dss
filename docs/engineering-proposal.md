@@ -74,6 +74,9 @@ frontend/     ← Next.js 14 App Router
 backend/      ← Fastify 4 (controllers / services / models / encryption)
   bin/        ← setup.ts + seed.ts (owned by backend; invoked via npm --prefix backend)
   data/       ← JSON seed files (one per collection; consumed only by backend/bin/seed.ts)
+test/         ← All automated tests (Vitest unit + integration, Playwright E2E)
+  backend/    ←   mirrors backend/src/ — unit/services/ + integration/routes/
+  frontend/   ←   mirrors frontend/src/ — unit/lib/ + unit/components/ + e2e/
 docs/         ← PRD, roadmap, technical-spec, this EP
 ```
 
@@ -187,12 +190,29 @@ GET    /health
 
 ### 3.7 Testing strategy
 
-| Level | Scope | Tool |
-|---|---|---|
-| Unit | Service layer functions in isolation (mock MongoDB client) | Jest / Vitest |
-| Integration | API endpoints against a real Atlas test cluster with QE | Supertest + real driver |
-| E2E | Full payment-to-investigation flow in the browser | Playwright |
-| Security | Level 1 cannot access sensitive collections; no plaintext PAN in any response | Jest integration tests |
+All tests live in `test/` at the repository root, organised by layer and type (IST engineering standard §7a):
+
+```
+test/
+├── setup.ts                          ← global Vitest setup
+├── backend/
+│   ├── unit/services/                ← mirrors backend/src/services/
+│   └── integration/routes/           ← mirrors backend/src/controllers/
+└── frontend/
+    ├── unit/lib/                     ← mirrors frontend/src/lib/
+    ├── unit/components/              ← mirrors frontend/src/app/components/
+    └── e2e/                          ← Playwright flow specs
+```
+
+| Level | Scope | Tool | Location |
+|---|---|---|---|
+| Unit | Service layer functions in isolation (mock MongoDB client) | **Vitest** | `test/backend/unit/` |
+| Unit | Frontend lib helpers (auth, constants, API client) | **Vitest + jsdom** | `test/frontend/unit/` |
+| Integration | API routes against a real Atlas cluster with QE active | **Vitest + Supertest** | `test/backend/integration/` |
+| E2E | Full payment-to-investigation flow in the browser | **Playwright** | `test/frontend/e2e/` |
+| Security | Level 1 cannot access sensitive collections; no plaintext PAN in any response | Integration tests | `test/backend/integration/` |
+
+See [docs/installation.md](installation.md) §5 for all commands to run the test suite.
 
 **QE-specific tests:**
 - Insert a document with QE fields; verify ciphertext in Atlas Data Explorer (manual or Atlas API call).
