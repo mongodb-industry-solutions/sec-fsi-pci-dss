@@ -57,7 +57,7 @@ describe('FR-v1-05: Auth routes', () => {
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.users)).toBe(true);
     for (const user of res.body.users) {
-      expect(user.authenticationPasswordHash).toBeUndefined();
+      expect(user.partyAuthenticationCredentialHash).toBeUndefined();
       expect(user.email).toBeTruthy();
     }
   });

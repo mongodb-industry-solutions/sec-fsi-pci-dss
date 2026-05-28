@@ -2,14 +2,12 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Backend: Debug (ts-node-dev)",
+      "name": "Backend: Debug",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "${workspaceFolder}/backend/node_modules/.bin/ts-node-dev",
+      "runtimeExecutable": "${workspaceFolder}/backend/node_modules/.bin/ts-node",
       "runtimeArgs": [
-        "--respawn",
-        "--transpile-only",
-        "--inspect=9229"
+        "--transpile-only"
       ],
       "args": ["src/server.ts"],
       "cwd": "${workspaceFolder}/backend",
@@ -32,31 +30,6 @@
       "sourceMaps": true,
       "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
       "outFiles": ["${workspaceFolder}/backend/dist/**/*.js"]
-    },
-    {
-      "name": "Frontend: Debug Next.js",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["--inspect=9230"],
-      "args": ["${workspaceFolder}/frontend/node_modules/.bin/next", "dev", "-p", "3000"],
-      "cwd": "${workspaceFolder}/frontend",
-      "env": {
-        "NODE_OPTIONS": "--inspect=9230"
-      },
-      "envFile": "${workspaceFolder}/.env",
-      "sourceMaps": true,
-      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "Frontend: Attach to Running (port 9230)",
-      "type": "node",
-      "request": "attach",
-      "port": 9230,
-      "restart": true,
-      "sourceMaps": true,
-      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
     },
     {
       "name": "Backend: Run Jest Unit Tests",
@@ -83,6 +56,30 @@
       "internalConsoleOptions": "neverOpen"
     },
     {
+      "name": "Frontend: Debug",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/frontend/node_modules/.bin/next",
+      "args": ["dev", "--port", "3000"],
+      "cwd": "${workspaceFolder}/frontend",
+      "env": {
+        "NODE_OPTIONS": "--inspect=9230"
+      },
+      "envFile": "${workspaceFolder}/.env",
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Frontend: Attach to Running (port 9230)",
+      "type": "node",
+      "request": "attach",
+      "port": 9230,
+      "restart": true,
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
       "name": "Launch Program",
       "type": "node",
       "request": "launch",
@@ -93,7 +90,7 @@
   "compounds": [
     {
       "name": "Full Stack: Backend + Frontend",
-      "configurations": ["Backend: Debug (ts-node-dev)", "Frontend: Debug Next.js"],
+      "configurations": ["Backend: Debug", "Frontend: Debug"],
       "stopAll": true
     }
   ]

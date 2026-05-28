@@ -36,10 +36,10 @@ export default function DemoPaymentPage() {
         accountReference: `ACC-DEMO-${Date.now().toString(36).toUpperCase()}`,
         amount: parseFloat(amount),
         currency: 'USD',
-        merchantName: merchant,
-        merchantCategoryCode: mcc,
-        transactionChannel: 'online',
-        maskedPanDisplay: maskedCard || '****-****-****-0000',
+        cardTransactionMerchantName: merchant,
+        cardTransactionMerchantCategoryCode: mcc,
+        cardTransactionChannel: 'online',
+        cardTransactionMaskedPanDisplay: maskedCard || '****-****-****-0000',
         gatewayPayload: { source: 'app-mode' },
       }, token);
       setResult({ txnId: res.cardTransactionInstanceReference, fraudCaseCreated: res.fraudCaseCreated, caseId: res.fraudDiagnosisInstanceReference });

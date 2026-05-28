@@ -3,7 +3,7 @@
 **Project:** FSI PCI DSS Payment Security Demo  
 **PRD reference:** [PRD.md](PRD.md)  
 **Engineering Proposal:** [engineering-proposal.md](engineering-proposal.md)  
-**Last updated:** 2026-05-26
+**Last updated:** 2026-05-28
 
 This document covers the implementation-level detail that the PRD deliberately omits: BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index creation, and environment configuration. Engineers start here.
 
@@ -32,8 +32,8 @@ All models live in `backend/src/models/`. Each file exports the TypeScript inter
 ```typescript
 // BIAN SD-254: Card Transaction
 
-export const CARD_TRANSACTION_COLLECTION = 'cardTransactionQE';
-export const CARD_TRANSACTION_SENSITIVE_COLLECTION = 'cardTransactionSensitiveQE';
+export const CARD_TRANSACTION_COLLECTION = 'cardTransaction';
+export const CARD_TRANSACTION_SENSITIVE_COLLECTION = 'cardTransactionSensitive';
 
 export interface CardTransactionLogControlRecord {
   // Identifiers
@@ -47,29 +47,31 @@ export interface CardTransactionLogControlRecord {
   cardTransactionAccountReference: string;        // Account reference
 
   // Plaintext operational fields
-  transactionAmount: {
+  cardTransactionAmount: {
     amount: number;                               // QE range in v2
     currency: string;                             // ISO 4217
   };
-  transactionDateTime: Date;
-  transactionStatus: CardTransactionStatus;
-  transactionChannel: CardTransactionChannel;
+  cardTransactionDateTime: Date;
+  cardTransactionStatus: CardTransactionStatus;
+  cardTransactionChannel: CardTransactionChannel;
   cardTransactionInitiationType: CardTransactionInitiationType; // v4: MIT vs CIT for Visa/MC recurring rules
-  merchantCategoryCode: string;                   // MCC code
-  merchantName: string;
-  maskedPanDisplay: string;                       // Display only: ****-****-****-1234
+  cardTransactionMerchantCategoryCode: string;    // MCC code
+  cardTransactionMerchantName: string;
+  cardTransactionMaskedPanDisplay: string;        // Display only: ****-****-****-1234
 
   // BIAN metadata
   bianServiceDomain: 'CardTransaction';
   bianControlRecordType: 'CardTransactionLog';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
+  schemaVersion: number;                           // Schema Versioning Pattern
 }
 
 export interface CardTransactionSensitiveRecord {
   cardTransactionInstanceReference: string;       // FK: plaintext linking key
   rawGatewayPayload: object;                      // QE none
   processorTransactionMetadata: object;           // QE none
+  schemaVersion: number;
 }
 
 export type CardTransactionStatus =
@@ -86,8 +88,8 @@ export type CardTransactionInitiationType = 'customerInitiated' | 'merchantIniti
 ```typescript
 // BIAN SD-53: Customer Agreement
 
-export const CUSTOMER_AGREEMENT_COLLECTION = 'customerAgreementQE';
-export const CUSTOMER_AGREEMENT_SENSITIVE_COLLECTION = 'customerAgreementSensitiveQE';
+export const CUSTOMER_AGREEMENT_COLLECTION = 'customerAgreement';
+export const CUSTOMER_AGREEMENT_SENSITIVE_COLLECTION = 'customerAgreementSensitive';
 
 export interface CustomerAgreementControlRecord {
   // Identifiers
@@ -101,9 +103,9 @@ export interface CustomerAgreementControlRecord {
   // Plaintext fields (v1): customerName becomes QE equality in v2
   customerName: string;
   customerSegment: CustomerSegment;
-  agreementStatus: AgreementStatus;
-  enrollmentDateTime: Date;
-  preferredLanguage: string;                     // ISO 639-1
+  customerAgreementStatus: CustomerAgreementStatus;
+  customerAgreementEnrollmentDate: Date;
+  customerAgreementPreferredLanguage: string;     // ISO 639-1
 
   // v4: recurring payment mandate
   preferredPaymentCardReference?: string;        // FK: paymentCardReference of the saved card
@@ -113,15 +115,17 @@ export interface CustomerAgreementControlRecord {
   bianControlRecordType: 'CustomerAgreement';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
+  schemaVersion: number;                          // Schema Versioning Pattern
 }
 
 export interface CustomerAgreementSensitiveRecord {
   customerAgreementInstanceReference: string;   // FK: plaintext linking key
 
   // QE none: retrieval only under Level 2 escalation
-  residentialAddressFull: ResidentialAddress;
+  customerAgreementResidentialAddress: ResidentialAddress;
   governmentIdentificationReference: string;
-  internalRiskProfileNotes: string;
+  customerAgreementRiskNotes: string;
+  schemaVersion: number;
 }
 
 export interface ResidentialAddress {
@@ -132,7 +136,7 @@ export interface ResidentialAddress {
 }
 
 export type CustomerSegment = 'retail' | 'premium' | 'corporate' | 'sme';
-export type AgreementStatus = 'active' | 'suspended' | 'closed';
+export type CustomerAgreementStatus = 'active' | 'suspended' | 'closed';
 ```
 
 ### `paymentCard.model.ts`
@@ -140,7 +144,7 @@ export type AgreementStatus = 'active' | 'suspended' | 'closed';
 ```typescript
 // BIAN SD-88: Payment Card
 
-export const PAYMENT_CARD_COLLECTION = 'paymentCardQE';
+export const PAYMENT_CARD_COLLECTION = 'paymentCard';
 
 export interface PaymentCardManagementControlRecord {
   // Identifiers
@@ -151,28 +155,29 @@ export interface PaymentCardManagementControlRecord {
   paymentCardReference: string;                  // Indexed plaintext: standard query, not QE
 
   // QE none: expiry date is CHD co-located with card reference
-  cardExpirationDate: string;                    // MM/YY format
+  paymentCardExpirationDate: string;             // MM/YY format
 
   // Plaintext display fields
-  maskedPanDisplay: string;                      // ****-****-****-1234
-  cardNetwork: CardNetwork;
-  cardStatus: CardStatus;
-  cardIssuanceDateTime: Date;
-  isPreferredCard: boolean;                      // true when saved as preferred payment method
+  paymentCardMaskedPanDisplay: string;           // ****-****-****-1234
+  paymentCardNetwork: CardNetwork;
+  paymentCardStatus: PaymentCardStatus;
+  paymentCardIssuanceDateTime: Date;
+  paymentCardIsPreferred: boolean;               // true when saved as preferred payment method
 
   // v4: recurring payment mandate (PCI DSS Req 3.1 + 3.7)
-  mandateStatus?: 'active' | 'cancelled' | 'expired';
-  cardholderConsentTimestamp?: Date;             // Req 3.1: explicit consent recorded at save-card time
-  mandateExpiryDate?: Date;                      // Req 3.7: auto-purge trigger
+  paymentCardMandateStatus?: 'active' | 'cancelled' | 'expired';
+  paymentCardConsentDateTime?: Date;             // Req 3.1: explicit consent recorded at save-card time
+  paymentCardMandateExpiryDate?: Date;           // Req 3.7: auto-purge trigger
 
   // BIAN metadata
   bianServiceDomain: 'PaymentCard';
   bianControlRecordType: 'PaymentCardManagement';
   recordCreatedDateTime: Date;
+  schemaVersion: number;                          // Schema Versioning Pattern
 }
 
 export type CardNetwork = 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
-export type CardStatus = 'active' | 'blocked' | 'expired' | 'pending_activation';
+export type PaymentCardStatus = 'active' | 'blocked' | 'expired' | 'pending_activation';
 ```
 
 ### `fraudDiagnosis.model.ts`
@@ -181,15 +186,27 @@ export type CardStatus = 'active' | 'blocked' | 'expired' | 'pending_activation'
 // BIAN SD-83: Fraud Diagnosis (no QE: operational metadata only)
 
 export const FRAUD_DIAGNOSIS_COLLECTION = 'fraudDiagnosisCase';
+export const FRAUD_DIAGNOSIS_EVENTS_COLLECTION = 'fraudDiagnosisCaseEvents';
 
 export interface FraudDiagnosisControlRecord {
   // Identifiers
-  fraudDiagnosisInstanceReference: string;           // UUID, primary key
-  caseReference: string;                             // FD-2026-001234
+  fraudDiagnosisInstanceReference: string;               // UUID, primary key
+  fraudDiagnosisCaseReference: string;                   // FD-2026-001234
 
   // Links to protected records (plaintext keys by design: no PII in these refs)
-  linkedCardTransactionReference: string;            // FK to cardTransactionQE
-  linkedCustomerAgreementReference: string;          // FK to customerAgreementQE
+  linkedCardTransactionReference: string;                // FK to cardTransaction
+  linkedCustomerAgreementReference: string;              // FK to customerAgreement
+
+  // Extended Reference Pattern: stable display fields from cardTransaction.
+  // Embedded to make fraud investigation display a single-collection query.
+  // Updated only when transaction status changes (controlled write path).
+  transactionSnapshot: {
+    cardTransactionAmount: { amount: number; currency: string };
+    cardTransactionMerchantName: string;
+    cardTransactionDateTime: Date;
+    cardTransactionStatus: 'authorized' | 'declined' | 'pending' | 'settled' | 'disputed';
+    cardTransactionMaskedPanDisplay: string;
+  };
 
   // Case lifecycle
   fraudDiagnosisCaseStatus: FraudDiagnosisCaseStatus;
@@ -198,13 +215,13 @@ export interface FraudDiagnosisControlRecord {
   fraudDiagnosisCaseClosingDateTime?: Date;
 
   // Assignment (v2: populated when case is assigned)
-  fraudDiagnosisAnalystInstanceReference?: string;    // FK to partyAuthenticationQE (L1)
-  fraudDiagnosisInvestigatorInstanceReference?: string; // FK to partyAuthenticationQE (L2)
+  fraudDiagnosisAnalystInstanceReference?: string;       // FK to partyAuthentication (L1)
+  fraudDiagnosisInvestigatorInstanceReference?: string;  // FK to partyAuthentication (L2)
 
   // Assessment
   fraudDiagnosisAssessment: {
-    riskIndicators: string[];                         // e.g. ["amount_threshold", "high_risk_mcc"]
-    fraudDiagnosisScore?: number;                     // 0-100
+    riskIndicators: string[];                            // e.g. ["amount_threshold", "high_risk_mcc"]
+    fraudDiagnosisScore?: number;                        // 0-100
     fraudDiagnosisConclusion?: string;
   };
 
@@ -224,31 +241,36 @@ export interface FraudDiagnosisControlRecord {
     resolvedByInstanceReference: string;
   };
 
-  // AI agent draft (populated by v3 agent, null if agent disabled)
+  // AI agent draft (v3: populated by agent, absent if agent disabled)
   agentDraftDiagnosis?: {
     riskSummary: string;
     recommendedAction: 'clear' | 'escalate' | 'investigate';
-    confidenceScore: number;                          // 0-100
+    confidenceScore: number;                             // 0-100
     supportingEvidence: string[];
     agentCompletionDateTime: Date;
   };
-
-  // Append-only audit trail
-  diagnosisActionLog: DiagnosisActionEvent[];
 
   // BIAN metadata
   bianServiceDomain: 'FraudDiagnosis';
   bianControlRecordType: 'FraudDiagnosis';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
+
+  // Schema Versioning Pattern: enables zero-downtime schema evolution across v1-v4
+  schemaVersion: number;
 }
 
-export interface DiagnosisActionEvent {
+// Audit event document stored in fraudDiagnosisCaseEvents (separate collection).
+// Replaces the embedded diagnosisActionLog array (Unbounded Array anti-pattern fix).
+// Indexed on (fraudDiagnosisInstanceReference, actionDateTime) for ordered retrieval.
+export interface FraudDiagnosisCaseEventRecord {
+  fraudDiagnosisInstanceReference: string;               // FK to fraudDiagnosisCase
   actionDateTime: Date;
   actionType: ActionType;
   performedByInstanceReference: string;
   performedByRole: AnalystRole;
   actionDetails: Record<string, unknown>;
+  schemaVersion: number;
 }
 
 export type FraudDiagnosisCaseStatus =
@@ -286,26 +308,27 @@ export type ResolutionOutcome = 'cleared' | 'confirmed_fraud' | 'referred';
 ```typescript
 // BIAN SD-16: Party Authentication (demo-only: stores pre-seeded user accounts)
 
-export const PARTY_AUTHENTICATION_COLLECTION = 'partyAuthenticationQE';
+export const PARTY_AUTHENTICATION_COLLECTION = 'partyAuthentication';
 
 export interface PartyAuthenticationControlRecord {
   // Identifiers
   partyAuthenticationInstanceReference: string;   // UUID, primary key
 
   // QE equality: searchable by email (login lookup)
-  authenticationUserEmailAddress: string;          // QE:equality: used as username
+  partyAuthenticationUserEmailAddress: string;     // QE:equality: used as username
 
   // Plaintext fields (hashed credential, not sensitive after hashing)
-  authenticationPasswordHash: string;              // bcrypt hash: never store plaintext
-  authenticationUserRole: DemoUserRole;
-  authenticationUserName: string;                  // Display name
-  authenticationDomain: 'local' | 'msentra';      // Identity domain
-  accountStatus: 'active' | 'suspended';
+  partyAuthenticationCredentialHash: string;       // bcrypt hash: never store plaintext
+  partyAuthenticationUserRole: DemoUserRole;
+  partyAuthenticationUserName: string;             // Display name
+  partyAuthenticationLoginDomain: 'local' | 'msentra'; // Identity domain
+  partyAuthenticationAccountStatus: 'active' | 'suspended';
 
   // BIAN metadata
   bianServiceDomain: 'PartyAuthentication';
   bianControlRecordType: 'PartyAuthentication';
   recordCreatedDateTime: Date;
+  schemaVersion: number;                          // Schema Versioning Pattern
 }
 
 export type DemoUserRole =
@@ -332,11 +355,11 @@ export function buildEncryptedFieldsMaps(
 ) {
   return {
 
-    // ── cardTransactionQE ──────────────────────────────────────────
+    // ── cardTransaction ──────────────────────────────────────────
     // NOTE: paymentCardReference is NOT in QE. A payment token is a card
     // surrogate, not CHD under PCI DSS v4.0. It is stored plaintext and
     // searched via a standard MongoDB index.
-    cardTransactionQE: {
+    cardTransaction: {
       fields: [
         {
           keyId: dekLookupId,
@@ -344,18 +367,18 @@ export function buildEncryptedFieldsMaps(
           bsonType: 'string',
           queries: { queryType: 'equality' },
         },
-        // v2: add transactionAmount.amount with queryType: 'range'
+        // v2: add cardTransactionAmount.amount with queryType: 'range'
         // {
         //   keyId: dekLookupId,
-        //   path: 'transactionAmount.amount',
+        //   path: 'cardTransactionAmount.amount',
         //   bsonType: 'double',
         //   queries: { queryType: 'range', min: 0, max: 999999, precision: 2 },
         // },
       ],
     },
 
-    // ── cardTransactionSensitiveQE ─────────────────────────────────
-    cardTransactionSensitiveQE: {
+    // ── cardTransactionSensitive ─────────────────────────────────
+    cardTransactionSensitive: {
       fields: [
         {
           keyId: dekSensitiveId,
@@ -371,8 +394,8 @@ export function buildEncryptedFieldsMaps(
       ],
     },
 
-    // ── customerAgreementQE ────────────────────────────────────────
-    customerAgreementQE: {
+    // ── customerAgreement ────────────────────────────────────────
+    customerAgreement: {
       fields: [
         {
           keyId: dekLookupId,
@@ -398,12 +421,12 @@ export function buildEncryptedFieldsMaps(
       ],
     },
 
-    // ── customerAgreementSensitiveQE ───────────────────────────────
-    customerAgreementSensitiveQE: {
+    // ── customerAgreementSensitive ───────────────────────────────
+    customerAgreementSensitive: {
       fields: [
         {
           keyId: dekSensitiveId,
-          path: 'residentialAddressFull',
+          path: 'customerAgreementResidentialAddress',
           bsonType: 'object',
           // QE:none: no queries
         },
@@ -414,33 +437,33 @@ export function buildEncryptedFieldsMaps(
         },
         {
           keyId: dekSensitiveId,
-          path: 'internalRiskProfileNotes',
+          path: 'customerAgreementRiskNotes',
           bsonType: 'string',
         },
       ],
     },
 
-    // ── paymentCardQE ──────────────────────────────────────────────
-    // NOTE: paymentCardReference is NOT in QE (see cardTransactionQE note).
-    // cardExpirationDate IS protected: expiry date is CHD when co-located with
+    // ── paymentCard ──────────────────────────────────────────────
+    // NOTE: paymentCardReference is NOT in QE (see cardTransaction note).
+    // paymentCardExpirationDate IS protected: expiry date is CHD when co-located with
     // a card reference, and here it travels alongside the token.
-    paymentCardQE: {
+    paymentCard: {
       fields: [
         {
           keyId: dekSensitiveId,
-          path: 'cardExpirationDate',
+          path: 'paymentCardExpirationDate',
           bsonType: 'string',
           // QE:none — non-searchable, retrieval only
         },
       ],
     },
 
-    // ── partyAuthenticationQE ─────────────────────────────────────
-    partyAuthenticationQE: {
+    // ── partyAuthentication ─────────────────────────────────────
+    partyAuthentication: {
       fields: [
         {
           keyId: dekLookupId,
-          path: 'authenticationUserEmailAddress',
+          path: 'partyAuthenticationUserEmailAddress',
           bsonType: 'string',
           queries: { queryType: 'equality' },   // login lookup by email
         },
@@ -575,18 +598,18 @@ export async function getMongoClient(): Promise<MongoClient> {
       keyVaultNamespace: KEY_VAULT_NAMESPACE,
       kmsProviders: buildKmsProviders(),
       encryptedFieldsMap: {
-        [`${process.env.MONGODB_DB_NAME}.cardTransactionQE`]:
-          encryptedFieldsMap.cardTransactionQE,
-        [`${process.env.MONGODB_DB_NAME}.cardTransactionSensitiveQE`]:
-          encryptedFieldsMap.cardTransactionSensitiveQE,
-        [`${process.env.MONGODB_DB_NAME}.customerAgreementQE`]:
-          encryptedFieldsMap.customerAgreementQE,
-        [`${process.env.MONGODB_DB_NAME}.customerAgreementSensitiveQE`]:
-          encryptedFieldsMap.customerAgreementSensitiveQE,
-        [`${process.env.MONGODB_DB_NAME}.paymentCardQE`]:
-          encryptedFieldsMap.paymentCardQE,
-        [`${process.env.MONGODB_DB_NAME}.partyAuthenticationQE`]:
-          encryptedFieldsMap.partyAuthenticationQE,
+        [`${process.env.MONGODB_DB_NAME}.cardTransaction`]:
+          encryptedFieldsMap.cardTransaction,
+        [`${process.env.MONGODB_DB_NAME}.cardTransactionSensitive`]:
+          encryptedFieldsMap.cardTransactionSensitive,
+        [`${process.env.MONGODB_DB_NAME}.customerAgreement`]:
+          encryptedFieldsMap.customerAgreement,
+        [`${process.env.MONGODB_DB_NAME}.customerAgreementSensitive`]:
+          encryptedFieldsMap.customerAgreementSensitive,
+        [`${process.env.MONGODB_DB_NAME}.paymentCard`]:
+          encryptedFieldsMap.paymentCard,
+        [`${process.env.MONGODB_DB_NAME}.partyAuthentication`]:
+          encryptedFieldsMap.partyAuthentication,
       },
       // crypt_shared is auto-discovered from node_modules/mongodb-client-encryption
       extraOptions: {
@@ -612,27 +635,27 @@ import { MongoClient, ClientEncryption } from 'mongodb';
 async function createIndexes(client: MongoClient, dbName: string) {
   const db = client.db(dbName);
 
-  await db.collection('cardTransactionQE').createIndexes([
+  await db.collection('cardTransaction').createIndexes([
     { key: { cardTransactionInstanceReference: 1 }, unique: true },
     { key: { paymentCardReference: 1 } },             // standard index: token is not QE
-    { key: { transactionDateTime: -1 } },
-    { key: { transactionStatus: 1 } },
+    { key: { cardTransactionDateTime: -1 } },
+    { key: { cardTransactionStatus: 1 } },
   ]);
 
-  await db.collection('cardTransactionSensitiveQE').createIndexes([
+  await db.collection('cardTransactionSensitive').createIndexes([
     { key: { cardTransactionInstanceReference: 1 }, unique: true },
   ]);
 
-  await db.collection('customerAgreementQE').createIndexes([
+  await db.collection('customerAgreement').createIndexes([
     { key: { customerAgreementInstanceReference: 1 }, unique: true },
-    { key: { agreementStatus: 1 } },
+    { key: { customerAgreementStatus: 1 } },
   ]);
 
-  await db.collection('customerAgreementSensitiveQE').createIndexes([
+  await db.collection('customerAgreementSensitive').createIndexes([
     { key: { customerAgreementInstanceReference: 1 }, unique: true },
   ]);
 
-  await db.collection('paymentCardQE').createIndexes([
+  await db.collection('paymentCard').createIndexes([
     { key: { paymentCardInstanceReference: 1 }, unique: true },
     { key: { paymentCardReference: 1 } },             // standard index: token is not QE
     { key: { customerAgreementInstanceReference: 1 } },
@@ -644,9 +667,16 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { fraudDiagnosisCaseStatus: 1, fraudDiagnosisCaseSeverity: -1 } },
   ]);
 
-  await db.collection('partyAuthenticationQE').createIndexes([
+  // fraudDiagnosisCaseEvents: supports ordered audit retrieval per case
+  // and filtered queries by actionType (e.g. fetch only escalation events)
+  await db.collection('fraudDiagnosisCaseEvents').createIndexes([
+    { key: { fraudDiagnosisInstanceReference: 1, actionDateTime: -1 } },
+    { key: { fraudDiagnosisInstanceReference: 1, actionType: 1 } },
+  ]);
+
+  await db.collection('partyAuthentication').createIndexes([
     { key: { partyAuthenticationInstanceReference: 1 }, unique: true },
-    { key: { authenticationUserRole: 1 } },
+    { key: { partyAuthenticationUserRole: 1 } },
   ]);
 }
 ```
@@ -677,10 +707,10 @@ Creates a transaction and optionally a fraud case.
   "accountReference": "ACC-001",
   "amount": 850.00,
   "currency": "USD",
-  "merchantName": "Online Store Inc.",
-  "merchantCategoryCode": "5999",
-  "transactionChannel": "online",
-  "maskedPanDisplay": "****-****-****-1234",
+  "cardTransactionMerchantName": "Online Store Inc.",
+  "cardTransactionMerchantCategoryCode": "5999",
+  "cardTransactionChannel": "online",
+  "cardTransactionMaskedPanDisplay": "****-****-****-1234",
   "gatewayPayload": { "raw": "..." }
 }
 ```
@@ -689,7 +719,7 @@ Creates a transaction and optionally a fraud case.
 ```json
 {
   "cardTransactionInstanceReference": "uuid-v4",
-  "transactionStatus": "authorized",
+  "cardTransactionStatus": "authorized",
   "fraudCaseCreated": true,
   "fraudDiagnosisInstanceReference": "uuid-v4"
 }
@@ -705,12 +735,12 @@ Returns transaction by ID (no QE field values returned to Level 1).
 ```json
 {
   "cardTransactionInstanceReference": "...",
-  "transactionAmount": { "amount": 850.00, "currency": "USD" },
-  "transactionDateTime": "2026-05-26T14:30:00Z",
-  "transactionStatus": "authorized",
-  "merchantName": "Online Store Inc.",
-  "merchantCategoryCode": "5999",
-  "maskedPanDisplay": "****-****-****-1234"
+  "cardTransactionAmount": { "amount": 850.00, "currency": "USD" },
+  "cardTransactionDateTime": "2026-05-26T14:30:00Z",
+  "cardTransactionStatus": "authorized",
+  "cardTransactionMerchantName": "Online Store Inc.",
+  "cardTransactionMerchantCategoryCode": "5999",
+  "cardTransactionMaskedPanDisplay": "****-****-****-1234"
 }
 ```
 
@@ -744,7 +774,7 @@ QE equality search on the corresponding encrypted field.
   "customerAgreementInstanceReference": "...",
   "customerName": "John Doe",
   "customerSegment": "retail",
-  "agreementStatus": "active"
+  "customerAgreementStatus": "active"
 }
 ```
 
@@ -763,10 +793,10 @@ Registers a tokenized card linked to a customer agreement.
 {
   "customerAgreementInstanceReference": "uuid-v4",
   "cardToken": "tok_abc123",
-  "cardExpirationDate": "12/28",
-  "maskedPanDisplay": "****-****-****-1234",
-  "cardNetwork": "VISA",
-  "isPreferredCard": false
+  "paymentCardExpirationDate": "12/28",
+  "paymentCardMaskedPanDisplay": "****-****-****-1234",
+  "paymentCardNetwork": "VISA",
+  "paymentCardIsPreferred": false
 }
 ```
 
@@ -774,7 +804,7 @@ Registers a tokenized card linked to a customer agreement.
 ```json
 {
   "paymentCardInstanceReference": "uuid-v4",
-  "cardStatus": "active"
+  "paymentCardStatus": "active"
 }
 ```
 
@@ -790,10 +820,10 @@ Returns cards linked to a customer (plaintext lookup by FK).
   "results": [
     {
       "paymentCardInstanceReference": "...",
-      "maskedPanDisplay": "****-****-****-1234",
-      "cardNetwork": "VISA",
-      "cardStatus": "active",
-      "isPreferredCard": true
+      "paymentCardMaskedPanDisplay": "****-****-****-1234",
+      "paymentCardNetwork": "VISA",
+      "paymentCardStatus": "active",
+      "paymentCardIsPreferred": true
     }
   ]
 }
@@ -825,7 +855,7 @@ Returns cards linked to a customer (plaintext lookup by FK).
 ```json
 {
   "fraudDiagnosisInstanceReference": "...",
-  "caseReference": "FD-2026-001234",
+  "fraudDiagnosisCaseReference": "FD-2026-001234",
   "caseStatus": "open",
   "riskSeverity": "high",
   "linkedCardTransactionReference": "...",
@@ -898,7 +928,7 @@ All auth endpoints are public (no JWT required).
 
 #### `POST /auth/login`
 
-Validates credentials against `partyAuthenticationQE` (QE equality search on email). Returns a signed JWT on success.
+Validates credentials against `partyAuthentication` (QE equality search on email). Returns a signed JWT on success.
 
 **Request body:**
 ```json
@@ -953,17 +983,17 @@ Available only when `NODE_ENV !== 'production'`. Used by the "Encrypted in Atlas
 
 Returns the raw BSON document as stored in Atlas (ciphertext visible, no auto-decryption). Uses a plain MongoClient without `autoEncryption`.
 
-**Path params:** `collection` (e.g., `cardTransactionQE`), `id` (document `_id` or primary key value)
+**Path params:** `collection` (e.g., `cardTransaction`), `id` (document `_id` or primary key value)
 
 **Response 200:**
 ```json
 {
-  "collection": "cardTransactionQE",
+  "collection": "cardTransaction",
   "document": {
     "_id": "...",
     "paymentCardReference": { "$binary": { "base64": "BhKJ9KMsA...", "subType": "06" } },
     "customerEmailAddress": { "$binary": { "base64": "AqF8M9jl...", "subType": "06" } },
-    "transactionAmount": { "amount": 850, "currency": "USD" }
+    "cardTransactionAmount": { "amount": 850, "currency": "USD" }
   }
 }
 ```
@@ -1045,12 +1075,12 @@ Seed files live in `backend/data/`. The seed script (`backend/bin/seed.ts`) read
 
 | File | Collection | Documents |
 |---|---|---|
-| `backend/data/users.json` | `partyAuthenticationQE` | 5 |
-| `backend/data/customerAgreements.json` | `customerAgreementQE` | 50 |
-| `backend/data/customerAgreementsSensitive.json` | `customerAgreementSensitiveQE` | 50 |
-| `backend/data/paymentCards.json` | `paymentCardQE` | 50 |
-| `backend/data/cardTransactions.json` | `cardTransactionQE` | 200 |
-| `backend/data/cardTransactionsSensitive.json` | `cardTransactionSensitiveQE` | 200 |
+| `backend/data/users.json` | `partyAuthentication` | 5 |
+| `backend/data/customerAgreements.json` | `customerAgreement` | 50 |
+| `backend/data/customerAgreementsSensitive.json` | `customerAgreementSensitive` | 50 |
+| `backend/data/paymentCards.json` | `paymentCard` | 50 |
+| `backend/data/cardTransactions.json` | `cardTransaction` | 200 |
+| `backend/data/cardTransactionsSensitive.json` | `cardTransactionSensitive` | 200 |
 | `backend/data/fraudCases.json` | `fraudDiagnosisCase` | 20 |
 
 ### Demo users (`data/users.json`)
@@ -1069,8 +1099,8 @@ Passwords are stored as bcrypt hashes (12 rounds). Plaintext passwords are in `.
 
 - All personal data (names, emails, phones, addresses) is generated with `@faker-js/faker`
 - Card tokens use the format `tok_<uuid>`: never a real card number
-- `maskedPanDisplay` format: `****-****-****-XXXX` where XXXX is a random 4-digit suffix
-- `cardExpirationDate` is always a future date (at least 12 months from generation)
+- `paymentCardMaskedPanDisplay` / `cardTransactionMaskedPanDisplay` format: `****-****-****-XXXX` where XXXX is a random 4-digit suffix
+- `paymentCardExpirationDate` is always a future date (at least 12 months from generation)
 - CVV, PIN, full PAN, and magnetic stripe data are **never included** in seed files
 - Government IDs use a format that is clearly synthetic: `SYNTH-<random-8-digits>`
 - Fraud cases are linked to the first 20 transactions (indices 0–19) in the transactions seed
@@ -1079,12 +1109,12 @@ Passwords are stored as bcrypt hashes (12 rounds). Plaintext passwords are in `.
 
 | Collection | Upsert filter key |
 |---|---|
-| `partyAuthenticationQE` | `partyAuthenticationInstanceReference` |
-| `customerAgreementQE` | `customerAgreementInstanceReference` |
-| `customerAgreementSensitiveQE` | `customerAgreementInstanceReference` |
-| `paymentCardQE` | `paymentCardInstanceReference` |
-| `cardTransactionQE` | `cardTransactionInstanceReference` |
-| `cardTransactionSensitiveQE` | `cardTransactionInstanceReference` |
+| `partyAuthentication` | `partyAuthenticationInstanceReference` |
+| `customerAgreement` | `customerAgreementInstanceReference` |
+| `customerAgreementSensitive` | `customerAgreementInstanceReference` |
+| `paymentCard` | `paymentCardInstanceReference` |
+| `cardTransaction` | `cardTransactionInstanceReference` |
+| `cardTransactionSensitive` | `cardTransactionInstanceReference` |
 | `fraudDiagnosisCase` | `fraudDiagnosisInstanceReference` |
 
 ---
@@ -1141,10 +1171,10 @@ backend/
 │   │   └── provisionDEKs.ts             # DEK-lookup + DEK-sensitive
 │   └── seed/
 │       ├── index.ts                     # runSeed(): orchestrates all seed steps
-│       ├── seedUsers.ts                 # partyAuthenticationQE upserts
-│       ├── seedCustomers.ts             # customerAgreementQE + sensitive upserts
-│       ├── seedCards.ts                 # paymentCardQE upserts
-│       ├── seedTransactions.ts          # cardTransactionQE + sensitive upserts
+│       ├── seedUsers.ts                 # partyAuthentication upserts
+│       ├── seedCustomers.ts             # customerAgreement + sensitive upserts
+│       ├── seedCards.ts                 # paymentCard upserts
+│       ├── seedTransactions.ts          # cardTransaction + sensitive upserts
 │       └── seedCases.ts                 # fraudDiagnosisCase upserts
 │
 ├── middleware/

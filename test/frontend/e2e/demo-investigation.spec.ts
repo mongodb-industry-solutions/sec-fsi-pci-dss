@@ -16,7 +16,7 @@ const MOCK_CASES = {
   results: [
     {
       fraudDiagnosisInstanceReference: 'case-app-001',
-      caseReference: 'FD-2026-002001',
+      fraudDiagnosisCaseReference: 'FD-2026-002001',
       fraudDiagnosisCaseStatus: 'open',
       fraudDiagnosisCaseSeverity: 'high',
       linkedCardTransactionReference: 'txn-app-001',
@@ -97,7 +97,7 @@ test.describe('FR-v1-04: Case Detail', () => {
     await page.route('**/api/v1/demo/raw-document/**', (route) => {
       route.fulfill({
         status: 200, contentType: 'application/json',
-        body: JSON.stringify({ document: { merchantName: 'Test', cardTransactionAccountReference: { $binary: { base64: 'AABB==', subType: '06' } } } }),
+        body: JSON.stringify({ document: { cardTransactionMerchantName: 'Test', cardTransactionAccountReference: { $binary: { base64: 'AABB==', subType: '06' } } } }),
       });
     });
     await page.locator('button:has-text("Raw"), button:has-text("🔐")').first().click();

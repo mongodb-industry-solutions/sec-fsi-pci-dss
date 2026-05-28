@@ -11,20 +11,20 @@ export async function seedCustomers(db: Db) {
   );
 
   for (const record of agreements) {
-    await db.collection('customerAgreementQE').updateOne(
+    await db.collection('customerAgreement').updateOne(
       { customerAgreementInstanceReference: record.customerAgreementInstanceReference },
       { $set: record },
       { upsert: true }
     );
   }
-  console.log(`  customerAgreementQE: ${agreements.length} upserted`);
+  console.log(`  customerAgreement: ${agreements.length} upserted`);
 
   for (const record of sensitive) {
-    await db.collection('customerAgreementSensitiveQE').updateOne(
+    await db.collection('customerAgreementSensitive').updateOne(
       { customerAgreementInstanceReference: record.customerAgreementInstanceReference },
       { $set: record },
       { upsert: true }
     );
   }
-  console.log(`  customerAgreementSensitiveQE: ${sensitive.length} upserted`);
+  console.log(`  customerAgreementSensitive: ${sensitive.length} upserted`);
 }

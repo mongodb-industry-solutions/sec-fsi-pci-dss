@@ -2,7 +2,9 @@ import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
 import {
   FRAUD_DIAGNOSIS_COLLECTION,
+  FRAUD_DIAGNOSIS_EVENTS_COLLECTION,
   FraudDiagnosisControlRecord,
+  FraudDiagnosisCaseEventRecord,
   RiskSeverity,
 } from '../models';
 
@@ -17,16 +19,18 @@ export async function createFraudCase(
   txnId: string,
   customerRef: string,
   riskIndicators: string[],
-  severity: RiskSeverity
+  severity: RiskSeverity,
+  transactionSnapshot: FraudDiagnosisControlRecord['transactionSnapshot']
 ) {
   const caseId = uuidv4();
   const now = new Date();
 
   const fraudCase: Omit<FraudDiagnosisControlRecord, never> = {
     fraudDiagnosisInstanceReference: caseId,
-    caseReference: nextCaseRef(),
+    fraudDiagnosisCaseReference: nextCaseRef(),
     linkedCardTransactionReference: txnId,
     linkedCustomerAgreementReference: customerRef,
+    transactionSnapshot,
     fraudDiagnosisCaseStatus: 'open',
     fraudDiagnosisCaseSeverity: severity,
     fraudDiagnosisRequestDateTime: now,
@@ -34,22 +38,26 @@ export async function createFraudCase(
       riskIndicators,
       fraudDiagnosisScore: Math.min(100, riskIndicators.length * 40),
     },
-    diagnosisActionLog: [
-      {
-        actionDateTime: now,
-        actionType: 'case_opened',
-        performedByInstanceReference: 'system',
-        performedByRole: 'payment_service',
-        actionDetails: { trigger: riskIndicators[0] ?? 'manual' },
-      },
-    ],
     bianServiceDomain: 'FraudDiagnosis',
     bianControlRecordType: 'FraudDiagnosis',
     recordCreatedDateTime: now,
     recordUpdatedDateTime: now,
+    schemaVersion: 1,
+  };
+
+  const openEvent: FraudDiagnosisCaseEventRecord = {
+    fraudDiagnosisInstanceReference: caseId,
+    actionDateTime: now,
+    actionType: 'case_opened',
+    performedByInstanceReference: 'system',
+    performedByRole: 'payment_service',
+    actionDetails: { trigger: riskIndicators[0] ?? 'manual' },
+    schemaVersion: 1,
   };
 
   await db.collection(FRAUD_DIAGNOSIS_COLLECTION).insertOne(fraudCase as object);
+  await db.collection(FRAUD_DIAGNOSIS_EVENTS_COLLECTION).insertOne(openEvent as object);
+
   return { fraudDiagnosisInstanceReference: caseId };
 }
 

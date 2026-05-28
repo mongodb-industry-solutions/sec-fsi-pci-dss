@@ -13,10 +13,10 @@ export interface CreateTransactionInput {
   accountReference: string;
   amount: number;
   currency: string;
-  merchantName: string;
-  merchantCategoryCode: string;
-  transactionChannel: string;
-  maskedPanDisplay: string;
+  cardTransactionMerchantName: string;
+  cardTransactionMerchantCategoryCode: string;
+  cardTransactionChannel: string;
+  cardTransactionMaskedPanDisplay: string;
   gatewayPayload: object;
 }
 
@@ -44,41 +44,50 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
     cardTransactionInstanceReference: txnId,
     paymentCardReference: input.cardToken,
     cardTransactionAccountReference: input.accountReference,
-    transactionAmount: { amount: input.amount, currency: input.currency },
-    transactionDateTime: now,
-    transactionStatus: 'authorized',
-    transactionChannel: input.transactionChannel as CardTransactionLogControlRecord['transactionChannel'],
+    cardTransactionAmount: { amount: input.amount, currency: input.currency },
+    cardTransactionDateTime: now,
+    cardTransactionStatus: 'authorized',
+    cardTransactionChannel: input.cardTransactionChannel as CardTransactionLogControlRecord['cardTransactionChannel'],
     cardTransactionInitiationType: 'customerInitiated',
-    merchantCategoryCode: input.merchantCategoryCode,
-    merchantName: input.merchantName,
-    maskedPanDisplay: input.maskedPanDisplay,
+    cardTransactionMerchantCategoryCode: input.cardTransactionMerchantCategoryCode,
+    cardTransactionMerchantName: input.cardTransactionMerchantName,
+    cardTransactionMaskedPanDisplay: input.cardTransactionMaskedPanDisplay,
     bianServiceDomain: 'CardTransaction',
     bianControlRecordType: 'CardTransactionLog',
     recordCreatedDateTime: now,
     recordUpdatedDateTime: now,
+    schemaVersion: 1,
   };
 
   const sensitive: CardTransactionSensitiveRecord = {
     cardTransactionInstanceReference: txnId,
     rawGatewayPayload: input.gatewayPayload,
     processorTransactionMetadata: { processedAt: now.toISOString() },
+    schemaVersion: 1,
   };
 
   await db.collection(CARD_TRANSACTION_COLLECTION).insertOne(txn as object);
   await db.collection(CARD_TRANSACTION_SENSITIVE_COLLECTION).insertOne(sensitive as object);
 
-  const { create, reasons } = shouldCreateFraudCase(input.amount, input.merchantCategoryCode);
+  const { create, reasons } = shouldCreateFraudCase(input.amount, input.cardTransactionMerchantCategoryCode);
   let fraudCaseRef: string | undefined;
 
   if (create) {
     const severity = deriveSeverity(input.amount, reasons);
-    const fraudCase = await createFraudCase(db, txnId, input.accountReference, reasons, severity);
+    const snapshot = {
+      cardTransactionAmount: { amount: input.amount, currency: input.currency },
+      cardTransactionMerchantName: input.cardTransactionMerchantName,
+      cardTransactionDateTime: now,
+      cardTransactionStatus: 'authorized' as const,
+      cardTransactionMaskedPanDisplay: input.cardTransactionMaskedPanDisplay,
+    };
+    const fraudCase = await createFraudCase(db, txnId, input.accountReference, reasons, severity, snapshot);
     fraudCaseRef = fraudCase.fraudDiagnosisInstanceReference;
   }
 
   return {
     cardTransactionInstanceReference: txnId,
-    transactionStatus: 'authorized',
+    cardTransactionStatus: 'authorized',
     fraudCaseCreated: create,
     ...(fraudCaseRef && { fraudDiagnosisInstanceReference: fraudCaseRef }),
   };
@@ -93,13 +102,13 @@ export async function getTransactionById(db: Db, id: string) {
   // Level 1 response: no QE fields echoed back
   return {
     cardTransactionInstanceReference: txn.cardTransactionInstanceReference,
-    transactionAmount: txn.transactionAmount,
-    transactionDateTime: txn.transactionDateTime,
-    transactionStatus: txn.transactionStatus,
-    merchantName: txn.merchantName,
-    merchantCategoryCode: txn.merchantCategoryCode,
-    maskedPanDisplay: txn.maskedPanDisplay,
-    transactionChannel: txn.transactionChannel,
+    cardTransactionAmount: txn.cardTransactionAmount,
+    cardTransactionDateTime: txn.cardTransactionDateTime,
+    cardTransactionStatus: txn.cardTransactionStatus,
+    cardTransactionMerchantName: txn.cardTransactionMerchantName,
+    cardTransactionMerchantCategoryCode: txn.cardTransactionMerchantCategoryCode,
+    cardTransactionMaskedPanDisplay: txn.cardTransactionMaskedPanDisplay,
+    cardTransactionChannel: txn.cardTransactionChannel,
     paymentCardReference: txn.paymentCardReference,
   };
 }
@@ -107,7 +116,7 @@ export async function getTransactionById(db: Db, id: string) {
 export async function getTransactionsByCardToken(db: Db, cardToken: string) {
   const results = await db.collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION)
     .find({ paymentCardReference: cardToken } as Partial<CardTransactionLogControlRecord>)
-    .sort({ transactionDateTime: -1 })
+    .sort({ cardTransactionDateTime: -1 })
     .toArray();
 
   return { results, count: results.length };

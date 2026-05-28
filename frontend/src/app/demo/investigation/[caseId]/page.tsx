@@ -23,7 +23,7 @@ export default function DemoCaseDetailPage() {
   async function toggleRaw() {
     if (!showRaw && !rawDoc && fraudCase) {
       try {
-        const res = await api.demo.rawDocument('cardTransactionQE', fraudCase.linkedCardTransactionReference, token);
+        const res = await api.demo.rawDocument('cardTransaction', fraudCase.linkedCardTransactionReference, token);
         setRawDoc(res.document);
       } catch { /* non-prod endpoint unavailable */ }
     }
@@ -44,7 +44,7 @@ export default function DemoCaseDetailPage() {
 
         <div className="bg-white rounded-xl border p-5">
           <div className="flex gap-3 items-center mb-3">
-            <h1 className="text-xl font-bold">{fraudCase.caseReference}</h1>
+            <h1 className="text-xl font-bold">{fraudCase.fraudDiagnosisCaseReference}</h1>
             <span className={`px-2 py-0.5 rounded text-xs font-bold ${SEVERITY_COLORS[fraudCase.riskSeverity] ?? ''}`}>{fraudCase.riskSeverity.toUpperCase()}</span>
             <span className={`px-2 py-0.5 rounded text-xs ${STATUS_COLORS[fraudCase.caseStatus] ?? ''}`}>{fraudCase.caseStatus.replace(/_/g,' ')}</span>
           </div>
@@ -83,7 +83,7 @@ export default function DemoCaseDetailPage() {
               {showRaw ? '👁 Business View' : '🔐 Raw Atlas Document'}
             </button>
           </div>
-          {showRaw && rawDoc && <RawDocumentPanel document={rawDoc} collection="cardTransactionQE" />}
+          {showRaw && rawDoc && <RawDocumentPanel document={rawDoc} collection="cardTransaction" />}
           {showRaw && !rawDoc && (
             <p className="text-sm text-gray-500">Raw document endpoint unavailable (requires non-production env).</p>
           )}

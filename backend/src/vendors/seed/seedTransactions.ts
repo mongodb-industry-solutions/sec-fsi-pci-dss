@@ -11,20 +11,20 @@ export async function seedTransactions(db: Db) {
   );
 
   for (const record of txns) {
-    await db.collection('cardTransactionQE').updateOne(
+    await db.collection('cardTransaction').updateOne(
       { cardTransactionInstanceReference: record.cardTransactionInstanceReference },
       { $set: record },
       { upsert: true }
     );
   }
-  console.log(`  cardTransactionQE: ${txns.length} upserted`);
+  console.log(`  cardTransaction: ${txns.length} upserted`);
 
   for (const record of sensitive) {
-    await db.collection('cardTransactionSensitiveQE').updateOne(
+    await db.collection('cardTransactionSensitive').updateOne(
       { cardTransactionInstanceReference: record.cardTransactionInstanceReference },
       { $set: record },
       { upsert: true }
     );
   }
-  console.log(`  cardTransactionSensitiveQE: ${sensitive.length} upserted`);
+  console.log(`  cardTransactionSensitive: ${sensitive.length} upserted`);
 }

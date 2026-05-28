@@ -92,17 +92,17 @@ The only consumer of the QE client is the backend. A shared package adds workspa
 Seven MongoDB collections following BIAN Service Domain naming. Full TypeScript interfaces are in [technical-spec.md §1](technical-spec.md#1-bian-typescript-models).
 
 ```
-partyAuthenticationQE  ← BIAN SD-16: demo users + JWT auth (email QE:equality)
+partyAuthentication  ← BIAN SD-16: demo users + JWT auth (email QE:equality)
 
-customerAgreementQE ──1:1──► customerAgreementSensitiveQE
+customerAgreement ──1:1──► customerAgreementSensitive
        │
        │ 1:many (via customerAgreementInstanceReference, plaintext)
        ▼
-paymentCardQE  ──────────────────────────────────────────────────────┐
+paymentCard  ──────────────────────────────────────────────────────┐
        │ (via paymentCardReference token, standard index)            │
        │ many:1                                                      │
        ▼                                                             │
-cardTransactionQE ──1:1──► cardTransactionSensitiveQE                │
+cardTransaction ──1:1──► cardTransactionSensitive                │
        │                                                             │
        │ 1:many                                                      │
        ▼                                                             │
@@ -122,8 +122,8 @@ Two DEKs:
 
 | DEK | Wraps | Collections | Access |
 |---|---|---|---|
-| `DEK-lookup` | AWS CMK | `cardTransactionQE`, `customerAgreementQE`, `paymentCardQE`, `partyAuthenticationQE` | All service roles |
-| `DEK-sensitive` | AWS CMK | `cardTransactionSensitiveQE`, `customerAgreementSensitiveQE` | Level 2 + escalation token only (v2) |
+| `DEK-lookup` | AWS CMK | `cardTransaction`, `customerAgreement`, `paymentCard`, `partyAuthentication` | All service roles |
+| `DEK-sensitive` | AWS CMK | `cardTransactionSensitive`, `customerAgreementSensitive` | Level 2 + escalation token only (v2) |
 
 Complete `encryptedFieldsMap` definitions are in [technical-spec.md §2](technical-spec.md#2-qe-encryptedfieldsmaps).
 
@@ -177,11 +177,11 @@ GET    /health
 - Seed data contains no real card numbers; synthetic tokens only.
 
 **Authentication (v1):**
-- `POST /api/v1/auth/login` validates email + password against `partyAuthenticationQE` (bcrypt hash). Returns a signed HS256 JWT.
+- `POST /api/v1/auth/login` validates email + password against `partyAuthentication` (bcrypt hash). Returns a signed HS256 JWT.
 - Five pre-seeded demo roles: `customer`, `level1Analyst`, `level2Investigator`, `auditor`, `admin`.
 - The frontend's Application Mode shows a user-selector dropdown at the login screen (no password required for demo flow).
 - The auth domain is configurable: `AUTH_DOMAIN=local` (default) uses the seeded users; `AUTH_DOMAIN=msentra` delegates to MS Entra ID (future).
-- `authenticationUserEmailAddress` in `partyAuthenticationQE` is QE:equality for demo completeness — the same QE search story applies to auth lookup.
+- `authenticationUserEmailAddress` in `partyAuthentication` is QE:equality for demo completeness — the same QE search story applies to auth lookup.
 
 **v2 RBAC:**
 - JWT `role` claim drives field projection in API responses (replaces the earlier `X-Demo-Role` header pattern).
@@ -344,7 +344,7 @@ Each of the five QE-protected collections has its own dedicated DEK.
 **Date:** 2026-05-26  
 **Status:** Accepted
 
-**Context:** The demo needs to combine data from `customerAgreementQE`, `cardTransactionQE`, and `fraudDiagnosisCase` in a single case detail response. The natural MongoDB approach would be `$lookup`.
+**Context:** The demo needs to combine data from `customerAgreement`, `cardTransaction`, and `fraudDiagnosisCase` in a single case detail response. The natural MongoDB approach would be `$lookup`.
 
 **Decision:** Use application-side sequential queries. The backend service fetches each collection independently and assembles the response object in TypeScript.
 
@@ -362,7 +362,7 @@ Each of the five QE-protected collections has its own dedicated DEK.
 
 **Context:** QE requires a DEK per encrypted field (or shared DEK across fields). Options: one global DEK, two DEKs, or one DEK per collection.
 
-**Decision:** Two DEKs: `DEK-lookup` for searchable collections (`cardTransactionQE`, `customerAgreementQE`, `paymentCardQE`, `partyAuthenticationQE`), `DEK-sensitive` for non-searchable sensitive collections.
+**Decision:** Two DEKs: `DEK-lookup` for searchable collections (`cardTransaction`, `customerAgreement`, `paymentCard`, `partyAuthentication`), `DEK-sensitive` for non-searchable sensitive collections.
 
 **Consequences:**  
 + Maps clearly onto the access-control boundary (Level 1 vs Level 2).  

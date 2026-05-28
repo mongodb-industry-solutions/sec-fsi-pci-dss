@@ -40,7 +40,7 @@ export function CaseTable({ cases, basePath }: Props) {
                   href={`${basePath}/${c.fraudDiagnosisInstanceReference}`}
                   className="text-blue-600 hover:underline"
                 >
-                  {c.caseReference}
+                  {c.fraudDiagnosisCaseReference}
                 </Link>
               </td>
               <td className="px-4 py-3 font-mono text-xs text-gray-600 truncate max-w-[140px]">

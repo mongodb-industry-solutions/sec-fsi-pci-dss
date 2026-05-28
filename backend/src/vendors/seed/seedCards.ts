@@ -8,11 +8,11 @@ export async function seedCards(db: Db) {
   );
 
   for (const record of records) {
-    await db.collection('paymentCardQE').updateOne(
+    await db.collection('paymentCard').updateOne(
       { paymentCardInstanceReference: record.paymentCardInstanceReference },
       { $set: record },
       { upsert: true }
     );
   }
-  console.log(`  paymentCardQE: ${records.length} upserted`);
+  console.log(`  paymentCard: ${records.length} upserted`);
 }

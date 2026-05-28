@@ -1,4 +1,4 @@
-import { MongoClient } from 'mongodb';
+import { MongoClient, Binary } from 'mongodb';
 import { buildKmsProviders } from './kms';
 import { buildEncryptedFieldsMaps } from './encryptedFieldsMaps';
 import { provisionDataEncryptionKeys } from './keyVault';
@@ -14,7 +14,7 @@ export async function getQEClient(): Promise<MongoClient> {
   const { dekLookupId, dekSensitiveId } = await provisionDataEncryptionKeys(plainClient);
   await plainClient.close();
 
-  const encryptedFieldsMap = buildEncryptedFieldsMaps(dekLookupId, dekSensitiveId);
+  const encryptedFieldsMap = buildEncryptedFieldsMaps(dekLookupId as Binary, dekSensitiveId as Binary);
   const dbName = process.env.MONGODB_DB_NAME!;
 
   _client = new MongoClient(process.env.MONGODB_URI!, {
@@ -22,12 +22,12 @@ export async function getQEClient(): Promise<MongoClient> {
       keyVaultNamespace: KEY_VAULT_NAMESPACE,
       kmsProviders: buildKmsProviders(),
       encryptedFieldsMap: {
-        [`${dbName}.cardTransactionQE`]: encryptedFieldsMap.cardTransactionQE,
-        [`${dbName}.cardTransactionSensitiveQE`]: encryptedFieldsMap.cardTransactionSensitiveQE,
-        [`${dbName}.customerAgreementQE`]: encryptedFieldsMap.customerAgreementQE,
-        [`${dbName}.customerAgreementSensitiveQE`]: encryptedFieldsMap.customerAgreementSensitiveQE,
-        [`${dbName}.paymentCardQE`]: encryptedFieldsMap.paymentCardQE,
-        [`${dbName}.partyAuthenticationQE`]: encryptedFieldsMap.partyAuthenticationQE,
+        [`${dbName}.cardTransaction`]: encryptedFieldsMap.cardTransaction,
+        [`${dbName}.cardTransactionSensitive`]: encryptedFieldsMap.cardTransactionSensitive,
+        [`${dbName}.customerAgreement`]: encryptedFieldsMap.customerAgreement,
+        [`${dbName}.customerAgreementSensitive`]: encryptedFieldsMap.customerAgreementSensitive,
+        [`${dbName}.paymentCard`]: encryptedFieldsMap.paymentCard,
+        [`${dbName}.partyAuthentication`]: encryptedFieldsMap.partyAuthentication,
       },
       extraOptions: { cryptSharedLibRequired: true },
     },

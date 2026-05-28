@@ -77,10 +77,10 @@ export default function PaymentPage() {
         accountReference: `ACC-${Date.now().toString(36).toUpperCase()}`,
         amount: parseFloat(form.amount),
         currency: 'USD',
-        merchantName: form.merchantName,
-        merchantCategoryCode: form.merchantCategoryCode,
-        transactionChannel: 'online',
-        maskedPanDisplay: maskedCard || '****-****-****-1234',
+        cardTransactionMerchantName: form.merchantName,
+        cardTransactionMerchantCategoryCode: form.merchantCategoryCode,
+        cardTransactionChannel: 'online',
+        cardTransactionMaskedPanDisplay: maskedCard || '****-****-****-1234',
         gatewayPayload: { source: 'simulator', timestamp: new Date().toISOString() },
       }, '');
 

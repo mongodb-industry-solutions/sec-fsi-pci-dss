@@ -33,12 +33,14 @@ This answers the most common FSI prospect question:
 
 | Document | Description |
 |---|---|
-| [📖 Project Wiki](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki) | Installation guide, Q&A, and additional resources for non-engineering readers |
-| [PRD](docs/PRD.md) | What and why: audience, storyline, BIAN data model, QE design overview |
-| [Roadmap](docs/roadmap.md) | FR and NFR per iteration (v1 / v2 / v3 / v4) with acceptance criteria and Definition of Done |
-| [Technical Specification](docs/technical-spec.md) | BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index strategy |
-| [Engineering Proposal](docs/engineering-proposal.md) | Architecture decisions, implementation phases, risks, alternatives, ADRs |
-| [Q&A: PCI DSS](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki/q&a) | Common FSI client questions about MongoDB and PCI DSS compliance |
+| 📖 [Project Wiki](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki) | Installation guide, Q&A, and additional resources for non-engineering readers |
+| 📋 [PRD](docs/PRD.md) | What and why: audience, storyline, BIAN data model, QE design overview |
+| 🗺️ [Roadmap](docs/roadmap.md) | FR and NFR per iteration (v1 / v2 / v3 / v4) with acceptance criteria and Definition of Done |
+| 🛠️ [Technical Specification](docs/technical-spec.md) | BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index strategy |
+| 🏗️ [Engineering Proposal](docs/engineering-proposal.md) | Architecture decisions, implementation phases, risks, alternatives, ADRs |
+| 🗂️ [Architecture Overview](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki/architecture) | Data model, PII fields, encryption design, collection relationships, and role model |
+| ❓ [Q&A: PCI DSS](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki/q&a) | Common FSI client questions about MongoDB and PCI DSS compliance |
+| 🐛 [Issues](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/issues) | Bug reports, feature requests, and task tracking |
 
 ---
 
@@ -84,12 +86,12 @@ The data model follows **BIAN Service Domain** naming conventions across 7 colle
 
 | Collection | BIAN Service Domain | QE Protection |
 |---|---|---|
-| `partyAuthenticationQE` | Party Authentication (SD-16) | equality: user email |
-| `cardTransactionQE` | Card Transaction (SD-254) | equality: account reference; card token is plaintext (not CHD) |
-| `cardTransactionSensitiveQE` | Card Transaction: Sensitive | none: gateway payload, processor metadata |
-| `customerAgreementQE` | Customer Agreement (SD-53) | equality: email, phone, account reference |
-| `customerAgreementSensitiveQE` | Customer Agreement: Sensitive | none: address, government ID, risk notes |
-| `paymentCardQE` | Payment Card (SD-88) | none: expiry date; card token is plaintext (not CHD) |
+| `partyAuthentication` | Party Authentication (SD-16) | equality: user email |
+| `cardTransaction` | Card Transaction (SD-254) | equality: account reference; card token is plaintext (not CHD) |
+| `cardTransactionSensitive` | Card Transaction: Sensitive | none: gateway payload, processor metadata |
+| `customerAgreement` | Customer Agreement (SD-53) | equality: email, phone, account reference |
+| `customerAgreementSensitive` | Customer Agreement: Sensitive | none: address, government ID, risk notes |
+| `paymentCard` | Payment Card (SD-88) | none: expiry date; card token is plaintext (not CHD) |
 | `fraudDiagnosisCase` | Fraud Diagnosis (SD-83) | plaintext: operational metadata only |
 
 > Full schema definitions, field-level QE modes, index strategy, and collection relationships are in [docs/technical-spec.md](docs/technical-spec.md).

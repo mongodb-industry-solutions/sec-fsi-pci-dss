@@ -53,15 +53,15 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
         accountReference: 'ACC-TEST-001',
         amount: 100,
         currency: 'USD',
-        merchantName: 'Safe Store',
-        merchantCategoryCode: '5411',
-        transactionChannel: 'online',
-        maskedPanDisplay: '****-****-****-9999',
+        cardTransactionMerchantName: 'Safe Store',
+        cardTransactionMerchantCategoryCode: '5411',
+        cardTransactionChannel: 'online',
+        cardTransactionMaskedPanDisplay: '****-****-****-9999',
         gatewayPayload: {},
       });
     expect(res.status).toBe(201);
     expect(res.body.cardTransactionInstanceReference).toBeTruthy();
-    expect(res.body.transactionStatus).toBe('authorized');
+    expect(res.body.cardTransactionStatus).toBe('authorized');
     expect(res.body.fraudCaseCreated).toBe(false);
   });
 
@@ -75,10 +75,10 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
         accountReference: 'ACC-TEST-002',
         amount: 850,
         currency: 'USD',
-        merchantName: 'High Risk Store',
-        merchantCategoryCode: '5999',
-        transactionChannel: 'online',
-        maskedPanDisplay: '****-****-****-0001',
+        cardTransactionMerchantName: 'High Risk Store',
+        cardTransactionMerchantCategoryCode: '5999',
+        cardTransactionChannel: 'online',
+        cardTransactionMaskedPanDisplay: '****-****-****-0001',
         gatewayPayload: {},
       });
     expect(res.status).toBe(201);
@@ -96,10 +96,10 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
         accountReference: 'ACC-TEST-003',
         amount: 50,
         currency: 'USD',
-        merchantName: 'Casino',
-        merchantCategoryCode: '7995',
-        transactionChannel: 'online',
-        maskedPanDisplay: '****-****-****-0002',
+        cardTransactionMerchantName: 'Casino',
+        cardTransactionMerchantCategoryCode: '7995',
+        cardTransactionChannel: 'online',
+        cardTransactionMaskedPanDisplay: '****-****-****-0002',
         gatewayPayload: {},
       });
     expect(res.status).toBe(201);
@@ -116,10 +116,10 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
         accountReference: 'ACC-SECRET',
         amount: 99,
         currency: 'USD',
-        merchantName: 'Test',
-        merchantCategoryCode: '5411',
-        transactionChannel: 'pos',
-        maskedPanDisplay: '****-****-****-0003',
+        cardTransactionMerchantName: 'Test',
+        cardTransactionMerchantCategoryCode: '5411',
+        cardTransactionChannel: 'pos',
+        cardTransactionMaskedPanDisplay: '****-****-****-0003',
         gatewayPayload: {},
       });
 
@@ -128,7 +128,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
       .get(`/api/v1/card-transactions/${txnId}`)
       .set('Authorization', `Bearer ${authToken}`);
     expect(res.status).toBe(200);
-    expect(res.body.merchantName).toBeDefined();
+    expect(res.body.cardTransactionMerchantName).toBeDefined();
     expect(res.body.cardTransactionAccountReference).toBeUndefined();
   });
 
@@ -140,14 +140,14 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
       .send({
         customerAgreementInstanceReference: 'cust-test-001',
         cardToken: `tok_card_${Date.now()}`,
-        cardExpirationDate: '12/28',
-        maskedPanDisplay: '****-****-****-1111',
-        cardNetwork: 'VISA',
-        isPreferredCard: false,
+        paymentCardExpirationDate: '12/28',
+        paymentCardMaskedPanDisplay: '****-****-****-1111',
+        paymentCardNetwork: 'VISA',
+        paymentCardIsPreferred: false,
       });
     expect(res.status).toBe(201);
     expect(res.body.paymentCardInstanceReference).toBeTruthy();
-    expect(res.body.cardStatus).toBe('active');
+    expect(res.body.paymentCardStatus).toBe('active');
   });
 
   // FR-v1-04.1: GET fraud cases paginated

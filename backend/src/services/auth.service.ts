@@ -1,5 +1,5 @@
 import { Db } from 'mongodb';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 import { PARTY_AUTHENTICATION_COLLECTION, PartyAuthenticationControlRecord } from '../models';
 
@@ -19,23 +19,23 @@ export async function loginUser(
 ): Promise<{ token: string; user: Omit<JwtPayload, 'iat' | 'exp'> }> {
   const user = await db
     .collection<PartyAuthenticationControlRecord>(PARTY_AUTHENTICATION_COLLECTION)
-    .findOne({ authenticationUserEmailAddress: email } as Partial<PartyAuthenticationControlRecord>);
+    .findOne({ partyAuthenticationUserEmailAddress: email } as Partial<PartyAuthenticationControlRecord>);
 
   if (!user) {
     throw Object.assign(new Error('Invalid credentials'), { statusCode: 401 });
   }
 
-  const valid = await bcrypt.compare(password, user.authenticationPasswordHash);
+  const valid = await bcrypt.compare(password, user.partyAuthenticationCredentialHash);
   if (!valid) {
     throw Object.assign(new Error('Invalid credentials'), { statusCode: 401 });
   }
 
   const payload: JwtPayload = {
     sub: user.partyAuthenticationInstanceReference,
-    email: user.authenticationUserEmailAddress,
-    role: user.authenticationUserRole,
-    name: user.authenticationUserName,
-    domain: user.authenticationDomain,
+    email: user.partyAuthenticationUserEmailAddress,
+    role: user.partyAuthenticationUserRole,
+    name: user.partyAuthenticationUserName,
+    domain: user.partyAuthenticationLoginDomain,
   };
 
   const secret = process.env.JWT_SECRET!;
@@ -57,12 +57,12 @@ export async function loginUser(
 export async function getDemoUsers(db: Db) {
   const users = await db
     .collection<PartyAuthenticationControlRecord>(PARTY_AUTHENTICATION_COLLECTION)
-    .find({}, { projection: { authenticationUserName: 1, authenticationUserEmailAddress: 1, authenticationUserRole: 1 } })
+    .find({}, { projection: { partyAuthenticationUserName: 1, partyAuthenticationUserEmailAddress: 1, partyAuthenticationUserRole: 1 } })
     .toArray();
 
   return users.map((u) => ({
-    email: u.authenticationUserEmailAddress,
-    name: u.authenticationUserName,
-    role: u.authenticationUserRole,
+    email: u.partyAuthenticationUserEmailAddress,
+    name: u.partyAuthenticationUserName,
+    role: u.partyAuthenticationUserRole,
   }));
 }

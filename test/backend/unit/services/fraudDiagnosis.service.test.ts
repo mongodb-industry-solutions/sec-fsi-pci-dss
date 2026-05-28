@@ -40,10 +40,10 @@ describe('createFraudCase', () => {
     expect(db._insertOne.mock.calls[0][0].fraudDiagnosisCaseStatus).toBe('open');
   });
 
-  it('caseReference follows FD-YYYY-NNNNNN pattern', async () => {
+  it('fraudDiagnosisCaseReference follows FD-YYYY-NNNNNN pattern', async () => {
     const db = makeDb();
     await createFraudCase(db, 'txn-001', 'cust-001', ['amount_threshold'], 'high');
-    expect(db._insertOne.mock.calls[0][0].caseReference).toMatch(/^FD-\d{4}-\d{6}$/);
+    expect(db._insertOne.mock.calls[0][0].fraudDiagnosisCaseReference).toMatch(/^FD-\d{4}-\d{6}$/);
   });
 
   it('diagnosisActionLog has a single case_opened entry authored by payment_service', async () => {
@@ -111,7 +111,7 @@ describe('getCases', () => {
 
 describe('getCaseById', () => {
   it('returns the fraud case when found', async () => {
-    const caseDoc = { fraudDiagnosisInstanceReference: 'case-001', caseReference: 'FD-2026-001001' };
+    const caseDoc = { fraudDiagnosisInstanceReference: 'case-001', fraudDiagnosisCaseReference: 'FD-2026-001001' };
     const result = await getCaseById(makeDb({ findOneResult: caseDoc }), 'case-001');
     expect(result).toEqual(caseDoc);
   });

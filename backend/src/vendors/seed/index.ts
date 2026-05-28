@@ -13,16 +13,16 @@ export async function runSeed() {
   const db = client.db(process.env.MONGODB_DB_NAME!);
 
   try {
-    console.log('Seeding partyAuthenticationQE...');
+    console.log('Seeding partyAuthentication...');
     await seedUsers(db);
 
-    console.log('Seeding customerAgreementQE + customerAgreementSensitiveQE...');
+    console.log('Seeding customerAgreement + customerAgreementSensitive...');
     await seedCustomers(db);
 
-    console.log('Seeding paymentCardQE...');
+    console.log('Seeding paymentCard...');
     await seedCards(db);
 
-    console.log('Seeding cardTransactionQE + cardTransactionSensitiveQE...');
+    console.log('Seeding cardTransaction + cardTransactionSensitive...');
     await seedTransactions(db);
 
     console.log('Seeding fraudDiagnosisCase...');

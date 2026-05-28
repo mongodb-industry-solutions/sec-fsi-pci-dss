@@ -8,7 +8,7 @@ export async function seedUsers(db: Db) {
 
   let upserted = 0;
   for (const record of records) {
-    await db.collection('partyAuthenticationQE').updateOne(
+    await db.collection('partyAuthentication').updateOne(
       { partyAuthenticationInstanceReference: record.partyAuthenticationInstanceReference },
       { $set: record },
       { upsert: true }
