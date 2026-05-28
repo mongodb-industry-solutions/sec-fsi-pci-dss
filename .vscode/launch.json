@@ -1,0 +1,100 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Backend: Debug (ts-node-dev)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/backend/node_modules/.bin/ts-node-dev",
+      "runtimeArgs": [
+        "--respawn",
+        "--transpile-only",
+        "--inspect=9229"
+      ],
+      "args": ["src/server.ts"],
+      "cwd": "${workspaceFolder}/backend",
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "envFile": "${workspaceFolder}/.env",
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "outFiles": ["${workspaceFolder}/backend/dist/**/*.js"],
+      "console": "integratedTerminal",
+      "restart": true
+    },
+    {
+      "name": "Backend: Attach to Running (port 9229)",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "restart": true,
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "outFiles": ["${workspaceFolder}/backend/dist/**/*.js"]
+    },
+    {
+      "name": "Frontend: Debug Next.js",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--inspect=9230"],
+      "args": ["${workspaceFolder}/frontend/node_modules/.bin/next", "dev", "-p", "3000"],
+      "cwd": "${workspaceFolder}/frontend",
+      "env": {
+        "NODE_OPTIONS": "--inspect=9230"
+      },
+      "envFile": "${workspaceFolder}/.env",
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Frontend: Attach to Running (port 9230)",
+      "type": "node",
+      "request": "attach",
+      "port": 9230,
+      "restart": true,
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+    },
+    {
+      "name": "Backend: Run Jest Unit Tests",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/backend/node_modules/.bin/jest",
+      "runtimeArgs": ["--runInBand", "--testPathPattern=unit", "--no-coverage"],
+      "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Backend: Run Jest Integration Tests",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/backend/node_modules/.bin/jest",
+      "runtimeArgs": ["--runInBand", "--testPathPattern=integration", "--no-coverage"],
+      "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Launch Program",
+      "type": "node",
+      "request": "launch",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${file}"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack: Backend + Frontend",
+      "configurations": ["Backend: Debug (ts-node-dev)", "Frontend: Debug Next.js"],
+      "stopAll": true
+    }
+  ]
+}

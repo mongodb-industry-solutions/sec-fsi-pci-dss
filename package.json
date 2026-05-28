@@ -1,0 +1,33 @@
+{
+  "name": "fsi-pci-dss-demo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "install:all":      "npm install && npm install --prefix frontend && npm install --prefix backend",
+    "dev":              "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend":     "npm run dev --prefix frontend",
+    "dev:backend":      "npm run dev --prefix backend",
+    "setup:db":         "npm run setup:db --prefix backend",
+    "seed":             "npm run seed --prefix backend",
+    "build":            "npm run build --prefix frontend && npm run build --prefix backend",
+    "test":             "npm run test:unit && npm run test:integration",
+    "test:unit":        "vitest run test/backend/unit test/frontend/unit",
+    "test:integration": "vitest run test/backend/integration test/frontend/integration",
+    "test:e2e":         "playwright test",
+    "test:e2e:ui":      "playwright test --ui",
+    "test:e2e:debug":   "playwright test --debug",
+    "test:watch":       "vitest watch",
+    "type-check":       "tsc --noEmit --project tsconfig.base.json"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "concurrently": "^8.2.2",
+    "jsdom": "^25.0.0",
+    "supertest": "^6.3.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5",
+    "vitest": "^2.0.0"
+  }
+}

@@ -1,0 +1,95 @@
+/**
+ * Unit tests: auth.service (FR-v1-05)
+ * Source: backend/src/services/auth.service.ts
+ */
+import { describe, it, expect, vi, beforeAll } from 'vitest';
+import * as bcrypt from 'bcrypt';
+import * as jwt from 'jsonwebtoken';
+import { loginUser, getDemoUsers } from '../../../../backend/src/services/auth.service';
+
+function makeDb(user: Record<string, unknown> | null) {
+  const findOneMock = vi.fn().mockResolvedValue(user);
+  const toArrayMock = vi.fn().mockResolvedValue(user ? [user] : []);
+  return {
+    collection: vi.fn().mockReturnValue({
+      findOne: findOneMock,
+      find: vi.fn().mockReturnValue({ toArray: toArrayMock }),
+    }),
+  } as any;
+}
+
+beforeAll(() => {
+  process.env.JWT_SECRET = 'test-secret-key';
+  process.env.JWT_EXPIRES_IN = '1h';
+});
+
+describe('loginUser', () => {
+  const validUser = {
+    partyAuthenticationInstanceReference: 'usr-001',
+    authenticationUserEmailAddress: 'sarah.chen@leafybank.demo',
+    authenticationPasswordHash: bcrypt.hashSync('demo-password', 4),
+    authenticationUserRole: 'level1_analyst',
+    authenticationUserName: 'Sarah Chen',
+    authenticationDomain: 'local',
+  };
+
+  it('returns a signed JWT for valid credentials', async () => {
+    const db = makeDb(validUser);
+    const { token, user } = await loginUser(db, 'sarah.chen@leafybank.demo', 'demo-password', 'local');
+    expect(typeof token).toBe('string');
+    expect(user.email).toBe('sarah.chen@leafybank.demo');
+    expect(user.role).toBe('level1_analyst');
+  });
+
+  it('JWT payload contains sub, email, role, name, domain', async () => {
+    const db = makeDb(validUser);
+    const { token } = await loginUser(db, 'sarah.chen@leafybank.demo', 'demo-password', 'local');
+    const decoded = jwt.verify(token, 'test-secret-key') as Record<string, unknown>;
+    expect(decoded.sub).toBe('usr-001');
+    expect(decoded.email).toBe('sarah.chen@leafybank.demo');
+    expect(decoded.role).toBe('level1_analyst');
+    expect(decoded.name).toBe('Sarah Chen');
+    expect(decoded.domain).toBe('local');
+  });
+
+  it('throws 401 when user is not found', async () => {
+    const db = makeDb(null);
+    await expect(loginUser(db, 'unknown@leafybank.demo', 'demo-password', 'local'))
+      .rejects.toMatchObject({ message: 'Invalid credentials', statusCode: 401 });
+  });
+
+  it('throws 401 for wrong password', async () => {
+    const db = makeDb(validUser);
+    await expect(loginUser(db, 'sarah.chen@leafybank.demo', 'wrong-pass', 'local'))
+      .rejects.toMatchObject({ message: 'Invalid credentials', statusCode: 401 });
+  });
+
+  it('response user object contains no password hash', async () => {
+    const db = makeDb(validUser);
+    const { user } = await loginUser(db, 'sarah.chen@leafybank.demo', 'demo-password', 'local');
+    expect((user as Record<string, unknown>).authenticationPasswordHash).toBeUndefined();
+  });
+});
+
+describe('getDemoUsers', () => {
+  it('returns name, email, role — no password hash', async () => {
+    const raw = {
+      authenticationUserName: 'Sarah Chen',
+      authenticationUserEmailAddress: 'sarah.chen@leafybank.demo',
+      authenticationUserRole: 'level1_analyst',
+      authenticationPasswordHash: 'bcrypt-hash-must-not-leak',
+    };
+    const db = {
+      collection: vi.fn().mockReturnValue({
+        find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([raw]) }),
+      }),
+    } as any;
+
+    const users = await getDemoUsers(db);
+    expect(users).toHaveLength(1);
+    expect(users[0].email).toBe('sarah.chen@leafybank.demo');
+    expect(users[0].name).toBe('Sarah Chen');
+    expect(users[0].role).toBe('level1_analyst');
+    expect((users[0] as Record<string, unknown>).authenticationPasswordHash).toBeUndefined();
+  });
+});
