@@ -12,7 +12,24 @@ import { fraudDiagnosisController } from './controllers/fraudDiagnosis.controlle
 import { demoController } from './controllers/demo.controller';
 
 export async function buildApp(): Promise<FastifyInstance> {
-  const fastify = Fastify({ logger: true });
+  const fastify = Fastify({
+    logger: true,
+    ajv: {
+      customOptions: {
+        // Allow OpenAPI keywords that are not part of JSON Schema draft-07.
+        // AJV runs in strict mode by default in Fastify 4; without this it
+        // rejects 'example' and other OpenAPI annotations in route schemas.
+        keywords: ['example'],
+      },
+    },
+  });
+
+  // Shared schemas registered on the root scope so all controllers can resolve
+  // $ref references. Must come before any plugin or route registration.
+  fastify.addSchema({ $id: 'Error', type: 'object', properties: { error: { type: 'string' } }, required: ['error'] });
+  fastify.addSchema({ $id: 'MonetaryAmount', type: 'object', properties: { amount: { type: 'number' }, currency: { type: 'string' } }, required: ['amount', 'currency'] });
+  fastify.addSchema({ $id: 'TransactionSnapshot', type: 'object', properties: { cardTransactionAmount: { $ref: 'MonetaryAmount#' }, cardTransactionMerchantName: { type: 'string' }, cardTransactionDateTime: { type: 'string', format: 'date-time' }, cardTransactionStatus: { type: 'string' }, cardTransactionMaskedPanDisplay: { type: 'string' } }, required: ['cardTransactionAmount', 'cardTransactionMerchantName', 'cardTransactionDateTime', 'cardTransactionStatus', 'cardTransactionMaskedPanDisplay'] });
+  fastify.addSchema({ $id: 'FraudDiagnosisAssessment', type: 'object', properties: { riskIndicators: { type: 'array', items: { type: 'string' } }, fraudDiagnosisScore: { type: 'number' }, fraudDiagnosisConclusion: { type: 'string' } }, required: ['riskIndicators'] });
 
   // Swagger must be registered before routes so schemas are captured in the spec
   await fastify.register(swaggerPlugin);

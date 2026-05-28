@@ -81,52 +81,9 @@ Obtain a token via \`POST /api/v1/auth/login\`.
             description: 'JWT token obtained from POST /api/v1/auth/login',
           },
         },
-        schemas: {
-          Error: {
-            type: 'object',
-            properties: {
-              error: { type: 'string', description: 'Human-readable error message' },
-            },
-            required: ['error'],
-          },
-          MonetaryAmount: {
-            type: 'object',
-            description: 'ISO 4217 monetary amount',
-            properties: {
-              amount: { type: 'number', example: 450.0 },
-              currency: { type: 'string', example: 'USD', description: 'ISO 4217 currency code' },
-            },
-            required: ['amount', 'currency'],
-          },
-          TransactionSnapshot: {
-            type: 'object',
-            description: 'Extended Reference: key display fields from cardTransaction, embedded for single-query fraud investigation display',
-            properties: {
-              cardTransactionAmount: { $ref: '#/components/schemas/MonetaryAmount' },
-              cardTransactionMerchantName: { type: 'string', example: 'Amazon EU' },
-              cardTransactionDateTime: { type: 'string', format: 'date-time' },
-              cardTransactionStatus: {
-                type: 'string',
-                enum: ['authorized', 'declined', 'pending', 'settled', 'disputed'],
-              },
-              cardTransactionMaskedPanDisplay: { type: 'string', example: '****-****-****-1234' },
-            },
-            required: ['cardTransactionAmount', 'cardTransactionMerchantName', 'cardTransactionDateTime', 'cardTransactionStatus', 'cardTransactionMaskedPanDisplay'],
-          },
-          FraudDiagnosisAssessment: {
-            type: 'object',
-            properties: {
-              riskIndicators: {
-                type: 'array',
-                items: { type: 'string' },
-                example: ['amount_threshold', 'high_risk_mcc'],
-              },
-              fraudDiagnosisScore: { type: 'number', minimum: 0, maximum: 100, example: 72 },
-              fraudDiagnosisConclusion: { type: 'string', example: 'Suspicious activity detected' },
-            },
-            required: ['riskIndicators'],
-          },
-        },
+        // Shared schemas (Error, MonetaryAmount, TransactionSnapshot,
+        // FraudDiagnosisAssessment) are registered via fastify.addSchema()
+        // above. @fastify/swagger includes them here automatically.
       },
       tags: [
         { name: 'auth', description: 'Authentication — Party Authentication SD-16. Public routes, no JWT required.' },

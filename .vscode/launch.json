@@ -5,11 +5,9 @@
       "name": "Backend: Debug",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "${workspaceFolder}/backend/node_modules/.bin/ts-node-dev",
+      "runtimeExecutable": "${workspaceFolder}/backend/node_modules/.bin/ts-node",
       "runtimeArgs": [
-        "--respawn",
-        "--transpile-only",
-        "--inspect=9229"
+        "--transpile-only"
       ],
       "args": ["src/server.ts"],
       "cwd": "${workspaceFolder}/backend",

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/src/server.js",
     "setup:db": "ts-node bin/setup.ts",
@@ -37,6 +37,7 @@
     "@types/webidl-conversions": "^7.0.3",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.22.3",
     "typescript": "^5.4.5"
   }
 }

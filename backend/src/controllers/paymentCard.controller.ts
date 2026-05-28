@@ -63,9 +63,9 @@ Customer Agreement.
             paymentCardStatus: { type: 'string', enum: ['active', 'blocked', 'expired', 'pending_activation'] },
           },
         },
-        400: { $ref: '#/components/schemas/Error' },
-        401: { $ref: '#/components/schemas/Error' },
-        500: { $ref: '#/components/schemas/Error' },
+        400: { $ref: 'Error#' },
+        401: { $ref: 'Error#' },
+        500: { $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
@@ -125,8 +125,8 @@ Customer Agreement.
             },
           },
         },
-        400: { $ref: '#/components/schemas/Error' },
-        401: { $ref: '#/components/schemas/Error' },
+        400: { $ref: 'Error#' },
+        401: { $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {

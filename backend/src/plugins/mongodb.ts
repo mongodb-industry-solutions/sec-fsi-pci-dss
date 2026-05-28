@@ -35,6 +35,13 @@ async function mongodbPlugin(fastify: FastifyInstance) {
   fastify.decorate('db', null as unknown as Db);
   fastify.decorate('dbError', null as string | null);
 
+  if (!process.env.MONGODB_URI) {
+    const msg = 'MONGODB_URI is not set — server starting in degraded mode';
+    console.error(`[mongodb] ${msg}`);
+    fastify.dbError = msg;
+    return;
+  }
+
   try {
     const client = await getQEClient();
     const db = client.db(process.env.MONGODB_DB_NAME!);
@@ -48,11 +55,10 @@ async function mongodbPlugin(fastify: FastifyInstance) {
       await closeQEClient();
     });
   } catch (err) {
-    const { server, database } = sanitizeUri(process.env.MONGODB_URI ?? '');
+    const { server, database } = sanitizeUri(process.env.MONGODB_URI);
     const reason = err instanceof Error ? err.message : String(err);
-    const summary = `server=${server} database=${database} — ${reason}`;
 
-    console.error(`[mongodb] Connection failed: ${summary}`);
+    console.error(`[mongodb] Connection failed — server=${server} database=${database} — ${reason}`);
     fastify.dbError = `Connection failed: server=${server} database=${database}`;
     // Server continues to start; Swagger UI and /health remain accessible.
   }

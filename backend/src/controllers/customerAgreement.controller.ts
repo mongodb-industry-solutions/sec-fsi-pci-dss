@@ -70,9 +70,9 @@ plaintext is decrypted client-side in the API process.
             },
           },
         },
-        400: { $ref: '#/components/schemas/Error' },
-        401: { $ref: '#/components/schemas/Error' },
-        404: { $ref: '#/components/schemas/Error' },
+        400: { $ref: 'Error#' },
+        401: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
