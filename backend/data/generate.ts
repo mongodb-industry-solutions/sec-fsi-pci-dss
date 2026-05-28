@@ -1,5 +1,5 @@
 /**
- * Generates synthetic seed data for all 7 collections.
+ * Generates synthetic seed data for all collections.
  * Run: ts-node data/generate.ts
  */
 import * as fs from 'fs';
@@ -38,15 +38,10 @@ function caseRef(n: number): string {
   return `FD-2026-${String(n).padStart(6, '0')}`;
 }
 
-function txnRef(n: number): string {
-  return `TXN-2026-${String(n).padStart(6, '0')}`;
-}
-
 const NETWORKS = ['VISA', 'MASTERCARD', 'AMEX', 'ELO'] as const;
 const SEGMENTS = ['retail', 'premium', 'corporate', 'sme'] as const;
 const CHANNELS = ['online', 'pos', 'contactless', 'atm'] as const;
 const STATUSES = ['authorized', 'settled', 'disputed'] as const;
-const SEVERITIES = ['low', 'medium', 'high', 'critical'] as const;
 const MCC_LIST = ['5812', '6011', '7995', '5734', '5411', '5912', '4814', '5999'];
 const RISK_MCC = ['5812', '6011', '7995'];
 
@@ -67,6 +62,7 @@ async function main() {
       bianServiceDomain: 'PartyAuthentication',
       bianControlRecordType: 'PartyAuthentication',
       recordCreatedDateTime: NOW,
+      schemaVersion: 1,
     },
     {
       partyAuthenticationInstanceReference: uuid(),
@@ -79,6 +75,7 @@ async function main() {
       bianServiceDomain: 'PartyAuthentication',
       bianControlRecordType: 'PartyAuthentication',
       recordCreatedDateTime: NOW,
+      schemaVersion: 1,
     },
     {
       partyAuthenticationInstanceReference: uuid(),
@@ -91,6 +88,7 @@ async function main() {
       bianServiceDomain: 'PartyAuthentication',
       bianControlRecordType: 'PartyAuthentication',
       recordCreatedDateTime: NOW,
+      schemaVersion: 1,
     },
     {
       partyAuthenticationInstanceReference: uuid(),
@@ -103,6 +101,7 @@ async function main() {
       bianServiceDomain: 'PartyAuthentication',
       bianControlRecordType: 'PartyAuthentication',
       recordCreatedDateTime: NOW,
+      schemaVersion: 1,
     },
     {
       partyAuthenticationInstanceReference: uuid(),
@@ -115,6 +114,7 @@ async function main() {
       bianServiceDomain: 'PartyAuthentication',
       bianControlRecordType: 'PartyAuthentication',
       recordCreatedDateTime: NOW,
+      schemaVersion: 1,
     },
   ];
 
@@ -144,6 +144,7 @@ async function main() {
       bianControlRecordType: 'CustomerAgreement',
       recordCreatedDateTime: faker.date.past({ years: 2 }),
       recordUpdatedDateTime: NOW,
+      schemaVersion: 1,
     });
 
     customerAgreementsSensitive.push({
@@ -156,6 +157,7 @@ async function main() {
       },
       governmentIdentificationReference: synthGovId(),
       customerAgreementRiskNotes: 'No prior fraud history.',
+      schemaVersion: 1,
     });
   }
 
@@ -181,6 +183,7 @@ async function main() {
       bianServiceDomain: 'PaymentCard',
       bianControlRecordType: 'PaymentCardManagement',
       recordCreatedDateTime: faker.date.past({ years: 1 }),
+      schemaVersion: 1,
     });
   }
 
@@ -213,6 +216,7 @@ async function main() {
       bianControlRecordType: 'CardTransactionLog',
       recordCreatedDateTime: faker.date.recent({ days: 30 }),
       recordUpdatedDateTime: NOW,
+      schemaVersion: 1,
     });
 
     cardTransactionsSensitive.push({
@@ -227,15 +231,18 @@ async function main() {
         settlementDate: faker.date.soon({ days: 3 }),
         processingFlags: ['standard'],
       },
+      schemaVersion: 1,
     });
   }
 
-  // ── 5. Fraud cases (first 20 transactions) ────────────────────────
+  // ── 5. Fraud cases + events ───────────────────────────────────────
   const fraudCases = [];
+  const fraudCaseEvents = [];
 
   for (let i = 0; i < 20; i++) {
     const txn = cardTransactions[i];
     const custId = customerIds[i % 50];
+    const caseId = uuid();
     const isFraud = txn.cardTransactionAmount.amount > 500 || RISK_MCC.includes(txn.cardTransactionMerchantCategoryCode);
     const severity = txn.cardTransactionAmount.amount > 1000 ? 'critical'
       : txn.cardTransactionAmount.amount > 500 ? 'high'
@@ -247,31 +254,44 @@ async function main() {
     if (riskIndicators.length === 0) riskIndicators.push('manual_review');
 
     fraudCases.push({
-      fraudDiagnosisInstanceReference: uuid(),
+      fraudDiagnosisInstanceReference: caseId,
       fraudDiagnosisCaseReference: caseRef(i + 1),
       linkedCardTransactionReference: txnIds[i],
       linkedCustomerAgreementReference: custId,
+
+      // Extended Reference Pattern: stable display fields from cardTransaction
+      transactionSnapshot: {
+        cardTransactionAmount: txn.cardTransactionAmount,
+        cardTransactionMerchantName: txn.cardTransactionMerchantName,
+        cardTransactionDateTime: txn.cardTransactionDateTime,
+        cardTransactionStatus: txn.cardTransactionStatus,
+        cardTransactionMaskedPanDisplay: txn.cardTransactionMaskedPanDisplay,
+      },
+
       fraudDiagnosisCaseStatus: i < 5 ? 'open' : i < 10 ? 'under_review' : i < 15 ? 'escalated' : 'resolved_cleared',
-      fraudDiagnosisCaseSeverity: SEVERITIES[i % SEVERITIES.length],
+      fraudDiagnosisCaseSeverity: severity,
       fraudDiagnosisRequestDateTime: txn.cardTransactionDateTime,
       fraudDiagnosisAssessment: {
         riskIndicators,
         fraudDiagnosisScore: Math.floor(Math.random() * 60 + 30),
         fraudDiagnosisConclusion: isFraud ? 'Suspicious activity detected' : 'Routine review',
       },
-      diagnosisActionLog: [
-        {
-          actionDateTime: txn.cardTransactionDateTime,
-          actionType: 'case_opened',
-          performedByInstanceReference: 'system',
-          performedByRole: 'payment_service',
-          actionDetails: { trigger: riskIndicators[0] ?? 'manual' },
-        },
-      ],
       bianServiceDomain: 'FraudDiagnosis',
       bianControlRecordType: 'FraudDiagnosis',
       recordCreatedDateTime: txn.cardTransactionDateTime,
       recordUpdatedDateTime: NOW,
+      schemaVersion: 1,
+    });
+
+    // Audit event in separate collection (Unbounded Array anti-pattern fix)
+    fraudCaseEvents.push({
+      fraudDiagnosisInstanceReference: caseId,
+      actionDateTime: txn.cardTransactionDateTime,
+      actionType: 'case_opened',
+      performedByInstanceReference: 'system',
+      performedByRole: 'payment_service',
+      actionDetails: { trigger: riskIndicators[0] ?? 'manual' },
+      schemaVersion: 1,
     });
   }
 
@@ -289,6 +309,7 @@ async function main() {
   write('cardTransactions.json', cardTransactions);
   write('cardTransactionsSensitive.json', cardTransactionsSensitive);
   write('fraudCases.json', fraudCases);
+  write('fraudCaseEvents.json', fraudCaseEvents);
 
   console.log('Done.');
 }

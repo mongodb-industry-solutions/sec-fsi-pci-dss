@@ -14,6 +14,7 @@ export interface PartyAuthenticationControlRecord {
   bianServiceDomain: 'PartyAuthentication';
   bianControlRecordType: 'PartyAuthentication';
   recordCreatedDateTime: Date;
+  schemaVersion: number;
 }
 
 export type DemoUserRole =

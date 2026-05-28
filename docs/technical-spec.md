@@ -64,12 +64,14 @@ export interface CardTransactionLogControlRecord {
   bianControlRecordType: 'CardTransactionLog';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
+  schemaVersion: number;                           // Schema Versioning Pattern
 }
 
 export interface CardTransactionSensitiveRecord {
   cardTransactionInstanceReference: string;       // FK: plaintext linking key
   rawGatewayPayload: object;                      // QE none
   processorTransactionMetadata: object;           // QE none
+  schemaVersion: number;
 }
 
 export type CardTransactionStatus =
@@ -113,6 +115,7 @@ export interface CustomerAgreementControlRecord {
   bianControlRecordType: 'CustomerAgreement';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
+  schemaVersion: number;                          // Schema Versioning Pattern
 }
 
 export interface CustomerAgreementSensitiveRecord {
@@ -122,6 +125,7 @@ export interface CustomerAgreementSensitiveRecord {
   customerAgreementResidentialAddress: ResidentialAddress;
   governmentIdentificationReference: string;
   customerAgreementRiskNotes: string;
+  schemaVersion: number;
 }
 
 export interface ResidentialAddress {
@@ -169,6 +173,7 @@ export interface PaymentCardManagementControlRecord {
   bianServiceDomain: 'PaymentCard';
   bianControlRecordType: 'PaymentCardManagement';
   recordCreatedDateTime: Date;
+  schemaVersion: number;                          // Schema Versioning Pattern
 }
 
 export type CardNetwork = 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
@@ -181,15 +186,27 @@ export type PaymentCardStatus = 'active' | 'blocked' | 'expired' | 'pending_acti
 // BIAN SD-83: Fraud Diagnosis (no QE: operational metadata only)
 
 export const FRAUD_DIAGNOSIS_COLLECTION = 'fraudDiagnosisCase';
+export const FRAUD_DIAGNOSIS_EVENTS_COLLECTION = 'fraudDiagnosisCaseEvents';
 
 export interface FraudDiagnosisControlRecord {
   // Identifiers
-  fraudDiagnosisInstanceReference: string;           // UUID, primary key
-  fraudDiagnosisCaseReference: string;               // FD-2026-001234
+  fraudDiagnosisInstanceReference: string;               // UUID, primary key
+  fraudDiagnosisCaseReference: string;                   // FD-2026-001234
 
   // Links to protected records (plaintext keys by design: no PII in these refs)
-  linkedCardTransactionReference: string;            // FK to cardTransaction
-  linkedCustomerAgreementReference: string;          // FK to customerAgreement
+  linkedCardTransactionReference: string;                // FK to cardTransaction
+  linkedCustomerAgreementReference: string;              // FK to customerAgreement
+
+  // Extended Reference Pattern: stable display fields from cardTransaction.
+  // Embedded to make fraud investigation display a single-collection query.
+  // Updated only when transaction status changes (controlled write path).
+  transactionSnapshot: {
+    cardTransactionAmount: { amount: number; currency: string };
+    cardTransactionMerchantName: string;
+    cardTransactionDateTime: Date;
+    cardTransactionStatus: 'authorized' | 'declined' | 'pending' | 'settled' | 'disputed';
+    cardTransactionMaskedPanDisplay: string;
+  };
 
   // Case lifecycle
   fraudDiagnosisCaseStatus: FraudDiagnosisCaseStatus;
@@ -198,13 +215,13 @@ export interface FraudDiagnosisControlRecord {
   fraudDiagnosisCaseClosingDateTime?: Date;
 
   // Assignment (v2: populated when case is assigned)
-  fraudDiagnosisAnalystInstanceReference?: string;    // FK to partyAuthentication (L1)
-  fraudDiagnosisInvestigatorInstanceReference?: string; // FK to partyAuthentication (L2)
+  fraudDiagnosisAnalystInstanceReference?: string;       // FK to partyAuthentication (L1)
+  fraudDiagnosisInvestigatorInstanceReference?: string;  // FK to partyAuthentication (L2)
 
   // Assessment
   fraudDiagnosisAssessment: {
-    riskIndicators: string[];                         // e.g. ["amount_threshold", "high_risk_mcc"]
-    fraudDiagnosisScore?: number;                     // 0-100
+    riskIndicators: string[];                            // e.g. ["amount_threshold", "high_risk_mcc"]
+    fraudDiagnosisScore?: number;                        // 0-100
     fraudDiagnosisConclusion?: string;
   };
 
@@ -224,31 +241,36 @@ export interface FraudDiagnosisControlRecord {
     resolvedByInstanceReference: string;
   };
 
-  // AI agent draft (populated by v3 agent, null if agent disabled)
+  // AI agent draft (v3: populated by agent, absent if agent disabled)
   agentDraftDiagnosis?: {
     riskSummary: string;
     recommendedAction: 'clear' | 'escalate' | 'investigate';
-    confidenceScore: number;                          // 0-100
+    confidenceScore: number;                             // 0-100
     supportingEvidence: string[];
     agentCompletionDateTime: Date;
   };
-
-  // Append-only audit trail
-  diagnosisActionLog: DiagnosisActionEvent[];
 
   // BIAN metadata
   bianServiceDomain: 'FraudDiagnosis';
   bianControlRecordType: 'FraudDiagnosis';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
+
+  // Schema Versioning Pattern: enables zero-downtime schema evolution across v1-v4
+  schemaVersion: number;
 }
 
-export interface DiagnosisActionEvent {
+// Audit event document stored in fraudDiagnosisCaseEvents (separate collection).
+// Replaces the embedded diagnosisActionLog array (Unbounded Array anti-pattern fix).
+// Indexed on (fraudDiagnosisInstanceReference, actionDateTime) for ordered retrieval.
+export interface FraudDiagnosisCaseEventRecord {
+  fraudDiagnosisInstanceReference: string;               // FK to fraudDiagnosisCase
   actionDateTime: Date;
   actionType: ActionType;
   performedByInstanceReference: string;
   performedByRole: AnalystRole;
   actionDetails: Record<string, unknown>;
+  schemaVersion: number;
 }
 
 export type FraudDiagnosisCaseStatus =
@@ -306,6 +328,7 @@ export interface PartyAuthenticationControlRecord {
   bianServiceDomain: 'PartyAuthentication';
   bianControlRecordType: 'PartyAuthentication';
   recordCreatedDateTime: Date;
+  schemaVersion: number;                          // Schema Versioning Pattern
 }
 
 export type DemoUserRole =
@@ -642,6 +665,13 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { fraudDiagnosisInstanceReference: 1 }, unique: true },
     { key: { linkedCardTransactionReference: 1 } },
     { key: { fraudDiagnosisCaseStatus: 1, fraudDiagnosisCaseSeverity: -1 } },
+  ]);
+
+  // fraudDiagnosisCaseEvents: supports ordered audit retrieval per case
+  // and filtered queries by actionType (e.g. fetch only escalation events)
+  await db.collection('fraudDiagnosisCaseEvents').createIndexes([
+    { key: { fraudDiagnosisInstanceReference: 1, actionDateTime: -1 } },
+    { key: { fraudDiagnosisInstanceReference: 1, actionType: 1 } },
   ]);
 
   await db.collection('partyAuthentication').createIndexes([

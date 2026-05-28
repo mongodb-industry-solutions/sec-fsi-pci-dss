@@ -21,6 +21,7 @@ export interface CustomerAgreementControlRecord {
   bianControlRecordType: 'CustomerAgreement';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
+  schemaVersion: number;
 }
 
 export interface CustomerAgreementSensitiveRecord {
@@ -29,6 +30,7 @@ export interface CustomerAgreementSensitiveRecord {
   customerAgreementResidentialAddress: ResidentialAddress;
   governmentIdentificationReference: string;
   customerAgreementRiskNotes: string;
+  schemaVersion: number;
 }
 
 export interface ResidentialAddress {

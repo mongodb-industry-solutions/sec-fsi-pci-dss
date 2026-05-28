@@ -25,12 +25,14 @@ export interface CardTransactionLogControlRecord {
   bianControlRecordType: 'CardTransactionLog';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
+  schemaVersion: number;
 }
 
 export interface CardTransactionSensitiveRecord {
   cardTransactionInstanceReference: string;
   rawGatewayPayload: object;
   processorTransactionMetadata: object;
+  schemaVersion: number;
 }
 
 export type CardTransactionStatus =

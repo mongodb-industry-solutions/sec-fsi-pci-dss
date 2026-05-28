@@ -21,6 +21,7 @@ export interface PaymentCardManagementControlRecord {
   bianServiceDomain: 'PaymentCard';
   bianControlRecordType: 'PaymentCardManagement';
   recordCreatedDateTime: Date;
+  schemaVersion: number;
 }
 
 export type CardNetwork = 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
