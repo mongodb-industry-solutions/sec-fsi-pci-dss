@@ -31,6 +31,7 @@ export async function createCard(db: Db, input: CreateCardInput) {
     bianServiceDomain: 'PaymentCard',
     bianControlRecordType: 'PaymentCardManagement',
     recordCreatedDateTime: now,
+    schemaVersion: 1,
   };
 
   await db.collection(PAYMENT_CARD_COLLECTION).insertOne(card as object);

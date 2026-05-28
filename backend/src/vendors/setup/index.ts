@@ -1,4 +1,4 @@
-import { MongoClient } from 'mongodb';
+import { MongoClient, Binary } from 'mongodb';
 import * as dotenv from 'dotenv';
 import { provisionDEKs } from './provisionDEKs';
 import { createCollections } from './createCollections';
@@ -17,7 +17,7 @@ export async function runSetup(reset = false) {
     console.log('   DEK-lookup and DEK-sensitive provisioned');
 
     console.log('\n2. Creating collections...');
-    await createCollections(client, dekLookupId, dekSensitiveId, reset);
+    await createCollections(client, dekLookupId as Binary, dekSensitiveId as Binary, reset);
 
     console.log('\n3. Creating indexes...');
     await createIndexes(client);

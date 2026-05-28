@@ -2,6 +2,7 @@ import 'dotenv/config';
 import Fastify, { FastifyInstance } from 'fastify';
 import corsPlugin from './plugins/cors';
 import mongodbPlugin from './plugins/mongodb';
+import { swaggerPlugin } from './plugins/swagger';
 import { authMiddleware } from './middleware/auth';
 import { authController } from './controllers/auth.controller';
 import { cardTransactionController } from './controllers/cardTransaction.controller';
@@ -13,13 +14,56 @@ import { demoController } from './controllers/demo.controller';
 export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({ logger: true });
 
+  // Swagger must be registered before routes so schemas are captured in the spec
+  await fastify.register(swaggerPlugin);
+
   await fastify.register(corsPlugin);
   await fastify.register(mongodbPlugin);
 
   fastify.addHook('preHandler', authMiddleware);
 
+  // Root redirect → /doc
+  fastify.get('/', {
+    schema: {
+      tags: ['health'],
+      summary: 'Redirect to Swagger UI',
+      description: 'Redirects to `/doc` (Swagger UI).',
+      response: {
+        302: { type: 'null', description: 'Redirect to /doc' },
+      },
+    },
+  }, async (_request, reply) => {
+    return reply.redirect('/doc');
+  });
+
   // Health (public)
-  fastify.get('/health', async (_request, reply) => {
+  fastify.get('/health', {
+    schema: {
+      tags: ['health'],
+      summary: 'Health check',
+      description: 'Returns the API and Atlas connectivity status. Does not require authentication.',
+      response: {
+        200: {
+          description: 'Healthy',
+          type: 'object',
+          properties: {
+            status: { type: 'string', enum: ['ok'] },
+            atlas: { type: 'string', enum: ['connected'] },
+            kmsProvider: { type: 'string', enum: ['aws', 'local'] },
+            timestamp: { type: 'string', format: 'date-time' },
+          },
+        },
+        503: {
+          description: 'Atlas unreachable',
+          type: 'object',
+          properties: {
+            status: { type: 'string', enum: ['error'] },
+            atlas: { type: 'string', enum: ['disconnected'] },
+          },
+        },
+      },
+    },
+  }, async (_request, reply) => {
     try {
       await fastify.db.command({ ping: 1 });
       return reply.send({
@@ -55,6 +99,7 @@ async function start() {
   try {
     await app.listen({ port, host });
     console.log(`Backend listening on http://${host}:${port}`);
+    console.log(`Swagger UI: http://${host}:${port}/doc`);
   } catch (err) {
     app.log.error(err);
     process.exit(1);

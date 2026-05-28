@@ -56,12 +56,14 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
     bianControlRecordType: 'CardTransactionLog',
     recordCreatedDateTime: now,
     recordUpdatedDateTime: now,
+    schemaVersion: 1,
   };
 
   const sensitive: CardTransactionSensitiveRecord = {
     cardTransactionInstanceReference: txnId,
     rawGatewayPayload: input.gatewayPayload,
     processorTransactionMetadata: { processedAt: now.toISOString() },
+    schemaVersion: 1,
   };
 
   await db.collection(CARD_TRANSACTION_COLLECTION).insertOne(txn as object);
@@ -72,7 +74,14 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
 
   if (create) {
     const severity = deriveSeverity(input.amount, reasons);
-    const fraudCase = await createFraudCase(db, txnId, input.accountReference, reasons, severity);
+    const snapshot = {
+      cardTransactionAmount: { amount: input.amount, currency: input.currency },
+      cardTransactionMerchantName: input.cardTransactionMerchantName,
+      cardTransactionDateTime: now,
+      cardTransactionStatus: 'authorized' as const,
+      cardTransactionMaskedPanDisplay: input.cardTransactionMaskedPanDisplay,
+    };
+    const fraudCase = await createFraudCase(db, txnId, input.accountReference, reasons, severity, snapshot);
     fraudCaseRef = fraudCase.fraudDiagnosisInstanceReference;
   }
 

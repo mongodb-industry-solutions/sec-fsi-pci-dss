@@ -1,4 +1,4 @@
-import { MongoClient } from 'mongodb';
+import { MongoClient, Binary } from 'mongodb';
 import { buildKmsProviders } from './kms';
 import { buildEncryptedFieldsMaps } from './encryptedFieldsMaps';
 import { provisionDataEncryptionKeys } from './keyVault';
@@ -14,7 +14,7 @@ export async function getQEClient(): Promise<MongoClient> {
   const { dekLookupId, dekSensitiveId } = await provisionDataEncryptionKeys(plainClient);
   await plainClient.close();
 
-  const encryptedFieldsMap = buildEncryptedFieldsMaps(dekLookupId, dekSensitiveId);
+  const encryptedFieldsMap = buildEncryptedFieldsMaps(dekLookupId as Binary, dekSensitiveId as Binary);
   const dbName = process.env.MONGODB_DB_NAME!;
 
   _client = new MongoClient(process.env.MONGODB_URI!, {
