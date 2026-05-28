@@ -18,9 +18,24 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(swaggerPlugin);
 
   await fastify.register(corsPlugin);
+
+  // MongoDB plugin is fault-tolerant: if connection fails the server still starts.
+  // fastify.dbError is set to a non-null string on failure (credentials stripped).
   await fastify.register(mongodbPlugin);
 
+  // Auth: skip JWT check for public routes and Swagger UI
   fastify.addHook('preHandler', authMiddleware);
+
+  // DB availability guard: return 503 for all /api/* routes when the DB is down.
+  // This runs after auth so unauthenticated requests still get 401, not 503.
+  fastify.addHook('preHandler', async (_request, reply) => {
+    if (fastify.dbError !== null && _request.url.startsWith('/api/')) {
+      return reply.status(503).send({
+        error: 'Service unavailable',
+        detail: fastify.dbError,
+      });
+    }
+  });
 
   // Root redirect → /doc
   fastify.get('/', {
@@ -36,15 +51,17 @@ export async function buildApp(): Promise<FastifyInstance> {
     return reply.redirect('/doc');
   });
 
-  // Health (public)
+  // Health check — always responds, even when MongoDB is unreachable
   fastify.get('/health', {
     schema: {
       tags: ['health'],
       summary: 'Health check',
-      description: 'Returns the API and Atlas connectivity status. Does not require authentication.',
+      description: `Returns the API and Atlas connectivity status.
+Does not require authentication. Responds even when the database is unreachable —
+check \`atlas\` and \`error\` fields to detect a degraded state.`,
       response: {
         200: {
-          description: 'Healthy',
+          description: 'Healthy — Atlas reachable',
           type: 'object',
           properties: {
             status: { type: 'string', enum: ['ok'] },
@@ -54,26 +71,47 @@ export async function buildApp(): Promise<FastifyInstance> {
           },
         },
         503: {
-          description: 'Atlas unreachable',
+          description: 'Degraded — Atlas unreachable or connection failed at startup',
           type: 'object',
           properties: {
             status: { type: 'string', enum: ['error'] },
             atlas: { type: 'string', enum: ['disconnected'] },
+            error: { type: 'string', description: 'Error summary (no credentials)' },
+            timestamp: { type: 'string', format: 'date-time' },
           },
         },
       },
     },
   }, async (_request, reply) => {
+    const timestamp = new Date().toISOString();
+
+    // Connection failed at startup — skip ping, report stored error
+    if (fastify.dbError !== null) {
+      return reply.status(503).send({
+        status: 'error',
+        atlas: 'disconnected',
+        error: fastify.dbError,
+        timestamp,
+      });
+    }
+
+    // Live ping to verify the connection is still healthy
     try {
       await fastify.db.command({ ping: 1 });
       return reply.send({
         status: 'ok',
         atlas: 'connected',
         kmsProvider: process.env.KMS_PROVIDER ?? 'aws',
-        timestamp: new Date().toISOString(),
+        timestamp,
       });
-    } catch {
-      return reply.status(503).send({ status: 'error', atlas: 'disconnected' });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : 'ping failed';
+      return reply.status(503).send({
+        status: 'error',
+        atlas: 'disconnected',
+        error: reason,
+        timestamp,
+      });
     }
   });
 
@@ -100,6 +138,11 @@ async function start() {
     await app.listen({ port, host });
     console.log(`Backend listening on http://${host}:${port}`);
     console.log(`Swagger UI: http://${host}:${port}/doc`);
+
+    if (app.dbError !== null) {
+      console.warn(`[mongodb] Running in degraded mode — ${app.dbError}`);
+      console.warn('[mongodb] API routes will return 503 until the database becomes reachable.');
+    }
   } catch (err) {
     app.log.error(err);
     process.exit(1);
