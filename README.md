@@ -34,7 +34,7 @@ This answers the most common FSI prospect question:
 | Document | Description |
 |---|---|
 | [📖 Project Wiki](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki) | Installation guide, Q&A, and additional resources for non-engineering readers |
-| [PRD](/sec-fsi-pci-dss/blob/develop/docs/PRD.md) | What and why: audience, storyline, BIAN data model, QE design overview |
+| [PRD](docs/PRD.md) | What and why: audience, storyline, BIAN data model, QE design overview |
 | [Roadmap](docs/roadmap.md) | FR and NFR per iteration (v1 / v2 / v3 / v4) with acceptance criteria and Definition of Done |
 | [Technical Specification](docs/technical-spec.md) | BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index strategy |
 | [Engineering Proposal](docs/engineering-proposal.md) | Architecture decisions, implementation phases, risks, alternatives, ADRs |
