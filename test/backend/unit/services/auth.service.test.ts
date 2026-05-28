@@ -3,7 +3,7 @@
  * Source: backend/src/services/auth.service.ts
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 import { loginUser, getDemoUsers } from '../../../../backend/src/services/auth.service';
 
