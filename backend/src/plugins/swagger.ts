@@ -1,8 +1,11 @@
+import fp from 'fastify-plugin';
 import { FastifyInstance } from 'fastify';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 
-export async function swaggerPlugin(fastify: FastifyInstance) {
+// fp() removes encapsulation so @fastify/swagger's onRoute hook
+// captures routes registered in the root scope.
+export const swaggerPlugin = fp(async function (fastify: FastifyInstance) {
   await fastify.register(fastifySwagger, {
     openapi: {
       openapi: '3.0.0',
@@ -115,4 +118,4 @@ Obtain a token via \`POST /api/v1/auth/login\`.
     transformSpecification: (spec) => spec,
     transformSpecificationClone: true,
   });
-}
+});

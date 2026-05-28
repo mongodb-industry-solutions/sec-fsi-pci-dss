@@ -5,18 +5,18 @@ export async function fraudDiagnosisController(fastify: FastifyInstance) {
   fastify.get('/', {
     schema: {
       tags: ['fraud-diagnosis'],
-      summary: 'List fraud diagnosis cases',
-      description: `Returns a paginated list of fraud investigation cases (BIAN SD-83 Fraud Diagnosis).
+      summary: 'List fraud diagnosis cases (paginated)',
+      description: `Returns a paginated list of \`fraudDiagnosisCase\` documents (BIAN SD-83).
 
-**BIAN lifecycle states:** \`open\` → \`under_review\` → \`escalated\` → \`resolved_cleared\` / \`resolved_fraud\` → \`closed\`
+**BIAN lifecycle:** \`open\` → \`under_review\` → \`escalated\` → \`resolved_cleared\` / \`resolved_fraud\` → \`closed\`
 
-**Extended Reference Pattern:** each case document embeds a \`transactionSnapshot\` with
-the key display fields from the originating \`cardTransaction\` document, so the list view
-is satisfied by a single collection query without \`$lookup\`.
+Each case embeds a \`transactionSnapshot\` with the key display fields from the originating
+\`cardTransaction\` document (Extended Reference Pattern) — the list view requires only a
+single collection query with no \`$lookup\`.
 
-**Audit trail:** Audit events are stored in the \`fraudDiagnosisCaseEvents\` collection
-(separate from the case document to avoid the Unbounded Array anti-pattern). A future
-\`GET /api/v1/fraud-diagnosis-cases/:id/events\` endpoint will expose them (v2).`,
+**Audit trail:** events (who acted, when, what) are stored in the separate
+\`fraudDiagnosisCaseEvents\` collection to avoid unbounded array growth. A dedicated
+\`GET /api/v1/fraud-diagnosis-cases/:id/events\` endpoint is planned for v2.`,
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
@@ -24,42 +24,59 @@ is satisfied by a single collection query without \`$lookup\`.
           status: {
             type: 'string',
             enum: ['open', 'under_review', 'escalated', 'resolved_cleared', 'resolved_fraud', 'closed'],
-            description: 'Filter by BIAN lifecycle status',
+            description: 'Filter by BIAN lifecycle status. Omit to return all statuses.',
           },
           severity: {
             type: 'string',
             enum: ['low', 'medium', 'high', 'critical'],
-            description: 'Filter by risk severity',
+            description: 'Filter by risk severity. Derived from transaction amount and risk indicators.',
           },
-          page: { type: 'string', default: '1', description: 'Page number (1-based)' },
-          limit: { type: 'string', default: '20', description: 'Records per page (max 100)' },
+          page: {
+            type: 'string',
+            default: '1',
+            description: 'Page number (1-based). Combined with `limit` for offset calculation: skip = (page-1) * limit.',
+          },
+          limit: {
+            type: 'string',
+            default: '20',
+            description: 'Maximum records per page. Recommended maximum: 100.',
+          },
         },
       },
       response: {
         200: {
-          description: 'Paginated case list',
+          description: 'Paginated list of fraud cases sorted by `fraudDiagnosisRequestDateTime` descending.',
           type: 'object',
           properties: {
-            cases: {
+            results: {
               type: 'array',
+              description: 'Fraud cases for the current page.',
               items: {
                 type: 'object',
                 properties: {
-                  fraudDiagnosisInstanceReference: { type: 'string' },
-                  fraudDiagnosisCaseReference: { type: 'string', example: 'FD-2026-000001' },
-                  caseStatus: { type: 'string' },
-                  riskSeverity: { type: 'string' },
+                  fraudDiagnosisInstanceReference: { type: 'string', description: 'Case UUID. Use in GET /:id to fetch full details.' },
+                  fraudDiagnosisCaseReference: { type: 'string', description: 'Human-readable case ID, format `FD-YYYY-NNNNNN`.' },
+                  fraudDiagnosisCaseStatus: {
+                    type: 'string',
+                    enum: ['open', 'under_review', 'escalated', 'resolved_cleared', 'resolved_fraud', 'closed'],
+                    description: 'Current BIAN lifecycle status.',
+                  },
+                  fraudDiagnosisCaseSeverity: {
+                    type: 'string',
+                    enum: ['low', 'medium', 'high', 'critical'],
+                    description: 'Risk severity derived from transaction amount and indicator count.',
+                  },
                   transactionSnapshot: { $ref: 'TransactionSnapshot#' },
-                  requestDateTime: { type: 'string', format: 'date-time' },
+                  fraudDiagnosisRequestDateTime: { type: 'string', format: 'date-time', description: 'UTC timestamp when the case was opened.' },
                 },
               },
             },
-            total: { type: 'number' },
-            page: { type: 'number' },
-            limit: { type: 'number' },
+            total: { type: 'number', description: 'Total number of cases matching the filters (used for pagination UI).' },
+            page: { type: 'number', description: 'Current page number.' },
+            limit: { type: 'number', description: 'Records per page.' },
           },
         },
-        401: { $ref: 'Error#' },
+        401: { description: 'Missing or invalid Bearer token.', $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
@@ -88,38 +105,53 @@ is satisfied by a single collection query without \`$lookup\`.
     schema: {
       tags: ['fraud-diagnosis'],
       summary: 'Get a fraud diagnosis case by ID',
-      description: `Returns a single fraud investigation case with the embedded
-\`transactionSnapshot\` and the risk assessment details.
+      description: `Returns a single \`fraudDiagnosisCase\` document with the embedded
+\`transactionSnapshot\` and the risk assessment.
 
-**Note on audit trail:** Audit events (who did what and when) are stored in the separate
-\`fraudDiagnosisCaseEvents\` collection. They are not included in this response to keep
-the case document bounded. A dedicated events endpoint is planned for v2.`,
+**Linked data (not embedded — requires separate requests):**
+- Transaction details: \`GET /api/v1/card-transactions/:linkedCardTransactionReference\`
+- Customer agreement: \`GET /api/v1/customer-agreements?accountRef=<customerAgreementReference>\`
+- Audit events: planned for v2 (\`GET /api/v1/fraud-diagnosis-cases/:id/events\`)`,
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
         required: ['id'],
         properties: {
-          id: { type: 'string', description: 'fraudDiagnosisInstanceReference (UUID)' },
+          id: { type: 'string', description: '`fraudDiagnosisInstanceReference` UUID.' },
         },
       },
       response: {
         200: {
-          description: 'Fraud diagnosis case',
+          description: 'Full fraud diagnosis case document.',
           type: 'object',
           properties: {
-            fraudDiagnosisInstanceReference: { type: 'string' },
-            fraudDiagnosisCaseReference: { type: 'string', example: 'FD-2026-000001' },
-            caseStatus: { type: 'string', enum: ['open', 'under_review', 'escalated', 'resolved_cleared', 'resolved_fraud', 'closed'] },
-            riskSeverity: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] },
-            linkedCardTransactionReference: { type: 'string', description: 'FK to cardTransaction' },
-            linkedCustomerAgreementReference: { type: 'string', description: 'FK to customerAgreement' },
+            fraudDiagnosisInstanceReference: { type: 'string', description: 'Case UUID.' },
+            fraudDiagnosisCaseReference: { type: 'string', description: 'Human-readable case ID, format `FD-YYYY-NNNNNN`.' },
+            caseStatus: {
+              type: 'string',
+              enum: ['open', 'under_review', 'escalated', 'resolved_cleared', 'resolved_fraud', 'closed'],
+              description: 'Current BIAN lifecycle status.',
+            },
+            riskSeverity: {
+              type: 'string',
+              enum: ['low', 'medium', 'high', 'critical'],
+              description: 'Risk severity.',
+            },
+            linkedCardTransactionReference: {
+              type: 'string',
+              description: 'UUID of the originating `cardTransaction` document. Use with `GET /api/v1/card-transactions/:id`.',
+            },
+            linkedCustomerAgreementReference: {
+              type: 'string',
+              description: 'UUID of the subject `customerAgreement` document. Use with `GET /api/v1/customer-agreements`.',
+            },
             transactionSnapshot: { $ref: 'TransactionSnapshot#' },
             fraudDiagnosisAssessment: { $ref: 'FraudDiagnosisAssessment#' },
-            requestDateTime: { type: 'string', format: 'date-time' },
+            requestDateTime: { type: 'string', format: 'date-time', description: 'UTC timestamp when the case was opened.' },
           },
         },
-        401: { $ref: 'Error#' },
-        404: { $ref: 'Error#' },
+        401: { description: 'Missing or invalid Bearer token.', $ref: 'Error#' },
+        404: { description: 'No fraud case found with the given ID.', $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
