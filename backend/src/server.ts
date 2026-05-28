@@ -1,4 +1,10 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import { resolve } from 'path';
+
+// Load .env from project root (two levels up from backend/src/).
+// Works regardless of CWD — whether called via `npm run dev` from backend/
+// or via `npm run dev:backend` from the workspace root.
+dotenv.config({ path: resolve(__dirname, '../../.env') });
 import Fastify, { FastifyInstance } from 'fastify';
 import corsPlugin from './plugins/cors';
 import mongodbPlugin from './plugins/mongodb';
