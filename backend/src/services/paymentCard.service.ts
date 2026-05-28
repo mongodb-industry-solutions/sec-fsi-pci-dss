@@ -8,10 +8,10 @@ import {
 export interface CreateCardInput {
   customerAgreementInstanceReference: string;
   cardToken: string;
-  cardExpirationDate: string;
-  maskedPanDisplay: string;
-  cardNetwork: PaymentCardManagementControlRecord['cardNetwork'];
-  isPreferredCard: boolean;
+  paymentCardExpirationDate: string;
+  paymentCardMaskedPanDisplay: string;
+  paymentCardNetwork: PaymentCardManagementControlRecord['paymentCardNetwork'];
+  paymentCardIsPreferred: boolean;
 }
 
 export async function createCard(db: Db, input: CreateCardInput) {
@@ -22,12 +22,12 @@ export async function createCard(db: Db, input: CreateCardInput) {
     paymentCardInstanceReference: cardId,
     customerAgreementInstanceReference: input.customerAgreementInstanceReference,
     paymentCardReference: input.cardToken,
-    cardExpirationDate: input.cardExpirationDate,
-    maskedPanDisplay: input.maskedPanDisplay,
-    cardNetwork: input.cardNetwork,
-    cardStatus: 'active',
-    cardIssuanceDateTime: now,
-    isPreferredCard: input.isPreferredCard,
+    paymentCardExpirationDate: input.paymentCardExpirationDate,
+    paymentCardMaskedPanDisplay: input.paymentCardMaskedPanDisplay,
+    paymentCardNetwork: input.paymentCardNetwork,
+    paymentCardStatus: 'active',
+    paymentCardIssuanceDateTime: now,
+    paymentCardIsPreferred: input.paymentCardIsPreferred,
     bianServiceDomain: 'PaymentCard',
     bianControlRecordType: 'PaymentCardManagement',
     recordCreatedDateTime: now,
@@ -37,7 +37,7 @@ export async function createCard(db: Db, input: CreateCardInput) {
 
   return {
     paymentCardInstanceReference: cardId,
-    cardStatus: 'active',
+    paymentCardStatus: 'active',
   };
 }
 
@@ -46,10 +46,10 @@ export async function getCardsByCustomer(db: Db, customerRef: string) {
     .find({ customerAgreementInstanceReference: customerRef })
     .project({
       paymentCardInstanceReference: 1,
-      maskedPanDisplay: 1,
-      cardNetwork: 1,
-      cardStatus: 1,
-      isPreferredCard: 1,
+      paymentCardMaskedPanDisplay: 1,
+      paymentCardNetwork: 1,
+      paymentCardStatus: 1,
+      paymentCardIsPreferred: 1,
     })
     .toArray();
 

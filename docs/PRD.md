@@ -191,21 +191,21 @@ BIAN (Banking Industry Architecture Network) provides a standardized vocabulary 
 
 | # | BIAN Service Domain | SD Reference | Role in Demo | Collection |
 |---|---|---|---|---|
-| 1 | **Card Transaction** | SD-254 | Records card payment events | `cardTransactionQE` |
-| 2 | **Card Transaction: Sensitive** | SD-254 (sensitive) | Stores non-searchable gateway payload | `cardTransactionSensitiveQE` |
-| 3 | **Customer Agreement** | SD-53 | Customer profile, searchable PII | `customerAgreementQE` |
-| 4 | **Customer Agreement: Sensitive** | SD-53 (sensitive) | Non-searchable PII (address, gov ID) | `customerAgreementSensitiveQE` |
-| 5 | **Payment Card** | SD-88 | Stored card instruments (tokens) | `paymentCardQE` |
+| 1 | **Card Transaction** | SD-254 | Records card payment events | `cardTransaction` |
+| 2 | **Card Transaction: Sensitive** | SD-254 (sensitive) | Stores non-searchable gateway payload | `cardTransactionSensitive` |
+| 3 | **Customer Agreement** | SD-53 | Customer profile, searchable PII | `customerAgreement` |
+| 4 | **Customer Agreement: Sensitive** | SD-53 (sensitive) | Non-searchable PII (address, gov ID) | `customerAgreementSensitive` |
+| 5 | **Payment Card** | SD-88 | Stored card instruments (tokens) | `paymentCard` |
 | 6 | **Fraud Diagnosis** | SD-83 | Investigation cases and workflow | `fraudDiagnosisCase` |
-| 7 | **Party Authentication** | SD-16 | Demo user accounts, roles, hashed credentials | `partyAuthenticationQE` |
+| 7 | **Party Authentication** | SD-16 | Demo user accounts, roles, hashed credentials | `partyAuthentication` |
 
 > **Note 1:** BIAN does not define separate "sensitive" collections; the split is an architectural pattern for separating searchable QE fields from non-searchable QE fields, as required by MongoDB QE design constraints.
 >
-> **Note 2:** `partyAuthenticationQE` is a demo-only construct. It stores pre-seeded user accounts (email, bcrypt password hash, role) to support Application Mode login. In a production FSI system, authentication would be delegated to an identity provider (e.g., MS Entra ID). The `partyAuthenticationQE` collection uses QE equality on `authenticationUserEmailAddress` to demonstrate that even user credential lookups can be encrypted.
+> **Note 2:** `partyAuthentication` is a demo-only construct. It stores pre-seeded user accounts (email, bcrypt password hash, role) to support Application Mode login. In a production FSI system, authentication would be delegated to an identity provider (e.g., MS Entra ID). The `partyAuthentication` collection uses QE equality on `authenticationUserEmailAddress` to demonstrate that even user credential lookups can be encrypted.
 
 ### 6.3 Collection Schemas
 
-#### Collection 1: `cardTransactionQE`
+#### Collection 1: `cardTransaction`
 *BIAN SD-254: Card Transaction Log Control Record*
 
 ```typescript
@@ -240,13 +240,13 @@ interface CardTransactionLogControlRecord {
 }
 ```
 
-#### Collection 2: `cardTransactionSensitiveQE`
+#### Collection 2: `cardTransactionSensitive`
 *BIAN SD-254: Sensitive / Non-searchable attributes*
 
 ```typescript
 interface CardTransactionSensitiveRecord {
   // Linking key (plaintext by policy)
-  cardTransactionInstanceReference: string;       // FK to cardTransactionQE
+  cardTransactionInstanceReference: string;       // FK to cardTransaction
 
   // Encrypted: QE none (non-searchable, retrieval only under Level 2)
   rawGatewayPayload: object;                      // QE:none: full gateway response
@@ -257,7 +257,7 @@ interface CardTransactionSensitiveRecord {
 }
 ```
 
-#### Collection 3: `customerAgreementQE`
+#### Collection 3: `customerAgreement`
 *BIAN SD-53: Customer Agreement Control Record (searchable PII)*
 
 ```typescript
@@ -285,13 +285,13 @@ interface CustomerAgreementControlRecord {
 }
 ```
 
-#### Collection 4: `customerAgreementSensitiveQE`
+#### Collection 4: `customerAgreementSensitive`
 *BIAN SD-53: Non-searchable PII (escalation-only access)*
 
 ```typescript
 interface CustomerAgreementSensitiveRecord {
   // Linking key (plaintext by policy)
-  customerAgreementInstanceReference: string;   // FK to customerAgreementQE
+  customerAgreementInstanceReference: string;   // FK to customerAgreement
 
   // Encrypted: QE none (non-searchable, Level 2 escalation only)
   residentialAddressFull: {                      // QE:none
@@ -305,14 +305,14 @@ interface CustomerAgreementSensitiveRecord {
 }
 ```
 
-#### Collection 5: `paymentCardQE`
+#### Collection 5: `paymentCard`
 *BIAN SD-88: Payment Card Management Control Record*
 
 ```typescript
 interface PaymentCardManagementControlRecord {
   // Identifiers (plaintext)
   paymentCardInstanceReference: string;          // primary key, UUID
-  customerAgreementInstanceReference: string;    // FK to customerAgreementQE (plaintext)
+  customerAgreementInstanceReference: string;    // FK to customerAgreement (plaintext)
 
   // Plaintext: payment token is a card surrogate, not CHD under PCI DSS v4.0
   paymentCardReference: string;                  // indexed plaintext: standard query, not QE
@@ -344,8 +344,8 @@ interface FraudDiagnosisControlRecord {
   caseReference: string;                         // human-readable case number: FD-2026-001234
 
   // Links to protected records (plaintext keys by design)
-  linkedCardTransactionReference: string;        // FK to cardTransactionQE
-  linkedCustomerAgreementReference: string;      // FK to customerAgreementQE
+  linkedCardTransactionReference: string;        // FK to cardTransaction
+  linkedCustomerAgreementReference: string;      // FK to customerAgreement
 
   // Case workflow (plaintext)
   caseStatus: 'open' | 'in_review' | 'escalated' | 'pending_closure' | 'closed';
@@ -375,24 +375,24 @@ interface FraudDiagnosisControlRecord {
 ### 6.4 Collection Relationships
 
 ```
-partyAuthenticationQE ─────────────────────────────────────────────────────────────────
+partyAuthentication ─────────────────────────────────────────────────────────────────
         │ (demo user accounts: login maps to role)
         │
-customerAgreementQE ──────────────── 1 : 1 ──────────────── customerAgreementSensitiveQE
+customerAgreement ──────────────── 1 : 1 ──────────────── customerAgreementSensitive
         │                               via: customerAgreementInstanceReference
         │
         │ 1 : many
         ↓
-paymentCardQE ──────────────────────────────────────────────────────────────────────────
+paymentCard ──────────────────────────────────────────────────────────────────────────
         │ (via paymentCardReference token)
         │ many : 1
         ↓
-cardTransactionQE ─────────────────── 1 : 1 ──────────────── cardTransactionSensitiveQE
+cardTransaction ─────────────────── 1 : 1 ──────────────── cardTransactionSensitive
         │                               via: cardTransactionInstanceReference
         │
         │ 1 : many
         ↓
-fraudDiagnosisCase ─── also links to ──► customerAgreementQE
+fraudDiagnosisCase ─── also links to ──► customerAgreement
         (via linkedCardTransactionReference + linkedCustomerAgreementReference)
 ```
 
@@ -402,22 +402,22 @@ fraudDiagnosisCase ─── also links to ──► customerAgreementQE
 
 | Collection | Index | Type | Purpose |
 |---|---|---|---|
-| `cardTransactionQE` | `cardTransactionInstanceReference` | Unique | Primary lookup |
-| `cardTransactionQE` | `transactionDateTime` | Single field | Time-range filtering |
-| `cardTransactionQE` | `transactionStatus` | Single field | Status filtering |
-| `cardTransactionSensitiveQE` | `cardTransactionInstanceReference` | Unique | 1:1 join |
-| `customerAgreementQE` | `customerAgreementInstanceReference` | Unique | Primary lookup |
-| `customerAgreementQE` | `agreementStatus` | Single field | Active customer filtering |
-| `customerAgreementSensitiveQE` | `customerAgreementInstanceReference` | Unique | 1:1 join |
-| `paymentCardQE` | `paymentCardInstanceReference` | Unique | Primary lookup |
-| `paymentCardQE` | `paymentCardReference` | Single field | Token lookup (standard index: not QE) |
-| `paymentCardQE` | `customerAgreementInstanceReference` | Single field | Cards by customer |
-| `cardTransactionQE` | `paymentCardReference` | Single field | Transactions by token (standard index: not QE) |
+| `cardTransaction` | `cardTransactionInstanceReference` | Unique | Primary lookup |
+| `cardTransaction` | `transactionDateTime` | Single field | Time-range filtering |
+| `cardTransaction` | `transactionStatus` | Single field | Status filtering |
+| `cardTransactionSensitive` | `cardTransactionInstanceReference` | Unique | 1:1 join |
+| `customerAgreement` | `customerAgreementInstanceReference` | Unique | Primary lookup |
+| `customerAgreement` | `agreementStatus` | Single field | Active customer filtering |
+| `customerAgreementSensitive` | `customerAgreementInstanceReference` | Unique | 1:1 join |
+| `paymentCard` | `paymentCardInstanceReference` | Unique | Primary lookup |
+| `paymentCard` | `paymentCardReference` | Single field | Token lookup (standard index: not QE) |
+| `paymentCard` | `customerAgreementInstanceReference` | Single field | Cards by customer |
+| `cardTransaction` | `paymentCardReference` | Single field | Transactions by token (standard index: not QE) |
 | `fraudDiagnosisCase` | `fraudDiagnosisInstanceReference` | Unique | Primary lookup |
 | `fraudDiagnosisCase` | `linkedCardTransactionReference` | Single field | Case by transaction |
 | `fraudDiagnosisCase` | `caseStatus, riskSeverity` | Compound | Dashboard filtering |
-| `partyAuthenticationQE` | `partyAuthenticationInstanceReference` | Unique | Primary lookup |
-| `partyAuthenticationQE` | `authenticationUserRole` | Single field | User list by role |
+| `partyAuthentication` | `partyAuthenticationInstanceReference` | Unique | Primary lookup |
+| `partyAuthentication` | `authenticationUserRole` | Single field | User list by role |
 
 > QE encrypted fields (`paymentCardReference`, `customerEmailAddress`, etc.) use QE metadata indexes automatically managed by the driver: do not create manual indexes on these fields.
 
@@ -429,20 +429,20 @@ fraudDiagnosisCase ─── also links to ──► customerAgreementQE
 
 | Field | BIAN SD | PCI Classification | QE Mode | Collection | Demo Version |
 |---|---|---|---|---|---|
-| `paymentCardReference` | Card Transaction | **Card surrogate: not CHD under PCI DSS v4.0** | **plaintext (indexed)** | `cardTransactionQE` | v1 |
-| `cardTransactionAccountReference` | Card Transaction | CHD-adjacent | `equality` | `cardTransactionQE` | v1 |
-| `customerEmailAddress` | Customer Agreement | PII | `equality` | `customerAgreementQE` | v1 |
-| `customerMobilePhoneNumber` | Customer Agreement | PII | `equality` | `customerAgreementQE` | v1 |
-| `customerAgreementReference` | Customer Agreement | CHD-adjacent | `equality` | `customerAgreementQE` | v1 |
-| `paymentCardReference` | Payment Card | **Card surrogate: not CHD under PCI DSS v4.0** | **plaintext (indexed)** | `paymentCardQE` | v1 |
-| `cardExpirationDate` | Payment Card | CHD | `none` | `paymentCardQE` | v1 |
-| `rawGatewayPayload` | Card Transaction | Internal | `none` | `cardTransactionSensitiveQE` | v1 |
-| `processorTransactionMetadata` | Card Transaction | Internal | `none` | `cardTransactionSensitiveQE` | v1 |
-| `residentialAddressFull` | Customer Agreement | PII | `none` | `customerAgreementSensitiveQE` | v1 |
-| `governmentIdentificationReference` | Customer Agreement | PII | `none` | `customerAgreementSensitiveQE` | v1 |
-| `internalRiskProfileNotes` | Customer Agreement | Internal | `none` | `customerAgreementSensitiveQE` | v1 |
-| `transactionAmount.amount` | Card Transaction |: | `range` | `cardTransactionQE` | **v2** |
-| `customerName` | Customer Agreement | CHD | `equality` | `customerAgreementQE` | **v2** |
+| `paymentCardReference` | Card Transaction | **Card surrogate: not CHD under PCI DSS v4.0** | **plaintext (indexed)** | `cardTransaction` | v1 |
+| `cardTransactionAccountReference` | Card Transaction | CHD-adjacent | `equality` | `cardTransaction` | v1 |
+| `customerEmailAddress` | Customer Agreement | PII | `equality` | `customerAgreement` | v1 |
+| `customerMobilePhoneNumber` | Customer Agreement | PII | `equality` | `customerAgreement` | v1 |
+| `customerAgreementReference` | Customer Agreement | CHD-adjacent | `equality` | `customerAgreement` | v1 |
+| `paymentCardReference` | Payment Card | **Card surrogate: not CHD under PCI DSS v4.0** | **plaintext (indexed)** | `paymentCard` | v1 |
+| `cardExpirationDate` | Payment Card | CHD | `none` | `paymentCard` | v1 |
+| `rawGatewayPayload` | Card Transaction | Internal | `none` | `cardTransactionSensitive` | v1 |
+| `processorTransactionMetadata` | Card Transaction | Internal | `none` | `cardTransactionSensitive` | v1 |
+| `residentialAddressFull` | Customer Agreement | PII | `none` | `customerAgreementSensitive` | v1 |
+| `governmentIdentificationReference` | Customer Agreement | PII | `none` | `customerAgreementSensitive` | v1 |
+| `internalRiskProfileNotes` | Customer Agreement | Internal | `none` | `customerAgreementSensitive` | v1 |
+| `transactionAmount.amount` | Card Transaction |: | `range` | `cardTransaction` | **v2** |
+| `customerName` | Customer Agreement | CHD | `equality` | `customerAgreement` | **v2** |
 | **`fullPan`** |: | CHD: **PROHIBITED** | **never store** |: |: |
 | **`cvv` / `pin`** |: | SAD: **PROHIBITED** | **never store** |: |: |
 | **`magneticStripeData`** |: | SAD: **PROHIBITED** | **never store** |: |: |
@@ -470,11 +470,11 @@ fraudDiagnosisCase ─── also links to ──► customerAgreementQE
 ┌──────────────────────────▼──────────────────────────────┐
 │                 MongoDB Atlas Cluster                   │
 │                                                         │
-│  cardTransactionQE        ← DEK-lookup                  │
-│  customerAgreementQE      ← DEK-lookup                  │
-│  paymentCardQE            ← DEK-lookup                  │
-│  cardTransactionSensitiveQE ← DEK-sensitive             │
-│  customerAgreementSensitiveQE ← DEK-sensitive           │
+│  cardTransaction        ← DEK-lookup                  │
+│  customerAgreement      ← DEK-lookup                  │
+│  paymentCard            ← DEK-lookup                  │
+│  cardTransactionSensitive ← DEK-sensitive             │
+│  customerAgreementSensitive ← DEK-sensitive           │
 │  fraudDiagnosisCase       ← plaintext (no QE)           │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -906,7 +906,7 @@ npm run docker:up         # OR: npm run dev (hot reload without Docker)
 
 `backend/bin/seed.ts` is a thin wrapper. All logic lives in `backend/src/vendors/seed/`:
 
-1. Upsert demo users into `partyAuthenticationQE` (hashed passwords, roles)
+1. Upsert demo users into `partyAuthentication` (hashed passwords, roles)
 2. Upsert synthetic BIAN-compliant data (no real PII: Faker.js)
 3. Insert in dependency order: users → customers → cards → transactions → fraud cases
 4. Respect QE encryption: use the QE-enabled client for all writes to QE collections
@@ -957,7 +957,7 @@ npm run docker:up         # OR: npm run dev (hot reload without Docker)
 | 12 | Perspective switch after payment | Auto-switch after confirmation (3s countdown) + manual "Stay here" button | 2026-05-27 |
 | 13 | Split-screen vs full-page | Full-page default + optional split-screen toggle for technical audiences | 2026-05-27 |
 | 14 | Raw Atlas document toggle | Real ciphertext fetched from Atlas via plain MongoClient endpoint | 2026-05-27 |
-| 15 | Authentication model | Local JWT (HS256) stored in `partyAuthenticationQE`; extensible to MS Entra ID | 2026-05-27 |
+| 15 | Authentication model | Local JWT (HS256) stored in `partyAuthentication`; extensible to MS Entra ID | 2026-05-27 |
 | 16 | Seeder user selection UX | Username dropdown auto-fills password on selection; dev-friendly | 2026-05-27 |
 | 17 | Bin/ vs backend/vendors/ | Setup/seed logic lives in `backend/src/vendors/`; `bin/` are thin wrappers | 2026-05-27 |
 | 18 | v3 scope | Agentic fraud investigation (Magenta AI agent); old v3 becomes v4 | 2026-05-27 |

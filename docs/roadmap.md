@@ -63,8 +63,8 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 03.1 | `POST /api/v1/card-transactions` writes to `cardTransactionQE` and `cardTransactionSensitiveQE` via QE auto-encryption | QE fields in Atlas are ciphertext; plaintext fields are readable |
-| 03.2 | `POST /api/v1/payment-cards` registers a tokenized card in `paymentCardQE` | Card token stored encrypted; expiry date stored as QE:none |
+| 03.1 | `POST /api/v1/card-transactions` writes to `cardTransaction` and `cardTransactionSensitive` via QE auto-encryption | QE fields in Atlas are ciphertext; plaintext fields are readable |
+| 03.2 | `POST /api/v1/payment-cards` registers a tokenized card in `paymentCard` | Card token stored encrypted; expiry date stored as QE:none |
 | 03.3 | `GET /api/v1/card-transactions/:id` returns transaction by ID | Response includes transaction metadata; sensitive fields excluded from Level 1 response |
 | 03.4 | Auto-create a `fraudDiagnosisCase` when amount > 500 or MCC is in a risk list | Case is created and linked to the transaction on every triggering event |
 | 03.5 | `GET /health` returns 200 with Atlas connection status | Returns `{ status: "ok", atlas: "connected" }` when Atlas is reachable |
@@ -84,7 +84,7 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 05A.1 | `POST /api/v1/auth/login` validates credentials against `partyAuthenticationQE` and returns a JWT | Valid credentials return `{ token, user: { name, email, role } }`; invalid credentials return 401 |
+| 05A.1 | `POST /api/v1/auth/login` validates credentials against `partyAuthentication` and returns a JWT | Valid credentials return `{ token, user: { name, email, role } }`; invalid credentials return 401 |
 | 05A.2 | `GET /api/v1/auth/users` returns list of demo users (name, email, role) without passwords | Response used by frontend user selector dropdown |
 | 05A.3 | Application Mode login screen shows domain selector (`local`) and username dropdown | Selecting a username auto-fills the password field |
 | 05A.4 | JWT is verified on all protected `/api/v1/*` endpoints | Missing or invalid token returns 401 |
@@ -94,7 +94,7 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 06.1 | `bin/setup.ts` creates all 7 collections via `createEncryptedCollection()` (6 domain + `partyAuthenticationQE`) | All collections exist in Atlas after setup; QE metadata is provisioned |
+| 06.1 | `bin/setup.ts` creates all 7 collections via `createEncryptedCollection()` (6 domain + `partyAuthentication`) | All collections exist in Atlas after setup; QE metadata is provisioned |
 | 06.2 | `bin/setup.ts` provisions `DEK-lookup` and `DEK-sensitive` in `encryption.__keyVault` | Key vault contains exactly two DEK documents after setup |
 | 06.3 | `bin/setup.ts` creates all indexes defined in the Technical Specification | Index exists on every field listed in the index strategy |
 | 06.4 | `bin/seed.ts` inserts synthetic BIAN-compliant data into all collections | 5 demo users, 50 customers, 50 sensitive records, 50 cards, 200 transactions, 200 sensitive transactions, 20 fraud cases |
@@ -168,7 +168,7 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | 13.1 | API reads role from `X-Demo-Role` request header | Missing header defaults to `level1_analyst` |
-| 13.2 | Level 1 requests never query `customerAgreementSensitiveQE` or `cardTransactionSensitiveQE` | Collections are not touched; no sensitive fields appear in Level 1 responses |
+| 13.2 | Level 1 requests never query `customerAgreementSensitive` or `cardTransactionSensitive` | Collections are not touched; no sensitive fields appear in Level 1 responses |
 | 13.3 | Level 2 access to sensitive collections requires a valid escalation token | Request without escalation token returns 403 |
 | 13.4 | Every sensitive field access writes an audit event | `field_accessed` event is appended to the case action log |
 
@@ -210,7 +210,7 @@ Introduce an AI agent (MongoDB Agentic Platform, Magenta preferred) into the fra
 
 - [ ] All v1 and v2 DoD criteria still pass
 - [ ] AI agent fires automatically when a `fraudDiagnosisCase` is created
-- [ ] Agent queries `customerAgreementQE` and `cardTransactionQE` via existing QE equality endpoints
+- [ ] Agent queries `customerAgreement` and `cardTransaction` via existing QE equality endpoints
 - [ ] Agent produces a structured draft: risk summary, recommended action (`clear` / `escalate` / `investigate`), confidence score 0–100
 - [ ] L1 analyst sees the AI draft inline in the case detail view; can confirm, override, or dismiss
 - [ ] Agent action is logged in `diagnosisActionLog` with `performedByRole: 'ai_agent'`
@@ -225,8 +225,8 @@ Introduce an AI agent (MongoDB Agentic Platform, Magenta preferred) into the fra
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | 30.1 | Agent is triggered automatically when a fraud case status transitions to `open` | Agent invocation logged within 2 seconds of case creation |
-| 30.2 | Agent queries `customerAgreementQE` by `cardTransactionAccountReference` to retrieve customer profile | Agent uses existing QE equality search endpoint: `GET /api/v1/customer-agreements?accountRef=<value>` |
-| 30.3 | Agent queries `cardTransactionQE` for prior transactions by same card token | Agent uses `GET /api/v1/card-transactions?cardToken=<value>` |
+| 30.2 | Agent queries `customerAgreement` by `cardTransactionAccountReference` to retrieve customer profile | Agent uses existing QE equality search endpoint: `GET /api/v1/customer-agreements?accountRef=<value>` |
+| 30.3 | Agent queries `cardTransaction` for prior transactions by same card token | Agent uses `GET /api/v1/card-transactions?cardToken=<value>` |
 | 30.4 | Agent produces a structured JSON draft: `{ riskSummary, recommendedAction, confidenceScore, supportingEvidence[] }` | All four fields are present in the agent output |
 | 30.5 | Agent action is appended to `diagnosisActionLog` with `performedByRole: 'ai_agent'` | Log entry present in MongoDB document after agent completes |
 
@@ -285,8 +285,8 @@ Make the demo Leafy Bank integration-ready and Solutions Library publishable. Ad
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | 20.1 | After successful payment, a consent checkbox "Save this card for future payments" appears unchecked by default | Checkbox is visible on the confirmation screen; requires explicit opt-in |
-| 20.2 | Accepting consent records `isPreferredCard: true`, `mandateStatus: 'active'`, and `cardholderConsentTimestamp` in `paymentCardQE` | All three mandate fields are present in the Atlas document |
-| 20.3 | `customerAgreementQE.preferredPaymentCardReference` is updated to link to the saved card token | Field equals the `paymentCardReference` of the saved card |
+| 20.2 | Accepting consent records `isPreferredCard: true`, `mandateStatus: 'active'`, and `cardholderConsentTimestamp` in `paymentCard` | All three mandate fields are present in the Atlas document |
+| 20.3 | `customerAgreement.preferredPaymentCardReference` is updated to link to the saved card token | Field equals the `paymentCardReference` of the saved card |
 | 20.4 | On next payment, "Use saved card ****-1234" option appears | Saved card is retrieved via `preferredPaymentCardReference` from the customer agreement |
 | 20.5 | Selecting a saved card completes checkout without re-entering card details; CVV is never requested | Card transaction is created with `cardTransactionInitiationType: 'merchantInitiated'`; no CVV field in the flow |
 | 20.6 | Mandate can be cancelled: `mandateStatus` updates to `'cancelled'` and the card is no longer offered | Cancelled card does not appear on next payment; `preferredPaymentCardReference` is cleared |

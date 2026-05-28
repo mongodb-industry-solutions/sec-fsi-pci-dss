@@ -36,7 +36,7 @@ export interface AuthUser {
 
 export interface CardTransactionCreateResponse {
   cardTransactionInstanceReference: string;
-  transactionStatus: string;
+  cardTransactionStatus: string;
   fraudCaseCreated: boolean;
   fraudDiagnosisInstanceReference?: string;
 }
@@ -50,7 +50,7 @@ export interface FraudCaseListResponse {
 
 export interface FraudCase {
   fraudDiagnosisInstanceReference: string;
-  caseReference: string;
+  fraudDiagnosisCaseReference: string;
   caseStatus: string;
   riskSeverity: string;
   linkedCardTransactionReference: string;

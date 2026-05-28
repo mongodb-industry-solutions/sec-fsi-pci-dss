@@ -20,12 +20,12 @@ export async function createCollections(
   });
 
   const qeCollections = [
-    { name: 'cardTransactionQE', map: maps.cardTransactionQE },
-    { name: 'cardTransactionSensitiveQE', map: maps.cardTransactionSensitiveQE },
-    { name: 'customerAgreementQE', map: maps.customerAgreementQE },
-    { name: 'customerAgreementSensitiveQE', map: maps.customerAgreementSensitiveQE },
-    { name: 'paymentCardQE', map: maps.paymentCardQE },
-    { name: 'partyAuthenticationQE', map: maps.partyAuthenticationQE },
+    { name: 'cardTransaction', map: maps.cardTransaction },
+    { name: 'cardTransactionSensitive', map: maps.cardTransactionSensitive },
+    { name: 'customerAgreement', map: maps.customerAgreement },
+    { name: 'customerAgreementSensitive', map: maps.customerAgreementSensitive },
+    { name: 'paymentCard', map: maps.paymentCard },
+    { name: 'partyAuthentication', map: maps.partyAuthentication },
   ] as const;
 
   const existingList = await db.listCollections().toArray();

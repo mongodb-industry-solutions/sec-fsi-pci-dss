@@ -1,16 +1,16 @@
 // BIAN SD-16: Party Authentication (demo-only: stores pre-seeded user accounts)
 
-export const PARTY_AUTHENTICATION_COLLECTION = 'partyAuthenticationQE';
+export const PARTY_AUTHENTICATION_COLLECTION = 'partyAuthentication';
 
 export interface PartyAuthenticationControlRecord {
   partyAuthenticationInstanceReference: string;
   // QE equality: searchable by email (login lookup)
-  authenticationUserEmailAddress: string;
-  authenticationPasswordHash: string;
-  authenticationUserRole: DemoUserRole;
-  authenticationUserName: string;
-  authenticationDomain: 'local' | 'msentra';
-  accountStatus: 'active' | 'suspended';
+  partyAuthenticationUserEmailAddress: string;
+  partyAuthenticationCredentialHash: string;
+  partyAuthenticationUserRole: DemoUserRole;
+  partyAuthenticationUserName: string;
+  partyAuthenticationLoginDomain: 'local' | 'msentra';
+  partyAuthenticationAccountStatus: 'active' | 'suspended';
   bianServiceDomain: 'PartyAuthentication';
   bianControlRecordType: 'PartyAuthentication';
   recordCreatedDateTime: Date;

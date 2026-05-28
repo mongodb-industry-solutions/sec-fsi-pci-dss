@@ -24,7 +24,7 @@ export default function SimulatorCaseDetailPage() {
       setRawLoading(true);
       try {
         const doc = await api.demo.rawDocument(
-          'cardTransactionQE',
+          'cardTransaction',
           fraudCase.linkedCardTransactionReference,
           ''
         );
@@ -50,7 +50,7 @@ export default function SimulatorCaseDetailPage() {
       {/* Case header */}
       <div className="bg-white rounded-xl border p-5">
         <div className="flex items-center gap-3 mb-3">
-          <h1 className="text-xl font-bold">{fraudCase.caseReference}</h1>
+          <h1 className="text-xl font-bold">{fraudCase.fraudDiagnosisCaseReference}</h1>
           <span className={`px-2 py-0.5 rounded text-xs font-bold ${SEVERITY_COLORS[fraudCase.riskSeverity] ?? ''}`}>
             {fraudCase.riskSeverity.toUpperCase()}
           </span>
@@ -125,14 +125,14 @@ export default function SimulatorCaseDetailPage() {
 
         {showRaw && !rawDoc && !rawLoading && (
           <div className="bg-gray-900 text-green-300 rounded-lg p-4 font-mono text-xs">
-            <div className="text-gray-400 mb-2">Atlas · cardTransactionQE · simulated ciphertext</div>
+            <div className="text-gray-400 mb-2">Atlas · cardTransaction · simulated ciphertext</div>
             <pre>{`{
   "_id": "...",
   "cardTransactionAccountReference": {
     "$binary": { "base64": "BhKJ9KMs...", "subType": "06" }
   },
   "paymentCardReference": "tok_7xB2kp1q",  ✅ plaintext (not CHD)
-  "transactionAmount": { "amount": 850, "currency": "USD" }
+  "cardTransactionAmount": { "amount": 850, "currency": "USD" }
 }`}</pre>
           </div>
         )}

@@ -12,10 +12,10 @@ export async function cardTransactionController(fastify: FastifyInstance) {
       accountReference: string;
       amount: number;
       currency: string;
-      merchantName: string;
-      merchantCategoryCode: string;
-      transactionChannel: string;
-      maskedPanDisplay: string;
+      cardTransactionMerchantName: string;
+      cardTransactionMerchantCategoryCode: string;
+      cardTransactionChannel: string;
+      cardTransactionMaskedPanDisplay: string;
       gatewayPayload: object;
     };
 

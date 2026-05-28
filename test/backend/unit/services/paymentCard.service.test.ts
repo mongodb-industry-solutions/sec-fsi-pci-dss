@@ -22,10 +22,10 @@ function makeDb(overrides?: { findResults?: unknown[] }) {
 const baseInput = {
   customerAgreementInstanceReference: 'cust-001',
   cardToken: 'tok_abcdef1234567890',
-  cardExpirationDate: '12/28',
-  maskedPanDisplay: '****-****-****-4242',
-  cardNetwork: 'VISA' as const,
-  isPreferredCard: false,
+  paymentCardExpirationDate: '12/28',
+  paymentCardMaskedPanDisplay: '****-****-****-4242',
+  paymentCardNetwork: 'VISA' as const,
+  paymentCardIsPreferred: false,
 };
 
 describe('createCard', () => {
@@ -36,9 +36,9 @@ describe('createCard', () => {
     );
   });
 
-  it('returns cardStatus = active', async () => {
+  it('returns paymentCardStatus = active', async () => {
     const result = await createCard(makeDb(), baseInput);
-    expect(result.cardStatus).toBe('active');
+    expect(result.paymentCardStatus).toBe('active');
   });
 
   it('inserts exactly one document', async () => {
@@ -58,8 +58,8 @@ describe('createCard', () => {
   it.each(['VISA', 'MASTERCARD', 'AMEX', 'DISCOVER'] as const)(
     'accepts network %s',
     async (network) => {
-      const result = await createCard(makeDb(), { ...baseInput, cardNetwork: network });
-      expect(result.cardStatus).toBe('active');
+      const result = await createCard(makeDb(), { ...baseInput, paymentCardNetwork: network });
+      expect(result.paymentCardStatus).toBe('active');
     }
   );
 });
@@ -67,12 +67,12 @@ describe('createCard', () => {
 describe('getCardsByCustomer', () => {
   it('returns projected card list', async () => {
     const cards = [
-      { paymentCardInstanceReference: 'card-001', maskedPanDisplay: '****-4242', cardNetwork: 'VISA', cardStatus: 'active', isPreferredCard: true },
-      { paymentCardInstanceReference: 'card-002', maskedPanDisplay: '****-1111', cardNetwork: 'MC', cardStatus: 'active', isPreferredCard: false },
+      { paymentCardInstanceReference: 'card-001', paymentCardMaskedPanDisplay: '****-4242', paymentCardNetwork: 'VISA', paymentCardStatus: 'active', paymentCardIsPreferred: true },
+      { paymentCardInstanceReference: 'card-002', paymentCardMaskedPanDisplay: '****-1111', paymentCardNetwork: 'MC', paymentCardStatus: 'active', paymentCardIsPreferred: false },
     ];
     const result = await getCardsByCustomer(makeDb({ findResults: cards }), 'cust-001');
     expect(result.results).toHaveLength(2);
-    expect(result.results[0].maskedPanDisplay).toBe('****-4242');
+    expect(result.results[0].paymentCardMaskedPanDisplay).toBe('****-4242');
   });
 
   it('returns empty list when no cards found', async () => {

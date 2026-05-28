@@ -26,11 +26,11 @@ beforeAll(() => {
 describe('loginUser', () => {
   const validUser = {
     partyAuthenticationInstanceReference: 'usr-001',
-    authenticationUserEmailAddress: 'sarah.chen@leafybank.demo',
-    authenticationPasswordHash: bcrypt.hashSync('demo-password', 4),
-    authenticationUserRole: 'level1_analyst',
-    authenticationUserName: 'Sarah Chen',
-    authenticationDomain: 'local',
+    partyAuthenticationUserEmailAddress: 'sarah.chen@leafybank.demo',
+    partyAuthenticationCredentialHash: bcrypt.hashSync('demo-password', 4),
+    partyAuthenticationUserRole: 'level1_analyst',
+    partyAuthenticationUserName: 'Sarah Chen',
+    partyAuthenticationLoginDomain: 'local',
   };
 
   it('returns a signed JWT for valid credentials', async () => {
@@ -67,17 +67,17 @@ describe('loginUser', () => {
   it('response user object contains no password hash', async () => {
     const db = makeDb(validUser);
     const { user } = await loginUser(db, 'sarah.chen@leafybank.demo', 'demo-password', 'local');
-    expect((user as Record<string, unknown>).authenticationPasswordHash).toBeUndefined();
+    expect((user as Record<string, unknown>).partyAuthenticationCredentialHash).toBeUndefined();
   });
 });
 
 describe('getDemoUsers', () => {
   it('returns name, email, role — no password hash', async () => {
     const raw = {
-      authenticationUserName: 'Sarah Chen',
-      authenticationUserEmailAddress: 'sarah.chen@leafybank.demo',
-      authenticationUserRole: 'level1_analyst',
-      authenticationPasswordHash: 'bcrypt-hash-must-not-leak',
+      partyAuthenticationUserName: 'Sarah Chen',
+      partyAuthenticationUserEmailAddress: 'sarah.chen@leafybank.demo',
+      partyAuthenticationUserRole: 'level1_analyst',
+      partyAuthenticationCredentialHash: 'bcrypt-hash-must-not-leak',
     };
     const db = {
       collection: vi.fn().mockReturnValue({
@@ -90,6 +90,6 @@ describe('getDemoUsers', () => {
     expect(users[0].email).toBe('sarah.chen@leafybank.demo');
     expect(users[0].name).toBe('Sarah Chen');
     expect(users[0].role).toBe('level1_analyst');
-    expect((users[0] as Record<string, unknown>).authenticationPasswordHash).toBeUndefined();
+    expect((users[0] as Record<string, unknown>).partyAuthenticationCredentialHash).toBeUndefined();
   });
 });

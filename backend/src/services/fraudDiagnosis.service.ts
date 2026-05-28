@@ -24,7 +24,7 @@ export async function createFraudCase(
 
   const fraudCase: Omit<FraudDiagnosisControlRecord, never> = {
     fraudDiagnosisInstanceReference: caseId,
-    caseReference: nextCaseRef(),
+    fraudDiagnosisCaseReference: nextCaseRef(),
     linkedCardTransactionReference: txnId,
     linkedCustomerAgreementReference: customerRef,
     fraudDiagnosisCaseStatus: 'open',

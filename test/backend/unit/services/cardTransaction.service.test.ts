@@ -31,10 +31,10 @@ const baseInput = {
   accountReference: 'ACC-001',
   amount: 100,
   currency: 'USD',
-  merchantName: 'Safe Store',
-  merchantCategoryCode: '5411',
-  transactionChannel: 'online',
-  maskedPanDisplay: '****-****-****-1234',
+  cardTransactionMerchantName: 'Safe Store',
+  cardTransactionMerchantCategoryCode: '5411',
+  cardTransactionChannel: 'online',
+  cardTransactionMaskedPanDisplay: '****-****-****-1234',
   gatewayPayload: { source: 'test' },
 };
 
@@ -53,49 +53,49 @@ describe('createTransaction', () => {
     );
   });
 
-  it('returns transactionStatus = authorized', async () => {
+  it('returns cardTransactionStatus = authorized', async () => {
     const db = makeDb();
     const result = await createTransaction(db, baseInput);
-    expect(result.transactionStatus).toBe('authorized');
+    expect(result.cardTransactionStatus).toBe('authorized');
   });
 
   it('fraudCaseCreated is false for amount ≤ threshold + safe MCC', async () => {
     const db = makeDb();
-    const result = await createTransaction(db, { ...baseInput, amount: 100, merchantCategoryCode: '5411' });
+    const result = await createTransaction(db, { ...baseInput, amount: 100, cardTransactionMerchantCategoryCode: '5411' });
     expect(result.fraudCaseCreated).toBe(false);
     expect(result.fraudDiagnosisInstanceReference).toBeUndefined();
   });
 
   it('fraudCaseCreated is false when amount equals threshold exactly', async () => {
     const db = makeDb();
-    const result = await createTransaction(db, { ...baseInput, amount: 500, merchantCategoryCode: '5411' });
+    const result = await createTransaction(db, { ...baseInput, amount: 500, cardTransactionMerchantCategoryCode: '5411' });
     expect(result.fraudCaseCreated).toBe(false);
   });
 
   it('fraudCaseCreated is true when amount > threshold', async () => {
     const db = makeDb();
-    const result = await createTransaction(db, { ...baseInput, amount: 850, merchantCategoryCode: '5411' });
+    const result = await createTransaction(db, { ...baseInput, amount: 850, cardTransactionMerchantCategoryCode: '5411' });
     expect(result.fraudCaseCreated).toBe(true);
     expect(result.fraudDiagnosisInstanceReference).toBeTruthy();
   });
 
   it('fraudCaseCreated is true when MCC is in RISK_MCC_LIST (below threshold)', async () => {
     const db = makeDb();
-    const result = await createTransaction(db, { ...baseInput, amount: 50, merchantCategoryCode: '7995' });
+    const result = await createTransaction(db, { ...baseInput, amount: 50, cardTransactionMerchantCategoryCode: '7995' });
     expect(result.fraudCaseCreated).toBe(true);
   });
 
   it('respects custom FRAUD_AMOUNT_THRESHOLD env var', async () => {
     process.env.FRAUD_AMOUNT_THRESHOLD = '1000';
     const db = makeDb();
-    const result = await createTransaction(db, { ...baseInput, amount: 850, merchantCategoryCode: '5411' });
+    const result = await createTransaction(db, { ...baseInput, amount: 850, cardTransactionMerchantCategoryCode: '5411' });
     expect(result.fraudCaseCreated).toBe(false);
   });
 
   it('respects custom RISK_MCC_LIST env var', async () => {
     process.env.RISK_MCC_LIST = '1234';
     const db = makeDb();
-    const result = await createTransaction(db, { ...baseInput, amount: 50, merchantCategoryCode: '7995' });
+    const result = await createTransaction(db, { ...baseInput, amount: 50, cardTransactionMerchantCategoryCode: '7995' });
     expect(result.fraudCaseCreated).toBe(false);
   });
 });
@@ -104,13 +104,13 @@ describe('getTransactionById', () => {
   it('returns projected transaction (no accountReference — Level 1 response)', async () => {
     const doc = {
       cardTransactionInstanceReference: 'txn-001',
-      transactionAmount: { amount: 100, currency: 'USD' },
-      transactionDateTime: new Date(),
-      transactionStatus: 'authorized',
-      merchantName: 'Safe Store',
-      merchantCategoryCode: '5411',
-      maskedPanDisplay: '****-****-****-1234',
-      transactionChannel: 'online',
+      cardTransactionAmount: { amount: 100, currency: 'USD' },
+      cardTransactionDateTime: new Date(),
+      cardTransactionStatus: 'authorized',
+      cardTransactionMerchantName: 'Safe Store',
+      cardTransactionMerchantCategoryCode: '5411',
+      cardTransactionMaskedPanDisplay: '****-****-****-1234',
+      cardTransactionChannel: 'online',
       paymentCardReference: 'tok_abc',
       cardTransactionAccountReference: 'ACC-SECRET',
     };

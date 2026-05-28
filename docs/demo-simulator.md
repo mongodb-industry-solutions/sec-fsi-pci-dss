@@ -67,7 +67,7 @@ Split-screen is the most effective tool for a technically sophisticated audience
 
 ```
 ┌─────────────────────────┬──────────────────────────────────┐
-│  Customer View          │  Atlas · cardTransactionQE       │
+│  Customer View          │  Atlas · cardTransaction       │
 │                         │                                  │
 │  Card: **** **** ****   │  {                               │
 │        1234             │    "_id": "txn-001234",          │
@@ -275,11 +275,11 @@ The email search matches `luis.fernandez@leafybank.demo` against the encrypted `
 │   plaintext: it is a surrogate, not cardholder data under PCI    │
 │   DSS v4.0. The server never decrypted the email or phone."      │
 │                                                                  │
-│  Source: cardTransactionQE · _id: txn-001234 · fetched live     │
+│  Source: cardTransaction · _id: txn-001234 · fetched live     │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-The raw document is fetched live from Atlas via `GET /api/v1/demo/raw-document/cardTransactionQE/txn-001234`. The backend endpoint uses a plain MongoClient (no autoEncryption) so the stored bytes are returned as-is.
+The raw document is fetched live from Atlas via `GET /api/v1/demo/raw-document/cardTransaction/txn-001234`. The backend endpoint uses a plain MongoClient (no autoEncryption) so the stored bytes are returned as-is.
 
 **Presenter talking point:** "Notice the token is plaintext — that is intentional and correct. A payment token is a surrogate for the card number; it is not itself cardholder data under PCI DSS v4.0. The fields that ARE cardholder data — email, phone, account reference — those are the ciphertext blobs. We encrypt exactly what the standard requires, and nothing more."
 
@@ -659,8 +659,8 @@ payment_service
 interface FraudDiagnosisCase {
   // BIAN SD-83 identifiers
   fraudDiagnosisCaseInstanceReference: string;         // FD-YYYY-NNNNNN
-  customerAgreementInstanceReference: string;          // link to customerAgreementQE
-  cardTransactionInstanceReference: string;            // link to cardTransactionQE
+  customerAgreementInstanceReference: string;          // link to customerAgreement
+  cardTransactionInstanceReference: string;            // link to cardTransaction
 
   // Case lifecycle
   fraudDiagnosisCaseStatus:
@@ -824,10 +824,10 @@ backend/
     │   │   ├── createIndexes.ts     # index definitions
     │   │   └── provisionDEKs.ts     # DEK-lookup and DEK-sensitive setup
     │   └── seed/
-    │       ├── seedUsers.ts         # partyAuthenticationQE seed
-    │       ├── seedCustomers.ts     # customerAgreementQE seed
-    │       ├── seedCards.ts         # paymentCardQE seed
-    │       ├── seedTransactions.ts  # cardTransactionQE seed
+    │       ├── seedUsers.ts         # partyAuthentication seed
+    │       ├── seedCustomers.ts     # customerAgreement seed
+    │       ├── seedCards.ts         # paymentCard seed
+    │       ├── seedTransactions.ts  # cardTransaction seed
     │       └── seedCases.ts         # fraudDiagnosisCase seed
     ├── controllers/
     ├── services/

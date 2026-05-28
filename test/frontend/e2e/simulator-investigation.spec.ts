@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 
 const MOCK_CASE = {
   fraudDiagnosisInstanceReference: 'case-sim-e2e',
-  caseReference: 'FD-2026-001001',
+  fraudDiagnosisCaseReference: 'FD-2026-001001',
   fraudDiagnosisCaseStatus: 'open',
   fraudDiagnosisCaseSeverity: 'high',
   linkedCardTransactionReference: 'txn-001',
@@ -95,7 +95,7 @@ test.describe('FR-v1-02: Case Detail Page', () => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ document: { merchantName: 'Test', cardTransactionAccountReference: { $binary: { base64: 'AABB', subType: '06' } } } }),
+        body: JSON.stringify({ document: { cardTransactionMerchantName: 'Test', cardTransactionAccountReference: { $binary: { base64: 'AABB', subType: '06' } } } }),
       });
     });
     await page.locator('button:has-text("Raw"), button:has-text("🔐")').first().click();

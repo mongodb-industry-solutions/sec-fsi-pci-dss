@@ -50,7 +50,7 @@ test.describe('FR-v1-01: Simulator Payment Flow', () => {
           contentType: 'application/json',
           body: JSON.stringify({
             cardTransactionInstanceReference: 'txn-e2e-sim-001',
-            transactionStatus: 'authorized',
+            cardTransactionStatus: 'authorized',
             fraudCaseCreated: true,
             fraudDiagnosisInstanceReference: 'case-sim-001',
           }),
@@ -70,7 +70,7 @@ test.describe('FR-v1-01: Simulator Payment Flow', () => {
           contentType: 'application/json',
           body: JSON.stringify({
             cardTransactionInstanceReference: 'txn-e2e-sim-002',
-            transactionStatus: 'authorized',
+            cardTransactionStatus: 'authorized',
             fraudCaseCreated: false,
           }),
         });

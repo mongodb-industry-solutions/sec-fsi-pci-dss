@@ -19,7 +19,7 @@ export default function AuditPage() {
   const allEvents = cases.flatMap((c) =>
     (c.diagnosisActionLog ?? []).map((e) => ({
       ...e,
-      caseRef: c.caseReference,
+      caseRef: c.fraudDiagnosisCaseReference,
       caseId: c.fraudDiagnosisInstanceReference,
     }))
   ).sort((a, b) => new Date(b.actionDateTime).getTime() - new Date(a.actionDateTime).getTime());

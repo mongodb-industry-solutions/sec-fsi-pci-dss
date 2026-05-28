@@ -61,9 +61,8 @@
       "name": "Frontend: Debug",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["--inspect=9230"],
-      "args": ["${workspaceFolder}/frontend/node_modules/.bin/next", "dev", "-p", "3000"],
+      "runtimeExecutable": "${workspaceFolder}/frontend/node_modules/.bin/next",
+      "args": ["dev", "--port", "3000"],
       "cwd": "${workspaceFolder}/frontend",
       "env": {
         "NODE_OPTIONS": "--inspect=9230"

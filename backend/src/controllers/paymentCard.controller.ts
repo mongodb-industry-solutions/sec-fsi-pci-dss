@@ -7,15 +7,15 @@ export async function paymentCardController(fastify: FastifyInstance) {
     const body = request.body as {
       customerAgreementInstanceReference: string;
       cardToken: string;
-      cardExpirationDate: string;
-      maskedPanDisplay: string;
-      cardNetwork: PaymentCardManagementControlRecord['cardNetwork'];
-      isPreferredCard: boolean;
+      paymentCardExpirationDate: string;
+      paymentCardMaskedPanDisplay: string;
+      paymentCardNetwork: PaymentCardManagementControlRecord['paymentCardNetwork'];
+      paymentCardIsPreferred: boolean;
     };
 
-    if (!body.customerAgreementInstanceReference || !body.cardToken || !body.cardExpirationDate) {
+    if (!body.customerAgreementInstanceReference || !body.cardToken || !body.paymentCardExpirationDate) {
       return reply.status(400).send({
-        error: 'customerAgreementInstanceReference, cardToken, and cardExpirationDate are required',
+        error: 'customerAgreementInstanceReference, cardToken, and paymentCardExpirationDate are required',
       });
     }
 

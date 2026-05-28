@@ -86,12 +86,12 @@ The data model follows **BIAN Service Domain** naming conventions across 7 colle
 
 | Collection | BIAN Service Domain | QE Protection |
 |---|---|---|
-| `partyAuthenticationQE` | Party Authentication (SD-16) | equality: user email |
-| `cardTransactionQE` | Card Transaction (SD-254) | equality: account reference; card token is plaintext (not CHD) |
-| `cardTransactionSensitiveQE` | Card Transaction: Sensitive | none: gateway payload, processor metadata |
-| `customerAgreementQE` | Customer Agreement (SD-53) | equality: email, phone, account reference |
-| `customerAgreementSensitiveQE` | Customer Agreement: Sensitive | none: address, government ID, risk notes |
-| `paymentCardQE` | Payment Card (SD-88) | none: expiry date; card token is plaintext (not CHD) |
+| `partyAuthentication` | Party Authentication (SD-16) | equality: user email |
+| `cardTransaction` | Card Transaction (SD-254) | equality: account reference; card token is plaintext (not CHD) |
+| `cardTransactionSensitive` | Card Transaction: Sensitive | none: gateway payload, processor metadata |
+| `customerAgreement` | Customer Agreement (SD-53) | equality: email, phone, account reference |
+| `customerAgreementSensitive` | Customer Agreement: Sensitive | none: address, government ID, risk notes |
+| `paymentCard` | Payment Card (SD-88) | none: expiry date; card token is plaintext (not CHD) |
 | `fraudDiagnosisCase` | Fraud Diagnosis (SD-83) | plaintext: operational metadata only |
 
 > Full schema definitions, field-level QE modes, index strategy, and collection relationships are in [docs/technical-spec.md](docs/technical-spec.md).

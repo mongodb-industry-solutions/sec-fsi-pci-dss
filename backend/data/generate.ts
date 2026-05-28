@@ -58,60 +58,60 @@ async function main() {
   const users = [
     {
       partyAuthenticationInstanceReference: uuid(),
-      authenticationUserEmailAddress: 'luis.fernandez@leafybank.demo',
-      authenticationPasswordHash: demoPassword,
-      authenticationUserRole: 'customer',
-      authenticationUserName: 'Luis Fernandez',
-      authenticationDomain: 'local',
-      accountStatus: 'active',
+      partyAuthenticationUserEmailAddress: 'luis.fernandez@leafybank.demo',
+      partyAuthenticationCredentialHash: demoPassword,
+      partyAuthenticationUserRole: 'customer',
+      partyAuthenticationUserName: 'Luis Fernandez',
+      partyAuthenticationLoginDomain: 'local',
+      partyAuthenticationAccountStatus: 'active',
       bianServiceDomain: 'PartyAuthentication',
       bianControlRecordType: 'PartyAuthentication',
       recordCreatedDateTime: NOW,
     },
     {
       partyAuthenticationInstanceReference: uuid(),
-      authenticationUserEmailAddress: 'julia.santos@leafybank.demo',
-      authenticationPasswordHash: demoPassword,
-      authenticationUserRole: 'customer',
-      authenticationUserName: 'Julia Santos',
-      authenticationDomain: 'local',
-      accountStatus: 'active',
+      partyAuthenticationUserEmailAddress: 'julia.santos@leafybank.demo',
+      partyAuthenticationCredentialHash: demoPassword,
+      partyAuthenticationUserRole: 'customer',
+      partyAuthenticationUserName: 'Julia Santos',
+      partyAuthenticationLoginDomain: 'local',
+      partyAuthenticationAccountStatus: 'active',
       bianServiceDomain: 'PartyAuthentication',
       bianControlRecordType: 'PartyAuthentication',
       recordCreatedDateTime: NOW,
     },
     {
       partyAuthenticationInstanceReference: uuid(),
-      authenticationUserEmailAddress: 'sarah.chen@leafybank.demo',
-      authenticationPasswordHash: demoPassword,
-      authenticationUserRole: 'level1_analyst',
-      authenticationUserName: 'Sarah Chen',
-      authenticationDomain: 'local',
-      accountStatus: 'active',
+      partyAuthenticationUserEmailAddress: 'sarah.chen@leafybank.demo',
+      partyAuthenticationCredentialHash: demoPassword,
+      partyAuthenticationUserRole: 'level1_analyst',
+      partyAuthenticationUserName: 'Sarah Chen',
+      partyAuthenticationLoginDomain: 'local',
+      partyAuthenticationAccountStatus: 'active',
       bianServiceDomain: 'PartyAuthentication',
       bianControlRecordType: 'PartyAuthentication',
       recordCreatedDateTime: NOW,
     },
     {
       partyAuthenticationInstanceReference: uuid(),
-      authenticationUserEmailAddress: 'michael.obi@leafybank.demo',
-      authenticationPasswordHash: demoPassword,
-      authenticationUserRole: 'level2_investigator',
-      authenticationUserName: 'Michael Obi',
-      authenticationDomain: 'local',
-      accountStatus: 'active',
+      partyAuthenticationUserEmailAddress: 'michael.obi@leafybank.demo',
+      partyAuthenticationCredentialHash: demoPassword,
+      partyAuthenticationUserRole: 'level2_investigator',
+      partyAuthenticationUserName: 'Michael Obi',
+      partyAuthenticationLoginDomain: 'local',
+      partyAuthenticationAccountStatus: 'active',
       bianServiceDomain: 'PartyAuthentication',
       bianControlRecordType: 'PartyAuthentication',
       recordCreatedDateTime: NOW,
     },
     {
       partyAuthenticationInstanceReference: uuid(),
-      authenticationUserEmailAddress: 'admin@leafybank.demo',
-      authenticationPasswordHash: demoPassword,
-      authenticationUserRole: 'security_auditor',
-      authenticationUserName: 'Admin',
-      authenticationDomain: 'local',
-      accountStatus: 'active',
+      partyAuthenticationUserEmailAddress: 'admin@leafybank.demo',
+      partyAuthenticationCredentialHash: demoPassword,
+      partyAuthenticationUserRole: 'security_auditor',
+      partyAuthenticationUserName: 'Admin',
+      partyAuthenticationLoginDomain: 'local',
+      partyAuthenticationAccountStatus: 'active',
       bianServiceDomain: 'PartyAuthentication',
       bianControlRecordType: 'PartyAuthentication',
       recordCreatedDateTime: NOW,
@@ -137,9 +137,9 @@ async function main() {
       customerAgreementReference: ref,
       customerName: faker.person.fullName(),
       customerSegment: SEGMENTS[i % SEGMENTS.length],
-      agreementStatus: 'active',
-      enrollmentDateTime: faker.date.past({ years: 2 }),
-      preferredLanguage: 'en',
+      customerAgreementStatus: 'active',
+      customerAgreementEnrollmentDate: faker.date.past({ years: 2 }),
+      customerAgreementPreferredLanguage: 'en',
       bianServiceDomain: 'CustomerAgreement',
       bianControlRecordType: 'CustomerAgreement',
       recordCreatedDateTime: faker.date.past({ years: 2 }),
@@ -148,14 +148,14 @@ async function main() {
 
     customerAgreementsSensitive.push({
       customerAgreementInstanceReference: id,
-      residentialAddressFull: {
+      customerAgreementResidentialAddress: {
         streetAddress: faker.location.streetAddress(),
         city: faker.location.city(),
         postalCode: faker.location.zipCode(),
         countryCode: 'GB',
       },
       governmentIdentificationReference: synthGovId(),
-      internalRiskProfileNotes: 'No prior fraud history.',
+      customerAgreementRiskNotes: 'No prior fraud history.',
     });
   }
 
@@ -172,12 +172,12 @@ async function main() {
       paymentCardInstanceReference: cardId,
       customerAgreementInstanceReference: customerIds[i],
       paymentCardReference: token,
-      cardExpirationDate: futureExpiry(),
-      maskedPanDisplay: maskedPan(),
-      cardNetwork: NETWORKS[i % NETWORKS.length],
-      cardStatus: 'active',
-      cardIssuanceDateTime: faker.date.past({ years: 1 }),
-      isPreferredCard: false,
+      paymentCardExpirationDate: futureExpiry(),
+      paymentCardMaskedPanDisplay: maskedPan(),
+      paymentCardNetwork: NETWORKS[i % NETWORKS.length],
+      paymentCardStatus: 'active',
+      paymentCardIssuanceDateTime: faker.date.past({ years: 1 }),
+      paymentCardIsPreferred: false,
       bianServiceDomain: 'PaymentCard',
       bianControlRecordType: 'PaymentCardManagement',
       recordCreatedDateTime: faker.date.past({ years: 1 }),
@@ -201,14 +201,14 @@ async function main() {
       cardTransactionInstanceReference: txnId,
       paymentCardReference: token,
       cardTransactionAccountReference: customerAgreementRefs[custIdx],
-      transactionAmount: { amount, currency: 'USD' },
-      transactionDateTime: faker.date.recent({ days: 30 }),
-      transactionStatus: STATUSES[i % STATUSES.length],
-      transactionChannel: CHANNELS[i % CHANNELS.length],
+      cardTransactionAmount: { amount, currency: 'USD' },
+      cardTransactionDateTime: faker.date.recent({ days: 30 }),
+      cardTransactionStatus: STATUSES[i % STATUSES.length],
+      cardTransactionChannel: CHANNELS[i % CHANNELS.length],
       cardTransactionInitiationType: 'customerInitiated',
-      merchantCategoryCode: mcc,
-      merchantName: faker.company.name(),
-      maskedPanDisplay: paymentCards[custIdx].maskedPanDisplay,
+      cardTransactionMerchantCategoryCode: mcc,
+      cardTransactionMerchantName: faker.company.name(),
+      cardTransactionMaskedPanDisplay: paymentCards[custIdx].paymentCardMaskedPanDisplay,
       bianServiceDomain: 'CardTransaction',
       bianControlRecordType: 'CardTransactionLog',
       recordCreatedDateTime: faker.date.recent({ days: 30 }),
@@ -236,24 +236,24 @@ async function main() {
   for (let i = 0; i < 20; i++) {
     const txn = cardTransactions[i];
     const custId = customerIds[i % 50];
-    const isFraud = txn.transactionAmount.amount > 500 || RISK_MCC.includes(txn.merchantCategoryCode);
-    const severity = txn.transactionAmount.amount > 1000 ? 'critical'
-      : txn.transactionAmount.amount > 500 ? 'high'
-      : txn.transactionAmount.amount > 200 ? 'medium' : 'low';
+    const isFraud = txn.cardTransactionAmount.amount > 500 || RISK_MCC.includes(txn.cardTransactionMerchantCategoryCode);
+    const severity = txn.cardTransactionAmount.amount > 1000 ? 'critical'
+      : txn.cardTransactionAmount.amount > 500 ? 'high'
+      : txn.cardTransactionAmount.amount > 200 ? 'medium' : 'low';
 
     const riskIndicators: string[] = [];
-    if (txn.transactionAmount.amount > 500) riskIndicators.push('amount_threshold');
-    if (RISK_MCC.includes(txn.merchantCategoryCode)) riskIndicators.push('high_risk_mcc');
+    if (txn.cardTransactionAmount.amount > 500) riskIndicators.push('amount_threshold');
+    if (RISK_MCC.includes(txn.cardTransactionMerchantCategoryCode)) riskIndicators.push('high_risk_mcc');
     if (riskIndicators.length === 0) riskIndicators.push('manual_review');
 
     fraudCases.push({
       fraudDiagnosisInstanceReference: uuid(),
-      caseReference: caseRef(i + 1),
+      fraudDiagnosisCaseReference: caseRef(i + 1),
       linkedCardTransactionReference: txnIds[i],
       linkedCustomerAgreementReference: custId,
       fraudDiagnosisCaseStatus: i < 5 ? 'open' : i < 10 ? 'under_review' : i < 15 ? 'escalated' : 'resolved_cleared',
       fraudDiagnosisCaseSeverity: SEVERITIES[i % SEVERITIES.length],
-      fraudDiagnosisRequestDateTime: txn.transactionDateTime,
+      fraudDiagnosisRequestDateTime: txn.cardTransactionDateTime,
       fraudDiagnosisAssessment: {
         riskIndicators,
         fraudDiagnosisScore: Math.floor(Math.random() * 60 + 30),
@@ -261,7 +261,7 @@ async function main() {
       },
       diagnosisActionLog: [
         {
-          actionDateTime: txn.transactionDateTime,
+          actionDateTime: txn.cardTransactionDateTime,
           actionType: 'case_opened',
           performedByInstanceReference: 'system',
           performedByRole: 'payment_service',
@@ -270,7 +270,7 @@ async function main() {
       ],
       bianServiceDomain: 'FraudDiagnosis',
       bianControlRecordType: 'FraudDiagnosis',
-      recordCreatedDateTime: txn.transactionDateTime,
+      recordCreatedDateTime: txn.cardTransactionDateTime,
       recordUpdatedDateTime: NOW,
     });
   }

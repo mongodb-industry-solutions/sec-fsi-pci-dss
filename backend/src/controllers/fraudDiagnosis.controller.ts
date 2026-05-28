@@ -31,7 +31,7 @@ export async function fraudDiagnosisController(fastify: FastifyInstance) {
 
     return reply.send({
       fraudDiagnosisInstanceReference: fraudCase.fraudDiagnosisInstanceReference,
-      caseReference: fraudCase.caseReference,
+      fraudDiagnosisCaseReference: fraudCase.fraudDiagnosisCaseReference,
       caseStatus: fraudCase.fraudDiagnosisCaseStatus,
       riskSeverity: fraudCase.fraudDiagnosisCaseSeverity,
       linkedCardTransactionReference: fraudCase.linkedCardTransactionReference,

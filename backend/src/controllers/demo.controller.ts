@@ -11,12 +11,12 @@ export async function demoController(fastify: FastifyInstance) {
     const { collection, id } = request.params as { collection: string; id: string };
 
     const allowedCollections = new Set([
-      'cardTransactionQE',
-      'cardTransactionSensitiveQE',
-      'customerAgreementQE',
-      'customerAgreementSensitiveQE',
-      'paymentCardQE',
-      'partyAuthenticationQE',
+      'cardTransaction',
+      'cardTransactionSensitive',
+      'customerAgreement',
+      'customerAgreementSensitive',
+      'paymentCard',
+      'partyAuthentication',
       'fraudDiagnosisCase',
     ]);
 

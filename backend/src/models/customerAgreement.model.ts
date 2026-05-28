@@ -1,7 +1,7 @@
 // BIAN SD-53: Customer Agreement
 
-export const CUSTOMER_AGREEMENT_COLLECTION = 'customerAgreementQE';
-export const CUSTOMER_AGREEMENT_SENSITIVE_COLLECTION = 'customerAgreementSensitiveQE';
+export const CUSTOMER_AGREEMENT_COLLECTION = 'customerAgreement';
+export const CUSTOMER_AGREEMENT_SENSITIVE_COLLECTION = 'customerAgreementSensitive';
 
 export interface CustomerAgreementControlRecord {
   customerAgreementInstanceReference: string;
@@ -12,9 +12,9 @@ export interface CustomerAgreementControlRecord {
   // Plaintext fields (customerName becomes QE equality in v2)
   customerName: string;
   customerSegment: CustomerSegment;
-  agreementStatus: AgreementStatus;
-  enrollmentDateTime: Date;
-  preferredLanguage: string;
+  customerAgreementStatus: AgreementStatus;
+  customerAgreementEnrollmentDate: Date;
+  customerAgreementPreferredLanguage: string;
   // v4: recurring payment mandate
   preferredPaymentCardReference?: string;
   bianServiceDomain: 'CustomerAgreement';
@@ -26,9 +26,9 @@ export interface CustomerAgreementControlRecord {
 export interface CustomerAgreementSensitiveRecord {
   customerAgreementInstanceReference: string;
   // QE none: retrieval only under Level 2 escalation
-  residentialAddressFull: ResidentialAddress;
+  customerAgreementResidentialAddress: ResidentialAddress;
   governmentIdentificationReference: string;
-  internalRiskProfileNotes: string;
+  customerAgreementRiskNotes: string;
 }
 
 export interface ResidentialAddress {

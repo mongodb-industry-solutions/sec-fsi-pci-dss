@@ -1,7 +1,7 @@
 // BIAN SD-254: Card Transaction
 
-export const CARD_TRANSACTION_COLLECTION = 'cardTransactionQE';
-export const CARD_TRANSACTION_SENSITIVE_COLLECTION = 'cardTransactionSensitiveQE';
+export const CARD_TRANSACTION_COLLECTION = 'cardTransaction';
+export const CARD_TRANSACTION_SENSITIVE_COLLECTION = 'cardTransactionSensitive';
 
 export interface CardTransactionLogControlRecord {
   cardTransactionInstanceReference: string;
@@ -10,17 +10,17 @@ export interface CardTransactionLogControlRecord {
   paymentCardReference: string;
   // QE equality: searchable encrypted field
   cardTransactionAccountReference: string;
-  transactionAmount: {
+  cardTransactionAmount: {
     amount: number;
     currency: string;
   };
-  transactionDateTime: Date;
-  transactionStatus: CardTransactionStatus;
-  transactionChannel: CardTransactionChannel;
+  cardTransactionDateTime: Date;
+  cardTransactionStatus: CardTransactionStatus;
+  cardTransactionChannel: CardTransactionChannel;
   cardTransactionInitiationType: CardTransactionInitiationType;
-  merchantCategoryCode: string;
-  merchantName: string;
-  maskedPanDisplay: string;
+  cardTransactionMerchantCategoryCode: string;
+  cardTransactionMerchantName: string;
+  cardTransactionMaskedPanDisplay: string;
   bianServiceDomain: 'CardTransaction';
   bianControlRecordType: 'CardTransactionLog';
   recordCreatedDateTime: Date;

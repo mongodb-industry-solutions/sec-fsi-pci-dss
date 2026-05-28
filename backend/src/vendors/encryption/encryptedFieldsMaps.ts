@@ -7,7 +7,7 @@ export function buildEncryptedFieldsMaps(
   return {
     // NOTE: paymentCardReference is NOT in QE. A payment token is a card
     // surrogate, not CHD under PCI DSS v4.0. Stored plaintext, standard index.
-    cardTransactionQE: {
+    cardTransaction: {
       fields: [
         {
           keyId: dekLookupId,
@@ -15,11 +15,11 @@ export function buildEncryptedFieldsMaps(
           bsonType: 'string',
           queries: { queryType: 'equality' },
         },
-        // v2: add transactionAmount.amount with queryType: 'range'
+        // v2: add cardTransactionAmount.amount with queryType: 'range'
       ],
     },
 
-    cardTransactionSensitiveQE: {
+    cardTransactionSensitive: {
       fields: [
         {
           keyId: dekSensitiveId,
@@ -35,7 +35,7 @@ export function buildEncryptedFieldsMaps(
       ],
     },
 
-    customerAgreementQE: {
+    customerAgreement: {
       fields: [
         {
           keyId: dekLookupId,
@@ -59,11 +59,11 @@ export function buildEncryptedFieldsMaps(
       ],
     },
 
-    customerAgreementSensitiveQE: {
+    customerAgreementSensitive: {
       fields: [
         {
           keyId: dekSensitiveId,
-          path: 'residentialAddressFull',
+          path: 'customerAgreementResidentialAddress',
           bsonType: 'object',
           // QE:none
         },
@@ -74,30 +74,30 @@ export function buildEncryptedFieldsMaps(
         },
         {
           keyId: dekSensitiveId,
-          path: 'internalRiskProfileNotes',
+          path: 'customerAgreementRiskNotes',
           bsonType: 'string',
         },
       ],
     },
 
-    // NOTE: paymentCardReference is NOT in QE (same reason as cardTransactionQE).
-    // cardExpirationDate IS protected: expiry date is CHD when co-located with card ref.
-    paymentCardQE: {
+    // NOTE: paymentCardReference is NOT in QE (same reason as cardTransaction).
+    // paymentCardExpirationDate IS protected: expiry date is CHD when co-located with card ref.
+    paymentCard: {
       fields: [
         {
           keyId: dekSensitiveId,
-          path: 'cardExpirationDate',
+          path: 'paymentCardExpirationDate',
           bsonType: 'string',
           // QE:none — non-searchable, retrieval only
         },
       ],
     },
 
-    partyAuthenticationQE: {
+    partyAuthentication: {
       fields: [
         {
           keyId: dekLookupId,
-          path: 'authenticationUserEmailAddress',
+          path: 'partyAuthenticationUserEmailAddress',
           bsonType: 'string',
           queries: { queryType: 'equality' },
         },

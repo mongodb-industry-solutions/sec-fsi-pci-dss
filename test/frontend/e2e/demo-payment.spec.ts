@@ -48,7 +48,7 @@ test.describe('FR-v1-01/03: App Mode Payment', () => {
     const mockTxnId = `txn-e2e-${Date.now()}`;
     await page.route('**/api/v1/card-transactions', (route, req) => {
       if (req.method() === 'POST') {
-        route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ cardTransactionInstanceReference: mockTxnId, transactionStatus: 'authorized', fraudCaseCreated: false }) });
+        route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ cardTransactionInstanceReference: mockTxnId, cardTransactionStatus: 'authorized', fraudCaseCreated: false }) });
       } else route.continue();
     });
     await page.goto('/demo/payment');
@@ -61,7 +61,7 @@ test.describe('FR-v1-01/03: App Mode Payment', () => {
   test('03.5 fraud alert shown when API returns fraudCaseCreated=true', async ({ page }) => {
     await page.route('**/api/v1/card-transactions', (route, req) => {
       if (req.method() === 'POST') {
-        route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ cardTransactionInstanceReference: 'txn-fraud-e2e', transactionStatus: 'authorized', fraudCaseCreated: true, fraudDiagnosisInstanceReference: 'case-e2e-001' }) });
+        route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ cardTransactionInstanceReference: 'txn-fraud-e2e', cardTransactionStatus: 'authorized', fraudCaseCreated: true, fraudDiagnosisInstanceReference: 'case-e2e-001' }) });
       } else route.continue();
     });
     await page.goto('/demo/payment');

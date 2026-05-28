@@ -4,7 +4,7 @@ export const FRAUD_DIAGNOSIS_COLLECTION = 'fraudDiagnosisCase';
 
 export interface FraudDiagnosisControlRecord {
   fraudDiagnosisInstanceReference: string;
-  caseReference: string;
+  fraudDiagnosisCaseReference: string;
   linkedCardTransactionReference: string;
   linkedCustomerAgreementReference: string;
   fraudDiagnosisCaseStatus: FraudDiagnosisCaseStatus;
