@@ -1,5 +1,7 @@
 import * as dotenv from 'dotenv';
-import { resolve } from 'path';
+import { resolve, join } from 'path';
+import { existsSync } from 'fs';
+import { execSync } from 'child_process';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
 import { seedUsers } from './seedUsers';
 import { seedCustomers } from './seedCustomers';
@@ -10,7 +12,56 @@ import { seedCases } from './seedCases';
 // Load .env from project root — works regardless of CWD (npm --prefix changes CWD to backend/)
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
 
+// DATA_DIR resolution — compatible with local dev, ts-node, compiled build, and Docker:
+//   • npm run seed --prefix backend  → process.cwd() = <project>/backend/
+//   • Docker WORKDIR /app            → process.cwd() = /app  (backend root)
+//   • SEED_DATA_DIR env var          → explicit override for custom deployments
+const DATA_DIR: string = process.env.SEED_DATA_DIR ?? join(process.cwd(), 'data');
+
+/**
+ * Generates JSON seed files if they are missing.
+ * Safe to call repeatedly: skips generation if all files already exist.
+ */
+function ensureDataFiles() {
+  const required = [
+    'users.json',
+    'customerAgreements.json',
+    'customerAgreementsSensitive.json',
+    'paymentCards.json',
+    'cardTransactions.json',
+    'cardTransactionsSensitive.json',
+    'fraudCases.json',
+    'fraudCaseEvents.json',
+  ];
+
+  const missing = required.filter((f) => !existsSync(join(DATA_DIR, f)));
+  if (missing.length === 0) return;
+
+  console.log(`\n  Data files not found: ${missing.join(', ')}`);
+  console.log('  Running data generator...\n');
+
+  // Use process.cwd() as the backend root — correct in both local and Docker
+  const backendDir = process.cwd();
+  const generateScript = join(backendDir, 'data', 'generate.ts');
+
+  try {
+    execSync(`npx ts-node "${generateScript}"`, {
+      cwd: backendDir,
+      stdio: 'inherit',
+    });
+    console.log('');
+  } catch (err) {
+    throw new Error(
+      `Data generation failed: ${(err as Error).message}\n` +
+      `  Run manually: npm run generate:data --prefix backend`
+    );
+  }
+}
+
 export async function runSeed() {
+  // Auto-generate data files if they don't exist yet
+  ensureDataFiles();
+
   const client = await getQEClient();
   const db = client.db(process.env.MONGODB_DB_NAME!);
 

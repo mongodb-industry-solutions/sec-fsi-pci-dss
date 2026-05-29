@@ -1,5 +1,19 @@
 version: '3.9'
 
+# ── LeafyBank FSI PCI DSS Demo ───────────────────────────────────────────────
+# Usage:
+#   docker compose up --build          # build + start both services
+#   docker compose up --build backend  # rebuild backend only
+#   docker compose exec backend npm run setup:db    # provision QE collections
+#   docker compose exec backend npm run setup:seed  # seed demo data
+#
+# Prerequisites:
+#   1. Copy .env.example to .env and fill in MONGODB_URI, JWT_SECRET, KMS_PROVIDER.
+#   2. For offline/local KMS: run `npm run setup:key` and set LOCAL_MASTER_KEY_BASE64.
+#   3. For QE shared library: set MONGODB_CRYPT_SHARED_LIB_PATH in .env.
+#      The path must be accessible INSIDE the container — mount it via volumes if needed.
+# ─────────────────────────────────────────────────────────────────────────────
+
 services:
   backend:
     build:
@@ -10,23 +24,35 @@ services:
     env_file:
       - .env
     environment:
-      - NODE_ENV=development
+      NODE_ENV: production
+      SEED_DATA_DIR: /app/data
+      # CORS: allow the frontend container origin
+      CORS_ORIGIN: http://localhost:3000
+    # Mount the QE shared library if MONGODB_CRYPT_SHARED_LIB_PATH points to a host path.
+    # Uncomment and adjust if the library is stored outside the container:
+    # volumes:
+    #   - ${MONGODB_CRYPT_SHARED_LIB_PATH}:${MONGODB_CRYPT_SHARED_LIB_PATH}:ro
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/v1/system/health"]
       interval: 10s
       timeout: 5s
       retries: 6
+      start_period: 10s
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* vars are baked into the Next.js bundle at build time.
+        # For local Docker Compose, the browser talks to localhost:3001 directly.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
     ports:
       - "3000:3000"
     env_file:
       - .env
     environment:
-      - NODE_ENV=development
+      NODE_ENV: production
     depends_on:
       backend:
         condition: service_healthy
