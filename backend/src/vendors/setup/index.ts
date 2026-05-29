@@ -1,10 +1,12 @@
 import { MongoClient, Binary } from 'mongodb';
 import * as dotenv from 'dotenv';
+import { resolve } from 'path';
 import { provisionDEKs } from './provisionDEKs';
 import { createCollections } from './createCollections';
 import { createIndexes } from './createIndexes';
 
-dotenv.config();
+// Load .env from project root — works regardless of CWD (npm --prefix changes CWD to backend/)
+dotenv.config({ path: resolve(__dirname, '../../../../.env') });
 
 export async function runSetup(reset = false) {
   const client = new MongoClient(process.env.MONGODB_URI!);

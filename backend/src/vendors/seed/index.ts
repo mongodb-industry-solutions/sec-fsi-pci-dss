@@ -1,4 +1,5 @@
 import * as dotenv from 'dotenv';
+import { resolve } from 'path';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
 import { seedUsers } from './seedUsers';
 import { seedCustomers } from './seedCustomers';
@@ -6,7 +7,8 @@ import { seedCards } from './seedCards';
 import { seedTransactions } from './seedTransactions';
 import { seedCases } from './seedCases';
 
-dotenv.config();
+// Load .env from project root — works regardless of CWD (npm --prefix changes CWD to backend/)
+dotenv.config({ path: resolve(__dirname, '../../../../.env') });
 
 export async function runSeed() {
   const client = await getQEClient();

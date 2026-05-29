@@ -1287,8 +1287,8 @@ runSeed().then(() => process.exit(0)).catch(err => { console.error(err); process
 // root package.json (relevant entries)
 {
   "scripts": {
-    "setup:db": "npm run setup:db --prefix backend",
-    "seed":     "npm run seed --prefix backend"
+    "setup:db":   "npm run setup:db --prefix backend",
+    "setup:seed": "npm run seed --prefix backend"
   }
 }
 ```

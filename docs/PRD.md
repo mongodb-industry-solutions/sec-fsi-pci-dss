@@ -638,26 +638,26 @@ All commands are accessible from the repository root. No need to navigate into s
 
 ```json
 {
-  "name": "sec-fsi-pci-dss",
+  "name": "fsi-pci-dss-demo",
   "private": true,
   "scripts": {
-    "install:all":      "npm install && npm install --prefix frontend && npm install --prefix backend",
+    "setup":            "npm install && npm install --prefix frontend && npm install --prefix backend",
     "dev":              "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:frontend":     "npm run dev --prefix frontend",
     "dev:backend":      "npm run dev --prefix backend",
     "build":            "npm run build --prefix frontend && npm run build --prefix backend",
 
     "setup:db":         "npm run setup:db --prefix backend",
-    "seed":             "npm run seed --prefix backend",
+    "setup:seed":       "npm run seed --prefix backend",
 
-    "docker:up":        "docker compose up --build",
-    "docker:down":      "docker compose down",
-    "docker:logs":      "docker compose logs -f"
-  },
-  "devDependencies": {
-    "concurrently":     "^8.0.0",
-    "ts-node":          "^10.0.0",
-    "typescript":       "^5.0.0"
+    "test":             "npm run test:unit && npm run test:integration",
+    "test:unit":        "vitest run test/backend/unit test/frontend/unit",
+    "test:integration": "vitest run test/backend/integration test/frontend/integration",
+    "test:e2e":         "playwright test",
+    "test:e2e:ui":      "playwright test --ui",
+    "test:e2e:debug":   "playwright test --debug",
+    "test:watch":       "vitest watch",
+    "type-check":       "tsc --noEmit --project tsconfig.base.json"
   }
 }
 ```
@@ -768,7 +768,7 @@ v5: Payment Gateway + Modular Architecture  (TBD: after v4 validated)
 **Theme:** Show that QE works. A user submits a payment, fields are encrypted on the client, and a fraud analyst finds the record by searching an encrypted field.
 
 **Deliverables:**
-- Runnable monorepo (npm install + npm run docker:up)
+- Runnable monorepo (`npm run setup` + `npm run dev`)
 - Payment simulation screen with 3-step checkout
 - Fraud investigation dashboard with encrypted-field search
 - Visual encryption explainer: "before/after" document view
@@ -901,29 +901,33 @@ git clone <repo-url> && cd sec-fsi-pci-dss
 cp .env.example .env      # fill in MONGODB_URI + AWS KMS credentials (or set KMS_PROVIDER=local)
 
 # 2. Install all dependencies
-npm run install:all
+npm run setup
 
 # 3a. Set up the database and seed demo data
-npm run setup:db && npm run seed
+npm run setup:db && npm run setup:seed
 
-# 3b. Start the full stack
-npm run docker:up         # OR: npm run dev (hot reload without Docker)
+# 3b. Start the full stack (hot reload)
+npm run dev
 ```
 
 ### Individual Commands
 
 | Command | Description |
 |---|---|
-| `npm run install:all` | Install root + frontend + backend dependencies |
+| `npm run setup` | Install root + frontend + backend dependencies |
 | `npm run dev` | Start frontend and backend concurrently (hot reload) |
-| `npm run dev:frontend` | Start only the Next.js frontend |
-| `npm run dev:backend` | Start only the Fastify API |
+| `npm run dev:frontend` | Start only the Next.js frontend (:3000) |
+| `npm run dev:backend` | Start only the Fastify API (:3001) |
 | `npm run build` | Build frontend and backend for production |
-| `npm run setup:db` | Create collections, indexes, provision QE key vault and DEKs |
-| `npm run seed` | Insert synthetic demo data (idempotent: safe to re-run) |
-| `npm run docker:up` | Build and start full stack with Docker Compose |
-| `npm run docker:down` | Stop and remove containers |
-| `npm run docker:logs` | Tail container logs |
+| `npm run setup:db` | Create QE collections, provision DEKs and indexes |
+| `npm run setup:seed` | Insert synthetic BIAN-compliant demo data (idempotent) |
+| `npm run test` | Run unit + integration tests (Vitest) |
+| `npm run test:unit` | Unit tests only (no Atlas required) |
+| `npm run test:integration` | Integration tests (requires `TEST_MONGODB_URI`) |
+| `npm run test:e2e` | Playwright end-to-end browser tests |
+| `npm run test:e2e:ui` | Playwright interactive UI mode |
+| `npm run test:watch` | Vitest watch mode (development) |
+| `npm run type-check` | TypeScript type check without emitting |
 
 ### `backend/bin/setup.ts` Responsibilities
 
@@ -957,7 +961,7 @@ npm run docker:up         # OR: npm run dev (hot reload without Docker)
 
 | Criterion | Measure |
 |---|---|
-| **Setup time** | `npm run install:all` + `setup:db` + `seed` + `docker:up` completes in < 5 minutes |
+| **Setup time** | `npm run setup` + `setup:db` + `setup:seed` + `dev` completes in < 5 minutes |
 | **Demo flow** | CISO persona walkthrough completes in ≤ 10 minutes |
 | **Explainability** | Non-technical AE can run the demo without engineering support after 1 practice session |
 | **Offline capability** | Demo runs fully offline with `KMS_PROVIDER=local` for travel/conference scenarios |

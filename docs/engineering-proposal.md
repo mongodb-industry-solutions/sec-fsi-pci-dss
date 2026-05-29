@@ -80,7 +80,7 @@ test/         ← All automated tests (Vitest unit + integration, Playwright E2E
 docs/         ← PRD, roadmap, technical-spec, this EP
 ```
 
-`bin/` and `data/` live inside `backend/` because they call `backend/src/vendors/` directly. The root `package.json` delegates with `npm run setup:db --prefix backend` and `npm run seed --prefix backend`.
+`bin/` and `data/` live inside `backend/` because they call `backend/src/vendors/` directly. The root `package.json` delegates with `npm run setup:db --prefix backend` and `npm run setup:seed --prefix backend`.
 
 No `packages/` shared workspace. The backend owns all MongoDB access and all encryption logic. The frontend is a pure HTTP consumer. Shared TypeScript base config lives in `tsconfig.base.json`.
 
@@ -439,7 +439,7 @@ No existing data or users. Every setup starts from scratch:
 
 ```
 npm run setup:db   → creates collections + provisions DEKs + creates indexes
-npm run seed       → inserts synthetic data
+npm run setup:seed → inserts synthetic data
 ```
 
 Re-seeding uses upsert operations (idempotent). Running `setup:db` twice is safe: `getOrCreate` logic in `keyVault.ts` skips DEK creation if the key already exists.
