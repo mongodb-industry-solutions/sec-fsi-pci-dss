@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "setup": "npm install && npm install --prefix frontend && npm install --prefix backend",
+    "setup:key": "npm run generate:key --prefix backend",
     "setup:db": "npm run setup:db --prefix backend",
     "setup:seed": "npm run seed --prefix backend",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
