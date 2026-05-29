@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   PAYMENT_CARD_COLLECTION,
   PaymentCardManagementControlRecord,
-} from '../models';
+} from '../models/paymentCard.model';
 
 export interface CreateCardInput {
   customerAgreementInstanceReference: string;

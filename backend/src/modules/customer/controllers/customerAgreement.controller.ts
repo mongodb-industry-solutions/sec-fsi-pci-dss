@@ -4,7 +4,7 @@ import { getByEmail, getByPhone, getByAccountRef } from '../services/customerAgr
 export async function customerAgreementController(fastify: FastifyInstance) {
   fastify.get('/', {
     schema: {
-      tags: ['customer-agreements'],
+      tags: ['customer'],
       summary: 'Search customer agreement by PII key',
       description: `Looks up a \`customerAgreement\` document (BIAN SD-53) by **exactly one**
 search key: \`email\`, \`phone\`, or \`accountRef\`. Omitting all three returns 400.
@@ -54,7 +54,7 @@ caller has the DEK-sensitive key, i.e. \`level2_investigator\` role.`,
           properties: {
             customerAgreementInstanceReference: {
               type: 'string',
-              description: 'Primary key UUID of the `customerAgreement` document. Use this to query linked payment cards (`GET /api/v1/payment-cards?customerRef=<value>`).',
+              description: 'Primary key UUID of the `customerAgreement` document. Use this to query linked payment cards (`GET /api/v1/customer/:customerId/cards`).',
             },
             customerName: {
               type: 'string',

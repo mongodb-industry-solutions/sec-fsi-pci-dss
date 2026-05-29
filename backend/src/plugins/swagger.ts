@@ -89,13 +89,14 @@ Obtain a token via \`POST /api/v1/auth/login\`.
         // above. @fastify/swagger includes them here automatically.
       },
       tags: [
-        { name: 'auth', description: 'Authentication: Party Authentication SD-16. Public routes, no JWT required.' },
-        { name: 'card-transactions', description: 'Card Transaction SD-254. Payment event log with QE:equality on account reference.' },
-        { name: 'customer-agreements', description: 'Customer Agreement SD-53. PII search surface; QE:equality on email, phone, and account reference.' },
-        { name: 'payment-cards', description: 'Payment Card SD-88. Card lifecycle management. Expiry date protected as QE:none (CHD).' },
-        { name: 'fraud-diagnosis', description: 'Fraud Diagnosis SD-83. Investigation case lifecycle: open → under_review → escalated → resolved.' },
-        { name: 'health', description: 'Operational health check. Public, no JWT required.' },
-        { name: 'demo', description: '⚠️ Demo utilities; non-production only. Returns raw (undecrypted) MongoDB documents to illustrate QE ciphertext storage.' },
+        { name: 'auth',         description: 'module:identity — SD-16 Party Authentication. /api/v1/auth. Public routes — no JWT required.' },
+        { name: 'customer',     description: 'module:customer — SD-53 Customer Agreement. /api/v1/customer. QE:equality search on email, phone, account reference.' },
+        { name: 'cards',        description: 'module:customer — SD-88 Payment Card. /api/v1/customer/:customerId/cards. Cards as sub-resource of Customer Agreement.' },
+        { name: 'transactions', description: 'module:transactions — SD-254 Card Transaction. /api/v1/transactions. QE:equality on account reference. Auto-triggers fraud case.' },
+        { name: 'fraud',        description: 'module:fraud — SD-83 Fraud Diagnosis. /api/v1/fraud. Investigation lifecycle: open → under_review → escalated → resolved → closed.' },
+        { name: 'merchants',    description: 'module:gateway — SD-89 Merchant Relations. /api/v1/merchants. Merchant onboarding, configuration, and webhook registration. Prototype (v5 roadmap).' },
+        { name: 'gateway',      description: 'module:gateway — SD-64 Payment Order · SD-65 Payment Execution · SD-57 Card Token. /api/v1/gateway/payments · /api/v1/gateway/tokens. Prototype (v5 roadmap).' },
+        { name: 'system',       description: 'module:system — /api/v1/system. Health check (public) + raw document viewer (non-production, JWT required).' },
       ],
     },
   });

@@ -1,44 +1,56 @@
 import { FastifyInstance } from 'fastify';
 import { createCard, getCardsByCustomer } from '../services/paymentCard.service';
-import type { PaymentCardManagementControlRecord } from '../models';
+import type { PaymentCardManagementControlRecord } from '../models/paymentCard.model';
 
+// Mounted at /customer — routes are /:customerId/cards
 export async function paymentCardController(fastify: FastifyInstance) {
-  fastify.post('/', {
+
+  // POST /api/v1/customer/:customerId/cards
+  fastify.post('/:customerId/cards', {
     schema: {
-      tags: ['payment-cards'],
-      summary: 'Add a payment card to a customer agreement',
-      description: `Creates a \`paymentCard\` document (BIAN SD-88) linked to a
-\`customerAgreement\` (SD-53).
+      tags: ['cards'],
+      summary: 'Register a payment card for a customer',
+      description: `Creates a \`paymentCard\` document (BIAN SD-88) linked to the customer
+identified by \`customerId\` (\`customerAgreementInstanceReference\`).
+
+**REST note:** the card is a sub-resource of the customer agreement. The
+\`customerAgreementInstanceReference\` is taken from the path parameter \`:customerId\`
+and must NOT be repeated in the request body.
 
 **PCI DSS field classification:**
 
 | Field | Classification | Storage |
 |---|---|---|
 | \`cardToken\` | NOT CHD (surrogate) | Plaintext, indexed |
-| \`paymentCardExpirationDate\` | CHD (expiry is CHD when co-located with a card reference) | QE:none; encrypted at rest, requires DEK-sensitive |
+| \`paymentCardExpirationDate\` | CHD (expiry co-located with card ref) | QE:none — encrypted, requires DEK-sensitive |
 | \`paymentCardMaskedPanDisplay\` | Display only (last 4) | Plaintext; permitted by PCI DSS |
 | CVV / PIN | SAD (**prohibited**) | Never stored |`,
       security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['customerId'],
+        properties: {
+          customerId: {
+            type: 'string',
+            description: '`customerAgreementInstanceReference` UUID. Obtain via `GET /api/v1/customer?email=...`.',
+          },
+        },
+      },
       body: {
         type: 'object',
-        required: ['customerAgreementInstanceReference', 'cardToken',
-          'paymentCardExpirationDate', 'paymentCardMaskedPanDisplay', 'paymentCardNetwork'],
+        required: ['cardToken', 'paymentCardExpirationDate', 'paymentCardMaskedPanDisplay', 'paymentCardNetwork'],
         properties: {
-          customerAgreementInstanceReference: {
-            type: 'string',
-            description: 'UUID of the parent `customerAgreement` document. Obtain this from `GET /api/v1/customer-agreements`.',
-          },
           cardToken: {
             type: 'string',
-            description: 'PAN surrogate token provided by the payment processor. NOT the real card number. Stored in plaintext.',
+            description: 'PAN surrogate token. NOT the real card number. Stored in plaintext.',
           },
           paymentCardExpirationDate: {
             type: 'string',
-            description: 'Card expiry date in `MM/YY` format. Classified as CHD; stored as QE:none (encrypted, not searchable).',
+            description: 'Card expiry date in `MM/YY` format. Stored as QE:none (encrypted, not searchable).',
           },
           paymentCardMaskedPanDisplay: {
             type: 'string',
-            description: 'Display-safe last-4 string, format `****-****-****-XXXX`. Stored in plaintext; no sensitive card data.',
+            description: 'Display-safe last-4 string, format `****-****-****-XXXX`.',
           },
           paymentCardNetwork: {
             type: 'string',
@@ -48,7 +60,7 @@ export async function paymentCardController(fastify: FastifyInstance) {
           paymentCardIsPreferred: {
             type: 'boolean',
             default: false,
-            description: 'When true, marks this card as the default for recurring payment mandates (v4 feature). Sets `preferredPaymentCardReference` on the linked `customerAgreement`.',
+            description: 'When true, marks this card as the default for recurring payments (v4).',
           },
         },
       },
@@ -59,7 +71,7 @@ export async function paymentCardController(fastify: FastifyInstance) {
           properties: {
             paymentCardInstanceReference: {
               type: 'string',
-              description: 'UUID of the created `paymentCard` document (BIAN SD-88 Control Record identifier).',
+              description: 'UUID of the created `paymentCard` document (BIAN SD-88).',
             },
             paymentCardStatus: {
               type: 'string',
@@ -74,42 +86,50 @@ export async function paymentCardController(fastify: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
+    const { customerId } = request.params as { customerId: string };
     const body = request.body as {
-      customerAgreementInstanceReference: string;
       cardToken: string;
       paymentCardExpirationDate: string;
       paymentCardMaskedPanDisplay: string;
       paymentCardNetwork: PaymentCardManagementControlRecord['paymentCardNetwork'];
-      paymentCardIsPreferred: boolean;
+      paymentCardIsPreferred?: boolean;
     };
 
-    if (!body.customerAgreementInstanceReference || !body.cardToken || !body.paymentCardExpirationDate) {
+    if (!body.cardToken || !body.paymentCardExpirationDate) {
       return reply.status(400).send({
-        error: 'customerAgreementInstanceReference, cardToken, and paymentCardExpirationDate are required',
+        error: 'cardToken and paymentCardExpirationDate are required',
       });
     }
 
-    const result = await createCard(fastify.db, body);
+    const result = await createCard(fastify.db, {
+      customerAgreementInstanceReference: customerId,
+      cardToken: body.cardToken,
+      paymentCardExpirationDate: body.paymentCardExpirationDate,
+      paymentCardMaskedPanDisplay: body.paymentCardMaskedPanDisplay,
+      paymentCardNetwork: body.paymentCardNetwork,
+      paymentCardIsPreferred: body.paymentCardIsPreferred ?? false,
+    });
     return reply.status(201).send(result);
   });
 
-  fastify.get('/', {
+  // GET /api/v1/customer/:customerId/cards
+  fastify.get('/:customerId/cards', {
     schema: {
-      tags: ['payment-cards'],
+      tags: ['cards'],
       summary: 'List payment cards for a customer',
-      description: `Returns all \`paymentCard\` documents linked to a customer agreement.
+      description: `Returns all \`paymentCard\` documents (BIAN SD-88) linked to the
+customer identified by \`:customerId\` (\`customerAgreementInstanceReference\`).
 
-The query uses a standard index on \`customerAgreementInstanceReference\`. The encrypted
-expiry date (\`paymentCardExpirationDate\`, QE:none) is **not** included in this list
-response; fetch the individual card record to retrieve it with Level 2 access.`,
+The encrypted expiry date (\`paymentCardExpirationDate\`, QE:none) is **not** included
+in this list response; it requires Level 2 access and a separate request.`,
       security: [{ bearerAuth: [] }],
-      querystring: {
+      params: {
         type: 'object',
-        required: ['customerRef'],
+        required: ['customerId'],
         properties: {
-          customerRef: {
+          customerId: {
             type: 'string',
-            description: '`customerAgreementInstanceReference` UUID. Obtain this from `GET /api/v1/customer-agreements`.',
+            description: '`customerAgreementInstanceReference` UUID.',
           },
         },
       },
@@ -120,7 +140,7 @@ response; fetch the individual card record to retrieve it with Level 2 access.`,
           properties: {
             results: {
               type: 'array',
-              description: 'All cards for this customer. Expiry date is not included (QE:none, Level 2 only).',
+              description: 'All active cards for this customer.',
               items: {
                 type: 'object',
                 properties: {
@@ -146,16 +166,13 @@ response; fetch the individual card record to retrieve it with Level 2 access.`,
             },
           },
         },
-        400: { description: '`customerRef` query parameter missing.', $ref: 'Error#' },
         401: { description: 'Missing or invalid Bearer token.', $ref: 'Error#' },
+        404: { description: 'Customer not found.', $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
-    const { customerRef } = request.query as { customerRef?: string };
-    if (!customerRef) {
-      return reply.status(400).send({ error: 'customerRef query parameter is required' });
-    }
-    const result = await getCardsByCustomer(fastify.db, customerRef);
+    const { customerId } = request.params as { customerId: string };
+    const result = await getCardsByCustomer(fastify.db, customerId);
     return reply.send(result);
   });
 }

@@ -8,7 +8,7 @@ import {
 export async function cardTransactionController(fastify: FastifyInstance) {
   fastify.post('/', {
     schema: {
-      tags: ['card-transactions'],
+      tags: ['transactions'],
       summary: 'Record a new card transaction',
       description: `Creates a \`cardTransaction\` document (BIAN SD-254) and a matching
 \`cardTransactionSensitive\` document (raw gateway payload, QE:none).
@@ -119,7 +119,7 @@ export async function cardTransactionController(fastify: FastifyInstance) {
 
   fastify.get('/', {
     schema: {
-      tags: ['card-transactions'],
+      tags: ['transactions'],
       summary: 'List transactions by card token',
       description: `Returns all transactions associated with a card token, sorted by
 \`cardTransactionDateTime\` descending (most recent first).
@@ -183,7 +183,7 @@ token is a PAN surrogate and is NOT Cardholder Data under PCI DSS v4.0.`,
 
   fastify.get('/:id', {
     schema: {
-      tags: ['card-transactions'],
+      tags: ['transactions'],
       summary: 'Get a transaction by ID',
       description: `Returns a single \`cardTransaction\` document by its UUID.
 

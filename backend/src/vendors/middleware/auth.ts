@@ -4,7 +4,7 @@ import * as jwt from 'jsonwebtoken';
 // Exact URL matches that bypass JWT auth
 const PUBLIC_EXACT: Set<string> = new Set([
   '/',
-  '/health',
+  '/api/v1/system/health',
   '/api/v1/auth/login',
   '/api/v1/auth/users',
 ]);

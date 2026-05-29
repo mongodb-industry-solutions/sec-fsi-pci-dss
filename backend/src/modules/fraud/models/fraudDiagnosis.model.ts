@@ -1,5 +1,11 @@
 // BIAN SD-83: Fraud Diagnosis (no QE: operational metadata only)
 
+import { RiskSeverity } from '../../../shared/models/risk.model';
+import { AnalystRole } from '../../../shared/models/identity.model';
+import { TransactionSnapshot } from '../../../shared/models/transaction.model';
+
+export { RiskSeverity, AnalystRole };
+
 export const FRAUD_DIAGNOSIS_COLLECTION = 'fraudDiagnosisCase';
 export const FRAUD_DIAGNOSIS_EVENTS_COLLECTION = 'fraudDiagnosisCaseEvents';
 
@@ -15,13 +21,7 @@ export interface FraudDiagnosisControlRecord {
   // Extended Reference Pattern: stable display fields from cardTransaction.
   // Embedded to make fraud investigation display a single-collection query.
   // Updated only when transaction status changes (controlled write path).
-  transactionSnapshot: {
-    cardTransactionAmount: { amount: number; currency: string };
-    cardTransactionMerchantName: string;
-    cardTransactionDateTime: Date;
-    cardTransactionStatus: 'authorized' | 'declined' | 'pending' | 'settled' | 'disputed';
-    cardTransactionMaskedPanDisplay: string;
-  };
+  transactionSnapshot: TransactionSnapshot;
 
   // Case lifecycle
   fraudDiagnosisCaseStatus: FraudDiagnosisCaseStatus;
@@ -95,15 +95,6 @@ export type FraudDiagnosisCaseStatus =
   | 'resolved_cleared'
   | 'resolved_fraud'
   | 'closed';
-
-export type RiskSeverity = 'low' | 'medium' | 'high' | 'critical';
-
-export type AnalystRole =
-  | 'payment_service'
-  | 'level1_analyst'
-  | 'level2_investigator'
-  | 'security_auditor'
-  | 'ai_agent';
 
 export type ActionType =
   | 'case_opened'

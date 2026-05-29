@@ -87,36 +87,59 @@ export const api = {
       apiFetch<{ users: AuthUser[] }>('/api/v1/auth/users'),
   },
 
-  cardTransactions: {
+  transactions: {
     create: (body: object, token: string) =>
-      apiFetch<CardTransactionCreateResponse>('/api/v1/card-transactions', {
+      apiFetch<CardTransactionCreateResponse>('/api/v1/transactions', {
         method: 'POST',
         body: JSON.stringify(body),
       }, token),
     getById: (id: string, token: string) =>
-      apiFetch<Record<string, unknown>>(`/api/v1/card-transactions/${id}`, {}, token),
+      apiFetch<Record<string, unknown>>(`/api/v1/transactions/${id}`, {}, token),
     getByCardToken: (cardToken: string, token: string) =>
       apiFetch<{ results: Record<string, unknown>[]; count: number }>(
-        `/api/v1/card-transactions?cardToken=${encodeURIComponent(cardToken)}`, {}, token
+        `/api/v1/transactions?cardToken=${encodeURIComponent(cardToken)}`, {}, token
       ),
   },
 
-  customerAgreements: {
+  customer: {
+    // SD-53: search by QE-encrypted field (no ID in path — lookup IS the encrypted search)
     getByEmail: (email: string, token: string) =>
       apiFetch<Record<string, unknown>>(
-        `/api/v1/customer-agreements?email=${encodeURIComponent(email)}`, {}, token
+        `/api/v1/customer?email=${encodeURIComponent(email)}`, {}, token
       ),
     getByPhone: (phone: string, token: string) =>
       apiFetch<Record<string, unknown>>(
-        `/api/v1/customer-agreements?phone=${encodeURIComponent(phone)}`, {}, token
+        `/api/v1/customer?phone=${encodeURIComponent(phone)}`, {}, token
       ),
     getByAccountRef: (ref: string, token: string) =>
       apiFetch<Record<string, unknown>>(
-        `/api/v1/customer-agreements?accountRef=${encodeURIComponent(ref)}`, {}, token
+        `/api/v1/customer?accountRef=${encodeURIComponent(ref)}`, {}, token
+      ),
+
+    // SD-88: cards as sub-resource of customer — /api/v1/customer/:customerId/cards
+    getCards: (customerId: string, token: string) =>
+      apiFetch<{ results: Record<string, unknown>[] }>(
+        `/api/v1/customer/${encodeURIComponent(customerId)}/cards`, {}, token
+      ),
+    addCard: (
+      customerId: string,
+      body: {
+        cardToken: string;
+        paymentCardExpirationDate: string;
+        paymentCardMaskedPanDisplay: string;
+        paymentCardNetwork: 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
+        paymentCardIsPreferred?: boolean;
+      },
+      token: string
+    ) =>
+      apiFetch<{ paymentCardInstanceReference: string; paymentCardStatus: string }>(
+        `/api/v1/customer/${encodeURIComponent(customerId)}/cards`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token
       ),
   },
 
-  fraudCases: {
+  fraud: {
     list: (
       params: { status?: string; severity?: string; page?: number; limit?: number },
       token: string
@@ -127,19 +150,19 @@ export const api = {
           .map(([k, v]) => [k, String(v)])
       ).toString();
       return apiFetch<FraudCaseListResponse>(
-        `/api/v1/fraud-diagnosis-cases${qs ? `?${qs}` : ''}`, {}, token
+        `/api/v1/fraud${qs ? `?${qs}` : ''}`, {}, token
       );
     },
     getById: (id: string, token: string) =>
-      apiFetch<FraudCase>(`/api/v1/fraud-diagnosis-cases/${id}`, {}, token),
+      apiFetch<FraudCase>(`/api/v1/fraud/${id}`, {}, token),
   },
 
   demo: {
     rawDocument: (collection: string, id: string, token: string) =>
       apiFetch<RawDocumentResponse>(
-        `/api/v1/demo/raw-document/${collection}/${id}`, {}, token
+        `/api/v1/system/raw/${collection}/${id}`, {}, token
       ),
   },
 
-  health: () => apiFetch<{ status: string; atlas: string }>('/health'),
+  health: () => apiFetch<{ status: string; atlas: string; kmsProvider: string; timestamp: string }>('/api/v1/system/health'),
 };

@@ -139,21 +139,21 @@ Complete `encryptedFieldsMap` definitions are in [technical-spec.md §2](technic
 Full contracts are in [technical-spec.md §6](technical-spec.md#6-api-contracts). Summary:
 
 ```
-POST   /api/v1/auth/login                      JWT login (returns signed token)
-POST   /api/v1/card-transactions               create transaction (triggers fraud case)
-GET    /api/v1/card-transactions/:id           get transaction by ID
-GET    /api/v1/card-transactions/:id/raw       raw Atlas document (plain MongoClient, for simulator toggle)
-GET    /api/v1/card-transactions?cardToken=    standard index query (token is not CHD, not QE)
-POST   /api/v1/payment-cards                   register card token
-GET    /api/v1/payment-cards?customerRef=      list cards by customer
-GET    /api/v1/customer-agreements?email=      QE equality search
-GET    /api/v1/customer-agreements?phone=      QE equality search
-GET    /api/v1/customer-agreements?accountRef= QE equality search
-GET    /api/v1/fraud-diagnosis-cases           list cases (filter: status, severity)
-GET    /api/v1/fraud-diagnosis-cases/:id       case detail
-POST   /api/v1/fraud-diagnosis-cases/:id/escalate  [v2]
-GET    /api/v1/audit-events?caseId=            [v2]
-GET    /api/v1/diagnostics/query-timing        [v4]
+POST   /api/v1/auth/login                 JWT login (returns signed token)
+GET    /api/v1/customer?email=                  QE equality search                 ← module: customer / SD-53
+GET    /api/v1/customer?phone=                  QE equality search
+GET    /api/v1/customer?accountRef=             QE equality search
+GET    /api/v1/customer/:customerId/cards        list customer cards                ← module: customer / SD-88
+POST   /api/v1/customer/:customerId/cards        register card for customer
+POST   /api/v1/transactions              create transaction (triggers fraud case)   ← module: transactions / SD-254
+GET    /api/v1/transactions/:id          get transaction by ID
+GET    /api/v1/transactions/:id/raw      raw Atlas document (plain MongoClient, for simulator toggle)
+GET    /api/v1/transactions?cardToken=   list by card token (standard index, not QE)
+GET    /api/v1/fraud                     list cases (filter: status, severity)      ← module: fraud / SD-83
+GET    /api/v1/fraud/:id                 case detail
+POST   /api/v1/fraud/:id/escalate        [v2]
+GET    /api/v1/fraud/:id/events          [v2] audit events per case
+GET    /api/v1/diagnostics/query-timing  [v4]
 GET    /health
 ```
 
@@ -221,6 +221,183 @@ See [docs/installation.md](installation.md) §5 for all commands to run the test
 
 ---
 
+### 3.8 Backend module architecture and BIAN map
+
+**Decision:** The backend `src/` is organized into domain modules. Each module owns its controllers, services, and models. Cross-module resources live in `shared/` (business logic shared by 2+ modules) or `vendors/` (infrastructure shared by all modules).
+
+**Rule for placement:**
+
+| Resource type | 1 module uses it | 2+ modules use it |
+|---|---|---|
+| Interface / type | inside the module's `models/` | `shared/models/` |
+| Business service | inside the module's `services/` | `shared/services/` |
+| Fastify middleware / plugin | `vendors/middleware/` or `vendors/plugins/` | (always cross-cutting) |
+| Encryption client, KMS, DEKs | `vendors/encryption/` | (always cross-cutting) |
+| DevOps (setup, seed) | `vendors/setup/` or `vendors/seed/` | (always cross-cutting) |
+
+#### 3.8.1 BIAN Module Map
+
+Each module maps to one or more BIAN Service Domains. No module exists without a SD reference.
+
+| Module | BIAN SD | SD Name | Collections | QE Classification | API Prefix | PCI CDE Scope |
+|---|---|---|---|---|---|---|
+| `identity` | SD-16 | Party Authentication | `partyAuthentication` | `equality` on email | `/api/v1/auth` | Adjacent — auth only |
+| `customer` | SD-53 · SD-88 | Customer Agreement · Payment Card | `customerAgreement` · `customerAgreementSensitive` · `paymentCard` | `equality` on email / phone / accountRef · `none` on address / govId / expirationDate | `/api/v1/customer` · `/api/v1/customer/:id/cards` | **In scope** — PII/CHD |
+| `transactions` | SD-254 | Card Transaction | `cardTransaction` · `cardTransactionSensitive` | `equality` on accountRef · `none` on rawGatewayPayload | `/api/v1/transactions` | **In scope** — CHD |
+| `fraud` | SD-83 | Fraud Diagnosis | `fraudDiagnosisCase` · `fraudDiagnosisCaseEvents` | None — operational metadata, FK refs only | `/api/v1/fraud` · `/api/v1/fraud/:id/events` | Adjacent — references CDE keys |
+| `gateway` *(v5)* | SD-64 · SD-65 · SD-89 · SD-57 | Payment Order · Payment Execution · Merchant Relations · Card Etoken | `merchantAgreement` · `paymentOrder` · `tokenVault` | `none` on merchantApiKeyHash · `equality` on merchant/customer refs | `/api/v1/gateway` | **In scope** — merchant secrets + payment refs |
+| `system` | — | Demo infrastructure | None | None | `/health` · `/api/v1/demo` | Non-CDE — excluded from production |
+
+#### 3.8.2 Shared resources
+
+| File | Exported types | Consuming modules |
+|---|---|---|
+| `shared/models/risk.model.ts` | `RiskSeverity` · `FraudTriggerInput` | `transactions` · `fraud` · `gateway` (v5) |
+| `shared/models/identity.model.ts` | `UserRole` · `AnalystRole` · `JwtDemoPayload` | `identity` · `fraud` · `gateway` (v5) |
+| `shared/models/transaction.model.ts` | `TransactionSnapshot` | `fraud` (defines embedded field) · `transactions` (builds the value at write time) |
+| `shared/services/fraudTrigger.service.ts` *(v5)* | `triggerFraudEvaluation()` | `transactions` · `gateway` — activated when gateway also triggers fraud cases |
+
+Until v5, `transactions` calls `createFraudCase()` from `modules/fraud/` directly. The shared service is introduced only when a second caller (gateway) makes the duplication worth extracting.
+
+#### 3.8.3 Vendor resources (infrastructure, not business logic)
+
+| Directory | Contents | Used by |
+|---|---|---|
+| `vendors/encryption/` | `qeClient.ts` · `rawClient.ts` · `kms.ts` · `keyVault.ts` · `encryptedFieldsMaps.ts` | `customer` · `transactions` · `identity` · `gateway` (v5) |
+| `vendors/middleware/` | `auth.ts` · `rbac.ts` | All modules via `server.ts` Fastify hooks |
+| `vendors/setup/` | `createCollections.ts` · `createIndexes.ts` · `provisionDEKs.ts` | `bin/setup.ts` only |
+| `vendors/seed/` | `seedUsers.ts` · `seedCustomers.ts` · `seedCards.ts` · `seedTransactions.ts` · `seedCases.ts` · `seedMerchants.ts` (v5) | `bin/seed.ts` only |
+
+#### 3.8.4 Module dependency graph
+
+```
+server.ts
+  ├── vendors/middleware/auth.ts       ← Fastify preHandler hook (all routes)
+  ├── vendors/middleware/rbac.ts       ← Fastify preHandler hook (protected routes)
+  │
+  ├── modules/identity/               SD-16
+  ├── modules/customer/               SD-53
+  ├── modules/transactions/           SD-254 + SD-88
+  │     └── imports createFraudCase ──────────────────────────────────────────┐
+  ├── modules/fraud/                  SD-83  ◄──────────────────────────────┘
+  │
+  ├── modules/gateway/ [v5]           SD-64 + SD-65 + SD-89 + SD-57
+  │     └── imports triggerFraudEvaluation ──► shared/services/fraudTrigger ──► modules/fraud/
+  │
+  └── modules/system/                 demo infra (NODE_ENV !== 'production' only)
+
+shared/models/   ←── imported by any module that needs the type (no runtime cost)
+vendors/encryption/  ←── imported by QE-enabled modules only
+```
+
+PCI CDE boundary at code level: modules `customer`, `transactions`, and `gateway` (v5) are in scope. `fraud` and `identity` are adjacent. `system` is non-CDE. This mirrors the network segmentation principle in [payment_gateway.md §7.2](payment_gateway.md).
+
+#### 3.8.5 Backend source structure
+
+```
+backend/src/
+├── shared/
+│   ├── models/
+│   │   ├── risk.model.ts             RiskSeverity · FraudTriggerInput
+│   │   ├── identity.model.ts         UserRole · AnalystRole · JwtDemoPayload
+│   │   └── transaction.model.ts      TransactionSnapshot
+│   └── services/
+│       └── fraudTrigger.service.ts   [v5] triggerFraudEvaluation()
+│
+├── vendors/
+│   ├── encryption/
+│   │   ├── qeClient.ts
+│   │   ├── rawClient.ts
+│   │   ├── kms.ts
+│   │   ├── keyVault.ts
+│   │   └── encryptedFieldsMaps.ts
+│   ├── middleware/
+│   │   ├── auth.ts
+│   │   └── rbac.ts
+│   ├── setup/
+│   │   ├── index.ts
+│   │   ├── createCollections.ts
+│   │   ├── createIndexes.ts
+│   │   └── provisionDEKs.ts
+│   └── seed/
+│       ├── index.ts
+│       ├── seedUsers.ts
+│       ├── seedCustomers.ts
+│       ├── seedCards.ts
+│       ├── seedTransactions.ts
+│       ├── seedCases.ts
+│       └── seedMerchants.ts          [v5]
+│
+└── modules/
+    ├── identity/                     SD-16: Party Authentication
+    │   ├── controllers/auth.controller.ts
+    │   ├── services/auth.service.ts
+    │   ├── models/partyAuthentication.model.ts
+    │   └── index.ts                  Fastify plugin → registers /auth/*
+    │
+    ├── customer/                     SD-53: Customer Agreement
+    │   ├── controllers/customerAgreement.controller.ts
+    │   ├── services/customerAgreement.service.ts
+    │   ├── models/customerAgreement.model.ts
+    │   └── index.ts                  Fastify plugin → registers /customer + /customer/:id/cards
+    │
+    ├── transactions/                 SD-254: Card Transaction · SD-88: Payment Card
+    │   ├── controllers/
+    │   │   ├── cardTransaction.controller.ts
+    │   │   └── paymentCard.controller.ts
+    │   ├── services/
+    │   │   ├── cardTransaction.service.ts
+    │   │   └── paymentCard.service.ts
+    │   ├── models/
+    │   │   ├── cardTransaction.model.ts
+    │   │   └── paymentCard.model.ts
+    │   └── index.ts                  Fastify plugin → registers /transactions
+    │
+    ├── fraud/                        SD-83: Fraud Diagnosis
+    │   ├── controllers/fraudDiagnosis.controller.ts
+    │   ├── services/fraudDiagnosis.service.ts
+    │   ├── models/fraudDiagnosis.model.ts
+    │   └── index.ts                  Fastify plugin → registers /fraud (+ /fraud/:id/events in v2)
+    │
+    ├── gateway/                      [v5] SD-64+SD-65+SD-89+SD-57
+    │   ├── controllers/
+    │   │   ├── merchant.controller.ts
+    │   │   ├── payment.controller.ts
+    │   │   ├── token.controller.ts
+    │   │   └── webhook.controller.ts
+    │   ├── services/
+    │   │   ├── merchant.service.ts
+    │   │   ├── paymentOrder.service.ts
+    │   │   ├── routing.service.ts
+    │   │   ├── tokenization.service.ts
+    │   │   └── webhook.service.ts
+    │   ├── models/
+    │   │   ├── merchantAgreement.model.ts    SD-89
+    │   │   ├── paymentOrder.model.ts         SD-64
+    │   │   └── tokenVault.model.ts           SD-57
+    │   └── index.ts                  Fastify plugin → registers /gateway/*
+    │
+    └── system/                       Demo infrastructure (non-BIAN)
+        ├── controllers/demo.controller.ts
+        └── index.ts                  Registered only when NODE_ENV !== 'production'
+```
+
+`server.ts` registers modules as Fastify plugins:
+
+```typescript
+await fastify.register(identityModule,     { prefix: '/api/v1' });
+await fastify.register(customerModule,     { prefix: '/api/v1' });
+await fastify.register(transactionsModule, { prefix: '/api/v1' });
+await fastify.register(fraudModule,        { prefix: '/api/v1' });
+await fastify.register(gatewayModule,      { prefix: '/api/v1' });   // v5
+if (process.env.NODE_ENV !== 'production')
+  await fastify.register(systemModule,     { prefix: '/api/v1' });
+```
+
+The API URL surface follows REST nesting and module semantics: `/api/v1/customer` (SD-53), `/api/v1/customer/:id/cards` (SD-88 sub-resource), `/api/v1/transactions` (SD-254), `/api/v1/fraud` (SD-83).
+
+---
+
 ## 4. Implementation phases
 
 | Phase | Scope | Dependency | Version |
@@ -229,7 +406,7 @@ See [docs/installation.md](installation.md) §5 for all commands to run the test
 | **P2** | `backend/bin/seed.ts`: synthetic data for all 7 collections (incl. 5 demo users) | P1 | v1 |
 | **P3** | Backend: QE client, KMS provider factory, `encryptedFieldsMap` | P1 | v1 |
 | **P3a** | Backend: JWT auth middleware + `POST /api/v1/auth/login` endpoint | P3 | v1 |
-| **P4** | Backend: payment API (`POST /card-transactions`, `POST /payment-cards`) | P3 | v1 |
+| **P4** | Backend: payment API (`POST /transactions`, `POST /cards`) | P3 | v1 |
 | **P5** | Backend: investigation API (QE equality searches, fraud cases, raw document endpoint) | P3, P4 | v1 |
 | **P6** | Frontend: Simulator Mode — payment simulation flow (checkout, token gen, encryption toggle) | P4 | v1 |
 | **P6a** | Frontend: dual-mode landing page + Application Mode shell (login, role selector, JWT flow) | P3a | v1 |
@@ -241,10 +418,18 @@ See [docs/installation.md](installation.md) §5 for all commands to run the test
 | **P12** | Frontend: role badge, escalation workflow UI, audit trail panel | P9, P10 | v2 |
 | **P13** | Backend + Frontend: AI agent integration (Magenta, `agentDraftDiagnosis` field) | P5 | v3 |
 | **P14** | Frontend: AI draft inline panel (Accept / Override / Dismiss) | P13 | v3 |
-| **P15** | Backend: `POST /payment-cards` save-card + returning-customer recurring payment | P3 | v4 |
+| **P15** | Backend: `POST /cards` save-card + returning-customer recurring payment | P3 | v4 |
 | **P16** | Frontend: save card flow, returning-customer payment | P15 | v4 |
 | **P17** | Backend: `/diagnostics/query-timing` | P5 | v4 |
 | **P18** | Frontend: performance comparison panel | P17 | v4 |
+| **P19** | Backend: structural refactor — create `src/modules/` + `src/shared/` layout; move all existing files; no functional change | P18 | v5 |
+| **P20** | Backend: extract shared types to `shared/models/` (`risk`, `identity`, `transaction`) | P19 | v5 |
+| **P21** | Backend: create module `index.ts` Fastify plugins; update `server.ts` registration | P20 | v5 |
+| **P22** | Backend: gateway module — BIAN models (`merchantAgreement`, `paymentOrder`, `tokenVault`) | P21 | v5 |
+| **P23** | Backend: gateway services (merchant, paymentOrder, routing, tokenization, webhook) | P22 | v5 |
+| **P24** | Backend: gateway controllers + `index.ts` plugin; update `encryptedFieldsMaps` + `createCollections` + `createIndexes` | P23 | v5 |
+| **P25** | Backend: merchant + gateway seed data; update `bin/seed.ts` | P24 | v5 |
+| **P26** | Frontend: gateway simulator step + merchant profile view in Application Mode | P24, P25 | v5 |
 
 ---
 
@@ -402,7 +587,7 @@ The correct story is: encrypt what the standard requires, nothing more. QE equal
 
 **Decision:** The frontend supports two distinct modes selectable from the landing page:
 
-- **Simulator Mode:** No login. Story-driven, presenter-controlled. Each step is a scripted screen with talking points. The "Encrypted in Atlas" toggle calls the raw document endpoint (`GET /api/v1/card-transactions/:id/raw`) via a plain MongoClient to show actual ciphertext. Suitable for conference demos, screen recordings, and low-bandwidth environments.
+- **Simulator Mode:** No login. Story-driven, presenter-controlled. Each step is a scripted screen with talking points. The "Encrypted in Atlas" toggle calls the raw document endpoint (`GET /api/v1/transactions/:id/raw`) via a plain MongoClient to show actual ciphertext. Suitable for conference demos, screen recordings, and low-bandwidth environments.
 - **Application Mode:** Full JWT login via the pre-seeded user selector. Role-based routing: customer → payment flow; Level 1 Analyst → investigation dashboard; Level 2 Investigator → escalation workflow; Auditor → audit trail. Suitable for hands-on prospect workshops and guided evaluations.
 
 Both modes connect to the same Fastify API and the same Atlas cluster. The mode selection is a frontend routing concern only: no backend changes required.

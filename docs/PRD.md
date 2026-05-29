@@ -189,19 +189,32 @@ BIAN (Banking Industry Architecture Network) provides a standardized vocabulary 
 
 ### 6.2 BIAN Service Domains in Scope
 
-| # | BIAN Service Domain | SD Reference | Role in Demo | Collection |
-|---|---|---|---|---|
-| 1 | **Card Transaction** | SD-254 | Records card payment events | `cardTransaction` |
-| 2 | **Card Transaction: Sensitive** | SD-254 (sensitive) | Stores non-searchable gateway payload | `cardTransactionSensitive` |
-| 3 | **Customer Agreement** | SD-53 | Customer profile, searchable PII | `customerAgreement` |
-| 4 | **Customer Agreement: Sensitive** | SD-53 (sensitive) | Non-searchable PII (address, gov ID) | `customerAgreementSensitive` |
-| 5 | **Payment Card** | SD-88 | Stored card instruments (tokens) | `paymentCard` |
-| 6 | **Fraud Diagnosis** | SD-83 | Investigation cases and workflow | `fraudDiagnosisCase` |
-| 7 | **Party Authentication** | SD-16 | Demo user accounts, roles, hashed credentials | `partyAuthentication` |
+#### v1–v4: Core demo SDs (currently implemented)
+
+| # | BIAN Service Domain | SD Reference | Role in Demo | Collection | Version |
+|---|---|---|---|---|---|
+| 1 | **Card Transaction** | SD-254 | Records card payment events | `cardTransaction` | v1 |
+| 2 | **Card Transaction: Sensitive** | SD-254 (sensitive) | Stores non-searchable gateway payload | `cardTransactionSensitive` | v1 |
+| 3 | **Customer Agreement** | SD-53 | Customer profile, searchable PII | `customerAgreement` | v1 |
+| 4 | **Customer Agreement: Sensitive** | SD-53 (sensitive) | Non-searchable PII (address, gov ID) | `customerAgreementSensitive` | v1 |
+| 5 | **Payment Card** | SD-88 | Stored card instruments (tokens) | `paymentCard` | v1 |
+| 6 | **Fraud Diagnosis** | SD-83 | Investigation cases and workflow | `fraudDiagnosisCase` | v1 |
+| 7 | **Party Authentication** | SD-16 | Demo user accounts, roles, hashed credentials | `partyAuthentication` | v1 |
+
+#### v5: Payment Gateway SDs (new)
+
+| # | BIAN Service Domain | SD Reference | Role in Demo | Collection | Version |
+|---|---|---|---|---|---|
+| 8 | **Merchant Relations** | SD-89 | Merchant profile, MCC, limits, API key | `merchantAgreement` | v5 |
+| 9 | **Payment Order** | SD-64 | Payment intent lifecycle (initiated → settled) | `paymentOrder` | v5 |
+| 10 | **Payment Execution** | SD-65 | Gateway routing and authorization orchestration | *(service layer, no dedicated collection)* | v5 |
+| 11 | **Card Etoken** | SD-57 | Token vault: card token references and network tokens | `tokenVault` | v5 |
 
 > **Note 1:** BIAN does not define separate "sensitive" collections; the split is an architectural pattern for separating searchable QE fields from non-searchable QE fields, as required by MongoDB QE design constraints.
 >
 > **Note 2:** `partyAuthentication` is a demo-only construct. It stores pre-seeded user accounts (email, bcrypt password hash, role) to support Application Mode login. In a production FSI system, authentication would be delegated to an identity provider (e.g., MS Entra ID). The `partyAuthentication` collection uses QE equality on `authenticationUserEmailAddress` to demonstrate that even user credential lookups can be encrypted.
+>
+> **Note 3 (v5):** The backend module structure mirrors the BIAN SD grouping. Each module owns the collections, services, and API routes for its assigned SDs. See [engineering-proposal.md §3.8](engineering-proposal.md) for the full BIAN Module Map.
 
 ### 6.3 Collection Schemas
 
@@ -741,6 +754,13 @@ v3: Agentic Fraud Investigation  (TBD: after v2 validated)
 v4: Advanced Capabilities  (TBD: after v3 validated)
   Range queries, tokenization for recurring payments, performance visualization
   Goal: Leafy Bank integration-ready, Solutions Library publishable
+
+v5: Payment Gateway + Modular Architecture  (TBD: after v4 validated)
+  Backend refactored to domain modules (BIAN SD clusters) + new gateway module
+  New BIAN SDs: SD-89 Merchant Relations · SD-64 Payment Order · SD-65 Payment Execution · SD-57 Card Etoken
+  New collections: merchantAgreement · paymentOrder · tokenVault
+  New actors: Merchant (first-class entity with MCC risk profile, limits, settlement config)
+  Goal: API-first payment platform story — MongoDB as the data backbone for a full card payment gateway
 ```
 
 ### v1: Security Foundation
@@ -795,6 +815,21 @@ v4: Advanced Capabilities  (TBD: after v3 validated)
 - Solutions Library article draft
 - Slide deck (ks-mongodb-writer-deck standard)
 
+### v5: Payment Gateway + Modular Architecture
+
+**Theme:** MongoDB as the data backbone of a full card payment gateway, structured around BIAN Service Domains.
+
+**Deliverables:**
+- Backend refactored to domain module layout: `src/modules/<sd-cluster>/` + `src/shared/` — zero API surface change, all existing tests pass
+- Four new BIAN Service Domains: SD-89 Merchant Relations, SD-64 Payment Order, SD-65 Payment Execution, SD-57 Card Etoken
+- Three new collections: `merchantAgreement` (QE:none on API key hash), `paymentOrder` (intent lifecycle with TTL index), `tokenVault` (QE:none on network token)
+- Merchant as first-class actor: MCC risk category, transaction limits, settlement schedule, webhook endpoint
+- Gateway API: `POST /gateway/payments` (create intent with idempotency key) → confirm → authorize → capture → void/refund
+- Payment Order lifecycle: `initiated → confirmed → authorized → captured → settled/refunded/voided`
+- Merchant context in fraud investigation: investigator sees merchant's average transaction amount, volume, risk category alongside the case
+- Simulator Mode: new step 0 showing merchant creating the payment intent before customer checkout
+- `shared/services/fraudTrigger.service.ts`: shared fraud evaluation extracted so both `transactions` and `gateway` modules trigger fraud cases through the same path
+
 ---
 
 ## 10. Feature Requirements
@@ -811,6 +846,7 @@ The following is a high-level summary. Refer to the roadmap for the full specifi
 | **v2** | Role selector (Level 1 / Level 2 / Auditor), escalation workflow, audit trail timeline | RBAC middleware, escalation endpoint, audit log queries, range queries on amount |
 | **v3** | AI draft inline in case detail, agent confidence indicator, agent action log | Magenta agent integration, structured draft diagnosis output |
 | **v4** | Save card / recurring payment flow, performance comparison panel | Tokenization endpoint, query-timing diagnostic endpoint, Leafy Bank API contracts |
+| **v5** | Simulator step 0 (merchant creates payment intent), merchant profile panel in fraud case detail, merchant portal in Application Mode | Backend modular refactor (BIAN SD modules), gateway API (`/gateway/payments`, `/merchants`, `/gateway/tokens`), 3 new collections (merchantAgreement · paymentOrder · tokenVault), merchant seed data |
 
 See [docs/roadmap.md](roadmap.md) for the complete FR and NFR specification with acceptance criteria per iteration.
 

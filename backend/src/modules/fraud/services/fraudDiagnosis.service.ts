@@ -5,8 +5,9 @@ import {
   FRAUD_DIAGNOSIS_EVENTS_COLLECTION,
   FraudDiagnosisControlRecord,
   FraudDiagnosisCaseEventRecord,
-  RiskSeverity,
-} from '../models';
+} from '../models/fraudDiagnosis.model';
+import { RiskSeverity } from '../../../shared/models/risk.model';
+import { TransactionSnapshot } from '../../../shared/models/transaction.model';
 
 let caseCounter = 1000;
 
@@ -20,7 +21,7 @@ export async function createFraudCase(
   customerRef: string,
   riskIndicators: string[],
   severity: RiskSeverity,
-  transactionSnapshot: FraudDiagnosisControlRecord['transactionSnapshot']
+  transactionSnapshot: TransactionSnapshot
 ) {
   const caseId = uuidv4();
   const now = new Date();
@@ -88,4 +89,30 @@ export async function getCases(
 export async function getCaseById(db: Db, id: string) {
   return db.collection<FraudDiagnosisControlRecord>(FRAUD_DIAGNOSIS_COLLECTION)
     .findOne({ fraudDiagnosisInstanceReference: id });
+}
+
+export async function updateCase(
+  db: Db,
+  id: string,
+  patch: {
+    fraudDiagnosisCaseStatus?: FraudDiagnosisControlRecord['fraudDiagnosisCaseStatus'];
+    caseNotes?: string;
+    fraudDiagnosisAnalystInstanceReference?: string;
+  }
+) {
+  const now = new Date();
+  const result = await db.collection(FRAUD_DIAGNOSIS_COLLECTION).findOneAndUpdate(
+    { fraudDiagnosisInstanceReference: id },
+    { $set: { ...patch, recordUpdatedDateTime: now } },
+    { returnDocument: 'after' }
+  );
+  return result ?? null;
+}
+
+export async function getCaseEvents(db: Db, caseId: string) {
+  const events = await db.collection<FraudDiagnosisCaseEventRecord>(FRAUD_DIAGNOSIS_EVENTS_COLLECTION)
+    .find({ fraudDiagnosisInstanceReference: caseId })
+    .sort({ actionDateTime: 1 })
+    .toArray();
+  return { caseId, events };
 }

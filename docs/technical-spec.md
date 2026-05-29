@@ -694,9 +694,11 @@ Role is passed via `X-Demo-Role` header (v2+). Omitted defaults to `level1_analy
 
 ---
 
-### 6.1 Card Transactions
+### 6.1 Transactions — `module: transactions` (SD-254 · SD-88)
 
-#### `POST /card-transactions`
+> Base path: `/api/v1/transactions`
+
+#### `POST /transactions`
 
 Creates a transaction and optionally a fraud case.
 
@@ -727,7 +729,7 @@ Creates a transaction and optionally a fraud case.
 
 ---
 
-#### `GET /card-transactions/:id`
+#### `GET /transactions/:id`
 
 Returns transaction by ID (no QE field values returned to Level 1).
 
@@ -746,7 +748,7 @@ Returns transaction by ID (no QE field values returned to Level 1).
 
 ---
 
-#### `GET /card-transactions?cardToken=<value>`
+#### `GET /transactions?cardToken=<value>`
 
 Standard index query on `paymentCardReference` (plaintext field: token is a card surrogate, not CHD under PCI DSS v4.0).
 
@@ -760,11 +762,13 @@ Standard index query on `paymentCardReference` (plaintext field: token is a card
 
 ---
 
-### 6.2 Customer Agreements
+### 6.2 Customer — `module: customer` (SD-53)
 
-#### `GET /customer-agreements?email=<value>`
-#### `GET /customer-agreements?phone=<value>`
-#### `GET /customer-agreements?accountRef=<value>`
+> Base path: `/api/v1/customer`
+
+#### `GET /customer?email=<value>`
+#### `GET /customer?phone=<value>`
+#### `GET /customer?accountRef=<value>`
 
 QE equality search on the corresponding encrypted field.
 
@@ -782,9 +786,11 @@ QE equality search on the corresponding encrypted field.
 
 ---
 
-### 6.3 Payment Cards
+### 6.3 Cards — `module: customer` (SD-88)
 
-#### `POST /payment-cards`
+> Base path: `/api/v1/customer/:customerId/cards` — cards as sub-resource of Customer Agreement (SD-53)
+
+#### `POST /customer/:customerId/cards`
 
 Registers a tokenized card linked to a customer agreement.
 
@@ -810,7 +816,7 @@ Registers a tokenized card linked to a customer agreement.
 
 ---
 
-#### `GET /payment-cards?customerRef=<customerAgreementInstanceReference>`
+#### `GET /customer/:customerId/cards`
 
 Returns cards linked to a customer (plaintext lookup by FK).
 
@@ -831,9 +837,11 @@ Returns cards linked to a customer (plaintext lookup by FK).
 
 ---
 
-### 6.4 Fraud Diagnosis Cases
+### 6.4 Fraud — `module: fraud` (SD-83)
 
-#### `GET /fraud-diagnosis-cases`
+> Base path: `/api/v1/fraud`
+
+#### `GET /fraud`
 
 **Query params:** `status`, `severity`, `page` (default 1), `limit` (default 20)
 
@@ -849,7 +857,7 @@ Returns cards linked to a customer (plaintext lookup by FK).
 
 ---
 
-#### `GET /fraud-diagnosis-cases/:id`
+#### `GET /fraud/:id`
 
 **Response 200:**
 ```json
@@ -868,7 +876,7 @@ Returns cards linked to a customer (plaintext lookup by FK).
 
 ---
 
-#### `POST /fraud-diagnosis-cases/:id/escalate` *(v2)*
+#### `POST /fraud/:id/escalate` *(v2)*
 
 **Request header:** `X-Demo-Role: level1_analyst`
 
@@ -883,9 +891,11 @@ Returns cards linked to a customer (plaintext lookup by FK).
 
 ---
 
-### 6.5 Audit Events *(v2)*
+### 6.5 Fraud — Audit Events *(v2)*
 
-#### `GET /audit-events?caseId=<id>`
+> Nested under `/api/v1/fraud/:id/events` (module: fraud)
+
+#### `GET /fraud/:id/events`
 
 **Response 200:**
 ```json
@@ -1121,72 +1131,133 @@ Passwords are stored as bcrypt hashes (12 rounds). Plaintext passwords are in `.
 
 ## 9. Backend Source Structure
 
+The backend uses a **domain-module layout** aligned with BIAN Service Domains. See [engineering-proposal.md §3.8](engineering-proposal.md#38-backend-module-architecture-and-bian-map) for the full BIAN module map, shared/vendors boundary rules, and dependency graph.
+
 ```
 backend/
 ├── bin/
-│   ├── setup.ts                         # Calls src/vendors/setup/runSetup()
-│   └── seed.ts                          # Calls src/vendors/seed/runSeed()
-├── data/                                # JSON seed files (consumed by bin/seed.ts only)
+│   ├── setup.ts                    # thin wrapper → src/vendors/setup/runSetup()
+│   └── seed.ts                     # thin wrapper → src/vendors/seed/runSeed()
+│
+├── data/                           # JSON seed files (consumed by bin/seed.ts only)
 │   ├── users.json
 │   ├── customerAgreements.json
 │   ├── customerAgreementsSensitive.json
 │   ├── paymentCards.json
 │   ├── cardTransactions.json
 │   ├── cardTransactionsSensitive.json
-│   └── fraudCases.json
-├── src/
-├── controllers/
-│   ├── auth.controller.ts
-│   ├── cardTransaction.controller.ts
-│   ├── customerAgreement.controller.ts
-│   ├── paymentCard.controller.ts
-│   ├── fraudDiagnosis.controller.ts
-│   └── demo.controller.ts               # Raw document endpoint (non-prod only)
+│   ├── fraudCases.json
+│   └── merchants.json              # [v5] seed data for merchantAgreement collection
 │
-├── services/
-│   ├── auth.service.ts                  # JWT sign/verify, bcrypt compare
-│   ├── cardTransaction.service.ts
-│   ├── customerAgreement.service.ts
-│   ├── paymentCard.service.ts
-│   └── fraudDiagnosis.service.ts
-│
-├── models/
-│   ├── partyAuthentication.model.ts     # BIAN SD-16
-│   ├── cardTransaction.model.ts         # BIAN SD-254
-│   ├── customerAgreement.model.ts       # BIAN SD-53
-│   ├── paymentCard.model.ts             # BIAN SD-88
-│   └── fraudDiagnosis.model.ts          # BIAN SD-83
-│
-├── vendors/
-│   ├── encryption/
-│   │   ├── qeClient.ts                  # MongoClient with autoEncryption
-│   │   ├── rawClient.ts                 # Plain MongoClient (no decryption)
-│   │   ├── kms.ts                       # buildKmsProviders(), buildCmkOptions()
-│   │   ├── keyVault.ts                  # provisionDataEncryptionKeys()
-│   │   └── encryptedFieldsMaps.ts       # buildEncryptedFieldsMaps()
-│   ├── setup/
-│   │   ├── index.ts                     # runSetup(): orchestrates all setup steps
-│   │   ├── createCollections.ts         # createEncryptedCollection() calls
-│   │   ├── createIndexes.ts             # all index definitions
-│   │   └── provisionDEKs.ts             # DEK-lookup + DEK-sensitive
-│   └── seed/
-│       ├── index.ts                     # runSeed(): orchestrates all seed steps
-│       ├── seedUsers.ts                 # partyAuthentication upserts
-│       ├── seedCustomers.ts             # customerAgreement + sensitive upserts
-│       ├── seedCards.ts                 # paymentCard upserts
-│       ├── seedTransactions.ts          # cardTransaction + sensitive upserts
-│       └── seedCases.ts                 # fraudDiagnosisCase upserts
-│
-├── middleware/
-│   ├── auth.ts                          # JWT verification: reads Authorization header
-│   └── rbac.ts                          # Role enforcement: gates sensitive collections
-│
-├── plugins/
-│   ├── mongodb.ts                       # Fastify plugin: registers QE client
-│   └── cors.ts
-│
-└── server.ts                            # Fastify app setup + route registration
+└── src/
+    │
+    ├── shared/                     # Business logic shared by 2+ modules
+    │   ├── models/
+    │   │   ├── risk.model.ts       # RiskSeverity · FraudTriggerInput
+    │   │   ├── identity.model.ts   # UserRole · AnalystRole · JwtDemoPayload
+    │   │   └── transaction.model.ts # TransactionSnapshot (defined in fraud, built in transactions)
+    │   └── services/
+    │       └── fraudTrigger.service.ts  # [v5] triggerFraudEvaluation() — shared when gateway also triggers fraud
+    │
+    ├── vendors/                    # Infrastructure shared by all modules (no business logic)
+    │   ├── encryption/
+    │   │   ├── qeClient.ts         # MongoClient with autoEncryption (QE)
+    │   │   ├── rawClient.ts        # Plain MongoClient (ciphertext view for simulator toggle)
+    │   │   ├── kms.ts              # buildKmsProviders() · buildCmkOptions()
+    │   │   ├── keyVault.ts         # provisionDataEncryptionKeys(): DEK-lookup + DEK-sensitive
+    │   │   └── encryptedFieldsMaps.ts  # buildEncryptedFieldsMaps(): QE schemas for all collections
+    │   ├── middleware/
+    │   │   ├── auth.ts             # JWT verification (Fastify preHandler, all routes)
+    │   │   └── rbac.ts             # Role enforcement (Fastify preHandler, protected routes)
+    │   ├── setup/
+    │   │   ├── index.ts            # runSetup(): orchestrates all setup steps
+    │   │   ├── createCollections.ts
+    │   │   ├── createIndexes.ts
+    │   │   └── provisionDEKs.ts
+    │   └── seed/
+    │       ├── index.ts            # runSeed(): orchestrates all seed steps
+    │       ├── seedUsers.ts
+    │       ├── seedCustomers.ts
+    │       ├── seedCards.ts
+    │       ├── seedTransactions.ts
+    │       ├── seedCases.ts
+    │       └── seedMerchants.ts    # [v5]
+    │
+    ├── modules/                    # Domain modules — one per BIAN SD cluster
+    │   │
+    │   ├── identity/               # BIAN SD-16: Party Authentication
+    │   │   ├── controllers/
+    │   │   │   └── auth.controller.ts
+    │   │   ├── services/
+    │   │   │   └── auth.service.ts         # JWT sign/verify, bcrypt compare
+    │   │   ├── models/
+    │   │   │   └── partyAuthentication.model.ts
+    │   │   └── index.ts                    # Fastify plugin → /auth/login
+    │   │
+    │   ├── customer/               # BIAN SD-53: Customer Agreement
+    │   │   ├── controllers/
+    │   │   │   └── customerAgreement.controller.ts
+    │   │   ├── services/
+    │   │   │   └── customerAgreement.service.ts  # QE equality search (email/phone/accountRef)
+    │   │   ├── models/
+    │   │   │   └── customerAgreement.model.ts
+    │   │   └── index.ts                    # Fastify plugin → /customer + /customer/:id/cards
+    │   │
+    │   ├── transactions/           # BIAN SD-254: Card Transaction · SD-88: Payment Card
+    │   │   ├── controllers/
+    │   │   │   ├── cardTransaction.controller.ts
+    │   │   │   └── paymentCard.controller.ts
+    │   │   ├── services/
+    │   │   │   ├── cardTransaction.service.ts   # writes QE fields; imports createFraudCase from fraud/
+    │   │   │   └── paymentCard.service.ts
+    │   │   ├── models/
+    │   │   │   ├── cardTransaction.model.ts
+    │   │   │   └── paymentCard.model.ts
+    │   │   └── index.ts                    # Fastify plugin → /transactions
+    │   │
+    │   ├── fraud/                  # BIAN SD-83: Fraud Diagnosis
+    │   │   ├── controllers/
+    │   │   │   └── fraudDiagnosis.controller.ts
+    │   │   ├── services/
+    │   │   │   └── fraudDiagnosis.service.ts    # createFraudCase(); getCases(); getCaseById()
+    │   │   ├── models/
+    │   │   │   └── fraudDiagnosis.model.ts
+    │   │   └── index.ts                    # Fastify plugin → /fraud (+ /fraud/:id/events in v2)
+    │   │
+    │   ├── gateway/                # [v5] BIAN SD-64+SD-65+SD-89+SD-57
+    │   │   ├── controllers/
+    │   │   │   ├── merchant.controller.ts
+    │   │   │   ├── payment.controller.ts    # /gateway/payments lifecycle
+    │   │   │   ├── token.controller.ts
+    │   │   │   └── webhook.controller.ts
+    │   │   ├── services/
+    │   │   │   ├── merchant.service.ts      # SD-89: merchant CRUD + limit validation
+    │   │   │   ├── paymentOrder.service.ts  # SD-64: initiated→authorized→captured→settled
+    │   │   │   ├── routing.service.ts       # SD-65: simulated processor routing
+    │   │   │   ├── tokenization.service.ts  # SD-57: token vault operations
+    │   │   │   └── webhook.service.ts       # webhook delivery + retry
+    │   │   ├── models/
+    │   │   │   ├── merchantAgreement.model.ts   # SD-89: MCC, limits, settlement config
+    │   │   │   ├── paymentOrder.model.ts         # SD-64: payment intent lifecycle
+    │   │   │   └── tokenVault.model.ts           # SD-57: token references
+    │   │   └── index.ts                    # Fastify plugin → /gateway/*
+    │   │
+    │   └── system/                 # Demo infrastructure (non-BIAN)
+    │       ├── controllers/
+    │       │   └── demo.controller.ts       # raw-document endpoint + diagnostics
+    │       └── index.ts                    # Registered only when NODE_ENV !== 'production'
+    │
+    ├── plugins/
+    │   ├── mongodb.ts              # Fastify plugin: registers QE client on fastify.db
+    │   ├── swagger.ts
+    │   └── cors.ts
+    │
+    └── server.ts                   # Registers shared schemas, plugins, middleware, and all modules
 ```
+
+**Cross-module dependency rule:** `transactions` imports `createFraudCase` from `modules/fraud/` directly (permanent, unidirectional). All other cross-module dependencies are types from `shared/models/` (no runtime cost). In v5, `shared/services/fraudTrigger.service.ts` is introduced when `gateway` becomes a second caller of fraud case creation.
+
+**API URL semantics follow REST nesting.** Cards (SD-88) are a sub-resource of Customer Agreement (SD-53): `/api/v1/customer/:id/cards`. Other resources are top-level: `/api/v1/transactions` (SD-254), `/api/v1/fraud` (SD-83), `/api/v1/auth` (SD-16).
 
 `backend/bin/setup.ts` and `backend/bin/seed.ts` are thin wrappers inside the backend package:
 

@@ -5,8 +5,8 @@ import {
   CARD_TRANSACTION_SENSITIVE_COLLECTION,
   CardTransactionLogControlRecord,
   CardTransactionSensitiveRecord,
-} from '../models';
-import { createFraudCase } from './fraudDiagnosis.service';
+} from '../models/cardTransaction.model';
+import { createFraudCase } from '../../fraud/services/fraudDiagnosis.service';
 
 export interface CreateTransactionInput {
   cardToken: string;
@@ -99,7 +99,6 @@ export async function getTransactionById(db: Db, id: string) {
 
   if (!txn) return null;
 
-  // Level 1 response: no QE fields echoed back
   return {
     cardTransactionInstanceReference: txn.cardTransactionInstanceReference,
     cardTransactionAmount: txn.cardTransactionAmount,

@@ -2,7 +2,7 @@ import { Db } from 'mongodb';
 import {
   CUSTOMER_AGREEMENT_COLLECTION,
   CustomerAgreementControlRecord,
-} from '../models';
+} from '../models/customerAgreement.model';
 
 function stripQEFields(agreement: CustomerAgreementControlRecord) {
   // Encrypted fields are used only as search predicates; never echoed back
