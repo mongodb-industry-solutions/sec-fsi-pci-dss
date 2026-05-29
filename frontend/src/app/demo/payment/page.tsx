@@ -31,7 +31,7 @@ export default function DemoPaymentPage() {
   async function handleConfirm() {
     setSubmitting(true);
     try {
-      const res = await api.cardTransactions.create({
+      const res = await api.transactions.create({
         cardToken,
         accountReference: `ACC-DEMO-${Date.now().toString(36).toUpperCase()}`,
         amount: parseFloat(amount),

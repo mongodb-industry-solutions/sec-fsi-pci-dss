@@ -17,13 +17,13 @@ export default function DemoCaseDetailPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.fraudCases.getById(caseId, token).then(setFraudCase).finally(() => setLoading(false));
+    api.fraud.getById(caseId, token).then(setFraudCase).finally(() => setLoading(false));
   }, [caseId, token]);
 
   async function toggleRaw() {
     if (!showRaw && !rawDoc && fraudCase) {
       try {
-        const res = await api.demo.rawDocument('cardTransaction', fraudCase.linkedCardTransactionReference, token);
+        const res = await api.system.rawDocument('cardTransaction', fraudCase.linkedCardTransactionReference, token);
         setRawDoc(res.document);
       } catch { /* non-prod endpoint unavailable */ }
     }

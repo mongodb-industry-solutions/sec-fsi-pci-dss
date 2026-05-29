@@ -157,7 +157,7 @@ export const api = {
       apiFetch<FraudCase>(`/api/v1/fraud/${id}`, {}, token),
   },
 
-  demo: {
+  system: {
     rawDocument: (collection: string, id: string, token: string) =>
       apiFetch<RawDocumentResponse>(
         `/api/v1/system/raw/${collection}/${id}`, {}, token

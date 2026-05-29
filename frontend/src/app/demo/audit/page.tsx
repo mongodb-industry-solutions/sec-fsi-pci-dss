@@ -11,7 +11,7 @@ export default function AuditPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.fraudCases.list({ limit: 50 }, token)
+    api.fraud.list({ limit: 50 }, token)
       .then((res) => setCases(res.results))
       .finally(() => setLoading(false));
   }, [token]);
