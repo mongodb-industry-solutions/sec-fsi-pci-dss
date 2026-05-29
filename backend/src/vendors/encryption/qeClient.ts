@@ -2,6 +2,7 @@ import { MongoClient } from 'mongodb';
 import { buildKmsProviders } from './kms';
 import { buildEncryptedFieldsMaps } from './encryptedFieldsMaps';
 import { provisionDataEncryptionKeys } from './keyVault';
+import { resolveCryptLibOptions } from './cryptLib';
 
 const KEY_VAULT_NAMESPACE = 'encryption.__keyVault';
 let _client: MongoClient | null = null;
@@ -17,6 +18,7 @@ export async function getQEClient(): Promise<MongoClient> {
 
   const encryptedFieldsMap = buildEncryptedFieldsMaps(deks);
   const dbName = process.env.MONGODB_DB_NAME!;
+  const cryptLib = resolveCryptLibOptions();
 
   _client = new MongoClient(process.env.MONGODB_URI!, {
     autoEncryption: {
@@ -30,7 +32,10 @@ export async function getQEClient(): Promise<MongoClient> {
         [`${dbName}.paymentCard`]:                 encryptedFieldsMap.paymentCard,
         [`${dbName}.partyAuthentication`]:         encryptedFieldsMap.partyAuthentication,
       },
-      extraOptions: { cryptSharedLibRequired: true },
+      extraOptions: {
+        ...(cryptLib.cryptSharedLibPath && { cryptSharedLibPath: cryptLib.cryptSharedLibPath }),
+        cryptSharedLibRequired: cryptLib.cryptSharedLibRequired,
+      },
     },
   });
 

@@ -1049,8 +1049,24 @@ AWS_CMK_ARN=arn:aws:kms:us-east-1:<account>:key/<key-id>
 KMS_PROVIDER=aws                # 'aws' | 'local'
 
 # ── Local KMS (offline / docker-compose dev only) ─────────────────
-# Generate with: node -e "require('crypto').randomBytes(96).toString('base64')"
+# Generate with: npm run setup:key  (creates a 96-byte base64 key)
 LOCAL_MASTER_KEY_BASE64=
+
+# ── MongoDB QE Shared Library ─────────────────────────────────────
+# Optional explicit path to mongo_crypt_v1 shared library.
+# If omitted, the backend tries common default paths automatically.
+# If not found anywhere, set this variable after downloading the library:
+#
+#   Download: https://www.mongodb.com/try/download/enterprise
+#   → Select your platform → "Cryptography Library (crypt_shared)"
+#
+# Windows default after install:
+#   MONGODB_CRYPT_SHARED_LIB_PATH=C:/Program Files/MongoDB/Shared Library/bin/mongo_crypt_v1.dll
+# macOS:
+#   MONGODB_CRYPT_SHARED_LIB_PATH=/usr/local/lib/mongo_crypt_v1.dylib
+# Linux:
+#   MONGODB_CRYPT_SHARED_LIB_PATH=/usr/lib/mongo_crypt_v1.so
+MONGODB_CRYPT_SHARED_LIB_PATH=
 
 # ── Backend (Fastify) ─────────────────────────────────────────────
 API_PORT=3001
