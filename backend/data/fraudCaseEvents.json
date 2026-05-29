@@ -1,0 +1,222 @@
+[
+  {
+    "fraudDiagnosisInstanceReference": "c08292cf-39f4-4ac9-8d89-7784dfcd68d9",
+    "actionDateTime": "2026-05-21T00:50:09.504Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "high_risk_mcc"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "b361e999-37aa-4290-9980-164d8b288657",
+    "actionDateTime": "2026-05-20T08:54:01.228Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "high_risk_mcc"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "1d5ca4b5-8038-4b98-a002-dd4efc1a0040",
+    "actionDateTime": "2026-05-20T03:29:35.900Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "high_risk_mcc"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "c460f542-bd31-491d-97d1-8173b7e43eb3",
+    "actionDateTime": "2026-05-11T14:54:38.361Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "manual_review"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "5b3b7a60-fa68-4255-9073-c8e570e621f0",
+    "actionDateTime": "2026-05-06T20:01:09.846Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "amount_threshold"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "ca1afa2e-0ad3-4f05-b5f0-b74b2ba35c93",
+    "actionDateTime": "2026-04-30T07:47:39.023Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "manual_review"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "bc08415b-67e1-48aa-aabb-8bc1c07e2172",
+    "actionDateTime": "2026-05-20T13:47:24.181Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "amount_threshold"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "3a9ff6e2-d2ad-491e-a83d-39fcb9422f9c",
+    "actionDateTime": "2026-05-16T08:59:03.499Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "amount_threshold"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "d05683c0-7d04-4f36-b35b-f9511f1bf931",
+    "actionDateTime": "2026-05-19T09:43:29.736Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "amount_threshold"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "25eae091-2d90-41a6-b25f-590026320834",
+    "actionDateTime": "2026-05-12T11:06:38.684Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "amount_threshold"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "52765a01-a4e9-4bed-80a3-8e80c3a7d2a2",
+    "actionDateTime": "2026-05-25T23:39:21.626Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "amount_threshold"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "2ed9eaeb-2348-4be6-a85f-833d3050d3f0",
+    "actionDateTime": "2026-05-25T15:37:26.934Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "amount_threshold"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "d450fb14-ddc7-4455-927f-b4e7bdeaea1e",
+    "actionDateTime": "2026-05-26T10:19:47.557Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "manual_review"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "1b7ed9a2-e39d-42bb-8b6a-fd7e1ae248f2",
+    "actionDateTime": "2026-05-20T23:57:09.963Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "amount_threshold"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "bbf72422-4190-45fb-ab1d-a2640fcca740",
+    "actionDateTime": "2026-05-28T22:59:38.496Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "manual_review"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "858578fc-fb87-4ffc-b588-94e3f2dd6e07",
+    "actionDateTime": "2026-05-19T21:01:29.610Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "amount_threshold"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "28bab209-fe8c-4261-aa05-e10ec68aec0b",
+    "actionDateTime": "2026-05-12T19:01:10.037Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "high_risk_mcc"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "64f0f7ed-6f22-4041-8074-f984a9a40dd2",
+    "actionDateTime": "2026-05-04T13:15:31.084Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "amount_threshold"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "11f1b1e9-f9bd-448e-a555-7f410cf54f5b",
+    "actionDateTime": "2026-05-01T02:53:10.961Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "high_risk_mcc"
+    },
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "43251c33-7683-4b3b-8922-1ffdbef4a706",
+    "actionDateTime": "2026-05-27T01:01:16.044Z",
+    "actionType": "case_opened",
+    "performedByInstanceReference": "system",
+    "performedByRole": "payment_service",
+    "actionDetails": {
+      "trigger": "manual_review"
+    },
+    "schemaVersion": 1
+  }
+]
