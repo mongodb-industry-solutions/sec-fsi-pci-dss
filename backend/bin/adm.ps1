@@ -13,6 +13,21 @@ function run {
     & $Block
 }
 
+function Get-RepoContext {
+    param([string]$Prompt = "Repository owner/repo (leave empty to detect from git remote)")
+    $repoInput = Read-Host $Prompt
+    if ($repoInput.Trim() -ne "") {
+        return @{ Name = $repoInput.Trim(); Flag = @("--repo", $repoInput.Trim()) }
+    }
+    $gitUrl = & git remote get-url origin 2>&1
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrEmpty("$gitUrl")) {
+        fail "Could not detect repo from git remote. Specify owner/repo manually."
+        return $null
+    }
+    $name = "$gitUrl".Trim() -replace "^git@github\.com:", "" -replace "^https://github\.com/", "" -replace "\.git$", "" -replace "/$", ""
+    return @{ Name = $name; Flag = @() }
+}
+
 # ---- Dependency checks -------------------------------------
 
 function Ensure-ExecutionPolicy {
@@ -262,10 +277,12 @@ function Invoke-ListPRs {
     Write-Host ""
     if ($RepoInput.Trim() -ne "") {
         Write-Host "Pull requests targeting '$BaseBranch' in $($RepoInput.Trim()):"
-        run { gh pr list --repo $RepoInput.Trim() --base $BaseBranch }
+        Write-Host "[cmd]    gh pr list --repo $($RepoInput.Trim()) --base $BaseBranch"
+        gh pr list --repo $RepoInput.Trim() --base $BaseBranch
     } else {
         Write-Host "Pull requests targeting '$BaseBranch' in current repo:"
-        run { gh pr list --base $BaseBranch }
+        Write-Host "[cmd]    gh pr list --base $BaseBranch"
+        gh pr list --base $BaseBranch
     }
 }
 
@@ -380,6 +397,247 @@ function Invoke-MergePR {
     }
 }
 
+# ---- Option 7: Bypass rulesets and force merge -------------
+
+function Invoke-BypassMerge {
+    Write-Host ""
+    chk "GitHub CLI authentication..."
+    Write-Host "[cmd]    gh auth status"
+    gh auth status 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        fail "Not authenticated with GitHub CLI. Run option 2 first."
+        return
+    }
+    ok "Authenticated."
+
+    $ctx = Get-RepoContext
+    if ($null -eq $ctx) { return }
+    $RepoFlag = $ctx.Flag
+    $RepoName = $ctx.Name
+
+    Write-Host ""
+    Write-Host "[cmd]    gh api repos/$RepoName/rulesets"
+    $raw = & gh api repos/$RepoName/rulesets 2>&1
+    if ($LASTEXITCODE -ne 0) { fail "API error: $raw"; return }
+    $rulesets = $raw | ConvertFrom-Json
+    if (-not $rulesets -or $rulesets.Count -eq 0) {
+        warn "No rulesets found for $RepoName."
+        return
+    }
+
+    Write-Host ""
+    Write-Host "Active rulesets:"
+    Write-Host "------------------------------------------------------------"
+    $rulesets | ForEach-Object { Write-Host "  [$($_.id)] $($_.name) - enforcement: $($_.enforcement)" }
+    Write-Host "------------------------------------------------------------"
+
+    $PRInput = Read-Host "PR number to merge"
+    if ($PRInput.Trim() -eq "") { Write-Host "Cancelled."; return }
+
+    Write-Host ""
+    Write-Host "Merge strategy (merge commits are often disabled - squash is safer):"
+    Write-Host "  1. squash  - squash all commits into one (default)"
+    Write-Host "  2. rebase  - rebase commits onto base branch"
+    Write-Host "  3. merge   - standard merge commit"
+    $stratInput = Read-Host "Strategy (default: 1)"
+    $strategy = switch ($stratInput.Trim()) {
+        "2" { "--rebase" }
+        "3" { "--merge" }
+        default { "--squash" }
+    }
+
+    Write-Host ""
+    $confirm = Read-Host "Disable ALL rulesets, merge PR #$($PRInput.Trim()) [$($strategy.TrimStart('-'))], then re-enable rulesets? (y/N)"
+    if ($confirm.Trim().ToLower() -ne "y") { Write-Host "Cancelled."; return }
+
+    # Disable all active rulesets
+    $disabledRulesets = @()
+    foreach ($rs in $rulesets) {
+        if ($rs.enforcement -ne "disabled") {
+            $result = Invoke-RulesetPut -Ruleset $rs -RepoName $RepoName -State "disabled"
+            if ($result.Ok) {
+                $disabledRulesets += $rs
+                ok "Ruleset '$($rs.name)' disabled."
+            } else {
+                warn "Could not disable '$($rs.name)': $($result.Output)"
+            }
+        }
+    }
+
+    # Merge
+    $mergeArgs = @($PRInput.Trim()) + $RepoFlag + @($strategy, "--delete-branch")
+    Write-Host "[cmd]    gh pr merge $($mergeArgs -join ' ')"
+    $mergeOutput = & gh pr merge @mergeArgs 2>&1
+    $mergeOutput | Write-Host
+    $mergeOk = $LASTEXITCODE -eq 0
+
+    # Re-enable rulesets (always, even if merge failed)
+    foreach ($rs in $disabledRulesets) {
+        $result = Invoke-RulesetPut -Ruleset $rs -RepoName $RepoName -State "active"
+        if ($result.Ok) { ok "Ruleset '$($rs.name)' re-enabled." } else { warn "Could not re-enable '$($rs.name)'." }
+    }
+
+    if ($mergeOk) {
+        ok "PR #$($PRInput.Trim()) merged successfully."
+        Write-Host ""
+        Write-Host "[cmd]    gh pr view $($PRInput.Trim()) --json state,mergedAt,mergedBy,title $($RepoFlag -join ' ')"
+        & gh pr view $PRInput.Trim() @RepoFlag --json state,mergedAt,mergedBy,title |
+            ConvertFrom-Json |
+            ForEach-Object {
+                Write-Host "  state    : $($_.state)"
+                Write-Host "  title    : $($_.title)"
+                Write-Host "  mergedAt : $($_.mergedAt)"
+                Write-Host "  mergedBy : $($_.mergedBy.login)"
+            }
+    } else {
+        fail "Merge failed even after bypassing rulesets. Check the output above."
+    }
+}
+
+# ---- Option 8: List pending conversations ------------------
+
+function Invoke-ListConversations {
+    Write-Host ""
+    $ctx = Get-RepoContext
+    if ($null -eq $ctx) { return }
+    $prNum = (Read-Host "PR number").Trim()
+    if ($prNum -eq "") { Write-Host "Cancelled."; return }
+
+    $owner, $repoOnly = $ctx.Name -split "/", 2
+    $gqlQuery = 'query($owner:String!,$name:String!,$num:Int!){repository(owner:$owner,name:$name){pullRequest(number:$num){reviewThreads(first:50){nodes{id isResolved comments(first:1){nodes{body author{login}}}}}}}}'
+    Write-Host "[cmd]    gh api graphql -f query=<reviewThreads> -f owner=$owner -f name=$repoOnly -F num=$prNum"
+    $raw = & gh api graphql -f query=$gqlQuery -f owner=$owner -f name=$repoOnly -F num=$([int]$prNum) 2>&1
+    if ($LASTEXITCODE -ne 0) { fail "GraphQL error: $raw"; return }
+
+    $threads = ($raw | ConvertFrom-Json).data.repository.pullRequest.reviewThreads.nodes
+    $pending = $threads | Where-Object { -not $_.isResolved }
+
+    if ($pending.Count -eq 0) { ok "No pending conversations in PR #$prNum."; return }
+
+    Write-Host ""
+    Write-Host "Pending conversations in PR #$prNum ($($pending.Count) unresolved):"
+    Write-Host "------------------------------------------------------------"
+    foreach ($t in $pending) {
+        $c = $t.comments.nodes[0]
+        $preview = if ($c.body.Length -gt 120) { $c.body.Substring(0, 120) + "..." } else { $c.body }
+        Write-Host "  ID     : $($t.id)"
+        Write-Host "  Author : $($c.author.login)"
+        Write-Host "  Comment: $preview"
+        Write-Host ""
+    }
+    Write-Host "------------------------------------------------------------"
+}
+
+# ---- Option 9: Resolve a conversation ----------------------
+
+function Invoke-ResolveConversation {
+    Write-Host ""
+    $ctx = Get-RepoContext
+    if ($null -eq $ctx) { return }
+    $prNum = (Read-Host "PR number").Trim()
+    if ($prNum -eq "") { Write-Host "Cancelled."; return }
+
+    $owner, $repoOnly = $ctx.Name -split "/", 2
+    $gqlQuery = 'query($owner:String!,$name:String!,$num:Int!){repository(owner:$owner,name:$name){pullRequest(number:$num){reviewThreads(first:50){nodes{id isResolved comments(first:1){nodes{body author{login}}}}}}}}'
+    Write-Host "[cmd]    gh api graphql -f query=<reviewThreads> -f owner=$owner -f name=$repoOnly -F num=$prNum"
+    $raw = & gh api graphql -f query=$gqlQuery -f owner=$owner -f name=$repoOnly -F num=$([int]$prNum) 2>&1
+    if ($LASTEXITCODE -ne 0) { fail "GraphQL error: $raw"; return }
+
+    $threads = ($raw | ConvertFrom-Json).data.repository.pullRequest.reviewThreads.nodes
+    $pending = $threads | Where-Object { -not $_.isResolved }
+
+    if ($pending.Count -eq 0) { ok "No pending conversations in PR #$prNum."; return }
+
+    Write-Host ""
+    foreach ($t in $pending) {
+        $c = $t.comments.nodes[0]
+        $preview = if ($c.body.Length -gt 80) { $c.body.Substring(0, 80) + "..." } else { $c.body }
+        Write-Host "  $($t.id)  |  $($c.author.login): $preview"
+    }
+    Write-Host ""
+    $threadId = (Read-Host "Thread ID to resolve (or 'all' to resolve all)").Trim()
+    if ($threadId -eq "") { Write-Host "Cancelled."; return }
+
+    $toResolve = if ($threadId -eq "all") { $pending } else { $pending | Where-Object { $_.id -eq $threadId } }
+    $gqlMutation = 'mutation($tid:ID!){resolveReviewThread(input:{threadId:$tid}){thread{id isResolved}}}'
+    foreach ($t in $toResolve) {
+        Write-Host "[cmd]    gh api graphql -f query=<resolveReviewThread> -f tid=$($t.id)"
+        $res = & gh api graphql -f query=$gqlMutation -f tid=$($t.id) 2>&1
+        if ($LASTEXITCODE -eq 0) { ok "Thread $($t.id) resolved." } else { fail "Failed: $res" }
+    }
+}
+
+# ---- Option 10: List rulesets ------------------------------
+
+function Invoke-ListRulesets {
+    Write-Host ""
+    $ctx = Get-RepoContext
+    if ($null -eq $ctx) { return }
+    Write-Host ""
+    Write-Host "[cmd]    gh api repos/$($ctx.Name)/rulesets"
+    $raw = & gh api repos/$($ctx.Name)/rulesets 2>&1
+    if ($LASTEXITCODE -ne 0) { fail "API error: $raw"; return }
+    $rulesets = $raw | ConvertFrom-Json
+    if ($rulesets.Count -eq 0) { warn "No rulesets found."; return }
+    Write-Host ""
+    Write-Host "Rulesets for $($ctx.Name):"
+    Write-Host "------------------------------------------------------------"
+    $rulesets | ForEach-Object {
+        Write-Host "  [$($_.id)] $($_.name)"
+        Write-Host "       enforcement : $($_.enforcement)"
+        Write-Host "       target      : $($_.target)"
+        Write-Host ""
+    }
+    Write-Host "------------------------------------------------------------"
+}
+
+# ---- Options 11/12: Toggle a specific ruleset --------------
+
+function Invoke-RulesetPut {
+    param($Ruleset, [string]$RepoName, [string]$State)
+    $srcType = if ($Ruleset.PSObject.Properties['source_type']) { $Ruleset.source_type } else { "Repository" }
+    if ($srcType -eq "Organization") {
+        $org = $RepoName -split "/" | Select-Object -First 1
+        $endpoint = "orgs/$org/rulesets/$($Ruleset.id)"
+    } else {
+        $endpoint = "repos/$RepoName/rulesets/$($Ruleset.id)"
+    }
+    Write-Host "[cmd]    gh api --method PUT $endpoint -f enforcement=$State -f name=$($Ruleset.name)"
+    $res = & gh api --method PUT $endpoint -f enforcement=$State -f name="$($Ruleset.name)" 2>&1
+    return @{ Ok = ($LASTEXITCODE -eq 0); Output = $res }
+}
+
+function Invoke-SetRulesetState {
+    param([string]$TargetState)
+    Write-Host ""
+    $ctx = Get-RepoContext
+    if ($null -eq $ctx) { return }
+
+    Write-Host "[cmd]    gh api repos/$($ctx.Name)/rulesets"
+    $raw = & gh api repos/$($ctx.Name)/rulesets 2>&1
+    if ($LASTEXITCODE -ne 0) { fail "API error: $raw"; return }
+    $rulesets = $raw | ConvertFrom-Json
+
+    Write-Host ""
+    $rulesets | ForEach-Object {
+        $srcLabel = if ($_.PSObject.Properties['source_type']) { $_.source_type } else { "?" }
+        Write-Host "  [$($_.id)] $($_.name) - enforcement: $($_.enforcement) - source: $srcLabel"
+    }
+    Write-Host ""
+    $id = (Read-Host "Ruleset ID to set to '$TargetState'").Trim()
+    if ($id -eq "") { Write-Host "Cancelled."; return }
+
+    $rs = $rulesets | Where-Object { "$($_.id)" -eq $id }
+    $confirm = (Read-Host "Set ruleset '$($rs.name)' to '$TargetState'? (y/N)").Trim().ToLower()
+    if ($confirm -ne "y") { Write-Host "Cancelled."; return }
+
+    $result = Invoke-RulesetPut -Ruleset $rs -RepoName $ctx.Name -State $TargetState
+    if ($result.Ok) { ok "Ruleset '$($rs.name)' is now '$TargetState'." } else { fail "Failed: $($result.Output)" }
+}
+
+function Invoke-DisableRuleset { Invoke-SetRulesetState -TargetState "disabled" }
+function Invoke-EnableRuleset  { Invoke-SetRulesetState -TargetState "active" }
+
 # ============================================================
 #  Bootstrap
 # ============================================================
@@ -409,25 +667,41 @@ do {
     Write-Host "============================================"
     Write-Host " Menu"
     Write-Host "============================================"
-    Write-Host "  1. Create SSH key for GitHub"
-    Write-Host "  2. Authenticate with GitHub CLI (gh auth login)"
-    Write-Host "  3. List pull requests in a project"
-    Write-Host "  4. List SSH keys"
-    Write-Host "  5. Logout / switch GitHub account"
-    Write-Host "  6. Merge a pull request"
-    Write-Host "  0. Exit"
+    Write-Host "  --- SSH & Auth ---"
+    Write-Host "  1.  Create SSH key for GitHub"
+    Write-Host "  2.  Authenticate with GitHub CLI (gh auth login)"
+    Write-Host "  3.  Logout / switch GitHub account"
+    Write-Host "  4.  List SSH keys"
+    Write-Host "  --- Pull Requests ---"
+    Write-Host "  5.  List pull requests"
+    Write-Host "  6.  Merge a pull request"
+    Write-Host "  7.  Force merge (bypass all rulesets temporarily)"
+    Write-Host "  8.  List pending conversations in a PR"
+    Write-Host "  9.  Resolve a conversation in a PR"
+    Write-Host "  --- Rulesets ---"
+    Write-Host "  10. List rulesets"
+    Write-Host "  11. Disable a specific ruleset"
+    Write-Host "  12. Enable a specific ruleset"
+    Write-Host "  --- ---"
+    Write-Host "  0.  Exit"
     Write-Host ""
     $choice = Read-Host "Select an option"
 
     switch ($choice) {
-        "1" { Invoke-CreateSSHKey }
-        "2" { Invoke-GitHubAuth }
-        "3" { Invoke-ListPRs }
-        "4" { Invoke-ListSSHKeys }
-        "5" { Invoke-GitHubLogout }
-        "6" { Invoke-MergePR }
-        "0" { Write-Host ""; Write-Host "Goodbye." }
-        default { warn "Invalid option. Enter 1-6 or 0." }
+        "1"  { Invoke-CreateSSHKey }
+        "2"  { Invoke-GitHubAuth }
+        "3"  { Invoke-GitHubLogout }
+        "4"  { Invoke-ListSSHKeys }
+        "5"  { Invoke-ListPRs }
+        "6"  { Invoke-MergePR }
+        "7"  { Invoke-BypassMerge }
+        "8"  { Invoke-ListConversations }
+        "9"  { Invoke-ResolveConversation }
+        "10" { Invoke-ListRulesets }
+        "11" { Invoke-DisableRuleset }
+        "12" { Invoke-EnableRuleset }
+        "0"  { Write-Host ""; Write-Host "Goodbye." }
+        default { warn "Invalid option. Enter 1-12 or 0." }
     }
 
     if ($choice -ne "0") {

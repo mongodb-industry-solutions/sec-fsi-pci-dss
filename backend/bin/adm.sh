@@ -11,6 +11,18 @@ action() { echo "[action] $1"; }
 chk()    { echo "[check]  $1"; }
 run()    { echo "[cmd]    $*"; "$@"; }
 
+get_repo_name() {
+    local INPUT="$1"
+    if [ -n "$INPUT" ]; then echo "$INPUT"; return 0; fi
+    local URL
+    URL=$(git remote get-url origin 2>/dev/null)
+    if [ -z "$URL" ]; then
+        fail "Could not detect repo from git remote. Specify owner/repo manually."
+        return 1
+    fi
+    echo "$URL" | sed 's|git@github\.com:||;s|https://github\.com/||;s|\.git$||;s|/$||'
+}
+
 # ---- Dependency checks -------------------------------------
 
 ensure_ssh_keygen() {
@@ -182,10 +194,12 @@ list_prs() {
     echo ""
     if [ -n "$REPO_INPUT" ]; then
         echo "Pull requests targeting '$BASE' in $REPO_INPUT:"
-        run gh pr list --repo "$REPO_INPUT" --base "$BASE"
+        echo "[cmd]    gh pr list --repo $REPO_INPUT --base $BASE"
+        gh pr list --repo "$REPO_INPUT" --base "$BASE"
     else
         echo "Pull requests targeting '$BASE' in current repo:"
-        run gh pr list --base "$BASE"
+        echo "[cmd]    gh pr list --base $BASE"
+        gh pr list --base "$BASE"
     fi
 }
 
@@ -359,6 +373,281 @@ merge_pr() {
     fi
 }
 
+# ---- Option 7: Bypass rulesets and force merge -------------
+
+bypass_merge() {
+    echo ""
+    chk "GitHub CLI authentication..."
+    echo "[cmd]    gh auth status"
+    if ! gh auth status &>/dev/null; then
+        fail "Not authenticated with GitHub CLI. Run option 2 first."
+        return
+    fi
+    ok "Authenticated."
+
+    read -rp "Repository owner/repo (leave empty for current directory): " REPO_INPUT
+    REPO_FLAG=()
+    [ -n "$REPO_INPUT" ] && REPO_FLAG=("--repo" "$REPO_INPUT")
+    REPO_NAME=$(get_repo_name "$REPO_INPUT") || return
+
+    echo ""
+    echo "[cmd]    gh api repos/$REPO_NAME/rulesets"
+    RULESETS=$(gh api repos/$REPO_NAME/rulesets 2>&1)
+    if [ -z "$RULESETS" ] || echo "$RULESETS" | grep -q '"message"'; then
+        warn "No rulesets found or access denied for $REPO_NAME."
+        return
+    fi
+
+    echo ""
+    echo "Active rulesets:"
+    echo "------------------------------------------------------------"
+    echo "$RULESETS" | python3 -c "
+import sys,json
+for r in json.load(sys.stdin):
+    print(f\"  [{r['id']}] {r['name']} - enforcement: {r['enforcement']}\")
+" 2>/dev/null || echo "$RULESETS" | grep -E '"id"|"name"|"enforcement"'
+    echo "------------------------------------------------------------"
+
+    read -rp "PR number to merge: " PR_NUMBER
+    [ -z "$PR_NUMBER" ] && echo "Cancelled." && return
+
+    echo ""
+    echo "Merge strategy (merge commits are often disabled - squash is safer):"
+    echo "  1. squash  - squash all commits into one (default)"
+    echo "  2. rebase  - rebase commits onto base branch"
+    echo "  3. merge   - standard merge commit"
+    read -rp "Strategy (default: 1): " STRAT_INPUT
+    case "$STRAT_INPUT" in
+        2) STRATEGY="--rebase" ;;
+        3) STRATEGY="--merge" ;;
+        *) STRATEGY="--squash" ;;
+    esac
+
+    echo ""
+    read -rp "Disable ALL rulesets, merge PR #$PR_NUMBER [${STRATEGY#--}], then re-enable? (y/N): " CONFIRM
+    [[ "${CONFIRM,,}" != "y" ]] && echo "Cancelled." && return
+
+    # Disable all active rulesets (using correct org/repo endpoint)
+    ORG="${REPO_NAME%%/*}"
+    DISABLED_ENTRIES=()
+    while IFS='|' read -r RS_ID RS_NAME RS_SRC_TYPE RS_SOURCE RS_ENF; do
+        if [ -n "$RS_ID" ] && [ "$RS_ENF" != "disabled" ]; then
+            if [ "$RS_SRC_TYPE" = "Organization" ]; then
+                ENDPOINT="orgs/$ORG/rulesets/$RS_ID"
+            else
+                ENDPOINT="repos/$REPO_NAME/rulesets/$RS_ID"
+            fi
+            echo "[cmd]    gh api --method PUT $ENDPOINT -f enforcement=disabled -f name=$RS_NAME"
+            RES=$(gh api --method PUT "$ENDPOINT" -f enforcement=disabled -f name="$RS_NAME" 2>&1)
+            if [ $? -eq 0 ]; then
+                DISABLED_ENTRIES+=("$RS_ID|$RS_NAME|$RS_SRC_TYPE|$ENDPOINT")
+                ok "Ruleset '$RS_NAME' disabled."
+            else
+                warn "Could not disable '$RS_NAME': $RES"
+            fi
+        fi
+    done < <(echo "$RULESETS" | python3 -c "
+import sys,json
+for r in json.load(sys.stdin):
+    print(f\"{r['id']}|{r['name']}|{r.get('source_type','Repository')}|{r.get('source','')}|{r['enforcement']}\")
+" 2>/dev/null)
+
+    # Merge
+    MERGE_ARGS=("$PR_NUMBER" "${REPO_FLAG[@]}" "$STRATEGY" "--delete-branch")
+    echo "[cmd]    gh pr merge ${MERGE_ARGS[*]}"
+    MERGE_OUTPUT=$(gh pr merge "${MERGE_ARGS[@]}" 2>&1)
+    MERGE_EXIT=$?
+    echo "$MERGE_OUTPUT"
+
+    # Re-enable rulesets (always)
+    for entry in "${DISABLED_ENTRIES[@]}"; do
+        RS_ID="${entry%%|*}"
+        rest="${entry#*|}"
+        RS_NAME="${rest%%|*}"
+        rest="${rest#*|}"
+        RS_SRC_TYPE="${rest%%|*}"
+        ENDPOINT="${rest#*|}"
+        echo "[cmd]    gh api --method PUT $ENDPOINT -f enforcement=active -f name=$RS_NAME"
+        RES=$(gh api --method PUT "$ENDPOINT" -f enforcement=active -f name="$RS_NAME" 2>&1)
+        [ $? -eq 0 ] && ok "Ruleset '$RS_NAME' re-enabled." || warn "Could not re-enable '$RS_NAME'."
+    done
+
+    if [ $MERGE_EXIT -eq 0 ]; then
+        ok "PR #$PR_NUMBER merged successfully."
+        echo ""
+        VIEW_ARGS=("$PR_NUMBER" "${REPO_FLAG[@]}" --json state,mergedAt,mergedBy,title)
+        echo "[cmd]    gh pr view ${VIEW_ARGS[*]}"
+        VIEW=$(gh pr view "${VIEW_ARGS[@]}" 2>/dev/null)
+        echo "  state    : $(echo "$VIEW" | grep -o '"state":"[^"]*"' | cut -d'"' -f4)"
+        echo "  title    : $(echo "$VIEW" | grep -o '"title":"[^"]*"' | cut -d'"' -f4)"
+        echo "  mergedAt : $(echo "$VIEW" | grep -o '"mergedAt":"[^"]*"' | cut -d'"' -f4)"
+    else
+        fail "Merge failed even after bypassing rulesets. Check the output above."
+    fi
+}
+
+# ---- Option 8: List pending conversations ------------------
+
+list_conversations() {
+    echo ""
+    read -rp "Repository owner/repo (leave empty to detect from git remote): " REPO_INPUT
+    REPO_NAME=$(get_repo_name "$REPO_INPUT") || return
+    read -rp "PR number: " PR_NUMBER
+    [ -z "$PR_NUMBER" ] && echo "Cancelled." && return
+
+    OWNER="${REPO_NAME%%/*}"; REPO_ONLY="${REPO_NAME#*/}"
+    GQL_QUERY='query($owner:String!,$name:String!,$num:Int!){repository(owner:$owner,name:$name){pullRequest(number:$num){reviewThreads(first:50){nodes{id isResolved comments(first:1){nodes{body author{login}}}}}}}}'
+    echo "[cmd]    gh api graphql -f query=<reviewThreads> -f owner=$OWNER -f name=$REPO_ONLY -F num=$PR_NUMBER"
+    RAW=$(gh api graphql -f query="$GQL_QUERY" -f owner="$OWNER" -f name="$REPO_ONLY" -F num="$PR_NUMBER" 2>&1)
+    if [ $? -ne 0 ]; then fail "GraphQL error: $RAW"; return; fi
+
+    echo ""
+    echo "Pending conversations in PR #$PR_NUMBER:"
+    echo "------------------------------------------------------------"
+    COUNT=0
+    echo "$RAW" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+threads = data['data']['repository']['pullRequest']['reviewThreads']['nodes']
+for t in threads:
+    if not t['isResolved']:
+        c = t['comments']['nodes'][0]
+        body = c['body'][:120] + ('...' if len(c['body']) > 120 else '')
+        print(f\"  ID     : {t['id']}\")
+        print(f\"  Author : {c['author']['login']}\")
+        print(f\"  Comment: {body}\")
+        print()
+" 2>/dev/null || { warn "Could not parse response. Raw output:"; echo "$RAW"; }
+    echo "------------------------------------------------------------"
+}
+
+# ---- Option 9: Resolve a conversation ----------------------
+
+resolve_conversation() {
+    echo ""
+    read -rp "Repository owner/repo (leave empty to detect from git remote): " REPO_INPUT
+    REPO_NAME=$(get_repo_name "$REPO_INPUT") || return
+    read -rp "PR number: " PR_NUMBER
+    [ -z "$PR_NUMBER" ] && echo "Cancelled." && return
+
+    OWNER="${REPO_NAME%%/*}"; REPO_ONLY="${REPO_NAME#*/}"
+    GQL_QUERY='query($owner:String!,$name:String!,$num:Int!){repository(owner:$owner,name:$name){pullRequest(number:$num){reviewThreads(first:50){nodes{id isResolved comments(first:1){nodes{body author{login}}}}}}}}'
+    echo "[cmd]    gh api graphql -f query=<reviewThreads> -f owner=$OWNER -f name=$REPO_ONLY -F num=$PR_NUMBER"
+    RAW=$(gh api graphql -f query="$GQL_QUERY" -f owner="$OWNER" -f name="$REPO_ONLY" -F num="$PR_NUMBER" 2>&1)
+    if [ $? -ne 0 ]; then fail "GraphQL error: $RAW"; return; fi
+
+    echo ""
+    echo "$RAW" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+threads = data['data']['repository']['pullRequest']['reviewThreads']['nodes']
+for t in threads:
+    if not t['isResolved']:
+        c = t['comments']['nodes'][0]
+        body = c['body'][:80] + ('...' if len(c['body']) > 80 else '')
+        print(f\"  {t['id']}  |  {c['author']['login']}: {body}\")
+" 2>/dev/null
+    echo ""
+
+    read -rp "Thread ID to resolve (or 'all' to resolve all): " THREAD_ID
+    [ -z "$THREAD_ID" ] && echo "Cancelled." && return
+
+    PENDING_IDS=()
+    if [ "$THREAD_ID" = "all" ]; then
+        mapfile -t PENDING_IDS < <(echo "$RAW" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for t in data['data']['repository']['pullRequest']['reviewThreads']['nodes']:
+    if not t['isResolved']: print(t['id'])
+" 2>/dev/null)
+    else
+        PENDING_IDS=("$THREAD_ID")
+    fi
+
+    GQL_MUTATION='mutation($tid:ID!){resolveReviewThread(input:{threadId:$tid}){thread{id isResolved}}}'
+    for TID in "${PENDING_IDS[@]}"; do
+        echo "[cmd]    gh api graphql -f query=<resolveReviewThread> -f tid=$TID"
+        RES=$(gh api graphql -f query="$GQL_MUTATION" -f tid="$TID" 2>&1)
+        [ $? -eq 0 ] && ok "Thread $TID resolved." || fail "Failed: $RES"
+    done
+}
+
+# ---- Option 10: List rulesets ------------------------------
+
+list_rulesets() {
+    echo ""
+    read -rp "Repository owner/repo (leave empty to detect from git remote): " REPO_INPUT
+    REPO_NAME=$(get_repo_name "$REPO_INPUT") || return
+    echo ""
+    echo "[cmd]    gh api repos/$REPO_NAME/rulesets"
+    RAW=$(gh api repos/$REPO_NAME/rulesets 2>&1)
+    if [ $? -ne 0 ]; then fail "API error: $RAW"; return; fi
+    echo ""
+    echo "Rulesets for $REPO_NAME:"
+    echo "------------------------------------------------------------"
+    echo "$RAW" | python3 -c "
+import sys, json
+for r in json.load(sys.stdin):
+    print(f\"  [{r['id']}] {r['name']}\")
+    print(f\"       enforcement : {r['enforcement']}\")
+    print(f\"       target      : {r.get('target','')}\")
+    print()
+" 2>/dev/null || echo "$RAW"
+    echo "------------------------------------------------------------"
+}
+
+# ---- Options 11/12: Toggle a specific ruleset --------------
+
+set_ruleset_state() {
+    local TARGET_STATE="$1"
+    echo ""
+    read -rp "Repository owner/repo (leave empty to detect from git remote): " REPO_INPUT
+    REPO_NAME=$(get_repo_name "$REPO_INPUT") || return
+
+    echo "[cmd]    gh api repos/$REPO_NAME/rulesets"
+    RAW=$(gh api repos/$REPO_NAME/rulesets 2>&1)
+    if [ $? -ne 0 ]; then fail "API error: $RAW"; return; fi
+
+    echo ""
+    echo "$RAW" | python3 -c "
+import sys, json
+for r in json.load(sys.stdin):
+    src = r.get('source_type','?')
+    print(f\"  [{r['id']}] {r['name']} - enforcement: {r['enforcement']} - source: {src}\")
+" 2>/dev/null || echo "$RAW"
+    echo ""
+
+    read -rp "Ruleset ID to set to '$TARGET_STATE': " RS_ID
+    [ -z "$RS_ID" ] && echo "Cancelled." && return
+
+    RS_DATA=$(echo "$RAW" | python3 -c "
+import sys, json
+for r in json.load(sys.stdin):
+    if str(r['id']) == '$RS_ID':
+        print(r['name'] + '|' + r.get('source_type','Repository') + '|' + r.get('source',''))
+" 2>/dev/null)
+    RS_NAME="${RS_DATA%%|*}"
+    RS_REST="${RS_DATA#*|}"
+    RS_SRC_TYPE="${RS_REST%%|*}"
+    RS_SOURCE="${RS_REST#*|}"
+
+    read -rp "Set ruleset '$RS_NAME' to '$TARGET_STATE'? (y/N): " CONFIRM
+    [[ "${CONFIRM,,}" != "y" ]] && echo "Cancelled." && return
+
+    ORG="${REPO_NAME%%/*}"
+    if [ "$RS_SRC_TYPE" = "Organization" ]; then
+        ENDPOINT="orgs/$ORG/rulesets/$RS_ID"
+    else
+        ENDPOINT="repos/$REPO_NAME/rulesets/$RS_ID"
+    fi
+    echo "[cmd]    gh api --method PUT $ENDPOINT -f enforcement=$TARGET_STATE -f name=$RS_NAME"
+    RES=$(gh api --method PUT "$ENDPOINT" -f enforcement="$TARGET_STATE" -f name="$RS_NAME" 2>&1)
+    [ $? -eq 0 ] && ok "Ruleset '$RS_NAME' is now '$TARGET_STATE'." || fail "Failed: $RES"
+}
+
+disable_ruleset() { set_ruleset_state "disabled"; }
+enable_ruleset()  { set_ruleset_state "active"; }
+
 # ============================================================
 #  Bootstrap
 # ============================================================
@@ -387,25 +676,41 @@ while true; do
     echo "============================================"
     echo " Menu"
     echo "============================================"
-    echo "  1. Create SSH key for GitHub"
-    echo "  2. Authenticate with GitHub CLI (gh auth login)"
-    echo "  3. List pull requests in a project"
-    echo "  4. List SSH keys"
-    echo "  5. Logout / switch GitHub account"
-    echo "  6. Merge a pull request"
-    echo "  0. Exit"
+    echo "  --- SSH & Auth ---"
+    echo "  1.  Create SSH key for GitHub"
+    echo "  2.  Authenticate with GitHub CLI (gh auth login)"
+    echo "  3.  Logout / switch GitHub account"
+    echo "  4.  List SSH keys"
+    echo "  --- Pull Requests ---"
+    echo "  5.  List pull requests"
+    echo "  6.  Merge a pull request"
+    echo "  7.  Force merge (bypass all rulesets temporarily)"
+    echo "  8.  List pending conversations in a PR"
+    echo "  9.  Resolve a conversation in a PR"
+    echo "  --- Rulesets ---"
+    echo "  10. List rulesets"
+    echo "  11. Disable a specific ruleset"
+    echo "  12. Enable a specific ruleset"
+    echo "  --- ---"
+    echo "  0.  Exit"
     echo ""
     read -rp "Select an option: " CHOICE
 
     case "$CHOICE" in
-        1) create_ssh_key ;;
-        2) github_auth ;;
-        3) list_prs ;;
-        4) list_ssh_keys ;;
-        5) github_logout ;;
-        6) merge_pr ;;
-        0) echo ""; echo "Goodbye."; break ;;
-        *) warn "Invalid option. Enter 1-6 or 0." ;;
+        1)  create_ssh_key ;;
+        2)  github_auth ;;
+        3)  github_logout ;;
+        4)  list_ssh_keys ;;
+        5)  list_prs ;;
+        6)  merge_pr ;;
+        7)  bypass_merge ;;
+        8)  list_conversations ;;
+        9)  resolve_conversation ;;
+        10) list_rulesets ;;
+        11) disable_ruleset ;;
+        12) enable_ruleset ;;
+        0)  echo ""; echo "Goodbye."; break ;;
+        *)  warn "Invalid option. Enter 1-12 or 0." ;;
     esac
 
     if [ "$CHOICE" != "0" ]; then
