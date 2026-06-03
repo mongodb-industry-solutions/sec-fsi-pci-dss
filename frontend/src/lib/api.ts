@@ -38,6 +38,10 @@ export interface AuthDomain {
   name: string;
   displayName: string;
   type: 'local' | 'oidc' | 'saml';
+  /** Determines UI behaviour: client_credentials → show form; others → show redirect button */
+  flowType?: 'client_credentials' | 'authorization_code' | 'saml' | 'oidc';
+  /** Optional banner text shown below the domain selector (sourced from DB) */
+  alertMessage?: string;
 }
 
 export interface Merchant {

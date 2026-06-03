@@ -88,5 +88,8 @@ export async function getEnabledDomains(db: Db) {
     name: d.partyAuthenticationDomainName,
     displayName: d.partyAuthenticationDomainDisplayName,
     type: d.partyAuthenticationDomainType,
+    flowType: d.partyAuthenticationDomainFlowType
+      ?? (d.partyAuthenticationDomainType === 'local' ? 'client_credentials' : d.partyAuthenticationDomainType),
+    alertMessage: d.partyAuthenticationDomainAlertMessage,
   }));
 }

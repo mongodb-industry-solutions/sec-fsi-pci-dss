@@ -22,6 +22,17 @@ interface FormData {
 // Default card number for demo (masked immediately on mount)
 const DEMO_CARD_NUMBER = '4111111111111234';
 
+// Test card presets for demo selection
+const TEST_CARDS = [  
+  { label: "Visa Standard (4242-4242-4242-4242)", number: "4242424242424242" },    
+  { label: "Visa Business (2223-0000-4840-0010)", number: "2223000048400010" },    
+  { label: "Mastercard Standard (5555-5555-5555-1212)", number: "5555555555551212" },    
+  { label: "Mastercard Prepaid (5200-8282-8282-8210)", number: "5200828282828210" },    
+  { label: "Amex Gold (3782-8224-6301-0005)", number: "378282246310005" },    
+  { label: "Amex Platinum (3714-4963-5309-8431)", number: "371449635398431" },    
+  { label: "Demo Card (Pre-filled Example)", number: DEMO_CARD_NUMBER },    
+] ;
+
 const DEFAULTS: FormData = {
   cardholderName: 'Luis Fernandez',
   expiry: '12/28',
@@ -113,8 +124,8 @@ function MerchantCombobox({
       onChange={handleSelect}
       className="w-full border rounded-lg px-3 py-2 text-sm"
     >
-      {merchants.map((m) => (
-        <option key={m.name} value={m.name}>
+      {merchants.map((m, idx) => (
+        <option key={`${m.name}-${m.mcc}-${idx}`} value={m.name}>
           {m.name} (MCC {m.mcc})
         </option>
       ))}
@@ -183,6 +194,77 @@ function AmountSelector({ value, onChange }: { value: string; onChange: (v: stri
   );
 }
 
+// ── Card selector ─────────────────────────────────────────────────────────────
+function CardSelector({
+  maskedCard,
+  onCardChange,
+}: {
+  maskedCard: string;
+  onCardChange: (raw: string) => void;
+}) {
+  const [custom, setCustom] = useState(false);
+
+  function handlePreset(e: React.ChangeEvent<HTMLSelectElement>) {
+    if (e.target.value === '__custom__') {
+      setCustom(true);
+    } else if (e.target.value) {
+      onCardChange(e.target.value);
+    }
+  }
+
+  if (custom) {
+    return (
+      <div className="space-y-1">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Enter card number"
+            onChange={(e) => onCardChange(e.target.value.replace(/\D/g, '').slice(0, 16))}
+            className="flex-1 border rounded-lg px-3 py-2 font-mono text-sm"
+            maxLength={19}
+          />
+          <button
+            type="button"
+            onClick={() => setCustom(false)}
+            className="text-xs text-blue-600 underline whitespace-nowrap"
+          >
+            Use presets
+          </button>
+        </div>
+        {maskedCard && (
+          <div className="font-mono text-gray-700 bg-gray-50 rounded px-3 py-2 flex items-center gap-2 text-sm">
+            <span className="text-[#00ED64]">🔒</span> {maskedCard}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <select
+        onChange={handlePreset}
+        defaultValue=""
+        className="w-full border rounded-lg px-3 py-2 text-sm bg-white"
+      >
+        <option value="" disabled>Select a test card or enter custom…</option>
+        {TEST_CARDS.map((c) => (
+          <option key={c.number} value={c.number}>{c.label}</option>
+        ))}
+        <option value="__custom__">✏ Enter custom card number…</option>
+      </select>
+      {maskedCard && (
+        <div className="font-mono text-gray-700 bg-gray-50 rounded px-3 py-2 flex items-center gap-2 text-sm">
+          <span className="text-[#00ED64]">🔒</span> {maskedCard}
+        </div>
+      )}
+      <p className="text-xs text-gray-500">
+        Masked immediately. Raw PAN never stored. Leave blank to use the pre-filled demo card.
+      </p>
+    </div>
+  );
+}
+
 // ── Validation ────────────────────────────────────────────────────────────────
 interface ValidationErrors {
   email?: string;
@@ -236,12 +318,6 @@ export default function PaymentPage() {
       })
       .catch(() => {/* keep fallback list */});
   }, []);
-
-  function handleCardInput(e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = e.target.value.replace(/\D/g, '').slice(0, 16);
-    setMaskedCard(maskCardNumber(raw));
-    setValidationErrors((v) => ({ ...v, cardNumber: undefined }));
-  }
 
   function handleMerchantChange(name: string, mcc: string) {
     setForm((f) => ({ ...f, merchantName: name, merchantCategoryCode: mcc }));
@@ -359,23 +435,12 @@ export default function PaymentPage() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Card Number
-              <Tooltip text="Enter the 16-digit card number. The raw PAN is masked immediately on input and is never stored in component state or sent to the server. A secure token is generated instead." />
+              <Tooltip text="Select a test card or enter a custom PAN. The raw PAN is masked immediately on input and is never stored in component state or sent to the server. A secure token is generated instead." />
             </label>
-            <input
-              type="text"
-              placeholder="Enter card number (pre-filled: demo card)"
-              onChange={handleCardInput}
-              className="w-full border rounded-lg px-3 py-2 font-mono"
-              maxLength={19}
+            <CardSelector
+              maskedCard={maskedCard}
+              onCardChange={(raw) => setMaskedCard(maskCardNumber(raw))}
             />
-            {maskedCard && (
-              <div className="mt-1 font-mono text-gray-700 bg-gray-50 rounded px-3 py-2 flex items-center gap-2">
-                <span className="text-[#00ED64]">🔒</span> {maskedCard}
-              </div>
-            )}
-            <p className="text-xs text-gray-500 mt-1">
-              Masked immediately. Raw PAN never stored. Leave blank to use the pre-filled demo card.
-            </p>
           </div>
 
           {/* Cardholder name */}

@@ -4,6 +4,7 @@
     "partyAuthenticationDomainName": "local",
     "partyAuthenticationDomainDisplayName": "Local (Demo Users)",
     "partyAuthenticationDomainType": "local",
+    "partyAuthenticationDomainFlowType": "client_credentials",
     "partyAuthenticationDomainEnabled": true,
     "partyAuthenticationDomainConfiguration": {},
     "bianServiceDomain": "PartyAuthentication",
@@ -16,7 +17,9 @@
     "partyAuthenticationDomainName": "msentra",
     "partyAuthenticationDomainDisplayName": "Microsoft Entra ID",
     "partyAuthenticationDomainType": "oidc",
+    "partyAuthenticationDomainFlowType": "authorization_code",
     "partyAuthenticationDomainEnabled": false,
+    "partyAuthenticationDomainAlertMessage": "⚠ Microsoft Entra ID integration is configured but not yet active in this demo build.",
     "partyAuthenticationDomainConfiguration": {
       "tenantId": "",
       "clientId": "",
@@ -32,7 +35,9 @@
     "partyAuthenticationDomainName": "bigid",
     "partyAuthenticationDomainDisplayName": "BigID",
     "partyAuthenticationDomainType": "oidc",
+    "partyAuthenticationDomainFlowType": "oidc",
     "partyAuthenticationDomainEnabled": false,
+    "partyAuthenticationDomainAlertMessage": "⚠ BigID integration is configured but not yet active in this demo build.",
     "partyAuthenticationDomainConfiguration": {
       "tenantUrl": "",
       "clientId": ""
