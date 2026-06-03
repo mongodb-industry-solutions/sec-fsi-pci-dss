@@ -638,6 +638,122 @@ function Invoke-SetRulesetState {
 function Invoke-DisableRuleset { Invoke-SetRulesetState -TargetState "disabled" }
 function Invoke-EnableRuleset  { Invoke-SetRulesetState -TargetState "active" }
 
+# ---- Option 13: Dependabot alerts --------------------------
+
+function Invoke-ListDependabotAlerts {
+    Write-Host ""
+    $ctx = Get-RepoContext
+    if ($null -eq $ctx) { return }
+
+    $stateInput = (Read-Host "State filter (open/dismissed/fixed/auto_dismissed/all - default: open)").Trim()
+    $filterState = if ($stateInput -eq "" -or $stateInput -eq "open") { "open" } `
+                   elseif ($stateInput -eq "all") { "" } else { $stateInput }
+
+    if ($filterState -ne "") {
+        Write-Host "[cmd]    gh api --paginate repos/$($ctx.Name)/dependabot/alerts -f state=$filterState"
+        $raw = & gh api --paginate "repos/$($ctx.Name)/dependabot/alerts" -f state=$filterState 2>&1
+    } else {
+        Write-Host "[cmd]    gh api --paginate repos/$($ctx.Name)/dependabot/alerts"
+        $raw = & gh api --paginate "repos/$($ctx.Name)/dependabot/alerts" 2>&1
+    }
+    if ($LASTEXITCODE -ne 0) { fail "API error: $raw"; return }
+
+    $alerts = $raw | ConvertFrom-Json
+    if ($alerts.Count -eq 0) { ok "No Dependabot alerts found."; return }
+
+    Write-Host ""
+    Write-Host "Dependabot alerts for $($ctx.Name) ($($alerts.Count) total):"
+    Write-Host "------------------------------------------------------------"
+    $alerts | ForEach-Object {
+        $sev = $_.security_advisory.severity.ToUpper()
+        $eco = $_.dependency.package.ecosystem
+        $pkg = $_.dependency.package.name
+        Write-Host "  [#$($_.number)] [$($_.state.ToUpper())] [$sev] $eco/$pkg"
+        Write-Host "         $($_.security_advisory.summary)"
+        Write-Host "         CVE: $($_.security_advisory.cve_id)  CVSS: $($_.security_advisory.cvss.score)"
+        Write-Host ""
+    }
+    Write-Host "------------------------------------------------------------"
+    Write-Host "Browser: https://github.com/$($ctx.Name)/security/dependabot"
+}
+
+# ---- Option 14: Secret scanning alerts ---------------------
+
+function Invoke-ListSecretAlerts {
+    Write-Host ""
+    $ctx = Get-RepoContext
+    if ($null -eq $ctx) { return }
+
+    $stateInput = (Read-Host "State filter (open/resolved/all - default: open)").Trim()
+    $filterState = if ($stateInput -eq "" -or $stateInput -eq "open") { "open" } `
+                   elseif ($stateInput -eq "all") { "" } else { $stateInput }
+
+    if ($filterState -ne "") {
+        Write-Host "[cmd]    gh api --paginate repos/$($ctx.Name)/secret-scanning/alerts -f state=$filterState"
+        $raw = & gh api --paginate "repos/$($ctx.Name)/secret-scanning/alerts" -f state=$filterState 2>&1
+    } else {
+        Write-Host "[cmd]    gh api --paginate repos/$($ctx.Name)/secret-scanning/alerts"
+        $raw = & gh api --paginate "repos/$($ctx.Name)/secret-scanning/alerts" 2>&1
+    }
+    if ($LASTEXITCODE -ne 0) { fail "API error: $raw"; return }
+
+    $alerts = $raw | ConvertFrom-Json
+    if ($alerts.Count -eq 0) { ok "No secret scanning alerts found."; return }
+
+    Write-Host ""
+    Write-Host "Secret scanning alerts for $($ctx.Name) ($($alerts.Count) total):"
+    Write-Host "------------------------------------------------------------"
+    foreach ($a in $alerts) {
+        Write-Host "  [#$($a.number)] [$($a.state.ToUpper())] $($a.secret_type_display_name)"
+        Write-Host "         Validity : $($a.validity)"
+        Write-Host "         Created  : $($a.created_at)"
+        Write-Host "         URL      : $($a.html_url)"
+        Write-Host ""
+    }
+    Write-Host "------------------------------------------------------------"
+    Write-Host "Browser: https://github.com/$($ctx.Name)/security/secret-scanning"
+}
+
+# ---- Option 15: Code scanning alerts -----------------------
+
+function Invoke-ListCodeAlerts {
+    Write-Host ""
+    $ctx = Get-RepoContext
+    if ($null -eq $ctx) { return }
+
+    $stateInput = (Read-Host "State filter (open/dismissed/fixed/all - default: open)").Trim()
+    $filterState = if ($stateInput -eq "" -or $stateInput -eq "open") { "open" } `
+                   elseif ($stateInput -eq "all") { "" } else { $stateInput }
+
+    if ($filterState -ne "") {
+        Write-Host "[cmd]    gh api --paginate repos/$($ctx.Name)/code-scanning/alerts -f state=$filterState"
+        $raw = & gh api --paginate "repos/$($ctx.Name)/code-scanning/alerts" -f state=$filterState 2>&1
+    } else {
+        Write-Host "[cmd]    gh api --paginate repos/$($ctx.Name)/code-scanning/alerts"
+        $raw = & gh api --paginate "repos/$($ctx.Name)/code-scanning/alerts" 2>&1
+    }
+    if ($LASTEXITCODE -ne 0) { fail "API error: $raw"; return }
+
+    $alerts = $raw | ConvertFrom-Json
+    if ($alerts.Count -eq 0) { ok "No code scanning alerts found."; return }
+
+    Write-Host ""
+    Write-Host "Code scanning alerts for $($ctx.Name) ($($alerts.Count) total):"
+    Write-Host "------------------------------------------------------------"
+    foreach ($a in $alerts) {
+        $sev = if ($a.rule.PSObject.Properties['security_severity_level'] -and $a.rule.security_severity_level) `
+               { $a.rule.security_severity_level } else { $a.rule.severity }
+        $tags = if ($a.rule.PSObject.Properties['tags'] -and $a.rule.tags) { $a.rule.tags -join ", " } else { "" }
+        Write-Host "  [#$($a.number)] [$($a.state.ToUpper())] [$($sev.ToUpper())] $($a.rule.name)"
+        Write-Host "         $($a.rule.description)"
+        if ($tags) { Write-Host "         Tags: $tags" }
+        Write-Host "         Tool: $($a.tool.name) | Ref: $($a.most_recent_instance.ref)"
+        Write-Host ""
+    }
+    Write-Host "------------------------------------------------------------"
+    Write-Host "Browser: https://github.com/$($ctx.Name)/security/code-scanning"
+}
+
 # ============================================================
 #  Bootstrap
 # ============================================================
@@ -682,6 +798,10 @@ do {
     Write-Host "  10. List rulesets"
     Write-Host "  11. Disable a specific ruleset"
     Write-Host "  12. Enable a specific ruleset"
+    Write-Host "  --- Security ---"
+    Write-Host "  13. Dependabot alerts (dependency vulnerabilities)"
+    Write-Host "  14. Secret scanning alerts"
+    Write-Host "  15. Code scanning alerts (quality / malware)"
     Write-Host "  --- ---"
     Write-Host "  0.  Exit"
     Write-Host ""
@@ -700,8 +820,11 @@ do {
         "10" { Invoke-ListRulesets }
         "11" { Invoke-DisableRuleset }
         "12" { Invoke-EnableRuleset }
+        "13" { Invoke-ListDependabotAlerts }
+        "14" { Invoke-ListSecretAlerts }
+        "15" { Invoke-ListCodeAlerts }
         "0"  { Write-Host ""; Write-Host "Goodbye." }
-        default { warn "Invalid option. Enter 1-12 or 0." }
+        default { warn "Invalid option. Enter 1-15 or 0." }
     }
 
     if ($choice -ne "0") {

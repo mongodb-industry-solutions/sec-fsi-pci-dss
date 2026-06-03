@@ -648,6 +648,128 @@ for r in json.load(sys.stdin):
 disable_ruleset() { set_ruleset_state "disabled"; }
 enable_ruleset()  { set_ruleset_state "active"; }
 
+# ---- Option 13: Dependabot alerts --------------------------
+
+list_dependabot_alerts() {
+    echo ""
+    read -rp "Repository owner/repo (leave empty to detect from git remote): " REPO_INPUT
+    REPO_NAME=$(get_repo_name "$REPO_INPUT") || return
+
+    read -rp "State filter (open/dismissed/fixed/auto_dismissed/all - default: open): " STATE_INPUT
+    FILTER_STATE="${STATE_INPUT:-open}"
+    [ "$FILTER_STATE" = "all" ] && FILTER_STATE=""
+
+    if [ -n "$FILTER_STATE" ]; then
+        echo "[cmd]    gh api --paginate repos/$REPO_NAME/dependabot/alerts -f state=$FILTER_STATE"
+        RAW=$(gh api --paginate "repos/$REPO_NAME/dependabot/alerts" -f state="$FILTER_STATE" 2>&1)
+    else
+        echo "[cmd]    gh api --paginate repos/$REPO_NAME/dependabot/alerts"
+        RAW=$(gh api --paginate "repos/$REPO_NAME/dependabot/alerts" 2>&1)
+    fi
+    if [ $? -ne 0 ]; then fail "API error: $RAW"; return; fi
+
+    echo ""
+    echo "$RAW" | python3 -c "
+import sys, json
+alerts = json.load(sys.stdin)
+if not alerts: print('No Dependabot alerts found.'); sys.exit(0)
+print(f'Dependabot alerts ({len(alerts)} total):')
+print('------------------------------------------------------------')
+for a in alerts:
+    sev = a['security_advisory']['severity'].upper()
+    eco = a['dependency']['package']['ecosystem']
+    pkg = a['dependency']['package']['name']
+    cve = a['security_advisory'].get('cve_id','N/A')
+    cvss = a['security_advisory'].get('cvss',{}).get('score','N/A')
+    print(f\"  [#{a['number']}] [{a['state'].upper()}] [{sev}] {eco}/{pkg}\")
+    print(f\"         {a['security_advisory']['summary']}\")
+    print(f\"         CVE: {cve}  CVSS: {cvss}\")
+    print()
+print('------------------------------------------------------------')
+" 2>/dev/null || { warn "Could not parse response."; echo "$RAW"; }
+    echo "Browser: https://github.com/$REPO_NAME/security/dependabot"
+}
+
+# ---- Option 14: Secret scanning alerts ---------------------
+
+list_secret_alerts() {
+    echo ""
+    read -rp "Repository owner/repo (leave empty to detect from git remote): " REPO_INPUT
+    REPO_NAME=$(get_repo_name "$REPO_INPUT") || return
+
+    read -rp "State filter (open/resolved/all - default: open): " STATE_INPUT
+    FILTER_STATE="${STATE_INPUT:-open}"
+    [ "$FILTER_STATE" = "all" ] && FILTER_STATE=""
+
+    if [ -n "$FILTER_STATE" ]; then
+        echo "[cmd]    gh api --paginate repos/$REPO_NAME/secret-scanning/alerts -f state=$FILTER_STATE"
+        RAW=$(gh api --paginate "repos/$REPO_NAME/secret-scanning/alerts" -f state="$FILTER_STATE" 2>&1)
+    else
+        echo "[cmd]    gh api --paginate repos/$REPO_NAME/secret-scanning/alerts"
+        RAW=$(gh api --paginate "repos/$REPO_NAME/secret-scanning/alerts" 2>&1)
+    fi
+    if [ $? -ne 0 ]; then fail "API error: $RAW"; return; fi
+
+    echo ""
+    echo "$RAW" | python3 -c "
+import sys, json
+alerts = json.load(sys.stdin)
+if not alerts: print('No secret scanning alerts found.'); sys.exit(0)
+print(f'Secret scanning alerts ({len(alerts)} total):')
+print('------------------------------------------------------------')
+for a in alerts:
+    print(f\"  [#{a['number']}] [{a['state'].upper()}] {a['secret_type_display_name']}\")
+    print(f\"         Validity : {a.get('validity','N/A')}\")
+    print(f\"         Created  : {a.get('created_at','N/A')}\")
+    print(f\"         URL      : {a.get('html_url','N/A')}\")
+    print()
+print('------------------------------------------------------------')
+" 2>/dev/null || { warn "Could not parse response."; echo "$RAW"; }
+    echo "Browser: https://github.com/$REPO_NAME/security/secret-scanning"
+}
+
+# ---- Option 15: Code scanning alerts -----------------------
+
+list_code_alerts() {
+    echo ""
+    read -rp "Repository owner/repo (leave empty to detect from git remote): " REPO_INPUT
+    REPO_NAME=$(get_repo_name "$REPO_INPUT") || return
+
+    read -rp "State filter (open/dismissed/fixed/all - default: open): " STATE_INPUT
+    FILTER_STATE="${STATE_INPUT:-open}"
+    [ "$FILTER_STATE" = "all" ] && FILTER_STATE=""
+
+    if [ -n "$FILTER_STATE" ]; then
+        echo "[cmd]    gh api --paginate repos/$REPO_NAME/code-scanning/alerts -f state=$FILTER_STATE"
+        RAW=$(gh api --paginate "repos/$REPO_NAME/code-scanning/alerts" -f state="$FILTER_STATE" 2>&1)
+    else
+        echo "[cmd]    gh api --paginate repos/$REPO_NAME/code-scanning/alerts"
+        RAW=$(gh api --paginate "repos/$REPO_NAME/code-scanning/alerts" 2>&1)
+    fi
+    if [ $? -ne 0 ]; then fail "API error: $RAW"; return; fi
+
+    echo ""
+    echo "$RAW" | python3 -c "
+import sys, json
+alerts = json.load(sys.stdin)
+if not alerts: print('No code scanning alerts found.'); sys.exit(0)
+print(f'Code scanning alerts ({len(alerts)} total):')
+print('------------------------------------------------------------')
+for a in alerts:
+    rule = a.get('rule', {})
+    sev = rule.get('security_severity_level') or rule.get('severity','N/A')
+    tags = ', '.join(rule.get('tags') or [])
+    ref = a.get('most_recent_instance',{}).get('ref','N/A')
+    print(f\"  [#{a['number']}] [{a['state'].upper()}] [{sev.upper()}] {rule.get('name','')}\")
+    print(f\"         {rule.get('description','')}\")
+    if tags: print(f\"         Tags: {tags}\")
+    print(f\"         Tool: {a.get('tool',{}).get('name','N/A')} | Ref: {ref}\")
+    print()
+print('------------------------------------------------------------')
+" 2>/dev/null || { warn "Could not parse response."; echo "$RAW"; }
+    echo "Browser: https://github.com/$REPO_NAME/security/code-scanning"
+}
+
 # ============================================================
 #  Bootstrap
 # ============================================================
@@ -691,6 +813,10 @@ while true; do
     echo "  10. List rulesets"
     echo "  11. Disable a specific ruleset"
     echo "  12. Enable a specific ruleset"
+    echo "  --- Security ---"
+    echo "  13. Dependabot alerts (dependency vulnerabilities)"
+    echo "  14. Secret scanning alerts"
+    echo "  15. Code scanning alerts (quality / malware)"
     echo "  --- ---"
     echo "  0.  Exit"
     echo ""
@@ -709,8 +835,11 @@ while true; do
         10) list_rulesets ;;
         11) disable_ruleset ;;
         12) enable_ruleset ;;
+        13) list_dependabot_alerts ;;
+        14) list_secret_alerts ;;
+        15) list_code_alerts ;;
         0)  echo ""; echo "Goodbye."; break ;;
-        *)  warn "Invalid option. Enter 1-12 or 0." ;;
+        *)  warn "Invalid option. Enter 1-15 or 0." ;;
     esac
 
     if [ "$CHOICE" != "0" ]; then
