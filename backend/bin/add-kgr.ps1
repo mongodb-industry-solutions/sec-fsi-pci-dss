@@ -1,5 +1,20 @@
 Write-Host "Please ensure you have executed: 'Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned' to allow this script to run properly."
 
+# Ensure GitHub CLI is installed
+if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+    Write-Host ""
+    Write-Host "GitHub CLI (gh) not found. Installing via winget..."
+    winget install --id GitHub.cli --silent --accept-package-agreements --accept-source-agreements
+    $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+        Write-Host "Failed to install GitHub CLI. Install it manually from https://cli.github.com and re-run this script."
+        exit 1
+    }
+    Write-Host "GitHub CLI installed."
+} else {
+    Write-Host "GitHub CLI already installed: $(gh --version | Select-Object -First 1)"
+}
+
 $SSHDir = "$HOME\.ssh"
 
 if (-not (Test-Path -Path $SSHDir)) {
