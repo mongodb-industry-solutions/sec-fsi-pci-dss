@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { api, Merchant } from '../../../lib/api';
 import { FraudAlert } from '../../../components/FraudAlert';
 import { EncryptionBadge } from '../../../components/EncryptionBadge';
+import { Tooltip } from '../../../components/Tooltip';
+import { StepExplainer } from '../../../components/StepExplainer';
 
 type Step = 1 | 2 | 3;
 
@@ -58,70 +60,6 @@ function simulateCipher(seed: string): string {
     c.charCodeAt(0).toString(16).padStart(2, '0')
   );
   return `\\x${bytes.slice(0, 4).join('\\x')}...`;
-}
-
-// ── Tooltip component ────────────────────────────────────────────────────────
-function Tooltip({ text }: { text: string }) {
-  const [visible, setVisible] = useState(false);
-  return (
-    <span className="relative inline-block ml-1 align-middle">
-      <button
-        type="button"
-        onMouseEnter={() => setVisible(true)}
-        onMouseLeave={() => setVisible(false)}
-        className="text-gray-400 hover:text-blue-500 text-xs leading-none transition-colors"
-        aria-label="More information"
-      >
-        ⓘ
-      </button>
-      {visible && (
-        <span className="absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 rounded-lg bg-[#001E2B] text-white text-xs px-3 py-2 shadow-xl pointer-events-none leading-relaxed">
-          {text}
-          <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#001E2B]" />
-        </span>
-      )}
-    </span>
-  );
-}
-
-// ── Step Explainer popover ────────────────────────────────────────────────────
-function StepExplainer({ title, children }: { title: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, [open]);
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="ml-2 px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 transition-colors font-medium"
-      >
-        ? About this step
-      </button>
-      {open && (
-        <div className="absolute z-30 left-0 top-full mt-2 w-80 rounded-xl bg-white border border-blue-200 shadow-xl p-4">
-          <p className="font-semibold text-gray-800 mb-2">{title}</p>
-          <div className="text-sm text-gray-600 space-y-2 leading-relaxed">{children}</div>
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className="mt-3 text-xs text-gray-400 hover:text-gray-600"
-          >
-            Close
-          </button>
-        </div>
-      )}
-    </div>
-  );
 }
 
 // ── Merchant combobox ────────────────────────────────────────────────────────

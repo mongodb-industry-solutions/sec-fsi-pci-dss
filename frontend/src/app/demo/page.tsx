@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { api, AuthUser, AuthDomain } from '../../lib/api';
 import { setToken, decodeToken } from '../../lib/auth';
 import { DEMO_USERS_PASSWORDS, ROLE_LABELS } from '../../lib/constants';
+import { Tooltip } from '../../components/Tooltip';
 
 const ROLE_REDIRECTS: Record<string, string> = {
   customer: '/demo/payment/history',
@@ -11,29 +12,6 @@ const ROLE_REDIRECTS: Record<string, string> = {
   level2_investigator: '/demo/investigation',
   security_auditor: '/demo/audit',
 };
-
-function Tooltip({ text }: { text: string }) {
-  const [visible, setVisible] = useState(false);
-  return (
-    <span className="relative inline-block ml-1">
-      <button
-        type="button"
-        onMouseEnter={() => setVisible(true)}
-        onMouseLeave={() => setVisible(false)}
-        className="text-gray-400 hover:text-gray-600 text-xs align-middle leading-none"
-        aria-label="More information"
-      >
-        ⓘ
-      </button>
-      {visible && (
-        <span className="absolute z-10 bottom-full left-1/2 -translate-x-1/2 mb-1 w-56 rounded-lg bg-[#001E2B] text-white text-xs px-3 py-2 shadow-lg pointer-events-none">
-          {text}
-          <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#001E2B]" />
-        </span>
-      )}
-    </span>
-  );
-}
 
 export default function DemoLoginPage() {
   const router = useRouter();
