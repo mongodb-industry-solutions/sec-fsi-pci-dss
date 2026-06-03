@@ -275,7 +275,7 @@ function Invoke-SetGlobalSSHLogin {
                 if ($signIdx -ge 0 -and $signIdx -lt $keyList.Count) {
                     $signKey = $keyList[$signIdx]
                 } else {
-                    fail "Invalid selection — skipping signed commits."
+                    fail "Invalid selection - skipping signed commits."
                 }
             }
         }
@@ -316,7 +316,7 @@ function Invoke-SetGlobalSSHLogin {
     }
 
     action "Starting GitHub CLI login with SSH git-protocol..."
-    Write-Host "  > A browser window will open — authorize the GitHub CLI app."
+    Write-Host "  > A browser window will open - authorize the GitHub CLI app."
     Write-Host ""
     run { gh auth login --web --git-protocol ssh --scopes repo,read:org,workflow }
     if ($LASTEXITCODE -eq 0) {
