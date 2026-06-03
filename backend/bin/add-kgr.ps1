@@ -25,7 +25,7 @@ if (!(Test-Path -Path $SSHDir)) {
 # Generate the SSH key  
 Write-Host "Generating a new SSH key with the email: $Email..."  
 try {  
-    & ssh-keygen -t rsa -b 4096 -C "$Email" -f "$SSHDir\$KeyFileName" -N ""  
+    & ssh-keygen -t rsa -b 4096 -C "$Email" -f "$SSHDir\$KeyFileName" -N '""'  
 } catch {  
     Write-Host "Failed to generate SSH key using ssh-keygen. Ensure OpenSSH Client is installed and available in PATH."  
     exit  
