@@ -65,7 +65,8 @@ ensure_ssh_dir() {
     SSH_DIR="$HOME/.ssh"
     if [ ! -d "$SSH_DIR" ]; then
         action "Creating ~/.ssh directory..."
-        mkdir -p "$SSH_DIR" && chmod 700 "$SSH_DIR"
+        run mkdir -p "$SSH_DIR"
+        run chmod 700 "$SSH_DIR"
         ok "~/.ssh created."
     else
         ok "~/.ssh directory exists."
@@ -181,10 +182,10 @@ list_prs() {
     echo ""
     if [ -n "$REPO_INPUT" ]; then
         echo "Pull requests targeting '$BASE' in $REPO_INPUT:"
-        gh pr list --repo "$REPO_INPUT" --base "$BASE"
+        run gh pr list --repo "$REPO_INPUT" --base "$BASE"
     else
         echo "Pull requests targeting '$BASE' in current repo:"
-        gh pr list --base "$BASE"
+        run gh pr list --base "$BASE"
     fi
 }
 
@@ -230,6 +231,7 @@ list_ssh_keys() {
 
     for pub in "${PUB_KEYS[@]}"; do
         KEY_NAME=$(basename "$pub" .pub)
+        echo "[cmd]    ssh-keygen -lf $pub"
         FINGERPRINT=$(ssh-keygen -lf "$pub" 2>/dev/null)
         IN_CONFIG="no"
         [ -f "$CONFIG" ] && grep -q "IdentityFile.*$KEY_NAME" "$CONFIG" && IN_CONFIG="yes"
@@ -334,6 +336,14 @@ merge_pr() {
     echo "$MERGE_OUTPUT"
     if [ $MERGE_EXIT -eq 0 ]; then
         ok "PR #$PR_NUMBER merged successfully."
+        echo ""
+        VIEW_ARGS=("$PR_NUMBER" "${REPO_FLAG[@]}" --json state,mergedAt,mergedBy,title)
+        echo "[cmd]    gh pr view ${VIEW_ARGS[*]}"
+        VIEW=$(gh pr view "${VIEW_ARGS[@]}" 2>/dev/null)
+        echo "  state    : $(echo "$VIEW" | grep -o '"state":"[^"]*"' | cut -d'"' -f4)"
+        echo "  title    : $(echo "$VIEW" | grep -o '"title":"[^"]*"' | cut -d'"' -f4)"
+        echo "  mergedAt : $(echo "$VIEW" | grep -o '"mergedAt":"[^"]*"' | cut -d'"' -f4)"
+        echo "  mergedBy : $(echo "$VIEW" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('mergedBy',{}).get('login',''))" 2>/dev/null || echo "n/a")"
     else
         fail "Merge failed."
         if echo "$MERGE_OUTPUT" | grep -q "Resource not accessible by personal access token"; then

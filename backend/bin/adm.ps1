@@ -222,6 +222,7 @@ function Invoke-ListSSHKeys {
 
     foreach ($pub in $pubKeys) {
         $keyName = $pub.BaseName
+        Write-Host "[cmd]    ssh-keygen -lf $($pub.FullName)"
         $fingerprint = & ssh-keygen -lf $pub.FullName 2>&1
         $inConfig = if ($configContent -match "IdentityFile\s+[~\w/\\]*$keyName") { "yes" } else { "no" }
         Write-Host ""
@@ -246,6 +247,7 @@ function Invoke-ListSSHKeys {
 function Invoke-ListPRs {
     Write-Host ""
     chk "GitHub CLI authentication..."
+    Write-Host "[cmd]    gh auth status"
     gh auth status 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) {
         fail "Not authenticated with GitHub CLI. Run option 2 first."
@@ -260,10 +262,10 @@ function Invoke-ListPRs {
     Write-Host ""
     if ($RepoInput.Trim() -ne "") {
         Write-Host "Pull requests targeting '$BaseBranch' in $($RepoInput.Trim()):"
-        gh pr list --repo $RepoInput.Trim() --base $BaseBranch
+        run { gh pr list --repo $RepoInput.Trim() --base $BaseBranch }
     } else {
         Write-Host "Pull requests targeting '$BaseBranch' in current repo:"
-        gh pr list --base $BaseBranch
+        run { gh pr list --base $BaseBranch }
     }
 }
 
@@ -272,6 +274,7 @@ function Invoke-ListPRs {
 function Invoke-MergePR {
     Write-Host ""
     chk "GitHub CLI authentication..."
+    Write-Host "[cmd]    gh auth status"
     gh auth status 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) {
         fail "Not authenticated with GitHub CLI. Run option 2 first."
@@ -280,6 +283,7 @@ function Invoke-MergePR {
     ok "Authenticated."
 
     chk "Token scopes (repo scope required to merge)..."
+    Write-Host "[cmd]    gh auth status"
     $scopes = gh auth status 2>&1 | Select-String "Token scopes"
     if ($scopes -notmatch "\brepo\b") {
         warn "Token is missing the 'repo' scope. Attempting to refresh..."
@@ -351,6 +355,16 @@ function Invoke-MergePR {
     $mergeOutput | Write-Host
     if ($LASTEXITCODE -eq 0) {
         ok "PR #$($PRNumber.Trim()) merged successfully."
+        Write-Host ""
+        Write-Host "[cmd]    gh pr view $($PRNumber.Trim()) --json state,mergedAt,mergedBy,title $($RepoFlag -join ' ')"
+        & gh pr view $PRNumber.Trim() @RepoFlag --json state,mergedAt,mergedBy,title |
+            ConvertFrom-Json |
+            ForEach-Object {
+                Write-Host "  state    : $($_.state)"
+                Write-Host "  title    : $($_.title)"
+                Write-Host "  mergedAt : $($_.mergedAt)"
+                Write-Host "  mergedBy : $($_.mergedBy.login)"
+            }
     } else {
         fail "Merge failed."
         if ($mergeOutput -match "Resource not accessible by personal access token") {
