@@ -794,10 +794,9 @@ QE equality search on the corresponding encrypted field.
 
 Registers a tokenized card linked to a customer agreement.
 
-**Request body:**
+**Request body** (`customerAgreementInstanceReference` is taken from the `:customerId` path param — do not include it in the body):
 ```json
 {
-  "customerAgreementInstanceReference": "uuid-v4",
   "cardToken": "tok_abc123",
   "paymentCardExpirationDate": "12/28",
   "paymentCardMaskedPanDisplay": "****-****-****-1234",
@@ -1014,7 +1013,7 @@ Returns the raw BSON document as stored in Atlas (ciphertext visible, no auto-de
 
 ### 6.9 Health
 
-#### `GET /health`
+#### `GET /api/v1/system/health`
 
 **Response 200:**
 ```json

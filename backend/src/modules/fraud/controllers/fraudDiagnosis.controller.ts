@@ -15,8 +15,8 @@ Each case embeds a \`transactionSnapshot\` with the key display fields from the 
 single collection query with no \`$lookup\`.
 
 **Audit trail:** events (who acted, when, what) are stored in the separate
-\`fraudDiagnosisCaseEvents\` collection to avoid unbounded array growth. A dedicated
-\`GET /api/v1/fraud/:id/events\` endpoint is planned for v2.`,
+\`fraudDiagnosisCaseEvents\` collection to avoid unbounded array growth.
+Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit log.`,
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
@@ -111,7 +111,7 @@ single collection query with no \`$lookup\`.
 **Linked data (not embedded; requires separate requests):**
 - Transaction details: \`GET /api/v1/transactions/:linkedCardTransactionReference\`
 - Customer agreement: \`GET /api/v1/customer?accountRef=<customerAgreementReference>\`
-- Audit events: planned for v2 (\`GET /api/v1/fraud/:id/events\`)`,
+- Audit events: \`GET /api/v1/fraud/:id/events\``,
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
@@ -221,14 +221,18 @@ single collection query with no \`$lookup\`.
     };
     const result = await updateCase(fastify.db, id, patch as never);
     if (!result) return reply.status(404).send({ error: 'Fraud case not found' });
-    return reply.send(result);
+    return reply.send({
+      fraudDiagnosisInstanceReference: (result as { fraudDiagnosisInstanceReference: string }).fraudDiagnosisInstanceReference,
+      fraudDiagnosisCaseStatus: (result as { fraudDiagnosisCaseStatus: string }).fraudDiagnosisCaseStatus,
+      recordUpdatedDateTime: (result as { recordUpdatedDateTime: Date }).recordUpdatedDateTime,
+    });
   });
 
   // GET /api/v1/fraud/:id/events  [v2]
   fastify.get('/:id/events', {
     schema: {
       tags: ['fraud'],
-      summary: 'List audit events for a fraud case (SD-83) [v2]',
+      summary: 'List audit events for a fraud case (SD-83)',
       description: `Returns the chronological audit event log for a \`fraudDiagnosisCase\` from \`fraudDiagnosisCaseEvents\`.
 
 Each event records who acted, when, the action type, and any associated details.

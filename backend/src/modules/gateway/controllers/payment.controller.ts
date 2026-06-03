@@ -26,7 +26,7 @@ export async function paymentController(fastify: FastifyInstance) {
       summary: 'Create a payment order (SD-64)',
       description: `Creates a \`paymentOrder\` (BIAN SD-64) with initial status \`initiated\`.
 
-**Idempotency:** The \`X-Idempotency-Key\` header is **required**. A second request with the same key returns \`409 Conflict\` — the original order is not mutated.
+**Idempotency:** The \`X-Idempotency-Key\` header is **required**. _(v5: duplicate-key detection and 409 enforcement are not yet implemented in this prototype.)_
 
 **Payment lifecycle (SD-64 state machine):**
 \`\`\`
@@ -48,7 +48,7 @@ initiated → confirmed → authorized → captured → settled
         type: 'object',
         required: ['x-idempotency-key'],
         properties: {
-          'x-idempotency-key': { type: 'string', description: 'Unique key per operation. Duplicate key returns 409.' },
+          'x-idempotency-key': { type: 'string', description: 'Unique key per operation. (v5: duplicate-key enforcement not yet active in prototype.)' },
         },
       },
       body: {
@@ -74,7 +74,7 @@ initiated → confirmed → authorized → captured → settled
         },
         400: { $ref: 'Error#' },
         401: { $ref: 'Error#' },
-        409: { description: 'Duplicate idempotency key.', $ref: 'Error#' },
+        409: { description: '(v5-only) Duplicate idempotency key — not yet enforced in this prototype.', $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
@@ -89,8 +89,8 @@ initiated → confirmed → authorized → captured → settled
       paymentOrderDescription?: string;
     };
 
-    if (!body.merchantAgreementInstanceReference || !body.amount || !body.currency) {
-      return reply.status(400).send({ error: 'merchantAgreementInstanceReference, amount, and currency are required' });
+    if (!body.merchantAgreementInstanceReference || body.amount == null || !body.currency || !body.paymentOrderMerchantReference) {
+      return reply.status(400).send({ error: 'merchantAgreementInstanceReference, paymentOrderMerchantReference, amount, and currency are required' });
     }
 
     const result = await createPaymentOrder({ ...body, idempotencyKey });
@@ -144,7 +144,7 @@ initiated → confirmed → authorized → captured → settled
       tags: ['gateway'],
       summary: 'Confirm payment order (SD-64: initiated → confirmed)',
       description: `Transitions the payment order from \`initiated\` to \`confirmed\`. Links the order to a \`customerAgreement\`.
-Allowed only when current status is \`initiated\`. Returns \`422\` for invalid transitions.`,
+_(v5: state validation and 422 enforcement are not yet implemented in this prototype.)_`,
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       body: {
@@ -191,7 +191,7 @@ Allowed only when current status is \`initiated\`. Returns \`422\` for invalid t
 3. Fraud evaluation triggered via \`shared/services/fraudTrigger\`
 4. Status transitions \`confirmed → authorized\`
 
-Allowed only when current status is \`confirmed\`.`,
+_(v5: state validation and 422 enforcement are not yet implemented in this prototype.)_`,
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       response: {
@@ -222,7 +222,8 @@ Allowed only when current status is \`confirmed\`.`,
       tags: ['gateway'],
       summary: 'Capture authorized payment (SD-64: authorized → captured)',
       description: `Captures the funds from an authorized payment. Allowed only from \`authorized\` status.
-In card-not-present flows, capture may be deferred from authorization (e.g., ship-then-capture).`,
+In card-not-present flows, capture may be deferred from authorization (e.g., ship-then-capture).
+_(v5: state validation and 422 enforcement are not yet implemented in this prototype.)_`,
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       response: {
@@ -251,7 +252,7 @@ In card-not-present flows, capture may be deferred from authorization (e.g., shi
       tags: ['gateway'],
       summary: 'Void a payment order (SD-64: authorized|confirmed → voided)',
       description: `Voids a payment order. Allowed from \`authorized\` or \`confirmed\` status.
-A voided order cannot be captured or refunded. The linked \`cardTransaction\` status is updated to \`declined\`.`,
+A voided order cannot be captured or refunded. _(v5: updating the linked \`cardTransaction\` to \`declined\` is not yet implemented in this prototype.)_`,
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       response: {
@@ -280,7 +281,8 @@ A voided order cannot be captured or refunded. The linked \`cardTransaction\` st
       tags: ['gateway'],
       summary: 'Refund a captured payment (SD-64: captured → refunded)',
       description: `Issues a partial or full refund for a captured payment. Allowed only from \`captured\` status.
-Partial refunds are supported: \`refundAmount\` must be ≤ original payment amount.`,
+Partial refunds are supported: \`refundAmount\` must be ≤ original payment amount.
+_(v5: state validation, refund amount check, and 422 enforcement are not yet implemented in this prototype.)_`,
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       body: {

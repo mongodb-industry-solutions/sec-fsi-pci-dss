@@ -145,7 +145,6 @@ in this list response; it requires Level 2 access and a separate request.`,
                 type: 'object',
                 properties: {
                   paymentCardInstanceReference: { type: 'string', description: 'Card UUID.' },
-                  paymentCardReference: { type: 'string', description: 'Card surrogate token (not the PAN).' },
                   paymentCardMaskedPanDisplay: { type: 'string', description: 'Last-4 display string.' },
                   paymentCardNetwork: {
                     type: 'string',
@@ -167,7 +166,6 @@ in this list response; it requires Level 2 access and a separate request.`,
           },
         },
         401: { description: 'Missing or invalid Bearer token.', $ref: 'Error#' },
-        404: { description: 'Customer not found.', $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {

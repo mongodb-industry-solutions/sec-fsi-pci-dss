@@ -50,9 +50,10 @@ export async function buildApp(): Promise<FastifyInstance> {
   fastify.addHook('preHandler', authMiddleware);
 
   // DB availability guard: return 503 for all /api/* routes when the DB is down.
+  // Excludes /api/v1/system/health so it can report degraded status even when Atlas is unreachable.
   // This runs after auth so unauthenticated requests still get 401, not 503.
   fastify.addHook('preHandler', async (_request, reply) => {
-    if (fastify.dbError !== null && _request.url.startsWith('/api/')) {
+    if (fastify.dbError !== null && _request.url.startsWith('/api/') && !_request.url.startsWith('/api/v1/system/health')) {
       return reply.status(503).send({
         error: 'Service unavailable',
         detail: fastify.dbError,

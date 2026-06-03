@@ -68,7 +68,7 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 | 03.2 | `POST /api/v1/customer/:customerId/cards` registers a tokenized card in `paymentCard` | Card token stored encrypted; expiry date stored as QE:none |
 | 03.3 | `GET /api/v1/transactions/:id` returns transaction by ID | Response includes transaction metadata; sensitive fields excluded from Level 1 response |
 | 03.4 | Auto-create a `fraudDiagnosisCase` when amount > 500 or MCC is in a risk list | Case is created and linked to the transaction on every triggering event |
-| 03.5 | `GET /health` returns 200 with Atlas connection status | Returns `{ status: "ok", atlas: "connected" }` when Atlas is reachable |
+| 03.5 | `GET /api/v1/system/health` returns 200 with Atlas connection status | Returns `{ status: "ok", atlas: "connected", kmsProvider, timestamp }` when Atlas is reachable; returns 503 when unreachable |
 
 #### FR-v1-04: Investigation API (Backend)
 

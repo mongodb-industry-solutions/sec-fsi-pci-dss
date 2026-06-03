@@ -147,14 +147,14 @@ GET    /api/v1/customer/:customerId/cards        list customer cards            
 POST   /api/v1/customer/:customerId/cards        register card for customer
 POST   /api/v1/transactions              create transaction (triggers fraud case)   ← module: transactions / SD-254
 GET    /api/v1/transactions/:id          get transaction by ID
-GET    /api/v1/transactions/:id/raw      raw Atlas document (plain MongoClient, for simulator toggle)
+GET    /api/v1/system/raw/:collection/:id raw Atlas document (plain MongoClient, for simulator toggle; dev-only)
 GET    /api/v1/transactions?cardToken=   list by card token (standard index, not QE)
 GET    /api/v1/fraud                     list cases (filter: status, severity)      ← module: fraud / SD-83
 GET    /api/v1/fraud/:id                 case detail
 POST   /api/v1/fraud/:id/escalate        [v2]
-GET    /api/v1/fraud/:id/events          [v2] audit events per case
+GET    /api/v1/fraud/:id/events          audit events per case
 GET    /api/v1/diagnostics/query-timing  [v4]
-GET    /health
+GET    /api/v1/system/health
 ```
 
 ### 3.6 Security considerations
@@ -246,7 +246,7 @@ Each module maps to one or more BIAN Service Domains. No module exists without a
 | `transactions` | SD-254 | Card Transaction | `cardTransaction` · `cardTransactionSensitive` | `equality` on accountRef · `none` on rawGatewayPayload | `/api/v1/transactions` | **In scope** — CHD |
 | `fraud` | SD-83 | Fraud Diagnosis | `fraudDiagnosisCase` · `fraudDiagnosisCaseEvents` | None — operational metadata, FK refs only | `/api/v1/fraud` · `/api/v1/fraud/:id/events` | Adjacent — references CDE keys |
 | `gateway` *(v5)* | SD-64 · SD-65 · SD-89 · SD-57 | Payment Order · Payment Execution · Merchant Relations · Card Etoken | `merchantAgreement` · `paymentOrder` · `tokenVault` | `none` on merchantApiKeyHash · `equality` on merchant/customer refs | `/api/v1/gateway` | **In scope** — merchant secrets + payment refs |
-| `system` | — | Demo infrastructure | None | None | `/health` · `/api/v1/demo` | Non-CDE — excluded from production |
+| `system` | — | Demo infrastructure | None | None | `/api/v1/system/health` · `/api/v1/system/raw/:collection/:id` | Non-CDE — raw endpoint blocked in production |
 
 #### 3.8.2 Shared resources
 
@@ -587,7 +587,7 @@ The correct story is: encrypt what the standard requires, nothing more. QE equal
 
 **Decision:** The frontend supports two distinct modes selectable from the landing page:
 
-- **Simulator Mode:** No login. Story-driven, presenter-controlled. Each step is a scripted screen with talking points. The "Encrypted in Atlas" toggle calls the raw document endpoint (`GET /api/v1/transactions/:id/raw`) via a plain MongoClient to show actual ciphertext. Suitable for conference demos, screen recordings, and low-bandwidth environments.
+- **Simulator Mode:** No login. Story-driven, presenter-controlled. Each step is a scripted screen with talking points. The "Encrypted in Atlas" toggle calls the raw document endpoint (`GET /api/v1/system/raw/:collection/:id`) via a plain MongoClient to show actual ciphertext. Suitable for conference demos, screen recordings, and low-bandwidth environments.
 - **Application Mode:** Full JWT login via the pre-seeded user selector. Role-based routing: customer → payment flow; Level 1 Analyst → investigation dashboard; Level 2 Investigator → escalation workflow; Auditor → audit trail. Suitable for hands-on prospect workshops and guided evaluations.
 
 Both modes connect to the same Fastify API and the same Atlas cluster. The mode selection is a frontend routing concern only: no backend changes required.

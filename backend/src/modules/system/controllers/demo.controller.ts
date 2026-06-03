@@ -2,8 +2,8 @@ import { FastifyInstance } from 'fastify';
 import { getRawClient } from '../../../vendors/encryption/rawClient';
 
 // Mounted at /system → /api/v1/system
-// - GET /health        public, always available
-// - GET /raw/:col/:id  JWT required, non-production only
+// - GET /api/v1/system/health       public, always available (bypasses DB guard)
+// - GET /api/v1/system/raw/:col/:id JWT required, non-production only
 export async function demoController(fastify: FastifyInstance) {
 
   // GET /api/v1/system/health
