@@ -243,6 +243,58 @@ function Invoke-SetGlobalSSHLogin {
         Write-Host ""
     }
 
+    # Optional: signed commits via SSH key
+    Write-Host "------------------------------------------------------------"
+    Write-Host " Signed commits (optional)"
+    Write-Host "------------------------------------------------------------"
+    Write-Host "  Configures git to sign every commit with an SSH key so that"
+    Write-Host "  VSCode and other tools can commit against strict branch rules."
+    Write-Host "  Sets: gpg.format=ssh  user.signingkey=<pub>  commit.gpgsign=true"
+    Write-Host ""
+
+    $signKey = ""
+    if ($keyName -ne "") {
+        $enableSign = (Read-Host "Enable signed commits with key '$keyName'? (y/N)").Trim().ToLower()
+        if ($enableSign -eq "y") { $signKey = $keyName }
+    } else {
+        $enableSign = (Read-Host "Enable signed commits? (y/N)").Trim().ToLower()
+        if ($enableSign -eq "y") {
+            Write-Host ""
+            Write-Host "Select a key to use for signing:"
+            $idx2 = 1
+            foreach ($pub in $pubKeys) {
+                $fp2 = & ssh-keygen -lf $pub.FullName 2>&1
+                Write-Host "  $idx2. $($pub.BaseName)"
+                Write-Host "     $fp2"
+                $idx2++
+            }
+            Write-Host ""
+            $signSel = (Read-Host "Key number for signing (leave empty to skip)").Trim()
+            if ($signSel -ne "") {
+                $signIdx = [int]$signSel - 1
+                if ($signIdx -ge 0 -and $signIdx -lt $keyList.Count) {
+                    $signKey = $keyList[$signIdx]
+                } else {
+                    fail "Invalid selection — skipping signed commits."
+                }
+            }
+        }
+    }
+
+    if ($signKey -ne "") {
+        $signPubPath = ("$SSHDir\$signKey.pub") -replace '\\', '/'
+        action "Configuring signed commits with key '$signKey'..."
+        run { git config --global gpg.format ssh }
+        run { git config --global user.signingkey "$signPubPath" }
+        run { git config --global commit.gpgsign true }
+        ok "Signed commits enabled."
+        Write-Host ""
+        Write-Host "  Verify : git config --global --list | Select-String 'gpg|sign'"
+        Write-Host "  Note   : Add the public key to GitHub as an SSH *Signing* key at"
+        Write-Host "           https://github.com/settings/keys (type: Signing Key)"
+        Write-Host ""
+    }
+
     # Optionally authenticate / re-authenticate gh CLI with SSH protocol
     chk "GitHub CLI authentication status..."
     $status = gh auth status 2>&1

@@ -291,6 +291,59 @@ set_global_ssh_login() {
         echo ""
     fi
 
+    # Optional: signed commits via SSH key
+    echo "------------------------------------------------------------"
+    echo " Signed commits (optional)"
+    echo "------------------------------------------------------------"
+    echo "  Configures git to sign every commit with an SSH key so that"
+    echo "  VSCode and other tools can commit against strict branch rules."
+    echo "  Sets: gpg.format=ssh  user.signingkey=<pub>  commit.gpgsign=true"
+    echo ""
+
+    SIGN_KEY=""
+    if [ -n "$KEY_NAME" ]; then
+        read -rp "Enable signed commits with key '$KEY_NAME'? (y/N): " ENABLE_SIGN
+        [[ "${ENABLE_SIGN,,}" == "y" ]] && SIGN_KEY="$KEY_NAME"
+    else
+        read -rp "Enable signed commits? (y/N): " ENABLE_SIGN
+        if [[ "${ENABLE_SIGN,,}" == "y" ]]; then
+            echo ""
+            echo "Select a key to use for signing:"
+            IDX2=1
+            for pub in "${PUB_KEYS[@]}"; do
+                KN=$(basename "$pub" .pub)
+                FP=$(ssh-keygen -lf "$pub" 2>/dev/null)
+                echo "  $IDX2. $KN"
+                echo "     $FP"
+                IDX2=$((IDX2 + 1))
+            done
+            echo ""
+            read -rp "Key number for signing (leave empty to skip): " SIGN_SEL
+            if [ -n "$SIGN_SEL" ]; then
+                SIGN_IDX=$((SIGN_SEL - 1))
+                if [ "$SIGN_IDX" -ge 0 ] && [ "$SIGN_IDX" -lt "${#KEY_NAMES[@]}" ]; then
+                    SIGN_KEY="${KEY_NAMES[$SIGN_IDX]}"
+                else
+                    fail "Invalid selection — skipping signed commits."
+                fi
+            fi
+        fi
+    fi
+
+    if [ -n "$SIGN_KEY" ]; then
+        SIGN_PUB_PATH="$SSH_DIR/$SIGN_KEY.pub"
+        action "Configuring signed commits with key '$SIGN_KEY'..."
+        run git config --global gpg.format ssh
+        run git config --global user.signingkey "$SIGN_PUB_PATH"
+        run git config --global commit.gpgsign true
+        ok "Signed commits enabled."
+        echo ""
+        echo "  Verify : git config --global --list | grep -E 'gpg|sign'"
+        echo "  Note   : Add the public key to GitHub as an SSH Signing key at"
+        echo "           https://github.com/settings/keys (type: Signing Key)"
+        echo ""
+    fi
+
     # Optionally authenticate / re-authenticate gh CLI with SSH protocol
     chk "GitHub CLI authentication status..."
     if gh auth status &>/dev/null; then
