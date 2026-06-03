@@ -841,7 +841,7 @@ backend/
 
 ```json
 // root package.json
-{ "setup:db": "npm run setup:db --prefix backend", "seed": "npm run seed --prefix backend" }
+{ "setup:db": "npm run setup:db --prefix backend", "setup:seed": "npm run seed --prefix backend" }
 
 // backend/package.json
 { "setup:db": "ts-node bin/setup.ts", "seed": "ts-node bin/seed.ts" }

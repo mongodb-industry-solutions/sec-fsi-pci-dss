@@ -1,7 +1,7 @@
 import { MongoClient } from 'mongodb';
-import { provisionDataEncryptionKeys } from '../encryption/keyVault';
+import { provisionDataEncryptionKeys, DEKs } from '../encryption/keyVault';
 
-export async function provisionDEKs(client: MongoClient) {
+export async function provisionDEKs(client: MongoClient): Promise<DEKs> {
   const keyVaultDb = client.db('encryption');
   await keyVaultDb.collection('__keyVault').createIndex(
     { keyAltNames: 1 },

@@ -1,0 +1,3202 @@
+[
+  {
+    "cardTransactionInstanceReference": "4dd6a964-deac-4975-96aa-b9c630f4f517",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-331d58d3-6974-45c5-88f6-3d005a8ba3fb",
+      "processorCode": "PROC8557",
+      "authCode": "AUTH198143"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T05:01:56.966Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "36d59340-be0a-4e08-b056-ed51f3a1473b",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-28d81e9c-7289-4200-9d52-7d84d86b9656",
+      "processorCode": "PROC9951",
+      "authCode": "AUTH188229"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T23:58:16.474Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "0f86bccf-f74b-4402-84e5-0c324f1eea5e",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-7146d3cb-9d11-432b-b8e7-582a1a30b03b",
+      "processorCode": "PROC8292",
+      "authCode": "AUTH715572"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T03:04:55.352Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "f29b4bc3-a63c-428c-a8bf-7b79b54cdee6",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-c1e9b097-8564-41ad-bf01-dca95266f2aa",
+      "processorCode": "PROC9220",
+      "authCode": "AUTH677741"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T09:30:04.076Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "b7296269-6140-4874-9728-f867086a715b",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-fd35f12f-0e51-451c-8ff0-4f3ac6bc0fa5",
+      "processorCode": "PROC5774",
+      "authCode": "AUTH960510"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T12:26:40.935Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "d27562b0-81ca-4d18-b8ee-1aaa96fbca32",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-f806e085-ea82-4770-92c8-f311ff5f6a73",
+      "processorCode": "PROC9256",
+      "authCode": "AUTH213145"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T00:59:58.727Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "a6ef41a1-c719-40ee-a174-025b531428e0",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-946b6c1f-ab46-49cd-a984-dd138d46c0b6",
+      "processorCode": "PROC9577",
+      "authCode": "AUTH352611"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T06:57:36.020Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "f41000c3-7a65-4762-89fa-347fc5287a22",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-6606544a-26cc-4374-b59d-c38a08445bba",
+      "processorCode": "PROC3647",
+      "authCode": "AUTH993053"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T21:14:22.171Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "708df675-3bfb-425a-8fc5-66a1c4710c5b",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-f4f492ac-7ae6-4286-940e-98e1a3132e0e",
+      "processorCode": "PROC9749",
+      "authCode": "AUTH686788"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T04:35:16.315Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "f611c4c8-3faa-4477-95b6-f6ce284c0b58",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-67678ab7-7618-409d-a0bf-9a7d3c5ac210",
+      "processorCode": "PROC2492",
+      "authCode": "AUTH732389"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T06:37:58.972Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "3f5d36b5-563c-465f-9fdb-0e8187859099",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-6e0920fd-379a-4300-9167-9a0fd7cef3ef",
+      "processorCode": "PROC5009",
+      "authCode": "AUTH678341"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T15:32:20.462Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "b065217e-50c9-47b0-800a-525dfd689919",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-8fcd0f2c-9b02-4567-9c4d-9ccc548738b6",
+      "processorCode": "PROC2779",
+      "authCode": "AUTH248851"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T22:58:40.774Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "4ab58c42-1d11-4ddd-9486-8d23bd6334ae",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-6cf7e7b1-7da5-4fe7-9da0-7fab3f85b7b0",
+      "processorCode": "PROC1538",
+      "authCode": "AUTH222958"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T13:39:25.793Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "855ed3ac-e087-4895-b76b-9ba06235e46b",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-08317359-7107-482a-8253-01364dc003ab",
+      "processorCode": "PROC3565",
+      "authCode": "AUTH518830"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T12:28:58.471Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "2c5dbf72-2036-47e5-a11c-18c63acc1392",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-1c22b339-ad45-4fd6-9000-10372a53f63c",
+      "processorCode": "PROC8652",
+      "authCode": "AUTH380344"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T21:03:36.124Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "313957e8-5dc8-401d-a161-3341d9c68d86",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-c0c33dde-3f85-4fc4-8a64-90fa1dbcb66f",
+      "processorCode": "PROC5455",
+      "authCode": "AUTH885338"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T16:21:24.734Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "d7531b1a-d6dd-4acc-abaf-fd7cce426624",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-64462128-f10e-48d5-b8b3-3997a299f9ee",
+      "processorCode": "PROC8837",
+      "authCode": "AUTH921931"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T11:18:03.392Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "eec4c0b6-c81a-497c-abea-375682d2adc6",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-d6cd8d08-ccac-4ec5-bfc9-269048a1ee2b",
+      "processorCode": "PROC8199",
+      "authCode": "AUTH579486"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T13:29:40.086Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "5afc8486-2c72-452e-ba41-9290eb1e9e06",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-33778641-6d13-48e3-a6ae-5ba4325fff57",
+      "processorCode": "PROC6658",
+      "authCode": "AUTH762818"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T08:32:40.863Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "59da4b13-59b5-4bd0-a1b4-85029b4ec4cb",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-66d6ed4f-d829-4731-a748-9fa9c5ea1a95",
+      "processorCode": "PROC2383",
+      "authCode": "AUTH516687"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T23:18:18.097Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "efd73305-3150-42f4-9063-80320a47f3da",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-a16ed6bb-6b92-4db8-a738-e1df45cba027",
+      "processorCode": "PROC7155",
+      "authCode": "AUTH123865"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T14:12:56.468Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "68f54764-04f4-4e50-be4f-e60e069b6ea0",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-0f9ac721-c333-4df2-af51-ee77f51fcd1d",
+      "processorCode": "PROC2120",
+      "authCode": "AUTH146129"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T02:54:05.742Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "b44704b6-4c0e-42bf-8e3f-d29c2e32e2fb",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-71cb3709-c2e3-4af0-ae3e-41064167a749",
+      "processorCode": "PROC2074",
+      "authCode": "AUTH281738"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T18:24:21.134Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "fa450e6e-2f10-4abb-bee0-53faf94368a2",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-bc74a0f8-fa01-4cfa-b7b1-780f28fa9325",
+      "processorCode": "PROC4126",
+      "authCode": "AUTH936778"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T15:08:52.531Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "f4fb6a66-aa3b-4f96-877c-5426816a7413",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-ac553b73-de4b-4661-b39e-54e03e74b415",
+      "processorCode": "PROC9512",
+      "authCode": "AUTH816276"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T22:28:43.135Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "143c5c6d-940f-4afc-932f-5fa1c775bf5d",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-509c5d91-9e17-4a54-8892-8b70e1aa46f1",
+      "processorCode": "PROC8462",
+      "authCode": "AUTH189041"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T08:08:55.790Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "4fb32407-be68-4d5f-a3f8-7a5d5d296721",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-cd08ca46-d867-4be2-9563-eb74187cd065",
+      "processorCode": "PROC2231",
+      "authCode": "AUTH915589"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T20:28:24.300Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "0df761b4-c525-450e-97cf-f2717b072125",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-6b7b3579-12c1-4bb6-b06d-408d9cd10694",
+      "processorCode": "PROC7319",
+      "authCode": "AUTH156721"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T02:32:41.739Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "93354622-4785-45b7-8c5c-4a822e7a9557",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-be52e770-c9a0-4f16-a61e-bdb46deba5b2",
+      "processorCode": "PROC8683",
+      "authCode": "AUTH476943"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T00:35:06.334Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "4d9b8ee5-bade-4b84-911f-b35b5b950d12",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-4080e95e-2868-40d7-82f6-d07a2c3e59e7",
+      "processorCode": "PROC5248",
+      "authCode": "AUTH804299"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T14:14:19.896Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "1770a3c3-ce21-49db-8adc-4cce2e8adc57",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-472b5e91-7bfd-4cf2-b43d-4b225ab4781f",
+      "processorCode": "PROC9995",
+      "authCode": "AUTH319839"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T23:38:40.052Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "afc64dc7-944f-4f6d-bb92-e253b3ac480f",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-c6414e5d-1e09-4120-a23a-63e6affb46c9",
+      "processorCode": "PROC8550",
+      "authCode": "AUTH426607"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T22:08:31.411Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "f4bdc3b9-7bde-4058-a674-72a326f5ea98",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-e1b51aea-90b1-41fd-8eb2-442942896ba1",
+      "processorCode": "PROC3094",
+      "authCode": "AUTH568541"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T14:32:18.264Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "51b086bd-4a3d-46ba-bd40-1d855beaaf37",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-1bd471f8-fdb7-4fcc-ab65-ce47aa7ebc1c",
+      "processorCode": "PROC9605",
+      "authCode": "AUTH873178"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T09:16:20.417Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "1578475b-daa4-4158-96d8-093bf3139510",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-56a78ea5-aa73-4cbc-8251-14aeba3fdbce",
+      "processorCode": "PROC3178",
+      "authCode": "AUTH482393"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T01:53:14.067Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "ecac9c55-0dca-4415-bf6a-6098f1b13423",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-cb77fd2c-cb86-4069-880b-b15d069550c4",
+      "processorCode": "PROC9938",
+      "authCode": "AUTH795230"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T18:49:31.136Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "8d53e999-3942-416b-9421-5bd1eb768abe",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-c6320504-a0b4-46f9-87e8-a8073bec25fd",
+      "processorCode": "PROC1028",
+      "authCode": "AUTH391809"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T02:17:12.333Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "77d4db7b-abbb-4f78-9c32-9de876e66ca4",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-b66ad7fc-d7c8-4634-acd5-b425a7c8a0f1",
+      "processorCode": "PROC6509",
+      "authCode": "AUTH622295"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T20:22:03.990Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "c75b4391-36c8-400c-b49d-a50681aebc35",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-8684ae6b-b4ac-446b-bb0e-9f20bc3dcbb2",
+      "processorCode": "PROC5153",
+      "authCode": "AUTH956916"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T10:35:13.200Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "7b9bf341-716f-42a5-a803-131195401318",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-2bc0553e-7311-462a-9d3c-bda3941d7207",
+      "processorCode": "PROC4913",
+      "authCode": "AUTH105063"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T03:03:03.138Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "8745658b-1629-47d2-9d8a-113321004bb8",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-0fc5e996-caec-4cd3-bdc9-71d40d7ac586",
+      "processorCode": "PROC4004",
+      "authCode": "AUTH767355"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T05:08:47.133Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "cb447d72-fe8d-4819-add9-a0d056a70bb2",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-7ba87afd-34c3-4e6f-945c-f609466f8c58",
+      "processorCode": "PROC2891",
+      "authCode": "AUTH252481"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T09:36:22.988Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "9be49f94-652e-4181-820b-19e9169b7a68",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-a248735e-6c27-4235-b6dc-ae3996ad17d6",
+      "processorCode": "PROC2574",
+      "authCode": "AUTH709505"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T12:52:09.329Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "7c33a23c-8491-4506-983f-2dd7e376aa14",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-fe2a3683-c438-4d2b-a236-d5404467ebef",
+      "processorCode": "PROC5807",
+      "authCode": "AUTH860160"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T03:18:54.224Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "bb200e33-b13b-4f5d-8801-12890c48af03",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-9d271650-33f1-437f-b0de-3eae4356079c",
+      "processorCode": "PROC2523",
+      "authCode": "AUTH698048"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T02:28:12.669Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "0e0f6ad2-1f60-41e0-bc9e-f3cd149f6f08",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-d6a7e517-e054-444e-8b96-867aa931f74b",
+      "processorCode": "PROC3648",
+      "authCode": "AUTH420007"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T18:11:57.233Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "fe59937e-f144-425d-a039-a48c43b95ccf",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-511999f6-ca70-429e-9284-7f8e5833b6a1",
+      "processorCode": "PROC2504",
+      "authCode": "AUTH347685"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T16:46:59.847Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "56568b9d-8e3a-438f-9a90-34267024dc17",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-7110879b-7e29-44e6-b809-6fbe4bc73bb5",
+      "processorCode": "PROC8446",
+      "authCode": "AUTH872358"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T14:14:34.540Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "53950e9a-ceec-4b90-9926-80b270dc0526",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-e93faa02-9601-4bfc-8a9e-c3d2af862e80",
+      "processorCode": "PROC6291",
+      "authCode": "AUTH476161"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T23:29:41.845Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "f169098b-f46b-4d96-8e39-41468cbe9b23",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-138647e6-8306-4157-8869-9fb1ba6f6198",
+      "processorCode": "PROC8484",
+      "authCode": "AUTH564063"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T07:02:22.790Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "3e7e4c86-be8e-4ac8-80f0-87b0e9182ed6",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-cef6a545-3905-470f-873e-b0a2a7f7d429",
+      "processorCode": "PROC8547",
+      "authCode": "AUTH535047"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T09:10:52.854Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "d70b1d1a-b4ad-4913-aa80-d5786af162a4",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-e6ed0596-f1b5-4ab5-b721-eae309059375",
+      "processorCode": "PROC5921",
+      "authCode": "AUTH232209"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T20:00:03.993Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "35ec69da-5aaa-42a8-a2ef-6d2454f695d4",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-68cfdaf5-7f6e-454c-8879-436950d5c609",
+      "processorCode": "PROC8699",
+      "authCode": "AUTH668015"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T15:41:36.473Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "679fbf21-e1f5-4a93-8ff7-f88cea5fccea",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-dbd229af-9c89-46bc-8a34-c53570c8d0af",
+      "processorCode": "PROC9830",
+      "authCode": "AUTH201323"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T21:49:00.988Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "9498f27d-7a8c-4902-bc70-8df85e101905",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-66b44a72-5d01-415c-b254-8f16341b820d",
+      "processorCode": "PROC3552",
+      "authCode": "AUTH757353"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T06:59:47.726Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "55d068ed-c497-4084-8f97-5d4e64d1ebd8",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-0acce198-a384-4b6f-b794-161a785128a8",
+      "processorCode": "PROC2937",
+      "authCode": "AUTH646817"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T05:45:53.865Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "1a3bc47d-bfff-4501-80d3-b6e17511de5d",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-aec0de53-3cc9-4b54-acb0-3d6c4d3319f0",
+      "processorCode": "PROC7159",
+      "authCode": "AUTH474223"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T10:50:27.310Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "26872372-5f93-4101-a9d3-535e30ade1ae",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-ff5ebc64-d118-4ddd-834d-dfe4d5a8da85",
+      "processorCode": "PROC5548",
+      "authCode": "AUTH696072"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T22:01:13.819Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "fa9d055a-7ee8-44c4-889b-2077facff54e",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-7a218e46-2096-4e66-9b11-c2546a3b49f3",
+      "processorCode": "PROC6139",
+      "authCode": "AUTH142286"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T12:54:26.419Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "7e17ba37-a94c-472a-bbe8-4f03809b84d6",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-70675e79-a9db-40c9-97d4-2e84015f6a47",
+      "processorCode": "PROC7631",
+      "authCode": "AUTH743155"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T15:37:38.425Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "5caad350-591b-4bd0-8a54-82fa78dba331",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-e5ea6a9d-0599-447c-b0dc-3ac7e00610d6",
+      "processorCode": "PROC9184",
+      "authCode": "AUTH688551"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T13:14:25.507Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "2747c0f1-a67c-4dc2-96b4-f2116968410e",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-9d26b01e-1cf5-4818-a2eb-fbf411352579",
+      "processorCode": "PROC6197",
+      "authCode": "AUTH345412"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T19:39:34.855Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "6e55f0a0-4ae9-4387-a42b-87de980c0d0e",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-1422396f-ac07-49e6-82f8-b8f925b7f75d",
+      "processorCode": "PROC5873",
+      "authCode": "AUTH985244"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T14:58:54.405Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "9e1a339e-cead-4cd6-b744-f4d5e7371589",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-fc75fefb-0402-4e35-bd9f-e9c1b75471e8",
+      "processorCode": "PROC5590",
+      "authCode": "AUTH440852"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T14:40:06.057Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "e02a5494-0d8b-45a5-890a-cff41f313248",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-3e758a2f-202d-4d30-a47f-36164df641c3",
+      "processorCode": "PROC5867",
+      "authCode": "AUTH139911"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T15:11:17.675Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "02c37c71-08ab-41f7-89d7-93721973d9f8",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-95433e5e-a41c-4563-affb-9a395a551d28",
+      "processorCode": "PROC2005",
+      "authCode": "AUTH512902"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T05:23:40.362Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "131f1544-c126-438f-81a2-9e0f983a3547",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-b3742668-9b54-41fb-b638-c3857e9af920",
+      "processorCode": "PROC8934",
+      "authCode": "AUTH347360"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T03:53:08.584Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "d7b332d7-93c7-41de-8794-f0837b96981a",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-49b655da-9313-4d89-a627-fd423f75108a",
+      "processorCode": "PROC3917",
+      "authCode": "AUTH556602"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T07:13:24.124Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "71fb7af5-8199-47d3-a4ab-f8b3bbeccb6d",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-f02a859c-43b4-4da2-9ab2-725a6cdef96d",
+      "processorCode": "PROC6045",
+      "authCode": "AUTH447858"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T14:01:51.234Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "082c6e7d-4a8f-4e58-b3c8-7b3bbdf1fee9",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-6aa5fc1c-5089-4d84-9801-7ab2f5725a1a",
+      "processorCode": "PROC1273",
+      "authCode": "AUTH261550"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T01:17:49.709Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "1118878e-607f-463b-9c38-62811c08ce0f",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-2818dbc7-a416-43cc-88a6-4fec97ee7eaf",
+      "processorCode": "PROC6407",
+      "authCode": "AUTH948872"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T23:38:11.267Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "4d4b2434-2022-4b2a-b38e-819529a18631",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-82577716-9325-40ab-99b9-f2c24acb59e1",
+      "processorCode": "PROC7114",
+      "authCode": "AUTH848531"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T01:20:26.194Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "67ff8074-afb5-4762-bbb5-b0cf9374995b",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-705a02a6-4adb-46bb-82fa-0ec541b5f228",
+      "processorCode": "PROC3884",
+      "authCode": "AUTH930243"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T00:55:39.025Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "2bcb24a7-30b7-4f8e-99f7-19616c29e9a0",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-335788f4-b9f0-42ed-a282-2f757734466b",
+      "processorCode": "PROC4098",
+      "authCode": "AUTH652965"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T12:59:02.463Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "9803ea7a-cce2-4abd-b8d0-4e16f656395c",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-e20a7d87-3daf-40e9-ad8f-5756779bdcc2",
+      "processorCode": "PROC5973",
+      "authCode": "AUTH776903"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T07:02:29.350Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "11fa4299-db09-4935-83fc-db63e1214af1",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-c2ca189c-7812-418d-99df-4b11534ed749",
+      "processorCode": "PROC2341",
+      "authCode": "AUTH259096"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T19:47:00.073Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "82357561-a951-4d22-b13b-ba5813f32240",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-b46ed2fb-42c5-450f-a217-910aa59474c5",
+      "processorCode": "PROC1315",
+      "authCode": "AUTH352331"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T07:35:11.634Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "c7909e1f-2f5d-4fcf-ac8a-30fd9f5d6274",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-e38bec86-0a40-438a-8128-f2b251d087b3",
+      "processorCode": "PROC3398",
+      "authCode": "AUTH328124"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T08:52:45.845Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "a0e16b4f-6c3e-46d3-b0e1-393b9ce7dc3d",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-ff170258-a044-4aa5-9412-58394e18a611",
+      "processorCode": "PROC3939",
+      "authCode": "AUTH958913"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T22:36:50.986Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "12b8a93c-df10-494d-82c6-0fb6279b5516",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-59e42fc1-c188-4169-892e-dcf0ce1f0378",
+      "processorCode": "PROC9031",
+      "authCode": "AUTH765999"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T20:44:59.977Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "e58a8fb3-c311-48be-a864-ee9c2fbc95f7",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-d0a26203-b95f-4342-ae64-e4bf7cfedaf9",
+      "processorCode": "PROC4051",
+      "authCode": "AUTH247411"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T11:32:42.733Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "6da4bbd3-8871-4eea-b614-e39339fa177c",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-47be242b-3c06-41b8-b72c-b490a1453d13",
+      "processorCode": "PROC5573",
+      "authCode": "AUTH858076"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T05:00:46.950Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "e82dd618-6fb3-4a96-a8bd-417e6ee5c9c1",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-413fef79-c832-4d0d-a0b4-2a4a8bc7f1b3",
+      "processorCode": "PROC8534",
+      "authCode": "AUTH553385"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T12:20:23.822Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "a2aed446-3d4c-4120-aa84-8520bc7dd7f9",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-3bdbbc97-ed0d-4cd3-ab43-54e7b453bb59",
+      "processorCode": "PROC2922",
+      "authCode": "AUTH240181"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T15:03:20.821Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "b8f53a68-f303-4742-8d25-476c8dfe75f5",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-ef723334-1d14-40de-9dd2-a115afb1daf7",
+      "processorCode": "PROC9956",
+      "authCode": "AUTH313787"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T05:23:52.694Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "1b3d9629-2c35-4e36-a61c-7f7130791cbf",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-5bbe2a5c-107a-4b0b-adc8-117a0eea06c1",
+      "processorCode": "PROC5455",
+      "authCode": "AUTH393959"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T00:58:43.301Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "511ef801-11d7-41be-8de1-a5fc1fbb564e",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-ae4b0c47-9a6f-4c4f-986f-426d4dd35b60",
+      "processorCode": "PROC1964",
+      "authCode": "AUTH853010"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T07:55:52.713Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "767cc8a3-3f25-484b-b74e-cf7aa9f26f5b",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-ad1fa993-a758-4af0-80e6-cd7e8725b0fe",
+      "processorCode": "PROC9357",
+      "authCode": "AUTH910949"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T17:17:04.396Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "25cf054e-1ec5-4d92-bd59-053f8a76b498",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-ddbb238a-44d3-44e9-8e3b-4748628ed388",
+      "processorCode": "PROC7022",
+      "authCode": "AUTH399689"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T21:42:28.168Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "5f08fa5b-d52b-4132-ae95-7ccc966605b3",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-2cf2ad16-4640-4109-a779-a22560c60a44",
+      "processorCode": "PROC3143",
+      "authCode": "AUTH129674"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T08:52:14.805Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "844390f5-d88c-490c-bbb7-35b281f73a48",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-6dc35ae6-de5c-4552-bb5a-90230ea430d3",
+      "processorCode": "PROC6974",
+      "authCode": "AUTH556277"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T14:42:30.898Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "39d4ae79-8ff9-42be-bc60-88db9541604d",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-1582f47a-3868-41b8-b145-c9a0b72266ea",
+      "processorCode": "PROC8286",
+      "authCode": "AUTH512422"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T09:14:09.077Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "62873b90-beaf-4c0f-a169-23fb18b8897a",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-a441599f-6560-4a8b-8dc5-eff2d0cbc1a5",
+      "processorCode": "PROC3246",
+      "authCode": "AUTH541676"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T22:37:27.517Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "ffe050be-463b-44cb-a87a-b0a64b2497a7",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-10cd942f-2885-4ce5-bd90-561c19e323ef",
+      "processorCode": "PROC3981",
+      "authCode": "AUTH529491"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T14:03:13.970Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "77e3ddba-349a-4442-bbe1-62f08270bd88",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-0d588aae-e2ad-4012-8db5-f3d5f7684dd0",
+      "processorCode": "PROC5269",
+      "authCode": "AUTH291857"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T13:24:19.685Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "5f9ba14d-2a31-450e-859c-c920d14ffe36",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-5ea75bb6-ca99-411f-bd19-0b5371a98ef2",
+      "processorCode": "PROC5926",
+      "authCode": "AUTH260874"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T15:42:11.409Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "fb526f44-77f4-455f-b0fb-cce1ffbc60d8",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-cf251061-23ad-4f73-9aeb-bd95b7a953cb",
+      "processorCode": "PROC5451",
+      "authCode": "AUTH881315"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T00:51:45.718Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "7625df98-9515-4f4b-9b56-349d35960989",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-b8e56578-2087-4040-8b3d-10e302451c82",
+      "processorCode": "PROC9685",
+      "authCode": "AUTH864261"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T23:23:33.900Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "8ccdb911-3e9c-4c1d-8b98-8879e1f80cee",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-2a727fd6-bb69-4702-8b84-84651f9c5fbc",
+      "processorCode": "PROC4266",
+      "authCode": "AUTH954711"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T19:55:57.218Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "18f19fe6-cde7-4db3-af3b-e0aa08e8e70f",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-7daefb3f-221b-463e-91aa-529e50c98df4",
+      "processorCode": "PROC9354",
+      "authCode": "AUTH153661"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T15:58:36.447Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "a82cc119-b9c2-437d-b292-84aea7075b92",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-f48b703b-a758-4ed7-8ef9-788f00ac653a",
+      "processorCode": "PROC7744",
+      "authCode": "AUTH961638"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T08:51:06.927Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "2f40f6dd-e017-4d53-88c6-4131546934f1",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-dfeda0db-1c67-4a4c-a49a-a6ae9378422f",
+      "processorCode": "PROC6683",
+      "authCode": "AUTH356699"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T21:39:08.112Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "ce210357-bc4f-41c5-babf-9eafab833248",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-08d9f2fd-3506-48d9-aa4e-28f9b1e34039",
+      "processorCode": "PROC8363",
+      "authCode": "AUTH939905"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T04:00:59.959Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "099b1d7b-6bc9-409a-84f5-e45693c2563c",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-c8186d31-50ea-480b-91b8-438a1aba8220",
+      "processorCode": "PROC2668",
+      "authCode": "AUTH995913"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T15:10:04.305Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "1ac5bf12-0e42-4819-a5ad-b307ca06ff00",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-fdcd35c0-d2d4-4072-9367-c3ffc89a8d2d",
+      "processorCode": "PROC1887",
+      "authCode": "AUTH897717"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T08:08:44.586Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "7be68d42-717f-4ae2-9b96-87c4b1195257",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-d2a94f61-b343-4ebf-a00a-6f0f045be91e",
+      "processorCode": "PROC6669",
+      "authCode": "AUTH359556"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T00:32:05.715Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "5d6f36fa-52c9-4aba-a48e-dcc34fc72912",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-2107cef1-8839-47a5-ac81-783b87e129dd",
+      "processorCode": "PROC7039",
+      "authCode": "AUTH678027"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T07:49:24.850Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "248e42cc-26a1-4e59-a2bf-913e7b6d5907",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-49c50b19-e70c-4284-bb92-a55da8308281",
+      "processorCode": "PROC6742",
+      "authCode": "AUTH796190"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T20:58:43.251Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "294b914c-45d2-42d0-bf92-919612f5f2f6",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-b7651505-e935-4215-aa11-d9cc185c9666",
+      "processorCode": "PROC2021",
+      "authCode": "AUTH724258"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T07:20:36.902Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "94490a59-1ac0-41a5-a1eb-d417c593689f",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-f39519d8-b215-4fe9-973a-5ec56d7a7db6",
+      "processorCode": "PROC8471",
+      "authCode": "AUTH660986"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T03:34:06.837Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "f1fdae68-e47a-471c-bd0b-c5d978e3419e",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-7cbd456e-642d-429a-be04-b25a98363b99",
+      "processorCode": "PROC1345",
+      "authCode": "AUTH577968"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T21:58:31.863Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "336593a4-2e16-478b-8873-12679bbeba4e",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-a3b3a4a2-8be5-4f67-9fd5-5a73339b66d0",
+      "processorCode": "PROC1233",
+      "authCode": "AUTH607274"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T14:24:28.075Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "239ecb04-6240-4708-be02-6d890a8a5fea",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-22fb530f-9dc1-46d4-bf28-78f72cb9af81",
+      "processorCode": "PROC2437",
+      "authCode": "AUTH168463"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T15:03:47.944Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "1fcf573f-ef7b-47ef-af00-ed862f9414e0",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-2ab791c0-2aef-4262-95bb-c66b8f2a668b",
+      "processorCode": "PROC1558",
+      "authCode": "AUTH423683"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T19:11:58.868Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "76fbd179-5db4-4d49-85c3-4aca9544c8ef",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-40565afb-dbd0-49c6-bd29-b889f9173075",
+      "processorCode": "PROC4150",
+      "authCode": "AUTH232331"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T01:34:04.941Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "819be83e-8aba-43dd-a708-a08ca9e7bb52",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-f72423dc-741f-49ab-b897-81b3a1a1fccc",
+      "processorCode": "PROC6010",
+      "authCode": "AUTH256373"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T08:10:01.328Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "c9db1a4b-d49f-43e2-95d2-89bc4d200250",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-7ebc0fdc-ff47-407e-8582-6a6f62f0f67a",
+      "processorCode": "PROC7645",
+      "authCode": "AUTH428701"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T10:29:19.744Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "a602a48e-f3ee-49ca-8266-51540a19b2e3",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-773c1708-dd82-46ac-b8c7-2dd905dad549",
+      "processorCode": "PROC5990",
+      "authCode": "AUTH516641"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T11:40:53.715Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "95000f47-10cf-4d07-b721-b4e491adc54b",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-bdf18ae1-b4b8-47b0-a27a-1a2f8a04836c",
+      "processorCode": "PROC9485",
+      "authCode": "AUTH442691"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T23:56:59.194Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "98cf0e67-5dd4-488a-8c32-73aa74bd0107",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-6a405a8e-7d39-4859-bd22-c1cb9d132b1c",
+      "processorCode": "PROC6221",
+      "authCode": "AUTH305707"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T13:20:58.508Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "3919a440-c566-4632-85ee-e36a794f790c",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-48f21432-c4b4-46d1-b533-9a548294c225",
+      "processorCode": "PROC6227",
+      "authCode": "AUTH482958"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T15:35:54.238Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "4071a5d5-0026-4fe2-9e40-9fbd12744ab1",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-b2432467-b3f6-4684-b2a8-ace9630500dc",
+      "processorCode": "PROC4858",
+      "authCode": "AUTH748703"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T00:01:25.354Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "18995395-e443-456b-b33b-c49323277a3a",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-49431688-749b-430e-bdd7-531c291c97d2",
+      "processorCode": "PROC3487",
+      "authCode": "AUTH808114"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T12:32:29.935Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "37b54414-4858-4422-9fcb-e16b7df1bf9c",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-b138ee80-9865-48c4-8930-a6dd479768df",
+      "processorCode": "PROC1736",
+      "authCode": "AUTH178392"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T03:55:57.670Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "42c69876-5a52-4618-88c9-4cc4e90692cb",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-39b0fc48-412d-4c71-9472-0afabac63070",
+      "processorCode": "PROC4199",
+      "authCode": "AUTH909986"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T14:14:36.230Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "649a5a6b-063e-4848-b9a0-3bb8f5b3b3bd",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-d18faaba-e3b6-4e6e-904f-6eddbd65e23b",
+      "processorCode": "PROC8264",
+      "authCode": "AUTH211990"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T21:23:11.865Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "0d8c02f7-17f8-46b5-ad6e-01ef8047b8f9",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-81a5fabb-7162-4ab6-92de-475693147c80",
+      "processorCode": "PROC6296",
+      "authCode": "AUTH782458"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T05:29:38.943Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "202e3e35-3029-468d-8bb8-4fc1dbc64cf9",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-1ce45fcd-6a20-4fbb-97ee-b4793c8457d3",
+      "processorCode": "PROC4928",
+      "authCode": "AUTH196743"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T22:13:15.282Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "e7ab3978-3873-43d5-9cea-f1947470eefe",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-18e9760c-278c-4997-9852-4af9fc9a7451",
+      "processorCode": "PROC7033",
+      "authCode": "AUTH989702"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T15:54:24.644Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "64d10256-cc03-4a3e-8a28-8a2cf441881f",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-50ec2a06-44f5-42c9-b4cf-3cdbb7e783c8",
+      "processorCode": "PROC6370",
+      "authCode": "AUTH468797"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T13:47:02.065Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "af6e13a6-335e-4ba0-a3db-9e1ee4d68b79",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-6ea289bb-f238-403a-95e4-94d8c9376ccb",
+      "processorCode": "PROC7658",
+      "authCode": "AUTH620102"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T00:19:03.823Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "d46f8804-b34a-4eb2-ac6a-991ca95e6754",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-25e4e86e-a247-4fdc-909a-40a8748d12ec",
+      "processorCode": "PROC3625",
+      "authCode": "AUTH499506"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T12:53:36.381Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "e7821dd7-525d-4f33-b218-185da938b68d",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-8348e98c-2322-4634-aa4c-d6b5793bcfdb",
+      "processorCode": "PROC9222",
+      "authCode": "AUTH958992"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T10:26:57.481Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "adc8359a-490c-410d-81cb-61565954f566",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-ebc3777b-b561-4809-ba6b-1267a3edea6c",
+      "processorCode": "PROC3166",
+      "authCode": "AUTH494949"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T10:46:53.371Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "f44a08c6-74ec-4768-a1c2-ae991f1d58fb",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-fe79adc3-d09d-44eb-a8c1-4cb8c002405f",
+      "processorCode": "PROC3608",
+      "authCode": "AUTH555956"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T10:16:12.926Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "54da657e-8f60-423c-a6f4-c2c1b433d235",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-212d64bc-8455-45eb-b04c-a1063871ffdf",
+      "processorCode": "PROC4623",
+      "authCode": "AUTH637440"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T23:29:14.135Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "c76a1272-bad0-4180-a8ec-f041861d5399",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-eb72fa2f-1057-4025-89fa-e6efee9d0e34",
+      "processorCode": "PROC3734",
+      "authCode": "AUTH904586"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T09:35:36.400Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "3702781f-af3c-4239-bde4-40ae59b3782c",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-0d75ce70-6b07-4305-9bd6-2cfbf4262394",
+      "processorCode": "PROC5606",
+      "authCode": "AUTH194130"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T13:28:45.406Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "00321d05-6bbc-4481-9a08-bbd24036e01a",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-b826449a-ac5b-4a76-87b4-b5fc7f2ae509",
+      "processorCode": "PROC4944",
+      "authCode": "AUTH370229"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T12:00:37.338Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "f75b4078-598c-48cb-a0a9-0ae3e5410962",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-8771a0ea-3daa-4635-b439-36a7eafe5532",
+      "processorCode": "PROC8122",
+      "authCode": "AUTH205211"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T17:21:31.804Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "8993b4cd-aa8c-4602-8a89-51f195194349",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-e56a1938-5113-4013-9d6b-2e45d4ae6e53",
+      "processorCode": "PROC2695",
+      "authCode": "AUTH530301"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T12:12:21.977Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "2ecde2ab-2711-44aa-b114-6d56be47b85f",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-42bc3076-9828-443e-83d6-f12413d2c2b5",
+      "processorCode": "PROC5012",
+      "authCode": "AUTH141787"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T06:23:31.123Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "aae52a1b-d3d8-446f-b073-14aa23add36f",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-307af4b3-79a2-44d9-bdb7-6e579ae481ce",
+      "processorCode": "PROC5845",
+      "authCode": "AUTH677473"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T10:45:53.047Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "bb8f2bd8-7631-4bbe-a90a-c5613dd7e777",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-402f909e-0142-4731-b1cd-75e183f728f1",
+      "processorCode": "PROC3496",
+      "authCode": "AUTH786711"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T04:34:50.948Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "9226f1ca-ee63-451b-8ab3-ccd9dbc42060",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-c0910a83-32eb-4c67-993a-38788b26e602",
+      "processorCode": "PROC3856",
+      "authCode": "AUTH941367"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T05:47:11.209Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "89c82f46-72ea-4e6f-83d4-16b2fdf2e24b",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-52edc131-7498-4c60-b14e-568c1bf850cc",
+      "processorCode": "PROC9428",
+      "authCode": "AUTH732756"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T01:36:19.527Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "55cb6d52-1d23-426b-82f5-d4d2a5dfe546",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-77a54a6b-ff44-4154-825c-8d7fa5cf56d1",
+      "processorCode": "PROC5313",
+      "authCode": "AUTH907585"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T07:29:31.558Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "e5717db1-d916-4429-b094-c137a9337590",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-1bea9836-436d-41bd-9b82-b16c3caff206",
+      "processorCode": "PROC4109",
+      "authCode": "AUTH867132"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T00:01:09.726Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "e70efc19-7c9d-4472-a5d7-2eab88f14128",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-bfa3ed22-0dc4-47ec-a050-cd5fb9b80e78",
+      "processorCode": "PROC4393",
+      "authCode": "AUTH620607"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T15:14:03.609Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "94031890-d25e-43b8-b626-50bfe137bf01",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-7bf41af3-6114-4831-ab78-4bbff4e292d0",
+      "processorCode": "PROC7636",
+      "authCode": "AUTH904313"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T16:19:32.437Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "b248e120-aab3-418c-9062-52338c7d2ba8",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-3b217918-d6e3-49c5-8c37-2e5639495af7",
+      "processorCode": "PROC1818",
+      "authCode": "AUTH978947"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T18:21:39.118Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "2215b0de-906d-42ad-996b-9864c6eb89ca",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-b0343cc9-5c39-4244-a4e8-1f92fe41deb6",
+      "processorCode": "PROC1340",
+      "authCode": "AUTH384486"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T18:14:47.893Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "0e9a6ab4-2190-4b2d-b1cf-aa8bd02d527e",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-a1798a19-6760-4223-bcb0-2906b4ac25ea",
+      "processorCode": "PROC5367",
+      "authCode": "AUTH477152"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T08:36:06.934Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "14d05e7c-129f-4ca5-9224-b8b99ca75ec1",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-830fa237-6c01-4d5d-a84e-b44a02645dc2",
+      "processorCode": "PROC5378",
+      "authCode": "AUTH240428"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T12:27:54.741Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "e8aa0584-3c78-4e57-8da7-0f60f8d09064",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-6a996ad8-1b17-4ef1-80de-260ed50b5be8",
+      "processorCode": "PROC2484",
+      "authCode": "AUTH141833"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T09:42:33.954Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "60467e05-258c-4be5-bd85-69df6f19efcf",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-628b2ac6-b7b4-4270-b268-08e50ca6a6a1",
+      "processorCode": "PROC4948",
+      "authCode": "AUTH533556"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T17:25:38.806Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "687c696e-188b-4a5e-86ff-5f113af109fb",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-14c58613-dbc3-4dd0-b99c-2d2b55753324",
+      "processorCode": "PROC8896",
+      "authCode": "AUTH819647"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T06:53:45.922Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "bc7191e7-bc49-4fa7-be82-9ff86569c1d7",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-c39cb5eb-f97b-46d7-b958-8f1f22f69a58",
+      "processorCode": "PROC2058",
+      "authCode": "AUTH744427"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T19:33:36.472Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "474deac8-ad1b-47b6-8a5c-bc175020d145",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-a61197dc-f223-4653-948c-6ad7a97efdce",
+      "processorCode": "PROC2530",
+      "authCode": "AUTH232691"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T23:06:52.586Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "df749673-c3ef-4fb9-8ac0-2e8fe199852b",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-ad1c6ade-8444-4281-b2b5-007d0ed66ea4",
+      "processorCode": "PROC8603",
+      "authCode": "AUTH507289"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T04:17:52.009Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "b392937d-5bcc-4fe5-a73a-8d8aa3f2eee6",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-0ad86c88-92a1-4901-aec2-2f41d83d88ac",
+      "processorCode": "PROC8702",
+      "authCode": "AUTH124861"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T16:50:55.149Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "5f8d45ac-15db-4fe6-b0d7-442a2d286086",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-7a77767e-bcb0-4455-be95-2805636626d5",
+      "processorCode": "PROC8479",
+      "authCode": "AUTH642144"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T04:33:20.235Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "0f41d7fe-8829-47e8-bdbd-5be95e1d9175",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-a50f12b3-62cc-4fa8-b1ac-07c681f3ddf9",
+      "processorCode": "PROC9618",
+      "authCode": "AUTH713688"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T11:44:47.088Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "7b5c3eaf-4121-4756-9a93-d9ff4d0e07fa",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-a1bc7757-59db-439d-a3c8-95c477ed314e",
+      "processorCode": "PROC2792",
+      "authCode": "AUTH603599"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T08:11:08.153Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "c1349357-79dd-4fff-b8b7-6dc5400d42af",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-23c20342-65cc-4ba0-8239-ef27a48e4ff3",
+      "processorCode": "PROC5911",
+      "authCode": "AUTH460294"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T23:02:31.517Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "aa8e66cb-c44a-4588-8631-e43eefdc9e35",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-3681d06f-2444-40d5-833c-74839863807a",
+      "processorCode": "PROC2951",
+      "authCode": "AUTH305874"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T20:02:15.964Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "f7ddbf1a-7d70-4b1a-a4e2-2d547bbe7358",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-9de3981f-27b0-4102-8ed1-b3e343cd32c2",
+      "processorCode": "PROC1073",
+      "authCode": "AUTH835159"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T13:34:14.532Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "49bb193f-2d71-4c0f-846a-c77bc8262fe2",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-58d51b0a-38db-4292-8fba-83dfa6b6b12e",
+      "processorCode": "PROC1273",
+      "authCode": "AUTH822675"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T16:43:59.026Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "e22f5608-512c-48b0-ad2f-4d0c52a7b837",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-4063349c-7f31-4f27-b5e1-d491cc591a39",
+      "processorCode": "PROC7152",
+      "authCode": "AUTH195819"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T16:42:51.193Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "77aeefd0-5869-4407-b9ed-7278d523e608",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-4aa64514-5c02-462c-adc4-910771c01d5f",
+      "processorCode": "PROC3755",
+      "authCode": "AUTH978344"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T16:20:35.353Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "e7ffe575-95d6-4353-bb9b-72a353630d02",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-4558be39-985c-4a2e-9195-45658dd22136",
+      "processorCode": "PROC3931",
+      "authCode": "AUTH801406"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T13:15:08.669Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "b74c1e94-b547-4fa2-aaab-8bf0fc481f73",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-97bcf90b-14e9-4e95-a056-3979ddc29dfb",
+      "processorCode": "PROC4756",
+      "authCode": "AUTH472324"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T14:53:30.406Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "57f4aaf8-92e7-4307-8e51-ba338b13bd9d",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-23a6a41d-797e-4675-baeb-ac7c8351a3ac",
+      "processorCode": "PROC1764",
+      "authCode": "AUTH534877"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T12:25:56.422Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "03cafbeb-4799-489e-98a6-9b2a86a76578",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-9ee934b1-3abd-428d-8b61-cd602c646081",
+      "processorCode": "PROC2565",
+      "authCode": "AUTH683809"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T12:20:02.519Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "02c69ea1-12f5-41c1-9c25-c89872567033",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-3bbac650-416f-4718-995e-cdb44c480a65",
+      "processorCode": "PROC1927",
+      "authCode": "AUTH709639"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T11:22:10.548Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "26cb2289-c219-4f12-9012-362107b18a30",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-deae6384-e53b-4509-8d61-1b75e8bed7a3",
+      "processorCode": "PROC5994",
+      "authCode": "AUTH257700"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T01:00:06.975Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "1a22936f-2f7a-4068-89c5-a0db48c8586e",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-dc99082f-5208-4587-bf3a-6e9aa238ff01",
+      "processorCode": "PROC7891",
+      "authCode": "AUTH717886"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T23:38:49.038Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "75bcef66-eda1-4767-b0dd-889bf466068f",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-7f46c1c8-1d0c-4ff6-a507-f4c7a153156c",
+      "processorCode": "PROC6548",
+      "authCode": "AUTH234425"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T13:04:29.144Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "f30aa4a5-f648-42e8-bbc8-e24669a4e61b",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-d78043ef-92f1-4e60-9f0f-55628636c24d",
+      "processorCode": "PROC7815",
+      "authCode": "AUTH446301"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T06:03:35.124Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "2dba126b-60a2-40c1-9547-21e6af88cd76",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-7a5943ec-a31b-4002-b049-30c20ea1de63",
+      "processorCode": "PROC3553",
+      "authCode": "AUTH438049"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T09:13:34.279Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "b78c3a1d-cc47-41ee-82b2-25cdb4aa74e9",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-69223e92-860a-4d00-b23c-493310577719",
+      "processorCode": "PROC5869",
+      "authCode": "AUTH239193"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T00:16:13.493Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "965e722e-c397-4dc5-be38-766312d762c5",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-4b762916-dbae-46ea-8b0a-7209b7614025",
+      "processorCode": "PROC4220",
+      "authCode": "AUTH952421"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T17:52:37.067Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "dddb3b72-9923-4a1d-bca8-1e8474c578a4",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-2464a971-80e7-424a-8c25-a8a54a990a82",
+      "processorCode": "PROC6036",
+      "authCode": "AUTH950563"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T08:01:11.912Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "29178fce-d982-462b-bf75-b4085660ccc7",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-8d202ede-feee-413e-a507-4ef45b4f8b3d",
+      "processorCode": "PROC8518",
+      "authCode": "AUTH480003"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T19:19:28.486Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "8dd6252c-e41a-4990-af34-a6de4a9a006c",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-b70f4896-e329-4fee-8d11-18f06120accd",
+      "processorCode": "PROC6727",
+      "authCode": "AUTH883607"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T09:46:07.623Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "e8d4c443-e610-4648-92c7-4a832b6993b8",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-da8f18d2-3d62-4d06-a577-e49788bbbdad",
+      "processorCode": "PROC8156",
+      "authCode": "AUTH233315"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T13:40:46.007Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "12e0b7e1-8637-4dad-90eb-8c3428ad9653",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-2506abe3-6146-4f92-a5f1-a67a5115ae61",
+      "processorCode": "PROC1653",
+      "authCode": "AUTH262879"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T12:34:00.062Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "1a3873ab-059f-4335-a6e9-e43f1a0c02f5",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-46831e59-44ec-4961-88aa-3416b122c162",
+      "processorCode": "PROC9530",
+      "authCode": "AUTH597605"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T14:49:47.631Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "bb222453-81b8-4c21-8e53-41a3c3b38b90",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-35c5d522-3799-41c6-b1d2-bca4d68774c9",
+      "processorCode": "PROC7744",
+      "authCode": "AUTH553934"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T00:20:52.691Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "0f6e2ea9-2533-4393-8246-77624010aca8",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-ba4a0260-bcfe-45da-924d-949b3a2555ff",
+      "processorCode": "PROC9039",
+      "authCode": "AUTH523029"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T18:28:54.059Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "6a886d6b-d841-49e3-ba88-097240713eb7",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-3cf8c092-3e71-4d4b-a056-5e6b3109c24c",
+      "processorCode": "PROC3553",
+      "authCode": "AUTH943073"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T06:07:46.231Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "500a984e-7195-43eb-b5bb-dfc5700e4830",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-16f780fe-703b-456d-8efa-b0d844fedf2c",
+      "processorCode": "PROC3069",
+      "authCode": "AUTH166472"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T16:52:47.734Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "a2697f6a-fa80-4f0a-803f-02065dfc576f",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-edef75d5-409f-43e2-9fdf-3ec8ba7dbd13",
+      "processorCode": "PROC6005",
+      "authCode": "AUTH446742"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T08:23:59.028Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "84df9003-5026-45cc-8a8f-ca3e0769d218",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-c2f8e562-f6a1-415d-8723-0cfbb0855a71",
+      "processorCode": "PROC4480",
+      "authCode": "AUTH249915"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T12:57:21.213Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "a7e956c8-7a62-4443-82cc-97617425be23",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-8a1b69ec-ccb6-4aef-9e1e-6728c345e58e",
+      "processorCode": "PROC7210",
+      "authCode": "AUTH935949"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-06-01T06:31:54.717Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "b56a030e-a6c4-4b5b-9721-eea61a84644d",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-5788d488-7f62-401f-9d3c-0f8c67a589d9",
+      "processorCode": "PROC3318",
+      "authCode": "AUTH755771"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-29T20:28:13.505Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "b4acd29e-bd73-4ab8-988f-6f93af736435",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-4e0d703d-a2b8-4c52-ad68-60132e4f9987",
+      "processorCode": "PROC6249",
+      "authCode": "AUTH411076"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T04:10:09.048Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "0b9029ad-e528-47be-a67f-3ea56526426d",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-fb6f34e8-09af-4406-b435-02d3052debe6",
+      "processorCode": "PROC1725",
+      "authCode": "AUTH129550"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T00:59:52.075Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "58d67d71-e337-4b4f-b7f9-23414abd3af5",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-b4f69df8-d4f0-49e6-a17c-c04bee61b899",
+      "processorCode": "PROC2021",
+      "authCode": "AUTH748457"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-31T15:46:34.095Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "294163c9-81b0-46b9-b627-7a6e0789bc5a",
+    "rawGatewayPayload": {
+      "gatewayId": "GW-672fccd8-4dda-4313-9117-9c8c788a14e8",
+      "processorCode": "PROC8941",
+      "authCode": "AUTH834182"
+    },
+    "processorTransactionMetadata": {
+      "networkId": "VISA_NET",
+      "settlementDate": "2026-05-30T01:21:07.118Z",
+      "processingFlags": [
+        "standard"
+      ]
+    },
+    "schemaVersion": 1
+  }
+]

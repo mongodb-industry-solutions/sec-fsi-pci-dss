@@ -15,6 +15,7 @@
 | **v2** | Investigation & Control | CISO-ready: RBAC, escalation, audit trail, KMS key rotation | 4–6 weeks after v1 |
 | **v3** | Agentic Fraud Investigation | AI-assisted L1 pre-review using MongoDB Agentic Platform (Magenta preferred) | TBD after v2 validated |
 | **v4** | Advanced Capabilities | Leafy Bank-ready: recurring payment, range queries, performance story | TBD after v3 validated |
+| **v5** | Payment Gateway + Modular Architecture | API-first payment platform: modular backend (BIAN SD modules) + gateway layer (SD-64/65/89/57) | TBD after v4 validated |
 
 ---
 
@@ -26,7 +27,7 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 
 ### Definition of Done
 
-- [ ] `npm run install:all && npm run setup:db && npm run seed` completes without errors
+- [ ] `npm run setup && npm run setup:db && npm run setup:seed` completes without errors
 - [ ] `docker compose up` starts both services and the demo is accessible at `http://localhost:3000`
 - [ ] Payment flow completes and creates a fraud diagnosis case in Atlas
 - [ ] Investigation search returns a result for an encrypted `customerEmailAddress`
@@ -63,22 +64,22 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 03.1 | `POST /api/v1/card-transactions` writes to `cardTransaction` and `cardTransactionSensitive` via QE auto-encryption | QE fields in Atlas are ciphertext; plaintext fields are readable |
-| 03.2 | `POST /api/v1/payment-cards` registers a tokenized card in `paymentCard` | Card token stored encrypted; expiry date stored as QE:none |
-| 03.3 | `GET /api/v1/card-transactions/:id` returns transaction by ID | Response includes transaction metadata; sensitive fields excluded from Level 1 response |
+| 03.1 | `POST /api/v1/transactions` writes to `cardTransaction` and `cardTransactionSensitive` via QE auto-encryption | QE fields in Atlas are ciphertext; plaintext fields are readable |
+| 03.2 | `POST /api/v1/customer/:customerId/cards` registers a tokenized card in `paymentCard` | Card token stored encrypted; expiry date stored as QE:none |
+| 03.3 | `GET /api/v1/transactions/:id` returns transaction by ID | Response includes transaction metadata; sensitive fields excluded from Level 1 response |
 | 03.4 | Auto-create a `fraudDiagnosisCase` when amount > 500 or MCC is in a risk list | Case is created and linked to the transaction on every triggering event |
-| 03.5 | `GET /health` returns 200 with Atlas connection status | Returns `{ status: "ok", atlas: "connected" }` when Atlas is reachable |
+| 03.5 | `GET /api/v1/system/health` returns 200 with Atlas connection status | Returns `{ status: "ok", atlas: "connected", kmsProvider, timestamp }` when Atlas is reachable; returns 503 when unreachable |
 
 #### FR-v1-04: Investigation API (Backend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 04.1 | `GET /api/v1/customer-agreements?email=<value>` performs QE equality search | Returns matching record when email value matches an encrypted field |
-| 04.2 | `GET /api/v1/customer-agreements?phone=<value>` performs QE equality search | Returns matching record when phone value matches |
-| 04.3 | `GET /api/v1/customer-agreements?accountRef=<value>` performs QE equality search | Returns matching record when account reference matches |
-| 04.4 | `GET /api/v1/card-transactions?cardToken=<value>` performs standard index query on `paymentCardReference` | Returns matching transactions for the given card token (token is not CHD: standard index, not QE) |
-| 04.5 | `GET /api/v1/fraud-diagnosis-cases` returns paginated list with filters `status` and `severity` | Filtering works; response includes pagination metadata |
-| 04.6 | `GET /api/v1/fraud-diagnosis-cases/:id` returns full case detail | Response includes linked transaction reference and customer reference |
+| 04.1 | `GET /api/v1/customer?email=<value>` performs QE equality search | Returns matching record when email value matches an encrypted field |
+| 04.2 | `GET /api/v1/customer?phone=<value>` performs QE equality search | Returns matching record when phone value matches |
+| 04.3 | `GET /api/v1/customer?accountRef=<value>` performs QE equality search | Returns matching record when account reference matches |
+| 04.4 | `GET /api/v1/transactions?cardToken=<value>` performs standard index query on `paymentCardReference` | Returns matching transactions for the given card token (token is not CHD: standard index, not QE) |
+| 04.5 | `GET /api/v1/fraud` returns paginated list with filters `status` and `severity` | Filtering works; response includes pagination metadata |
+| 04.6 | `GET /api/v1/fraud/:id` returns full case detail | Response includes linked transaction reference and customer reference |
 
 #### FR-v1-05: Authentication (Backend + Frontend)
 
@@ -150,7 +151,7 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 11.1 | Level 1 can trigger an escalation request on an open case | `POST /api/v1/fraud-diagnosis-cases/:id/escalate` changes status to `escalated` |
+| 11.1 | Level 1 can trigger an escalation request on an open case | `POST /api/v1/fraud/:id/escalate` changes status to `escalated` |
 | 11.2 | Level 2 Investigator sees pending escalation cases in a dedicated queue | Cases with status `escalated` appear in the Level 2 dashboard |
 | 11.3 | Level 2 approves and sensitive QE:none fields are decrypted and displayed | `residentialAddressFull` and `governmentIdentificationReference` are shown after approval |
 | 11.4 | Escalation approval writes an audit event with timestamp, role, and field names accessed | Audit event persists in `fraudDiagnosisCase.diagnosisActionLog` |
@@ -177,13 +178,13 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | 14.1 | `GET /api/v1/audit-events?caseId=<id>` returns action log for the case | Response contains all events in chronological order |
-| 14.2 | `POST /api/v1/fraud-diagnosis-cases/:id/escalate` creates escalation record | Status changes to `escalated`; escalation event is logged |
+| 14.2 | `POST /api/v1/fraud/:id/escalate` creates escalation record | Status changes to `escalated`; escalation event is logged |
 
 #### FR-v2-15: Range Query Support (Backend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 15.1 | `GET /api/v1/card-transactions?amountMin=<n>&amountMax=<n>` performs QE range query on `transactionAmount.amount` | Returns only transactions within the encrypted amount range |
+| 15.1 | `GET /api/v1/transactions?amountMin=<n>&amountMax=<n>` performs QE range query on `transactionAmount.amount` | Returns only transactions within the encrypted amount range |
 | 15.2 | `transactionAmount.amount` is defined in `encryptedFieldsMap` with `queryType: "range"`, `min: 0`, `max: 999999`, `precision: 2` | QE range query executes without error |
 
 ---
@@ -225,8 +226,8 @@ Introduce an AI agent (MongoDB Agentic Platform, Magenta preferred) into the fra
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | 30.1 | Agent is triggered automatically when a fraud case status transitions to `open` | Agent invocation logged within 2 seconds of case creation |
-| 30.2 | Agent queries `customerAgreement` by `cardTransactionAccountReference` to retrieve customer profile | Agent uses existing QE equality search endpoint: `GET /api/v1/customer-agreements?accountRef=<value>` |
-| 30.3 | Agent queries `cardTransaction` for prior transactions by same card token | Agent uses `GET /api/v1/card-transactions?cardToken=<value>` |
+| 30.2 | Agent queries `customerAgreement` by `cardTransactionAccountReference` to retrieve customer profile | Agent uses existing QE equality search endpoint: `GET /api/v1/customer?accountRef=<value>` |
+| 30.3 | Agent queries `cardTransaction` for prior transactions by same card token | Agent uses `GET /api/v1/transactions?cardToken=<value>` |
 | 30.4 | Agent produces a structured JSON draft: `{ riskSummary, recommendedAction, confidenceScore, supportingEvidence[] }` | All four fields are present in the agent output |
 | 30.5 | Agent action is appended to `diagnosisActionLog` with `performedByRole: 'ai_agent'` | Log entry present in MongoDB document after agent completes |
 
@@ -317,6 +318,96 @@ Make the demo Leafy Bank integration-ready and Solutions Library publishable. Ad
 | NFR-v4-02 | UX | Returning customer payment with saved card completes in fewer steps than first-time payment | Saved card flow requires ≤ 2 steps vs 3 for new card |
 | NFR-v4-03 | Portability | Demo can be embedded into Leafy Bank with ≤ 1 week of integration work | Integration scaffold validated by Leafy Bank team review |
 | NFR-v4-04 | Content readiness | Solutions Library article passes the four-section template check | Validated using ks-mongodb-ist-content checklist |
+
+---
+
+---
+
+## v5: Payment Gateway + Modular Architecture
+
+### Objective
+
+Extend the demo from a **fraud investigation tool** to a **full payment platform story**: MongoDB as the PCI DSS-aligned data backbone for a card payment gateway. The backend is restructured into domain modules (one per BIAN SD cluster) and a new gateway module adds four BIAN Service Domains (SD-89, SD-64, SD-65, SD-57), three collections, and a full payment order lifecycle API. The frontend adds the merchant as a visible actor in the demo flow.
+
+The structural refactor (P19–P21) has zero functional impact: same API surface, same QE behaviour, same frontend. The gateway module (P22–P25) adds new capabilities on top.
+
+### Definition of Done
+
+- [ ] All v4 DoD criteria still pass
+- [ ] `npm run build` exits 0; no TypeScript errors after structural refactor
+- [ ] No file remains in `backend/src/controllers/`, `backend/src/services/`, `backend/src/models/`, `backend/src/middleware/` (all moved to modules)
+- [ ] `npm run setup:db` creates `merchantAgreement`, `paymentOrder`, `tokenVault` collections
+- [ ] Atlas Data Explorer confirms `merchantApiKeyHash` is ciphertext (QE:none)
+- [ ] `POST /api/v1/gateway/payments` creates a payment order with status `initiated`
+- [ ] Full authorize flow: create → confirm → authorize creates a linked `cardTransaction` and `fraudDiagnosisCase` (if MCC/amount triggers)
+- [ ] Idempotency: duplicate `X-Idempotency-Key` returns 409
+- [ ] Merchant profile panel visible in fraud case detail (merchant name, MCC, risk category, amount ratio)
+- [ ] Simulator Mode step 0 shows merchant creating the payment intent
+
+---
+
+### FR-v5: Functional Requirements
+
+#### FR-v5-P1: Backend Structural Refactor (no functional change)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| P1.1 | All backend source files moved to `src/modules/<module>/controllers/services/models/` | No file remains in the old flat `src/controllers/`, `src/services/`, `src/models/` directories |
+| P1.2 | Shared types extracted to `src/shared/models/` (`risk`, `identity`, `transaction`) | `RiskSeverity`, `AnalystRole`, `TransactionSnapshot` imported from `shared/models/` in all consuming modules |
+| P1.3 | Each module exports a single Fastify plugin via `index.ts`; `server.ts` registers modules with `prefix: '/api/v1'` | All existing routes respond with identical status codes and response shapes as before the refactor |
+| P1.4 | `middleware/auth.ts` and `rbac.ts` moved to `vendors/middleware/` | Imports updated in `server.ts`; middleware behaviour unchanged |
+| P1.5 | `models/index.ts` barrel deleted; each module imports from its own `models/` directory | `grep -r "from '../models'" backend/src/modules` returns zero results |
+
+#### FR-v5-P2: Merchant Relations (SD-89)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| P2.1 | `POST /api/v1/merchants` creates a `merchantAgreement` document with all required BIAN fields | Document visible in Atlas; `merchantApiKeyHash` is ciphertext (QE:none) |
+| P2.2 | `GET /api/v1/merchants/:id` returns merchant profile without `merchantApiKeyHash` | Response includes `merchantName`, `merchantCategoryCode`, `merchantRiskCategory`, `merchantTransactionLimitAmount`; hash field absent |
+| P2.3 | `GET /api/v1/merchants` returns paginated merchant list with filters `status` and `mcc` | Pagination metadata present; filter by `merchantCategoryCode=5812` returns only gambling/restaurant merchants |
+| P2.4 | `cardTransaction` documents include `merchantAgreementInstanceReference` FK after v5 seed | FK links transaction to a seeded merchant; existing transactions without FK are valid (optional field, schema version 2) |
+
+#### FR-v5-P3: Payment Order Lifecycle (SD-64 + SD-65)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| P3.1 | `POST /api/v1/gateway/payments` creates a `paymentOrder` with status `initiated`; requires `X-Idempotency-Key` header | Order created; second call with same key returns 409 |
+| P3.2 | `POST /api/v1/gateway/payments/:id/confirm` transitions `initiated → confirmed`; sets `customerAgreementInstanceReference` | Status updated in Atlas; invalid transitions (e.g., confirm a voided order) return 422 |
+| P3.3 | Authorization step creates a `cardTransaction` (SD-254) and links it to the `paymentOrder` | `paymentOrder.linkedCardTransactionReference` populated; `cardTransaction` visible in the investigation dashboard |
+| P3.4 | Authorization triggers fraud evaluation if amount/MCC criteria met | `fraudDiagnosisCase` created and linked; uses `shared/services/fraudTrigger.service.ts` |
+| P3.5 | `POST /api/v1/gateway/payments/:id/capture` transitions `authorized → captured` | Status updated; only valid from `authorized` state |
+| P3.6 | `DELETE /api/v1/gateway/payments/:id` (void) transitions `authorized | confirmed → voided` | Status updated; no `cardTransaction` reversal required in v5 (documented limitation) |
+| P3.7 | `POST /api/v1/gateway/payments/:id/refund` records a partial or full refund; transitions `captured → refunded` | `refundAmount` recorded; amount validation against original amount |
+| P3.8 | `GET /api/v1/gateway/payments/:id` returns full payment order with current status and routing decision | Response includes `paymentOrderStatus`, `routingDecision.processor`, `linkedCardTransactionReference` |
+| P3.9 | `paymentOrder` TTL index expires stale `initiated` orders after 24 hours | MongoDB removes expired `initiated` orders automatically (verified in Atlas) |
+
+#### FR-v5-P4: Token Vault (SD-57)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| P4.1 | `POST /api/v1/gateway/tokens` creates a `tokenVault` record linked to a `customerAgreement` | Record visible in Atlas; `tokenVaultNetworkToken` is ciphertext if populated |
+| P4.2 | `GET /api/v1/gateway/tokens/:token` returns token metadata without `tokenVaultNetworkToken` | Response includes `tokenVaultStatus`, `tokenVaultCreatedAt`, `tokenVaultLastUsedAt`; network token absent |
+
+#### FR-v5-P5: Frontend — Merchant Context
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| P5.1 | Simulator Mode: step 0 "Merchant creates payment intent" is inserted before the checkout step | Step visible; shows merchant card (name, MCC, risk category) and the generated payment order reference |
+| P5.2 | Fraud case detail (Simulator + Application Mode): "Merchant Profile" panel shows merchant name, MCC description, risk category, average transaction amount, and amount ratio | Panel visible; ratio calculated as `transactionAmount / merchantAverageTransactionAmount`; label "78x merchant average" when ratio ≥ 10 |
+| P5.3 | Application Mode: route `/demo/merchant` accessible to users with role `merchant_portal` | Route loads without errors; shows merchant's payment orders list and profile |
+
+---
+
+### NFR-v5: Non-Functional Requirements
+
+| ID | Category | Requirement | Measure |
+|---|---|---|---|
+| NFR-v5-01 | Backward compatibility | Structural refactor does not change any API URL, request schema, or response shape | All v4 integration tests pass unchanged after refactor |
+| NFR-v5-02 | PCI CDE scope | Modules `customer`, `transactions`, `gateway` are explicitly documented as in-scope; `fraud`, `identity` as adjacent; `system` as non-CDE | EP §3.8.1 BIAN Module Map confirms scope classification; no CHD in `fraud` or `system` module responses |
+| NFR-v5-03 | Security | `merchantApiKeyHash` is never returned in any GET response | Integration test: `GET /merchants/:id` response parsed for absence of `merchantApiKeyHash` field |
+| NFR-v5-04 | Idempotency | Duplicate `X-Idempotency-Key` on any gateway write endpoint returns 409 within P95 < 100ms | Load test with duplicate key; verify consistent 409 response |
+| NFR-v5-05 | Demo explainability | A non-technical AE can narrate the gateway flow (merchant → intent → authorization → fraud case) in ≤ 2 minutes | Validated by IST team walkthrough |
+| NFR-v5-06 | Module isolation | No module imports from another module's `controllers/` or `models/` directory directly | `grep -r "from '../../[^s]" backend/src/modules` returns zero cross-module direct imports (only `shared/` and `vendors/` allowed) |
 
 ---
 

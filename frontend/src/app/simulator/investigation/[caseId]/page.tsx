@@ -2,10 +2,10 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { api, FraudCase, RawDocumentResponse } from '../../../../../lib/api';
-import { EncryptionBadge } from '../../../../../components/EncryptionBadge';
-import { RawDocumentPanel } from '../../../../../components/RawDocumentPanel';
-import { SEVERITY_COLORS, STATUS_COLORS } from '../../../../../lib/constants';
+import { api, FraudCase, RawDocumentResponse } from '../../../../lib/api';
+import { EncryptionBadge } from '../../../../components/EncryptionBadge';
+import { RawDocumentPanel } from '../../../../components/RawDocumentPanel';
+import { SEVERITY_COLORS, STATUS_COLORS } from '../../../../lib/constants';
 
 export default function SimulatorCaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
@@ -16,14 +16,14 @@ export default function SimulatorCaseDetailPage() {
   const [rawLoading, setRawLoading] = useState(false);
 
   useEffect(() => {
-    api.fraudCases.getById(caseId, '').then(setFraudCase).finally(() => setLoading(false));
+    api.fraud.getById(caseId, '').then(setFraudCase).finally(() => setLoading(false));
   }, [caseId]);
 
   async function toggleRaw() {
     if (!showRaw && !rawDoc && fraudCase) {
       setRawLoading(true);
       try {
-        const doc = await api.demo.rawDocument(
+        const doc = await api.system.rawDocument(
           'cardTransaction',
           fraudCase.linkedCardTransactionReference,
           ''

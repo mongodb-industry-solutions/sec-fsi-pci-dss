@@ -72,7 +72,7 @@ export default function PaymentPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await api.cardTransactions.create({
+      const res = await api.transactions.create({
         cardToken,
         accountReference: `ACC-${Date.now().toString(36).toUpperCase()}`,
         amount: parseFloat(form.amount),

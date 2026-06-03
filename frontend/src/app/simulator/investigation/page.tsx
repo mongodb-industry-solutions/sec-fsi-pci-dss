@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { api, FraudCase } from '../../../../lib/api';
-import { CaseTable } from '../../../../components/CaseTable';
+import { api, FraudCase } from '../../../lib/api';
+import { CaseTable } from '../../../components/CaseTable';
 
 type SearchField = 'email' | 'phone' | 'accountRef' | 'cardToken';
 
@@ -29,7 +29,7 @@ export default function SimulatorInvestigationPage() {
   async function loadCases() {
     setLoading(true);
     try {
-      const res = await api.fraudCases.list(
+      const res = await api.fraud.list(
         { status: filterStatus || undefined, severity: filterSeverity || undefined, limit: 20 },
         ''
       );

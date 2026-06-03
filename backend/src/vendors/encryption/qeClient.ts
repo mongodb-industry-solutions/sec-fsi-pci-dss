@@ -1,7 +1,8 @@
-import { MongoClient, Binary } from 'mongodb';
+import { MongoClient } from 'mongodb';
 import { buildKmsProviders } from './kms';
 import { buildEncryptedFieldsMaps } from './encryptedFieldsMaps';
 import { provisionDataEncryptionKeys } from './keyVault';
+import { resolveCryptLibOptions } from './cryptLib';
 
 const KEY_VAULT_NAMESPACE = 'encryption.__keyVault';
 let _client: MongoClient | null = null;
@@ -9,27 +10,32 @@ let _client: MongoClient | null = null;
 export async function getQEClient(): Promise<MongoClient> {
   if (_client) return _client;
 
+  // Plain client to resolve DEK IDs from the key vault
   const plainClient = new MongoClient(process.env.MONGODB_URI!);
   await plainClient.connect();
-  const { dekLookupId, dekSensitiveId } = await provisionDataEncryptionKeys(plainClient);
+  const deks = await provisionDataEncryptionKeys(plainClient);
   await plainClient.close();
 
-  const encryptedFieldsMap = buildEncryptedFieldsMaps(dekLookupId as Binary, dekSensitiveId as Binary);
+  const encryptedFieldsMap = buildEncryptedFieldsMaps(deks);
   const dbName = process.env.MONGODB_DB_NAME!;
+  const cryptLib = resolveCryptLibOptions();
 
   _client = new MongoClient(process.env.MONGODB_URI!, {
     autoEncryption: {
       keyVaultNamespace: KEY_VAULT_NAMESPACE,
       kmsProviders: buildKmsProviders(),
       encryptedFieldsMap: {
-        [`${dbName}.cardTransaction`]: encryptedFieldsMap.cardTransaction,
-        [`${dbName}.cardTransactionSensitive`]: encryptedFieldsMap.cardTransactionSensitive,
-        [`${dbName}.customerAgreement`]: encryptedFieldsMap.customerAgreement,
-        [`${dbName}.customerAgreementSensitive`]: encryptedFieldsMap.customerAgreementSensitive,
-        [`${dbName}.paymentCard`]: encryptedFieldsMap.paymentCard,
-        [`${dbName}.partyAuthentication`]: encryptedFieldsMap.partyAuthentication,
+        [`${dbName}.cardTransaction`]:             encryptedFieldsMap.cardTransaction,
+        [`${dbName}.cardTransactionSensitive`]:    encryptedFieldsMap.cardTransactionSensitive,
+        [`${dbName}.customerAgreement`]:           encryptedFieldsMap.customerAgreement,
+        [`${dbName}.customerAgreementSensitive`]:  encryptedFieldsMap.customerAgreementSensitive,
+        [`${dbName}.paymentCard`]:                 encryptedFieldsMap.paymentCard,
+        [`${dbName}.partyAuthentication`]:         encryptedFieldsMap.partyAuthentication,
       },
-      extraOptions: { cryptSharedLibRequired: true },
+      extraOptions: {
+        ...(cryptLib.cryptSharedLibPath && { cryptSharedLibPath: cryptLib.cryptSharedLibPath }),
+        cryptSharedLibRequired: cryptLib.cryptSharedLibRequired,
+      },
     },
   });
 

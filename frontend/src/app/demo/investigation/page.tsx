@@ -24,7 +24,7 @@ export default function InvestigationPage() {
   async function loadCases() {
     setLoading(true);
     try {
-      const res = await api.fraudCases.list(
+      const res = await api.fraud.list(
         { status: filterStatus || undefined, severity: filterSeverity || undefined, limit: 20 },
         token
       );
