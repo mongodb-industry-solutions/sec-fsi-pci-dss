@@ -7,6 +7,11 @@ function warn   { param($msg) Write-Host "[warn]   $msg" }
 function fail   { param($msg) Write-Host "[error]  $msg" }
 function action { param($msg) Write-Host "[action] $msg" }
 function chk    { param($msg) Write-Host "[check]  $msg" }
+function run {
+    param([scriptblock]$Block)
+    Write-Host "[cmd]    $($Block.ToString().Trim())"
+    & $Block
+}
 
 # ---- Dependency checks -------------------------------------
 
@@ -29,7 +34,7 @@ function Ensure-OpenSSH {
         return
     }
     action "Installing OpenSSH Client via Windows optional features..."
-    Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0 | Out-Null
+    run { Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0 } | Out-Null
     if (Get-Command ssh-keygen -ErrorAction SilentlyContinue) {
         ok "OpenSSH Client installed."
     } else {
@@ -46,7 +51,7 @@ function Ensure-GitHubCLI {
         return
     }
     action "Installing GitHub CLI via winget..."
-    winget install --id GitHub.cli --silent --accept-package-agreements --accept-source-agreements
+    run { winget install --id GitHub.cli --silent --accept-package-agreements --accept-source-agreements }
     $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" +
                 [System.Environment]::GetEnvironmentVariable("PATH", "User")
     if (Get-Command gh -ErrorAction SilentlyContinue) {
@@ -96,7 +101,7 @@ function Invoke-CreateSSHKey {
     action "Generating SSH key '$KeyFileName' for $Email..."
 
     try {
-        & ssh-keygen -t rsa -b 4096 -C "$Email" -f "$KeyPath" -N '""'
+        run { ssh-keygen -t rsa -b 4096 -C "$Email" -f "$KeyPath" -N '""' }
     } catch {
         fail "ssh-keygen failed. Ensure OpenSSH Client is installed and in PATH."
         return
@@ -159,18 +164,17 @@ function Invoke-GitHubAuth {
         Write-Host $status
         return
     }
-    action "Starting GitHub CLI authentication..."
-    Write-Host "  > When prompted, choose:"
-    Write-Host "      - GitHub.com"
-    Write-Host "      - SSH as preferred protocol"
-    Write-Host "      - Select your SSH key (e.g. id_rsa_github)"
-    Write-Host "      - Login with a web browser"
+    action "Starting GitHub CLI authentication via browser (OAuth)..."
+    Write-Host "  > A code will appear - open https://github.com/login/device and paste it."
+    Write-Host "  > If your org has app restrictions, approve 'GitHub CLI' access when prompted."
     Write-Host ""
-    gh auth login
+    run { gh auth login --web --git-protocol ssh --scopes repo,read:org,workflow }
     if ($LASTEXITCODE -eq 0) {
         ok "Authentication successful."
+        Write-Host ""
+        gh auth status
     } else {
-        fail "Authentication failed. Try running: gh auth login"
+        fail "Authentication failed. Try running: gh auth login --web --scopes repo,read:org,workflow"
     }
 }
 
@@ -191,7 +195,7 @@ function Invoke-GitHubLogout {
         Write-Host "Logout cancelled."
         return
     }
-    gh auth logout
+    run { gh auth logout }
     if ($LASTEXITCODE -eq 0) {
         ok "Logged out successfully. Run option 2 to authenticate as a different user."
     } else {
@@ -263,6 +267,105 @@ function Invoke-ListPRs {
     }
 }
 
+# ---- Option 6: Merge a pull request ------------------------
+
+function Invoke-MergePR {
+    Write-Host ""
+    chk "GitHub CLI authentication..."
+    gh auth status 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        fail "Not authenticated with GitHub CLI. Run option 2 first."
+        return
+    }
+    ok "Authenticated."
+
+    chk "Token scopes (repo scope required to merge)..."
+    $scopes = gh auth status 2>&1 | Select-String "Token scopes"
+    if ($scopes -notmatch "\brepo\b") {
+        warn "Token is missing the 'repo' scope. Attempting to refresh..."
+        run { gh auth refresh --scopes repo,read:org }
+        if ($LASTEXITCODE -ne 0) {
+            fail "Could not refresh token scopes. Try running: gh auth refresh --scopes repo,read:org"
+            return
+        }
+        ok "Token scopes refreshed."
+    } else {
+        ok "Token scopes OK: $scopes"
+    }
+
+    $RepoInput = Read-Host "Repository owner/repo (leave empty to use current directory)"
+    $BaseInput = Read-Host "Base branch (default: staging)"
+    $BaseBranch = if ($BaseInput.Trim() -ne "") { $BaseInput.Trim() } else { "staging" }
+    $RepoFlag  = if ($RepoInput.Trim() -ne "") { @("--repo", $RepoInput.Trim()) } else { @() }
+
+    Write-Host ""
+    Write-Host "Open pull requests targeting '$BaseBranch':"
+    Write-Host "------------------------------------------------------------"
+    Write-Host "[cmd]    gh pr list $($RepoFlag -join ' ') --base $BaseBranch --state open"
+    & gh pr list @RepoFlag --base $BaseBranch --state open
+    Write-Host "------------------------------------------------------------"
+    Write-Host ""
+
+    $PRNumber = Read-Host "PR number to merge (leave empty to cancel)"
+    if ($PRNumber.Trim() -eq "") {
+        Write-Host "Cancelled."
+        return
+    }
+
+    Write-Host ""
+    Write-Host "Merge strategy:"
+    Write-Host "  1. merge   - standard merge commit (default)"
+    Write-Host "  2. squash  - squash all commits into one"
+    Write-Host "  3. rebase  - rebase commits onto base branch"
+    $stratInput = Read-Host "Strategy (default: 1)"
+    $strategy = switch ($stratInput.Trim()) {
+        "2" { "--squash" }
+        "3" { "--rebase" }
+        default { "--merge" }
+    }
+
+    Write-Host ""
+    Write-Host "Branch protection (pick one - these flags are mutually exclusive):"
+    Write-Host "  1. --admin  - bypass ALL requirements now: reviews, CI, branch rules (default)"
+    Write-Host "  2. --auto   - queue merge: auto-merges once CI and reviews pass (does NOT skip checks)"
+    Write-Host "  3. none     - standard merge, fails if any requirement is not met"
+    $policyInput = Read-Host "Policy (default: 1)"
+    $policyFlag = switch ($policyInput.Trim()) {
+        "2" { "--auto" }
+        "3" { "" }
+        default { "--admin" }
+    }
+    $policyLabel = if ($policyFlag -eq "") { "none" } else { $policyFlag }
+
+    Write-Host ""
+    $confirm = Read-Host "Merge PR #$($PRNumber.Trim()) into '$BaseBranch' [$($strategy.TrimStart('-'))] [$policyLabel]? (y/N)"
+    if ($confirm.Trim().ToLower() -ne "y") {
+        Write-Host "Cancelled."
+        return
+    }
+
+    $mergeArgs = @($PRNumber.Trim()) + $RepoFlag + @($strategy, "--delete-branch")
+    if ($policyFlag -ne "") { $mergeArgs += $policyFlag }
+    Write-Host "[cmd]    gh pr merge $($mergeArgs -join ' ')"
+    $mergeOutput = & gh pr merge @mergeArgs 2>&1
+    $mergeOutput | Write-Host
+    if ($LASTEXITCODE -eq 0) {
+        ok "PR #$($PRNumber.Trim()) merged successfully."
+    } else {
+        fail "Merge failed."
+        if ($mergeOutput -match "Resource not accessible by personal access token") {
+            Write-Host ""
+            Write-Host "  This error means the GitHub CLI OAuth app is not authorized for the organization."
+            Write-Host "  Fix options:"
+            Write-Host "    A) Go to https://github.com/settings/connections/applications"
+            Write-Host "       Find 'GitHub CLI' and click 'Grant' next to your organization."
+            Write-Host ""
+            Write-Host "    B) Re-authenticate and authorize the org during the browser flow:"
+            Write-Host "       gh auth refresh --scopes repo,read:org,workflow"
+        }
+    }
+}
+
 # ============================================================
 #  Bootstrap
 # ============================================================
@@ -297,6 +400,7 @@ do {
     Write-Host "  3. List pull requests in a project"
     Write-Host "  4. List SSH keys"
     Write-Host "  5. Logout / switch GitHub account"
+    Write-Host "  6. Merge a pull request"
     Write-Host "  0. Exit"
     Write-Host ""
     $choice = Read-Host "Select an option"
@@ -307,8 +411,9 @@ do {
         "3" { Invoke-ListPRs }
         "4" { Invoke-ListSSHKeys }
         "5" { Invoke-GitHubLogout }
+        "6" { Invoke-MergePR }
         "0" { Write-Host ""; Write-Host "Goodbye." }
-        default { warn "Invalid option. Enter 1-5 or 0." }
+        default { warn "Invalid option. Enter 1-6 or 0." }
     }
 
     if ($choice -ne "0") {
