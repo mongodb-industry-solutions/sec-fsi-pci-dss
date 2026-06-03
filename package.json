@@ -12,6 +12,8 @@
     "dev:frontend": "npm run dev --prefix frontend",
     "dev:backend": "npm run dev --prefix backend",
     "build": "npm run build --prefix frontend && npm run build --prefix backend",
+    "build:frontend": "npm run build --prefix frontend",
+    "build:backend": "npm run build --prefix backend",
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "vitest run test/backend/unit test/frontend/unit",
     "test:integration": "vitest run test/backend/integration test/frontend/integration",
@@ -24,12 +26,12 @@
   "devDependencies": {
     "@playwright/test": "^1.44.0",
     "@vitejs/plugin-react": "^4.3.0",
-    "@vitest/coverage-v8": "^2.0.0",
+    "@vitest/coverage-v8": "^4.1.0",
     "concurrently": "^8.2.2",
     "jsdom": "^25.0.0",
     "supertest": "^6.3.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5",
-    "vitest": "^2.0.0"
+    "vitest": "^4.1.0"
   }
 }
