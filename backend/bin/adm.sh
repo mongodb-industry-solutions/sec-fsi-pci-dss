@@ -176,34 +176,7 @@ github_auth() {
     fi
 }
 
-# ---- Option 3: List pull requests --------------------------
-
-list_prs() {
-    echo ""
-    chk "GitHub CLI authentication..."
-    if ! gh auth status &>/dev/null; then
-        fail "Not authenticated with GitHub CLI. Run option 2 first."
-        return
-    fi
-    ok "Authenticated."
-
-    read -rp "Repository owner/repo (leave empty to use current directory): " REPO_INPUT
-    read -rp "Base branch to filter (default: staging): " BASE_INPUT
-    BASE="${BASE_INPUT:-staging}"
-
-    echo ""
-    if [ -n "$REPO_INPUT" ]; then
-        echo "Pull requests targeting '$BASE' in $REPO_INPUT:"
-        echo "[cmd]    gh pr list --repo $REPO_INPUT --base $BASE"
-        gh pr list --repo "$REPO_INPUT" --base "$BASE"
-    else
-        echo "Pull requests targeting '$BASE' in current repo:"
-        echo "[cmd]    gh pr list --base $BASE"
-        gh pr list --base "$BASE"
-    fi
-}
-
-# ---- Option 5: Logout / switch user -----------------------
+# ---- Option 3: Logout / switch user ------------------------
 
 github_logout() {
     echo ""
@@ -266,7 +239,115 @@ list_ssh_keys() {
     fi
 }
 
-# ---- Option 6: Merge a pull request ------------------------
+# ---- Option 5: Set global GitHub login via SSH key ---------
+
+set_global_ssh_login() {
+    echo ""
+    SSH_DIR="$HOME/.ssh"
+
+    shopt -s nullglob
+    PUB_KEYS=("$SSH_DIR"/*.pub)
+    shopt -u nullglob
+
+    if [ ${#PUB_KEYS[@]} -eq 0 ]; then
+        warn "No public keys found in $SSH_DIR."
+        echo "  > Run option 1 to generate a key first, then come back here."
+        return
+    fi
+
+    echo "Available SSH keys in $SSH_DIR :"
+    echo "------------------------------------------------------------"
+    KEY_NAMES=()
+    IDX=1
+    for pub in "${PUB_KEYS[@]}"; do
+        KEY_NAME=$(basename "$pub" .pub)
+        FINGERPRINT=$(ssh-keygen -lf "$pub" 2>/dev/null)
+        echo "  $IDX. $KEY_NAME"
+        echo "     $FINGERPRINT"
+        KEY_NAMES+=("$KEY_NAME")
+        IDX=$((IDX + 1))
+    done
+    echo "------------------------------------------------------------"
+    echo ""
+
+    read -rp "Key number to use globally (leave empty to skip key configuration): " SEL
+
+    KEY_NAME=""
+    if [ -n "$SEL" ]; then
+        SEL_IDX=$((SEL - 1))
+        if [ "$SEL_IDX" -lt 0 ] || [ "$SEL_IDX" -ge "${#KEY_NAMES[@]}" ]; then
+            fail "Invalid selection."
+            return
+        fi
+        KEY_NAME="${KEY_NAMES[$SEL_IDX]}"
+        KEY_PATH="$SSH_DIR/$KEY_NAME"
+
+        action "Setting global git SSH command to use key '$KEY_NAME'..."
+        run git config --global core.sshCommand "ssh -i \"$KEY_PATH\" -o IdentitiesOnly=yes"
+        ok "git config --global core.sshCommand updated."
+        echo ""
+        echo "  Verify with : git config --global core.sshCommand"
+        echo "  Test SSH    : ssh -i \"$KEY_PATH\" -T git@github.com"
+        echo ""
+    fi
+
+    # Optionally authenticate / re-authenticate gh CLI with SSH protocol
+    chk "GitHub CLI authentication status..."
+    if gh auth status &>/dev/null; then
+        ok "Already authenticated:"
+        gh auth status
+        echo ""
+        read -rp "Re-authenticate to ensure SSH git-protocol is set? (y/N): " REAUTH
+        if [[ "${REAUTH,,}" != "y" ]]; then
+            [ -n "$KEY_NAME" ] && ok "Global SSH key configured. All git SSH operations will use '$KEY_NAME'."
+            return
+        fi
+        action "Logging out first to allow fresh SSH-protocol login..."
+        run gh auth logout
+    fi
+
+    action "Starting GitHub CLI login with SSH git-protocol..."
+    echo "  > A browser window will open — authorize the GitHub CLI app."
+    echo ""
+    run gh auth login --web --git-protocol ssh --scopes repo,read:org,workflow
+    if gh auth status &>/dev/null; then
+        ok "GitHub CLI authenticated with SSH protocol."
+        echo ""
+        gh auth status
+        [ -n "$KEY_NAME" ] && echo "" && ok "Global SSH key '$KEY_NAME' + gh SSH protocol configured."
+    else
+        fail "Authentication failed. Try: gh auth login --git-protocol ssh --scopes repo,read:org,workflow"
+    fi
+}
+
+# ---- Option 6: List pull requests --------------------------
+
+list_prs() {
+    echo ""
+    chk "GitHub CLI authentication..."
+    if ! gh auth status &>/dev/null; then
+        fail "Not authenticated with GitHub CLI. Run option 2 first."
+        return
+    fi
+    ok "Authenticated."
+
+    read -rp "Repository owner/repo (leave empty to use current directory): " REPO_INPUT
+    read -rp "Base branch to filter (default: staging): " BASE_INPUT
+    BASE="${BASE_INPUT:-staging}"
+
+    echo ""
+    if [ -n "$REPO_INPUT" ]; then
+        echo "Pull requests targeting '$BASE' in $REPO_INPUT:"
+        echo "[cmd]    gh pr list --repo $REPO_INPUT --base $BASE"
+        gh pr list --repo "$REPO_INPUT" --base "$BASE"
+    else
+        echo "Pull requests targeting '$BASE' in current repo:"
+        echo "[cmd]    gh pr list --base $BASE"
+        gh pr list --base "$BASE"
+    fi
+}
+
+# ---- Option 7: Merge a pull request ------------------------
 
 merge_pr() {
     echo ""
@@ -373,7 +454,7 @@ merge_pr() {
     fi
 }
 
-# ---- Option 7: Bypass rulesets and force merge -------------
+# ---- Option 8: Force merge (bypass all rulesets) -----------
 
 bypass_merge() {
     echo ""
@@ -427,7 +508,7 @@ for r in json.load(sys.stdin):
     read -rp "Disable ALL rulesets, merge PR #$PR_NUMBER [${STRATEGY#--}], then re-enable? (y/N): " CONFIRM
     [[ "${CONFIRM,,}" != "y" ]] && echo "Cancelled." && return
 
-    # Disable all active rulesets (using correct org/repo endpoint)
+    # Disable all active rulesets
     ORG="${REPO_NAME%%/*}"
     DISABLED_ENTRIES=()
     while IFS='|' read -r RS_ID RS_NAME RS_SRC_TYPE RS_SOURCE RS_ENF; do
@@ -459,7 +540,7 @@ for r in json.load(sys.stdin):
     MERGE_EXIT=$?
     echo "$MERGE_OUTPUT"
 
-    # Re-enable rulesets (always)
+    # Re-enable rulesets (always, even if merge failed)
     for entry in "${DISABLED_ENTRIES[@]}"; do
         RS_ID="${entry%%|*}"
         rest="${entry#*|}"
@@ -486,7 +567,7 @@ for r in json.load(sys.stdin):
     fi
 }
 
-# ---- Option 8: List pending conversations ------------------
+# ---- Option 9: List pending conversations ------------------
 
 list_conversations() {
     echo ""
@@ -504,24 +585,25 @@ list_conversations() {
     echo ""
     echo "Pending conversations in PR #$PR_NUMBER:"
     echo "------------------------------------------------------------"
-    COUNT=0
     echo "$RAW" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 threads = data['data']['repository']['pullRequest']['reviewThreads']['nodes']
-for t in threads:
-    if not t['isResolved']:
-        c = t['comments']['nodes'][0]
-        body = c['body'][:120] + ('...' if len(c['body']) > 120 else '')
-        print(f\"  ID     : {t['id']}\")
-        print(f\"  Author : {c['author']['login']}\")
-        print(f\"  Comment: {body}\")
-        print()
+pending = [t for t in threads if not t['isResolved']]
+if not pending:
+    print('  No pending conversations.')
+for t in pending:
+    c = t['comments']['nodes'][0]
+    body = c['body'][:120] + ('...' if len(c['body']) > 120 else '')
+    print(f\"  ID     : {t['id']}\")
+    print(f\"  Author : {c['author']['login']}\")
+    print(f\"  Comment: {body}\")
+    print()
 " 2>/dev/null || { warn "Could not parse response. Raw output:"; echo "$RAW"; }
     echo "------------------------------------------------------------"
 }
 
-# ---- Option 9: Resolve a conversation ----------------------
+# ---- Option 10: Resolve a conversation ---------------------
 
 resolve_conversation() {
     echo ""
@@ -572,7 +654,7 @@ for t in data['data']['repository']['pullRequest']['reviewThreads']['nodes']:
     done
 }
 
-# ---- Option 10: List rulesets ------------------------------
+# ---- Option 11: List rulesets ------------------------------
 
 list_rulesets() {
     echo ""
@@ -596,7 +678,7 @@ for r in json.load(sys.stdin):
     echo "------------------------------------------------------------"
 }
 
-# ---- Options 11/12: Toggle a specific ruleset --------------
+# ---- Options 12/13: Toggle a specific ruleset --------------
 
 set_ruleset_state() {
     local TARGET_STATE="$1"
@@ -629,7 +711,6 @@ for r in json.load(sys.stdin):
     RS_NAME="${RS_DATA%%|*}"
     RS_REST="${RS_DATA#*|}"
     RS_SRC_TYPE="${RS_REST%%|*}"
-    RS_SOURCE="${RS_REST#*|}"
 
     read -rp "Set ruleset '$RS_NAME' to '$TARGET_STATE'? (y/N): " CONFIRM
     [[ "${CONFIRM,,}" != "y" ]] && echo "Cancelled." && return
@@ -648,7 +729,7 @@ for r in json.load(sys.stdin):
 disable_ruleset() { set_ruleset_state "disabled"; }
 enable_ruleset()  { set_ruleset_state "active"; }
 
-# ---- Option 13: Dependabot alerts --------------------------
+# ---- Option 14: Dependabot alerts --------------------------
 
 list_dependabot_alerts() {
     echo ""
@@ -696,7 +777,7 @@ print('------------------------------------------------------------')
     echo "Browser: https://github.com/$REPO_NAME/security/dependabot"
 }
 
-# ---- Option 14: Secret scanning alerts ---------------------
+# ---- Option 15: Secret scanning alerts ---------------------
 
 list_secret_alerts() {
     echo ""
@@ -740,7 +821,7 @@ print('------------------------------------------------------------')
     echo "Browser: https://github.com/$REPO_NAME/security/secret-scanning"
 }
 
-# ---- Option 15: Code scanning alerts -----------------------
+# ---- Option 16: Code scanning alerts -----------------------
 
 list_code_alerts() {
     echo ""
@@ -789,7 +870,7 @@ print('------------------------------------------------------------')
     echo "Browser: https://github.com/$REPO_NAME/security/code-scanning"
 }
 
-# ---- Option 16: Generate JSON reports ----------------------
+# ---- Option 17: Generate JSON reports ----------------------
 
 generate_report() {
     echo ""
@@ -927,21 +1008,22 @@ while true; do
     echo "  2.  Authenticate with GitHub CLI (gh auth login)"
     echo "  3.  Logout / switch GitHub account"
     echo "  4.  List SSH keys"
+    echo "  5.  Set global GitHub login via SSH key (optional key selection)"
     echo "  --- Pull Requests ---"
-    echo "  5.  List pull requests"
-    echo "  6.  Merge a pull request"
-    echo "  7.  Force merge (bypass all rulesets temporarily)"
-    echo "  8.  List pending conversations in a PR"
-    echo "  9.  Resolve a conversation in a PR"
+    echo "  6.  List pull requests"
+    echo "  7.  Merge a pull request"
+    echo "  8.  Force merge (bypass all rulesets temporarily)"
+    echo "  9.  List pending conversations in a PR"
+    echo "  10. Resolve a conversation in a PR"
     echo "  --- Rulesets ---"
-    echo "  10. List rulesets"
-    echo "  11. Disable a specific ruleset"
-    echo "  12. Enable a specific ruleset"
+    echo "  11. List rulesets"
+    echo "  12. Disable a specific ruleset"
+    echo "  13. Enable a specific ruleset"
     echo "  --- Security ---"
-    echo "  13. Dependabot alerts (dependency vulnerabilities)"
-    echo "  14. Secret scanning alerts"
-    echo "  15. Code scanning alerts (quality / malware)"
-    echo "  16. Generate JSON reports (PR conversations + security)"
+    echo "  14. Dependabot alerts (dependency vulnerabilities)"
+    echo "  15. Secret scanning alerts"
+    echo "  16. Code scanning alerts (quality / malware)"
+    echo "  17. Generate JSON reports (PR conversations + security)"
     echo "  --- ---"
     echo "  0.  Exit"
     echo ""
@@ -952,20 +1034,21 @@ while true; do
         2)  github_auth ;;
         3)  github_logout ;;
         4)  list_ssh_keys ;;
-        5)  list_prs ;;
-        6)  merge_pr ;;
-        7)  bypass_merge ;;
-        8)  list_conversations ;;
-        9)  resolve_conversation ;;
-        10) list_rulesets ;;
-        11) disable_ruleset ;;
-        12) enable_ruleset ;;
-        13) list_dependabot_alerts ;;
-        14) list_secret_alerts ;;
-        15) list_code_alerts ;;
-        16) generate_report ;;
+        5)  set_global_ssh_login ;;
+        6)  list_prs ;;
+        7)  merge_pr ;;
+        8)  bypass_merge ;;
+        9)  list_conversations ;;
+        10) resolve_conversation ;;
+        11) list_rulesets ;;
+        12) disable_ruleset ;;
+        13) enable_ruleset ;;
+        14) list_dependabot_alerts ;;
+        15) list_secret_alerts ;;
+        16) list_code_alerts ;;
+        17) generate_report ;;
         0)  echo ""; echo "Goodbye."; break ;;
-        *)  warn "Invalid option. Enter 1-16 or 0." ;;
+        *)  warn "Invalid option. Enter 1-17 or 0." ;;
     esac
 
     if [ "$CHOICE" != "0" ]; then

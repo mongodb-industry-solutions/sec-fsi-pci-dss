@@ -985,22 +985,22 @@ do {
     Write-Host "  2.  Authenticate with GitHub CLI (gh auth login)"
     Write-Host "  3.  Logout / switch GitHub account"
     Write-Host "  4.  List SSH keys"
-    Write-Host "  17. Set global GitHub login via SSH key (optional key selection)"
+    Write-Host "  5.  Set global GitHub login via SSH key (optional key selection)"
     Write-Host "  --- Pull Requests ---"
-    Write-Host "  5.  List pull requests"
-    Write-Host "  6.  Merge a pull request"
-    Write-Host "  7.  Force merge (bypass all rulesets temporarily)"
-    Write-Host "  8.  List pending conversations in a PR"
-    Write-Host "  9.  Resolve a conversation in a PR"
+    Write-Host "  6.  List pull requests"
+    Write-Host "  7.  Merge a pull request"
+    Write-Host "  8.  Force merge (bypass all rulesets temporarily)"
+    Write-Host "  9.  List pending conversations in a PR"
+    Write-Host "  10. Resolve a conversation in a PR"
     Write-Host "  --- Rulesets ---"
-    Write-Host "  10. List rulesets"
-    Write-Host "  11. Disable a specific ruleset"
-    Write-Host "  12. Enable a specific ruleset"
+    Write-Host "  11. List rulesets"
+    Write-Host "  12. Disable a specific ruleset"
+    Write-Host "  13. Enable a specific ruleset"
     Write-Host "  --- Security ---"
-    Write-Host "  13. Dependabot alerts (dependency vulnerabilities)"
-    Write-Host "  14. Secret scanning alerts"
-    Write-Host "  15. Code scanning alerts (quality / malware)"
-    Write-Host "  16. Generate JSON reports (PR conversations + security)"
+    Write-Host "  14. Dependabot alerts (dependency vulnerabilities)"
+    Write-Host "  15. Secret scanning alerts"
+    Write-Host "  16. Code scanning alerts (quality / malware)"
+    Write-Host "  17. Generate JSON reports (PR conversations + security)"
     Write-Host "  --- ---"
     Write-Host "  0.  Exit"
     Write-Host ""
@@ -1011,19 +1011,19 @@ do {
         "2"  { Invoke-GitHubAuth }
         "3"  { Invoke-GitHubLogout }
         "4"  { Invoke-ListSSHKeys }
-        "5"  { Invoke-ListPRs }
-        "6"  { Invoke-MergePR }
-        "7"  { Invoke-BypassMerge }
-        "8"  { Invoke-ListConversations }
-        "9"  { Invoke-ResolveConversation }
-        "10" { Invoke-ListRulesets }
-        "11" { Invoke-DisableRuleset }
-        "12" { Invoke-EnableRuleset }
-        "13" { Invoke-ListDependabotAlerts }
-        "14" { Invoke-ListSecretAlerts }
-        "15" { Invoke-ListCodeAlerts }
-        "16" { Invoke-GenerateReport }
-        "17" { Invoke-SetGlobalSSHLogin }
+        "5"  { Invoke-SetGlobalSSHLogin }
+        "6"  { Invoke-ListPRs }
+        "7"  { Invoke-MergePR }
+        "8"  { Invoke-BypassMerge }
+        "9"  { Invoke-ListConversations }
+        "10" { Invoke-ResolveConversation }
+        "11" { Invoke-ListRulesets }
+        "12" { Invoke-DisableRuleset }
+        "13" { Invoke-EnableRuleset }
+        "14" { Invoke-ListDependabotAlerts }
+        "15" { Invoke-ListSecretAlerts }
+        "16" { Invoke-ListCodeAlerts }
+        "17" { Invoke-GenerateReport }
         "0"  { Write-Host ""; Write-Host "Goodbye." }
         default { warn "Invalid option. Enter 1-17 or 0." }
     }
