@@ -3,9 +3,41 @@ import {
   createTransaction,
   getTransactionById,
   getTransactionsByCardToken,
+  getDistinctMerchants,
 } from '../services/cardTransaction.service';
 
 export async function cardTransactionController(fastify: FastifyInstance) {
+  fastify.get('/merchants', {
+    schema: {
+      tags: ['transactions'],
+      summary: 'List distinct merchants from transaction history',
+      description: `Returns unique merchant name and MCC pairs aggregated from the
+\`cardTransaction\` collection. Used by the Simulator STEP 1 form to populate
+the Merchant Name selector. No authentication required (public, simulator mode).`,
+      response: {
+        200: {
+          description: 'List of distinct merchants, sorted alphabetically.',
+          type: 'object',
+          properties: {
+            merchants: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string', description: 'Merchant display name.' },
+                  mcc: { type: 'string', description: 'ISO 18245 Merchant Category Code.' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, async (_request, reply) => {
+    const merchants = await getDistinctMerchants(fastify.db);
+    return reply.send({ merchants });
+  });
+
   fastify.post('/', {
     schema: {
       tags: ['transactions'],

@@ -4,6 +4,7 @@ import { existsSync } from 'fs';
 import { execSync } from 'child_process';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
 import { seedUsers } from './seedUsers';
+import { seedAuthDomains } from './seedAuthDomains';
 import { seedCustomers } from './seedCustomers';
 import { seedCards } from './seedCards';
 import { seedTransactions } from './seedTransactions';
@@ -25,6 +26,7 @@ const DATA_DIR: string = process.env.SEED_DATA_DIR ?? join(process.cwd(), 'data'
 function ensureDataFiles() {
   const required = [
     'users.json',
+    'authDomains.json',
     'customerAgreements.json',
     'customerAgreementsSensitive.json',
     'paymentCards.json',
@@ -68,6 +70,9 @@ export async function runSeed() {
   try {
     console.log('Seeding partyAuthentication...');
     await seedUsers(db);
+
+    console.log('Seeding authenticationDomain...');
+    await seedAuthDomains(db);
 
     console.log('Seeding customerAgreement + customerAgreementSensitive...');
     await seedCustomers(db);

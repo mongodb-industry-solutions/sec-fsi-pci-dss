@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { loginUser, getDemoUsers } from '../services/auth.service';
+import { loginUser, getDemoUsers, getEnabledDomains } from '../services/auth.service';
 
 export async function authController(fastify: FastifyInstance) {
   fastify.post('/login', {
@@ -44,9 +44,9 @@ Password for all demo users: \`demo-password\``,
           },
           domain: {
             type: 'string',
-            enum: ['local', 'msentra'],
+            enum: ['local', 'msentra', 'bigid'],
             default: 'local',
-            description: '`local` for seeded demo users. `msentra` for Microsoft Entra ID delegation (v2).',
+            description: '`local` for seeded demo users. `msentra` for Microsoft Entra ID delegation (v2). `bigid` for BigID integration (v2).',
           },
         },
       },
@@ -114,9 +114,10 @@ Password for all demo users: \`demo-password\``,
   fastify.get('/users', {
     schema: {
       tags: ['auth'],
-      summary: 'List demo users (Simulator mode)',
-      description: `Returns all pre-seeded demo user accounts for the Simulator login panel.
-Intended for the UI to display one-click login shortcuts; passwords are **never** returned.`,
+      summary: 'List demo users (local domain)',
+      description: `Returns all active pre-seeded demo user accounts for the local authentication domain.
+Intended for the UI to display one-click login shortcuts; passwords are **never** returned.
+Data is read directly from the seed file to avoid QE-decryption overhead on this helper endpoint.`,
       response: {
         200: {
           description: 'List of available demo users.',
@@ -124,24 +125,13 @@ Intended for the UI to display one-click login shortcuts; passwords are **never*
           properties: {
             users: {
               type: 'array',
-              description: 'All active demo accounts.',
+              description: 'All active demo accounts for the local domain.',
               items: {
                 type: 'object',
                 properties: {
-                  partyAuthenticationInstanceReference: {
-                    type: 'string',
-                    description: 'User UUID, use as the `sub` claim reference.',
-                  },
-                  partyAuthenticationUserName: {
-                    type: 'string',
-                    description: 'Display name.',
-                  },
-                  partyAuthenticationUserEmailAddress: {
-                    type: 'string',
-                    format: 'email',
-                    description: 'Login email; submit to POST /api/v1/auth/login.',
-                  },
-                  partyAuthenticationUserRole: {
+                  email: { type: 'string', format: 'email', description: 'Login email; submit to POST /api/v1/auth/login.' },
+                  name: { type: 'string', description: 'Display name.' },
+                  role: {
                     type: 'string',
                     enum: ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor'],
                     description: 'Role that will be encoded in the JWT on login.',
@@ -156,5 +146,43 @@ Intended for the UI to display one-click login shortcuts; passwords are **never*
   }, async (_request, reply) => {
     const users = await getDemoUsers(fastify.db);
     return reply.send({ users });
+  });
+
+  fastify.get('/domains', {
+    schema: {
+      tags: ['auth'],
+      summary: 'List enabled authentication domains',
+      description: `Returns all enabled authentication domains from the \`authenticationDomain\` collection (BIAN SD-16).
+Only domains with \`partyAuthenticationDomainEnabled: true\` are returned.
+The UI uses this to populate the domain selector on the login screen.`,
+      response: {
+        200: {
+          description: 'List of enabled authentication domains.',
+          type: 'object',
+          properties: {
+            domains: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string', description: 'Domain slug used in login requests (e.g. "local", "msentra", "bigid").' },
+                  displayName: { type: 'string', description: 'Human-readable label shown in the UI.' },
+                  type: { type: 'string', enum: ['local', 'oidc', 'saml'], description: 'Authentication protocol.' },
+                },
+              },
+            },
+          },
+        },
+        503: { description: 'Database unavailable.', $ref: 'Error#' },
+      },
+    },
+  }, async (_request, reply) => {
+    try {
+      const domains = await getEnabledDomains(fastify.db);
+      return reply.send({ domains });
+    } catch (err: unknown) {
+      const e = err as { message: string };
+      return reply.status(503).send({ error: e.message });
+    }
   });
 }

@@ -1,14 +1,13 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '../../../lib/api';
+import { api, Merchant } from '../../../lib/api';
 import { FraudAlert } from '../../../components/FraudAlert';
 import { EncryptionBadge } from '../../../components/EncryptionBadge';
 
 type Step = 1 | 2 | 3;
 
 interface FormData {
-  cardNumber: string;
   cardholderName: string;
   expiry: string;
   email: string;
@@ -18,8 +17,10 @@ interface FormData {
   merchantCategoryCode: string;
 }
 
+// Default card number for demo (masked immediately on mount)
+const DEMO_CARD_NUMBER = '4111111111111234';
+
 const DEFAULTS: FormData = {
-  cardNumber: '',
   cardholderName: 'Luis Fernandez',
   expiry: '12/28',
   email: 'luis.fernandez@leafybank.demo',
@@ -29,9 +30,21 @@ const DEFAULTS: FormData = {
   merchantCategoryCode: '5734',
 };
 
+// Preset amount options for quick selection
+const AMOUNT_PRESETS = ['100.00', '250.00', '500.00', '850.00', '1200.00'];
+
+// Fallback merchant list when DB is unavailable
+const FALLBACK_MERCHANTS: Merchant[] = [
+  { name: 'TechGadgets Ltd.', mcc: '5734' },
+  { name: 'Global Electronics', mcc: '5734' },
+  { name: 'City Restaurant', mcc: '5812' },
+  { name: 'ATM Cash Withdrawal', mcc: '6011' },
+  { name: 'Online Casino', mcc: '7995' },
+];
+
 function maskCardNumber(raw: string): string {
   const digits = raw.replace(/\D/g, '').slice(0, 16);
-  if (digits.length <= 12) return digits.replace(/(.{4})/g, '****-').replace(/-$/, '');
+  if (digits.length < 13) return digits.replace(/(.{4})/g, '$1-').replace(/-$/, '');
   const last4 = digits.slice(-4);
   return `****-****-****-${last4}`;
 }
@@ -47,11 +60,217 @@ function simulateCipher(seed: string): string {
   return `\\x${bytes.slice(0, 4).join('\\x')}...`;
 }
 
+// ── Tooltip component ────────────────────────────────────────────────────────
+function Tooltip({ text }: { text: string }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <span className="relative inline-block ml-1 align-middle">
+      <button
+        type="button"
+        onMouseEnter={() => setVisible(true)}
+        onMouseLeave={() => setVisible(false)}
+        className="text-gray-400 hover:text-blue-500 text-xs leading-none transition-colors"
+        aria-label="More information"
+      >
+        ⓘ
+      </button>
+      {visible && (
+        <span className="absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 rounded-lg bg-[#001E2B] text-white text-xs px-3 py-2 shadow-xl pointer-events-none leading-relaxed">
+          {text}
+          <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#001E2B]" />
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ── Step Explainer popover ────────────────────────────────────────────────────
+function StepExplainer({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="ml-2 px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 transition-colors font-medium"
+      >
+        ? About this step
+      </button>
+      {open && (
+        <div className="absolute z-30 left-0 top-full mt-2 w-80 rounded-xl bg-white border border-blue-200 shadow-xl p-4">
+          <p className="font-semibold text-gray-800 mb-2">{title}</p>
+          <div className="text-sm text-gray-600 space-y-2 leading-relaxed">{children}</div>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="mt-3 text-xs text-gray-400 hover:text-gray-600"
+          >
+            Close
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Merchant combobox ────────────────────────────────────────────────────────
+function MerchantCombobox({
+  value,
+  mcc,
+  merchants,
+  onChange,
+}: {
+  value: string;
+  mcc: string;
+  merchants: Merchant[];
+  onChange: (name: string, mcc: string) => void;
+}) {
+  const [custom, setCustom] = useState(false);
+
+  function handleSelect(e: React.ChangeEvent<HTMLSelectElement>) {
+    if (e.target.value === '__custom__') {
+      setCustom(true);
+      onChange(value, mcc);
+    } else {
+      const m = merchants.find((x) => x.name === e.target.value);
+      if (m) onChange(m.name, m.mcc);
+    }
+  }
+
+  if (custom) {
+    return (
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value, mcc)}
+          className="flex-1 border rounded-lg px-3 py-2 text-sm"
+          placeholder="Merchant name"
+        />
+        <button
+          type="button"
+          onClick={() => setCustom(false)}
+          className="text-xs text-blue-600 underline whitespace-nowrap"
+        >
+          Use list
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={handleSelect}
+      className="w-full border rounded-lg px-3 py-2 text-sm"
+    >
+      {merchants.map((m) => (
+        <option key={m.name} value={m.name}>
+          {m.name} (MCC {m.mcc})
+        </option>
+      ))}
+      <option value="__custom__">✏ Enter custom merchant…</option>
+    </select>
+  );
+}
+
+// ── Amount selector ──────────────────────────────────────────────────────────
+function AmountSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [custom, setCustom] = useState(!AMOUNT_PRESETS.includes(value));
+
+  if (custom) {
+    return (
+      <div className="flex gap-2 items-center">
+        <span className="text-gray-500 text-sm">$</span>
+        <input
+          type="number"
+          step="0.01"
+          min="0.01"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="flex-1 border rounded-lg px-3 py-2 text-sm"
+          placeholder="0.00"
+        />
+        <button
+          type="button"
+          onClick={() => setCustom(false)}
+          className="text-xs text-blue-600 underline whitespace-nowrap"
+        >
+          Use presets
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2 flex-wrap">
+        {AMOUNT_PRESETS.map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            onClick={() => onChange(preset)}
+            className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+              value === preset
+                ? 'bg-[#001E2B] text-[#00ED64] border-[#001E2B]'
+                : 'bg-white text-gray-700 border-gray-300 hover:border-[#001E2B]'
+            }`}
+          >
+            ${preset}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => setCustom(true)}
+          className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-400 text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+        >
+          ✏ Custom
+        </button>
+      </div>
+      <p className="text-xs text-amber-700">
+        ⚠ Amounts above $500 trigger automatic fraud case creation.
+      </p>
+    </div>
+  );
+}
+
+// ── Validation ────────────────────────────────────────────────────────────────
+interface ValidationErrors {
+  email?: string;
+  phone?: string;
+  amount?: string;
+  merchantName?: string;
+}
+
+function validateStep1(form: FormData, maskedCard: string): ValidationErrors {
+  const errors: ValidationErrors = {};
+  if (!maskedCard) errors.email = 'Enter a card number to continue.';
+  if (!form.email.includes('@')) errors.email = 'Enter a valid email address.';
+  if (!form.phone.trim()) errors.phone = 'Phone number is required.';
+  const amt = parseFloat(form.amount);
+  if (!form.amount || isNaN(amt) || amt <= 0) errors.amount = 'Enter a valid amount greater than $0.';
+  if (!form.merchantName.trim()) errors.merchantName = 'Merchant name is required.';
+  return errors;
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 export default function PaymentPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<FormData>(DEFAULTS);
-  const [maskedCard, setMaskedCard] = useState('');
+  const [maskedCard, setMaskedCard] = useState<string>(maskCardNumber(DEMO_CARD_NUMBER));
+  const [merchants, setMerchants] = useState<Merchant[]>(FALLBACK_MERCHANTS);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{
     txnId: string;
@@ -60,12 +279,45 @@ export default function PaymentPage() {
     caseRef?: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const cardToken = generateToken();
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const cardTokenRef = useRef<string>(generateToken());
+
+  useEffect(() => {
+    api.transactions.merchants()
+      .then((res) => {
+        if (res.merchants.length > 0) {
+          setMerchants(res.merchants);
+          const defaultMerchant = res.merchants.find((m) => m.name === DEFAULTS.merchantName)
+            ?? res.merchants[0];
+          setForm((f) => ({
+            ...f,
+            merchantName: defaultMerchant.name,
+            merchantCategoryCode: defaultMerchant.mcc,
+          }));
+        }
+      })
+      .catch(() => {/* keep fallback list */});
+  }, []);
 
   function handleCardInput(e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value.replace(/\D/g, '').slice(0, 16);
     setMaskedCard(maskCardNumber(raw));
-    // Raw PAN is never stored in state; we only keep the token
+    setValidationErrors((v) => ({ ...v, cardNumber: undefined }));
+  }
+
+  function handleMerchantChange(name: string, mcc: string) {
+    setForm((f) => ({ ...f, merchantName: name, merchantCategoryCode: mcc }));
+  }
+
+  function handleNext() {
+    const errors = validateStep1(form, maskedCard);
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+    setValidationErrors({});
+    setError(null);
+    setStep(2);
   }
 
   async function handleConfirm() {
@@ -73,7 +325,7 @@ export default function PaymentPage() {
     setError(null);
     try {
       const res = await api.transactions.create({
-        cardToken,
+        cardToken: cardTokenRef.current,
         accountReference: `ACC-${Date.now().toString(36).toUpperCase()}`,
         amount: parseFloat(form.amount),
         currency: 'USD',
@@ -82,7 +334,7 @@ export default function PaymentPage() {
         cardTransactionChannel: 'online',
         cardTransactionMaskedPanDisplay: maskedCard || '****-****-****-1234',
         gatewayPayload: { source: 'simulator', timestamp: new Date().toISOString() },
-      }, '');
+      });
 
       setResult({
         txnId: res.cardTransactionInstanceReference,
@@ -94,11 +346,29 @@ export default function PaymentPage() {
       });
       setStep(3);
     } catch (err) {
-      setError((err as Error).message);
+      const msg = (err as Error).message ?? '';
+      if (msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('fetch')) {
+        setError('Cannot reach the backend server. Make sure the API is running on the configured port and try again.');
+      } else {
+        setError(msg || 'An unexpected error occurred while processing the payment.');
+      }
     } finally {
       setSubmitting(false);
     }
   }
+
+  function handleReset() {
+    setStep(1);
+    setForm(DEFAULTS);
+    setMaskedCard(maskCardNumber(DEMO_CARD_NUMBER));
+    setResult(null);
+    setError(null);
+    setValidationErrors({});
+    cardTokenRef.current = generateToken();
+  }
+
+  // ── Step indicator ──────────────────────────────────────────────────────────
+  const stepLabels = ['Card Details', 'Review & Encrypt', 'Confirmation'];
 
   return (
     <div className="max-w-xl mx-auto">
@@ -107,7 +377,7 @@ export default function PaymentPage() {
         {([1, 2, 3] as Step[]).map((s) => (
           <div key={s} className="flex items-center gap-1">
             <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
                 step === s
                   ? 'bg-[#001E2B] text-[#00ED64] border-2 border-[#00ED64]'
                   : step > s
@@ -115,120 +385,314 @@ export default function PaymentPage() {
                   : 'bg-gray-200 text-gray-500'
               }`}
             >
-              {s}
+              {step > s ? '✓' : s}
             </div>
-            {s < 3 && <div className={`h-px w-8 ${step > s ? 'bg-[#00ED64]' : 'bg-gray-300'}`} />}
+            {s < 3 && <div className={`h-px w-8 transition-colors ${step > s ? 'bg-[#00ED64]' : 'bg-gray-300'}`} />}
           </div>
         ))}
         <span className="text-sm text-gray-500 ml-2">
-          Step {step} of 3:{' '}
-          {step === 1 ? 'Card Details' : step === 2 ? 'Review' : 'Confirmation'}
+          Step {step} of 3: <strong>{stepLabels[step - 1]}</strong>
         </span>
       </div>
 
-      {/* Step 1: Card Details */}
+      {/* ── STEP 1: Card Details ───────────────────────────────────────────── */}
       {step === 1 && (
         <div className="bg-white rounded-xl border p-6 space-y-4">
-          <h2 className="text-xl font-bold">💳 New Payment</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">💳 New Payment</h2>
+            <StepExplainer title="Step 1: Card Details">
+              <p>
+                The customer enters their card details. The raw PAN (Primary Account Number) is
+                masked immediately in the browser; it never enters component state or network traffic.
+              </p>
+              <p>
+                A <strong>card token</strong> (surrogate reference) is generated locally and sent to
+                the backend instead of the PAN. Under PCI DSS v4.0 a token is not Cardholder Data
+                and can be stored in plaintext.
+              </p>
+              <p>
+                PII fields (email, phone) will be encrypted with{' '}
+                <strong>MongoDB Queryable Encryption</strong> before leaving the browser in Step 2.
+              </p>
+            </StepExplainer>
+          </div>
+
+          {/* Card number */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Card Number
+              <Tooltip text="Enter the 16-digit card number. The raw PAN is masked immediately on input and is never stored in component state or sent to the server. A secure token is generated instead." />
             </label>
             <input
               type="text"
-              placeholder="Enter card number"
+              placeholder="Enter card number (pre-filled: demo card)"
               onChange={handleCardInput}
               className="w-full border rounded-lg px-3 py-2 font-mono"
               maxLength={19}
             />
             {maskedCard && (
-              <div className="mt-1 font-mono text-gray-700 bg-gray-50 rounded px-3 py-2">
-                {maskedCard}
+              <div className="mt-1 font-mono text-gray-700 bg-gray-50 rounded px-3 py-2 flex items-center gap-2">
+                <span className="text-[#00ED64]">🔒</span> {maskedCard}
               </div>
             )}
             <p className="text-xs text-gray-500 mt-1">
-              Masked immediately — raw PAN never stored
+              Masked immediately. Raw PAN never stored. Leave blank to use the pre-filled demo card.
             </p>
           </div>
-          {(['cardholderName', 'expiry'] as const).map((field) => (
-            <div key={field}>
-              <label className="block text-sm font-medium text-gray-700 mb-1 capitalize">
-                {field.replace(/([A-Z])/g, ' $1')}
+
+          {/* Cardholder name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Cardholder Name
+              <Tooltip text="Name as it appears on the card. Stored as plaintext, not classified as Cardholder Data under PCI DSS v4.0 when stored without a PAN." />
+            </label>
+            <input
+              type="text"
+              value={form.cardholderName}
+              onChange={(e) => setForm((f) => ({ ...f, cardholderName: e.target.value }))}
+              className="w-full border rounded-lg px-3 py-2"
+            />
+          </div>
+
+          {/* Expiry */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Expiry Date
+              <Tooltip text="Card expiration date (MM/YY). Stored in the paymentCard collection with QE:none encryption: protected at rest, not searchable." />
+            </label>
+            <input
+              type="text"
+              value={form.expiry}
+              onChange={(e) => setForm((f) => ({ ...f, expiry: e.target.value }))}
+              className="w-full border rounded-lg px-3 py-2 font-mono"
+              placeholder="MM/YY"
+            />
+          </div>
+
+          <div className="border-t pt-4 space-y-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payment Details</p>
+
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email Address
+                <Tooltip text="Customer email address (QE:equality field). Encrypted with Queryable Encryption before being sent to Atlas. MongoDB stores only ciphertext and can still perform exact-match queries without seeing the plaintext." />
+              </label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => { setForm((f) => ({ ...f, email: e.target.value })); setValidationErrors((v) => ({ ...v, email: undefined })); }}
+                className={`w-full border rounded-lg px-3 py-2 ${validationErrors.email ? 'border-red-400' : ''}`}
+              />
+              {validationErrors.email && (
+                <p className="text-xs text-red-600 mt-0.5">{validationErrors.email}</p>
+              )}
+            </div>
+
+            {/* Phone */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Mobile Phone
+                <Tooltip text="Customer mobile number (QE:equality field). Encrypted at origin with Queryable Encryption. L1 Analysts can search by phone without Atlas seeing the plaintext number." />
               </label>
               <input
                 type="text"
-                value={form[field]}
-                onChange={(e) => setForm((f) => ({ ...f, [field]: e.target.value }))}
-                className="w-full border rounded-lg px-3 py-2"
+                value={form.phone}
+                onChange={(e) => { setForm((f) => ({ ...f, phone: e.target.value })); setValidationErrors((v) => ({ ...v, phone: undefined })); }}
+                className={`w-full border rounded-lg px-3 py-2 ${validationErrors.phone ? 'border-red-400' : ''}`}
               />
+              {validationErrors.phone && (
+                <p className="text-xs text-red-600 mt-0.5">{validationErrors.phone}</p>
+              )}
             </div>
-          ))}
-          <div className="border-t pt-4 space-y-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase">Payment Details</p>
-            {(['email', 'phone', 'amount', 'merchantName', 'merchantCategoryCode'] as const).map(
-              (field) => (
-                <div key={field}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1 capitalize">
-                    {field.replace(/([A-Z])/g, ' $1')}
-                  </label>
-                  <input
-                    type="text"
-                    value={form[field]}
-                    onChange={(e) => setForm((f) => ({ ...f, [field]: e.target.value }))}
-                    className="w-full border rounded-lg px-3 py-2"
-                  />
-                </div>
-              )
-            )}
+
+            {/* Amount */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Amount (USD)
+                <Tooltip text="Transaction amount. Stored as plaintext in cardTransactionAmount. Amounts above $500 automatically trigger fraud case creation (configurable via FRAUD_AMOUNT_THRESHOLD env var). Selecting $850 will trigger a fraud alert." />
+              </label>
+              <AmountSelector value={form.amount} onChange={(v) => { setForm((f) => ({ ...f, amount: v })); setValidationErrors((v2) => ({ ...v2, amount: undefined })); }} />
+              {validationErrors.amount && (
+                <p className="text-xs text-red-600 mt-0.5">{validationErrors.amount}</p>
+              )}
+            </div>
+
+            {/* Merchant Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Merchant Name
+                <Tooltip text="Name of the business processing the payment. Stored as plaintext in cardTransactionMerchantName. Selecting a merchant also sets its ISO 18245 MCC code. Certain MCC codes (5812 restaurants, 6011 ATM, 7995 gambling) are high-risk and trigger fraud cases." />
+              </label>
+              <MerchantCombobox
+                value={form.merchantName}
+                mcc={form.merchantCategoryCode}
+                merchants={merchants}
+                onChange={handleMerchantChange}
+              />
+              {validationErrors.merchantName && (
+                <p className="text-xs text-red-600 mt-0.5">{validationErrors.merchantName}</p>
+              )}
+            </div>
+
+            {/* MCC (read-only display) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Merchant Category Code (MCC)
+                <Tooltip text="ISO 18245 four-digit code classifying the merchant's business type. Set automatically when you select a merchant. High-risk codes (5812, 6011, 7995) trigger automatic fraud case creation regardless of transaction amount." />
+              </label>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={form.merchantCategoryCode}
+                  onChange={(e) => setForm((f) => ({ ...f, merchantCategoryCode: e.target.value }))}
+                  className="w-28 border rounded-lg px-3 py-2 font-mono text-sm"
+                  maxLength={4}
+                />
+                {['5812', '6011', '7995'].includes(form.merchantCategoryCode) && (
+                  <span className="text-xs text-red-600 font-medium">⚠ High-risk MCC: fraud case will be created</span>
+                )}
+              </div>
+            </div>
           </div>
+
+          {/* Validation summary */}
+          {Object.keys(validationErrors).length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
+              Please fix the highlighted fields before continuing.
+            </div>
+          )}
+
           <button
-            onClick={() => setStep(2)}
+            onClick={handleNext}
             className="w-full bg-[#001E2B] text-[#00ED64] py-2.5 rounded-lg font-semibold hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors"
           >
-            Next: Review →
+            Next: Review & Encrypt →
           </button>
         </div>
       )}
 
-      {/* Step 2: Review (Encryption Explainer) */}
+      {/* ── STEP 2: Review (Encryption Explainer) ─────────────────────────── */}
       {step === 2 && (
         <div className="bg-white rounded-xl border p-6 space-y-4">
-          <h2 className="text-xl font-bold">🔐 Review Payment</h2>
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800 font-medium">
-            🔒 PII fields encrypted before leaving your browser
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">🔐 Review & Encryption</h2>
+            <StepExplainer title="Step 2: Review and Encryption">
+              <p>
+                Before the data is sent to MongoDB Atlas, the client-side MongoDB driver applies
+                <strong> Queryable Encryption (QE)</strong> to PII fields.
+              </p>
+              <p>
+                The table below shows what each field looks like <em>as stored in Atlas</em>.
+                Fields marked 🔒 are encrypted ciphertext. Atlas never sees the plaintext values.
+              </p>
+              <p>
+                Decryption happens only in the application process, using keys stored in your KMS
+                (AWS KMS or local key provider). <strong>MongoDB has zero access to the keys.</strong>
+              </p>
+            </StepExplainer>
           </div>
+
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800 font-medium">
+            🔒 PII fields will be encrypted before leaving your browser
+          </div>
+
           <div className="rounded-lg border overflow-hidden text-sm">
-            <div className="bg-gray-50 px-4 py-2 grid grid-cols-2 font-semibold text-gray-600 text-xs uppercase">
-              <span>Field</span>
-              <span>Sent to Atlas</span>
+            <div className="bg-gray-50 px-4 py-2 grid grid-cols-2 font-semibold text-gray-600 text-xs uppercase tracking-wide">
+              <span>
+                Field
+                <Tooltip text="Name of the field being sent to MongoDB Atlas." />
+              </span>
+              <span>
+                Sent to Atlas
+                <Tooltip text="Value as stored in Atlas. Encrypted fields show simulated ciphertext (🔒). Plaintext fields show the actual value." />
+              </span>
             </div>
             {[
-              { label: '🔒 Email', value: form.email, type: 'qe-equality' as const, cipher: simulateCipher(form.email) },
-              { label: '🔒 Phone', value: form.phone, type: 'qe-equality' as const, cipher: simulateCipher(form.phone) },
-              { label: '🔒 Account Ref', value: 'auto-generated', type: 'qe-equality' as const, cipher: simulateCipher('ACC-') },
-              { label: 'Card token', value: cardToken, type: 'plaintext' as const, cipher: cardToken },
-              { label: 'Amount', value: `$${form.amount}`, type: 'plaintext' as const, cipher: form.amount },
-              { label: 'Merchant', value: form.merchantName, type: 'plaintext' as const, cipher: form.merchantName },
-            ].map(({ label, type, cipher }) => (
+              {
+                label: '🔒 Email',
+                value: form.email,
+                type: 'qe-equality' as const,
+                cipher: simulateCipher(form.email),
+                tooltip: 'QE:equality: encrypted at origin, searchable by exact match. Atlas stores only ciphertext.',
+              },
+              {
+                label: '🔒 Phone',
+                value: form.phone,
+                type: 'qe-equality' as const,
+                cipher: simulateCipher(form.phone),
+                tooltip: 'QE:equality: encrypted at origin, searchable by exact match. Atlas stores only ciphertext.',
+              },
+              {
+                label: '🔒 Account Ref',
+                value: 'auto-generated',
+                type: 'qe-equality' as const,
+                cipher: simulateCipher('ACC-'),
+                tooltip: 'QE:equality: a unique account reference generated server-side, stored encrypted, searchable by exact match.',
+              },
+              {
+                label: 'Card Token',
+                value: cardTokenRef.current,
+                type: 'plaintext' as const,
+                cipher: cardTokenRef.current,
+                tooltip: 'Plain surrogate token (not the PAN). Under PCI DSS v4.0, a token is not Cardholder Data and may be stored in plaintext with a standard index.',
+              },
+              {
+                label: 'Masked PAN',
+                value: maskedCard,
+                type: 'plaintext' as const,
+                cipher: maskedCard,
+                tooltip: 'Last-4 display only (****-****-****-XXXX). PCI DSS permits storing the last four digits in plaintext.',
+              },
+              {
+                label: 'Amount',
+                value: `$${form.amount}`,
+                type: 'plaintext' as const,
+                cipher: form.amount,
+                tooltip: 'Transaction amount stored as plaintext. Not considered Cardholder Data under PCI DSS.',
+              },
+              {
+                label: 'Merchant',
+                value: form.merchantName,
+                type: 'plaintext' as const,
+                cipher: form.merchantName,
+                tooltip: 'Merchant display name stored as plaintext. Not Cardholder Data.',
+              },
+              {
+                label: 'MCC',
+                value: form.merchantCategoryCode,
+                type: 'plaintext' as const,
+                cipher: form.merchantCategoryCode,
+                tooltip: 'ISO 18245 Merchant Category Code stored as plaintext. Used for fraud risk evaluation.',
+              },
+            ].map(({ label, type, cipher, tooltip }) => (
               <div key={label} className="px-4 py-2.5 grid grid-cols-2 border-t items-center">
-                <div>
+                <div className="flex items-center">
                   <EncryptionBadge label={label} type={type} />
+                  <Tooltip text={tooltip} />
                 </div>
                 <div className={`font-mono text-xs truncate ${type !== 'plaintext' ? 'text-yellow-700' : 'text-gray-600'}`}>
-                  {type !== 'plaintext' ? cipher : cipher}
+                  {cipher}
                 </div>
               </div>
             ))}
           </div>
+
           <p className="text-xs text-gray-500">
-            PII fields are encrypted at origin. The card token is a surrogate — not cardholder
-            data. Your KMS key controls decryption. MongoDB has zero access.
+            PII fields are encrypted at origin. The card token is a surrogate, not cardholder data.
+            Your KMS key controls decryption. MongoDB has zero access.
           </p>
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
+              <strong>Error:</strong> {error}
+            </div>
+          )}
+
           <div className="flex gap-3">
             <button
-              onClick={() => setStep(1)}
-              className="flex-1 border rounded-lg py-2.5 text-gray-700 hover:bg-gray-50"
+              onClick={() => { setStep(1); setError(null); }}
+              className="flex-1 border rounded-lg py-2.5 text-gray-700 hover:bg-gray-50 transition-colors"
             >
               ← Back
             </button>
@@ -243,24 +707,68 @@ export default function PaymentPage() {
         </div>
       )}
 
-      {/* Step 3: Confirmation + Fraud Alert */}
+      {/* ── STEP 3: Confirmation + Fraud Alert ────────────────────────────── */}
       {step === 3 && result && (
         <div className="bg-white rounded-xl border p-6 space-y-4">
-          <h2 className="text-xl font-bold">✅ Payment Confirmed</h2>
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-1 text-sm">
-            <p>
-              <strong>Transaction:</strong>{' '}
-              <span className="font-mono">{result.txnId.slice(0, 16)}…</span>
-            </p>
-            <p>
-              <strong>Amount:</strong> ${form.amount} · {form.merchantName}
-            </p>
-            <p>
-              <strong>Card:</strong> {maskedCard || '****-****-****-1234'}
-            </p>
-            <p>
-              <strong>Time:</strong> {new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC
-            </p>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">✅ Payment Confirmed</h2>
+            <StepExplainer title="Step 3: Confirmation">
+              <p>
+                The transaction has been written to MongoDB Atlas. The QE-encrypted fields are stored
+                as opaque ciphertext; no plaintext PII ever reaches the database server.
+              </p>
+              <p>
+                If the amount exceeded <strong>$500</strong> or the MCC is high-risk, a
+                <strong> FraudDiagnosisCase</strong> (BIAN SD-105) was automatically opened and you
+                will be redirected to the Investigation Dashboard.
+              </p>
+              <p>
+                In the Investigation Dashboard, analysts can search for this transaction by encrypted
+                email or phone. Atlas runs the equality query without decrypting the stored values.
+              </p>
+            </StepExplainer>
+          </div>
+
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Transaction ID</span>
+              <span className="font-mono text-xs text-gray-800">
+                {result.txnId.slice(0, 16)}…
+                <Tooltip text="UUID of the cardTransaction document (BIAN SD-254 Control Record). Use this to fetch the transaction via GET /api/v1/transactions/:id." />
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Amount</span>
+              <span className="font-semibold">
+                ${form.amount}
+                <Tooltip text="Plaintext amount stored in cardTransactionAmount.amount. Not considered Cardholder Data under PCI DSS." />
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Merchant</span>
+              <span>
+                {form.merchantName}
+                <Tooltip text="Plaintext merchant name stored in cardTransactionMerchantName." />
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Card</span>
+              <span className="font-mono">
+                {maskedCard || '****-****-****-1234'}
+                <Tooltip text="Masked PAN (last 4 digits only). PCI DSS permits displaying this. The raw PAN was never stored." />
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Token</span>
+              <span className="font-mono text-xs">
+                {cardTokenRef.current}
+                <Tooltip text="Card surrogate token generated client-side. This is what is stored in paymentCardReference, not the PAN." />
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Time</span>
+              <span className="text-xs">{new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC</span>
+            </div>
           </div>
 
           {result.fraudCaseCreated && result.caseId && (
@@ -275,17 +783,13 @@ export default function PaymentPage() {
           {!result.fraudCaseCreated && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
               ✅ No fraud risk detected for this transaction.
+              <Tooltip text="No fraud case was created because the amount was below $500 and the MCC was not in the high-risk list (5812, 6011, 7995). Try $850 with MCC 5734 to trigger a fraud alert." />
             </div>
           )}
 
           <button
-            onClick={() => {
-              setStep(1);
-              setForm(DEFAULTS);
-              setMaskedCard('');
-              setResult(null);
-            }}
-            className="w-full border rounded-lg py-2.5 text-gray-700 hover:bg-gray-50"
+            onClick={handleReset}
+            className="w-full border rounded-lg py-2.5 text-gray-700 hover:bg-gray-50 transition-colors"
           >
             ← New Payment
           </button>

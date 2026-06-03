@@ -7,6 +7,10 @@ const PUBLIC_EXACT: Set<string> = new Set([
   '/api/v1/system/health',
   '/api/v1/auth/login',
   '/api/v1/auth/users',
+  '/api/v1/auth/domains',
+  '/api/v1/transactions/merchants',
+  // Simulator mode: transaction creation without a user session
+  '/api/v1/transactions',
 ]);
 
 // URL prefixes that bypass JWT auth (Swagger UI and its static assets)

@@ -34,6 +34,17 @@ export interface AuthUser {
   role: string;
 }
 
+export interface AuthDomain {
+  name: string;
+  displayName: string;
+  type: 'local' | 'oidc' | 'saml';
+}
+
+export interface Merchant {
+  name: string;
+  mcc: string;
+}
+
 export interface CardTransactionCreateResponse {
   cardTransactionInstanceReference: string;
   cardTransactionStatus: string;
@@ -85,14 +96,18 @@ export const api = {
       }),
     users: () =>
       apiFetch<{ users: AuthUser[] }>('/api/v1/auth/users'),
+    domains: () =>
+      apiFetch<{ domains: AuthDomain[] }>('/api/v1/auth/domains'),
   },
 
   transactions: {
-    create: (body: object, token: string) =>
+    create: (body: object, token?: string) =>
       apiFetch<CardTransactionCreateResponse>('/api/v1/transactions', {
         method: 'POST',
         body: JSON.stringify(body),
       }, token),
+    merchants: () =>
+      apiFetch<{ merchants: Merchant[] }>('/api/v1/transactions/merchants'),
     getById: (id: string, token: string) =>
       apiFetch<Record<string, unknown>>(`/api/v1/transactions/${id}`, {}, token),
     getByCardToken: (cardToken: string, token: string) =>

@@ -56,6 +56,18 @@ export async function createCollections(
     console.log(`  created: ${name}`);
   }
 
+  // authenticationDomain — plaintext collection, no QE (domain config, no CHD)
+  if (!existingNames.has('authenticationDomain') || reset) {
+    if (existingNames.has('authenticationDomain') && reset) {
+      await db.collection('authenticationDomain').drop();
+      console.log('  dropped: authenticationDomain');
+    }
+    await db.createCollection('authenticationDomain');
+    console.log('  created: authenticationDomain');
+  } else {
+    console.log('  skip:    authenticationDomain (already exists)');
+  }
+
   // fraudDiagnosisCase — plaintext collection, no QE
   if (!existingNames.has('fraudDiagnosisCase') || reset) {
     if (existingNames.has('fraudDiagnosisCase') && reset) {
