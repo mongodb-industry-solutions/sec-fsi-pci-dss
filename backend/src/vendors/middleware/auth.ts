@@ -12,10 +12,13 @@ const PUBLIC_EXACT: Set<string> = new Set([
   '/api/v1/transactions/merchants',
   // Simulator mode: transaction creation without a user session
   '/api/v1/transactions',
+  // Admin login does its own credential check
+  '/api/v1/admin/login',
 ]);
 
 // URL prefixes that bypass JWT auth (Swagger UI and its static assets + simulator read-only routes)
-const PUBLIC_PREFIXES: string[] = ['/doc', '/api/v1/fraud'];
+// Admin run/logs endpoints handle their own admin token verification internally
+const PUBLIC_PREFIXES: string[] = ['/doc', '/api/v1/fraud', '/api/v1/admin'];
 
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const { url } = request;

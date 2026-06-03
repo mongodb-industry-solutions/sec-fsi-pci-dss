@@ -94,20 +94,11 @@ export default function DemoLoginPage() {
   return (
     <div className="min-h-screen bg-[#001E2B] flex items-center justify-center p-6">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
-        {/* Header row with exit link */}
-        <div className="flex items-start justify-between mb-6">
-          <div className="text-center flex-1">
-            <div className="text-4xl mb-2">🏦</div>
-            <h1 className="text-2xl font-bold">PCI DSS Demo</h1>
-            <p className="text-gray-500 text-sm mt-1">Application Mode: Sign In</p>
-          </div>
-          <Link
-            href="/"
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors whitespace-nowrap mt-1 flex items-center gap-1"
-            title="Back to mode selection"
-          >
-            ✕ Exit
-          </Link>
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="text-4xl mb-2">🏦</div>
+          <h1 className="text-2xl font-bold">PCI DSS Demo</h1>
+          <p className="text-gray-500 text-sm mt-1">Application Mode: Sign In</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">

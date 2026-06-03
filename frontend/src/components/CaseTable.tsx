@@ -44,7 +44,8 @@ export function CaseTable({ cases, basePath }: Props) {
                 </Link>
               </td>
               <td className="px-4 py-3 font-mono text-xs text-gray-600 truncate max-w-[140px]">
-                {c.linkedCardTransactionReference.slice(0, 12)}…
+                {(c.linkedCardTransactionReference ?? '').slice(0, 12) || 'N/A'}
+                {c.linkedCardTransactionReference ? '…' : ''}
               </td>
               <td className="px-4 py-3">
                 <span
