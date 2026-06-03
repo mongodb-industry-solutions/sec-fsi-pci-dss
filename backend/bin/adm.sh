@@ -184,6 +184,28 @@ list_prs() {
     fi
 }
 
+# ---- Option 5: Logout / switch user -----------------------
+
+github_logout() {
+    echo ""
+    chk "GitHub CLI authentication status..."
+    if ! gh auth status &>/dev/null; then
+        warn "No active GitHub CLI session found. Nothing to log out from."
+        return
+    fi
+    gh auth status
+    echo ""
+    read -rp "Log out from GitHub CLI? This will remove the stored token. (y/N): " CONFIRM
+    if [[ "${CONFIRM,,}" != "y" ]]; then
+        echo "Logout cancelled."
+        return
+    fi
+    gh auth logout
+    gh auth status &>/dev/null \
+        && fail "Logout failed. Try running: gh auth logout" \
+        || ok "Logged out successfully. Run option 2 to authenticate as a different user."
+}
+
 # ---- Option 4: List SSH keys -------------------------------
 
 list_ssh_keys() {
@@ -256,6 +278,7 @@ while true; do
     echo "  2. Authenticate with GitHub CLI (gh auth login)"
     echo "  3. List pull requests in a project"
     echo "  4. List SSH keys"
+    echo "  5. Logout / switch GitHub account"
     echo "  0. Exit"
     echo ""
     read -rp "Select an option: " CHOICE
@@ -265,8 +288,9 @@ while true; do
         2) github_auth ;;
         3) list_prs ;;
         4) list_ssh_keys ;;
+        5) github_logout ;;
         0) echo ""; echo "Goodbye."; break ;;
-        *) warn "Invalid option. Enter 1, 2, 3, 4, or 0." ;;
+        *) warn "Invalid option. Enter 1-5 or 0." ;;
     esac
 
     if [ "$CHOICE" != "0" ]; then

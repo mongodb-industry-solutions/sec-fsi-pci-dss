@@ -174,6 +174,31 @@ function Invoke-GitHubAuth {
     }
 }
 
+# ---- Option 5: Logout / switch user -----------------------
+
+function Invoke-GitHubLogout {
+    Write-Host ""
+    chk "GitHub CLI authentication status..."
+    $status = gh auth status 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        warn "No active GitHub CLI session found. Nothing to log out from."
+        return
+    }
+    Write-Host $status
+    Write-Host ""
+    $confirm = Read-Host "Log out from GitHub CLI? This will remove the stored token. (y/N)"
+    if ($confirm.Trim().ToLower() -ne "y") {
+        Write-Host "Logout cancelled."
+        return
+    }
+    gh auth logout
+    if ($LASTEXITCODE -eq 0) {
+        ok "Logged out successfully. Run option 2 to authenticate as a different user."
+    } else {
+        fail "Logout failed. Try running: gh auth logout"
+    }
+}
+
 # ---- Option 4: List SSH keys -------------------------------
 
 function Invoke-ListSSHKeys {
@@ -271,6 +296,7 @@ do {
     Write-Host "  2. Authenticate with GitHub CLI (gh auth login)"
     Write-Host "  3. List pull requests in a project"
     Write-Host "  4. List SSH keys"
+    Write-Host "  5. Logout / switch GitHub account"
     Write-Host "  0. Exit"
     Write-Host ""
     $choice = Read-Host "Select an option"
@@ -280,8 +306,9 @@ do {
         "2" { Invoke-GitHubAuth }
         "3" { Invoke-ListPRs }
         "4" { Invoke-ListSSHKeys }
+        "5" { Invoke-GitHubLogout }
         "0" { Write-Host ""; Write-Host "Goodbye." }
-        default { warn "Invalid option. Enter 1, 2, 3, 4, or 0." }
+        default { warn "Invalid option. Enter 1-5 or 0." }
     }
 
     if ($choice -ne "0") {
