@@ -16,7 +16,10 @@ export default function SimulatorCaseDetailPage() {
   const [rawLoading, setRawLoading] = useState(false);
 
   useEffect(() => {
-    api.fraud.getById(caseId, '').then(setFraudCase).finally(() => setLoading(false));
+    api.fraud.getById(caseId, '')
+      .then(setFraudCase)
+      .catch(() => setFraudCase(null))
+      .finally(() => setLoading(false));
   }, [caseId]);
 
   async function toggleRaw() {
@@ -63,9 +66,9 @@ export default function SimulatorCaseDetailPage() {
           <div><span className="font-medium">Transaction ID:</span></div>
           <div className="font-mono text-xs truncate">{fraudCase.linkedCardTransactionReference.slice(0, 20)}…</div>
           <div><span className="font-medium">Risk Indicators:</span></div>
-          <div>{fraudCase.fraudDiagnosisAssessment?.riskIndicators.join(', ') ?? '—'}</div>
+          <div>{fraudCase.fraudDiagnosisAssessment?.riskIndicators.join(', ') ?? 'N/A'}</div>
           <div><span className="font-medium">Risk Score:</span></div>
-          <div>{fraudCase.fraudDiagnosisAssessment?.fraudDiagnosisScore ?? '—'}/100</div>
+          <div>{fraudCase.fraudDiagnosisAssessment?.fraudDiagnosisScore ?? 'N/A'}/100</div>
         </div>
       </div>
 

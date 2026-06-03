@@ -5,6 +5,7 @@ import * as jwt from 'jsonwebtoken';
 const PUBLIC_EXACT: Set<string> = new Set([
   '/',
   '/api/v1/system/health',
+  '/api/v1/system/users',
   '/api/v1/auth/login',
   '/api/v1/auth/users',
   '/api/v1/auth/domains',
@@ -13,8 +14,8 @@ const PUBLIC_EXACT: Set<string> = new Set([
   '/api/v1/transactions',
 ]);
 
-// URL prefixes that bypass JWT auth (Swagger UI and its static assets)
-const PUBLIC_PREFIXES: string[] = ['/doc'];
+// URL prefixes that bypass JWT auth (Swagger UI and its static assets + simulator read-only routes)
+const PUBLIC_PREFIXES: string[] = ['/doc', '/api/v1/fraud'];
 
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const { url } = request;

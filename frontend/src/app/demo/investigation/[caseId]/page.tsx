@@ -50,7 +50,7 @@ export default function DemoCaseDetailPage() {
           </div>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <span className="font-medium">Risk indicators:</span>
-            <span>{fraudCase.fraudDiagnosisAssessment?.riskIndicators.join(', ') ?? '—'}</span>
+            <span>{fraudCase.fraudDiagnosisAssessment?.riskIndicators.join(', ') ?? 'N/A'}</span>
           </div>
         </div>
 

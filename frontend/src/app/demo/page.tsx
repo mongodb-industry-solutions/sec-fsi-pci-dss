@@ -40,7 +40,9 @@ export default function DemoLoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.auth.users().then((res) => setUsers(res.users)).catch(() => {});
+    api.system.users().then((res) => setUsers(res.users)).catch(() => {
+      api.auth.users().then((res) => setUsers(res.users)).catch(() => {});
+    });
     api.auth.domains()
       .then((res) => {
         setDomains(res.domains);
@@ -97,7 +99,7 @@ export default function DemoLoginPage() {
           <div className="text-center flex-1">
             <div className="text-4xl mb-2">🏦</div>
             <h1 className="text-2xl font-bold">PCI DSS Demo</h1>
-            <p className="text-gray-500 text-sm mt-1">Application Mode — Sign In</p>
+            <p className="text-gray-500 text-sm mt-1">Application Mode: Sign In</p>
           </div>
           <Link
             href="/"
@@ -149,7 +151,7 @@ export default function DemoLoginPage() {
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3">
               <p className="text-sm text-blue-800">
                 <strong>{currentDomain.displayName}</strong> uses{' '}
-                <strong>{FLOW_TYPE_LABELS[flowType ?? ''] ?? flowType}</strong> — you will be
+                <strong>{FLOW_TYPE_LABELS[flowType ?? ''] ?? flowType}</strong>. You will be
                 redirected to the provider to complete login.
               </p>
               <button
@@ -167,26 +169,49 @@ export default function DemoLoginPage() {
             <>
               {/* User selector (local domain only) */}
               {isLocalDomain && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Select User
-                    <Tooltip text="Pre-seeded demo users for the local domain. Select one to auto-fill credentials. Passwords are bcrypt-hashed in the database, never stored in plaintext." />
-                  </label>
-                  <select
-                    value={selectedEmail}
-                    onChange={(e) => handleUserSelect(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm"
-                  >
-                    <option value="">Select a user…</option>
-                    {users.map((u) => (
-                      <option key={u.email} value={u.email}>
-                        {u.name} ({ROLE_LABELS[u.role] ?? u.role})
-                      </option>
-                    ))}
-                  </select>
-                  {selectedUser && (
-                    <p className="text-xs text-gray-500 mt-0.5 font-mono">{selectedEmail}</p>
-                  )}
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Select User
+                      <Tooltip text="Pre-seeded demo users for the local domain. Select one to auto-fill credentials. Passwords are bcrypt-hashed in the database, never stored in plaintext." />
+                    </label>
+                    {users.length === 0 ? (
+                      <div className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-400 animate-pulse">
+                        Loading users…
+                      </div>
+                    ) : (
+                      <select
+                        value={users.some((u) => u.email === selectedEmail) ? selectedEmail : ''}
+                        onChange={(e) => handleUserSelect(e.target.value)}
+                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                      >
+                        <option value="">Select a user…</option>
+                        {users.map((u) => (
+                          <option key={u.email} value={u.email}>
+                            {u.name} ({ROLE_LABELS[u.role] ?? u.role})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email
+                      <Tooltip text="Select a user above to auto-fill, or type a custom email address." />
+                    </label>
+                    <input
+                      type="email"
+                      value={selectedEmail}
+                      onChange={(e) => {
+                        const email = e.target.value;
+                        setSelectedEmail(email);
+                        if (DEMO_USERS_PASSWORDS[email]) setPassword(DEMO_USERS_PASSWORDS[email]);
+                        setError(null);
+                      }}
+                      placeholder="user@example.com"
+                      className="w-full border rounded-lg px-3 py-2 text-sm"
+                    />
+                  </div>
                 </div>
               )}
 

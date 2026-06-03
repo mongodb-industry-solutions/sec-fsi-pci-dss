@@ -297,12 +297,30 @@ export default function PaymentPage() {
     fraudCaseCreated: boolean;
     caseId?: string;
     caseRef?: string;
+    cardToken: string;
   } | null>(null);
+  const [returning, setReturning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const cardTokenRef = useRef<string>(generateToken());
 
   useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('sim_payment_step3');
+      if (saved) {
+        const { savedResult, savedForm, savedMasked } = JSON.parse(saved);
+        cardTokenRef.current = savedResult.cardToken || cardTokenRef.current;
+        setResult(savedResult);
+        setForm(savedForm);
+        setMaskedCard(savedMasked);
+        setStep(3);
+        setReturning(true);
+        return;
+      }
+    } catch {
+      sessionStorage.removeItem('sim_payment_step3');
+    }
+
     api.transactions.merchants()
       .then((res) => {
         if (res.merchants.length > 0) {
@@ -317,6 +335,7 @@ export default function PaymentPage() {
         }
       })
       .catch(() => {/* keep fallback list */});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleMerchantChange(name: string, mcc: string) {
@@ -350,14 +369,23 @@ export default function PaymentPage() {
         gatewayPayload: { source: 'simulator', timestamp: new Date().toISOString() },
       });
 
-      setResult({
+      const newResult = {
         txnId: res.cardTransactionInstanceReference,
         fraudCaseCreated: res.fraudCaseCreated,
         caseId: res.fraudDiagnosisInstanceReference,
         caseRef: res.fraudDiagnosisInstanceReference
           ? `FD-SIM-${res.fraudDiagnosisInstanceReference.slice(-6).toUpperCase()}`
           : undefined,
-      });
+        cardToken: cardTokenRef.current,
+      };
+      try {
+        sessionStorage.setItem('sim_payment_step3', JSON.stringify({
+          savedResult: newResult,
+          savedForm: form,
+          savedMasked: maskedCard,
+        }));
+      } catch { /* ignore storage errors */ }
+      setResult(newResult);
       setStep(3);
     } catch (err) {
       const msg = (err as Error).message ?? '';
@@ -372,10 +400,12 @@ export default function PaymentPage() {
   }
 
   function handleReset() {
+    try { sessionStorage.removeItem('sim_payment_step3'); } catch { /* ignore */ }
     setStep(1);
     setForm(DEFAULTS);
     setMaskedCard(maskCardNumber(DEMO_CARD_NUMBER));
     setResult(null);
+    setReturning(false);
     setError(null);
     setValidationErrors({});
     cardTokenRef.current = generateToken();
@@ -713,6 +743,17 @@ export default function PaymentPage() {
       {/* ── STEP 3: Confirmation + Fraud Alert ────────────────────────────── */}
       {step === 3 && result && (
         <div className="bg-white rounded-xl border p-6 space-y-4">
+          {returning && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center justify-between">
+              <span className="text-sm text-amber-800 font-medium">Simulation completed. Reset to run a new one.</span>
+              <button
+                onClick={handleReset}
+                className="px-4 py-1.5 bg-[#001E2B] text-[#00ED64] rounded-lg text-sm font-semibold hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors"
+              >
+                Restart Simulation
+              </button>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold">✅ Payment Confirmed</h2>
             <StepExplainer title="Step 3: Confirmation">
@@ -764,7 +805,7 @@ export default function PaymentPage() {
             <div className="flex justify-between">
               <span className="text-gray-600">Token</span>
               <span className="font-mono text-xs">
-                {cardTokenRef.current}
+                {result.cardToken}
                 <Tooltip text="Card surrogate token generated client-side. This is what is stored in paymentCardReference, not the PAN." />
               </span>
             </div>
@@ -780,6 +821,7 @@ export default function PaymentPage() {
               severity="high"
               caseRef={result.caseRef ?? 'FD-SIM-XXXXXX'}
               investigationPath="/simulator/investigation"
+              noAutoRedirect={returning}
             />
           )}
 

@@ -121,7 +121,6 @@ export const api = {
   },
 
   customer: {
-    // SD-53: search by QE-encrypted field (no ID in path — lookup IS the encrypted search)
     getByEmail: (email: string, token: string) =>
       apiFetch<Record<string, unknown>>(
         `/api/v1/customer?email=${encodeURIComponent(email)}`, {}, token
@@ -135,7 +134,6 @@ export const api = {
         `/api/v1/customer?accountRef=${encodeURIComponent(ref)}`, {}, token
       ),
 
-    // SD-88: cards as sub-resource of customer — /api/v1/customer/:customerId/cards
     getCards: (customerId: string, token: string) =>
       apiFetch<{ results: Record<string, unknown>[] }>(
         `/api/v1/customer/${encodeURIComponent(customerId)}/cards`, {}, token
@@ -177,6 +175,8 @@ export const api = {
   },
 
   system: {
+    users: () =>
+      apiFetch<{ users: AuthUser[] }>('/api/v1/system/users'),
     rawDocument: (collection: string, id: string, token: string) =>
       apiFetch<RawDocumentResponse>(
         `/api/v1/system/raw/${collection}/${id}`, {}, token

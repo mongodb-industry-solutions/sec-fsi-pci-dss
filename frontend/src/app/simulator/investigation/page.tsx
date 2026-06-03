@@ -97,7 +97,7 @@ export default function SimulatorInvestigationPage() {
         )}
         {searchField === 'cardToken' && (
           <p className="mt-2 text-xs text-gray-500">
-            ✅ Card token uses a standard MongoDB index — it is a card surrogate, not CHD under
+            ✅ Card token uses a standard MongoDB index; it is a card surrogate, not CHD under
             PCI DSS v4.0.
           </p>
         )}

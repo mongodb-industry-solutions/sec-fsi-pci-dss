@@ -6,13 +6,13 @@ export default function SimulatorLandingPage() {
       <div className="text-5xl mb-4">🎬</div>
       <h1 className="text-2xl font-bold mb-3">Simulator Mode</h1>
       <p className="text-gray-600 mb-6">
-        Follow Luis Fernandez&apos;s payment journey — from card checkout to automatic fraud
+        Follow Luis Fernandez&apos;s payment journey, from card checkout to automatic fraud
         detection and encrypted investigation. This is a presenter-controlled, story-driven
         walkthrough of MongoDB Queryable Encryption.
       </p>
       <div className="bg-white rounded-xl border p-5 mb-6 text-left text-sm text-gray-700 space-y-2">
         <p>
-          <strong>1.</strong> Luis enters card details (masked immediately — raw PAN never sent)
+          <strong>1.</strong> Luis enters card details (masked immediately; raw PAN never sent)
         </p>
         <p>
           <strong>2.</strong> Fields are encrypted before leaving the browser (Review step)

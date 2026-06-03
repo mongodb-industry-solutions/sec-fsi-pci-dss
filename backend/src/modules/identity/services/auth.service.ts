@@ -64,7 +64,7 @@ export async function loginUser(
  * are NOT returned). This is safe for demo purposes only.
  */
 export async function getDemoUsers(_db: Db) {
-  const filePath = path.join(__dirname, '../../../data/users.json');
+  const filePath = path.join(__dirname, '../../../../data/users.json');
   const records: PartyAuthenticationControlRecord[] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
 
   return records

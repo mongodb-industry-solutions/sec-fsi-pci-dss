@@ -63,7 +63,7 @@ export function CaseTable({ cases, basePath }: Props) {
               <td className="px-4 py-3 text-gray-500 text-xs">
                 {c.requestDateTime
                   ? new Date(c.requestDateTime).toLocaleString()
-                  : '—'}
+                  : '-'}
               </td>
             </tr>
           ))}

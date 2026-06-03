@@ -1,5 +1,7 @@
 import { FastifyInstance } from 'fastify';
+import { Db } from 'mongodb';
 import { getRawClient } from '../../../vendors/encryption/rawClient';
+import { getDemoUsers } from '../../identity/services/auth.service';
 
 // Mounted at /system → /api/v1/system
 // - GET /api/v1/system/health       public, always available (bypasses DB guard)
@@ -54,6 +56,51 @@ export async function demoController(fastify: FastifyInstance) {
     } catch (err) {
       const reason = err instanceof Error ? err.message : 'ping failed';
       return reply.status(503).send({ status: 'error', atlas: 'disconnected', error: reason, timestamp });
+    }
+  });
+
+  // GET /api/v1/system/users
+  fastify.get('/users', {
+    schema: {
+      tags: ['system'],
+      summary: 'List demo users for quick login (max 5)',
+      description: `Returns up to 5 active pre-seeded demo user accounts for the local authentication domain.
+**Public — no JWT required.** Intended for the login UI to populate the user selector. Passwords are never returned.`,
+      response: {
+        200: {
+          description: 'List of available demo users (max 5).',
+          type: 'object',
+          properties: {
+            users: {
+              type: 'array',
+              maxItems: 5,
+              description: 'Active demo accounts for the local domain.',
+              items: {
+                type: 'object',
+                properties: {
+                  email: { type: 'string', format: 'email', description: 'Login email; submit to POST /api/v1/auth/login.' },
+                  name: { type: 'string', description: 'Display name.' },
+                  role: {
+                    type: 'string',
+                    enum: ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor'],
+                    description: 'Role encoded in the JWT on login.',
+                  },
+                },
+              },
+            },
+          },
+        },
+        500: { $ref: 'Error#' },
+      },
+    },
+  }, async (_request, reply) => {
+    try {
+      const db = (fastify as FastifyInstance & { db?: Db }).db as Db;
+      const users = await getDemoUsers(db);
+      return reply.send({ users: users.slice(0, 5) });
+    } catch (err) {
+      fastify.log.error(err);
+      return reply.status(500).send({ error: 'Failed to load demo users' });
     }
   });
 
