@@ -1,0 +1,45 @@
+[
+  {
+    "partyAuthenticationDomainInstanceReference": "d1a2b3c4-0001-0001-0001-000000000001",
+    "partyAuthenticationDomainName": "local",
+    "partyAuthenticationDomainDisplayName": "Local (Demo Users)",
+    "partyAuthenticationDomainType": "local",
+    "partyAuthenticationDomainEnabled": true,
+    "partyAuthenticationDomainConfiguration": {},
+    "bianServiceDomain": "PartyAuthentication",
+    "bianControlRecordType": "AuthenticationDomain",
+    "recordCreatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "partyAuthenticationDomainInstanceReference": "d1a2b3c4-0002-0002-0002-000000000002",
+    "partyAuthenticationDomainName": "msentra",
+    "partyAuthenticationDomainDisplayName": "Microsoft Entra ID",
+    "partyAuthenticationDomainType": "oidc",
+    "partyAuthenticationDomainEnabled": false,
+    "partyAuthenticationDomainConfiguration": {
+      "tenantId": "",
+      "clientId": "",
+      "scopes": ["openid", "profile", "email"]
+    },
+    "bianServiceDomain": "PartyAuthentication",
+    "bianControlRecordType": "AuthenticationDomain",
+    "recordCreatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "partyAuthenticationDomainInstanceReference": "d1a2b3c4-0003-0003-0003-000000000003",
+    "partyAuthenticationDomainName": "bigid",
+    "partyAuthenticationDomainDisplayName": "BigID",
+    "partyAuthenticationDomainType": "oidc",
+    "partyAuthenticationDomainEnabled": false,
+    "partyAuthenticationDomainConfiguration": {
+      "tenantUrl": "",
+      "clientId": ""
+    },
+    "bianServiceDomain": "PartyAuthentication",
+    "bianControlRecordType": "AuthenticationDomain",
+    "recordCreatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  }
+]
