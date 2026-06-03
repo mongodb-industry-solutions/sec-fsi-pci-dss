@@ -655,9 +655,9 @@ list_dependabot_alerts() {
     read -rp "Repository owner/repo (leave empty to detect from git remote): " REPO_INPUT
     REPO_NAME=$(get_repo_name "$REPO_INPUT") || return
 
-    read -rp "State filter (open/dismissed/fixed/auto_dismissed/all - default: open): " STATE_INPUT
-    FILTER_STATE="${STATE_INPUT:-open}"
-    [ "$FILTER_STATE" = "all" ] && FILTER_STATE=""
+    read -rp "State filter (open/dismissed/fixed/auto_dismissed/all - default: all): " STATE_INPUT
+    FILTER_STATE="${STATE_INPUT}"
+    [ -z "$FILTER_STATE" ] || [ "$FILTER_STATE" = "all" ] && FILTER_STATE=""
 
     if [ -n "$FILTER_STATE" ]; then
         echo "[cmd]    gh api --paginate repos/$REPO_NAME/dependabot/alerts -f state=$FILTER_STATE"
@@ -666,7 +666,13 @@ list_dependabot_alerts() {
         echo "[cmd]    gh api --paginate repos/$REPO_NAME/dependabot/alerts"
         RAW=$(gh api --paginate "repos/$REPO_NAME/dependabot/alerts" 2>&1)
     fi
-    if [ $? -ne 0 ]; then fail "API error: $RAW"; return; fi
+    if [ $? -ne 0 ]; then
+        fail "Dependabot API error."
+        echo "  Possible causes:"
+        echo "    1. Dependabot not enabled -> Settings -> Security -> Dependabot alerts"
+        echo "    2. Token missing scope -> gh auth refresh --scopes repo,security_events"
+        return
+    fi
 
     echo ""
     echo "$RAW" | python3 -c "
@@ -697,9 +703,9 @@ list_secret_alerts() {
     read -rp "Repository owner/repo (leave empty to detect from git remote): " REPO_INPUT
     REPO_NAME=$(get_repo_name "$REPO_INPUT") || return
 
-    read -rp "State filter (open/resolved/all - default: open): " STATE_INPUT
-    FILTER_STATE="${STATE_INPUT:-open}"
-    [ "$FILTER_STATE" = "all" ] && FILTER_STATE=""
+    read -rp "State filter (open/resolved/all - default: all): " STATE_INPUT
+    FILTER_STATE="${STATE_INPUT}"
+    [ -z "$FILTER_STATE" ] || [ "$FILTER_STATE" = "all" ] && FILTER_STATE=""
 
     if [ -n "$FILTER_STATE" ]; then
         echo "[cmd]    gh api --paginate repos/$REPO_NAME/secret-scanning/alerts -f state=$FILTER_STATE"
@@ -708,7 +714,13 @@ list_secret_alerts() {
         echo "[cmd]    gh api --paginate repos/$REPO_NAME/secret-scanning/alerts"
         RAW=$(gh api --paginate "repos/$REPO_NAME/secret-scanning/alerts" 2>&1)
     fi
-    if [ $? -ne 0 ]; then fail "API error: $RAW"; return; fi
+    if [ $? -ne 0 ]; then
+        fail "Secret scanning API error."
+        echo "  Possible causes:"
+        echo "    1. Secret scanning not enabled -> Settings -> Security -> Secret scanning"
+        echo "    2. Token missing scope -> gh auth refresh --scopes repo,security_events"
+        return
+    fi
 
     echo ""
     echo "$RAW" | python3 -c "
@@ -735,9 +747,9 @@ list_code_alerts() {
     read -rp "Repository owner/repo (leave empty to detect from git remote): " REPO_INPUT
     REPO_NAME=$(get_repo_name "$REPO_INPUT") || return
 
-    read -rp "State filter (open/dismissed/fixed/all - default: open): " STATE_INPUT
-    FILTER_STATE="${STATE_INPUT:-open}"
-    [ "$FILTER_STATE" = "all" ] && FILTER_STATE=""
+    read -rp "State filter (open/dismissed/fixed/all - default: all): " STATE_INPUT
+    FILTER_STATE="${STATE_INPUT}"
+    [ -z "$FILTER_STATE" ] || [ "$FILTER_STATE" = "all" ] && FILTER_STATE=""
 
     if [ -n "$FILTER_STATE" ]; then
         echo "[cmd]    gh api --paginate repos/$REPO_NAME/code-scanning/alerts -f state=$FILTER_STATE"
@@ -746,7 +758,14 @@ list_code_alerts() {
         echo "[cmd]    gh api --paginate repos/$REPO_NAME/code-scanning/alerts"
         RAW=$(gh api --paginate "repos/$REPO_NAME/code-scanning/alerts" 2>&1)
     fi
-    if [ $? -ne 0 ]; then fail "API error: $RAW"; return; fi
+    if [ $? -ne 0 ]; then
+        fail "Code scanning API error."
+        echo "  Possible causes:"
+        echo "    1. No code scanning analysis found (GitHub Actions workflow needed)"
+        echo "    2. Token missing scope -> gh auth refresh --scopes repo,security_events,admin:repo_hook"
+        echo "    3. Code scanning not configured -> Settings -> Security -> Code scanning"
+        return
+    fi
 
     echo ""
     echo "$RAW" | python3 -c "
@@ -768,6 +787,111 @@ for a in alerts:
 print('------------------------------------------------------------')
 " 2>/dev/null || { warn "Could not parse response."; echo "$RAW"; }
     echo "Browser: https://github.com/$REPO_NAME/security/code-scanning"
+}
+
+# ---- Option 16: Generate JSON reports ----------------------
+
+generate_report() {
+    echo ""
+    read -rp "Repository owner/repo (leave empty to detect from git remote): " REPO_INPUT
+    REPO_NAME=$(get_repo_name "$REPO_INPUT") || return
+
+    mkdir -p tmp
+
+    # PR report
+    read -rp "PR number for issue report (leave empty to skip): " PR_NUMBER
+    if [ -n "$PR_NUMBER" ]; then
+        echo ""
+        echo "[action] Generating PR report for #$PR_NUMBER..."
+        OWNER="${REPO_NAME%%/*}"; REPO_ONLY="${REPO_NAME#*/}"
+
+        echo "[cmd]    gh api repos/$REPO_NAME/pulls/$PR_NUMBER"
+        PR_DATA=$(gh api "repos/$REPO_NAME/pulls/$PR_NUMBER" 2>/dev/null)
+
+        GQL_QUERY='query($owner:String!,$name:String!,$num:Int!){repository(owner:$owner,name:$name){pullRequest(number:$num){title state body author{login} baseRefName headRefName createdAt mergedAt reviews(first:50){nodes{id state author{login} body submittedAt}} reviewThreads(first:50){nodes{id isResolved path line comments(first:20){nodes{body author{login} createdAt}}}}}}}'
+        echo "[cmd]    gh api graphql -f query=<PR full detail>"
+        GQL_DATA=$(gh api graphql -f query="$GQL_QUERY" -f owner="$OWNER" -f name="$REPO_ONLY" -F num="$PR_NUMBER" 2>/dev/null)
+
+        echo "[cmd]    gh api repos/$REPO_NAME/issues/$PR_NUMBER/comments"
+        COMMENTS=$(gh api "repos/$REPO_NAME/issues/$PR_NUMBER/comments" 2>/dev/null)
+
+        OUT="tmp/issue.pr${PR_NUMBER}.json"
+        python3 -c "
+import sys, json
+from datetime import datetime, timezone
+
+pr = json.loads('''$PR_DATA''') if '''$PR_DATA''' else {}
+gql = json.loads('''$GQL_DATA''') if '''$GQL_DATA''' else {}
+comments = json.loads('''$COMMENTS''') if '''$COMMENTS''' else []
+
+pr_gql = gql.get('data',{}).get('repository',{}).get('pullRequest',{}) if gql else {}
+threads = pr_gql.get('reviewThreads',{}).get('nodes',[]) if pr_gql else []
+pending = [t for t in threads if not t.get('isResolved')]
+
+report = {
+    'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+    'repo': '$REPO_NAME',
+    'pr_number': $PR_NUMBER,
+    'title': pr.get('title'),
+    'state': pr.get('state'),
+    'author': pr.get('user',{}).get('login'),
+    'base_branch': pr.get('base',{}).get('ref'),
+    'head_branch': pr.get('head',{}).get('ref'),
+    'created_at': pr.get('created_at'),
+    'merged_at': pr.get('merged_at'),
+    'body': pr.get('body'),
+    'pending_count': len(pending),
+    'pending_conversations': pending,
+    'all_review_threads': threads,
+    'reviews': pr_gql.get('reviews',{}).get('nodes',[]),
+    'comments': comments,
+}
+with open('$OUT','w') as f: json.dump(report, f, indent=2)
+print(f'[ok]     PR report saved: $OUT ({len(pending)} pending conversations)')
+" 2>/dev/null || { warn "Could not generate PR report."; }
+    fi
+
+    # Security report
+    read -rp "Generate security report? (Y/n - default: y): " GEN_SEC
+    if [[ "${GEN_SEC,,}" != "n" ]]; then
+        echo ""
+        echo "[action] Fetching Dependabot alerts..."
+        echo "[cmd]    gh api --paginate repos/$REPO_NAME/dependabot/alerts"
+        DEP=$(gh api --paginate "repos/$REPO_NAME/dependabot/alerts" 2>/dev/null || echo "[]")
+
+        echo "[action] Fetching secret scanning alerts..."
+        echo "[cmd]    gh api --paginate repos/$REPO_NAME/secret-scanning/alerts"
+        SEC=$(gh api --paginate "repos/$REPO_NAME/secret-scanning/alerts" 2>/dev/null || echo "[]")
+
+        echo "[action] Fetching code scanning alerts..."
+        echo "[cmd]    gh api --paginate repos/$REPO_NAME/code-scanning/alerts"
+        CODE=$(gh api --paginate "repos/$REPO_NAME/code-scanning/alerts" 2>/dev/null || echo "[]")
+
+        OUT="tmp/issue.security.json"
+        python3 -c "
+import sys, json
+from datetime import datetime, timezone
+
+dep   = json.loads('''$DEP''')   if '''$DEP'''   else []
+sec   = json.loads('''$SEC''')   if '''$SEC'''   else []
+code  = json.loads('''$CODE''')  if '''$CODE'''  else []
+
+report = {
+    'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+    'repo': '$REPO_NAME',
+    'summary': {
+        'dependabot_total':  len(dep),
+        'secret_scan_total': len(sec),
+        'code_scan_total':   len(code),
+    },
+    'dependabot_alerts':      dep,
+    'secret_scanning_alerts': sec,
+    'code_scanning_alerts':   code,
+}
+with open('$OUT','w') as f: json.dump(report, f, indent=2)
+print(f'[ok]     Security report saved: $OUT (dep:{len(dep)} sec:{len(sec)} code:{len(code)})')
+" 2>/dev/null || { warn "Could not generate security report."; }
+    fi
 }
 
 # ============================================================
@@ -817,6 +941,7 @@ while true; do
     echo "  13. Dependabot alerts (dependency vulnerabilities)"
     echo "  14. Secret scanning alerts"
     echo "  15. Code scanning alerts (quality / malware)"
+    echo "  16. Generate JSON reports (PR conversations + security)"
     echo "  --- ---"
     echo "  0.  Exit"
     echo ""
@@ -838,8 +963,9 @@ while true; do
         13) list_dependabot_alerts ;;
         14) list_secret_alerts ;;
         15) list_code_alerts ;;
+        16) generate_report ;;
         0)  echo ""; echo "Goodbye."; break ;;
-        *)  warn "Invalid option. Enter 1-15 or 0." ;;
+        *)  warn "Invalid option. Enter 1-16 or 0." ;;
     esac
 
     if [ "$CHOICE" != "0" ]; then

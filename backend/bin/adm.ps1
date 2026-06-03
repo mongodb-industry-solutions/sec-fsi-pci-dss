@@ -645,9 +645,8 @@ function Invoke-ListDependabotAlerts {
     $ctx = Get-RepoContext
     if ($null -eq $ctx) { return }
 
-    $stateInput = (Read-Host "State filter (open/dismissed/fixed/auto_dismissed/all - default: open)").Trim()
-    $filterState = if ($stateInput -eq "" -or $stateInput -eq "open") { "open" } `
-                   elseif ($stateInput -eq "all") { "" } else { $stateInput }
+    $stateInput = (Read-Host "State filter (open/dismissed/fixed/auto_dismissed/all - default: all)").Trim()
+    $filterState = if ($stateInput -ne "" -and $stateInput -ne "all") { $stateInput } else { "" }
 
     if ($filterState -ne "") {
         Write-Host "[cmd]    gh api --paginate repos/$($ctx.Name)/dependabot/alerts -f state=$filterState"
@@ -656,7 +655,13 @@ function Invoke-ListDependabotAlerts {
         Write-Host "[cmd]    gh api --paginate repos/$($ctx.Name)/dependabot/alerts"
         $raw = & gh api --paginate "repos/$($ctx.Name)/dependabot/alerts" 2>&1
     }
-    if ($LASTEXITCODE -ne 0) { fail "API error: $raw"; return }
+    if ($LASTEXITCODE -ne 0) {
+        fail "Dependabot API error."
+        Write-Host "  Possible causes:"
+        Write-Host "    1. Dependabot is not enabled -> Settings -> Security -> Dependabot alerts"
+        Write-Host "    2. Token missing scope -> run: gh auth refresh --scopes repo,security_events"
+        return
+    }
 
     $alerts = $raw | ConvertFrom-Json
     if ($alerts.Count -eq 0) { ok "No Dependabot alerts found."; return }
@@ -684,9 +689,8 @@ function Invoke-ListSecretAlerts {
     $ctx = Get-RepoContext
     if ($null -eq $ctx) { return }
 
-    $stateInput = (Read-Host "State filter (open/resolved/all - default: open)").Trim()
-    $filterState = if ($stateInput -eq "" -or $stateInput -eq "open") { "open" } `
-                   elseif ($stateInput -eq "all") { "" } else { $stateInput }
+    $stateInput = (Read-Host "State filter (open/resolved/all - default: all)").Trim()
+    $filterState = if ($stateInput -ne "" -and $stateInput -ne "all") { $stateInput } else { "" }
 
     if ($filterState -ne "") {
         Write-Host "[cmd]    gh api --paginate repos/$($ctx.Name)/secret-scanning/alerts -f state=$filterState"
@@ -695,7 +699,13 @@ function Invoke-ListSecretAlerts {
         Write-Host "[cmd]    gh api --paginate repos/$($ctx.Name)/secret-scanning/alerts"
         $raw = & gh api --paginate "repos/$($ctx.Name)/secret-scanning/alerts" 2>&1
     }
-    if ($LASTEXITCODE -ne 0) { fail "API error: $raw"; return }
+    if ($LASTEXITCODE -ne 0) {
+        fail "Secret scanning API error."
+        Write-Host "  Possible causes:"
+        Write-Host "    1. Secret scanning not enabled -> Settings -> Security -> Secret scanning"
+        Write-Host "    2. Token missing scope -> run: gh auth refresh --scopes repo,security_events"
+        return
+    }
 
     $alerts = $raw | ConvertFrom-Json
     if ($alerts.Count -eq 0) { ok "No secret scanning alerts found."; return }
@@ -721,9 +731,8 @@ function Invoke-ListCodeAlerts {
     $ctx = Get-RepoContext
     if ($null -eq $ctx) { return }
 
-    $stateInput = (Read-Host "State filter (open/dismissed/fixed/all - default: open)").Trim()
-    $filterState = if ($stateInput -eq "" -or $stateInput -eq "open") { "open" } `
-                   elseif ($stateInput -eq "all") { "" } else { $stateInput }
+    $stateInput = (Read-Host "State filter (open/dismissed/fixed/all - default: all)").Trim()
+    $filterState = if ($stateInput -ne "" -and $stateInput -ne "all") { $stateInput } else { "" }
 
     if ($filterState -ne "") {
         Write-Host "[cmd]    gh api --paginate repos/$($ctx.Name)/code-scanning/alerts -f state=$filterState"
@@ -732,7 +741,14 @@ function Invoke-ListCodeAlerts {
         Write-Host "[cmd]    gh api --paginate repos/$($ctx.Name)/code-scanning/alerts"
         $raw = & gh api --paginate "repos/$($ctx.Name)/code-scanning/alerts" 2>&1
     }
-    if ($LASTEXITCODE -ne 0) { fail "API error: $raw"; return }
+    if ($LASTEXITCODE -ne 0) {
+        fail "Code scanning API error."
+        Write-Host "  Possible causes:"
+        Write-Host "    1. No code scanning analysis found (GitHub Actions workflow needed)"
+        Write-Host "    2. Token missing scope -> run: gh auth refresh --scopes repo,security_events,admin:repo_hook"
+        Write-Host "    3. Code scanning not configured -> Settings -> Security -> Code scanning"
+        return
+    }
 
     $alerts = $raw | ConvertFrom-Json
     if ($alerts.Count -eq 0) { ok "No code scanning alerts found."; return }
@@ -752,6 +768,100 @@ function Invoke-ListCodeAlerts {
     }
     Write-Host "------------------------------------------------------------"
     Write-Host "Browser: https://github.com/$($ctx.Name)/security/code-scanning"
+}
+
+# ---- Option 16: Generate JSON reports ----------------------
+
+function Invoke-GenerateReport {
+    Write-Host ""
+    $ctx = Get-RepoContext
+    if ($null -eq $ctx) { return }
+
+    $tmpDir = "tmp"
+    if (!(Test-Path $tmpDir)) { New-Item -ItemType Directory -Path $tmpDir | Out-Null; ok "Created $tmpDir/" }
+
+    # PR report
+    $prNum = (Read-Host "PR number for issue report (leave empty to skip)").Trim()
+    if ($prNum -ne "") {
+        Write-Host ""
+        action "Generating PR report for #$prNum..."
+        $owner, $repoOnly = $ctx.Name -split "/", 2
+
+        Write-Host "[cmd]    gh api repos/$($ctx.Name)/pulls/$prNum"
+        $prRaw = & gh api "repos/$($ctx.Name)/pulls/$prNum" 2>&1
+        $prData = if ($LASTEXITCODE -eq 0) { $prRaw | ConvertFrom-Json } else { $null }
+
+        $gqlQuery = 'query($owner:String!,$name:String!,$num:Int!){repository(owner:$owner,name:$name){pullRequest(number:$num){title state body author{login} baseRefName headRefName createdAt mergedAt reviews(first:50){nodes{id state author{login} body submittedAt}} reviewThreads(first:50){nodes{id isResolved path line comments(first:20){nodes{body author{login} createdAt}}}}}}}'
+        Write-Host "[cmd]    gh api graphql -f query=<PR full detail with threads>"
+        $gqlRaw = & gh api graphql -f query=$gqlQuery -f owner=$owner -f name=$repoOnly -F num=$([int]$prNum) 2>&1
+        $gqlData = if ($LASTEXITCODE -eq 0) { ($gqlRaw | ConvertFrom-Json).data.repository.pullRequest } else { $null }
+
+        Write-Host "[cmd]    gh api repos/$($ctx.Name)/issues/$prNum/comments"
+        $commentsRaw = & gh api "repos/$($ctx.Name)/issues/$prNum/comments" 2>&1
+        $comments = if ($LASTEXITCODE -eq 0) { $commentsRaw | ConvertFrom-Json } else { @() }
+
+        $pending = if ($gqlData) { $gqlData.reviewThreads.nodes | Where-Object { -not $_.isResolved } } else { @() }
+
+        $report = [ordered]@{
+            generated_at          = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+            repo                  = $ctx.Name
+            pr_number             = [int]$prNum
+            title                 = if ($prData) { $prData.title } else { $null }
+            state                 = if ($prData) { $prData.state } else { $null }
+            author                = if ($prData -and $prData.user) { $prData.user.login } else { $null }
+            base_branch           = if ($prData -and $prData.base) { $prData.base.ref } else { $null }
+            head_branch           = if ($prData -and $prData.head) { $prData.head.ref } else { $null }
+            created_at            = if ($prData) { $prData.created_at } else { $null }
+            merged_at             = if ($prData) { $prData.merged_at } else { $null }
+            body                  = if ($prData) { $prData.body } else { $null }
+            pending_count         = $pending.Count
+            pending_conversations = $pending
+            all_review_threads    = if ($gqlData -and $gqlData.reviewThreads) { $gqlData.reviewThreads.nodes } else { @() }
+            reviews               = if ($gqlData -and $gqlData.reviews) { $gqlData.reviews.nodes } else { @() }
+            comments              = $comments
+        }
+
+        $outFile = "$tmpDir/issue.pr$prNum.json"
+        $report | ConvertTo-Json -Depth 15 | Set-Content -Path $outFile -Encoding UTF8
+        ok "PR report saved: $outFile ($($pending.Count) pending conversations)"
+    }
+
+    # Security report
+    $genSec = (Read-Host "Generate security report? (Y/n - default: y)").Trim().ToLower()
+    if ($genSec -ne "n") {
+        Write-Host ""
+        action "Fetching Dependabot alerts..."
+        Write-Host "[cmd]    gh api --paginate repos/$($ctx.Name)/dependabot/alerts"
+        $depRaw = & gh api --paginate "repos/$($ctx.Name)/dependabot/alerts" 2>&1
+        $depAlerts = if ($LASTEXITCODE -eq 0) { $depRaw | ConvertFrom-Json } else { @() }
+
+        action "Fetching secret scanning alerts..."
+        Write-Host "[cmd]    gh api --paginate repos/$($ctx.Name)/secret-scanning/alerts"
+        $secRaw = & gh api --paginate "repos/$($ctx.Name)/secret-scanning/alerts" 2>&1
+        $secAlerts = if ($LASTEXITCODE -eq 0) { $secRaw | ConvertFrom-Json } else { @() }
+
+        action "Fetching code scanning alerts..."
+        Write-Host "[cmd]    gh api --paginate repos/$($ctx.Name)/code-scanning/alerts"
+        $codeRaw = & gh api --paginate "repos/$($ctx.Name)/code-scanning/alerts" 2>&1
+        $codeAlerts = if ($LASTEXITCODE -eq 0) { $codeRaw | ConvertFrom-Json } else { @() }
+
+        $secReport = [ordered]@{
+            generated_at = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+            repo         = $ctx.Name
+            summary      = [ordered]@{
+                dependabot_total    = $depAlerts.Count
+                secret_scan_total   = $secAlerts.Count
+                code_scan_total     = $codeAlerts.Count
+            }
+            dependabot_alerts       = $depAlerts
+            secret_scanning_alerts  = $secAlerts
+            code_scanning_alerts    = $codeAlerts
+        }
+
+        $outFile = "$tmpDir/issue.security.json"
+        $secReport | ConvertTo-Json -Depth 15 | Set-Content -Path $outFile -Encoding UTF8
+        ok "Security report saved: $outFile (dep:$($depAlerts.Count) sec:$($secAlerts.Count) code:$($codeAlerts.Count))"
+    }
 }
 
 # ============================================================
@@ -802,6 +912,7 @@ do {
     Write-Host "  13. Dependabot alerts (dependency vulnerabilities)"
     Write-Host "  14. Secret scanning alerts"
     Write-Host "  15. Code scanning alerts (quality / malware)"
+    Write-Host "  16. Generate JSON reports (PR conversations + security)"
     Write-Host "  --- ---"
     Write-Host "  0.  Exit"
     Write-Host ""
@@ -823,8 +934,9 @@ do {
         "13" { Invoke-ListDependabotAlerts }
         "14" { Invoke-ListSecretAlerts }
         "15" { Invoke-ListCodeAlerts }
+        "16" { Invoke-GenerateReport }
         "0"  { Write-Host ""; Write-Host "Goodbye." }
-        default { warn "Invalid option. Enter 1-15 or 0." }
+        default { warn "Invalid option. Enter 1-16 or 0." }
     }
 
     if ($choice -ne "0") {
