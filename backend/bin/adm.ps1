@@ -193,6 +193,93 @@ function Invoke-GitHubAuth {
     }
 }
 
+# ---- Option 17: Set global GitHub login via SSH key -------
+
+function Invoke-SetGlobalSSHLogin {
+    Write-Host ""
+    $SSHDir = "$HOME\.ssh"
+
+    # List available public keys so the user can pick one
+    $pubKeys = Get-ChildItem -Path $SSHDir -Filter "*.pub" -ErrorAction SilentlyContinue
+    if (-not $pubKeys) {
+        warn "No public keys found in $SSHDir."
+        Write-Host "  > Run option 1 to generate a key first, then come back here."
+        return
+    }
+
+    Write-Host "Available SSH keys in $SSHDir :"
+    Write-Host "------------------------------------------------------------"
+    $keyList = @()
+    $idx = 1
+    foreach ($pub in $pubKeys) {
+        $fingerprint = & ssh-keygen -lf $pub.FullName 2>&1
+        Write-Host "  $idx. $($pub.BaseName)"
+        Write-Host "     $fingerprint"
+        $keyList += $pub.BaseName
+        $idx++
+    }
+    Write-Host "------------------------------------------------------------"
+    Write-Host ""
+
+    $sel = (Read-Host "Key number to use globally (leave empty to skip key configuration)").Trim()
+
+    $keyName = ""
+    if ($sel -ne "") {
+        $selIdx = [int]$sel - 1
+        if ($selIdx -lt 0 -or $selIdx -ge $keyList.Count) {
+            fail "Invalid selection."
+            return
+        }
+        $keyName = $keyList[$selIdx]
+        $keyPath = "$SSHDir\$keyName"
+
+        action "Setting global git SSH command to use key '$keyName'..."
+        run { git config --global core.sshCommand "ssh -i `"$keyPath`" -o IdentitiesOnly=yes" }
+        ok "git config --global core.sshCommand updated."
+
+        Write-Host ""
+        Write-Host "  Verify with : git config --global core.sshCommand"
+        Write-Host "  Test SSH    : ssh -i `"$keyPath`" -T git@github.com"
+        Write-Host ""
+    }
+
+    # Optionally authenticate / re-authenticate gh CLI with SSH protocol
+    chk "GitHub CLI authentication status..."
+    $status = gh auth status 2>&1
+    $alreadyAuthed = ($LASTEXITCODE -eq 0)
+
+    if ($alreadyAuthed) {
+        ok "Already authenticated:"
+        Write-Host $status
+        Write-Host ""
+        $reauth = (Read-Host "Re-authenticate to ensure SSH git-protocol is set? (y/N)").Trim().ToLower()
+        if ($reauth -ne "y") {
+            if ($keyName -ne "") {
+                ok "Global SSH key configured. All git SSH operations will use '$keyName'."
+            }
+            return
+        }
+        action "Logging out first to allow fresh SSH-protocol login..."
+        run { gh auth logout }
+    }
+
+    action "Starting GitHub CLI login with SSH git-protocol..."
+    Write-Host "  > A browser window will open — authorize the GitHub CLI app."
+    Write-Host ""
+    run { gh auth login --web --git-protocol ssh --scopes repo,read:org,workflow }
+    if ($LASTEXITCODE -eq 0) {
+        ok "GitHub CLI authenticated with SSH protocol."
+        Write-Host ""
+        gh auth status
+        if ($keyName -ne "") {
+            Write-Host ""
+            ok "Global SSH key '$keyName' + gh SSH protocol configured."
+        }
+    } else {
+        fail "Authentication failed. Try: gh auth login --git-protocol ssh --scopes repo,read:org,workflow"
+    }
+}
+
 # ---- Option 5: Logout / switch user -----------------------
 
 function Invoke-GitHubLogout {
@@ -898,6 +985,7 @@ do {
     Write-Host "  2.  Authenticate with GitHub CLI (gh auth login)"
     Write-Host "  3.  Logout / switch GitHub account"
     Write-Host "  4.  List SSH keys"
+    Write-Host "  17. Set global GitHub login via SSH key (optional key selection)"
     Write-Host "  --- Pull Requests ---"
     Write-Host "  5.  List pull requests"
     Write-Host "  6.  Merge a pull request"
@@ -935,8 +1023,9 @@ do {
         "14" { Invoke-ListSecretAlerts }
         "15" { Invoke-ListCodeAlerts }
         "16" { Invoke-GenerateReport }
+        "17" { Invoke-SetGlobalSSHLogin }
         "0"  { Write-Host ""; Write-Host "Goodbye." }
-        default { warn "Invalid option. Enter 1-16 or 0." }
+        default { warn "Invalid option. Enter 1-17 or 0." }
     }
 
     if ($choice -ne "0") {
