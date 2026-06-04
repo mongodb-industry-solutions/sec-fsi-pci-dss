@@ -33,24 +33,29 @@ const ALLOWED_NPM_COMMANDS: Record<string, string[]> = {
   'type-check':        ['run', 'type-check'],
 };
 
-// Simple in-memory rate limiter: max 10 attempts per 15 min per IP
-const rateLimitMap = new Map<string, { count: number; reset: number }>();
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-const RATE_LIMIT_MAX = 10;
+type RateLimitStore = Map<string, { count: number; reset: number }>;
 
-function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry || entry.reset < now) {
-    rateLimitMap.set(ip, { count: 1, reset: now + RATE_LIMIT_WINDOW_MS });
+function makeRateLimiter(maxRequests: number, windowMs: number) {
+  const store: RateLimitStore = new Map();
+  return function check(ip: string): { allowed: boolean; retryAfter?: number } {
+    const now = Date.now();
+    const entry = store.get(ip);
+    if (!entry || entry.reset < now) {
+      store.set(ip, { count: 1, reset: now + windowMs });
+      return { allowed: true };
+    }
+    if (entry.count >= maxRequests) {
+      return { allowed: false, retryAfter: Math.ceil((entry.reset - now) / 1000) };
+    }
+    entry.count++;
     return { allowed: true };
-  }
-  if (entry.count >= RATE_LIMIT_MAX) {
-    return { allowed: false, retryAfter: Math.ceil((entry.reset - now) / 1000) };
-  }
-  entry.count++;
-  return { allowed: true };
+  };
 }
+
+// Strict: login endpoint — 10 attempts per 15 min (brute-force protection)
+const checkLoginRateLimit = makeRateLimiter(10, 15 * 60 * 1000);
+// Lenient: command/exec/logs/system — 300 requests per 15 min (demo usage)
+const checkOpsRateLimit   = makeRateLimiter(300, 15 * 60 * 1000);
 
 function sha256(text: string): string {
   return crypto.createHash('sha256').update(text).digest('hex');
@@ -153,7 +158,7 @@ export async function adminController(fastify: FastifyInstance) {
     },
   }, async (request, reply) => {
     const ip = request.ip ?? 'unknown';
-    const rl = checkRateLimit(ip);
+    const rl = checkLoginRateLimit(ip);
     if (!rl.allowed) {
       reply.header('Retry-After', String(rl.retryAfter));
       return reply.status(429).send({ error: `Too many login attempts. Retry after ${rl.retryAfter}s.` });
@@ -193,7 +198,7 @@ export async function adminController(fastify: FastifyInstance) {
     },
   }, async (request, reply) => {
     const ip = request.ip ?? 'unknown';
-    const rl = checkRateLimit(ip);
+    const rl = checkOpsRateLimit(ip);
     if (!rl.allowed) {
       reply.header('Retry-After', String(rl.retryAfter));
       return reply.status(429).send({ error: `Too many requests. Retry after ${rl.retryAfter}s.` });
@@ -227,7 +232,7 @@ export async function adminController(fastify: FastifyInstance) {
     },
   }, async (request, reply) => {
     const ip = request.ip ?? 'unknown';
-    const rl = checkRateLimit(ip);
+    const rl = checkOpsRateLimit(ip);
     if (!rl.allowed) {
       reply.header('Retry-After', String(rl.retryAfter));
       return reply.status(429).send({ error: `Too many requests. Retry after ${rl.retryAfter}s.` });
@@ -254,7 +259,7 @@ export async function adminController(fastify: FastifyInstance) {
     },
   }, async (request, reply) => {
     const ip = request.ip ?? 'unknown';
-    const rl = checkRateLimit(ip);
+    const rl = checkOpsRateLimit(ip);
     if (!rl.allowed) {
       reply.header('Retry-After', String(rl.retryAfter));
       return reply.status(429).send({ error: `Too many requests. Retry after ${rl.retryAfter}s.` });
@@ -311,7 +316,7 @@ export async function adminController(fastify: FastifyInstance) {
     },
   }, async (request, reply) => {
     const ip = request.ip ?? 'unknown';
-    const rl = checkRateLimit(ip);
+    const rl = checkOpsRateLimit(ip);
     if (!rl.allowed) {
       reply.header('Retry-After', String(rl.retryAfter));
       return reply.status(429).send({ error: `Too many requests. Retry after ${rl.retryAfter}s.` });
