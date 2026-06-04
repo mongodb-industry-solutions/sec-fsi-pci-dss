@@ -33,7 +33,9 @@ export function Tooltip({ text }: Props) {
         type="button"
         onMouseEnter={show}
         onMouseLeave={() => setVisible(false)}
-        className="text-gray-400 hover:text-blue-500 text-xs leading-none transition-colors"
+        onFocus={show}
+        onBlur={() => setVisible(false)}
+        className="text-gray-400 hover:text-blue-500 focus:text-blue-500 focus:outline-none text-xs leading-none transition-colors"
         aria-label="More information"
       >
         ⓘ

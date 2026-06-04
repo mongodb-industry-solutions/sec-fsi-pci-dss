@@ -122,7 +122,7 @@ function beginSSE(reply: import('fastify').FastifyReply) {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': process.env.CORS_ORIGIN ?? 'http://localhost:3000',
   });
   reply.raw.flushHeaders();
 }
@@ -243,7 +243,12 @@ export async function adminController(fastify: FastifyInstance) {
     const { command, cwd } = request.body as { command: string; cwd?: string };
     if (!command?.trim()) return reply.status(400).send({ error: 'command is required' });
 
-    const workDir = cwd?.trim() || PROJECT_ROOT;
+    const resolvedRoot = path.resolve(PROJECT_ROOT);
+    const requestedCwd = cwd?.trim() ? path.resolve(cwd.trim()) : resolvedRoot;
+    if (!requestedCwd.startsWith(resolvedRoot)) {
+      return reply.status(400).send({ error: 'cwd must be within the project directory' });
+    }
+    const workDir = requestedCwd;
 
     beginSSE(reply);
     await spawnSSE(reply.raw, command, [], workDir, `exec`);

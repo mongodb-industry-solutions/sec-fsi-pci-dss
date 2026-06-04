@@ -85,8 +85,9 @@ Obtain a token via \`POST /api/v1/auth/login\`.
           },
           adminAuth: {
             type: 'http',
-            scheme: 'basic',
-            description: 'Admin credentials. Use username and password from ADM_USER / ADM_PASS env vars (dev default: admin / admin).',
+            scheme: 'bearer',
+            bearerFormat: 'JWT',
+            description: 'Admin JWT obtained from POST /api/v1/admin/login. Provide as Bearer token.',
           },
         },
         // Shared schemas (Error, MonetaryAmount, TransactionSnapshot,

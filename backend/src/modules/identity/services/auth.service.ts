@@ -28,6 +28,10 @@ export async function loginUser(
     throw Object.assign(new Error('Invalid credentials'), { statusCode: 401 });
   }
 
+  if (user.partyAuthenticationLoginDomain !== domain) {
+    throw Object.assign(new Error('Invalid credentials'), { statusCode: 401 });
+  }
+
   const valid = await bcrypt.compare(password, user.partyAuthenticationCredentialHash);
   if (!valid) {
     throw Object.assign(new Error('Invalid credentials'), { statusCode: 401 });
@@ -64,7 +68,8 @@ export async function loginUser(
  * are NOT returned). This is safe for demo purposes only.
  */
 export async function getDemoUsers(_db: Db) {
-  const filePath = path.join(__dirname, '../../../../data/users.json');
+  const dataDir = process.env.SEED_DATA_DIR ?? path.join(__dirname, '../../../../data');
+  const filePath = path.join(dataDir, 'users.json');
   const records: PartyAuthenticationControlRecord[] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
 
   return records

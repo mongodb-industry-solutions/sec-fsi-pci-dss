@@ -3,8 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { API_BASE_URL } from '../../lib/constants';
-
-const ADMIN_TOKEN_KEY = 'admin_token';
+import { ADMIN_TOKEN_KEY } from '../../lib/adminHelpers';
 
 export function setAdminToken(token: string) {
   sessionStorage.setItem(ADMIN_TOKEN_KEY, token);

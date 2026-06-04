@@ -47,6 +47,7 @@ export function Pagination({ page, totalPages, total, limit, onPageChange }: Pro
 
       <nav className="flex items-center gap-1 order-1 sm:order-2">
         <button
+          type="button"
           onClick={() => onPageChange(page - 1)}
           disabled={page === 1}
           aria-label="Previous page"
@@ -60,6 +61,7 @@ export function Pagination({ page, totalPages, total, limit, onPageChange }: Pro
             <span key={`e${i}`} className="px-1 text-gray-400 text-sm">…</span>
           ) : (
             <button
+              type="button"
               key={p}
               onClick={() => onPageChange(p)}
               aria-current={p === page ? 'page' : undefined}
@@ -71,6 +73,7 @@ export function Pagination({ page, totalPages, total, limit, onPageChange }: Pro
         )}
 
         <button
+          type="button"
           onClick={() => onPageChange(page + 1)}
           disabled={page === totalPages}
           aria-label="Next page"
