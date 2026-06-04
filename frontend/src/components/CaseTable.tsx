@@ -49,16 +49,16 @@ export function CaseTable({ cases, basePath }: Props) {
               </td>
               <td className="px-4 py-3">
                 <span
-                  className={`px-2 py-0.5 rounded text-xs font-bold ${SEVERITY_COLORS[c.riskSeverity] ?? 'bg-gray-100'}`}
+                  className={`px-2 py-0.5 rounded text-xs font-bold ${SEVERITY_COLORS[c.riskSeverity ?? ''] ?? 'bg-gray-100 text-gray-600'}`}
                 >
-                  {c.riskSeverity.toUpperCase()}
+                  {(c.riskSeverity ?? 'N/A').toUpperCase()}
                 </span>
               </td>
               <td className="px-4 py-3">
                 <span
-                  className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[c.caseStatus] ?? 'bg-gray-100 text-gray-800'}`}
+                  className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[c.caseStatus ?? ''] ?? 'bg-gray-100 text-gray-800'}`}
                 >
-                  {c.caseStatus.replace(/_/g, ' ')}
+                  {(c.caseStatus ?? 'N/A').replace(/_/g, ' ')}
                 </span>
               </td>
               <td className="px-4 py-3 text-gray-500 text-xs">

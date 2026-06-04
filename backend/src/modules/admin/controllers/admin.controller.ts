@@ -11,7 +11,6 @@ import { logBuffer, appendLog } from '../../../shared/logBuffer';
 // 5 levels up -> project root
 const PROJECT_ROOT = path.resolve(__dirname, '../../../../../');
 
-// Env var keys whose values should be masked in the system-info endpoint
 const SENSITIVE_KEY_PATTERNS = [
   /secret/i, /password/i, /passwd/i, /pass/i, /key/i,
   /token/i, /uri/i, /url/i, /dsn/i, /credential/i,
@@ -33,6 +32,25 @@ const ALLOWED_NPM_COMMANDS: Record<string, string[]> = {
   'test:integration':  ['run', 'test:integration'],
   'type-check':        ['run', 'type-check'],
 };
+
+// Simple in-memory rate limiter: max 10 attempts per 15 min per IP
+const rateLimitMap = new Map<string, { count: number; reset: number }>();
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const RATE_LIMIT_MAX = 10;
+
+function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || entry.reset < now) {
+    rateLimitMap.set(ip, { count: 1, reset: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true };
+  }
+  if (entry.count >= RATE_LIMIT_MAX) {
+    return { allowed: false, retryAfter: Math.ceil((entry.reset - now) / 1000) };
+  }
+  entry.count++;
+  return { allowed: true };
+}
 
 function sha256(text: string): string {
   return crypto.createHash('sha256').update(text).digest('hex');
@@ -106,22 +124,19 @@ function beginSSE(reply: import('fastify').FastifyReply) {
 
 export async function adminController(fastify: FastifyInstance) {
 
-  // ── POST /admin/login ─────────────────────────────────────────────────────
+  // POST /admin/login
   fastify.post('/login', {
     schema: {
       tags: ['admin'],
-      summary: 'Obtain an admin JWT (SHA-256 password check)',
-      description: [
-        'Validates `username` against `ADM_USER` and `sha256(password)` against `ADM_PASS`.',
-        'Returns a JWT with `{ role: "admin" }` valid for 4 hours.',
-        'Pass this token as `Authorization: Bearer <token>` to all other `/admin/*` endpoints.',
-      ].join(' '),
+      summary: 'Obtain an admin JWT',
+      description: 'Validates username and password. Returns a JWT valid for 4 hours.',
+      security: [],
       body: {
         type: 'object',
         required: ['username', 'password'],
         properties: {
           username: { type: 'string', description: 'Admin username (matches ADM_USER env var).' },
-          password: { type: 'string', description: 'Plaintext password. Server computes SHA-256 and compares against ADM_PASS.' },
+          password: { type: 'string', description: 'Plaintext password (server computes SHA-256 and compares against ADM_PASS).' },
         },
       },
       response: {
@@ -129,13 +144,21 @@ export async function adminController(fastify: FastifyInstance) {
           description: 'Login successful.',
           type: 'object',
           properties: {
-            token: { type: 'string', description: 'Admin JWT. Valid 4 h. Pass as Bearer token.' },
+            token: { type: 'string', description: 'Admin JWT. Valid 4 hours. Pass as Bearer token to other /admin/* endpoints.' },
           },
         },
         401: { $ref: 'Error#', description: 'Invalid credentials.' },
+        429: { $ref: 'Error#', description: 'Too many attempts. Try again later.' },
       },
     },
   }, async (request, reply) => {
+    const ip = request.ip ?? 'unknown';
+    const rl = checkRateLimit(ip);
+    if (!rl.allowed) {
+      reply.header('Retry-After', String(rl.retryAfter));
+      return reply.status(429).send({ error: `Too many login attempts. Retry after ${rl.retryAfter}s.` });
+    }
+
     const { username, password } = request.body as { username: string; password: string };
     const admUser = process.env.ADM_USER ?? 'admin';
     const admPass = process.env.ADM_PASS ?? sha256('admin');
@@ -149,18 +172,13 @@ export async function adminController(fastify: FastifyInstance) {
     return reply.send({ token });
   });
 
-  // ── POST /admin/run ───────────────────────────────────────────────────────
+  // POST /admin/run
   fastify.post('/run', {
     schema: {
       tags: ['admin'],
       summary: 'Run a predefined npm script (SSE output)',
-      description: [
-        'Executes a predefined npm script from the project root and streams stdout/stderr',
-        'line by line via Server-Sent Events. Uses `shell: true` for cross-platform',
-        'compatibility (cmd.exe on Windows, /bin/sh on Linux/macOS).',
-        '',
-        'Requires `Authorization: Bearer <admin-jwt>` (obtain via `POST /admin/login`).',
-      ].join('\n'),
+      description: 'Executes a predefined npm script from the project root and streams output via Server-Sent Events.',
+      security: [{ adminAuth: [] }],
       body: {
         type: 'object',
         required: ['command'],
@@ -174,6 +192,12 @@ export async function adminController(fastify: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
+    const ip = request.ip ?? 'unknown';
+    const rl = checkRateLimit(ip);
+    if (!rl.allowed) {
+      reply.header('Retry-After', String(rl.retryAfter));
+      return reply.status(429).send({ error: `Too many requests. Retry after ${rl.retryAfter}s.` });
+    }
     if (!verifyAdminToken(request.headers.authorization)) {
       return reply.status(401).send({ error: 'Invalid admin token' });
     }
@@ -185,31 +209,29 @@ export async function adminController(fastify: FastifyInstance) {
     await spawnSSE(reply.raw, 'npm', args, PROJECT_ROOT, `npm:${command}`);
   });
 
-  // ── POST /admin/exec ──────────────────────────────────────────────────────
+  // POST /admin/exec
   fastify.post('/exec', {
     schema: {
       tags: ['admin'],
       summary: 'Execute any shell command (SSE output)',
-      description: [
-        'Runs an arbitrary shell command in the project root directory and streams',
-        'stdout/stderr via Server-Sent Events. The command is passed to the OS shell',
-        '(`cmd.exe /d /s /c` on Windows, `/bin/sh -c` on Linux/macOS).',
-        '',
-        'Requires `Authorization: Bearer <admin-jwt>`.',
-        '',
-        '**Security note:** This endpoint is intentionally unrestricted — it is protected',
-        'only by admin credentials and is intended for demo environment management.',
-      ].join('\n'),
+      description: 'Runs an arbitrary shell command in the project root and streams stdout/stderr via Server-Sent Events.',
+      security: [{ adminAuth: [] }],
       body: {
         type: 'object',
         required: ['command'],
         properties: {
-          command: { type: 'string', description: 'Full shell command to execute, e.g. `ls -la` or `npm run setup:db`.' },
+          command: { type: 'string', description: 'Full shell command to execute, e.g. `ls -la`.' },
           cwd: { type: 'string', description: 'Working directory (default: project root).' },
         },
       },
     },
   }, async (request, reply) => {
+    const ip = request.ip ?? 'unknown';
+    const rl = checkRateLimit(ip);
+    if (!rl.allowed) {
+      reply.header('Retry-After', String(rl.retryAfter));
+      return reply.status(429).send({ error: `Too many requests. Retry after ${rl.retryAfter}s.` });
+    }
     if (!verifyAdminToken(request.headers.authorization)) {
       return reply.status(401).send({ error: 'Invalid admin token' });
     }
@@ -222,19 +244,21 @@ export async function adminController(fastify: FastifyInstance) {
     await spawnSSE(reply.raw, command, [], workDir, `exec`);
   });
 
-  // ── GET /admin/logs ───────────────────────────────────────────────────────
+  // GET /admin/logs
   fastify.get('/logs', {
     schema: {
       tags: ['admin'],
       summary: 'Stream server request log ring-buffer via SSE',
-      description: [
-        'Sends the current log buffer snapshot (up to 500 entries) then polls every 2 s',
-        'for new entries. Each SSE event is `event: log\\ndata: { "text": "..." }\\n\\n`.',
-        '',
-        'Requires `Authorization: Bearer <admin-jwt>`.',
-      ].join('\n'),
+      description: 'Sends the current log buffer snapshot (up to 500 entries) then polls every 2s for new entries.',
+      security: [{ adminAuth: [] }],
     },
   }, async (request, reply) => {
+    const ip = request.ip ?? 'unknown';
+    const rl = checkRateLimit(ip);
+    if (!rl.allowed) {
+      reply.header('Retry-After', String(rl.retryAfter));
+      return reply.status(429).send({ error: `Too many requests. Retry after ${rl.retryAfter}s.` });
+    }
     if (!verifyAdminToken(request.headers.authorization)) {
       return reply.status(401).send({ error: 'Invalid admin token' });
     }
@@ -263,35 +287,39 @@ export async function adminController(fastify: FastifyInstance) {
     await new Promise<void>(() => { /* held open until client disconnects */ });
   });
 
-  // ── GET /admin/system ─────────────────────────────────────────────────────
+  // GET /admin/system
   fastify.get('/system', {
     schema: {
       tags: ['admin'],
       summary: 'System information (OS, Node.js, package.json, env vars)',
-      description: [
-        'Returns a snapshot of the runtime environment. Sensitive environment variable',
-        'values are masked with `***`. Requires `Authorization: Bearer <admin-jwt>`.',
-      ].join(' '),
+      description: 'Returns a snapshot of the runtime environment. Sensitive env var values are masked with `***`.',
+      security: [{ adminAuth: [] }],
       response: {
         200: {
           description: 'System information.',
           type: 'object',
           properties: {
-            os:      { type: 'object' },
-            node:    { type: 'object' },
-            package: { type: 'object' },
-            env:     { type: 'object' },
+            os:      { type: 'object', additionalProperties: true },
+            node:    { type: 'object', additionalProperties: true },
+            package: { type: 'object', additionalProperties: true },
+            env:     { type: 'object', additionalProperties: { type: 'string' } },
           },
         },
         401: { $ref: 'Error#' },
+        429: { $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
+    const ip = request.ip ?? 'unknown';
+    const rl = checkRateLimit(ip);
+    if (!rl.allowed) {
+      reply.header('Retry-After', String(rl.retryAfter));
+      return reply.status(429).send({ error: `Too many requests. Retry after ${rl.retryAfter}s.` });
+    }
     if (!verifyAdminToken(request.headers.authorization)) {
       return reply.status(401).send({ error: 'Invalid admin token' });
     }
 
-    // OS info
     const osInfo = {
       platform: os.platform(),
       arch: os.arch(),
@@ -304,7 +332,6 @@ export async function adminController(fastify: FastifyInstance) {
       uptime: Math.round(os.uptime()),
     };
 
-    // Node.js info
     const nodeInfo = {
       version: process.version,
       execPath: process.execPath,
@@ -314,7 +341,6 @@ export async function adminController(fastify: FastifyInstance) {
       uptimeSeconds: Math.round(process.uptime()),
     };
 
-    // Root package.json
     let pkgInfo: Record<string, unknown> = {};
     try {
       const pkgPath = path.join(PROJECT_ROOT, 'package.json');
@@ -330,7 +356,6 @@ export async function adminController(fastify: FastifyInstance) {
       pkgInfo = { error: 'Could not read package.json' };
     }
 
-    // Sanitized env vars
     const env: Record<string, string> = {};
     for (const [k, v] of Object.entries(process.env)) {
       if (v !== undefined) {
