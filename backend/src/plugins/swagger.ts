@@ -62,7 +62,7 @@ Obtain a token via \`POST /api/v1/auth/login\`.
   (Data Encryption Key). Requires \`level2_investigator\` role.
         `.trim(),
         contact: {
-          name: 'LeafyBank IST Demo Team',
+          name: 'MongoDB IST Cybersecurity & Integration Team',
           email: 'antonio.membrides@mongodb.com',
         },
         license: {
