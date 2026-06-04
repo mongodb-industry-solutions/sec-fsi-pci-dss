@@ -10,12 +10,12 @@ export const swaggerPlugin = fp(async function (fastify: FastifyInstance) {
     openapi: {
       openapi: '3.0.0',
       info: {
-        title: 'FSI PCI DSS Payment Security Demo API',
+        title: 'FSI Payment Gateway API',
         version: '1.0.0',
         description: `
 ## Overview
 
-REST API for the **LeafyBank FSI PCI DSS Payment Security Demo**. It demonstrates how
+REST API for the **FSI Payment Gateway Demo**. It demonstrates how
 [MongoDB Queryable Encryption (QE)](https://www.mongodb.com/docs/manual/core/queryable-encryption/)
 enables a PCI DSS-aligned fraud investigation workflow for digital banks and card issuers:
 encrypted sensitive fields are searchable client-side without the plaintext ever reaching
