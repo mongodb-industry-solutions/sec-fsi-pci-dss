@@ -1,11 +1,17 @@
 'use client';
-import { FraudCase } from '../lib/api';
+import { FraudCase, TransactionSnapshot } from '../lib/api';
 import { SEVERITY_COLORS, STATUS_COLORS } from '../lib/constants';
 import Link from 'next/link';
 
 interface Props {
   cases: FraudCase[];
   basePath: string;
+}
+
+function formatAmount(snap?: TransactionSnapshot): string {
+  if (!snap) return '-';
+  const { amount, currency } = snap.cardTransactionAmount;
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 }
 
 export function CaseTable({ cases, basePath }: Props) {
@@ -22,7 +28,7 @@ export function CaseTable({ cases, basePath }: Props) {
       <table className="min-w-full divide-y divide-gray-200 text-sm">
         <thead className="bg-gray-50">
           <tr>
-            {['Case', 'Transaction', 'Severity', 'Status', 'Opened'].map((h) => (
+            {['Case', 'Masked PAN', 'Amount', 'Merchant', 'Severity', 'Status'].map((h) => (
               <th
                 key={h}
                 className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wide text-xs"
@@ -43,27 +49,28 @@ export function CaseTable({ cases, basePath }: Props) {
                   {c.fraudDiagnosisCaseReference}
                 </Link>
               </td>
-              <td className="px-4 py-3 font-mono text-xs text-gray-600 truncate max-w-[140px]">
-                {c.linkedCardTransactionReference.slice(0, 12)}…
+              <td className="px-4 py-3 font-mono text-xs text-gray-600">
+                {c.transactionSnapshot?.cardTransactionMaskedPanDisplay ?? '-'}
+              </td>
+              <td className="px-4 py-3 text-gray-800 font-medium">
+                {formatAmount(c.transactionSnapshot)}
+              </td>
+              <td className="px-4 py-3 text-gray-600 truncate max-w-[160px]">
+                {c.transactionSnapshot?.cardTransactionMerchantName ?? '-'}
               </td>
               <td className="px-4 py-3">
                 <span
-                  className={`px-2 py-0.5 rounded text-xs font-bold ${SEVERITY_COLORS[c.riskSeverity] ?? 'bg-gray-100'}`}
+                  className={`px-2 py-0.5 rounded text-xs font-bold ${SEVERITY_COLORS[c.riskSeverity ?? ''] ?? 'bg-gray-100 text-gray-600'}`}
                 >
-                  {c.riskSeverity.toUpperCase()}
+                  {(c.riskSeverity ?? 'N/A').toUpperCase()}
                 </span>
               </td>
               <td className="px-4 py-3">
                 <span
-                  className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[c.caseStatus] ?? 'bg-gray-100 text-gray-800'}`}
+                  className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[c.caseStatus ?? ''] ?? 'bg-gray-100 text-gray-800'}`}
                 >
-                  {c.caseStatus.replace(/_/g, ' ')}
+                  {(c.caseStatus ?? 'N/A').replace(/_/g, ' ')}
                 </span>
-              </td>
-              <td className="px-4 py-3 text-gray-500 text-xs">
-                {c.requestDateTime
-                  ? new Date(c.requestDateTime).toLocaleString()
-                  : '—'}
               </td>
             </tr>
           ))}

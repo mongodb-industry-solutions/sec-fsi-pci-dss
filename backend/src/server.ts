@@ -10,12 +10,14 @@ import corsPlugin from './plugins/cors';
 import mongodbPlugin from './plugins/mongodb';
 import { swaggerPlugin } from './plugins/swagger';
 import { authMiddleware } from './vendors/middleware/auth';
+import { appendLog }          from './shared/logBuffer';
 import { identityModule }     from './modules/identity';
 import { customerModule }     from './modules/customer';
 import { transactionsModule } from './modules/transactions';
 import { fraudModule }        from './modules/fraud';
 import { gatewayModule }      from './modules/gateway';
 import { systemModule }       from './modules/system';
+import { adminModule }        from './modules/admin';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
@@ -53,7 +55,10 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Excludes /api/v1/system/health so it can report degraded status even when Atlas is unreachable.
   // This runs after auth so unauthenticated requests still get 401, not 503.
   fastify.addHook('preHandler', async (_request, reply) => {
-    if (fastify.dbError !== null && _request.url.startsWith('/api/') && !_request.url.startsWith('/api/v1/system/health')) {
+    const url = _request.url;
+    const isHealthCheck = url.startsWith('/api/v1/system/health');
+    const isAdminRoute = url.startsWith('/api/v1/admin');
+    if (fastify.dbError !== null && url.startsWith('/api/') && !isHealthCheck && !isAdminRoute) {
       return reply.status(503).send({
         error: 'Service unavailable',
         detail: fastify.dbError,
@@ -61,7 +66,14 @@ export async function buildApp(): Promise<FastifyInstance> {
     }
   });
 
-  // Root redirect → /doc
+  // Populate the admin log buffer with request/response summaries
+  fastify.addHook('onResponse', (request, reply, done) => {
+    const line = `[${new Date().toISOString()}] ${request.method} ${request.url} -> ${reply.statusCode}`;
+    appendLog(line);
+    done();
+  });
+
+  // Root redirect -> /doc
   fastify.get('/', {
     schema: {
       tags: ['system'],
@@ -80,6 +92,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   // system module always registered: /api/v1/system/health is available in all envs
   // /api/v1/system/raw returns 403 in production (enforced inside the controller)
   await fastify.register(systemModule,       { prefix: '/api/v1' });
+  await fastify.register(adminModule,        { prefix: '/api/v1' });
 
   return fastify;
 }

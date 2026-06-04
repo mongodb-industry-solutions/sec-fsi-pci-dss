@@ -39,4 +39,10 @@ export async function createIndexes(client: MongoClient) {
     { key: { partyAuthenticationInstanceReference: 1 }, unique: true },
     { key: { partyAuthenticationUserRole: 1 } },
   ]);
+
+  await db.collection('authenticationDomain').createIndexes([
+    { key: { partyAuthenticationDomainInstanceReference: 1 }, unique: true },
+    { key: { partyAuthenticationDomainName: 1 }, unique: true },
+    { key: { partyAuthenticationDomainEnabled: 1 } },
+  ]);
 }

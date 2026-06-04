@@ -1,58 +1,76 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api, FraudCase } from '../../../lib/api';
 import { CaseTable } from '../../../components/CaseTable';
+import { Pagination } from '../../../components/Pagination';
 
 type SearchField = 'email' | 'phone' | 'accountRef' | 'cardToken';
 
 const FIELD_LABELS: Record<SearchField, string> = {
-  email: 'Email',
-  phone: 'Phone',
+  email:      'Email',
+  phone:      'Phone',
   accountRef: 'Account Reference',
-  cardToken: 'Card Token',
+  cardToken:  'Card Token',
 };
 
+const PAGE_SIZE = 10;
+
 export default function SimulatorInvestigationPage() {
-  const [searchField, setSearchField] = useState<SearchField>('email');
-  const [searchValue, setSearchValue] = useState('luis.fernandez@leafybank.demo');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [searchField, setSearchField]     = useState<SearchField>('email');
+  const [searchValue, setSearchValue]     = useState('luis.fernandez@leafybank.demo');
+  const [filterStatus, setFilterStatus]   = useState('');
   const [filterSeverity, setFilterSeverity] = useState('');
-  const [cases, setCases] = useState<FraudCase[]>([]);
-  const [total, setTotal] = useState(0);
+  const [cases, setCases]   = useState<FraudCase[]>([]);
+  const [total, setTotal]   = useState(0);
+  const [page, setPage]     = useState(1);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadCases();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterStatus, filterSeverity]);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  async function loadCases() {
+  const loadCases = useCallback(async (targetPage: number) => {
     setLoading(true);
     try {
       const res = await api.fraud.list(
-        { status: filterStatus || undefined, severity: filterSeverity || undefined, limit: 20 },
+        {
+          status:   filterStatus   || undefined,
+          severity: filterSeverity || undefined,
+          page:     targetPage,
+          limit:    PAGE_SIZE,
+        },
         ''
       );
       setCases(res.results);
       setTotal(res.total);
     } catch {
       setCases([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
+  }, [filterStatus, filterSeverity]);
+
+  // Reload from page 1 when filters change
+  useEffect(() => {
+    setPage(1);
+    loadCases(1);
+  }, [filterStatus, filterSeverity]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    setPage(1);
+    loadCases(1);
   }
 
-  async function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    // For demonstration: search by encrypted field or standard index
-    // In simulator mode, we still call the API to show real results
-    await loadCases();
+  function handlePageChange(newPage: number) {
+    setPage(newPage);
+    loadCases(newPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold flex items-center gap-2">
-        🕵️ Fraud Investigation
+        Fraud Investigation
       </h1>
 
       {/* Search bar */}
@@ -66,9 +84,7 @@ export default function SimulatorInvestigationPage() {
               className="border rounded-lg px-3 py-2 text-sm"
             >
               {(Object.keys(FIELD_LABELS) as SearchField[]).map((f) => (
-                <option key={f} value={f}>
-                  {FIELD_LABELS[f]}
-                </option>
+                <option key={f} value={f}>{FIELD_LABELS[f]}</option>
               ))}
             </select>
           </div>
@@ -86,25 +102,24 @@ export default function SimulatorInvestigationPage() {
             type="submit"
             className="bg-[#001E2B] text-[#00ED64] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors"
           >
-            🔍 Search
+            Search
           </button>
         </form>
-        {searchField !== 'cardToken' && (
+        {searchField !== 'cardToken' ? (
           <p className="mt-2 text-xs text-gray-500">
-            🔒 {FIELD_LABELS[searchField]} is a QE equality-searchable encrypted field. The server
+            {FIELD_LABELS[searchField]} is a QE equality-searchable encrypted field. The server
             matches ciphertext-to-ciphertext without decrypting.
           </p>
-        )}
-        {searchField === 'cardToken' && (
+        ) : (
           <p className="mt-2 text-xs text-gray-500">
-            ✅ Card token uses a standard MongoDB index — it is a card surrogate, not CHD under
+            Card token uses a standard MongoDB index; it is a card surrogate, not CHD under
             PCI DSS v4.0.
           </p>
         )}
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-3 items-center">
+      {/* Filters + count */}
+      <div className="flex flex-wrap gap-3 items-center">
         <span className="text-sm text-gray-500">Filter:</span>
         <select
           value={filterStatus}
@@ -112,13 +127,9 @@ export default function SimulatorInvestigationPage() {
           className="border rounded-lg px-3 py-1.5 text-sm"
         >
           <option value="">All Status</option>
-          {['open', 'under_review', 'escalated', 'resolved_cleared', 'resolved_fraud', 'closed'].map(
-            (s) => (
-              <option key={s} value={s}>
-                {s.replace(/_/g, ' ')}
-              </option>
-            )
-          )}
+          {['open', 'under_review', 'escalated', 'resolved_cleared', 'resolved_fraud', 'closed'].map((s) => (
+            <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+          ))}
         </select>
         <select
           value={filterSeverity}
@@ -127,18 +138,28 @@ export default function SimulatorInvestigationPage() {
         >
           <option value="">All Severity</option>
           {['critical', 'high', 'medium', 'low'].map((s) => (
-            <option key={s} value={s}>
-              {s.toUpperCase()}
-            </option>
+            <option key={s} value={s}>{s.toUpperCase()}</option>
           ))}
         </select>
-        <span className="text-sm text-gray-500 ml-auto">{total} case{total !== 1 ? 's' : ''} total</span>
+        <span className="text-sm text-gray-500 ml-auto">
+          {total} case{total !== 1 ? 's' : ''}
+        </span>
       </div>
 
+      {/* Table */}
       {loading ? (
-        <div className="text-center py-8 text-gray-400">Loading cases…</div>
+        <div className="text-center py-10 text-gray-400">Loading cases...</div>
       ) : (
-        <CaseTable cases={cases} basePath="/simulator/investigation" />
+        <>
+          <CaseTable cases={cases} basePath="/simulator/investigation" />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={PAGE_SIZE}
+            onPageChange={handlePageChange}
+          />
+        </>
       )}
     </div>
   );

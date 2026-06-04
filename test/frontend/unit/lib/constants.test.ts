@@ -1,6 +1,6 @@
 /**
  * Unit tests: frontend/src/lib/constants.ts
- * Validates all five demo users, role labels, and color maps are defined.
+ * Validates all five demo users, role labels, color maps, and formatRiskIndicator.
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -8,6 +8,7 @@ import {
   ROLE_LABELS,
   SEVERITY_COLORS,
   STATUS_COLORS,
+  formatRiskIndicator,
 } from '../../../../frontend/src/lib/constants';
 
 const EXPECTED_USERS = [
@@ -56,5 +57,34 @@ describe('STATUS_COLORS', () => {
     for (const s of statuses) {
       expect(STATUS_COLORS[s]).toBeTruthy();
     }
+  });
+});
+
+describe('formatRiskIndicator', () => {
+  it('formats amount_threshold with human-readable label', () => {
+    expect(formatRiskIndicator('amount_threshold')).toBe(
+      'High-value transaction (amount exceeds fraud threshold)'
+    );
+  });
+
+  it('formats known MCC code with category label', () => {
+    const result = formatRiskIndicator('high_risk_mcc_7995');
+    expect(result).toContain('7995');
+    expect(result).toContain('Gambling');
+  });
+
+  it('formats unknown MCC code without label', () => {
+    const result = formatRiskIndicator('high_risk_mcc_9999');
+    expect(result).toContain('9999');
+    expect(result).not.toContain('undefined');
+    expect(result).not.toContain('null');
+  });
+
+  it('falls back to replacing underscores for unknown indicators', () => {
+    expect(formatRiskIndicator('velocity_check_failed')).toBe('velocity check failed');
+  });
+
+  it('handles empty string without throwing', () => {
+    expect(() => formatRiskIndicator('')).not.toThrow();
   });
 });

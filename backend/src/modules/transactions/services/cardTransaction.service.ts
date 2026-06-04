@@ -112,6 +112,27 @@ export async function getTransactionById(db: Db, id: string) {
   };
 }
 
+/** Returns unique merchant name + MCC pairs from seeded transactions, sorted by name. */
+export async function getDistinctMerchants(db: Db) {
+  const results = await db
+    .collection(CARD_TRANSACTION_COLLECTION)
+    .aggregate([
+      {
+        $group: {
+          _id: {
+            name: '$cardTransactionMerchantName',
+            mcc: '$cardTransactionMerchantCategoryCode',
+          },
+        },
+      },
+      { $project: { _id: 0, name: '$_id.name', mcc: '$_id.mcc' } },
+      { $sort: { name: 1 } },
+    ])
+    .toArray();
+
+  return results as { name: string; mcc: string }[];
+}
+
 export async function getTransactionsByCardToken(db: Db, cardToken: string) {
   const results = await db.collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION)
     .find({ paymentCardReference: cardToken } as Partial<CardTransactionLogControlRecord>)

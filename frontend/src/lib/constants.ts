@@ -31,3 +31,26 @@ export const STATUS_COLORS: Record<string, string> = {
   resolved_fraud: 'bg-red-100 text-red-800',
   closed: 'bg-gray-100 text-gray-800',
 };
+
+const MCC_LABELS: Record<string, string> = {
+  '5411': 'Grocery Stores',
+  '5732': 'Electronics Stores',
+  '5812': 'Restaurants / Food Service',
+  '5834': 'Pharmacy',
+  '6011': 'Cash Advance / ATM',
+  '7011': 'Hotels / Lodging',
+  '7995': 'Gambling / Betting',
+};
+
+export function formatRiskIndicator(indicator: string): string {
+  if (indicator === 'amount_threshold') {
+    return 'High-value transaction (amount exceeds fraud threshold)';
+  }
+  const mccMatch = indicator.match(/^high_risk_mcc_(\d+)$/);
+  if (mccMatch) {
+    const mcc = mccMatch[1];
+    const label = MCC_LABELS[mcc];
+    return `High-risk merchant category: MCC ${mcc}${label ? ` (${label})` : ''}`;
+  }
+  return indicator.replace(/_/g, ' ');
+}

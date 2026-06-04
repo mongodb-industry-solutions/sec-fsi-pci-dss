@@ -27,7 +27,7 @@ export default function LandingPage() {
               investigation. Ideal for 10-minute live demos.
             </p>
             <span className="inline-block bg-[#00ED64] text-[#001E2B] px-4 py-1.5 rounded font-semibold text-sm group-hover:opacity-90">
-              Start Demo →
+              Start Demo
             </span>
           </Link>
 
@@ -42,7 +42,7 @@ export default function LandingPage() {
               workflow. Ideal for hands-on technical evaluations.
             </p>
             <span className="inline-block bg-blue-500 text-white px-4 py-1.5 rounded font-semibold text-sm group-hover:opacity-90">
-              → Sign In
+              Sign In
             </span>
           </Link>
         </div>

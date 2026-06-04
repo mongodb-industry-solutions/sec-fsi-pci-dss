@@ -58,14 +58,14 @@ export default function DemoPaymentPage() {
         <Link href="/demo/payment/history" className="text-sm text-gray-400 hover:text-white">← My Transactions</Link>
       </header>
       <main className="max-w-md mx-auto p-6">
-        <h1 className="text-xl font-bold mb-6">💳 New Payment — Step {step} of 3</h1>
+        <h1 className="text-xl font-bold mb-6">💳 New Payment: Step {step} of 3</h1>
         {step === 1 && (
           <div className="bg-white rounded-xl border p-5 space-y-4">
             <div>
               <label className="block text-sm font-medium mb-1">Card Number</label>
               <input type="text" onChange={handleCardInput} placeholder="Enter card number" className="w-full border rounded-lg px-3 py-2 font-mono" />
               {maskedCard && <div className="mt-1 font-mono text-sm bg-gray-50 rounded px-3 py-2">{maskedCard}</div>}
-              <p className="text-xs text-gray-500 mt-1">Masked immediately — raw PAN never stored</p>
+              <p className="text-xs text-gray-500 mt-1">Masked immediately. Raw PAN never stored.</p>
             </div>
             <div><label className="block text-sm font-medium mb-1">Amount ($)</label>
               <input value={amount} onChange={e=>setAmount(e.target.value)} className="w-full border rounded-lg px-3 py-2" /></div>
@@ -85,7 +85,7 @@ export default function DemoPaymentPage() {
               <div className="flex justify-between"><span>Amount:</span><strong>${amount}</strong></div>
               <div className="flex justify-between"><span>Merchant:</span><strong>{merchant}</strong></div>
               <div className="flex justify-between"><span>Card token:</span><code className="text-xs">{cardToken}</code></div>
-              <div className="flex justify-between text-gray-500 text-xs"><span>Card token is a surrogate — not CHD under PCI DSS v4.0</span></div>
+              <div className="flex justify-between text-gray-500 text-xs"><span>Card token is a surrogate, not CHD under PCI DSS v4.0</span></div>
             </div>
             {error && <p className="text-red-600 text-sm">{error}</p>}
             <div className="flex gap-3">

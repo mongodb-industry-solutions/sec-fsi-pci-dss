@@ -10,12 +10,12 @@ export const swaggerPlugin = fp(async function (fastify: FastifyInstance) {
     openapi: {
       openapi: '3.0.0',
       info: {
-        title: 'FSI PCI DSS Payment Security Demo API',
+        title: 'FSI Payment Gateway API',
         version: '1.0.0',
         description: `
 ## Overview
 
-REST API for the **LeafyBank FSI PCI DSS Payment Security Demo**. It demonstrates how
+REST API for the **FSI Payment Gateway Demo**. It demonstrates how
 [MongoDB Queryable Encryption (QE)](https://www.mongodb.com/docs/manual/core/queryable-encryption/)
 enables a PCI DSS-aligned fraud investigation workflow for digital banks and card issuers:
 encrypted sensitive fields are searchable client-side without the plaintext ever reaching
@@ -62,7 +62,7 @@ Obtain a token via \`POST /api/v1/auth/login\`.
   (Data Encryption Key). Requires \`level2_investigator\` role.
         `.trim(),
         contact: {
-          name: 'LeafyBank IST Demo Team',
+          name: 'MongoDB IST Cybersecurity & Integration Team',
           email: 'antonio.membrides@mongodb.com',
         },
         license: {
@@ -83,20 +83,27 @@ Obtain a token via \`POST /api/v1/auth/login\`.
             bearerFormat: 'JWT',
             description: 'JWT token obtained from POST /api/v1/auth/login',
           },
+          adminAuth: {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT',
+            description: 'Admin JWT obtained from POST /api/v1/admin/login. Provide as Bearer token.',
+          },
         },
         // Shared schemas (Error, MonetaryAmount, TransactionSnapshot,
         // FraudDiagnosisAssessment) are registered via fastify.addSchema()
         // above. @fastify/swagger includes them here automatically.
       },
       tags: [
-        { name: 'auth',         description: 'module:identity — SD-16 Party Authentication. /api/v1/auth. Public routes — no JWT required.' },
-        { name: 'customer',     description: 'module:customer — SD-53 Customer Agreement. /api/v1/customer. QE:equality search on email, phone, account reference.' },
-        { name: 'cards',        description: 'module:customer — SD-88 Payment Card. /api/v1/customer/:customerId/cards. Cards as sub-resource of Customer Agreement.' },
-        { name: 'transactions', description: 'module:transactions — SD-254 Card Transaction. /api/v1/transactions. QE:equality on account reference. Auto-triggers fraud case.' },
-        { name: 'fraud',        description: 'module:fraud — SD-83 Fraud Diagnosis. /api/v1/fraud. Investigation lifecycle: open → under_review → escalated → resolved → closed.' },
-        { name: 'merchants',    description: 'module:gateway — SD-89 Merchant Relations. /api/v1/merchants. Merchant onboarding, configuration, and webhook registration. Prototype (v5 roadmap).' },
-        { name: 'gateway',      description: 'module:gateway — SD-64 Payment Order · SD-65 Payment Execution · SD-57 Card Token. /api/v1/gateway/payments · /api/v1/gateway/tokens. Prototype (v5 roadmap).' },
-        { name: 'system',       description: 'module:system — /api/v1/system. Health check (public) + raw document viewer (non-production, JWT required).' },
+        { name: 'auth',         description: 'module:identity · SD-16 Party Authentication. /api/v1/auth. Public routes, no JWT required.' },
+        { name: 'customer',     description: 'module:customer · SD-53 Customer Agreement. /api/v1/customer. QE:equality search on email, phone, account reference.' },
+        { name: 'cards',        description: 'module:customer · SD-88 Payment Card. /api/v1/customer/:customerId/cards. Cards as sub-resource of Customer Agreement.' },
+        { name: 'transactions', description: 'module:transactions · SD-254 Card Transaction. /api/v1/transactions. QE:equality on account reference. Auto-triggers fraud case.' },
+        { name: 'fraud',        description: 'module:fraud · SD-83 Fraud Diagnosis. /api/v1/fraud. Investigation lifecycle: open > under_review > escalated > resolved > closed.' },
+        { name: 'merchants',    description: 'module:gateway · SD-89 Merchant Relations. /api/v1/merchants. Merchant onboarding, configuration, and webhook registration. Prototype (v5 roadmap).' },
+        { name: 'gateway',      description: 'module:gateway · SD-64 Payment Order · SD-65 Payment Execution · SD-57 Card Token. /api/v1/gateway/payments · /api/v1/gateway/tokens. Prototype (v5 roadmap).' },
+        { name: 'system',       description: 'module:system · /api/v1/system. Health check (public) + raw document viewer (non-production, JWT required).' },
+        { name: 'admin',        description: 'module:admin · /api/v1/admin. Administration panel: setup commands, terminal, log streaming, system info. Login via POST /admin/login.' },
       ],
     },
   });

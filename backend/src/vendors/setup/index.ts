@@ -37,7 +37,9 @@ export async function runSetup(reset = false) {
     await createIndexes(client);
     console.log('   Indexes created\n');
 
-    console.log('Setup complete. Run: npm run seed');
+    console.log('Setup complete.');
+    console.log('  From repo root:   npm run setup:seed');
+    console.log('  From backend dir: npm run seed');
   } finally {
     await client.close();
   }

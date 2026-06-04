@@ -241,6 +241,78 @@ list_ssh_keys() {
 
 # ---- Option 5: Set global GitHub login via SSH key ---------
 
+# Interactive key picker for Linux/macOS terminals.
+# Before calling, populate the PICKER_KEYS and PICKER_FPS arrays.
+# The selected key name is stored in PICKER_RESULT ("" = Esc / skip).
+PICKER_KEYS=()
+PICKER_FPS=()
+PICKER_RESULT=""
+
+interactive_key_picker() {
+    local TITLE="${1:-Select SSH key  (arrow keys + Enter, Esc = skip)}"
+    local total=${#PICKER_KEYS[@]}
+    local selected=0
+    PICKER_RESULT=""
+
+    [ "$total" -eq 0 ] && return 1
+
+    tput civis 2>/dev/null   # hide cursor
+
+    # Header printed once — never redrawn, no flicker
+    printf "\n\033[36m  %s\033[0m\n\n" "$TITLE"
+
+    local lines=$(( total * 2 ))   # lines the items section occupies
+
+    # Redraw items from current cursor position, then step cursor back up
+    # using relative movement so scroll state never causes drift
+    _picker_redraw() {
+        local i
+        for ((i=0; i<total; i++)); do
+            if [ "$i" -eq "$selected" ]; then
+                printf "\033[30;46m  [ %-40s ]  \033[0m\n" "${PICKER_KEYS[$i]}"
+                printf "\033[36m    %s\033[0m\n"            "${PICKER_FPS[$i]}"
+            else
+                printf "\033[90m    %-42s\033[0m\n" "${PICKER_KEYS[$i]}"
+                printf "\033[90m    %s\033[0m\n"    "${PICKER_FPS[$i]}"
+            fi
+        done
+        printf "\033[%dA" "$lines"   # cursor up: back to items top for next redraw
+    }
+
+    _picker_redraw
+
+    local key
+    while true; do
+        IFS= read -rs -n1 key </dev/tty
+        if [[ "$key" == $'\x1b' ]]; then
+            IFS= read -rs -n2 -t 0.1 key2 </dev/tty
+            key="${key}${key2}"
+        fi
+        case "$key" in
+            $'\x1b[A')                       # Up arrow
+                if [ "$selected" -gt 0 ]; then
+                    selected=$((selected - 1))
+                    _picker_redraw
+                fi ;;
+            $'\x1b[B')                       # Down arrow
+                if [ "$selected" -lt $((total - 1)) ]; then
+                    selected=$((selected + 1))
+                    _picker_redraw
+                fi ;;
+            ''|$'\x0a'|$'\x0d')             # Enter
+                PICKER_RESULT="${PICKER_KEYS[$selected]}"
+                printf "\033[%dB\n" "$lines"   # cursor down past items, then blank line
+                break ;;
+            $'\x1b')                         # Lone Escape
+                PICKER_RESULT=""
+                printf "\033[%dB\n" "$lines"
+                break ;;
+        esac
+    done
+
+    tput cnorm 2>/dev/null
+}
+
 set_global_ssh_login() {
     echo ""
     SSH_DIR="$HOME/.ssh"
@@ -255,78 +327,63 @@ set_global_ssh_login() {
         return
     fi
 
-    echo "Available SSH keys in $SSH_DIR :"
-    echo "------------------------------------------------------------"
+    # Build arrays once; reuse for every picker call
     KEY_NAMES=()
-    IDX=1
+    KEY_FPS=()
     for pub in "${PUB_KEYS[@]}"; do
-        KEY_NAME=$(basename "$pub" .pub)
-        FINGERPRINT=$(ssh-keygen -lf "$pub" 2>/dev/null)
-        echo "  $IDX. $KEY_NAME"
-        echo "     $FINGERPRINT"
-        KEY_NAMES+=("$KEY_NAME")
-        IDX=$((IDX + 1))
+        KEY_NAMES+=("$(basename "$pub" .pub)")
+        KEY_FPS+=("$(ssh-keygen -lf "$pub" 2>/dev/null)")
     done
-    echo "------------------------------------------------------------"
+
+    # ── Transport key (core.sshCommand) ──────────────────────────────────────
+    printf "\033[36m  --- Transport key (git push / pull / fetch) ---\033[0m\n\n"
+    PICKER_KEYS=("${KEY_NAMES[@]}")
+    PICKER_FPS=("${KEY_FPS[@]}")
+    interactive_key_picker "Transport key for git SSH operations  (Esc = skip)"
+    TRANSPORT_KEY="$PICKER_RESULT"
     echo ""
 
-    read -rp "Key number to use globally (leave empty to skip key configuration): " SEL
-
-    KEY_NAME=""
-    if [ -n "$SEL" ]; then
-        SEL_IDX=$((SEL - 1))
-        if [ "$SEL_IDX" -lt 0 ] || [ "$SEL_IDX" -ge "${#KEY_NAMES[@]}" ]; then
-            fail "Invalid selection."
-            return
-        fi
-        KEY_NAME="${KEY_NAMES[$SEL_IDX]}"
-        KEY_PATH="$SSH_DIR/$KEY_NAME"
-
-        action "Setting global git SSH command to use key '$KEY_NAME'..."
-        run git config --global core.sshCommand "ssh -i \"$KEY_PATH\" -o IdentitiesOnly=yes"
+    if [ -n "$TRANSPORT_KEY" ]; then
+        TRANSPORT_PATH="$SSH_DIR/$TRANSPORT_KEY"
+        action "Setting global git SSH command to use key '$TRANSPORT_KEY'..."
+        run git config --global core.sshCommand "ssh -i \"$TRANSPORT_PATH\" -o IdentitiesOnly=yes"
         ok "git config --global core.sshCommand updated."
         echo ""
-        echo "  Verify with : git config --global core.sshCommand"
-        echo "  Test SSH    : ssh -i \"$KEY_PATH\" -T git@github.com"
+        echo "  Verify : git config --global core.sshCommand"
+        echo "  Test   : ssh -i \"$TRANSPORT_PATH\" -T git@github.com"
         echo ""
     fi
 
-    # Optional: signed commits via SSH key
+    # ── Signed commits (gpg.format ssh) ──────────────────────────────────────
     echo "------------------------------------------------------------"
-    echo " Signed commits (optional)"
+    printf "\033[36m Signed commits (optional)\033[0m\n"
     echo "------------------------------------------------------------"
-    echo "  Configures git to sign every commit with an SSH key so that"
-    echo "  VSCode and other tools can commit against strict branch rules."
-    echo "  Sets: gpg.format=ssh  user.signingkey=<pub>  commit.gpgsign=true"
+    echo "  Sets gpg.format=ssh + user.signingkey + commit.gpgsign=true"
+    echo "  so VSCode and other tools sign commits automatically."
     echo ""
 
     SIGN_KEY=""
-    if [ -n "$KEY_NAME" ]; then
-        read -rp "Enable signed commits with key '$KEY_NAME'? (y/N): " ENABLE_SIGN
-        [[ "${ENABLE_SIGN,,}" == "y" ]] && SIGN_KEY="$KEY_NAME"
+    if [ -n "$TRANSPORT_KEY" ]; then
+        read -rp "Use the same key '$TRANSPORT_KEY' for signed commits? (Y/n): " USE_SAME
+        if [[ "${USE_SAME,,}" == "" || "${USE_SAME,,}" == "y" ]]; then
+            SIGN_KEY="$TRANSPORT_KEY"
+        else
+            echo ""
+            PICKER_KEYS=("${KEY_NAMES[@]}")
+            PICKER_FPS=("${KEY_FPS[@]}")
+            interactive_key_picker "Signing key for commits  (Esc = skip)"
+            SIGN_KEY="$PICKER_RESULT"
+            echo ""
+        fi
     else
         read -rp "Enable signed commits? (y/N): " ENABLE_SIGN
         if [[ "${ENABLE_SIGN,,}" == "y" ]]; then
             echo ""
-            echo "Select a key to use for signing:"
-            IDX2=1
-            for pub in "${PUB_KEYS[@]}"; do
-                KN=$(basename "$pub" .pub)
-                FP=$(ssh-keygen -lf "$pub" 2>/dev/null)
-                echo "  $IDX2. $KN"
-                echo "     $FP"
-                IDX2=$((IDX2 + 1))
-            done
+            PICKER_KEYS=("${KEY_NAMES[@]}")
+            PICKER_FPS=("${KEY_FPS[@]}")
+            interactive_key_picker "Signing key for commits  (Esc = skip)"
+            SIGN_KEY="$PICKER_RESULT"
             echo ""
-            read -rp "Key number for signing (leave empty to skip): " SIGN_SEL
-            if [ -n "$SIGN_SEL" ]; then
-                SIGN_IDX=$((SIGN_SEL - 1))
-                if [ "$SIGN_IDX" -ge 0 ] && [ "$SIGN_IDX" -lt "${#KEY_NAMES[@]}" ]; then
-                    SIGN_KEY="${KEY_NAMES[$SIGN_IDX]}"
-                else
-                    fail "Invalid selection — skipping signed commits."
-                fi
-            fi
         fi
     fi
 
@@ -339,12 +396,12 @@ set_global_ssh_login() {
         ok "Signed commits enabled."
         echo ""
         echo "  Verify : git config --global --list | grep -E 'gpg|sign'"
-        echo "  Note   : Add the public key to GitHub as an SSH Signing key at"
-        echo "           https://github.com/settings/keys (type: Signing Key)"
+        echo "  Note   : Register the public key on GitHub as a Signing Key at"
+        echo "           https://github.com/settings/keys  (type: Signing Key)"
         echo ""
     fi
 
-    # Optionally authenticate / re-authenticate gh CLI with SSH protocol
+    # ── GitHub CLI auth ───────────────────────────────────────────────────────
     chk "GitHub CLI authentication status..."
     if gh auth status &>/dev/null; then
         ok "Already authenticated:"
@@ -352,7 +409,7 @@ set_global_ssh_login() {
         echo ""
         read -rp "Re-authenticate to ensure SSH git-protocol is set? (y/N): " REAUTH
         if [[ "${REAUTH,,}" != "y" ]]; then
-            [ -n "$KEY_NAME" ] && ok "Global SSH key configured. All git SSH operations will use '$KEY_NAME'."
+            [ -n "$TRANSPORT_KEY" ] && ok "Global SSH key configured. All git SSH operations will use '$TRANSPORT_KEY'."
             return
         fi
         action "Logging out first to allow fresh SSH-protocol login..."
@@ -360,20 +417,58 @@ set_global_ssh_login() {
     fi
 
     action "Starting GitHub CLI login with SSH git-protocol..."
-    echo "  > A browser window will open — authorize the GitHub CLI app."
+    echo "  > A browser window will open - authorize the GitHub CLI app."
     echo ""
     run gh auth login --web --git-protocol ssh --scopes repo,read:org,workflow
     if gh auth status &>/dev/null; then
         ok "GitHub CLI authenticated with SSH protocol."
         echo ""
         gh auth status
-        [ -n "$KEY_NAME" ] && echo "" && ok "Global SSH key '$KEY_NAME' + gh SSH protocol configured."
+        [ -n "$TRANSPORT_KEY" ] && echo "" && ok "Global SSH key '$TRANSPORT_KEY' + gh SSH protocol configured."
     else
         fail "Authentication failed. Try: gh auth login --git-protocol ssh --scopes repo,read:org,workflow"
     fi
 }
 
-# ---- Option 6: List pull requests --------------------------
+# ---- Option 6: View git signing / SSH transport config -----
+
+show_signing_config() {
+    echo ""
+    printf "\033[36m  Git signing / SSH transport config (global)\033[0m\n"
+    echo "  --------------------------------------------"
+    echo ""
+
+    for entry in \
+        "gpg.format:gpg.format       " \
+        "user.signingkey:user.signingkey  " \
+        "commit.gpgsign:commit.gpgsign   " \
+        "core.sshCommand:core.sshCommand  "; do
+        KEY="${entry%%:*}"
+        LABEL="${entry#*:}"
+        VAL=$(git config --global "$KEY" 2>/dev/null)
+        if [ -n "$VAL" ]; then
+            printf "\033[32m  [ok]  %s = %s\033[0m\n" "$LABEL" "$VAL"
+        else
+            printf "\033[90m  [--]  %s   (not set)\033[0m\n" "$LABEL"
+        fi
+    done
+
+    echo ""
+    printf "\033[36m  Full signing-related entries:\033[0m\n"
+    echo "[cmd]    git config --global --list | grep -E 'gpg|sign|ssh'"
+    RESULT=$(git config --global --list 2>/dev/null | grep -E "gpg|sign|ssh")
+    if [ -n "$RESULT" ]; then
+        echo "$RESULT" | while IFS= read -r line; do
+            printf "\033[36m  %s\033[0m\n" "$line"
+        done
+    else
+        warn "No signing-related entries found in global git config."
+        echo "  > Run option 5 to configure SSH signing and transport."
+    fi
+    echo ""
+}
+
+# ---- Option 7: List pull requests --------------------------
 
 list_prs() {
     echo ""
@@ -1062,21 +1157,22 @@ while true; do
     echo "  3.  Logout / switch GitHub account"
     echo "  4.  List SSH keys"
     echo "  5.  Set global GitHub login via SSH key (optional key selection)"
+    echo "  6.  View git signing / SSH transport config"
     echo "  --- Pull Requests ---"
-    echo "  6.  List pull requests"
-    echo "  7.  Merge a pull request"
-    echo "  8.  Force merge (bypass all rulesets temporarily)"
-    echo "  9.  List pending conversations in a PR"
-    echo "  10. Resolve a conversation in a PR"
+    echo "  7.  List pull requests"
+    echo "  8.  Merge a pull request"
+    echo "  9.  Force merge (bypass all rulesets temporarily)"
+    echo "  10. List pending conversations in a PR"
+    echo "  11. Resolve a conversation in a PR"
     echo "  --- Rulesets ---"
-    echo "  11. List rulesets"
-    echo "  12. Disable a specific ruleset"
-    echo "  13. Enable a specific ruleset"
+    echo "  12. List rulesets"
+    echo "  13. Disable a specific ruleset"
+    echo "  14. Enable a specific ruleset"
     echo "  --- Security ---"
-    echo "  14. Dependabot alerts (dependency vulnerabilities)"
-    echo "  15. Secret scanning alerts"
-    echo "  16. Code scanning alerts (quality / malware)"
-    echo "  17. Generate JSON reports (PR conversations + security)"
+    echo "  15. Dependabot alerts (dependency vulnerabilities)"
+    echo "  16. Secret scanning alerts"
+    echo "  17. Code scanning alerts (quality / malware)"
+    echo "  18. Generate JSON reports (PR conversations + security)"
     echo "  --- ---"
     echo "  0.  Exit"
     echo ""
@@ -1088,20 +1184,21 @@ while true; do
         3)  github_logout ;;
         4)  list_ssh_keys ;;
         5)  set_global_ssh_login ;;
-        6)  list_prs ;;
-        7)  merge_pr ;;
-        8)  bypass_merge ;;
-        9)  list_conversations ;;
-        10) resolve_conversation ;;
-        11) list_rulesets ;;
-        12) disable_ruleset ;;
-        13) enable_ruleset ;;
-        14) list_dependabot_alerts ;;
-        15) list_secret_alerts ;;
-        16) list_code_alerts ;;
-        17) generate_report ;;
+        6)  show_signing_config ;;
+        7)  list_prs ;;
+        8)  merge_pr ;;
+        9)  bypass_merge ;;
+        10) list_conversations ;;
+        11) resolve_conversation ;;
+        12) list_rulesets ;;
+        13) disable_ruleset ;;
+        14) enable_ruleset ;;
+        15) list_dependabot_alerts ;;
+        16) list_secret_alerts ;;
+        17) list_code_alerts ;;
+        18) generate_report ;;
         0)  echo ""; echo "Goodbye."; break ;;
-        *)  warn "Invalid option. Enter 1-17 or 0." ;;
+        *)  warn "Invalid option. Enter 1-18 or 0." ;;
     esac
 
     if [ "$CHOICE" != "0" ]; then

@@ -193,13 +193,66 @@ function Invoke-GitHubAuth {
     }
 }
 
-# ---- Option 17: Set global GitHub login via SSH key -------
+# ---- Option 5: Set global GitHub login via SSH key --------
+
+# Interactive key picker: arrow keys + Enter to confirm, Esc to skip.
+# Returns the selected key object or $null if the user pressed Esc.
+function Invoke-InteractiveKeyPicker {
+    param(
+        [Parameter(Mandatory)][array]$Keys,
+        [string]$Title = "Select SSH key  (arrow keys + Enter, Esc = skip)"
+    )
+    if ($Keys.Count -eq 0) { return $null }
+
+    $selected = 0
+    $ESC      = [char]27
+    $lines    = $Keys.Count * 2          # total lines the items section occupies
+    $up       = "$ESC[$($lines)A"        # ANSI: cursor up $lines rows
+    $down     = "$ESC[$($lines)B"        # ANSI: cursor down $lines rows
+
+    # Header printed once — never redrawn, no flicker
+    [Console]::WriteLine()
+    [Console]::WriteLine("  $Title")
+    [Console]::WriteLine()
+
+    # Redraw items from current cursor position, then step cursor back up
+    # so the next call always draws in the same spot regardless of scroll state
+    $redraw = {
+        for ($i = 0; $i -lt $Keys.Count; $i++) {
+            $name = ("  [ " + $Keys[$i].Name + " ]").PadRight(60)
+            $fp   = ("    " + $Keys[$i].Fingerprint).PadRight(60)
+            if ($i -eq $selected) {
+                [Console]::Write("$ESC[30;46m$name$ESC[0m`r`n$ESC[36m$fp$ESC[0m`r`n")
+            } else {
+                [Console]::Write("$ESC[90m$name$ESC[0m`r`n$ESC[90m$fp$ESC[0m`r`n")
+            }
+        }
+        [Console]::Write($up)    # step back to items top, ready for next redraw
+    }
+
+    [Console]::CursorVisible = $false
+    & $redraw
+
+    try {
+        while ($true) {
+            $k = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+            switch ($k.VirtualKeyCode) {
+                38 { if ($selected -gt 0)                { $selected--; & $redraw } }
+                40 { if ($selected -lt $Keys.Count - 1) { $selected++; & $redraw } }
+                13 { [Console]::Write($down); return $Keys[$selected] }
+                27 { [Console]::Write($down); return $null }
+            }
+        }
+    } finally {
+        [Console]::CursorVisible = $true
+        [Console]::WriteLine()
+    }
+}
 
 function Invoke-SetGlobalSSHLogin {
     Write-Host ""
     $SSHDir = "$HOME\.ssh"
 
-    # List available public keys so the user can pick one
     $pubKeys = Get-ChildItem -Path $SSHDir -Filter "*.pub" -ErrorAction SilentlyContinue
     if (-not $pubKeys) {
         warn "No public keys found in $SSHDir."
@@ -207,95 +260,79 @@ function Invoke-SetGlobalSSHLogin {
         return
     }
 
-    Write-Host "Available SSH keys in $SSHDir :"
-    Write-Host "------------------------------------------------------------"
-    $keyList = @()
-    $idx = 1
-    foreach ($pub in $pubKeys) {
-        $fingerprint = & ssh-keygen -lf $pub.FullName 2>&1
-        Write-Host "  $idx. $($pub.BaseName)"
-        Write-Host "     $fingerprint"
-        $keyList += $pub.BaseName
-        $idx++
-    }
-    Write-Host "------------------------------------------------------------"
-    Write-Host ""
-
-    $sel = (Read-Host "Key number to use globally (leave empty to skip key configuration)").Trim()
-
-    $keyName = ""
-    if ($sel -ne "") {
-        $selIdx = [int]$sel - 1
-        if ($selIdx -lt 0 -or $selIdx -ge $keyList.Count) {
-            fail "Invalid selection."
-            return
+    # Build typed objects so the picker has both display name and full paths
+    $keyObjects = @($pubKeys | ForEach-Object {
+        $fp = (& ssh-keygen -lf $_.FullName 2>&1) -join ""
+        [PSCustomObject]@{
+            Name        = $_.BaseName
+            Path        = "$SSHDir\$($_.BaseName)"
+            PubPath     = $_.FullName -replace '\\', '/'
+            Fingerprint = $fp
         }
-        $keyName = $keyList[$selIdx]
-        $keyPath = "$SSHDir\$keyName"
+    })
 
-        action "Setting global git SSH command to use key '$keyName'..."
-        run { git config --global core.sshCommand "ssh -i `"$keyPath`" -o IdentitiesOnly=yes" }
+    # ── Transport key (core.sshCommand) ──────────────────────────────────────
+    Write-Host "  --- Transport key (git push / pull / fetch) ---" -ForegroundColor DarkCyan
+    Write-Host ""
+    $transportKey = Invoke-InteractiveKeyPicker -Keys $keyObjects `
+        -Title "Transport key for git SSH operations  (Esc = skip)"
+    Write-Host ""
+
+    if ($transportKey) {
+        $tPath = $transportKey.Path
+        action "Setting global git SSH command to use key '$($transportKey.Name)'..."
+        run { git config --global core.sshCommand "ssh -i `"$tPath`" -o IdentitiesOnly=yes" }
         ok "git config --global core.sshCommand updated."
-
         Write-Host ""
-        Write-Host "  Verify with : git config --global core.sshCommand"
-        Write-Host "  Test SSH    : ssh -i `"$keyPath`" -T git@github.com"
+        Write-Host "  Verify : git config --global core.sshCommand"
+        Write-Host "  Test   : ssh -i `"$tPath`" -T git@github.com"
         Write-Host ""
     }
 
-    # Optional: signed commits via SSH key
+    # ── Signed commits (gpg.format ssh) ──────────────────────────────────────
     Write-Host "------------------------------------------------------------"
-    Write-Host " Signed commits (optional)"
+    Write-Host " Signed commits (optional)" -ForegroundColor DarkCyan
     Write-Host "------------------------------------------------------------"
-    Write-Host "  Configures git to sign every commit with an SSH key so that"
-    Write-Host "  VSCode and other tools can commit against strict branch rules."
-    Write-Host "  Sets: gpg.format=ssh  user.signingkey=<pub>  commit.gpgsign=true"
+    Write-Host "  Sets gpg.format=ssh + user.signingkey + commit.gpgsign=true"
+    Write-Host "  so VSCode and other tools sign commits automatically."
     Write-Host ""
 
-    $signKey = ""
-    if ($keyName -ne "") {
-        $enableSign = (Read-Host "Enable signed commits with key '$keyName'? (y/N)").Trim().ToLower()
-        if ($enableSign -eq "y") { $signKey = $keyName }
+    $signingKey = $null
+    if ($transportKey) {
+        $useSame = (Read-Host "Use the same key '$($transportKey.Name)' for signed commits? (Y/n)").Trim().ToLower()
+        if ($useSame -eq "" -or $useSame -eq "y") {
+            $signingKey = $transportKey
+        } else {
+            Write-Host ""
+            $signingKey = Invoke-InteractiveKeyPicker -Keys $keyObjects `
+                -Title "Signing key for commits  (Esc = skip)"
+            Write-Host ""
+        }
     } else {
         $enableSign = (Read-Host "Enable signed commits? (y/N)").Trim().ToLower()
         if ($enableSign -eq "y") {
             Write-Host ""
-            Write-Host "Select a key to use for signing:"
-            $idx2 = 1
-            foreach ($pub in $pubKeys) {
-                $fp2 = & ssh-keygen -lf $pub.FullName 2>&1
-                Write-Host "  $idx2. $($pub.BaseName)"
-                Write-Host "     $fp2"
-                $idx2++
-            }
+            $signingKey = Invoke-InteractiveKeyPicker -Keys $keyObjects `
+                -Title "Signing key for commits  (Esc = skip)"
             Write-Host ""
-            $signSel = (Read-Host "Key number for signing (leave empty to skip)").Trim()
-            if ($signSel -ne "") {
-                $signIdx = [int]$signSel - 1
-                if ($signIdx -ge 0 -and $signIdx -lt $keyList.Count) {
-                    $signKey = $keyList[$signIdx]
-                } else {
-                    fail "Invalid selection - skipping signed commits."
-                }
-            }
         }
     }
 
-    if ($signKey -ne "") {
-        $signPubPath = ("$SSHDir\$signKey.pub") -replace '\\', '/'
-        action "Configuring signed commits with key '$signKey'..."
+    if ($signingKey) {
+        $sPubPath = $signingKey.PubPath
+        action "Configuring signed commits with key '$($signingKey.Name)'..."
         run { git config --global gpg.format ssh }
-        run { git config --global user.signingkey "$signPubPath" }
+        run { git config --global user.signingkey "$sPubPath" }
         run { git config --global commit.gpgsign true }
         ok "Signed commits enabled."
         Write-Host ""
         Write-Host "  Verify : git config --global --list | Select-String 'gpg|sign'"
-        Write-Host "  Note   : Add the public key to GitHub as an SSH *Signing* key at"
-        Write-Host "           https://github.com/settings/keys (type: Signing Key)"
+        Write-Host "  Note   : Register the public key on GitHub as a Signing Key at"
+        Write-Host "           https://github.com/settings/keys  (type: Signing Key)"
         Write-Host ""
     }
 
-    # Optionally authenticate / re-authenticate gh CLI with SSH protocol
+    # ── GitHub CLI auth ───────────────────────────────────────────────────────
     chk "GitHub CLI authentication status..."
     $status = gh auth status 2>&1
     $alreadyAuthed = ($LASTEXITCODE -eq 0)
@@ -306,8 +343,8 @@ function Invoke-SetGlobalSSHLogin {
         Write-Host ""
         $reauth = (Read-Host "Re-authenticate to ensure SSH git-protocol is set? (y/N)").Trim().ToLower()
         if ($reauth -ne "y") {
-            if ($keyName -ne "") {
-                ok "Global SSH key configured. All git SSH operations will use '$keyName'."
+            if ($transportKey) {
+                ok "Global SSH key configured. All git SSH operations will use '$($transportKey.Name)'."
             }
             return
         }
@@ -323,16 +360,53 @@ function Invoke-SetGlobalSSHLogin {
         ok "GitHub CLI authenticated with SSH protocol."
         Write-Host ""
         gh auth status
-        if ($keyName -ne "") {
+        if ($transportKey) {
             Write-Host ""
-            ok "Global SSH key '$keyName' + gh SSH protocol configured."
+            ok "Global SSH key '$($transportKey.Name)' + gh SSH protocol configured."
         }
     } else {
         fail "Authentication failed. Try: gh auth login --git-protocol ssh --scopes repo,read:org,workflow"
     }
 }
 
-# ---- Option 5: Logout / switch user -----------------------
+# ---- Option 6: View git signing / SSH transport config -----
+
+function Invoke-ShowSigningConfig {
+    Write-Host ""
+    Write-Host "  Git signing / SSH transport config (global)" -ForegroundColor Cyan
+    Write-Host "  --------------------------------------------"
+    Write-Host ""
+
+    $checks = @(
+        @{ Key = "gpg.format";       Label = "gpg.format        " },
+        @{ Key = "user.signingkey";  Label = "user.signingkey   " },
+        @{ Key = "commit.gpgsign";   Label = "commit.gpgsign    " },
+        @{ Key = "core.sshCommand";  Label = "core.sshCommand   " }
+    )
+
+    foreach ($c in $checks) {
+        $val = git config --global $c.Key 2>$null
+        if ($val) {
+            Write-Host "  [ok]  $($c.Label) = $val" -ForegroundColor Green
+        } else {
+            Write-Host "  [--]  $($c.Label)   (not set)" -ForegroundColor DarkGray
+        }
+    }
+
+    Write-Host ""
+    Write-Host "  Full signing-related entries:" -ForegroundColor DarkCyan
+    Write-Host "[cmd]    git config --global --list | Select-String 'gpg|sign|ssh'"
+    $result = git config --global --list 2>$null | Select-String "gpg|sign|ssh"
+    if ($result) {
+        $result | ForEach-Object { Write-Host "  $_" -ForegroundColor Cyan }
+    } else {
+        warn "No signing-related entries found in global git config."
+        Write-Host "  > Run option 5 to configure SSH signing and transport."
+    }
+    Write-Host ""
+}
+
+# ---- Option 3: Logout / switch user -----------------------
 
 function Invoke-GitHubLogout {
     Write-Host ""
@@ -1038,21 +1112,22 @@ do {
     Write-Host "  3.  Logout / switch GitHub account"
     Write-Host "  4.  List SSH keys"
     Write-Host "  5.  Set global GitHub login via SSH key (optional key selection)"
+    Write-Host "  6.  View git signing / SSH transport config"
     Write-Host "  --- Pull Requests ---"
-    Write-Host "  6.  List pull requests"
-    Write-Host "  7.  Merge a pull request"
-    Write-Host "  8.  Force merge (bypass all rulesets temporarily)"
-    Write-Host "  9.  List pending conversations in a PR"
-    Write-Host "  10. Resolve a conversation in a PR"
+    Write-Host "  7.  List pull requests"
+    Write-Host "  8.  Merge a pull request"
+    Write-Host "  9.  Force merge (bypass all rulesets temporarily)"
+    Write-Host "  10. List pending conversations in a PR"
+    Write-Host "  11. Resolve a conversation in a PR"
     Write-Host "  --- Rulesets ---"
-    Write-Host "  11. List rulesets"
-    Write-Host "  12. Disable a specific ruleset"
-    Write-Host "  13. Enable a specific ruleset"
+    Write-Host "  12. List rulesets"
+    Write-Host "  13. Disable a specific ruleset"
+    Write-Host "  14. Enable a specific ruleset"
     Write-Host "  --- Security ---"
-    Write-Host "  14. Dependabot alerts (dependency vulnerabilities)"
-    Write-Host "  15. Secret scanning alerts"
-    Write-Host "  16. Code scanning alerts (quality / malware)"
-    Write-Host "  17. Generate JSON reports (PR conversations + security)"
+    Write-Host "  15. Dependabot alerts (dependency vulnerabilities)"
+    Write-Host "  16. Secret scanning alerts"
+    Write-Host "  17. Code scanning alerts (quality / malware)"
+    Write-Host "  18. Generate JSON reports (PR conversations + security)"
     Write-Host "  --- ---"
     Write-Host "  0.  Exit"
     Write-Host ""
@@ -1064,20 +1139,21 @@ do {
         "3"  { Invoke-GitHubLogout }
         "4"  { Invoke-ListSSHKeys }
         "5"  { Invoke-SetGlobalSSHLogin }
-        "6"  { Invoke-ListPRs }
-        "7"  { Invoke-MergePR }
-        "8"  { Invoke-BypassMerge }
-        "9"  { Invoke-ListConversations }
-        "10" { Invoke-ResolveConversation }
-        "11" { Invoke-ListRulesets }
-        "12" { Invoke-DisableRuleset }
-        "13" { Invoke-EnableRuleset }
-        "14" { Invoke-ListDependabotAlerts }
-        "15" { Invoke-ListSecretAlerts }
-        "16" { Invoke-ListCodeAlerts }
-        "17" { Invoke-GenerateReport }
+        "6"  { Invoke-ShowSigningConfig }
+        "7"  { Invoke-ListPRs }
+        "8"  { Invoke-MergePR }
+        "9"  { Invoke-BypassMerge }
+        "10" { Invoke-ListConversations }
+        "11" { Invoke-ResolveConversation }
+        "12" { Invoke-ListRulesets }
+        "13" { Invoke-DisableRuleset }
+        "14" { Invoke-EnableRuleset }
+        "15" { Invoke-ListDependabotAlerts }
+        "16" { Invoke-ListSecretAlerts }
+        "17" { Invoke-ListCodeAlerts }
+        "18" { Invoke-GenerateReport }
         "0"  { Write-Host ""; Write-Host "Goodbye." }
-        default { warn "Invalid option. Enter 1-17 or 0." }
+        default { warn "Invalid option. Enter 1-18 or 0." }
     }
 
     if ($choice -ne "0") {

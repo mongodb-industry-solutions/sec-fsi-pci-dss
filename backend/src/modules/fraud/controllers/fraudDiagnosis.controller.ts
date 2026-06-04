@@ -45,7 +45,7 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
       },
       response: {
         200: {
-          description: 'Paginated list of fraud cases sorted by `fraudDiagnosisRequestDateTime` descending.',
+          description: 'Paginated list of fraud cases sorted by `requestDateTime` descending.',
           type: 'object',
           properties: {
             results: {
@@ -56,18 +56,19 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
                 properties: {
                   fraudDiagnosisInstanceReference: { type: 'string', description: 'Case UUID. Use in GET /:id to fetch full details.' },
                   fraudDiagnosisCaseReference: { type: 'string', description: 'Human-readable case ID, format `FD-YYYY-NNNNNN`.' },
-                  fraudDiagnosisCaseStatus: {
+                  caseStatus: {
                     type: 'string',
                     enum: ['open', 'under_review', 'escalated', 'resolved_cleared', 'resolved_fraud', 'closed'],
                     description: 'Current BIAN lifecycle status.',
                   },
-                  fraudDiagnosisCaseSeverity: {
+                  riskSeverity: {
                     type: 'string',
                     enum: ['low', 'medium', 'high', 'critical'],
                     description: 'Risk severity derived from transaction amount and indicator count.',
                   },
+                  linkedCardTransactionReference: { type: 'string', description: 'UUID of the originating cardTransaction document.' },
                   transactionSnapshot: { $ref: 'TransactionSnapshot#' },
-                  fraudDiagnosisRequestDateTime: { type: 'string', format: 'date-time', description: 'UTC timestamp when the case was opened.' },
+                  requestDateTime: { type: 'string', format: 'date-time', description: 'UTC timestamp when the case was opened.' },
                 },
               },
             },
@@ -98,7 +99,20 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
       parseInt(page, 10),
       parseInt(limit, 10)
     );
-    return reply.send(result);
+    return reply.send({
+      results: result.results.map((c) => ({
+        fraudDiagnosisInstanceReference: c.fraudDiagnosisInstanceReference,
+        fraudDiagnosisCaseReference: c.fraudDiagnosisCaseReference,
+        caseStatus: c.fraudDiagnosisCaseStatus,
+        riskSeverity: c.fraudDiagnosisCaseSeverity,
+        linkedCardTransactionReference: c.linkedCardTransactionReference,
+        transactionSnapshot: c.transactionSnapshot,
+        requestDateTime: c.fraudDiagnosisRequestDateTime,
+      })),
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+    });
   });
 
   fastify.get('/:id', {
@@ -221,10 +235,11 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
     };
     const result = await updateCase(fastify.db, id, patch as never);
     if (!result) return reply.status(404).send({ error: 'Fraud case not found' });
+    const updated = result as unknown as { fraudDiagnosisInstanceReference: string; fraudDiagnosisCaseStatus: string; recordUpdatedDateTime: Date };
     return reply.send({
-      fraudDiagnosisInstanceReference: (result as { fraudDiagnosisInstanceReference: string }).fraudDiagnosisInstanceReference,
-      fraudDiagnosisCaseStatus: (result as { fraudDiagnosisCaseStatus: string }).fraudDiagnosisCaseStatus,
-      recordUpdatedDateTime: (result as { recordUpdatedDateTime: Date }).recordUpdatedDateTime,
+      fraudDiagnosisInstanceReference: updated.fraudDiagnosisInstanceReference,
+      fraudDiagnosisCaseStatus: updated.fraudDiagnosisCaseStatus,
+      recordUpdatedDateTime: updated.recordUpdatedDateTime,
     });
   });
 

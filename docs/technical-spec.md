@@ -338,6 +338,34 @@ export type DemoUserRole =
   | 'security_auditor';
 ```
 
+### `authenticationDomain.model.ts`
+
+```typescript
+// BIAN SD-16: Party Authentication — Authentication Domain configuration registry
+
+export const AUTHENTICATION_DOMAIN_COLLECTION = 'authenticationDomain';
+
+export type AuthDomainType = 'local' | 'oidc' | 'saml';
+export type AuthDomainName = 'local' | 'msentra' | 'bigid';
+
+export interface AuthenticationDomainRecord {
+  partyAuthenticationDomainInstanceReference: string;  // UUID, primary key
+  partyAuthenticationDomainName: AuthDomainName;       // Slug used in login + JWT claim
+  partyAuthenticationDomainDisplayName: string;        // UI label (e.g. "Microsoft Entra ID")
+  partyAuthenticationDomainType: AuthDomainType;       // Protocol: local | oidc | saml
+  partyAuthenticationDomainEnabled: boolean;           // Only enabled domains appear in UI
+  partyAuthenticationDomainConfiguration: Record<string, unknown>; // Provider-specific config
+  bianServiceDomain: 'PartyAuthentication';
+  bianControlRecordType: 'AuthenticationDomain';
+  recordCreatedDateTime: Date;
+  schemaVersion: number;
+}
+```
+
+**Collection:** `authenticationDomain` — plaintext, no QE (domain config contains no CHD or PII).  
+**Seed file:** `backend/data/authDomains.json` — 3 pre-seeded domains: `local` (enabled), `msentra` (disabled), `bigid` (disabled).  
+**API:** `GET /api/v1/auth/domains` (public) — returns only domains with `partyAuthenticationDomainEnabled: true`.
+
 ---
 
 ## 2. QE encryptedFieldsMaps
@@ -678,6 +706,12 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { partyAuthenticationInstanceReference: 1 }, unique: true },
     { key: { partyAuthenticationUserRole: 1 } },
   ]);
+
+  await db.collection('authenticationDomain').createIndexes([
+    { key: { partyAuthenticationDomainInstanceReference: 1 }, unique: true },
+    { key: { partyAuthenticationDomainName: 1 }, unique: true },
+    { key: { partyAuthenticationDomainEnabled: 1 } },
+  ]);
 }
 ```
 
@@ -967,7 +1001,7 @@ Validates credentials against `partyAuthentication` (QE equality search on email
 
 #### `GET /auth/users`
 
-Returns the list of demo users for the login screen dropdown. Passwords are never included.
+Returns the list of local domain demo users for the login screen dropdown. Data is read from `backend/data/users.json` (seed file) rather than the QE-encrypted collection to avoid decryption overhead on this helper endpoint. Passwords are never included.
 
 **Response 200:**
 ```json
@@ -978,6 +1012,39 @@ Returns the list of demo users for the login screen dropdown. Passwords are neve
     { "email": "sarah.chen@leafybank.demo",     "name": "Sarah Chen",     "role": "level1_analyst" },
     { "email": "michael.obi@leafybank.demo",    "name": "Michael Obi",    "role": "level2_investigator" },
     { "email": "admin@leafybank.demo",          "name": "Admin",          "role": "security_auditor" }
+  ]
+}
+```
+
+---
+
+#### `GET /auth/domains`
+
+Returns only enabled authentication domains from the `authenticationDomain` collection (BIAN SD-16). Public endpoint — no Bearer token required. Used by the Application Mode login screen to populate the domain selector dynamically.
+
+**Response 200:**
+```json
+{
+  "domains": [
+    { "name": "local", "displayName": "Local (Demo Users)", "type": "local" }
+  ]
+}
+```
+
+> Domains with `partyAuthenticationDomainEnabled: false` (e.g., `msentra`, `bigid`) are excluded. Enable them by updating the `authenticationDomain` collection document.
+
+---
+
+#### `GET /transactions/merchants`
+
+Returns unique `{ name, mcc }` pairs aggregated from the `cardTransaction` collection, sorted alphabetically. Public endpoint — used by the Simulator STEP 1 form to populate the Merchant Name selector.
+
+**Response 200:**
+```json
+{
+  "merchants": [
+    { "name": "TechGadgets Ltd.", "mcc": "5734" },
+    { "name": "City Restaurant", "mcc": "5812" }
   ]
 }
 ```
@@ -1101,6 +1168,7 @@ Seed files live in `backend/data/`. The seed script (`backend/bin/seed.ts`) read
 | File | Collection | Documents |
 |---|---|---|
 | `backend/data/users.json` | `partyAuthentication` | 5 |
+| `backend/data/authDomains.json` | `authenticationDomain` | 3 |
 | `backend/data/customerAgreements.json` | `customerAgreement` | 50 |
 | `backend/data/customerAgreementsSensitive.json` | `customerAgreementSensitive` | 50 |
 | `backend/data/paymentCards.json` | `paymentCard` | 50 |
@@ -1135,6 +1203,7 @@ Passwords are stored as bcrypt hashes (12 rounds). Plaintext passwords are in `.
 | Collection | Upsert filter key |
 |---|---|
 | `partyAuthentication` | `partyAuthenticationInstanceReference` |
+| `authenticationDomain` | `partyAuthenticationDomainInstanceReference` |
 | `customerAgreement` | `customerAgreementInstanceReference` |
 | `customerAgreementSensitive` | `customerAgreementInstanceReference` |
 | `paymentCard` | `paymentCardInstanceReference` |
