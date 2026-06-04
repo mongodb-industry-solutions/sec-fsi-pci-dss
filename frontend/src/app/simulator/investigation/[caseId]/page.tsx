@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { api, FraudCase, RawDocumentResponse } from '../../../../lib/api';
 import { EncryptionBadge } from '../../../../components/EncryptionBadge';
 import { RawDocumentPanel } from '../../../../components/RawDocumentPanel';
-import { SEVERITY_COLORS, STATUS_COLORS } from '../../../../lib/constants';
+import { SEVERITY_COLORS, STATUS_COLORS, formatRiskIndicator } from '../../../../lib/constants';
 
 type StepId = 'l1-open' | 'l1-escalate' | 'l2-review' | 'l2-resolve' | 'customer-view';
 
@@ -22,7 +22,7 @@ const STEPS: Step[] = [
     id: 'l1-open',
     label: 'L1 Opens Ticket',
     role: 'Level 1 Analyst',
-    icon: '👤',
+    icon: 'person',
     description: 'L1 support agent Sarah Chen reviews the flagged transaction and opens the fraud investigation ticket.',
   },
   {
@@ -36,24 +36,49 @@ const STEPS: Step[] = [
     id: 'l2-review',
     label: 'L2 Deep Analysis',
     role: 'Level 2 Investigator',
-    icon: '🔍',
+    icon: 'search',
     description: 'Investigator Michael Obi receives the escalation and conducts a full forensic review with elevated data access.',
   },
   {
     id: 'l2-resolve',
     label: 'L2 Resolution',
     role: 'Level 2 Investigator',
-    icon: '✅',
+    icon: 'check',
     description: 'Michael documents findings, confirms fraud, and triggers the resolution workflow.',
   },
   {
     id: 'customer-view',
     label: 'Customer Notification',
     role: 'Customer (Luis)',
-    icon: '🧑',
+    icon: 'person',
     description: 'Luis Fernandez receives the outcome: transaction disputed, card replaced, data protected.',
   },
 ];
+
+const STEP_ICONS: Record<string, string> = {
+  person: '👤',
+  escalate: '⬆️',
+  search: '🔍',
+  check: '✅',
+};
+
+// Static demo ciphertext for simulator (no JWT available in this mode)
+const DEMO_RAW_TRANSACTION: Record<string, unknown> = {
+  _id: { $oid: '6650a2b3c4d5e6f700000001' },
+  cardTransactionInstanceReference: 'a7f3d891-2c45-4b67-8e12-9f0a1b2c3d4e',
+  cardTransactionAccountReference: {
+    $binary: { base64: 'BhKJ9KMsQfY7lP+2Xa8nDEz1rVwCqI5uH0TbGmOjS6Ry==', subType: '06' },
+  },
+  paymentCardReference: 'tok_sim_7xB2kp1q',
+  cardTransactionAmount: { amount: 850, currency: 'USD' },
+  cardTransactionDateTime: '2026-06-04T14:32:17.000Z',
+  cardTransactionStatus: 'authorized',
+  cardTransactionMaskedPanDisplay: '****-****-****-4291',
+  cardTransactionMerchantName: 'Casino Royale',
+  cardTransactionMerchantCategoryCode: '7995',
+  schemaVersion: 1,
+  recordCreatedDateTime: '2026-06-04T14:32:17.000Z',
+};
 
 export default function SimulatorCaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
@@ -61,7 +86,6 @@ export default function SimulatorCaseDetailPage() {
   const [showRaw, setShowRaw] = useState(false);
   const [rawDoc, setRawDoc] = useState<RawDocumentResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [rawLoading, setRawLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState<StepId>('l1-open');
 
   useEffect(() => {
@@ -73,7 +97,7 @@ export default function SimulatorCaseDetailPage() {
 
   async function toggleRaw() {
     if (!showRaw && !rawDoc && fraudCase) {
-      setRawLoading(true);
+      // Simulator has no JWT; try the real endpoint first, fall back to demo document
       try {
         const doc = await api.system.rawDocument(
           'cardTransaction',
@@ -82,9 +106,8 @@ export default function SimulatorCaseDetailPage() {
         );
         setRawDoc(doc);
       } catch {
-        setRawDoc(null);
-      } finally {
-        setRawLoading(false);
+        // Expected in simulator (no JWT). Use static demo ciphertext.
+        setRawDoc({ collection: 'cardTransaction', document: DEMO_RAW_TRANSACTION });
       }
     }
     setShowRaw((v) => !v);
@@ -120,18 +143,23 @@ export default function SimulatorCaseDetailPage() {
             {fraudCase.caseStatus.replace(/_/g, ' ')}
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
-          <div><span className="font-medium">Transaction ID:</span></div>
-          <div className="font-mono text-xs truncate">
-            {fraudCase.linkedCardTransactionReference
-              ? `${fraudCase.linkedCardTransactionReference.slice(0, 20)}...`
-              : 'N/A'}
+        {fraudCase.transactionSnapshot && (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-700">
+            <span className="font-medium text-gray-500">Amount:</span>
+            <span className="font-semibold text-red-700">
+              {new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: fraudCase.transactionSnapshot.cardTransactionAmount.currency,
+              }).format(fraudCase.transactionSnapshot.cardTransactionAmount.amount)}
+            </span>
+            <span className="font-medium text-gray-500">Merchant:</span>
+            <span>{fraudCase.transactionSnapshot.cardTransactionMerchantName}</span>
+            <span className="font-medium text-gray-500">Masked PAN:</span>
+            <span className="font-mono">{fraudCase.transactionSnapshot.cardTransactionMaskedPanDisplay}</span>
+            <span className="font-medium text-gray-500">Date:</span>
+            <span>{new Date(fraudCase.transactionSnapshot.cardTransactionDateTime).toLocaleString()}</span>
           </div>
-          <div><span className="font-medium">Risk Indicators:</span></div>
-          <div>{fraudCase.fraudDiagnosisAssessment?.riskIndicators.join(', ') ?? 'N/A'}</div>
-          <div><span className="font-medium">Risk Score:</span></div>
-          <div>{fraudCase.fraudDiagnosisAssessment?.fraudDiagnosisScore ?? 'N/A'}/100</div>
-        </div>
+        )}
       </div>
 
       {/* Step navigator */}
@@ -155,7 +183,7 @@ export default function SimulatorCaseDetailPage() {
           ))}
         </div>
         <div className="mt-4 flex items-start gap-3">
-          <span className="text-2xl">{step.icon === 'escalate' ? '⬆️' : step.icon}</span>
+          <span className="text-2xl">{STEP_ICONS[step.icon]}</span>
           <div>
             <p className="font-semibold text-[#00ED64] text-sm">{step.role}</p>
             <p className="text-gray-300 text-sm mt-0.5">{step.description}</p>
@@ -165,7 +193,12 @@ export default function SimulatorCaseDetailPage() {
 
       {/* Step content */}
       {currentStep === 'l1-open' && (
-        <L1OpenView fraudCase={fraudCase} />
+        <L1OpenView
+          fraudCase={fraudCase}
+          showRaw={showRaw}
+          rawDoc={rawDoc}
+          onToggleRaw={toggleRaw}
+        />
       )}
       {currentStep === 'l1-escalate' && (
         <L1EscalateView fraudCase={fraudCase} />
@@ -175,7 +208,6 @@ export default function SimulatorCaseDetailPage() {
           fraudCase={fraudCase}
           showRaw={showRaw}
           rawDoc={rawDoc}
-          rawLoading={rawLoading}
           onToggleRaw={toggleRaw}
         />
       )}
@@ -230,9 +262,24 @@ export default function SimulatorCaseDetailPage() {
 
 /* ---- Step sub-views ---- */
 
-function L1OpenView({ fraudCase }: { fraudCase: FraudCase }) {
+function L1OpenView({
+  fraudCase,
+  showRaw,
+  rawDoc,
+  onToggleRaw,
+}: {
+  fraudCase: FraudCase;
+  showRaw: boolean;
+  rawDoc: RawDocumentResponse | null;
+  onToggleRaw: () => void;
+}) {
+  const snap = fraudCase.transactionSnapshot;
+  const indicators = fraudCase.fraudDiagnosisAssessment?.riskIndicators ?? [];
+  const score = fraudCase.fraudDiagnosisAssessment?.fraudDiagnosisScore;
+
   return (
     <div className="space-y-4">
+      {/* Analyst card */}
       <div className="bg-white rounded-xl border p-5">
         <div className="flex items-center gap-2 mb-4">
           <span className="text-2xl">👤</span>
@@ -246,64 +293,124 @@ function L1OpenView({ fraudCase }: { fraudCase: FraudCase }) {
           An automated rule triggered a fraud alert on this transaction. Sarah opens the case and reviews
           the available data at L1 access level.
         </p>
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800 mb-4">
-          Flag: High-risk merchant (MCC 7995 - Gambling) combined with unusual transaction velocity.
+
+        {/* Transaction details */}
+        {snap && (
+          <div className="bg-gray-50 rounded-lg p-4 mb-4">
+            <h3 className="font-semibold text-sm text-gray-700 mb-2">Transaction Details</h3>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+              <span className="text-gray-500">Amount:</span>
+              <span className="font-semibold text-red-700">
+                {new Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: snap.cardTransactionAmount.currency,
+                }).format(snap.cardTransactionAmount.amount)}
+              </span>
+              <span className="text-gray-500">Merchant:</span>
+              <span className="font-medium">{snap.cardTransactionMerchantName}</span>
+              <span className="text-gray-500">Card (masked):</span>
+              <span className="font-mono">{snap.cardTransactionMaskedPanDisplay}</span>
+              <span className="text-gray-500">Date / Time:</span>
+              <span>{new Date(snap.cardTransactionDateTime).toLocaleString()}</span>
+              <span className="text-gray-500">Txn Status:</span>
+              <span className="capitalize">{snap.cardTransactionStatus}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Risk assessment */}
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-amber-600 font-semibold text-sm">Risk Assessment</span>
+            {score !== undefined && (
+              <span className="ml-auto font-bold text-red-700">{score}/100</span>
+            )}
+          </div>
+          {indicators.length > 0 ? (
+            <ul className="space-y-1">
+              {indicators.map((ind) => (
+                <li key={ind} className="flex items-start gap-2 text-sm text-amber-800">
+                  <span className="text-amber-500 mt-0.5">!</span>
+                  {formatRiskIndicator(ind)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-amber-700">No risk indicators recorded.</p>
+          )}
         </div>
-        <h3 className="font-semibold text-sm text-gray-700 mb-2">Data visible to L1 Analyst:</h3>
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center gap-2">
-            <EncryptionBadge label="Customer Email" type="qe-equality" />
-            <span className="text-gray-500 italic">equality-searchable, never decrypted at rest</span>
+
+        {/* Data visibility: L1 vs L2 */}
+        <h3 className="font-semibold text-sm text-gray-700 mb-2">Customer Data Access by Role</h3>
+        <div className="rounded-lg border divide-y text-sm">
+          <div className="px-3 py-2 bg-blue-50">
+            <p className="text-xs font-semibold text-blue-700 uppercase mb-1">L1 can search (encrypted)</p>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <EncryptionBadge label="Email" type="qe-equality" />
+                <span className="text-gray-500 text-xs">QE equality search - value hidden until searched</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <EncryptionBadge label="Phone" type="qe-equality" />
+                <span className="text-gray-500 text-xs">QE equality search - value hidden until searched</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <EncryptionBadge label="Account Reference" type="qe-equality" />
+                <span className="text-gray-500 text-xs">QE equality search - value hidden until searched</span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <EncryptionBadge label="Customer Phone" type="qe-equality" />
-            <span className="text-gray-500 italic">equality-searchable, never decrypted at rest</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <EncryptionBadge label="Account Reference" type="qe-equality" />
-            <span className="text-gray-500 italic">equality-searchable, never decrypted at rest</span>
-          </div>
-        </div>
-        <div className="mt-3 pt-3 border-t space-y-2 text-sm text-gray-400">
-          <div className="flex items-center gap-2">
-            <span>🔒</span>
-            <strong>Physical Address:</strong>
-            <span className="italic">Requires L2 escalation (QE:none)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span>🔒</span>
-            <strong>Government ID:</strong>
-            <span className="italic">Requires L2 escalation (QE:none)</span>
+          <div className="px-3 py-2 bg-gray-50">
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">L2 only (QE:none - encrypted, not searchable)</p>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <EncryptionBadge label="Physical Address" type="qe-none" />
+                <span className="text-gray-400 text-xs">Requires Level 2 escalation</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <EncryptionBadge label="Government ID" type="qe-none" />
+                <span className="text-gray-400 text-xs">Requires Level 2 escalation</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Atlas raw document (L1 perspective) */}
       <div className="bg-white rounded-xl border p-5">
-        <h3 className="font-semibold text-sm text-gray-700 mb-3">Transaction Details (L1 view)</h3>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <span className="text-gray-500">Case Reference:</span>
-          <span className="font-mono">{fraudCase.fraudDiagnosisCaseReference}</span>
-          <span className="text-gray-500">Risk Score:</span>
-          <span className="font-semibold text-red-600">
-            {fraudCase.fraudDiagnosisAssessment?.fraudDiagnosisScore ?? 'N/A'}/100
-          </span>
-          <span className="text-gray-500">Risk Indicators:</span>
-          <span>{fraudCase.fraudDiagnosisAssessment?.riskIndicators.join(', ') ?? 'N/A'}</span>
-          <span className="text-gray-500">Opened:</span>
-          <span>{fraudCase.requestDateTime ? new Date(fraudCase.requestDateTime).toLocaleString() : 'N/A'}</span>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold text-gray-800">What Atlas Stores</h2>
+          <button
+            onClick={onToggleRaw}
+            className="flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg border hover:bg-gray-50 transition-colors"
+          >
+            {showRaw ? 'Hide Raw Document' : 'View Raw Atlas Document'}
+          </button>
         </div>
+        {!showRaw && (
+          <p className="text-sm text-gray-500">
+            Click to see the actual document stored in Atlas for this transaction.
+            QE-encrypted fields appear as binary ciphertext - neither L1 nor Atlas can read them without the client-side key.
+          </p>
+        )}
+        {showRaw && rawDoc && (
+          <RawDocumentPanel document={rawDoc.document} collection={rawDoc.collection} />
+        )}
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
         <strong>MongoDB QE in action:</strong> Sarah can search by email, phone, or account reference
-        using MongoDB Queryable Encryption. Atlas receives ciphertext queries and returns ciphertext
-        results. Plaintext never leaves the application tier.
+        using Queryable Encryption. Atlas receives and matches ciphertext-to-ciphertext.
+        Plaintext never reaches the server.
       </div>
     </div>
   );
 }
 
 function L1EscalateView({ fraudCase }: { fraudCase: FraudCase }) {
+  const score = fraudCase.fraudDiagnosisAssessment?.fraudDiagnosisScore;
+  const indicators = fraudCase.fraudDiagnosisAssessment?.riskIndicators ?? [];
+
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-xl border p-5">
@@ -322,8 +429,12 @@ function L1EscalateView({ fraudCase }: { fraudCase: FraudCase }) {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
           <p className="font-semibold text-red-800 text-sm mb-2">Escalation Criteria Met</p>
           <ul className="text-sm text-red-700 space-y-1 list-disc list-inside">
-            <li>Risk score {fraudCase.fraudDiagnosisAssessment?.fraudDiagnosisScore ?? 'N/A'}/100 exceeds L1 threshold (70)</li>
-            <li>Transaction involves high-risk MCC code</li>
+            {score !== undefined && (
+              <li>Risk score {score}/100 exceeds L1 threshold (70)</li>
+            )}
+            {indicators.map((ind) => (
+              <li key={ind}>{formatRiskIndicator(ind)}</li>
+            ))}
             <li>PII fields locked behind L2 QE access control</li>
           </ul>
         </div>
@@ -337,7 +448,8 @@ function L1EscalateView({ fraudCase }: { fraudCase: FraudCase }) {
             <span>
               <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded text-xs font-medium">escalated</span>
             </span>
-            <span>Priority:</span><span className="font-semibold text-red-600">{fraudCase.riskSeverity.toUpperCase()}</span>
+            <span>Priority:</span>
+            <span className="font-semibold text-red-600">{fraudCase.riskSeverity.toUpperCase()}</span>
           </div>
         </div>
       </div>
@@ -382,13 +494,11 @@ function L2ReviewView({
   fraudCase,
   showRaw,
   rawDoc,
-  rawLoading,
   onToggleRaw,
 }: {
   fraudCase: FraudCase;
   showRaw: boolean;
   rawDoc: RawDocumentResponse | null;
-  rawLoading: boolean;
   onToggleRaw: () => void;
 }) {
   return (
@@ -407,33 +517,64 @@ function L2ReviewView({
           the additional PII fields. Full forensic data is now available.
         </p>
 
-        <h3 className="font-semibold text-sm text-gray-700 mb-2">Extended data visible at L2:</h3>
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center gap-2">
-            <EncryptionBadge label="Customer Email" type="qe-equality" />
-            <span className="text-green-600 font-mono text-xs">luis.fernandez@leafybank.demo</span>
+        {/* Transaction summary at L2 */}
+        {fraudCase.transactionSnapshot && (
+          <div className="bg-gray-50 rounded-lg p-4 mb-4">
+            <h3 className="font-semibold text-sm text-gray-700 mb-2">Transaction Details</h3>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+              <span className="text-gray-500">Amount:</span>
+              <span className="font-semibold text-red-700">
+                {new Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: fraudCase.transactionSnapshot.cardTransactionAmount.currency,
+                }).format(fraudCase.transactionSnapshot.cardTransactionAmount.amount)}
+              </span>
+              <span className="text-gray-500">Merchant:</span>
+              <span>{fraudCase.transactionSnapshot.cardTransactionMerchantName}</span>
+              <span className="text-gray-500">Card (masked):</span>
+              <span className="font-mono">{fraudCase.transactionSnapshot.cardTransactionMaskedPanDisplay}</span>
+              <span className="text-gray-500">Date / Time:</span>
+              <span>{new Date(fraudCase.transactionSnapshot.cardTransactionDateTime).toLocaleString()}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <EncryptionBadge label="Customer Phone" type="qe-equality" />
-            <span className="text-green-600 font-mono text-xs">+1-555-0142</span>
+        )}
+
+        <h3 className="font-semibold text-sm text-gray-700 mb-2">Customer Profile: Extended L2 View</h3>
+        <div className="rounded-lg border divide-y text-sm">
+          <div className="px-3 py-2 bg-blue-50">
+            <p className="text-xs font-semibold text-blue-700 uppercase mb-1.5">QE:equality fields (L1 + L2)</p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <EncryptionBadge label="Email" type="qe-equality" />
+                <span className="text-green-700 font-mono text-xs">luis.fernandez@leafybank.demo</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <EncryptionBadge label="Phone" type="qe-equality" />
+                <span className="text-green-700 font-mono text-xs">+1-555-0142</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <EncryptionBadge label="Account Reference" type="qe-equality" />
+                <span className="text-green-700 font-mono text-xs">ACC-LF-20240115</span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <EncryptionBadge label="Account Reference" type="qe-equality" />
-            <span className="text-green-600 font-mono text-xs">ACC-LF-20240115</span>
-          </div>
-          <div className="flex items-center gap-2 mt-2 pt-2 border-t">
-            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-medium">QE:none / L2 only</span>
-            <span className="font-medium text-sm">Physical Address:</span>
-            <span className="text-green-600 text-xs font-mono">742 Evergreen Terrace, Springfield</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-medium">QE:none / L2 only</span>
-            <span className="font-medium text-sm">Government ID:</span>
-            <span className="text-green-600 text-xs font-mono">XXX-XX-4821 (masked)</span>
+          <div className="px-3 py-2 bg-purple-50">
+            <p className="text-xs font-semibold text-purple-700 uppercase mb-1.5">QE:none fields (L2 only - decrypted after escalation)</p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <EncryptionBadge label="Physical Address" type="qe-none" />
+                <span className="text-green-700 font-mono text-xs">742 Evergreen Terrace, Springfield</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <EncryptionBadge label="Government ID" type="qe-none" />
+                <span className="text-green-700 font-mono text-xs">XXX-XX-4821 (masked)</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Raw Atlas document */}
       <div className="bg-white rounded-xl border p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-gray-800">Atlas Storage: Raw Document</h2>
@@ -445,9 +586,7 @@ function L2ReviewView({
           </button>
         </div>
 
-        {rawLoading && <div className="text-sm text-gray-400">Fetching raw document from Atlas...</div>}
-
-        {!showRaw && !rawLoading && (
+        {!showRaw && (
           <p className="text-sm text-gray-500">
             Toggle to see the actual ciphertext stored in Atlas for the linked transaction.
             Even with L2 access, Atlas itself only stores encrypted blobs; decryption happens client-side.
@@ -456,20 +595,6 @@ function L2ReviewView({
 
         {showRaw && rawDoc && (
           <RawDocumentPanel document={rawDoc.document} collection={rawDoc.collection} />
-        )}
-
-        {showRaw && !rawDoc && !rawLoading && (
-          <div className="bg-gray-900 text-green-300 rounded-lg p-4 font-mono text-xs">
-            <div className="text-gray-400 mb-2">Atlas . cardTransaction . ciphertext</div>
-            <pre>{`{
-  "_id": "...",
-  "cardTransactionAccountReference": {
-    "$binary": { "base64": "BhKJ9KMs...", "subType": "06" }
-  },
-  "paymentCardReference": "tok_7xB2kp1q",
-  "cardTransactionAmount": { "amount": 850, "currency": "USD" }
-}`}</pre>
-          </div>
         )}
       </div>
 
@@ -503,7 +628,7 @@ function L2ResolveView({ fraudCase }: { fraudCase: FraudCase }) {
           <ul className="text-sm text-red-700 space-y-1 list-disc list-inside">
             <li>Transaction originated from an IP address in a different country than the registered address</li>
             <li>Device fingerprint does not match any previously known device</li>
-            <li>Merchant (MCC 7995) flagged in fraud network consortium data</li>
+            <li>Merchant flagged in fraud network consortium data</li>
             <li>Card was reported stolen 6 hours after this transaction</li>
           </ul>
         </div>
@@ -529,7 +654,7 @@ function L2ResolveView({ fraudCase }: { fraudCase: FraudCase }) {
         <h3 className="font-semibold text-sm text-gray-700 mb-3">Security controls applied</h3>
         <div className="space-y-3 text-sm">
           {[
-            { icon: '🔒', title: 'Card token revoked', desc: 'tok_7xB2kp1q invalidated in the token vault. Surrogate token, not CHD.' },
+            { icon: '🔒', title: 'Card token revoked', desc: 'Token invalidated in the vault. Surrogate token, not CHD.' },
             { icon: '📧', title: 'Fraud alert dispatched', desc: 'Customer notified via encrypted channel with resolution details.' },
             { icon: '📋', title: 'Audit log sealed', desc: 'All actions immutably recorded with role, timestamp, and reference.' },
             { icon: '🏦', title: 'Chargeback initiated', desc: 'BIAN SD-83 conclusion propagated to card network via payment gateway.' },
@@ -556,6 +681,13 @@ function L2ResolveView({ fraudCase }: { fraudCase: FraudCase }) {
 }
 
 function CustomerView({ fraudCase }: { fraudCase: FraudCase }) {
+  const amount = fraudCase.transactionSnapshot
+    ? new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: fraudCase.transactionSnapshot.cardTransactionAmount.currency,
+      }).format(fraudCase.transactionSnapshot.cardTransactionAmount.amount)
+    : 'N/A';
+
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-xl border p-5">
@@ -575,7 +707,8 @@ function CustomerView({ fraudCase }: { fraudCase: FraudCase }) {
         <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
           <p className="font-semibold text-green-800 mb-1">Your dispute has been resolved</p>
           <p className="text-sm text-green-700">
-            The unauthorized transaction of <strong>$850.00</strong> at a gambling merchant has been
+            The unauthorized transaction of <strong>{amount}</strong> at{' '}
+            <strong>{fraudCase.transactionSnapshot?.cardTransactionMerchantName ?? 'a flagged merchant'}</strong> has been
             confirmed as fraud. A full refund has been issued and a new card will arrive within 5-7 business days.
           </p>
         </div>
@@ -586,7 +719,9 @@ function CustomerView({ fraudCase }: { fraudCase: FraudCase }) {
             <span>Case number:</span>
             <span className="font-mono text-xs">{fraudCase.fraudDiagnosisCaseReference}</span>
             <span>Transaction:</span>
-            <span className="text-gray-500">$850.00 - Gambling merchant</span>
+            <span className="text-gray-500">
+              {amount} - {fraudCase.transactionSnapshot?.cardTransactionMerchantName ?? 'N/A'}
+            </span>
             <span>Outcome:</span>
             <span className="text-green-600 font-medium">Fraud confirmed - full refund</span>
             <span>Card status:</span>

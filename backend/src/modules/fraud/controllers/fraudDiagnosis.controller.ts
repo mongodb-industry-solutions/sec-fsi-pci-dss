@@ -235,10 +235,11 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
     };
     const result = await updateCase(fastify.db, id, patch as never);
     if (!result) return reply.status(404).send({ error: 'Fraud case not found' });
+    const updated = result as unknown as { fraudDiagnosisInstanceReference: string; fraudDiagnosisCaseStatus: string; recordUpdatedDateTime: Date };
     return reply.send({
-      fraudDiagnosisInstanceReference: (result as { fraudDiagnosisInstanceReference: string }).fraudDiagnosisInstanceReference,
-      fraudDiagnosisCaseStatus: (result as { fraudDiagnosisCaseStatus: string }).fraudDiagnosisCaseStatus,
-      recordUpdatedDateTime: (result as { recordUpdatedDateTime: Date }).recordUpdatedDateTime,
+      fraudDiagnosisInstanceReference: updated.fraudDiagnosisInstanceReference,
+      fraudDiagnosisCaseStatus: updated.fraudDiagnosisCaseStatus,
+      recordUpdatedDateTime: updated.recordUpdatedDateTime,
     });
   });
 

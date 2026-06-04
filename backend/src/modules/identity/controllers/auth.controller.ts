@@ -107,7 +107,8 @@ Password for all demo users: \`demo-password\``,
       });
     } catch (err: unknown) {
       const e = err as { statusCode?: number; message: string };
-      return reply.status(e.statusCode ?? 500).send({ error: e.message });
+      const statusCode = (e.statusCode === 400 || e.statusCode === 401 ? e.statusCode : 500) as 400 | 401 | 500;
+      return reply.status(statusCode).send({ error: e.message });
     }
   });
 

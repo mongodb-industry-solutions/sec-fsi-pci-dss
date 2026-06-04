@@ -137,7 +137,7 @@ function LogPanel({ title, logs, endRef, onClear }: {
             {e.type === 'error' ? '[ERR] ' : ''}{e.text}
           </div>
         ))}
-        <div ref={endRef} />
+        <div ref={endRef as React.RefObject<HTMLDivElement>} />
       </div>
     </div>
   );

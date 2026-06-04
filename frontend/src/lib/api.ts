@@ -63,6 +63,14 @@ export interface FraudCaseListResponse {
   limit: number;
 }
 
+export interface TransactionSnapshot {
+  cardTransactionAmount: { amount: number; currency: string };
+  cardTransactionMerchantName: string;
+  cardTransactionDateTime: string;
+  cardTransactionStatus: string;
+  cardTransactionMaskedPanDisplay: string;
+}
+
 export interface FraudCase {
   fraudDiagnosisInstanceReference: string;
   fraudDiagnosisCaseReference: string;
@@ -70,6 +78,7 @@ export interface FraudCase {
   riskSeverity: string;
   linkedCardTransactionReference: string;
   linkedCustomerAgreementReference: string;
+  transactionSnapshot?: TransactionSnapshot;
   fraudDiagnosisAssessment?: {
     riskIndicators: string[];
     fraudDiagnosisScore?: number;
