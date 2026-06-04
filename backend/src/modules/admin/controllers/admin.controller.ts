@@ -165,6 +165,9 @@ export async function adminController(fastify: FastifyInstance) {
     }
 
     const { username, password } = request.body as { username: string; password: string };
+    if (process.env.NODE_ENV === 'production' && (!process.env.ADM_USER || !process.env.ADM_PASS)) {
+      return reply.status(503).send({ error: 'Admin credentials not configured. Set ADM_USER and ADM_PASS environment variables.' });
+    }
     const admUser = process.env.ADM_USER ?? 'admin';
     const admPass = process.env.ADM_PASS ?? sha256('admin');
 
@@ -236,6 +239,9 @@ export async function adminController(fastify: FastifyInstance) {
     if (!rl.allowed) {
       reply.header('Retry-After', String(rl.retryAfter));
       return reply.status(429).send({ error: `Too many requests. Retry after ${rl.retryAfter}s.` });
+    }
+    if (process.env.NODE_ENV === 'production') {
+      return reply.status(403).send({ error: '/admin/exec is disabled in production' });
     }
     if (!verifyAdminToken(request.headers.authorization)) {
       return reply.status(401).send({ error: 'Invalid admin token' });

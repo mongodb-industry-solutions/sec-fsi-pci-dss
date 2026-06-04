@@ -57,8 +57,7 @@ const FALLBACK_MERCHANTS: Merchant[] = [
 
 function maskCardNumber(raw: string): string {
   const digits = raw.replace(/\D/g, '').slice(0, 16);
-  if (digits.length < 13) return digits.replace(/(.{4})/g, '$1-').replace(/-$/, '');
-  const last4 = digits.slice(-4);
+  const last4 = digits.slice(-4).padStart(4, '*');
   return `****-****-****-${last4}`;
 }
 
@@ -267,6 +266,7 @@ function CardSelector({
 
 // ── Validation ────────────────────────────────────────────────────────────────
 interface ValidationErrors {
+  cardNumber?: string;
   email?: string;
   phone?: string;
   amount?: string;
@@ -275,7 +275,7 @@ interface ValidationErrors {
 
 function validateStep1(form: FormData, maskedCard: string): ValidationErrors {
   const errors: ValidationErrors = {};
-  if (!maskedCard) errors.email = 'Enter a card number to continue.';
+  if (!maskedCard) errors.cardNumber = 'Enter a card number to continue.';
   if (!form.email.includes('@')) errors.email = 'Enter a valid email address.';
   if (!form.phone.trim()) errors.phone = 'Phone number is required.';
   const amt = parseFloat(form.amount);
@@ -471,6 +471,9 @@ export default function PaymentPage() {
               maskedCard={maskedCard}
               onCardChange={(raw) => setMaskedCard(maskCardNumber(raw))}
             />
+            {validationErrors.cardNumber && (
+              <p className="text-xs text-red-600 mt-0.5">{validationErrors.cardNumber}</p>
+            )}
           </div>
 
           {/* Cardholder name */}

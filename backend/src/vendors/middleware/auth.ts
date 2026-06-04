@@ -1,6 +1,8 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import * as jwt from 'jsonwebtoken';
 
+const JWT_SECRET = process.env.JWT_SECRET ?? 'demo-local-secret-change-in-production';
+
 // Exact URL matches that bypass JWT auth
 const PUBLIC_EXACT: Set<string> = new Set([
   '/',
@@ -16,15 +18,20 @@ const PUBLIC_EXACT: Set<string> = new Set([
   '/api/v1/admin/login',
 ]);
 
-// URL prefixes that bypass JWT auth (Swagger UI and its static assets + simulator read-only routes)
+// URL prefixes that bypass JWT auth (Swagger UI and its static assets)
 // Admin run/logs endpoints handle their own admin token verification internally
-const PUBLIC_PREFIXES: string[] = ['/doc', '/api/v1/fraud', '/api/v1/admin'];
+const PUBLIC_PREFIXES: string[] = ['/doc', '/api/v1/admin'];
+
+// Prefixes that bypass JWT auth only for GET requests (simulator read-only mode)
+// Mutation routes (PATCH /fraud/:id, POST /fraud/:id/escalate) still require JWT
+const PUBLIC_GET_PREFIXES: string[] = ['/api/v1/fraud'];
 
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
-  const { url } = request;
+  const { url, method } = request;
 
   if (PUBLIC_EXACT.has(url)) return;
   if (PUBLIC_PREFIXES.some((p) => url.startsWith(p))) return;
+  if (method === 'GET' && PUBLIC_GET_PREFIXES.some((p) => url.startsWith(p))) return;
 
   const authHeader = request.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
@@ -33,7 +40,7 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
 
   const token = authHeader.slice(7);
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET!) as jwt.JwtPayload;
+    const payload = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
     (request as FastifyRequest & { user: jwt.JwtPayload }).user = payload;
   } catch {
     return reply.status(401).send({ error: 'Invalid or expired token' });
