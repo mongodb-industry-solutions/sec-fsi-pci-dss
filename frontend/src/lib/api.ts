@@ -83,6 +83,13 @@ export interface FraudCase {
     riskIndicators: string[];
     fraudDiagnosisScore?: number;
   };
+  fraudDiagnosisCaseNotes?: string | null;
+  fraudDiagnosisCustomerSubjectNotes?: string | null;
+  fraudDiagnosisResolutionRecord?: {
+    resolutionDateTime: string;
+    resolutionOutcome: 'cleared' | 'confirmed_fraud' | 'referred';
+    resolutionNotes: string;
+  } | null;
   diagnosisActionLog?: ActionEvent[];
   requestDateTime?: string;
 }
@@ -245,6 +252,22 @@ export const api = {
       apiFetch<EscalationApproveResponse>(
         `/api/v1/fraud/${id}/escalate/approve`,
         { method: 'POST', body: JSON.stringify(body) },
+        token
+      ),
+    update: (
+      id: string,
+      body: {
+        fraudDiagnosisCaseStatus?: string;
+        fraudDiagnosisCaseNotes?: string;
+        fraudDiagnosisCustomerSubjectNotes?: string;
+        resolutionOutcome?: 'cleared' | 'confirmed_fraud' | 'referred';
+        resolutionNotes?: string;
+      },
+      token: string
+    ) =>
+      apiFetch<{ fraudDiagnosisInstanceReference: string; fraudDiagnosisCaseStatus: string; recordUpdatedDateTime: string }>(
+        `/api/v1/fraud/${id}`,
+        { method: 'PATCH', body: JSON.stringify(body) },
         token
       ),
   },

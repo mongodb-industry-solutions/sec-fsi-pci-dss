@@ -96,14 +96,29 @@ export async function updateCase(
   id: string,
   patch: {
     fraudDiagnosisCaseStatus?: FraudDiagnosisControlRecord['fraudDiagnosisCaseStatus'];
-    caseNotes?: string;
+    fraudDiagnosisCaseNotes?: string;
+    fraudDiagnosisCustomerSubjectNotes?: string;
     fraudDiagnosisAnalystInstanceReference?: string;
+    fraudDiagnosisResolutionRecord?: FraudDiagnosisControlRecord['fraudDiagnosisResolutionRecord'];
   }
 ) {
   const now = new Date();
+  const update: Record<string, unknown> = { recordUpdatedDateTime: now };
+
+  if (patch.fraudDiagnosisCaseStatus !== undefined)
+    update['fraudDiagnosisCaseStatus'] = patch.fraudDiagnosisCaseStatus;
+  if (patch.fraudDiagnosisAnalystInstanceReference !== undefined)
+    update['fraudDiagnosisAnalystInstanceReference'] = patch.fraudDiagnosisAnalystInstanceReference;
+  if (patch.fraudDiagnosisResolutionRecord !== undefined)
+    update['fraudDiagnosisResolutionRecord'] = patch.fraudDiagnosisResolutionRecord;
+  if (patch.fraudDiagnosisCaseNotes !== undefined)
+    update['fraudDiagnosisCaseNotes'] = patch.fraudDiagnosisCaseNotes;
+  if (patch.fraudDiagnosisCustomerSubjectNotes !== undefined)
+    update['fraudDiagnosisCustomerSubjectNotes'] = patch.fraudDiagnosisCustomerSubjectNotes;
+
   const result = await db.collection(FRAUD_DIAGNOSIS_COLLECTION).findOneAndUpdate(
     { fraudDiagnosisInstanceReference: id },
-    { $set: { ...patch, recordUpdatedDateTime: now } },
+    { $set: update },
     { returnDocument: 'after' }
   );
   return result ?? null;

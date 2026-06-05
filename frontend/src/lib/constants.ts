@@ -16,6 +16,16 @@ export const ROLE_LABELS: Record<string, string> = {
   security_auditor: 'Security Auditor',
 };
 
+export const PERFORMER_LABELS: Record<string, string> = {
+  payment_service: 'System - Automated detection',
+  level1_analyst: 'L1 Analyst',
+  level2_investigator: 'L2 Investigator',
+  security_auditor: 'Security Auditor',
+  ai_agent: 'AI Agent',
+  'rbac-layer': 'System - Access control',
+  system: 'System',
+};
+
 export const SEVERITY_COLORS: Record<string, string> = {
   critical: 'bg-red-600 text-white',
   high: 'bg-red-500 text-white',

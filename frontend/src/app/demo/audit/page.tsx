@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { api, AuditEventWithCase } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
+import { PERFORMER_LABELS } from '../../../lib/constants';
 import Link from 'next/link';
 
 const ACTION_TYPE_LABELS: Record<string, string> = {
@@ -26,17 +27,9 @@ const ACTION_TYPE_COLORS: Record<string, string> = {
   closed: 'bg-gray-100 text-gray-600',
 };
 
-const ROLE_LABELS: Record<string, string> = {
-  payment_service: 'System (Payment Service)',
-  level1_analyst: 'L1 Analyst',
-  level2_investigator: 'L2 Investigator',
-  security_auditor: 'Security Auditor',
-  ai_agent: 'AI Agent',
-};
-
 export default function AuditPage() {
-  const token = getToken() ?? '';
-  const user = token ? decodeToken(token) : null;
+  const [token, setToken] = useState('');
+  const [user, setUser] = useState<ReturnType<typeof decodeToken>>(null);
   const [events, setEvents] = useState<AuditEventWithCase[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -44,14 +37,14 @@ export default function AuditPage() {
   const [filterAction, setFilterAction] = useState('');
 
   useEffect(() => {
-    api.fraud.allEvents({ page: 1, limit: 100 }, token)
-      .then((res) => {
-        setEvents(res.events);
-        setTotal(res.total);
-      })
+    const t = getToken() ?? '';
+    setToken(t);
+    setUser(t ? decodeToken(t) : null);
+    api.fraud.allEvents({ page: 1, limit: 100 }, t)
+      .then((res) => { setEvents(res.events); setTotal(res.total); })
       .catch(() => setEvents([]))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, []);
 
   const filtered = events.filter((e) => {
     if (filterRole && e.performedByRole !== filterRole) return false;
@@ -111,7 +104,7 @@ export default function AuditPage() {
           >
             <option value="">All roles</option>
             {uniqueRoles.map((r) => (
-              <option key={r} value={r}>{ROLE_LABELS[r] ?? r}</option>
+              <option key={r} value={r}>{PERFORMER_LABELS[r] ?? r}</option>
             ))}
           </select>
           <select
@@ -181,7 +174,7 @@ export default function AuditPage() {
                         </span>
                       </td>
                       <td className="px-4 py-2.5 text-gray-600 text-xs">
-                        {ROLE_LABELS[e.performedByRole] ?? e.performedByRole}
+                        {PERFORMER_LABELS[e.performedByRole] ?? e.performedByRole}
                       </td>
                       <td className="px-4 py-2.5 text-gray-500 text-xs max-w-xs truncate">
                         {e.actionDetails && Object.keys(e.actionDetails).length > 0

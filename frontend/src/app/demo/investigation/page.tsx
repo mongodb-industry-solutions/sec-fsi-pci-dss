@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { api, FraudCase } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { CaseTable } from '../../../components/CaseTable';
@@ -12,8 +13,20 @@ type SearchField = 'email' | 'phone' | 'accountRef' | 'cardToken';
 const PAGE_SIZE = 10;
 
 export default function InvestigationPage() {
-  const token = getToken() ?? '';
-  const user  = token ? decodeToken(token) : null;
+  const router = useRouter();
+  const [token, setToken] = useState('');
+  const [user, setUser] = useState<ReturnType<typeof decodeToken>>(null);
+
+  useEffect(() => {
+    const t = getToken() ?? '';
+    const u = t ? decodeToken(t) : null;
+    setToken(t);
+    setUser(u);
+    // RBAC: customers must not access the investigation dashboard
+    if (u?.role === 'customer') {
+      router.replace('/demo/payment/history');
+    }
+  }, [router]);
 
   const [cases, setCases]   = useState<FraudCase[]>([]);
   const [total, setTotal]   = useState(0);

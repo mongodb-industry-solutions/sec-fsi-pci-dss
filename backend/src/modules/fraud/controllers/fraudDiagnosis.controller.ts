@@ -185,6 +185,9 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
       linkedCustomerAgreementReference: fraudCase.linkedCustomerAgreementReference,
       transactionSnapshot: fraudCase.transactionSnapshot,
       fraudDiagnosisAssessment: fraudCase.fraudDiagnosisAssessment,
+      fraudDiagnosisCaseNotes: fraudCase.fraudDiagnosisCaseNotes ?? null,
+      fraudDiagnosisCustomerSubjectNotes: fraudCase.fraudDiagnosisCustomerSubjectNotes ?? null,
+      fraudDiagnosisResolutionRecord: fraudCase.fraudDiagnosisResolutionRecord ?? null,
       requestDateTime: fraudCase.fraudDiagnosisRequestDateTime,
     });
   });
@@ -211,8 +214,11 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
             enum: ['open', 'under_review', 'escalated', 'resolved_cleared', 'resolved_fraud', 'closed'],
             description: 'New case status.',
           },
-          caseNotes: { type: 'string', description: 'Analyst notes (appended to case, not replacing).' },
+          fraudDiagnosisCaseNotes: { type: 'string', description: 'Internal notes for L1/L2 team (overwrites previous notes; include full text).' },
+          fraudDiagnosisCustomerSubjectNotes: { type: 'string', description: 'Notes visible to the customer in their transaction detail view.' },
           fraudDiagnosisAnalystInstanceReference: { type: 'string', description: 'UUID of the analyst taking ownership (FK to partyAuthentication).' },
+          resolutionOutcome: { type: 'string', enum: ['cleared', 'confirmed_fraud', 'referred'], description: 'Resolution outcome (required when setting status to resolved_cleared or resolved_fraud).' },
+          resolutionNotes: { type: 'string', description: 'Resolution notes (required when setting status to resolved_*).' },
         },
       },
       response: {
@@ -231,13 +237,49 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const patch = request.body as {
+    const body = request.body as {
       fraudDiagnosisCaseStatus?: string;
-      caseNotes?: string;
+      fraudDiagnosisCaseNotes?: string;
+      fraudDiagnosisCustomerSubjectNotes?: string;
       fraudDiagnosisAnalystInstanceReference?: string;
+      resolutionOutcome?: 'cleared' | 'confirmed_fraud' | 'referred';
+      resolutionNotes?: string;
     };
-    const result = await updateCase(fastify.db, id, patch as never);
+
+    const patch: Parameters<typeof updateCase>[2] = {};
+    if (body.fraudDiagnosisCaseStatus) patch.fraudDiagnosisCaseStatus = body.fraudDiagnosisCaseStatus as never;
+    if (body.fraudDiagnosisCaseNotes) patch.fraudDiagnosisCaseNotes = body.fraudDiagnosisCaseNotes;
+    if (body.fraudDiagnosisCustomerSubjectNotes) patch.fraudDiagnosisCustomerSubjectNotes = body.fraudDiagnosisCustomerSubjectNotes;
+    if (body.fraudDiagnosisAnalystInstanceReference) patch.fraudDiagnosisAnalystInstanceReference = body.fraudDiagnosisAnalystInstanceReference;
+
+    if (body.resolutionOutcome) {
+      patch.fraudDiagnosisResolutionRecord = {
+        resolutionDateTime: new Date(),
+        resolutionOutcome: body.resolutionOutcome,
+        resolutionNotes: body.resolutionNotes ?? '',
+        resolvedByInstanceReference: 'rbac-layer',
+      };
+    }
+
+    const result = await updateCase(fastify.db, id, patch);
     if (!result) return reply.status(404).send({ error: 'Fraud case not found' });
+
+    // Write audit event for status changes and note additions
+    const actionType = body.fraudDiagnosisCaseStatus === 'resolved_cleared' || body.fraudDiagnosisCaseStatus === 'resolved_fraud' || body.fraudDiagnosisCaseStatus === 'closed'
+      ? 'resolved' as const
+      : body.fraudDiagnosisCaseNotes || body.fraudDiagnosisCustomerSubjectNotes
+      ? 'note_added' as const
+      : undefined;
+
+    if (actionType) {
+      await appendAuditEvent(fastify.db, id, actionType, 'level1_analyst', {
+        newStatus: body.fraudDiagnosisCaseStatus,
+        hasInternalNote: !!body.fraudDiagnosisCaseNotes,
+        hasCustomerNote: !!body.fraudDiagnosisCustomerSubjectNotes,
+        resolutionOutcome: body.resolutionOutcome,
+      });
+    }
+
     const updated = result as unknown as { fraudDiagnosisInstanceReference: string; fraudDiagnosisCaseStatus: string; recordUpdatedDateTime: Date };
     return reply.send({
       fraudDiagnosisInstanceReference: updated.fraudDiagnosisInstanceReference,

@@ -48,6 +48,12 @@ export interface FraudDiagnosisControlRecord {
     escalatedToInstanceReference: string;
   };
 
+  // Operational notes (appended by analysts, visible to L1/L2/Auditor)
+  fraudDiagnosisCaseNotes?: string;
+
+  // Customer-facing notes (visible to the customer in their transaction detail view)
+  fraudDiagnosisCustomerSubjectNotes?: string;
+
   // Resolution record (populated on close)
   fraudDiagnosisResolutionRecord?: {
     resolutionDateTime: Date;
