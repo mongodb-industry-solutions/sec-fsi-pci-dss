@@ -97,6 +97,39 @@ export async function getByAccountRef(db: Db, ref: string, role: UserRole = 'lev
 // Look up by primary UUID — used by fraud case detail to load the linked customer profile.
 // The UUID (customerAgreementInstanceReference) is a plaintext field, so no QE decryption
 // is required for the lookup itself. Sensitive fields still require escalation token.
+// Returns the full customer profile for self-service (/auth/me).
+// Unlike the QE-search endpoints, this does NOT strip QE:equality fields —
+// the customer is entitled to see their own email, phone, and account reference.
+// Sensitive fields (address, govt ID) are always included with a clearly marked null
+// when the sensitive record does not exist.
+export async function getSelfProfile(db: Db, email: string): Promise<Record<string, unknown> | null> {
+  const doc = await db
+    .collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
+    .findOne({ customerEmailAddress: email } as Partial<CustomerAgreementControlRecord>);
+
+  if (!doc) return null;
+
+  const sensitive = await fetchSensitive(db, doc.customerAgreementInstanceReference);
+
+  return {
+    customerAgreementInstanceReference: doc.customerAgreementInstanceReference,
+    customerName:                       doc.customerName,
+    customerEmailAddress:               doc.customerEmailAddress,
+    customerMobilePhoneNumber:          doc.customerMobilePhoneNumber,
+    customerAgreementReference:         doc.customerAgreementReference,
+    customerSegment:                    doc.customerSegment,
+    customerAgreementStatus:            doc.customerAgreementStatus,
+    customerAgreementEnrollmentDate:    doc.customerAgreementEnrollmentDate,
+    customerAgreementPreferredLanguage: doc.customerAgreementPreferredLanguage,
+    sensitive: sensitive
+      ? {
+          customerAgreementResidentialAddress: sensitive.customerAgreementResidentialAddress,
+          governmentIdentificationReference:   sensitive.governmentIdentificationReference,
+        }
+      : null,
+  };
+}
+
 export async function getByInstanceReference(db: Db, id: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
   const doc = await db
     .collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)

@@ -29,9 +29,18 @@ const PUBLIC_PREFIXES: string[] = ['/doc', '/api/v1/admin'];
 // is checked — customers are denied even on public-GET routes.
 const PUBLIC_GET_PREFIXES: string[] = ['/api/v1/fraud'];
 
-// URL prefixes that the `customer` role is never allowed to access,
-// regardless of authentication status.
-const CUSTOMER_BLOCKED_PREFIXES: string[] = ['/api/v1/fraud'];
+// URL prefixes and exact paths that the `customer` role is never allowed to access.
+// Customers use /api/v1/auth/me for their own profile; they must not query other
+// customers' data through the general customer search or investigation endpoints.
+const CUSTOMER_BLOCKED_PREFIXES: string[] = [
+  '/api/v1/fraud',
+  '/api/v1/customer',   // QE equality searches — customer must use /auth/me instead
+];
+
+// Exact paths blocked for customers even when the prefix is otherwise public
+const CUSTOMER_BLOCKED_EXACT: Set<string> = new Set([
+  '/api/v1/audit-events',
+]);
 
 function tryVerifyToken(authHeader: string | undefined): jwt.JwtPayload | null {
   if (!authHeader?.startsWith('Bearer ')) return null;
@@ -61,10 +70,12 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     if (payload) {
       (request as FastifyRequest & { user: jwt.JwtPayload }).user = payload;
       if (
-        (payload as { role?: string }).role === 'customer' &&
-        CUSTOMER_BLOCKED_PREFIXES.some((p) => url.startsWith(p))
+        (payload as { role?: string }).role === 'customer' && (
+          CUSTOMER_BLOCKED_PREFIXES.some((p) => url.startsWith(p)) ||
+          CUSTOMER_BLOCKED_EXACT.has(url.split('?')[0])
+        )
       ) {
-        return reply.status(403).send({ error: 'Access denied: investigation endpoints are not available to the customer role' });
+        return reply.status(403).send({ error: 'Access denied: this endpoint is not available to the customer role' });
       }
     }
     attachRbacContext(request);
@@ -86,12 +97,14 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     return reply.status(401).send({ error: 'Invalid or expired token' });
   }
 
-  // Customers are blocked from investigation and audit endpoints
-  if (
-    (payload as { role?: string }).role === 'customer' &&
-    CUSTOMER_BLOCKED_PREFIXES.some((p) => url.startsWith(p))
-  ) {
-    return reply.status(403).send({ error: 'Access denied: investigation endpoints are not available to the customer role' });
+  // Customers are blocked from investigation, customer-search, and audit endpoints.
+  // They must use /api/v1/auth/me for their own profile data.
+  const customerRole = (payload as { role?: string }).role === 'customer';
+  if (customerRole && (
+    CUSTOMER_BLOCKED_PREFIXES.some((p) => url.startsWith(p)) ||
+    CUSTOMER_BLOCKED_EXACT.has(url.split('?')[0])
+  )) {
+    return reply.status(403).send({ error: 'Access denied: this endpoint is not available to the customer role' });
   }
 
   // Always populate demoRole and escalationToken after auth resolves

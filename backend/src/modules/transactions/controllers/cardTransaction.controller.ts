@@ -4,6 +4,7 @@ import {
   getTransactionById,
   getTransactionsByCardToken,
   getDistinctMerchants,
+  getAllTransactions,
 } from '../services/cardTransaction.service';
 
 export async function cardTransactionController(fastify: FastifyInstance) {
@@ -267,5 +268,68 @@ role to retrieve.`,
     const txn = await getTransactionById(fastify.db, id);
     if (!txn) return reply.status(404).send({ error: 'Transaction not found' });
     return reply.send(txn);
+  });
+
+  // GET /api/v1/transactions/all  — paginated transaction list for analyst / auditor roles
+  fastify.get('/all', {
+    schema: {
+      tags: ['transactions'],
+      summary: 'List all transactions (paginated)',
+      description: `Returns a paginated list of all \`cardTransaction\` records sorted by
+\`cardTransactionDateTime\` descending. Supports optional filters.
+
+Intended for L1 Analyst, L2 Investigator, and Security Auditor roles.
+Not accessible to the \`customer\` role (enforced by RBAC middleware).`,
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          status:    { type: 'string', enum: ['authorized', 'declined', 'pending', 'settled', 'disputed'], description: 'Filter by transaction status.' },
+          merchant:  { type: 'string', description: 'Case-insensitive partial match on merchant name.' },
+          cardToken: { type: 'string', description: 'Filter by exact card token (paymentCardReference).' },
+          page:      { type: 'string', default: '1' },
+          limit:     { type: 'string', default: '20' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            results: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  cardTransactionInstanceReference: { type: 'string' },
+                  paymentCardReference:             { type: 'string' },
+                  cardTransactionAmount:             { $ref: 'MonetaryAmount#' },
+                  cardTransactionDateTime:           { type: 'string', format: 'date-time' },
+                  cardTransactionStatus:             { type: 'string' },
+                  cardTransactionMerchantName:       { type: 'string' },
+                  cardTransactionMerchantCategoryCode: { type: 'string' },
+                  cardTransactionChannel:            { type: 'string' },
+                  cardTransactionMaskedPanDisplay:   { type: 'string' },
+                },
+              },
+            },
+            total: { type: 'number' },
+            page:  { type: 'number' },
+            limit: { type: 'number' },
+          },
+        },
+        401: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { status, merchant, cardToken, page = '1', limit = '20' } = request.query as {
+      status?: string; merchant?: string; cardToken?: string; page?: string; limit?: string;
+    };
+    const result = await getAllTransactions(
+      fastify.db,
+      { status, merchant, cardToken },
+      parseInt(page, 10),
+      parseInt(limit, 10)
+    );
+    return reply.send(result);
   });
 }

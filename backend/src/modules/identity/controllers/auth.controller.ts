@@ -1,5 +1,6 @@
-import { FastifyInstance } from 'fastify';
-import { loginUser, getDemoUsers, getEnabledDomains } from '../services/auth.service';
+import { FastifyInstance, FastifyRequest } from 'fastify';
+import { loginUser, getDemoUsers, getEnabledDomains, JwtPayload } from '../services/auth.service';
+import { getSelfProfile } from '../../customer/services/customerAgreement.service';
 
 export async function authController(fastify: FastifyInstance) {
   fastify.post('/login', {
@@ -185,5 +186,57 @@ The UI uses this to populate the domain selector on the login screen.`,
       const e = err as { message: string };
       return reply.status(503).send({ error: e.message });
     }
+  });
+
+  // GET /api/v1/auth/me — returns the authenticated user's full profile.
+  // For customer role: returns JWT claims + full customerAgreement record including
+  // QE:equality fields (email, phone, accountRef) and sensitive fields if linked.
+  // For analyst / auditor roles: returns JWT claims only (no customerAgreement).
+  fastify.get('/me', {
+    schema: {
+      tags: ['auth'],
+      summary: 'Get authenticated user profile',
+      description: `Returns the full profile of the currently authenticated user.
+
+**Customer role:** Includes JWT claims and the linked \`customerAgreement\` record.
+All QE:equality fields (email, phone, account reference) are returned in plaintext
+since the user is requesting their own data. Sensitive fields (address, govt ID)
+are included if found.
+
+**Analyst / Auditor roles:** Returns JWT claims only. These users do not have
+a \`customerAgreement\` record.`,
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            sub:    { type: 'string' },
+            email:  { type: 'string' },
+            name:   { type: 'string' },
+            role:   { type: 'string' },
+            domain: { type: 'string' },
+            agreement: { type: 'object', nullable: true, additionalProperties: true },
+          },
+        },
+        401: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const user = (request as FastifyRequest & { user?: JwtPayload }).user;
+    if (!user?.email) return reply.status(401).send({ error: 'Unauthenticated' });
+
+    let agreement: Record<string, unknown> | null = null;
+    if (user.role === 'customer') {
+      agreement = await getSelfProfile(fastify.db, user.email).catch(() => null);
+    }
+
+    return reply.send({
+      sub:       user.sub,
+      email:     user.email,
+      name:      user.name,
+      role:      user.role,
+      domain:    user.domain,
+      agreement,
+    });
   });
 }

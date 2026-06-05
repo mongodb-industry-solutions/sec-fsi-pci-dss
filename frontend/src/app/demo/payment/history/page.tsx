@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { Pagination } from '../../../../components/Pagination';
-import { ROLE_LABELS } from '../../../../lib/constants';
 
 interface StoredTransaction {
   txnId: string;
@@ -47,7 +46,6 @@ function displayStatus(txn: TransactionWithCase) {
 }
 
 export default function TransactionHistoryPage() {
-  const [user, setUser] = useState<ReturnType<typeof decodeToken>>(null);
   const [allTxns, setAllTxns] = useState<TransactionWithCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -63,7 +61,6 @@ export default function TransactionHistoryPage() {
     const load = async () => {
       const t = getToken() ?? '';
       const u = t ? decodeToken(t) : null;
-      setUser(u);
 
       const storageKey = u?.sub ? `demo_transactions_${u.sub}` : 'demo_transactions_guest';
       const stored: StoredTransaction[] = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
@@ -97,38 +94,18 @@ export default function TransactionHistoryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-[#001E2B] text-white px-4 py-3 flex justify-between items-center">
-        <span className="font-bold text-[#00ED64]">🏦 Payment Gateway</span>
-        <div className="flex items-center gap-3 text-sm">
-          {user && (
-            <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">
-              {user.name} · {ROLE_LABELS[user.role] ?? user.role}
-            </span>
-          )}
-          <button
-            onClick={() => setDebugMode((v) => !v)}
-            title="Toggle debug mode"
-            className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded border transition-colors ${
-              debugMode
-                ? 'bg-[#00ED64] text-[#001E2B] border-[#00ED64]'
-                : 'text-gray-400 border-white/20 hover:border-white/40'
-            }`}
-          >
-            <span className="hidden sm:inline">{debugMode ? 'Debug ON' : 'Debug'}</span>
-          </button>
-          <Link href="/demo" className="text-gray-400 hover:text-white">Sign out</Link>
-        </div>
-      </header>
-
       <main className="max-w-2xl mx-auto p-6">
         <div className="flex justify-between items-center mb-5">
           <h1 className="text-2xl font-bold">My Transactions</h1>
-          <Link
-            href="/demo/payment"
-            className="bg-[#001E2B] text-[#00ED64] px-4 py-2 rounded-lg text-sm font-semibold"
-          >
-            New Payment
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setDebugMode((v) => !v)}
+              className={`text-xs px-2 py-1 rounded border transition-colors ${debugMode ? 'bg-[#001E2B] text-[#00ED64] border-[#001E2B]' : 'border-gray-300 text-gray-500 hover:border-gray-400'}`}
+            >⚙ {debugMode ? 'Debug ON' : 'Debug'}</button>
+            <Link href="/demo/payment" className="bg-[#001E2B] text-[#00ED64] px-4 py-2 rounded-lg text-sm font-semibold">
+              New Payment
+            </Link>
+          </div>
         </div>
 
         {loading ? (

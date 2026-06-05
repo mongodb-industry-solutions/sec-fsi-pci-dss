@@ -626,9 +626,8 @@ export default function DemoCaseDetailPage() {
   );
 }
 
+// PageHeader — minimal wrapper, layout provides the top bar
 function PageHeader({
-  name,
-  role,
   debugMode,
   onToggleDebug,
 }: {
@@ -638,23 +637,12 @@ function PageHeader({
   onToggleDebug: () => void;
 }) {
   return (
-    <header className="bg-[#001E2B] text-white px-4 py-3 flex items-center justify-between">
-      <span className="font-bold text-[#00ED64]">🏦 Payment Gateway</span>
-      <div className="flex items-center gap-3 text-sm">
-        {name && (
-          <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">
-            {name} · {ROLE_LABELS[role] ?? role}
-          </span>
-        )}
-        <button
-          onClick={onToggleDebug}
-          title="Toggle debug mode"
-          className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded border transition-colors ${debugMode ? 'bg-[#00ED64] text-[#001E2B] border-[#00ED64]' : 'text-gray-400 border-white/20 hover:border-white/40'}`}
-        >
-          <span className="hidden sm:inline">{debugMode ? 'Debug ON' : 'Debug'}</span>
-        </button>
-        <Link href="/demo" className="text-gray-400 hover:text-white">Sign out</Link>
-      </div>
-    </header>
+    <div className="flex justify-end px-6 pt-4">
+      <button
+        onClick={onToggleDebug}
+        title="Toggle debug mode"
+        className={`text-xs px-2 py-1 rounded border transition-colors ${debugMode ? 'bg-[#001E2B] text-[#00ED64] border-[#001E2B]' : 'border-gray-300 text-gray-500 hover:border-gray-400'}`}
+      >⚙ {debugMode ? 'Debug ON' : 'Debug'}</button>
+    </div>
   );
 }

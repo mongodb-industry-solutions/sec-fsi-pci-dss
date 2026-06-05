@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { api, AuditEventWithCase } from '../../../lib/api';
-import { getToken, decodeToken } from '../../../lib/auth';
-import { PERFORMER_LABELS, ROLE_LABELS } from '../../../lib/constants';
+import { getToken } from '../../../lib/auth';
+import { PERFORMER_LABELS } from '../../../lib/constants';
 import Link from 'next/link';
 
 const ACTION_TYPE_LABELS: Record<string, string> = {
@@ -29,7 +29,6 @@ const ACTION_TYPE_COLORS: Record<string, string> = {
 
 export default function AuditPage() {
   const [token, setToken] = useState('');
-  const [user, setUser] = useState<ReturnType<typeof decodeToken>>(null);
   const [events, setEvents] = useState<AuditEventWithCase[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -39,7 +38,6 @@ export default function AuditPage() {
   useEffect(() => {
     const t = getToken() ?? '';
     setToken(t);
-    setUser(t ? decodeToken(t) : null);
     api.fraud.allEvents({ page: 1, limit: 100 }, t)
       .then((res) => { setEvents(res.events); setTotal(res.total); })
       .catch(() => setEvents([]))
@@ -57,23 +55,6 @@ export default function AuditPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-[#001E2B] text-white px-4 py-3 flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <span className="font-bold text-[#00ED64]">🏦 Payment Gateway Demo</span>
-          <nav className="flex gap-3 text-sm text-gray-300">
-            <Link href="/demo/investigation" className="hover:text-white">Investigation</Link>
-            <Link href="/demo/audit" className="text-[#00ED64] font-medium">Audit Log</Link>
-          </nav>
-        </div>
-        <div className="flex gap-3 items-center text-sm">
-          {user && (
-            <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">
-              {user.name} · {ROLE_LABELS[user.role] ?? user.role}
-            </span>
-          )}
-          <Link href="/demo" className="text-gray-400 hover:text-white">Sign out</Link>
-        </div>
-      </header>
 
       <main className="max-w-6xl mx-auto p-6">
         <div className="flex items-center justify-between mb-4">

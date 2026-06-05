@@ -160,6 +160,15 @@ export const api = {
       apiFetch<{ users: AuthUser[] }>('/api/v1/auth/users'),
     domains: () =>
       apiFetch<{ domains: AuthDomain[] }>('/api/v1/auth/domains'),
+    me: (token: string) =>
+      apiFetch<{
+        sub: string;
+        email: string;
+        name: string;
+        role: string;
+        domain: string;
+        agreement: Record<string, unknown> | null;
+      }>('/api/v1/auth/me', {}, token),
   },
 
   transactions: {
@@ -176,6 +185,22 @@ export const api = {
       apiFetch<{ results: Record<string, unknown>[]; count: number }>(
         `/api/v1/transactions?cardToken=${encodeURIComponent(cardToken)}`, {}, token
       ),
+    listAll: (
+      params: { status?: string; merchant?: string; cardToken?: string; page?: number; limit?: number },
+      token: string
+    ) => {
+      const qs = new URLSearchParams(
+        Object.entries(params)
+          .filter(([, v]) => v !== undefined)
+          .map(([k, v]) => [k, String(v)])
+      ).toString();
+      return apiFetch<{
+        results: Record<string, unknown>[];
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/transactions/all${qs ? `?${qs}` : ''}`, {}, token);
+    },
   },
 
   customer: {

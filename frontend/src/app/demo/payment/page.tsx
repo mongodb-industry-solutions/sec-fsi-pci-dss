@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
-import { ROLE_LABELS } from '../../../lib/constants';
 import { FraudAlert } from '../../../components/FraudAlert';
 import Link from 'next/link';
 
@@ -43,13 +42,10 @@ const INITIATION_OPTIONS = [
 export default function DemoPaymentPage() {
   const router = useRouter();
   const [token, setToken] = useState('');
-  const [user, setUser] = useState<ReturnType<typeof decodeToken>>(null);
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   useEffect(() => {
-    const t = getToken() ?? '';
-    setToken(t);
-    setUser(t ? decodeToken(t) : null);
+    setToken(getToken() ?? '');
   }, []);
   const [maskedCard, setMaskedCard] = useState('');
   const [selectedPreset, setSelectedPreset] = useState<CardPreset | null>(null);
@@ -152,27 +148,18 @@ export default function DemoPaymentPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-[#001E2B] text-white px-4 py-3 flex justify-between items-center">
-        <span className="font-bold text-[#00ED64]">🏦 Payment Gateway</span>
-        <div className="flex items-center gap-3 text-sm">
-          {user && (
-            <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">
-              {user.name} · {ROLE_LABELS[user.role] ?? user.role}
-            </span>
-          )}
+      <main className="max-w-md mx-auto p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-bold">New Payment - Step {step} of 3</h1>
           <button
             onClick={() => setDebugMode((v) => !v)}
             title="Toggle debug mode"
-            className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded border transition-colors ${debugMode ? 'bg-[#00ED64] text-[#001E2B] border-[#00ED64]' : 'text-gray-400 border-white/20 hover:border-white/40'}`}
+            className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded border transition-colors ${debugMode ? 'bg-[#001E2B] text-[#00ED64] border-[#001E2B]' : 'text-gray-400 border-gray-300 hover:border-gray-400'}`}
           >
-            <span className="hidden sm:inline">{debugMode ? 'Debug ON' : 'Debug'}</span>
+            <span>⚙</span>
+            <span>{debugMode ? 'Debug ON' : 'Debug'}</span>
           </button>
-          <Link href="/demo/payment/history" className="text-gray-400 hover:text-white">My Transactions</Link>
         </div>
-      </header>
-
-      <main className="max-w-md mx-auto p-6">
-        <h1 className="text-xl font-bold mb-6">New Payment - Step {step} of 3</h1>
 
         {/* STEP 1: Card and payment details */}
         {step === 1 && (

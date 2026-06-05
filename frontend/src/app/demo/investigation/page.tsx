@@ -5,8 +5,6 @@ import { api, FraudCase } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { CaseTable } from '../../../components/CaseTable';
 import { Pagination } from '../../../components/Pagination';
-import { ROLE_LABELS } from '../../../lib/constants';
-import Link from 'next/link';
 
 type SearchField = 'email' | 'phone' | 'accountRef' | 'cardToken';
 
@@ -79,18 +77,6 @@ export default function InvestigationPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-[#001E2B] text-white px-4 py-3 flex items-center justify-between">
-        <span className="font-bold text-[#00ED64]">🏦 Payment Gateway</span>
-        <div className="flex items-center gap-3 text-sm">
-          {user && (
-            <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">
-              {user.name} · {ROLE_LABELS[user.role] ?? user.role}
-            </span>
-          )}
-          <Link href="/demo" className="text-gray-400 hover:text-white">Sign out</Link>
-        </div>
-      </header>
-
       <main className="max-w-5xl mx-auto p-6 space-y-5">
         <h1 className="text-2xl font-bold">Case Dashboard</h1>
 

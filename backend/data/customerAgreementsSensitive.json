@@ -2,24 +2,24 @@
   {
     "customerAgreementInstanceReference": "78d58c43-f9dc-426f-b7d8-eb2f3487f541",
     "customerAgreementResidentialAddress": {
-      "streetAddress": "24622 Nikita Court",
-      "city": "Auermouth",
-      "postalCode": "53767-2913",
-      "countryCode": "GB"
+      "streetAddress": "742 Evergreen Terrace",
+      "city": "Springfield",
+      "postalCode": "62704",
+      "countryCode": "US"
     },
-    "governmentIdentificationReference": "SYNTH-02632741",
+    "governmentIdentificationReference": "SYNTH-LF-4821",
     "customerAgreementRiskNotes": "No prior fraud history.",
     "schemaVersion": 1
   },
   {
     "customerAgreementInstanceReference": "d4d288de-8a3f-40c9-a0ec-e7e3f857dffa",
     "customerAgreementResidentialAddress": {
-      "streetAddress": "7299 Lila Point",
-      "city": "Howardshire",
-      "postalCode": "40487-5125",
-      "countryCode": "GB"
+      "streetAddress": "1600 Pennsylvania Avenue NW",
+      "city": "Washington",
+      "postalCode": "20500",
+      "countryCode": "US"
     },
-    "governmentIdentificationReference": "SYNTH-70440332",
+    "governmentIdentificationReference": "SYNTH-JS-7731",
     "customerAgreementRiskNotes": "No prior fraud history.",
     "schemaVersion": 1
   },

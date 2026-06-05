@@ -141,3 +141,28 @@ export async function getTransactionsByCardToken(db: Db, cardToken: string) {
 
   return { results, count: results.length };
 }
+
+export async function getAllTransactions(
+  db: Db,
+  filters: { status?: string; merchant?: string; cardToken?: string },
+  page: number,
+  limit: number
+) {
+  const query: Record<string, unknown> = {};
+  if (filters.status)     query['cardTransactionStatus']      = filters.status;
+  if (filters.merchant)   query['cardTransactionMerchantName'] = { $regex: filters.merchant, $options: 'i' };
+  if (filters.cardToken)  query['paymentCardReference']        = filters.cardToken;
+
+  const skip = (page - 1) * limit;
+  const [results, total] = await Promise.all([
+    db.collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION)
+      .find(query)
+      .sort({ cardTransactionDateTime: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray(),
+    db.collection(CARD_TRANSACTION_COLLECTION).countDocuments(query),
+  ]);
+
+  return { results, total, page, limit };
+}
