@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
+import { useDebugMode } from '../../../lib/debugMode';
 import { FraudAlert } from '../../../components/FraudAlert';
 import Link from 'next/link';
 
@@ -57,7 +58,7 @@ export default function DemoPaymentPage() {
   const [paymentReference, setPaymentReference] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [debugMode, setDebugMode] = useState(false);
+  const { debugMode } = useDebugMode();
   const [result, setResult] = useState<{ txnId: string; fraudCaseCreated: boolean; caseId?: string; maskedPan: string } | null>(null);
 
   const cardToken = `tok_${Math.random().toString(36).slice(2, 10)}`;
@@ -152,17 +153,7 @@ export default function DemoPaymentPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="max-w-md mx-auto p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold">New Payment - Step {step} of 3</h1>
-          <button
-            onClick={() => setDebugMode((v) => !v)}
-            title="Toggle debug mode"
-            className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded border transition-colors ${debugMode ? 'bg-[#001E2B] text-[#00ED64] border-[#001E2B]' : 'text-gray-400 border-gray-300 hover:border-gray-400'}`}
-          >
-            <span>⚙</span>
-            <span>{debugMode ? 'Debug ON' : 'Debug'}</span>
-          </button>
-        </div>
+        <h1 className="text-xl font-bold mb-4">New Payment - Step {step} of 3</h1>
 
         {/* STEP 1: Card and payment details */}
         {step === 1 && (

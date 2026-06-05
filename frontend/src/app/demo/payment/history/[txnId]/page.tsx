@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, FraudCase, ActionEvent } from '../../../../../lib/api';
 import { getToken, decodeToken } from '../../../../../lib/auth';
+import { useDebugMode } from '../../../../../lib/debugMode';
 
 interface StoredTransaction {
   txnId: string;
@@ -72,7 +73,7 @@ export default function TransactionDetailPage() {
   const { txnId } = useParams<{ txnId: string }>();
 
   const [user, setUser] = useState<ReturnType<typeof decodeToken>>(null);
-  const [debugMode, setDebugMode] = useState(false);
+  const { debugMode } = useDebugMode();
   const [txn, setTxn] = useState<StoredTransaction | null>(null);
   const [apiTxn, setApiTxn] = useState<{ paymentCardReference?: string; cardTransactionMerchantCategoryCode?: string; cardTransactionChannel?: string; cardTransactionInitiationType?: string } | null>(null);
   const [fraudCase, setFraudCase] = useState<FraudCase | null>(null);
@@ -139,7 +140,7 @@ export default function TransactionDetailPage() {
     label: currentStatus.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700', icon: '●',
   };
 
-  const shell = { user, debugMode, onToggleDebug: () => setDebugMode((v) => !v) };
+  const shell = { user, debugMode };
 
   if (loading) return (
     <PageShell {...shell}>
@@ -368,24 +369,15 @@ export default function TransactionDetailPage() {
 }
 
 function PageShell({
-  debugMode,
-  onToggleDebug,
   children,
 }: {
   user: ReturnType<typeof decodeToken>;
   debugMode: boolean;
-  onToggleDebug: () => void;
   children: React.ReactNode;
 }) {
   return (
     <div className="min-h-full bg-gray-50">
       <main className="max-w-xl mx-auto p-6">
-        <div className="flex justify-end mb-3">
-          <button
-            onClick={onToggleDebug}
-            className={`text-xs px-2 py-1 rounded border transition-colors ${debugMode ? 'bg-[#001E2B] text-[#00ED64] border-[#001E2B]' : 'border-gray-300 text-gray-500 hover:border-gray-400'}`}
-          >⚙ {debugMode ? 'Debug ON' : 'Debug'}</button>
-        </div>
         {children}
       </main>
     </div>

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { Pagination } from '../../../../components/Pagination';
+import { useDebugMode } from '../../../../lib/debugMode';
 
 interface StoredTransaction {
   txnId: string;
@@ -55,7 +56,7 @@ export default function TransactionHistoryPage() {
     setPageSize(newLimit);
     setPage(1);
   }
-  const [debugMode, setDebugMode] = useState(false);
+  const { debugMode } = useDebugMode();
 
   useEffect(() => {
     const load = async () => {
@@ -97,15 +98,9 @@ export default function TransactionHistoryPage() {
       <main className="max-w-2xl mx-auto p-6">
         <div className="flex justify-between items-center mb-5">
           <h1 className="text-2xl font-bold">My Transactions</h1>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setDebugMode((v) => !v)}
-              className={`text-xs px-2 py-1 rounded border transition-colors ${debugMode ? 'bg-[#001E2B] text-[#00ED64] border-[#001E2B]' : 'border-gray-300 text-gray-500 hover:border-gray-400'}`}
-            >⚙ {debugMode ? 'Debug ON' : 'Debug'}</button>
-            <Link href="/demo/payment" className="bg-[#001E2B] text-[#00ED64] px-4 py-2 rounded-lg text-sm font-semibold">
-              New Payment
-            </Link>
-          </div>
+          <Link href="/demo/payment" className="bg-[#001E2B] text-[#00ED64] px-4 py-2 rounded-lg text-sm font-semibold">
+            New Payment
+          </Link>
         </div>
 
         {loading ? (
