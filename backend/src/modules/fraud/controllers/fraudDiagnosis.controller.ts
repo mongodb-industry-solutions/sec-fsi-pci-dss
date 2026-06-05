@@ -164,6 +164,26 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
             },
             transactionSnapshot: { $ref: 'TransactionSnapshot#' },
             fraudDiagnosisAssessment: { $ref: 'FraudDiagnosisAssessment#' },
+            fraudDiagnosisCaseNotes: {
+              type: 'string',
+              nullable: true,
+              description: 'Internal analyst notes visible to L1, L2, and Security Auditor.',
+            },
+            fraudDiagnosisCustomerSubjectNotes: {
+              type: 'string',
+              nullable: true,
+              description: 'Customer-facing note shown in the customer transaction detail view.',
+            },
+            fraudDiagnosisResolutionRecord: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                resolutionDateTime: { type: 'string', format: 'date-time' },
+                resolutionOutcome: { type: 'string', enum: ['cleared', 'confirmed_fraud', 'referred'] },
+                resolutionNotes: { type: 'string' },
+                resolvedByInstanceReference: { type: 'string' },
+              },
+            },
             requestDateTime: { type: 'string', format: 'date-time', description: 'UTC timestamp when the case was opened.' },
           },
         },

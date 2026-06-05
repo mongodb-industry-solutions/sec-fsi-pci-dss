@@ -22,9 +22,13 @@ export default function InvestigationPage() {
     const u = t ? decodeToken(t) : null;
     setToken(t);
     setUser(u);
-    // RBAC: customers must not access the investigation dashboard
     if (u?.role === 'customer') {
       router.replace('/demo/payment/history');
+      return;
+    }
+    // L2 Investigators see escalated cases first by default
+    if (u?.role === 'level2_investigator') {
+      setFilterStatus('escalated');
     }
   }, [router]);
 
@@ -141,6 +145,11 @@ export default function InvestigationPage() {
               <option key={s} value={s}>{s.toUpperCase()}</option>
             ))}
           </select>
+          {user?.role === 'level2_investigator' && filterStatus === 'escalated' && (
+            <span className="text-xs text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded">
+              Showing escalated cases (L2 default)
+            </span>
+          )}
           <span className="text-gray-500 ml-auto">{total} cases</span>
         </div>
 
