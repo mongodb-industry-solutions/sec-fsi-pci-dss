@@ -51,6 +51,7 @@ export default function DemoCaseDetailPage() {
   // The actual values are resolved in the single mount useEffect below.
   const [token, setToken] = useState('');
   const [role, setRole] = useState('level1_analyst');
+  const [userName, setUserName] = useState('');
 
   const isL1 = role === 'level1_analyst';
   const isL2 = role === 'level2_investigator';
@@ -100,6 +101,7 @@ export default function DemoCaseDetailPage() {
 
     setToken(t);
     setRole(resolvedRole);
+    setUserName(payload?.name ?? '');
 
     const load = async () => {
       try {
@@ -173,14 +175,14 @@ export default function DemoCaseDetailPage() {
 
   if (loading) return (
     <div className="min-h-screen bg-gray-50">
-      <PageHeader role={role} debugMode={debugMode} onToggleDebug={() => setDebugMode((v) => !v)} />
+      <PageHeader name={userName} role={role} debugMode={debugMode} onToggleDebug={() => setDebugMode((v) => !v)} />
       <main className="max-w-2xl mx-auto p-6"><div className="text-center py-12 text-gray-400">Loading case...</div></main>
     </div>
   );
 
   if (!fraudCase) return (
     <div className="min-h-screen bg-gray-50">
-      <PageHeader role={role} debugMode={debugMode} onToggleDebug={() => setDebugMode((v) => !v)} />
+      <PageHeader name={userName} role={role} debugMode={debugMode} onToggleDebug={() => setDebugMode((v) => !v)} />
       <main className="max-w-2xl mx-auto p-6"><div className="text-center py-12 text-gray-500">Case not found.</div></main>
     </div>
   );
@@ -198,7 +200,7 @@ export default function DemoCaseDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <PageHeader role={role} debugMode={debugMode} onToggleDebug={() => setDebugMode((v) => !v)} />
+      <PageHeader name={userName} role={role} debugMode={debugMode} onToggleDebug={() => setDebugMode((v) => !v)} />
       <main className="max-w-2xl mx-auto p-6 space-y-5">
         <div className="flex items-center justify-between">
           <Link href="/demo/investigation" className="text-sm text-blue-600 hover:underline">Back to cases</Link>
@@ -332,23 +334,28 @@ export default function DemoCaseDetailPage() {
           </div>
         </div>
 
-        {/* ── Notes and resolution ── */}
-        {(fraudCase.fraudDiagnosisCaseNotes || fraudCase.fraudDiagnosisCustomerSubjectNotes) && (
-          <div className="bg-white rounded-xl border p-5 space-y-3">
-            {fraudCase.fraudDiagnosisCaseNotes && (
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Internal Notes</p>
-                <p className="text-sm text-gray-800 bg-gray-50 rounded p-2">{fraudCase.fraudDiagnosisCaseNotes}</p>
-              </div>
-            )}
-            {fraudCase.fraudDiagnosisCustomerSubjectNotes && (
-              <div>
-                <p className="text-xs font-semibold text-green-700 uppercase mb-1">Customer-Visible Note</p>
-                <p className="text-sm text-gray-800 bg-green-50 border border-green-200 rounded p-2">{fraudCase.fraudDiagnosisCustomerSubjectNotes}</p>
-              </div>
-            )}
+        {/* ── Notes (always visible) ── */}
+        <div className="bg-white rounded-xl border p-5 space-y-3">
+          <h2 className="font-semibold text-sm text-gray-700">Case Notes</h2>
+
+          {/* Internal notes – visible to L1, L2, Auditor */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Internal Notes</p>
+            {fraudCase.fraudDiagnosisCaseNotes
+              ? <p className="text-sm text-gray-800 bg-gray-50 rounded p-2 whitespace-pre-wrap">{fraudCase.fraudDiagnosisCaseNotes}</p>
+              : <p className="text-xs text-gray-400 italic">No internal notes yet.</p>
+            }
           </div>
-        )}
+
+          {/* Customer-visible notes – shown to customer in their transaction view */}
+          <div>
+            <p className="text-xs font-semibold text-green-700 uppercase mb-1">Customer-Visible Note</p>
+            {fraudCase.fraudDiagnosisCustomerSubjectNotes
+              ? <p className="text-sm text-gray-800 bg-green-50 border border-green-200 rounded p-2 whitespace-pre-wrap">{fraudCase.fraudDiagnosisCustomerSubjectNotes}</p>
+              : <p className="text-xs text-gray-400 italic">No customer-facing note yet. Add one to keep the customer informed.</p>
+            }
+          </div>
+        </div>
 
         {fraudCase.fraudDiagnosisResolutionRecord && (
           <div className={`rounded-xl border p-4 text-sm ${fraudCase.fraudDiagnosisResolutionRecord.resolutionOutcome === 'confirmed_fraud' ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
@@ -577,19 +584,34 @@ export default function DemoCaseDetailPage() {
   );
 }
 
-function PageHeader({ role, debugMode, onToggleDebug }: { role: string; debugMode: boolean; onToggleDebug: () => void }) {
+function PageHeader({
+  name,
+  role,
+  debugMode,
+  onToggleDebug,
+}: {
+  name: string;
+  role: string;
+  debugMode: boolean;
+  onToggleDebug: () => void;
+}) {
   return (
     <header className="bg-[#001E2B] text-white px-4 py-3 flex items-center justify-between">
       <span className="font-bold text-[#00ED64]">🏦 Payment Gateway</span>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 text-sm">
+        {name && (
+          <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">
+            {name} · {ROLE_LABELS[role] ?? role}
+          </span>
+        )}
         <button
           onClick={onToggleDebug}
-          className={`text-xs px-2 py-0.5 rounded border transition-colors ${debugMode ? 'bg-[#00ED64] text-[#001E2B] border-[#00ED64]' : 'text-gray-400 border-white/20 hover:border-white/40'}`}
+          title="Toggle debug mode"
+          className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded border transition-colors ${debugMode ? 'bg-[#00ED64] text-[#001E2B] border-[#00ED64]' : 'text-gray-400 border-white/20 hover:border-white/40'}`}
         >
-          {debugMode ? 'Debug ON' : 'Debug'}
+          <span className="hidden sm:inline">{debugMode ? 'Debug ON' : 'Debug'}</span>
         </button>
-        <span className="text-xs bg-white/10 px-2 py-0.5 rounded text-gray-300">{ROLE_LABELS[role] ?? role}</span>
-        <Link href="/demo" className="text-sm text-gray-400 hover:text-white">Sign out</Link>
+        <Link href="/demo" className="text-gray-400 hover:text-white">↩ Sign out</Link>
       </div>
     </header>
   );

@@ -254,13 +254,9 @@ function PageShell({
         <span className="font-bold text-[#00ED64]">🏦 Payment Gateway</span>
         <div className="flex items-center gap-3 text-sm">
           {user && (
-            <div className="flex items-center gap-2">
-              <span className="text-base leading-none">👤</span>
-              <span className="text-gray-200 font-medium">{user.name}</span>
-              <span className="text-xs bg-white/10 px-2 py-0.5 rounded text-gray-300">
-                {ROLE_LABELS[user.role] ?? user.role}
-              </span>
-            </div>
+            <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">
+              {user.name} · {ROLE_LABELS[user.role] ?? user.role}
+            </span>
           )}
           <button
             onClick={onToggleDebug}

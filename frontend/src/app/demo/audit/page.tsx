@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { api, AuditEventWithCase } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
-import { PERFORMER_LABELS } from '../../../lib/constants';
+import { PERFORMER_LABELS, ROLE_LABELS } from '../../../lib/constants';
 import Link from 'next/link';
 
 const ACTION_TYPE_LABELS: Record<string, string> = {
@@ -67,8 +67,8 @@ export default function AuditPage() {
         </div>
         <div className="flex gap-3 items-center text-sm">
           {user && (
-            <span className="text-xs bg-white/10 px-2 py-0.5 rounded text-gray-300">
-              {user.name} - Security Auditor
+            <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">
+              {user.name} · {ROLE_LABELS[user.role] ?? user.role}
             </span>
           )}
           <Link href="/demo" className="text-gray-400 hover:text-white">Sign out</Link>
