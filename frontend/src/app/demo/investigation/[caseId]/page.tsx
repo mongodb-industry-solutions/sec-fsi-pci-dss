@@ -554,9 +554,9 @@ export default function DemoCaseDetailPage() {
                   </span>
                   <span className="text-gray-500 text-xs">{PERFORMER_LABELS[e.performedByRole] ?? e.performedByRole}</span>
                   {debugMode && e.actionDetails && Object.keys(e.actionDetails).length > 0 && (
-                    <span className="text-gray-400 text-xs font-mono ml-auto truncate max-w-32">
-                      {JSON.stringify(e.actionDetails).slice(0, 50)}
-                    </span>
+                    <pre className="mt-1 w-full text-xs font-mono text-gray-400 bg-gray-50 rounded px-2 py-1 whitespace-pre-wrap break-all">
+                      {JSON.stringify(e.actionDetails, null, 2)}
+                    </pre>
                   )}
                 </div>
               ))}
