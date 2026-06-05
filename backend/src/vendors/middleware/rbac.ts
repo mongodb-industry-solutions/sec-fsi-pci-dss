@@ -1,9 +1,43 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import type { JwtPayload } from 'jsonwebtoken';
+import { FastifyRequest } from 'fastify';
+import type { JwtDemoPayload, UserRole, DemoRequest } from '../../shared/models/identity.model';
 
-// v1 stub: accepts any authenticated request.
-// Full RBAC (field projection by role, L2 escalation gate) is implemented in v2.
-export async function rbacMiddleware(request: FastifyRequest, reply: FastifyReply) {
-  const user = (request as FastifyRequest & { user?: JwtPayload }).user;
-  if (!user) return reply.status(401).send({ error: 'Unauthorized' });
+export const VALID_DEMO_ROLES: ReadonlySet<UserRole> = new Set([
+  'customer',
+  'level1_analyst',
+  'level2_investigator',
+  'security_auditor',
+]);
+
+export function extractDemoRole(request: FastifyRequest): UserRole {
+  const header = request.headers['x-demo-role'] as string | undefined;
+  if (header && VALID_DEMO_ROLES.has(header as UserRole)) {
+    return header as UserRole;
+  }
+  const user = (request as FastifyRequest & { user?: JwtDemoPayload }).user;
+  if (user?.role && VALID_DEMO_ROLES.has(user.role)) {
+    return user.role;
+  }
+  return 'level1_analyst';
+}
+
+// Roles that can see sensitive fields without an escalation token
+export const SENSITIVE_READ_ROLES: ReadonlySet<UserRole> = new Set([
+  'security_auditor',
+]);
+
+// Roles that require an escalation token to access sensitive fields
+export const ESCALATION_REQUIRED_ROLES: ReadonlySet<UserRole> = new Set([
+  'level2_investigator',
+]);
+
+export function canReadSensitive(role: UserRole, hasValidToken: boolean): boolean {
+  if (SENSITIVE_READ_ROLES.has(role)) return true;
+  if (ESCALATION_REQUIRED_ROLES.has(role)) return hasValidToken;
+  return false;
+}
+
+export function attachRbacContext(request: FastifyRequest): void {
+  const demoReq = request as unknown as DemoRequest;
+  demoReq.demoRole = extractDemoRole(request);
+  demoReq.escalationToken = request.headers['x-escalation-token'] as string | undefined;
 }

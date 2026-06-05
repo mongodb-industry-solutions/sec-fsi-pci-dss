@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { getByEmail, getByPhone, getByAccountRef } from '../services/customerAgreement.service';
+import type { DemoRequest } from '../../../shared/models/identity.model';
 
 export async function customerAgreementController(fastify: FastifyInstance) {
   fastify.get('/', {
@@ -107,6 +108,7 @@ caller has the DEK-sensitive key, i.e. \`level2_investigator\` role.`,
         },
         400: { description: 'No search key provided, or multiple keys provided.', $ref: 'Error#' },
         401: { description: 'Missing or invalid Bearer token.', $ref: 'Error#' },
+        403: { description: 'Level 2 access requires a valid X-Escalation-Token header.', $ref: 'Error#' },
         404: { description: 'No customer agreement found matching the search key.', $ref: 'Error#' },
       },
     },
@@ -116,23 +118,32 @@ caller has the DEK-sensitive key, i.e. \`level2_investigator\` role.`,
       phone?: string;
       accountRef?: string;
     };
+    const { demoRole, escalationToken } = request as unknown as DemoRequest;
 
-    if (email) {
-      const result = await getByEmail(fastify.db, email);
-      if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
-      return reply.send(result);
-    }
+    try {
+      if (email) {
+        const result = await getByEmail(fastify.db, email, demoRole, escalationToken);
+        if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
+        return reply.send(result);
+      }
 
-    if (phone) {
-      const result = await getByPhone(fastify.db, phone);
-      if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
-      return reply.send(result);
-    }
+      if (phone) {
+        const result = await getByPhone(fastify.db, phone, demoRole, escalationToken);
+        if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
+        return reply.send(result);
+      }
 
-    if (accountRef) {
-      const result = await getByAccountRef(fastify.db, accountRef);
-      if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
-      return reply.send(result);
+      if (accountRef) {
+        const result = await getByAccountRef(fastify.db, accountRef, demoRole, escalationToken);
+        if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
+        return reply.send(result);
+      }
+    } catch (err) {
+      const e = err as { statusCode?: number; message?: string };
+      if (e.statusCode === 403) {
+        return reply.status(403).send({ error: e.message ?? 'Forbidden' });
+      }
+      throw err;
     }
 
     return reply.status(400).send({ error: 'Provide email, phone, or accountRef query parameter' });

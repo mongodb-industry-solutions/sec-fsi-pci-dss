@@ -154,6 +154,7 @@ export async function adminController(fastify: FastifyInstance) {
         },
         401: { $ref: 'Error#', description: 'Invalid credentials.' },
         429: { $ref: 'Error#', description: 'Too many attempts. Try again later.' },
+        503: { $ref: 'Error#', description: 'Admin credentials not configured (production mode).' },
       },
     },
   }, async (request, reply) => {

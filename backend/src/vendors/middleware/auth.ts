@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import * as jwt from 'jsonwebtoken';
+import { attachRbacContext } from './rbac';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? 'demo-local-secret-change-in-production';
 
@@ -29,9 +30,18 @@ const PUBLIC_GET_PREFIXES: string[] = ['/api/v1/fraud'];
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const { url, method } = request;
 
-  if (PUBLIC_EXACT.has(url)) return;
-  if (PUBLIC_PREFIXES.some((p) => url.startsWith(p))) return;
-  if (method === 'GET' && PUBLIC_GET_PREFIXES.some((p) => url.startsWith(p))) return;
+  if (PUBLIC_EXACT.has(url)) {
+    attachRbacContext(request);
+    return;
+  }
+  if (PUBLIC_PREFIXES.some((p) => url.startsWith(p))) {
+    attachRbacContext(request);
+    return;
+  }
+  if (method === 'GET' && PUBLIC_GET_PREFIXES.some((p) => url.startsWith(p))) {
+    attachRbacContext(request);
+    return;
+  }
 
   const authHeader = request.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
@@ -45,4 +55,7 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   } catch {
     return reply.status(401).send({ error: 'Invalid or expired token' });
   }
+
+  // Always populate demoRole and escalationToken after auth resolves
+  attachRbacContext(request);
 }

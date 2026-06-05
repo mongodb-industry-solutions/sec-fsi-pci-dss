@@ -1,3 +1,5 @@
+import type { FastifyRequest } from 'fastify';
+
 export type UserRole =
   | 'customer'
   | 'level1_analyst'
@@ -19,4 +21,9 @@ export interface JwtDemoPayload {
   domain: string;
   iat: number;
   exp: number;
+}
+
+export interface DemoRequest extends FastifyRequest {
+  demoRole: UserRole;
+  escalationToken?: string;
 }

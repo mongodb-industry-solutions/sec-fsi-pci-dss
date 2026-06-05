@@ -116,3 +116,22 @@ export async function getCaseEvents(db: Db, caseId: string) {
     .toArray();
   return { caseId, events };
 }
+
+export async function appendAuditEvent(
+  db: Db,
+  caseId: string,
+  actionType: FraudDiagnosisCaseEventRecord['actionType'],
+  performedByRole: FraudDiagnosisCaseEventRecord['performedByRole'],
+  details: Record<string, unknown>
+): Promise<void> {
+  const event: FraudDiagnosisCaseEventRecord = {
+    fraudDiagnosisInstanceReference: caseId,
+    actionDateTime: new Date(),
+    actionType,
+    performedByInstanceReference: 'rbac-layer',
+    performedByRole,
+    actionDetails: details,
+    schemaVersion: 1,
+  };
+  await db.collection(FRAUD_DIAGNOSIS_EVENTS_COLLECTION).insertOne(event as object);
+}
