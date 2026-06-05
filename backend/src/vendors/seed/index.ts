@@ -9,6 +9,7 @@ import { seedCustomers } from './seedCustomers';
 import { seedCards } from './seedCards';
 import { seedTransactions } from './seedTransactions';
 import { seedCases } from './seedCases';
+import { seedCreditRatings } from './seedCreditRatings';
 
 // Load .env from project root — works regardless of CWD (npm --prefix changes CWD to backend/)
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
@@ -44,7 +45,7 @@ function ensureDataFiles() {
 
   // Use process.cwd() as the backend root — correct in both local and Docker
   const backendDir = process.cwd();
-  const generateScript = join(backendDir, 'data', 'generate.ts');
+  const generateScript = join(backendDir, 'bin', 'generate.ts');
 
   try {
     execSync(`npx ts-node "${generateScript}"`, {
@@ -55,7 +56,7 @@ function ensureDataFiles() {
   } catch (err) {
     throw new Error(
       `Data generation failed: ${(err as Error).message}\n` +
-      `  Run manually: npm run generate:data --prefix backend`
+      `  Run manually: npm run setup:data --prefix backend`
     );
   }
 }
@@ -85,6 +86,9 @@ export async function runSeed() {
 
     console.log('Seeding fraudDiagnosisCase...');
     await seedCases(db);
+
+    console.log('Seeding customerCreditRating...');
+    await seedCreditRatings(db);
 
     console.log('\nSeed complete.');
   } finally {

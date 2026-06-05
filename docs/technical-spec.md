@@ -3,7 +3,7 @@
 **Project:** FSI PCI DSS Payment Security Demo  
 **PRD reference:** [PRD.md](PRD.md)  
 **Engineering Proposal:** [engineering-proposal.md](engineering-proposal.md)  
-**Last updated:** 2026-05-28
+**Last updated:** 2026-06-05
 
 This document covers the implementation-level detail that the PRD deliberately omits: BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index creation, and environment configuration. Engineers start here.
 
@@ -362,9 +362,65 @@ export interface AuthenticationDomainRecord {
 }
 ```
 
-**Collection:** `authenticationDomain` — plaintext, no QE (domain config contains no CHD or PII).  
-**Seed file:** `backend/data/authDomains.json` — 3 pre-seeded domains: `local` (enabled), `msentra` (disabled), `bigid` (disabled).  
+**Collection:** `authenticationDomain` — plaintext, no QE (domain config contains no CHD or PII).
+**Seed file:** `backend/data/authDomains.json` — 3 pre-seeded domains: `local` (enabled), `msentra` (disabled), `bigid` (disabled).
 **API:** `GET /api/v1/auth/domains` (public) — returns only domains with `partyAuthenticationDomainEnabled: true`.
+
+---
+
+### `creditRating.model.ts`
+
+```typescript
+// BIAN SD-60: Customer Credit Rating — HRPC risk classification state per customer account
+
+export const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRating';
+
+export type HrpcCategory =
+  | 'pep'
+  | 'sip'
+  | 'hnwi'
+  | 'ubo'
+  | 'terrorism_linked'
+  | 'high_risk_jurisdiction'
+  | 'sanctioned'
+  | 'financial_fraud_history'
+  | 'suspicious_transaction_patterns';
+
+export type HrpcRiskLevel = 'low' | 'medium' | 'high';
+
+export type HrpcClassificationSource =
+  | 'kyc_periodic_review'
+  | 'transaction_monitoring'
+  | 'correspondent_screening'
+  | 'aml_due_diligence'
+  | 'internal_case_history';
+
+export interface CustomerCreditRatingClassificationFlag {
+  customerCreditRatingClassificationCategory: HrpcCategory;
+  customerCreditRatingClassificationLevel: HrpcRiskLevel;
+  customerCreditRatingClassificationLabel: string;           // Human-readable label for UI
+  customerCreditRatingClassificationDescription: string;     // Narrative explanation
+  customerCreditRatingClassificationDetectedDateTime: string; // ISO 8601 date
+  customerCreditRatingClassificationSource: HrpcClassificationSource;
+  customerCreditRatingReviewRequiredIndicator: boolean;
+}
+
+export interface CustomerCreditRatingStateControlRecord {
+  customerCreditRatingInstanceReference: string;             // UUID, primary key
+  customerAgreementReference: string;                        // FK to customerAgreement (by account ref, not UUID)
+  customerCreditRatingClassificationFlags: CustomerCreditRatingClassificationFlag[];
+  bianServiceDomain: 'CustomerCreditRating';
+  bianControlRecordType: 'CustomerCreditRatingState';
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+  schemaVersion: number;
+}
+```
+
+**Collection:** `customerCreditRating` — plaintext, no QE. Contains compliance classification metadata only; no PII, no CHD.
+**Seed file:** `backend/data/customerCreditRatings.json` — 5 pre-seeded HRPC profiles covering accounts ACC-003, ACC-007, ACC-012, ACC-019, ACC-025.
+**API:** `GET /api/v1/fraud/hrpc/check?accountRef=<ref>` — see §6.6.
+**Link key:** `customerAgreementReference` (a QE:equality field in `customerAgreement`) is used as the join key. The API looks up the fraud case's `linkedCustomerAgreementReference`, resolves the account reference, then queries this collection. This avoids a cross-QE-collection `$lookup` (per ADR-001).
 
 ---
 
@@ -712,6 +768,12 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { partyAuthenticationDomainName: 1 }, unique: true },
     { key: { partyAuthenticationDomainEnabled: 1 } },
   ]);
+
+  // customerCreditRating (SD-60): lookup by account reference during investigation
+  await db.collection('customerCreditRating').createIndexes([
+    { key: { customerCreditRatingInstanceReference: 1 }, unique: true },
+    { key: { customerAgreementReference: 1 } },            // primary lookup key for HRPC check
+  ]);
 }
 ```
 
@@ -909,26 +971,61 @@ Returns cards linked to a customer (plaintext lookup by FK).
 
 ---
 
-#### `POST /fraud/:id/escalate` *(v2)*
+#### `POST /fraud/:id/escalate` *(v2 — L1 triggers escalation)*
 
 **Request header:** `X-Demo-Role: level1_analyst`
+
+**Request body:**
+```json
+{ "escalationReason": "Risk score exceeds L1 threshold. High-risk MCC." }
+```
 
 **Response 200:**
 ```json
 {
   "fraudDiagnosisInstanceReference": "...",
-  "caseStatus": "escalated",
+  "fraudDiagnosisCaseStatus": "escalated",
   "escalationDateTime": "2026-05-26T15:00:00Z"
 }
 ```
+
+Side effects: case status set to `escalated`; `escalated` event appended to `fraudDiagnosisCaseEvents`.
+
+---
+
+#### `POST /fraud/:id/escalate/approve` *(v2 — L2 approves and gets token)*
+
+**Request header:** `X-Demo-Role: level2_investigator`
+
+**Request body:**
+```json
+{ "approvalNotes": "Confirmed high-risk transaction. Proceeding with full investigation." }
+```
+
+**Response 200:**
+```json
+{
+  "fraudDiagnosisInstanceReference": "...",
+  "fraudDiagnosisCaseStatus": "escalated",
+  "escalationToken": "4e7a9f2b-c831-4d50-b9f0-1e2a3b4c5d6e",
+  "escalationApprovedAt": "2026-05-26T15:05:00Z",
+  "tokenExpiresAt": "2026-05-26T19:05:00Z"
+}
+```
+
+The `escalationToken` is a short-lived UUID (TTL 4 hours) stored in an in-memory token store. Include it in `X-Escalation-Token` on subsequent requests to customer and transaction sensitive endpoints. Side effects: `field_accessed` event appended to `fraudDiagnosisCaseEvents` with `action: "escalation_approved"`.
+
+**Response 422:** Case is not in `escalated` status.
 
 ---
 
 ### 6.5 Fraud — Audit Events *(v2)*
 
-> Nested under `/api/v1/fraud/:id/events` (module: fraud)
+> Base path: `/api/v1/fraud`
 
 #### `GET /fraud/:id/events`
+
+Returns the chronological event log for a single case.
 
 **Response 200:**
 ```json
@@ -939,7 +1036,13 @@ Returns cards linked to a customer (plaintext lookup by FK).
       "actionDateTime": "2026-05-26T14:35:00Z",
       "actionType": "case_opened",
       "performedByRole": "payment_service",
-      "actionDetails": "Fraud case auto-created on authorization"
+      "actionDetails": { "trigger": "amount_threshold" }
+    },
+    {
+      "actionDateTime": "2026-05-26T15:00:00Z",
+      "actionType": "escalated",
+      "performedByRole": "level1_analyst",
+      "actionDetails": { "escalationReason": "Risk score exceeds L1 threshold." }
     }
   ]
 }
@@ -947,7 +1050,69 @@ Returns cards linked to a customer (plaintext lookup by FK).
 
 ---
 
-### 6.6 Diagnostics *(v3)*
+#### `GET /fraud/audit-events` *(v2 — Security Auditor)*
+
+Returns all events across all cases, sorted descending by `actionDateTime`. Joins `fraudDiagnosisCaseReference` from `fraudDiagnosisCase` via aggregation.
+
+**Query params:** `page` (default 1), `limit` (default 50)
+
+**Response 200:**
+```json
+{
+  "events": [
+    {
+      "fraudDiagnosisInstanceReference": "...",
+      "fraudDiagnosisCaseReference": "FD-2026-000001",
+      "actionDateTime": "2026-05-26T15:05:00Z",
+      "actionType": "field_accessed",
+      "performedByInstanceReference": "rbac-layer",
+      "performedByRole": "level2_investigator",
+      "actionDetails": { "action": "escalation_approved" }
+    }
+  ],
+  "total": 42,
+  "page": 1,
+  "limit": 50
+}
+```
+
+---
+
+### 6.6 Fraud — HRPC Check *(v2)*
+
+> Base path: `/api/v1/fraud`
+
+#### `GET /fraud/hrpc/check?accountRef=<ref>`
+
+Checks whether a customer account appears in any HRPC (High-Risk Person and Counterparty) category. Queries `customerCreditRating` collection by `customerAgreementReference`.
+
+**Query params:** `accountRef` (required) — the customer's account reference (e.g. `ACC-003`).
+
+**Response 200:**
+```json
+{
+  "accountRef": "ACC-003",
+  "hrpcMatch": true,
+  "highestRiskLevel": "high",
+  "hrpcFlags": [
+    {
+      "category": "suspicious_transaction_patterns",
+      "riskLevel": "high",
+      "label": "Suspicious Transaction Patterns",
+      "description": "Multiple high-value card transactions at high-risk MCC merchants detected over 90 days.",
+      "detectedAt": "2026-03-15",
+      "source": "internal_transaction_monitoring",
+      "reviewRequired": true
+    }
+  ]
+}
+```
+
+Returns `hrpcMatch: false` and empty `hrpcFlags` when no profile exists for the given account reference. No 404 is returned — absence of a profile is a valid and expected result.
+
+---
+
+### 6.7 Diagnostics *(v3)*
 
 #### `GET /diagnostics/query-timing`
 
@@ -1165,16 +1330,19 @@ Seed files live in `backend/data/`. The seed script (`backend/bin/seed.ts`) read
 
 ### Seed volumes
 
-| File | Collection | Documents |
-|---|---|---|
-| `backend/data/users.json` | `partyAuthentication` | 5 |
-| `backend/data/authDomains.json` | `authenticationDomain` | 3 |
-| `backend/data/customerAgreements.json` | `customerAgreement` | 50 |
-| `backend/data/customerAgreementsSensitive.json` | `customerAgreementSensitive` | 50 |
-| `backend/data/paymentCards.json` | `paymentCard` | 50 |
-| `backend/data/cardTransactions.json` | `cardTransaction` | 200 |
-| `backend/data/cardTransactionsSensitive.json` | `cardTransactionSensitive` | 200 |
-| `backend/data/fraudCases.json` | `fraudDiagnosisCase` | 20 |
+| File | Collection | Documents | Generator |
+|---|---|---|---|
+| `backend/data/users.json` | `partyAuthentication` | 5 | `bin/generate.ts` |
+| `backend/data/authDomains.json` | `authenticationDomain` | 3 | manual |
+| `backend/data/customerAgreements.json` | `customerAgreement` | 50 | `bin/generate.ts` |
+| `backend/data/customerAgreementsSensitive.json` | `customerAgreementSensitive` | 50 | `bin/generate.ts` |
+| `backend/data/paymentCards.json` | `paymentCard` | 50 | `bin/generate.ts` |
+| `backend/data/cardTransactions.json` | `cardTransaction` | 200 | `bin/generate.ts` |
+| `backend/data/cardTransactionsSensitive.json` | `cardTransactionSensitive` | 200 | `bin/generate.ts` |
+| `backend/data/fraudCases.json` | `fraudDiagnosisCase` | 20 | `bin/generate.ts` |
+| `backend/data/customerCreditRatings.json` | `customerCreditRating` | 5 | manual (HRPC profiles) |
+
+**Regenerating synthetic data:** Run `npm run setup:data --prefix backend` (executes `bin/generate.ts`). This overwrites all files marked `bin/generate.ts` above. Manual files (`authDomains.json`, `customerCreditRatings.json`) are never overwritten by the generator.
 
 ### Demo users (`data/users.json`)
 
@@ -1210,6 +1378,7 @@ Passwords are stored as bcrypt hashes (12 rounds). Plaintext passwords are in `.
 | `cardTransaction` | `cardTransactionInstanceReference` |
 | `cardTransactionSensitive` | `cardTransactionInstanceReference` |
 | `fraudDiagnosisCase` | `fraudDiagnosisInstanceReference` |
+| `customerCreditRating` | `customerCreditRatingInstanceReference` |
 
 ---
 
@@ -1221,16 +1390,20 @@ The backend uses a **domain-module layout** aligned with BIAN Service Domains. S
 backend/
 ├── bin/
 │   ├── setup.ts                    # thin wrapper → src/vendors/setup/runSetup()
-│   └── seed.ts                     # thin wrapper → src/vendors/seed/runSeed()
+│   ├── seed.ts                     # thin wrapper → src/vendors/seed/runSeed()
+│   └── generate.ts                 # synthetic data generator → writes backend/data/*.json
 │
 ├── data/                           # JSON seed files (consumed by bin/seed.ts only)
-│   ├── users.json
-│   ├── customerAgreements.json
-│   ├── customerAgreementsSensitive.json
-│   ├── paymentCards.json
-│   ├── cardTransactions.json
-│   ├── cardTransactionsSensitive.json
-│   ├── fraudCases.json
+│   ├── users.json                  # generated by bin/generate.ts
+│   ├── authDomains.json            # manual: local + msentra + bigid domains
+│   ├── customerAgreements.json     # generated
+│   ├── customerAgreementsSensitive.json  # generated
+│   ├── paymentCards.json           # generated
+│   ├── cardTransactions.json       # generated
+│   ├── cardTransactionsSensitive.json    # generated
+│   ├── fraudCases.json             # generated
+│   ├── fraudCaseEvents.json        # generated (initial case_opened events)
+│   ├── customerCreditRatings.json  # manual: 5 HRPC profiles (BIAN SD-60)
 │   └── merchants.json              # [v5] seed data for merchantAgreement collection
 │
 └── src/
@@ -1261,10 +1434,12 @@ backend/
     │   └── seed/
     │       ├── index.ts            # runSeed(): orchestrates all seed steps
     │       ├── seedUsers.ts
+    │       ├── seedAuthDomains.ts
     │       ├── seedCustomers.ts
     │       ├── seedCards.ts
     │       ├── seedTransactions.ts
     │       ├── seedCases.ts
+    │       ├── seedCreditRatings.ts  # BIAN SD-60: upserts customerCreditRatings.json
     │       └── seedMerchants.ts    # [v5]
     │
     ├── modules/                    # Domain modules — one per BIAN SD cluster

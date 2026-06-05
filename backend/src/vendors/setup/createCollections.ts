@@ -90,4 +90,16 @@ export async function createCollections(
   } else {
     console.log('  skip:    fraudDiagnosisCaseEvents (already exists)');
   }
+
+  // customerCreditRating — BIAN SD-60, plaintext, no QE (classification metadata, no PII or CHD)
+  if (!existingNames.has('customerCreditRating') || reset) {
+    if (existingNames.has('customerCreditRating') && reset) {
+      await db.collection('customerCreditRating').drop();
+      console.log('  dropped: customerCreditRating');
+    }
+    await db.createCollection('customerCreditRating');
+    console.log('  created: customerCreditRating');
+  } else {
+    console.log('  skip:    customerCreditRating (already exists)');
+  }
 }

@@ -1,32 +1,8 @@
 import { FastifyInstance } from 'fastify';
-import { resolve } from 'path';
-import { readFileSync } from 'fs';
 import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, appendAuditEvent } from '../services/fraudDiagnosis.service';
 import { generateToken } from '../../../vendors/security/escalationTokens';
 
-// BIAN SD-60: CustomerCreditRating — classification flag shape from hrpcProfiles.json
-interface CustomerCreditRatingFlag {
-  customerCreditRatingClassificationCategory: string;
-  customerCreditRatingClassificationLevel: string;
-  customerCreditRatingClassificationLabel: string;
-  customerCreditRatingClassificationDescription: string;
-  customerCreditRatingClassificationDetectedDateTime: string;
-  customerCreditRatingClassificationSource: string;
-  customerCreditRatingReviewRequiredIndicator: boolean;
-}
-
-interface CustomerCreditRatingProfile {
-  customerCreditRatingInstanceReference: string;
-  customerAgreementReference: string;
-  customerCreditRatingClassificationFlags: CustomerCreditRatingFlag[];
-  bianServiceDomain: string;
-  bianControlRecordType: string;
-  schemaVersion: number;
-}
-
-const HRPC_PROFILES: CustomerCreditRatingProfile[] = JSON.parse(
-  readFileSync(resolve(__dirname, '../../../../data/hrpcProfiles.json'), 'utf-8')
-);
+const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRating';
 
 export async function fraudDiagnosisController(fastify: FastifyInstance) {
   fastify.get('/', {
@@ -438,8 +414,11 @@ Returns an empty \`hrpcFlags\` array when the account is not in any HRPC categor
     const { accountRef } = request.query as { accountRef: string };
     if (!accountRef) return reply.status(400).send({ error: 'accountRef query parameter is required' });
 
-    const profile = HRPC_PROFILES.find((p) => p.customerAgreementReference === accountRef);
-    const rawFlags = profile?.customerCreditRatingClassificationFlags ?? [];
+    const profile = await fastify.db
+      .collection(CUSTOMER_CREDIT_RATING_COLLECTION)
+      .findOne({ customerAgreementReference: accountRef });
+
+    const rawFlags: Record<string, unknown>[] = (profile?.customerCreditRatingClassificationFlags as Record<string, unknown>[]) ?? [];
 
     // Map BIAN field names to compact response field names for the API consumer
     const flags = rawFlags.map((f) => ({
@@ -452,10 +431,10 @@ Returns an empty \`hrpcFlags\` array when the account is not in any HRPC categor
       reviewRequired: f.customerCreditRatingReviewRequiredIndicator,
     }));
 
-    const riskOrder = { high: 3, medium: 2, low: 1, none: 0 };
+    const riskOrder: Record<string, number> = { high: 3, medium: 2, low: 1, none: 0 };
     const highestRiskLevel = flags.reduce<'none' | 'low' | 'medium' | 'high'>((acc, f) => {
-      const lvl = f.riskLevel as 'low' | 'medium' | 'high';
-      return riskOrder[lvl] > riskOrder[acc] ? lvl : acc;
+      const lvl = (f.riskLevel as string) ?? 'none';
+      return (riskOrder[lvl] ?? 0) > riskOrder[acc] ? (lvl as 'low' | 'medium' | 'high') : acc;
     }, 'none');
 
     return reply.send({
