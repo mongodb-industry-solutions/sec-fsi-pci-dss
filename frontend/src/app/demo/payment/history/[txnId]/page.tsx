@@ -251,7 +251,7 @@ function PageShell({
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-[#001E2B] text-white px-4 py-3 flex justify-between items-center">
-        <span className="font-bold text-[#00ED64]">LeafyBank</span>
+        <span className="font-bold text-[#00ED64]">🏦 Payment Gateway</span>
         <div className="flex items-center gap-3 text-sm">
           {user && (
             <div className="flex items-center gap-2">
@@ -271,7 +271,6 @@ function PageShell({
                 : 'text-gray-400 border-white/20 hover:border-white/40'
             }`}
           >
-            <span>⚙</span>
             <span className="hidden sm:inline">{debugMode ? 'Debug ON' : 'Debug'}</span>
           </button>
           <Link href="/demo" className="text-gray-400 hover:text-white text-sm">

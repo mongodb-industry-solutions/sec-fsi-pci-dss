@@ -1,8 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
+import { ROLE_LABELS } from '../../../lib/constants';
 import { FraudAlert } from '../../../components/FraudAlert';
 import Link from 'next/link';
 
@@ -41,8 +42,15 @@ const INITIATION_OPTIONS = [
 
 export default function DemoPaymentPage() {
   const router = useRouter();
-  const token = getToken() ?? '';
+  const [token, setToken] = useState('');
+  const [user, setUser] = useState<ReturnType<typeof decodeToken>>(null);
   const [step, setStep] = useState<1 | 2 | 3>(1);
+
+  useEffect(() => {
+    const t = getToken() ?? '';
+    setToken(t);
+    setUser(t ? decodeToken(t) : null);
+  }, []);
   const [maskedCard, setMaskedCard] = useState('');
   const [selectedPreset, setSelectedPreset] = useState<CardPreset | null>(null);
   const [amount, setAmount] = useState('850.00');
@@ -146,14 +154,24 @@ export default function DemoPaymentPage() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-[#001E2B] text-white px-4 py-3 flex justify-between items-center">
         <span className="font-bold text-[#00ED64]">🏦 Payment Gateway</span>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 text-sm">
+          {user && (
+            <div className="flex items-center gap-2">
+              <span className="text-base leading-none">👤</span>
+              <span className="text-gray-200 font-medium">{user.name}</span>
+              <span className="text-xs bg-white/10 px-2 py-0.5 rounded text-gray-300">
+                {ROLE_LABELS[user.role] ?? user.role}
+              </span>
+            </div>
+          )}
           <button
             onClick={() => setDebugMode((v) => !v)}
-            className={`text-xs px-2 py-0.5 rounded border transition-colors ${debugMode ? 'bg-[#00ED64] text-[#001E2B] border-[#00ED64]' : 'text-gray-400 border-white/20 hover:border-white/40'}`}
+            title="Toggle debug mode"
+            className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded border transition-colors ${debugMode ? 'bg-[#00ED64] text-[#001E2B] border-[#00ED64]' : 'text-gray-400 border-white/20 hover:border-white/40'}`}
           >
-            {debugMode ? 'Debug ON' : 'Debug'}
+            <span className="hidden sm:inline">{debugMode ? 'Debug ON' : 'Debug'}</span>
           </button>
-          <Link href="/demo/payment/history" className="text-sm text-gray-400 hover:text-white">My Transactions</Link>
+          <Link href="/demo/payment/history" className="text-gray-400 hover:text-white">My Transactions</Link>
         </div>
       </header>
 

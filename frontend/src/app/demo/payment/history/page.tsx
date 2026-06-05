@@ -40,7 +40,6 @@ const STATUS_DISPLAY: Record<string, { label: string; color: string }> = {
   declined:         { label: 'Declined',                        color: 'bg-red-100 text-red-800' },
 };
 
-const PAGE_SIZE = 10;
 
 function displayStatus(txn: TransactionWithCase) {
   const key = txn.caseStatus ?? txn.status;
@@ -52,6 +51,12 @@ export default function TransactionHistoryPage() {
   const [allTxns, setAllTxns] = useState<TransactionWithCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  function handleLimitChange(newLimit: number) {
+    setPageSize(newLimit);
+    setPage(1);
+  }
   const [debugMode, setDebugMode] = useState(false);
 
   useEffect(() => {
@@ -87,8 +92,8 @@ export default function TransactionHistoryPage() {
     load();
   }, []);
 
-  const totalPages = Math.max(1, Math.ceil(allTxns.length / PAGE_SIZE));
-  const paginated = allTxns.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(allTxns.length / pageSize));
+  const paginated = allTxns.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -113,7 +118,6 @@ export default function TransactionHistoryPage() {
                 : 'text-gray-400 border-white/20 hover:border-white/40'
             }`}
           >
-            <span>⚙</span>
             <span className="hidden sm:inline">{debugMode ? 'Debug ON' : 'Debug'}</span>
           </button>
           <Link href="/demo" className="text-gray-400 hover:text-white">↩ Sign out</Link>
@@ -149,24 +153,27 @@ export default function TransactionHistoryPage() {
                   <Link
                     key={txn.txnId}
                     href={`/demo/payment/history/${txn.txnId}`}
-                    className="block bg-white rounded-xl border p-4 hover:border-gray-300 hover:shadow-sm transition-all"
+                    className="group block bg-white rounded-xl border p-4 hover:border-[#001E2B]/30 hover:shadow-md transition-all cursor-pointer"
                   >
                     <div className="flex items-start justify-between gap-3 mb-2">
-                      <div>
-                        <p className="font-semibold text-gray-900">{txn.merchant}</p>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">{txn.merchant}</p>
                         <p className="text-xs text-gray-500">{new Date(txn.createdAt).toLocaleString()}</p>
                         {txn.paymentReference && (
                           <p className="text-xs text-gray-400 mt-0.5">Ref: {txn.paymentReference}</p>
                         )}
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-bold text-gray-900">
-                          {new Intl.NumberFormat('en-US', {
-                            style: 'currency',
-                            currency: txn.currency,
-                          }).format(txn.amount)}
-                        </p>
-                        <p className="text-xs text-gray-500 font-mono">{txn.maskedPan}</p>
+                      <div className="flex items-start gap-3 shrink-0">
+                        <div className="text-right">
+                          <p className="font-bold text-gray-900">
+                            {new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency: txn.currency,
+                            }).format(txn.amount)}
+                          </p>
+                          <p className="text-xs text-gray-500 font-mono">{txn.maskedPan}</p>
+                        </div>
+                        <span className="text-gray-300 group-hover:text-[#001E2B] transition-colors text-lg leading-none mt-0.5">›</span>
                       </div>
                     </div>
 
@@ -192,12 +199,15 @@ export default function TransactionHistoryPage() {
               })}
             </div>
 
+            {/* Pagination: count + size selector always visible, navigation when >1 page */}
             <Pagination
               page={page}
               totalPages={totalPages}
               total={allTxns.length}
-              limit={PAGE_SIZE}
+              limit={pageSize}
               onPageChange={setPage}
+              onLimitChange={handleLimitChange}
+              limitOptions={[5, 10, 20, 50]}
               noun="transactions"
             />
           </>
