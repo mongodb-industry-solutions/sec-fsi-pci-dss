@@ -1,6 +1,7 @@
 /**
  * Generates synthetic seed data for all collections.
- * Run: ts-node data/generate.ts
+ * Run: ts-node bin/generate.ts
+ * Output: backend/data/*.json
  */
 import * as fs from 'fs';
 import * as path from 'path';
@@ -8,7 +9,7 @@ import * as crypto from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { faker } from '@faker-js/faker';
 
-const OUT_DIR = path.join(__dirname);
+const OUT_DIR = path.join(__dirname, '..', 'data');
 
 function uuid(): string {
   return crypto.randomUUID();

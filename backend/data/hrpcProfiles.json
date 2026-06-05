@@ -1,95 +1,120 @@
 [
   {
-    "accountRef": "ACC-003",
-    "customerName": "Synthetic Demo Customer A",
-    "hrpcFlags": [
+    "customerCreditRatingInstanceReference": "hrpc-001",
+    "customerAgreementReference": "ACC-003",
+    "customerCreditRatingClassificationFlags": [
       {
-        "category": "suspicious_transaction_patterns",
-        "riskLevel": "high",
-        "label": "Suspicious Transaction Patterns",
-        "description": "Multiple high-value card transactions at high-risk MCC merchants (7995 - Gambling, 5813 - Drinking Establishments) detected over 90 days. Velocity exceeds peer-group baseline by 340%.",
-        "detectedAt": "2026-03-15",
-        "source": "internal_transaction_monitoring",
-        "reviewRequired": true
+        "customerCreditRatingClassificationCategory": "suspicious_transaction_patterns",
+        "customerCreditRatingClassificationLevel": "high",
+        "customerCreditRatingClassificationLabel": "Suspicious Transaction Patterns",
+        "customerCreditRatingClassificationDescription": "Multiple high-value card transactions at high-risk MCC merchants (7995 - Gambling, 5813 - Drinking Establishments) detected over 90 days. Velocity exceeds peer-group baseline by 340%.",
+        "customerCreditRatingClassificationDetectedDateTime": "2026-03-15",
+        "customerCreditRatingClassificationSource": "internal_transaction_monitoring",
+        "customerCreditRatingReviewRequiredIndicator": true
       }
-    ]
+    ],
+    "bianServiceDomain": "CustomerCreditRating",
+    "bianControlRecordType": "CustomerCreditRatingState",
+    "recordCreatedDateTime": "2026-03-15T09:00:00Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00Z",
+    "schemaVersion": 1
   },
   {
-    "accountRef": "ACC-007",
-    "customerName": "Synthetic Demo Customer B",
-    "hrpcFlags": [
+    "customerCreditRatingInstanceReference": "hrpc-002",
+    "customerAgreementReference": "ACC-007",
+    "customerCreditRatingClassificationFlags": [
       {
-        "category": "high_risk_jurisdiction",
-        "riskLevel": "medium",
-        "label": "High-Risk Jurisdiction Link",
-        "description": "Transaction counterparty linked to a jurisdiction on the FATF elevated-risk list. Cross-border transfer activity increased 80% since last review.",
-        "detectedAt": "2026-04-10",
-        "source": "correspondent_screening",
-        "reviewRequired": true
+        "customerCreditRatingClassificationCategory": "high_risk_jurisdiction",
+        "customerCreditRatingClassificationLevel": "medium",
+        "customerCreditRatingClassificationLabel": "High-Risk Jurisdiction Link",
+        "customerCreditRatingClassificationDescription": "Transaction counterparty linked to a jurisdiction on the FATF elevated-risk list. Cross-border transfer activity increased 80% since last review.",
+        "customerCreditRatingClassificationDetectedDateTime": "2026-04-10",
+        "customerCreditRatingClassificationSource": "correspondent_screening",
+        "customerCreditRatingReviewRequiredIndicator": true
       }
-    ]
+    ],
+    "bianServiceDomain": "CustomerCreditRating",
+    "bianControlRecordType": "CustomerCreditRatingState",
+    "recordCreatedDateTime": "2026-04-10T11:30:00Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00Z",
+    "schemaVersion": 1
   },
   {
-    "accountRef": "ACC-012",
-    "customerName": "Synthetic Demo Customer C",
-    "hrpcFlags": [
+    "customerCreditRatingInstanceReference": "hrpc-003",
+    "customerAgreementReference": "ACC-012",
+    "customerCreditRatingClassificationFlags": [
       {
-        "category": "pep",
-        "riskLevel": "high",
-        "label": "Politically Exposed Person",
-        "description": "Customer holds a senior government role in a regional public authority. Source-of-funds and source-of-wealth review is required under EDD policy.",
-        "detectedAt": "2025-11-20",
-        "source": "kyc_periodic_review",
-        "reviewRequired": true
+        "customerCreditRatingClassificationCategory": "pep",
+        "customerCreditRatingClassificationLevel": "high",
+        "customerCreditRatingClassificationLabel": "Politically Exposed Person",
+        "customerCreditRatingClassificationDescription": "Customer holds a senior government role in a regional public authority. Source-of-funds and source-of-wealth review is required under EDD policy.",
+        "customerCreditRatingClassificationDetectedDateTime": "2025-11-20",
+        "customerCreditRatingClassificationSource": "kyc_periodic_review",
+        "customerCreditRatingReviewRequiredIndicator": true
       },
       {
-        "category": "hnwi",
-        "riskLevel": "medium",
-        "label": "High Net Worth Individual",
-        "description": "Account profile qualifies for HNWI classification based on portfolio value and transaction volumes. Complex cross-border structures noted.",
-        "detectedAt": "2025-11-20",
-        "source": "kyc_periodic_review",
-        "reviewRequired": false
+        "customerCreditRatingClassificationCategory": "hnwi",
+        "customerCreditRatingClassificationLevel": "medium",
+        "customerCreditRatingClassificationLabel": "High Net Worth Individual",
+        "customerCreditRatingClassificationDescription": "Account profile qualifies for HNWI classification based on portfolio value and transaction volumes. Complex cross-border structures noted.",
+        "customerCreditRatingClassificationDetectedDateTime": "2025-11-20",
+        "customerCreditRatingClassificationSource": "kyc_periodic_review",
+        "customerCreditRatingReviewRequiredIndicator": false
       }
-    ]
+    ],
+    "bianServiceDomain": "CustomerCreditRating",
+    "bianControlRecordType": "CustomerCreditRatingState",
+    "recordCreatedDateTime": "2025-11-20T08:00:00Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00Z",
+    "schemaVersion": 1
   },
   {
-    "accountRef": "ACC-019",
-    "customerName": "Synthetic Demo Customer D",
-    "hrpcFlags": [
+    "customerCreditRatingInstanceReference": "hrpc-004",
+    "customerAgreementReference": "ACC-019",
+    "customerCreditRatingClassificationFlags": [
       {
-        "category": "financial_fraud_history",
-        "riskLevel": "high",
-        "label": "Prior Fraud History",
-        "description": "Prior confirmed chargeback fraud in 2024 involving card-not-present transactions. Case FD-2024-000291 closed as confirmed_fraud. Enhanced monitoring active.",
-        "detectedAt": "2024-08-05",
-        "source": "internal_case_history",
-        "reviewRequired": true
+        "customerCreditRatingClassificationCategory": "financial_fraud_history",
+        "customerCreditRatingClassificationLevel": "high",
+        "customerCreditRatingClassificationLabel": "Prior Fraud History",
+        "customerCreditRatingClassificationDescription": "Prior confirmed chargeback fraud in 2024 involving card-not-present transactions. Case FD-2024-000291 closed as confirmed_fraud. Enhanced monitoring active.",
+        "customerCreditRatingClassificationDetectedDateTime": "2024-08-05",
+        "customerCreditRatingClassificationSource": "internal_case_history",
+        "customerCreditRatingReviewRequiredIndicator": true
       }
-    ]
+    ],
+    "bianServiceDomain": "CustomerCreditRating",
+    "bianControlRecordType": "CustomerCreditRatingState",
+    "recordCreatedDateTime": "2024-08-05T16:00:00Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00Z",
+    "schemaVersion": 1
   },
   {
-    "accountRef": "ACC-025",
-    "customerName": "Synthetic Demo Customer E",
-    "hrpcFlags": [
+    "customerCreditRatingInstanceReference": "hrpc-005",
+    "customerAgreementReference": "ACC-025",
+    "customerCreditRatingClassificationFlags": [
       {
-        "category": "ubo",
-        "riskLevel": "medium",
-        "label": "Complex UBO Structure",
-        "description": "Account linked to a legal entity with opaque beneficial ownership structure. UBO verification is incomplete pending additional documentation.",
-        "detectedAt": "2026-01-30",
-        "source": "aml_due_diligence",
-        "reviewRequired": true
+        "customerCreditRatingClassificationCategory": "ubo",
+        "customerCreditRatingClassificationLevel": "medium",
+        "customerCreditRatingClassificationLabel": "Complex UBO Structure",
+        "customerCreditRatingClassificationDescription": "Account linked to a legal entity with opaque beneficial ownership structure. UBO verification is incomplete pending additional documentation.",
+        "customerCreditRatingClassificationDetectedDateTime": "2026-01-30",
+        "customerCreditRatingClassificationSource": "aml_due_diligence",
+        "customerCreditRatingReviewRequiredIndicator": true
       },
       {
-        "category": "suspicious_transaction_patterns",
-        "riskLevel": "medium",
-        "label": "Suspicious Transaction Patterns",
-        "description": "Rapid fund movement pattern between multiple accounts suggests possible layering. Three linked accounts identified in network analysis.",
-        "detectedAt": "2026-02-14",
-        "source": "transaction_monitoring",
-        "reviewRequired": true
+        "customerCreditRatingClassificationCategory": "suspicious_transaction_patterns",
+        "customerCreditRatingClassificationLevel": "medium",
+        "customerCreditRatingClassificationLabel": "Suspicious Transaction Patterns",
+        "customerCreditRatingClassificationDescription": "Rapid fund movement pattern between multiple accounts suggests possible layering. Three linked accounts identified in network analysis.",
+        "customerCreditRatingClassificationDetectedDateTime": "2026-02-14",
+        "customerCreditRatingClassificationSource": "transaction_monitoring",
+        "customerCreditRatingReviewRequiredIndicator": true
       }
-    ]
+    ],
+    "bianServiceDomain": "CustomerCreditRating",
+    "bianControlRecordType": "CustomerCreditRatingState",
+    "recordCreatedDateTime": "2026-01-30T10:00:00Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00Z",
+    "schemaVersion": 1
   }
 ]

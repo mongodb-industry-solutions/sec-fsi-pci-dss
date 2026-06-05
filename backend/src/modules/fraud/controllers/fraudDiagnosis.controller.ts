@@ -4,23 +4,27 @@ import { readFileSync } from 'fs';
 import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, appendAuditEvent } from '../services/fraudDiagnosis.service';
 import { generateToken } from '../../../vendors/security/escalationTokens';
 
-interface HrpcFlag {
-  category: string;
-  riskLevel: string;
-  label: string;
-  description: string;
-  detectedAt: string;
-  source: string;
-  reviewRequired: boolean;
+// BIAN SD-60: CustomerCreditRating — classification flag shape from hrpcProfiles.json
+interface CustomerCreditRatingFlag {
+  customerCreditRatingClassificationCategory: string;
+  customerCreditRatingClassificationLevel: string;
+  customerCreditRatingClassificationLabel: string;
+  customerCreditRatingClassificationDescription: string;
+  customerCreditRatingClassificationDetectedDateTime: string;
+  customerCreditRatingClassificationSource: string;
+  customerCreditRatingReviewRequiredIndicator: boolean;
 }
 
-interface HrpcProfile {
-  accountRef: string;
-  customerName: string;
-  hrpcFlags: HrpcFlag[];
+interface CustomerCreditRatingProfile {
+  customerCreditRatingInstanceReference: string;
+  customerAgreementReference: string;
+  customerCreditRatingClassificationFlags: CustomerCreditRatingFlag[];
+  bianServiceDomain: string;
+  bianControlRecordType: string;
+  schemaVersion: number;
 }
 
-const HRPC_PROFILES: HrpcProfile[] = JSON.parse(
+const HRPC_PROFILES: CustomerCreditRatingProfile[] = JSON.parse(
   readFileSync(resolve(__dirname, '../../../../data/hrpcProfiles.json'), 'utf-8')
 );
 
@@ -434,8 +438,19 @@ Returns an empty \`hrpcFlags\` array when the account is not in any HRPC categor
     const { accountRef } = request.query as { accountRef: string };
     if (!accountRef) return reply.status(400).send({ error: 'accountRef query parameter is required' });
 
-    const profile = HRPC_PROFILES.find((p) => p.accountRef === accountRef);
-    const flags = profile?.hrpcFlags ?? [];
+    const profile = HRPC_PROFILES.find((p) => p.customerAgreementReference === accountRef);
+    const rawFlags = profile?.customerCreditRatingClassificationFlags ?? [];
+
+    // Map BIAN field names to compact response field names for the API consumer
+    const flags = rawFlags.map((f) => ({
+      category: f.customerCreditRatingClassificationCategory,
+      riskLevel: f.customerCreditRatingClassificationLevel,
+      label: f.customerCreditRatingClassificationLabel,
+      description: f.customerCreditRatingClassificationDescription,
+      detectedAt: f.customerCreditRatingClassificationDetectedDateTime,
+      source: f.customerCreditRatingClassificationSource,
+      reviewRequired: f.customerCreditRatingReviewRequiredIndicator,
+    }));
 
     const riskOrder = { high: 3, medium: 2, low: 1, none: 0 };
     const highestRiskLevel = flags.reduce<'none' | 'low' | 'medium' | 'high'>((acc, f) => {
