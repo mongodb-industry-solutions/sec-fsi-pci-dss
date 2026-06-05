@@ -58,15 +58,15 @@ function DemoShell({ children }: { children: React.ReactNode }) {
           {/* Debug toggle  -  always visible in the top bar */}
           <button
             onClick={toggleDebug}
-            title="Toggle debug mode  -  shows technical details and raw JSON options"
-            className={`text-xs px-2 py-1 rounded border transition-colors ${
+            title="Toggle debug mode"
+            className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded border transition-colors ${
               debugMode
                 ? 'bg-[#00ED64] text-[#001E2B] border-[#00ED64] font-semibold'
                 : 'text-gray-400 border-white/20 hover:border-white/40'
             }`}
           >
             <Settings size={13} />
-            <span>{debugMode ? 'Debug ON' : 'Debug'}</span>
+            <span className="hidden sm:inline">{debugMode ? 'Debug ON' : 'Debug'}</span>
           </button>
           <Link href="/demo" className="flex items-center gap-1.5 text-gray-400 hover:text-white text-sm">
             <LogOut size={13} />

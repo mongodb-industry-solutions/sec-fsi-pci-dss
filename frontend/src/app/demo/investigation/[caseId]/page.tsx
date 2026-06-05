@@ -420,7 +420,7 @@ export default function DemoCaseDetailPage() {
                 <button
                   onClick={handleEscalate}
                   disabled={actionBusy}
-                  className="w-full py-2 px-4 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition-colors"
+                  className="w-full inline-flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition-colors"
                 >
                   <ArrowUpFromLine size={14} />
                   Escalate to Level 2 Investigator
