@@ -53,10 +53,10 @@
   },
   {
     "partyAuthenticationInstanceReference": "5f05a02f-478a-4d59-acdb-c43da6192b03",
-    "partyAuthenticationUserEmailAddress": "admin@leafybank.demo",
+    "partyAuthenticationUserEmailAddress": "diego.sans@leafybank.demo",
     "partyAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
     "partyAuthenticationUserRole": "security_auditor",
-    "partyAuthenticationUserName": "Admin",
+    "partyAuthenticationUserName": "Diego Sans",
     "partyAuthenticationLoginDomain": "local",
     "partyAuthenticationAccountStatus": "active",
     "bianServiceDomain": "PartyAuthentication",
