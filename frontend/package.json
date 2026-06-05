@@ -12,6 +12,7 @@
   "dependencies": {
     "fsi-pci-dss-demo": "file:..",
     "js-cookie": "^3.0.5",
+    "lucide-react": "^1.17.0",
     "next": "^16.2.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

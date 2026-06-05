@@ -9,6 +9,7 @@ import { RawDocumentPanel } from '../../../../components/RawDocumentPanel';
 import { SEVERITY_COLORS, STATUS_COLORS, ROLE_LABELS, formatRiskIndicator } from '../../../../lib/constants';
 import { useDebugMode } from '../../../../lib/debugMode';
 import { DebugRawJson } from '../../../../components/DebugRawJson';
+import { ArrowUpFromLine, CheckCircle, XCircle, StickyNote, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 
 const ACTION_LABELS: Record<string, string> = {
   case_opened: 'Case opened',
@@ -328,7 +329,7 @@ export default function DemoCaseDetailPage() {
             <div className="p-3 bg-blue-50">
               {debugMode && (
                 <p className="text-xs text-blue-600 mb-2 font-medium">
-                  QE:equality — searchable while encrypted. Atlas stores ciphertext; queries match ciphertext-to-ciphertext.
+                  QE:equality  -  searchable while encrypted. Atlas stores ciphertext; queries match ciphertext-to-ciphertext.
                 </p>
               )}
               <div className="space-y-2">
@@ -352,7 +353,7 @@ export default function DemoCaseDetailPage() {
             <div className={`p-3 ${canSeeAll ? 'bg-purple-50' : 'bg-gray-50'}`}>
               {debugMode && (
                 <p className={`text-xs mb-2 font-medium ${canSeeAll ? 'text-purple-600' : 'text-gray-500'}`}>
-                  QE:none — encrypted, not searchable. Requires DEK-sensitive (L2 escalation approval).
+                  QE:none  -  encrypted, not searchable. Requires DEK-sensitive (L2 escalation approval).
                 </p>
               )}
               <div className="space-y-2">
@@ -421,17 +422,20 @@ export default function DemoCaseDetailPage() {
                   disabled={actionBusy}
                   className="w-full py-2 px-4 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition-colors"
                 >
+                  <ArrowUpFromLine size={14} />
                   Escalate to Level 2 Investigator
                 </button>
               )}
               <button
                 onClick={() => handleAction({ fraudDiagnosisCaseStatus: 'resolved_cleared', resolutionOutcome: 'cleared', resolutionNotes: 'Cleared by L1 analyst as false positive.' }, 'Case closed as false positive.')}
                 disabled={actionBusy}
-                className="w-full py-2 px-4 rounded-lg border border-green-600 text-green-700 text-sm font-medium hover:bg-green-50 disabled:opacity-50 transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-green-600 text-green-700 text-sm font-medium hover:bg-green-50 disabled:opacity-50 transition-colors"
               >
+                <CheckCircle size={14} />
                 Close - False Positive
               </button>
-              <button onClick={() => setShowNoteForm((v) => !v)} className="w-full py-2 px-4 rounded-lg border text-gray-700 text-sm font-medium hover:bg-gray-50">
+              <button onClick={() => setShowNoteForm((v) => !v)} className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border text-gray-700 text-sm font-medium hover:bg-gray-50">
+                <StickyNote size={14} />
                 {showNoteForm ? 'Cancel' : 'Add Notes'}
               </button>
             </div>
@@ -488,8 +492,9 @@ export default function DemoCaseDetailPage() {
                 <button
                   onClick={handleApproveEscalation}
                   disabled={actionBusy}
-                  className="w-full py-2 px-4 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 disabled:opacity-50 transition-colors"
                 >
+                  <ShieldAlert size={14} />
                   Approve Escalation - Access Sensitive Fields
                 </button>
               )}
@@ -503,18 +508,21 @@ export default function DemoCaseDetailPage() {
               <button
                 onClick={() => handleAction({ fraudDiagnosisCaseStatus: 'resolved_fraud', resolutionOutcome: 'confirmed_fraud', resolutionNotes: 'Fraud confirmed by L2 investigator after full analysis.' }, 'Case resolved as confirmed fraud.')}
                 disabled={actionBusy}
-                className="w-full py-2 px-4 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors"
               >
+                <XCircle size={14} />
                 Confirm Fraud - Close Case
               </button>
               <button
                 onClick={() => handleAction({ fraudDiagnosisCaseStatus: 'resolved_cleared', resolutionOutcome: 'cleared', resolutionNotes: 'Cleared by L2 investigator after full analysis.' }, 'Case cleared - no fraud found.')}
                 disabled={actionBusy}
-                className="w-full py-2 px-4 rounded-lg border border-green-600 text-green-700 text-sm font-medium hover:bg-green-50 disabled:opacity-50 transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-green-600 text-green-700 text-sm font-medium hover:bg-green-50 disabled:opacity-50 transition-colors"
               >
+                <CheckCircle size={14} />
                 Clear Case - No Fraud Found
               </button>
-              <button onClick={() => setShowNoteForm((v) => !v)} className="w-full py-2 px-4 rounded-lg border text-gray-700 text-sm font-medium hover:bg-gray-50">
+              <button onClick={() => setShowNoteForm((v) => !v)} className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border text-gray-700 text-sm font-medium hover:bg-gray-50">
+                <StickyNote size={14} />
                 {showNoteForm ? 'Cancel' : 'Add Notes'}
               </button>
             </div>
@@ -562,8 +570,8 @@ export default function DemoCaseDetailPage() {
                 <h2 className="font-semibold">Atlas Storage</h2>
                 <p className="text-xs text-gray-500">cardTransaction collection - raw ciphertext document</p>
               </div>
-              <button onClick={toggleRaw} className="text-sm px-3 py-1.5 rounded-lg border hover:bg-gray-50">
-                {showRaw ? 'Hide' : 'View Raw Document'}
+              <button onClick={toggleRaw} className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border hover:bg-gray-50">
+                {showRaw ? <><EyeOff size={13} /> Hide</> : <><Eye size={13} /> View Raw Document</>}
               </button>
             </div>
             {!showRaw && <p className="text-sm text-gray-500">Shows the actual document stored in Atlas. QE-encrypted fields appear as BSON binary blobs.</p>}
@@ -623,9 +631,9 @@ export default function DemoCaseDetailPage() {
         {debugMode && (
           <DebugRawJson
             sections={[
-              { label: 'API — GET /api/v1/fraud/:id (case document)', data: fraudCase },
-              { label: 'API — GET /api/v1/fraud/:id/events (audit trail)', data: events },
-              { label: 'API — GET /api/v1/fraud/hrpc/check (HRPC profile)', data: hrpc },
+              { label: 'API  -  GET /api/v1/fraud/:id (case document)', data: fraudCase },
+              { label: 'API  -  GET /api/v1/fraud/:id/events (audit trail)', data: events },
+              { label: 'API  -  GET /api/v1/fraud/hrpc/check (HRPC profile)', data: hrpc },
               { label: 'Customer profile (GET /api/v1/customer/by-id/:customerId)', data: customerProfile },
             ]}
           />

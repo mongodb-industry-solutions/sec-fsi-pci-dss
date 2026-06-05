@@ -1,4 +1,4 @@
-// BIAN SD-89: Merchant Relations — prototype stub service
+// BIAN SD-89: Merchant Relations  -  prototype stub service
 // Full implementation scheduled for v5. Returns typed stub data.
 
 import { v4 as uuidv4 } from 'uuid';

@@ -89,7 +89,7 @@ export default function InvestigationPage() {
   async function handleSearch() {
     const value = searchValue.trim();
     if (!value) {
-      // Clear search — back to full list
+      // Clear search  -  back to full list
       setIsSearchMode(false);
       setSearchError(null);
       setPage(1);

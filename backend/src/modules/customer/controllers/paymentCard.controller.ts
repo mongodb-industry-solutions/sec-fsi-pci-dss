@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { createCard, getCardsByCustomer } from '../services/paymentCard.service';
 import type { PaymentCardManagementControlRecord } from '../models/paymentCard.model';
 
-// Mounted at /customer — routes are /:customerId/cards
+// Mounted at /customer  -  routes are /:customerId/cards
 export async function paymentCardController(fastify: FastifyInstance) {
 
   // POST /api/v1/customer/:customerId/cards
@@ -22,7 +22,7 @@ and must NOT be repeated in the request body.
 | Field | Classification | Storage |
 |---|---|---|
 | \`cardToken\` | NOT CHD (surrogate) | Plaintext, indexed |
-| \`paymentCardExpirationDate\` | CHD (expiry co-located with card ref) | QE:none — encrypted, requires DEK-sensitive |
+| \`paymentCardExpirationDate\` | CHD (expiry co-located with card ref) | QE:none  -  encrypted, requires DEK-sensitive |
 | \`paymentCardMaskedPanDisplay\` | Display only (last 4) | Plaintext; permitted by PCI DSS |
 | CVV / PIN | SAD (**prohibited**) | Never stored |`,
       security: [{ bearerAuth: [] }],

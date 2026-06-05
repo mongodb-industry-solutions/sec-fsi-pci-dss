@@ -131,7 +131,7 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
     });
   });
 
-  // POST /api/v1/fraud — manually open a fraud investigation case for a transaction
+  // POST /api/v1/fraud  -  manually open a fraud investigation case for a transaction
   fastify.post('/', {
     schema: {
       tags: ['fraud'],
@@ -328,7 +328,7 @@ without creating a duplicate.
 
 **Allowed status transitions:**
 - \`open\` → \`under_review\` (analyst assigns themselves)
-- \`under_review\` → \`escalated\` (use \`POST /fraud/:id/escalate\` for escalation with workflow — v2)
+- \`under_review\` → \`escalated\` (use \`POST /fraud/:id/escalate\` for escalation with workflow  -  v2)
 - \`escalated\` → \`resolved_cleared\` | \`resolved_fraud\`
 - Any → \`closed\``,
       security: [{ bearerAuth: [] }],

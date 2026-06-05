@@ -19,7 +19,7 @@ export interface PaymentOrderControlRecord {
   paymentOrderMerchantReference: string;            // Merchant's own order ID
   paymentOrderDescription?: string;
 
-  // Lifecycle — SD-64: Payment Order state machine
+  // Lifecycle  -  SD-64: Payment Order state machine
   paymentOrderStatus: PaymentOrderStatus;
   paymentOrderInitiatedDateTime: Date;
   paymentOrderConfirmedDateTime?: Date;
@@ -30,7 +30,7 @@ export interface PaymentOrderControlRecord {
   paymentOrderRefundedDateTime?: Date;
   paymentOrderExpiresAt: Date;                      // TTL: auto-expire stale initiated orders
 
-  // Routing — SD-65: Payment Execution decision
+  // Routing  -  SD-65: Payment Execution decision
   routingDecision?: {
     processor: string;                              // e.g. 'simulated_processor_v1'
     routedAt: Date;

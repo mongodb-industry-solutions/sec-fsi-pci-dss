@@ -23,7 +23,7 @@ export interface MerchantAgreementControlRecord {
   merchantTransactionCount30d: number;
   merchantRiskCategory: MerchantRiskCategory;
 
-  // QE:none — API key hash (not CHD, but operationally sensitive)
+  // QE:none  -  API key hash (not CHD, but operationally sensitive)
   merchantApiKeyHash: string;
 
   // BIAN metadata

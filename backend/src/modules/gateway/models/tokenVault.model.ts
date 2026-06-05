@@ -1,4 +1,4 @@
-// BIAN SD-57: Card Etoken — Token Vault Control Record
+// BIAN SD-57: Card Etoken  -  Token Vault Control Record
 
 export const TOKEN_VAULT_COLLECTION = 'tokenVault';
 
@@ -12,7 +12,7 @@ export interface TokenVaultControlRecord {
 
   // Token fields
   tokenVaultCardToken: string;                      // Plaintext surrogate token (tok_<uuid>)
-  tokenVaultNetworkToken?: string;                  // QE:none — card scheme network token (if applicable)
+  tokenVaultNetworkToken?: string;                  // QE:none  -  card scheme network token (if applicable)
   tokenVaultMaskedPanDisplay: string;               // ****-****-****-XXXX (display only)
   tokenVaultCardNetwork: 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
 

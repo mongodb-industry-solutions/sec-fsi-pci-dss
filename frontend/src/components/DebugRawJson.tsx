@@ -31,7 +31,7 @@ export function DebugRawJson({ sections }: { sections: Section[] }) {
           {expanded[i] && (
             <pre className="bg-[#001E2B] text-green-300 text-xs font-mono px-4 py-3 overflow-x-auto whitespace-pre-wrap break-all max-h-64 overflow-y-auto">
               {section.data == null
-                ? 'null — data not yet loaded'
+                ? 'null  -  data not yet loaded'
                 : JSON.stringify(section.data, null, 2)}
             </pre>
           )}

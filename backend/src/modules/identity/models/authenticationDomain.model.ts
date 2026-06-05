@@ -15,7 +15,7 @@ export interface AuthenticationDomainRecord {
   partyAuthenticationDomainDisplayName: string;
   /** Protocol used by this domain */
   partyAuthenticationDomainType: AuthDomainType;
-  /** OAuth/SSO flow — client_credentials shows username+password; others show a redirect button */
+  /** OAuth/SSO flow  -  client_credentials shows username+password; others show a redirect button */
   partyAuthenticationDomainFlowType?: AuthDomainFlowType;
   /** Only enabled domains are surfaced to the UI */
   partyAuthenticationDomainEnabled: boolean;

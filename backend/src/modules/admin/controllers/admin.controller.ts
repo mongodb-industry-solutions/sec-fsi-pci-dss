@@ -52,9 +52,9 @@ function makeRateLimiter(maxRequests: number, windowMs: number) {
   };
 }
 
-// Strict: login endpoint — 10 attempts per 15 min (brute-force protection)
+// Strict: login endpoint  -  10 attempts per 15 min (brute-force protection)
 const checkLoginRateLimit = makeRateLimiter(10, 15 * 60 * 1000);
-// Lenient: command/exec/logs/system — 300 requests per 15 min (demo usage)
+// Lenient: command/exec/logs/system  -  300 requests per 15 min (demo usage)
 const checkOpsRateLimit   = makeRateLimiter(300, 15 * 60 * 1000);
 
 function sha256(text: string): string {

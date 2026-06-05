@@ -37,7 +37,7 @@ export async function createCollections(
         await db.collection(name).drop();
         console.log(`  dropped: ${name}`);
       } else {
-        console.log(`  skip:    ${name} (already exists — run with --reset to recreate)`);
+        console.log(`  skip:    ${name} (already exists  -  run with --reset to recreate)`);
         continue;
       }
     }
@@ -56,7 +56,7 @@ export async function createCollections(
     console.log(`  created: ${name}`);
   }
 
-  // authenticationDomain — plaintext collection, no QE (domain config, no CHD)
+  // authenticationDomain  -  plaintext collection, no QE (domain config, no CHD)
   if (!existingNames.has('authenticationDomain') || reset) {
     if (existingNames.has('authenticationDomain') && reset) {
       await db.collection('authenticationDomain').drop();
@@ -68,7 +68,7 @@ export async function createCollections(
     console.log('  skip:    authenticationDomain (already exists)');
   }
 
-  // fraudDiagnosisCase — plaintext collection, no QE
+  // fraudDiagnosisCase  -  plaintext collection, no QE
   if (!existingNames.has('fraudDiagnosisCase') || reset) {
     if (existingNames.has('fraudDiagnosisCase') && reset) {
       await db.collection('fraudDiagnosisCase').drop();
@@ -80,7 +80,7 @@ export async function createCollections(
     console.log('  skip:    fraudDiagnosisCase (already exists)');
   }
 
-  // fraudDiagnosisCaseEvents — plaintext collection, no QE
+  // fraudDiagnosisCaseEvents  -  plaintext collection, no QE
   if (!existingNames.has('fraudDiagnosisCaseEvents') || reset) {
     if (existingNames.has('fraudDiagnosisCaseEvents') && reset) {
       await db.collection('fraudDiagnosisCaseEvents').drop();
@@ -91,7 +91,7 @@ export async function createCollections(
     console.log('  skip:    fraudDiagnosisCaseEvents (already exists)');
   }
 
-  // customerCreditRating — BIAN SD-60, plaintext, no QE (classification metadata, no PII or CHD)
+  // customerCreditRating  -  BIAN SD-60, plaintext, no QE (classification metadata, no PII or CHD)
   if (!existingNames.has('customerCreditRating') || reset) {
     if (existingNames.has('customerCreditRating') && reset) {
       await db.collection('customerCreditRating').drop();

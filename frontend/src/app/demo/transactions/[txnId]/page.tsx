@@ -7,6 +7,7 @@ import { getToken, decodeToken } from '../../../../lib/auth';
 import { EncryptionBadge } from '../../../../components/EncryptionBadge';
 import { useDebugMode } from '../../../../lib/debugMode';
 import { DebugRawJson } from '../../../../components/DebugRawJson';
+import { Eye, EyeOff } from 'lucide-react';
 
 type TxnDetail = Awaited<ReturnType<typeof api.transactions.getById>>;
 
@@ -41,8 +42,8 @@ function RevealField({ label, value, type }: { label: string; value: string; typ
       <span className={`text-xs font-mono transition-colors ${shown ? 'text-gray-900' : 'text-gray-400 select-none'}`}>
         {shown ? value : masked}
       </span>
-      <button onClick={() => setShown(v => !v)} className="text-gray-400 hover:text-[#001E2B] text-sm" title={shown ? 'Hide' : 'Reveal'}>
-        {shown ? '🙈' : '👁'}
+      <button onClick={() => setShown(v => !v)} className="text-gray-400 hover:text-[#001E2B] transition-colors" title={shown ? 'Hide' : 'Reveal'}>
+        {shown ? <EyeOff size={13} /> : <Eye size={13} />}
       </button>
     </div>
   );
@@ -170,7 +171,7 @@ export default function TransactionDetailPage() {
         </div>
       </div>
 
-      {/* QE:equality fields — Account Reference */}
+      {/* QE:equality fields  -  Account Reference */}
       <div className="bg-white rounded-xl border p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-sm text-gray-700">Encrypted Fields</h2>
@@ -181,7 +182,7 @@ export default function TransactionDetailPage() {
 
         <div className="space-y-3">
           <div className="bg-blue-50 rounded-lg p-3">
-            <p className="text-xs font-semibold text-blue-700 uppercase mb-2">QE:equality — searchable while encrypted</p>
+            <p className="text-xs font-semibold text-blue-700 uppercase mb-2">QE:equality  -  searchable while encrypted</p>
             {txn.cardTransactionAccountReference ? (
               <RevealField
                 label="Account Reference"
@@ -196,11 +197,11 @@ export default function TransactionDetailPage() {
             )}
           </div>
 
-          {/* QE:none — Sensitive fields */}
+          {/* QE:none  -  Sensitive fields */}
           <div className={`rounded-lg p-3 ${canSeeSensitive ? 'bg-purple-50' : 'bg-gray-50'}`}>
             <div className="flex items-center justify-between mb-2">
               <p className={`text-xs font-semibold uppercase ${canSeeSensitive ? 'text-purple-700' : 'text-gray-500'}`}>
-                QE:none — sensitive (DEK-sensitive)
+                QE:none  -  sensitive (DEK-sensitive)
               </p>
               {!canSeeSensitive && isL2 && !escalationToken && (
                 <button
@@ -248,7 +249,7 @@ export default function TransactionDetailPage() {
         </div>
       </div>
 
-      {/* Investigation case — linked or open new */}
+      {/* Investigation case  -  linked or open new */}
       <div className="bg-white rounded-xl border p-4">
         {linkedCase ? (
           <div className="flex items-center justify-between">
@@ -322,7 +323,7 @@ export default function TransactionDetailPage() {
       {debugMode && (
         <DebugRawJson
           sections={[
-            { label: 'API — GET /api/v1/transactions/:id', data: txn },
+            { label: 'API  -  GET /api/v1/transactions/:id', data: txn },
             { label: 'Linked case', data: linkedCase },
           ]}
         />

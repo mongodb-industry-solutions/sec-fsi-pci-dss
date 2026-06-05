@@ -2,39 +2,48 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import {
+  BriefcaseMedical,
+  CreditCard,
+  Users,
+  BarChart3,
+  ClipboardList,
+  User,
+  PlusCircle,
+} from 'lucide-react';
 import { getToken, decodeToken } from '../lib/auth';
 
 interface NavItem {
   label: string;
   path: string;
-  icon: string;
+  icon: React.ReactNode;
   exact?: boolean;
 }
 
 const NAV_BY_ROLE: Record<string, NavItem[]> = {
   level1_analyst: [
-    { label: 'Cases',        path: '/demo/investigation', icon: '📋' },
-    { label: 'Transactions', path: '/demo/transactions',  icon: '💳' },
-    { label: 'Users',        path: '/demo/users',         icon: '👥' },
-    { label: 'My Profile',   path: '/demo/profile',       icon: '👤' },
+    { label: 'Cases',        path: '/demo/investigation', icon: <BriefcaseMedical size={16} /> },
+    { label: 'Transactions', path: '/demo/transactions',  icon: <CreditCard size={16} /> },
+    { label: 'Users',        path: '/demo/users',         icon: <Users size={16} /> },
+    { label: 'My Profile',   path: '/demo/profile',       icon: <User size={16} /> },
   ],
   level2_investigator: [
-    { label: 'Cases',        path: '/demo/investigation', icon: '📋' },
-    { label: 'Transactions', path: '/demo/transactions',  icon: '💳' },
-    { label: 'Users',        path: '/demo/users',         icon: '👥' },
-    { label: 'My Profile',   path: '/demo/profile',       icon: '👤' },
+    { label: 'Cases',        path: '/demo/investigation', icon: <BriefcaseMedical size={16} /> },
+    { label: 'Transactions', path: '/demo/transactions',  icon: <CreditCard size={16} /> },
+    { label: 'Users',        path: '/demo/users',         icon: <Users size={16} /> },
+    { label: 'My Profile',   path: '/demo/profile',       icon: <User size={16} /> },
   ],
   security_auditor: [
-    { label: 'Cases',        path: '/demo/investigation', icon: '📋' },
-    { label: 'Transactions', path: '/demo/transactions',  icon: '💳' },
-    { label: 'Users',        path: '/demo/users',         icon: '👥' },
-    { label: 'Audit Log',    path: '/demo/audit',         icon: '📊' },
-    { label: 'My Profile',   path: '/demo/profile',       icon: '👤' },
+    { label: 'Cases',        path: '/demo/investigation', icon: <BriefcaseMedical size={16} /> },
+    { label: 'Transactions', path: '/demo/transactions',  icon: <CreditCard size={16} /> },
+    { label: 'Users',        path: '/demo/users',         icon: <Users size={16} /> },
+    { label: 'Audit Log',    path: '/demo/audit',         icon: <BarChart3 size={16} /> },
+    { label: 'My Profile',   path: '/demo/profile',       icon: <User size={16} /> },
   ],
   customer: [
-    { label: 'My Transactions', path: '/demo/payment/history', icon: '💳' },
-    { label: 'New Payment',     path: '/demo/payment',         icon: '+', exact: true },
-    { label: 'My Profile',      path: '/demo/profile',         icon: '👤' },
+    { label: 'My Transactions', path: '/demo/payment/history', icon: <ClipboardList size={16} /> },
+    { label: 'New Payment',     path: '/demo/payment',         icon: <PlusCircle size={16} />, exact: true },
+    { label: 'My Profile',      path: '/demo/profile',         icon: <User size={16} /> },
   ],
 };
 
@@ -63,13 +72,13 @@ export function DemoSidebar() {
           <Link
             key={item.path}
             href={item.path}
-            className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium transition-colors ${
               isActive(item)
                 ? 'bg-[#00ED64]/10 text-[#00ED64] border-r-2 border-[#00ED64]'
                 : 'text-gray-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            <span className="text-base leading-none w-5 text-center">{item.icon}</span>
+            <span className="shrink-0">{item.icon}</span>
             {item.label}
           </Link>
         ))}

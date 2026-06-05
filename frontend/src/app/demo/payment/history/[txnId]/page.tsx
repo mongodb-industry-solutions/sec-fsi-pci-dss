@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { api, FraudCase, ActionEvent } from '../../../../../lib/api';
 import { getToken, decodeToken } from '../../../../../lib/auth';
 import { useDebugMode } from '../../../../../lib/debugMode';
+import { Eye, EyeOff } from 'lucide-react';
 import { DebugRawJson } from '../../../../../components/DebugRawJson';
 
 interface StoredTransaction {
@@ -45,7 +46,7 @@ const CHANNEL_LABELS: Record<string, string> = {
 };
 
 const EVENT_META: Record<string, { label: string; icon: string; dotColor: string }> = {
-  case_opened:    { label: 'Transaction flagged for security review',  icon: '⚑', dotColor: 'border-amber-400 bg-amber-50' },
+  case_opened:    { label: 'Transaction flagged for security review',  icon: '!', dotColor: 'border-amber-400 bg-amber-50' },
   escalated:      { label: 'Review escalated to specialist team',      icon: '↑', dotColor: 'border-orange-400 bg-orange-50' },
   note_added:     { label: 'Update added to your case',                icon: '✉', dotColor: 'border-blue-400 bg-blue-50' },
   resolved:       { label: 'Review completed',                         icon: '✓', dotColor: 'border-green-400 bg-green-50' },
@@ -62,9 +63,9 @@ function CardTokenField({ token }: { token: string }) {
       <button
         onClick={() => setShown(v => !v)}
         title={shown ? 'Hide token' : 'Show token'}
-        className="text-gray-400 hover:text-[#001E2B] transition-colors text-sm leading-none"
+        className="text-gray-400 hover:text-[#001E2B] transition-colors"
       >
-        {shown ? '🙈' : '👁'}
+        {shown ? <EyeOff size={13} /> : <Eye size={13} />}
       </button>
     </div>
   );
@@ -103,7 +104,7 @@ export default function TransactionDetailPage() {
       if (!found) { setNotFound(true); setLoading(false); return; }
       setTxn(found);
 
-      // Fetch customer-visible case notes (works even for customer role — dedicated endpoint)
+      // Fetch customer-visible case notes (works even for customer role  -  dedicated endpoint)
       api.transactions.getNotes(txnId, t)
         .then(setCaseNotes)
         .catch(() => null);
@@ -198,7 +199,7 @@ export default function TransactionDetailPage() {
             </>
           )}
 
-          {/* Card token — from API (always up-to-date) or localStorage fallback */}
+          {/* Card token  -  from API (always up-to-date) or localStorage fallback */}
           {(apiTxn?.paymentCardReference || txn.cardToken) && (
             <>
               <span className="text-gray-500">Card token</span>
@@ -206,7 +207,7 @@ export default function TransactionDetailPage() {
             </>
           )}
 
-          {/* Transaction details — prefer API data, fallback to localStorage */}
+          {/* Transaction details  -  prefer API data, fallback to localStorage */}
           <span className="text-gray-500">Channel</span>
           <span>{CHANNEL_LABELS[apiTxn?.cardTransactionChannel ?? txn.channel] ?? txn.channel}</span>
 
@@ -370,9 +371,9 @@ export default function TransactionDetailPage() {
       {debugMode && (
         <DebugRawJson
           sections={[
-            { label: 'localStorage — stored transaction', data: txn },
-            { label: 'API — GET /api/v1/transactions/:id', data: apiTxn },
-            { label: 'API — GET /api/v1/transactions/:id/notes', data: caseNotes },
+            { label: 'localStorage  -  stored transaction', data: txn },
+            { label: 'API  -  GET /api/v1/transactions/:id', data: apiTxn },
+            { label: 'API  -  GET /api/v1/transactions/:id/notes', data: caseNotes },
           ]}
         />
       )}

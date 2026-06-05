@@ -5,7 +5,7 @@ import { DEKs } from './keyVault';
  *
  * MongoDB QE requires uniqueness of keyId within the encryptedFields.fields array
  * of the same collection (error 6338401 otherwise). Fields across different
- * collections may share a DEK — but for clarity each field has its own named DEK.
+ * collections may share a DEK  -  but for clarity each field has its own named DEK.
  */
 export function buildEncryptedFieldsMaps(deks: DEKs) {
   return {
@@ -30,13 +30,13 @@ export function buildEncryptedFieldsMaps(deks: DEKs) {
     cardTransactionSensitive: {
       fields: [
         {
-          keyId: deks.txRawPayload,           // unique keyId — required by QE
+          keyId: deks.txRawPayload,           // unique keyId  -  required by QE
           path: 'rawGatewayPayload',
           bsonType: 'object',
-          // QE:none — encrypted, not searchable
+          // QE:none  -  encrypted, not searchable
         },
         {
-          keyId: deks.txProcessorMeta,        // unique keyId — required by QE
+          keyId: deks.txProcessorMeta,        // unique keyId  -  required by QE
           path: 'processorTransactionMetadata',
           bsonType: 'object',
         },
@@ -47,19 +47,19 @@ export function buildEncryptedFieldsMaps(deks: DEKs) {
     customerAgreement: {
       fields: [
         {
-          keyId: deks.customerEmail,          // unique keyId — required by QE
+          keyId: deks.customerEmail,          // unique keyId  -  required by QE
           path: 'customerEmailAddress',
           bsonType: 'string',
           queries: { queryType: 'equality' },
         },
         {
-          keyId: deks.customerPhone,          // unique keyId — required by QE
+          keyId: deks.customerPhone,          // unique keyId  -  required by QE
           path: 'customerMobilePhoneNumber',
           bsonType: 'string',
           queries: { queryType: 'equality' },
         },
         {
-          keyId: deks.customerAccountRef,     // unique keyId — required by QE
+          keyId: deks.customerAccountRef,     // unique keyId  -  required by QE
           path: 'customerAgreementReference',
           bsonType: 'string',
           queries: { queryType: 'equality' },
@@ -72,18 +72,18 @@ export function buildEncryptedFieldsMaps(deks: DEKs) {
     customerAgreementSensitive: {
       fields: [
         {
-          keyId: deks.customerAddress,        // unique keyId — required by QE
+          keyId: deks.customerAddress,        // unique keyId  -  required by QE
           path: 'customerAgreementResidentialAddress',
           bsonType: 'object',
           // QE:none
         },
         {
-          keyId: deks.customerGovId,          // unique keyId — required by QE
+          keyId: deks.customerGovId,          // unique keyId  -  required by QE
           path: 'governmentIdentificationReference',
           bsonType: 'string',
         },
         {
-          keyId: deks.customerRiskNotes,      // unique keyId — required by QE
+          keyId: deks.customerRiskNotes,      // unique keyId  -  required by QE
           path: 'customerAgreementRiskNotes',
           bsonType: 'string',
         },
@@ -91,7 +91,7 @@ export function buildEncryptedFieldsMaps(deks: DEKs) {
     },
 
     // ── SD-88: Payment Card ───────────────────────────────────────────────────
-    // NOTE: paymentCardReference (token) is NOT in QE — same rule as cardTransaction.
+    // NOTE: paymentCardReference (token) is NOT in QE  -  same rule as cardTransaction.
     // paymentCardExpirationDate IS protected: CHD when co-located with a card reference.
     paymentCard: {
       fields: [
@@ -99,7 +99,7 @@ export function buildEncryptedFieldsMaps(deks: DEKs) {
           keyId: deks.cardExpiry,
           path: 'paymentCardExpirationDate',
           bsonType: 'string',
-          // QE:none — not searchable, retrieval only
+          // QE:none  -  not searchable, retrieval only
         },
       ],
     },
@@ -116,6 +116,6 @@ export function buildEncryptedFieldsMaps(deks: DEKs) {
       ],
     },
 
-    // fraudDiagnosisCase: no QE — operational metadata only, no CHD
+    // fraudDiagnosisCase: no QE  -  operational metadata only, no CHD
   };
 }

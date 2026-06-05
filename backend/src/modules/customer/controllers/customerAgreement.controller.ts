@@ -150,7 +150,7 @@ caller has the DEK-sensitive key, i.e. \`level2_investigator\` role.`,
   });
 
   // GET /api/v1/customer/by-id/:id
-  // Resolves a customerAgreement by primary UUID — used by fraud case detail to auto-load
+  // Resolves a customerAgreement by primary UUID  -  used by fraud case detail to auto-load
   // the customer profile linked to a case without requiring a QE equality search.
   fastify.get('/by-id/:id', {
     schema: {
@@ -164,7 +164,7 @@ to perform a manual QE equality search.
 
 **Returned fields:** Non-sensitive plaintext fields only (name, segment, status,
 enrollment date). QE:equality fields (email, phone, account reference) are not returned
-— they are stored as ciphertext and require explicit QE search. For sensitive fields
+ -  they are stored as ciphertext and require explicit QE search. For sensitive fields
 (address, government ID) a valid escalation token is required (L2 role only).`,
       security: [{ bearerAuth: [] }],
       params: {

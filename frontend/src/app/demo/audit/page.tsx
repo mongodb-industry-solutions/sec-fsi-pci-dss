@@ -4,6 +4,7 @@ import { api, AuditEventWithCase } from '../../../lib/api';
 import { getToken } from '../../../lib/auth';
 import { PERFORMER_LABELS } from '../../../lib/constants';
 import Link from 'next/link';
+import { Filter, X, ShieldCheck } from 'lucide-react';
 
 const ACTION_TYPE_LABELS: Record<string, string> = {
   case_opened: 'Case Opened',
@@ -77,7 +78,8 @@ export default function AuditPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex gap-3 mb-4 flex-wrap">
+        <div className="flex gap-3 mb-4 flex-wrap items-center">
+          <Filter size={14} className="text-gray-400 shrink-0" />
           <select
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value)}
@@ -101,8 +103,9 @@ export default function AuditPage() {
           {(filterRole || filterAction) && (
             <button
               onClick={() => { setFilterRole(''); setFilterAction(''); }}
-              className="text-sm text-blue-600 hover:underline"
+              className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
             >
+              <X size={13} />
               Clear filters
             </button>
           )}
@@ -182,7 +185,10 @@ export default function AuditPage() {
         {!loading && events.length > 0 && (
           <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
             <div className="bg-white border rounded-xl p-4">
-              <p className="font-semibold text-gray-700 mb-1">Access controls verified</p>
+              <div className="flex items-center gap-1.5 mb-1">
+                <ShieldCheck size={14} className="text-green-600" />
+                <p className="font-semibold text-gray-700">Access controls verified</p>
+              </div>
               <p className="text-gray-500 text-xs">
                 Events for <code>field_accessed</code> confirm that sensitive QE:none fields were accessed
                 only by authorized Level 2 investigators with valid escalation tokens.

@@ -10,12 +10,12 @@ import { paymentController }  from './controllers/payment.controller';
 import { tokenController }    from './controllers/token.controller';
 
 export async function gatewayModule(fastify: FastifyInstance) {
-  // SD-89: Merchant Relations — top-level resource (merchants have identity independent of payments)
+  // SD-89: Merchant Relations  -  top-level resource (merchants have identity independent of payments)
   await fastify.register(merchantController, { prefix: '/merchants' });
 
-  // SD-64 + SD-65: Payment Order + Execution — namespaced under /gateway/
+  // SD-64 + SD-65: Payment Order + Execution  -  namespaced under /gateway/
   await fastify.register(paymentController,  { prefix: '/gateway/payments' });
 
-  // SD-57: Card Etoken — namespaced under /gateway/
+  // SD-57: Card Etoken  -  namespaced under /gateway/
   await fastify.register(tokenController,    { prefix: '/gateway/tokens' });
 }

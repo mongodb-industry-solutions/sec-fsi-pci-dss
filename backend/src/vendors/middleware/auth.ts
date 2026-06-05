@@ -26,7 +26,7 @@ const PUBLIC_PREFIXES: string[] = ['/doc', '/api/v1/admin'];
 // Prefixes that bypass JWT auth only for GET requests (simulator read-only mode).
 // Mutation routes (PATCH /fraud/:id, POST /fraud/:id/escalate) still require JWT.
 // NOTE: if a Bearer token IS present on these routes, it is validated and the role
-// is checked — customers are denied even on public-GET routes.
+// is checked  -  customers are denied even on public-GET routes.
 const PUBLIC_GET_PREFIXES: string[] = ['/api/v1/fraud'];
 
 // URL prefixes and exact paths that the `customer` role is never allowed to access.
@@ -34,7 +34,7 @@ const PUBLIC_GET_PREFIXES: string[] = ['/api/v1/fraud'];
 // customers' data through the general customer search or investigation endpoints.
 const CUSTOMER_BLOCKED_PREFIXES: string[] = [
   '/api/v1/fraud',
-  '/api/v1/customer',   // QE equality searches — customer must use /auth/me instead
+  '/api/v1/customer',   // QE equality searches  -  customer must use /auth/me instead
 ];
 
 // Exact paths blocked for customers even when the prefix is otherwise public

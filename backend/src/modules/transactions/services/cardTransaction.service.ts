@@ -116,7 +116,7 @@ export async function getTransactionById(
     cardTransactionChannel:           txn.cardTransactionChannel,
     cardTransactionInitiationType:    txn.cardTransactionInitiationType,
     paymentCardReference:             txn.paymentCardReference,
-    // QE:equality — decrypted by QE client, available for analyst roles
+    // QE:equality  -  decrypted by QE client, available for analyst roles
     cardTransactionAccountReference:  txn.cardTransactionAccountReference,
   };
 

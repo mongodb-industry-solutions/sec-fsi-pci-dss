@@ -1,4 +1,4 @@
-// BIAN SD-64: Payment Order + SD-65: Payment Execution — prototype stub service
+// BIAN SD-64: Payment Order + SD-65: Payment Execution  -  prototype stub service
 // Full implementation (DB persistence, idempotency, routing engine) scheduled for v5.
 
 import { v4 as uuidv4 } from 'uuid';

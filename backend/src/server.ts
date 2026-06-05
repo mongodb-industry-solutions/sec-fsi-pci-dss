@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import { resolve } from 'path';
 
 // Load .env from project root (two levels up from backend/src/).
-// Works regardless of CWD — whether called via `npm run dev` from backend/
+// Works regardless of CWD  -  whether called via `npm run dev` from backend/
 // or via `npm run dev:backend` from the workspace root.
 dotenv.config({ path: resolve(__dirname, '../../.env') });
 import Fastify, { FastifyInstance } from 'fastify';
@@ -83,7 +83,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
   }, async (_request, reply) => reply.redirect('/doc'));
 
-  // API routes — each module registers its own routes internally
+  // API routes  -  each module registers its own routes internally
   await fastify.register(identityModule,     { prefix: '/api/v1' });
   await fastify.register(customerModule,     { prefix: '/api/v1' });
   await fastify.register(transactionsModule, { prefix: '/api/v1' });

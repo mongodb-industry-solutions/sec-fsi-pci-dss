@@ -5,7 +5,7 @@ import { provisionDEKs } from './provisionDEKs';
 import { createCollections } from './createCollections';
 import { createIndexes } from './createIndexes';
 
-// Load .env from project root — works regardless of CWD (npm --prefix changes CWD to backend/)
+// Load .env from project root  -  works regardless of CWD (npm --prefix changes CWD to backend/)
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
 
 export async function runSetup(reset = false) {

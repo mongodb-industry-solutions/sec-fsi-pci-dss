@@ -1,4 +1,4 @@
-// BIAN SD-89: Merchant Relations — REST controller
+// BIAN SD-89: Merchant Relations  -  REST controller
 // Routes mounted at /merchants → /api/v1/merchants
 
 import { FastifyInstance } from 'fastify';
@@ -15,7 +15,7 @@ export async function merchantController(fastify: FastifyInstance) {
 
 **Filters:** \`status\` (active|suspended|closed), \`mcc\` (ISO 18245 code).
 
-The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI DSS Req 3 — protect stored account data equivalent for gateway credentials).`,
+The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI DSS Req 3  -  protect stored account data equivalent for gateway credentials).`,
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',

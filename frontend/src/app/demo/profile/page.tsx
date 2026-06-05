@@ -4,6 +4,7 @@ import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { ROLE_LABELS } from '../../../lib/constants';
 import { useDebugMode } from '../../../lib/debugMode';
+import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck } from 'lucide-react';
 
 interface ProfileData {
   sub: string;
@@ -94,9 +95,9 @@ function RevealField({
         <button
           onClick={() => setRevealed((v) => !v)}
           title={revealed ? 'Hide' : 'Reveal'}
-          className="text-gray-400 hover:text-[#001E2B] transition-colors text-base shrink-0"
+          className="text-gray-400 hover:text-[#001E2B] transition-colors shrink-0"
         >
-          {revealed ? '🙈' : '👁'}
+          {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
         </button>
       </div>
     </>
@@ -196,8 +197,9 @@ export default function ProfilePage() {
         {ag && !editing && (
           <button
             onClick={() => { setEditing(true); setSaveMsg(null); }}
-            className="text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
+            className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
           >
+            <Pencil size={14} />
             Edit Profile
           </button>
         )}
@@ -328,10 +330,12 @@ export default function ProfilePage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
+              <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1.5 flex-wrap">
                 Phone
-                <span className="ml-1.5 text-xs bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-mono">QE:equality</span>
-                <span className="ml-1 text-gray-400 font-normal">(re-encrypted on save)</span>
+                <span className="flex items-center gap-1 bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-mono text-xs">
+                  <Lock size={10} /> QE:equality
+                </span>
+                <span className="text-gray-400 font-normal text-xs">New value will be encrypted client-side before reaching the server</span>
               </label>
               <input
                 value={editPhone}
@@ -359,15 +363,17 @@ export default function ProfilePage() {
           <div className="flex gap-2 pt-1">
             <button
               onClick={() => { setEditing(false); setSaveMsg(null); }}
-              className="flex-1 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50"
             >
+              <X size={14} />
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex-1 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold disabled:opacity-50"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold disabled:opacity-50"
             >
+              <Save size={14} />
               {saving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
@@ -387,8 +393,8 @@ export default function ProfilePage() {
             <span>Encrypted in Atlas. Not searchable. Requires Level 2 escalation to reveal.</span>
           </div>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-base">👁</span>
-            <span>Click to reveal. Click 🙈 to re-hide. Each field is independent.</span>
+            <Eye size={12} />
+            <span>Click to reveal a field. Click again to re-hide it. Each field is independent.</span>
           </div>
         </div>
       </div>
@@ -404,7 +410,7 @@ export default function ProfilePage() {
       {debugMode && (
         <div className="bg-gray-900 rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold text-[#00ED64]">⚙ Debug — Raw API response (/api/v1/auth/me)</p>
+            <p className="text-xs font-semibold text-[#00ED64]">Debug  -  Raw API response (/api/v1/auth/me)</p>
             <button
               onClick={async () => {
                 if (rawJson) { setRawJson(null); return; }

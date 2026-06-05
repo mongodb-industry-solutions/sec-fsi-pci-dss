@@ -6,6 +6,7 @@ import { ROLE_LABELS } from '../../lib/constants';
 import { DebugModeProvider, useDebugMode } from '../../lib/debugMode';
 import { DemoSidebar } from '../../components/DemoSidebar';
 import Link from 'next/link';
+import { Settings, LogOut } from 'lucide-react';
 
 const NO_SHELL_PATHS = ['/demo'];
 
@@ -45,7 +46,7 @@ function DemoShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Top panel — full width, above sidebar */}
+      {/* Top panel  -  full width, above sidebar */}
       <header className="bg-[#001E2B] text-white px-4 py-3 flex justify-between items-center z-20 shrink-0">
         <span className="font-bold text-[#00ED64]">🏦 Payment Gateway</span>
         <div className="flex items-center gap-3 text-sm">
@@ -54,19 +55,23 @@ function DemoShell({ children }: { children: React.ReactNode }) {
               {user.name} · {ROLE_LABELS[user.role] ?? user.role}
             </span>
           )}
-          {/* Debug toggle — always visible in the top bar */}
+          {/* Debug toggle  -  always visible in the top bar */}
           <button
             onClick={toggleDebug}
-            title="Toggle debug mode — shows technical details and raw JSON options"
+            title="Toggle debug mode  -  shows technical details and raw JSON options"
             className={`text-xs px-2 py-1 rounded border transition-colors ${
               debugMode
                 ? 'bg-[#00ED64] text-[#001E2B] border-[#00ED64] font-semibold'
                 : 'text-gray-400 border-white/20 hover:border-white/40'
             }`}
           >
-            {debugMode ? 'Debug ON' : 'Debug'}
+            <Settings size={13} />
+            <span>{debugMode ? 'Debug ON' : 'Debug'}</span>
           </button>
-          <Link href="/demo" className="text-gray-400 hover:text-white text-sm">Sign out</Link>
+          <Link href="/demo" className="flex items-center gap-1.5 text-gray-400 hover:text-white text-sm">
+            <LogOut size={13} />
+            <span>Sign out</span>
+          </Link>
         </div>
       </header>
 

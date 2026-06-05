@@ -46,7 +46,7 @@ async function buildResponse(
     return safeBase;
   }
 
-  // Fetch sensitive record (app-side join — ADR-001: no $lookup across QE collections)
+  // Fetch sensitive record (app-side join  -  ADR-001: no $lookup across QE collections)
   const sensitiveDoc = await fetchSensitive(db, base.customerAgreementInstanceReference);
 
   // Write audit event if we have a case context from the token
@@ -96,7 +96,7 @@ export async function getByAccountRef(db: Db, ref: string, role: UserRole = 'lev
 
 // Update allowed profile fields for the authenticated customer.
 // Uses the QE-enabled client so QE:equality fields (phone) are auto-encrypted.
-// Email and accountReference are intentionally excluded — they are identity keys.
+// Email and accountReference are intentionally excluded  -  they are identity keys.
 export async function updateSelfProfile(
   db: Db,
   email: string,
@@ -116,11 +116,11 @@ export async function updateSelfProfile(
   return result.matchedCount > 0;
 }
 
-// Look up by primary UUID — used by fraud case detail to load the linked customer profile.
+// Look up by primary UUID  -  used by fraud case detail to load the linked customer profile.
 // The UUID (customerAgreementInstanceReference) is a plaintext field, so no QE decryption
 // is required for the lookup itself. Sensitive fields still require escalation token.
 // Returns the full customer profile for self-service (/auth/me).
-// Unlike the QE-search endpoints, this does NOT strip QE:equality fields —
+// Unlike the QE-search endpoints, this does NOT strip QE:equality fields  - 
 // the customer is entitled to see their own email, phone, and account reference.
 // Sensitive fields (address, govt ID) are always included with a clearly marked null
 // when the sensitive record does not exist.

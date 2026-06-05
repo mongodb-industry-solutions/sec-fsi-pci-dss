@@ -259,7 +259,7 @@ role to retrieve.`,
               description: 'Payment channel.',
             },
             paymentCardReference:              { type: 'string', description: 'Card token (surrogate, not the PAN).' },
-            cardTransactionAccountReference:   { type: 'string', nullable: true, description: 'QE:equality — decrypted account reference.' },
+            cardTransactionAccountReference:   { type: 'string', nullable: true, description: 'QE:equality  -  decrypted account reference.' },
             cardTransactionInitiationType:     { type: 'string', nullable: true },
             sensitive: {
               type: 'object', nullable: true,
@@ -283,7 +283,7 @@ role to retrieve.`,
     return reply.send(txn);
   });
 
-  // GET /api/v1/transactions/:id/notes — customer-safe endpoint: returns only public notes
+  // GET /api/v1/transactions/:id/notes  -  customer-safe endpoint: returns only public notes
   // accessible to any authenticated user (including customer role)
   fastify.get('/:id/notes', {
     schema: {
@@ -293,7 +293,7 @@ role to retrieve.`,
 transaction, without exposing internal analyst notes or sensitive case details.
 
 Accessible to the \`customer\` role (unlike direct fraud case endpoints).
-Only \`fraudDiagnosisCustomerSubjectNotes\` is returned — internal \`fraudDiagnosisCaseNotes\`
+Only \`fraudDiagnosisCustomerSubjectNotes\` is returned  -  internal \`fraudDiagnosisCaseNotes\`
 are never included in this response.`,
       security: [{ bearerAuth: [] }],
       params: {
@@ -338,7 +338,7 @@ are never included in this response.`,
     });
   });
 
-  // GET /api/v1/transactions/all  — paginated transaction list for analyst / auditor roles
+  // GET /api/v1/transactions/all   -  paginated transaction list for analyst / auditor roles
   fastify.get('/all', {
     schema: {
       tags: ['transactions'],

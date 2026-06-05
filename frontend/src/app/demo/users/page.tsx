@@ -290,7 +290,7 @@ export default function UsersPage() {
                   }`}>{txn.cardTransactionStatus}</span>
                 </div>
 
-                {/* Case action — context-aware */}
+                {/* Case action  -  context-aware */}
                 <div className="shrink-0 text-right space-y-1">
                   {linkedCase === undefined ? (
                     // Still loading case info

@@ -14,7 +14,7 @@ export async function demoController(fastify: FastifyInstance) {
       tags: ['system'],
       summary: 'API and Atlas health check',
       description: `Returns the API server status and MongoDB Atlas connectivity.
-**Public — no JWT required.** Responds even when Atlas is unreachable; check the \`atlas\` field.`,
+**Public  -  no JWT required.** Responds even when Atlas is unreachable; check the \`atlas\` field.`,
       response: {
         200: {
           description: 'Healthy: Atlas reachable',
@@ -65,7 +65,7 @@ export async function demoController(fastify: FastifyInstance) {
       tags: ['system'],
       summary: 'List demo users for quick login (max 5)',
       description: `Returns up to 5 active pre-seeded demo user accounts for the local authentication domain.
-**Public — no JWT required.** Intended for the login UI to populate the user selector. Passwords are never returned.`,
+**Public  -  no JWT required.** Intended for the login UI to populate the user selector. Passwords are never returned.`,
       response: {
         200: {
           description: 'List of available demo users (max 5).',
@@ -109,9 +109,9 @@ export async function demoController(fastify: FastifyInstance) {
     schema: {
       tags: ['system'],
       summary: 'Raw (undecrypted) document from Atlas',
-      description: `**Non-production only — blocked in production (403).** Returns the MongoDB document exactly as stored on Atlas, bypassing QE auto-decryption.
+      description: `**Non-production only  -  blocked in production (403).** Returns the MongoDB document exactly as stored on Atlas, bypassing QE auto-decryption.
 
-QE-protected fields appear as BSON binary ciphertext — this is the core of the **"What does Atlas see?"** demo step.
+QE-protected fields appear as BSON binary ciphertext  -  this is the core of the **"What does Atlas see?"** demo step.
 
 **JWT required.** The plain \`MongoClient\` (no \`autoEncryption\`) is used, so ciphertext is returned as-is.`,
       'x-internal': true,

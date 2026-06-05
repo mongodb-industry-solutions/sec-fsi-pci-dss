@@ -188,7 +188,7 @@ The UI uses this to populate the domain selector on the login screen.`,
     }
   });
 
-  // GET /api/v1/auth/me — returns the authenticated user's full profile.
+  // GET /api/v1/auth/me  -  returns the authenticated user's full profile.
   // For customer role: returns JWT claims + full customerAgreement record including
   // QE:equality fields (email, phone, accountRef) and sensitive fields if linked.
   // For analyst / auditor roles: returns JWT claims only (no customerAgreement).
@@ -240,7 +240,7 @@ a \`customerAgreement\` record.`,
     });
   });
 
-  // PATCH /api/v1/auth/me — update own profile (customer only)
+  // PATCH /api/v1/auth/me  -  update own profile (customer only)
   fastify.patch('/me', {
     schema: {
       tags: ['auth'],
@@ -259,7 +259,7 @@ automatically re-encrypts the new value before writing it to Atlas.`,
         type: 'object',
         properties: {
           customerName:                       { type: 'string', description: 'Updated display name.' },
-          customerMobilePhoneNumber:          { type: 'string', description: 'Updated phone (QE:equality — re-encrypted automatically).' },
+          customerMobilePhoneNumber:          { type: 'string', description: 'Updated phone (QE:equality  -  re-encrypted automatically).' },
           customerAgreementPreferredLanguage: { type: 'string', description: 'ISO 639-1 language code (e.g. "en").' },
         },
       },

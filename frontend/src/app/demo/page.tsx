@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, AuthUser, AuthDomain } from '../../lib/api';
+import { Eye, EyeOff } from 'lucide-react';
 import { setToken, decodeToken } from '../../lib/auth';
 import { DEMO_USERS_PASSWORDS, ROLE_LABELS } from '../../lib/constants';
 import { Tooltip } from '../../components/Tooltip';
@@ -242,7 +243,7 @@ export default function DemoLoginPage() {
                     tabIndex={-1}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    {showPassword ? '🙈' : '👁'}
+                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
               </div>
