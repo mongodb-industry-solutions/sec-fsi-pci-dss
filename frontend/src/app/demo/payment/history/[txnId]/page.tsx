@@ -76,6 +76,14 @@ export default function TransactionDetailPage() {
   const [txn, setTxn] = useState<StoredTransaction | null>(null);
   const [apiTxn, setApiTxn] = useState<{ paymentCardReference?: string; cardTransactionMerchantCategoryCode?: string; cardTransactionChannel?: string; cardTransactionInitiationType?: string } | null>(null);
   const [fraudCase, setFraudCase] = useState<FraudCase | null>(null);
+  const [caseNotes, setCaseNotes] = useState<{
+    caseFound: boolean;
+    fraudDiagnosisCaseReference: string | null;
+    fraudDiagnosisCaseStatus: string | null;
+    fraudDiagnosisCaseSeverity: string | null;
+    fraudDiagnosisCustomerSubjectNotes: string | null;
+    fraudDiagnosisResolutionOutcome: string | null;
+  } | null>(null);
   const [events, setEvents] = useState<ActionEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -92,6 +100,11 @@ export default function TransactionDetailPage() {
 
       if (!found) { setNotFound(true); setLoading(false); return; }
       setTxn(found);
+
+      // Fetch customer-visible case notes (works even for customer role — dedicated endpoint)
+      api.transactions.getNotes(txnId, t)
+        .then(setCaseNotes)
+        .catch(() => null);
 
       // Fetch full transaction details from the API to get card token and all fields
       // even for transactions created before the localStorage cardToken field was added
@@ -236,13 +249,64 @@ export default function TransactionDetailPage() {
         )}
       </div>
 
-      {/* Message from security team */}
-      {fraudCase?.fraudDiagnosisCustomerSubjectNotes && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
-          <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1.5">
-            ✉ Message from security team
-          </p>
-          <p className="text-sm text-blue-900">{fraudCase.fraudDiagnosisCustomerSubjectNotes}</p>
+      {/* Notes and messages from the security team */}
+      {caseNotes?.caseFound && (
+        <div className="bg-white rounded-xl border p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-gray-800">Security Review</h2>
+            {caseNotes.fraudDiagnosisCaseReference && (
+              <span className="text-xs font-mono text-gray-400">{caseNotes.fraudDiagnosisCaseReference}</span>
+            )}
+          </div>
+
+          {/* Case status */}
+          {caseNotes.fraudDiagnosisCaseStatus && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-gray-500">Status:</span>
+              <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                caseNotes.fraudDiagnosisCaseStatus === 'escalated'        ? 'bg-orange-100 text-orange-800' :
+                caseNotes.fraudDiagnosisCaseStatus === 'resolved_fraud'   ? 'bg-red-100 text-red-800'    :
+                caseNotes.fraudDiagnosisCaseStatus === 'resolved_cleared' ? 'bg-green-100 text-green-800' :
+                caseNotes.fraudDiagnosisCaseStatus === 'closed'           ? 'bg-gray-100 text-gray-700'  :
+                'bg-amber-100 text-amber-800'
+              }`}>
+                {caseNotes.fraudDiagnosisCaseStatus.replace(/_/g, ' ')}
+              </span>
+              {caseNotes.fraudDiagnosisCaseSeverity && (
+                <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                  caseNotes.fraudDiagnosisCaseSeverity === 'critical' ? 'bg-red-600 text-white' :
+                  caseNotes.fraudDiagnosisCaseSeverity === 'high'     ? 'bg-red-500 text-white' :
+                  caseNotes.fraudDiagnosisCaseSeverity === 'medium'   ? 'bg-yellow-500 text-black' :
+                  'bg-green-600 text-white'
+                }`}>
+                  {caseNotes.fraudDiagnosisCaseSeverity.toUpperCase()}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Customer-visible note from agents */}
+          {caseNotes.fraudDiagnosisCustomerSubjectNotes ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-xs font-semibold text-blue-700 uppercase mb-1">✉ Message from security team</p>
+              <p className="text-sm text-blue-900">{caseNotes.fraudDiagnosisCustomerSubjectNotes}</p>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 italic">No message from the security team yet.</p>
+          )}
+
+          {/* Resolution outcome */}
+          {caseNotes.fraudDiagnosisResolutionOutcome && (
+            <div className={`rounded-lg p-3 text-sm ${
+              caseNotes.fraudDiagnosisResolutionOutcome === 'confirmed_fraud'
+                ? 'bg-red-50 border border-red-200 text-red-800'
+                : 'bg-green-50 border border-green-200 text-green-800'
+            }`}>
+              {caseNotes.fraudDiagnosisResolutionOutcome === 'confirmed_fraud'
+                ? 'Unauthorized transaction confirmed. A refund has been initiated and your card has been secured.'
+                : 'Review complete. This transaction has been confirmed as legitimate.'}
+            </div>
+          )}
         </div>
       )}
 

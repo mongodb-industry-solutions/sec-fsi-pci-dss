@@ -214,6 +214,15 @@ export const api = {
       apiFetch<{ results: Record<string, unknown>[]; count: number }>(
         `/api/v1/transactions?cardToken=${encodeURIComponent(cardToken)}`, {}, token
       ),
+    getNotes: (txnId: string, token: string) =>
+      apiFetch<{
+        caseFound: boolean;
+        fraudDiagnosisCaseReference: string | null;
+        fraudDiagnosisCaseStatus: string | null;
+        fraudDiagnosisCaseSeverity: string | null;
+        fraudDiagnosisCustomerSubjectNotes: string | null;
+        fraudDiagnosisResolutionOutcome: string | null;
+      }>(`/api/v1/transactions/${txnId}/notes`, {}, token),
     listAll: (
       params: { status?: string; merchant?: string; cardToken?: string; email?: string; page?: number; limit?: number },
       token: string

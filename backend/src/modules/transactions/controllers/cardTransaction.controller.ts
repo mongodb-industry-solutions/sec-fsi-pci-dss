@@ -7,6 +7,7 @@ import {
   getDistinctMerchants,
   getAllTransactions,
 } from '../services/cardTransaction.service';
+import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
 
 export async function cardTransactionController(fastify: FastifyInstance) {
   fastify.get('/merchants', {
@@ -280,6 +281,61 @@ role to retrieve.`,
     const txn = await getTransactionById(fastify.db, id, demoRole, escalationToken);
     if (!txn) return reply.status(404).send({ error: 'Transaction not found' });
     return reply.send(txn);
+  });
+
+  // GET /api/v1/transactions/:id/notes — customer-safe endpoint: returns only public notes
+  // accessible to any authenticated user (including customer role)
+  fastify.get('/:id/notes', {
+    schema: {
+      tags: ['transactions'],
+      summary: 'Get customer-visible notes for a transaction',
+      description: `Returns the customer-facing investigation notes and case status for a
+transaction, without exposing internal analyst notes or sensitive case details.
+
+Accessible to the \`customer\` role (unlike direct fraud case endpoints).
+Only \`fraudDiagnosisCustomerSubjectNotes\` is returned — internal \`fraudDiagnosisCaseNotes\`
+are never included in this response.`,
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: { id: { type: 'string', description: '`cardTransactionInstanceReference` UUID.' } },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            caseFound:                        { type: 'boolean' },
+            fraudDiagnosisCaseReference:      { type: 'string', nullable: true },
+            fraudDiagnosisCaseStatus:         { type: 'string', nullable: true },
+            fraudDiagnosisCaseSeverity:       { type: 'string', nullable: true },
+            fraudDiagnosisCustomerSubjectNotes: { type: 'string', nullable: true },
+            fraudDiagnosisResolutionOutcome:  { type: 'string', nullable: true },
+          },
+        },
+        401: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    const fraudCase = await fastify.db
+      .collection(FRAUD_DIAGNOSIS_COLLECTION)
+      .findOne({ linkedCardTransactionReference: id });
+
+    if (!fraudCase) {
+      return reply.send({ caseFound: false, fraudDiagnosisCaseReference: null, fraudDiagnosisCaseStatus: null, fraudDiagnosisCaseSeverity: null, fraudDiagnosisCustomerSubjectNotes: null, fraudDiagnosisResolutionOutcome: null });
+    }
+
+    return reply.send({
+      caseFound:                          true,
+      fraudDiagnosisCaseReference:        fraudCase['fraudDiagnosisCaseReference'] ?? null,
+      fraudDiagnosisCaseStatus:           fraudCase['fraudDiagnosisCaseStatus'] ?? null,
+      fraudDiagnosisCaseSeverity:         fraudCase['fraudDiagnosisCaseSeverity'] ?? null,
+      fraudDiagnosisCustomerSubjectNotes: fraudCase['fraudDiagnosisCustomerSubjectNotes'] ?? null,
+      fraudDiagnosisResolutionOutcome:    (fraudCase['fraudDiagnosisResolutionRecord'] as Record<string, unknown> | null)?.resolutionOutcome ?? null,
+    });
   });
 
   // GET /api/v1/transactions/all  — paginated transaction list for analyst / auditor roles
