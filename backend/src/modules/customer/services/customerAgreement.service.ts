@@ -40,9 +40,9 @@ async function buildResponse(
   const hasValidToken = tokenResult.valid;
 
   if (!canReadSensitive(role, hasValidToken)) {
-    if (role === 'level2_investigator') {
-      throw { statusCode: 403, message: 'Escalation token required for Level 2 sensitive access' };
-    }
+    // All roles without sensitive access (including L2 without escalation token)
+    // receive the basic non-sensitive data. The 403 only applies when sensitive
+    // QE:none fields are explicitly requested via the escalation token flow.
     return safeBase;
   }
 
