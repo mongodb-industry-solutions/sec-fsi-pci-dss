@@ -163,9 +163,17 @@ export async function getDistinctMerchants(db: Db) {
   return results as { name: string; mcc: string }[];
 }
 
-export async function getTransactionsByCardToken(db: Db, cardToken: string) {
+export async function getTransactionsByCardToken(db: Db, value: string) {
+  // Detect masked PAN (contains * or matches ****-****-****-XXXX pattern)
+  // and route to the correct plaintext field.
+  const isMaskedPan = value.includes('*') || /^\*{4}[-\s]?\*{4}[-\s]?\*{4}[-\s]?\d{4}$/.test(value);
+
+  const query = isMaskedPan
+    ? { cardTransactionMaskedPanDisplay: value }
+    : { paymentCardReference: value };
+
   const results = await db.collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION)
-    .find({ paymentCardReference: cardToken } as Partial<CardTransactionLogControlRecord>)
+    .find(query as Partial<CardTransactionLogControlRecord>)
     .sort({ cardTransactionDateTime: -1 })
     .toArray();
 
