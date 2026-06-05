@@ -60,6 +60,8 @@ export default function UsersPage() {
   const [searchValue, setSearchValue] = useState('');
   const [customer, setCustomer] = useState<CustomerResult | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [casesMap, setCasesMap] = useState<Record<string, { id: string; ref: string; status: string } | null>>({});
+  const [caseActionBusy, setCaseActionBusy] = useState<Record<string, boolean>>({});
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [cardToken, setCardToken] = useState('');
@@ -88,9 +90,24 @@ export default function UsersPage() {
   async function loadTransactions() {
     if (!cardToken.trim()) return;
     setTxnLoading(true);
+    setCasesMap({});
     try {
       const res = await api.transactions.getByCardToken(cardToken.trim(), token);
-      setTransactions((res.results ?? []) as Transaction[]);
+      const txns = (res.results ?? []) as Transaction[];
+      setTransactions(txns);
+
+      // For each transaction, look up the associated fraud case (max 1 per transaction)
+      const caseEntries = await Promise.all(
+        txns
+          .filter(t => t.cardTransactionInstanceReference)
+          .map(async t => {
+            const id = t.cardTransactionInstanceReference!;
+            const cases = await api.fraud.list({ transactionId: id, limit: 1 }, token).catch(() => null);
+            const c = cases?.results?.[0];
+            return [id, c ? { id: c.fraudDiagnosisInstanceReference, ref: c.fraudDiagnosisCaseReference, status: c.caseStatus } : null] as const;
+          })
+      );
+      setCasesMap(Object.fromEntries(caseEntries));
     } catch {
       setTransactions([]);
     } finally {
@@ -98,10 +115,25 @@ export default function UsersPage() {
     }
   }
 
-  async function openNewCase(txnId: string) {
-    // Navigate to create-case flow via investigation, pre-selecting the transaction
-    // For now: navigate to the investigation dashboard filtered to relevant cases
-    window.location.href = `/demo/investigation`;
+  async function handleCaseAction(txnId: string, existingCase: { id: string; ref: string; status: string } | null | undefined) {
+    setCaseActionBusy(prev => ({ ...prev, [txnId]: true }));
+    try {
+      if (!existingCase) {
+        // No case: create a new one
+        const res = await api.fraud.open({ transactionId: txnId, reason: 'Manually opened by analyst from customer lookup' }, token);
+        const caseData = await api.fraud.getById(res.fraudDiagnosisInstanceReference, token);
+        setCasesMap(prev => ({ ...prev, [txnId]: { id: res.fraudDiagnosisInstanceReference, ref: caseData.fraudDiagnosisCaseReference, status: caseData.caseStatus } }));
+      } else if (existingCase.status === 'closed') {
+        // Closed case: reopen it
+        await api.fraud.update(existingCase.id, { fraudDiagnosisCaseStatus: 'open' }, token);
+        setCasesMap(prev => ({ ...prev, [txnId]: { ...existingCase, status: 'open' } }));
+      }
+      // If case is open/active, just navigate (handled by Link below)
+    } catch {
+      // Silently handle errors
+    } finally {
+      setCaseActionBusy(prev => ({ ...prev, [txnId]: false }));
+    }
   }
 
   return (
@@ -209,42 +241,79 @@ export default function UsersPage() {
         <div className="bg-white rounded-xl border divide-y">
           <div className="px-5 py-3 flex items-center justify-between">
             <h2 className="font-semibold">Transactions ({transactions.length})</h2>
-            <span className="text-xs text-gray-500">Click to view case or open new investigation</span>
+            <span className="text-xs text-gray-400">One investigation case per transaction</span>
           </div>
-          {transactions.map((txn, i) => (
-            <div key={txn.cardTransactionInstanceReference ?? i} className="px-5 py-3 flex items-center gap-4">
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">{txn.cardTransactionMerchantName ?? 'Unknown'}</p>
-                <p className="text-xs text-gray-500">
-                  {txn.cardTransactionDateTime ? new Date(txn.cardTransactionDateTime).toLocaleString() : ''}
-                  {txn.cardTransactionMaskedPanDisplay ? ` · ${txn.cardTransactionMaskedPanDisplay}` : ''}
-                  {txn.cardTransactionChannel ? ` · ${txn.cardTransactionChannel}` : ''}
-                </p>
-              </div>
-              <div className="text-right shrink-0">
-                {txn.cardTransactionAmount && (
-                  <p className="font-semibold text-sm">
-                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: txn.cardTransactionAmount.currency }).format(txn.cardTransactionAmount.amount)}
+          {transactions.map((txn, i) => {
+            const txnId = txn.cardTransactionInstanceReference ?? '';
+            const linkedCase = txnId ? casesMap[txnId] : undefined;
+            const busy = txnId ? !!caseActionBusy[txnId] : false;
+            const isClosed = linkedCase?.status === 'closed' || linkedCase?.status === 'resolved_cleared' || linkedCase?.status === 'resolved_fraud';
+
+            return (
+              <div key={txnId || i} className="px-5 py-3 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">{txn.cardTransactionMerchantName ?? 'Unknown'}</p>
+                  <p className="text-xs text-gray-500">
+                    {txn.cardTransactionDateTime ? new Date(txn.cardTransactionDateTime).toLocaleString() : ''}
+                    {txn.cardTransactionMaskedPanDisplay ? ` · ${txn.cardTransactionMaskedPanDisplay}` : ''}
+                    {txn.cardTransactionChannel ? ` · ${txn.cardTransactionChannel}` : ''}
                   </p>
-                )}
-                <span className={`text-xs px-1.5 py-0.5 rounded ${
-                  txn.cardTransactionStatus === 'disputed' ? 'bg-red-100 text-red-700' :
-                  txn.cardTransactionStatus === 'authorized' || txn.cardTransactionStatus === 'settled' ? 'bg-green-100 text-green-700' :
-                  'bg-gray-100 text-gray-600'
-                }`}>
-                  {txn.cardTransactionStatus}
-                </span>
+                </div>
+
+                <div className="text-right shrink-0">
+                  {txn.cardTransactionAmount && (
+                    <p className="font-semibold text-sm">
+                      {new Intl.NumberFormat('en-US', { style: 'currency', currency: txn.cardTransactionAmount.currency }).format(txn.cardTransactionAmount.amount)}
+                    </p>
+                  )}
+                  <span className={`text-xs px-1.5 py-0.5 rounded ${
+                    txn.cardTransactionStatus === 'disputed'   ? 'bg-red-100 text-red-700' :
+                    txn.cardTransactionStatus === 'authorized' || txn.cardTransactionStatus === 'settled' ? 'bg-green-100 text-green-700' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>{txn.cardTransactionStatus}</span>
+                </div>
+
+                {/* Case action — context-aware */}
+                <div className="shrink-0 text-right space-y-1">
+                  {linkedCase === undefined ? (
+                    // Still loading case info
+                    <span className="text-xs text-gray-300">...</span>
+                  ) : linkedCase && !isClosed ? (
+                    // Active case: direct link
+                    <Link
+                      href={`/demo/investigation/${linkedCase.id}`}
+                      className="text-xs px-2 py-1 rounded bg-[#001E2B] text-[#00ED64] hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors font-medium"
+                    >
+                      Open case
+                    </Link>
+                  ) : linkedCase && isClosed ? (
+                    // Closed case: reopen button
+                    <button
+                      disabled={busy}
+                      onClick={() => handleCaseAction(txnId, linkedCase)}
+                      className="text-xs px-2 py-1 rounded border border-amber-600 text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
+                    >
+                      {busy ? '...' : 'Reopen case'}
+                    </button>
+                  ) : (
+                    // No case: open new investigation
+                    <button
+                      disabled={busy}
+                      onClick={() => handleCaseAction(txnId, null)}
+                      className="text-xs px-2 py-1 rounded border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] disabled:opacity-50 transition-colors"
+                    >
+                      {busy ? '...' : 'Open investigation'}
+                    </button>
+                  )}
+                  {linkedCase && (
+                    <p className={`text-xs ${isClosed ? 'text-gray-400' : 'text-orange-600'}`}>
+                      {linkedCase.ref} · {linkedCase.status.replace(/_/g, ' ')}
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="shrink-0 flex gap-2">
-                <Link
-                  href="/demo/investigation"
-                  className="text-xs px-2 py-1 rounded border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors"
-                >
-                  View cases
-                </Link>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
