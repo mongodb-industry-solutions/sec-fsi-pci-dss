@@ -9,7 +9,7 @@ export default function TransactionHistoryPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-[#001E2B] text-white px-4 py-3 flex justify-between">
-        <span className="font-bold text-[#00ED64]">🏦 LeafyBank Demo</span>
+        <span className="font-bold text-[#00ED64]">🏦 Payment Gateway Demo</span>
         <div className="flex gap-3 items-center text-sm">
           {user && <span className="text-gray-300">{user.name} [Customer]</span>}
           <Link href="/demo" className="text-gray-400 hover:text-white">Sign out</Link>

@@ -54,7 +54,7 @@ export default function DemoPaymentPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-[#001E2B] text-white px-4 py-3 flex justify-between">
-        <span className="font-bold text-[#00ED64]">🏦 LeafyBank Demo</span>
+        <span className="font-bold text-[#00ED64]">🏦 Payment Gateway Demo</span>
         <Link href="/demo/payment/history" className="text-sm text-gray-400 hover:text-white">← My Transactions</Link>
       </header>
       <main className="max-w-md mx-auto p-6">

@@ -97,7 +97,7 @@ export default function DemoLoginPage() {
         {/* Header */}
         <div className="text-center mb-6">
           <div className="text-4xl mb-2">🏦</div>
-          <h1 className="text-2xl font-bold">PCI DSS Demo</h1>
+          <h1 className="text-2xl font-bold">Payment Gateway Demo</h1>
           <p className="text-gray-500 text-sm mt-1">Application Mode: Sign In</p>
         </div>
 

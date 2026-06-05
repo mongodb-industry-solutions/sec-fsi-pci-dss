@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| **Version** | 1.0 |
-| **Status** | Draft |
+| **Version** | 1.1 |
+| **Status** | Active |
 | **Author** | Antonio Membrides Espinosa |
-| **Date** | 2026-05-26 |
+| **Date** | 2026-06-05 |
 | **Repository** | sec-fsi-pci-dss |
 | **Demo Type** | IST Standalone Demo: FSI / Security |
 
@@ -784,12 +784,22 @@ v5: Payment Gateway + Modular Architecture  (TBD: after v4 validated)
 
 **Deliverables:**
 - Multi-role login simulation (Level 1 Analyst, Level 2 Investigator, Security Auditor)
-- Escalation workflow: request + approve + reveal sensitive fields
-- Audit trail UI: event timeline per case
+- Escalation workflow: request + approve + reveal sensitive fields (FR-v2-11)
+- Audit trail UI: event timeline per case and global audit log for Security Auditor (FR-v2-12, FR-v2-14)
+- HRPC risk check integration: validate a customer against High-Risk Person and Counterparty categories (PEP, SIP, HNWI, fraud history, sanctions, high-risk jurisdictions) via `GET /api/v1/fraud/hrpc/check`
+- Role-aware case detail views with debug mode for technical context during demos
+- RBAC API layer enforcing least-privilege data access at DEK level (FR-v2-13)
 - KMS key rotation demo flow
-- Range queries on `transactionAmount.amount` (QE range)
-- Atlas database audit log integration (read audit events into the UI)
+- Range queries on `transactionAmount.amount` (QE range) (FR-v2-15)
 - Data model documentation (`docs/data-model.md` with ERD)
+
+**v2 implementation status (2026-06-05):**
+- FR-v2-11 (Escalation Workflow): `POST /fraud/:id/escalate/approve` implemented. Generates escalation token, appends audit event, returns token to L2 Investigator.
+- FR-v2-13 (RBAC API Layer): RBAC middleware implemented. Role extracted from JWT or `X-Demo-Role` header. L1 blocked from sensitive collections. L2 requires valid escalation token.
+- FR-v2-14 (Audit Log API): `GET /api/v1/fraud/audit-events` implemented. Security Auditor can view all events across all cases.
+- HRPC Service: `GET /api/v1/fraud/hrpc/check` implemented. Demo dataset with PEP, HNWI, suspicious patterns, and fraud history profiles.
+- App Mode L1/L2/Auditor views: Realistic role-based UX aligned to FDS operating model. Debug mode toggle for technical context.
+- Simulator Mode STEP1/STEP3: Improved with multi-collection Atlas storage map and FDS-aligned L2 investigation sources.
 
 ### v3: Agentic Fraud Investigation
 

@@ -340,68 +340,165 @@ function L1OpenView({
           )}
         </div>
 
+        {/* L1 triage decision context */}
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+          <p className="font-semibold text-amber-800 text-sm mb-1">L1 Triage Assessment</p>
+          <p className="text-xs text-amber-700 mb-2">
+            Sarah reviews the case against L1 authority thresholds. Based on the FDS operating model,
+            L1 can close, add notes, or escalate. Actions that require PII are reserved for L2.
+          </p>
+          <div className="grid grid-cols-2 gap-1 text-xs text-amber-800">
+            <span className="font-medium">L1 can:</span>
+            <span>Review transaction, risk score, indicators</span>
+            <span className="font-medium">L1 can search:</span>
+            <span>By email, phone, or account reference (QE:equality)</span>
+            <span className="font-medium">L1 cannot see:</span>
+            <span>Physical address, Government ID (QE:none, L2 only)</span>
+            <span className="font-medium">L1 action:</span>
+            <span className="font-semibold text-red-700">Escalate - risk score exceeds L1 threshold</span>
+          </div>
+        </div>
+
         {/* Data visibility: L1 vs L2 */}
         <h3 className="font-semibold text-sm text-gray-700 mb-2">Customer Data Access by Role</h3>
         <div className="rounded-lg border divide-y text-sm">
           <div className="px-3 py-2 bg-blue-50">
-            <p className="text-xs font-semibold text-blue-700 uppercase mb-1">L1 can search (encrypted)</p>
+            <p className="text-xs font-semibold text-blue-700 uppercase mb-1.5">
+              L1 can search these fields (QE:equality - encrypted but queryable)
+            </p>
+            <p className="text-xs text-blue-600 mb-2">
+              QE:equality fields are searchable without decryption. The MongoDB driver sends
+              a deterministic ciphertext of the search value. Atlas compares ciphertext-to-ciphertext.
+              No plaintext leaves the application.
+            </p>
             <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <EncryptionBadge label="Email" type="qe-equality" />
-                <span className="text-gray-500 text-xs">QE equality search - value hidden until searched</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <EncryptionBadge label="Phone" type="qe-equality" />
-                <span className="text-gray-500 text-xs">QE equality search - value hidden until searched</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <EncryptionBadge label="Account Reference" type="qe-equality" />
-                <span className="text-gray-500 text-xs">QE equality search - value hidden until searched</span>
-              </div>
+              {[
+                { label: 'Email', note: 'Primary search key - L1 enters a known email to retrieve the customer' },
+                { label: 'Phone', note: 'Secondary search key - used when email is unknown' },
+                { label: 'Account Reference', note: 'Account number equivalent - linked to this fraud case' },
+              ].map(({ label, note }) => (
+                <div key={label} className="flex items-start gap-2">
+                  <EncryptionBadge label={label} type="qe-equality" />
+                  <span className="text-blue-700 text-xs">{note}</span>
+                </div>
+              ))}
             </div>
           </div>
           <div className="px-3 py-2 bg-gray-50">
-            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">L2 only (QE:none - encrypted, not searchable)</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">
+              L2 only - QE:none (encrypted, not searchable, separate DEK)
+            </p>
+            <p className="text-xs text-gray-500 mb-2">
+              These fields use a separate Data Encryption Key (DEK-sensitive). The L1 client
+              does not receive this DEK. Decryption only happens after the L2 investigator
+              approves the escalation.
+            </p>
             <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <EncryptionBadge label="Physical Address" type="qe-none" />
-                <span className="text-gray-400 text-xs">Requires Level 2 escalation</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <EncryptionBadge label="Government ID" type="qe-none" />
-                <span className="text-gray-400 text-xs">Requires Level 2 escalation</span>
-              </div>
+              {[
+                { label: 'Physical Address', note: 'Full residential address - required for identity verification and fraud recovery' },
+                { label: 'Government ID', note: 'National ID or passport reference - used for high-confidence identity confirmation' },
+              ].map(({ label, note }) => (
+                <div key={label} className="flex items-start gap-2">
+                  <EncryptionBadge label={label} type="qe-none" />
+                  <span className="text-gray-400 text-xs">{note}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Atlas raw document (L1 perspective) */}
+      {/* Atlas storage: what L1 sees vs what Atlas actually holds */}
       <div className="bg-white rounded-xl border p-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-gray-800">What Atlas Stores</h2>
+          <div>
+            <h2 className="font-semibold text-gray-800">What Atlas Stores</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Two collections involved in this fraud case</p>
+          </div>
           <button
             onClick={onToggleRaw}
             className="flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg border hover:bg-gray-50 transition-colors"
           >
-            {showRaw ? 'Hide Raw Document' : 'View Raw Atlas Document'}
+            {showRaw ? 'Hide Raw Document' : 'View cardTransaction Raw'}
           </button>
         </div>
-        {!showRaw && (
-          <p className="text-sm text-gray-500">
-            Click to see the actual document stored in Atlas for this transaction.
-            QE-encrypted fields appear as binary ciphertext - neither L1 nor Atlas can read them without the client-side key.
-          </p>
-        )}
+
+        {/* Collection map */}
+        <div className="space-y-3 mb-4">
+          <div className="rounded-lg border p-3 bg-blue-50">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-bold text-blue-700 uppercase">cardTransaction (SD-254)</span>
+              <span className="text-xs bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded">L1 can access</span>
+            </div>
+            <p className="text-xs text-blue-700 mb-2">
+              The payment event record. Amount, merchant, channel, and masked PAN are plaintext.
+              The account reference linking the card to the customer is QE:equality encrypted.
+            </p>
+            {snap && (
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
+                <span className="text-gray-500">Amount:</span>
+                <span className="text-green-700 font-medium">
+                  {new Intl.NumberFormat('en-US', { style: 'currency', currency: snap.cardTransactionAmount.currency }).format(snap.cardTransactionAmount.amount)}
+                  <span className="text-gray-400 ml-1">(plaintext)</span>
+                </span>
+                <span className="text-gray-500">Merchant:</span>
+                <span className="text-green-700">{snap.cardTransactionMerchantName} <span className="text-gray-400">(plaintext)</span></span>
+                <span className="text-gray-500">Masked PAN:</span>
+                <span className="text-green-700 font-mono">{snap.cardTransactionMaskedPanDisplay} <span className="text-gray-400">(plaintext)</span></span>
+                <span className="text-gray-500">Account Ref:</span>
+                <span className="text-orange-700 font-mono text-xs">
+                  BhKJ9... <span className="text-gray-400">(QE:equality ciphertext)</span>
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-lg border p-3 bg-gray-50">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-bold text-gray-600 uppercase">fraudDiagnosisCase (SD-83)</span>
+              <span className="text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded">L1 can access</span>
+            </div>
+            <p className="text-xs text-gray-600 mb-2">
+              The investigation case created when the transaction triggered a fraud rule.
+              No QE encryption: case metadata contains no PII. References point to protected records.
+            </p>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
+              <span className="text-gray-500">Case Ref:</span>
+              <span className="text-green-700">{fraudCase.fraudDiagnosisCaseReference}</span>
+              <span className="text-gray-500">Status:</span>
+              <span className="capitalize">{fraudCase.caseStatus}</span>
+              <span className="text-gray-500">Severity:</span>
+              <span className="capitalize">{fraudCase.riskSeverity}</span>
+              <span className="text-gray-500">Customer FK:</span>
+              <span className="text-gray-500 font-mono text-xs">{fraudCase.linkedCustomerAgreementReference?.slice(0, 12)}... (UUID)</span>
+            </div>
+          </div>
+
+          <div className="rounded-lg border p-3 bg-purple-50 opacity-75">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-bold text-purple-700 uppercase">customerAgreementSensitive (SD-53)</span>
+              <span className="text-xs bg-purple-200 text-purple-800 px-1.5 py-0.5 rounded">L2 only</span>
+            </div>
+            <p className="text-xs text-purple-700">
+              Address and government ID. Encrypted with DEK-sensitive (separate key from DEK-lookup).
+              L1 application never receives this DEK. Field values are inaccessible at this stage.
+            </p>
+          </div>
+        </div>
+
         {showRaw && rawDoc && (
-          <RawDocumentPanel document={rawDoc.document} collection={rawDoc.collection} />
+          <>
+            <div className="text-xs font-semibold text-gray-600 mb-2">Raw cardTransaction document from Atlas:</div>
+            <RawDocumentPanel document={rawDoc.document} collection={rawDoc.collection} />
+          </>
         )}
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
         <strong>MongoDB QE in action:</strong> Sarah can search by email, phone, or account reference
         using Queryable Encryption. Atlas receives and matches ciphertext-to-ciphertext.
-        Plaintext never reaches the server.
+        Plaintext never reaches the server. The customerAgreementSensitive collection is not
+        queried at L1 - the DEK-sensitive key never leaves the L2 application context.
       </div>
     </div>
   );
@@ -501,6 +598,9 @@ function L2ReviewView({
   rawDoc: RawDocumentResponse | null;
   onToggleRaw: () => void;
 }) {
+  const snap = fraudCase.transactionSnapshot;
+  const indicators = fraudCase.fraudDiagnosisAssessment?.riskIndicators ?? [];
+
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-xl border p-5">
@@ -513,12 +613,21 @@ function L2ReviewView({
           <span className="ml-auto bg-purple-100 text-purple-700 text-xs font-medium px-2 py-0.5 rounded">L2 Access</span>
         </div>
         <p className="text-sm text-gray-600 mb-4">
-          Michael receives the escalation from Sarah. With L2 credentials, the QE client decrypts
-          the additional PII fields. Full forensic data is now available.
+          Michael receives the escalation from Sarah and approves it. The escalation token grants
+          the L2 QE client access to DEK-sensitive, unlocking QE:none fields. Full forensic data
+          is now available from multiple collections.
         </p>
 
+        {/* Escalation token context */}
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-4 text-xs text-purple-800">
+          <p className="font-semibold mb-1">Escalation token issued (FR-v2-11)</p>
+          <p className="font-mono text-purple-600 mb-1">X-Escalation-Token: 4e7a9f2b-...</p>
+          <p>Token TTL: 4 hours. The RBAC middleware validates this token on every request to
+          sensitive endpoints. Any access to QE:none fields is logged as a <code>field_accessed</code> audit event.</p>
+        </div>
+
         {/* Transaction summary at L2 */}
-        {fraudCase.transactionSnapshot && (
+        {snap && (
           <div className="bg-gray-50 rounded-lg p-4 mb-4">
             <h3 className="font-semibold text-sm text-gray-700 mb-2">Transaction Details</h3>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
@@ -526,48 +635,113 @@ function L2ReviewView({
               <span className="font-semibold text-red-700">
                 {new Intl.NumberFormat('en-US', {
                   style: 'currency',
-                  currency: fraudCase.transactionSnapshot.cardTransactionAmount.currency,
-                }).format(fraudCase.transactionSnapshot.cardTransactionAmount.amount)}
+                  currency: snap.cardTransactionAmount.currency,
+                }).format(snap.cardTransactionAmount.amount)}
               </span>
               <span className="text-gray-500">Merchant:</span>
-              <span>{fraudCase.transactionSnapshot.cardTransactionMerchantName}</span>
+              <span>{snap.cardTransactionMerchantName}</span>
               <span className="text-gray-500">Card (masked):</span>
-              <span className="font-mono">{fraudCase.transactionSnapshot.cardTransactionMaskedPanDisplay}</span>
+              <span className="font-mono">{snap.cardTransactionMaskedPanDisplay}</span>
               <span className="text-gray-500">Date / Time:</span>
-              <span>{new Date(fraudCase.transactionSnapshot.cardTransactionDateTime).toLocaleString()}</span>
+              <span>{new Date(snap.cardTransactionDateTime).toLocaleString()}</span>
+              <span className="text-gray-500">Channel:</span>
+              <span className="capitalize">{snap.cardTransactionStatus}</span>
             </div>
           </div>
         )}
 
+        {/* Risk indicators context */}
+        {indicators.length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+            <p className="font-semibold text-red-800 text-xs mb-1">Active fraud indicators</p>
+            <ul className="text-xs text-red-700 space-y-0.5">
+              {indicators.map((ind) => (
+                <li key={ind} className="flex gap-1.5">
+                  <span className="text-red-400 mt-0.5">!</span>
+                  {formatRiskIndicator(ind)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <h3 className="font-semibold text-sm text-gray-700 mb-2">Customer Profile: Extended L2 View</h3>
-        <div className="rounded-lg border divide-y text-sm">
+        <div className="rounded-lg border divide-y text-sm mb-4">
           <div className="px-3 py-2 bg-blue-50">
-            <p className="text-xs font-semibold text-blue-700 uppercase mb-1.5">QE:equality fields (L1 + L2)</p>
+            <p className="text-xs font-semibold text-blue-700 uppercase mb-1.5">QE:equality fields (available to L1 and L2)</p>
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <EncryptionBadge label="Email" type="qe-equality" />
-                <span className="text-green-700 font-mono text-xs">luis.fernandez@leafybank.demo</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <EncryptionBadge label="Phone" type="qe-equality" />
-                <span className="text-green-700 font-mono text-xs">+1-555-0142</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <EncryptionBadge label="Account Reference" type="qe-equality" />
-                <span className="text-green-700 font-mono text-xs">ACC-LF-20240115</span>
-              </div>
+              {[
+                { label: 'Email', value: 'luis.fernandez@leafybank.demo' },
+                { label: 'Phone', value: '+1-555-0142' },
+                { label: 'Account Reference', value: 'ACC-LF-20240115' },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex items-center gap-2">
+                  <EncryptionBadge label={label} type="qe-equality" />
+                  <span className="text-green-700 font-mono text-xs">{value}</span>
+                </div>
+              ))}
             </div>
           </div>
           <div className="px-3 py-2 bg-purple-50">
-            <p className="text-xs font-semibold text-purple-700 uppercase mb-1.5">QE:none fields (L2 only - decrypted after escalation)</p>
+            <p className="text-xs font-semibold text-purple-700 uppercase mb-1.5">
+              QE:none fields (L2 only - decrypted after escalation approval)
+            </p>
+            <p className="text-xs text-purple-600 mb-1.5">
+              Decrypted client-side using DEK-sensitive. The plaintext is never sent to Atlas.
+            </p>
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <EncryptionBadge label="Physical Address" type="qe-none" />
-                <span className="text-green-700 font-mono text-xs">742 Evergreen Terrace, Springfield</span>
+              {[
+                { label: 'Physical Address', value: '742 Evergreen Terrace, Springfield, IL 62704' },
+                { label: 'Government ID', value: 'XXX-XX-4821 (masked per PCI DSS)' },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex items-center gap-2">
+                  <EncryptionBadge label={label} type="qe-none" />
+                  <span className="text-green-700 font-mono text-xs">{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* L2 additional investigation sources */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2">
+          <p className="font-semibold text-sm text-gray-700 mb-2">Additional investigation sources available to L2</p>
+          <div className="space-y-2 text-xs text-gray-600">
+            <div className="flex gap-2">
+              <span className="text-purple-500 font-bold mt-0.5">+</span>
+              <div>
+                <p className="font-medium">cardTransactionSensitive (SD-254)</p>
+                <p className="text-gray-500">Raw gateway payload and processor metadata. Accessible via DEK-sensitive after escalation approval. Contains authorization codes and network identifiers.</p>
               </div>
-              <div className="flex items-center gap-2">
-                <EncryptionBadge label="Government ID" type="qe-none" />
-                <span className="text-green-700 font-mono text-xs">XXX-XX-4821 (masked)</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-purple-500 font-bold mt-0.5">+</span>
+              <div>
+                <p className="font-medium">Transaction history by card token</p>
+                <p className="text-gray-500">
+                  GET /api/v1/transactions?cardToken={snap?.cardTransactionMaskedPanDisplay?.replace(/\*/g, '') ?? 'tok_...'} -
+                  all prior transactions on this card. Enables velocity analysis and merchant pattern review.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-purple-500 font-bold mt-0.5">+</span>
+              <div>
+                <p className="font-medium">HRPC risk profile check</p>
+                <p className="text-gray-500">
+                  GET /api/v1/fraud/hrpc/check?accountRef=ACC-LF-20240115 -
+                  validates customer against High-Risk Person and Counterparty categories (PEP, SIP, fraud history, high-risk jurisdictions).
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-purple-500 font-bold mt-0.5">+</span>
+              <div>
+                <p className="font-medium">Full audit trail</p>
+                <p className="text-gray-500">
+                  GET /api/v1/fraud/{fraudCase.fraudDiagnosisInstanceReference}/events -
+                  every action on this case with timestamps, roles, and details.
+                </p>
               </div>
             </div>
           </div>
@@ -577,7 +751,10 @@ function L2ReviewView({
       {/* Raw Atlas document */}
       <div className="bg-white rounded-xl border p-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-gray-800">Atlas Storage: Raw Document</h2>
+          <div>
+            <h2 className="font-semibold text-gray-800">Atlas Storage: Raw Document</h2>
+            <p className="text-xs text-gray-500 mt-0.5">cardTransaction collection</p>
+          </div>
           <button
             onClick={onToggleRaw}
             className="flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg border hover:bg-gray-50 transition-colors"
@@ -589,7 +766,8 @@ function L2ReviewView({
         {!showRaw && (
           <p className="text-sm text-gray-500">
             Toggle to see the actual ciphertext stored in Atlas for the linked transaction.
-            Even with L2 access, Atlas itself only stores encrypted blobs; decryption happens client-side.
+            Even with L2 access, Atlas itself only stores encrypted blobs. Decryption happens
+            client-side using the QE library with DEK-sensitive.
           </p>
         )}
 

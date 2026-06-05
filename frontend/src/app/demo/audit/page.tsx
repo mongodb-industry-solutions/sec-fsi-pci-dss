@@ -1,82 +1,234 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { api, FraudCase } from '../../../lib/api';
+import { api, AuditEventWithCase } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import Link from 'next/link';
+
+const ACTION_TYPE_LABELS: Record<string, string> = {
+  case_opened: 'Case Opened',
+  assigned: 'Assigned',
+  note_added: 'Note Added',
+  field_accessed: 'Sensitive Field Accessed',
+  escalated: 'Escalated to L2',
+  ai_review: 'AI Pre-Review',
+  resolved: 'Resolved',
+  closed: 'Closed',
+};
+
+const ACTION_TYPE_COLORS: Record<string, string> = {
+  case_opened: 'bg-blue-100 text-blue-800',
+  assigned: 'bg-gray-100 text-gray-700',
+  note_added: 'bg-gray-100 text-gray-700',
+  field_accessed: 'bg-purple-100 text-purple-800',
+  escalated: 'bg-yellow-100 text-yellow-800',
+  ai_review: 'bg-indigo-100 text-indigo-800',
+  resolved: 'bg-green-100 text-green-800',
+  closed: 'bg-gray-100 text-gray-600',
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  payment_service: 'System (Payment Service)',
+  level1_analyst: 'L1 Analyst',
+  level2_investigator: 'L2 Investigator',
+  security_auditor: 'Security Auditor',
+  ai_agent: 'AI Agent',
+};
 
 export default function AuditPage() {
   const token = getToken() ?? '';
   const user = token ? decodeToken(token) : null;
-  const [cases, setCases] = useState<FraudCase[]>([]);
+  const [events, setEvents] = useState<AuditEventWithCase[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [filterRole, setFilterRole] = useState('');
+  const [filterAction, setFilterAction] = useState('');
 
   useEffect(() => {
-    api.fraud.list({ limit: 50 }, token)
-      .then((res) => setCases(res.results))
+    api.fraud.allEvents({ page: 1, limit: 100 }, token)
+      .then((res) => {
+        setEvents(res.events);
+        setTotal(res.total);
+      })
+      .catch(() => setEvents([]))
       .finally(() => setLoading(false));
   }, [token]);
 
-  const allEvents = cases.flatMap((c) =>
-    (c.diagnosisActionLog ?? []).map((e) => ({
-      ...e,
-      caseRef: c.fraudDiagnosisCaseReference,
-      caseId: c.fraudDiagnosisInstanceReference,
-    }))
-  ).sort((a, b) => new Date(b.actionDateTime).getTime() - new Date(a.actionDateTime).getTime());
+  const filtered = events.filter((e) => {
+    if (filterRole && e.performedByRole !== filterRole) return false;
+    if (filterAction && e.actionType !== filterAction) return false;
+    return true;
+  });
+
+  const uniqueRoles = [...new Set(events.map((e) => e.performedByRole))];
+  const uniqueActions = [...new Set(events.map((e) => e.actionType))];
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-[#001E2B] text-white px-4 py-3 flex justify-between">
-        <span className="font-bold text-[#00ED64]">🏦 LeafyBank Demo</span>
+      <header className="bg-[#001E2B] text-white px-4 py-3 flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <span className="font-bold text-[#00ED64]">🏦 Payment Gateway Demo</span>
+          <nav className="flex gap-3 text-sm text-gray-300">
+            <Link href="/demo/investigation" className="hover:text-white">Investigation</Link>
+            <Link href="/demo/audit" className="text-[#00ED64] font-medium">Audit Log</Link>
+          </nav>
+        </div>
         <div className="flex gap-3 items-center text-sm">
-          {user && <span className="text-gray-300">{user.name} [Security Auditor]</span>}
+          {user && (
+            <span className="text-xs bg-white/10 px-2 py-0.5 rounded text-gray-300">
+              {user.name} - Security Auditor
+            </span>
+          )}
           <Link href="/demo" className="text-gray-400 hover:text-white">Sign out</Link>
         </div>
       </header>
-      <main className="max-w-5xl mx-auto p-6">
-        <h1 className="text-2xl font-bold mb-5">📋 Audit Log</h1>
+
+      <main className="max-w-6xl mx-auto p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold">Audit Log</h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Immutable event trail across all fraud investigation cases. PCI DSS Requirement 10 compliance.
+            </p>
+          </div>
+          <div className="text-right text-sm text-gray-500">
+            {!loading && <span>{total} total events</span>}
+          </div>
+        </div>
+
+        {/* Access model context */}
+        <div className="bg-[#001E2B]/5 border border-[#001E2B]/20 rounded-xl p-4 text-sm mb-5">
+          <strong>Security Auditor access (Level 4):</strong> Read-only oversight across all cases and roles.
+          You can inspect access logs, escalations, field accesses, and control evidence.
+          You cannot modify cases, rules, or customer data. Segregation of duties is enforced.
+        </div>
+
+        {/* Filters */}
+        <div className="flex gap-3 mb-4 flex-wrap">
+          <select
+            value={filterRole}
+            onChange={(e) => setFilterRole(e.target.value)}
+            className="border rounded-lg px-3 py-1.5 text-sm bg-white"
+          >
+            <option value="">All roles</option>
+            {uniqueRoles.map((r) => (
+              <option key={r} value={r}>{ROLE_LABELS[r] ?? r}</option>
+            ))}
+          </select>
+          <select
+            value={filterAction}
+            onChange={(e) => setFilterAction(e.target.value)}
+            className="border rounded-lg px-3 py-1.5 text-sm bg-white"
+          >
+            <option value="">All action types</option>
+            {uniqueActions.map((a) => (
+              <option key={a} value={a}>{ACTION_TYPE_LABELS[a] ?? a}</option>
+            ))}
+          </select>
+          {(filterRole || filterAction) && (
+            <button
+              onClick={() => { setFilterRole(''); setFilterAction(''); }}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+
         {loading ? (
-          <div className="text-center py-8 text-gray-400">Loading audit events…</div>
+          <div className="text-center py-8 text-gray-400">Loading audit events...</div>
         ) : (
           <div className="bg-white rounded-xl border overflow-hidden">
             <table className="min-w-full text-sm divide-y divide-gray-100">
               <thead className="bg-gray-50">
                 <tr>
                   {['Datetime (UTC)', 'Case', 'Action', 'Role', 'Details'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {allEvents.length === 0 ? (
+                {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
-                      No audit events found.
+                      {events.length === 0
+                        ? 'No audit events found. Events are recorded when fraud cases are created, escalated, or resolved.'
+                        : 'No events match the current filters.'}
                     </td>
                   </tr>
                 ) : (
-                  allEvents.map((e, i) => (
+                  filtered.map((e, i) => (
                     <tr key={i} className="hover:bg-gray-50">
-                      <td className="px-4 py-2.5 font-mono text-xs text-gray-500">
+                      <td className="px-4 py-2.5 font-mono text-xs text-gray-500 whitespace-nowrap">
                         {new Date(e.actionDateTime).toISOString().replace('T', ' ').slice(0, 19)}
                       </td>
                       <td className="px-4 py-2.5 font-mono text-xs">
-                        <Link href={`/demo/investigation/${e.caseId}`} className="text-blue-600 hover:underline">
-                          {e.caseRef}
-                        </Link>
+                        {e.fraudDiagnosisCaseReference ? (
+                          <Link
+                            href={`/demo/investigation/${e.fraudDiagnosisInstanceReference}`}
+                            className="text-blue-600 hover:underline"
+                          >
+                            {e.fraudDiagnosisCaseReference}
+                          </Link>
+                        ) : (
+                          <span className="text-gray-400">{e.fraudDiagnosisInstanceReference?.slice(0, 8)}...</span>
+                        )}
                       </td>
-                      <td className="px-4 py-2.5 font-medium">{e.actionType.replace(/_/g, ' ')}</td>
-                      <td className="px-4 py-2.5 text-gray-600">{e.performedByRole}</td>
-                      <td className="px-4 py-2.5 text-gray-500 text-xs">
-                        {JSON.stringify(e.actionDetails ?? {})}
+                      <td className="px-4 py-2.5">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${ACTION_TYPE_COLORS[e.actionType] ?? 'bg-gray-100 text-gray-700'}`}>
+                          {ACTION_TYPE_LABELS[e.actionType] ?? e.actionType.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-gray-600 text-xs">
+                        {ROLE_LABELS[e.performedByRole] ?? e.performedByRole}
+                      </td>
+                      <td className="px-4 py-2.5 text-gray-500 text-xs max-w-xs truncate">
+                        {e.actionDetails && Object.keys(e.actionDetails).length > 0
+                          ? Object.entries(e.actionDetails)
+                              .map(([k, v]) => `${k}: ${v}`)
+                              .join(', ')
+                          : '-'}
                       </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
+            {filtered.length > 0 && (
+              <div className="px-4 py-2.5 border-t bg-gray-50 text-xs text-gray-500">
+                Showing {filtered.length} of {total} events
+                {(filterRole || filterAction) && ' (filtered)'}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Audit control context */}
+        {!loading && events.length > 0 && (
+          <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div className="bg-white border rounded-xl p-4">
+              <p className="font-semibold text-gray-700 mb-1">Access controls verified</p>
+              <p className="text-gray-500 text-xs">
+                Events for <code>field_accessed</code> confirm that sensitive QE:none fields were accessed
+                only by authorized Level 2 investigators with valid escalation tokens.
+              </p>
+            </div>
+            <div className="bg-white border rounded-xl p-4">
+              <p className="font-semibold text-gray-700 mb-1">Immutable trail</p>
+              <p className="text-gray-500 text-xs">
+                All events in <code>fraudDiagnosisCaseEvents</code> are append-only. No event can be
+                modified or deleted by any application role, including Security Auditor.
+              </p>
+            </div>
+            <div className="bg-white border rounded-xl p-4">
+              <p className="font-semibold text-gray-700 mb-1">PCI DSS Req 10</p>
+              <p className="text-gray-500 text-xs">
+                This audit trail satisfies Requirement 10: track and monitor all access to network
+                resources and cardholder data. Timestamp, role, and action type are recorded for
+                every event.
+              </p>
+            </div>
           </div>
         )}
       </main>

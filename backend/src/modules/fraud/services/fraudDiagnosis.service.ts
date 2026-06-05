@@ -117,6 +117,41 @@ export async function getCaseEvents(db: Db, caseId: string) {
   return { caseId, events };
 }
 
+export async function getAllAuditEvents(
+  db: Db,
+  page: number,
+  limit: number
+) {
+  const skip = (page - 1) * limit;
+
+  const events = await db.collection(FRAUD_DIAGNOSIS_EVENTS_COLLECTION)
+    .aggregate([
+      { $sort: { actionDateTime: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $lookup: {
+          from: FRAUD_DIAGNOSIS_COLLECTION,
+          localField: 'fraudDiagnosisInstanceReference',
+          foreignField: 'fraudDiagnosisInstanceReference',
+          as: 'caseData',
+          pipeline: [{ $project: { fraudDiagnosisCaseReference: 1 } }],
+        },
+      },
+      {
+        $addFields: {
+          fraudDiagnosisCaseReference: { $arrayElemAt: ['$caseData.fraudDiagnosisCaseReference', 0] },
+        },
+      },
+      { $project: { caseData: 0 } },
+    ])
+    .toArray();
+
+  const total = await db.collection(FRAUD_DIAGNOSIS_EVENTS_COLLECTION).countDocuments();
+
+  return { events, total, page, limit };
+}
+
 export async function appendAuditEvent(
   db: Db,
   caseId: string,

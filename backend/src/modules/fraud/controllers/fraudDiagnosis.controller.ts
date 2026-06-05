@@ -1,5 +1,28 @@
 import { FastifyInstance } from 'fastify';
-import { getCases, getCaseById, updateCase, getCaseEvents } from '../services/fraudDiagnosis.service';
+import { resolve } from 'path';
+import { readFileSync } from 'fs';
+import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, appendAuditEvent } from '../services/fraudDiagnosis.service';
+import { generateToken } from '../../../vendors/security/escalationTokens';
+
+interface HrpcFlag {
+  category: string;
+  riskLevel: string;
+  label: string;
+  description: string;
+  detectedAt: string;
+  source: string;
+  reviewRequired: boolean;
+}
+
+interface HrpcProfile {
+  accountRef: string;
+  customerName: string;
+  hrpcFlags: HrpcFlag[];
+}
+
+const HRPC_PROFILES: HrpcProfile[] = JSON.parse(
+  readFileSync(resolve(__dirname, '../../../../data/hrpcProfiles.json'), 'utf-8')
+);
 
 export async function fraudDiagnosisController(fastify: FastifyInstance) {
   fastify.get('/', {
@@ -294,6 +317,140 @@ Events are append-only; they are never updated or deleted.
     return reply.send(result);
   });
 
+  // GET /api/v1/fraud/audit-events  [v2]
+  fastify.get('/audit-events', {
+    schema: {
+      tags: ['fraud'],
+      summary: 'List all audit events across all cases (Security Auditor)',
+      description: `Returns all events from the \`fraudDiagnosisCaseEvents\` collection sorted by
+date descending. Includes case reference for each event.
+
+Intended for the Security Auditor role to review access governance, traceability,
+and evidence integrity across the entire fraud investigation operation.
+
+Each event records: who acted, in which role, when, on which case, and what action was taken.`,
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'string', default: '1' },
+          limit: { type: 'string', default: '50' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            events: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  fraudDiagnosisInstanceReference: { type: 'string' },
+                  fraudDiagnosisCaseReference: { type: 'string' },
+                  actionDateTime: { type: 'string', format: 'date-time' },
+                  actionType: { type: 'string' },
+                  performedByInstanceReference: { type: 'string' },
+                  performedByRole: { type: 'string' },
+                  actionDetails: { type: 'object', additionalProperties: true },
+                },
+              },
+            },
+            total: { type: 'number' },
+            page: { type: 'number' },
+            limit: { type: 'number' },
+          },
+        },
+        401: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { page = '1', limit = '50' } = request.query as { page?: string; limit?: string };
+    const result = await getAllAuditEvents(fastify.db, parseInt(page, 10), parseInt(limit, 10));
+    return reply.send(result);
+  });
+
+  // GET /api/v1/fraud/hrpc/check  [v2]
+  fastify.get('/hrpc/check', {
+    schema: {
+      tags: ['fraud'],
+      summary: 'Check HRPC risk profile for a customer account',
+      description: `Validates whether a customer account reference appears in any
+High-Risk Person and Counterparty (HRPC) category.
+
+HRPC categories are defined risk indicators that require enhanced scrutiny in fraud,
+AML, KYC, sanctions, and EDD contexts. Presence in an HRPC category is a risk
+indicator, not proof of fraud.
+
+**HRPC categories supported:**
+- \`pep\` - Politically Exposed Person
+- \`sip\` - Special Interest Person
+- \`hnwi\` - High Net Worth Individual
+- \`ubo\` - Ultimate Beneficial Owner with complex structure
+- \`terrorism_linked\` - Terrorism or sanctions overlap
+- \`high_risk_jurisdiction\` - Transaction activity in elevated-risk jurisdictions
+- \`sanctioned\` - Active sanctions match
+- \`financial_fraud_history\` - Prior confirmed fraud
+- \`suspicious_transaction_patterns\` - Behavioral anomaly pattern
+
+Returns an empty \`hrpcFlags\` array when the account is not in any HRPC category.`,
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        required: ['accountRef'],
+        properties: {
+          accountRef: { type: 'string', description: 'Customer agreement reference (QE:equality searchable field).' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            accountRef: { type: 'string' },
+            hrpcMatch: { type: 'boolean', description: 'True when one or more HRPC flags are active for this account.' },
+            highestRiskLevel: { type: 'string', enum: ['none', 'low', 'medium', 'high'], description: 'Highest risk level across all active flags.' },
+            hrpcFlags: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  category: { type: 'string' },
+                  riskLevel: { type: 'string', enum: ['low', 'medium', 'high'] },
+                  label: { type: 'string' },
+                  description: { type: 'string' },
+                  detectedAt: { type: 'string' },
+                  source: { type: 'string' },
+                  reviewRequired: { type: 'boolean' },
+                },
+              },
+            },
+          },
+        },
+        400: { $ref: 'Error#' },
+        401: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { accountRef } = request.query as { accountRef: string };
+    if (!accountRef) return reply.status(400).send({ error: 'accountRef query parameter is required' });
+
+    const profile = HRPC_PROFILES.find((p) => p.accountRef === accountRef);
+    const flags = profile?.hrpcFlags ?? [];
+
+    const riskOrder = { high: 3, medium: 2, low: 1, none: 0 };
+    const highestRiskLevel = flags.reduce<'none' | 'low' | 'medium' | 'high'>((acc, f) => {
+      const lvl = f.riskLevel as 'low' | 'medium' | 'high';
+      return riskOrder[lvl] > riskOrder[acc] ? lvl : acc;
+    }, 'none');
+
+    return reply.send({
+      accountRef,
+      hrpcMatch: flags.length > 0,
+      highestRiskLevel,
+      hrpcFlags: flags,
+    });
+  });
+
   // POST /api/v1/fraud/:id/escalate  [v2]
   fastify.post('/:id/escalate', {
     schema: {
@@ -336,12 +493,95 @@ The Level 2 Investigator gains access to QE:none sensitive fields (DEK-sensitive
     if (!escalationReason) return reply.status(400).send({ error: 'escalationReason is required' });
     const result = await updateCase(fastify.db, id, { fraudDiagnosisCaseStatus: 'escalated' } as never);
     if (!result) return reply.status(404).send({ error: 'Fraud case not found' });
+    await appendAuditEvent(fastify.db, id, 'escalated', 'level1_analyst', {
+      escalationReason,
+      escalationDateTime: new Date().toISOString(),
+    });
     return reply.send({
       fraudDiagnosisInstanceReference: id,
       fraudDiagnosisCaseStatus: 'escalated',
       escalationDateTime: new Date().toISOString(),
-      escalationToken: null,
-      _v2note: 'DEK-sensitive escalation token will be issued in v2',
+    });
+  });
+
+  // POST /api/v1/fraud/:id/escalate/approve  [FR-v2-11]
+  fastify.post('/:id/escalate/approve', {
+    schema: {
+      tags: ['fraud'],
+      summary: 'Approve escalation and issue L2 access token (FR-v2-11)',
+      description: `Approves an escalated case for Level 2 investigation.
+
+**What this endpoint does:**
+1. Validates the case is in \`escalated\` status
+2. Calls \`generateToken(caseId, 'level2_investigator')\` to issue a short-lived escalation token
+3. Appends a \`field_accessed\` audit event documenting the approval
+4. Returns the token to the L2 Investigator
+
+**How the token is used:**
+The L2 Investigator includes the token in the \`X-Escalation-Token\` header when calling
+customer and transaction endpoints. The RBAC middleware validates the token and grants
+access to DEK-sensitive QE:none fields (\`customerAgreementSensitive\`, \`cardTransactionSensitive\`).
+
+Token TTL: 4 hours. Use \`POST /fraud/:id/escalate/approve\` again to renew.`,
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: { id: { type: 'string', description: '`fraudDiagnosisInstanceReference` UUID.' } },
+      },
+      body: {
+        type: 'object',
+        properties: {
+          approvalNotes: { type: 'string', description: 'Optional notes from the approving L2 investigator.' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            fraudDiagnosisInstanceReference: { type: 'string' },
+            fraudDiagnosisCaseStatus: { type: 'string', enum: ['escalated'] },
+            escalationToken: {
+              type: 'string',
+              description: 'Short-lived UUID token granting DEK-sensitive access to QE:none fields. Valid for 4 hours. Include in X-Escalation-Token header.',
+            },
+            escalationApprovedAt: { type: 'string', format: 'date-time' },
+            tokenExpiresAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        400: { $ref: 'Error#' },
+        401: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+        422: { description: 'Case is not in escalated status.', $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { approvalNotes } = (request.body as { approvalNotes?: string }) ?? {};
+
+    const fraudCase = await getCaseById(fastify.db, id);
+    if (!fraudCase) return reply.status(404).send({ error: 'Fraud case not found' });
+    if (fraudCase.fraudDiagnosisCaseStatus !== 'escalated') {
+      return reply.status(422).send({ error: 'Case must be in escalated status to approve' });
+    }
+
+    const token = generateToken(id, 'level2_investigator');
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 4 * 60 * 60 * 1000);
+
+    await appendAuditEvent(fastify.db, id, 'field_accessed', 'level2_investigator', {
+      action: 'escalation_approved',
+      approvalNotes: approvalNotes ?? null,
+      tokenIssuedAt: now.toISOString(),
+      tokenExpiresAt: expiresAt.toISOString(),
+    });
+
+    return reply.send({
+      fraudDiagnosisInstanceReference: id,
+      fraudDiagnosisCaseStatus: 'escalated',
+      escalationToken: token,
+      escalationApprovedAt: now.toISOString(),
+      tokenExpiresAt: expiresAt.toISOString(),
     });
   });
 }

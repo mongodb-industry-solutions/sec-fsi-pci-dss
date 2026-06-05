@@ -408,7 +408,7 @@ All users and their bcrypt-hashed passwords are inserted by the seeder (`bin/see
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  🏦 LeafyBank Demo        Luis Fernandez [Customer]  [Sign out]  │
+│  🏦 Payment Gateway      Luis Fernandez [Customer]  [Sign out]  │
 │                                                                  │
 │  💳 My Transactions                    [+ New Payment]           │
 │                                                                  │
@@ -429,7 +429,7 @@ All users and their bcrypt-hashed passwords are inserted by the seeder (`bin/see
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  🏦 LeafyBank Demo        Luis Fernandez [Customer]  [Sign out]  │
+│  🏦 Payment Gateway       Luis Fernandez [Customer]  [Sign out]  │
 │                                                                  │
 │  🚨 Transaction Under Review                                     │
 │                                                                  │
@@ -454,7 +454,7 @@ The customer sees the outcome state only: `under investigation`, `cleared`, or `
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  LeafyBank Demo    Sarah Chen [Level 1 Analyst]  [Sign out]      │
+│  Payment Gateway   Sarah Chen [Level 1 Analyst]  [Sign out]      │
 │                                                                  │
 │  Case Dashboard                  [My Cases]  [All Open Cases]    │
 │                                                                  │
@@ -526,7 +526,7 @@ The customer sees the outcome state only: `under investigation`, `cleared`, or `
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  🏦 LeafyBank Demo  Michael Obi [L2 Investigator]  [Sign out]   │
+│  🏦 Payment Gateway Michael Obi [L2 Investigator]  [Sign out]   │
 │                                                                  │
 │  🔍 Escalated Cases                                              │
 │                                                                  │
@@ -600,7 +600,7 @@ After resolution: case status changes to `resolved_cleared`. Customer (Luis) see
 
 ```
 ┌───────────────────────────────────────────────────────────────────┐
-│  LeafyBank Demo        Admin [Security Auditor]  [Sign out]       │
+│  Payment Gateway       Admin [Security Auditor]  [Sign out]       │
 │                                                                   │
 │  Audit Log                                                        │
 │                                                                   │

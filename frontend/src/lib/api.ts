@@ -100,6 +100,48 @@ export interface RawDocumentResponse {
   document: Record<string, unknown>;
 }
 
+export interface HrpcFlag {
+  category: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  label: string;
+  description: string;
+  detectedAt: string;
+  source: string;
+  reviewRequired: boolean;
+}
+
+export interface HrpcCheckResponse {
+  accountRef: string;
+  hrpcMatch: boolean;
+  highestRiskLevel: 'none' | 'low' | 'medium' | 'high';
+  hrpcFlags: HrpcFlag[];
+}
+
+export interface AuditEventWithCase extends ActionEvent {
+  fraudDiagnosisInstanceReference: string;
+  fraudDiagnosisCaseReference?: string;
+}
+
+export interface AuditEventsResponse {
+  events: AuditEventWithCase[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface EscalationApproveResponse {
+  fraudDiagnosisInstanceReference: string;
+  fraudDiagnosisCaseStatus: string;
+  escalationToken: string;
+  escalationApprovedAt: string;
+  tokenExpiresAt: string;
+}
+
+export interface CaseEventsResponse {
+  caseId: string;
+  events: ActionEvent[];
+}
+
 export const api = {
   auth: {
     login: (body: { email: string; password: string; domain: string }) =>
@@ -181,6 +223,39 @@ export const api = {
     },
     getById: (id: string, token: string) =>
       apiFetch<FraudCase>(`/api/v1/fraud/${id}`, {}, token),
+    getEvents: (id: string, token: string) =>
+      apiFetch<CaseEventsResponse>(`/api/v1/fraud/${id}/events`, {}, token),
+    allEvents: (params: { page?: number; limit?: number }, token: string) => {
+      const qs = new URLSearchParams(
+        Object.entries(params)
+          .filter(([, v]) => v !== undefined)
+          .map(([k, v]) => [k, String(v)])
+      ).toString();
+      return apiFetch<AuditEventsResponse>(
+        `/api/v1/fraud/audit-events${qs ? `?${qs}` : ''}`, {}, token
+      );
+    },
+    escalate: (id: string, body: { escalationReason: string }, token: string) =>
+      apiFetch<{ fraudDiagnosisInstanceReference: string; fraudDiagnosisCaseStatus: string; escalationDateTime: string }>(
+        `/api/v1/fraud/${id}/escalate`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token
+      ),
+    escalateApprove: (id: string, body: { approvalNotes?: string }, token: string) =>
+      apiFetch<EscalationApproveResponse>(
+        `/api/v1/fraud/${id}/escalate/approve`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token
+      ),
+  },
+
+  hrpc: {
+    check: (accountRef: string, token: string) =>
+      apiFetch<HrpcCheckResponse>(
+        `/api/v1/fraud/hrpc/check?accountRef=${encodeURIComponent(accountRef)}`,
+        {},
+        token
+      ),
   },
 
   system: {

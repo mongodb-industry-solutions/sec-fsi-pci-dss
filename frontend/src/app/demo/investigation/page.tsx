@@ -63,7 +63,7 @@ export default function InvestigationPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-[#001E2B] text-white px-4 py-3 flex items-center justify-between">
-        <span className="font-bold text-[#00ED64]">LeafyBank Demo</span>
+        <span className="font-bold text-[#00ED64]">🏦 Payment Gateway Demo</span>
         <div className="flex items-center gap-3 text-sm">
           {user && (
             <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">
