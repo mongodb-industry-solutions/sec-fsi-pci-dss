@@ -6,9 +6,10 @@ interface Props {
   total: number;
   limit: number;
   onPageChange: (page: number) => void;
+  noun?: string;
 }
 
-export function Pagination({ page, totalPages, total, limit, onPageChange }: Props) {
+export function Pagination({ page, totalPages, total, limit, onPageChange, noun = 'cases' }: Props) {
   if (totalPages <= 1) return null;
 
   const from = (page - 1) * limit + 1;
@@ -42,7 +43,7 @@ export function Pagination({ page, totalPages, total, limit, onPageChange }: Pro
         {' '}&ndash;{' '}
         <span className="font-medium text-gray-700">{to}</span>
         {' '}of{' '}
-        <span className="font-medium text-gray-700">{total}</span> cases
+        <span className="font-medium text-gray-700">{total}</span> {noun}
       </span>
 
       <nav className="flex items-center gap-1 order-1 sm:order-2">

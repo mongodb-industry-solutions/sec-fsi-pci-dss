@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../lib/api';
-import { getToken } from '../../../lib/auth';
+import { getToken, decodeToken } from '../../../lib/auth';
 import { FraudAlert } from '../../../components/FraudAlert';
 import Link from 'next/link';
 
@@ -59,7 +59,8 @@ export default function DemoPaymentPage() {
   const cardToken = `tok_${Math.random().toString(36).slice(2, 10)}`;
 
   function handleCardInput(e: React.ChangeEvent<HTMLInputElement>) {
-    const digits = e.target.value.replace(/\D/g, '').slice(0, 16);
+    // Strip any existing mask characters to get raw digits
+    const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 16);
     setSelectedPreset(null);
     if (digits.length === 0) {
       setMaskedCard('');
@@ -104,8 +105,10 @@ export default function DemoPaymentPage() {
       }, token);
 
       const txnId = res.cardTransactionInstanceReference;
-      // Persist in session for transaction history
-      const stored = JSON.parse(localStorage.getItem('demo_transactions') ?? '[]') as object[];
+      // Persist scoped by user sub so each user only sees their own transactions
+      const payload = decodeToken(token);
+      const storageKey = payload?.sub ? `demo_transactions_${payload.sub}` : 'demo_transactions_guest';
+      const stored = JSON.parse(localStorage.getItem(storageKey) ?? '[]') as object[];
       stored.unshift({
         txnId,
         amount: parseFloat(amount),
@@ -120,7 +123,7 @@ export default function DemoPaymentPage() {
         createdAt: new Date().toISOString(),
         paymentReference: paymentReference || null,
       });
-      localStorage.setItem('demo_transactions', JSON.stringify(stored.slice(0, 50)));
+      localStorage.setItem(storageKey, JSON.stringify(stored.slice(0, 50)));
 
       setResult({
         txnId,
@@ -142,7 +145,7 @@ export default function DemoPaymentPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-[#001E2B] text-white px-4 py-3 flex justify-between items-center">
-        <span className="font-bold text-[#00ED64]">LeafyBank</span>
+        <span className="font-bold text-[#00ED64]">🏦 Payment Gateway</span>
         <div className="flex items-center gap-3">
           <button
             onClick={() => setDebugMode((v) => !v)}
@@ -175,24 +178,26 @@ export default function DemoPaymentPage() {
                     }`}
                   >
                     <div className="font-semibold">{p.network}</div>
-                    <div className="text-gray-400 font-mono">...{p.lastFour}</div>
+                    <div className={`font-mono ${selectedPreset?.lastFour === p.lastFour ? 'text-gray-300' : 'text-gray-400'}`}>...{p.lastFour}</div>
                   </button>
                 ))}
               </div>
-              <input
-                type="text"
-                inputMode="numeric"
-                onChange={handleCardInput}
-                placeholder="Or enter card number manually"
-                maxLength={19}
-                className="w-full border rounded-lg px-3 py-2 font-mono text-sm"
-              />
-              {maskedCard && (
-                <div className="mt-1.5 font-mono text-sm bg-gray-50 rounded px-3 py-2 flex justify-between">
-                  <span>{maskedCard}</span>
-                  {selectedPreset && <span className="text-xs text-gray-400">{selectedPreset.network}</span>}
-                </div>
-              )}
+              <div className="relative">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={maskedCard}
+                  onChange={handleCardInput}
+                  placeholder="Select a card above or enter number"
+                  maxLength={19}
+                  className="w-full border rounded-lg px-3 py-2 font-mono text-sm pr-20"
+                />
+                {selectedPreset && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">
+                    {selectedPreset.network}
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Amount presets */}
@@ -214,7 +219,7 @@ export default function DemoPaymentPage() {
                 onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
                 className="w-full border rounded-lg px-3 py-2"
               />
-              {isFraudRisk && (
+              {debugMode && isFraudRisk && (
                 <p className="text-xs text-amber-600 mt-1">
                   {amountNum > 500 ? 'Amount exceeds $500 - fraud review will be triggered.' : 'High-risk merchant category - fraud review will be triggered.'}
                 </p>
@@ -244,12 +249,20 @@ export default function DemoPaymentPage() {
               <input value={mcc} onChange={(e) => setMcc(e.target.value)} placeholder="MCC code" className="w-full border rounded-lg px-3 py-2 font-mono text-sm" />
             </div>
 
-            <button
-              onClick={() => { if (!maskedCard) { setError('Please select or enter a card.'); return; } setError(null); setStep(2); }}
-              className="w-full bg-[#001E2B] text-[#00ED64] py-2.5 rounded-lg font-semibold"
-            >
-              Review Payment
-            </button>
+            <div className="flex gap-3 pt-1">
+              <Link
+                href="/demo/payment/history"
+                className="flex-1 text-center border rounded-lg py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </Link>
+              <button
+                onClick={() => { if (!maskedCard) { setError('Please select or enter a card.'); return; } setError(null); setStep(2); }}
+                className="flex-1 bg-[#001E2B] text-[#00ED64] py-2.5 rounded-lg font-semibold text-sm"
+              >
+                Review Payment
+              </button>
+            </div>
             {error && <p className="text-red-600 text-sm text-center">{error}</p>}
           </div>
         )}
@@ -317,7 +330,7 @@ export default function DemoPaymentPage() {
               </div>
             )}
 
-            {isFraudRisk && (
+            {debugMode && isFraudRisk && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
                 This transaction will be flagged for fraud review based on the amount or merchant category.
               </div>

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, FraudCase, ActionEvent, HrpcCheckResponse } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
@@ -44,6 +44,7 @@ const HRPC_COLORS: Record<string, string> = {
 
 export default function DemoCaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const router = useRouter();
 
   // role/token must start with stable defaults to avoid SSR/client hydration mismatch.
   // getToken() reads localStorage which is undefined during SSR.
@@ -90,6 +91,13 @@ export default function DemoCaseDetailPage() {
     const t = getToken() ?? '';
     const payload = decodeToken(t);
     const resolvedRole = payload?.role ?? 'level1_analyst';
+
+    // Customers must not access investigation cases directly
+    if (resolvedRole === 'customer') {
+      router.replace('/demo/payment/history');
+      return;
+    }
+
     setToken(t);
     setRole(resolvedRole);
 
@@ -572,7 +580,7 @@ export default function DemoCaseDetailPage() {
 function PageHeader({ role, debugMode, onToggleDebug }: { role: string; debugMode: boolean; onToggleDebug: () => void }) {
   return (
     <header className="bg-[#001E2B] text-white px-4 py-3 flex items-center justify-between">
-      <span className="font-bold text-[#00ED64]">LeafyBank</span>
+      <span className="font-bold text-[#00ED64]">🏦 Payment Gateway</span>
       <div className="flex items-center gap-3">
         <button
           onClick={onToggleDebug}

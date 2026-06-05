@@ -23,9 +23,24 @@ const PUBLIC_EXACT: Set<string> = new Set([
 // Admin run/logs endpoints handle their own admin token verification internally
 const PUBLIC_PREFIXES: string[] = ['/doc', '/api/v1/admin'];
 
-// Prefixes that bypass JWT auth only for GET requests (simulator read-only mode)
-// Mutation routes (PATCH /fraud/:id, POST /fraud/:id/escalate) still require JWT
+// Prefixes that bypass JWT auth only for GET requests (simulator read-only mode).
+// Mutation routes (PATCH /fraud/:id, POST /fraud/:id/escalate) still require JWT.
+// NOTE: if a Bearer token IS present on these routes, it is validated and the role
+// is checked — customers are denied even on public-GET routes.
 const PUBLIC_GET_PREFIXES: string[] = ['/api/v1/fraud'];
+
+// URL prefixes that the `customer` role is never allowed to access,
+// regardless of authentication status.
+const CUSTOMER_BLOCKED_PREFIXES: string[] = ['/api/v1/fraud'];
+
+function tryVerifyToken(authHeader: string | undefined): jwt.JwtPayload | null {
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  try {
+    return jwt.verify(authHeader.slice(7), JWT_SECRET) as jwt.JwtPayload;
+  } catch {
+    return null;
+  }
+}
 
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const { url, method } = request;
@@ -38,22 +53,45 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     attachRbacContext(request);
     return;
   }
+
   if (method === 'GET' && PUBLIC_GET_PREFIXES.some((p) => url.startsWith(p))) {
+    // Simulator mode: allow unauthenticated GET requests.
+    // But if a Bearer token is present, validate it and enforce customer block.
+    const payload = tryVerifyToken(request.headers.authorization);
+    if (payload) {
+      (request as FastifyRequest & { user: jwt.JwtPayload }).user = payload;
+      if (
+        (payload as { role?: string }).role === 'customer' &&
+        CUSTOMER_BLOCKED_PREFIXES.some((p) => url.startsWith(p))
+      ) {
+        return reply.status(403).send({ error: 'Access denied: investigation endpoints are not available to the customer role' });
+      }
+    }
     attachRbacContext(request);
     return;
   }
 
+  // All other routes require a valid JWT
   const authHeader = request.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
     return reply.status(401).send({ error: 'Authorization header required' });
   }
 
   const token = authHeader.slice(7);
+  let payload: jwt.JwtPayload;
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+    payload = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
     (request as FastifyRequest & { user: jwt.JwtPayload }).user = payload;
   } catch {
     return reply.status(401).send({ error: 'Invalid or expired token' });
+  }
+
+  // Customers are blocked from investigation and audit endpoints
+  if (
+    (payload as { role?: string }).role === 'customer' &&
+    CUSTOMER_BLOCKED_PREFIXES.some((p) => url.startsWith(p))
+  ) {
+    return reply.status(403).send({ error: 'Access denied: investigation endpoints are not available to the customer role' });
   }
 
   // Always populate demoRole and escalationToken after auth resolves
