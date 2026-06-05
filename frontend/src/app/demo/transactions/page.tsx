@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { Pagination } from '../../../components/Pagination';
+import { Mail, Type, Search, X, Lock } from 'lucide-react';
 
 interface Transaction {
   cardTransactionInstanceReference?: string;
@@ -124,18 +125,28 @@ export default function TransactionsPage() {
       {/* Search + filters */}
       <div className="bg-white rounded-xl border p-4 space-y-3">
         {/* Search type selector */}
-        <div className="flex gap-1.5">
-          {(['text', 'email'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => { setSearchType(t); setSearchInput(''); }}
-              className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                searchType === t ? 'bg-[#001E2B] text-[#00ED64] border-[#001E2B]' : 'border-gray-300 text-gray-600 hover:border-gray-400'
-              }`}
-            >
-              {t === 'email' ? '✉ Email (QE:equality)' : '🔤 Merchant / Card token'}
-            </button>
-          ))}
+        <div className="flex gap-1.5 flex-wrap">
+          <button
+            onClick={() => { setSearchType('text'); setSearchInput(''); }}
+            className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+              searchType === 'text' ? 'bg-[#001E2B] text-[#00ED64] border-[#001E2B]' : 'border-gray-300 text-gray-600 hover:border-gray-400'
+            }`}
+          >
+            <Type size={12} />
+            Merchant / Card token
+          </button>
+          <button
+            onClick={() => { setSearchType('email'); setSearchInput(''); }}
+            className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+              searchType === 'email' ? 'bg-[#001E2B] text-[#00ED64] border-[#001E2B]' : 'border-gray-300 text-gray-600 hover:border-gray-400'
+            }`}
+          >
+            <Mail size={12} />
+            <span>Email</span>
+            <span className="inline-flex items-center gap-0.5 bg-blue-100 text-blue-700 border border-blue-200 px-1 py-0 rounded font-mono text-xs">
+              <Lock size={9} />QE
+            </span>
+          </button>
         </div>
 
         <div className="flex gap-2">
@@ -146,7 +157,7 @@ export default function TransactionsPage() {
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             placeholder={
               searchType === 'email'
-                ? 'customer@example.com  (QE equality search)'
+                ? 'customer@example.com'
                 : 'Merchant name  or  tok_xxxxxxxx'
             }
             className="flex-1 border rounded-lg px-3 py-2 text-sm"
@@ -154,13 +165,18 @@ export default function TransactionsPage() {
           <button
             onClick={handleSearch}
             disabled={!searchInput.trim()}
-            className="px-4 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold disabled:opacity-50"
           >
-            Search
+            <Search size={14} />
+            <span className="hidden sm:inline">Search</span>
           </button>
           {(filterStatus || filterMerchant || filterCardToken || filterEmail) && (
-            <button onClick={clearAll} className="px-3 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50">
-              Clear
+            <button
+              onClick={clearAll}
+              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50"
+            >
+              <X size={14} />
+              <span className="hidden sm:inline">Clear</span>
             </button>
           )}
         </div>
@@ -169,18 +185,18 @@ export default function TransactionsPage() {
         {(filterEmail || filterCardToken || filterMerchant) && (
           <div className="flex gap-2 flex-wrap">
             {filterEmail && (
-              <span className="text-xs bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded font-medium">
-                ✉ Email: {filterEmail}
+              <span className="inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded font-medium">
+                <Mail size={11} /> {filterEmail}
               </span>
             )}
             {filterCardToken && (
-              <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-mono">
+              <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-mono">
                 Token: {filterCardToken}
               </span>
             )}
             {filterMerchant && (
-              <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
-                Merchant: {filterMerchant}
+              <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                <Type size={11} /> {filterMerchant}
               </span>
             )}
           </div>

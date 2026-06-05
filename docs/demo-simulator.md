@@ -596,7 +596,7 @@ The customer sees the outcome state only: `under investigation`, `cleared`, or `
 
 After resolution: case status changes to `resolved_cleared`. Customer (Luis) sees "Transaction cleared" in their history.
 
-### 4.7 Role: Security Auditor (Admin)
+### 4.7 Role: Security Auditor (Diego Sans)
 
 ```
 ┌───────────────────────────────────────────────────────────────────┐
