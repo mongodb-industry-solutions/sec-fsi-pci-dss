@@ -7,12 +7,15 @@ import { getToken, decodeToken } from '../../../../../lib/auth';
 
 interface StoredTransaction {
   txnId: string;
+  cardToken?: string | null;
   amount: number;
   currency: string;
   merchant: string;
   mcc: string;
   channel: string;
+  initiationType?: string | null;
   maskedPan: string;
+  network?: string | null;
   status: string;
   fraudCaseCreated: boolean;
   caseId?: string;
@@ -48,12 +51,30 @@ const EVENT_META: Record<string, { label: string; icon: string; dotColor: string
   field_accessed: { label: 'Account details verified',                 icon: '●', dotColor: 'border-purple-400 bg-purple-50' },
 };
 
+function CardTokenField({ token }: { token: string }) {
+  const [shown, setShown] = useState(false);
+  const masked = token.slice(0, 4) + '_●●●●●●●●';
+  return (
+    <div className="flex items-center gap-2">
+      <span className="font-mono text-xs text-gray-700">{shown ? token : masked}</span>
+      <button
+        onClick={() => setShown(v => !v)}
+        title={shown ? 'Hide token' : 'Show token'}
+        className="text-gray-400 hover:text-[#001E2B] transition-colors text-sm leading-none"
+      >
+        {shown ? '🙈' : '👁'}
+      </button>
+    </div>
+  );
+}
+
 export default function TransactionDetailPage() {
   const { txnId } = useParams<{ txnId: string }>();
 
   const [user, setUser] = useState<ReturnType<typeof decodeToken>>(null);
   const [debugMode, setDebugMode] = useState(false);
   const [txn, setTxn] = useState<StoredTransaction | null>(null);
+  const [apiTxn, setApiTxn] = useState<{ paymentCardReference?: string; cardTransactionMerchantCategoryCode?: string; cardTransactionChannel?: string; cardTransactionInitiationType?: string } | null>(null);
   const [fraudCase, setFraudCase] = useState<FraudCase | null>(null);
   const [events, setEvents] = useState<ActionEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +92,17 @@ export default function TransactionDetailPage() {
 
       if (!found) { setNotFound(true); setLoading(false); return; }
       setTxn(found);
+
+      // Fetch full transaction details from the API to get card token and all fields
+      // even for transactions created before the localStorage cardToken field was added
+      api.transactions.getById(txnId, t)
+        .then((data) => setApiTxn({
+          paymentCardReference:             data.paymentCardReference,
+          cardTransactionMerchantCategoryCode: data.cardTransactionMerchantCategoryCode,
+          cardTransactionChannel:           data.cardTransactionChannel,
+          cardTransactionInitiationType:    data.cardTransactionInitiationType,
+        }))
+        .catch(() => null);
 
       if (found.caseId) {
         try {
@@ -140,24 +172,59 @@ export default function TransactionDetailPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm border-t pt-4">
-          <span className="text-gray-500">Card</span>
+          {/* Card info */}
+          <span className="text-gray-500">Card (masked)</span>
           <span className="font-mono">{txn.maskedPan}</span>
+
+          {txn.network && (
+            <>
+              <span className="text-gray-500">Network</span>
+              <span className="font-medium">{txn.network}</span>
+            </>
+          )}
+
+          {/* Card token — from API (always up-to-date) or localStorage fallback */}
+          {(apiTxn?.paymentCardReference || txn.cardToken) && (
+            <>
+              <span className="text-gray-500">Card token</span>
+              <CardTokenField token={(apiTxn?.paymentCardReference ?? txn.cardToken)!} />
+            </>
+          )}
+
+          {/* Transaction details — prefer API data, fallback to localStorage */}
           <span className="text-gray-500">Channel</span>
-          <span>{CHANNEL_LABELS[txn.channel] ?? txn.channel}</span>
+          <span>{CHANNEL_LABELS[apiTxn?.cardTransactionChannel ?? txn.channel] ?? txn.channel}</span>
+
+          {(apiTxn?.cardTransactionInitiationType || txn.initiationType) && (
+            <>
+              <span className="text-gray-500">Initiation</span>
+              <span>
+                {(apiTxn?.cardTransactionInitiationType ?? txn.initiationType) === 'customerInitiated'
+                  ? 'Customer Initiated (CIT)'
+                  : 'Merchant Initiated (MIT)'}
+              </span>
+            </>
+          )}
+
           <span className="text-gray-500">Merchant category</span>
-          <span className="font-mono">MCC {txn.mcc}</span>
+          <span className="font-mono text-xs">MCC {apiTxn?.cardTransactionMerchantCategoryCode ?? txn.mcc}</span>
+
           {txn.paymentReference && (
             <>
               <span className="text-gray-500">Reference</span>
               <span>{txn.paymentReference}</span>
             </>
           )}
+
           {fraudCase?.fraudDiagnosisCaseReference && (
             <>
               <span className="text-gray-500">Case reference</span>
               <span className="font-mono text-xs">{fraudCase.fraudDiagnosisCaseReference}</span>
             </>
           )}
+
+          <span className="text-gray-500">Transaction ID</span>
+          <span className="font-mono text-xs text-gray-500 truncate">{txn.txnId}</span>
         </div>
 
         {debugMode && (

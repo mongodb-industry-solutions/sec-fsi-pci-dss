@@ -115,12 +115,15 @@ export default function DemoPaymentPage() {
       const stored = JSON.parse(localStorage.getItem(storageKey) ?? '[]') as object[];
       stored.unshift({
         txnId,
+        cardToken,
         amount: parseFloat(amount),
         currency: 'USD',
         merchant,
         mcc,
         channel,
+        initiationType,
         maskedPan: maskedCard,
+        network: selectedPreset?.network ?? null,
         status: res.fraudCaseCreated ? 'under_review' : 'authorized',
         fraudCaseCreated: res.fraudCaseCreated,
         caseId: res.fraudDiagnosisInstanceReference,
