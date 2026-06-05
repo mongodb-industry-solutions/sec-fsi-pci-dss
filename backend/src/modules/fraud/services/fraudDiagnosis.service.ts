@@ -64,14 +64,15 @@ export async function createFraudCase(
 
 export async function getCases(
   db: Db,
-  filters: { status?: string; severity?: string; transactionId?: string },
+  filters: { status?: string; severity?: string; transactionId?: string; customerId?: string },
   page: number,
   limit: number
 ) {
   const query: Record<string, unknown> = {};
-  if (filters.status)        query['fraudDiagnosisCaseStatus']        = filters.status;
-  if (filters.severity)      query['fraudDiagnosisCaseSeverity']      = filters.severity;
-  if (filters.transactionId) query['linkedCardTransactionReference']  = filters.transactionId;
+  if (filters.status)        query['fraudDiagnosisCaseStatus']       = filters.status;
+  if (filters.severity)      query['fraudDiagnosisCaseSeverity']     = filters.severity;
+  if (filters.transactionId) query['linkedCardTransactionReference'] = filters.transactionId;
+  if (filters.customerId)    query['linkedCustomerAgreementReference'] = filters.customerId;
 
   const skip = (page - 1) * limit;
   const [results, total] = await Promise.all([

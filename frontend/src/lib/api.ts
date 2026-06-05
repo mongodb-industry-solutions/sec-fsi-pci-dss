@@ -274,7 +274,7 @@ export const api = {
 
   fraud: {
     list: (
-      params: { status?: string; severity?: string; transactionId?: string; page?: number; limit?: number },
+      params: { status?: string; severity?: string; transactionId?: string; customerId?: string; page?: number; limit?: number },
       token: string
     ) => {
       const qs = new URLSearchParams(

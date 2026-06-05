@@ -39,6 +39,10 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
             type: 'string',
             description: 'Filter by `linkedCardTransactionReference` UUID. Returns the case for a specific transaction.',
           },
+          customerId: {
+            type: 'string',
+            description: 'Filter by `linkedCustomerAgreementReference` UUID. Returns all cases for a specific customer.',
+          },
           page: {
             type: 'string',
             default: '1',
@@ -93,19 +97,21 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
       status,
       severity,
       transactionId,
+      customerId,
       page = '1',
       limit = '20',
     } = request.query as {
       status?: string;
       severity?: string;
       transactionId?: string;
+      customerId?: string;
       page?: string;
       limit?: string;
     };
 
     const result = await getCases(
       fastify.db,
-      { status, severity, transactionId },
+      { status, severity, transactionId, customerId },
       parseInt(page, 10),
       parseInt(limit, 10)
     );
