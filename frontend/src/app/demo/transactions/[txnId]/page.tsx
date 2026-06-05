@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { EncryptionBadge } from '../../../../components/EncryptionBadge';
+import { useDebugMode } from '../../../../lib/debugMode';
+import { DebugRawJson } from '../../../../components/DebugRawJson';
 
 type TxnDetail = Awaited<ReturnType<typeof api.transactions.getById>>;
 
@@ -102,6 +104,7 @@ export default function TransactionDetailPage() {
     }
   }
 
+  const { debugMode } = useDebugMode();
   const isL2 = role === 'level2_investigator';
   const isAuditor = role === 'security_auditor';
   const canSeeSensitive = txn?.sensitive != null;
@@ -313,6 +316,16 @@ export default function TransactionDetailPage() {
           Sensitive fields (QE:none) are accessible without escalation token per the role access model.
           No modifications permitted.
         </div>
+      )}
+
+      {/* Debug: raw JSON */}
+      {debugMode && (
+        <DebugRawJson
+          sections={[
+            { label: 'API — GET /api/v1/transactions/:id', data: txn },
+            { label: 'Linked case', data: linkedCase },
+          ]}
+        />
       )}
     </div>
   );

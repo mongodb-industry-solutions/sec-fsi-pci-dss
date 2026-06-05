@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { api, FraudCase, ActionEvent } from '../../../../../lib/api';
 import { getToken, decodeToken } from '../../../../../lib/auth';
 import { useDebugMode } from '../../../../../lib/debugMode';
+import { DebugRawJson } from '../../../../../components/DebugRawJson';
 
 interface StoredTransaction {
   txnId: string;
@@ -363,6 +364,17 @@ export default function TransactionDetailPage() {
         <div className="bg-white rounded-xl border p-5 text-center text-sm text-gray-500">
           ✓ This transaction was processed normally and did not require additional review.
         </div>
+      )}
+
+      {/* Debug: raw JSON of all available data */}
+      {debugMode && (
+        <DebugRawJson
+          sections={[
+            { label: 'localStorage — stored transaction', data: txn },
+            { label: 'API — GET /api/v1/transactions/:id', data: apiTxn },
+            { label: 'API — GET /api/v1/transactions/:id/notes', data: caseNotes },
+          ]}
+        />
       )}
     </PageShell>
   );

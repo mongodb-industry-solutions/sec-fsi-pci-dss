@@ -8,6 +8,7 @@ import { EncryptionBadge } from '../../../../components/EncryptionBadge';
 import { RawDocumentPanel } from '../../../../components/RawDocumentPanel';
 import { SEVERITY_COLORS, STATUS_COLORS, ROLE_LABELS, formatRiskIndicator } from '../../../../lib/constants';
 import { useDebugMode } from '../../../../lib/debugMode';
+import { DebugRawJson } from '../../../../components/DebugRawJson';
 
 const ACTION_LABELS: Record<string, string> = {
   case_opened: 'Case opened',
@@ -616,6 +617,18 @@ export default function DemoCaseDetailPage() {
             satisfies Requirements 3 (protect stored CHD), 7 (restrict access by business need), and
             10 (audit trail). Role boundaries are enforced at the DEK level, not just application logic.
           </div>
+        )}
+
+        {/* ── Debug: raw JSON ── */}
+        {debugMode && (
+          <DebugRawJson
+            sections={[
+              { label: 'API — GET /api/v1/fraud/:id (case document)', data: fraudCase },
+              { label: 'API — GET /api/v1/fraud/:id/events (audit trail)', data: events },
+              { label: 'API — GET /api/v1/fraud/hrpc/check (HRPC profile)', data: hrpc },
+              { label: 'Customer profile (GET /api/v1/customer/by-id/:customerId)', data: customerProfile },
+            ]}
+          />
         )}
       </main>
     </div>
