@@ -191,9 +191,12 @@ export async function getAllTransactions(
   if (filters.merchant)  query['cardTransactionMerchantName'] = { $regex: filters.merchant, $options: 'i' };
   if (filters.cardToken) query['paymentCardReference']        = filters.cardToken;
 
-  // Two-step QE search: email → customerAgreementReference → cardTransactions
+  // Three-step lookup by email using only plaintext fields after the initial QE search.
+  // This avoids a second QE:equality search which can behave inconsistently across roles.
+  //
   // Step 1: QE:equality search on customerAgreement.customerEmailAddress
-  // Step 2: QE:equality search on cardTransaction.cardTransactionAccountReference
+  // Step 2: plaintext FK lookup on paymentCard.customerAgreementInstanceReference (UUID)
+  // Step 3: plaintext $in filter on cardTransaction.paymentCardReference
   if (filters.email) {
     const agreement = await db
       .collection(CUSTOMER_AGREEMENT_COLLECTION)
@@ -203,10 +206,28 @@ export async function getAllTransactions(
       return { results: [], total: 0, page, limit };
     }
 
-    // customerAgreementReference is a QE:equality field — after QE decryption it
-    // is the plaintext account reference (e.g. ACC-001). Use it to query transactions.
-    const accountRef = (agreement as Record<string, unknown>).customerAgreementReference as string;
-    query['cardTransactionAccountReference'] = accountRef;
+    const customerUuid = (agreement as Record<string, unknown>).customerAgreementInstanceReference as string;
+    if (!customerUuid) {
+      return { results: [], total: 0, page, limit };
+    }
+
+    // Get all card tokens for this customer via the plaintext paymentCard FK
+    const cards = await db
+      .collection('paymentCard')
+      .find({ customerAgreementInstanceReference: customerUuid })
+      .project({ paymentCardReference: 1 })
+      .toArray();
+
+    const cardTokens = cards
+      .map(c => (c as Record<string, unknown>)['paymentCardReference'] as string)
+      .filter(Boolean);
+
+    if (cardTokens.length === 0) {
+      return { results: [], total: 0, page, limit };
+    }
+
+    // Filter transactions by the collected card tokens (paymentCardReference is plaintext)
+    query['paymentCardReference'] = { $in: cardTokens };
   }
 
   const skip = (page - 1) * limit;
