@@ -29,7 +29,6 @@ const ACTION_TYPE_COLORS: Record<string, string> = {
 };
 
 export default function AuditPage() {
-  const [token, setToken] = useState('');
   const [events, setEvents] = useState<AuditEventWithCase[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -38,7 +37,6 @@ export default function AuditPage() {
 
   useEffect(() => {
     const t = getToken() ?? '';
-    setToken(t);
     api.fraud.allEvents({ page: 1, limit: 100 }, t)
       .then((res) => { setEvents(res.events); setTotal(res.total); })
       .catch(() => setEvents([]))
@@ -114,7 +112,7 @@ export default function AuditPage() {
         {loading ? (
           <div className="text-center py-8 text-gray-400">Loading audit events...</div>
         ) : (
-          <div className="bg-white rounded-xl border overflow-hidden">
+          <div className="bg-white rounded-xl border overflow-x-auto">
             <table className="min-w-full text-sm divide-y divide-gray-100">
               <thead className="bg-gray-50">
                 <tr>

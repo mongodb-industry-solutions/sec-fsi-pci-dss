@@ -10,40 +10,41 @@ import {
   ClipboardList,
   User,
   PlusCircle,
+  type LucideIcon,
 } from 'lucide-react';
 import { getToken, decodeToken } from '../lib/auth';
 
 interface NavItem {
   label: string;
   path: string;
-  icon: React.ReactNode;
+  icon: LucideIcon;
   exact?: boolean;
 }
 
 const NAV_BY_ROLE: Record<string, NavItem[]> = {
   level1_analyst: [
-    { label: 'Cases',        path: '/demo/investigation', icon: <BriefcaseMedical size={16} /> },
-    { label: 'Transactions', path: '/demo/transactions',  icon: <CreditCard size={16} /> },
-    { label: 'Users',        path: '/demo/users',         icon: <Users size={16} /> },
-    { label: 'My Profile',   path: '/demo/profile',       icon: <User size={16} /> },
+    { label: 'Cases',        path: '/demo/investigation', icon: BriefcaseMedical },
+    { label: 'Transactions', path: '/demo/transactions',  icon: CreditCard },
+    { label: 'Users',        path: '/demo/users',         icon: Users },
+    { label: 'My Profile',   path: '/demo/profile',       icon: User },
   ],
   level2_investigator: [
-    { label: 'Cases',        path: '/demo/investigation', icon: <BriefcaseMedical size={16} /> },
-    { label: 'Transactions', path: '/demo/transactions',  icon: <CreditCard size={16} /> },
-    { label: 'Users',        path: '/demo/users',         icon: <Users size={16} /> },
-    { label: 'My Profile',   path: '/demo/profile',       icon: <User size={16} /> },
+    { label: 'Cases',        path: '/demo/investigation', icon: BriefcaseMedical },
+    { label: 'Transactions', path: '/demo/transactions',  icon: CreditCard },
+    { label: 'Users',        path: '/demo/users',         icon: Users },
+    { label: 'My Profile',   path: '/demo/profile',       icon: User },
   ],
   security_auditor: [
-    { label: 'Cases',        path: '/demo/investigation', icon: <BriefcaseMedical size={16} /> },
-    { label: 'Transactions', path: '/demo/transactions',  icon: <CreditCard size={16} /> },
-    { label: 'Users',        path: '/demo/users',         icon: <Users size={16} /> },
-    { label: 'Audit Log',    path: '/demo/audit',         icon: <BarChart3 size={16} /> },
-    { label: 'My Profile',   path: '/demo/profile',       icon: <User size={16} /> },
+    { label: 'Cases',        path: '/demo/investigation', icon: BriefcaseMedical },
+    { label: 'Transactions', path: '/demo/transactions',  icon: CreditCard },
+    { label: 'Users',        path: '/demo/users',         icon: Users },
+    { label: 'Audit Log',    path: '/demo/audit',         icon: BarChart3 },
+    { label: 'My Profile',   path: '/demo/profile',       icon: User },
   ],
   customer: [
-    { label: 'My Transactions', path: '/demo/payment/history', icon: <ClipboardList size={16} /> },
-    { label: 'New Payment',     path: '/demo/payment',         icon: <PlusCircle size={16} />, exact: true },
-    { label: 'My Profile',      path: '/demo/profile',         icon: <User size={16} /> },
+    { label: 'My Transactions', path: '/demo/payment/history', icon: ClipboardList },
+    { label: 'New Payment',     path: '/demo/payment',         icon: PlusCircle, exact: true },
+    { label: 'My Profile',      path: '/demo/profile',         icon: User },
   ],
 };
 
@@ -65,23 +66,32 @@ export function DemoSidebar() {
   }
 
   return (
-    <aside className="w-44 flex-shrink-0 bg-[#001E2B] flex flex-col border-r border-white/10">
-      <nav className="flex-1 py-4">
-        <p className="px-4 pb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Menu</p>
-        {items.map((item) => (
-          <Link
-            key={item.path}
-            href={item.path}
-            className={`flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium transition-colors ${
-              isActive(item)
-                ? 'bg-[#00ED64]/10 text-[#00ED64] border-r-2 border-[#00ED64]'
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <span className="shrink-0">{item.icon}</span>
-            {item.label}
-          </Link>
-        ))}
+    <aside className="flex-shrink-0 bg-[#001E2B] flex flex-col border-r border-white/10 w-12 md:w-44">
+      <nav className="flex-1 py-3 md:py-4">
+        {/* Section label only on wider screens */}
+        <p className="hidden md:block px-4 pb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          Menu
+        </p>
+        {items.map((item) => {
+          const Icon = item.icon;
+          const active = isActive(item);
+          return (
+            <Link
+              key={item.path}
+              href={item.path}
+              title={item.label}
+              className={`flex items-center gap-2.5 px-3 md:px-4 py-2.5 text-sm font-medium transition-colors ${
+                active
+                  ? 'bg-[#00ED64]/10 text-[#00ED64] border-r-2 border-[#00ED64]'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Icon size={16} className="shrink-0" />
+              {/* Label hidden on small screens, visible on md+ */}
+              <span className="hidden md:block truncate">{item.label}</span>
+            </Link>
+          );
+        })}
       </nav>
     </aside>
   );

@@ -209,7 +209,7 @@ export default function TransactionsPage() {
         </div>
       ) : (
         <>
-          <div className="bg-white rounded-xl border overflow-hidden">
+          <div className="bg-white rounded-xl border overflow-x-auto">
             <table className="min-w-full text-sm divide-y divide-gray-100">
               <thead className="bg-gray-50">
                 <tr>

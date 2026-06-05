@@ -47,19 +47,24 @@ function DemoShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Top panel  -  full width, above sidebar */}
-      <header className="bg-[#001E2B] text-white px-4 py-3 flex justify-between items-center z-20 shrink-0">
-        <span className="font-bold text-[#00ED64]">🏦 Payment Gateway</span>
-        <div className="flex items-center gap-3 text-sm">
+      <header className="bg-[#001E2B] text-white px-3 sm:px-4 py-3 flex justify-between items-center z-20 shrink-0 gap-2">
+        <span className="font-bold text-[#00ED64] text-sm sm:text-base whitespace-nowrap">🏦 Payment Gateway</span>
+        <div className="flex items-center gap-2 sm:gap-3 text-sm min-w-0">
           {user && (
-            <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">
+            <span className="hidden sm:inline bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded truncate max-w-48">
               {user.name} · {ROLE_LABELS[user.role] ?? user.role}
             </span>
           )}
-          {/* Debug toggle  -  always visible in the top bar */}
+          {/* Compact user chip on small screens */}
+          {user && (
+            <span className="sm:hidden bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded text-xs truncate max-w-24">
+              {user.name.split(' ')[0]}
+            </span>
+          )}
           <button
             onClick={toggleDebug}
             title="Toggle debug mode"
-            className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded border transition-colors ${
+            className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors shrink-0 ${
               debugMode
                 ? 'bg-[#00ED64] text-[#001E2B] border-[#00ED64] font-semibold'
                 : 'text-gray-400 border-white/20 hover:border-white/40'
@@ -68,17 +73,17 @@ function DemoShell({ children }: { children: React.ReactNode }) {
             <Settings size={13} />
             <span className="hidden sm:inline">{debugMode ? 'Debug ON' : 'Debug'}</span>
           </button>
-          <Link href="/demo" className="flex items-center gap-1.5 text-gray-400 hover:text-white text-sm">
-            <LogOut size={13} />
-            <span>Sign out</span>
+          <Link href="/demo" className="inline-flex items-center gap-1 text-gray-400 hover:text-white shrink-0">
+            <LogOut size={14} />
+            <span className="hidden sm:inline text-sm">Sign out</span>
           </Link>
         </div>
       </header>
 
       {/* Sidebar + content row */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         <DemoSidebar />
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto min-w-0">
           {children}
         </div>
       </div>
