@@ -192,6 +192,10 @@ export const api = {
         `/api/v1/customer?accountRef=${encodeURIComponent(ref)}`, {}, token
       ),
 
+    getById: (id: string, token: string) =>
+      apiFetch<Record<string, unknown>>(
+        `/api/v1/customer/by-id/${encodeURIComponent(id)}`, {}, token
+      ),
     getCards: (customerId: string, token: string) =>
       apiFetch<{ results: Record<string, unknown>[] }>(
         `/api/v1/customer/${encodeURIComponent(customerId)}/cards`, {}, token

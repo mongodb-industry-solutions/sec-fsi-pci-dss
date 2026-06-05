@@ -67,6 +67,9 @@ export default function DemoCaseDetailPage() {
   const [rawError, setRawError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Customer profile linked to the case (auto-loaded from linkedCustomerAgreementReference)
+  const [customerProfile, setCustomerProfile] = useState<Record<string, unknown> | null>(null);
+
   // Action state
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [noteText, setNoteText] = useState('');
@@ -82,6 +85,14 @@ export default function DemoCaseDetailPage() {
     ]);
     setFraudCase(caseData);
     setEvents(eventsData.events);
+
+    // Auto-load the customer profile linked to this case
+    if (caseData.linkedCustomerAgreementReference) {
+      api.customer.getById(caseData.linkedCustomerAgreementReference, resolvedToken)
+        .then(setCustomerProfile)
+        .catch(() => null);
+    }
+
     return caseData;
   }
 
@@ -287,39 +298,70 @@ export default function DemoCaseDetailPage() {
             </span>
           </div>
 
+          {/* Auto-loaded customer profile from linkedCustomerAgreementReference */}
+          {customerProfile && (
+            <div className="mb-3 bg-gray-50 rounded-lg p-3 text-sm space-y-1.5">
+              {[
+                { label: 'Name',     key: 'customerName' },
+                { label: 'Segment',  key: 'customerSegment' },
+                { label: 'Status',   key: 'customerAgreementStatus' },
+                { label: 'Enrolled', key: 'customerAgreementEnrollmentDate' },
+              ].map(({ label, key }) =>
+                customerProfile[key] ? (
+                  <div key={key} className="flex gap-2">
+                    <span className="text-gray-500 w-20 shrink-0 text-xs">{label}:</span>
+                    <span className="font-medium text-xs capitalize">
+                      {key === 'customerAgreementEnrollmentDate'
+                        ? new Date(String(customerProfile[key])).toLocaleDateString()
+                        : String(customerProfile[key])}
+                    </span>
+                  </div>
+                ) : null
+              )}
+              {debugMode && (
+                <p className="text-xs text-gray-400 mt-1 font-mono">
+                  Resolved from customerAgreementInstanceReference (plaintext UUID lookup)
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="rounded-lg border divide-y text-sm">
+            {/* QE:equality fields */}
             <div className="p-3 bg-blue-50">
               {debugMode && (
                 <p className="text-xs text-blue-600 mb-2 font-medium">
-                  QE:equality - Searchable while encrypted. Atlas stores ciphertext; queries match ciphertext-to-ciphertext.
+                  QE:equality — searchable while encrypted. Atlas stores ciphertext; queries match ciphertext-to-ciphertext.
                 </p>
               )}
               <div className="space-y-2">
                 {[
-                  { label: 'Email', value: canSeeAll ? 'luis.fernandez@leafybank.demo' : null },
-                  { label: 'Phone', value: canSeeAll ? '+1-555-0142' : null },
+                  { label: 'Email',             value: canSeeAll ? 'luis.fernandez@leafybank.demo' : null },
+                  { label: 'Phone',             value: canSeeAll ? '+1-555-0142' : null },
                   { label: 'Account Reference', value: canSeeAll ? 'ACC-LF-20240115' : null },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex items-center gap-2">
                     <EncryptionBadge label={label} type="qe-equality" />
                     {value
                       ? <span className="text-green-700 font-mono text-xs">{value}</span>
-                      : <span className="text-blue-600 text-xs italic">Use investigation search to look up this customer</span>
+                      : <span className="text-gray-400 text-xs italic">Search above to verify</span>
                     }
                   </div>
                 ))}
               </div>
             </div>
+
+            {/* QE:none fields */}
             <div className={`p-3 ${canSeeAll ? 'bg-purple-50' : 'bg-gray-50'}`}>
               {debugMode && (
                 <p className={`text-xs mb-2 font-medium ${canSeeAll ? 'text-purple-600' : 'text-gray-500'}`}>
-                  QE:none - Encrypted, not searchable. Requires DEK-sensitive (L2 escalation approval).
+                  QE:none — encrypted, not searchable. Requires DEK-sensitive (L2 escalation approval).
                 </p>
               )}
               <div className="space-y-2">
                 {[
                   { label: 'Physical Address', value: canSeeAll ? '742 Evergreen Terrace, Springfield' : null },
-                  { label: 'Government ID', value: canSeeAll ? 'XXX-XX-4821 (masked)' : null },
+                  { label: 'Government ID',    value: canSeeAll ? 'XXX-XX-4821 (masked)' : null },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex items-center gap-2">
                     <EncryptionBadge label={label} type="qe-none" />

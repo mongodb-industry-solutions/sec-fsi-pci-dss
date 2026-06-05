@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { getByEmail, getByPhone, getByAccountRef } from '../services/customerAgreement.service';
+import { getByEmail, getByPhone, getByAccountRef, getByInstanceReference } from '../services/customerAgreement.service';
 import type { DemoRequest } from '../../../shared/models/identity.model';
 
 export async function customerAgreementController(fastify: FastifyInstance) {
@@ -147,5 +147,58 @@ caller has the DEK-sensitive key, i.e. \`level2_investigator\` role.`,
     }
 
     return reply.status(400).send({ error: 'Provide email, phone, or accountRef query parameter' });
+  });
+
+  // GET /api/v1/customer/by-id/:id
+  // Resolves a customerAgreement by primary UUID — used by fraud case detail to auto-load
+  // the customer profile linked to a case without requiring a QE equality search.
+  fastify.get('/by-id/:id', {
+    schema: {
+      tags: ['customer'],
+      summary: 'Get customer agreement by instance reference UUID',
+      description: `Looks up a \`customerAgreement\` by its primary UUID (\`customerAgreementInstanceReference\`).
+
+Used by the fraud case detail view to load the customer profile automatically from
+\`fraudDiagnosisCase.linkedCustomerAgreementReference\` without requiring the analyst
+to perform a manual QE equality search.
+
+**Returned fields:** Non-sensitive plaintext fields only (name, segment, status,
+enrollment date). QE:equality fields (email, phone, account reference) are not returned
+— they are stored as ciphertext and require explicit QE search. For sensitive fields
+(address, government ID) a valid escalation token is required (L2 role only).`,
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: { id: { type: 'string', description: '`customerAgreementInstanceReference` UUID.' } },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            customerAgreementInstanceReference: { type: 'string' },
+            customerName: { type: 'string' },
+            customerSegment: { type: 'string' },
+            customerAgreementStatus: { type: 'string' },
+            customerAgreementEnrollmentDate: { type: 'string' },
+          },
+          additionalProperties: true,
+        },
+        401: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { demoRole, escalationToken } = request as unknown as DemoRequest;
+    try {
+      const result = await getByInstanceReference(fastify.db, id, demoRole, escalationToken);
+      if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
+      return reply.send(result);
+    } catch (err) {
+      const e = err as { statusCode?: number; message?: string };
+      if (e.statusCode === 403) return (reply as typeof reply & { status(n: number): typeof reply }).status(403).send({ error: e.message ?? 'Forbidden' });
+      throw err;
+    }
   });
 }

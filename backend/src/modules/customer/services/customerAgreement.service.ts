@@ -93,3 +93,14 @@ export async function getByAccountRef(db: Db, ref: string, role: UserRole = 'lev
   if (!doc) return null;
   return buildResponse(db, doc, role, escalationToken);
 }
+
+// Look up by primary UUID — used by fraud case detail to load the linked customer profile.
+// The UUID (customerAgreementInstanceReference) is a plaintext field, so no QE decryption
+// is required for the lookup itself. Sensitive fields still require escalation token.
+export async function getByInstanceReference(db: Db, id: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
+  const doc = await db
+    .collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
+    .findOne({ customerAgreementInstanceReference: id });
+  if (!doc) return null;
+  return buildResponse(db, doc, role, escalationToken);
+}
