@@ -94,6 +94,28 @@ export async function getByAccountRef(db: Db, ref: string, role: UserRole = 'lev
   return buildResponse(db, doc, role, escalationToken);
 }
 
+// Update allowed profile fields for the authenticated customer.
+// Uses the QE-enabled client so QE:equality fields (phone) are auto-encrypted.
+// Email and accountReference are intentionally excluded — they are identity keys.
+export async function updateSelfProfile(
+  db: Db,
+  email: string,
+  patch: {
+    customerName?: string;
+    customerMobilePhoneNumber?: string;
+    customerAgreementPreferredLanguage?: string;
+  }
+): Promise<boolean> {
+  if (Object.keys(patch).length === 0) return false;
+
+  const result = await db.collection(CUSTOMER_AGREEMENT_COLLECTION).updateOne(
+    { customerEmailAddress: email } as Record<string, unknown>,
+    { $set: { ...patch, recordUpdatedDateTime: new Date() } }
+  );
+
+  return result.matchedCount > 0;
+}
+
 // Look up by primary UUID — used by fraud case detail to load the linked customer profile.
 // The UUID (customerAgreementInstanceReference) is a plaintext field, so no QE decryption
 // is required for the lookup itself. Sensitive fields still require escalation token.

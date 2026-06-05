@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { ROLE_LABELS } from '../../../lib/constants';
+import { useDebugMode } from '../../../lib/debugMode';
 
 interface ProfileData {
   sub: string;
@@ -112,27 +113,71 @@ function PlainField({ label, value }: { label: string; value: string }) {
 }
 
 export default function ProfilePage() {
+  const { debugMode } = useDebugMode();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rawJson, setRawJson] = useState<string | null>(null);
+  const [loadingRaw, setLoadingRaw] = useState(false);
+  const [token, setToken] = useState('');
+
+  // Edit state
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editLang, setEditLang] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+
+  async function reload(t: string) {
+    const data = await api.auth.me(t).catch(() => null);
+    if (data) {
+      setProfile(data);
+      setEditName((data.agreement?.customerName as string | undefined) ?? data.name ?? '');
+      setEditPhone((data.agreement?.customerMobilePhoneNumber as string | undefined) ?? '');
+      setEditLang((data.agreement?.customerAgreementPreferredLanguage as string | undefined) ?? '');
+    }
+    return data;
+  }
 
   useEffect(() => {
     const t = getToken() ?? '';
+    setToken(t);
     if (!t) { setLoading(false); setError('Session not found.'); return; }
 
-    api.auth.me(t)
-      .then(setProfile)
+    reload(t)
       .catch(() => {
-        // Fallback: show JWT data only
         const user = decodeToken(t);
         if (user) {
           setProfile({ sub: user.sub, email: user.email, name: user.name, role: user.role, domain: user.domain, agreement: null });
+          setEditName(user.name ?? '');
         } else {
           setError('Could not load profile.');
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleSave() {
+    if (!profile?.agreement) return;
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      const patch: Record<string, string> = {};
+      if (editName.trim())  patch.customerName = editName.trim();
+      if (editPhone.trim()) patch.customerMobilePhoneNumber = editPhone.trim();
+      if (editLang.trim())  patch.customerAgreementPreferredLanguage = editLang.trim();
+
+      await api.auth.updateMe(patch, token);
+      await reload(token);
+      setEditing(false);
+      setSaveMsg('Profile updated successfully.');
+    } catch (e) {
+      setSaveMsg(`Error: ${e instanceof Error ? e.message : 'Update failed.'}`);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (loading) return <div className="p-6 text-gray-400 text-sm">Loading profile...</div>;
   if (error)   return <div className="p-6 text-red-600 text-sm">{error}</div>;
@@ -146,7 +191,23 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-xl mx-auto p-6 space-y-5">
-      <h1 className="text-2xl font-bold">My Profile</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">My Profile</h1>
+        {ag && !editing && (
+          <button
+            onClick={() => { setEditing(true); setSaveMsg(null); }}
+            className="text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
+          >
+            Edit Profile
+          </button>
+        )}
+      </div>
+
+      {saveMsg && (
+        <div className={`rounded-xl p-3 text-sm ${saveMsg.startsWith('Error') ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+          {saveMsg}
+        </div>
+      )}
 
       {/* Identity card */}
       <div className="bg-white rounded-xl border p-5">
@@ -251,6 +312,68 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      {/* Edit form */}
+      {editing && ag && (
+        <div className="bg-white rounded-xl border p-5 space-y-4">
+          <h2 className="font-semibold">Edit Profile</h2>
+
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Full name</label>
+              <input
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                placeholder="Your full name"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Phone
+                <span className="ml-1.5 text-xs bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-mono">QE:equality</span>
+                <span className="ml-1 text-gray-400 font-normal">(re-encrypted on save)</span>
+              </label>
+              <input
+                value={editPhone}
+                onChange={e => setEditPhone(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm font-mono"
+                placeholder="+1-555-0000"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Preferred language (ISO 639-1)</label>
+              <select
+                value={editLang}
+                onChange={e => setEditLang(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm bg-white"
+              >
+                <option value="en">English (en)</option>
+                <option value="es">Spanish (es)</option>
+                <option value="fr">French (fr)</option>
+                <option value="de">German (de)</option>
+                <option value="pt">Portuguese (pt)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={() => { setEditing(false); setSaveMsg(null); }}
+              className="flex-1 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex-1 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Legend */}
       <div className="bg-white rounded-xl border p-4 text-sm">
         <p className="font-semibold text-gray-700 mb-2">Field encryption legend</p>
@@ -276,6 +399,41 @@ export default function ProfilePage() {
         Sensitive fields are stored encrypted using MongoDB Queryable Encryption. They are never
         accessible in plaintext to database administrators or support staff.
       </div>
+
+      {/* Debug: raw JSON */}
+      {debugMode && (
+        <div className="bg-gray-900 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-[#00ED64]">⚙ Debug — Raw API response (/api/v1/auth/me)</p>
+            <button
+              onClick={async () => {
+                if (rawJson) { setRawJson(null); return; }
+                setLoadingRaw(true);
+                try {
+                  const t = getToken() ?? '';
+                  const data = await api.auth.me(t);
+                  setRawJson(JSON.stringify(data, null, 2));
+                } catch (e) {
+                  setRawJson(`Error: ${e instanceof Error ? e.message : 'Unknown'}`);
+                } finally {
+                  setLoadingRaw(false);
+                }
+              }}
+              className="text-xs px-2 py-1 rounded border border-[#00ED64]/40 text-[#00ED64] hover:bg-[#00ED64]/10 transition-colors"
+            >
+              {loadingRaw ? 'Loading...' : rawJson ? 'Hide JSON' : 'Load raw JSON'}
+            </button>
+          </div>
+          {rawJson && (
+            <pre className="text-xs text-green-300 overflow-x-auto whitespace-pre-wrap font-mono max-h-80 overflow-y-auto">
+              {rawJson}
+            </pre>
+          )}
+          {!rawJson && !loadingRaw && (
+            <p className="text-xs text-gray-500 italic">Click "Load raw JSON" to fetch the full API response including QE field status.</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

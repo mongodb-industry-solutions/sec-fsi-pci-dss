@@ -3,14 +3,16 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getToken, decodeToken, isTokenExpired } from '../../lib/auth';
 import { ROLE_LABELS } from '../../lib/constants';
+import { DebugModeProvider, useDebugMode } from '../../lib/debugMode';
 import { DemoSidebar } from '../../components/DemoSidebar';
 import Link from 'next/link';
 
 const NO_SHELL_PATHS = ['/demo'];
 
-export default function DemoLayout({ children }: { children: React.ReactNode }) {
+function DemoShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { debugMode, toggleDebug } = useDebugMode();
   const [user, setUser] = useState<ReturnType<typeof decodeToken>>(null);
 
   useEffect(() => {
@@ -27,10 +29,10 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
 
     if (payload && pathname === '/demo') {
       const roleRedirects: Record<string, string> = {
-        customer: '/demo/payment/history',
-        level1_analyst: '/demo/investigation',
+        customer:            '/demo/payment/history',
+        level1_analyst:      '/demo/investigation',
         level2_investigator: '/demo/investigation',
-        security_auditor: '/demo/audit',
+        security_auditor:    '/demo/audit',
       };
       const redirect = roleRedirects[payload.role];
       if (redirect) router.replace(redirect);
@@ -52,6 +54,18 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
               {user.name} · {ROLE_LABELS[user.role] ?? user.role}
             </span>
           )}
+          {/* Debug toggle — always visible in the top bar */}
+          <button
+            onClick={toggleDebug}
+            title="Toggle debug mode — shows technical details and raw JSON options"
+            className={`text-xs px-2 py-1 rounded border transition-colors ${
+              debugMode
+                ? 'bg-[#00ED64] text-[#001E2B] border-[#00ED64] font-semibold'
+                : 'text-gray-400 border-white/20 hover:border-white/40'
+            }`}
+          >
+            {debugMode ? 'Debug ON' : 'Debug'}
+          </button>
           <Link href="/demo" className="text-gray-400 hover:text-white text-sm">Sign out</Link>
         </div>
       </header>
@@ -64,5 +78,13 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
         </div>
       </div>
     </div>
+  );
+}
+
+export default function DemoLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <DebugModeProvider>
+      <DemoShell>{children}</DemoShell>
+    </DebugModeProvider>
   );
 }

@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
-import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, appendAuditEvent } from '../services/fraudDiagnosis.service';
+import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, appendAuditEvent, createFraudCase } from '../services/fraudDiagnosis.service';
+import { getTransactionById } from '../../transactions/services/cardTransaction.service';
 import { generateToken } from '../../../vendors/security/escalationTokens';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRating';
@@ -33,6 +34,10 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
             type: 'string',
             enum: ['low', 'medium', 'high', 'critical'],
             description: 'Filter by risk severity. Derived from transaction amount and risk indicators.',
+          },
+          transactionId: {
+            type: 'string',
+            description: 'Filter by `linkedCardTransactionReference` UUID. Returns the case for a specific transaction.',
           },
           page: {
             type: 'string',
@@ -87,18 +92,20 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
     const {
       status,
       severity,
+      transactionId,
       page = '1',
       limit = '20',
     } = request.query as {
       status?: string;
       severity?: string;
+      transactionId?: string;
       page?: string;
       limit?: string;
     };
 
     const result = await getCases(
       fastify.db,
-      { status, severity },
+      { status, severity, transactionId },
       parseInt(page, 10),
       parseInt(limit, 10)
     );
@@ -115,6 +122,100 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
       total: result.total,
       page: result.page,
       limit: result.limit,
+    });
+  });
+
+  // POST /api/v1/fraud — manually open a fraud investigation case for a transaction
+  fastify.post('/', {
+    schema: {
+      tags: ['fraud'],
+      summary: 'Manually open a fraud diagnosis case (SD-83)',
+      description: `Creates a \`fraudDiagnosisCase\` for a transaction that did not trigger
+automatic fraud detection, based on an analyst decision.
+
+Checks whether a case already exists for the transaction; if so, returns the existing one
+without creating a duplicate.
+
+**Risk indicators:** Set to \`['manual_review']\` for analyst-initiated cases.
+**Severity:** Derived from the transaction amount using the same thresholds as automatic detection.`,
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['transactionId'],
+        properties: {
+          transactionId: { type: 'string', description: '`cardTransactionInstanceReference` UUID of the transaction to investigate.' },
+          reason:        { type: 'string', description: 'Reason for opening the case (stored as the first audit event detail).' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            fraudDiagnosisInstanceReference: { type: 'string' },
+            fraudDiagnosisCaseReference:     { type: 'string' },
+            alreadyExisted:                  { type: 'boolean', description: 'True if a case already existed for this transaction.' },
+          },
+        },
+        400: { $ref: 'Error#' },
+        401: { $ref: 'Error#' },
+        404: { description: 'Transaction not found.', $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { transactionId, reason } = request.body as { transactionId: string; reason?: string };
+
+    // Check if a case already exists
+    const existing = await getCases(fastify.db, { transactionId }, 1, 1);
+    if (existing.results.length > 0) {
+      const c = existing.results[0];
+      return reply.send({
+        fraudDiagnosisInstanceReference: c.fraudDiagnosisInstanceReference,
+        fraudDiagnosisCaseReference:     c.fraudDiagnosisCaseReference,
+        alreadyExisted: true,
+      });
+    }
+
+    // Fetch transaction data
+    const txn = await getTransactionById(fastify.db, transactionId);
+    if (!txn) return reply.status(404).send({ error: 'Transaction not found' });
+
+    // Derive severity from amount
+    const amount = (txn as { cardTransactionAmount?: { amount: number } }).cardTransactionAmount?.amount ?? 0;
+    const severity =
+      amount > 1000 ? 'critical' :
+      amount > 500  ? 'high'     :
+      amount > 200  ? 'medium'   : 'low';
+
+    const t = txn as unknown as {
+      cardTransactionAmount: { amount: number; currency: string };
+      cardTransactionMerchantName: string;
+      cardTransactionDateTime: Date;
+      cardTransactionStatus: 'authorized' | 'declined' | 'pending' | 'settled' | 'disputed';
+      cardTransactionMaskedPanDisplay: string;
+      cardTransactionAccountReference?: string;
+    };
+
+    const snapshot = {
+      cardTransactionAmount:           t.cardTransactionAmount,
+      cardTransactionMerchantName:     t.cardTransactionMerchantName,
+      cardTransactionDateTime:         t.cardTransactionDateTime,
+      cardTransactionStatus:           t.cardTransactionStatus,
+      cardTransactionMaskedPanDisplay: t.cardTransactionMaskedPanDisplay,
+    };
+
+    const result = await createFraudCase(
+      fastify.db,
+      transactionId,
+      t.cardTransactionAccountReference ?? transactionId,
+      [reason ? `manual_review: ${reason}` : 'manual_review'],
+      severity as 'low' | 'medium' | 'high' | 'critical',
+      snapshot
+    );
+
+    return reply.send({
+      fraudDiagnosisInstanceReference: result.fraudDiagnosisInstanceReference,
+      fraudDiagnosisCaseReference:     '', // will be populated once fetched
+      alreadyExisted: false,
     });
   });
 

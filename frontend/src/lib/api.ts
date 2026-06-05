@@ -160,6 +160,15 @@ export const api = {
       apiFetch<{ users: AuthUser[] }>('/api/v1/auth/users'),
     domains: () =>
       apiFetch<{ domains: AuthDomain[] }>('/api/v1/auth/domains'),
+    updateMe: (
+      body: { customerName?: string; customerMobilePhoneNumber?: string; customerAgreementPreferredLanguage?: string },
+      token: string
+    ) =>
+      apiFetch<{ updated: boolean }>(
+        '/api/v1/auth/me',
+        { method: 'PATCH', body: JSON.stringify(body) },
+        token
+      ),
     me: (token: string) =>
       apiFetch<{
         sub: string;
@@ -179,14 +188,34 @@ export const api = {
       }, token),
     merchants: () =>
       apiFetch<{ merchants: Merchant[] }>('/api/v1/transactions/merchants'),
-    getById: (id: string, token: string) =>
-      apiFetch<Record<string, unknown>>(`/api/v1/transactions/${id}`, {}, token),
+    getById: (id: string, token: string, escalationToken?: string) =>
+      apiFetch<{
+        cardTransactionInstanceReference: string;
+        cardTransactionAmount: { amount: number; currency: string };
+        cardTransactionDateTime: string;
+        cardTransactionStatus: string;
+        cardTransactionMerchantName: string;
+        cardTransactionMerchantCategoryCode?: string;
+        cardTransactionMaskedPanDisplay: string;
+        cardTransactionChannel?: string;
+        cardTransactionInitiationType?: string;
+        paymentCardReference?: string;
+        cardTransactionAccountReference?: string;
+        sensitive?: {
+          rawGatewayPayload?: Record<string, unknown>;
+          processorTransactionMetadata?: Record<string, unknown>;
+        } | null;
+      }>(
+        `/api/v1/transactions/${id}`,
+        escalationToken ? { headers: { 'X-Escalation-Token': escalationToken } } : {},
+        token
+      ),
     getByCardToken: (cardToken: string, token: string) =>
       apiFetch<{ results: Record<string, unknown>[]; count: number }>(
         `/api/v1/transactions?cardToken=${encodeURIComponent(cardToken)}`, {}, token
       ),
     listAll: (
-      params: { status?: string; merchant?: string; cardToken?: string; page?: number; limit?: number },
+      params: { status?: string; merchant?: string; cardToken?: string; email?: string; page?: number; limit?: number },
       token: string
     ) => {
       const qs = new URLSearchParams(
@@ -245,7 +274,7 @@ export const api = {
 
   fraud: {
     list: (
-      params: { status?: string; severity?: string; page?: number; limit?: number },
+      params: { status?: string; severity?: string; transactionId?: string; page?: number; limit?: number },
       token: string
     ) => {
       const qs = new URLSearchParams(
@@ -280,6 +309,12 @@ export const api = {
     escalateApprove: (id: string, body: { approvalNotes?: string }, token: string) =>
       apiFetch<EscalationApproveResponse>(
         `/api/v1/fraud/${id}/escalate/approve`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token
+      ),
+    open: (body: { transactionId: string; reason?: string }, token: string) =>
+      apiFetch<{ fraudDiagnosisInstanceReference: string; fraudDiagnosisCaseReference: string; alreadyExisted: boolean }>(
+        '/api/v1/fraud',
         { method: 'POST', body: JSON.stringify(body) },
         token
       ),

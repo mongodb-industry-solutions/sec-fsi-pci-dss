@@ -7,6 +7,7 @@ import {
   CardTransactionSensitiveRecord,
 } from '../models/cardTransaction.model';
 import { createFraudCase } from '../../fraud/services/fraudDiagnosis.service';
+import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 
 export interface CreateTransactionInput {
   cardToken: string;
@@ -93,23 +94,52 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
   };
 }
 
-export async function getTransactionById(db: Db, id: string) {
+export async function getTransactionById(
+  db: Db,
+  id: string,
+  role: 'level1_analyst' | 'level2_investigator' | 'security_auditor' | 'customer' = 'level1_analyst',
+  escalationToken?: string
+) {
   const txn = await db.collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION)
     .findOne({ cardTransactionInstanceReference: id } as Partial<CardTransactionLogControlRecord>);
 
   if (!txn) return null;
 
-  return {
+  const base = {
     cardTransactionInstanceReference: txn.cardTransactionInstanceReference,
-    cardTransactionAmount: txn.cardTransactionAmount,
-    cardTransactionDateTime: txn.cardTransactionDateTime,
-    cardTransactionStatus: txn.cardTransactionStatus,
-    cardTransactionMerchantName: txn.cardTransactionMerchantName,
+    cardTransactionAmount:            txn.cardTransactionAmount,
+    cardTransactionDateTime:          txn.cardTransactionDateTime,
+    cardTransactionStatus:            txn.cardTransactionStatus,
+    cardTransactionMerchantName:      txn.cardTransactionMerchantName,
     cardTransactionMerchantCategoryCode: txn.cardTransactionMerchantCategoryCode,
-    cardTransactionMaskedPanDisplay: txn.cardTransactionMaskedPanDisplay,
-    cardTransactionChannel: txn.cardTransactionChannel,
-    paymentCardReference: txn.paymentCardReference,
+    cardTransactionMaskedPanDisplay:  txn.cardTransactionMaskedPanDisplay,
+    cardTransactionChannel:           txn.cardTransactionChannel,
+    cardTransactionInitiationType:    txn.cardTransactionInitiationType,
+    paymentCardReference:             txn.paymentCardReference,
+    // QE:equality — decrypted by QE client, available for analyst roles
+    cardTransactionAccountReference:  txn.cardTransactionAccountReference,
   };
+
+  // Include sensitive fields for L2 (with escalation token) and Security Auditor
+  const { canReadSensitive } = await import('../../../vendors/middleware/rbac');
+  const { validateToken }    = await import('../../../vendors/security/escalationTokens');
+
+  const hasValidToken = validateToken(escalationToken).valid;
+  if (canReadSensitive(role, hasValidToken)) {
+    const sensitive = await db.collection(CARD_TRANSACTION_SENSITIVE_COLLECTION)
+      .findOne({ cardTransactionInstanceReference: id });
+    return {
+      ...base,
+      sensitive: sensitive
+        ? {
+            rawGatewayPayload:            (sensitive as unknown as CardTransactionSensitiveRecord).rawGatewayPayload,
+            processorTransactionMetadata: (sensitive as unknown as CardTransactionSensitiveRecord).processorTransactionMetadata,
+          }
+        : null,
+    };
+  }
+
+  return base;
 }
 
 /** Returns unique merchant name + MCC pairs from seeded transactions, sorted by name. */
@@ -144,14 +174,32 @@ export async function getTransactionsByCardToken(db: Db, cardToken: string) {
 
 export async function getAllTransactions(
   db: Db,
-  filters: { status?: string; merchant?: string; cardToken?: string },
+  filters: { status?: string; merchant?: string; cardToken?: string; email?: string },
   page: number,
   limit: number
 ) {
   const query: Record<string, unknown> = {};
-  if (filters.status)     query['cardTransactionStatus']      = filters.status;
-  if (filters.merchant)   query['cardTransactionMerchantName'] = { $regex: filters.merchant, $options: 'i' };
-  if (filters.cardToken)  query['paymentCardReference']        = filters.cardToken;
+  if (filters.status)    query['cardTransactionStatus']       = filters.status;
+  if (filters.merchant)  query['cardTransactionMerchantName'] = { $regex: filters.merchant, $options: 'i' };
+  if (filters.cardToken) query['paymentCardReference']        = filters.cardToken;
+
+  // Two-step QE search: email → customerAgreementReference → cardTransactions
+  // Step 1: QE:equality search on customerAgreement.customerEmailAddress
+  // Step 2: QE:equality search on cardTransaction.cardTransactionAccountReference
+  if (filters.email) {
+    const agreement = await db
+      .collection(CUSTOMER_AGREEMENT_COLLECTION)
+      .findOne({ customerEmailAddress: filters.email } as Record<string, unknown>);
+
+    if (!agreement) {
+      return { results: [], total: 0, page, limit };
+    }
+
+    // customerAgreementReference is a QE:equality field — after QE decryption it
+    // is the plaintext account reference (e.g. ACC-001). Use it to query transactions.
+    const accountRef = (agreement as Record<string, unknown>).customerAgreementReference as string;
+    query['cardTransactionAccountReference'] = accountRef;
+  }
 
   const skip = (page - 1) * limit;
   const [results, total] = await Promise.all([

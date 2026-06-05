@@ -48,10 +48,12 @@ export default function TransactionsPage() {
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(false);
 
-  const [filterStatus,   setFilterStatus]   = useState('');
-  const [filterMerchant, setFilterMerchant] = useState('');
+  const [filterStatus,    setFilterStatus]    = useState('');
+  const [filterMerchant,  setFilterMerchant]  = useState('');
   const [filterCardToken, setFilterCardToken] = useState('');
-  const [searchInput,    setSearchInput]    = useState('');
+  const [filterEmail,     setFilterEmail]     = useState('');
+  const [searchInput,     setSearchInput]     = useState('');
+  const [searchType,      setSearchType]      = useState<'text' | 'email'>('text');
 
   const load = useCallback(async (p: number, ps: number) => {
     if (!token) return;
@@ -62,6 +64,7 @@ export default function TransactionsPage() {
           status:    filterStatus    || undefined,
           merchant:  filterMerchant  || undefined,
           cardToken: filterCardToken || undefined,
+          email:     filterEmail     || undefined,
           page:      p,
           limit:     ps,
         },
@@ -75,16 +78,29 @@ export default function TransactionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, filterStatus, filterMerchant, filterCardToken]);
+  }, [token, filterStatus, filterMerchant, filterCardToken, filterEmail]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (token) load(page, pageSize);
-  }, [token, filterStatus, filterMerchant, filterCardToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [token, filterStatus, filterMerchant, filterCardToken, filterEmail]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSearch() {
-    setFilterCardToken(searchInput.trim().startsWith('tok_') ? searchInput.trim() : '');
-    setFilterMerchant(!searchInput.trim().startsWith('tok_') ? searchInput.trim() : '');
+    const v = searchInput.trim();
+    if (searchType === 'email') {
+      setFilterEmail(v);
+      setFilterMerchant('');
+      setFilterCardToken('');
+    } else {
+      setFilterEmail('');
+      setFilterCardToken(v.startsWith('tok_') ? v : '');
+      setFilterMerchant(!v.startsWith('tok_') ? v : '');
+    }
     setPage(1);
+  }
+
+  function clearAll() {
+    setFilterStatus(''); setFilterMerchant(''); setFilterCardToken(''); setFilterEmail('');
+    setSearchInput(''); setPage(1);
   }
 
   function handlePageChange(newPage: number) {
@@ -107,30 +123,68 @@ export default function TransactionsPage() {
 
       {/* Search + filters */}
       <div className="bg-white rounded-xl border p-4 space-y-3">
+        {/* Search type selector */}
+        <div className="flex gap-1.5">
+          {(['text', 'email'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => { setSearchType(t); setSearchInput(''); }}
+              className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                searchType === t ? 'bg-[#001E2B] text-[#00ED64] border-[#001E2B]' : 'border-gray-300 text-gray-600 hover:border-gray-400'
+              }`}
+            >
+              {t === 'email' ? '✉ Email (QE:equality)' : '🔤 Merchant / Card token'}
+            </button>
+          ))}
+        </div>
+
         <div className="flex gap-2">
           <input
-            type="text"
+            type={searchType === 'email' ? 'email' : 'text'}
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="Search by merchant name or card token (tok_...)"
+            placeholder={
+              searchType === 'email'
+                ? 'customer@example.com  (QE equality search)'
+                : 'Merchant name  or  tok_xxxxxxxx'
+            }
             className="flex-1 border rounded-lg px-3 py-2 text-sm"
           />
           <button
             onClick={handleSearch}
-            className="px-4 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold"
+            disabled={!searchInput.trim()}
+            className="px-4 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold disabled:opacity-50"
           >
             Search
           </button>
-          {(filterStatus || filterMerchant || filterCardToken) && (
-            <button
-              onClick={() => { setFilterStatus(''); setFilterMerchant(''); setFilterCardToken(''); setSearchInput(''); setPage(1); }}
-              className="px-3 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50"
-            >
+          {(filterStatus || filterMerchant || filterCardToken || filterEmail) && (
+            <button onClick={clearAll} className="px-3 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50">
               Clear
             </button>
           )}
         </div>
+
+        {/* Active filter badges */}
+        {(filterEmail || filterCardToken || filterMerchant) && (
+          <div className="flex gap-2 flex-wrap">
+            {filterEmail && (
+              <span className="text-xs bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded font-medium">
+                ✉ Email: {filterEmail}
+              </span>
+            )}
+            {filterCardToken && (
+              <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-mono">
+                Token: {filterCardToken}
+              </span>
+            )}
+            {filterMerchant && (
+              <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                Merchant: {filterMerchant}
+              </span>
+            )}
+          </div>
+        )}
         <div className="flex gap-2 flex-wrap">
           <select
             value={filterStatus}
@@ -168,7 +222,7 @@ export default function TransactionsPage() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {transactions.map((txn, i) => (
-                  <tr key={txn.cardTransactionInstanceReference ?? i} className="hover:bg-gray-50">
+                  <tr key={txn.cardTransactionInstanceReference ?? i} className="hover:bg-gray-50 cursor-pointer group">
                     <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
                       {txn.cardTransactionDateTime
                         ? new Date(txn.cardTransactionDateTime).toLocaleString()
@@ -199,10 +253,10 @@ export default function TransactionsPage() {
                     <td className="px-4 py-2.5">
                       {txn.cardTransactionInstanceReference && (
                         <Link
-                          href="/demo/investigation"
-                          className="text-xs text-blue-600 hover:underline whitespace-nowrap"
+                          href={`/demo/transactions/${txn.cardTransactionInstanceReference}`}
+                          className="text-xs text-blue-600 hover:underline whitespace-nowrap flex items-center gap-1"
                         >
-                          View cases
+                          View details <span className="opacity-0 group-hover:opacity-100 transition-opacity">›</span>
                         </Link>
                       )}
                     </td>

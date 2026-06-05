@@ -7,6 +7,7 @@ import { getToken, decodeToken } from '../../../../lib/auth';
 import { EncryptionBadge } from '../../../../components/EncryptionBadge';
 import { RawDocumentPanel } from '../../../../components/RawDocumentPanel';
 import { SEVERITY_COLORS, STATUS_COLORS, ROLE_LABELS, formatRiskIndicator } from '../../../../lib/constants';
+import { useDebugMode } from '../../../../lib/debugMode';
 
 const ACTION_LABELS: Record<string, string> = {
   case_opened: 'Case opened',
@@ -49,9 +50,9 @@ export default function DemoCaseDetailPage() {
   // role/token must start with stable defaults to avoid SSR/client hydration mismatch.
   // getToken() reads localStorage which is undefined during SSR.
   // The actual values are resolved in the single mount useEffect below.
+  const { debugMode } = useDebugMode();
   const [token, setToken] = useState('');
   const [role, setRole] = useState('level1_analyst');
-  const [userName, setUserName] = useState('');
 
   const isL1 = role === 'level1_analyst';
   const isL2 = role === 'level2_investigator';
@@ -62,7 +63,6 @@ export default function DemoCaseDetailPage() {
   const [events, setEvents] = useState<ActionEvent[]>([]);
   const [hrpc, setHrpc] = useState<HrpcCheckResponse | null>(null);
   const [showRaw, setShowRaw] = useState(false);
-  const [debugMode, setDebugMode] = useState(false);
   const [rawDoc, setRawDoc] = useState<Record<string, unknown> | null>(null);
   const [rawError, setRawError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,7 +112,6 @@ export default function DemoCaseDetailPage() {
 
     setToken(t);
     setRole(resolvedRole);
-    setUserName(payload?.name ?? '');
 
     const load = async () => {
       try {
@@ -185,16 +184,14 @@ export default function DemoCaseDetailPage() {
   }
 
   if (loading) return (
-    <div className="min-h-screen bg-gray-50">
-      <PageHeader name={userName} role={role} debugMode={debugMode} onToggleDebug={() => setDebugMode((v) => !v)} />
-      <main className="max-w-2xl mx-auto p-6"><div className="text-center py-12 text-gray-400">Loading case...</div></main>
+    <div className="max-w-2xl mx-auto p-6">
+      <div className="text-center py-12 text-gray-400">Loading case...</div>
     </div>
   );
 
   if (!fraudCase) return (
-    <div className="min-h-screen bg-gray-50">
-      <PageHeader name={userName} role={role} debugMode={debugMode} onToggleDebug={() => setDebugMode((v) => !v)} />
-      <main className="max-w-2xl mx-auto p-6"><div className="text-center py-12 text-gray-500">Case not found.</div></main>
+    <div className="max-w-2xl mx-auto p-6">
+      <div className="text-center py-12 text-gray-500">Case not found.</div>
     </div>
   );
 
@@ -210,8 +207,7 @@ export default function DemoCaseDetailPage() {
     : null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <PageHeader name={userName} role={role} debugMode={debugMode} onToggleDebug={() => setDebugMode((v) => !v)} />
+    <div className="min-h-full bg-gray-50">
       <main className="max-w-2xl mx-auto p-6 space-y-5">
         <div className="flex items-center justify-between">
           <Link href="/demo/investigation" className="text-sm text-blue-600 hover:underline">Back to cases</Link>
@@ -622,27 +618,6 @@ export default function DemoCaseDetailPage() {
           </div>
         )}
       </main>
-    </div>
-  );
-}
-
-// PageHeader — minimal wrapper, layout provides the top bar
-function PageHeader({
-  debugMode,
-  onToggleDebug,
-}: {
-  name: string;
-  role: string;
-  debugMode: boolean;
-  onToggleDebug: () => void;
-}) {
-  return (
-    <div className="flex justify-end px-6 pt-4">
-      <button
-        onClick={onToggleDebug}
-        title="Toggle debug mode"
-        className={`text-xs px-2 py-1 rounded border transition-colors ${debugMode ? 'bg-[#001E2B] text-[#00ED64] border-[#001E2B]' : 'border-gray-300 text-gray-500 hover:border-gray-400'}`}
-      >⚙ {debugMode ? 'Debug ON' : 'Debug'}</button>
     </div>
   );
 }

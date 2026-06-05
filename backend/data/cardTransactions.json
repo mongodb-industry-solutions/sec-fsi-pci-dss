@@ -2,7 +2,7 @@
   {
     "cardTransactionInstanceReference": "4dd6a964-deac-4975-96aa-b9c630f4f517",
     "paymentCardReference": "tok_e82c09ff8db21749",
-    "cardTransactionAccountReference": "ACC-001",
+    "cardTransactionAccountReference": "ACC-LF-20240115",
     "cardTransactionAmount": {
       "amount": 452.18,
       "currency": "USD"
@@ -23,7 +23,7 @@
   {
     "cardTransactionInstanceReference": "36d59340-be0a-4e08-b056-ed51f3a1473b",
     "paymentCardReference": "tok_81c70327af327b45",
-    "cardTransactionAccountReference": "ACC-002",
+    "cardTransactionAccountReference": "ACC-JS-20231201",
     "cardTransactionAmount": {
       "amount": 417.09,
       "currency": "USD"
@@ -1052,7 +1052,7 @@
   {
     "cardTransactionInstanceReference": "3e7e4c86-be8e-4ac8-80f0-87b0e9182ed6",
     "paymentCardReference": "tok_e82c09ff8db21749",
-    "cardTransactionAccountReference": "ACC-001",
+    "cardTransactionAccountReference": "ACC-LF-20240115",
     "cardTransactionAmount": {
       "amount": 1370.46,
       "currency": "USD"
@@ -1073,7 +1073,7 @@
   {
     "cardTransactionInstanceReference": "d70b1d1a-b4ad-4913-aa80-d5786af162a4",
     "paymentCardReference": "tok_81c70327af327b45",
-    "cardTransactionAccountReference": "ACC-002",
+    "cardTransactionAccountReference": "ACC-JS-20231201",
     "cardTransactionAmount": {
       "amount": 1033.89,
       "currency": "USD"
@@ -2102,7 +2102,7 @@
   {
     "cardTransactionInstanceReference": "a82cc119-b9c2-437d-b292-84aea7075b92",
     "paymentCardReference": "tok_e82c09ff8db21749",
-    "cardTransactionAccountReference": "ACC-001",
+    "cardTransactionAccountReference": "ACC-LF-20240115",
     "cardTransactionAmount": {
       "amount": 738.47,
       "currency": "USD"
@@ -2123,7 +2123,7 @@
   {
     "cardTransactionInstanceReference": "2f40f6dd-e017-4d53-88c6-4131546934f1",
     "paymentCardReference": "tok_81c70327af327b45",
-    "cardTransactionAccountReference": "ACC-002",
+    "cardTransactionAccountReference": "ACC-JS-20231201",
     "cardTransactionAmount": {
       "amount": 1425.74,
       "currency": "USD"
@@ -3152,7 +3152,7 @@
   {
     "cardTransactionInstanceReference": "b248e120-aab3-418c-9062-52338c7d2ba8",
     "paymentCardReference": "tok_e82c09ff8db21749",
-    "cardTransactionAccountReference": "ACC-001",
+    "cardTransactionAccountReference": "ACC-LF-20240115",
     "cardTransactionAmount": {
       "amount": 515.82,
       "currency": "USD"
@@ -3173,7 +3173,7 @@
   {
     "cardTransactionInstanceReference": "2215b0de-906d-42ad-996b-9864c6eb89ca",
     "paymentCardReference": "tok_81c70327af327b45",
-    "cardTransactionAccountReference": "ACC-002",
+    "cardTransactionAccountReference": "ACC-JS-20231201",
     "cardTransactionAmount": {
       "amount": 141.95,
       "currency": "USD"

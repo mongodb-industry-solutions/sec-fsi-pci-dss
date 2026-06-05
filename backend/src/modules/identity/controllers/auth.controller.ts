@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import { loginUser, getDemoUsers, getEnabledDomains, JwtPayload } from '../services/auth.service';
-import { getSelfProfile } from '../../customer/services/customerAgreement.service';
+import { getSelfProfile, updateSelfProfile } from '../../customer/services/customerAgreement.service';
 
 export async function authController(fastify: FastifyInstance) {
   fastify.post('/login', {
@@ -238,5 +238,53 @@ a \`customerAgreement\` record.`,
       domain:    user.domain,
       agreement,
     });
+  });
+
+  // PATCH /api/v1/auth/me — update own profile (customer only)
+  fastify.patch('/me', {
+    schema: {
+      tags: ['auth'],
+      summary: 'Update authenticated user profile',
+      description: `Updates editable fields on the \`customerAgreement\` record for the
+authenticated customer.
+
+**Editable fields:** \`customerName\`, \`customerMobilePhoneNumber\`, \`customerAgreementPreferredLanguage\`.
+
+**Not editable:** \`customerEmailAddress\` (login identity), \`customerAgreementReference\` (account key).
+
+**QE note:** \`customerMobilePhoneNumber\` is a QE:equality field. The QE client
+automatically re-encrypts the new value before writing it to Atlas.`,
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        properties: {
+          customerName:                       { type: 'string', description: 'Updated display name.' },
+          customerMobilePhoneNumber:          { type: 'string', description: 'Updated phone (QE:equality — re-encrypted automatically).' },
+          customerAgreementPreferredLanguage: { type: 'string', description: 'ISO 639-1 language code (e.g. "en").' },
+        },
+      },
+      response: {
+        200: { type: 'object', properties: { updated: { type: 'boolean' } } },
+        400: { $ref: 'Error#' },
+        401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const user = (request as FastifyRequest & { user?: JwtPayload }).user;
+    if (!user?.email) return reply.status(401).send({ error: 'Unauthenticated' });
+
+    const body = request.body as {
+      customerName?: string;
+      customerMobilePhoneNumber?: string;
+      customerAgreementPreferredLanguage?: string;
+    };
+
+    if (!body || Object.keys(body).length === 0) {
+      return reply.status(400).send({ error: 'No fields provided for update' });
+    }
+
+    const updated = await updateSelfProfile(fastify.db, user.email, body);
+    return reply.send({ updated });
   });
 }

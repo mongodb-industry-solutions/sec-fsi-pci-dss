@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import type { DemoRequest } from '../../../shared/models/identity.model';
 import {
   createTransaction,
   getTransactionById,
@@ -256,7 +257,17 @@ role to retrieve.`,
               enum: ['online', 'pos', 'contactless', 'atm'],
               description: 'Payment channel.',
             },
-            paymentCardReference: { type: 'string', description: 'Card token (surrogate, not the PAN).' },
+            paymentCardReference:              { type: 'string', description: 'Card token (surrogate, not the PAN).' },
+            cardTransactionAccountReference:   { type: 'string', nullable: true, description: 'QE:equality — decrypted account reference.' },
+            cardTransactionInitiationType:     { type: 'string', nullable: true },
+            sensitive: {
+              type: 'object', nullable: true,
+              description: 'Available to Level 2 Investigator (with escalation token) and Security Auditor.',
+              properties: {
+                rawGatewayPayload:            { type: 'object', additionalProperties: true },
+                processorTransactionMetadata: { type: 'object', additionalProperties: true },
+              },
+            },
           },
         },
         401: { description: 'Missing or invalid Bearer token.', $ref: 'Error#' },
@@ -265,7 +276,8 @@ role to retrieve.`,
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const txn = await getTransactionById(fastify.db, id);
+    const { demoRole, escalationToken } = request as unknown as DemoRequest;
+    const txn = await getTransactionById(fastify.db, id, demoRole, escalationToken);
     if (!txn) return reply.status(404).send({ error: 'Transaction not found' });
     return reply.send(txn);
   });
@@ -287,6 +299,7 @@ Not accessible to the \`customer\` role (enforced by RBAC middleware).`,
           status:    { type: 'string', enum: ['authorized', 'declined', 'pending', 'settled', 'disputed'], description: 'Filter by transaction status.' },
           merchant:  { type: 'string', description: 'Case-insensitive partial match on merchant name.' },
           cardToken: { type: 'string', description: 'Filter by exact card token (paymentCardReference).' },
+          email:     { type: 'string', format: 'email', description: 'Filter by customer email (QE:equality → account reference → transactions). Two-step QE search.' },
           page:      { type: 'string', default: '1' },
           limit:     { type: 'string', default: '20' },
         },
@@ -321,12 +334,12 @@ Not accessible to the \`customer\` role (enforced by RBAC middleware).`,
       },
     },
   }, async (request, reply) => {
-    const { status, merchant, cardToken, page = '1', limit = '20' } = request.query as {
-      status?: string; merchant?: string; cardToken?: string; page?: string; limit?: string;
+    const { status, merchant, cardToken, email, page = '1', limit = '20' } = request.query as {
+      status?: string; merchant?: string; cardToken?: string; email?: string; page?: string; limit?: string;
     };
     const result = await getAllTransactions(
       fastify.db,
-      { status, merchant, cardToken },
+      { status, merchant, cardToken, email },
       parseInt(page, 10),
       parseInt(limit, 10)
     );
