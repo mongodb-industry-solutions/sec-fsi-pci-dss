@@ -67,6 +67,15 @@ export default function UsersPage() {
   const [cardToken, setCardToken] = useState('');
   const [txnLoading, setTxnLoading] = useState(false);
 
+  function clearSearch() {
+    setSearchValue('');
+    setSearchError(null);
+    setCustomer(null);
+    setTransactions([]);
+    setCasesMap({});
+    setCardToken('');
+  }
+
   async function handleSearch() {
     if (!searchValue.trim()) return;
     setSearchLoading(true);
@@ -176,6 +185,14 @@ export default function UsersPage() {
           >
             {searchLoading ? 'Searching...' : 'Search'}
           </button>
+          {(customer || searchError || searchValue) && (
+            <button
+              onClick={clearSearch}
+              className="px-3 py-2 rounded-lg border text-sm text-gray-500 hover:bg-gray-50 transition-colors"
+            >
+              Clear
+            </button>
+          )}
         </div>
         {searchError && <p className="text-sm text-red-600">{searchError}</p>}
       </div>
