@@ -270,7 +270,7 @@ function PageShell({
             <span className="hidden sm:inline">{debugMode ? 'Debug ON' : 'Debug'}</span>
           </button>
           <Link href="/demo" className="text-gray-400 hover:text-white text-sm">
-            ↩ Sign out
+            Sign out
           </Link>
         </div>
       </header>

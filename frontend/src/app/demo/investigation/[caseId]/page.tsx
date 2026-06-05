@@ -611,7 +611,7 @@ function PageHeader({
         >
           <span className="hidden sm:inline">{debugMode ? 'Debug ON' : 'Debug'}</span>
         </button>
-        <Link href="/demo" className="text-gray-400 hover:text-white">↩ Sign out</Link>
+        <Link href="/demo" className="text-gray-400 hover:text-white">Sign out</Link>
       </div>
     </header>
   );
