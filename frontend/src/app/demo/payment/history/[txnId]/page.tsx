@@ -369,9 +369,10 @@ export default function TransactionDetailPage() {
         </div>
       )}
 
-      {/* Debug: unified raw data panel (API responses + MongoDB documents) */}
+      {/* Debug: unified raw data panel — separated with proportional margin */}
       {debugMode && (
-        <RawMongoPanel
+        <div className="p-5 mb-4">
+          <RawMongoPanel
           token={token}
           title="Debug - Raw data"
           sections={[
@@ -413,7 +414,8 @@ export default function TransactionDetailPage() {
               maxHeight: 'max-h-52',
             },
           ]}
-        />
+          />
+        </div>
       )}
     </PageShell>
   );
