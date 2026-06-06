@@ -1,11 +1,13 @@
 import Link from 'next/link';
+import { BookOpen, Code2 } from 'lucide-react';
+import { API_BASE_URL } from '../lib/constants';
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#001E2B] text-white flex flex-col items-center justify-center p-6">
       <div className="max-w-3xl w-full text-center">
         <div className="text-6xl mb-4">🏦</div>
-        <h1 className="text-3xl font-bold mb-2">FSI PCI DSS Payment Security Demo</h1>
+        <h1 className="text-3xl font-bold mb-2">Payment Gateway (FSI - PCI DSS Demo)</h1>
         <p className="text-[#00ED64] text-lg mb-8 font-medium">
           MongoDB Queryable Encryption · AWS KMS
         </p>
@@ -47,9 +49,30 @@ export default function LandingPage() {
           </Link>
         </div>
 
-        <p className="mt-12 text-gray-600 text-xs">
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <a
+            href="https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-700 bg-white/5 hover:border-gray-500 hover:bg-white/10 text-gray-300 hover:text-white text-sm font-medium transition-all"
+          >
+            <BookOpen size={15} /> Wiki
+          </a>
+          <a
+            href={`${API_BASE_URL}/doc`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-700 bg-white/5 hover:border-gray-500 hover:bg-white/10 text-gray-300 hover:text-white text-sm font-medium transition-all"
+          >
+            <Code2 size={15} /> API Reference
+          </a>
+        </div>
+
+        <p className="mt-3 text-gray-600 text-xs">
           v1 · Security Foundation · MongoDB Atlas · QE equality search · Local KMS fallback
-          {' · '}<Link href="/admin" className="text-gray-700 hover:text-gray-500 transition-colors">admin</Link>
+        </p>
+        <p className="mt-1">
+          <Link href="/admin" className="text-gray-700 hover:text-gray-500 transition-colors text-xs">admin</Link>
         </p>
       </div>
     </div>
