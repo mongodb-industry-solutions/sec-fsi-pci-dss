@@ -121,6 +121,7 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [rawDocs, setRawDocs] = useState<{ agreement: Record<string, unknown> | string | null; sensitive: Record<string, unknown> | null } | null>(null);
   const [loadingRaw, setLoadingRaw] = useState(false);
+  const [rawExpanded, setRawExpanded] = useState<Record<string, boolean>>({ agreement: true, sensitive: true });
   const [token, setToken] = useState('');
 
   // Edit state
@@ -448,43 +449,28 @@ export default function ProfilePage() {
           </div>
 
           {rawDocs ? (
-            <div className="space-y-4">
-              {/* customerAgreement - QE:equality fields as ciphertext */}
-              <div>
-                <p className="text-xs font-mono text-gray-400 mb-1.5">
-                  Collection:{' '}
-                  <span className="text-blue-400">customerAgreement</span>
-                  <span className="ml-2 text-gray-600 font-sans">
-                    — QE:equality fields (email, phone, accountRef) stored as BSON binary
-                  </span>
-                </p>
-                <pre className={[
-                  'text-xs text-green-300 whitespace-pre font-mono',
-                  'max-h-64 overflow-auto bg-black/40 rounded-lg p-3',
-                  '[scrollbar-width:thin] [scrollbar-color:#00ED64_#1a2e1a]',
-                  '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5',
-                  '[&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full',
-                  '[&::-webkit-scrollbar-thumb]:bg-[#00ED64]/50 [&::-webkit-scrollbar-thumb]:rounded-full',
-                  '[&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/80',
-                  '[&::-webkit-scrollbar-corner]:bg-gray-900',
-                ].join(' ')}>
-                  {JSON.stringify(rawDocs.agreement, null, 2)}
-                </pre>
-              </div>
-
-              {/* customerAgreementSensitive - QE:none fields as ciphertext */}
-              {rawDocs.sensitive && (
-                <div>
-                  <p className="text-xs font-mono text-gray-400 mb-1.5">
-                    Collection:{' '}
-                    <span className="text-purple-400">customerAgreementSensitive</span>
-                    <span className="ml-2 text-gray-600 font-sans">
-                      — QE:none fields (address, govt ID) also encrypted; not searchable
+            <div className="rounded-lg overflow-hidden border border-[#00ED64]/20">
+              {/* customerAgreement accordion */}
+              <div className="border-b border-[#00ED64]/10 last:border-b-0">
+                <button
+                  onClick={() => setRawExpanded(p => ({ ...p, agreement: !p.agreement }))}
+                  className="w-full flex items-center justify-between px-3 py-2 bg-[#001E2B]/80 hover:bg-[#001E2B] transition-colors text-left"
+                >
+                  <span className="text-xs font-mono text-gray-300 flex items-center gap-2 flex-wrap">
+                    Collection:
+                    <span className="text-blue-400">customerAgreement</span>
+                    <span className="text-gray-600 font-sans hidden sm:inline">
+                      QE:equality fields stored as BSON binary
                     </span>
-                  </p>
+                  </span>
+                  <span className="text-[#00ED64] text-xs ml-2 shrink-0">
+                    {rawExpanded.agreement ? '▲' : '▼'}
+                  </span>
+                </button>
+                {rawExpanded.agreement && (
                   <pre className={[
                     'text-xs text-green-300 whitespace-pre font-mono',
-                    'max-h-48 overflow-auto bg-black/40 rounded-lg p-3',
+                    'max-h-72 overflow-auto bg-black/40 px-4 py-3',
                     '[scrollbar-width:thin] [scrollbar-color:#00ED64_#1a2e1a]',
                     '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5',
                     '[&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full',
@@ -492,8 +478,43 @@ export default function ProfilePage() {
                     '[&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/80',
                     '[&::-webkit-scrollbar-corner]:bg-gray-900',
                   ].join(' ')}>
-                    {JSON.stringify(rawDocs.sensitive, null, 2)}
+                    {JSON.stringify(rawDocs.agreement, null, 2)}
                   </pre>
+                )}
+              </div>
+
+              {/* customerAgreementSensitive accordion */}
+              {rawDocs.sensitive && (
+                <div>
+                  <button
+                    onClick={() => setRawExpanded(p => ({ ...p, sensitive: !p.sensitive }))}
+                    className="w-full flex items-center justify-between px-3 py-2 bg-[#001E2B]/80 hover:bg-[#001E2B] transition-colors text-left"
+                  >
+                    <span className="text-xs font-mono text-gray-300 flex items-center gap-2 flex-wrap">
+                      Collection:
+                      <span className="text-purple-400">customerAgreementSensitive</span>
+                      <span className="text-gray-600 font-sans hidden sm:inline">
+                        QE:none fields (address, govt ID); not searchable
+                      </span>
+                    </span>
+                    <span className="text-[#00ED64] text-xs ml-2 shrink-0">
+                      {rawExpanded.sensitive ? '▲' : '▼'}
+                    </span>
+                  </button>
+                  {rawExpanded.sensitive && (
+                    <pre className={[
+                      'text-xs text-green-300 whitespace-pre font-mono',
+                      'max-h-56 overflow-auto bg-black/40 px-4 py-3',
+                      '[scrollbar-width:thin] [scrollbar-color:#00ED64_#1a2e1a]',
+                      '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5',
+                      '[&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full',
+                      '[&::-webkit-scrollbar-thumb]:bg-[#00ED64]/50 [&::-webkit-scrollbar-thumb]:rounded-full',
+                      '[&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/80',
+                      '[&::-webkit-scrollbar-corner]:bg-gray-900',
+                    ].join(' ')}>
+                      {JSON.stringify(rawDocs.sensitive, null, 2)}
+                    </pre>
+                  )}
                 </div>
               )}
             </div>
