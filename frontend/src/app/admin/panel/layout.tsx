@@ -3,12 +3,13 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { ADMIN_TOKEN_KEY } from '../../../lib/adminHelpers';
+import { Package, Terminal, ScrollText, Info, LogOut, Home } from 'lucide-react';
 
 const TABS = [
-  { path: '/admin/panel/setup',    label: 'Setup Commands', icon: '📦' },
-  { path: '/admin/panel/terminal', label: 'Terminal',        icon: '>' },
-  { path: '/admin/panel/logs',     label: 'Server Logs',    icon: '📋' },
-  { path: '/admin/panel/info',     label: 'System Info',    icon: 'ℹ️' },
+  { path: '/admin/panel/setup',    label: 'Setup',       icon: Package,    shortLabel: 'Setup' },
+  { path: '/admin/panel/terminal', label: 'Terminal',    icon: Terminal,   shortLabel: 'Term' },
+  { path: '/admin/panel/logs',     label: 'Server Logs', icon: ScrollText, shortLabel: 'Logs' },
+  { path: '/admin/panel/info',     label: 'System Info', icon: Info,       shortLabel: 'Info' },
 ];
 
 export default function PanelLayout({ children }: { children: React.ReactNode }) {
@@ -25,42 +26,59 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
   if (!ready) return <div className="text-center py-12 text-gray-500">Redirecting...</div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-full gap-4">
+      {/* Header row */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
-          <p className="text-gray-400 text-sm mt-0.5">Manage demo environment setup and monitoring</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Admin Panel</h1>
+          <p className="text-gray-500 text-xs sm:text-sm mt-0.5 hidden sm:block">
+            Demo environment setup and monitoring
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Link href="/" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">
-            Back to Home
+        <div className="flex items-center gap-2">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+          >
+            <Home size={13} />
+            <span className="hidden sm:inline">Back to Home</span>
           </Link>
           <button
             onClick={() => { sessionStorage.removeItem(ADMIN_TOKEN_KEY); router.push('/admin'); }}
-            className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-2.5 py-1.5 rounded-lg transition-colors"
           >
-            Sign Out
+            <LogOut size={13} />
+            <span className="hidden sm:inline">Sign Out</span>
           </button>
         </div>
       </div>
 
-      <div className="flex gap-1 border-b border-gray-800">
-        {TABS.map((tab) => (
-          <Link
-            key={tab.path}
-            href={tab.path}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-1.5 ${
-              pathname === tab.path
-                ? 'bg-gray-800 text-orange-400 border-b-2 border-orange-400'
-                : 'text-gray-500 hover:text-gray-300'
-            }`}
-          >
-            <span>{tab.icon}</span> {tab.label}
-          </Link>
-        ))}
+      {/* Tabs — horizontally scrollable on mobile */}
+      <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
+        <div className="flex gap-1 border-b border-gray-800 min-w-max sm:min-w-0">
+          {TABS.map(({ path, label, shortLabel, icon: Icon }) => {
+            const active = pathname === path;
+            return (
+              <Link
+                key={path}
+                href={path}
+                className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap ${
+                  active
+                    ? 'bg-gray-800 text-orange-400 border-b-2 border-orange-400'
+                    : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/40'
+                }`}
+              >
+                <Icon size={14} />
+                <span className="hidden xs:inline sm:inline">{label}</span>
+                <span className="xs:hidden sm:hidden">{shortLabel}</span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
-      {children}
+      {/* Page content — flex-1 so logs/terminal fill remaining height */}
+      <div className="flex-1 min-h-0 min-w-0">{children}</div>
     </div>
   );
 }

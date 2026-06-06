@@ -1,7 +1,8 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { API_BASE_URL } from '../../../../lib/constants';
-import { getAdminToken, readSSE, LogEntry } from '../../../../lib/adminHelpers';
+import { getAdminToken, readSSE, LogEntry, downloadText } from '../../../../lib/adminHelpers';
+import { Download } from 'lucide-react';
 
 interface CommandDef {
   id: string;
@@ -63,12 +64,22 @@ export default function SetupPage() {
   const testCmds  = COMMANDS.filter((c) => c.group === 'test');
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="space-y-4">
+    <div className="flex flex-col lg:flex-row gap-6 h-full">
+      {/* Left column — command list */}
+      <div className="flex-shrink-0 space-y-4 lg:w-1/2 lg:overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/60">
         <CommandGroup label="Setup" cmds={setupCmds} activeCommand={activeCommand} running={running} onRun={runCommand} />
         <CommandGroup label="Test & Quality" cmds={testCmds} activeCommand={activeCommand} running={running} onRun={runCommand} />
       </div>
-      <LogPanel title={activeCommand ? `npm run ${activeCommand}` : 'Output'} logs={logs} endRef={logsEndRef} onClear={() => setLogs([])} />
+      {/* Right column — output panel fills remaining height */}
+      <div className="flex-1 min-h-[280px] lg:min-h-0">
+        <LogPanel
+          title={activeCommand ? `npm run ${activeCommand}` : 'Output'}
+          logs={logs}
+          endRef={logsEndRef}
+          onClear={() => setLogs([])}
+          onDownload={() => downloadText(`setup-${activeCommand ?? 'output'}-${Date.now()}.txt`, logs.map((e) => e.text).join('\n'))}
+        />
+      </div>
     </div>
   );
 }
@@ -113,17 +124,28 @@ function CommandGroup({ label, cmds, activeCommand, running, onRun }: {
   );
 }
 
-function LogPanel({ title, logs, endRef, onClear }: {
+function LogPanel({ title, logs, endRef, onClear, onDownload }: {
   title: string;
   logs: LogEntry[];
   endRef: React.RefObject<HTMLDivElement | null>;
   onClear: () => void;
+  onDownload: () => void;
 }) {
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col h-[540px]">
+    <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col h-full">
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-950">
         <span className="text-xs font-mono text-gray-400 truncate">{title}</span>
-        <button onClick={onClear} className="text-xs text-gray-600 hover:text-gray-400 ml-2 flex-shrink-0">Clear</button>
+        <div className="flex items-center gap-3 ml-2 flex-shrink-0">
+          <button
+            onClick={onDownload}
+            disabled={logs.length === 0}
+            className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-300 disabled:opacity-30 transition-colors"
+            title="Download output"
+          >
+            <Download size={12} /> Download
+          </button>
+          <button onClick={onClear} className="text-xs text-gray-600 hover:text-gray-400">Clear</button>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-0.5 [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/70 [&::-webkit-scrollbar-corner]:bg-gray-900">
         {logs.length === 0 && <div className="text-gray-600 italic">Select a command to run...</div>}

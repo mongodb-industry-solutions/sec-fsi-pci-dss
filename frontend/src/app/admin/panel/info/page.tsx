@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../../../lib/constants';
-import { getAdminToken } from '../../../../lib/adminHelpers';
+import { getAdminToken, downloadText } from '../../../../lib/adminHelpers';
+import { Download } from 'lucide-react';
 
 interface SystemInfo {
   os: Record<string, unknown>;
@@ -15,6 +16,33 @@ export default function InfoPage() {
   const [sysLoading, setSysLoading] = useState(false);
   const [sysError, setSysError] = useState<string | null>(null);
   const [envFilter, setEnvFilter] = useState('');
+
+  function handleDownload() {
+    if (!sysInfo) return;
+    const lines: string[] = [`=== System Info === ${new Date().toISOString()}`, ''];
+    const section = (title: string, obj: Record<string, unknown>) => {
+      lines.push(`--- ${title} ---`);
+      for (const [k, v] of Object.entries(obj)) {
+        if (k === 'scripts' && typeof v === 'object' && v !== null) {
+          lines.push('scripts:');
+          for (const [sk, sv] of Object.entries(v as Record<string, string>)) {
+            lines.push(`  ${sk}: ${sv}`);
+          }
+        } else {
+          lines.push(`${k}: ${String(v)}`);
+        }
+      }
+      lines.push('');
+    };
+    section('Operating System', sysInfo.os);
+    section('Node.js Runtime', sysInfo.node);
+    section('package.json', sysInfo.package);
+    lines.push('--- Environment Variables ---');
+    for (const [k, v] of Object.entries(sysInfo.env).sort(([a], [b]) => a.localeCompare(b))) {
+      lines.push(`${k}=${v}`);
+    }
+    downloadText(`system-info-${Date.now()}.txt`, lines.join('\n'));
+  }
 
   async function fetchSysInfo() {
     const token = getAdminToken();
@@ -47,6 +75,14 @@ export default function InfoPage() {
           className="text-xs bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded disabled:opacity-40 transition-colors"
         >
           {sysLoading ? 'Refreshing...' : 'Refresh'}
+        </button>
+        <button
+          onClick={handleDownload}
+          disabled={!sysInfo}
+          className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-300 disabled:opacity-30 transition-colors"
+          title="Download summary"
+        >
+          <Download size={12} /> Download
         </button>
         {sysError && <span className="text-xs text-red-400">{sysError}</span>}
       </div>

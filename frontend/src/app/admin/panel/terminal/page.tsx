@@ -1,7 +1,8 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { API_BASE_URL } from '../../../../lib/constants';
-import { getAdminToken, readSSE, LogEntry } from '../../../../lib/adminHelpers';
+import { getAdminToken, readSSE, LogEntry, downloadText } from '../../../../lib/adminHelpers';
+import { Download } from 'lucide-react';
 
 export default function TerminalPage() {
   const [termInput, setTermInput] = useState('');
@@ -67,10 +68,20 @@ export default function TerminalPage() {
   }
 
   return (
-    <div className="flex flex-col h-[600px] bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+    <div className="flex flex-col h-full bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-950">
         <span className="text-xs font-mono text-gray-400">Shell · project root</span>
-        <button onClick={() => setTermLogs([])} className="text-xs text-gray-600 hover:text-gray-400">Clear</button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => downloadText(`terminal-${Date.now()}.txt`, termLogs.map((e) => e.text).join('\n'))}
+            disabled={termLogs.length === 0}
+            className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-300 disabled:opacity-30 transition-colors"
+            title="Download output"
+          >
+            <Download size={12} /> Download
+          </button>
+          <button onClick={() => setTermLogs([])} className="text-xs text-gray-600 hover:text-gray-400">Clear</button>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-0.5 [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/70 [&::-webkit-scrollbar-corner]:bg-gray-900">
         {termLogs.length === 0 && (
