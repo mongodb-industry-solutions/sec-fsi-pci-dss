@@ -64,14 +64,14 @@ export default function SetupPage() {
   const testCmds  = COMMANDS.filter((c) => c.group === 'test');
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 h-full">
+    <div className="flex flex-col lg:flex-row gap-6 lg:h-full">
       {/* Left column — command list */}
       <div className="flex-shrink-0 space-y-4 lg:w-1/2 lg:overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/60">
         <CommandGroup label="Setup" cmds={setupCmds} activeCommand={activeCommand} running={running} onRun={runCommand} />
         <CommandGroup label="Test & Quality" cmds={testCmds} activeCommand={activeCommand} running={running} onRun={runCommand} />
       </div>
       {/* Right column — output panel fills remaining height */}
-      <div className="flex-1 min-h-[280px] lg:min-h-0">
+      <div className="min-h-[280px] lg:flex-1 lg:min-h-0">
         <LogPanel
           title={activeCommand ? `npm run ${activeCommand}` : 'Output'}
           logs={logs}
@@ -132,7 +132,7 @@ function LogPanel({ title, logs, endRef, onClear, onDownload }: {
   onDownload: () => void;
 }) {
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col h-full">
+    <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col h-[50vh] lg:h-full">
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-950">
         <span className="text-xs font-mono text-gray-400 truncate">{title}</span>
         <div className="flex items-center gap-3 ml-2 flex-shrink-0">

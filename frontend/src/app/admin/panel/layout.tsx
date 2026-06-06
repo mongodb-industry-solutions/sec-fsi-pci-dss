@@ -26,7 +26,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
   if (!ready) return <div className="text-center py-12 text-gray-500">Redirecting...</div>;
 
   return (
-    <div className="flex flex-col h-full gap-4">
+    <div className="flex flex-col lg:h-full gap-4">
       {/* Header row */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
@@ -69,16 +69,16 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
                 }`}
               >
                 <Icon size={14} />
-                <span className="hidden xs:inline sm:inline">{label}</span>
-                <span className="xs:hidden sm:hidden">{shortLabel}</span>
+                <span className="hidden sm:inline">{label}</span>
+                <span className="sm:hidden">{shortLabel}</span>
               </Link>
             );
           })}
         </div>
       </div>
 
-      {/* Page content — flex-1 so logs/terminal fill remaining height */}
-      <div className="flex-1 min-h-0 min-w-0">{children}</div>
+      {/* Page content — fills remaining height on desktop; flows naturally on mobile */}
+      <div className="min-w-0 lg:flex-1 lg:min-h-0">{children}</div>
     </div>
   );
 }

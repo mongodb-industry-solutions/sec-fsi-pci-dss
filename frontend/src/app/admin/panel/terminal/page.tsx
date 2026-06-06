@@ -68,7 +68,7 @@ export default function TerminalPage() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+    <div className="flex flex-col h-[65vh] lg:h-full bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-950">
         <span className="text-xs font-mono text-gray-400">Shell · project root</span>
         <div className="flex items-center gap-3">

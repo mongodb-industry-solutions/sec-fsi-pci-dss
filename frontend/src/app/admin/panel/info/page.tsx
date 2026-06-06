@@ -67,8 +67,8 @@ export default function InfoPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
+    <div className="flex flex-col gap-4 lg:h-full">
+      <div className="flex-shrink-0 flex items-center gap-3">
         <button
           onClick={fetchSysInfo}
           disabled={sysLoading}
@@ -88,73 +88,86 @@ export default function InfoPage() {
       </div>
 
       {sysLoading && !sysInfo && (
-        <div className="text-gray-500 text-sm">Loading system info...</div>
+        <div className="flex-shrink-0 text-gray-500 text-sm">Loading system info...</div>
       )}
 
       {sysInfo && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <InfoCard title="Operating System" icon="💻">
-            {Object.entries(sysInfo.os).map(([k, v]) => (
-              <InfoRow key={k} label={k} value={String(v)} />
-            ))}
-          </InfoCard>
-
-          <InfoCard title="Node.js Runtime" icon="🟢">
-            {Object.entries(sysInfo.node).map(([k, v]) => (
-              <InfoRow key={k} label={k} value={String(v)} />
-            ))}
-          </InfoCard>
-
-          <InfoCard title="package.json" icon="📦">
-            {Object.entries(sysInfo.package).map(([k, v]) =>
-              k === 'scripts' ? (
-                <div key={k} className="col-span-2 mt-2">
-                  <p className="text-gray-500 text-xs font-semibold uppercase mb-1">scripts</p>
-                  {Object.entries(v as Record<string, string>).map(([sk, sv]) => (
-                    <div key={sk} className="flex gap-2 text-xs py-0.5 border-b border-gray-800">
-                      <code className="text-orange-400 min-w-[120px]">{sk}</code>
-                      <code className="text-gray-400 truncate">{sv}</code>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <InfoRow key={k} label={k} value={
-                  Array.isArray(v) ? (v as string[]).join(', ') : String(v)
-                } />
-              )
-            )}
-          </InfoCard>
-
-          <InfoCard title="Environment Variables" icon="⚙️">
-            <div className="col-span-2 mb-2">
-              <input
-                type="text"
-                value={envFilter}
-                onChange={(e) => setEnvFilter(e.target.value)}
-                placeholder="Filter..."
-                className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 placeholder-gray-600 focus:outline-none"
-              />
-            </div>
-            {Object.entries(sysInfo.env)
-              .filter(([k]) => !envFilter || k.toLowerCase().includes(envFilter.toLowerCase()))
-              .sort(([a], [b]) => a.localeCompare(b))
-              .map(([k, v]) => (
-                <InfoRow key={k} label={k} value={v} mono />
+        /* wrapper gives the grid a definite height so 1fr resolves correctly */
+        <div className="lg:flex-1 lg:min-h-0">
+          <div className="grid grid-cols-1 lg:grid-cols-2 lg:grid-rows-[auto_1fr] gap-4 lg:h-full">
+            <InfoCard title="Operating System" icon="💻" fixed>
+              {Object.entries(sysInfo.os).map(([k, v]) => (
+                <InfoRow key={k} label={k} value={String(v)} />
               ))}
-          </InfoCard>
+            </InfoCard>
+
+            <InfoCard title="Node.js Runtime" icon="🟢" fixed>
+              {Object.entries(sysInfo.node).map(([k, v]) => (
+                <InfoRow key={k} label={k} value={String(v)} />
+              ))}
+            </InfoCard>
+
+            <InfoCard title="package.json" icon="📦">
+              {Object.entries(sysInfo.package).map(([k, v]) =>
+                k === 'scripts' ? (
+                  <div key={k} className="col-span-2 mt-2">
+                    <p className="text-gray-500 text-xs font-semibold uppercase mb-1">scripts</p>
+                    {Object.entries(v as Record<string, string>).map(([sk, sv]) => (
+                      <div key={sk} className="flex gap-2 text-xs py-0.5 border-b border-gray-800">
+                        <code className="text-orange-400 min-w-[120px]">{sk}</code>
+                        <code className="text-gray-400 truncate">{sv}</code>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <InfoRow key={k} label={k} value={
+                    Array.isArray(v) ? (v as string[]).join(', ') : String(v)
+                  } />
+                )
+              )}
+            </InfoCard>
+
+            <InfoCard
+              title="Environment Variables"
+              icon="⚙️"
+              subHeader={
+                <input
+                  type="text"
+                  value={envFilter}
+                  onChange={(e) => setEnvFilter(e.target.value)}
+                  placeholder="Filter..."
+                  className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 placeholder-gray-600 focus:outline-none"
+                />
+              }
+            >
+              {Object.entries(sysInfo.env)
+                .filter(([k]) => !envFilter || k.toLowerCase().includes(envFilter.toLowerCase()))
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([k, v]) => (
+                  <InfoRow key={k} label={k} value={v} mono />
+                ))}
+            </InfoCard>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function InfoCard({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
+function InfoCard({ title, icon, children, fixed, subHeader }: {
+  title: string;
+  icon: string;
+  children: React.ReactNode;
+  fixed?: boolean;
+  subHeader?: React.ReactNode;
+}) {
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-      <p className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+    <div className={`bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col${fixed ? '' : ' lg:h-full lg:min-h-0'}`}>
+      <p className="flex-shrink-0 text-sm font-semibold text-white mb-3 flex items-center gap-2">
         <span>{icon}</span> {title}
       </p>
-      <div className="space-y-0.5 max-h-64 overflow-y-auto pr-1.5 [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/70 [&::-webkit-scrollbar-corner]:bg-gray-900">{children}</div>
+      {subHeader && <div className="flex-shrink-0 mb-2">{subHeader}</div>}
+      <div className={`space-y-0.5 overflow-y-auto pr-1.5 max-h-64 [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/70 [&::-webkit-scrollbar-corner]:bg-gray-900${fixed ? '' : ' lg:max-h-none lg:flex-1 lg:min-h-0'}`}>{children}</div>
     </div>
   );
 }
