@@ -49,6 +49,7 @@ export default function LandingPage() {
 
         <p className="mt-12 text-gray-600 text-xs">
           v1 · Security Foundation · MongoDB Atlas · QE equality search · Local KMS fallback
+          {' · '}<Link href="/admin" className="text-gray-700 hover:text-gray-500 transition-colors">admin</Link>
         </p>
       </div>
     </div>
