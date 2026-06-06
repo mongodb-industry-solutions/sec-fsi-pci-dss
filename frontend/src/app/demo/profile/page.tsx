@@ -78,6 +78,7 @@ function RevealField({
   type: QEType;
 }) {
   const [revealed, setRevealed] = useState(false);
+  const { debugMode } = useDebugMode();
   const badgeStyle = type === 'qe-equality'
     ? 'bg-blue-100 text-blue-700 border-blue-200'
     : 'bg-purple-100 text-purple-700 border-purple-200';
@@ -86,9 +87,11 @@ function RevealField({
     <>
       <div className="flex items-center gap-1.5">
         <span className="text-gray-500 text-sm">{label}</span>
-        <span className={`text-xs px-1.5 py-0.5 rounded border font-mono ${badgeStyle}`}>
-          {type === 'qe-equality' ? 'QE:equality' : 'QE:none'}
-        </span>
+        {debugMode && (
+          <span className={`text-xs px-1.5 py-0.5 rounded border font-mono ${badgeStyle}`}>
+            {type === 'qe-equality' ? 'QE:equality' : 'QE:none'}
+          </span>
+        )}
       </div>
       <div className="flex items-center gap-2">
         <span className={`text-sm font-mono transition-all ${revealed ? 'text-gray-900' : 'text-gray-400 select-none'}`}>
@@ -289,7 +292,7 @@ export default function ProfilePage() {
             <>
               <div className="flex items-center gap-1.5">
                 <span className="text-gray-500 text-sm">Address</span>
-                <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-purple-100 text-purple-700 border-purple-200">QE:none</span>
+                {debugMode && <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-purple-100 text-purple-700 border-purple-200">QE:none</span>}
               </div>
               <span className="text-gray-400 text-xs italic">Not on file</span>
             </>
@@ -306,7 +309,7 @@ export default function ProfilePage() {
             <>
               <div className="flex items-center gap-1.5">
                 <span className="text-gray-500 text-sm">Government ID</span>
-                <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-purple-100 text-purple-700 border-purple-200">QE:none</span>
+                {debugMode && <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-purple-100 text-purple-700 border-purple-200">QE:none</span>}
               </div>
               <span className="text-gray-400 text-xs italic">Not on file</span>
             </>
@@ -332,10 +335,14 @@ export default function ProfilePage() {
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1.5 flex-wrap">
                 Phone
-                <span className="flex items-center gap-1 bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-mono text-xs">
-                  <Lock size={10} /> QE:equality
-                </span>
-                <span className="text-gray-400 font-normal text-xs">New value will be encrypted client-side before reaching the server</span>
+                {debugMode && (
+                  <>
+                    <span className="flex items-center gap-1 bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-mono text-xs">
+                      <Lock size={10} /> QE:equality
+                    </span>
+                    <span className="text-gray-400 font-normal text-xs">New value will be encrypted client-side before reaching the server</span>
+                  </>
+                )}
               </label>
               <input
                 value={editPhone}
@@ -380,24 +387,26 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Legend */}
-      <div className="bg-white rounded-xl border p-4 text-sm">
-        <p className="font-semibold text-gray-700 mb-2">Field encryption legend</p>
-        <div className="space-y-1.5 text-xs text-gray-600">
-          <div className="flex items-center gap-2">
-            <span className="bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-mono shrink-0">QE:equality</span>
-            <span>Encrypted in Atlas. Searchable without server-side decryption.</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="bg-purple-100 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded font-mono shrink-0">QE:none</span>
-            <span>Encrypted in Atlas. Not searchable. Requires Level 2 escalation to reveal.</span>
-          </div>
-          <div className="flex items-center gap-2 mt-1">
-            <Eye size={12} />
-            <span>Click to reveal a field. Click again to re-hide it. Each field is independent.</span>
+      {/* Legend — only visible in debug mode */}
+      {debugMode && (
+        <div className="bg-white rounded-xl border p-4 text-sm">
+          <p className="font-semibold text-gray-700 mb-2">Field encryption legend</p>
+          <div className="space-y-1.5 text-xs text-gray-600">
+            <div className="flex items-center gap-2">
+              <span className="bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-mono shrink-0">QE:equality</span>
+              <span>Encrypted in Atlas. Searchable without server-side decryption.</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="bg-purple-100 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded font-mono shrink-0">QE:none</span>
+              <span>Encrypted in Atlas. Not searchable. Requires Level 2 escalation to reveal.</span>
+            </div>
+            <div className="flex items-center gap-2 mt-1">
+              <Eye size={12} />
+              <span>Click to reveal a field. Click again to re-hide it. Each field is independent.</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Data protection notice */}
       <div className="bg-[#001E2B]/5 border border-[#001E2B]/20 rounded-xl p-4 text-sm text-gray-600">
