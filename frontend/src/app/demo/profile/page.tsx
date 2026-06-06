@@ -458,7 +458,16 @@ export default function ProfilePage() {
                     — QE:equality fields (email, phone, accountRef) stored as BSON binary
                   </span>
                 </p>
-                <pre className="text-xs text-green-300 overflow-x-auto whitespace-pre-wrap font-mono max-h-64 overflow-y-auto bg-black/30 rounded p-2">
+                <pre className={[
+                  'text-xs text-green-300 whitespace-pre font-mono',
+                  'max-h-64 overflow-auto bg-black/40 rounded-lg p-3',
+                  '[scrollbar-width:thin] [scrollbar-color:#00ED64_#1a2e1a]',
+                  '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5',
+                  '[&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full',
+                  '[&::-webkit-scrollbar-thumb]:bg-[#00ED64]/50 [&::-webkit-scrollbar-thumb]:rounded-full',
+                  '[&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/80',
+                  '[&::-webkit-scrollbar-corner]:bg-gray-900',
+                ].join(' ')}>
                   {JSON.stringify(rawDocs.agreement, null, 2)}
                 </pre>
               </div>
@@ -473,7 +482,16 @@ export default function ProfilePage() {
                       — QE:none fields (address, govt ID) also encrypted; not searchable
                     </span>
                   </p>
-                  <pre className="text-xs text-green-300 overflow-x-auto whitespace-pre-wrap font-mono max-h-48 overflow-y-auto bg-black/30 rounded p-2">
+                  <pre className={[
+                    'text-xs text-green-300 whitespace-pre font-mono',
+                    'max-h-48 overflow-auto bg-black/40 rounded-lg p-3',
+                    '[scrollbar-width:thin] [scrollbar-color:#00ED64_#1a2e1a]',
+                    '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5',
+                    '[&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full',
+                    '[&::-webkit-scrollbar-thumb]:bg-[#00ED64]/50 [&::-webkit-scrollbar-thumb]:rounded-full',
+                    '[&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/80',
+                    '[&::-webkit-scrollbar-corner]:bg-gray-900',
+                  ].join(' ')}>
                     {JSON.stringify(rawDocs.sensitive, null, 2)}
                   </pre>
                 </div>
