@@ -13,6 +13,7 @@ interface ProfileData {
   role: string;
   domain: string;
   agreement: {
+    customerAgreementInstanceReference?: string;
     customerName?: string;
     customerEmailAddress?: string;
     customerMobilePhoneNumber?: string;
@@ -118,7 +119,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rawJson, setRawJson] = useState<string | null>(null);
+  const [rawDocs, setRawDocs] = useState<{ agreement: Record<string, unknown> | string | null; sensitive: Record<string, unknown> | null } | null>(null);
   const [loadingRaw, setLoadingRaw] = useState(false);
   const [token, setToken] = useState('');
 
@@ -406,37 +407,82 @@ export default function ProfilePage() {
         accessible in plaintext to database administrators or support staff.
       </div>
 
-      {/* Debug: raw JSON */}
+      {/* Debug: raw MongoDB documents */}
       {debugMode && (
-        <div className="bg-gray-900 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold text-[#00ED64]">Debug  -  Raw API response (/api/v1/auth/me)</p>
+        <div className="bg-gray-900 rounded-xl p-4 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-[#00ED64]">Debug - Raw MongoDB documents</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                QE-encrypted fields appear as{' '}
+                <span className="font-mono text-amber-400">{'"$binary"'}</span>{' '}
+                (BSON subType 06). Plaintext fields are readable as-is.
+              </p>
+            </div>
             <button
               onClick={async () => {
-                if (rawJson) { setRawJson(null); return; }
+                if (rawDocs) { setRawDocs(null); return; }
+                const customerId = profile?.agreement?.['customerAgreementInstanceReference'] as string | undefined;
+                if (!customerId) return;
                 setLoadingRaw(true);
                 try {
                   const t = getToken() ?? '';
-                  const data = await api.auth.me(t);
-                  setRawJson(JSON.stringify(data, null, 2));
+                  const [agreementRaw, sensitiveRaw] = await Promise.all([
+                    api.system.rawDocument('customerAgreement', customerId, t).catch(() => null),
+                    api.system.rawDocument('customerAgreementSensitive', customerId, t).catch(() => null),
+                  ]);
+                  setRawDocs({
+                    agreement: (agreementRaw?.document as Record<string, unknown>) ?? null,
+                    sensitive: (sensitiveRaw?.document as Record<string, unknown>) ?? null,
+                  });
                 } catch (e) {
-                  setRawJson(`Error: ${e instanceof Error ? e.message : 'Unknown'}`);
+                  setRawDocs({ agreement: `Error: ${e instanceof Error ? e.message : 'Unknown'}`, sensitive: null });
                 } finally {
                   setLoadingRaw(false);
                 }
               }}
-              className="text-xs px-2 py-1 rounded border border-[#00ED64]/40 text-[#00ED64] hover:bg-[#00ED64]/10 transition-colors"
+              className="text-xs px-2 py-1 rounded border border-[#00ED64]/40 text-[#00ED64] hover:bg-[#00ED64]/10 transition-colors shrink-0"
             >
-              {loadingRaw ? 'Loading...' : rawJson ? 'Hide JSON' : 'Load raw JSON'}
+              {loadingRaw ? 'Loading...' : rawDocs ? 'Hide' : 'Load raw documents'}
             </button>
           </div>
-          {rawJson && (
-            <pre className="text-xs text-green-300 overflow-x-auto whitespace-pre-wrap font-mono max-h-80 overflow-y-auto">
-              {rawJson}
-            </pre>
-          )}
-          {!rawJson && !loadingRaw && (
-            <p className="text-xs text-gray-500 italic">Click "Load raw JSON" to fetch the full API response including QE field status.</p>
+
+          {rawDocs ? (
+            <div className="space-y-4">
+              {/* customerAgreement - QE:equality fields as ciphertext */}
+              <div>
+                <p className="text-xs font-mono text-gray-400 mb-1.5">
+                  Collection:{' '}
+                  <span className="text-blue-400">customerAgreement</span>
+                  <span className="ml-2 text-gray-600 font-sans">
+                    — QE:equality fields (email, phone, accountRef) stored as BSON binary
+                  </span>
+                </p>
+                <pre className="text-xs text-green-300 overflow-x-auto whitespace-pre-wrap font-mono max-h-64 overflow-y-auto bg-black/30 rounded p-2">
+                  {JSON.stringify(rawDocs.agreement, null, 2)}
+                </pre>
+              </div>
+
+              {/* customerAgreementSensitive - QE:none fields as ciphertext */}
+              {rawDocs.sensitive && (
+                <div>
+                  <p className="text-xs font-mono text-gray-400 mb-1.5">
+                    Collection:{' '}
+                    <span className="text-purple-400">customerAgreementSensitive</span>
+                    <span className="ml-2 text-gray-600 font-sans">
+                      — QE:none fields (address, govt ID) also encrypted; not searchable
+                    </span>
+                  </p>
+                  <pre className="text-xs text-green-300 overflow-x-auto whitespace-pre-wrap font-mono max-h-48 overflow-y-auto bg-black/30 rounded p-2">
+                    {JSON.stringify(rawDocs.sensitive, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          ) : !loadingRaw && (
+            <p className="text-xs text-gray-500 italic">
+              Click &quot;Load raw documents&quot; to fetch the actual Atlas documents and observe which fields are stored as encrypted binary blobs vs plaintext.
+            </p>
           )}
         </div>
       )}
