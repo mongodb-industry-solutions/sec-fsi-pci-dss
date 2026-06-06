@@ -154,7 +154,7 @@ export function RawMongoPanel({
 
             <button
               onClick={() => toggle(section)}
-              className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left bg-[#001E2B] hover:bg-[#00ED64]/5 transition-colors duration-150"
+              className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left bg-[#001E2B] hover:bg-[#001020] transition-colors duration-150"
             >
               <span className="flex items-center gap-2 flex-wrap text-xs font-mono min-w-0">
                 {/* Badge: 'static' or 'mongo' to distinguish source */}
