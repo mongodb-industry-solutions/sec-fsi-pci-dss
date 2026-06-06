@@ -6,7 +6,6 @@ import { api, FraudCase, ActionEvent } from '../../../../../lib/api';
 import { getToken, decodeToken } from '../../../../../lib/auth';
 import { useDebugMode } from '../../../../../lib/debugMode';
 import { Eye, EyeOff } from 'lucide-react';
-import { DebugRawJson } from '../../../../../components/DebugRawJson';
 import { RawMongoPanel } from '../../../../../components/RawMongoPanel';
 
 interface StoredTransaction {
@@ -370,23 +369,34 @@ export default function TransactionDetailPage() {
         </div>
       )}
 
-      {/* Debug: API response data */}
+      {/* Debug: unified raw data panel (API responses + MongoDB documents) */}
       {debugMode && (
-        <DebugRawJson
-          sections={[
-            { label: 'localStorage - stored transaction', data: txn },
-            { label: 'API - GET /api/v1/transactions/:id', data: apiTxn },
-            { label: 'API - GET /api/v1/transactions/:id/notes', data: caseNotes },
-          ]}
-        />
-      )}
-
-      {/* Debug: raw MongoDB documents (ciphertext visible) */}
-      {debugMode && token && (
         <RawMongoPanel
           token={token}
+          title="Debug - Raw data"
           sections={[
             {
+              kind: 'static',
+              label: 'localStorage — stored transaction',
+              description: 'Data saved locally when this payment was made',
+              data: txn,
+            },
+            {
+              kind: 'static',
+              label: 'API — GET /api/v1/transactions/:id',
+              labelColor: 'text-yellow-400',
+              description: 'Backend response including decrypted QE:equality fields',
+              data: apiTxn,
+            },
+            {
+              kind: 'static',
+              label: 'API — GET /api/v1/transactions/:id/notes',
+              labelColor: 'text-yellow-400',
+              description: 'Customer-visible case notes from the investigation module',
+              data: caseNotes,
+            },
+            {
+              kind: 'mongo',
               collection: 'cardTransaction',
               id: txnId,
               label: 'cardTransaction',
@@ -394,6 +404,7 @@ export default function TransactionDetailPage() {
               description: 'QE:equality - cardTransactionAccountReference as BSON ciphertext',
             },
             {
+              kind: 'mongo',
               collection: 'cardTransactionSensitive',
               id: txnId,
               label: 'cardTransactionSensitive',

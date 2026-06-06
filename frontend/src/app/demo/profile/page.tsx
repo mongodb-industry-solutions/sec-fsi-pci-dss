@@ -412,6 +412,7 @@ export default function ProfilePage() {
           token={token}
           sections={[
             {
+              kind: 'mongo' as const,
               collection: 'customerAgreement',
               id: profile.agreement.customerAgreementInstanceReference,
               label: 'customerAgreement',
@@ -419,6 +420,7 @@ export default function ProfilePage() {
               description: 'QE:equality — email, phone, accountRef stored as BSON binary ciphertext',
             },
             {
+              kind: 'mongo' as const,
               collection: 'customerAgreementSensitive',
               id: profile.agreement.customerAgreementInstanceReference,
               label: 'customerAgreementSensitive',
