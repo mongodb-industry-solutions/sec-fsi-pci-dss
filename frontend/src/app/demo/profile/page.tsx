@@ -5,6 +5,7 @@ import { getToken, decodeToken } from '../../../lib/auth';
 import { ROLE_LABELS } from '../../../lib/constants';
 import { useDebugMode } from '../../../lib/debugMode';
 import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck } from 'lucide-react';
+import { RawMongoPanel } from '../../../components/RawMongoPanel';
 
 interface ProfileData {
   sub: string;
@@ -119,9 +120,6 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rawDocs, setRawDocs] = useState<{ agreement: Record<string, unknown> | string | null; sensitive: Record<string, unknown> | null } | null>(null);
-  const [loadingRaw, setLoadingRaw] = useState(false);
-  const [rawExpanded, setRawExpanded] = useState<Record<string, boolean>>({ agreement: true, sensitive: true });
   const [token, setToken] = useState('');
 
   // Edit state
@@ -408,122 +406,28 @@ export default function ProfilePage() {
         accessible in plaintext to database administrators or support staff.
       </div>
 
-      {/* Debug: raw MongoDB documents */}
-      {debugMode && (
-        <div className="bg-gray-900 rounded-xl p-4 space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold text-[#00ED64]">Debug - Raw MongoDB documents</p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                QE-encrypted fields appear as{' '}
-                <span className="font-mono text-amber-400">{'"$binary"'}</span>{' '}
-                (BSON subType 06). Plaintext fields are readable as-is.
-              </p>
-            </div>
-            <button
-              onClick={async () => {
-                if (rawDocs) { setRawDocs(null); return; }
-                const customerId = profile?.agreement?.['customerAgreementInstanceReference'] as string | undefined;
-                if (!customerId) return;
-                setLoadingRaw(true);
-                try {
-                  const t = getToken() ?? '';
-                  const [agreementRaw, sensitiveRaw] = await Promise.all([
-                    api.system.rawDocument('customerAgreement', customerId, t).catch(() => null),
-                    api.system.rawDocument('customerAgreementSensitive', customerId, t).catch(() => null),
-                  ]);
-                  setRawDocs({
-                    agreement: (agreementRaw?.document as Record<string, unknown>) ?? null,
-                    sensitive: (sensitiveRaw?.document as Record<string, unknown>) ?? null,
-                  });
-                } catch (e) {
-                  setRawDocs({ agreement: `Error: ${e instanceof Error ? e.message : 'Unknown'}`, sensitive: null });
-                } finally {
-                  setLoadingRaw(false);
-                }
-              }}
-              className="text-xs px-2 py-1 rounded border border-[#00ED64]/40 text-[#00ED64] hover:bg-[#00ED64]/10 transition-colors shrink-0"
-            >
-              {loadingRaw ? 'Loading...' : rawDocs ? 'Hide' : 'Load raw documents'}
-            </button>
-          </div>
-
-          {rawDocs ? (
-            <div className="rounded-lg overflow-hidden border border-[#00ED64]/20">
-              {/* customerAgreement accordion */}
-              <div className="border-b border-[#00ED64]/10 last:border-b-0">
-                <button
-                  onClick={() => setRawExpanded(p => ({ ...p, agreement: !p.agreement }))}
-                  className="w-full flex items-center justify-between px-3 py-2 bg-[#001E2B]/80 hover:bg-[#001E2B] transition-colors text-left"
-                >
-                  <span className="text-xs font-mono text-gray-300 flex items-center gap-2 flex-wrap">
-                    Collection:
-                    <span className="text-blue-400">customerAgreement</span>
-                    <span className="text-gray-600 font-sans hidden sm:inline">
-                      QE:equality fields stored as BSON binary
-                    </span>
-                  </span>
-                  <span className="text-[#00ED64] text-xs ml-2 shrink-0">
-                    {rawExpanded.agreement ? '▲' : '▼'}
-                  </span>
-                </button>
-                {rawExpanded.agreement && (
-                  <pre className={[
-                    'text-xs text-green-300 whitespace-pre font-mono',
-                    'max-h-72 overflow-auto bg-black/40 px-4 py-3',
-                    '[scrollbar-width:thin] [scrollbar-color:#00ED64_#1a2e1a]',
-                    '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5',
-                    '[&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full',
-                    '[&::-webkit-scrollbar-thumb]:bg-[#00ED64]/50 [&::-webkit-scrollbar-thumb]:rounded-full',
-                    '[&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/80',
-                    '[&::-webkit-scrollbar-corner]:bg-gray-900',
-                  ].join(' ')}>
-                    {JSON.stringify(rawDocs.agreement, null, 2)}
-                  </pre>
-                )}
-              </div>
-
-              {/* customerAgreementSensitive accordion */}
-              {rawDocs.sensitive && (
-                <div>
-                  <button
-                    onClick={() => setRawExpanded(p => ({ ...p, sensitive: !p.sensitive }))}
-                    className="w-full flex items-center justify-between px-3 py-2 bg-[#001E2B]/80 hover:bg-[#001E2B] transition-colors text-left"
-                  >
-                    <span className="text-xs font-mono text-gray-300 flex items-center gap-2 flex-wrap">
-                      Collection:
-                      <span className="text-purple-400">customerAgreementSensitive</span>
-                      <span className="text-gray-600 font-sans hidden sm:inline">
-                        QE:none fields (address, govt ID); not searchable
-                      </span>
-                    </span>
-                    <span className="text-[#00ED64] text-xs ml-2 shrink-0">
-                      {rawExpanded.sensitive ? '▲' : '▼'}
-                    </span>
-                  </button>
-                  {rawExpanded.sensitive && (
-                    <pre className={[
-                      'text-xs text-green-300 whitespace-pre font-mono',
-                      'max-h-56 overflow-auto bg-black/40 px-4 py-3',
-                      '[scrollbar-width:thin] [scrollbar-color:#00ED64_#1a2e1a]',
-                      '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5',
-                      '[&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full',
-                      '[&::-webkit-scrollbar-thumb]:bg-[#00ED64]/50 [&::-webkit-scrollbar-thumb]:rounded-full',
-                      '[&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/80',
-                      '[&::-webkit-scrollbar-corner]:bg-gray-900',
-                    ].join(' ')}>
-                      {JSON.stringify(rawDocs.sensitive, null, 2)}
-                    </pre>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : !loadingRaw && (
-            <p className="text-xs text-gray-500 italic">
-              Click &quot;Load raw documents&quot; to fetch the actual Atlas documents and observe which fields are stored as encrypted binary blobs vs plaintext.
-            </p>
-          )}
-        </div>
+      {/* Debug: raw MongoDB documents via RawMongoPanel */}
+      {debugMode && profile?.agreement?.customerAgreementInstanceReference && (
+        <RawMongoPanel
+          token={token}
+          sections={[
+            {
+              collection: 'customerAgreement',
+              id: profile.agreement.customerAgreementInstanceReference,
+              label: 'customerAgreement',
+              labelColor: 'text-blue-400',
+              description: 'QE:equality — email, phone, accountRef stored as BSON binary ciphertext',
+            },
+            {
+              collection: 'customerAgreementSensitive',
+              id: profile.agreement.customerAgreementInstanceReference,
+              label: 'customerAgreementSensitive',
+              labelColor: 'text-purple-400',
+              description: 'QE:none — address, govt ID; requires DEK-sensitive to decrypt',
+              maxHeight: 'max-h-56',
+            },
+          ]}
+        />
       )}
     </div>
   );

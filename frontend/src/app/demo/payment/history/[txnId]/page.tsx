@@ -7,6 +7,7 @@ import { getToken, decodeToken } from '../../../../../lib/auth';
 import { useDebugMode } from '../../../../../lib/debugMode';
 import { Eye, EyeOff } from 'lucide-react';
 import { DebugRawJson } from '../../../../../components/DebugRawJson';
+import { RawMongoPanel } from '../../../../../components/RawMongoPanel';
 
 interface StoredTransaction {
   txnId: string;
@@ -75,6 +76,7 @@ export default function TransactionDetailPage() {
   const { txnId } = useParams<{ txnId: string }>();
 
   const [user, setUser] = useState<ReturnType<typeof decodeToken>>(null);
+  const [token, setToken] = useState('');
   const { debugMode } = useDebugMode();
   const [txn, setTxn] = useState<StoredTransaction | null>(null);
   const [apiTxn, setApiTxn] = useState<{ paymentCardReference?: string; cardTransactionMerchantCategoryCode?: string; cardTransactionChannel?: string; cardTransactionInitiationType?: string } | null>(null);
@@ -96,6 +98,7 @@ export default function TransactionDetailPage() {
       const t = getToken() ?? '';
       const u = t ? decodeToken(t) : null;
       setUser(u);
+      setToken(t);
 
       const storageKey = u?.sub ? `demo_transactions_${u.sub}` : 'demo_transactions_guest';
       const stored: StoredTransaction[] = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
@@ -367,13 +370,37 @@ export default function TransactionDetailPage() {
         </div>
       )}
 
-      {/* Debug: raw JSON of all available data */}
+      {/* Debug: API response data */}
       {debugMode && (
         <DebugRawJson
           sections={[
-            { label: 'localStorage  -  stored transaction', data: txn },
-            { label: 'API  -  GET /api/v1/transactions/:id', data: apiTxn },
-            { label: 'API  -  GET /api/v1/transactions/:id/notes', data: caseNotes },
+            { label: 'localStorage - stored transaction', data: txn },
+            { label: 'API - GET /api/v1/transactions/:id', data: apiTxn },
+            { label: 'API - GET /api/v1/transactions/:id/notes', data: caseNotes },
+          ]}
+        />
+      )}
+
+      {/* Debug: raw MongoDB documents (ciphertext visible) */}
+      {debugMode && token && (
+        <RawMongoPanel
+          token={token}
+          sections={[
+            {
+              collection: 'cardTransaction',
+              id: txnId,
+              label: 'cardTransaction',
+              labelColor: 'text-blue-400',
+              description: 'QE:equality - cardTransactionAccountReference as BSON ciphertext',
+            },
+            {
+              collection: 'cardTransactionSensitive',
+              id: txnId,
+              label: 'cardTransactionSensitive',
+              labelColor: 'text-purple-400',
+              description: 'QE:none - rawGatewayPayload, processorMetadata; requires DEK-sensitive',
+              maxHeight: 'max-h-52',
+            },
           ]}
         />
       )}
