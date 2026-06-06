@@ -118,7 +118,7 @@ function InfoCard({ title, icon, children }: { title: string; icon: string; chil
       <p className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
         <span>{icon}</span> {title}
       </p>
-      <div className="space-y-0.5 max-h-64 overflow-y-auto pr-1">{children}</div>
+      <div className="space-y-0.5 max-h-64 overflow-y-auto pr-1.5 [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/70 [&::-webkit-scrollbar-corner]:bg-gray-900">{children}</div>
     </div>
   );
 }

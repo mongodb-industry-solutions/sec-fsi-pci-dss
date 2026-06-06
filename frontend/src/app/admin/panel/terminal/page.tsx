@@ -72,7 +72,7 @@ export default function TerminalPage() {
         <span className="text-xs font-mono text-gray-400">Shell · project root</span>
         <button onClick={() => setTermLogs([])} className="text-xs text-gray-600 hover:text-gray-400">Clear</button>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-0.5">
+      <div className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-0.5 [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/70 [&::-webkit-scrollbar-corner]:bg-gray-900">
         {termLogs.length === 0 && (
           <div className="text-gray-600 italic">Type a command below and press Enter...</div>
         )}
