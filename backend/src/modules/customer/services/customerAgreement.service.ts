@@ -104,16 +104,44 @@ export async function updateSelfProfile(
     customerName?: string;
     customerMobilePhoneNumber?: string;
     customerAgreementPreferredLanguage?: string;
+    customerAgreementResidentialAddress?: {
+      streetAddress: string;
+      city: string;
+      postalCode: string;
+      countryCode: string;
+    };
   }
 ): Promise<boolean> {
-  if (Object.keys(patch).length === 0) return false;
+  const { customerAgreementResidentialAddress, ...basePatch } = patch;
+  let matched = false;
 
-  const result = await db.collection(CUSTOMER_AGREEMENT_COLLECTION).updateOne(
-    { customerEmailAddress: email } as Record<string, unknown>,
-    { $set: { ...patch, recordUpdatedDateTime: new Date() } }
-  );
+  // Update plaintext + QE:equality fields in customerAgreement
+  if (Object.keys(basePatch).length > 0) {
+    const res = await db.collection(CUSTOMER_AGREEMENT_COLLECTION).updateOne(
+      { customerEmailAddress: email } as Record<string, unknown>,
+      { $set: { ...basePatch, recordUpdatedDateTime: new Date() } }
+    );
+    matched = res.matchedCount > 0;
+  }
 
-  return result.matchedCount > 0;
+  // Update QE:none address in customerAgreementSensitive (same UUID as FK)
+  if (customerAgreementResidentialAddress) {
+    const baseDoc = await db
+      .collection(CUSTOMER_AGREEMENT_COLLECTION)
+      .findOne({ customerEmailAddress: email } as Record<string, unknown>);
+
+    if (baseDoc) {
+      const uuid = (baseDoc as Record<string, unknown>).customerAgreementInstanceReference as string;
+      await db.collection(CUSTOMER_AGREEMENT_SENSITIVE_COLLECTION).updateOne(
+        { customerAgreementInstanceReference: uuid },
+        { $set: { customerAgreementResidentialAddress } },
+        { upsert: true }
+      );
+      matched = true;
+    }
+  }
+
+  return matched;
 }
 
 // Look up by primary UUID  -  used by fraud case detail to load the linked customer profile.

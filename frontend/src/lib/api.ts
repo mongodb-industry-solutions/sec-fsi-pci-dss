@@ -161,7 +161,12 @@ export const api = {
     domains: () =>
       apiFetch<{ domains: AuthDomain[] }>('/api/v1/auth/domains'),
     updateMe: (
-      body: { customerName?: string; customerMobilePhoneNumber?: string; customerAgreementPreferredLanguage?: string },
+      body: {
+        customerName?: string;
+        customerMobilePhoneNumber?: string;
+        customerAgreementPreferredLanguage?: string;
+        customerAgreementResidentialAddress?: { streetAddress: string; city: string; postalCode: string; countryCode: string };
+      },
       token: string
     ) =>
       apiFetch<{ updated: boolean }>(

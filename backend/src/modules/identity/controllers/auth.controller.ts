@@ -259,8 +259,18 @@ automatically re-encrypts the new value before writing it to Atlas.`,
         type: 'object',
         properties: {
           customerName:                       { type: 'string', description: 'Updated display name.' },
-          customerMobilePhoneNumber:          { type: 'string', description: 'Updated phone (QE:equality  -  re-encrypted automatically).' },
+          customerMobilePhoneNumber:          { type: 'string', description: 'Updated phone (QE:equality - re-encrypted automatically).' },
           customerAgreementPreferredLanguage: { type: 'string', description: 'ISO 639-1 language code (e.g. "en").' },
+          customerAgreementResidentialAddress: {
+            type: 'object',
+            description: 'Updated address (QE:none - stored in customerAgreementSensitive).',
+            properties: {
+              streetAddress: { type: 'string' },
+              city:          { type: 'string' },
+              postalCode:    { type: 'string' },
+              countryCode:   { type: 'string', description: 'ISO 3166-1 alpha-2 (e.g. "US").' },
+            },
+          },
         },
       },
       response: {
@@ -278,6 +288,12 @@ automatically re-encrypts the new value before writing it to Atlas.`,
       customerName?: string;
       customerMobilePhoneNumber?: string;
       customerAgreementPreferredLanguage?: string;
+      customerAgreementResidentialAddress?: {
+        streetAddress: string;
+        city: string;
+        postalCode: string;
+        countryCode: string;
+      };
     };
 
     if (!body || Object.keys(body).length === 0) {

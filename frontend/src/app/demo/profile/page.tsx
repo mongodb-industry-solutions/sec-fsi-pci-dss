@@ -132,6 +132,7 @@ export default function ProfilePage() {
   const [editLang, setEditLang] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [editAddress, setEditAddress] = useState({ streetAddress: '', city: '', postalCode: '', countryCode: '' });
 
   // QE reference accordion state
   const [qeExpanded, setQeExpanded] = useState<Record<string, boolean>>({});
@@ -144,6 +145,16 @@ export default function ProfilePage() {
       setEditName((data.agreement?.customerName as string | undefined) ?? data.name ?? '');
       setEditPhone((data.agreement?.customerMobilePhoneNumber as string | undefined) ?? '');
       setEditLang((data.agreement?.customerAgreementPreferredLanguage as string | undefined) ?? '');
+      const sensitive = data.agreement?.['sensitive'] as { customerAgreementResidentialAddress?: Record<string, string> } | null;
+      const addr = sensitive?.customerAgreementResidentialAddress;
+      if (addr) {
+        setEditAddress({
+          streetAddress: addr.streetAddress ?? '',
+          city:          addr.city ?? '',
+          postalCode:    addr.postalCode ?? '',
+          countryCode:   addr.countryCode ?? '',
+        });
+      }
     }
     return data;
   }
@@ -166,15 +177,28 @@ export default function ProfilePage() {
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  function cancelEdit() {
+    setEditing(false);
+    setSaveMsg(null);
+  }
+
   async function handleSave() {
     if (!profile?.agreement) return;
     setSaving(true);
     setSaveMsg(null);
     try {
-      const patch: Record<string, string> = {};
+      const patch: Parameters<typeof api.auth.updateMe>[0] = {};
       if (editName.trim())  patch.customerName = editName.trim();
       if (editPhone.trim()) patch.customerMobilePhoneNumber = editPhone.trim();
       if (editLang.trim())  patch.customerAgreementPreferredLanguage = editLang.trim();
+      if (editAddress.streetAddress.trim() || editAddress.city.trim()) {
+        patch.customerAgreementResidentialAddress = {
+          streetAddress: editAddress.streetAddress.trim(),
+          city:          editAddress.city.trim(),
+          postalCode:    editAddress.postalCode.trim(),
+          countryCode:   editAddress.countryCode.trim() || 'US',
+        };
+      }
 
       await api.auth.updateMe(patch, token);
       await reload(token);
@@ -218,13 +242,23 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Identity card */}
+      {/* Identity card — inline editable */}
       <div className="bg-white rounded-xl border p-5">
+        {/* Header: avatar + name (editable) + status */}
         <div className="flex items-center gap-4 mb-5">
           <div className="w-14 h-14 rounded-full bg-[#001E2B]/10 flex items-center justify-center text-3xl shrink-0">👤</div>
-          <div>
-            <p className="font-bold text-xl text-gray-900">{name}</p>
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
+          <div className="flex-1 min-w-0">
+            {editing ? (
+              <input
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-lg font-bold text-gray-900 focus:outline-none focus:border-[#001E2B] focus:ring-1 focus:ring-[#001E2B]/20 mb-1"
+                placeholder="Full name"
+              />
+            ) : (
+              <p className="font-bold text-xl text-gray-900">{name}</p>
+            )}
+            <div className="flex items-center gap-2 flex-wrap">
               <span className={`text-xs px-2 py-0.5 rounded font-medium ${STATUS_COLORS[status] ?? 'bg-gray-100 text-gray-700'}`}>
                 {status.charAt(0).toUpperCase() + status.slice(1)}
               </span>
@@ -235,9 +269,9 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3 border-t pt-4 items-center">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3 border-t pt-4 items-start">
 
-          {/* QE:equality fields */}
+          {/* Email — always read-only (login identity) */}
           <RevealField
             label="Email"
             plainValue={ag?.customerEmailAddress ?? profile.email}
@@ -245,27 +279,36 @@ export default function ProfilePage() {
             type="qe-equality"
           />
 
-          {ag?.customerMobilePhoneNumber ? (
-            <RevealField
-              label="Phone"
-              plainValue={ag.customerMobilePhoneNumber}
-              maskedValue={maskPhone(ag.customerMobilePhoneNumber)}
-              type="qe-equality"
-            />
+          {/* Phone — editable */}
+          {editing ? (
+            <>
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <span className="text-gray-500 text-sm">Phone</span>
+                {debugMode && (
+                  <span className="flex items-center gap-1 bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-mono text-xs">
+                    <Lock size={9} /> QE:equality
+                  </span>
+                )}
+              </div>
+              <input
+                value={editPhone}
+                onChange={e => setEditPhone(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-[#001E2B] focus:ring-1 focus:ring-[#001E2B]/20"
+                placeholder="+1-555-0000"
+              />
+            </>
+          ) : ag?.customerMobilePhoneNumber ? (
+            <RevealField label="Phone" plainValue={ag.customerMobilePhoneNumber} maskedValue={maskPhone(ag.customerMobilePhoneNumber)} type="qe-equality" />
           ) : (
             <>
               <span className="text-gray-500 text-sm">Phone</span>
-              <span className="text-gray-400 text-xs italic">Not on file</span>
+              <span className="text-gray-400 text-xs italic">{editing ? '' : 'Not on file'}</span>
             </>
           )}
 
+          {/* Account Reference — read-only */}
           {ag?.customerAgreementReference ? (
-            <RevealField
-              label="Account Reference"
-              plainValue={ag.customerAgreementReference}
-              maskedValue={maskAccountRef(ag.customerAgreementReference)}
-              type="qe-equality"
-            />
+            <RevealField label="Account Reference" plainValue={ag.customerAgreementReference} maskedValue={maskAccountRef(ag.customerAgreementReference)} type="qe-equality" />
           ) : (
             <>
               <span className="text-gray-500 text-sm">Account Reference</span>
@@ -273,19 +316,68 @@ export default function ProfilePage() {
             </>
           )}
 
-          {/* Plaintext fields */}
-          {ag?.customerSegment && (
-            <PlainField label="Account type" value={SEGMENT_LABELS[ag.customerSegment] ?? ag.customerSegment} />
-          )}
-          {ag?.customerAgreementEnrollmentDate && (
-            <PlainField label="Member since" value={new Date(ag.customerAgreementEnrollmentDate).toLocaleDateString()} />
-          )}
-          {ag?.customerAgreementPreferredLanguage && (
+          {/* Segment / member since — read-only */}
+          {ag?.customerSegment && <PlainField label="Account type" value={SEGMENT_LABELS[ag.customerSegment] ?? ag.customerSegment} />}
+          {ag?.customerAgreementEnrollmentDate && <PlainField label="Member since" value={new Date(ag.customerAgreementEnrollmentDate).toLocaleDateString()} />}
+
+          {/* Language — editable */}
+          {editing ? (
+            <>
+              <span className="text-gray-500 text-sm pt-0.5">Language</span>
+              <select
+                value={editLang}
+                onChange={e => setEditLang(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-[#001E2B]"
+              >
+                <option value="en">English (en)</option>
+                <option value="es">Spanish (es)</option>
+                <option value="fr">French (fr)</option>
+                <option value="de">German (de)</option>
+                <option value="pt">Portuguese (pt)</option>
+              </select>
+            </>
+          ) : ag?.customerAgreementPreferredLanguage && (
             <PlainField label="Language" value={ag.customerAgreementPreferredLanguage.toUpperCase()} />
           )}
 
-          {/* QE:none fields (sensitive) */}
-          {hasAddress ? (
+          {/* Address — editable (QE:none) */}
+          {editing ? (
+            <>
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <span className="text-gray-500 text-sm">Address</span>
+                {debugMode && <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-purple-100 text-purple-700 border-purple-200">QE:none</span>}
+              </div>
+              <div className="space-y-1.5">
+                <input
+                  value={editAddress.streetAddress}
+                  onChange={e => setEditAddress(p => ({ ...p, streetAddress: e.target.value }))}
+                  placeholder="Street address"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#001E2B] focus:ring-1 focus:ring-[#001E2B]/20"
+                />
+                <div className="grid grid-cols-2 gap-1.5">
+                  <input
+                    value={editAddress.city}
+                    onChange={e => setEditAddress(p => ({ ...p, city: e.target.value }))}
+                    placeholder="City"
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#001E2B]"
+                  />
+                  <input
+                    value={editAddress.postalCode}
+                    onChange={e => setEditAddress(p => ({ ...p, postalCode: e.target.value }))}
+                    placeholder="Postal code"
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#001E2B]"
+                  />
+                </div>
+                <input
+                  value={editAddress.countryCode}
+                  onChange={e => setEditAddress(p => ({ ...p, countryCode: e.target.value.toUpperCase().slice(0, 2) }))}
+                  placeholder="Country code (US)"
+                  maxLength={2}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-mono uppercase focus:outline-none focus:border-[#001E2B]"
+                />
+              </div>
+            </>
+          ) : hasAddress ? (
             <RevealField
               label="Address"
               plainValue={`${hasAddress.streetAddress}, ${hasAddress.city}, ${hasAddress.postalCode}, ${hasAddress.countryCode}`}
@@ -302,13 +394,9 @@ export default function ProfilePage() {
             </>
           )}
 
+          {/* Government ID — read-only */}
           {hasGovId ? (
-            <RevealField
-              label="Government ID"
-              plainValue={hasGovId}
-              maskedValue={maskGovId(hasGovId)}
-              type="qe-none"
-            />
+            <RevealField label="Government ID" plainValue={hasGovId} maskedValue={maskGovId(hasGovId)} type="qe-none" />
           ) : ag !== null && (
             <>
               <div className="flex items-center gap-1.5">
@@ -318,78 +406,29 @@ export default function ProfilePage() {
               <span className="text-gray-400 text-xs italic">Not on file</span>
             </>
           )}
+
+          {/* Inline Save / Cancel — only when editing */}
+          {editing && (
+            <div className="col-span-2 flex gap-2 pt-3 mt-1 border-t">
+              <button
+                onClick={cancelEdit}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                <X size={14} />
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold disabled:opacity-50 transition-colors"
+              >
+                <Save size={14} />
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Edit form */}
-      {editing && ag && (
-        <div className="bg-white rounded-xl border p-5 space-y-4">
-          <h2 className="font-semibold">Edit Profile</h2>
-
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Full name</label>
-              <input
-                value={editName}
-                onChange={e => setEditName(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm"
-                placeholder="Your full name"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1.5 flex-wrap">
-                Phone
-                {debugMode && (
-                  <>
-                    <span className="flex items-center gap-1 bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-mono text-xs">
-                      <Lock size={10} /> QE:equality
-                    </span>
-                    <span className="text-gray-400 font-normal text-xs">New value will be encrypted client-side before reaching the server</span>
-                  </>
-                )}
-              </label>
-              <input
-                value={editPhone}
-                onChange={e => setEditPhone(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm font-mono"
-                placeholder="+1-555-0000"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Preferred language (ISO 639-1)</label>
-              <select
-                value={editLang}
-                onChange={e => setEditLang(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm bg-white"
-              >
-                <option value="en">English (en)</option>
-                <option value="es">Spanish (es)</option>
-                <option value="fr">French (fr)</option>
-                <option value="de">German (de)</option>
-                <option value="pt">Portuguese (pt)</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex gap-2 pt-1">
-            <button
-              onClick={() => { setEditing(false); setSaveMsg(null); }}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50"
-            >
-              <X size={14} />
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold disabled:opacity-50"
-            >
-              <Save size={14} />
-              {saving ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Legend — only visible in debug mode */}
       {debugMode && (
