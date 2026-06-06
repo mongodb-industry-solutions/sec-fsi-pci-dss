@@ -133,6 +133,10 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
+  // QE reference accordion state
+  const [qeExpanded, setQeExpanded] = useState<Record<string, boolean>>({});
+  const toggleQe = (key: string) => setQeExpanded(p => ({ ...p, [key]: !p[key] }));
+
   async function reload(t: string) {
     const data = await api.auth.me(t).catch(() => null);
     if (data) {
@@ -439,6 +443,129 @@ export default function ProfilePage() {
             },
           ]}
         />
+      )}
+
+      {/* QE field definition reference — same style as RawMongoPanel, debug only */}
+      {debugMode && (
+        <div className="rounded-xl overflow-hidden border border-[#00ED64]/20">
+
+          {/* Header — identical to RawMongoPanel header */}
+          <div className="bg-[#001E2B] px-4 py-2.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-[#00ED64] text-xs font-semibold shrink-0">
+                How QE fields are declared in MongoDB
+              </span>
+              <span className="text-gray-500 text-xs hidden sm:inline">
+                Each entry in{' '}
+                <span className="font-mono text-gray-300">encryptedFieldsMap</span>
+                {' '}controls storage mode and searchability.
+              </span>
+            </div>
+            <a
+              href="https://www.mongodb.com/docs/manual/core/queryable-encryption/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 inline-flex items-center gap-1 text-xs text-[#00ED64] border border-[#00ED64]/40 px-2 py-1 rounded hover:bg-[#00ED64]/10 transition-colors"
+            >
+              Docs ↗
+            </a>
+          </div>
+
+          {/* Three code sections + comparison table — all accordion rows */}
+          {([
+            {
+              key: 'equality',
+              badge: <span className="bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-mono text-xs shrink-0">QE:equality</span>,
+              desc: 'Encrypted + searchable by exact match. Atlas stores ciphertext; the driver encrypts the predicate client-side.',
+              code: `{\n  path: "customerEmailAddress",\n  bsonType: "string",\n  queries: [{ queryType: "equality" }]   // enables QE:equality search\n}`,
+            },
+            {
+              key: 'none',
+              badge: <span className="bg-purple-100 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded font-mono text-xs shrink-0">QE:none</span>,
+              desc: 'Encrypted with DEK-sensitive. Not searchable. Requires L2 escalation token to reveal.',
+              code: `{\n  path: "customerAgreementResidentialAddress",\n  bsonType: "object"\n  // No "queries" key → stored encrypted, never queryable\n}`,
+            },
+            {
+              key: 'plaintext',
+              badge: <span className="bg-gray-800 text-gray-400 border border-gray-700 px-1.5 py-0.5 rounded font-mono text-xs shrink-0">plaintext</span>,
+              desc: 'Not listed in encryptedFieldsMap. Atlas stores the raw value — readable without any key.',
+              code: `// Simply omit the field from encryptedFieldsMap\n// Atlas stores:   "customerName": "Luis Fernandez"        ← plaintext\n// QE stores:      "customerEmailAddress": { "$binary": { "subType": "06" ... } }`,
+            },
+          ] as const).map(({ key, badge, desc, code }) => (
+            <div key={key} className="border-t border-[#00ED64]/60">
+              <button
+                onClick={() => toggleQe(key)}
+                className="w-full flex items-center justify-between gap-3 px-4 py-2.5 bg-[#001E2B] hover:bg-[#001020] transition-colors duration-150 text-left"
+              >
+                <span className="flex items-center gap-2 min-w-0">
+                  {badge}
+                  <span className="text-gray-600 text-xs hidden md:inline truncate">{desc}</span>
+                </span>
+                <span className="text-[#00ED64] text-xs shrink-0">{qeExpanded[key] ? '▲' : '▼'}</span>
+              </button>
+              {qeExpanded[key] && (
+                <div className="border-t border-[#00ED64]/20">
+                  <pre className={[
+                    'text-xs text-green-300 whitespace-pre font-mono max-h-40 overflow-auto bg-[#001E2B] px-4 py-3',
+                    '[scrollbar-width:thin] [scrollbar-color:#00ED64_#001020]',
+                    '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5',
+                    '[&::-webkit-scrollbar-track]:bg-[#001020] [&::-webkit-scrollbar-track]:rounded-full',
+                    '[&::-webkit-scrollbar-thumb]:bg-[#00ED64]/40 [&::-webkit-scrollbar-thumb]:rounded-full',
+                    '[&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/70',
+                  ].join(' ')}>{code}</pre>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Comparison table — accordion row */}
+          <div className="border-t border-[#00ED64]/60">
+            <button
+              onClick={() => toggleQe('table')}
+              className="w-full flex items-center justify-between gap-3 px-4 py-2.5 bg-[#001E2B] hover:bg-[#001020] transition-colors duration-150 text-left"
+            >
+              <span className="flex items-center gap-2">
+                <span className="text-gray-300 text-xs font-mono shrink-0">comparison</span>
+                <span className="text-gray-600 text-xs hidden md:inline">Mode vs storage format vs searchability vs DEK</span>
+              </span>
+              <span className="text-[#00ED64] text-xs shrink-0">{qeExpanded['table'] ? '▲' : '▼'}</span>
+            </button>
+            {qeExpanded['table'] && (
+              <div className="border-t border-[#00ED64]/20 bg-[#001E2B] px-4 py-3">
+                <table className="w-full text-xs text-gray-400">
+                  <thead>
+                    <tr className="text-gray-600 uppercase tracking-wide">
+                      <th className="text-left pb-2 pr-4">Mode</th>
+                      <th className="text-left pb-2 pr-4 hidden sm:table-cell">Atlas stores</th>
+                      <th className="text-left pb-2 pr-4">Searchable</th>
+                      <th className="text-left pb-2">DEK</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#00ED64]/10">
+                    <tr>
+                      <td className="py-1.5 pr-4 font-mono text-blue-400">QE:equality</td>
+                      <td className="py-1.5 pr-4 font-mono text-amber-400 hidden sm:table-cell">$binary subType 06</td>
+                      <td className="py-1.5 pr-4 text-green-400">Yes, exact match</td>
+                      <td className="py-1.5 text-gray-500">DEK-lookup</td>
+                    </tr>
+                    <tr>
+                      <td className="py-1.5 pr-4 font-mono text-purple-400">QE:none</td>
+                      <td className="py-1.5 pr-4 font-mono text-amber-400 hidden sm:table-cell">$binary subType 06</td>
+                      <td className="py-1.5 pr-4 text-red-400">No</td>
+                      <td className="py-1.5 text-gray-500">DEK-sensitive (L2)</td>
+                    </tr>
+                    <tr>
+                      <td className="py-1.5 pr-4 font-mono text-gray-500">plaintext</td>
+                      <td className="py-1.5 pr-4 font-mono text-green-300 hidden sm:table-cell">Raw value</td>
+                      <td className="py-1.5 pr-4 text-green-400">Yes, standard index</td>
+                      <td className="py-1.5 text-gray-500">None</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
