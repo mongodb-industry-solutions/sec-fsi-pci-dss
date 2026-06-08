@@ -10,6 +10,8 @@ import {
   ClipboardList,
   User,
   PlusCircle,
+  ChevronLeft,
+  ChevronRight,
   type LucideIcon,
 } from 'lucide-react';
 import { getToken, decodeToken } from '../lib/auth';
@@ -51,6 +53,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
 export function DemoSidebar() {
   const pathname = usePathname();
   const [role, setRole] = useState('');
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     const t = getToken() ?? '';
@@ -66,12 +69,22 @@ export function DemoSidebar() {
   }
 
   return (
-    <aside className="flex-shrink-0 bg-[#001E2B] flex flex-col border-r border-white/10 w-12 md:w-44">
-      <nav className="flex-1 py-3 md:py-4">
-        {/* Section label only on wider screens */}
-        <p className="hidden md:block px-4 pb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-          Menu
-        </p>
+    <aside className={`flex-shrink-0 bg-[#001E2B] flex flex-col border-r border-white/10 transition-all duration-200 ${collapsed ? 'w-12' : 'w-44'}`}>
+      <nav className="flex-1 py-3">
+        <div className="flex items-center justify-between px-3 pb-2">
+          {!collapsed && (
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Menu
+            </p>
+          )}
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            title={collapsed ? 'Expand menu' : 'Collapse menu'}
+            className={`flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 rounded p-0.5 transition-colors ${collapsed ? 'mx-auto' : 'ml-auto'}`}
+          >
+            {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          </button>
+        </div>
         {items.map((item) => {
           const Icon = item.icon;
           const active = isActive(item);
@@ -80,15 +93,14 @@ export function DemoSidebar() {
               key={item.path}
               href={item.path}
               title={item.label}
-              className={`flex items-center gap-2.5 px-3 md:px-4 py-2.5 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium transition-colors ${
                 active
                   ? 'bg-[#00ED64]/10 text-[#00ED64] border-r-2 border-[#00ED64]'
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
             >
               <Icon size={16} className="shrink-0" />
-              {/* Label hidden on small screens, visible on md+ */}
-              <span className="hidden md:block truncate">{item.label}</span>
+              {!collapsed && <span className="truncate">{item.label}</span>}
             </Link>
           );
         })}
