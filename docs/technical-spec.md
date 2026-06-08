@@ -54,7 +54,7 @@ export interface CardTransactionLogControlRecord {
   cardTransactionDateTime: Date;
   cardTransactionStatus: CardTransactionStatus;
   cardTransactionChannel: CardTransactionChannel;
-  cardTransactionInitiationType: CardTransactionInitiationType; // v4: MIT vs CIT for Visa/MC recurring rules
+  cardTransactionInitiationType: CardTransactionInitiationType; // v3: MIT vs CIT for Visa/MC recurring rules
   cardTransactionMerchantCategoryCode: string;    // MCC code
   cardTransactionMerchantName: string;
   cardTransactionMaskedPanDisplay: string;        // Display only: ****-****-****-1234
@@ -164,7 +164,7 @@ export interface PaymentCardManagementControlRecord {
   paymentCardIssuanceDateTime: Date;
   paymentCardIsPreferred: boolean;               // true when saved as preferred payment method
 
-  // v4: recurring payment mandate (PCI DSS Req 3.1 + 3.7)
+  // v3: recurring payment mandate (PCI DSS Req 3.1 + 3.7)
   paymentCardMandateStatus?: 'active' | 'cancelled' | 'expired';
   paymentCardConsentDateTime?: Date;             // Req 3.1: explicit consent recorded at save-card time
   paymentCardMandateExpiryDate?: Date;           // Req 3.7: auto-purge trigger
@@ -241,7 +241,7 @@ export interface FraudDiagnosisControlRecord {
     resolvedByInstanceReference: string;
   };
 
-  // AI agent draft (v3: populated by agent, absent if agent disabled)
+  // AI agent draft (v5: populated by agent, absent if agent disabled)
   agentDraftDiagnosis?: {
     riskSummary: string;
     recommendedAction: 'clear' | 'escalate' | 'investigate';
@@ -256,7 +256,7 @@ export interface FraudDiagnosisControlRecord {
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
 
-  // Schema Versioning Pattern: enables zero-downtime schema evolution across v1-v4
+  // Schema Versioning Pattern: enables zero-downtime schema evolution across v1-v5
   schemaVersion: number;
 }
 
@@ -1317,8 +1317,8 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 FRAUD_AMOUNT_THRESHOLD=500      # Transactions above this create a fraud case
 RISK_MCC_LIST=5812,6011,7995    # MCC codes that auto-trigger fraud diagnosis
 
-# ── AI Agent (v3) ─────────────────────────────────────────────────
-AGENT_ENABLED=false             # 'true' | 'false': set true to enable v3 agent
+# ── AI Agent (v5) ─────────────────────────────────────────────────
+AGENT_ENABLED=false             # 'true' | 'false': set true to enable v5 agent
 MAGENTA_API_KEY=                # MongoDB Agentic Platform (Magenta) API key
 ```
 
@@ -1404,7 +1404,7 @@ backend/
 │   ├── fraudCases.json             # generated
 │   ├── fraudCaseEvents.json        # generated (initial case_opened events)
 │   ├── customerCreditRatings.json  # manual: 5 HRPC profiles (BIAN SD-60)
-│   └── merchants.json              # [v5] seed data for merchantAgreement collection
+│   └── merchants.json              # [v4] seed data for merchantAgreement collection
 │
 └── src/
     │
@@ -1414,7 +1414,7 @@ backend/
     │   │   ├── identity.model.ts   # UserRole · AnalystRole · JwtDemoPayload
     │   │   └── transaction.model.ts # TransactionSnapshot (defined in fraud, built in transactions)
     │   └── services/
-    │       └── fraudTrigger.service.ts  # [v5] triggerFraudEvaluation() — shared when gateway also triggers fraud
+    │       └── fraudTrigger.service.ts  # [v4] triggerFraudEvaluation() — shared when gateway also triggers fraud
     │
     ├── vendors/                    # Infrastructure shared by all modules (no business logic)
     │   ├── encryption/
@@ -1440,7 +1440,7 @@ backend/
     │       ├── seedTransactions.ts
     │       ├── seedCases.ts
     │       ├── seedCreditRatings.ts  # BIAN SD-60: upserts customerCreditRatings.json
-    │       └── seedMerchants.ts    # [v5]
+    │       └── seedMerchants.ts    # [v4]
     │
     ├── modules/                    # Domain modules — one per BIAN SD cluster
     │   │
@@ -1483,7 +1483,7 @@ backend/
     │   │   │   └── fraudDiagnosis.model.ts
     │   │   └── index.ts                    # Fastify plugin → /fraud (+ /fraud/:id/events in v2)
     │   │
-    │   ├── gateway/                # [v5] BIAN SD-64+SD-65+SD-89+SD-57
+    │   ├── gateway/                # [v4] BIAN SD-64+SD-65+SD-89+SD-57
     │   │   ├── controllers/
     │   │   │   ├── merchant.controller.ts
     │   │   │   ├── payment.controller.ts    # /gateway/payments lifecycle
@@ -1514,7 +1514,7 @@ backend/
     └── server.ts                   # Registers shared schemas, plugins, middleware, and all modules
 ```
 
-**Cross-module dependency rule:** `transactions` imports `createFraudCase` from `modules/fraud/` directly (permanent, unidirectional). All other cross-module dependencies are types from `shared/models/` (no runtime cost). In v5, `shared/services/fraudTrigger.service.ts` is introduced when `gateway` becomes a second caller of fraud case creation.
+**Cross-module dependency rule:** `transactions` imports `createFraudCase` from `modules/fraud/` directly (permanent, unidirectional). All other cross-module dependencies are types from `shared/models/` (no runtime cost). In v4, `shared/services/fraudTrigger.service.ts` is introduced when `gateway` becomes a second caller of fraud case creation.
 
 **API URL semantics follow REST nesting.** Cards (SD-88) are a sub-resource of Customer Agreement (SD-53): `/api/v1/customer/:id/cards`. Other resources are top-level: `/api/v1/transactions` (SD-254), `/api/v1/fraud` (SD-83), `/api/v1/auth` (SD-16).
 

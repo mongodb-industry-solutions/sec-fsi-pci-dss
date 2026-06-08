@@ -3,7 +3,7 @@
 ## Status
 
 Draft  
-Version: 1.1: Author: Antonio Membrides Espinosa: Last updated: 2026-05-27  
+Version: 1.2: Author: Antonio Membrides Espinosa: Last updated: 2026-06-08  
 PRD reference: [docs/PRD.md](PRD.md)
 
 ---
@@ -28,7 +28,7 @@ Full business context, problem statement, and storyline are in [PRD.md](PRD.md).
 - Specify the Fastify REST API surface and request/response contracts.
 - Define the `backend/bin/setup.ts` and `backend/bin/seed.ts` scripts so the demo is installable in one sequence of commands.
 - Identify the risks specific to QE implementation and specify mitigations.
-- Break the work into four independently deliverable phases aligned with v1, v2, v3, and v4.
+- Break the work into five independently deliverable phases aligned with v1, v2, v3, v4, and v5.
 
 ### Non-goals
 
@@ -132,7 +132,7 @@ Complete `encryptedFieldsMap` definitions are in [technical-spec.md §2](technic
 
 **v2 addition:** range query on `transactionAmount.amount` (`min: 0`, `max: 999999`, `precision: 2`).
 
-**v4 consideration:** prefix/substring queries on `customerName` if MongoDB 8.2 prefix/suffix QE is GA.
+**v3 consideration:** prefix/substring queries on `customerName` if MongoDB 8.2 prefix/suffix QE is GA.
 
 ### 3.5 API design
 
@@ -153,7 +153,7 @@ GET    /api/v1/fraud                     list cases (filter: status, severity)  
 GET    /api/v1/fraud/:id                 case detail
 POST   /api/v1/fraud/:id/escalate        [v2]
 GET    /api/v1/fraud/:id/events          audit events per case
-GET    /api/v1/diagnostics/query-timing  [v4]
+GET    /api/v1/diagnostics/query-timing  [v3]
 GET    /api/v1/system/health
 ```
 
@@ -245,7 +245,7 @@ Each module maps to one or more BIAN Service Domains. No module exists without a
 | `customer` | SD-53 · SD-88 | Customer Agreement · Payment Card | `customerAgreement` · `customerAgreementSensitive` · `paymentCard` | `equality` on email / phone / accountRef · `none` on address / govId / expirationDate | `/api/v1/customer` · `/api/v1/customer/:id/cards` | **In scope** — PII/CHD |
 | `transactions` | SD-254 | Card Transaction | `cardTransaction` · `cardTransactionSensitive` | `equality` on accountRef · `none` on rawGatewayPayload | `/api/v1/transactions` | **In scope** — CHD |
 | `fraud` | SD-83 | Fraud Diagnosis | `fraudDiagnosisCase` · `fraudDiagnosisCaseEvents` | None — operational metadata, FK refs only | `/api/v1/fraud` · `/api/v1/fraud/:id/events` | Adjacent — references CDE keys |
-| `gateway` *(v5)* | SD-64 · SD-65 · SD-89 · SD-57 | Payment Order · Payment Execution · Merchant Relations · Card Etoken | `merchantAgreement` · `paymentOrder` · `tokenVault` | `none` on merchantApiKeyHash · `equality` on merchant/customer refs | `/api/v1/gateway` | **In scope** — merchant secrets + payment refs |
+| `gateway` *(v4)* | SD-64 · SD-65 · SD-89 · SD-57 | Payment Order · Payment Execution · Merchant Relations · Card Etoken | `merchantAgreement` · `paymentOrder` · `tokenVault` | `none` on merchantApiKeyHash · `equality` on merchant/customer refs | `/api/v1/gateway` | **In scope** — merchant secrets + payment refs |
 | `system` | — | Demo infrastructure | None | None | `/api/v1/system/health` · `/api/v1/system/raw/:collection/:id` | Non-CDE — raw endpoint blocked in production |
 
 #### 3.8.2 Shared resources
@@ -255,7 +255,7 @@ Each module maps to one or more BIAN Service Domains. No module exists without a
 | `shared/models/risk.model.ts` | `RiskSeverity` · `FraudTriggerInput` | `transactions` · `fraud` · `gateway` (v5) |
 | `shared/models/identity.model.ts` | `UserRole` · `AnalystRole` · `JwtDemoPayload` | `identity` · `fraud` · `gateway` (v5) |
 | `shared/models/transaction.model.ts` | `TransactionSnapshot` | `fraud` (defines embedded field) · `transactions` (builds the value at write time) |
-| `shared/services/fraudTrigger.service.ts` *(v5)* | `triggerFraudEvaluation()` | `transactions` · `gateway` — activated when gateway also triggers fraud cases |
+| `shared/services/fraudTrigger.service.ts` *(v4)* | `triggerFraudEvaluation()` | `transactions` · `gateway` — activated when gateway also triggers fraud cases |
 
 Until v5, `transactions` calls `createFraudCase()` from `modules/fraud/` directly. The shared service is introduced only when a second caller (gateway) makes the duplication worth extracting.
 
@@ -266,7 +266,7 @@ Until v5, `transactions` calls `createFraudCase()` from `modules/fraud/` directl
 | `vendors/encryption/` | `qeClient.ts` · `rawClient.ts` · `kms.ts` · `keyVault.ts` · `encryptedFieldsMaps.ts` | `customer` · `transactions` · `identity` · `gateway` (v5) |
 | `vendors/middleware/` | `auth.ts` · `rbac.ts` | All modules via `server.ts` Fastify hooks |
 | `vendors/setup/` | `createCollections.ts` · `createIndexes.ts` · `provisionDEKs.ts` | `bin/setup.ts` only |
-| `vendors/seed/` | `seedUsers.ts` · `seedCustomers.ts` · `seedCards.ts` · `seedTransactions.ts` · `seedCases.ts` · `seedMerchants.ts` (v5) | `bin/seed.ts` only |
+| `vendors/seed/` | `seedUsers.ts` · `seedCustomers.ts` · `seedCards.ts` · `seedTransactions.ts` · `seedCases.ts` · `seedMerchants.ts` (v4) | `bin/seed.ts` only |
 
 #### 3.8.4 Module dependency graph
 
@@ -281,7 +281,7 @@ server.ts
   │     └── imports createFraudCase ──────────────────────────────────────────┐
   ├── modules/fraud/                  SD-83  ◄──────────────────────────────┘
   │
-  ├── modules/gateway/ [v5]           SD-64 + SD-65 + SD-89 + SD-57
+  ├── modules/gateway/ [v4]           SD-64 + SD-65 + SD-89 + SD-57
   │     └── imports triggerFraudEvaluation ──► shared/services/fraudTrigger ──► modules/fraud/
   │
   └── modules/system/                 demo infra (NODE_ENV !== 'production' only)
@@ -302,7 +302,7 @@ backend/src/
 │   │   ├── identity.model.ts         UserRole · AnalystRole · JwtDemoPayload
 │   │   └── transaction.model.ts      TransactionSnapshot
 │   └── services/
-│       └── fraudTrigger.service.ts   [v5] triggerFraudEvaluation()
+│       └── fraudTrigger.service.ts   [v4] triggerFraudEvaluation()
 │
 ├── vendors/
 │   ├── encryption/
@@ -326,7 +326,7 @@ backend/src/
 │       ├── seedCards.ts
 │       ├── seedTransactions.ts
 │       ├── seedCases.ts
-│       └── seedMerchants.ts          [v5]
+│       └── seedMerchants.ts          [v4]
 │
 └── modules/
     ├── identity/                     SD-16: Party Authentication
@@ -359,7 +359,7 @@ backend/src/
     │   ├── models/fraudDiagnosis.model.ts
     │   └── index.ts                  Fastify plugin → registers /fraud (+ /fraud/:id/events in v2)
     │
-    ├── gateway/                      [v5] SD-64+SD-65+SD-89+SD-57
+    ├── gateway/                      [v4] SD-64+SD-65+SD-89+SD-57
     │   ├── controllers/
     │   │   ├── merchant.controller.ts
     │   │   ├── payment.controller.ts
@@ -389,7 +389,7 @@ await fastify.register(identityModule,     { prefix: '/api/v1' });
 await fastify.register(customerModule,     { prefix: '/api/v1' });
 await fastify.register(transactionsModule, { prefix: '/api/v1' });
 await fastify.register(fraudModule,        { prefix: '/api/v1' });
-await fastify.register(gatewayModule,      { prefix: '/api/v1' });   // v5
+await fastify.register(gatewayModule,      { prefix: '/api/v1' });   // v4
 if (process.env.NODE_ENV !== 'production')
   await fastify.register(systemModule,     { prefix: '/api/v1' });
 ```
@@ -416,20 +416,20 @@ The API URL surface follows REST nesting and module semantics: `/api/v1/customer
 | **P10** | Backend: escalation endpoint + audit event log | P9 | v2 |
 | **P11** | Backend: QE range query on `transactionAmount.amount` | P3 | v2 |
 | **P12** | Frontend: role badge, escalation workflow UI, audit trail panel | P9, P10 | v2 |
-| **P13** | Backend + Frontend: AI agent integration (Magenta, `agentDraftDiagnosis` field) | P5 | v3 |
-| **P14** | Frontend: AI draft inline panel (Accept / Override / Dismiss) | P13 | v3 |
-| **P15** | Backend: `POST /cards` save-card + returning-customer recurring payment | P3 | v4 |
-| **P16** | Frontend: save card flow, returning-customer payment | P15 | v4 |
-| **P17** | Backend: `/diagnostics/query-timing` | P5 | v4 |
-| **P18** | Frontend: performance comparison panel | P17 | v4 |
-| **P19** | Backend: structural refactor — create `src/modules/` + `src/shared/` layout; move all existing files; no functional change | P18 | v5 |
-| **P20** | Backend: extract shared types to `shared/models/` (`risk`, `identity`, `transaction`) | P19 | v5 |
-| **P21** | Backend: create module `index.ts` Fastify plugins; update `server.ts` registration | P20 | v5 |
-| **P22** | Backend: gateway module — BIAN models (`merchantAgreement`, `paymentOrder`, `tokenVault`) | P21 | v5 |
-| **P23** | Backend: gateway services (merchant, paymentOrder, routing, tokenization, webhook) | P22 | v5 |
-| **P24** | Backend: gateway controllers + `index.ts` plugin; update `encryptedFieldsMaps` + `createCollections` + `createIndexes` | P23 | v5 |
-| **P25** | Backend: merchant + gateway seed data; update `bin/seed.ts` | P24 | v5 |
-| **P26** | Frontend: gateway simulator step + merchant profile view in Application Mode | P24, P25 | v5 |
+| **P13** | Backend: `POST /cards` save-card + returning-customer recurring payment | P3 | v3 |
+| **P14** | Frontend: save card flow, returning-customer payment | P13 | v3 |
+| **P15** | Backend: `/diagnostics/query-timing` | P5 | v3 |
+| **P16** | Frontend: performance comparison panel | P15 | v3 |
+| **P17** | Backend: structural refactor — create `src/modules/` + `src/shared/` layout; move all existing files; no functional change | P16 | v4 |
+| **P18** | Backend: extract shared types to `shared/models/` (`risk`, `identity`, `transaction`) | P17 | v4 |
+| **P19** | Backend: create module `index.ts` Fastify plugins; update `server.ts` registration | P18 | v4 |
+| **P20** | Backend: gateway module — BIAN models (`merchantAgreement`, `paymentOrder`, `tokenVault`) | P19 | v4 |
+| **P21** | Backend: gateway services (merchant, paymentOrder, routing, tokenization, webhook) | P20 | v4 |
+| **P22** | Backend: gateway controllers + `index.ts` plugin; update `encryptedFieldsMaps` + `createCollections` + `createIndexes` | P21 | v4 |
+| **P23** | Backend: merchant + gateway seed data; update `bin/seed.ts` | P22 | v4 |
+| **P24** | Frontend: gateway simulator step + merchant profile view in Application Mode | P22, P23 | v4 |
+| **P25** | Backend + Frontend: AI agent integration (Magenta, `agentDraftDiagnosis` field) | P5 | v5 |
+| **P26** | Frontend: AI draft inline panel (Accept / Override / Dismiss) | P25 | v5 |
 
 ---
 
@@ -501,7 +501,7 @@ Each of the five QE-protected collections has its own dedicated DEK.
 | 1 | Should the escalation token (v2) be a short-lived UUID or a signed JWT? A UUID is preferred: stateless JWTs cannot be invalidated if escalation is revoked mid-session. | Engineering Lead | Before P9 starts |
 | 2 | Is QE prefix/substring available in the Atlas cluster version targeted for v4? | Engineering Lead | Before P17 starts |
 | 3 | Does the Leafy Bank integration require a shared auth service or is the role selector sufficient for v4? | IST Team / Leafy Bank team | Before P15 starts |
-| 4 | What is the Magenta API endpoint and authentication model for the v3 AI agent integration? | IST Team / MongoDB Magenta team | Before P13 starts |
+| 4 | What is the Magenta API endpoint and authentication model for the v5 AI agent integration? | IST Team / MongoDB Magenta team | Before P25 starts |
 
 ---
 
@@ -517,10 +517,12 @@ Each of the five QE-protected collections has its own dedicated DEK.
 | v2: RBAC + Escalation + Range | P9, P10, P11 | 3 days | High |
 | v2: Frontend v2 | P12 | 3 days | Medium |
 | **v2 Total** | | **~6 days** | |
-| v3: Agentic (Magenta integration) | P13, P14 | 3 days | Low (API stability TBD) |
-| **v3 Total** | | **~3 days** | |
-| v4: Save card + Performance + Scaffold | P15–P18 | 4 days | Medium |
-| **v4 Total** | | **~4 days** | |
+| v3: Save card + Performance + Scaffold | P13–P16 | 4 days | Medium |
+| **v3 Total** | | **~4 days** | |
+| v4: Gateway + Modular refactor | P17–P24 | 6 days | Medium |
+| **v4 Total** | | **~6 days** | |
+| v5: Agentic (Magenta integration) | P25, P26 | 3 days | Low (API stability TBD) |
+| **v5 Total** | | **~3 days** | |
 
 ---
 

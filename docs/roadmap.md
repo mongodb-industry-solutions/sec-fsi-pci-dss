@@ -3,7 +3,7 @@
 **Project:** FSI PCI DSS Payment Security Demo  
 **PRD reference:** [PRD.md](PRD.md)  
 **Engineering Proposal:** [engineering-proposal.md](engineering-proposal.md)  
-**Last updated:** 2026-05-26
+**Last updated:** 2026-06-08
 
 ---
 
@@ -13,9 +13,9 @@
 |---|---|---|---|
 | **v1** | Security Foundation | Working end-to-end: payment → QE encryption → fraud investigation | 2–3 weeks |
 | **v2** | Investigation & Control | CISO-ready: RBAC, escalation, audit trail, KMS key rotation | 4–6 weeks after v1 |
-| **v3** | Agentic Fraud Investigation | AI-assisted L1 pre-review using MongoDB Agentic Platform (Magenta preferred) | TBD after v2 validated |
-| **v4** | Advanced Capabilities | Leafy Bank-ready: recurring payment, range queries, performance story | TBD after v3 validated |
-| **v5** | Payment Gateway + Modular Architecture | API-first payment platform: modular backend (BIAN SD modules) + gateway layer (SD-64/65/89/57) | TBD after v4 validated |
+| **v3** | Advanced Capabilities | Leafy Bank-ready: recurring payment, range queries, performance story | TBD after v2 validated |
+| **v4** | Payment Gateway + Modular Architecture | API-first payment platform: modular backend (BIAN SD modules) + gateway layer (SD-64/65/89/57) | TBD after v3 validated |
+| **v5** | Agentic Fraud Investigation | AI-assisted L1 pre-review using MongoDB Agentic Platform (Magenta preferred) | TBD after v4 validated |
 
 ---
 
@@ -201,68 +201,7 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 
 ---
 
-## v3: Agentic Fraud Investigation
-
-### Objective
-
-Introduce an AI agent (MongoDB Agentic Platform, Magenta preferred) into the fraud investigation workflow. The agent automatically pre-reviews each fraud case when it opens, queries the encrypted QE collections to gather context, produces a structured draft diagnosis, and presents it to the L1 analyst as a suggested action. The human analyst confirms, overrides, or escalates. This demonstrates how Agentic AI integrates with existing encrypted data workflows without relaxing security controls.
-
-### Definition of Done
-
-- [ ] All v1 and v2 DoD criteria still pass
-- [ ] AI agent fires automatically when a `fraudDiagnosisCase` is created
-- [ ] Agent queries `customerAgreement` and `cardTransaction` via existing QE equality endpoints
-- [ ] Agent produces a structured draft: risk summary, recommended action (`clear` / `escalate` / `investigate`), confidence score 0–100
-- [ ] L1 analyst sees the AI draft inline in the case detail view; can confirm, override, or dismiss
-- [ ] Agent action is logged in `diagnosisActionLog` with `performedByRole: 'ai_agent'`
-- [ ] L2 investigator sees the agent's context note alongside sensitive field reveal
-
----
-
-### FR-v3: Functional Requirements
-
-#### FR-v3-30: AI Agent Pre-Review (Backend)
-
-| # | Requirement | Acceptance Criteria |
-|---|---|---|
-| 30.1 | Agent is triggered automatically when a fraud case status transitions to `open` | Agent invocation logged within 2 seconds of case creation |
-| 30.2 | Agent queries `customerAgreement` by `cardTransactionAccountReference` to retrieve customer profile | Agent uses existing QE equality search endpoint: `GET /api/v1/customer?accountRef=<value>` |
-| 30.3 | Agent queries `cardTransaction` for prior transactions by same card token | Agent uses `GET /api/v1/transactions?cardToken=<value>` |
-| 30.4 | Agent produces a structured JSON draft: `{ riskSummary, recommendedAction, confidenceScore, supportingEvidence[] }` | All four fields are present in the agent output |
-| 30.5 | Agent action is appended to `diagnosisActionLog` with `performedByRole: 'ai_agent'` | Log entry present in MongoDB document after agent completes |
-
-#### FR-v3-31: AI Draft UI (Frontend)
-
-| # | Requirement | Acceptance Criteria |
-|---|---|---|
-| 31.1 | L1 case detail view shows "AI Pre-Review" panel when a draft is available | Panel appears inline, above the analyst action buttons |
-| 31.2 | Panel displays: risk summary, recommended action badge, confidence percentage, supporting evidence list | All five elements are visible |
-| 31.3 | L1 analyst can click "Accept Recommendation", "Override", or "Dismiss AI draft" | Each action updates case status and logs the event |
-| 31.4 | L2 investigator case detail shows the AI context note alongside sensitive fields | AI summary visible in L2 view |
-| 31.5 | Audit trail includes agent events with `performedByRole: 'ai_agent'` and action type `ai_review` | Events appear in the audit timeline |
-
-#### FR-v3-32: Agent Infrastructure (Backend)
-
-| # | Requirement | Acceptance Criteria |
-|---|---|---|
-| 32.1 | Agent is implemented as a Magenta tool-calling agent or equivalent Agentic SDK | Agent invokes existing API endpoints as tools: no direct DB access |
-| 32.2 | Agent output is stored in `fraudDiagnosisCase.agentDraftDiagnosis` field | Field is populated after agent completes; readable without QE decryption |
-| 32.3 | Agent API key and configuration are in `.env`; no credentials in source code | `MAGENTA_API_KEY` or equivalent env var used |
-
----
-
-### NFR-v3: Non-Functional Requirements
-
-| ID | Category | Requirement | Measure |
-|---|---|---|---|
-| NFR-v3-01 | Performance | Agent pre-review completes within acceptable latency for demo | Agent draft available within 5 seconds of case creation |
-| NFR-v3-02 | Security | Agent uses only existing API endpoints: no direct MongoDB connection, no key access | Agent cannot bypass QE or RBAC layer |
-| NFR-v3-03 | Explainability | Non-technical audience can understand what the agent did and why | Agent evidence list uses plain English; no raw JSON shown in UI |
-| NFR-v3-04 | Backward compatibility | v1 and v2 flows work unchanged when agent is disabled (`AGENT_ENABLED=false`) | Full payment-to-investigation flow completes with `AGENT_ENABLED=false` |
-
----
-
-## v4: Advanced Capabilities
+## v3: Advanced Capabilities
 
 ### Objective
 
@@ -270,7 +209,7 @@ Make the demo Leafy Bank integration-ready and Solutions Library publishable. Ad
 
 ### Definition of Done
 
-- [ ] All v1, v2, and v3 DoD criteria still pass
+- [ ] All v1 and v2 DoD criteria still pass
 - [ ] "Save this card for future payments" flow works end-to-end
 - [ ] Returning customer can select a saved card and complete payment without re-entering card details
 - [ ] Performance comparison panel shows query time with QE vs a plaintext reference collection
@@ -279,9 +218,9 @@ Make the demo Leafy Bank integration-ready and Solutions Library publishable. Ad
 
 ---
 
-### FR-v4: Functional Requirements
+### FR-v3: Functional Requirements
 
-#### FR-v4-20: Save Card / Recurring Payment (Frontend + Backend)
+#### FR-v3-20: Save Card / Recurring Payment (Frontend + Backend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -293,7 +232,7 @@ Make the demo Leafy Bank integration-ready and Solutions Library publishable. Ad
 | 20.6 | Mandate can be cancelled: `mandateStatus` updates to `'cancelled'` and the card is no longer offered | Cancelled card does not appear on next payment; `preferredPaymentCardReference` is cleared |
 | 20.7 | Explainer panel: "No card data is stored in your browser: only a token, encrypted in Atlas" | Panel is visible on the saved card selection screen |
 
-#### FR-v4-21: Performance Visualization (Backend + Frontend)
+#### FR-v3-21: Performance Visualization (Backend + Frontend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -301,7 +240,7 @@ Make the demo Leafy Bank integration-ready and Solutions Library publishable. Ad
 | 21.2 | Response includes timing in milliseconds for both queries | `{ encrypted_ms: number, plaintext_ms: number, overhead_pct: number }` |
 | 21.3 | Frontend displays a side-by-side comparison panel with the timing values | Panel is visible in the investigation dashboard; values update on each search |
 
-#### FR-v4-22: Leafy Bank Integration Scaffold
+#### FR-v3-22: Leafy Bank Integration Scaffold
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -310,20 +249,18 @@ Make the demo Leafy Bank integration-ready and Solutions Library publishable. Ad
 
 ---
 
-### NFR-v4: Non-Functional Requirements
+### NFR-v3: Non-Functional Requirements
 
 | ID | Category | Requirement | Measure |
 |---|---|---|---|
-| NFR-v4-01 | Performance | QE overhead for equality search is below a defined threshold | Overhead < 20% vs plaintext on Atlas M10 under single-user demo load |
-| NFR-v4-02 | UX | Returning customer payment with saved card completes in fewer steps than first-time payment | Saved card flow requires ≤ 2 steps vs 3 for new card |
-| NFR-v4-03 | Portability | Demo can be embedded into Leafy Bank with ≤ 1 week of integration work | Integration scaffold validated by Leafy Bank team review |
-| NFR-v4-04 | Content readiness | Solutions Library article passes the four-section template check | Validated using ks-mongodb-ist-content checklist |
+| NFR-v3-01 | Performance | QE overhead for equality search is below a defined threshold | Overhead < 20% vs plaintext on Atlas M10 under single-user demo load |
+| NFR-v3-02 | UX | Returning customer payment with saved card completes in fewer steps than first-time payment | Saved card flow requires ≤ 2 steps vs 3 for new card |
+| NFR-v3-03 | Portability | Demo can be embedded into Leafy Bank with ≤ 1 week of integration work | Integration scaffold validated by Leafy Bank team review |
+| NFR-v3-04 | Content readiness | Solutions Library article passes the four-section template check | Validated using ks-mongodb-ist-content checklist |
 
 ---
 
----
-
-## v5: Payment Gateway + Modular Architecture
+## v4: Payment Gateway + Modular Architecture
 
 ### Objective
 
@@ -333,7 +270,7 @@ The structural refactor (P19–P21) has zero functional impact: same API surface
 
 ### Definition of Done
 
-- [ ] All v4 DoD criteria still pass
+- [ ] All v3 DoD criteria still pass
 - [ ] `npm run build` exits 0; no TypeScript errors after structural refactor
 - [ ] No file remains in `backend/src/controllers/`, `backend/src/services/`, `backend/src/models/`, `backend/src/middleware/` (all moved to modules)
 - [ ] `npm run setup:db` creates `merchantAgreement`, `paymentOrder`, `tokenVault` collections
@@ -346,9 +283,9 @@ The structural refactor (P19–P21) has zero functional impact: same API surface
 
 ---
 
-### FR-v5: Functional Requirements
+### FR-v4: Functional Requirements
 
-#### FR-v5-P1: Backend Structural Refactor (no functional change)
+#### FR-v4-P1: Backend Structural Refactor (no functional change)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -358,16 +295,16 @@ The structural refactor (P19–P21) has zero functional impact: same API surface
 | P1.4 | `middleware/auth.ts` and `rbac.ts` moved to `vendors/middleware/` | Imports updated in `server.ts`; middleware behaviour unchanged |
 | P1.5 | `models/index.ts` barrel deleted; each module imports from its own `models/` directory | `grep -r "from '../models'" backend/src/modules` returns zero results |
 
-#### FR-v5-P2: Merchant Relations (SD-89)
+#### FR-v4-P2: Merchant Relations (SD-89)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | P2.1 | `POST /api/v1/merchants` creates a `merchantAgreement` document with all required BIAN fields | Document visible in Atlas; `merchantApiKeyHash` is ciphertext (QE:none) |
 | P2.2 | `GET /api/v1/merchants/:id` returns merchant profile without `merchantApiKeyHash` | Response includes `merchantName`, `merchantCategoryCode`, `merchantRiskCategory`, `merchantTransactionLimitAmount`; hash field absent |
 | P2.3 | `GET /api/v1/merchants` returns paginated merchant list with filters `status` and `mcc` | Pagination metadata present; filter by `merchantCategoryCode=5812` returns only gambling/restaurant merchants |
-| P2.4 | `cardTransaction` documents include `merchantAgreementInstanceReference` FK after v5 seed | FK links transaction to a seeded merchant; existing transactions without FK are valid (optional field, schema version 2) |
+| P2.4 | `cardTransaction` documents include `merchantAgreementInstanceReference` FK after v4 seed | FK links transaction to a seeded merchant; existing transactions without FK are valid (optional field, schema version 2) |
 
-#### FR-v5-P3: Payment Order Lifecycle (SD-64 + SD-65)
+#### FR-v4-P3: Payment Order Lifecycle (SD-64 + SD-65)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -376,19 +313,19 @@ The structural refactor (P19–P21) has zero functional impact: same API surface
 | P3.3 | Authorization step creates a `cardTransaction` (SD-254) and links it to the `paymentOrder` | `paymentOrder.linkedCardTransactionReference` populated; `cardTransaction` visible in the investigation dashboard |
 | P3.4 | Authorization triggers fraud evaluation if amount/MCC criteria met | `fraudDiagnosisCase` created and linked; uses `shared/services/fraudTrigger.service.ts` |
 | P3.5 | `POST /api/v1/gateway/payments/:id/capture` transitions `authorized → captured` | Status updated; only valid from `authorized` state |
-| P3.6 | `DELETE /api/v1/gateway/payments/:id` (void) transitions `authorized | confirmed → voided` | Status updated; no `cardTransaction` reversal required in v5 (documented limitation) |
+| P3.6 | `DELETE /api/v1/gateway/payments/:id` (void) transitions `authorized | confirmed → voided` | Status updated; no `cardTransaction` reversal required in v4 (documented limitation) |
 | P3.7 | `POST /api/v1/gateway/payments/:id/refund` records a partial or full refund; transitions `captured → refunded` | `refundAmount` recorded; amount validation against original amount |
 | P3.8 | `GET /api/v1/gateway/payments/:id` returns full payment order with current status and routing decision | Response includes `paymentOrderStatus`, `routingDecision.processor`, `linkedCardTransactionReference` |
 | P3.9 | `paymentOrder` TTL index expires stale `initiated` orders after 24 hours | MongoDB removes expired `initiated` orders automatically (verified in Atlas) |
 
-#### FR-v5-P4: Token Vault (SD-57)
+#### FR-v4-P4: Token Vault (SD-57)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | P4.1 | `POST /api/v1/gateway/tokens` creates a `tokenVault` record linked to a `customerAgreement` | Record visible in Atlas; `tokenVaultNetworkToken` is ciphertext if populated |
 | P4.2 | `GET /api/v1/gateway/tokens/:token` returns token metadata without `tokenVaultNetworkToken` | Response includes `tokenVaultStatus`, `tokenVaultCreatedAt`, `tokenVaultLastUsedAt`; network token absent |
 
-#### FR-v5-P5: Frontend — Merchant Context
+#### FR-v4-P5: Frontend — Merchant Context
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -398,16 +335,77 @@ The structural refactor (P19–P21) has zero functional impact: same API surface
 
 ---
 
+### NFR-v4: Non-Functional Requirements
+
+| ID | Category | Requirement | Measure |
+|---|---|---|---|
+| NFR-v4-01 | Backward compatibility | Structural refactor does not change any API URL, request schema, or response shape | All v3 integration tests pass unchanged after refactor |
+| NFR-v4-02 | PCI CDE scope | Modules `customer`, `transactions`, `gateway` are explicitly documented as in-scope; `fraud`, `identity` as adjacent; `system` as non-CDE | EP §3.8.1 BIAN Module Map confirms scope classification; no CHD in `fraud` or `system` module responses |
+| NFR-v4-03 | Security | `merchantApiKeyHash` is never returned in any GET response | Integration test: `GET /merchants/:id` response parsed for absence of `merchantApiKeyHash` field |
+| NFR-v4-04 | Idempotency | Duplicate `X-Idempotency-Key` on any gateway write endpoint returns 409 within P95 < 100ms | Load test with duplicate key; verify consistent 409 response |
+| NFR-v4-05 | Demo explainability | A non-technical AE can narrate the gateway flow (merchant → intent → authorization → fraud case) in ≤ 2 minutes | Validated by IST team walkthrough |
+| NFR-v4-06 | Module isolation | No module imports from another module's `controllers/` or `models/` directory directly | `grep -r "from '../../[^s]" backend/src/modules` returns zero cross-module direct imports (only `shared/` and `vendors/` allowed) |
+
+---
+
+## v5: Agentic Fraud Investigation
+
+### Objective
+
+Introduce an AI agent (MongoDB Agentic Platform, Magenta preferred) into the fraud investigation workflow. The agent automatically pre-reviews each fraud case when it opens, queries the encrypted QE collections to gather context, produces a structured draft diagnosis, and presents it to the L1 analyst as a suggested action. The human analyst confirms, overrides, or escalates. This demonstrates how Agentic AI integrates with existing encrypted data workflows without relaxing security controls.
+
+### Definition of Done
+
+- [ ] All v1, v2, v3, and v4 DoD criteria still pass
+- [ ] AI agent fires automatically when a `fraudDiagnosisCase` is created
+- [ ] Agent queries `customerAgreement` and `cardTransaction` via existing QE equality endpoints
+- [ ] Agent produces a structured draft: risk summary, recommended action (`clear` / `escalate` / `investigate`), confidence score 0–100
+- [ ] L1 analyst sees the AI draft inline in the case detail view; can confirm, override, or dismiss
+- [ ] Agent action is logged in `diagnosisActionLog` with `performedByRole: 'ai_agent'`
+- [ ] L2 investigator sees the agent's context note alongside sensitive field reveal
+
+---
+
+### FR-v5: Functional Requirements
+
+#### FR-v5-30: AI Agent Pre-Review (Backend)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| 30.1 | Agent is triggered automatically when a fraud case status transitions to `open` | Agent invocation logged within 2 seconds of case creation |
+| 30.2 | Agent queries `customerAgreement` by `cardTransactionAccountReference` to retrieve customer profile | Agent uses existing QE equality search endpoint: `GET /api/v1/customer?accountRef=<value>` |
+| 30.3 | Agent queries `cardTransaction` for prior transactions by same card token | Agent uses `GET /api/v1/transactions?cardToken=<value>` |
+| 30.4 | Agent produces a structured JSON draft: `{ riskSummary, recommendedAction, confidenceScore, supportingEvidence[] }` | All four fields are present in the agent output |
+| 30.5 | Agent action is appended to `diagnosisActionLog` with `performedByRole: 'ai_agent'` | Log entry present in MongoDB document after agent completes |
+
+#### FR-v5-31: AI Draft UI (Frontend)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| 31.1 | L1 case detail view shows "AI Pre-Review" panel when a draft is available | Panel appears inline, above the analyst action buttons |
+| 31.2 | Panel displays: risk summary, recommended action badge, confidence percentage, supporting evidence list | All five elements are visible |
+| 31.3 | L1 analyst can click "Accept Recommendation", "Override", or "Dismiss AI draft" | Each action updates case status and logs the event |
+| 31.4 | L2 investigator case detail shows the AI context note alongside sensitive fields | AI summary visible in L2 view |
+| 31.5 | Audit trail includes agent events with `performedByRole: 'ai_agent'` and action type `ai_review` | Events appear in the audit timeline |
+
+#### FR-v5-32: Agent Infrastructure (Backend)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| 32.1 | Agent is implemented as a Magenta tool-calling agent or equivalent Agentic SDK | Agent invokes existing API endpoints as tools: no direct DB access |
+| 32.2 | Agent output is stored in `fraudDiagnosisCase.agentDraftDiagnosis` field | Field is populated after agent completes; readable without QE decryption |
+| 32.3 | Agent API key and configuration are in `.env`; no credentials in source code | `MAGENTA_API_KEY` or equivalent env var used |
+
+---
+
 ### NFR-v5: Non-Functional Requirements
 
 | ID | Category | Requirement | Measure |
 |---|---|---|---|
-| NFR-v5-01 | Backward compatibility | Structural refactor does not change any API URL, request schema, or response shape | All v4 integration tests pass unchanged after refactor |
-| NFR-v5-02 | PCI CDE scope | Modules `customer`, `transactions`, `gateway` are explicitly documented as in-scope; `fraud`, `identity` as adjacent; `system` as non-CDE | EP §3.8.1 BIAN Module Map confirms scope classification; no CHD in `fraud` or `system` module responses |
-| NFR-v5-03 | Security | `merchantApiKeyHash` is never returned in any GET response | Integration test: `GET /merchants/:id` response parsed for absence of `merchantApiKeyHash` field |
-| NFR-v5-04 | Idempotency | Duplicate `X-Idempotency-Key` on any gateway write endpoint returns 409 within P95 < 100ms | Load test with duplicate key; verify consistent 409 response |
-| NFR-v5-05 | Demo explainability | A non-technical AE can narrate the gateway flow (merchant → intent → authorization → fraud case) in ≤ 2 minutes | Validated by IST team walkthrough |
-| NFR-v5-06 | Module isolation | No module imports from another module's `controllers/` or `models/` directory directly | `grep -r "from '../../[^s]" backend/src/modules` returns zero cross-module direct imports (only `shared/` and `vendors/` allowed) |
+| NFR-v5-01 | Performance | Agent pre-review completes within acceptable latency for demo | Agent draft available within 5 seconds of case creation |
+| NFR-v5-02 | Security | Agent uses only existing API endpoints: no direct MongoDB connection, no key access | Agent cannot bypass QE or RBAC layer |
+| NFR-v5-03 | Explainability | Non-technical audience can understand what the agent did and why | Agent evidence list uses plain English; no raw JSON shown in UI |
+| NFR-v5-04 | Backward compatibility | v1–v4 flows work unchanged when agent is disabled (`AGENT_ENABLED=false`) | Full payment-to-investigation flow completes with `AGENT_ENABLED=false` |
 
 ---
 
@@ -423,4 +421,4 @@ These requirements apply to all versions from v1 onward:
 | NFR-X-04 | Accessibility | LeafyGreen components used: WCAG 2.1 AA compliance inherited from the design system |
 | NFR-X-05 | Documentation | Every new API endpoint added at any version is documented in technical-spec.md before merging |
 | NFR-X-06 | Type safety | `npm run build` exits 0 at every version: no TypeScript `any` escape hatches in production code |
-| NFR-X-07 | Agent security | AI agents (v3+) use only the public API layer: no direct MongoDB credentials or DEK access |
+| NFR-X-07 | Agent security | AI agents (v5) use only the public API layer: no direct MongoDB credentials or DEK access |
