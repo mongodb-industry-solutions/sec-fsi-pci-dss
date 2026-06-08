@@ -46,8 +46,8 @@ function DemoShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Top panel  -  full width, above sidebar */}
-      <header className="bg-[#001E2B] text-white px-3 sm:px-4 py-3 flex justify-between items-center z-20 shrink-0 gap-2">
+      {/* Top panel  -  sticky so it stays visible when content scrolls */}
+      <header className="sticky top-0 z-20 bg-[#001E2B] text-white px-3 sm:px-4 py-3 flex justify-between items-center shrink-0 gap-2">
         <span className="font-bold text-[#00ED64] text-sm sm:text-base whitespace-nowrap">🏦 Payment Gateway</span>
         <div className="flex items-center gap-2 sm:gap-3 text-sm min-w-0">
           {user && (
@@ -80,10 +80,10 @@ function DemoShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Sidebar + content row */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      {/* Sidebar + content row — document scrolls, sidebar is sticky */}
+      <div className="flex flex-1">
         <DemoSidebar />
-        <div className="flex-1 overflow-auto min-w-0">
+        <div className="flex-1 min-w-0">
           {children}
         </div>
       </div>

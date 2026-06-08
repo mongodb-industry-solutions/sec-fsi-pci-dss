@@ -70,7 +70,7 @@ export function DemoSidebar() {
   }
 
   return (
-    <aside className={`flex-shrink-0 bg-[#001E2B] flex flex-col border-r border-white/10 transition-all duration-200 ${collapsed ? 'w-12' : 'w-44'}`}>
+    <aside className={`sticky top-[44px] h-[calc(100vh-44px)] flex-shrink-0 bg-[#001E2B] flex flex-col border-r border-white/10 transition-all duration-200 ${collapsed ? 'w-12' : 'w-44'}`}>
       <nav className="flex-1 py-3">
         <div className="flex items-center justify-between px-3 pb-2">
           {!collapsed && (
