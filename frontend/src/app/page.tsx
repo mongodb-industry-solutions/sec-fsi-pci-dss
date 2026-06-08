@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { BookOpen, Code2 } from 'lucide-react';
 import { API_BASE_URL } from '../lib/constants';
 
@@ -71,9 +72,21 @@ export default function LandingPage() {
         <p className="mt-3 text-gray-600 text-xs">
           v1 · Security Foundation · MongoDB Atlas · QE equality search · Local KMS fallback
         </p>
-        <p className="mt-1">
-          <Link href="/admin" className="text-gray-700 hover:text-gray-500 transition-colors text-xs">admin</Link>
-        </p>
+        <Link
+          href="/admin"
+          className="mt-8 flex items-center justify-center gap-3 opacity-40 hover:opacity-90 transition-opacity group"
+        >
+          <div className="overflow-hidden rounded-full w-8 h-8 shrink-0">
+            <Image
+              src="/mongodb-badge.png"
+              alt="MongoDB"
+              width={32}
+              height={32}
+              className="scale-110"
+            />
+          </div>
+          <span className="text-gray-500 text-xs tracking-wide group-hover:text-gray-300 transition-colors">Built on MongoDB Atlas</span>
+        </Link>
       </div>
     </div>
   );

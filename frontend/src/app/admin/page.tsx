@@ -118,10 +118,6 @@ export default function AdminLoginPage() {
           </Link>
         </div>
 
-        <p className="mt-4 text-xs text-gray-600 text-center">
-          Credentials are set via ADM_USER and ADM_PASS env vars.
-          ADM_PASS stores a SHA-256 hash.
-        </p>
       </div>
     </div>
   );
