@@ -2,6 +2,8 @@ import { FastifyInstance } from 'fastify';
 import { Db } from 'mongodb';
 import { getRawClient } from '../../../vendors/encryption/rawClient';
 import { getDemoUsers } from '../../identity/services/auth.service';
+import { getDbForRole } from '../../../vendors/encryption/roleClients';
+import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 
 // Mounted at /system → /api/v1/system
 // - GET /api/v1/system/health       public, always available (bypasses DB guard)
@@ -169,16 +171,37 @@ QE-protected fields appear as BSON binary ciphertext  -  this is the core of the
     }
 
     try {
+      // If the id for customerAgreementProcedure is not a UUID it may be an account
+      // reference string (e.g. "ACC-LF-20240115") stored in legacy fraud cases created
+      // before the UUID-resolution fix.  Resolve it to the real UUID via the L1 QE
+      // client (which can equality-search the encrypted customerAgreementReference field)
+      // before querying the raw client.
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      let resolvedId = id;
+      if (collection === 'customerAgreementProcedure' && !UUID_RE.test(id)) {
+        try {
+          const l1Db = await getDbForRole('level1_analyst', false);
+          const agreementDoc = await l1Db
+            .collection<{ customerAgreementInstanceReference: string }>(CUSTOMER_AGREEMENT_COLLECTION)
+            .findOne({ customerAgreementReference: id } as Record<string, unknown>);
+          if (agreementDoc?.customerAgreementInstanceReference) {
+            resolvedId = agreementDoc.customerAgreementInstanceReference;
+          }
+        } catch {
+          // Resolution failed — fall through with original id, will 404 gracefully
+        }
+      }
+
       const rawClient = await getRawClient();
       const db = rawClient.db(process.env.MONGODB_DB_NAME!);
       const doc = await db.collection(collection).findOne({
         $or: [
-          { partyInstanceReference: id },
-          { customerAuthenticationInstanceReference: id },
-          { cardTransactionInstanceReference: id },
-          { customerAgreementInstanceReference: id },
-          { paymentCardInstanceReference: id },
-          { fraudDiagnosisInstanceReference: id },
+          { partyInstanceReference: resolvedId },
+          { customerAuthenticationInstanceReference: resolvedId },
+          { cardTransactionInstanceReference: resolvedId },
+          { customerAgreementInstanceReference: resolvedId },
+          { paymentCardInstanceReference: resolvedId },
+          { fraudDiagnosisInstanceReference: resolvedId },
         ],
       });
 

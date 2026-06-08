@@ -82,7 +82,25 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
       cardTransactionStatus: 'authorized' as const,
       cardTransactionMaskedPanDisplay: input.cardTransactionMaskedPanDisplay,
     };
-    const fraudCase = await createFraudCase(db, txnId, input.accountReference, reasons, severity, snapshot);
+
+    // Resolve the customerAgreementInstanceReference UUID from the account reference.
+    // input.accountReference is the QE:equality value (customerAgreementReference);
+    // fraudDiagnosisCase.customerAgreementInstanceReference must be the UUID primary key
+    // so the raw document endpoint can find the linked customerAgreementProcedure document.
+    let customerAgreementUuid = input.accountReference;
+    try {
+      const l1Db = await getDbForRole('level1_analyst', false);
+      const agreementDoc = await l1Db
+        .collection<{ customerAgreementInstanceReference: string }>(CUSTOMER_AGREEMENT_COLLECTION)
+        .findOne({ customerAgreementReference: input.accountReference } as Record<string, unknown>);
+      if (agreementDoc?.customerAgreementInstanceReference) {
+        customerAgreementUuid = agreementDoc.customerAgreementInstanceReference;
+      }
+    } catch {
+      // Keep account reference as fallback — raw document lookup will fail but fraud case still created
+    }
+
+    const fraudCase = await createFraudCase(db, txnId, customerAgreementUuid, reasons, severity, snapshot);
     fraudCaseRef = fraudCase.fraudDiagnosisInstanceReference;
   }
 

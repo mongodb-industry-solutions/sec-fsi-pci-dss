@@ -90,7 +90,7 @@ export default function TransactionDetailPage() {
     try {
       // Try to find fraud cases for this transaction
       const cases = await api.fraud.list({ limit: 50 }, token);
-      const linked = cases.results.find(c => c.linkedCardTransactionReference === txnId);
+      const linked = cases.results.find(c => c.cardTransactionInstanceReference === txnId);
       if (linked) {
         const res = await api.fraud.escalateApprove(linked.fraudDiagnosisInstanceReference, {}, token);
         setEscalationToken(res.escalationToken);

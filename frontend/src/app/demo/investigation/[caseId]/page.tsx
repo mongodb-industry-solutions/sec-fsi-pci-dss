@@ -5,11 +5,10 @@ import Link from 'next/link';
 import { api, FraudCase, ActionEvent, HrpcCheckResponse } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { EncryptionBadge } from '../../../../components/EncryptionBadge';
-import { RawDocumentPanel } from '../../../../components/RawDocumentPanel';
+import { RawMongoPanel } from '../../../../components/RawMongoPanel';
 import { SEVERITY_COLORS, STATUS_COLORS, ROLE_LABELS, formatRiskIndicator } from '../../../../lib/constants';
 import { useDebugMode } from '../../../../lib/debugMode';
-import { DebugRawJson } from '../../../../components/DebugRawJson';
-import { ArrowUpFromLine, CheckCircle, XCircle, StickyNote, ShieldAlert, Eye, EyeOff } from 'lucide-react';
+import { ArrowUpFromLine, CheckCircle, XCircle, StickyNote, ShieldAlert } from 'lucide-react';
 
 const ACTION_LABELS: Record<string, string> = {
   case_opened: 'Case opened',
@@ -64,12 +63,9 @@ export default function DemoCaseDetailPage() {
   const [fraudCase, setFraudCase] = useState<FraudCase | null>(null);
   const [events, setEvents] = useState<ActionEvent[]>([]);
   const [hrpc, setHrpc] = useState<HrpcCheckResponse | null>(null);
-  const [showRaw, setShowRaw] = useState(false);
-  const [rawDoc, setRawDoc] = useState<Record<string, unknown> | null>(null);
-  const [rawError, setRawError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Customer profile linked to the case (auto-loaded from linkedCustomerAgreementReference)
+  // Customer profile linked to the case (auto-loaded from customerAgreementInstanceReference)
   const [customerProfile, setCustomerProfile] = useState<Record<string, unknown> | null>(null);
 
   // Action state
@@ -89,8 +85,8 @@ export default function DemoCaseDetailPage() {
     setEvents(eventsData.events);
 
     // Auto-load the customer profile linked to this case
-    if (caseData.linkedCustomerAgreementReference) {
-      api.customer.getById(caseData.linkedCustomerAgreementReference, resolvedToken)
+    if (caseData.customerAgreementInstanceReference) {
+      api.customer.getById(caseData.customerAgreementInstanceReference, resolvedToken)
         .then(setCustomerProfile)
         .catch(() => null);
     }
@@ -125,19 +121,6 @@ export default function DemoCaseDetailPage() {
     };
     load();
   }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function toggleRaw() {
-    if (!showRaw && !rawDoc && fraudCase) {
-      setRawError(null);
-      try {
-        const res = await api.system.rawDocument('cardTransactionLog', fraudCase.linkedCardTransactionReference, token);
-        setRawDoc(res.document);
-      } catch (err) {
-        setRawError(err instanceof Error ? err.message : 'Failed to fetch');
-      }
-    }
-    setShowRaw((v) => !v);
-  }
 
   async function handleAction(body: Parameters<typeof api.fraud.update>[1], successMsg: string) {
     setActionBusy(true);
@@ -562,35 +545,6 @@ export default function DemoCaseDetailPage() {
           </div>
         )}
 
-        {/* ── Atlas storage (debug mode only) ── */}
-        {debugMode && (
-          <div className="bg-white rounded-xl border p-5">
-            <div className="flex justify-between items-center mb-3">
-              <div>
-                <h2 className="font-semibold">Atlas Storage</h2>
-                <p className="text-xs text-gray-500">cardTransaction collection - raw ciphertext document</p>
-              </div>
-              <button onClick={toggleRaw} className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border hover:bg-gray-50">
-                {showRaw ? <><EyeOff size={13} /> Hide</> : <><Eye size={13} /> View Raw Document</>}
-              </button>
-            </div>
-            {!showRaw && <p className="text-sm text-gray-500">Shows the actual document stored in Atlas. QE-encrypted fields appear as BSON binary blobs.</p>}
-            {showRaw && rawDoc && <RawDocumentPanel document={rawDoc} collection="cardTransaction" />}
-            {showRaw && !rawDoc && rawError && (
-              <div className="bg-gray-900 text-green-300 rounded-lg p-4 font-mono text-xs">
-                <p className="text-yellow-400 mb-2">Live fetch failed ({rawError}). Representative document:</p>
-                <pre>{`{
-  "cardTransactionAccountReference": {
-    "$binary": { "base64": "BhKJ9KMsQfY...", "subType": "06" }
-  },
-  "cardTransactionAmount": { "amount": 850, "currency": "USD" },
-  "cardTransactionMerchantName": "Casino Royale"
-}`}</pre>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* ── Audit trail ── */}
         <div className="bg-white rounded-xl border p-5">
           <h2 className="font-semibold mb-3">Activity Log</h2>
@@ -629,12 +583,59 @@ export default function DemoCaseDetailPage() {
 
         {/* ── Debug: raw JSON ── */}
         {debugMode && (
-          <DebugRawJson
+          <RawMongoPanel
+            token={token}
+            title="⚙ Debug - Raw JSON"
             sections={[
-              { label: 'API  -  GET /api/v1/fraud/:id (case document)', data: fraudCase },
-              { label: 'API  -  GET /api/v1/fraud/:id/events (audit trail)', data: events },
-              { label: 'API  -  GET /api/v1/fraud/hrpc/check (HRPC profile)', data: hrpc },
-              { label: 'Customer profile (GET /api/v1/customer/by-id/:customerId)', data: customerProfile },
+              {
+                kind: 'static',
+                label: 'API — GET /api/v1/fraud/:id',
+                labelColor: 'text-yellow-400',
+                description: 'Fraud case document (application layer response)',
+                data: fraudCase,
+              },
+              {
+                kind: 'static',
+                label: 'API — GET /api/v1/fraud/:id/events',
+                labelColor: 'text-yellow-400',
+                description: 'Audit trail events',
+                data: events,
+              },
+              {
+                kind: 'static',
+                label: 'API — GET /api/v1/fraud/hrpc/check',
+                labelColor: 'text-yellow-400',
+                description: 'HRPC risk profile for the linked account',
+                data: hrpc,
+              },
+              {
+                kind: 'static',
+                label: 'API — GET /api/v1/customer/by-id/:id',
+                labelColor: 'text-yellow-400',
+                description: 'Customer agreement profile (auto-loaded from customerAgreementInstanceReference)',
+                data: customerProfile,
+              },
+              {
+                kind: 'mongo',
+                collection: 'fraudDiagnosisCase',
+                id: caseId,
+                label: 'fraudDiagnosisCase',
+                description: 'Raw fraud case document as stored in Atlas (SD-83)',
+              },
+              {
+                kind: 'mongo',
+                collection: 'cardTransactionLog',
+                id: fraudCase.cardTransactionInstanceReference,
+                label: 'cardTransactionLog',
+                description: 'QE:equality (accountRef) + QE:none (rawGatewayPayload, processorMetadata) — BSON ciphertext',
+              },
+              {
+                kind: 'mongo',
+                collection: 'customerAgreementProcedure',
+                id: fraudCase.customerAgreementInstanceReference,
+                label: 'customerAgreementProcedure',
+                description: 'QE:equality (accountRef) + QE:none (address, govId, riskNotes) — BSON ciphertext',
+              },
             ]}
           />
         )}

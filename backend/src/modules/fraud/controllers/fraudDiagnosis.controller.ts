@@ -2,6 +2,8 @@ import { FastifyInstance } from 'fastify';
 import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, appendAuditEvent, createFraudCase } from '../services/fraudDiagnosis.service';
 import { getTransactionById } from '../../transactions/services/cardTransaction.service';
 import { generateToken } from '../../../vendors/security/escalationTokens';
+import { getDbForRole } from '../../../vendors/encryption/roleClients';
+import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
 
@@ -209,10 +211,29 @@ without creating a duplicate.
       cardTransactionMaskedPanDisplay: t.cardTransactionMaskedPanDisplay,
     };
 
+    // Resolve customerAgreementInstanceReference UUID from the QE:equality account reference.
+    // cardTransactionAccountReference is the human-readable ref (e.g. "ACC-LF-20240115");
+    // fraudDiagnosisCase.customerAgreementInstanceReference must be the UUID primary key
+    // so the raw document endpoint can find the linked customerAgreementProcedure document.
+    let customerAgreementUuid = t.cardTransactionAccountReference ?? transactionId;
+    if (t.cardTransactionAccountReference) {
+      try {
+        const l1Db = await getDbForRole('level1_analyst', false);
+        const agreementDoc = await l1Db
+          .collection<{ customerAgreementInstanceReference: string }>(CUSTOMER_AGREEMENT_COLLECTION)
+          .findOne({ customerAgreementReference: t.cardTransactionAccountReference } as Record<string, unknown>);
+        if (agreementDoc?.customerAgreementInstanceReference) {
+          customerAgreementUuid = agreementDoc.customerAgreementInstanceReference;
+        }
+      } catch {
+        // Keep account reference as fallback — raw document lookup will fail but fraud case still created
+      }
+    }
+
     const result = await createFraudCase(
       fastify.db,
       transactionId,
-      t.cardTransactionAccountReference ?? transactionId,
+      customerAgreementUuid,
       [reason ? `manual_review: ${reason}` : 'manual_review'],
       severity as 'low' | 'medium' | 'high' | 'critical',
       snapshot

@@ -76,8 +76,8 @@ export interface FraudCase {
   fraudDiagnosisCaseReference: string;
   caseStatus: string;
   riskSeverity: string;
-  linkedCardTransactionReference: string;
-  linkedCustomerAgreementReference: string;
+  cardTransactionInstanceReference: string;
+  customerAgreementInstanceReference: string;
   transactionSnapshot?: TransactionSnapshot;
   fraudDiagnosisAssessment?: {
     riskIndicators: string[];

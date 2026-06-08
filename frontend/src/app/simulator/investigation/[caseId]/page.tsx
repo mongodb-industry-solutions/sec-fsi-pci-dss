@@ -110,7 +110,7 @@ export default function SimulatorCaseDetailPage() {
       try {
         const doc = await api.system.rawDocument(
           'cardTransactionLog',
-          fraudCase.linkedCardTransactionReference,
+          fraudCase.cardTransactionInstanceReference,
           ''
         );
         setRawDoc(doc);
@@ -479,7 +479,7 @@ function L1OpenView({
               <span className="text-gray-500">Severity:</span>
               <span className="capitalize">{fraudCase.riskSeverity}</span>
               <span className="text-gray-500">Customer FK:</span>
-              <span className="text-gray-500 font-mono text-xs">{fraudCase.linkedCustomerAgreementReference?.slice(0, 12)}... (UUID)</span>
+              <span className="text-gray-500 font-mono text-xs">{fraudCase.customerAgreementInstanceReference?.slice(0, 12)}... (UUID)</span>
             </div>
           </div>
 

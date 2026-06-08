@@ -66,16 +66,26 @@ function maskGovId(id: string) {
 
 type QEType = 'qe-equality' | 'qe-none';
 
+function CollectionChip({ name }: { name: string }) {
+  return (
+    <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-[#001E2B]/5 text-amber-600 border-amber-200/60 shrink-0">
+      {name}
+    </span>
+  );
+}
+
 function RevealField({
   label,
   plainValue,
   maskedValue,
   type,
+  collection,
 }: {
   label: string;
   plainValue: string;
   maskedValue: string;
   type: QEType;
+  collection?: string;
 }) {
   const [revealed, setRevealed] = useState(false);
   const { debugMode } = useDebugMode();
@@ -85,13 +95,14 @@ function RevealField({
 
   return (
     <>
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 flex-wrap">
         <span className="text-gray-500 text-sm">{label}</span>
         {debugMode && (
           <span className={`text-xs px-1.5 py-0.5 rounded border font-mono ${badgeStyle}`}>
             {type === 'qe-equality' ? 'QE:equality' : 'QE:none'}
           </span>
         )}
+        {debugMode && collection && <CollectionChip name={collection} />}
       </div>
       <div className="flex items-center gap-2">
         <span className={`text-sm font-mono transition-all ${revealed ? 'text-gray-900' : 'text-gray-400 select-none'}`}>
@@ -109,10 +120,14 @@ function RevealField({
   );
 }
 
-function PlainField({ label, value }: { label: string; value: string }) {
+function PlainField({ label, value, collection }: { label: string; value: string; collection?: string }) {
+  const { debugMode } = useDebugMode();
   return (
     <>
-      <span className="text-gray-500 text-sm">{label}</span>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-gray-500 text-sm">{label}</span>
+        {debugMode && collection && <CollectionChip name={collection} />}
+      </div>
       <span className="text-sm text-gray-900">{value}</span>
     </>
   );
@@ -277,18 +292,20 @@ export default function ProfilePage() {
             plainValue={ag?.customerEmailAddress ?? profile.email}
             maskedValue={(() => { const e = ag?.customerEmailAddress ?? profile.email; const [l, d] = e.split('@'); return (l?.slice(0,2) ?? '') + '●●●' + '@' + (d ?? '●●●'); })()}
             type="qe-equality"
+            collection="customerAgreementProcedure"
           />
 
           {/* Phone — editable */}
           {editing ? (
             <>
-              <div className="flex items-center gap-1.5 pt-0.5">
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                 <span className="text-gray-500 text-sm">Phone</span>
                 {debugMode && (
                   <span className="flex items-center gap-1 bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-mono text-xs">
                     <Lock size={9} /> QE:equality
                   </span>
                 )}
+                {debugMode && <CollectionChip name="customerAgreementProcedure" />}
               </div>
               <input
                 value={editPhone}
@@ -298,7 +315,7 @@ export default function ProfilePage() {
               />
             </>
           ) : ag?.customerMobilePhoneNumber ? (
-            <RevealField label="Phone" plainValue={ag.customerMobilePhoneNumber} maskedValue={maskPhone(ag.customerMobilePhoneNumber)} type="qe-equality" />
+            <RevealField label="Phone" plainValue={ag.customerMobilePhoneNumber} maskedValue={maskPhone(ag.customerMobilePhoneNumber)} type="qe-equality" collection="customerAgreementProcedure" />
           ) : (
             <>
               <span className="text-gray-500 text-sm">Phone</span>
@@ -308,7 +325,7 @@ export default function ProfilePage() {
 
           {/* Account Reference — read-only */}
           {ag?.customerAgreementReference ? (
-            <RevealField label="Account Reference" plainValue={ag.customerAgreementReference} maskedValue={maskAccountRef(ag.customerAgreementReference)} type="qe-equality" />
+            <RevealField label="Account Reference" plainValue={ag.customerAgreementReference} maskedValue={maskAccountRef(ag.customerAgreementReference)} type="qe-equality" collection="customerAgreementProcedure" />
           ) : (
             <>
               <span className="text-gray-500 text-sm">Account Reference</span>
@@ -317,8 +334,8 @@ export default function ProfilePage() {
           )}
 
           {/* Segment / member since — read-only */}
-          {ag?.customerSegment && <PlainField label="Account type" value={SEGMENT_LABELS[ag.customerSegment] ?? ag.customerSegment} />}
-          {ag?.customerAgreementEnrollmentDate && <PlainField label="Member since" value={new Date(ag.customerAgreementEnrollmentDate).toLocaleDateString()} />}
+          {ag?.customerSegment && <PlainField label="Account type" value={SEGMENT_LABELS[ag.customerSegment] ?? ag.customerSegment} collection="customerAgreementProcedure" />}
+          {ag?.customerAgreementEnrollmentDate && <PlainField label="Member since" value={new Date(ag.customerAgreementEnrollmentDate).toLocaleDateString()} collection="customerAgreementProcedure" />}
 
           {/* Language — editable */}
           {editing ? (
@@ -337,15 +354,16 @@ export default function ProfilePage() {
               </select>
             </>
           ) : ag?.customerAgreementPreferredLanguage && (
-            <PlainField label="Language" value={ag.customerAgreementPreferredLanguage.toUpperCase()} />
+            <PlainField label="Language" value={ag.customerAgreementPreferredLanguage.toUpperCase()} collection="customerAgreementProcedure" />
           )}
 
           {/* Address — editable (QE:none) */}
           {editing ? (
             <>
-              <div className="flex items-center gap-1.5 pt-0.5">
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                 <span className="text-gray-500 text-sm">Address</span>
                 {debugMode && <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-purple-100 text-purple-700 border-purple-200">QE:none</span>}
+                {debugMode && <CollectionChip name="customerAgreementProcedure" />}
               </div>
               <div className="space-y-1.5">
                 <input
@@ -383,12 +401,14 @@ export default function ProfilePage() {
               plainValue={`${hasAddress.streetAddress}, ${hasAddress.city}, ${hasAddress.postalCode}, ${hasAddress.countryCode}`}
               maskedValue={maskAddress(hasAddress)}
               type="qe-none"
+              collection="customerAgreementProcedure"
             />
           ) : ag !== null && (
             <>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-gray-500 text-sm">Address</span>
                 {debugMode && <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-purple-100 text-purple-700 border-purple-200">QE:none</span>}
+                {debugMode && <CollectionChip name="customerAgreementProcedure" />}
               </div>
               <span className="text-gray-400 text-xs italic">Not on file</span>
             </>
@@ -396,12 +416,13 @@ export default function ProfilePage() {
 
           {/* Government ID — read-only */}
           {hasGovId ? (
-            <RevealField label="Government ID" plainValue={hasGovId} maskedValue={maskGovId(hasGovId)} type="qe-none" />
+            <RevealField label="Government ID" plainValue={hasGovId} maskedValue={maskGovId(hasGovId)} type="qe-none" collection="customerAgreementProcedure" />
           ) : ag !== null && (
             <>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-gray-500 text-sm">Government ID</span>
                 {debugMode && <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-purple-100 text-purple-700 border-purple-200">QE:none</span>}
+                {debugMode && <CollectionChip name="customerAgreementProcedure" />}
               </div>
               <span className="text-gray-400 text-xs italic">Not on file</span>
             </>

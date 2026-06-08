@@ -182,6 +182,25 @@ export function RawMongoPanel({
 
             {s.expanded && (
               <div className="border-t border-[#00ED64]/20">
+
+                {/* Atlas provenance banner — shown for every mongo section */}
+                {section.kind === 'mongo' && (
+                  <div className="bg-[#001020] border-b border-[#00ED64]/20 border-l-2 border-l-[#00ED64]/50 px-4 py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="flex items-center gap-1.5 text-[#00ED64] text-xs font-semibold shrink-0">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
+                      </svg>
+                      MongoDB Atlas
+                    </span>
+                    <span className="text-gray-500 text-xs shrink-0">collection:</span>
+                    <span className="font-mono text-amber-300 text-xs shrink-0">{section.collection}</span>
+                    <span className="text-gray-600 text-xs font-mono truncate hidden sm:block">
+                      id: {section.id}
+                    </span>
+                    <span className="ml-auto text-gray-600 text-xs hidden md:block">{section.description}</span>
+                  </div>
+                )}
+
                 {/* Loading (mongo only) */}
                 {s.loading && (
                   <p className="px-4 py-3 text-xs text-gray-500 font-mono animate-pulse bg-[#001E2B]">

@@ -404,6 +404,14 @@ export default function TransactionDetailPage() {
               labelColor: 'text-blue-400',
               description: 'QE:equality (accountRef) + QE:none (rawGatewayPayload, processorMetadata) inline — v2 unified document',
             },
+            ...(txn.caseId ? [{
+              kind: 'mongo' as const,
+              collection: 'fraudDiagnosisCase',
+              id: txn.caseId,
+              label: 'fraudDiagnosisCase',
+              labelColor: 'text-blue-400',
+              description: 'Raw fraud case document as stored in Atlas (SD-83)',
+            }] : []),
           ]}
           />
         </div>
