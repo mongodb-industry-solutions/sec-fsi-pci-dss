@@ -99,14 +99,14 @@ customerAgreement ──1:1──► customerAgreementSensitive
        │ 1:many (via customerAgreementInstanceReference, plaintext)
        ▼
 paymentCard  ──────────────────────────────────────────────────────┐
-       │ (via paymentCardReference token, standard index)            │
-       │ many:1                                                      │
-       ▼                                                             │
-cardTransaction ──1:1──► cardTransactionSensitive                │
-       │                                                             │
-       │ 1:many                                                      │
-       ▼                                                             │
-fraudDiagnosisCase ◄── also links ───────────────────────────────────┘
+       │ (via paymentCardReference token, standard index)          │
+       │ many:1                                                    │
+       ▼                                                           │
+cardTransaction ──1:1──► cardTransactionSensitive                  │
+       │                                                           │
+       │ 1:many                                                    │
+       ▼                                                           │
+fraudDiagnosisCase ◄── also links ─────────────────────────────────┘
    (linkedCustomerAgreementReference + linkedCardTransactionReference)
 ```
 
@@ -278,7 +278,7 @@ server.ts
   ├── modules/identity/               SD-16
   ├── modules/customer/               SD-53
   ├── modules/transactions/           SD-254 + SD-88
-  │     └── imports createFraudCase ──────────────────────────────────────────┐
+  │     └── imports createFraudCase ────────────────────────────────────────┐
   ├── modules/fraud/                  SD-83  ◄──────────────────────────────┘
   │
   ├── modules/gateway/ [v4]           SD-64 + SD-65 + SD-89 + SD-57
