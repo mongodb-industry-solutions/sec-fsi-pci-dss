@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
@@ -105,6 +106,24 @@ export function DemoSidebar() {
           );
         })}
       </nav>
+
+      {/* MongoDB brand footer */}
+      <div className="border-t border-white/10 p-3 flex flex-col items-center gap-1.5">
+        <div className={`overflow-hidden rounded-full shrink-0 ${collapsed ? 'w-8 h-8' : 'w-12 h-12'}`}>
+          <Image
+            src="/mongodb-badge.png"
+            alt="MongoDB"
+            width={collapsed ? 32 : 48}
+            height={collapsed ? 32 : 48}
+            className="opacity-80 hover:opacity-100 transition-opacity scale-110"
+          />
+        </div>
+        {!collapsed && (
+          <span className="text-[10px] text-gray-500 tracking-wide text-center leading-tight">
+            Built on<br />MongoDB Atlas
+          </span>
+        )}
+      </div>
     </aside>
   );
 }
