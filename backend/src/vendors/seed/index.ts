@@ -27,11 +27,9 @@ function ensureDataFiles() {
     'parties.json',
     'customerAuthentications.json',
     'authDomains.json',
-    'customerAgreements.json',
-    'customerAgreementsSensitive.json',
+    'customerAgreements.json',  // v2: includes address, govId, riskNotes inline (no separate *Sensitive file)
     'paymentCards.json',
-    'cardTransactions.json',
-    'cardTransactionsSensitive.json',
+    'cardTransactions.json',    // v2: includes rawGatewayPayload, processorMetadata inline
     'fraudCases.json',
     // fraudCaseEvents.json is not required here  -  events are generated during case seeding
   ];
@@ -76,13 +74,13 @@ export async function runSeed() {
     console.log('Seeding authenticationDomain...');
     await seedAuthDomains(db);
 
-    console.log('Seeding customerAgreementProcedure + customerAgreementProcedureSensitive...');
+    console.log('Seeding customerAgreementProcedure (v2: sensitive fields inline)...');
     await seedCustomers(db);
 
     console.log('Seeding paymentCardManagement...');
     await seedCards(db);
 
-    console.log('Seeding cardTransactionLog + cardTransactionLogSensitive...');
+    console.log('Seeding cardTransactionLog (v2: sensitive fields inline)...');
     await seedTransactions(db);
 
     console.log('Seeding fraudDiagnosisCase...');

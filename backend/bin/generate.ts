@@ -220,18 +220,24 @@ async function main() {
   const customerAgreementRefs: string[] = [];
   const customerAgreements = [];
 
+  // Fixed account refs for the two demo customers (used in seeded fraud cases and transactions)
+  const DEMO_ACCOUNT_REFS = ['ACC-LF-20240115', 'ACC-JS-20231201'];
+
   for (let i = 0; i < 50; i++) {
     const id = uuid();
-    const ref = `ACC-${String(i + 1).padStart(3, '0')}`;
+    const ref = i < 2 ? DEMO_ACCOUNT_REFS[i] : `ACC-${String(i + 1).padStart(3, '0')}`;
     customerAgreementIds.push(id);
     customerAgreementRefs.push(ref);
 
-    // v2: sensitive fields (QE:none, DEK-sensitive tier) merged inline.
-    // The L2 QE client encrypts them on seed write; L1 client returns Binary.
+    // v2: all fields — plaintext identity + QE:equality + QE:none — merged inline.
+    // The L2 QE client encrypts the encrypted fields on seed write.
     customerAgreements.push({
       customerAgreementInstanceReference: id,
       partyInstanceReference: customerPartyIds[i],
       customerAgreementReference: ref,
+      customerName: customerNames[i],
+      customerEmailAddress: customerEmails[i],
+      customerMobilePhoneNumber: customerPhones[i],
       customerAgreementResidentialAddress: {
         streetAddress: faker.location.streetAddress(),
         city: faker.location.city(),
