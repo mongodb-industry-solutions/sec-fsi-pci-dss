@@ -11,7 +11,9 @@ interface CommandDef {
   label: string;
   description: string;
   icon: string;
-  group: 'setup' | 'test';
+  group: 'setup' | 'test' | 'danger';
+  confirmMessage?: string;
+  confirmLabel?: string;
 }
 
 const COMMANDS: CommandDef[] = [
@@ -24,6 +26,15 @@ const COMMANDS: CommandDef[] = [
   { id: 'test:unit',        label: 'Unit Tests',        description: 'Run unit tests only',                              icon: '🔬', group: 'test'  },
   { id: 'test:integration', label: 'Integration Tests', description: 'Run integration tests only',                       icon: '🔗', group: 'test'  },
   { id: 'type-check',       label: 'Type Check',        description: 'TypeScript type check (no emit)',                  icon: '📐', group: 'test'  },
+  {
+    id: 'setup:db:drop',
+    label: 'Drop Everything',
+    description: 'Drop all collections, key vault, indexes, Atlas roles and DB users',
+    icon: '🗑️',
+    group: 'danger',
+    confirmMessage: 'This will permanently delete all collections, the QE key vault, all indexes, and Atlas custom roles and DB users. All data will be lost. This cannot be undone.',
+    confirmLabel: 'Drop Everything',
+  },
 ];
 
 export default function SetupPage() {
@@ -32,6 +43,7 @@ export default function SetupPage() {
   const [activeCommand, setActiveCommand] = useState<string | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const [logsLoaded, setLogsLoaded] = useState(false);
+  const [pendingConfirm, setPendingConfirm] = useState<CommandDef | null>(null);
 
   // Restore logs from sessionStorage on mount.
   // setLogs + setLogsLoaded are batched by React 18 into one render,
@@ -81,27 +93,54 @@ export default function SetupPage() {
     }
   }
 
-  const setupCmds = COMMANDS.filter((c) => c.group === 'setup');
-  const testCmds  = COMMANDS.filter((c) => c.group === 'test');
+  function handleRun(id: string) {
+    const cmd = COMMANDS.find((c) => c.id === id);
+    if (cmd?.confirmMessage) {
+      setPendingConfirm(cmd);
+      return;
+    }
+    runCommand(id);
+  }
+
+  const setupCmds  = COMMANDS.filter((c) => c.group === 'setup');
+  const testCmds   = COMMANDS.filter((c) => c.group === 'test');
+  const dangerCmds = COMMANDS.filter((c) => c.group === 'danger');
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 lg:h-full">
-      {/* Left column — command list */}
-      <div className="flex-shrink-0 space-y-4 lg:w-1/2 lg:overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/60">
-        <CommandGroup label="Setup" cmds={setupCmds} activeCommand={activeCommand} running={running} onRun={runCommand} />
-        <CommandGroup label="Test & Quality" cmds={testCmds} activeCommand={activeCommand} running={running} onRun={runCommand} />
+    <>
+      <div className="flex flex-col lg:flex-row gap-6 lg:h-full">
+        {/* Left column — command list */}
+        <div className="flex-shrink-0 space-y-4 lg:w-1/2 lg:overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/60">
+          <CommandGroup label="Setup" cmds={setupCmds} activeCommand={activeCommand} running={running} onRun={handleRun} />
+          <CommandGroup label="Test & Quality" cmds={testCmds} activeCommand={activeCommand} running={running} onRun={handleRun} />
+          {dangerCmds.length > 0 && (
+            <DangerCommandGroup cmds={dangerCmds} activeCommand={activeCommand} running={running} onRun={handleRun} />
+          )}
+        </div>
+        {/* Right column — output panel fills remaining height */}
+        <div className="min-h-[280px] lg:flex-1 lg:min-h-0">
+          <LogPanel
+            title={activeCommand ? `npm run ${activeCommand}` : 'Output'}
+            logs={logs}
+            endRef={logsEndRef}
+            onClear={() => setLogs([])}
+            onDownload={() => downloadText(`setup-${activeCommand ?? 'output'}-${Date.now()}.txt`, logs.map((e) => e.text).join('\n'))}
+          />
+        </div>
       </div>
-      {/* Right column — output panel fills remaining height */}
-      <div className="min-h-[280px] lg:flex-1 lg:min-h-0">
-        <LogPanel
-          title={activeCommand ? `npm run ${activeCommand}` : 'Output'}
-          logs={logs}
-          endRef={logsEndRef}
-          onClear={() => setLogs([])}
-          onDownload={() => downloadText(`setup-${activeCommand ?? 'output'}-${Date.now()}.txt`, logs.map((e) => e.text).join('\n'))}
+
+      {pendingConfirm && (
+        <ConfirmModal
+          cmd={pendingConfirm}
+          onConfirm={() => {
+            const id = pendingConfirm.id;
+            setPendingConfirm(null);
+            runCommand(id);
+          }}
+          onCancel={() => setPendingConfirm(null)}
         />
-      </div>
-    </div>
+      )}
+    </>
   );
 }
 
@@ -181,6 +220,92 @@ function LogPanel({ title, logs, endRef, onClear, onDownload }: {
           </div>
         ))}
         <div ref={endRef as React.RefObject<HTMLDivElement>} />
+      </div>
+    </div>
+  );
+}
+
+function DangerCommandGroup({ cmds, activeCommand, running, onRun }: {
+  cmds: CommandDef[];
+  activeCommand: string | null;
+  running: boolean;
+  onRun: (id: string) => void;
+}) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-red-600 uppercase tracking-wider mb-2">Danger Zone</p>
+      <div className="space-y-1.5">
+        {cmds.map((cmd) => (
+          <button
+            key={cmd.id}
+            onClick={() => onRun(cmd.id)}
+            disabled={running}
+            className={`w-full text-left flex items-start gap-3 p-3 rounded-lg border transition-all ${
+              activeCommand === cmd.id
+                ? 'border-red-500 bg-red-500/10'
+                : 'border-red-900/50 bg-gray-900 hover:border-red-700 hover:bg-red-950/30'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            <span className="text-lg mt-0.5">{cmd.icon}</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-red-400 text-sm">{cmd.label}</span>
+                <code className="text-xs text-gray-500 font-mono">npm run {cmd.id}</code>
+                {activeCommand === cmd.id && running && (
+                  <span className="text-xs text-orange-400 animate-pulse">Running...</span>
+                )}
+              </div>
+              <p className="text-gray-500 text-xs mt-0.5">{cmd.description}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ConfirmModal({ cmd, onConfirm, onCancel }: {
+  cmd: CommandDef;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-gray-900 border border-red-900/60 rounded-xl p-6 max-w-md w-full shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-3 mb-4">
+          <span className="text-xl mt-0.5">⚠️</span>
+          <div>
+            <h2 className="text-white font-bold text-base">Confirm Destructive Operation</h2>
+            <p className="text-gray-400 text-xs mt-0.5">This action cannot be undone.</p>
+          </div>
+        </div>
+
+        <div className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 mb-4">
+          <code className="text-red-400 text-xs font-mono">npm run {cmd.id}</code>
+        </div>
+
+        <p className="text-gray-300 text-sm mb-6 leading-relaxed">{cmd.confirmMessage}</p>
+
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded-lg border border-gray-700 text-gray-300 text-sm hover:border-gray-500 hover:text-white transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+          >
+            {cmd.confirmLabel ?? 'Confirm'}
+          </button>
+        </div>
       </div>
     </div>
   );

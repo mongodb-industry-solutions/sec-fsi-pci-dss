@@ -31,6 +31,7 @@ const ALLOWED_NPM_COMMANDS: Record<string, string[]> = {
   'test:unit':         ['run', 'test:unit'],
   'test:integration':  ['run', 'test:integration'],
   'type-check':        ['run', 'type-check'],
+  'setup:db:drop':     ['run', 'setup:db:drop'],
 };
 
 type RateLimitStore = Map<string, { count: number; reset: number }>;
