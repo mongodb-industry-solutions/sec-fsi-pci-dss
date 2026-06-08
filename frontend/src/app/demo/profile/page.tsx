@@ -15,6 +15,7 @@ interface ProfileData {
   domain: string;
   agreement: {
     customerAgreementInstanceReference?: string;
+    partyInstanceReference?: string;
     customerName?: string;
     customerEmailAddress?: string;
     customerMobilePhoneNumber?: string;
@@ -481,10 +482,18 @@ export default function ProfilePage() {
       </div>
 
       {/* Debug: raw MongoDB documents via RawMongoPanel */}
-      {debugMode && profile?.agreement?.customerAgreementInstanceReference && (
+      {debugMode && profile?.agreement?.customerAgreementInstanceReference && profile?.agreement?.partyInstanceReference && (
         <RawMongoPanel
           token={token}
           sections={[
+            {
+              kind: 'mongo' as const,
+              collection: 'party',
+              id: profile.agreement.partyInstanceReference,
+              label: 'party',
+              labelColor: 'text-emerald-400',
+              description: 'SD-13 PII store — QE:equality (email, phone) + plaintext (name, segment)',
+            },
             {
               kind: 'mongo' as const,
               collection: 'customerAgreementProcedure',
