@@ -15,8 +15,8 @@ export interface FraudDiagnosisControlRecord {
   fraudDiagnosisCaseReference: string;                   // FD-2026-001234
 
   // Links to protected records (plaintext keys by design: no PII in these refs)
-  linkedCardTransactionReference: string;                // FK to cardTransaction
-  linkedCustomerAgreementReference: string;              // FK to customerAgreement
+  cardTransactionInstanceReference: string;              // FK to cardTransactionLog (SD-254)
+  customerAgreementInstanceReference: string;            // FK to customerAgreementProcedure (SD-53)
 
   // Extended Reference Pattern: stable display fields from cardTransaction.
   // Embedded to make fraud investigation display a single-collection query.
@@ -30,8 +30,8 @@ export interface FraudDiagnosisControlRecord {
   fraudDiagnosisCaseClosingDateTime?: Date;
 
   // Assignment (v2: populated when case is assigned)
-  fraudDiagnosisAnalystInstanceReference?: string;       // FK to partyAuthentication (L1)
-  fraudDiagnosisInvestigatorInstanceReference?: string;  // FK to partyAuthentication (L2)
+  fraudDiagnosisAnalystInstanceReference?: string;       // FK to customerAuthenticationAssessment (L1)
+  fraudDiagnosisInvestigatorInstanceReference?: string;  // FK to customerAuthenticationAssessment (L2)
 
   // Assessment
   fraudDiagnosisAssessment: {
@@ -72,7 +72,7 @@ export interface FraudDiagnosisControlRecord {
   };
 
   // BIAN metadata
-  bianServiceDomain: 'FraudDiagnosis';
+  bianServiceDomain: 'Fraud Diagnosis';
   bianControlRecordType: 'FraudDiagnosis';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;

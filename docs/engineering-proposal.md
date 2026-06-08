@@ -94,19 +94,19 @@ Seven MongoDB collections following BIAN Service Domain naming. Full TypeScript 
 ```
 partyAuthentication  ← BIAN SD-16: demo users + JWT auth (email QE:equality)
 
-customerAgreement ──1:1──► customerAgreementSensitive
+customerAgreementProcedure  [inline QE:none: address, govId, riskNotes]
        │
        │ 1:many (via customerAgreementInstanceReference, plaintext)
        ▼
-paymentCard  ──────────────────────────────────────────────────────┐
-       │ (via paymentCardReference token, standard index)          │
-       │ many:1                                                    │
-       ▼                                                           │
-cardTransaction ──1:1──► cardTransactionSensitive                  │
-       │                                                           │
-       │ 1:many                                                    │
-       ▼                                                           │
-fraudDiagnosisCase ◄── also links ─────────────────────────────────┘
+paymentCardManagement  ─────────────────────────────────────────────────────┐
+       │ (via paymentCardReference token, standard index)                   │
+       │ many:1                                                             │
+       ▼                                                                    │
+cardTransactionLog  [inline QE:none: rawGatewayPayload, processorMetadata]  │
+       │                                                                    │
+       │ 1:many                                                             │
+       ▼                                                                    │
+fraudDiagnosisCase ◄── also links ──────────────────────────────────────────┘
    (linkedCustomerAgreementReference + linkedCardTransactionReference)
 ```
 
@@ -114,7 +114,7 @@ fraudDiagnosisCase ◄── also links ─────────────�
 
 **Join strategy:** Application-side sequential queries. The backend service layer queries each collection independently and assembles the response. No `$lookup` across QE collections: it is not supported for encrypted fields in the current QE implementation.
 
-**QE collection split rationale:** QE requires all encrypted fields in a collection to be defined in the `encryptedFieldsMap` at collection creation time. Mixing equality-searchable and non-searchable (`none`) fields in one collection is permitted, but separating lookup collections from sensitive collections makes the access-control boundary explicit: Level 1 queries only the `*QE` lookup collections; Level 2 additionally queries the `*SensitiveQE` collections after escalation.
+**QE tier rationale (v2):** QE:none sensitive fields are stored **inline** in `customerAgreementProcedure` and `cardTransactionLog`. The access-control boundary is the QE client tier, not a separate collection: the Level 1 `encryptedFieldsMap` omits QE:none fields so the driver returns Binary ciphertext, which the API projection layer strips. Level 2 uses a separate QE client with a complete `encryptedFieldsMap` that auto-decrypts all fields after escalation token validation. This follows the BIAN Control Record model (all attributes of a SD in one collection) while preserving cryptographic enforcement.
 
 ### 3.4 Queryable Encryption design
 
@@ -123,7 +123,7 @@ Two DEKs:
 | DEK | Wraps | Collections | Access |
 |---|---|---|---|
 | `DEK-lookup` | AWS CMK | `cardTransaction`, `customerAgreement`, `paymentCard`, `partyAuthentication` | All service roles |
-| `DEK-sensitive` | AWS CMK | `cardTransactionSensitive`, `customerAgreementSensitive` | Level 2 + escalation token only (v2) |
+| `DEK-sensitive` | AWS CMK | QE:none fields inline in `cardTransactionLog` and `customerAgreementProcedure` | Level 2 + escalation token only (v2) |
 
 Complete `encryptedFieldsMap` definitions are in [technical-spec.md §2](technical-spec.md#2-qe-encryptedfieldsmaps).
 
@@ -242,8 +242,8 @@ Each module maps to one or more BIAN Service Domains. No module exists without a
 | Module | BIAN SD | SD Name | Collections | QE Classification | API Prefix | PCI CDE Scope |
 |---|---|---|---|---|---|---|
 | `identity` | SD-16 | Party Authentication | `partyAuthentication` | `equality` on email | `/api/v1/auth` | Adjacent — auth only |
-| `customer` | SD-53 · SD-88 | Customer Agreement · Payment Card | `customerAgreement` · `customerAgreementSensitive` · `paymentCard` | `equality` on email / phone / accountRef · `none` on address / govId / expirationDate | `/api/v1/customer` · `/api/v1/customer/:id/cards` | **In scope** — PII/CHD |
-| `transactions` | SD-254 | Card Transaction | `cardTransaction` · `cardTransactionSensitive` | `equality` on accountRef · `none` on rawGatewayPayload | `/api/v1/transactions` | **In scope** — CHD |
+| `customer` | SD-53 · SD-88 | Customer Agreement · Payment Card | `customerAgreementProcedure` · `paymentCardManagement` | `equality` on accountRef; `none` (inline) on address / govId / riskNotes / expirationDate | `/api/v1/customer` · `/api/v1/customer/:id/cards` | **In scope** — PII/CHD |
+| `transactions` | SD-254 | Card Transaction | `cardTransactionLog` | `equality` on accountRef; `none` (inline) on rawGatewayPayload / processorMetadata | `/api/v1/transactions` | **In scope** — CHD |
 | `fraud` | SD-83 | Fraud Diagnosis | `fraudDiagnosisCase` · `fraudDiagnosisCaseEvents` | None — operational metadata, FK refs only | `/api/v1/fraud` · `/api/v1/fraud/:id/events` | Adjacent — references CDE keys |
 | `gateway` *(v4)* | SD-64 · SD-65 · SD-89 · SD-57 | Payment Order · Payment Execution · Merchant Relations · Card Etoken | `merchantAgreement` · `paymentOrder` · `tokenVault` | `none` on merchantApiKeyHash · `equality` on merchant/customer refs | `/api/v1/gateway` | **In scope** — merchant secrets + payment refs |
 | `system` | — | Demo infrastructure | None | None | `/api/v1/system/health` · `/api/v1/system/raw/:collection/:id` | Non-CDE — raw endpoint blocked in production |

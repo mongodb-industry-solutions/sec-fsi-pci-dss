@@ -193,13 +193,16 @@ BIAN (Banking Industry Architecture Network) provides a standardized vocabulary 
 
 | # | BIAN Service Domain | SD Reference | Role in Demo | Collection | Version |
 |---|---|---|---|---|---|
-| 1 | **Card Transaction** | SD-254 | Records card payment events | `cardTransaction` | v1 |
-| 2 | **Card Transaction: Sensitive** | SD-254 (sensitive) | Stores non-searchable gateway payload | `cardTransactionSensitive` | v1 |
-| 3 | **Customer Agreement** | SD-53 | Customer profile, searchable PII | `customerAgreement` | v1 |
-| 4 | **Customer Agreement: Sensitive** | SD-53 (sensitive) | Non-searchable PII (address, gov ID) | `customerAgreementSensitive` | v1 |
-| 5 | **Payment Card** | SD-88 | Stored card instruments (tokens) | `paymentCard` | v1 |
-| 6 | **Fraud Diagnosis** | SD-83 | Investigation cases and workflow | `fraudDiagnosisCase` | v1 |
-| 7 | **Party Authentication** | SD-16 | Demo user accounts, roles, hashed credentials | `partyAuthentication` | v1 |
+| 1 | **Party Data Management** | SD-13 | Canonical PII store: email, phone, name | `party` | v1 |
+| 2 | **Customer Authentication** | SD-91 | Login credentials, roles, access state | `customerAuthenticationAssessment` | v1 |
+| 3 | **Party Authentication** | SD-16 | Identity verification events; auth domain config | `partyAuthenticationAssessment` | v1 |
+| 4 | **Card Transaction** | SD-254 | Records card payment events; QE:none fields (gateway payload, processor metadata) stored inline | `cardTransactionLog` | v1 |
+| 5 | **Customer Agreement** | SD-53 | Customer account (no PII; links to `party`); QE:none fields (address, govId, riskNotes) stored inline | `customerAgreementProcedure` | v1 |
+| 8 | **Payment Card** | SD-88 | Stored card instruments (tokens) | `paymentCardManagement` | v1 |
+| 9 | **Fraud Diagnosis** | SD-83 | Investigation cases and workflow | `fraudDiagnosisCase` | v1 |
+| 10 | **Customer Credit Rating** | SD-60 | HRPC risk profiles | `customerCreditRatingState` | v1 |
+| 11 | **Consent Agreement** *(stub)* | SD-36 | Open Banking consent grants | `consentAgreement` | v3 stub |
+| 12 | **Consent Access Log** *(stub)* | SD-36 | Open Banking API access audit trail | `consentAccessLog` | v3 stub |
 
 #### v4: Payment Gateway SDs (new)
 
@@ -212,7 +215,9 @@ BIAN (Banking Industry Architecture Network) provides a standardized vocabulary 
 
 > **Note 1:** BIAN does not define separate "sensitive" collections; the split is an architectural pattern for separating searchable QE fields from non-searchable QE fields, as required by MongoDB QE design constraints.
 >
-> **Note 2:** `partyAuthentication` is a demo-only construct. It stores pre-seeded user accounts (email, bcrypt password hash, role) to support Application Mode login. In a production FSI system, authentication would be delegated to an identity provider (e.g., MS Entra ID). The `partyAuthentication` collection uses QE equality on `authenticationUserEmailAddress` to demonstrate that even user credential lookups can be encrypted.
+> **Note 2:** `customerAuthenticationAssessment` (SD-91) stores pre-seeded user accounts (email as QE:equality, bcrypt password hash, role) to support Application Mode login. Identity verification events belong to `partyAuthenticationAssessment` (SD-16). In a production FSI system, authentication would be delegated to an identity provider (e.g., MS Entra ID). The SD-91 collection demonstrates that even user credential lookups can be encrypted via QE.
+> 
+> **Note 4:** SD-13 `party` is the canonical PII store. `customerAgreementProcedure` (SD-53) holds only business keys and a `partyInstanceReference` FK — no email or phone. Email/phone lookups require a two-step query: (1) QE equality on `party.partyEmailAddress` → get `partyInstanceReference`; (2) plaintext index lookup on `customerAgreementProcedure.partyInstanceReference`. See `tmp/wiki/bian-openbanking-tradeoffs.md §1` for the performance analysis.
 >
 > **Note 3 (v4):** The backend module structure mirrors the BIAN SD grouping. Each module owns the collections, services, and API routes for its assigned SDs. See [engineering-proposal.md §3.8](engineering-proposal.md) for the full BIAN Module Map.
 
@@ -253,23 +258,6 @@ interface CardTransactionLogControlRecord {
 }
 ```
 
-#### Collection 2: `cardTransactionSensitive`
-*BIAN SD-254: Sensitive / Non-searchable attributes*
-
-```typescript
-interface CardTransactionSensitiveRecord {
-  // Linking key (plaintext by policy)
-  cardTransactionInstanceReference: string;       // FK to cardTransaction
-
-  // Encrypted: QE none (non-searchable, retrieval only under Level 2)
-  rawGatewayPayload: object;                      // QE:none: full gateway response
-  processorTransactionMetadata: object;           // QE:none: processor-specific metadata
-
-  // NEVER store:
-  // fullPan, cvv, pin, magneticStripeData: prohibited by PCI DSS SAD rules
-}
-```
-
 #### Collection 3: `customerAgreement`
 *BIAN SD-53: Customer Agreement Control Record (searchable PII)*
 
@@ -298,25 +286,7 @@ interface CustomerAgreementControlRecord {
 }
 ```
 
-#### Collection 4: `customerAgreementSensitive`
-*BIAN SD-53: Non-searchable PII (escalation-only access)*
-
-```typescript
-interface CustomerAgreementSensitiveRecord {
-  // Linking key (plaintext by policy)
-  customerAgreementInstanceReference: string;   // FK to customerAgreement
-
-  // Encrypted: QE none (non-searchable, Level 2 escalation only)
-  residentialAddressFull: {                      // QE:none
-    streetAddress: string;
-    city: string;
-    postalCode: string;
-    countryCode: string;
-  };
-  governmentIdentificationReference: string;    // QE:none: national ID / passport
-  internalRiskProfileNotes: string;             // QE:none: internal fraud notes
-}
-```
+> **v2 note:** Sensitive QE:none fields (`rawGatewayPayload`, `processorTransactionMetadata`, `customerAgreementResidentialAddress`, `governmentIdentificationReference`, `customerAgreementRiskNotes`) are stored **inline** in their parent collections (`cardTransactionLog` and `customerAgreementProcedure`). The Level 1 QE client's `encryptedFieldsMap` omits them, returning Binary ciphertext that the API strips from Level 1 responses. The Level 2 QE client includes all fields and auto-decrypts them upon escalation token validation.
 
 #### Collection 5: `paymentCard`
 *BIAN SD-88: Payment Card Management Control Record*
@@ -388,25 +358,36 @@ interface FraudDiagnosisControlRecord {
 ### 6.4 Collection Relationships
 
 ```
-partyAuthentication ─────────────────────────────────────────────────────────────────
-        │ (demo user accounts: login maps to role)
-        │
-customerAgreement ──────────────── 1 : 1 ──────────────── customerAgreementSensitive
-        │                               via: customerAgreementInstanceReference
-        │
-        │ 1 : many
-        ↓
-paymentCard ──────────────────────────────────────────────────────────────────────────
-        │ (via paymentCardReference token)
-        │ many : 1
-        ↓
-cardTransaction ─────────────────── 1 : 1 ──────────────── cardTransactionSensitive
-        │                               via: cardTransactionInstanceReference
-        │
-        │ 1 : many
-        ↓
-fraudDiagnosisCase ─── also links to ──► customerAgreement
-        (via linkedCardTransactionReference + linkedCustomerAgreementReference)
+party (SD-13)                                   ← canonical PII owner
+  │  partyInstanceReference (FK)
+  │
+  ├──► customerAuthenticationAssessment (SD-91)  ← login credentials, role
+  │         (via partyInstanceReference)
+  │
+  └──► partyAuthenticationAssessment (SD-16)     ← identity verification events
+            (via partyInstanceReference)
+
+customerAgreementProcedure (SD-53)  [inline QE:none: address, govId, riskNotes]
+  │  partyInstanceReference ───────────────────────────► party
+  │
+  │ 1 : many
+  ↓
+paymentCardManagement (SD-88)
+  │ (via paymentCardReference token)
+  │ many : 1
+  ↓
+cardTransactionLog (SD-254)  [inline QE:none: rawGatewayPayload, processorMetadata]
+  │
+  │ 1 : many
+  ↓
+fraudDiagnosisCase (SD-83) ─── links to ──► cardTransactionLog
+  (cardTransactionInstanceReference + customerAgreementInstanceReference)
+
+consentAgreement (SD-36) ──────────────────────────────► party
+  │  partyInstanceReference                        (v3 Open Banking stub)
+  │ 1 : many
+  ↓
+consentAccessLog (SD-36)
 ```
 
 **Join strategy:** Application-side joins only. No `$lookup` across QE collections (not supported for encrypted fields). The API service performs sequential queries and assembles the response.
@@ -415,22 +396,24 @@ fraudDiagnosisCase ─── also links to ──► customerAgreement
 
 | Collection | Index | Type | Purpose |
 |---|---|---|---|
-| `cardTransaction` | `cardTransactionInstanceReference` | Unique | Primary lookup |
-| `cardTransaction` | `transactionDateTime` | Single field | Time-range filtering |
-| `cardTransaction` | `transactionStatus` | Single field | Status filtering |
-| `cardTransactionSensitive` | `cardTransactionInstanceReference` | Unique | 1:1 join |
-| `customerAgreement` | `customerAgreementInstanceReference` | Unique | Primary lookup |
-| `customerAgreement` | `agreementStatus` | Single field | Active customer filtering |
-| `customerAgreementSensitive` | `customerAgreementInstanceReference` | Unique | 1:1 join |
-| `paymentCard` | `paymentCardInstanceReference` | Unique | Primary lookup |
-| `paymentCard` | `paymentCardReference` | Single field | Token lookup (standard index: not QE) |
-| `paymentCard` | `customerAgreementInstanceReference` | Single field | Cards by customer |
-| `cardTransaction` | `paymentCardReference` | Single field | Transactions by token (standard index: not QE) |
+| `party` | `partyInstanceReference` | Unique | Primary lookup; QE manages `partyEmailAddress` / `partyMobilePhoneNumber` |
+| `customerAuthenticationAssessment` | `customerAuthenticationInstanceReference` | Unique | Primary lookup |
+| `customerAuthenticationAssessment` | `partyInstanceReference` | Single field | Auth record by party |
+| `customerAuthenticationAssessment` | `customerAuthenticationUserRole` | Single field | User list by role |
+| `customerAgreementProcedure` | `customerAgreementInstanceReference` | Unique | Primary lookup |
+| `customerAgreementProcedure` | `partyInstanceReference` | Single field | Two-step PII lookup join key |
+| `customerAgreementProcedure` | `customerAgreementStatus` | Single field | Active customer filtering |
+| `paymentCardManagement` | `paymentCardInstanceReference` | Unique | Primary lookup |
+| `paymentCardManagement` | `paymentCardReference` | Single field | Token lookup (standard index: not QE) |
+| `paymentCardManagement` | `customerAgreementInstanceReference` | Single field | Cards by customer |
+| `cardTransactionLog` | `cardTransactionInstanceReference` | Unique | Primary lookup |
+| `cardTransactionLog` | `paymentCardReference` | Single field | Transactions by token (standard index: not QE) |
+| `cardTransactionLog` | `cardTransactionDateTime` | Single field | Time-range filtering |
+| `cardTransactionLog` | `cardTransactionStatus` | Single field | Status filtering |
 | `fraudDiagnosisCase` | `fraudDiagnosisInstanceReference` | Unique | Primary lookup |
-| `fraudDiagnosisCase` | `linkedCardTransactionReference` | Single field | Case by transaction |
-| `fraudDiagnosisCase` | `caseStatus, riskSeverity` | Compound | Dashboard filtering |
-| `partyAuthentication` | `partyAuthenticationInstanceReference` | Unique | Primary lookup |
-| `partyAuthentication` | `authenticationUserRole` | Single field | User list by role |
+| `fraudDiagnosisCase` | `cardTransactionInstanceReference` | Single field | Case by transaction |
+| `fraudDiagnosisCase` | `customerAgreementInstanceReference` | Single field | Cases by customer |
+| `fraudDiagnosisCase` | `fraudDiagnosisCaseStatus, fraudDiagnosisCaseSeverity` | Compound | Dashboard filtering |
 
 > QE encrypted fields (`paymentCardReference`, `customerEmailAddress`, etc.) use QE metadata indexes automatically managed by the driver: do not create manual indexes on these fields.
 
@@ -442,20 +425,20 @@ fraudDiagnosisCase ─── also links to ──► customerAgreement
 
 | Field | BIAN SD | PCI Classification | QE Mode | Collection | Demo Version |
 |---|---|---|---|---|---|
-| `paymentCardReference` | Card Transaction | **Card surrogate: not CHD under PCI DSS v4.0** | **plaintext (indexed)** | `cardTransaction` | v1 |
-| `cardTransactionAccountReference` | Card Transaction | CHD-adjacent | `equality` | `cardTransaction` | v1 |
-| `customerEmailAddress` | Customer Agreement | PII | `equality` | `customerAgreement` | v1 |
-| `customerMobilePhoneNumber` | Customer Agreement | PII | `equality` | `customerAgreement` | v1 |
-| `customerAgreementReference` | Customer Agreement | CHD-adjacent | `equality` | `customerAgreement` | v1 |
-| `paymentCardReference` | Payment Card | **Card surrogate: not CHD under PCI DSS v4.0** | **plaintext (indexed)** | `paymentCard` | v1 |
-| `cardExpirationDate` | Payment Card | CHD | `none` | `paymentCard` | v1 |
-| `rawGatewayPayload` | Card Transaction | Internal | `none` | `cardTransactionSensitive` | v1 |
-| `processorTransactionMetadata` | Card Transaction | Internal | `none` | `cardTransactionSensitive` | v1 |
-| `residentialAddressFull` | Customer Agreement | PII | `none` | `customerAgreementSensitive` | v1 |
-| `governmentIdentificationReference` | Customer Agreement | PII | `none` | `customerAgreementSensitive` | v1 |
-| `internalRiskProfileNotes` | Customer Agreement | Internal | `none` | `customerAgreementSensitive` | v1 |
-| `transactionAmount.amount` | Card Transaction |: | `range` | `cardTransaction` | **v2** |
-| `customerName` | Customer Agreement | CHD | `equality` | `customerAgreement` | **v2** |
+| `partyEmailAddress` | Party Data Management (SD-13) | PII | `equality` | `party` | v1 |
+| `partyMobilePhoneNumber` | Party Data Management (SD-13) | PII | `equality` | `party` | v1 |
+| `customerAuthenticationEmailAddress` | Customer Authentication (SD-91) | PII | `equality` | `customerAuthenticationAssessment` | v1 |
+| `customerAgreementReference` | Customer Agreement (SD-53) | CHD-adjacent | `equality` | `customerAgreementProcedure` | v1 |
+| `paymentCardReference` (on card) | Payment Card (SD-88) | **Card surrogate: not CHD under PCI DSS v4.0** | **plaintext (indexed)** | `paymentCardManagement` | v1 |
+| `paymentCardExpirationDate` | Payment Card (SD-88) | CHD | `none` | `paymentCardManagement` | v1 |
+| `paymentCardReference` (on tx) | Card Transaction (SD-254) | **Card surrogate: not CHD under PCI DSS v4.0** | **plaintext (indexed)** | `cardTransactionLog` | v1 |
+| `cardTransactionAccountReference` | Card Transaction (SD-254) | CHD-adjacent | `equality` | `cardTransactionLog` | v1 |
+| `rawGatewayPayload` | Card Transaction (SD-254) | Internal | `none` | `cardTransactionLog` (inline) | v1 |
+| `processorTransactionMetadata` | Card Transaction (SD-254) | Internal | `none` | `cardTransactionLog` (inline) | v1 |
+| `customerAgreementResidentialAddress` | Customer Agreement (SD-53) | PII | `none` | `customerAgreementProcedure` (inline) | v1 |
+| `governmentIdentificationReference` | Customer Agreement (SD-53) | PII | `none` | `customerAgreementProcedure` (inline) | v1 |
+| `customerAgreementRiskNotes` | Customer Agreement (SD-53) | Internal | `none` | `customerAgreementProcedure` (inline) | v1 |
+| `cardTransactionAmount.amount` | Card Transaction (SD-254) | — | `range` | `cardTransactionLog` | **v2** |
 | **`fullPan`** |: | CHD: **PROHIBITED** | **never store** |: |: |
 | **`cvv` / `pin`** |: | SAD: **PROHIBITED** | **never store** |: |: |
 | **`magneticStripeData`** |: | SAD: **PROHIBITED** | **never store** |: |: |
@@ -480,16 +463,20 @@ fraudDiagnosisCase ─── also links to ──► customerAgreement
 │  └── DEK-sensitive (for QE:none sensitive collections)  │
 └──────────────────────────┬──────────────────────────────┘
                            │ encrypts fields
-┌──────────────────────────▼──────────────────────────────┐
-│                 MongoDB Atlas Cluster                   │
-│                                                         │
-│  cardTransaction        ← DEK-lookup                  │
-│  customerAgreement      ← DEK-lookup                  │
-│  paymentCard            ← DEK-lookup                  │
-│  cardTransactionSensitive ← DEK-sensitive             │
-│  customerAgreementSensitive ← DEK-sensitive           │
-│  fraudDiagnosisCase       ← plaintext (no QE)           │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────▼────────────────────────────────────────────┐
+│                 MongoDB Atlas Cluster                                 │
+│                                                                       │
+│  party                            ← DEK: partyEmail, partyPhone       │
+│  customerAuthenticationAssessment ← DEK: authEmail                    │
+│  customerAgreementProcedure ← DEK: customerAccountRef (equality)      │
+│                               DEK: customerAddress, customerGovId,    │
+│                                    customerRiskNotes (QE:none inline) │
+│  cardTransactionLog         ← DEK: txAccountRef (equality)            │
+│                               DEK: txRawPayload, txProcessorMeta      │
+│                                 (QE:none inline)                      │
+│  paymentCardManagement      ← DEK: cardExpiry                         │
+│  fraudDiagnosisCase         ← plaintext (no QE)                       │
+└───────────────────────────────────────────────────────────────────────┘
 ```
 
 **Two DEKs by design:**
@@ -578,21 +565,23 @@ sec-fsi-pci-dss/
 │   ├── src/
 │   │   ├── controllers/            # Route handlers: thin, delegate to services
 │   │   │   ├── auth.controller.ts
-│   │   │   ├── cardTransaction.controller.ts
-│   │   │   ├── customerAgreement.controller.ts
-│   │   │   ├── paymentCard.controller.ts
+│   │   │   ├── transactions.controller.ts
+│   │   │   ├── customer.controller.ts
+│   │   │   ├── cards.controller.ts
 │   │   │   └── fraudDiagnosis.controller.ts
 │   │   ├── services/               # Business logic and domain operations
 │   │   │   ├── auth.service.ts
-│   │   │   ├── cardTransaction.service.ts
-│   │   │   ├── customerAgreement.service.ts
+│   │   │   ├── transactions.service.ts
+│   │   │   ├── customer.service.ts
 │   │   │   └── fraudDiagnosis.service.ts
 │   │   ├── models/                 # BIAN interfaces + QE encryptedFieldsMaps
-│   │   │   ├── partyAuthentication.model.ts
-│   │   │   ├── cardTransaction.model.ts
-│   │   │   ├── customerAgreement.model.ts
-│   │   │   ├── paymentCard.model.ts
-│   │   │   └── fraudDiagnosis.model.ts
+│   │   │   ├── party.model.ts                          # SD-13
+│   │   │   ├── customerAuthentication.model.ts         # SD-91
+│   │   │   ├── partyAuthentication.model.ts            # SD-16
+│   │   │   ├── cardTransaction.model.ts                # SD-254
+│   │   │   ├── customerAgreement.model.ts              # SD-53
+│   │   │   ├── paymentCard.model.ts                    # SD-88
+│   │   │   └── fraudDiagnosis.model.ts                 # SD-83
 │   │   ├── vendors/                # Infrastructure: encryption, setup, seed logic
 │   │   │   ├── encryption/         # QE client, KMS, key vault, raw client
 │   │   │   │   ├── qeClient.ts     # MongoClient with autoEncryption
@@ -608,13 +597,12 @@ sec-fsi-pci-dss/
 │   │   ├── plugins/                # Fastify plugins (mongodb, cors)
 │   │   └── server.ts
 │   ├── data/                       # JSON seed files: one per collection
-│   │   ├── users.json              # 5 demo users (hashed passwords, roles)
-│   │   ├── customerAgreements.json
-│   │   ├── customerAgreementsSensitive.json
-│   │   ├── paymentCards.json
-│   │   ├── cardTransactions.json
-│   │   ├── cardTransactionsSensitive.json
-│   │   └── fraudCases.json
+│   │   ├── parties.json            # 53 party records (SD-13)
+│   │   ├── customerAuthentications.json  # 5 demo users (SD-91, hashed passwords, roles)
+│   │   ├── customerAgreements.json       # (SD-53, QE:none fields inline)
+│   │   ├── paymentCards.json             # (SD-88)
+│   │   ├── cardTransactions.json         # (SD-254, QE:none fields inline)
+│   │   └── fraudCases.json               # (SD-83)
 │   └── package.json                # Owns setup:db and seed scripts
 │
 ├── docs/                           # Engineering documentation
@@ -956,7 +944,7 @@ npm run dev
 
 `backend/bin/seed.ts` is a thin wrapper. All logic lives in `backend/src/vendors/seed/`:
 
-1. Upsert demo users into `partyAuthentication` (hashed passwords, roles)
+1. Upsert demo users into `customerAuthenticationAssessment` (SD-91, hashed passwords, roles) and their corresponding `party` records (SD-13)
 2. Upsert synthetic BIAN-compliant data (no real PII: Faker.js)
 3. Insert in dependency order: users → customers → cards → transactions → fraud cases
 4. Respect QE encryption: use the QE-enabled client for all writes to QE collections
@@ -1007,7 +995,7 @@ npm run dev
 | 12 | Perspective switch after payment | Auto-switch after confirmation (3s countdown) + manual "Stay here" button | 2026-05-27 |
 | 13 | Split-screen vs full-page | Full-page default + optional split-screen toggle for technical audiences | 2026-05-27 |
 | 14 | Raw Atlas document toggle | Real ciphertext fetched from Atlas via plain MongoClient endpoint | 2026-05-27 |
-| 15 | Authentication model | Local JWT (HS256) stored in `partyAuthentication`; extensible to MS Entra ID | 2026-05-27 |
+| 15 | Authentication model | Local JWT (HS256) stored in `customerAuthenticationAssessment` (SD-91); `partyAuthenticationAssessment` (SD-16) holds verification events; extensible to MS Entra ID | 2026-05-27 |
 | 16 | Seeder user selection UX | Username dropdown auto-fills password on selection; dev-friendly | 2026-05-27 |
 | 17 | Bin/ vs backend/vendors/ | Setup/seed logic lives in `backend/src/vendors/`; `bin/` are thin wrappers | 2026-05-27 |
 | 18 | Version reorder | Agentic fraud investigation moved to v5 (last); old v4 Advanced Capabilities → new v3; old v5 Payment Gateway → new v4 | 2026-06-08 |

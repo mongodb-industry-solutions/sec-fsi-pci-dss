@@ -29,8 +29,8 @@ export async function createFraudCase(
   const fraudCase: Omit<FraudDiagnosisControlRecord, never> = {
     fraudDiagnosisInstanceReference: caseId,
     fraudDiagnosisCaseReference: nextCaseRef(),
-    linkedCardTransactionReference: txnId,
-    linkedCustomerAgreementReference: customerRef,
+    cardTransactionInstanceReference: txnId,
+    customerAgreementInstanceReference: customerRef,
     transactionSnapshot,
     fraudDiagnosisCaseStatus: 'open',
     fraudDiagnosisCaseSeverity: severity,
@@ -39,7 +39,7 @@ export async function createFraudCase(
       riskIndicators,
       fraudDiagnosisScore: Math.min(100, riskIndicators.length * 40),
     },
-    bianServiceDomain: 'FraudDiagnosis',
+    bianServiceDomain: 'Fraud Diagnosis',
     bianControlRecordType: 'FraudDiagnosis',
     recordCreatedDateTime: now,
     recordUpdatedDateTime: now,
@@ -69,10 +69,10 @@ export async function getCases(
   limit: number
 ) {
   const query: Record<string, unknown> = {};
-  if (filters.status)        query['fraudDiagnosisCaseStatus']       = filters.status;
-  if (filters.severity)      query['fraudDiagnosisCaseSeverity']     = filters.severity;
-  if (filters.transactionId) query['linkedCardTransactionReference'] = filters.transactionId;
-  if (filters.customerId)    query['linkedCustomerAgreementReference'] = filters.customerId;
+  if (filters.status)        query['fraudDiagnosisCaseStatus']          = filters.status;
+  if (filters.severity)      query['fraudDiagnosisCaseSeverity']        = filters.severity;
+  if (filters.transactionId) query['cardTransactionInstanceReference']   = filters.transactionId;
+  if (filters.customerId)    query['customerAgreementInstanceReference'] = filters.customerId;
 
   const skip = (page - 1) * limit;
   const [results, total] = await Promise.all([

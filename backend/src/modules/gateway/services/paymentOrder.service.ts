@@ -46,7 +46,7 @@ export async function authorizePaymentOrder(id: string) {
   return {
     paymentOrderInstanceReference: id,
     paymentOrderStatus: 'authorized' as PaymentOrderStatus,
-    linkedCardTransactionReference: uuidv4(),
+    cardTransactionInstanceReference: uuidv4(),
     routingDecision: {
       processor: 'simulated_processor_v1',
       routedAt: new Date().toISOString(),

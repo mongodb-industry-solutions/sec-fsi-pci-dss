@@ -1,6 +1,7 @@
 // BIAN SD-88: Payment Card
+// CR: PaymentCardManagement
 
-export const PAYMENT_CARD_COLLECTION = 'paymentCard';
+export const PAYMENT_CARD_COLLECTION = 'paymentCardManagement';
 
 export interface PaymentCardManagementControlRecord {
   paymentCardInstanceReference: string;
@@ -18,7 +19,7 @@ export interface PaymentCardManagementControlRecord {
   paymentCardMandateStatus?: 'active' | 'cancelled' | 'expired';
   paymentCardConsentDateTime?: Date;
   paymentCardMandateExpiryDate?: Date;
-  bianServiceDomain: 'PaymentCard';
+  bianServiceDomain: 'Payment Card';
   bianControlRecordType: 'PaymentCardManagement';
   recordCreatedDateTime: Date;
   schemaVersion: number;
@@ -26,7 +27,10 @@ export interface PaymentCardManagementControlRecord {
 
 export type CardNetwork = 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
 export type CardStatus =
+  | 'issued'
   | 'active'
+  | 'pending_activation'
   | 'blocked'
-  | 'expired'
-  | 'pending_activation';
+  | 'suspended'
+  | 'revoked'
+  | 'expired';

@@ -62,21 +62,30 @@ const STEP_ICONS: Record<string, string> = {
   check: '✅',
 };
 
-// Static demo ciphertext for simulator (no JWT available in this mode)
+// v2 demo document: sensitive fields are inline (no *Sensitive collection).
+// QE:equality field (cardTransactionAccountReference) and QE:none fields
+// (rawGatewayPayload, processorTransactionMetadata) both appear as BSON Binary
+// when read by the Level 1 client — Atlas never stores plaintext.
 const DEMO_RAW_TRANSACTION: Record<string, unknown> = {
   _id: { $oid: '6650a2b3c4d5e6f700000001' },
   cardTransactionInstanceReference: 'a7f3d891-2c45-4b67-8e12-9f0a1b2c3d4e',
+  paymentCardReference: 'tok_sim_7xB2kp1q',
   cardTransactionAccountReference: {
     $binary: { base64: 'BhKJ9KMsQfY7lP+2Xa8nDEz1rVwCqI5uH0TbGmOjS6Ry==', subType: '06' },
   },
-  paymentCardReference: 'tok_sim_7xB2kp1q',
+  rawGatewayPayload: {
+    $binary: { base64: 'Cv3xZ1pQmNkLtA8rEoWsYfUiBhGjDnK2McTvPqHaXeOl==', subType: '06' },
+  },
+  processorTransactionMetadata: {
+    $binary: { base64: 'Dw4yA2bRnCsJuF9oZkVpGxHiLeTmQdIwNjMrBtPaKlXe==', subType: '06' },
+  },
   cardTransactionAmount: { amount: 850, currency: 'USD' },
   cardTransactionDateTime: '2026-06-04T14:32:17.000Z',
   cardTransactionStatus: 'authorized',
   cardTransactionMaskedPanDisplay: '****-****-****-4291',
   cardTransactionMerchantName: 'Casino Royale',
   cardTransactionMerchantCategoryCode: '7995',
-  schemaVersion: 1,
+  schemaVersion: 2,
   recordCreatedDateTime: '2026-06-04T14:32:17.000Z',
 };
 
@@ -100,14 +109,14 @@ export default function SimulatorCaseDetailPage() {
       // Simulator has no JWT; try the real endpoint first, fall back to demo document
       try {
         const doc = await api.system.rawDocument(
-          'cardTransaction',
+          'cardTransactionLog',
           fraudCase.linkedCardTransactionReference,
           ''
         );
         setRawDoc(doc);
       } catch {
         // Expected in simulator (no JWT). Use static demo ciphertext.
-        setRawDoc({ collection: 'cardTransaction', document: DEMO_RAW_TRANSACTION });
+        setRawDoc({ collection: 'cardTransactionLog', document: DEMO_RAW_TRANSACTION });
       }
     }
     setShowRaw((v) => !v);
@@ -497,8 +506,9 @@ function L1OpenView({
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
         <strong>MongoDB QE in action:</strong> Sarah can search by email, phone, or account reference
         using Queryable Encryption. Atlas receives and matches ciphertext-to-ciphertext.
-        Plaintext never reaches the server. The customerAgreementSensitive collection is not
-        queried at L1 - the DEK-sensitive key never leaves the L2 application context.
+        Plaintext never reaches the server. Sensitive fields (QE:none) are stored inline in
+        the same document but returned as Binary ciphertext to the L1 client — the DEK-sensitive
+        key never leaves the L2 application context.
       </div>
     </div>
   );

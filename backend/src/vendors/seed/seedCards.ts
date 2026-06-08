@@ -1,6 +1,7 @@
 import { Db } from 'mongodb';
 import * as path from 'path';
 import * as fs from 'fs';
+import { PAYMENT_CARD_COLLECTION } from '../../modules/customer/models/paymentCard.model';
 
 export async function seedCards(db: Db) {
   const records = JSON.parse(
@@ -8,11 +9,11 @@ export async function seedCards(db: Db) {
   );
 
   for (const record of records) {
-    await db.collection('paymentCard').updateOne(
+    await db.collection(PAYMENT_CARD_COLLECTION).updateOne(
       { paymentCardInstanceReference: record.paymentCardInstanceReference },
       { $set: record },
       { upsert: true }
     );
   }
-  console.log(`  paymentCard: ${records.length} upserted`);
+  console.log(`  ${PAYMENT_CARD_COLLECTION}: ${records.length} upserted`);
 }

@@ -398,20 +398,11 @@ export default function TransactionDetailPage() {
             },
             {
               kind: 'mongo',
-              collection: 'cardTransaction',
+              collection: 'cardTransactionLog',
               id: txnId,
-              label: 'cardTransaction',
+              label: 'cardTransactionLog',
               labelColor: 'text-blue-400',
-              description: 'QE:equality - cardTransactionAccountReference as BSON ciphertext',
-            },
-            {
-              kind: 'mongo',
-              collection: 'cardTransactionSensitive',
-              id: txnId,
-              label: 'cardTransactionSensitive',
-              labelColor: 'text-purple-400',
-              description: 'QE:none - rawGatewayPayload, processorMetadata; requires DEK-sensitive',
-              maxHeight: 'max-h-52',
+              description: 'QE:equality (accountRef) + QE:none (rawGatewayPayload, processorMetadata) inline — v2 unified document',
             },
           ]}
           />

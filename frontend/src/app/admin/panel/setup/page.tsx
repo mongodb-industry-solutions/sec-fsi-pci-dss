@@ -4,6 +4,8 @@ import { API_BASE_URL } from '../../../../lib/constants';
 import { getAdminToken, readSSE, LogEntry, downloadText } from '../../../../lib/adminHelpers';
 import { Download } from 'lucide-react';
 
+const SETUP_LOGS_KEY = 'admin_setup_logs';
+
 interface CommandDef {
   id: string;
   label: string;
@@ -29,6 +31,25 @@ export default function SetupPage() {
   const [running, setRunning] = useState(false);
   const [activeCommand, setActiveCommand] = useState<string | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const [logsLoaded, setLogsLoaded] = useState(false);
+
+  // Restore logs from sessionStorage on mount.
+  // setLogs + setLogsLoaded are batched by React 18 into one render,
+  // so the persist effect below never runs with stale [] before load completes.
+  useEffect(() => {
+    const saved = sessionStorage.getItem(SETUP_LOGS_KEY);
+    if (saved) {
+      try { setLogs(JSON.parse(saved)); } catch { /* ignore corrupt data */ }
+    }
+    setLogsLoaded(true);
+  }, []);
+
+  // Persist logs after load is complete. Remove the key when empty (e.g. after Clear).
+  useEffect(() => {
+    if (!logsLoaded) return;
+    if (logs.length === 0) sessionStorage.removeItem(SETUP_LOGS_KEY);
+    else sessionStorage.setItem(SETUP_LOGS_KEY, JSON.stringify(logs));
+  }, [logs, logsLoaded]);
 
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });

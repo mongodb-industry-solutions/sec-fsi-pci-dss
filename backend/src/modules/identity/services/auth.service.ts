@@ -3,11 +3,11 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
-import { PARTY_AUTHENTICATION_COLLECTION, PartyAuthenticationControlRecord } from '../models/partyAuthentication.model';
+import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
 import { AUTHENTICATION_DOMAIN_COLLECTION, AuthenticationDomainRecord } from '../models/authenticationDomain.model';
 
 export interface JwtPayload {
-  sub: string;
+  sub: string;   // customerAuthenticationInstanceReference
   email: string;
   role: string;
   name: string;
@@ -21,28 +21,28 @@ export async function loginUser(
   domain: string
 ): Promise<{ token: string; user: Omit<JwtPayload, 'iat' | 'exp'> }> {
   const user = await db
-    .collection<PartyAuthenticationControlRecord>(PARTY_AUTHENTICATION_COLLECTION)
-    .findOne({ partyAuthenticationUserEmailAddress: email } as Partial<PartyAuthenticationControlRecord>);
+    .collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
+    .findOne({ customerAuthenticationEmailAddress: email } as Partial<CustomerAuthenticationAssessmentRecord>);
 
   if (!user) {
     throw Object.assign(new Error('Invalid credentials'), { statusCode: 401 });
   }
 
-  if (user.partyAuthenticationLoginDomain !== domain) {
+  if (user.customerAuthenticationLoginDomain !== domain) {
     throw Object.assign(new Error('Invalid credentials'), { statusCode: 401 });
   }
 
-  const valid = await bcrypt.compare(password, user.partyAuthenticationCredentialHash);
+  const valid = await bcrypt.compare(password, user.customerAuthenticationCredentialHash);
   if (!valid) {
     throw Object.assign(new Error('Invalid credentials'), { statusCode: 401 });
   }
 
   const payload: JwtPayload = {
-    sub: user.partyAuthenticationInstanceReference,
-    email: user.partyAuthenticationUserEmailAddress,
-    role: user.partyAuthenticationUserRole,
-    name: user.partyAuthenticationUserName,
-    domain: user.partyAuthenticationLoginDomain,
+    sub: user.customerAuthenticationInstanceReference,
+    email: user.customerAuthenticationEmailAddress,
+    role: user.customerAuthenticationUserRole,
+    name: user.customerAuthenticationUserName,
+    domain: user.customerAuthenticationLoginDomain,
   };
 
   const secret = process.env.JWT_SECRET ?? 'demo-local-secret-change-in-production';
@@ -69,15 +69,15 @@ export async function loginUser(
  */
 export async function getDemoUsers(_db: Db) {
   const dataDir = process.env.SEED_DATA_DIR ?? path.join(__dirname, '../../../../data');
-  const filePath = path.join(dataDir, 'users.json');
-  const records: PartyAuthenticationControlRecord[] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  const filePath = path.join(dataDir, 'customerAuthentications.json');
+  const records: CustomerAuthenticationAssessmentRecord[] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
 
   return records
-    .filter((u) => u.partyAuthenticationAccountStatus === 'active')
+    .filter((u) => u.customerAuthenticationAccountStatus === 'active')
     .map((u) => ({
-      email: u.partyAuthenticationUserEmailAddress,
-      name: u.partyAuthenticationUserName,
-      role: u.partyAuthenticationUserRole,
+      email: u.customerAuthenticationEmailAddress,
+      name: u.customerAuthenticationUserName,
+      role: u.customerAuthenticationUserRole,
     }));
 }
 

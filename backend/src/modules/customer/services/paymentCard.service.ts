@@ -28,7 +28,7 @@ export async function createCard(db: Db, input: CreateCardInput) {
     paymentCardStatus: 'active',
     paymentCardIssuanceDateTime: now,
     paymentCardIsPreferred: input.paymentCardIsPreferred,
-    bianServiceDomain: 'PaymentCard',
+    bianServiceDomain: 'Payment Card',
     bianControlRecordType: 'PaymentCardManagement',
     recordCreatedDateTime: now,
     schemaVersion: 1,

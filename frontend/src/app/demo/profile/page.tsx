@@ -465,20 +465,11 @@ export default function ProfilePage() {
           sections={[
             {
               kind: 'mongo' as const,
-              collection: 'customerAgreement',
+              collection: 'customerAgreementProcedure',
               id: profile.agreement.customerAgreementInstanceReference,
-              label: 'customerAgreement',
+              label: 'customerAgreementProcedure',
               labelColor: 'text-blue-400',
-              description: 'QE:equality — email, phone, accountRef stored as BSON binary ciphertext',
-            },
-            {
-              kind: 'mongo' as const,
-              collection: 'customerAgreementSensitive',
-              id: profile.agreement.customerAgreementInstanceReference,
-              label: 'customerAgreementSensitive',
-              labelColor: 'text-purple-400',
-              description: 'QE:none — address, govt ID; requires DEK-sensitive to decrypt',
-              maxHeight: 'max-h-56',
+              description: 'QE:equality (accountRef) + QE:none (address, govId) inline — v2 unified document',
             },
           ]}
         />

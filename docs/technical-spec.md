@@ -3,7 +3,7 @@
 **Project:** FSI PCI DSS Payment Security Demo  
 **PRD reference:** [PRD.md](PRD.md)  
 **Engineering Proposal:** [engineering-proposal.md](engineering-proposal.md)  
-**Last updated:** 2026-06-05
+**Last updated:** 2026-06-08
 
 This document covers the implementation-level detail that the PRD deliberately omits: BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index creation, and environment configuration. Engineers start here.
 
@@ -25,159 +25,213 @@ This document covers the implementation-level detail that the PRD deliberately o
 
 ## 1. BIAN TypeScript Models
 
-All models live in `backend/src/models/`. Each file exports the TypeScript interface for the collection document and the collection name constant.
+All models live in `backend/src/modules/*/models/`. Each file exports the TypeScript interface for the collection document and the collection name constant. All collections follow strict BIAN Service Domain (SD) naming.
 
-### `cardTransaction.model.ts`
+### `party.model.ts` (SD-13 — new)
 
 ```typescript
-// BIAN SD-254: Card Transaction
+// BIAN SD-13: Party Data Management
+// Canonical PII store. All other SDs reference parties via partyInstanceReference (FK).
 
-export const CARD_TRANSACTION_COLLECTION = 'cardTransaction';
-export const CARD_TRANSACTION_SENSITIVE_COLLECTION = 'cardTransactionSensitive';
+export const PARTY_COLLECTION = 'party';
 
-export interface CardTransactionLogControlRecord {
-  // Identifiers
-  cardTransactionInstanceReference: string;       // UUID, primary key
-  cardTransactionExternalReference?: string;      // Gateway transaction ID
-
-  // Plaintext: card token is a surrogate, not CHD under PCI DSS v4.0
-  paymentCardReference: string;                   // Indexed plaintext: standard query, not QE
-
-  // QE equality: searchable encrypted fields
-  cardTransactionAccountReference: string;        // Account reference
-
-  // Plaintext operational fields
-  cardTransactionAmount: {
-    amount: number;                               // QE range in v2
-    currency: string;                             // ISO 4217
-  };
-  cardTransactionDateTime: Date;
-  cardTransactionStatus: CardTransactionStatus;
-  cardTransactionChannel: CardTransactionChannel;
-  cardTransactionInitiationType: CardTransactionInitiationType; // v3: MIT vs CIT for Visa/MC recurring rules
-  cardTransactionMerchantCategoryCode: string;    // MCC code
-  cardTransactionMerchantName: string;
-  cardTransactionMaskedPanDisplay: string;        // Display only: ****-****-****-1234
-
-  // BIAN metadata
-  bianServiceDomain: 'CardTransaction';
-  bianControlRecordType: 'CardTransactionLog';
+export interface PartyControlRecord {
+  partyInstanceReference: string;        // PK, UUID; referenced as FK by SD-53, SD-91
+  partyEmailAddress: string;             // QE:equality — primary investigation search key
+  partyMobilePhoneNumber: string;        // QE:equality — secondary investigation search key
+  partyName: string;                     // Becomes QE:equality in v2
+  partyType: PartyType;
+  partyDateOfBirth?: string;             // ISO 8601 date
+  partyNationality?: string;             // ISO 3166-1 alpha-2
+  bianServiceDomain: 'Party Data Management';
+  bianControlRecordType: 'Party';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
-  schemaVersion: number;                           // Schema Versioning Pattern
-}
-
-export interface CardTransactionSensitiveRecord {
-  cardTransactionInstanceReference: string;       // FK: plaintext linking key
-  rawGatewayPayload: object;                      // QE none
-  processorTransactionMetadata: object;           // QE none
   schemaVersion: number;
 }
 
-export type CardTransactionStatus =
-  'authorized' | 'declined' | 'pending' | 'settled' | 'disputed';
-
-export type CardTransactionChannel =
-  'online' | 'pos' | 'contactless' | 'atm';
-
-export type CardTransactionInitiationType = 'customerInitiated' | 'merchantInitiated';
+export type PartyType = 'customer' | 'employee' | 'service_account';
 ```
 
-### `customerAgreement.model.ts`
+### `customerAuthentication.model.ts` (SD-91 — new)
+
+```typescript
+// BIAN SD-91: Customer Authentication
+// Owns login credentials, roles, and account access state.
+// Linked to party (SD-13) via partyInstanceReference.
+
+export const CUSTOMER_AUTHENTICATION_COLLECTION = 'customerAuthenticationAssessment';
+
+export interface CustomerAuthenticationAssessmentRecord {
+  customerAuthenticationInstanceReference: string;    // PK, UUID; used as JWT sub
+  partyInstanceReference: string;                     // FK to party (SD-13)
+  customerAuthenticationEmailAddress: string;         // QE:equality — login lookup
+  customerAuthenticationCredentialHash: string;       // bcrypt 12-round; NOT QE (hash is not PII)
+  customerAuthenticationUserRole: CustomerAuthRole;
+  customerAuthenticationUserName: string;             // Denormalized from party for JWT name claim
+  customerAuthenticationLoginDomain: 'local' | 'msentra';
+  customerAuthenticationAccountStatus: 'active' | 'suspended';
+  customerAuthenticationLastLoginDateTime?: Date;
+  bianServiceDomain: 'Customer Authentication';
+  bianControlRecordType: 'CustomerAuthenticationAssessment';
+  recordCreatedDateTime: Date;
+  schemaVersion: number;
+}
+
+export type CustomerAuthRole =
+  | 'customer'
+  | 'level1_analyst'
+  | 'level2_investigator'
+  | 'security_auditor';
+```
+
+### `customerAgreement.model.ts` (SD-53 — v2 updated)
+
+> **v2 change**: `customerAgreementProcedureSensitive` collection removed. Sensitive QE:none fields are now **inline** in `customerAgreementProcedure`. The QE tier (Level 1 / Level 2 client) controls whether they are returned as Binary or decrypted.
 
 ```typescript
 // BIAN SD-53: Customer Agreement
+// Business contract: account reference, segment, status, and sensitive PII (inline, QE:none).
+// PII (email, phone, name) separated to party (SD-13).
 
-export const CUSTOMER_AGREEMENT_COLLECTION = 'customerAgreement';
-export const CUSTOMER_AGREEMENT_SENSITIVE_COLLECTION = 'customerAgreementSensitive';
+export const CUSTOMER_AGREEMENT_COLLECTION = 'customerAgreementProcedure';
+// CUSTOMER_AGREEMENT_SENSITIVE_COLLECTION removed in v2
 
 export interface CustomerAgreementControlRecord {
-  // Identifiers
-  customerAgreementInstanceReference: string;    // UUID, primary key
+  customerAgreementInstanceReference: string;         // PK, UUID
+  partyInstanceReference: string;                     // FK to party (SD-13)
 
-  // QE equality: searchable encrypted fields
-  customerEmailAddress: string;
-  customerMobilePhoneNumber: string;
-  customerAgreementReference: string;            // Account number reference
+  // QE:equality — direct search key
+  customerAgreementReference: string;
 
-  // Plaintext fields (v1): customerName becomes QE equality in v2
-  customerName: string;
+  // QE:none (DEK-sensitive tier) — returned as Binary by L1 client; decrypted by L2
+  customerAgreementResidentialAddress?: ResidentialAddress;
+  governmentIdentificationReference?: string;
+  customerAgreementRiskNotes?: string;
+
+  // Plaintext operational fields
   customerSegment: CustomerSegment;
-  customerAgreementStatus: CustomerAgreementStatus;
+  customerAgreementStatus: AgreementStatus;
   customerAgreementEnrollmentDate: Date;
-  customerAgreementPreferredLanguage: string;     // ISO 639-1
+  customerAgreementPreferredLanguage: string;          // ISO 639-1
+  customerAgreementPreferredPaymentCardReference?: string; // FK to paymentCardManagement UUID
 
-  // v4: recurring payment mandate
-  preferredPaymentCardReference?: string;        // FK: paymentCardReference of the saved card
-
-  // BIAN metadata
-  bianServiceDomain: 'CustomerAgreement';
-  bianControlRecordType: 'CustomerAgreement';
+  bianServiceDomain: 'Customer Agreement';
+  bianControlRecordType: 'CustomerAgreementProcedure';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
-  schemaVersion: number;                          // Schema Versioning Pattern
+  schemaVersion: number;
 }
 
-export interface CustomerAgreementSensitiveRecord {
-  customerAgreementInstanceReference: string;   // FK: plaintext linking key
-
-  // QE none: retrieval only under Level 2 escalation
-  customerAgreementResidentialAddress: ResidentialAddress;
-  governmentIdentificationReference: string;
-  customerAgreementRiskNotes: string;
-  schemaVersion: number;
+// Binary field detection helper: returns false if field is BSON Binary (not decrypted by L1 client)
+export function isSensitiveDecrypted(field: unknown): boolean {
+  if (field === undefined || field === null) return false;
+  if (typeof field === 'object' && field !== null &&
+      'sub_type' in field && 'buffer' in field) return false;
+  return true;
 }
 
 export interface ResidentialAddress {
   streetAddress: string;
   city: string;
   postalCode: string;
-  countryCode: string;                           // ISO 3166-1 alpha-2
+  countryCode: string;                                // ISO 3166-1 alpha-2
 }
 
 export type CustomerSegment = 'retail' | 'premium' | 'corporate' | 'sme';
-export type CustomerAgreementStatus = 'active' | 'suspended' | 'closed';
+export type AgreementStatus =
+  | 'initiated'
+  | 'agreed'
+  | 'active'
+  | 'amended'
+  | 'suspended'
+  | 'dormant'
+  | 'closed';
 ```
 
-### `paymentCard.model.ts`
+### `paymentCard.model.ts` (SD-88 — updated)
 
 ```typescript
 // BIAN SD-88: Payment Card
 
-export const PAYMENT_CARD_COLLECTION = 'paymentCard';
+export const PAYMENT_CARD_COLLECTION = 'paymentCardManagement';
 
 export interface PaymentCardManagementControlRecord {
-  // Identifiers
-  paymentCardInstanceReference: string;          // UUID, primary key
-  customerAgreementInstanceReference: string;    // FK: plaintext linking key
+  paymentCardInstanceReference: string;               // PK, UUID
+  customerAgreementInstanceReference: string;         // FK to customerAgreementProcedure
 
   // Plaintext: token is a card surrogate, not CHD under PCI DSS v4.0
-  paymentCardReference: string;                  // Indexed plaintext: standard query, not QE
-
-  // QE none: expiry date is CHD co-located with card reference
-  paymentCardExpirationDate: string;             // MM/YY format
-
-  // Plaintext display fields
-  paymentCardMaskedPanDisplay: string;           // ****-****-****-1234
+  paymentCardReference: string;                       // Indexed plaintext; standard query, not QE
+  paymentCardExpirationDate: string;                  // QE:none (MM/YY, CHD co-located with card ref)
+  paymentCardMaskedPanDisplay: string;                // ****-****-****-1234
   paymentCardNetwork: CardNetwork;
   paymentCardStatus: PaymentCardStatus;
   paymentCardIssuanceDateTime: Date;
-  paymentCardIsPreferred: boolean;               // true when saved as preferred payment method
+  paymentCardIsPreferred: boolean;
 
-  // v3: recurring payment mandate (PCI DSS Req 3.1 + 3.7)
+  // v4: recurring payment mandate (PCI DSS Req 3.1 + 3.7)
   paymentCardMandateStatus?: 'active' | 'cancelled' | 'expired';
-  paymentCardConsentDateTime?: Date;             // Req 3.1: explicit consent recorded at save-card time
-  paymentCardMandateExpiryDate?: Date;           // Req 3.7: auto-purge trigger
+  paymentCardConsentDateTime?: Date;
+  paymentCardMandateExpiryDate?: Date;
 
   // BIAN metadata
-  bianServiceDomain: 'PaymentCard';
+  bianServiceDomain: 'Payment Card';
   bianControlRecordType: 'PaymentCardManagement';
   recordCreatedDateTime: Date;
-  schemaVersion: number;                          // Schema Versioning Pattern
+  schemaVersion: number;
 }
 
 export type CardNetwork = 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
-export type PaymentCardStatus = 'active' | 'blocked' | 'expired' | 'pending_activation';
+export type PaymentCardStatus =
+  | 'issued'
+  | 'active'
+  | 'pending_activation'
+  | 'blocked'
+  | 'suspended'
+  | 'revoked'
+  | 'expired';
+```
+
+### `cardTransaction.model.ts` (SD-254 — v2 updated)
+
+> **v2 change**: `cardTransactionLogSensitive` collection removed. Sensitive QE:none fields are now **inline** in `cardTransactionLog`. The QE tier controls whether they are returned as Binary or decrypted.
+
+```typescript
+// BIAN SD-254: Card Transaction
+
+export const CARD_TRANSACTION_COLLECTION = 'cardTransactionLog';
+// CARD_TRANSACTION_SENSITIVE_COLLECTION removed in v2
+
+export interface CardTransactionLogControlRecord {
+  cardTransactionInstanceReference: string;           // PK, UUID
+  paymentCardReference: string;                       // Indexed plaintext (surrogate, not CHD)
+  cardTransactionAccountReference: string;            // QE:equality — investigator search key
+
+  // QE:none (DEK-sensitive tier) — returned as Binary by L1 client; decrypted by L2
+  rawGatewayPayload?: object;
+  processorTransactionMetadata?: object;
+
+  cardTransactionAmount: { amount: number; currency: string };
+  cardTransactionDateTime: Date;
+  cardTransactionStatus: CardTransactionStatus;
+  cardTransactionChannel: CardTransactionChannel;
+  cardTransactionInitiationType: CardTransactionInitiationType;
+  cardTransactionMerchantCategoryCode: string;
+  cardTransactionMerchantName: string;
+  cardTransactionMaskedPanDisplay: string;
+
+  bianServiceDomain: 'Card Transaction';
+  bianControlRecordType: 'CardTransactionLog';
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+  schemaVersion: number;
+}
+
+export type CardTransactionStatus =
+  'authorized' | 'declined' | 'pending' | 'settled' | 'disputed';
+export type CardTransactionChannel =
+  'online' | 'pos' | 'contactless' | 'atm';
+export type CardTransactionInitiationType = 'customerInitiated' | 'merchantInitiated';
 ```
 
 ### `fraudDiagnosis.model.ts`
@@ -193,9 +247,9 @@ export interface FraudDiagnosisControlRecord {
   fraudDiagnosisInstanceReference: string;               // UUID, primary key
   fraudDiagnosisCaseReference: string;                   // FD-2026-001234
 
-  // Links to protected records (plaintext keys by design: no PII in these refs)
-  linkedCardTransactionReference: string;                // FK to cardTransaction
-  linkedCustomerAgreementReference: string;              // FK to customerAgreement
+  // Links to protected records — BIAN *InstanceReference FK naming pattern
+  cardTransactionInstanceReference: string;              // FK to cardTransactionLog (SD-254)
+  customerAgreementInstanceReference: string;            // FK to customerAgreementProcedure (SD-53)
 
   // Extended Reference Pattern: stable display fields from cardTransaction.
   // Embedded to make fraud investigation display a single-collection query.
@@ -215,8 +269,8 @@ export interface FraudDiagnosisControlRecord {
   fraudDiagnosisCaseClosingDateTime?: Date;
 
   // Assignment (v2: populated when case is assigned)
-  fraudDiagnosisAnalystInstanceReference?: string;       // FK to partyAuthentication (L1)
-  fraudDiagnosisInvestigatorInstanceReference?: string;  // FK to partyAuthentication (L2)
+  fraudDiagnosisAnalystInstanceReference?: string;       // FK to customerAuthenticationAssessment (L1)
+  fraudDiagnosisInvestigatorInstanceReference?: string;  // FK to customerAuthenticationAssessment (L2)
 
   // Assessment
   fraudDiagnosisAssessment: {
@@ -251,7 +305,7 @@ export interface FraudDiagnosisControlRecord {
   };
 
   // BIAN metadata
-  bianServiceDomain: 'FraudDiagnosis';
+  bianServiceDomain: 'Fraud Diagnosis';
   bianControlRecordType: 'FraudDiagnosis';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
@@ -303,40 +357,27 @@ export type ActionType =
 export type ResolutionOutcome = 'cleared' | 'confirmed_fraud' | 'referred';
 ```
 
-### `partyAuthentication.model.ts`
+### `partyAuthentication.model.ts` (SD-16 — updated)
 
 ```typescript
-// BIAN SD-16: Party Authentication (demo-only: stores pre-seeded user accounts)
+// BIAN SD-16: Party Authentication
+// Identity verification events only. Credentials and roles live in SD-91 (customerAuthenticationAssessment).
 
-export const PARTY_AUTHENTICATION_COLLECTION = 'partyAuthentication';
+export const PARTY_AUTHENTICATION_COLLECTION = 'partyAuthenticationAssessment';
 
-export interface PartyAuthenticationControlRecord {
-  // Identifiers
-  partyAuthenticationInstanceReference: string;   // UUID, primary key
-
-  // QE equality: searchable by email (login lookup)
-  partyAuthenticationUserEmailAddress: string;     // QE:equality: used as username
-
-  // Plaintext fields (hashed credential, not sensitive after hashing)
-  partyAuthenticationCredentialHash: string;       // bcrypt hash: never store plaintext
-  partyAuthenticationUserRole: DemoUserRole;
-  partyAuthenticationUserName: string;             // Display name
-  partyAuthenticationLoginDomain: 'local' | 'msentra'; // Identity domain
+export interface PartyAuthenticationAssessmentRecord {
+  partyAuthenticationInstanceReference: string;           // PK, UUID
+  partyInstanceReference: string;                         // FK to party (SD-13)
+  partyAuthenticationLoginDomain: 'local' | 'msentra';
   partyAuthenticationAccountStatus: 'active' | 'suspended';
-
-  // BIAN metadata
-  bianServiceDomain: 'PartyAuthentication';
-  bianControlRecordType: 'PartyAuthentication';
+  bianServiceDomain: 'Party Authentication';
+  bianControlRecordType: 'PartyAuthenticationAssessment';
   recordCreatedDateTime: Date;
-  schemaVersion: number;                          // Schema Versioning Pattern
+  schemaVersion: number;
 }
-
-export type DemoUserRole =
-  | 'customer'
-  | 'level1_analyst'
-  | 'level2_investigator'
-  | 'security_auditor';
 ```
+
+> **Auth credentials live in SD-91.** `customerAuthenticationAssessment` owns bcrypt hashes, roles, and login state. SD-16 (`partyAuthenticationAssessment`) is reserved for formal identity verification events (document scan, OTP, biometric) — v4+ scope.
 
 ### `authenticationDomain.model.ts`
 
@@ -373,7 +414,7 @@ export interface AuthenticationDomainRecord {
 ```typescript
 // BIAN SD-60: Customer Credit Rating — HRPC risk classification state per customer account
 
-export const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRating';
+export const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
 
 export type HrpcCategory =
   | 'pep'
@@ -409,7 +450,7 @@ export interface CustomerCreditRatingStateControlRecord {
   customerCreditRatingInstanceReference: string;             // UUID, primary key
   customerAgreementReference: string;                        // FK to customerAgreement (by account ref, not UUID)
   customerCreditRatingClassificationFlags: CustomerCreditRatingClassificationFlag[];
-  bianServiceDomain: 'CustomerCreditRating';
+  bianServiceDomain: 'Customer Credit Rating';
   bianControlRecordType: 'CustomerCreditRatingState';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
@@ -417,144 +458,93 @@ export interface CustomerCreditRatingStateControlRecord {
 }
 ```
 
-**Collection:** `customerCreditRating` — plaintext, no QE. Contains compliance classification metadata only; no PII, no CHD.
+**Collection:** `customerCreditRatingState` — plaintext, no QE. Contains compliance classification metadata only; no PII, no CHD.
 **Seed file:** `backend/data/customerCreditRatings.json` — 5 pre-seeded HRPC profiles covering accounts ACC-003, ACC-007, ACC-012, ACC-019, ACC-025.
 **API:** `GET /api/v1/fraud/hrpc/check?accountRef=<ref>` — see §6.6.
-**Link key:** `customerAgreementReference` (a QE:equality field in `customerAgreement`) is used as the join key. The API looks up the fraud case's `linkedCustomerAgreementReference`, resolves the account reference, then queries this collection. This avoids a cross-QE-collection `$lookup` (per ADR-001).
+**Link key:** `customerAgreementReference` (a QE:equality field in `customerAgreementProcedure`) is used as the join key. The API looks up the fraud case's `customerAgreementInstanceReference`, resolves the account reference, then queries this collection. This avoids a cross-QE-collection `$lookup` (per ADR-001).
 
 ---
 
 ## 2. QE encryptedFieldsMaps
 
-All maps live in `backend/src/encryption/encryptedFieldsMaps.ts`. The `keyId` values are BSON UUIDs resolved at runtime from the provisioned DEKs.
+All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `keyId` values are per-field BSON Binary UUIDs resolved at runtime from the provisioned DEKs via `provisionDEKs.ts`.
+
+**DEK naming (as of v3 BIAN compliance update):**
+
+| DEK key | Atlas key vault name | Protects |
+|---|---|---|
+| `deks.partyEmail` | `DEK-party-email` | `party.partyEmailAddress` |
+| `deks.partyPhone` | `DEK-party-phone` | `party.partyMobilePhoneNumber` |
+| `deks.authEmail` | `DEK-auth-email` | `customerAuthenticationAssessment.customerAuthenticationEmailAddress` |
+| `deks.customerAccountRef` | `DEK-customer-account-ref` | `customerAgreementProcedure.customerAgreementReference` |
+| `deks.txAccountRef` | `DEK-tx-account-ref` | `cardTransactionLog.cardTransactionAccountReference` |
+| `deks.customerAddress` | `DEK-customer-address` | `customerAgreementProcedure.customerAgreementResidentialAddress` (QE:none, inline v2) |
+| `deks.customerGovId` | `DEK-customer-gov-id` | `customerAgreementProcedure.governmentIdentificationReference` (QE:none, inline v2) |
+| `deks.customerRiskNotes` | `DEK-customer-risk-notes` | `customerAgreementProcedure.customerAgreementRiskNotes` (QE:none, inline v2) |
+| `deks.txRawPayload` | `DEK-tx-raw-payload` | `cardTransactionLog.rawGatewayPayload` (QE:none, inline v2) |
+| `deks.txProcessorMeta` | `DEK-tx-processor-meta` | `cardTransactionLog.processorTransactionMetadata` (QE:none, inline v2) |
+| `deks.cardExpiry` | `DEK-card-expiry` | `paymentCardManagement.paymentCardExpirationDate` |
 
 ```typescript
-// backend/src/encryption/encryptedFieldsMaps.ts
+// backend/src/vendors/encryption/encryptedFieldsMaps.ts
+// v2: tier parameter selects which QE:none fields are included in the map.
+// Level 1 map omits QE:none fields → driver returns Binary for those fields.
+// Level 2 map includes all fields → driver auto-decrypts everything.
 
-import { Binary } from 'mongodb';
+export type QETier = 'level1' | 'level2';
 
-export function buildEncryptedFieldsMaps(
-  dekLookupId: Binary,       // DEK-lookup UUID
-  dekSensitiveId: Binary     // DEK-sensitive UUID
-) {
+export function buildEncryptedFieldsMaps(deks: DEKs, tier: QETier = 'level2') {
+  const includeSensitive = tier === 'level2';
   return {
 
-    // ── cardTransaction ──────────────────────────────────────────
-    // NOTE: paymentCardReference is NOT in QE. A payment token is a card
-    // surrogate, not CHD under PCI DSS v4.0. It is stored plaintext and
-    // searched via a standard MongoDB index.
-    cardTransaction: {
+    // ── party (SD-13) ─────────────────────────────────────────────
+    party: {
       fields: [
-        {
-          keyId: dekLookupId,
-          path: 'cardTransactionAccountReference',
-          bsonType: 'string',
-          queries: { queryType: 'equality' },
-        },
-        // v2: add cardTransactionAmount.amount with queryType: 'range'
-        // {
-        //   keyId: dekLookupId,
-        //   path: 'cardTransactionAmount.amount',
-        //   bsonType: 'double',
-        //   queries: { queryType: 'range', min: 0, max: 999999, precision: 2 },
-        // },
+        { keyId: deks.partyEmail,  path: 'partyEmailAddress',      bsonType: 'string', queries: { queryType: 'equality' } },
+        { keyId: deks.partyPhone,  path: 'partyMobilePhoneNumber', bsonType: 'string', queries: { queryType: 'equality' } },
       ],
     },
 
-    // ── cardTransactionSensitive ─────────────────────────────────
-    cardTransactionSensitive: {
+    // ── customerAuthenticationAssessment (SD-91) ──────────────────
+    customerAuthenticationAssessment: {
       fields: [
-        {
-          keyId: dekSensitiveId,
-          path: 'rawGatewayPayload',
-          bsonType: 'object',
-          // no queries = QE:none: encrypted but not searchable
-        },
-        {
-          keyId: dekSensitiveId,
-          path: 'processorTransactionMetadata',
-          bsonType: 'object',
-        },
+        { keyId: deks.authEmail, path: 'customerAuthenticationEmailAddress', bsonType: 'string', queries: { queryType: 'equality' } },
       ],
     },
 
-    // ── customerAgreement ────────────────────────────────────────
-    customerAgreement: {
+    // ── customerAgreementProcedure (SD-53) ────────────────────────
+    // QE:equality always included; QE:none sensitive fields only in Level 2 map
+    customerAgreementProcedure: {
       fields: [
-        {
-          keyId: dekLookupId,
-          path: 'customerEmailAddress',
-          bsonType: 'string',
-          queries: { queryType: 'equality' },
-        },
-        {
-          keyId: dekLookupId,
-          path: 'customerMobilePhoneNumber',
-          bsonType: 'string',
-          queries: { queryType: 'equality' },
-        },
-        {
-          keyId: dekLookupId,
-          path: 'customerAgreementReference',
-          bsonType: 'string',
-          queries: { queryType: 'equality' },
-        },
-        // v2: customerName
-        // { keyId: dekLookupId, path: 'customerName', bsonType: 'string',
-        //   queries: { queryType: 'equality' } },
+        { keyId: deks.customerAccountRef, path: 'customerAgreementReference', bsonType: 'string', queries: { queryType: 'equality' } },
+        ...(includeSensitive ? [
+          { keyId: deks.customerAddress,   path: 'customerAgreementResidentialAddress', bsonType: 'object' },
+          { keyId: deks.customerGovId,     path: 'governmentIdentificationReference',   bsonType: 'string' },
+          { keyId: deks.customerRiskNotes, path: 'customerAgreementRiskNotes',          bsonType: 'string' },
+        ] : []),
       ],
     },
 
-    // ── customerAgreementSensitive ───────────────────────────────
-    customerAgreementSensitive: {
+    // ── cardTransactionLog (SD-254) ───────────────────────────────
+    // QE:equality always included; QE:none gateway fields only in Level 2 map
+    cardTransactionLog: {
       fields: [
-        {
-          keyId: dekSensitiveId,
-          path: 'customerAgreementResidentialAddress',
-          bsonType: 'object',
-          // QE:none: no queries
-        },
-        {
-          keyId: dekSensitiveId,
-          path: 'governmentIdentificationReference',
-          bsonType: 'string',
-        },
-        {
-          keyId: dekSensitiveId,
-          path: 'customerAgreementRiskNotes',
-          bsonType: 'string',
-        },
+        { keyId: deks.txAccountRef, path: 'cardTransactionAccountReference', bsonType: 'string', queries: { queryType: 'equality' } },
+        ...(includeSensitive ? [
+          { keyId: deks.txRawPayload,    path: 'rawGatewayPayload',            bsonType: 'object' },
+          { keyId: deks.txProcessorMeta, path: 'processorTransactionMetadata', bsonType: 'object' },
+        ] : []),
       ],
     },
 
-    // ── paymentCard ──────────────────────────────────────────────
-    // NOTE: paymentCardReference is NOT in QE (see cardTransaction note).
-    // paymentCardExpirationDate IS protected: expiry date is CHD when co-located with
-    // a card reference, and here it travels alongside the token.
-    paymentCard: {
+    // ── paymentCardManagement (SD-88) ─────────────────────────────
+    paymentCardManagement: {
       fields: [
-        {
-          keyId: dekSensitiveId,
-          path: 'paymentCardExpirationDate',
-          bsonType: 'string',
-          // QE:none — non-searchable, retrieval only
-        },
+        { keyId: deks.cardExpiry, path: 'paymentCardExpirationDate', bsonType: 'string' },
       ],
     },
 
-    // ── partyAuthentication ─────────────────────────────────────
-    partyAuthentication: {
-      fields: [
-        {
-          keyId: dekLookupId,
-          path: 'partyAuthenticationUserEmailAddress',
-          bsonType: 'string',
-          queries: { queryType: 'equality' },   // login lookup by email
-        },
-      ],
-    },
-
-    // fraudDiagnosisCase: no QE, standard collection
+    // fraudDiagnosisCase: no QE (operational metadata only, no PII or CHD)
   };
 }
 ```
@@ -652,58 +642,66 @@ export async function provisionDataEncryptionKeys(client: MongoClient) {
 
 ## 4. MongoDB Client Initialization
 
-```typescript
-// backend/src/encryption/client.ts
+> **v2**: Two MongoClient pools replace the single client. `getDbForRole(role, hasToken)` in `roleClients.ts` selects the correct pool.
 
-import { MongoClient } from 'mongodb';
-import { buildKmsProviders } from './kms';
-import { buildEncryptedFieldsMaps } from './encryptedFieldsMaps';
+```typescript
+// backend/src/vendors/encryption/roleClients.ts (v2)
+
+import { MongoClient, Db } from 'mongodb';
+import { buildEncryptedFieldsMaps, QETier } from './encryptedFieldsMaps';
 import { provisionDataEncryptionKeys } from './keyVault';
+import { buildKmsProviders } from './kms';
+import { canReadSensitive } from '../middleware/rbac';
+import type { UserRole } from '../../shared/models/identity.model';
 
 const KEY_VAULT_NAMESPACE = 'encryption.__keyVault';
+let _l1Client: MongoClient | null = null;
+let _l2Client: MongoClient | null = null;
 
-let _client: MongoClient | null = null;
+async function buildQEClient(uri: string, tier: QETier): Promise<MongoClient> {
+  // Resolve DEKs with a plain (non-QE) connection
+  const plain = new MongoClient(process.env.MONGODB_URI!);
+  await plain.connect();
+  const deks = await provisionDataEncryptionKeys(plain);
+  await plain.close();
 
-export async function getMongoClient(): Promise<MongoClient> {
-  if (_client) return _client;
+  const maps = buildEncryptedFieldsMaps(deks, tier);
+  const db = process.env.MONGODB_DB_NAME!;
 
-  // Step 1: plain client to provision DEKs
-  const plainClient = new MongoClient(process.env.MONGODB_URI!);
-  await plainClient.connect();
-
-  const { dekLookupId, dekSensitiveId } = await provisionDataEncryptionKeys(plainClient);
-  await plainClient.close();
-
-  // Step 2: QE-enabled client
-  const encryptedFieldsMap = buildEncryptedFieldsMaps(dekLookupId, dekSensitiveId);
-
-  _client = new MongoClient(process.env.MONGODB_URI!, {
+  const client = new MongoClient(uri, {
     autoEncryption: {
       keyVaultNamespace: KEY_VAULT_NAMESPACE,
       kmsProviders: buildKmsProviders(),
       encryptedFieldsMap: {
-        [`${process.env.MONGODB_DB_NAME}.cardTransaction`]:
-          encryptedFieldsMap.cardTransaction,
-        [`${process.env.MONGODB_DB_NAME}.cardTransactionSensitive`]:
-          encryptedFieldsMap.cardTransactionSensitive,
-        [`${process.env.MONGODB_DB_NAME}.customerAgreement`]:
-          encryptedFieldsMap.customerAgreement,
-        [`${process.env.MONGODB_DB_NAME}.customerAgreementSensitive`]:
-          encryptedFieldsMap.customerAgreementSensitive,
-        [`${process.env.MONGODB_DB_NAME}.paymentCard`]:
-          encryptedFieldsMap.paymentCard,
-        [`${process.env.MONGODB_DB_NAME}.partyAuthentication`]:
-          encryptedFieldsMap.partyAuthentication,
+        [`${db}.party`]:                            maps.party,
+        [`${db}.cardTransactionLog`]:               maps.cardTransactionLog,
+        [`${db}.customerAgreementProcedure`]:       maps.customerAgreementProcedure,
+        [`${db}.paymentCardManagement`]:            maps.paymentCardManagement,
+        [`${db}.customerAuthenticationAssessment`]: maps.customerAuthenticationAssessment,
       },
-      // crypt_shared is auto-discovered from node_modules/mongodb-client-encryption
-      extraOptions: {
-        cryptSharedLibRequired: true,
-      },
+      extraOptions: { cryptSharedLibRequired: true },
     },
   });
+  await client.connect();
+  return client;
+}
 
-  await _client.connect();
-  return _client;
+export async function getL1QEClient(): Promise<MongoClient> {
+  if (_l1Client) return _l1Client;
+  _l1Client = await buildQEClient(process.env.MONGODB_URI_LEVEL1 ?? process.env.MONGODB_URI!, 'level1');
+  return _l1Client;
+}
+
+export async function getL2QEClient(): Promise<MongoClient> {
+  if (_l2Client) return _l2Client;
+  _l2Client = await buildQEClient(process.env.MONGODB_URI_LEVEL2 ?? process.env.MONGODB_URI!, 'level2');
+  return _l2Client;
+}
+
+// Selects L1 or L2 pool based on role + escalation token validity
+export async function getDbForRole(role: UserRole, hasValidToken = false): Promise<Db> {
+  const client = canReadSensitive(role, hasValidToken) ? await getL2QEClient() : await getL1QEClient();
+  return client.db(process.env.MONGODB_DB_NAME!);
 }
 ```
 
@@ -719,60 +717,92 @@ import { MongoClient, ClientEncryption } from 'mongodb';
 async function createIndexes(client: MongoClient, dbName: string) {
   const db = client.db(dbName);
 
-  await db.collection('cardTransaction').createIndexes([
-    { key: { cardTransactionInstanceReference: 1 }, unique: true },
-    { key: { paymentCardReference: 1 } },             // standard index: token is not QE
-    { key: { cardTransactionDateTime: -1 } },
-    { key: { cardTransactionStatus: 1 } },
+  // ── party (SD-13) ─────────────────────────────────────────────────
+  await db.collection('party').createIndexes([
+    { key: { partyInstanceReference: 1 }, unique: true },
+    // Note: partyEmailAddress and partyMobilePhoneNumber are QE:equality —
+    // QE manages its own __safeContent__ index; do NOT add manual indexes on these fields
   ]);
 
-  await db.collection('cardTransactionSensitive').createIndexes([
-    { key: { cardTransactionInstanceReference: 1 }, unique: true },
+  // ── customerAuthenticationAssessment (SD-91) ──────────────────────
+  await db.collection('customerAuthenticationAssessment').createIndexes([
+    { key: { customerAuthenticationInstanceReference: 1 }, unique: true },
+    { key: { partyInstanceReference: 1 } },
+    { key: { customerAuthenticationUserRole: 1 } },
   ]);
 
-  await db.collection('customerAgreement').createIndexes([
-    { key: { customerAgreementInstanceReference: 1 }, unique: true },
-    { key: { customerAgreementStatus: 1 } },
-  ]);
-
-  await db.collection('customerAgreementSensitive').createIndexes([
-    { key: { customerAgreementInstanceReference: 1 }, unique: true },
-  ]);
-
-  await db.collection('paymentCard').createIndexes([
-    { key: { paymentCardInstanceReference: 1 }, unique: true },
-    { key: { paymentCardReference: 1 } },             // standard index: token is not QE
-    { key: { customerAgreementInstanceReference: 1 } },
-  ]);
-
-  await db.collection('fraudDiagnosisCase').createIndexes([
-    { key: { fraudDiagnosisInstanceReference: 1 }, unique: true },
-    { key: { linkedCardTransactionReference: 1 } },
-    { key: { fraudDiagnosisCaseStatus: 1, fraudDiagnosisCaseSeverity: -1 } },
-  ]);
-
-  // fraudDiagnosisCaseEvents: supports ordered audit retrieval per case
-  // and filtered queries by actionType (e.g. fetch only escalation events)
-  await db.collection('fraudDiagnosisCaseEvents').createIndexes([
-    { key: { fraudDiagnosisInstanceReference: 1, actionDateTime: -1 } },
-    { key: { fraudDiagnosisInstanceReference: 1, actionType: 1 } },
-  ]);
-
-  await db.collection('partyAuthentication').createIndexes([
+  // ── partyAuthenticationAssessment (SD-16) ─────────────────────────
+  await db.collection('partyAuthenticationAssessment').createIndexes([
     { key: { partyAuthenticationInstanceReference: 1 }, unique: true },
-    { key: { partyAuthenticationUserRole: 1 } },
+    { key: { partyInstanceReference: 1 } },
   ]);
 
+  // ── authenticationDomain (SD-16 support) ──────────────────────────
   await db.collection('authenticationDomain').createIndexes([
     { key: { partyAuthenticationDomainInstanceReference: 1 }, unique: true },
     { key: { partyAuthenticationDomainName: 1 }, unique: true },
     { key: { partyAuthenticationDomainEnabled: 1 } },
   ]);
 
-  // customerCreditRating (SD-60): lookup by account reference during investigation
-  await db.collection('customerCreditRating').createIndexes([
+  // ── customerAgreementProcedure (SD-53) ────────────────────────────
+  await db.collection('customerAgreementProcedure').createIndexes([
+    { key: { customerAgreementInstanceReference: 1 }, unique: true },
+    { key: { partyInstanceReference: 1 } },               // two-step lookup join key
+    { key: { customerAgreementStatus: 1 } },
+  ]);
+
+  // Note: customerAgreementProcedureSensitive collection removed in v2 (fields inline)
+
+  // ── paymentCardManagement (SD-88) ─────────────────────────────────
+  await db.collection('paymentCardManagement').createIndexes([
+    { key: { paymentCardInstanceReference: 1 }, unique: true },
+    { key: { paymentCardReference: 1 } },                 // standard index: token is not QE
+    { key: { customerAgreementInstanceReference: 1 } },
+  ]);
+
+  // ── cardTransactionLog (SD-254) ───────────────────────────────────
+  await db.collection('cardTransactionLog').createIndexes([
+    { key: { cardTransactionInstanceReference: 1 }, unique: true },
+    { key: { paymentCardReference: 1 } },                 // standard index: token is not QE
+    { key: { cardTransactionDateTime: -1 } },
+    { key: { cardTransactionStatus: 1 } },
+  ]);
+
+  // Note: cardTransactionLogSensitive collection removed in v2 (fields inline)
+
+  // ── fraudDiagnosisCase (SD-83) ────────────────────────────────────
+  await db.collection('fraudDiagnosisCase').createIndexes([
+    { key: { fraudDiagnosisInstanceReference: 1 }, unique: true },
+    { key: { cardTransactionInstanceReference: 1 } },
+    { key: { customerAgreementInstanceReference: 1 } },
+    { key: { fraudDiagnosisCaseStatus: 1, fraudDiagnosisCaseSeverity: -1 } },
+  ]);
+
+  // fraudDiagnosisCaseEvents: ordered audit retrieval per case
+  await db.collection('fraudDiagnosisCaseEvents').createIndexes([
+    { key: { fraudDiagnosisInstanceReference: 1, actionDateTime: -1 } },
+    { key: { fraudDiagnosisInstanceReference: 1, actionType: 1 } },
+  ]);
+
+  // ── customerCreditRatingState (SD-60) ─────────────────────────────
+  await db.collection('customerCreditRatingState').createIndexes([
     { key: { customerCreditRatingInstanceReference: 1 }, unique: true },
-    { key: { customerAgreementReference: 1 } },            // primary lookup key for HRPC check
+    { key: { customerAgreementReference: 1 } },           // HRPC lookup by account reference
+  ]);
+
+  // ── consentAgreement (SD-36) — Open Banking v3 stub ──────────────
+  await db.collection('consentAgreement').createIndexes([
+    { key: { consentAgreementInstanceReference: 1 }, unique: true },
+    { key: { partyInstanceReference: 1 } },
+    { key: { consentRecipientIdentifier: 1 } },
+    { key: { consentStatus: 1, consentExpiryDateTime: 1 } },
+  ]);
+
+  // ── consentAccessLog (SD-36) — Open Banking audit trail ──────────
+  await db.collection('consentAccessLog').createIndexes([
+    { key: { consentAccessLogInstanceReference: 1 }, unique: true },
+    { key: { consentAgreementInstanceReference: 1, accessDateTime: -1 } },
+    { key: { accessDateTime: -1 } },
   ]);
 }
 ```
@@ -1084,7 +1114,7 @@ Returns all events across all cases, sorted descending by `actionDateTime`. Join
 
 #### `GET /fraud/hrpc/check?accountRef=<ref>`
 
-Checks whether a customer account appears in any HRPC (High-Risk Person and Counterparty) category. Queries `customerCreditRating` collection by `customerAgreementReference`.
+Checks whether a customer account appears in any HRPC (High-Risk Person and Counterparty) category. Queries `customerCreditRatingState` (SD-60) collection by `customerAgreementReference`.
 
 **Query params:** `accountRef` (required) — the customer's account reference (e.g. `ACC-003`).
 
@@ -1136,7 +1166,7 @@ All auth endpoints are public (no JWT required).
 
 #### `POST /auth/login`
 
-Validates credentials against `partyAuthentication` (QE equality search on email). Returns a signed JWT on success.
+Validates credentials against `customerAuthenticationAssessment` (SD-91, QE equality search on `customerAuthenticationEmailAddress`). Returns a signed JWT on success.
 
 **Request body:**
 ```json
@@ -1152,7 +1182,7 @@ Validates credentials against `partyAuthentication` (QE equality search on email
 {
   "token": "<HS256 JWT>",
   "user": {
-    "partyAuthenticationInstanceReference": "uuid-v4",
+    "customerAuthenticationInstanceReference": "uuid-v4",
     "name": "Sarah Chen",
     "email": "sarah.chen@leafybank.demo",
     "role": "level1_analyst"
@@ -1202,7 +1232,7 @@ Returns only enabled authentication domains from the `authenticationDomain` coll
 
 #### `GET /transactions/merchants`
 
-Returns unique `{ name, mcc }` pairs aggregated from the `cardTransaction` collection, sorted alphabetically. Public endpoint — used by the Simulator STEP 1 form to populate the Merchant Name selector.
+Returns unique `{ name, mcc }` pairs aggregated from the `cardTransactionLog` collection, sorted alphabetically. Public endpoint — used by the Simulator STEP 1 form to populate the Merchant Name selector.
 
 **Response 200:**
 ```json
@@ -1224,12 +1254,12 @@ Available only when `NODE_ENV !== 'production'`. Used by the "Encrypted in Atlas
 
 Returns the raw BSON document as stored in Atlas (ciphertext visible, no auto-decryption). Uses a plain MongoClient without `autoEncryption`.
 
-**Path params:** `collection` (e.g., `cardTransaction`), `id` (document `_id` or primary key value)
+**Path params:** `collection` (e.g., `cardTransactionLog`), `id` (document `_id` or primary key value)
 
 **Response 200:**
 ```json
 {
-  "collection": "cardTransaction",
+  "collection": "cardTransactionLog",
   "document": {
     "_id": "...",
     "paymentCardReference": { "$binary": { "base64": "BhKJ9KMsA...", "subType": "06" } },
@@ -1262,64 +1292,44 @@ Returns the raw BSON document as stored in Atlas (ciphertext visible, no auto-de
 ## 7. Environment Variables Reference
 
 ```bash
-# .env.example
+# .env  (see backend/src/vendors/setup/env.example for full reference)
 
-# ── MongoDB Atlas ─────────────────────────────────────────────────
+# ── MongoDB connection ─────────────────────────────────────────────
 MONGODB_URI=mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/?retryWrites=true&w=majority
-MONGODB_DB_NAME=pci_dss_demo
+MONGODB_DB_NAME=pcidb
 
-# ── AWS KMS ───────────────────────────────────────────────────────
-# Required when KMS_PROVIDER=aws (default)
+# v2: role-pool connection strings (fall back to MONGODB_URI if not set)
+MONGODB_URI_LEVEL1=mongodb+srv://<l1-user>:<l1-pass>@<cluster>.mongodb.net/
+MONGODB_URI_LEVEL2=mongodb+srv://<l2-user>:<l2-pass>@<cluster>.mongodb.net/
+
+# ── KMS / Queryable Encryption ────────────────────────────────────
+KMS_PROVIDER=local              # 'local' | 'aws'
+LOCAL_MASTER_KEY=               # 96-byte hex (generated by `npm run setup:key`)
+AWS_KMS_KEY_ARN=
 AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
-AWS_SESSION_TOKEN=              # Optional: for temporary IAM credentials
-AWS_REGION=us-east-1
-AWS_CMK_ARN=arn:aws:kms:us-east-1:<account>:key/<key-id>
+AWS_REGION=
+CRYPT_SHARED_LIB_PATH=          # Path to mongo_crypt_v1 shared library
 
-# ── KMS provider selection ────────────────────────────────────────
-KMS_PROVIDER=aws                # 'aws' | 'local'
-
-# ── Local KMS (offline / docker-compose dev only) ─────────────────
-# Generate with: npm run setup:key  (creates a 96-byte base64 key)
-LOCAL_MASTER_KEY_BASE64=
-
-# ── MongoDB QE Shared Library ─────────────────────────────────────
-# Optional explicit path to mongo_crypt_v1 shared library.
-# If omitted, the backend tries common default paths automatically.
-# If not found anywhere, set this variable after downloading the library:
-#
-#   Download: https://www.mongodb.com/try/download/enterprise
-#   → Select your platform → "Cryptography Library (crypt_shared)"
-#
-# Windows default after install:
-#   MONGODB_CRYPT_SHARED_LIB_PATH=C:/Program Files/MongoDB/Shared Library/bin/mongo_crypt_v1.dll
-# macOS:
-#   MONGODB_CRYPT_SHARED_LIB_PATH=/usr/local/lib/mongo_crypt_v1.dylib
-# Linux:
-#   MONGODB_CRYPT_SHARED_LIB_PATH=/usr/lib/mongo_crypt_v1.so
-MONGODB_CRYPT_SHARED_LIB_PATH=
+# ── Atlas Admin API (v2 setup automation) ─────────────────────────
+# Leave blank to skip; roles must be created manually in Atlas UI instead.
+ATLAS_PUBLIC_KEY=
+ATLAS_PRIVATE_KEY=
+ATLAS_PROJECT_ID=
+ATLAS_DB_USER_LEVEL1=pci_l1
+ATLAS_DB_USER_LEVEL1_PASSWORD=
+ATLAS_DB_USER_LEVEL2=pci_l2
+ATLAS_DB_USER_LEVEL2_PASSWORD=
 
 # ── Backend (Fastify) ─────────────────────────────────────────────
-API_PORT=3001
-API_HOST=0.0.0.0
-CORS_ORIGIN=http://localhost:3000
+PORT=3001
+NODE_ENV=development
+JWT_SECRET=                     # 32-char random string
 
-# ── Authentication (Application Mode) ────────────────────────────
-# Generate with: node -e "require('crypto').randomBytes(32).toString('hex')"
-JWT_SECRET=
-JWT_EXPIRES_IN=24h
-AUTH_DOMAIN=local               # 'local' | 'msentra' (msentra: v2)
-
-# ── Frontend (Next.js) ────────────────────────────────────────────
-NEXT_PUBLIC_API_URL=http://localhost:3001
-
-# ── Demo configuration ────────────────────────────────────────────
-FRAUD_AMOUNT_THRESHOLD=500      # Transactions above this create a fraud case
-RISK_MCC_LIST=5812,6011,7995    # MCC codes that auto-trigger fraud diagnosis
-
-# ── AI Agent (v5) ─────────────────────────────────────────────────
-AGENT_ENABLED=false             # 'true' | 'false': set true to enable v5 agent
-MAGENTA_API_KEY=                # MongoDB Agentic Platform (Magenta) API key
+# ── Fraud detection ────────────────────────────────────────────────
+FRAUD_AMOUNT_THRESHOLD=500
+RISK_MCC_LIST=5812,6011,7995
+ESCALATION_TOKEN_TTL_SECONDS=3600
 ```
 
 ---
@@ -1330,23 +1340,23 @@ Seed files live in `backend/data/`. The seed script (`backend/bin/seed.ts`) read
 
 ### Seed volumes
 
-| File | Collection | Documents | Generator |
+| File | Collection (BIAN SD) | Documents | Generator |
 |---|---|---|---|
-| `backend/data/users.json` | `partyAuthentication` | 5 | `bin/generate.ts` |
-| `backend/data/authDomains.json` | `authenticationDomain` | 3 | manual |
-| `backend/data/customerAgreements.json` | `customerAgreement` | 50 | `bin/generate.ts` |
-| `backend/data/customerAgreementsSensitive.json` | `customerAgreementSensitive` | 50 | `bin/generate.ts` |
-| `backend/data/paymentCards.json` | `paymentCard` | 50 | `bin/generate.ts` |
-| `backend/data/cardTransactions.json` | `cardTransaction` | 200 | `bin/generate.ts` |
-| `backend/data/cardTransactionsSensitive.json` | `cardTransactionSensitive` | 200 | `bin/generate.ts` |
-| `backend/data/fraudCases.json` | `fraudDiagnosisCase` | 20 | `bin/generate.ts` |
-| `backend/data/customerCreditRatings.json` | `customerCreditRating` | 5 | manual (HRPC profiles) |
+| `backend/data/parties.json` | `party` (SD-13) | 53 (50 customers + 3 employees) | `bin/generate.ts` |
+| `backend/data/customerAuthentications.json` | `customerAuthenticationAssessment` (SD-91) | 5 | `bin/generate.ts` |
+| `backend/data/authDomains.json` | `authenticationDomain` (SD-16) | 3 | manual |
+| `backend/data/customerAgreements.json` | `customerAgreementProcedure` (SD-53) | 50 | `bin/generate.ts` — includes inline QE:none fields (v2) |
+| `backend/data/paymentCards.json` | `paymentCardManagement` (SD-88) | 50 | `bin/generate.ts` |
+| `backend/data/cardTransactions.json` | `cardTransactionLog` (SD-254) | 200 | `bin/generate.ts` — includes inline QE:none fields (v2) |
+| `backend/data/fraudCases.json` | `fraudDiagnosisCase` (SD-83) | 20 | `bin/generate.ts` |
+| `backend/data/fraudCaseEvents.json` | `fraudDiagnosisCaseEvents` (SD-83) | 20 | `bin/generate.ts` |
+| `backend/data/customerCreditRatings.json` | `customerCreditRatingState` (SD-60) | 5 | manual (HRPC profiles) |
 
 **Regenerating synthetic data:** Run `npm run setup:data --prefix backend` (executes `bin/generate.ts`). This overwrites all files marked `bin/generate.ts` above. Manual files (`authDomains.json`, `customerCreditRatings.json`) are never overwritten by the generator.
 
-### Demo users (`data/users.json`)
+### Demo users (`data/customerAuthentications.json`)
 
-Passwords are stored as bcrypt hashes (12 rounds). Plaintext passwords are in `.env.example` comments for demo convenience only.
+Credentials are stored in `customerAuthenticationAssessment` (SD-91). Passwords stored as bcrypt hashes (12 rounds). Email is a QE:equality field. Plaintext passwords are in `.env.example` comments for demo convenience only.
 
 | Email | Role | Display Name |
 |---|---|---|
@@ -1355,6 +1365,8 @@ Passwords are stored as bcrypt hashes (12 rounds). Plaintext passwords are in `.
 | `sarah.chen@leafybank.demo` | `level1_analyst` | Sarah Chen |
 | `michael.obi@leafybank.demo` | `level2_investigator` | Michael Obi |
 | `admin@leafybank.demo` | `security_auditor` | Admin |
+
+Each of these 5 users has a corresponding `party` document in `parties.json` linked via `partyInstanceReference`.
 
 ### Synthetic data rules
 
@@ -1368,17 +1380,20 @@ Passwords are stored as bcrypt hashes (12 rounds). Plaintext passwords are in `.
 
 ### Upsert key per collection
 
-| Collection | Upsert filter key |
+| Collection (BIAN name) | Upsert filter key |
 |---|---|
-| `partyAuthentication` | `partyAuthenticationInstanceReference` |
+| `party` | `partyInstanceReference` |
+| `customerAuthenticationAssessment` | `customerAuthenticationInstanceReference` |
+| `partyAuthenticationAssessment` | `partyAuthenticationInstanceReference` |
 | `authenticationDomain` | `partyAuthenticationDomainInstanceReference` |
-| `customerAgreement` | `customerAgreementInstanceReference` |
-| `customerAgreementSensitive` | `customerAgreementInstanceReference` |
-| `paymentCard` | `paymentCardInstanceReference` |
-| `cardTransaction` | `cardTransactionInstanceReference` |
-| `cardTransactionSensitive` | `cardTransactionInstanceReference` |
+| `customerAgreementProcedure` | `customerAgreementInstanceReference` |
+| `paymentCardManagement` | `paymentCardInstanceReference` |
+| `cardTransactionLog` | `cardTransactionInstanceReference` |
 | `fraudDiagnosisCase` | `fraudDiagnosisInstanceReference` |
-| `customerCreditRating` | `customerCreditRatingInstanceReference` |
+| `fraudDiagnosisCaseEvents` | `fraudDiagnosisInstanceReference` + `actionDateTime` |
+| `customerCreditRatingState` | `customerCreditRatingInstanceReference` |
+| `consentAgreement` *(v3 stub)* | `consentAgreementInstanceReference` |
+| `consentAccessLog` *(v3 stub)* | `consentAccessLogInstanceReference` |
 
 ---
 
@@ -1394,16 +1409,15 @@ backend/
 │   └── generate.ts                 # synthetic data generator → writes backend/data/*.json
 │
 ├── data/                           # JSON seed files (consumed by bin/seed.ts only)
-│   ├── users.json                  # generated by bin/generate.ts
+│   ├── parties.json                # generated → party (SD-13): 53 party records
+│   ├── customerAuthentications.json # generated → customerAuthenticationAssessment (SD-91): 5 users
 │   ├── authDomains.json            # manual: local + msentra + bigid domains
-│   ├── customerAgreements.json     # generated
-│   ├── customerAgreementsSensitive.json  # generated
-│   ├── paymentCards.json           # generated
-│   ├── cardTransactions.json       # generated
-│   ├── cardTransactionsSensitive.json    # generated
-│   ├── fraudCases.json             # generated
-│   ├── fraudCaseEvents.json        # generated (initial case_opened events)
-│   ├── customerCreditRatings.json  # manual: 5 HRPC profiles (BIAN SD-60)
+│   ├── customerAgreements.json     # generated → customerAgreementProcedure (SD-53) [inline QE:none v2]
+│   ├── paymentCards.json           # generated → paymentCardManagement (SD-88)
+│   ├── cardTransactions.json       # generated → cardTransactionLog (SD-254) [inline QE:none v2]
+│   ├── fraudCases.json             # generated → fraudDiagnosisCase (SD-83)
+│   ├── fraudCaseEvents.json        # generated → fraudDiagnosisCaseEvents (SD-83)
+│   ├── customerCreditRatings.json  # manual: 5 HRPC profiles → customerCreditRatingState (SD-60)
 │   └── merchants.json              # [v4] seed data for merchantAgreement collection
 │
 └── src/

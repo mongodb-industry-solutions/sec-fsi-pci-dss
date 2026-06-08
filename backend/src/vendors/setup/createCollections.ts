@@ -19,13 +19,21 @@ export async function createCollections(
     kmsProviders: buildKmsProviders(),
   });
 
+  // v2: *Sensitive collections removed. Sensitive fields (QE:none, DEK-sensitive tier)
+  // are now co-located in the main collection. Field-level access is enforced by the
+  // role-aware QE client pool (roleClients.ts) — Level 1 map omits sensitive fields so
+  // they are returned as Binary ciphertext; Level 2 map includes them for auto-decryption.
   const qeCollections = [
-    { name: 'cardTransaction',            map: maps.cardTransaction },
-    { name: 'cardTransactionSensitive',   map: maps.cardTransactionSensitive },
-    { name: 'customerAgreement',          map: maps.customerAgreement },
-    { name: 'customerAgreementSensitive', map: maps.customerAgreementSensitive },
-    { name: 'paymentCard',                map: maps.paymentCard },
-    { name: 'partyAuthentication',        map: maps.partyAuthentication },
+    // SD-13: Party Data Management  -  canonical PII store
+    { name: 'party',                            map: maps.party },
+    // SD-254: Card Transaction Log (includes sensitive gateway fields in unified doc)
+    { name: 'cardTransactionLog',               map: maps.cardTransactionLog },
+    // SD-53: Customer Agreement Procedure (includes sensitive address/govId in unified doc)
+    { name: 'customerAgreementProcedure',       map: maps.customerAgreementProcedure },
+    // SD-88: Payment Card Management
+    { name: 'paymentCardManagement',            map: maps.paymentCardManagement },
+    // SD-91: Customer Authentication
+    { name: 'customerAuthenticationAssessment', map: maps.customerAuthenticationAssessment },
   ] as const;
 
   const existingList = await db.listCollections().toArray();
@@ -56,7 +64,7 @@ export async function createCollections(
     console.log(`  created: ${name}`);
   }
 
-  // authenticationDomain  -  plaintext collection, no QE (domain config, no CHD)
+  // authenticationDomain  -  plaintext, no QE (domain config, no CHD)
   if (!existingNames.has('authenticationDomain') || reset) {
     if (existingNames.has('authenticationDomain') && reset) {
       await db.collection('authenticationDomain').drop();
@@ -68,7 +76,19 @@ export async function createCollections(
     console.log('  skip:    authenticationDomain (already exists)');
   }
 
-  // fraudDiagnosisCase  -  plaintext collection, no QE
+  // SD-16: Party Authentication Assessment  -  plaintext, identity verification stubs
+  if (!existingNames.has('partyAuthenticationAssessment') || reset) {
+    if (existingNames.has('partyAuthenticationAssessment') && reset) {
+      await db.collection('partyAuthenticationAssessment').drop();
+      console.log('  dropped: partyAuthenticationAssessment');
+    }
+    await db.createCollection('partyAuthenticationAssessment');
+    console.log('  created: partyAuthenticationAssessment');
+  } else {
+    console.log('  skip:    partyAuthenticationAssessment (already exists)');
+  }
+
+  // SD-83: Fraud Diagnosis Case  -  plaintext, no QE
   if (!existingNames.has('fraudDiagnosisCase') || reset) {
     if (existingNames.has('fraudDiagnosisCase') && reset) {
       await db.collection('fraudDiagnosisCase').drop();
@@ -80,7 +100,7 @@ export async function createCollections(
     console.log('  skip:    fraudDiagnosisCase (already exists)');
   }
 
-  // fraudDiagnosisCaseEvents  -  plaintext collection, no QE
+  // SD-83: Fraud Diagnosis Case Events  -  plaintext, append-only audit log
   if (!existingNames.has('fraudDiagnosisCaseEvents') || reset) {
     if (existingNames.has('fraudDiagnosisCaseEvents') && reset) {
       await db.collection('fraudDiagnosisCaseEvents').drop();
@@ -91,15 +111,39 @@ export async function createCollections(
     console.log('  skip:    fraudDiagnosisCaseEvents (already exists)');
   }
 
-  // customerCreditRating  -  BIAN SD-60, plaintext, no QE (classification metadata, no PII or CHD)
-  if (!existingNames.has('customerCreditRating') || reset) {
-    if (existingNames.has('customerCreditRating') && reset) {
-      await db.collection('customerCreditRating').drop();
-      console.log('  dropped: customerCreditRating');
+  // SD-60: Customer Credit Rating State  -  plaintext, classification metadata, no PII
+  if (!existingNames.has('customerCreditRatingState') || reset) {
+    if (existingNames.has('customerCreditRatingState') && reset) {
+      await db.collection('customerCreditRatingState').drop();
+      console.log('  dropped: customerCreditRatingState');
     }
-    await db.createCollection('customerCreditRating');
-    console.log('  created: customerCreditRating');
+    await db.createCollection('customerCreditRatingState');
+    console.log('  created: customerCreditRatingState');
   } else {
-    console.log('  skip:    customerCreditRating (already exists)');
+    console.log('  skip:    customerCreditRatingState (already exists)');
+  }
+
+  // Open Banking: Consent Agreement  -  plaintext, no CHD or PII stored here
+  if (!existingNames.has('consentAgreement') || reset) {
+    if (existingNames.has('consentAgreement') && reset) {
+      await db.collection('consentAgreement').drop();
+      console.log('  dropped: consentAgreement');
+    }
+    await db.createCollection('consentAgreement');
+    console.log('  created: consentAgreement');
+  } else {
+    console.log('  skip:    consentAgreement (already exists)');
+  }
+
+  // Open Banking: Consent Access Log  -  plaintext, append-only TPP access audit
+  if (!existingNames.has('consentAccessLog') || reset) {
+    if (existingNames.has('consentAccessLog') && reset) {
+      await db.collection('consentAccessLog').drop();
+      console.log('  dropped: consentAccessLog');
+    }
+    await db.createCollection('consentAccessLog');
+    console.log('  created: consentAccessLog');
+  } else {
+    console.log('  skip:    consentAccessLog (already exists)');
   }
 }

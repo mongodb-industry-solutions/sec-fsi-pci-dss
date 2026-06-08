@@ -130,7 +130,7 @@ export default function DemoCaseDetailPage() {
     if (!showRaw && !rawDoc && fraudCase) {
       setRawError(null);
       try {
-        const res = await api.system.rawDocument('cardTransaction', fraudCase.linkedCardTransactionReference, token);
+        const res = await api.system.rawDocument('cardTransactionLog', fraudCase.linkedCardTransactionReference, token);
         setRawDoc(res.document);
       } catch (err) {
         setRawError(err instanceof Error ? err.message : 'Failed to fetch');

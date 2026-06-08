@@ -4,6 +4,9 @@ import { API_BASE_URL } from '../../../../lib/constants';
 import { getAdminToken, readSSE, LogEntry, downloadText } from '../../../../lib/adminHelpers';
 import { Download } from 'lucide-react';
 
+const TERMINAL_LOGS_KEY    = 'admin_terminal_logs';
+const TERMINAL_HISTORY_KEY = 'admin_terminal_history';
+
 export default function TerminalPage() {
   const [termInput, setTermInput] = useState('');
   const [termLogs, setTermLogs] = useState<LogEntry[]>([]);
@@ -12,6 +15,34 @@ export default function TerminalPage() {
   const [historyIdx, setHistoryIdx] = useState(-1);
   const termEndRef = useRef<HTMLDivElement>(null);
   const termInputRef = useRef<HTMLInputElement>(null);
+  const [logsLoaded, setLogsLoaded] = useState(false);
+
+  // Restore logs and history from sessionStorage on mount.
+  // All setState calls here are batched by React 18 into one render.
+  useEffect(() => {
+    const savedLogs = sessionStorage.getItem(TERMINAL_LOGS_KEY);
+    if (savedLogs) {
+      try { setTermLogs(JSON.parse(savedLogs)); } catch { /* ignore corrupt data */ }
+    }
+    const savedHistory = sessionStorage.getItem(TERMINAL_HISTORY_KEY);
+    if (savedHistory) {
+      try { setHistory(JSON.parse(savedHistory)); } catch { /* ignore corrupt data */ }
+    }
+    setLogsLoaded(true);
+  }, []);
+
+  // Persist logs after load is complete. Remove the key when empty (e.g. after Clear).
+  useEffect(() => {
+    if (!logsLoaded) return;
+    if (termLogs.length === 0) sessionStorage.removeItem(TERMINAL_LOGS_KEY);
+    else sessionStorage.setItem(TERMINAL_LOGS_KEY, JSON.stringify(termLogs));
+  }, [termLogs, logsLoaded]);
+
+  // Persist command history (keep even when empty — preserves arrow-key history)
+  useEffect(() => {
+    if (!logsLoaded) return;
+    sessionStorage.setItem(TERMINAL_HISTORY_KEY, JSON.stringify(history));
+  }, [history, logsLoaded]);
 
   useEffect(() => {
     termEndRef.current?.scrollIntoView({ behavior: 'smooth' });

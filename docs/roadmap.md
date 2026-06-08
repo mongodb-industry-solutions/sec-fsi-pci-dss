@@ -19,6 +19,25 @@
 
 ---
 
+## BIAN Compliance Status *(achieved 2026-06-08)*
+
+All collection names, type suffixes, and `bianServiceDomain` values were brought into strict BIAN compliance as a pre-v1 alignment pass. This is not a new iteration — it is a baseline correction that all iterations (v1–v5) inherit.
+
+| Compliance decision | Standard | Status |
+|---|---|---|
+| PII separated into SD-13 `party` collection | BIAN SD-13 | ✅ Done |
+| Auth credentials in SD-91 `customerAuthenticationAssessment` | BIAN SD-91 | ✅ Done |
+| Collection names use BIAN Control Record type suffixes | BIAN naming convention | ✅ Done |
+| `bianServiceDomain` values use BIAN catalogue names with spaces | BIAN SD catalogue | ✅ Done |
+| Open Banking consent stubs `consentAgreement` + `consentAccessLog` | SD-36 | ✅ Done (v3 stub) |
+| FK names use `*InstanceReference` suffix | BIAN FK convention | ✅ Done |
+| Expanded lifecycle states (all BIAN-defined states on model types) | BIAN lifecycle | ✅ Done |
+| DEK-per-field naming (11 DEKs) | QE best practice | ✅ Done |
+
+**Impact on NFRs:** email/phone lookup P95 threshold updated from 300 ms to 500 ms due to two-step PII separation pattern (SD-13 query + SD-53 join). See `tmp/wiki/bian-openbanking-tradeoffs.md §1` for full analysis.
+
+---
+
 ## v1: Security Foundation
 
 ### Objective
@@ -64,8 +83,8 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 03.1 | `POST /api/v1/transactions` writes to `cardTransaction` and `cardTransactionSensitive` via QE auto-encryption | QE fields in Atlas are ciphertext; plaintext fields are readable |
-| 03.2 | `POST /api/v1/customer/:customerId/cards` registers a tokenized card in `paymentCard` | Card token stored encrypted; expiry date stored as QE:none |
+| 03.1 | `POST /api/v1/transactions` writes to `cardTransactionLog` via QE auto-encryption (QE:none fields stored inline) | QE equality and QE:none fields in Atlas are ciphertext; plaintext fields are readable |
+| 03.2 | `POST /api/v1/customer/:customerId/cards` registers a tokenized card in `paymentCardManagement` | Card token stored encrypted; expiry date stored as QE:none |
 | 03.3 | `GET /api/v1/transactions/:id` returns transaction by ID | Response includes transaction metadata; sensitive fields excluded from Level 1 response |
 | 03.4 | Auto-create a `fraudDiagnosisCase` when amount > 500 or MCC is in a risk list | Case is created and linked to the transaction on every triggering event |
 | 03.5 | `GET /api/v1/system/health` returns 200 with Atlas connection status | Returns `{ status: "ok", atlas: "connected", kmsProvider, timestamp }` when Atlas is reachable; returns 503 when unreachable |
@@ -85,7 +104,7 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 05A.1 | `POST /api/v1/auth/login` validates credentials against `partyAuthentication` and returns a JWT | Valid credentials return `{ token, user: { name, email, role } }`; invalid credentials return 401 |
+| 05A.1 | `POST /api/v1/auth/login` validates credentials against `customerAuthenticationAssessment` (SD-91) and returns a JWT | Valid credentials return `{ token, user: { name, email, role } }`; invalid credentials return 401 |
 | 05A.2 | `GET /api/v1/auth/users` returns list of demo users (name, email, role) without passwords | Response used by frontend user selector dropdown |
 | 05A.3 | Application Mode login screen shows domain selector (`local`) and username dropdown | Selecting a username auto-fills the password field |
 | 05A.4 | JWT is verified on all protected `/api/v1/*` endpoints | Missing or invalid token returns 401 |
@@ -95,10 +114,10 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 06.1 | `bin/setup.ts` creates all 7 collections via `createEncryptedCollection()` (6 domain + `partyAuthentication`) | All collections exist in Atlas after setup; QE metadata is provisioned |
-| 06.2 | `bin/setup.ts` provisions `DEK-lookup` and `DEK-sensitive` in `encryption.__keyVault` | Key vault contains exactly two DEK documents after setup |
+| 06.1 | `bin/setup.ts` creates all QE collections via `createEncryptedCollection()` (5 QE collections: `party`, `customerAuthenticationAssessment`, `customerAgreementProcedure`, `cardTransactionLog`, `paymentCardManagement`) | All collections exist in Atlas after setup; QE metadata is provisioned |
+| 06.2 | `bin/setup.ts` provisions 11 DEKs in `encryption.__keyVault`: `partyEmail`, `partyPhone`, `authEmail`, `customerAccountRef`, `txAccountRef`, `customerAddress`, `customerGovId`, `customerRiskNotes`, `txRawPayload`, `txProcessorMeta`, `cardExpiry` | Key vault contains exactly 11 DEK documents after setup |
 | 06.3 | `bin/setup.ts` creates all indexes defined in the Technical Specification | Index exists on every field listed in the index strategy |
-| 06.4 | `bin/seed.ts` inserts synthetic BIAN-compliant data into all collections | 5 demo users, 50 customers, 50 sensitive records, 50 cards, 200 transactions, 200 sensitive transactions, 20 fraud cases |
+| 06.4 | `bin/seed.ts` inserts synthetic BIAN-compliant data into all collections | 53 parties, 5 demo users, 50 customers, 50 sensitive records, 50 cards, 200 transactions, 200 sensitive transactions, 20 fraud cases |
 | 06.5 | `bin/seed.ts` is idempotent: safe to re-run without creating duplicates | Running seed twice produces the same number of documents |
 
 ---
@@ -169,8 +188,8 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | 13.1 | API reads role from `X-Demo-Role` request header | Missing header defaults to `level1_analyst` |
-| 13.2 | Level 1 requests never query `customerAgreementSensitive` or `cardTransactionSensitive` | Collections are not touched; no sensitive fields appear in Level 1 responses |
-| 13.3 | Level 2 access to sensitive collections requires a valid escalation token | Request without escalation token returns 403 |
+| 13.2 | Level 1 requests use the L1 QE client, which omits QE:none fields from its `encryptedFieldsMap`; Binary ciphertext fields are stripped from Level 1 API responses | No sensitive fields (address, govId, rawGatewayPayload) appear in Level 1 responses |
+| 13.3 | Level 2 access to QE:none fields requires a valid escalation token to activate the L2 QE client | Request without escalation token returns 403 |
 | 13.4 | Every sensitive field access writes an audit event | `field_accessed` event is appended to the case action log |
 
 #### FR-v2-14: Audit Log API
@@ -228,8 +247,8 @@ External systems such as Leafy Bank or Agentic ThreatSight360 **may** consume th
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | 20.1 | After successful payment, a consent checkbox "Save this card for future payments" appears unchecked by default | Checkbox is visible on the confirmation screen; requires explicit opt-in |
-| 20.2 | Accepting consent records `isPreferredCard: true`, `mandateStatus: 'active'`, and `cardholderConsentTimestamp` in `paymentCard` | All three mandate fields are present in the Atlas document |
-| 20.3 | `customerAgreement.preferredPaymentCardReference` is updated to link to the saved card token | Field equals the `paymentCardReference` of the saved card |
+| 20.2 | Accepting consent records `isPreferredCard: true`, `mandateStatus: 'active'`, and `cardholderConsentTimestamp` in `paymentCardManagement` | All three mandate fields are present in the Atlas document |
+| 20.3 | `customerAgreementProcedure.preferredPaymentCardReference` is updated to link to the saved card token | Field equals the `paymentCardReference` of the saved card |
 | 20.4 | On next payment, "Use saved card ****-1234" option appears | Saved card is retrieved via `preferredPaymentCardReference` from the customer agreement |
 | 20.5 | Selecting a saved card completes checkout without re-entering card details; CVV is never requested | Card transaction is created with `cardTransactionInitiationType: 'merchantInitiated'`; no CVV field in the flow |
 | 20.6 | Mandate can be cancelled: `mandateStatus` updates to `'cancelled'` and the card is no longer offered | Cancelled card does not appear on next payment; `preferredPaymentCardReference` is cleared |
@@ -285,7 +304,7 @@ v4 also finalises the external integration surface introduced in v3: OpenAPI sch
 - [ ] `npm run setup:db` creates `merchantAgreement`, `paymentOrder`, `tokenVault` collections
 - [ ] Atlas Data Explorer confirms `merchantApiKeyHash` is ciphertext (QE:none)
 - [ ] `POST /api/v1/gateway/payments` creates a payment order with status `initiated`
-- [ ] Full authorize flow: create → confirm → authorize creates a linked `cardTransaction` and `fraudDiagnosisCase` (if MCC/amount triggers)
+- [ ] Full authorize flow: create → confirm → authorize creates a linked `cardTransactionLog` entry and `fraudDiagnosisCase` (if MCC/amount triggers)
 - [ ] Idempotency: duplicate `X-Idempotency-Key` returns 409
 - [ ] Merchant profile panel visible in fraud case detail (merchant name, MCC, risk category, amount ratio)
 - [ ] Simulator Mode step 0 shows merchant creating the payment intent
@@ -311,7 +330,7 @@ v4 also finalises the external integration surface introduced in v3: OpenAPI sch
 | P2.1 | `POST /api/v1/merchants` creates a `merchantAgreement` document with all required BIAN fields | Document visible in Atlas; `merchantApiKeyHash` is ciphertext (QE:none) |
 | P2.2 | `GET /api/v1/merchants/:id` returns merchant profile without `merchantApiKeyHash` | Response includes `merchantName`, `merchantCategoryCode`, `merchantRiskCategory`, `merchantTransactionLimitAmount`; hash field absent |
 | P2.3 | `GET /api/v1/merchants` returns paginated merchant list with filters `status` and `mcc` | Pagination metadata present; filter by `merchantCategoryCode=5812` returns only gambling/restaurant merchants |
-| P2.4 | `cardTransaction` documents include `merchantAgreementInstanceReference` FK after v4 seed | FK links transaction to a seeded merchant; existing transactions without FK are valid (optional field, schema version 2) |
+| P2.4 | `cardTransactionLog` documents include `merchantAgreementInstanceReference` FK after v4 seed | FK links transaction to a seeded merchant; existing transactions without FK are valid (optional field, schema version 2) |
 
 #### FR-v4-P3: Payment Order Lifecycle (SD-64 + SD-65)
 
@@ -319,7 +338,7 @@ v4 also finalises the external integration surface introduced in v3: OpenAPI sch
 |---|---|---|
 | P3.1 | `POST /api/v1/gateway/payments` creates a `paymentOrder` with status `initiated`; requires `X-Idempotency-Key` header | Order created; second call with same key returns 409 |
 | P3.2 | `POST /api/v1/gateway/payments/:id/confirm` transitions `initiated → confirmed`; sets `customerAgreementInstanceReference` | Status updated in Atlas; invalid transitions (e.g., confirm a voided order) return 422 |
-| P3.3 | Authorization step creates a `cardTransaction` (SD-254) and links it to the `paymentOrder` | `paymentOrder.linkedCardTransactionReference` populated; `cardTransaction` visible in the investigation dashboard |
+| P3.3 | Authorization step creates a `cardTransactionLog` entry (SD-254) and links it to the `paymentOrder` | `paymentOrder.linkedCardTransactionReference` populated; transaction visible in the investigation dashboard |
 | P3.4 | Authorization triggers fraud evaluation if amount/MCC criteria met | `fraudDiagnosisCase` created and linked; uses `shared/services/fraudTrigger.service.ts` |
 | P3.5 | `POST /api/v1/gateway/payments/:id/capture` transitions `authorized → captured` | Status updated; only valid from `authorized` state |
 | P3.6 | `DELETE /api/v1/gateway/payments/:id` (void) transitions `authorized | confirmed → voided` | Status updated; no `cardTransaction` reversal required in v4 (documented limitation) |
@@ -331,7 +350,7 @@ v4 also finalises the external integration surface introduced in v3: OpenAPI sch
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| P4.1 | `POST /api/v1/gateway/tokens` creates a `tokenVault` record linked to a `customerAgreement` | Record visible in Atlas; `tokenVaultNetworkToken` is ciphertext if populated |
+| P4.1 | `POST /api/v1/gateway/tokens` creates a `tokenVault` record linked to a `customerAgreementProcedure` | Record visible in Atlas; `tokenVaultNetworkToken` is ciphertext if populated |
 | P4.2 | `GET /api/v1/gateway/tokens/:token` returns token metadata without `tokenVaultNetworkToken` | Response includes `tokenVaultStatus`, `tokenVaultCreatedAt`, `tokenVaultLastUsedAt`; network token absent |
 
 #### FR-v4-P5: Frontend — Merchant Context
@@ -371,7 +390,7 @@ As with v3 and v4, external agent adoption (e.g. Agentic ThreatSight360 performi
 
 - [ ] All v1, v2, v3, and v4 DoD criteria still pass
 - [ ] AI agent fires automatically when a `fraudDiagnosisCase` is created
-- [ ] Agent queries `customerAgreement` and `cardTransaction` via existing QE equality endpoints
+- [ ] Agent queries `customerAgreementProcedure` and `cardTransactionLog` via existing QE equality endpoints
 - [ ] Agent produces a structured draft: risk summary, recommended action (`clear` / `escalate` / `investigate`), confidence score 0–100
 - [ ] L1 analyst sees the AI draft inline in the case detail view; can confirm, override, or dismiss
 - [ ] Agent action is logged in `diagnosisActionLog` with `performedByRole: 'ai_agent'`
@@ -386,8 +405,8 @@ As with v3 and v4, external agent adoption (e.g. Agentic ThreatSight360 performi
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | 30.1 | Agent is triggered automatically when a fraud case status transitions to `open` | Agent invocation logged within 2 seconds of case creation |
-| 30.2 | Agent queries `customerAgreement` by `cardTransactionAccountReference` to retrieve customer profile | Agent uses existing QE equality search endpoint: `GET /api/v1/customer?accountRef=<value>` |
-| 30.3 | Agent queries `cardTransaction` for prior transactions by same card token | Agent uses `GET /api/v1/transactions?cardToken=<value>` |
+| 30.2 | Agent queries `customerAgreementProcedure` by `cardTransactionAccountReference` to retrieve customer profile | Agent uses existing QE equality search endpoint: `GET /api/v1/customer?accountRef=<value>` |
+| 30.3 | Agent queries `cardTransactionLog` for prior transactions by same card token | Agent uses `GET /api/v1/transactions?cardToken=<value>` |
 | 30.4 | Agent produces a structured JSON draft: `{ riskSummary, recommendedAction, confidenceScore, supportingEvidence[] }` | All four fields are present in the agent output |
 | 30.5 | Agent action is appended to `diagnosisActionLog` with `performedByRole: 'ai_agent'` | Log entry present in MongoDB document after agent completes |
 

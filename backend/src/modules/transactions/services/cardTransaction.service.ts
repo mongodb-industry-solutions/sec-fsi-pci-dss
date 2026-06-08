@@ -2,12 +2,13 @@ import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
 import {
   CARD_TRANSACTION_COLLECTION,
-  CARD_TRANSACTION_SENSITIVE_COLLECTION,
   CardTransactionLogControlRecord,
-  CardTransactionSensitiveRecord,
 } from '../models/cardTransaction.model';
+import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { createFraudCase } from '../../fraud/services/fraudDiagnosis.service';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
+import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
+import { PAYMENT_CARD_COLLECTION } from '../../customer/models/paymentCard.model';
 
 export interface CreateTransactionInput {
   cardToken: string;
@@ -41,10 +42,17 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
   const txnId = uuidv4();
   const now = new Date();
 
-  const txn: Omit<CardTransactionLogControlRecord, never> = {
+  // v2: sensitive gateway fields (QE:none, DEK-sensitive tier) are written inline.
+  // Use the Level 2 QE client so the driver encrypts them with the correct DEKs.
+  const txWriteDb = await getDbForRole('security_auditor', false);
+
+  const txn: CardTransactionLogControlRecord = {
     cardTransactionInstanceReference: txnId,
     paymentCardReference: input.cardToken,
     cardTransactionAccountReference: input.accountReference,
+    // QE:none fields — encrypted by L2 QE client on write
+    rawGatewayPayload: input.gatewayPayload,
+    processorTransactionMetadata: { processedAt: now.toISOString() },
     cardTransactionAmount: { amount: input.amount, currency: input.currency },
     cardTransactionDateTime: now,
     cardTransactionStatus: 'authorized',
@@ -53,22 +61,14 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
     cardTransactionMerchantCategoryCode: input.cardTransactionMerchantCategoryCode,
     cardTransactionMerchantName: input.cardTransactionMerchantName,
     cardTransactionMaskedPanDisplay: input.cardTransactionMaskedPanDisplay,
-    bianServiceDomain: 'CardTransaction',
+    bianServiceDomain: 'Card Transaction',
     bianControlRecordType: 'CardTransactionLog',
     recordCreatedDateTime: now,
     recordUpdatedDateTime: now,
-    schemaVersion: 1,
+    schemaVersion: 2,
   };
 
-  const sensitive: CardTransactionSensitiveRecord = {
-    cardTransactionInstanceReference: txnId,
-    rawGatewayPayload: input.gatewayPayload,
-    processorTransactionMetadata: { processedAt: now.toISOString() },
-    schemaVersion: 1,
-  };
-
-  await db.collection(CARD_TRANSACTION_COLLECTION).insertOne(txn as object);
-  await db.collection(CARD_TRANSACTION_SENSITIVE_COLLECTION).insertOne(sensitive as object);
+  await txWriteDb.collection(CARD_TRANSACTION_COLLECTION).insertOne(txn as object);
 
   const { create, reasons } = shouldCreateFraudCase(input.amount, input.cardTransactionMerchantCategoryCode);
   let fraudCaseRef: string | undefined;
@@ -100,46 +100,41 @@ export async function getTransactionById(
   role: 'level1_analyst' | 'level2_investigator' | 'security_auditor' | 'customer' = 'level1_analyst',
   escalationToken?: string
 ) {
-  const txn = await db.collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION)
-    .findOne({ cardTransactionInstanceReference: id } as Partial<CardTransactionLogControlRecord>);
+  // v2: use role-aware QE client. L2 auto-decrypts sensitive fields; L1 returns Binary.
+  const { validateToken } = await import('../../../vendors/security/escalationTokens');
+  const hasValidToken = validateToken(escalationToken).valid;
+  const roleDb = await getDbForRole(role, hasValidToken);
 
+  const txn = await roleDb.collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION)
+    .findOne({ cardTransactionInstanceReference: id } as Partial<CardTransactionLogControlRecord>);
   if (!txn) return null;
 
-  const base = {
-    cardTransactionInstanceReference: txn.cardTransactionInstanceReference,
-    cardTransactionAmount:            txn.cardTransactionAmount,
-    cardTransactionDateTime:          txn.cardTransactionDateTime,
-    cardTransactionStatus:            txn.cardTransactionStatus,
-    cardTransactionMerchantName:      txn.cardTransactionMerchantName,
+  // Detect whether rawGatewayPayload was decrypted (plain object) or still Binary
+  const raw = txn.rawGatewayPayload as unknown;
+  const gatewayDecrypted =
+    raw !== undefined && raw !== null &&
+    typeof raw === 'object' &&
+    !('sub_type' in (raw as object) && 'buffer' in (raw as object));
+
+  return {
+    cardTransactionInstanceReference:    txn.cardTransactionInstanceReference,
+    cardTransactionAmount:               txn.cardTransactionAmount,
+    cardTransactionDateTime:             txn.cardTransactionDateTime,
+    cardTransactionStatus:               txn.cardTransactionStatus,
+    cardTransactionMerchantName:         txn.cardTransactionMerchantName,
     cardTransactionMerchantCategoryCode: txn.cardTransactionMerchantCategoryCode,
-    cardTransactionMaskedPanDisplay:  txn.cardTransactionMaskedPanDisplay,
-    cardTransactionChannel:           txn.cardTransactionChannel,
-    cardTransactionInitiationType:    txn.cardTransactionInitiationType,
-    paymentCardReference:             txn.paymentCardReference,
-    // QE:equality  -  decrypted by QE client, available for analyst roles
-    cardTransactionAccountReference:  txn.cardTransactionAccountReference,
+    cardTransactionMaskedPanDisplay:     txn.cardTransactionMaskedPanDisplay,
+    cardTransactionChannel:              txn.cardTransactionChannel,
+    cardTransactionInitiationType:       txn.cardTransactionInitiationType,
+    paymentCardReference:                txn.paymentCardReference,
+    cardTransactionAccountReference:     txn.cardTransactionAccountReference,
+    ...(gatewayDecrypted && {
+      sensitive: {
+        rawGatewayPayload:            txn.rawGatewayPayload,
+        processorTransactionMetadata: txn.processorTransactionMetadata,
+      },
+    }),
   };
-
-  // Include sensitive fields for L2 (with escalation token) and Security Auditor
-  const { canReadSensitive } = await import('../../../vendors/middleware/rbac');
-  const { validateToken }    = await import('../../../vendors/security/escalationTokens');
-
-  const hasValidToken = validateToken(escalationToken).valid;
-  if (canReadSensitive(role, hasValidToken)) {
-    const sensitive = await db.collection(CARD_TRANSACTION_SENSITIVE_COLLECTION)
-      .findOne({ cardTransactionInstanceReference: id });
-    return {
-      ...base,
-      sensitive: sensitive
-        ? {
-            rawGatewayPayload:            (sensitive as unknown as CardTransactionSensitiveRecord).rawGatewayPayload,
-            processorTransactionMetadata: (sensitive as unknown as CardTransactionSensitiveRecord).processorTransactionMetadata,
-          }
-        : null,
-    };
-  }
-
-  return base;
 }
 
 /** Returns unique merchant name + MCC pairs from seeded transactions, sorted by name. */
@@ -191,16 +186,23 @@ export async function getAllTransactions(
   if (filters.merchant)  query['cardTransactionMerchantName'] = { $regex: filters.merchant, $options: 'i' };
   if (filters.cardToken) query['paymentCardReference']        = filters.cardToken;
 
-  // Three-step lookup by email using only plaintext fields after the initial QE search.
-  // This avoids a second QE:equality search which can behave inconsistently across roles.
-  //
-  // Step 1: QE:equality search on customerAgreement.customerEmailAddress
-  // Step 2: plaintext FK lookup on paymentCard.customerAgreementInstanceReference (UUID)
-  // Step 3: plaintext $in filter on cardTransaction.paymentCardReference
+  // Four-step lookup by email using only plaintext fields after the initial QE search.
+  // Step 1: QE:equality search on party.partyEmailAddress (SD-13)
+  // Step 2: plaintext FK lookup on customerAgreementProcedure.partyInstanceReference
+  // Step 3: plaintext FK lookup on paymentCardManagement.customerAgreementInstanceReference
+  // Step 4: plaintext $in filter on cardTransactionLog.paymentCardReference
   if (filters.email) {
+    const party = await db
+      .collection<PartyControlRecord>(PARTY_COLLECTION)
+      .findOne({ partyEmailAddress: filters.email } as Partial<PartyControlRecord>);
+
+    if (!party) {
+      return { results: [], total: 0, page, limit };
+    }
+
     const agreement = await db
       .collection(CUSTOMER_AGREEMENT_COLLECTION)
-      .findOne({ customerEmailAddress: filters.email } as Record<string, unknown>);
+      .findOne({ partyInstanceReference: party.partyInstanceReference } as Record<string, unknown>);
 
     if (!agreement) {
       return { results: [], total: 0, page, limit };
@@ -211,9 +213,9 @@ export async function getAllTransactions(
       return { results: [], total: 0, page, limit };
     }
 
-    // Get all card tokens for this customer via the plaintext paymentCard FK
+    // Get all card tokens for this customer via the plaintext paymentCardManagement FK
     const cards = await db
-      .collection('paymentCard')
+      .collection(PAYMENT_CARD_COLLECTION)
       .find({ customerAgreementInstanceReference: customerUuid })
       .project({ paymentCardReference: 1 })
       .toArray();

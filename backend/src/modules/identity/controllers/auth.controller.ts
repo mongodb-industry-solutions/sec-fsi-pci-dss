@@ -7,8 +7,8 @@ export async function authController(fastify: FastifyInstance) {
     schema: {
       tags: ['auth'],
       summary: 'Login: obtain a Bearer JWT',
-      description: `Authenticates a demo user against the \`partyAuthentication\` collection
-(BIAN SD-16) and returns a signed JWT valid for 24 hours.
+      description: `Authenticates a demo user against the \`customerAuthenticationAssessment\` collection
+(BIAN SD-91) and returns a signed JWT valid for 24 hours.
 
 The JWT payload contains the \`sub\` (user UUID), \`email\`, \`role\`, \`name\`, and
 \`domain\` claims. Send it on every subsequent request as:
@@ -64,9 +64,9 @@ Password for all demo users: \`demo-password\``,
               type: 'object',
               description: 'Authenticated user summary.',
               properties: {
-                partyAuthenticationInstanceReference: {
+                customerAuthenticationInstanceReference: {
                   type: 'string',
-                  description: 'Primary key UUID of the partyAuthentication document (BIAN SD-16 Control Record identifier).',
+                  description: 'Primary key UUID of the customerAuthenticationAssessment document (BIAN SD-91 Control Record identifier).',
                 },
                 name: { type: 'string', description: 'Display name.' },
                 email: { type: 'string', format: 'email', description: 'Login email address.' },
@@ -100,7 +100,7 @@ Password for all demo users: \`demo-password\``,
       return reply.status(200).send({
         token,
         user: {
-          partyAuthenticationInstanceReference: user.sub,
+          customerAuthenticationInstanceReference: user.sub,
           name: user.name,
           email: user.email,
           role: user.role,

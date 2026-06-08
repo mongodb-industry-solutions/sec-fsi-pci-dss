@@ -3,7 +3,7 @@ import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, ap
 import { getTransactionById } from '../../transactions/services/cardTransaction.service';
 import { generateToken } from '../../../vendors/security/escalationTokens';
 
-const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRating';
+const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
 
 export async function fraudDiagnosisController(fastify: FastifyInstance) {
   fastify.get('/', {
@@ -37,11 +37,11 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
           },
           transactionId: {
             type: 'string',
-            description: 'Filter by `linkedCardTransactionReference` UUID. Returns the case for a specific transaction.',
+            description: 'Filter by `cardTransactionInstanceReference` UUID. Returns the case for a specific transaction.',
           },
           customerId: {
             type: 'string',
-            description: 'Filter by `linkedCustomerAgreementReference` UUID. Returns all cases for a specific customer.',
+            description: 'Filter by `customerAgreementInstanceReference` UUID. Returns all cases for a specific customer.',
           },
           page: {
             type: 'string',
@@ -78,7 +78,7 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
                     enum: ['low', 'medium', 'high', 'critical'],
                     description: 'Risk severity derived from transaction amount and indicator count.',
                   },
-                  linkedCardTransactionReference: { type: 'string', description: 'UUID of the originating cardTransaction document.' },
+                  cardTransactionInstanceReference: { type: 'string', description: 'UUID of the originating cardTransactionLog document.' },
                   transactionSnapshot: { $ref: 'TransactionSnapshot#' },
                   requestDateTime: { type: 'string', format: 'date-time', description: 'UTC timestamp when the case was opened.' },
                 },
@@ -121,7 +121,7 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
         fraudDiagnosisCaseReference: c.fraudDiagnosisCaseReference,
         caseStatus: c.fraudDiagnosisCaseStatus,
         riskSeverity: c.fraudDiagnosisCaseSeverity,
-        linkedCardTransactionReference: c.linkedCardTransactionReference,
+        cardTransactionInstanceReference: c.cardTransactionInstanceReference,
         transactionSnapshot: c.transactionSnapshot,
         requestDateTime: c.fraudDiagnosisRequestDateTime,
       })),
@@ -233,7 +233,7 @@ without creating a duplicate.
 \`transactionSnapshot\` and the risk assessment.
 
 **Linked data (not embedded; requires separate requests):**
-- Transaction details: \`GET /api/v1/transactions/:linkedCardTransactionReference\`
+- Transaction details: \`GET /api/v1/transactions/:cardTransactionInstanceReference\`
 - Customer agreement: \`GET /api/v1/customer?accountRef=<customerAgreementReference>\`
 - Audit events: \`GET /api/v1/fraud/:id/events\``,
       security: [{ bearerAuth: [] }],
@@ -261,13 +261,13 @@ without creating a duplicate.
               enum: ['low', 'medium', 'high', 'critical'],
               description: 'Risk severity.',
             },
-            linkedCardTransactionReference: {
+            cardTransactionInstanceReference: {
               type: 'string',
-              description: 'UUID of the originating `cardTransaction` document. Use with `GET /api/v1/transactions/:id`.',
+              description: 'UUID of the originating `cardTransactionLog` document. Use with `GET /api/v1/transactions/:id`.',
             },
-            linkedCustomerAgreementReference: {
+            customerAgreementInstanceReference: {
               type: 'string',
-              description: 'UUID of the subject `customerAgreement` document. Use with `GET /api/v1/customer`.',
+              description: 'UUID of the subject `customerAgreementProcedure` document. Use with `GET /api/v1/customer`.',
             },
             transactionSnapshot: { $ref: 'TransactionSnapshot#' },
             fraudDiagnosisAssessment: { $ref: 'FraudDiagnosisAssessment#' },
@@ -308,8 +308,8 @@ without creating a duplicate.
       fraudDiagnosisCaseReference: fraudCase.fraudDiagnosisCaseReference,
       caseStatus: fraudCase.fraudDiagnosisCaseStatus,
       riskSeverity: fraudCase.fraudDiagnosisCaseSeverity,
-      linkedCardTransactionReference: fraudCase.linkedCardTransactionReference,
-      linkedCustomerAgreementReference: fraudCase.linkedCustomerAgreementReference,
+      cardTransactionInstanceReference: fraudCase.cardTransactionInstanceReference,
+      customerAgreementInstanceReference: fraudCase.customerAgreementInstanceReference,
       transactionSnapshot: fraudCase.transactionSnapshot,
       fraudDiagnosisAssessment: fraudCase.fraudDiagnosisAssessment,
       fraudDiagnosisCaseNotes: fraudCase.fraudDiagnosisCaseNotes ?? null,

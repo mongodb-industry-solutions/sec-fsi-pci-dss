@@ -123,9 +123,10 @@ QE-protected fields appear as BSON binary ciphertext  -  this is the core of the
           collection: {
             type: 'string',
             enum: [
-              'cardTransaction', 'cardTransactionSensitive',
-              'customerAgreement', 'customerAgreementSensitive',
-              'paymentCard', 'partyAuthentication', 'fraudDiagnosisCase',
+              'party', 'customerAuthenticationAssessment',
+              'cardTransactionLog',
+              'customerAgreementProcedure',
+              'paymentCardManagement', 'fraudDiagnosisCase',
             ],
             description: 'Collection name (allowed list enforced server-side)',
           },
@@ -155,10 +156,12 @@ QE-protected fields appear as BSON binary ciphertext  -  this is the core of the
 
     const { collection, id } = request.params as { collection: string; id: string };
 
+    // v2: *Sensitive collections removed — sensitive fields live inline in their parent collection.
     const allowedCollections = new Set([
-      'cardTransaction', 'cardTransactionSensitive',
-      'customerAgreement', 'customerAgreementSensitive',
-      'paymentCard', 'partyAuthentication', 'fraudDiagnosisCase',
+      'party', 'customerAuthenticationAssessment',
+      'cardTransactionLog',
+      'customerAgreementProcedure',
+      'paymentCardManagement', 'fraudDiagnosisCase',
     ]);
 
     if (!allowedCollections.has(collection)) {
@@ -170,11 +173,12 @@ QE-protected fields appear as BSON binary ciphertext  -  this is the core of the
       const db = rawClient.db(process.env.MONGODB_DB_NAME!);
       const doc = await db.collection(collection).findOne({
         $or: [
+          { partyInstanceReference: id },
+          { customerAuthenticationInstanceReference: id },
           { cardTransactionInstanceReference: id },
           { customerAgreementInstanceReference: id },
           { paymentCardInstanceReference: id },
           { fraudDiagnosisInstanceReference: id },
-          { partyAuthenticationInstanceReference: id },
         ],
       });
 

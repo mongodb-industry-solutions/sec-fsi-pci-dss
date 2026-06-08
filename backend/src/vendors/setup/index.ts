@@ -4,6 +4,7 @@ import { resolve } from 'path';
 import { provisionDEKs } from './provisionDEKs';
 import { createCollections } from './createCollections';
 import { createIndexes } from './createIndexes';
+import { createAtlasRoles } from './createAtlasRoles';
 
 // Load .env from project root  -  works regardless of CWD (npm --prefix changes CWD to backend/)
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
@@ -25,15 +26,21 @@ export async function runSetup(reset = false) {
     await client.connect();
     console.log('Connected to Atlas\n');
 
-    console.log('1. Provisioning DEKs (one per encrypted field)...');
+    // v2: create Atlas custom roles + DB users before provisioning DEKs so the
+    // role-specific connection strings (MONGODB_URI_LEVEL1/2) are ready for the pools.
+    console.log('1. Creating Atlas custom roles and DB users (v2 role-pool architecture)...');
+    await createAtlasRoles();
+    console.log('');
+
+    console.log('2. Provisioning DEKs (one per encrypted field)...');
     const deks = await provisionDEKs(client);
     console.log('   DEKs provisioned\n');
 
-    console.log('2. Creating collections...');
+    console.log('3. Creating collections...');
     await createCollections(client, deks, reset);
     console.log('');
 
-    console.log('3. Creating indexes...');
+    console.log('4. Creating indexes...');
     await createIndexes(client);
     console.log('   Indexes created\n');
 

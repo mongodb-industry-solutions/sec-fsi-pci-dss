@@ -1,189 +1,191 @@
 import { Db } from 'mongodb';
 import {
   CUSTOMER_AGREEMENT_COLLECTION,
-  CUSTOMER_AGREEMENT_SENSITIVE_COLLECTION,
   CustomerAgreementControlRecord,
-  CustomerAgreementSensitiveRecord,
+  isSensitiveDecrypted,
 } from '../models/customerAgreement.model';
+import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
 import type { UserRole } from '../../../shared/models/identity.model';
-import { canReadSensitive } from '../../../vendors/middleware/rbac';
+import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { validateToken } from '../../../vendors/security/escalationTokens';
 import { appendAuditEvent } from '../../fraud/services/fraudDiagnosis.service';
 
-function stripQEFields(agreement: CustomerAgreementControlRecord) {
-  // QE equality fields are used only as search predicates; never echoed back
-  const { customerEmailAddress, customerMobilePhoneNumber, customerAgreementReference, ...safe } = agreement;
-  void customerEmailAddress;
-  void customerMobilePhoneNumber;
-  void customerAgreementReference;
-  return safe;
-}
-
-async function fetchSensitive(
-  db: Db,
-  ref: string
-): Promise<CustomerAgreementSensitiveRecord | null> {
-  return db
-    .collection<CustomerAgreementSensitiveRecord>(CUSTOMER_AGREEMENT_SENSITIVE_COLLECTION)
-    .findOne({ customerAgreementInstanceReference: ref });
-}
-
-async function buildResponse(
-  db: Db,
-  base: CustomerAgreementControlRecord,
+/**
+ * Build the API response from a unified customerAgreementProcedure document.
+ *
+ * With the Level 1 QE client, sensitive fields (address, govId, riskNotes) come back
+ * as Binary ciphertext — isSensitiveDecrypted() returns false and they are omitted.
+ * With the Level 2 QE client the driver has already auto-decrypted them.
+ */
+function buildResponse(
+  doc: CustomerAgreementControlRecord,
+  party: PartyControlRecord,
   role: UserRole,
-  escalationToken: string | undefined
-): Promise<Record<string, unknown>> {
-  const safeBase = stripQEFields(base);
-
-  const tokenResult = validateToken(escalationToken);
-  const hasValidToken = tokenResult.valid;
-
-  if (!canReadSensitive(role, hasValidToken)) {
-    // All roles without sensitive access (including L2 without escalation token)
-    // receive the basic non-sensitive data. The 403 only applies when sensitive
-    // QE:none fields are explicitly requested via the escalation token flow.
-    return safeBase;
-  }
-
-  // Fetch sensitive record (app-side join  -  ADR-001: no $lookup across QE collections)
-  const sensitiveDoc = await fetchSensitive(db, base.customerAgreementInstanceReference);
-
-  // Write audit event if we have a case context from the token
-  const caseId = tokenResult.entry?.caseId;
-  if (caseId) {
-    await appendAuditEvent(db, caseId, 'field_accessed', role as 'level2_investigator' | 'security_auditor', {
-      fields: ['customerAgreementResidentialAddress', 'governmentIdentificationReference', 'customerAgreementRiskNotes'],
-      customerAgreementInstanceReference: base.customerAgreementInstanceReference,
-    });
-  }
-
-  return {
-    ...safeBase,
-    ...(sensitiveDoc && {
-      sensitive: {
-        customerAgreementResidentialAddress: sensitiveDoc.customerAgreementResidentialAddress,
-        governmentIdentificationReference: sensitiveDoc.governmentIdentificationReference,
-        customerAgreementRiskNotes: sensitiveDoc.customerAgreementRiskNotes,
-      },
-    }),
-  };
-}
-
-export async function getByEmail(db: Db, email: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
-  const doc = await db
-    .collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
-    .findOne({ customerEmailAddress: email } as Partial<CustomerAgreementControlRecord>);
-  if (!doc) return null;
-  return buildResponse(db, doc, role, escalationToken);
-}
-
-export async function getByPhone(db: Db, phone: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
-  const doc = await db
-    .collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
-    .findOne({ customerMobilePhoneNumber: phone } as Partial<CustomerAgreementControlRecord>);
-  if (!doc) return null;
-  return buildResponse(db, doc, role, escalationToken);
-}
-
-export async function getByAccountRef(db: Db, ref: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
-  const doc = await db
-    .collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
-    .findOne({ customerAgreementReference: ref } as Partial<CustomerAgreementControlRecord>);
-  if (!doc) return null;
-  return buildResponse(db, doc, role, escalationToken);
-}
-
-// Update allowed profile fields for the authenticated customer.
-// Uses the QE-enabled client so QE:equality fields (phone) are auto-encrypted.
-// Email and accountReference are intentionally excluded  -  they are identity keys.
-export async function updateSelfProfile(
-  db: Db,
-  email: string,
-  patch: {
-    customerName?: string;
-    customerMobilePhoneNumber?: string;
-    customerAgreementPreferredLanguage?: string;
-    customerAgreementResidentialAddress?: {
-      streetAddress: string;
-      city: string;
-      postalCode: string;
-      countryCode: string;
-    };
-  }
-): Promise<boolean> {
-  const { customerAgreementResidentialAddress, ...basePatch } = patch;
-  let matched = false;
-
-  // Update plaintext + QE:equality fields in customerAgreement
-  if (Object.keys(basePatch).length > 0) {
-    const res = await db.collection(CUSTOMER_AGREEMENT_COLLECTION).updateOne(
-      { customerEmailAddress: email } as Record<string, unknown>,
-      { $set: { ...basePatch, recordUpdatedDateTime: new Date() } }
-    );
-    matched = res.matchedCount > 0;
-  }
-
-  // Update QE:none address in customerAgreementSensitive (same UUID as FK)
-  if (customerAgreementResidentialAddress) {
-    const baseDoc = await db
-      .collection(CUSTOMER_AGREEMENT_COLLECTION)
-      .findOne({ customerEmailAddress: email } as Record<string, unknown>);
-
-    if (baseDoc) {
-      const uuid = (baseDoc as Record<string, unknown>).customerAgreementInstanceReference as string;
-      await db.collection(CUSTOMER_AGREEMENT_SENSITIVE_COLLECTION).updateOne(
-        { customerAgreementInstanceReference: uuid },
-        { $set: { customerAgreementResidentialAddress } },
-        { upsert: true }
-      );
-      matched = true;
-    }
-  }
-
-  return matched;
-}
-
-// Look up by primary UUID  -  used by fraud case detail to load the linked customer profile.
-// The UUID (customerAgreementInstanceReference) is a plaintext field, so no QE decryption
-// is required for the lookup itself. Sensitive fields still require escalation token.
-// Returns the full customer profile for self-service (/auth/me).
-// Unlike the QE-search endpoints, this does NOT strip QE:equality fields  - 
-// the customer is entitled to see their own email, phone, and account reference.
-// Sensitive fields (address, govt ID) are always included with a clearly marked null
-// when the sensitive record does not exist.
-export async function getSelfProfile(db: Db, email: string): Promise<Record<string, unknown> | null> {
-  const doc = await db
-    .collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
-    .findOne({ customerEmailAddress: email } as Partial<CustomerAgreementControlRecord>);
-
-  if (!doc) return null;
-
-  const sensitive = await fetchSensitive(db, doc.customerAgreementInstanceReference);
-
-  return {
+  caseId?: string,
+): Record<string, unknown> {
+  const base: Record<string, unknown> = {
     customerAgreementInstanceReference: doc.customerAgreementInstanceReference,
-    customerName:                       doc.customerName,
-    customerEmailAddress:               doc.customerEmailAddress,
-    customerMobilePhoneNumber:          doc.customerMobilePhoneNumber,
+    partyInstanceReference:             doc.partyInstanceReference,
+    customerName:                       party.partyName,
+    customerEmailAddress:               party.partyEmailAddress,
+    customerMobilePhoneNumber:          party.partyMobilePhoneNumber,
     customerAgreementReference:         doc.customerAgreementReference,
     customerSegment:                    doc.customerSegment,
     customerAgreementStatus:            doc.customerAgreementStatus,
     customerAgreementEnrollmentDate:    doc.customerAgreementEnrollmentDate,
     customerAgreementPreferredLanguage: doc.customerAgreementPreferredLanguage,
-    sensitive: sensitive
-      ? {
-          customerAgreementResidentialAddress: sensitive.customerAgreementResidentialAddress,
-          governmentIdentificationReference:   sensitive.governmentIdentificationReference,
-        }
-      : null,
+    bianServiceDomain:                  doc.bianServiceDomain,
+    bianControlRecordType:              doc.bianControlRecordType,
   };
+
+  const addressDecrypted = isSensitiveDecrypted(doc.customerAgreementResidentialAddress);
+  if (addressDecrypted) {
+    base.sensitive = {
+      customerAgreementResidentialAddress: doc.customerAgreementResidentialAddress,
+      governmentIdentificationReference:   doc.governmentIdentificationReference,
+      customerAgreementRiskNotes:          doc.customerAgreementRiskNotes,
+    };
+  }
+
+  return base;
+}
+
+// ── Internal helpers ─────────────────────────────────────────────────────────
+
+async function resolveDb(role: UserRole, escalationToken: string | undefined): Promise<{ db: Db; hasValidToken: boolean; caseId?: string }> {
+  const tokenResult = validateToken(escalationToken);
+  const hasValidToken = tokenResult.valid;
+  const db = await getDbForRole(role, hasValidToken);
+  return { db, hasValidToken, caseId: tokenResult.entry?.caseId };
+}
+
+async function findPartyAndAgreement(
+  db: Db,
+  partyQuery: Partial<PartyControlRecord>
+): Promise<{ doc: CustomerAgreementControlRecord; party: PartyControlRecord } | null> {
+  const party = await db.collection<PartyControlRecord>(PARTY_COLLECTION).findOne(partyQuery);
+  if (!party) return null;
+  const doc = await db.collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
+    .findOne({ partyInstanceReference: party.partyInstanceReference });
+  if (!doc) return null;
+  return { doc, party };
+}
+
+async function maybeAudit(db: Db, caseId: string | undefined, role: UserRole, doc: CustomerAgreementControlRecord): Promise<void> {
+  if (!caseId) return;
+  if (!isSensitiveDecrypted(doc.customerAgreementResidentialAddress)) return;
+  await appendAuditEvent(db, caseId, 'field_accessed', role as 'level2_investigator' | 'security_auditor', {
+    fields: ['customerAgreementResidentialAddress', 'governmentIdentificationReference', 'customerAgreementRiskNotes'],
+    customerAgreementInstanceReference: doc.customerAgreementInstanceReference,
+  });
+}
+
+// ── Public query functions ───────────────────────────────────────────────────
+
+export async function getByEmail(db: Db, email: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
+  const { db: roleDb, caseId } = await resolveDb(role, escalationToken);
+  const result = await findPartyAndAgreement(roleDb, { partyEmailAddress: email } as Partial<PartyControlRecord>);
+  if (!result) return null;
+  await maybeAudit(roleDb, caseId, role, result.doc);
+  return buildResponse(result.doc, result.party, role, caseId);
+}
+
+export async function getByPhone(db: Db, phone: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
+  const { db: roleDb, caseId } = await resolveDb(role, escalationToken);
+  const result = await findPartyAndAgreement(roleDb, { partyMobilePhoneNumber: phone } as Partial<PartyControlRecord>);
+  if (!result) return null;
+  await maybeAudit(roleDb, caseId, role, result.doc);
+  return buildResponse(result.doc, result.party, role, caseId);
+}
+
+export async function getByAccountRef(db: Db, ref: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
+  const { db: roleDb, caseId } = await resolveDb(role, escalationToken);
+  const doc = await roleDb.collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
+    .findOne({ customerAgreementReference: ref } as Partial<CustomerAgreementControlRecord>);
+  if (!doc) return null;
+  const party = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
+    .findOne({ partyInstanceReference: doc.partyInstanceReference });
+  if (!party) return null;
+  await maybeAudit(roleDb, caseId, role, doc);
+  return buildResponse(doc, party, role, caseId);
 }
 
 export async function getByInstanceReference(db: Db, id: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
-  const doc = await db
-    .collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
+  const { db: roleDb, caseId } = await resolveDb(role, escalationToken);
+  const doc = await roleDb.collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
     .findOne({ customerAgreementInstanceReference: id });
   if (!doc) return null;
-  return buildResponse(db, doc, role, escalationToken);
+  const party = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
+    .findOne({ partyInstanceReference: doc.partyInstanceReference });
+  if (!party) return null;
+  await maybeAudit(roleDb, caseId, role, doc);
+  return buildResponse(doc, party, role, caseId);
+}
+
+export async function getSelfProfile(db: Db, email: string): Promise<Record<string, unknown> | null> {
+  // Self-profile always uses L2 db so the customer can see their own address
+  const roleDb = await getDbForRole('security_auditor', false);
+  const result = await findPartyAndAgreement(roleDb, { partyEmailAddress: email } as Partial<PartyControlRecord>);
+  if (!result) return null;
+  const { doc, party } = result;
+  return {
+    customerAgreementInstanceReference: doc.customerAgreementInstanceReference,
+    partyInstanceReference:             doc.partyInstanceReference,
+    customerName:                       party.partyName,
+    customerEmailAddress:               party.partyEmailAddress,
+    customerMobilePhoneNumber:          party.partyMobilePhoneNumber,
+    customerAgreementReference:         doc.customerAgreementReference,
+    customerSegment:                    doc.customerSegment,
+    customerAgreementStatus:            doc.customerAgreementStatus,
+    customerAgreementEnrollmentDate:    doc.customerAgreementEnrollmentDate,
+    customerAgreementPreferredLanguage: doc.customerAgreementPreferredLanguage,
+    sensitive: isSensitiveDecrypted(doc.customerAgreementResidentialAddress) ? {
+      customerAgreementResidentialAddress: doc.customerAgreementResidentialAddress,
+      governmentIdentificationReference:   doc.governmentIdentificationReference,
+    } : null,
+  };
+}
+
+export async function updateSelfProfile(
+  db: Db,
+  email: string,
+  patch: {
+    customerAgreementPreferredLanguage?: string;
+    customerAgreementResidentialAddress?: { streetAddress: string; city: string; postalCode: string; countryCode: string };
+    customerMobilePhoneNumber?: string;
+  }
+): Promise<boolean> {
+  // Write operations always use L2 db so QE:none fields are encrypted on write
+  const roleDb = await getDbForRole('security_auditor', false);
+  const party = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
+    .findOne({ partyEmailAddress: email } as Partial<PartyControlRecord>);
+  if (!party) return false;
+
+  let matched = false;
+
+  if (patch.customerMobilePhoneNumber) {
+    await roleDb.collection(PARTY_COLLECTION).updateOne(
+      { partyInstanceReference: party.partyInstanceReference },
+      { $set: { partyMobilePhoneNumber: patch.customerMobilePhoneNumber, recordUpdatedDateTime: new Date() } }
+    );
+    matched = true;
+  }
+
+  const agreementPatch: Record<string, unknown> = {};
+  if (patch.customerAgreementPreferredLanguage) {
+    agreementPatch.customerAgreementPreferredLanguage = patch.customerAgreementPreferredLanguage;
+  }
+  if (patch.customerAgreementResidentialAddress) {
+    agreementPatch.customerAgreementResidentialAddress = patch.customerAgreementResidentialAddress;
+  }
+  if (Object.keys(agreementPatch).length > 0) {
+    agreementPatch.recordUpdatedDateTime = new Date();
+    const res = await roleDb.collection(CUSTOMER_AGREEMENT_COLLECTION).updateOne(
+      { partyInstanceReference: party.partyInstanceReference },
+      { $set: agreementPatch }
+    );
+    if (res.matchedCount > 0) matched = true;
+  }
+
+  return matched;
 }
