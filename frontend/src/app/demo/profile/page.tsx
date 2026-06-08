@@ -280,6 +280,7 @@ export default function ProfilePage() {
               <span className="text-xs bg-blue-500/10 text-blue-700 px-2 py-0.5 rounded">
                 {ROLE_LABELS[profile.role] ?? profile.role}
               </span>
+              {debugMode && <CollectionChip name="party" />}
             </div>
           </div>
         </div>
@@ -292,7 +293,7 @@ export default function ProfilePage() {
             plainValue={ag?.customerEmailAddress ?? profile.email}
             maskedValue={(() => { const e = ag?.customerEmailAddress ?? profile.email; const [l, d] = e.split('@'); return (l?.slice(0,2) ?? '') + '●●●' + '@' + (d ?? '●●●'); })()}
             type="qe-equality"
-            collection="customerAgreementProcedure"
+            collection="party"
           />
 
           {/* Phone — editable */}
@@ -305,7 +306,7 @@ export default function ProfilePage() {
                     <Lock size={9} /> QE:equality
                   </span>
                 )}
-                {debugMode && <CollectionChip name="customerAgreementProcedure" />}
+                {debugMode && <CollectionChip name="party" />}
               </div>
               <input
                 value={editPhone}
@@ -315,7 +316,7 @@ export default function ProfilePage() {
               />
             </>
           ) : ag?.customerMobilePhoneNumber ? (
-            <RevealField label="Phone" plainValue={ag.customerMobilePhoneNumber} maskedValue={maskPhone(ag.customerMobilePhoneNumber)} type="qe-equality" collection="customerAgreementProcedure" />
+            <RevealField label="Phone" plainValue={ag.customerMobilePhoneNumber} maskedValue={maskPhone(ag.customerMobilePhoneNumber)} type="qe-equality" collection="party" />
           ) : (
             <>
               <span className="text-gray-500 text-sm">Phone</span>

@@ -5,6 +5,7 @@ import {
   isSensitiveDecrypted,
 } from '../models/customerAgreement.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
+import { CUSTOMER_AUTHENTICATION_COLLECTION } from '../../identity/models/customerAuthentication.model';
 import type { UserRole } from '../../../shared/models/identity.model';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { validateToken } from '../../../vendors/security/escalationTokens';
@@ -150,6 +151,7 @@ export async function updateSelfProfile(
   db: Db,
   email: string,
   patch: {
+    customerName?: string;
     customerAgreementPreferredLanguage?: string;
     customerAgreementResidentialAddress?: { streetAddress: string; city: string; postalCode: string; countryCode: string };
     customerMobilePhoneNumber?: string;
@@ -163,12 +165,28 @@ export async function updateSelfProfile(
 
   let matched = false;
 
-  if (patch.customerMobilePhoneNumber) {
+  // PII fields that live in party (SD-13)
+  const partyPatch: Record<string, unknown> = {};
+  if (patch.customerMobilePhoneNumber) partyPatch.partyMobilePhoneNumber = patch.customerMobilePhoneNumber;
+  if (patch.customerName) partyPatch.partyName = patch.customerName;
+
+  if (Object.keys(partyPatch).length > 0) {
+    partyPatch.recordUpdatedDateTime = new Date();
     await roleDb.collection(PARTY_COLLECTION).updateOne(
       { partyInstanceReference: party.partyInstanceReference },
-      { $set: { partyMobilePhoneNumber: patch.customerMobilePhoneNumber, recordUpdatedDateTime: new Date() } }
+      { $set: partyPatch }
     );
     matched = true;
+
+    // Sync Extended Reference: customerAuthenticationAssessment.customerAuthenticationUserName
+    // mirrors party.partyName for JWT name claims. Update on every name change so the
+    // source record stays accurate (JWT itself refreshes on next login).
+    if (patch.customerName) {
+      await roleDb.collection(CUSTOMER_AUTHENTICATION_COLLECTION).updateOne(
+        { partyInstanceReference: party.partyInstanceReference },
+        { $set: { customerAuthenticationUserName: patch.customerName } }
+      );
+    }
   }
 
   const agreementPatch: Record<string, unknown> = {};

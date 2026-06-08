@@ -229,15 +229,12 @@ async function main() {
     customerAgreementIds.push(id);
     customerAgreementRefs.push(ref);
 
-    // v2: all fields — plaintext identity + QE:equality + QE:none — merged inline.
-    // The L2 QE client encrypts the encrypted fields on seed write.
+    // v2: QE:equality + QE:none sensitive fields merged inline.
+    // PII (name, email, phone) lives exclusively in party (SD-13). Do not add them here.
     customerAgreements.push({
       customerAgreementInstanceReference: id,
       partyInstanceReference: customerPartyIds[i],
       customerAgreementReference: ref,
-      customerName: customerNames[i],
-      customerEmailAddress: customerEmails[i],
-      customerMobilePhoneNumber: customerPhones[i],
       customerAgreementResidentialAddress: {
         streetAddress: faker.location.streetAddress(),
         city: faker.location.city(),
