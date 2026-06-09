@@ -766,7 +766,7 @@ export default function PaymentPage() {
               </p>
               <p>
                 If the amount exceeded <strong>$500</strong> or the MCC is high-risk, a
-                <strong> FraudDiagnosisCase</strong> (BIAN SD-105) was automatically opened and you
+                <strong> FraudDiagnosisCase</strong> (BIAN SD-83) was automatically opened and you
                 will be redirected to the Investigation Dashboard.
               </p>
               <p>

@@ -428,7 +428,7 @@ function L1OpenView({
             onClick={onToggleRaw}
             className="flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg border hover:bg-gray-50 transition-colors"
           >
-            {showRaw ? 'Hide Raw Document' : 'View cardTransaction Raw'}
+            {showRaw ? 'Hide Raw Document' : 'View cardTransactionLog Raw'}
           </button>
         </div>
 
@@ -436,7 +436,7 @@ function L1OpenView({
         <div className="space-y-3 mb-4">
           <div className="rounded-lg border p-3 bg-blue-50">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-bold text-blue-700 uppercase">cardTransaction (SD-254)</span>
+              <span className="text-xs font-bold text-blue-700 uppercase">cardTransactionLog (SD-254)</span>
               <span className="text-xs bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded">L1 can access</span>
             </div>
             <p className="text-xs text-blue-700 mb-2">
@@ -485,19 +485,23 @@ function L1OpenView({
 
           <div className="rounded-lg border p-3 bg-purple-50 opacity-75">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-bold text-purple-700 uppercase">customerAgreementSensitive (SD-53)</span>
+              <span className="text-xs font-bold text-purple-700 uppercase">customerAgreementProcedure (SD-53) — QE:none fields</span>
               <span className="text-xs bg-purple-200 text-purple-800 px-1.5 py-0.5 rounded">L2 only</span>
             </div>
             <p className="text-xs text-purple-700">
-              Address and government ID. Encrypted with DEK-sensitive (separate key from DEK-lookup).
-              L1 application never receives this DEK. Field values are inaccessible at this stage.
+              Residential address (<code>customerAgreementResidentialAddress</code>) and government ID
+              (<code>governmentIdentificationReference</code>) are stored <strong>inline</strong> in the
+              same <code>customerAgreementProcedure</code> document — there is no separate sensitive collection.
+              These QE:none fields use <code>DEK-sensitive</code> (a different key from <code>DEK-lookup</code>).
+              The L1 client never receives <code>DEK-sensitive</code>, so these fields arrive as BSON Binary
+              ciphertext and are stripped by the service layer before the response is returned.
             </p>
           </div>
         </div>
 
         {showRaw && rawDoc && (
           <>
-            <div className="text-xs font-semibold text-gray-600 mb-2">Raw cardTransaction document from Atlas:</div>
+            <div className="text-xs font-semibold text-gray-600 mb-2">Raw cardTransactionLog document from Atlas:</div>
             <RawDocumentPanel document={rawDoc.document} collection={rawDoc.collection} />
           </>
         )}
@@ -720,8 +724,13 @@ function L2ReviewView({
             <div className="flex gap-2">
               <span className="text-purple-500 font-bold mt-0.5">+</span>
               <div>
-                <p className="font-medium">cardTransactionSensitive (SD-254)</p>
-                <p className="text-gray-500">Raw gateway payload and processor metadata. Accessible via DEK-sensitive after escalation approval. Contains authorization codes and network identifiers.</p>
+                <p className="font-medium">cardTransactionLog (SD-254) — QE:none fields</p>
+                <p className="text-gray-500">
+                  <code>rawGatewayPayload</code> and <code>processorTransactionMetadata</code> are stored
+                  inline in the same <code>cardTransactionLog</code> document as QE:none fields.
+                  No separate sensitive collection exists. The L2 client decrypts them using <code>DEK-sensitive</code>
+                  after escalation approval. Contains authorization codes and network identifiers.
+                </p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -749,7 +758,7 @@ function L2ReviewView({
               <div>
                 <p className="font-medium">Full audit trail</p>
                 <p className="text-gray-500">
-                  GET /api/v1/fraud/{fraudCase.fraudDiagnosisInstanceReference}/events -
+                  GET /api/v1/fraud/{fraudCase.fraudDiagnosisCaseReference}/events -
                   every action on this case with timestamps, roles, and details.
                 </p>
               </div>
@@ -763,7 +772,7 @@ function L2ReviewView({
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="font-semibold text-gray-800">Atlas Storage: Raw Document</h2>
-            <p className="text-xs text-gray-500 mt-0.5">cardTransaction collection</p>
+            <p className="text-xs text-gray-500 mt-0.5">cardTransactionLog collection</p>
           </div>
           <button
             onClick={onToggleRaw}
