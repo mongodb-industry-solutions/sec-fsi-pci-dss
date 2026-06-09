@@ -6,7 +6,7 @@ import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { EncryptionBadge } from '../../../../components/EncryptionBadge';
 import { useDebugMode } from '../../../../lib/debugMode';
-import { DebugRawJson } from '../../../../components/DebugRawJson';
+import { RawMongoPanel } from '../../../../components/RawMongoPanel';
 import { Eye, EyeOff } from 'lucide-react';
 
 type TxnDetail = Awaited<ReturnType<typeof api.transactions.getById>>;
@@ -319,12 +319,35 @@ export default function TransactionDetailPage() {
         </div>
       )}
 
-      {/* Debug: raw JSON */}
+      {/* Debug: raw MongoDB documents for all roles */}
       {debugMode && (
-        <DebugRawJson
+        <RawMongoPanel
+          token={token}
           sections={[
-            { label: 'API  -  GET /api/v1/transactions/:id', data: txn },
-            { label: 'Linked case', data: linkedCase },
+            {
+              kind: 'mongo' as const,
+              collection: 'cardTransactionLog',
+              id: txnId,
+              label: 'cardTransactionLog',
+              labelColor: 'text-amber-400',
+              description: 'SD-27 — QE:equality (accountRef) + QE:none (raw gateway payload, processor metadata)',
+            },
+            ...(txn.paymentCardReference ? [{
+              kind: 'mongo' as const,
+              collection: 'paymentCardManagement',
+              id: txn.paymentCardReference,
+              label: 'paymentCardManagement',
+              labelColor: 'text-blue-400',
+              description: 'SD-170 — card token (QE:equality), PAN mask, network, expiry',
+            }] : []),
+            ...(linkedCase ? [{
+              kind: 'mongo' as const,
+              collection: 'fraudDiagnosisCase',
+              id: linkedCase.id,
+              label: 'fraudDiagnosisCase',
+              labelColor: 'text-red-400',
+              description: 'SD-92 — investigation case, risk indicators, resolution record',
+            }] : []),
           ]}
         />
       )}

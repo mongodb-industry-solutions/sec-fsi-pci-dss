@@ -22,6 +22,7 @@ import { adminModule }        from './modules/admin';
 export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
     logger: true,
+    pluginTimeout: 60000,
     ajv: {
       customOptions: {
         // Allow OpenAPI keywords that are not part of JSON Schema draft-07.

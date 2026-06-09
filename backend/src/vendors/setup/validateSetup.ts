@@ -1,6 +1,7 @@
 import { MongoClient } from 'mongodb';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
+import { existsSync } from 'fs';
 import * as https from 'https';
 import * as crypto from 'crypto';
 
@@ -132,18 +133,45 @@ function checkEnvVars(): boolean {
 
   const kms = process.env.KMS_PROVIDER;
 
-  // Core
+  // ── 1.1 Core (required) ────────────────────────────────────────────────────
+  console.log('   1.1 Core (required)');
+
   for (const v of ['MONGODB_URI', 'MONGODB_DB_NAME', 'KMS_PROVIDER', 'JWT_SECRET']) {
     process.env[v]
       ? check('pass', v, v === 'MONGODB_DB_NAME' ? process.env[v] : undefined)
       : check('fail', v, 'not set — required');
   }
 
-  // KMS-specific
+  // Semantic: MONGODB_URI format
+  const uri = process.env.MONGODB_URI;
+  if (uri && !uri.startsWith('mongodb://') && !uri.startsWith('mongodb+srv://')) {
+    check('warn', 'MONGODB_URI format', 'does not start with mongodb:// or mongodb+srv://');
+  }
+
+  // Semantic: JWT_SECRET must not be the demo default
+  if (process.env.JWT_SECRET === 'demo-local-secret-change-in-production') {
+    check('warn', 'JWT_SECRET', 'using the hardcoded demo default — change before any non-local deployment');
+  }
+
+  // ── 1.2 KMS-specific ────────────────────────────────────────────────────────
+  console.log('   1.2 KMS-specific');
+
   if (kms === 'local') {
-    process.env.LOCAL_MASTER_KEY_BASE64
+    const localKey = process.env.LOCAL_MASTER_KEY_BASE64;
+    localKey
       ? check('pass', 'LOCAL_MASTER_KEY_BASE64')
       : check('fail', 'LOCAL_MASTER_KEY_BASE64', 'not set — required for KMS_PROVIDER=local');
+
+    if (localKey) {
+      try {
+        const decoded = Buffer.from(localKey, 'base64');
+        decoded.length === 96
+          ? check('pass', 'LOCAL_MASTER_KEY_BASE64 length', '96 bytes ✓')
+          : check('fail', 'LOCAL_MASTER_KEY_BASE64 length', `expected 96 bytes, got ${decoded.length} — regenerate with setup:key`);
+      } catch {
+        check('fail', 'LOCAL_MASTER_KEY_BASE64', 'invalid base64 encoding');
+      }
+    }
   } else if (kms === 'aws') {
     for (const v of ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_CMK_ARN', 'AWS_REGION']) {
       process.env[v]
@@ -154,15 +182,18 @@ function checkEnvVars(): boolean {
     check('warn', 'KMS_PROVIDER', `unknown value '${kms}' — expected 'local' or 'aws'`);
   }
 
-  // Role pool URIs
+  // ── 1.3 Role pool URIs (optional) ──────────────────────────────────────────
+  console.log('   1.3 Role pool URIs (optional)');
+
   for (const v of ['MONGODB_URI_LEVEL1', 'MONGODB_URI_LEVEL2']) {
     process.env[v]
       ? check('pass', v)
       : check('warn', v, 'not set — Level 1/2 role pools will fall back to main URI');
   }
 
-  // Atlas API (optional, warn if missing)
-  const hasAtlasKeys = !!(process.env.ATLAS_PUBLIC_KEY && process.env.ATLAS_PRIVATE_KEY && process.env.ATLAS_PROJECT_ID);
+  // ── 1.4 Atlas API (optional) ───────────────────────────────────────────────
+  console.log('   1.4 Atlas API (optional)');
+
   for (const v of ['ATLAS_PUBLIC_KEY', 'ATLAS_PRIVATE_KEY', 'ATLAS_PROJECT_ID']) {
     process.env[v]
       ? check('pass', v)
@@ -172,6 +203,52 @@ function checkEnvVars(): boolean {
     process.env[v]
       ? check('pass', v)
       : check('warn', v, 'not set — Atlas DB user checks will be skipped');
+  }
+
+  // ── 1.5 Application runtime (optional) ────────────────────────────────────
+  console.log('   1.5 Application runtime (optional)');
+
+  const apiPort = process.env.API_PORT;
+  if (!apiPort) {
+    check('warn', 'API_PORT', 'not set — defaulting to 3001');
+  } else {
+    const p = parseInt(apiPort, 10);
+    (!isNaN(p) && p > 0 && p < 65536)
+      ? check('pass', 'API_PORT', String(p))
+      : check('warn', 'API_PORT', `'${apiPort}' is not a valid port number`);
+  }
+
+  process.env.API_HOST
+    ? check('pass', 'API_HOST', process.env.API_HOST)
+    : check('warn', 'API_HOST', 'not set — defaulting to 0.0.0.0');
+
+  process.env.CORS_ORIGIN
+    ? check('pass', 'CORS_ORIGIN', process.env.CORS_ORIGIN)
+    : check('warn', 'CORS_ORIGIN', 'not set — defaulting to http://localhost:3000 (update for non-local deployments)');
+
+  process.env.JWT_EXPIRES_IN
+    ? check('pass', 'JWT_EXPIRES_IN', process.env.JWT_EXPIRES_IN)
+    : check('warn', 'JWT_EXPIRES_IN', 'not set — defaulting to 24h');
+
+  const nodeEnv = process.env.NODE_ENV;
+  if (!nodeEnv) {
+    check('warn', 'NODE_ENV', 'not set — recommend setting to development or production');
+  } else if (!['development', 'production', 'test'].includes(nodeEnv)) {
+    check('warn', 'NODE_ENV', `unexpected value '${nodeEnv}' — expected development, production, or test`);
+  } else {
+    check('pass', 'NODE_ENV', nodeEnv);
+  }
+
+  // ── 1.6 QE shared library (optional) ──────────────────────────────────────
+  console.log('   1.6 QE shared library (optional)');
+
+  const cryptPath = process.env.MONGODB_CRYPT_SHARED_LIB_PATH;
+  if (!cryptPath) {
+    check('warn', 'MONGODB_CRYPT_SHARED_LIB_PATH', 'not set — library will be auto-detected from default platform locations');
+  } else if (!existsSync(cryptPath)) {
+    check('fail', 'MONGODB_CRYPT_SHARED_LIB_PATH', `file not found at '${cryptPath}' — QE will fail to initialize`);
+  } else {
+    check('pass', 'MONGODB_CRYPT_SHARED_LIB_PATH', cryptPath);
   }
 
   return fail === 0;

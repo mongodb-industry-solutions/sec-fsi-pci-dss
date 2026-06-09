@@ -35,8 +35,12 @@ let _l1Client: MongoClient | null = null;
 let _l2Client: MongoClient | null = null;
 
 async function buildQEClient(uri: string, tier: 'level1' | 'level2'): Promise<MongoClient> {
-  // Resolve DEKs using a plain (non-QE) connection first
-  const plainClient = new MongoClient(process.env.MONGODB_URI!);
+  // Resolve DEKs using a plain (non-QE) connection first.
+  // Short timeouts so the Fastify plugin fails fast when MongoDB is unreachable.
+  const plainClient = new MongoClient(process.env.MONGODB_URI!, {
+    serverSelectionTimeoutMS: 8000,
+    connectTimeoutMS: 8000,
+  });
   await plainClient.connect();
   const deks = await provisionDataEncryptionKeys(plainClient);
   await plainClient.close();
@@ -46,6 +50,8 @@ async function buildQEClient(uri: string, tier: 'level1' | 'level2'): Promise<Mo
   const cryptLib = resolveCryptLibOptions();
 
   const client = new MongoClient(uri, {
+    serverSelectionTimeoutMS: 8000,
+    connectTimeoutMS: 8000,
     autoEncryption: {
       keyVaultNamespace: KEY_VAULT_NAMESPACE,
       kmsProviders: buildKmsProviders(),

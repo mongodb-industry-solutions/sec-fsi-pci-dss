@@ -8,7 +8,7 @@
     "start": "node dist/src/server.js",
     "setup:db": "ts-node bin/setup.ts",
     "setup:db:drop": "ts-node bin/drop.ts",
-    "setup:db:check": "ts-node bin/validate.ts",
+    "setup:check": "ts-node bin/validate.ts",
     "seed": "ts-node bin/seed.ts",
     "generate:key": "ts-node bin/generate-key.ts",
     "generate:data": "ts-node data/generate.ts",
