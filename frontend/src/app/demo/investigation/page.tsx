@@ -46,6 +46,7 @@ export default function InvestigationPage() {
   const [cases, setCases]   = useState<FraudCase[]>([]);
   const [total, setTotal]   = useState(0);
   const [page, setPage]     = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(true);
 
   const [filterStatus,   setFilterStatus]   = useState('');
@@ -55,9 +56,9 @@ export default function InvestigationPage() {
   const [searchError,    setSearchError]    = useState<string | null>(null);
   const [isSearchMode,   setIsSearchMode]   = useState(false);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  const loadCases = useCallback(async (targetPage: number) => {
+  const loadCases = useCallback(async (targetPage: number, ps: number) => {
     setLoading(true);
     try {
       const res = await api.fraud.list(
@@ -65,7 +66,7 @@ export default function InvestigationPage() {
           status:   filterStatus   || undefined,
           severity: filterSeverity || undefined,
           page:     targetPage,
-          limit:    PAGE_SIZE,
+          limit:    ps,
         },
         token
       );
@@ -82,7 +83,7 @@ export default function InvestigationPage() {
   useEffect(() => {
     if (!isSearchMode && token) {
       setPage(1);
-      loadCases(1);
+      loadCases(1, pageSize);
     }
   }, [filterStatus, filterSeverity, token, isSearchMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -93,7 +94,7 @@ export default function InvestigationPage() {
       setIsSearchMode(false);
       setSearchError(null);
       setPage(1);
-      loadCases(1);
+      loadCases(1, pageSize);
       return;
     }
 
@@ -184,14 +185,22 @@ export default function InvestigationPage() {
     setSearchError(null);
     setIsSearchMode(false);
     setPage(1);
-    loadCases(1);
+    loadCases(1, pageSize);
   }
 
   function handlePageChange(newPage: number) {
     setPage(newPage);
     if (!isSearchMode) {
-      loadCases(newPage);
+      loadCases(newPage, pageSize);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  function handleLimitChange(newLimit: number) {
+    setPageSize(newLimit);
+    setPage(1);
+    if (!isSearchMode) {
+      loadCases(1, newLimit);
     }
   }
 
@@ -286,8 +295,11 @@ export default function InvestigationPage() {
               page={page}
               totalPages={totalPages}
               total={total}
-              limit={PAGE_SIZE}
+              limit={pageSize}
               onPageChange={handlePageChange}
+              onLimitChange={handleLimitChange}
+              limitOptions={[10, 20, 50, 100]}
+              noun="cases"
             />
           </>
         )}
