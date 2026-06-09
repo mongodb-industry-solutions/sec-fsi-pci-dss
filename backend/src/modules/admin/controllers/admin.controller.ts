@@ -3,7 +3,7 @@ import * as crypto from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import * as os from 'os';
 import * as fs from 'fs';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import * as path from 'path';
 import { logBuffer, appendLog } from '../../../shared/logBuffer';
 
@@ -104,6 +104,55 @@ function updateEnvFile(key: string, value: string): void {
   }
 
   fs.writeFileSync(ENV_PATH, updated.join(eol), 'utf-8');
+}
+
+/** Parses the frontend port from CORS_ORIGIN (defaults to 3000). */
+function getFrontendPort(): number {
+  const origin = process.env.CORS_ORIGIN ?? 'http://localhost:3000';
+  try {
+    const p = new URL(origin).port;
+    return p ? parseInt(p, 10) : 3000;
+  } catch {
+    return 3000;
+  }
+}
+
+/** Cross-platform: kills the process listening on the given TCP port. */
+function killProcessOnPort(port: number): void {
+  try {
+    if (process.platform === 'win32') {
+      const out = execSync(`netstat -ano | findstr ":${port} "`, {
+        encoding: 'utf-8', shell: true,
+      });
+      for (const line of out.split('\n')) {
+        if (/LISTEN/i.test(line)) {
+          const pid = line.trim().split(/\s+/).pop() ?? '';
+          if (/^\d+$/.test(pid) && pid !== '0') {
+            try { execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore', shell: true }); } catch {}
+          }
+        }
+      }
+    } else {
+      const pids = execSync(`lsof -ti:${port} -sTCP:LISTEN 2>/dev/null || echo ''`, {
+        encoding: 'utf-8', shell: true,
+      }).trim().split('\n').filter(Boolean);
+      for (const pid of pids) {
+        try { process.kill(parseInt(pid, 10), 'SIGTERM'); } catch {}
+      }
+    }
+  } catch { /* no process on port — nothing to kill */ }
+}
+
+/** Spawns a new frontend dev server from the project root (detached, untracked). */
+function spawnFrontend(): void {
+  const child = spawn('npm', ['run', 'dev:frontend'], {
+    cwd: PROJECT_ROOT,
+    detached: true,
+    stdio: 'ignore',
+    shell: true,
+    env: { ...process.env },
+  });
+  child.unref();
 }
 
 const ALLOWED_NPM_COMMANDS: Record<string, string[]> = {
@@ -533,5 +582,65 @@ export async function adminController(fastify: FastifyInstance) {
     process.env[key] = value;
 
     return reply.send({ updated: true, reloadRequired: true });
+  });
+
+  // POST /admin/restart
+  fastify.post('/restart', {
+    schema: {
+      tags: ['admin'],
+      summary: 'Restart backend or frontend server',
+      description: [
+        'backend — calls process.exit(0); tsx watch auto-restarts the backend.',
+        'frontend — kills the process on the configured frontend port (CORS_ORIGIN) and spawns a new dev server.',
+      ].join(' '),
+      security: [{ adminAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['target'],
+        properties: {
+          target: {
+            type: 'string',
+            enum: ['backend', 'frontend'],
+          },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            ok:      { type: 'boolean' },
+            message: { type: 'string' },
+          },
+        },
+        401: { $ref: 'Error#' },
+        429: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const ip = request.ip ?? 'unknown';
+    const rl = checkOpsRateLimit(ip);
+    if (!rl.allowed) {
+      reply.header('Retry-After', String(rl.retryAfter));
+      return reply.status(429).send({ error: `Too many requests. Retry after ${rl.retryAfter}s.` });
+    }
+    if (!verifyAdminToken(request.headers.authorization)) {
+      return reply.status(401).send({ error: 'Invalid admin token' });
+    }
+
+    const { target } = request.body as { target: 'backend' | 'frontend' };
+
+    if (target === 'frontend') {
+      const port = getFrontendPort();
+      killProcessOnPort(port);
+      await new Promise((r) => setTimeout(r, 600));
+      spawnFrontend();
+      appendLog(`[admin] Frontend restart initiated on port ${port}`);
+      return reply.send({ ok: true, message: `Frontend restarting on port ${port}` });
+    }
+
+    // Backend: flush response, then exit so tsx watch can restart
+    appendLog('[admin] Backend restart initiated');
+    await reply.send({ ok: true, message: 'Backend restarting...' });
+    setTimeout(() => process.exit(0), 800);
   });
 }

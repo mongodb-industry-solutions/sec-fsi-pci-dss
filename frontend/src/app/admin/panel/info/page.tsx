@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../../../../lib/constants';
 import { getAdminToken, downloadText } from '../../../../lib/adminHelpers';
-import { Download, Pencil, X, Check, RotateCcw, Plus } from 'lucide-react';
+import { Download, Pencil, X, Check, RotateCcw, Plus, RefreshCw } from 'lucide-react';
 
 interface SystemInfo {
   os: Record<string, unknown>;
@@ -25,6 +25,8 @@ function isAppVar(key: string, dotenvSet: Set<string>): boolean {
   return APP_VAR_PREFIXES.some(p => key.startsWith(p)) || APP_VAR_EXACT.has(key);
 }
 
+type RestartTarget = 'backend' | 'frontend';
+
 export default function InfoPage() {
   const [sysInfo, setSysInfo] = useState<SystemInfo | null>(null);
   const [sysLoading, setSysLoading] = useState(false);
@@ -32,6 +34,12 @@ export default function InfoPage() {
   const [envFilter, setEnvFilter] = useState('');
   const [restartRequired, setRestartRequired] = useState(false);
   const [addingVar, setAddingVar] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState<RestartTarget | null>(null);
+  const [restarting, setRestarting] = useState<RestartTarget | null>(null);
+  const [restartStatus, setRestartStatus] = useState<{ ok: boolean; msg: string } | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   function handleDownload() {
     if (!sysInfo) return;
@@ -94,6 +102,48 @@ export default function InfoPage() {
     await fetchSysInfo();
   }
 
+  async function restartServer(target: RestartTarget) {
+    const token = getAdminToken();
+    if (!token) return;
+    setConfirmTarget(null);
+    setRestarting(target);
+    setRestartStatus(null);
+
+    try {
+      await fetch(`${API_BASE_URL}/api/v1/admin/restart`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ target }),
+      });
+    } catch {
+      // backend restart triggers a connection reset — this is expected
+    }
+
+    if (target === 'backend') {
+      setRestartStatus({ ok: false, msg: 'Backend restarting — reconnecting...' });
+      pollRef.current = setInterval(async () => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/v1/admin/system`, {
+            headers: { Authorization: `Bearer ${getAdminToken() ?? ''}` },
+          });
+          // Any HTTP response (200 or 401) means the server is back up
+          if (res.status > 0) {
+            clearInterval(pollRef.current!);
+            setRestarting(null);
+            setRestartStatus({ ok: true, msg: 'Backend is back online' });
+            fetchSysInfo();
+            setTimeout(() => setRestartStatus(null), 4000);
+          }
+        } catch { /* still restarting */ }
+      }, 2000);
+    }
+
+    if (target === 'frontend') {
+      setRestartStatus({ ok: false, msg: 'Frontend restarting — page will reload in ~10s' });
+      setTimeout(() => window.location.reload(), 10000);
+    }
+  }
+
   useEffect(() => {
     fetchSysInfo();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -116,8 +166,76 @@ export default function InfoPage() {
         >
           <Download size={12} /> Download
         </button>
+
+        {/* Server restart controls */}
+        <div className="flex items-center gap-2 border-l border-gray-700 pl-3">
+          <span className="text-xs text-gray-600 flex-shrink-0">Restart:</span>
+
+          {confirmTarget === 'backend' ? (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-yellow-400">Restart backend?</span>
+              <button
+                onClick={() => restartServer('backend')}
+                className="text-xs text-red-400 hover:text-red-300 px-1.5 py-0.5 rounded border border-red-900/50 hover:border-red-700 transition-colors"
+              >
+                Yes
+              </button>
+              <button onClick={() => setConfirmTarget(null)} className="text-xs text-gray-500 hover:text-gray-300 transition-colors">No</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmTarget('backend')}
+              disabled={!!restarting}
+              title="Restart backend (tsx watch auto-restarts it)"
+              className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-yellow-400 disabled:opacity-30 transition-colors"
+            >
+              {restarting === 'backend'
+                ? <span className="w-3 h-3 border-2 border-yellow-400/30 border-t-yellow-400 rounded-full animate-spin" />
+                : <RefreshCw size={11} />
+              }
+              Backend
+            </button>
+          )}
+
+          {confirmTarget === 'frontend' ? (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-yellow-400">Restart frontend?</span>
+              <button
+                onClick={() => restartServer('frontend')}
+                className="text-xs text-red-400 hover:text-red-300 px-1.5 py-0.5 rounded border border-red-900/50 hover:border-red-700 transition-colors"
+              >
+                Yes
+              </button>
+              <button onClick={() => setConfirmTarget(null)} className="text-xs text-gray-500 hover:text-gray-300 transition-colors">No</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmTarget('frontend')}
+              disabled={!!restarting}
+              title="Restart frontend dev server (page reloads automatically)"
+              className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-blue-400 disabled:opacity-30 transition-colors"
+            >
+              {restarting === 'frontend'
+                ? <span className="w-3 h-3 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                : <RefreshCw size={11} />
+              }
+              Frontend
+            </button>
+          )}
+        </div>
+
         {sysError && <span className="text-xs text-red-400">{sysError}</span>}
-        {restartRequired && (
+        {restartStatus && (
+          <span className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border ${
+            restartStatus.ok
+              ? 'text-green-400 bg-green-400/10 border-green-400/30'
+              : 'text-yellow-400 bg-yellow-400/10 border-yellow-400/30'
+          }`}>
+            {!restartStatus.ok && <span className="w-2.5 h-2.5 border-2 border-yellow-400/30 border-t-yellow-400 rounded-full animate-spin" />}
+            {restartStatus.msg}
+          </span>
+        )}
+        {!restartStatus && restartRequired && (
           <span className="flex items-center gap-1.5 text-xs text-yellow-400 bg-yellow-400/10 border border-yellow-400/30 px-2.5 py-1 rounded-lg">
             <RotateCcw size={11} />
             Variables updated — restart the server to apply all changes
