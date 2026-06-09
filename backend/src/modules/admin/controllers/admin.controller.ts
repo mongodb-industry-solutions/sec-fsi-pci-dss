@@ -122,19 +122,19 @@ function killProcessOnPort(port: number): void {
   try {
     if (process.platform === 'win32') {
       const out = execSync(`netstat -ano | findstr ":${port} "`, {
-        encoding: 'utf-8', shell: true,
+        encoding: 'utf-8', shell: 'cmd.exe',
       });
       for (const line of out.split('\n')) {
         if (/LISTEN/i.test(line)) {
           const pid = line.trim().split(/\s+/).pop() ?? '';
           if (/^\d+$/.test(pid) && pid !== '0') {
-            try { execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore', shell: true }); } catch {}
+            try { execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' }); } catch {}
           }
         }
       }
     } else {
       const pids = execSync(`lsof -ti:${port} -sTCP:LISTEN 2>/dev/null || echo ''`, {
-        encoding: 'utf-8', shell: true,
+        encoding: 'utf-8', shell: '/bin/sh',
       }).trim().split('\n').filter(Boolean);
       for (const pid of pids) {
         try { process.kill(parseInt(pid, 10), 'SIGTERM'); } catch {}
