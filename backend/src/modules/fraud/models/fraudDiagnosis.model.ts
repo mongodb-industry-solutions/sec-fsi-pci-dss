@@ -48,6 +48,9 @@ export interface FraudDiagnosisControlRecord {
     escalatedToInstanceReference: string;
   };
 
+  // Set when L2 approves the escalation; cleared when L2 rejects it back to L1
+  fraudDiagnosisEscalationAcceptedAt?: Date | null;
+
   // Operational notes (appended by analysts, visible to L1/L2/Auditor)
   fraudDiagnosisCaseNotes?: string;
 

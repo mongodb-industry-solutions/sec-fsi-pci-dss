@@ -139,6 +139,20 @@ export default function DemoCaseDetailPage() {
     }
   }
 
+  async function handleCancelEscalation() {
+    setActionBusy(true);
+    setActionMsg(null);
+    try {
+      await api.fraud.update(caseId, { fraudDiagnosisCaseStatus: 'under_review' }, token);
+      await reload(token);
+      setActionMsg('Escalation cancelled. Case returned to under review.');
+    } catch (err) {
+      setActionMsg(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
   async function handleEscalate() {
     setActionBusy(true);
     setActionMsg(null);
@@ -146,6 +160,20 @@ export default function DemoCaseDetailPage() {
       await api.fraud.escalate(caseId, { escalationReason: 'Risk exceeds L1 threshold. Requesting L2 review.' }, token);
       await reload(token);
       setActionMsg('Case escalated to Level 2 Investigator.');
+    } catch (err) {
+      setActionMsg(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function handleRejectEscalation() {
+    setActionBusy(true);
+    setActionMsg(null);
+    try {
+      await api.fraud.escalateReject(caseId, {}, token);
+      await reload(token);
+      setActionMsg('Escalation rejected. Case returned to L1 for re-analysis.');
     } catch (err) {
       setActionMsg(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
@@ -185,6 +213,9 @@ export default function DemoCaseDetailPage() {
   const score = fraudCase.fraudDiagnosisAssessment?.fraudDiagnosisScore;
   const caseStatus = fraudCase.caseStatus;
   const isResolved = ['resolved_cleared', 'resolved_fraud', 'closed'].includes(caseStatus);
+  const isEscalated = caseStatus === 'escalated';
+  // Persisted on the case document — survives page refresh
+  const l2HasAccepted = !!fraudCase.escalationAcceptedAt;
 
   const formattedAmount = snap
     ? new Intl.NumberFormat('en-US', { style: 'currency', currency: snap.cardTransactionAmount.currency })
@@ -399,24 +430,49 @@ export default function DemoCaseDetailPage() {
           <div className="bg-white rounded-xl border p-5">
             <h2 className="font-semibold mb-3">L1 Analyst Actions</h2>
             <div className="space-y-2">
-              {(caseStatus === 'open' || caseStatus === 'under_review') && (
+              {/* Not escalated: normal actions */}
+              {!isEscalated && (
+                <>
+                  {(caseStatus === 'open' || caseStatus === 'under_review') && (
+                    <button
+                      onClick={handleEscalate}
+                      disabled={actionBusy}
+                      className="w-full inline-flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition-colors"
+                    >
+                      <ArrowUpFromLine size={14} />
+                      Escalate to Level 2 Investigator
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleAction({ fraudDiagnosisCaseStatus: 'resolved_cleared', resolutionOutcome: 'cleared', resolutionNotes: 'Cleared by L1 analyst as false positive.' }, 'Case closed as false positive.')}
+                    disabled={actionBusy}
+                    className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-green-600 text-green-700 text-sm font-medium hover:bg-green-50 disabled:opacity-50 transition-colors"
+                  >
+                    <CheckCircle size={14} />
+                    Close - False Positive
+                  </button>
+                </>
+              )}
+
+              {/* Escalated: cancel only if L2 hasn't accepted yet */}
+              {isEscalated && !l2HasAccepted && (
                 <button
-                  onClick={handleEscalate}
+                  onClick={handleCancelEscalation}
                   disabled={actionBusy}
-                  className="w-full inline-flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition-colors"
+                  className="w-full inline-flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-amber-500 text-amber-700 text-sm font-medium hover:bg-amber-50 disabled:opacity-50 transition-colors"
                 >
-                  <ArrowUpFromLine size={14} />
-                  Escalate to Level 2 Investigator
+                  <XCircle size={14} />
+                  Cancel Escalation
                 </button>
               )}
-              <button
-                onClick={() => handleAction({ fraudDiagnosisCaseStatus: 'resolved_cleared', resolutionOutcome: 'cleared', resolutionNotes: 'Cleared by L1 analyst as false positive.' }, 'Case closed as false positive.')}
-                disabled={actionBusy}
-                className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-green-600 text-green-700 text-sm font-medium hover:bg-green-50 disabled:opacity-50 transition-colors"
-              >
-                <CheckCircle size={14} />
-                Close - False Positive
-              </button>
+
+              {/* Escalated and L2 accepted: read-only notice */}
+              {isEscalated && l2HasAccepted && (
+                <div className="rounded-lg bg-purple-50 border border-purple-200 p-3 text-sm text-purple-800">
+                  L2 investigator has accepted this case. No further actions available for L1.
+                </div>
+              )}
+
               <button onClick={() => setShowNoteForm((v) => !v)} className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border text-gray-700 text-sm font-medium hover:bg-gray-50">
                 <StickyNote size={14} />
                 {showNoteForm ? 'Cancel' : 'Add Notes'}
@@ -471,7 +527,8 @@ export default function DemoCaseDetailPage() {
           <div className="bg-white rounded-xl border p-5">
             <h2 className="font-semibold mb-3">L2 Investigator Actions</h2>
             <div className="space-y-2">
-              {caseStatus === 'escalated' && !escalationToken && (
+              {/* Approve: only when escalated and not yet accepted */}
+              {isEscalated && !l2HasAccepted && (
                 <button
                   onClick={handleApproveEscalation}
                   disabled={actionBusy}
@@ -481,12 +538,30 @@ export default function DemoCaseDetailPage() {
                   Approve Escalation - Access Sensitive Fields
                 </button>
               )}
-              {escalationToken && (
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs">
-                  <p className="font-semibold text-purple-800 mb-1">Escalation approved - sensitive fields accessible</p>
-                  {debugMode && <p className="font-mono text-purple-600">Token: {escalationToken}</p>}
-                  <p className="text-purple-700">Valid for 4 hours. Include in X-Escalation-Token header.</p>
-                </div>
+              {/* Accepted state: show token info + reject option */}
+              {isEscalated && l2HasAccepted && (
+                <>
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs">
+                    <p className="font-semibold text-purple-800 mb-1">Escalation accepted — sensitive fields accessible</p>
+                    {escalationToken && debugMode && <p className="font-mono text-purple-600">Token: {escalationToken}</p>}
+                    {!escalationToken && <p className="text-purple-700 italic">Re-open this page or click below to renew your access token.</p>}
+                    <button
+                      onClick={handleApproveEscalation}
+                      disabled={actionBusy}
+                      className="mt-2 text-xs px-2 py-1 rounded border border-purple-400 text-purple-700 hover:bg-purple-100 disabled:opacity-50"
+                    >
+                      Renew access token
+                    </button>
+                  </div>
+                  <button
+                    onClick={handleRejectEscalation}
+                    disabled={actionBusy}
+                    className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-red-400 text-red-700 text-sm font-medium hover:bg-red-50 disabled:opacity-50 transition-colors"
+                  >
+                    <XCircle size={14} />
+                    Reject Escalation - Return to L1
+                  </button>
+                </>
               )}
               <button
                 onClick={() => handleAction({ fraudDiagnosisCaseStatus: 'resolved_fraud', resolutionOutcome: 'confirmed_fraud', resolutionNotes: 'Fraud confirmed by L2 investigator after full analysis.' }, 'Case resolved as confirmed fraud.')}
@@ -557,8 +632,14 @@ export default function DemoCaseDetailPage() {
                   <span className="text-gray-400 font-mono text-xs whitespace-nowrap mt-0.5">
                     {new Date(e.actionDateTime).toLocaleString()}
                   </span>
-                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium shrink-0 ${ACTION_COLORS[e.actionType] ?? 'bg-gray-100 text-gray-700'}`}>
-                    {ACTION_LABELS[e.actionType] ?? e.actionType.replace(/_/g, ' ')}
+                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium shrink-0 ${
+                    e.actionType === 'assigned' && e.actionDetails?.action === 'escalation_rejected' ? 'bg-red-100 text-red-700' :
+                    e.actionType === 'assigned' && e.actionDetails?.action === 'escalation_cancelled' ? 'bg-amber-100 text-amber-700' :
+                    ACTION_COLORS[e.actionType] ?? 'bg-gray-100 text-gray-700'
+                  }`}>
+                    {e.actionType === 'assigned' && e.actionDetails?.action === 'escalation_rejected' ? 'Escalation rejected by L2' :
+                     e.actionType === 'assigned' && e.actionDetails?.action === 'escalation_cancelled' ? 'Escalation cancelled by L1' :
+                     ACTION_LABELS[e.actionType] ?? e.actionType.replace(/_/g, ' ')}
                   </span>
                   <span className="text-gray-500 text-xs">{PERFORMER_LABELS[e.performedByRole] ?? e.performedByRole}</span>
                   {debugMode && e.actionDetails && Object.keys(e.actionDetails).length > 0 && (

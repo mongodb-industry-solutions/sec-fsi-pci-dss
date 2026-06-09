@@ -4,6 +4,7 @@ import { getTransactionById } from '../../transactions/services/cardTransaction.
 import { generateToken } from '../../../vendors/security/escalationTokens';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
+import type { DemoRequest } from '../../../shared/models/identity.model';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
 
@@ -336,6 +337,7 @@ without creating a duplicate.
       fraudDiagnosisCaseNotes: fraudCase.fraudDiagnosisCaseNotes ?? null,
       fraudDiagnosisCustomerSubjectNotes: fraudCase.fraudDiagnosisCustomerSubjectNotes ?? null,
       fraudDiagnosisResolutionRecord: fraudCase.fraudDiagnosisResolutionRecord ?? null,
+      escalationAcceptedAt: fraudCase.fraudDiagnosisEscalationAcceptedAt ?? null,
       requestDateTime: fraudCase.fraudDiagnosisRequestDateTime,
     });
   });
@@ -380,6 +382,7 @@ without creating a duplicate.
         },
         400: { $ref: 'Error#' },
         401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
         404: { $ref: 'Error#' },
       },
     },
@@ -393,6 +396,19 @@ without creating a duplicate.
       resolutionOutcome?: 'cleared' | 'confirmed_fraud' | 'referred';
       resolutionNotes?: string;
     };
+
+    // Role-based validation: L1 cannot close/resolve an escalated case
+    if (body.fraudDiagnosisCaseStatus) {
+      const { demoRole } = request as unknown as DemoRequest;
+      const TERMINAL_STATUSES = ['resolved_cleared', 'resolved_fraud', 'closed'];
+      if (demoRole === 'level1_analyst' && TERMINAL_STATUSES.includes(body.fraudDiagnosisCaseStatus)) {
+        const currentCase = await getCaseById(fastify.db, id);
+        if (!currentCase) return reply.status(404).send({ error: 'Fraud case not found' });
+        if (currentCase.fraudDiagnosisCaseStatus === 'escalated') {
+          return reply.status(403).send({ error: 'L1 analysts cannot close or resolve a case that has been escalated to L2' });
+        }
+      }
+    }
 
     const patch: Parameters<typeof updateCase>[2] = {};
     if (body.fraudDiagnosisCaseStatus) patch.fraudDiagnosisCaseStatus = body.fraudDiagnosisCaseStatus as never;
@@ -412,19 +428,24 @@ without creating a duplicate.
     const result = await updateCase(fastify.db, id, patch);
     if (!result) return reply.status(404).send({ error: 'Fraud case not found' });
 
+    const { demoRole: callerRole } = request as unknown as DemoRequest;
+
     // Write audit event for status changes and note additions
     const actionType = body.fraudDiagnosisCaseStatus === 'resolved_cleared' || body.fraudDiagnosisCaseStatus === 'resolved_fraud' || body.fraudDiagnosisCaseStatus === 'closed'
       ? 'resolved' as const
+      : body.fraudDiagnosisCaseStatus === 'under_review' || body.fraudDiagnosisCaseStatus === 'open'
+      ? 'assigned' as const
       : body.fraudDiagnosisCaseNotes || body.fraudDiagnosisCustomerSubjectNotes
       ? 'note_added' as const
       : undefined;
 
     if (actionType) {
-      await appendAuditEvent(fastify.db, id, actionType, 'level1_analyst', {
+      await appendAuditEvent(fastify.db, id, actionType, callerRole, {
         newStatus: body.fraudDiagnosisCaseStatus,
         hasInternalNote: !!body.fraudDiagnosisCaseNotes,
         hasCustomerNote: !!body.fraudDiagnosisCustomerSubjectNotes,
         resolutionOutcome: body.resolutionOutcome,
+        ...(body.fraudDiagnosisCaseStatus === 'under_review' && { action: 'escalation_cancelled' }),
       });
     }
 
@@ -753,6 +774,7 @@ Token TTL: 4 hours. Use \`POST /fraud/:id/escalate/approve\` again to renew.`,
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 4 * 60 * 60 * 1000);
 
+    await updateCase(fastify.db, id, { fraudDiagnosisEscalationAcceptedAt: now });
     await appendAuditEvent(fastify.db, id, 'field_accessed', 'level2_investigator', {
       action: 'escalation_approved',
       approvalNotes: approvalNotes ?? null,
@@ -766,6 +788,68 @@ Token TTL: 4 hours. Use \`POST /fraud/:id/escalate/approve\` again to renew.`,
       escalationToken: token,
       escalationApprovedAt: now.toISOString(),
       tokenExpiresAt: expiresAt.toISOString(),
+    });
+  });
+
+  // POST /api/v1/fraud/:id/escalate/reject  — L2 returns case to L1 for re-analysis
+  fastify.post('/:id/escalate/reject', {
+    schema: {
+      tags: ['fraud'],
+      summary: 'Reject escalation and return case to L1 (FR-v2)',
+      description: `L2 investigator rejects the escalation, returning the case to L1 analyst for re-analysis.
+
+The case status is set back to \`under_review\`. L1 can then close it as a false positive or re-escalate.`,
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: { id: { type: 'string', description: '`fraudDiagnosisInstanceReference` UUID.' } },
+      },
+      body: {
+        type: 'object',
+        properties: {
+          rejectionNotes: { type: 'string', description: 'Optional notes explaining the rejection decision.' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            fraudDiagnosisInstanceReference: { type: 'string' },
+            fraudDiagnosisCaseStatus: { type: 'string', enum: ['under_review'] },
+            rejectedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        404: { $ref: 'Error#' },
+        422: { description: 'Case is not in escalated status.', $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { rejectionNotes } = (request.body as { rejectionNotes?: string }) ?? {};
+
+    const fraudCase = await getCaseById(fastify.db, id);
+    if (!fraudCase) return reply.status(404).send({ error: 'Fraud case not found' });
+    if (fraudCase.fraudDiagnosisCaseStatus !== 'escalated') {
+      return reply.status(422).send({ error: 'Case must be in escalated status to reject' });
+    }
+
+    const now = new Date();
+    await updateCase(fastify.db, id, {
+      fraudDiagnosisCaseStatus: 'under_review',
+      fraudDiagnosisEscalationAcceptedAt: null,
+    });
+
+    await appendAuditEvent(fastify.db, id, 'assigned', 'level2_investigator', {
+      action: 'escalation_rejected',
+      rejectionNotes: rejectionNotes ?? null,
+      rejectedAt: now.toISOString(),
+    });
+
+    return reply.send({
+      fraudDiagnosisInstanceReference: id,
+      fraudDiagnosisCaseStatus: 'under_review',
+      rejectedAt: now.toISOString(),
     });
   });
 }

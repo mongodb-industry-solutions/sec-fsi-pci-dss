@@ -102,6 +102,7 @@ export async function updateCase(
     fraudDiagnosisCustomerSubjectNotes?: string;
     fraudDiagnosisAnalystInstanceReference?: string;
     fraudDiagnosisResolutionRecord?: FraudDiagnosisControlRecord['fraudDiagnosisResolutionRecord'];
+    fraudDiagnosisEscalationAcceptedAt?: Date | null;
   }
 ) {
   const now = new Date();
@@ -117,6 +118,8 @@ export async function updateCase(
     update['fraudDiagnosisCaseNotes'] = patch.fraudDiagnosisCaseNotes;
   if (patch.fraudDiagnosisCustomerSubjectNotes !== undefined)
     update['fraudDiagnosisCustomerSubjectNotes'] = patch.fraudDiagnosisCustomerSubjectNotes;
+  if ('fraudDiagnosisEscalationAcceptedAt' in patch)
+    update['fraudDiagnosisEscalationAcceptedAt'] = patch.fraudDiagnosisEscalationAcceptedAt ?? null;
 
   const result = await db.collection(FRAUD_DIAGNOSIS_COLLECTION).findOneAndUpdate(
     { fraudDiagnosisInstanceReference: id },
