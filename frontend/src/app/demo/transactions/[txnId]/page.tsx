@@ -144,12 +144,6 @@ export default function TransactionDetailPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm border-t pt-4">
-          <span className="text-gray-500">Merchant category</span>
-          <span className="font-mono text-xs">MCC {txn.cardTransactionMerchantCategoryCode ?? '-'}</span>
-
-          <span className="text-gray-500">Card</span>
-          <span className="font-mono">{txn.cardTransactionMaskedPanDisplay ?? '-'}</span>
-
           {txn.cardTransactionChannel && (
             <>
               <span className="text-gray-500">Channel</span>
@@ -162,27 +156,46 @@ export default function TransactionDetailPage() {
               <span>{INIT_LABELS[txn.cardTransactionInitiationType] ?? txn.cardTransactionInitiationType}</span>
             </>
           )}
-          {txn.paymentCardReference && (
+          {txn.cardTransactionMerchantCategoryCode && (
             <>
-              <span className="text-gray-500">Card token</span>
-              <span className="font-mono text-xs text-gray-600 truncate">{txn.paymentCardReference}</span>
+              <span className="text-gray-500">Merchant category</span>
+              <span className="font-mono text-xs">MCC {txn.cardTransactionMerchantCategoryCode}</span>
             </>
           )}
         </div>
       </div>
 
-      {/* QE:equality fields  -  Account Reference */}
+      {/* Cardholder Data — all fields that identify the cardholder */}
       <div className="bg-white rounded-xl border p-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-sm text-gray-700">Encrypted Fields</h2>
+          <h2 className="font-semibold text-sm text-gray-700">Cardholder Data</h2>
           <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
             {role === 'level1_analyst' ? 'L1 Access' : role === 'level2_investigator' ? 'L2 Access' : 'Auditor Access'}
           </span>
         </div>
 
         <div className="space-y-3">
+          {/* Visible cardholder identifiers */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
+            {txn.cardTransactionMaskedPanDisplay && (
+              <>
+                <span className="text-gray-500">Card number</span>
+                <span className="font-mono">{txn.cardTransactionMaskedPanDisplay}</span>
+              </>
+            )}
+            {txn.paymentCardReference && (
+              <>
+                <span className="text-gray-500">Card token</span>
+                <span className="font-mono text-xs text-gray-600 truncate">{txn.paymentCardReference}</span>
+              </>
+            )}
+          </div>
+
+          {/* Account Reference — QE:equality encrypted */}
           <div className="bg-blue-50 rounded-lg p-3">
-            <p className="text-xs font-semibold text-blue-700 uppercase mb-2">QE:equality  -  searchable while encrypted</p>
+            {debugMode && (
+              <p className="text-xs font-semibold text-blue-700 uppercase mb-2">QE:equality  —  searchable while encrypted</p>
+            )}
             {txn.cardTransactionAccountReference ? (
               <RevealField
                 label="Account Reference"
@@ -197,55 +210,57 @@ export default function TransactionDetailPage() {
             )}
           </div>
 
-          {/* QE:none  -  Sensitive fields */}
-          <div className={`rounded-lg p-3 ${canSeeSensitive ? 'bg-purple-50' : 'bg-gray-50'}`}>
-            <div className="flex items-center justify-between mb-2">
-              <p className={`text-xs font-semibold uppercase ${canSeeSensitive ? 'text-purple-700' : 'text-gray-500'}`}>
-                QE:none  -  sensitive (DEK-sensitive)
-              </p>
-              {!canSeeSensitive && isL2 && !escalationToken && (
-                <button
-                  onClick={approveAndReveal}
-                  disabled={approving}
-                  className="text-xs px-2 py-1 rounded bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
-                >
-                  {approving ? 'Approving...' : 'Approve escalation'}
-                </button>
+          {/* QE:none — debug only: explains system architecture (DEK-sensitive, L2 escalation) */}
+          {debugMode && (
+            <div className={`rounded-lg p-3 ${canSeeSensitive ? 'bg-purple-50' : 'bg-gray-50'}`}>
+              <div className="flex items-center justify-between mb-2">
+                <p className={`text-xs font-semibold uppercase ${canSeeSensitive ? 'text-purple-700' : 'text-gray-500'}`}>
+                  QE:none  —  sensitive (DEK-sensitive)
+                </p>
+                {!canSeeSensitive && isL2 && !escalationToken && (
+                  <button
+                    onClick={approveAndReveal}
+                    disabled={approving}
+                    className="text-xs px-2 py-1 rounded bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
+                  >
+                    {approving ? 'Approving...' : 'Approve escalation'}
+                  </button>
+                )}
+              </div>
+
+              {canSeeSensitive && txn.sensitive ? (
+                <div className="space-y-2">
+                  {txn.sensitive.rawGatewayPayload && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-1">Raw Gateway Payload</p>
+                      <pre className="text-xs bg-white rounded border p-2 overflow-x-auto font-mono text-gray-700">
+                        {JSON.stringify(txn.sensitive.rawGatewayPayload, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  {txn.sensitive.processorTransactionMetadata && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-1">Processor Metadata</p>
+                      <pre className="text-xs bg-white rounded border p-2 overflow-x-auto font-mono text-gray-700">
+                        {JSON.stringify(txn.sensitive.processorTransactionMetadata, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {['Raw Gateway Payload', 'Processor Metadata'].map(f => (
+                    <div key={f} className="flex items-center gap-2">
+                      <EncryptionBadge label={f} type="qe-none" />
+                      <span className="text-gray-400 text-xs italic">
+                        {isL2 && !escalationToken ? 'Click "Approve escalation" above' : 'Requires Level 2 escalation approval'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-
-            {canSeeSensitive && txn.sensitive ? (
-              <div className="space-y-2">
-                {txn.sensitive.rawGatewayPayload && (
-                  <div>
-                    <p className="text-xs font-medium text-gray-600 mb-1">Raw Gateway Payload</p>
-                    <pre className="text-xs bg-white rounded border p-2 overflow-x-auto font-mono text-gray-700">
-                      {JSON.stringify(txn.sensitive.rawGatewayPayload, null, 2)}
-                    </pre>
-                  </div>
-                )}
-                {txn.sensitive.processorTransactionMetadata && (
-                  <div>
-                    <p className="text-xs font-medium text-gray-600 mb-1">Processor Metadata</p>
-                    <pre className="text-xs bg-white rounded border p-2 overflow-x-auto font-mono text-gray-700">
-                      {JSON.stringify(txn.sensitive.processorTransactionMetadata, null, 2)}
-                    </pre>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                {['Raw Gateway Payload', 'Processor Metadata'].map(f => (
-                  <div key={f} className="flex items-center gap-2">
-                    <EncryptionBadge label={f} type="qe-none" />
-                    <span className="text-gray-400 text-xs italic">
-                      {isL2 && !escalationToken ? 'Click "Approve escalation" above' : 'Requires Level 2 escalation approval'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
