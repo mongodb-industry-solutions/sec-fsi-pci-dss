@@ -212,9 +212,13 @@ function LogPanel({ title, logs, endRef, onClear, onDownload }: {
         {logs.length === 0 && <div className="text-gray-600 italic">Select a command to run...</div>}
         {logs.map((e, i) => (
           <div key={i} className={
-            e.type === 'error' ? 'text-red-400' :
-            e.type === 'start' ? 'text-orange-400 font-semibold' :
-            e.type === 'done'  ? 'text-green-400 font-semibold' :
+            e.type === 'error'            ? 'text-red-400' :
+            e.type === 'start'            ? 'text-orange-400 font-semibold' :
+            e.type === 'done'             ? 'text-green-400 font-semibold' :
+            e.text.includes('[FAIL]')     ? 'text-red-400' :
+            e.text.includes('[WARN]')     ? 'text-yellow-400' :
+            e.text.includes('[PASS]')     ? 'text-green-400' :
+            e.text.includes('[SKIP]')     ? 'text-gray-500' :
             'text-gray-300'
           }>
             {e.type === 'error' ? '[ERR] ' : ''}{e.text}
