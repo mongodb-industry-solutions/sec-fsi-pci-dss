@@ -13,6 +13,7 @@ interface StoredTransaction {
   merchant: string;
   mcc: string;
   channel: string;
+  cardTransactionType?: string;
   maskedPan: string;
   status: string;
   fraudCaseCreated: boolean;
@@ -20,6 +21,24 @@ interface StoredTransaction {
   createdAt: string;
   paymentReference?: string | null;
 }
+
+const TYPE_LABELS: Record<string, string> = {
+  purchase:         'Purchase',
+  refund:           'Refund',
+  cash_advance:     'Cash Advance',
+  balance_transfer: 'Transfer',
+  fee:              'Fee',
+  adjustment:       'Adjustment',
+};
+
+const TYPE_COLORS: Record<string, string> = {
+  purchase:         'bg-blue-50 text-blue-700 border border-blue-200',
+  refund:           'bg-green-50 text-green-700 border border-green-200',
+  cash_advance:     'bg-amber-50 text-amber-700 border border-amber-200',
+  balance_transfer: 'bg-purple-50 text-purple-700 border border-purple-200',
+  fee:              'bg-gray-100 text-gray-600',
+  adjustment:       'bg-gray-100 text-gray-600',
+};
 
 interface TransactionWithCase extends StoredTransaction {
   caseStatus?: string;
@@ -95,8 +114,8 @@ export default function TransactionHistoryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <main className="max-w-2xl mx-auto p-6">
-        <div className="flex justify-between items-center mb-5">
+      <main className="w-full px-5 sm:px-8 lg:px-12 py-6">
+        <div className="flex flex-wrap justify-between items-center gap-2 mb-5">
           <h1 className="text-2xl font-bold">My Transactions</h1>
           <Link href="/demo/payment" className="bg-[#001E2B] text-[#00ED64] px-4 py-2 rounded-lg text-sm font-semibold">
             New Payment
@@ -147,6 +166,11 @@ export default function TransactionHistoryPage() {
 
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className={`text-xs px-2 py-0.5 rounded font-medium ${color}`}>{label}</span>
+                      {txn.cardTransactionType && (
+                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${TYPE_COLORS[txn.cardTransactionType] ?? 'bg-gray-100 text-gray-600'}`}>
+                          {TYPE_LABELS[txn.cardTransactionType] ?? txn.cardTransactionType.replace(/_/g, ' ')}
+                        </span>
+                      )}
                       {txn.caseRef && (
                         <span className="text-xs text-gray-400 font-mono">{txn.caseRef}</span>
                       )}

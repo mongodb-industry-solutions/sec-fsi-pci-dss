@@ -146,7 +146,7 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-5">
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <h1 className="text-2xl font-bold">Customer Lookup</h1>
       <p className="text-sm text-gray-500">
         When a customer contacts support, search by their email, phone, or account reference

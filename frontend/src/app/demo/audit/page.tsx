@@ -55,7 +55,7 @@ export default function AuditPage() {
   return (
     <div className="min-h-screen bg-gray-50">
 
-      <main className="max-w-6xl mx-auto p-6">
+      <main className="w-full px-5 sm:px-8 lg:px-12 py-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold">Audit Log</h1>

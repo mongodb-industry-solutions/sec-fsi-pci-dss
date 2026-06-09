@@ -19,6 +19,9 @@ export interface CreateTransactionInput {
   cardTransactionMerchantCategoryCode: string;
   cardTransactionChannel: string;
   cardTransactionMaskedPanDisplay: string;
+  cardTransactionType: string;
+  cardTransactionDescription: string;
+  cardTransactionNarrative?: string;
   gatewayPayload: object;
 }
 
@@ -56,16 +59,19 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
     cardTransactionAmount: { amount: input.amount, currency: input.currency },
     cardTransactionDateTime: now,
     cardTransactionStatus: 'authorized',
+    cardTransactionType: input.cardTransactionType as CardTransactionLogControlRecord['cardTransactionType'],
     cardTransactionChannel: input.cardTransactionChannel as CardTransactionLogControlRecord['cardTransactionChannel'],
     cardTransactionInitiationType: 'customerInitiated',
     cardTransactionMerchantCategoryCode: input.cardTransactionMerchantCategoryCode,
     cardTransactionMerchantName: input.cardTransactionMerchantName,
     cardTransactionMaskedPanDisplay: input.cardTransactionMaskedPanDisplay,
+    cardTransactionDescription: input.cardTransactionDescription,
+    ...(input.cardTransactionNarrative && { cardTransactionNarrative: input.cardTransactionNarrative }),
     bianServiceDomain: 'Card Transaction',
     bianControlRecordType: 'CardTransactionLog',
     recordCreatedDateTime: now,
     recordUpdatedDateTime: now,
-    schemaVersion: 2,
+    schemaVersion: 3,
   };
 
   await txWriteDb.collection(CARD_TRANSACTION_COLLECTION).insertOne(txn as object);
@@ -139,11 +145,14 @@ export async function getTransactionById(
     cardTransactionAmount:               txn.cardTransactionAmount,
     cardTransactionDateTime:             txn.cardTransactionDateTime,
     cardTransactionStatus:               txn.cardTransactionStatus,
+    cardTransactionType:                 txn.cardTransactionType,
     cardTransactionMerchantName:         txn.cardTransactionMerchantName,
     cardTransactionMerchantCategoryCode: txn.cardTransactionMerchantCategoryCode,
     cardTransactionMaskedPanDisplay:     txn.cardTransactionMaskedPanDisplay,
     cardTransactionChannel:              txn.cardTransactionChannel,
     cardTransactionInitiationType:       txn.cardTransactionInitiationType,
+    cardTransactionDescription:          txn.cardTransactionDescription,
+    cardTransactionNarrative:            txn.cardTransactionNarrative,
     paymentCardReference:                txn.paymentCardReference,
     cardTransactionAccountReference:     txn.cardTransactionAccountReference,
     ...(gatewayDecrypted && {

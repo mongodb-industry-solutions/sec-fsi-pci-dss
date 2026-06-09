@@ -78,7 +78,15 @@ export default function TransactionDetailPage() {
   const [token, setToken] = useState('');
   const { debugMode } = useDebugMode();
   const [txn, setTxn] = useState<StoredTransaction | null>(null);
-  const [apiTxn, setApiTxn] = useState<{ paymentCardReference?: string; cardTransactionMerchantCategoryCode?: string; cardTransactionChannel?: string; cardTransactionInitiationType?: string } | null>(null);
+  const [apiTxn, setApiTxn] = useState<{
+    paymentCardReference?: string;
+    cardTransactionMerchantCategoryCode?: string;
+    cardTransactionChannel?: string;
+    cardTransactionInitiationType?: string;
+    cardTransactionType?: string;
+    cardTransactionDescription?: string;
+    cardTransactionNarrative?: string;
+  } | null>(null);
   const [fraudCase, setFraudCase] = useState<FraudCase | null>(null);
   const [caseNotes, setCaseNotes] = useState<{
     caseFound: boolean;
@@ -115,10 +123,13 @@ export default function TransactionDetailPage() {
       // even for transactions created before the localStorage cardToken field was added
       api.transactions.getById(txnId, t)
         .then((data) => setApiTxn({
-          paymentCardReference:             data.paymentCardReference,
+          paymentCardReference:                data.paymentCardReference,
           cardTransactionMerchantCategoryCode: data.cardTransactionMerchantCategoryCode,
-          cardTransactionChannel:           data.cardTransactionChannel,
-          cardTransactionInitiationType:    data.cardTransactionInitiationType,
+          cardTransactionChannel:              data.cardTransactionChannel,
+          cardTransactionInitiationType:       data.cardTransactionInitiationType,
+          cardTransactionType:                 data.cardTransactionType,
+          cardTransactionDescription:          data.cardTransactionDescription,
+          cardTransactionNarrative:            data.cardTransactionNarrative,
         }))
         .catch(() => null);
 
@@ -226,6 +237,27 @@ export default function TransactionDetailPage() {
 
           <span className="text-gray-500">Merchant category</span>
           <span className="font-mono text-xs">MCC {apiTxn?.cardTransactionMerchantCategoryCode ?? txn.mcc}</span>
+
+          {apiTxn?.cardTransactionType && (
+            <>
+              <span className="text-gray-500">Transaction type</span>
+              <span className="capitalize">{apiTxn.cardTransactionType.replace('_', ' ')}</span>
+            </>
+          )}
+
+          {apiTxn?.cardTransactionDescription && (
+            <>
+              <span className="text-gray-500">Statement descriptor</span>
+              <span className="font-mono text-xs">{apiTxn.cardTransactionDescription}</span>
+            </>
+          )}
+
+          {apiTxn?.cardTransactionNarrative && (
+            <>
+              <span className="text-gray-500">Description</span>
+              <span className="text-xs text-gray-700">{apiTxn.cardTransactionNarrative}</span>
+            </>
+          )}
 
           {txn.paymentReference && (
             <>
@@ -429,7 +461,7 @@ function PageShell({
 }) {
   return (
     <div className="min-h-full bg-gray-50">
-      <main className="max-w-xl mx-auto p-6">
+      <main className="w-full px-5 sm:px-8 lg:px-12 py-6">
         {children}
       </main>
     </div>

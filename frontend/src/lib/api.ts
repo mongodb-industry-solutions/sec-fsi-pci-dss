@@ -200,11 +200,14 @@ export const api = {
         cardTransactionAmount: { amount: number; currency: string };
         cardTransactionDateTime: string;
         cardTransactionStatus: string;
+        cardTransactionType?: string;
         cardTransactionMerchantName: string;
         cardTransactionMerchantCategoryCode?: string;
         cardTransactionMaskedPanDisplay: string;
         cardTransactionChannel?: string;
         cardTransactionInitiationType?: string;
+        cardTransactionDescription?: string;
+        cardTransactionNarrative?: string;
         paymentCardReference?: string;
         cardTransactionAccountReference?: string;
         sensitive?: {

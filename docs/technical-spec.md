@@ -214,21 +214,28 @@ export interface CardTransactionLogControlRecord {
   cardTransactionAmount: { amount: number; currency: string };
   cardTransactionDateTime: Date;
   cardTransactionStatus: CardTransactionStatus;
+  cardTransactionType: CardTransactionType;           // BIAN SD-254 classification
   cardTransactionChannel: CardTransactionChannel;
   cardTransactionInitiationType: CardTransactionInitiationType;
   cardTransactionMerchantCategoryCode: string;
   cardTransactionMerchantName: string;
   cardTransactionMaskedPanDisplay: string;
 
+  // BIAN SD-254 statement descriptor fields (plaintext, not CHD, no QE)
+  cardTransactionDescription: string;                 // Max 22 chars; visible on cardholder statement
+  cardTransactionNarrative?: string;                  // Extended context for fraud investigation
+
   bianServiceDomain: 'Card Transaction';
   bianControlRecordType: 'CardTransactionLog';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
-  schemaVersion: number;
+  schemaVersion: number;                              // Current: 3
 }
 
 export type CardTransactionStatus =
   'authorized' | 'declined' | 'pending' | 'settled' | 'disputed';
+export type CardTransactionType =
+  'purchase' | 'cash_advance' | 'balance_transfer' | 'refund' | 'fee' | 'adjustment';
 export type CardTransactionChannel =
   'online' | 'pos' | 'contactless' | 'atm';
 export type CardTransactionInitiationType = 'customerInitiated' | 'merchantInitiated';
@@ -839,9 +846,18 @@ Creates a transaction and optionally a fraud case.
   "cardTransactionMerchantCategoryCode": "5999",
   "cardTransactionChannel": "online",
   "cardTransactionMaskedPanDisplay": "****-****-****-1234",
+  "cardTransactionType": "purchase",
+  "cardTransactionDescription": "ONLINE STORE INC.",
+  "cardTransactionNarrative": "PURCHASE at Online Store Inc. — ref AB12CD34",
   "gatewayPayload": { "raw": "..." }
 }
 ```
+
+Required: `cardToken`, `accountReference`, `amount`, `currency`, `cardTransactionMerchantName`, `cardTransactionMerchantCategoryCode`, `cardTransactionChannel`, `cardTransactionMaskedPanDisplay`, `cardTransactionType`, `cardTransactionDescription`.
+Optional: `cardTransactionNarrative`, `gatewayPayload`.
+
+`cardTransactionType` enum: `purchase | cash_advance | balance_transfer | refund | fee | adjustment`
+`cardTransactionDescription`: max 22 chars, visible on cardholder bank statement (BIAN SD-254).
 
 **Response 201:**
 ```json
@@ -866,9 +882,12 @@ Returns transaction by ID (no QE field values returned to Level 1).
   "cardTransactionAmount": { "amount": 850.00, "currency": "USD" },
   "cardTransactionDateTime": "2026-05-26T14:30:00Z",
   "cardTransactionStatus": "authorized",
+  "cardTransactionType": "purchase",
   "cardTransactionMerchantName": "Online Store Inc.",
   "cardTransactionMerchantCategoryCode": "5999",
-  "cardTransactionMaskedPanDisplay": "****-****-****-1234"
+  "cardTransactionMaskedPanDisplay": "****-****-****-1234",
+  "cardTransactionDescription": "ONLINE STORE INC.",
+  "cardTransactionNarrative": "PURCHASE at Online Store Inc. — ref AB12CD34"
 }
 ```
 

@@ -106,8 +106,8 @@ function RevealField({
         )}
         {debugMode && collection && <CollectionChip name={collection} />}
       </div>
-      <div className="flex items-center gap-2">
-        <span className={`text-sm font-mono transition-all ${revealed ? 'text-gray-900' : 'text-gray-400 select-none'}`}>
+      <div className="flex items-center gap-2 min-w-0">
+        <span className={`text-sm font-mono transition-all break-all min-w-0 ${revealed ? 'text-gray-900' : 'text-gray-400 select-none'}`}>
           {revealed ? plainValue : maskedValue}
         </span>
         <button
@@ -130,7 +130,7 @@ function PlainField({ label, value, collection }: { label: string; value: string
         <span className="text-gray-500 text-sm">{label}</span>
         {debugMode && collection && <CollectionChip name={collection} />}
       </div>
-      <span className="text-sm text-gray-900">{value}</span>
+      <span className="text-sm text-gray-900 break-all">{value}</span>
     </>
   );
 }
@@ -241,7 +241,7 @@ export default function ProfilePage() {
   const hasGovId   = ag?.sensitive?.governmentIdentificationReference;
 
   return (
-    <div className="max-w-xl mx-auto p-6 space-y-5">
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">My Profile</h1>
         {!editing && (
@@ -289,7 +289,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3 border-t pt-4 items-start">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-t pt-4 items-start min-w-0">
 
           {/* Email — always read-only (login identity) */}
           <RevealField

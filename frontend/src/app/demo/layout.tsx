@@ -4,7 +4,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { getToken, decodeToken, isTokenExpired } from '../../lib/auth';
 import { ROLE_LABELS } from '../../lib/constants';
 import { DebugModeProvider, useDebugMode } from '../../lib/debugMode';
-import { DemoSidebar } from '../../components/DemoSidebar';
+import { DemoSidebar, MobileBottomNav } from '../../components/DemoSidebar';
 import Link from 'next/link';
 import { Settings, LogOut } from 'lucide-react';
 
@@ -44,22 +44,32 @@ function DemoShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
+  const ROLE_HOME: Record<string, string> = {
+    customer:            '/demo/payment/history',
+    level1_analyst:      '/demo/investigation',
+    level2_investigator: '/demo/investigation',
+    security_auditor:    '/demo/audit',
+  };
+  const roleHome = (user && ROLE_HOME[user.role]) ?? '/demo/payment/history';
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Top panel  -  sticky so it stays visible when content scrolls */}
       <header className="sticky top-0 z-20 bg-[#001E2B] text-white px-3 sm:px-4 py-3 flex justify-between items-center shrink-0 gap-2">
-        <span className="font-bold text-[#00ED64] text-sm sm:text-base whitespace-nowrap">🏦 Payment Gateway</span>
+        <Link href={roleHome} className="font-bold text-[#00ED64] text-sm sm:text-base whitespace-nowrap hover:text-[#00ED64]/80 transition-colors">
+          🏦 Payment Gateway
+        </Link>
         <div className="flex items-center gap-2 sm:gap-3 text-sm min-w-0">
           {user && (
-            <span className="hidden sm:inline bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded truncate max-w-48">
+            <Link href="/demo/profile" className="hidden sm:inline bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded truncate max-w-48 hover:bg-blue-500/30 transition-colors">
               {user.name} · {ROLE_LABELS[user.role] ?? user.role}
-            </span>
+            </Link>
           )}
           {/* Compact user chip on small screens */}
           {user && (
-            <span className="sm:hidden bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded text-xs truncate max-w-24">
+            <Link href="/demo/profile" className="sm:hidden bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded text-xs truncate max-w-24 hover:bg-blue-500/30 transition-colors">
               {user.name.split(' ')[0]}
-            </span>
+            </Link>
           )}
           <button
             onClick={toggleDebug}
@@ -83,10 +93,11 @@ function DemoShell({ children }: { children: React.ReactNode }) {
       {/* Sidebar + content row — document scrolls, sidebar is sticky */}
       <div className="flex flex-1">
         <DemoSidebar />
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 pb-16 md:pb-0">
           {children}
         </div>
       </div>
+      <MobileBottomNav />
     </div>
   );
 }

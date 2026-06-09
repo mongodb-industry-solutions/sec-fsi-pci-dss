@@ -239,22 +239,28 @@ interface CardTransactionLogControlRecord {
   cardTransactionAccountReference: string;        // QE:equality: account reference
 
   // Transaction metadata (plaintext)
-  transactionAmount: {
+  cardTransactionAmount: {
     amount: number;                               // QE:range in v2
     currency: string;                             // ISO 4217
   };
-  transactionDateTime: Date;
-  transactionStatus: 'authorized' | 'declined' | 'pending' | 'settled' | 'disputed';
-  transactionChannel: 'online' | 'pos' | 'contactless' | 'atm';
-  merchantCategoryCode: string;                   // MCC code (plaintext)
-  merchantName: string;                           // plaintext
-  maskedPanDisplay: string;                       // plaintext: display only: ****-****-****-1234
+  cardTransactionDateTime: Date;
+  cardTransactionStatus: 'authorized' | 'declined' | 'pending' | 'settled' | 'disputed';
+  cardTransactionType: 'purchase' | 'cash_advance' | 'balance_transfer' | 'refund' | 'fee' | 'adjustment';
+  cardTransactionChannel: 'online' | 'pos' | 'contactless' | 'atm';
+  cardTransactionMerchantCategoryCode: string;    // MCC code (plaintext)
+  cardTransactionMerchantName: string;            // plaintext
+  cardTransactionMaskedPanDisplay: string;        // plaintext: display only: ****-****-****-1234
+
+  // BIAN SD-254 statement descriptor fields (plaintext, not CHD — no QE required)
+  cardTransactionDescription: string;             // max 22 chars; appears on cardholder bank statement
+  cardTransactionNarrative?: string;              // extended context for L1/L2 fraud investigation
 
   // BIAN metadata
-  bianServiceDomain: 'CardTransaction';
+  bianServiceDomain: 'Card Transaction';
   bianControlRecordType: 'CardTransactionLog';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
+  schemaVersion: number;                          // current: 3
 }
 ```
 

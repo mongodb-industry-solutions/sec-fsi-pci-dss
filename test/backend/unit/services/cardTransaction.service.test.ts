@@ -35,6 +35,8 @@ const baseInput = {
   cardTransactionMerchantCategoryCode: '5411',
   cardTransactionChannel: 'online',
   cardTransactionMaskedPanDisplay: '****-****-****-1234',
+  cardTransactionType: 'purchase' as const,
+  cardTransactionDescription: 'SAFE STORE',
   gatewayPayload: { source: 'test' },
 };
 
@@ -97,6 +99,43 @@ describe('createTransaction', () => {
     const db = makeDb();
     const result = await createTransaction(db, { ...baseInput, amount: 50, cardTransactionMerchantCategoryCode: '7995' });
     expect(result.fraudCaseCreated).toBe(false);
+  });
+
+  // U-01: cardTransactionDescription accepted and function returns successfully (BIAN SD-254)
+  it('U-01: accepts cardTransactionDescription and returns authorized status', async () => {
+    const db = makeDb();
+    const result = await createTransaction(db, { ...baseInput, cardTransactionDescription: 'AMAZON.COM*ELECTRONI' });
+    expect(result.cardTransactionStatus).toBe('authorized');
+    expect(result.cardTransactionInstanceReference).toBeTruthy();
+  });
+
+  // U-02: cardTransactionType accepted without error
+  it('U-02: accepts all valid cardTransactionType values', async () => {
+    const types = ['purchase', 'cash_advance', 'balance_transfer', 'refund', 'fee', 'adjustment'] as const;
+    for (const txType of types) {
+      const db = makeDb();
+      const result = await createTransaction(db, { ...baseInput, cardTransactionType: txType });
+      expect(result.cardTransactionStatus).toBe('authorized');
+    }
+  });
+
+  // U-03: optional cardTransactionNarrative accepted when provided
+  it('U-03: accepts optional cardTransactionNarrative when provided', async () => {
+    const db = makeDb();
+    const result = await createTransaction(db, {
+      ...baseInput,
+      cardTransactionNarrative: 'PURCHASE at Safe Store — ref AB12CD34',
+    });
+    expect(result.cardTransactionStatus).toBe('authorized');
+  });
+
+  // U-04: createTransaction works when cardTransactionNarrative is omitted
+  it('U-04: completes successfully when cardTransactionNarrative is absent', async () => {
+    const db = makeDb();
+    const inputWithoutNarrative = { ...baseInput };
+    expect('cardTransactionNarrative' in inputWithoutNarrative).toBe(false);
+    const result = await createTransaction(db, inputWithoutNarrative);
+    expect(result.cardTransactionStatus).toBe('authorized');
   });
 });
 

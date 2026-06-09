@@ -47,7 +47,7 @@ export default function InvestigationPage() {
   const [total, setTotal]   = useState(0);
   const [page, setPage]     = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const [filterStatus,   setFilterStatus]   = useState('');
   const [filterSeverity, setFilterSeverity] = useState('');
@@ -206,7 +206,7 @@ export default function InvestigationPage() {
 
   return (
     <div className="min-h-full bg-gray-50">
-      <main className="max-w-5xl mx-auto p-6 space-y-5">
+      <main className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
         <h1 className="text-2xl font-bold">Case Dashboard</h1>
 
         {/* Search */}

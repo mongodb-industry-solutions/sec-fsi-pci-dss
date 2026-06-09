@@ -27,11 +27,18 @@ export interface CardTransactionLogControlRecord {
   cardTransactionAmount: { amount: number; currency: string };
   cardTransactionDateTime: Date;
   cardTransactionStatus: CardTransactionStatus;
+  cardTransactionType: CardTransactionType;
   cardTransactionChannel: CardTransactionChannel;
   cardTransactionInitiationType: CardTransactionInitiationType;
   cardTransactionMerchantCategoryCode: string;
   cardTransactionMerchantName: string;
   cardTransactionMaskedPanDisplay: string;
+
+  // BIAN SD-254 transaction description (not CHD — plaintext, no QE)
+  // cardTransactionDescription: statement descriptor visible on the cardholder's bank statement (max 22 chars)
+  // cardTransactionNarrative: extended free-text context for L1/L2 fraud investigation
+  cardTransactionDescription: string;
+  cardTransactionNarrative?: string;
 
   bianServiceDomain: 'Card Transaction';
   bianControlRecordType: 'CardTransactionLog';
@@ -46,6 +53,14 @@ export type CardTransactionStatus =
   | 'pending'
   | 'settled'
   | 'disputed';
+
+export type CardTransactionType =
+  | 'purchase'
+  | 'cash_advance'
+  | 'balance_transfer'
+  | 'refund'
+  | 'fee'
+  | 'adjustment';
 
 export type CardTransactionChannel = 'online' | 'pos' | 'contactless' | 'atm';
 

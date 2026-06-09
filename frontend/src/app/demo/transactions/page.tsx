@@ -119,7 +119,7 @@ export default function TransactionsPage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-5">
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <h1 className="text-2xl font-bold">Transactions</h1>
 
       {/* Search + filters */}

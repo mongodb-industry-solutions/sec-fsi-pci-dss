@@ -60,7 +60,8 @@ the Merchant Name selector. No authentication required (public, simulator mode).
         type: 'object',
         required: ['cardToken', 'accountReference', 'amount', 'currency',
           'cardTransactionMerchantName', 'cardTransactionMerchantCategoryCode',
-          'cardTransactionChannel', 'cardTransactionMaskedPanDisplay'],
+          'cardTransactionChannel', 'cardTransactionMaskedPanDisplay',
+          'cardTransactionType', 'cardTransactionDescription'],
         properties: {
           cardToken: {
             type: 'string',
@@ -94,6 +95,20 @@ the Merchant Name selector. No authentication required (public, simulator mode).
           cardTransactionMaskedPanDisplay: {
             type: 'string',
             description: 'Last-4 display string in the format `****-****-****-XXXX`. Permitted by PCI DSS; no sensitive data.',
+          },
+          cardTransactionType: {
+            type: 'string',
+            enum: ['purchase', 'cash_advance', 'balance_transfer', 'refund', 'fee', 'adjustment'],
+            description: 'BIAN SD-254 transaction type classification.',
+          },
+          cardTransactionDescription: {
+            type: 'string',
+            maxLength: 22,
+            description: 'Statement descriptor visible on the cardholder\'s bank statement (BIAN SD-254). Max 22 characters.',
+          },
+          cardTransactionNarrative: {
+            type: 'string',
+            description: 'Extended free-text narrative for fraud investigation context. Optional.',
           },
           gatewayPayload: {
             type: 'object',
@@ -141,6 +156,9 @@ the Merchant Name selector. No authentication required (public, simulator mode).
       cardTransactionMerchantCategoryCode: string;
       cardTransactionChannel: string;
       cardTransactionMaskedPanDisplay: string;
+      cardTransactionType: string;
+      cardTransactionDescription: string;
+      cardTransactionNarrative?: string;
       gatewayPayload: object;
     };
 

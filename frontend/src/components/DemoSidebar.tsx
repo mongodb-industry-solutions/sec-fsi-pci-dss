@@ -45,38 +45,47 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'My Profile',   path: '/demo/profile',       icon: User },
   ],
   customer: [
-    { label: 'My Transactions', path: '/demo/payment/history', icon: ClipboardList },
-    { label: 'New Payment',     path: '/demo/payment',         icon: PlusCircle, exact: true },
-    { label: 'My Profile',      path: '/demo/profile',         icon: User },
+    { label: 'Transactions', path: '/demo/payment/history', icon: ClipboardList },
+    { label: 'New Payment',  path: '/demo/payment',         icon: PlusCircle, exact: true },
+    { label: 'Profile',      path: '/demo/profile',         icon: User },
   ],
 };
 
-export function DemoSidebar() {
-  const pathname = usePathname();
+function useRole() {
   const [role, setRole] = useState('');
-  const [collapsed, setCollapsed] = useState(false);
-
   useEffect(() => {
     const t = getToken() ?? '';
     const u = t ? decodeToken(t) : null;
     setRole(u?.role ?? '');
   }, []);
+  return role;
+}
 
-  const items = NAV_BY_ROLE[role] ?? [];
+function useActiveItem() {
+  const pathname = usePathname();
+  return (item: NavItem) =>
+    item.exact ? pathname === item.path : pathname === item.path || pathname.startsWith(item.path + '/');
+}
 
-  function isActive(item: NavItem) {
-    if (item.exact) return pathname === item.path;
-    return pathname === item.path || pathname.startsWith(item.path + '/');
-  }
+/** Desktop/tablet sidebar (hidden below md breakpoint) */
+export function DemoSidebar() {
+  const role    = useRole();
+  const items   = NAV_BY_ROLE[role] ?? [];
+  const isActive = useActiveItem();
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <aside className={`sticky top-[44px] h-[calc(100vh-44px)] flex-shrink-0 bg-[#001E2B] flex flex-col border-r border-white/10 transition-all duration-200 ${collapsed ? 'w-12' : 'w-44'}`}>
+    <aside className={`
+      hidden md:flex flex-col
+      sticky top-[44px] h-[calc(100vh-44px)] flex-shrink-0
+      bg-[#001E2B] border-r border-white/10
+      transition-all duration-200
+      ${collapsed ? 'w-12' : 'w-44'}
+    `}>
       <nav className="flex-1 py-3">
         <div className="flex items-center justify-between px-3 pb-2">
           {!collapsed && (
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Menu
-            </p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Menu</p>
           )}
           <button
             onClick={() => setCollapsed(c => !c)}
@@ -86,8 +95,9 @@ export function DemoSidebar() {
             {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
           </button>
         </div>
+
         {items.map((item) => {
-          const Icon = item.icon;
+          const Icon   = item.icon;
           const active = isActive(item);
           return (
             <Link
@@ -107,7 +117,6 @@ export function DemoSidebar() {
         })}
       </nav>
 
-      {/* MongoDB brand footer */}
       <div className="border-t border-white/10 p-3 flex flex-col items-center gap-1.5">
         <div className={`overflow-hidden rounded-full shrink-0 ${collapsed ? 'w-8 h-8' : 'w-12 h-12'}`}>
           <Image
@@ -125,5 +134,35 @@ export function DemoSidebar() {
         )}
       </div>
     </aside>
+  );
+}
+
+/** Mobile bottom tab bar (visible below md breakpoint only) */
+export function MobileBottomNav() {
+  const role     = useRole();
+  const items    = NAV_BY_ROLE[role] ?? [];
+  const isActive = useActiveItem();
+
+  if (items.length === 0) return null;
+
+  return (
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#001E2B] border-t border-white/10 flex">
+      {items.map((item) => {
+        const Icon   = item.icon;
+        const active = isActive(item);
+        return (
+          <Link
+            key={item.path}
+            href={item.path}
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors ${
+              active ? 'text-[#00ED64]' : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <Icon size={20} className="shrink-0" />
+            <span className="truncate max-w-[56px] text-center leading-tight">{item.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
   );
 }

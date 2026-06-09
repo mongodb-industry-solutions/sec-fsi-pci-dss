@@ -57,6 +57,22 @@ const CHANNELS = ['online', 'pos', 'contactless', 'atm'] as const;
 const STATUSES = ['authorized', 'settled', 'disputed'] as const;
 const MCC_LIST = ['5812', '6011', '7995', '5734', '5411', '5912', '4814', '5999'];
 const RISK_MCC = ['5812', '6011', '7995'];
+const TX_TYPES = ['purchase', 'cash_advance', 'balance_transfer', 'refund', 'fee', 'adjustment'] as const;
+
+const DESCRIPTOR_TEMPLATES = [
+  (name: string) => `${name.toUpperCase().slice(0, 22)}`,
+  (name: string) => `AMZN*${name.toUpperCase().slice(0, 17)}`,
+  (name: string) => `SQ *${name.toUpperCase().slice(0, 18)}`,
+  (name: string) => `PP*${name.toUpperCase().slice(0, 19)}`,
+  (name: string) => `PAYPAL *${name.toUpperCase().slice(0, 14)}`,
+];
+
+function descriptorFor(merchantName: string, txType: string): { description: string; narrative: string } {
+  const template = DESCRIPTOR_TEMPLATES[Math.floor(Math.random() * DESCRIPTOR_TEMPLATES.length)];
+  const description = template(merchantName).slice(0, 22);
+  const narrative = `${txType.replace('_', ' ').toUpperCase()} at ${merchantName} — ref ${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+  return { description, narrative };
+}
 
 const NOW = new Date('2026-05-27T14:00:00Z');
 
@@ -300,6 +316,10 @@ async function main() {
     txnIds.push(txnId);
 
     // v2: sensitive gateway fields (QE:none, DEK-sensitive tier) merged inline.
+    const merchantName = faker.company.name();
+    const txType = TX_TYPES[i % TX_TYPES.length];
+    const { description, narrative } = descriptorFor(merchantName, txType);
+
     cardTransactions.push({
       cardTransactionInstanceReference: txnId,
       paymentCardReference: token,
@@ -317,16 +337,19 @@ async function main() {
       cardTransactionAmount: { amount, currency: 'USD' },
       cardTransactionDateTime: faker.date.recent({ days: 30 }),
       cardTransactionStatus: STATUSES[i % STATUSES.length],
+      cardTransactionType: txType,
       cardTransactionChannel: CHANNELS[i % CHANNELS.length],
       cardTransactionInitiationType: 'customerInitiated',
       cardTransactionMerchantCategoryCode: mcc,
-      cardTransactionMerchantName: faker.company.name(),
+      cardTransactionMerchantName: merchantName,
       cardTransactionMaskedPanDisplay: paymentCards[custIdx].paymentCardMaskedPanDisplay,
+      cardTransactionDescription: description,
+      cardTransactionNarrative: narrative,
       bianServiceDomain: 'Card Transaction',
       bianControlRecordType: 'CardTransactionLog',
       recordCreatedDateTime: faker.date.recent({ days: 30 }),
       recordUpdatedDateTime: NOW,
-      schemaVersion: 2,
+      schemaVersion: 3,
     });
   }
 

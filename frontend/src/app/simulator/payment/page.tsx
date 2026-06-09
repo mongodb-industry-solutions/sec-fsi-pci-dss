@@ -366,6 +366,8 @@ export default function PaymentPage() {
         cardTransactionMerchantCategoryCode: form.merchantCategoryCode,
         cardTransactionChannel: 'online',
         cardTransactionMaskedPanDisplay: maskedCard || '****-****-****-1234',
+        cardTransactionType: 'purchase',
+        cardTransactionDescription: form.merchantName.toUpperCase().slice(0, 22),
         gatewayPayload: { source: 'simulator', timestamp: new Date().toISOString() },
       });
 
