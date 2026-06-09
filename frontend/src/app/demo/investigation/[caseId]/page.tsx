@@ -270,8 +270,8 @@ export default function DemoCaseDetailPage() {
           )}
         </div>
 
-        {/* ── Customer profile ── */}
-        <div className="bg-white rounded-xl border p-5">
+        {/* ── Customer profile (debug only — informational, not part of the core investigation UX) ── */}
+        {debugMode && <div className="bg-white rounded-xl border p-5">
           <div className="flex items-center gap-2 mb-3">
             <h2 className="font-semibold">Customer Profile</h2>
             <span className={`ml-auto text-xs px-2 py-0.5 rounded font-medium ${canSeeAll ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
@@ -355,7 +355,7 @@ export default function DemoCaseDetailPage() {
               </div>
             </div>
           </div>
-        </div>
+        </div>}
 
         {/* ── Notes (always visible) ── */}
         <div className="bg-white rounded-xl border p-5 space-y-3">
