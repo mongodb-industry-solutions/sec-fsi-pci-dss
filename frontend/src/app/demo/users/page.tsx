@@ -132,7 +132,7 @@ export default function UsersPage() {
         const res = await api.fraud.open({ transactionId: txnId, reason: 'Manually opened by analyst from customer lookup' }, token);
         const caseData = await api.fraud.getById(res.fraudDiagnosisInstanceReference, token);
         setCasesMap(prev => ({ ...prev, [txnId]: { id: res.fraudDiagnosisInstanceReference, ref: caseData.fraudDiagnosisCaseReference, status: caseData.caseStatus } }));
-      } else if (existingCase.status === 'closed') {
+      } else if (['closed', 'resolved_cleared', 'resolved_fraud'].includes(existingCase.status)) {
         // Closed case: reopen it
         await api.fraud.update(existingCase.id, { fraudDiagnosisCaseStatus: 'open' }, token);
         setCasesMap(prev => ({ ...prev, [txnId]: { ...existingCase, status: 'open' } }));

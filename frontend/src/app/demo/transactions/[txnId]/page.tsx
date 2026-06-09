@@ -110,9 +110,9 @@ export default function TransactionDetailPage() {
   const isAuditor = role === 'security_auditor';
   const canSeeSensitive = txn?.sensitive != null;
 
-  if (loading) return <div className="p-6 text-gray-400">Loading transaction...</div>;
+  if (loading) return <div className="w-full px-5 sm:px-8 lg:px-12 py-6 text-gray-400">Loading transaction...</div>;
   if (notFound || !txn) return (
-    <div className="p-6 text-gray-500 space-y-3">
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 text-gray-500 space-y-3">
       <p>Transaction not found.</p>
       <Link href="/demo/transactions" className="text-blue-600 hover:underline text-sm">← Back to transactions</Link>
     </div>
@@ -123,7 +123,7 @@ export default function TransactionDetailPage() {
     : '-';
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-5">
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <Link href="/demo/transactions" className="text-sm text-blue-600 hover:underline">← Back to transactions</Link>
 
       {/* Header */}
