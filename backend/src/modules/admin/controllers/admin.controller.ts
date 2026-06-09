@@ -17,8 +17,36 @@ const SENSITIVE_KEY_PATTERNS = [
   /aws_/i, /mongo/i,
 ];
 
+// Non-secret vars that match a sensitive pattern and must be shown in plain text.
+const SAFE_KEYS = new Set([
+  'MONGODB_DB_NAME',
+  'MONGODB_CRYPT_SHARED_LIB_PATH',
+]);
+
 function isSensitiveKey(key: string): boolean {
+  if (SAFE_KEYS.has(key)) return false;
   return SENSITIVE_KEY_PATTERNS.some((r) => r.test(key));
+}
+
+/**
+ * Returns true when the env var is a MongoDB connection string that should
+ * have only its password segment masked, not the entire value.
+ */
+function isMongoUri(key: string, value: string): boolean {
+  return /uri/i.test(key) &&
+    (value.startsWith('mongodb://') || value.startsWith('mongodb+srv://'));
+}
+
+/**
+ * Replaces the password in a MongoDB URI with *** while keeping the rest
+ * (scheme, username, host, port, database, options) visible.
+ * e.g.  mongodb+srv://admin:s3cr3t@cluster.net/db  →  mongodb+srv://admin:***@cluster.net/db
+ */
+function maskMongoUri(uri: string): string {
+  return uri.replace(
+    /^(mongodb(?:\+srv)?:\/\/[^:/?#]*:)([^@]*)(@)/,
+    '$1***$3',
+  );
 }
 
 const ALLOWED_NPM_COMMANDS: Record<string, string[]> = {
@@ -378,7 +406,13 @@ export async function adminController(fastify: FastifyInstance) {
     const env: Record<string, string> = {};
     for (const [k, v] of Object.entries(process.env)) {
       if (v !== undefined) {
-        env[k] = isSensitiveKey(k) ? '***' : v;
+        if (isMongoUri(k, v)) {
+          env[k] = maskMongoUri(v);
+        } else if (isSensitiveKey(k)) {
+          env[k] = '***';
+        } else {
+          env[k] = v;
+        }
       }
     }
 
