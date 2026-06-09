@@ -12,7 +12,7 @@
 | Version | Theme | Goal | Target timeline |
 |---|---|---|---|
 | **v1** | Security Foundation | Working end-to-end: payment → QE encryption → fraud investigation | 2–3 weeks |
-| **v2** | Investigation & Control | CISO-ready: RBAC, escalation, audit trail, KMS key rotation | 4–6 weeks after v1 |
+| **v2** | Investigation & Control | CISO (Chief Information Security Officer)  ready: RBAC, escalation, audit trail, KMS key rotation | 4–6 weeks after v1 |
 | **v3** | Integration-ready API Surface | Expose stable webhook events and API contracts that external systems can consume; recurring payment; performance story. External adoption (e.g. Leafy Bank) is decoupled and does not gate this iteration. | TBD after v2 validated |
 | **v4** | Payment Gateway + Integration Refinement | Full gateway layer (SD-64/65/89/57), modular backend, finalised OpenAPI contracts and webhook schemas for external integrators. | TBD after v3 validated |
 | **v5** | Agentic Integration | AI agent integration for fraud investigation: MongoDB Agentic Platform (Magenta) and/or external agentic systems such as Agentic ThreatSight360. | TBD after v4 validated |
