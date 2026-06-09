@@ -40,6 +40,16 @@ export default function DemoLoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Reset form state on every mount so the router cache never restores stale
+  // credentials from a previous session (causes hydration mismatch on the
+  // disabled button when the cached render had the form filled in).
+  useEffect(() => {
+    setSelectedEmail('');
+    setPassword('');
+    setSubmitting(false);
+    setError(null);
+  }, []);
+
   useEffect(() => {
     api.system.users().then((res) => setUsers(res.users)).catch(() => {
       api.auth.users().then((res) => setUsers(res.users)).catch(() => {});
@@ -260,6 +270,7 @@ export default function DemoLoginPage() {
             <button
               type="submit"
               disabled={!selectedEmail || !password || submitting}
+              suppressHydrationWarning
               className="w-full bg-[#001E2B] text-[#00ED64] py-2.5 rounded-lg font-semibold hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors disabled:opacity-40"
             >
               {submitting ? 'Signing in…' : 'Sign In'}
