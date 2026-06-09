@@ -27,7 +27,7 @@ const STATUS_COLORS: Record<string, string> = {
   pending:    'bg-amber-100 text-amber-800',
 };
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 export default function TransactionsPage() {
   const router = useRouter();

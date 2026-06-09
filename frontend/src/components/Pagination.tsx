@@ -56,7 +56,7 @@ export function Pagination({
             <span>Per page:</span>
             <select
               value={limit}
-              onChange={(e) => { onLimitChange(Number(e.target.value)); onPageChange(1); }}
+              onChange={(e) => onLimitChange(Number(e.target.value))}
               className="border border-gray-200 rounded px-1.5 py-0.5 text-xs text-gray-700 bg-white hover:border-gray-300 focus:outline-none focus:border-[#001E2B] cursor-pointer"
             >
               {limitOptions.map((opt) => (
