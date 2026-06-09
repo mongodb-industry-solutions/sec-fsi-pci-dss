@@ -181,6 +181,7 @@ export const api = {
         name: string;
         role: string;
         domain: string;
+        partyInstanceReference?: string;
         agreement: Record<string, unknown> | null;
       }>('/api/v1/auth/me', {}, token),
   },

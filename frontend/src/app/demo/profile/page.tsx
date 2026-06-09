@@ -13,6 +13,7 @@ interface ProfileData {
   name: string;
   role: string;
   domain: string;
+  partyInstanceReference?: string;
   agreement: {
     customerAgreementInstanceReference?: string;
     partyInstanceReference?: string;
@@ -199,21 +200,23 @@ export default function ProfilePage() {
   }
 
   async function handleSave() {
-    if (!profile?.agreement) return;
     setSaving(true);
     setSaveMsg(null);
     try {
       const patch: Parameters<typeof api.auth.updateMe>[0] = {};
-      if (editName.trim())  patch.customerName = editName.trim();
-      if (editPhone.trim()) patch.customerMobilePhoneNumber = editPhone.trim();
-      if (editLang.trim())  patch.customerAgreementPreferredLanguage = editLang.trim();
-      if (editAddress.streetAddress.trim() || editAddress.city.trim()) {
-        patch.customerAgreementResidentialAddress = {
-          streetAddress: editAddress.streetAddress.trim(),
-          city:          editAddress.city.trim(),
-          postalCode:    editAddress.postalCode.trim(),
-          countryCode:   editAddress.countryCode.trim() || 'US',
-        };
+      if (editName.trim()) patch.customerName = editName.trim();
+      // Customer-only fields (require agreement / party record)
+      if (profile?.agreement) {
+        if (editPhone.trim()) patch.customerMobilePhoneNumber = editPhone.trim();
+        if (editLang.trim())  patch.customerAgreementPreferredLanguage = editLang.trim();
+        if (editAddress.streetAddress.trim() || editAddress.city.trim()) {
+          patch.customerAgreementResidentialAddress = {
+            streetAddress: editAddress.streetAddress.trim(),
+            city:          editAddress.city.trim(),
+            postalCode:    editAddress.postalCode.trim(),
+            countryCode:   editAddress.countryCode.trim() || 'US',
+          };
+        }
       }
 
       await api.auth.updateMe(patch, token);
@@ -241,7 +244,7 @@ export default function ProfilePage() {
     <div className="max-w-xl mx-auto p-6 space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">My Profile</h1>
-        {ag && !editing && (
+        {!editing && (
           <button
             onClick={() => { setEditing(true); setSaveMsg(null); }}
             className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
@@ -297,8 +300,8 @@ export default function ProfilePage() {
             collection="party"
           />
 
-          {/* Phone — editable */}
-          {editing ? (
+          {/* Phone — editable (customer only) */}
+          {(editing && ag) ? (
             <>
               <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                 <span className="text-gray-500 text-sm">Phone</span>
@@ -339,8 +342,8 @@ export default function ProfilePage() {
           {ag?.customerSegment && <PlainField label="Account type" value={SEGMENT_LABELS[ag.customerSegment] ?? ag.customerSegment} collection="customerAgreementProcedure" />}
           {ag?.customerAgreementEnrollmentDate && <PlainField label="Member since" value={new Date(ag.customerAgreementEnrollmentDate).toLocaleDateString()} collection="customerAgreementProcedure" />}
 
-          {/* Language — editable */}
-          {editing ? (
+          {/* Language — editable (customer only) */}
+          {(editing && ag) ? (
             <>
               <span className="text-gray-500 text-sm pt-0.5">Language</span>
               <select
@@ -359,8 +362,8 @@ export default function ProfilePage() {
             <PlainField label="Language" value={ag.customerAgreementPreferredLanguage.toUpperCase()} collection="customerAgreementProcedure" />
           )}
 
-          {/* Address — editable (QE:none) */}
-          {editing ? (
+          {/* Address — editable (QE:none, customer only) */}
+          {(editing && ag) ? (
             <>
               <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                 <span className="text-gray-500 text-sm">Address</span>
@@ -482,26 +485,34 @@ export default function ProfilePage() {
       </div>
 
       {/* Debug: raw MongoDB documents via RawMongoPanel */}
-      {debugMode && profile?.agreement?.customerAgreementInstanceReference && profile?.agreement?.partyInstanceReference && (
+      {debugMode && (
         <RawMongoPanel
           token={token}
           sections={[
             {
               kind: 'mongo' as const,
+              collection: 'customerAuthenticationAssessment',
+              id: profile.sub,
+              label: 'customerAuthenticationAssessment',
+              labelColor: 'text-yellow-400',
+              description: 'SD-91 — login identity, role, QE:equality (email), bcrypt hash',
+            },
+            ...(profile.partyInstanceReference ? [{
+              kind: 'mongo' as const,
               collection: 'party',
-              id: profile.agreement.partyInstanceReference,
+              id: profile.partyInstanceReference,
               label: 'party',
               labelColor: 'text-emerald-400',
               description: 'SD-13 PII store — QE:equality (email, phone) + plaintext (name, segment)',
-            },
-            {
+            }] : []),
+            ...(profile.agreement?.customerAgreementInstanceReference ? [{
               kind: 'mongo' as const,
               collection: 'customerAgreementProcedure',
               id: profile.agreement.customerAgreementInstanceReference,
               label: 'customerAgreementProcedure',
               labelColor: 'text-blue-400',
-              description: 'QE:equality (accountRef) + QE:none (address, govId) inline — v2 unified document',
-            },
+              description: 'QE:equality (accountRef) + QE:none (address, govId) — v2 unified document',
+            }] : []),
           ]}
         />
       )}

@@ -81,6 +81,24 @@ export async function getDemoUsers(_db: Db) {
     }));
 }
 
+/**
+ * Update display name for any authenticated user (non-customer roles).
+ * Writes only to the plaintext customerAuthenticationUserName field.
+ */
+export async function updateAuthProfile(
+  db: Db,
+  sub: string,
+  name: string,
+): Promise<boolean> {
+  const res = await db
+    .collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
+    .updateOne(
+      { customerAuthenticationInstanceReference: sub },
+      { $set: { customerAuthenticationUserName: name } }
+    );
+  return res.matchedCount > 0;
+}
+
 /** Returns only enabled authentication domains, sorted by display name. */
 export async function getEnabledDomains(db: Db) {
   const domains = await db

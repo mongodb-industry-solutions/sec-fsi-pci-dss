@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
-import { loginUser, getDemoUsers, getEnabledDomains, JwtPayload } from '../services/auth.service';
+import { loginUser, getDemoUsers, getEnabledDomains, updateAuthProfile, JwtPayload } from '../services/auth.service';
 import { getSelfProfile, updateSelfProfile } from '../../customer/services/customerAgreement.service';
+import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
 
 export async function authController(fastify: FastifyInstance) {
   fastify.post('/login', {
@@ -226,16 +227,27 @@ a \`customerAgreement\` record.`,
     if (!user?.email) return reply.status(401).send({ error: 'Unauthenticated' });
 
     let agreement: Record<string, unknown> | null = null;
+    let partyInstanceReference: string | undefined;
+
     if (user.role === 'customer') {
       agreement = await getSelfProfile(fastify.db, user.email).catch(() => null);
+      partyInstanceReference = agreement?.partyInstanceReference as string | undefined;
+    } else {
+      // For non-customer roles, look up partyInstanceReference from the auth record
+      // so the debug panel can show the party document for any role.
+      const authRec = await fastify.db
+        .collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
+        .findOne({ customerAuthenticationInstanceReference: user.sub } as Partial<CustomerAuthenticationAssessmentRecord>);
+      partyInstanceReference = authRec?.partyInstanceReference;
     }
 
     return reply.send({
-      sub:       user.sub,
-      email:     user.email,
-      name:      user.name,
-      role:      user.role,
-      domain:    user.domain,
+      sub:                   user.sub,
+      email:                 user.email,
+      name:                  user.name,
+      role:                  user.role,
+      domain:                user.domain,
+      partyInstanceReference,
       agreement,
     });
   });
@@ -300,7 +312,15 @@ automatically re-encrypts the new value before writing it to Atlas.`,
       return reply.status(400).send({ error: 'No fields provided for update' });
     }
 
-    const updated = await updateSelfProfile(fastify.db, user.email, body);
+    let updated: boolean;
+    if (user.role === 'customer') {
+      updated = await updateSelfProfile(fastify.db, user.email, body);
+    } else {
+      // Non-customer roles (analyst / auditor): only display name is editable
+      updated = body.customerName?.trim()
+        ? await updateAuthProfile(fastify.db, user.sub, body.customerName.trim())
+        : false;
+    }
     return reply.send({ updated });
   });
 }
