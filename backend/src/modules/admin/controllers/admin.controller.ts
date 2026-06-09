@@ -49,6 +49,63 @@ function maskMongoUri(uri: string): string {
   );
 }
 
+const ENV_PATH = path.join(PROJECT_ROOT, '.env');
+
+/** Returns the list of keys defined in the .env file (comments and blank lines skipped). */
+function readDotenvKeys(): string[] {
+  try {
+    const keys: string[] = [];
+    for (const line of fs.readFileSync(ENV_PATH, 'utf-8').split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || /^[#;]/.test(trimmed)) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq === -1) continue;
+      const key = trimmed.slice(0, eq).trim();
+      if (/^[A-Z_][A-Z0-9_]*$/i.test(key)) keys.push(key);
+    }
+    return keys;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Writes or updates a single KEY=value line in the .env file.
+ * - Preserves comments, blank lines, and original line-ending style.
+ * - Appends the key if not present.
+ * - Quotes values that contain whitespace, #, =, or backslashes.
+ */
+function updateEnvFile(key: string, value: string): void {
+  let content = '';
+  try { content = fs.readFileSync(ENV_PATH, 'utf-8'); } catch { /* create new */ }
+
+  const eol = content.includes('\r\n') ? '\r\n' : '\n';
+  const lines = content.split(/\r?\n/);
+
+  const needsQuotes = /[ \t"'#\\=]/.test(value) || value === '';
+  const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const formatted = needsQuotes ? `"${escaped}"` : value;
+  const newLine = `${key}=${formatted}`;
+
+  let found = false;
+  const updated = lines.map(line => {
+    if (!line.trim() || /^\s*[#;]/.test(line)) return line;
+    const eqIdx = line.indexOf('=');
+    if (eqIdx !== -1 && line.slice(0, eqIdx).trim() === key) {
+      found = true;
+      return newLine;
+    }
+    return line;
+  });
+
+  if (!found) {
+    while (updated.length && !updated[updated.length - 1].trim()) updated.pop();
+    updated.push(newLine, '');
+  }
+
+  fs.writeFileSync(ENV_PATH, updated.join(eol), 'utf-8');
+}
+
 const ALLOWED_NPM_COMMANDS: Record<string, string[]> = {
   'setup':             ['run', 'setup'],
   'setup:key':         ['run', 'setup:key'],
@@ -416,6 +473,65 @@ export async function adminController(fastify: FastifyInstance) {
       }
     }
 
-    return reply.send({ os: osInfo, node: nodeInfo, package: pkgInfo, env });
+    const dotenvKeys = readDotenvKeys();
+    return reply.send({ os: osInfo, node: nodeInfo, package: pkgInfo, env, dotenvKeys });
+  });
+
+  // PATCH /admin/env  —  update a single env var in .env and process.env
+  fastify.patch('/env', {
+    schema: {
+      tags: ['admin'],
+      summary: 'Update an environment variable',
+      description: 'Updates a key in the project `.env` file and applies it to `process.env` immediately. Only keys already present in `.env` can be updated. A server restart is required for changes to fully propagate (e.g. reconnecting to a new database URI).',
+      security: [{ adminAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['key', 'value'],
+        properties: {
+          key:   { type: 'string', description: 'Env var name (must exist in .env).' },
+          value: { type: 'string', description: 'New value.' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            updated:        { type: 'boolean' },
+            reloadRequired: { type: 'boolean' },
+          },
+        },
+        400: { $ref: 'Error#' },
+        401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
+        429: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const ip = request.ip ?? 'unknown';
+    const rl = checkOpsRateLimit(ip);
+    if (!rl.allowed) {
+      reply.header('Retry-After', String(rl.retryAfter));
+      return reply.status(429).send({ error: `Too many requests. Retry after ${rl.retryAfter}s.` });
+    }
+    if (!verifyAdminToken(request.headers.authorization)) {
+      return reply.status(401).send({ error: 'Invalid admin token' });
+    }
+
+    const { key, value } = request.body as { key: string; value: string };
+
+    if (!key || !/^[A-Z_][A-Z0-9_]*$/i.test(key)) {
+      return reply.status(400).send({ error: 'Invalid key: must be uppercase letters, digits, and underscores.' });
+    }
+    if (typeof value !== 'string') {
+      return reply.status(400).send({ error: 'Value must be a string.' });
+    }
+    if (value.includes('\n') || value.includes('\r')) {
+      return reply.status(400).send({ error: 'Value must not contain newline characters.' });
+    }
+
+    updateEnvFile(key, value);
+    process.env[key] = value;
+
+    return reply.send({ updated: true, reloadRequired: true });
   });
 }
