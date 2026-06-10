@@ -1,6 +1,6 @@
-// BIAN SD-57: Card Etoken  -  Token Vault Control Record
+// BIAN SD-57: Card eToken  -  Token Vault Control Record
 
-export const TOKEN_VAULT_COLLECTION = 'tokenVault';
+export const TOKEN_VAULT_COLLECTION = 'cardEtokenProcedure';
 
 export interface TokenVaultControlRecord {
   // Identifiers
@@ -23,8 +23,8 @@ export interface TokenVaultControlRecord {
   tokenVaultExpiresAt?: Date;
 
   // BIAN metadata
-  bianServiceDomain: 'CardEtoken';
-  bianControlRecordType: 'TokenVault';
+  bianServiceDomain: 'Card eToken';
+  bianControlRecordType: 'CardEtokenProcedure';
   recordCreatedDateTime: Date;
   schemaVersion: number;
 }

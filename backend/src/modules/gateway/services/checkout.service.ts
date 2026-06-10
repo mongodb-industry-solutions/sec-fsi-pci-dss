@@ -54,7 +54,7 @@ export async function createCheckoutSession(
 
   const session: CheckoutSessionRecord = {
     bianServiceDomain: 'Payment Order',
-    bianControlRecordType: 'CheckoutSession',
+    bianControlRecordType: 'CheckoutSessionLog',
     schemaVersion: 1,
     checkoutSessionInstanceReference: sessionId,
     merchantAgreementInstanceReference: input.merchantAgreementInstanceReference,

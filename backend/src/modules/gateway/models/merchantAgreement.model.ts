@@ -21,6 +21,12 @@ export interface MerchantAgreementControlRecord {
   merchantAgreementStatus: MerchantAgreementStatus;
   merchantTier: 'standard' | 'enterprise';
 
+  // D-21: Party owner link — BIAN-canonical cross-domain reference via SD-13 Party.
+  // Points to the partyInstanceReference of the individual or legal entity that owns
+  // this merchant agreement. Enables dual-role: same Party can hold both a
+  // CustomerAgreement (SD-53) and a MerchantAgreement (SD-89).
+  merchantOwnerPartyReference?: string;             // FK → party.partyInstanceReference (SD-13)
+
   // Gateway configuration
   merchantAllowedCurrencies: string[];              // ISO 4217 codes
   merchantTransactionLimitAmount: number;           // Per-transaction limit (base currency)
@@ -44,6 +50,7 @@ export interface MerchantAgreementControlRecord {
   schemaVersion: number;
 }
 
-export type MerchantAgreementStatus = 'active' | 'suspended' | 'closed';
+// D-22: Full BIAN lifecycle states for an Agreement control record.
+export type MerchantAgreementStatus = 'initiated' | 'agreed' | 'active' | 'amended' | 'suspended' | 'closed';
 export type MerchantRiskCategory = 'low' | 'medium' | 'high';
 export type SettlementSchedule = 'T+1' | 'T+2' | 'T+3';

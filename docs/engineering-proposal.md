@@ -759,11 +759,21 @@ The merchant builds their own card form, calls a tokenization endpoint to conver
 
 | New Collection | BIAN SD | Control Record Type | Purpose |
 |---|---|---|---|
-| `checkoutSessionLog` | SD-64 Payment Order | `CheckoutSession` | Hosted payment page session (Method A) |
-| `paymentLinkRecord` | SD-64 Payment Order | `PaymentLink` | Pre-configured shareable payment invitation (Method B) |
-| `merchantAgreementProcedure` | SD-89 Merchant Relations | `MerchantAgreement` | Existing stub converted to full MongoDB persistence |
+| `checkoutSessionLog` | SD-64 Payment Order | `CheckoutSessionLog` | Hosted payment page session (Method A) |
+| `paymentLinkRecord` | SD-64 Payment Order | `PaymentLinkRecord` | Pre-configured shareable payment invitation (Method B) |
+| `paymentOrderProcedure` | SD-64 Payment Order | `PaymentOrderProcedure` | Full payment intent lifecycle (confirm → authorize → capture) |
+| `cardEtokenProcedure` | SD-57 Card eToken | `CardEtokenProcedure` | Card token references and network tokens (v5 stub) |
+| `merchantAgreementProcedure` | SD-89 Merchant Relations | `MerchantAgreementProcedure` | Existing stub converted to full MongoDB persistence |
+
+> **BIAN Audit 2026-06-10 (D-21–D-30):** All `bianControlRecordType` values now match the collection name suffix (e.g., `CheckoutSessionLog`, `PaymentLinkRecord`). `bianServiceDomain` values use BIAN standard spacing (`'Payment Order'`, `'Card eToken'`). `MerchantAgreementStatus` expanded to full BIAN Agreement lifecycle (`initiated | agreed | active | amended | suspended | closed`). Collection constants updated: `paymentOrder` → `paymentOrderProcedure`, `tokenVault` → `cardEtokenProcedure`.
 
 Both `checkoutSessionLog` and `paymentLinkRecord` use SD-64 because in BIAN terms a checkout session and a payment link are both forms of **payment order initiation** — the SD-64 Control Record captures the payment amount, currency, and status lifecycle regardless of how the buyer arrived at the payment form.
+
+#### Dual-role: Natural Person as Customer AND Merchant (BIAN-validated)
+
+A `Party` (SD-13) can simultaneously be the subject of a `CustomerAgreement` (SD-53) and the owner of a `MerchantAgreement` (SD-89). This is fully aligned with the BIAN Business Object Model: `Party` is the identity anchor; `CustomerAgreement` and `MerchantAgreement` are role-scoped contracts linked back to the Party via `partyInstanceReference`.
+
+The correct cross-domain FK is `merchantOwnerPartyReference → party.partyInstanceReference` (NOT a reference to `customerAgreementInstanceReference` — that would conflate identity with a role-scoped contract). A `Party` may own zero or more merchant agreements without having a customer agreement at all, and vice versa. KYC verification (performed once on the `Party`) is shared across all roles.
 
 ### Security Model
 

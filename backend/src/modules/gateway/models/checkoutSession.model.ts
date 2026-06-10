@@ -8,7 +8,7 @@ export type CheckoutSessionStatus = 'pending' | 'completed' | 'expired' | 'cance
 export interface CheckoutSessionRecord {
   // BIAN metadata
   bianServiceDomain: 'Payment Order';
-  bianControlRecordType: 'CheckoutSession';
+  bianControlRecordType: 'CheckoutSessionLog';
   schemaVersion: 1;
 
   // Primary key

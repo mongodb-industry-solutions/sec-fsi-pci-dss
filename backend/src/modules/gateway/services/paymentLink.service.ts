@@ -72,7 +72,7 @@ export async function createPaymentLink(
 
   const link: PaymentLinkRecord = {
     bianServiceDomain: 'Payment Order',
-    bianControlRecordType: 'PaymentLink',
+    bianControlRecordType: 'PaymentLinkRecord',
     schemaVersion: 1,
     paymentLinkInstanceReference: linkId,
     paymentLinkCode: code,

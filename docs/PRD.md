@@ -264,7 +264,7 @@ BIAN (Banking Industry Architecture Network) provides a standardized vocabulary 
 | 9 | **Payment Order** (Checkout Session) | SD-64 | Redirect Checkout: hosted payment page session lifecycle | `checkoutSessionLog` | v4 |
 | 10 | **Payment Order** (Payment Link) | SD-64 | Payment Links: shareable pre-configured payment URL | `paymentLinkRecord` | v4 |
 | 11 | **Payment Execution** | SD-65 | Gateway routing and authorization orchestration | *(service layer, no dedicated collection)* | v4 |
-| 12 | **Card Etoken** | SD-57 | Token vault: card token references and network tokens | `tokenVault` | v4 stub |
+| 12 | **Card eToken** | SD-57 | Token vault: card token references and network tokens | `cardEtokenProcedure` | v4 stub |
 
 > **Note 1:** BIAN does not define separate "sensitive" collections; the split is an architectural pattern for separating searchable QE fields from non-searchable QE fields, as required by MongoDB QE design constraints.
 >
@@ -470,6 +470,15 @@ consentAgreement (SD-36) ──────────────────�
   │ 1 : many
   ↓
 consentAccessLog (SD-36)
+
+merchantAgreementProcedure (SD-89) ────────────────────► party
+  │  merchantOwnerPartyReference          (D-21: BIAN-canonical Party owner link)
+  │  Note: same Party can own a CustomerAgreement (SD-53) AND a MerchantAgreement (SD-89)
+  │  — dual-role pattern. Identity anchor is Party, not the role-scoped Agreement.
+  │ 1 : many
+  ↓
+checkoutSessionLog (SD-64) / paymentLinkRecord (SD-64)
+  cardTransactionLog (SD-254) ◄── created on each payment
 ```
 
 **Join strategy:** Application-side joins only. No `$lookup` across QE collections (not supported for encrypted fields). The API service performs sequential queries and assembles the response.
@@ -824,7 +833,7 @@ v3: Advanced Capabilities  (TBD: after v2 validated)
 v4: Payment Gateway + Modular Architecture  (TBD: after v3 validated)
   Backend refactored to domain modules (BIAN SD clusters) + new gateway module
   New BIAN SDs: SD-89 Merchant Relations · SD-64 Payment Order · SD-65 Payment Execution · SD-57 Card Etoken
-  New collections: merchantAgreement · paymentOrder · tokenVault
+  New collections: merchantAgreementProcedure · paymentOrderProcedure · cardEtokenProcedure
   New actors: Merchant (first-class entity with MCC risk profile, limits, settlement config)
   Goal: API-first payment platform story — MongoDB as the data backbone for a full card payment gateway
 
@@ -890,7 +899,7 @@ v5: Agentic Fraud Investigation  (TBD: after v4 validated)
 **Deliverables:**
 - Backend refactored to domain module layout: `src/modules/<sd-cluster>/` + `src/shared/` — zero API surface change, all existing tests pass
 - Four new BIAN Service Domains: SD-89 Merchant Relations, SD-64 Payment Order, SD-65 Payment Execution, SD-57 Card Etoken
-- Three new collections: `merchantAgreement` (QE:none on API key hash), `paymentOrder` (intent lifecycle with TTL index), `tokenVault` (QE:none on network token)
+- Three new collections: `merchantAgreementProcedure` (plaintext, bcrypt-hashed API keys), `paymentOrderProcedure` (intent lifecycle with TTL index), `cardEtokenProcedure` (QE:none on network token)
 - Merchant as first-class actor: MCC risk category, transaction limits, settlement schedule, webhook endpoint
 - Gateway API: `POST /gateway/payments` (create intent with idempotency key) → confirm → authorize → capture → void/refund
 - Payment Order lifecycle: `initiated → confirmed → authorized → captured → settled/refunded/voided`
@@ -925,7 +934,7 @@ The following is a high-level summary. Refer to the roadmap for the full specifi
 | **v1** | Mode selector landing, simulator flow (payment + investigation + Atlas toggle), application mode (login + role-based routing) | JWT auth, QE writes, equality search, auto-fraud-case creation, `/health` endpoint |
 | **v2** | Role selector (Level 1 / Level 2 / Auditor), escalation workflow, audit trail timeline | RBAC middleware, escalation endpoint, audit log queries, range queries on amount |
 | **v3** | Save card / recurring payment flow, performance comparison panel | Tokenization endpoint, query-timing diagnostic endpoint, Leafy Bank API contracts |
-| **v4** | Simulator step 0 (merchant creates payment intent), merchant profile panel in fraud case detail, merchant portal in Application Mode | Backend modular refactor (BIAN SD modules), gateway API (`/gateway/payments`, `/merchants`, `/gateway/tokens`), 3 new collections (merchantAgreement · paymentOrder · tokenVault), merchant seed data |
+| **v4** | Simulator step 0 (merchant creates payment intent), merchant profile panel in fraud case detail, merchant portal in Application Mode | Backend modular refactor (BIAN SD modules), gateway API (`/gateway/payments`, `/merchants`, `/gateway/tokens`), 3 new collections (merchantAgreementProcedure · paymentOrderProcedure · cardEtokenProcedure), merchant seed data |
 | **v5** | AI draft inline in case detail, agent confidence indicator, agent action log | Magenta agent integration, structured draft diagnosis output |
 
 See [docs/roadmap.md](roadmap.md) for the complete FR and NFR specification with acceptance criteria per iteration.

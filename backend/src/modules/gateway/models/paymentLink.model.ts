@@ -9,7 +9,7 @@ export type PaymentLinkUsageType = 'single_use' | 'multi_use';
 export interface PaymentLinkRecord {
   // BIAN metadata
   bianServiceDomain: 'Payment Order';
-  bianControlRecordType: 'PaymentLink';
+  bianControlRecordType: 'PaymentLinkRecord';
   schemaVersion: 1;
 
   // Primary keys

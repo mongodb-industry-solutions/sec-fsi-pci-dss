@@ -1727,7 +1727,7 @@ export type CheckoutSessionStatus = 'pending' | 'completed' | 'expired' | 'cance
 
 export interface CheckoutSessionRecord {
   bianServiceDomain: 'Payment Order';
-  bianControlRecordType: 'CheckoutSession';
+  bianControlRecordType: 'CheckoutSessionLog';
   schemaVersion: 1;
   checkoutSessionInstanceReference: string;        // UUID
   merchantAgreementInstanceReference: string;      // FK → merchantAgreementProcedure
@@ -1759,7 +1759,7 @@ export type PaymentLinkUsageType = 'single_use' | 'multi_use';
 
 export interface PaymentLinkRecord {
   bianServiceDomain: 'Payment Order';
-  bianControlRecordType: 'PaymentLink';
+  bianControlRecordType: 'PaymentLinkRecord';
   schemaVersion: 1;
   paymentLinkInstanceReference: string;            // UUID
   paymentLinkCode: string;                         // 8-char, unique index
@@ -1795,9 +1795,20 @@ export interface MerchantApiKeyRecord {
   keyLastUsedDateTime?: Date;
 }
 
-// Added fields on MerchantAgreementControlRecord:
+// Added / corrected fields on MerchantAgreementControlRecord:
 merchantApiKeys: MerchantApiKeyRecord[];
 merchantWebhookSecret?: string;          // HMAC signing secret for webhook delivery
+
+// D-21 (BIAN audit 2026-06-10): Party owner link — canonical BIAN cross-domain reference.
+// Points to the partyInstanceReference (SD-13) of the individual or legal entity that owns
+// this merchant agreement. Enables the dual-role pattern: the same Party can hold both a
+// CustomerAgreement (SD-53) and a MerchantAgreement (SD-89).
+// Correct field is merchantOwnerPartyReference (NOT customerReference) because
+// 'customer' is a role-scoped concept (SD-53 contract), while 'Party' is the identity anchor.
+merchantOwnerPartyReference?: string;    // FK → party.partyInstanceReference (SD-13)
+
+// D-22 (BIAN audit 2026-06-10): Full BIAN Agreement lifecycle states.
+type MerchantAgreementStatus = 'initiated' | 'agreed' | 'active' | 'amended' | 'suspended' | 'closed';
 ```
 
 Key format: `lbpk_live_<32 hex chars>` — plaintext returned once on generation; only bcrypt hash persisted.

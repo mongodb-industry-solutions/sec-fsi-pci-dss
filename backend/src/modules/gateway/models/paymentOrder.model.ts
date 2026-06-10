@@ -1,7 +1,7 @@
 // BIAN SD-64: Payment Order Control Record
 // SD-65: Payment Execution is represented as the routingDecision sub-document
 
-export const PAYMENT_ORDER_COLLECTION = 'paymentOrder';
+export const PAYMENT_ORDER_COLLECTION = 'paymentOrderProcedure';
 
 export interface PaymentOrderControlRecord {
   // Identifiers
@@ -53,8 +53,8 @@ export interface PaymentOrderControlRecord {
   };
 
   // BIAN metadata
-  bianServiceDomain: 'PaymentOrder';
-  bianControlRecordType: 'PaymentOrder';
+  bianServiceDomain: 'Payment Order';
+  bianControlRecordType: 'PaymentOrderProcedure';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
   schemaVersion: number;
