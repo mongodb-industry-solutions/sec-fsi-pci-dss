@@ -3,7 +3,7 @@
 **Project:** FSI PCI DSS Payment Security Demo  
 **PRD reference:** [PRD.md](PRD.md)  
 **Engineering Proposal:** [engineering-proposal.md](engineering-proposal.md)  
-**Last updated:** 2026-06-08
+**Last updated:** 2026-06-10
 
 This document covers the implementation-level detail that the PRD deliberately omits: BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index creation, and environment configuration. Engineers start here.
 
@@ -355,6 +355,7 @@ export type ActionType =
   | 'case_opened'
   | 'assigned'
   | 'note_added'
+  | 'note_retracted'
   | 'field_accessed'
   | 'escalated'
   | 'ai_review'
@@ -363,6 +364,38 @@ export type ActionType =
 
 export type ResolutionOutcome = 'cleared' | 'confirmed_fraud' | 'referred';
 ```
+
+**Collection:** `fraudDiagnosisCaseEvents` (SD-83) — append-only audit and notes log. Every case event (including notes) is stored here. Indexed on `(fraudDiagnosisInstanceReference, actionDateTime)` for ordered retrieval. See §5 for index definitions.
+
+Document shape:
+
+| Field | Type | Notes |
+|---|---|---|
+| `fraudDiagnosisInstanceReference` | `string` | FK to `fraudDiagnosisCase` |
+| `actionDateTime` | `Date` | Event timestamp |
+| `actionType` | `ActionType` | Includes `note_added`, `note_retracted` |
+| `performedByRole` | `AnalystRole` | Role of the acting user |
+| `actionDetails` | `Record<string, unknown>` | Shape varies by `actionType` |
+| `schemaVersion` | `number` | Schema version |
+
+**`NoteEntry` — API response shape for note records (used by note endpoints in §6.4):**
+
+```typescript
+export interface NoteEntry {
+  noteId: string;
+  noteText: string;
+  visibility: 'internal' | 'customer';
+  performedByRole: string;
+  actionDateTime: string;           // ISO 8601
+  isRetracted: boolean;
+  retractionReason: string | null;
+  retractionDateTime: string | null;
+}
+```
+
+`noteId` is the `_id` of the `note_added` event in `fraudDiagnosisCaseEvents`. Retracted notes remain in the collection (BIAN SD-83 append-only); a `note_retracted` event is appended referencing the original `noteId`.
+
+---
 
 ### `partyAuthentication.model.ts` (SD-16 — updated)
 
@@ -1014,9 +1047,12 @@ Returns cards linked to a customer (plaintext lookup by FK).
   "linkedCustomerAgreementReference": "...",
   "assignedAnalystRole": "level1_analyst",
   "escalationFlag": false,
+  "escalationAcceptedAt": null,
   "diagnosisActionLog": []
 }
 ```
+
+`escalationAcceptedAt` (`string | null`) — ISO 8601 timestamp set by L2 when they approve an escalation (`POST /fraud/:id/escalate/approve`). Cleared (set to `null`) when L2 rejects the escalation.
 
 ---
 
@@ -1065,6 +1101,96 @@ Side effects: case status set to `escalated`; `escalated` event appended to `fra
 The `escalationToken` is a short-lived UUID (TTL 4 hours) stored in an in-memory token store. Include it in `X-Escalation-Token` on subsequent requests to customer and transaction sensitive endpoints. Side effects: `field_accessed` event appended to `fraudDiagnosisCaseEvents` with `action: "escalation_approved"`.
 
 **Response 422:** Case is not in `escalated` status.
+
+---
+
+#### `POST /fraud/:id/notes` *(Ch-03 — BIAN SD-83 append-only)*
+
+Creates a note on a fraud case. Appends a `note_added` event to `fraudDiagnosisCaseEvents`.
+
+**Auth:** `level1_analyst` or `level2_investigator`. Returns 403 for `customer` or `security_auditor` roles.
+
+**Request header:** `X-Demo-Role: level1_analyst` (or `level2_investigator`)
+
+**Request body:**
+```json
+{
+  "noteText": "Customer confirmed travel to Brazil; merchant appears legitimate.",
+  "visibility": "internal"
+}
+```
+
+`visibility` enum: `internal | customer`
+
+**Response 201:**
+```json
+{
+  "noteId": "uuid-v4",
+  "actionDateTime": "2026-06-10T09:15:00Z"
+}
+```
+
+`noteId` is the `_id` of the inserted `fraudDiagnosisCaseEvents` document.
+
+---
+
+#### `DELETE /fraud/:id/notes/:noteId` *(Ch-03 — retraction, not physical delete)*
+
+Retracts a note by appending a `note_retracted` event to `fraudDiagnosisCaseEvents`. The original `note_added` event is never deleted (BIAN SD-83 append-only).
+
+**Auth:** Same role that created the note. Returns 403 if a different role attempts retraction.
+
+**Request body (optional):**
+```json
+{ "retractionReason": "Note contained incorrect merchant name." }
+```
+
+**Response 200:**
+```json
+{
+  "retractedNoteId": "uuid-v4",
+  "retractionDateTime": "2026-06-10T09:30:00Z"
+}
+```
+
+**Error responses:**
+- **403** — requesting role differs from the role that created the note
+- **404** — `noteId` not found on this case
+- **409** — note has already been retracted
+
+---
+
+#### `GET /fraud/:id/notes` *(Ch-03)*
+
+Returns all notes for a fraud case, including retracted entries (visible to analysts and auditors), sorted chronologically (oldest first).
+
+**Auth:** `level1_analyst`, `level2_investigator`, `security_auditor`. Returns 403 for `customer`.
+
+**Response 200:**
+```json
+{
+  "notes": [
+    {
+      "noteId": "uuid-v4",
+      "noteText": "Customer confirmed travel to Brazil; merchant appears legitimate.",
+      "visibility": "internal",
+      "performedByRole": "level1_analyst",
+      "actionDateTime": "2026-06-10T09:15:00Z",
+      "isRetracted": false,
+      "retractionReason": null,
+      "retractionDateTime": null
+    }
+  ]
+}
+```
+
+> **Customer-facing variant:** `GET /api/v1/transactions/:id/notes` returns the same `{ notes: NoteEntry[] }` shape but filters out entries where `isRetracted: true` and restricts to `visibility: "customer"` notes only.
+
+---
+
+#### ~~`fraudDiagnosisCaseNotes`~~ and ~~`fraudDiagnosisCustomerSubjectNotes`~~ — **Deprecated**
+
+> **Deprecated** — These legacy note fields/collections are superseded by `POST /api/v1/fraud/:id/notes`. Legacy data stored under these paths remains **readable** for backward compatibility. **Write operations to these fields are rejected with HTTP 400.** Use the note endpoints above for all new note creation and retraction.
 
 ---
 

@@ -116,11 +116,11 @@ export default function InfoPage() {
         body: JSON.stringify({ target }),
       });
     } catch {
-      // backend restart triggers a connection reset — this is expected
+      // backend restart triggers a connection reset - this is expected
     }
 
     if (target === 'backend') {
-      setRestartStatus({ ok: false, msg: 'Backend restarting — reconnecting...' });
+      setRestartStatus({ ok: false, msg: 'Backend restarting - reconnecting...' });
       pollRef.current = setInterval(async () => {
         try {
           const res = await fetch(`${API_BASE_URL}/api/v1/admin/system`, {
@@ -139,7 +139,7 @@ export default function InfoPage() {
     }
 
     if (target === 'frontend') {
-      setRestartStatus({ ok: false, msg: 'Frontend restarting — page will reload in ~10s' });
+      setRestartStatus({ ok: false, msg: 'Frontend restarting - page will reload in ~10s' });
       setTimeout(() => window.location.reload(), 10000);
     }
   }
@@ -238,7 +238,7 @@ export default function InfoPage() {
         {!restartStatus && restartRequired && (
           <span className="flex items-center gap-1.5 text-xs text-yellow-400 bg-yellow-400/10 border border-yellow-400/30 px-2.5 py-1 rounded-lg">
             <RotateCcw size={11} />
-            Variables updated — restart the server to apply all changes
+            Variables updated - restart the server to apply all changes
           </span>
         )}
       </div>
@@ -508,7 +508,7 @@ function InfoRow({ label, value, mono, inDotenv, onSave }: {
             </button>
           </div>
           {isMasked && (
-            <p className="text-gray-600 text-[10px] ml-[148px]">Sensitive — leave blank to cancel without saving.</p>
+            <p className="text-gray-600 text-[10px] ml-[148px]">Sensitive - leave blank to cancel without saving.</p>
           )}
           {saveError && <p className="text-red-400 text-[10px] ml-[148px]">{saveError}</p>}
         </div>

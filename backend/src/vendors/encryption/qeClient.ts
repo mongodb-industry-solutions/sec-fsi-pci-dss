@@ -1,5 +1,5 @@
 /**
- * Legacy QE client — used only by setup/seed scripts that need full DEK access.
+ * Legacy QE client - used only by setup/seed scripts that need full DEK access.
  * Application request handlers must use getDbForRole() from roleClients.ts instead.
  */
 import { MongoClient } from 'mongodb';

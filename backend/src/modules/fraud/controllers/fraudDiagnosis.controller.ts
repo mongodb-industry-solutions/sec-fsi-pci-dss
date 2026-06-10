@@ -1,10 +1,11 @@
 import { FastifyInstance } from 'fastify';
-import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, appendAuditEvent, createFraudCase } from '../services/fraudDiagnosis.service';
+import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, appendAuditEvent, createFraudCase, addCaseNote, retractCaseNote, getCaseNotes } from '../services/fraudDiagnosis.service';
 import { getTransactionById } from '../../transactions/services/cardTransaction.service';
 import { generateToken } from '../../../vendors/security/escalationTokens';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import type { DemoRequest } from '../../../shared/models/identity.model';
+import type { AnalystRole } from '../models/fraudDiagnosis.model';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
 
@@ -227,7 +228,7 @@ without creating a duplicate.
           customerAgreementUuid = agreementDoc.customerAgreementInstanceReference;
         }
       } catch {
-        // Keep account reference as fallback — raw document lookup will fail but fraud case still created
+        // Keep account reference as fallback - raw document lookup will fail but fraud case still created
       }
     }
 
@@ -314,6 +315,7 @@ without creating a duplicate.
               },
             },
             requestDateTime: { type: 'string', format: 'date-time', description: 'UTC timestamp when the case was opened.' },
+            escalationAcceptedAt: { type: 'string', format: 'date-time', nullable: true, description: 'Set when L2 approves the escalation; null otherwise or after rejection.' },
           },
         },
         401: { description: 'Missing or invalid Bearer token.', $ref: 'Error#' },
@@ -410,10 +412,15 @@ without creating a duplicate.
       }
     }
 
+    // Reject deprecated note fields - use POST /fraud/:id/notes instead
+    if (body.fraudDiagnosisCaseNotes || body.fraudDiagnosisCustomerSubjectNotes) {
+      return reply.status(400).send({
+        error: 'fraudDiagnosisCaseNotes and fraudDiagnosisCustomerSubjectNotes are deprecated. Use POST /api/v1/fraud/:id/notes instead.',
+      });
+    }
+
     const patch: Parameters<typeof updateCase>[2] = {};
     if (body.fraudDiagnosisCaseStatus) patch.fraudDiagnosisCaseStatus = body.fraudDiagnosisCaseStatus as never;
-    if (body.fraudDiagnosisCaseNotes) patch.fraudDiagnosisCaseNotes = body.fraudDiagnosisCaseNotes;
-    if (body.fraudDiagnosisCustomerSubjectNotes) patch.fraudDiagnosisCustomerSubjectNotes = body.fraudDiagnosisCustomerSubjectNotes;
     if (body.fraudDiagnosisAnalystInstanceReference) patch.fraudDiagnosisAnalystInstanceReference = body.fraudDiagnosisAnalystInstanceReference;
 
     if (body.resolutionOutcome) {
@@ -440,7 +447,7 @@ without creating a duplicate.
       : undefined;
 
     if (actionType) {
-      await appendAuditEvent(fastify.db, id, actionType, callerRole, {
+      await appendAuditEvent(fastify.db, id, actionType, callerRole as AnalystRole, {
         newStatus: body.fraudDiagnosisCaseStatus,
         hasInternalNote: !!body.fraudDiagnosisCaseNotes,
         hasCustomerNote: !!body.fraudDiagnosisCustomerSubjectNotes,
@@ -791,7 +798,7 @@ Token TTL: 4 hours. Use \`POST /fraud/:id/escalate/approve\` again to renew.`,
     });
   });
 
-  // POST /api/v1/fraud/:id/escalate/reject  — L2 returns case to L1 for re-analysis
+  // POST /api/v1/fraud/:id/escalate/reject  - L2 returns case to L1 for re-analysis
   fastify.post('/:id/escalate/reject', {
     schema: {
       tags: ['fraud'],
@@ -851,5 +858,165 @@ The case status is set back to \`under_review\`. L1 can then close it as a false
       fraudDiagnosisCaseStatus: 'under_review',
       rejectedAt: now.toISOString(),
     });
+  });
+
+  // -- BIAN SD-83 append-only notes ------------------------------------------
+
+  // POST /api/v1/fraud/:id/notes
+  fastify.post('/:id/notes', {
+    schema: {
+      tags: ['fraud'],
+      summary: 'Add a note to a fraud case (BIAN append-only)',
+      description: `Appends a \`note_added\` event to \`fraudDiagnosisCaseEvents\`.
+
+Notes are **immutable** once saved (BIAN append-only principle, PCI DSS Req. 10.3).
+Errors are corrected via \`DELETE /fraud/:id/notes/:noteId\` (retraction), which itself creates an auditable event.
+
+**Visibility:**
+- \`internal\` - visible to L1 Analyst, L2 Investigator, Security Auditor only
+- \`customer\` - also visible to the customer in their transaction history`,
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      body: {
+        type: 'object',
+        required: ['noteText', 'visibility'],
+        properties: {
+          noteText: { type: 'string', minLength: 1, maxLength: 2000, description: 'Note content (immutable after save).' },
+          visibility: { type: 'string', enum: ['internal', 'customer'], description: 'Who can see this note.' },
+        },
+      },
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            noteId: { type: 'string' },
+            actionDateTime: { type: 'string', format: 'date-time' },
+          },
+        },
+        400: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { noteText, visibility } = request.body as { noteText: string; visibility: 'internal' | 'customer' };
+    const { demoRole } = request as unknown as DemoRequest;
+
+    if (demoRole === 'customer' || demoRole === 'security_auditor') {
+      return reply.status(403).send({ error: 'Only L1 and L2 analysts may add notes' });
+    }
+
+    const fraudCase = await getCaseById(fastify.db, id);
+    if (!fraudCase) return reply.status(404).send({ error: 'Fraud case not found' });
+
+    const result = await addCaseNote(fastify.db, id, noteText, visibility, demoRole);
+    return reply.status(201).send({ noteId: result.noteId, actionDateTime: result.actionDateTime });
+  });
+
+  // DELETE /api/v1/fraud/:id/notes/:noteId  (retraction - not physical delete)
+  fastify.delete('/:id/notes/:noteId', {
+    schema: {
+      tags: ['fraud'],
+      summary: 'Retract a note (BIAN append-only correction)',
+      description: `Creates a \`note_retracted\` event referencing the original \`noteId\`.
+
+The original note is **not deleted** - retraction is itself an auditable record.
+Only the same role that created the note may retract it.
+Retracted notes are hidden from the customer but remain visible in the internal audit trail.`,
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['id', 'noteId'],
+        properties: { id: { type: 'string' }, noteId: { type: 'string' } },
+      },
+      body: {
+        type: 'object',
+        properties: {
+          retractionReason: { type: 'string', description: 'Optional reason for retraction.' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            retractedNoteId: { type: 'string' },
+            retractionDateTime: { type: 'string', format: 'date-time' },
+          },
+        },
+        403: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+        409: { description: 'Note already retracted.', $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id, noteId } = request.params as { id: string; noteId: string };
+    const { retractionReason } = (request.body as { retractionReason?: string }) ?? {};
+    const { demoRole } = request as unknown as DemoRequest;
+
+    if (demoRole === 'customer' || demoRole === 'security_auditor') {
+      return reply.status(403).send({ error: 'Only L1 and L2 analysts may retract notes' });
+    }
+
+    const outcome = await retractCaseNote(fastify.db, id, noteId, retractionReason, demoRole);
+    if (outcome === 'not_found')        return reply.status(404).send({ error: 'Note not found for this case' });
+    if (outcome === 'wrong_role')       return reply.status(403).send({ error: 'Only the author role may retract this note' });
+    if (outcome === 'already_retracted') return reply.status(409).send({ error: 'Note has already been retracted' });
+
+    return reply.send({ retractedNoteId: noteId, retractionDateTime: new Date().toISOString() });
+  });
+
+  // GET /api/v1/fraud/:id/notes
+  fastify.get('/:id/notes', {
+    schema: {
+      tags: ['fraud'],
+      summary: 'List notes for a fraud case',
+      description: `Returns all \`note_added\` events for the case, enriched with retraction status.
+
+- L1 / L2 / Auditor: see all notes (internal + customer)
+- Customer role: blocked at auth middleware; use \`GET /transactions/:id/notes\` instead
+- Query \`?visibility=internal|customer\` to filter`,
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      querystring: {
+        type: 'object',
+        properties: {
+          visibility: { type: 'string', enum: ['internal', 'customer'] },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            notes: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  noteId:              { type: 'string' },
+                  noteText:            { type: 'string' },
+                  visibility:          { type: 'string', enum: ['internal', 'customer'] },
+                  performedByRole:     { type: 'string' },
+                  actionDateTime:      { type: 'string', format: 'date-time' },
+                  isRetracted:         { type: 'boolean' },
+                  retractionReason:    { type: 'string', nullable: true },
+                  retractionDateTime:  { type: 'string', nullable: true, format: 'date-time' },
+                },
+              },
+            },
+          },
+        },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { visibility } = request.query as { visibility?: 'internal' | 'customer' };
+
+    const fraudCase = await getCaseById(fastify.db, id);
+    if (!fraudCase) return reply.status(404).send({ error: 'Fraud case not found' });
+
+    const notes = await getCaseNotes(fastify.db, id, visibility);
+    return reply.send({ notes });
   });
 }

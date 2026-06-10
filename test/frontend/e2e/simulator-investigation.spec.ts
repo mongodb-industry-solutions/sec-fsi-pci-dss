@@ -1,5 +1,5 @@
 /**
- * E2E: Simulator Mode — Investigation Flow (FR-v1-02)
+ * E2E: Simulator Mode - Investigation Flow (FR-v1-02)
  * Search by QE fields, case table, case detail with encryption badges, raw document toggle.
  */
 import { test, expect } from '@playwright/test';

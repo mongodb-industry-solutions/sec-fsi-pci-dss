@@ -6,9 +6,10 @@ import { api, FraudCase, ActionEvent, HrpcCheckResponse } from '../../../../lib/
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { EncryptionBadge } from '../../../../components/EncryptionBadge';
 import { RawMongoPanel } from '../../../../components/RawMongoPanel';
+import { CaseNotesPanel } from '../../../../components/CaseNotesPanel';
 import { SEVERITY_COLORS, STATUS_COLORS, ROLE_LABELS, formatRiskIndicator } from '../../../../lib/constants';
 import { useDebugMode } from '../../../../lib/debugMode';
-import { ArrowUpFromLine, CheckCircle, XCircle, StickyNote, ShieldAlert } from 'lucide-react';
+import { ArrowUpFromLine, CheckCircle, XCircle, ShieldAlert } from 'lucide-react';
 
 const ACTION_LABELS: Record<string, string> = {
   case_opened: 'Case opened',
@@ -69,9 +70,6 @@ export default function DemoCaseDetailPage() {
   const [customerProfile, setCustomerProfile] = useState<Record<string, unknown> | null>(null);
 
   // Action state
-  const [showNoteForm, setShowNoteForm] = useState(false);
-  const [noteText, setNoteText] = useState('');
-  const [customerNoteText, setCustomerNoteText] = useState('');
   const [actionBusy, setActionBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [escalationToken, setEscalationToken] = useState<string | null>(null);
@@ -129,9 +127,6 @@ export default function DemoCaseDetailPage() {
       await api.fraud.update(caseId, body, token);
       await reload(token);
       setActionMsg(successMsg);
-      setShowNoteForm(false);
-      setNoteText('');
-      setCustomerNoteText('');
     } catch (err) {
       setActionMsg(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
@@ -214,7 +209,7 @@ export default function DemoCaseDetailPage() {
   const caseStatus = fraudCase.caseStatus;
   const isResolved = ['resolved_cleared', 'resolved_fraud', 'closed'].includes(caseStatus);
   const isEscalated = caseStatus === 'escalated';
-  // Persisted on the case document — survives page refresh
+  // Persisted on the case document - survives page refresh
   const l2HasAccepted = !!fraudCase.escalationAcceptedAt;
 
   const formattedAmount = snap
@@ -230,7 +225,7 @@ export default function DemoCaseDetailPage() {
           {isAuditor && <Link href="/demo/audit" className="text-sm text-blue-600 hover:underline">Full audit log</Link>}
         </div>
 
-        {/* ── Case header ── */}
+        {/* -- Case header -- */}
         <div className="bg-white rounded-xl border p-5">
           <div className="flex gap-3 items-center mb-4 flex-wrap">
             <h1 className="text-xl font-bold">{fraudCase.fraudDiagnosisCaseReference}</h1>
@@ -301,16 +296,20 @@ export default function DemoCaseDetailPage() {
           )}
         </div>
 
-        {/* ── Customer profile (debug only — informational, not part of the core investigation UX) ── */}
-        {debugMode && <div className="bg-white rounded-xl border p-5">
+        {/* -- Customer profile - visible to L2 and Auditor -- */}
+        {canSeeAll && <div className="bg-white rounded-xl border p-5">
           <div className="flex items-center gap-2 mb-3">
             <h2 className="font-semibold">Customer Profile</h2>
-            <span className={`ml-auto text-xs px-2 py-0.5 rounded font-medium ${canSeeAll ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-              {canSeeAll ? 'Full access' : 'L1 access'}
+            <span className={`ml-auto text-xs px-2 py-0.5 rounded font-medium ${
+              isAuditor                    ? 'bg-gray-100 text-gray-600' :
+              l2HasAccepted                ? 'bg-purple-100 text-purple-700' :
+                                             'bg-amber-100 text-amber-700'
+            }`}>
+              {isAuditor ? 'Auditor access' : l2HasAccepted ? 'Full access' : 'Pending escalation acceptance'}
             </span>
           </div>
 
-          {/* Auto-loaded customer profile from linkedCustomerAgreementReference */}
+          {/* Basic customer info - always visible to L2/Auditor */}
           {customerProfile && (
             <div className="mb-3 bg-gray-50 rounded-lg p-3 text-sm space-y-1.5">
               {[
@@ -339,47 +338,44 @@ export default function DemoCaseDetailPage() {
           )}
 
           <div className="rounded-lg border divide-y text-sm">
-            {/* QE:equality fields */}
+            {/* QE:equality - always visible to L2/Auditor */}
             <div className="p-3 bg-blue-50">
               {debugMode && (
                 <p className="text-xs text-blue-600 mb-2 font-medium">
-                  QE:equality  -  searchable while encrypted. Atlas stores ciphertext; queries match ciphertext-to-ciphertext.
+                  QE:equality - searchable while encrypted. Atlas stores ciphertext; queries match ciphertext-to-ciphertext.
                 </p>
               )}
               <div className="space-y-2">
                 {[
-                  { label: 'Email',             value: canSeeAll ? 'luis.fernandez@leafybank.demo' : null },
-                  { label: 'Phone',             value: canSeeAll ? '+1-555-0142' : null },
-                  { label: 'Account Reference', value: canSeeAll ? 'ACC-LF-20240115' : null },
+                  { label: 'Email',             value: 'luis.fernandez@leafybank.demo' },
+                  { label: 'Phone',             value: '+1-555-0142' },
+                  { label: 'Account Reference', value: 'ACC-LF-20240115' },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex items-center gap-2">
                     <EncryptionBadge label={label} type="qe-equality" />
-                    {value
-                      ? <span className="text-green-700 font-mono text-xs">{value}</span>
-                      : <span className="text-gray-400 text-xs italic">Search above to verify</span>
-                    }
+                    <span className="text-green-700 font-mono text-xs">{value}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* QE:none fields */}
-            <div className={`p-3 ${canSeeAll ? 'bg-purple-50' : 'bg-gray-50'}`}>
+            {/* QE:none - requires accepted escalation (or Auditor role) */}
+            <div className={`p-3 ${(l2HasAccepted || isAuditor) ? 'bg-purple-50' : 'bg-gray-50'}`}>
               {debugMode && (
-                <p className={`text-xs mb-2 font-medium ${canSeeAll ? 'text-purple-600' : 'text-gray-500'}`}>
-                  QE:none  -  encrypted, not searchable. Requires DEK-sensitive (L2 escalation approval).
+                <p className={`text-xs mb-2 font-medium ${(l2HasAccepted || isAuditor) ? 'text-purple-600' : 'text-gray-400'}`}>
+                  QE:none - encrypted, not searchable. Requires DEK-sensitive key (L2 escalation approval).
                 </p>
               )}
               <div className="space-y-2">
                 {[
-                  { label: 'Physical Address', value: canSeeAll ? '742 Evergreen Terrace, Springfield' : null },
-                  { label: 'Government ID',    value: canSeeAll ? 'XXX-XX-4821 (masked)' : null },
+                  { label: 'Physical Address', value: '742 Evergreen Terrace, Springfield' },
+                  { label: 'Government ID',    value: 'XXX-XX-4821 (masked)' },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex items-center gap-2">
                     <EncryptionBadge label={label} type="qe-none" />
-                    {value
+                    {(l2HasAccepted || isAuditor)
                       ? <span className="text-green-700 font-mono text-xs">{value}</span>
-                      : <span className="text-gray-400 text-xs italic">Requires L2 escalation approval</span>
+                      : <span className="text-gray-400 text-xs italic">Requires escalation acceptance to access</span>
                     }
                   </div>
                 ))}
@@ -388,28 +384,8 @@ export default function DemoCaseDetailPage() {
           </div>
         </div>}
 
-        {/* ── Notes (always visible) ── */}
-        <div className="bg-white rounded-xl border p-5 space-y-3">
-          <h2 className="font-semibold text-sm text-gray-700">Case Notes</h2>
-
-          {/* Internal notes – visible to L1, L2, Auditor */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Internal Notes</p>
-            {fraudCase.fraudDiagnosisCaseNotes
-              ? <p className="text-sm text-gray-800 bg-gray-50 rounded p-2 whitespace-pre-wrap">{fraudCase.fraudDiagnosisCaseNotes}</p>
-              : <p className="text-xs text-gray-400 italic">No internal notes yet.</p>
-            }
-          </div>
-
-          {/* Customer-visible notes – shown to customer in their transaction view */}
-          <div>
-            <p className="text-xs font-semibold text-green-700 uppercase mb-1">Customer-Visible Note</p>
-            {fraudCase.fraudDiagnosisCustomerSubjectNotes
-              ? <p className="text-sm text-gray-800 bg-green-50 border border-green-200 rounded p-2 whitespace-pre-wrap">{fraudCase.fraudDiagnosisCustomerSubjectNotes}</p>
-              : <p className="text-xs text-gray-400 italic">No customer-facing note yet. Add one to keep the customer informed.</p>
-            }
-          </div>
-        </div>
+        {/* -- Notes -- */}
+        {token && <CaseNotesPanel caseId={caseId} token={token} role={role} />}
 
         {fraudCase.fraudDiagnosisResolutionRecord && (
           <div className={`rounded-xl border p-4 text-sm ${fraudCase.fraudDiagnosisResolutionRecord.resolutionOutcome === 'confirmed_fraud' ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
@@ -425,7 +401,7 @@ export default function DemoCaseDetailPage() {
           </div>
         )}
 
-        {/* ── L1 Actions ── */}
+        {/* -- L1 Actions -- */}
         {isL1 && !isResolved && (
           <div className="bg-white rounded-xl border p-5">
             <h2 className="font-semibold mb-3">L1 Analyst Actions</h2>
@@ -473,46 +449,7 @@ export default function DemoCaseDetailPage() {
                 </div>
               )}
 
-              <button onClick={() => setShowNoteForm((v) => !v)} className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border text-gray-700 text-sm font-medium hover:bg-gray-50">
-                <StickyNote size={14} />
-                {showNoteForm ? 'Cancel' : 'Add Notes'}
-              </button>
             </div>
-
-            {showNoteForm && (
-              <div className="mt-3 space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Internal note (for L2 team)</label>
-                  <textarea
-                    value={noteText}
-                    onChange={(e) => setNoteText(e.target.value)}
-                    rows={2}
-                    placeholder="Add context for the Level 2 investigator..."
-                    className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Customer-visible note (shown to customer in their transaction history)</label>
-                  <textarea
-                    value={customerNoteText}
-                    onChange={(e) => setCustomerNoteText(e.target.value)}
-                    rows={2}
-                    placeholder="e.g. Your transaction is under security review. No action needed."
-                    className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
-                  />
-                </div>
-                <button
-                  onClick={() => handleAction({
-                    ...(noteText ? { fraudDiagnosisCaseNotes: noteText } : {}),
-                    ...(customerNoteText ? { fraudDiagnosisCustomerSubjectNotes: customerNoteText } : {}),
-                  }, 'Notes saved.')}
-                  disabled={actionBusy || (!noteText && !customerNoteText)}
-                  className="w-full py-2 px-4 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-medium disabled:opacity-50"
-                >
-                  Save Notes
-                </button>
-              </div>
-            )}
 
             {actionMsg && (
               <div className={`mt-2 text-sm rounded p-2 ${actionMsg.startsWith('Error') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
@@ -522,7 +459,7 @@ export default function DemoCaseDetailPage() {
           </div>
         )}
 
-        {/* ── L2 Actions ── */}
+        {/* -- L2 Actions -- */}
         {isL2 && !isResolved && (
           <div className="bg-white rounded-xl border p-5">
             <h2 className="font-semibold mb-3">L2 Investigator Actions</h2>
@@ -538,11 +475,11 @@ export default function DemoCaseDetailPage() {
                   Approve Escalation - Access Sensitive Fields
                 </button>
               )}
-              {/* Accepted state: show token info + reject option */}
+              {/* Accepted state: token info + reject + resolution buttons */}
               {isEscalated && l2HasAccepted && (
                 <>
                   <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs">
-                    <p className="font-semibold text-purple-800 mb-1">Escalation accepted — sensitive fields accessible</p>
+                    <p className="font-semibold text-purple-800 mb-1">Escalation accepted - sensitive fields accessible</p>
                     {escalationToken && debugMode && <p className="font-mono text-purple-600">Token: {escalationToken}</p>}
                     {!escalationToken && <p className="text-purple-700 italic">Re-open this page or click below to renew your access token.</p>}
                     <button
@@ -556,61 +493,30 @@ export default function DemoCaseDetailPage() {
                   <button
                     onClick={handleRejectEscalation}
                     disabled={actionBusy}
-                    className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-red-400 text-red-700 text-sm font-medium hover:bg-red-50 disabled:opacity-50 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-amber-500 text-amber-700 text-sm font-medium hover:bg-amber-50 disabled:opacity-50 transition-colors"
                   >
                     <XCircle size={14} />
                     Reject Escalation - Return to L1
                   </button>
+                  <button
+                    onClick={() => handleAction({ fraudDiagnosisCaseStatus: 'resolved_fraud', resolutionOutcome: 'confirmed_fraud', resolutionNotes: 'Fraud confirmed by L2 investigator after full analysis.' }, 'Case resolved as confirmed fraud.')}
+                    disabled={actionBusy}
+                    className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors"
+                  >
+                    <XCircle size={14} />
+                    Confirm Fraud - Close Case
+                  </button>
+                  <button
+                    onClick={() => handleAction({ fraudDiagnosisCaseStatus: 'resolved_cleared', resolutionOutcome: 'cleared', resolutionNotes: 'Cleared by L2 investigator after full analysis.' }, 'Case cleared - no fraud found.')}
+                    disabled={actionBusy}
+                    className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-green-600 text-green-700 text-sm font-medium hover:bg-green-50 disabled:opacity-50 transition-colors"
+                  >
+                    <CheckCircle size={14} />
+                    Clear Case - No Fraud Found
+                  </button>
                 </>
               )}
-              <button
-                onClick={() => handleAction({ fraudDiagnosisCaseStatus: 'resolved_fraud', resolutionOutcome: 'confirmed_fraud', resolutionNotes: 'Fraud confirmed by L2 investigator after full analysis.' }, 'Case resolved as confirmed fraud.')}
-                disabled={actionBusy}
-                className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors"
-              >
-                <XCircle size={14} />
-                Confirm Fraud - Close Case
-              </button>
-              <button
-                onClick={() => handleAction({ fraudDiagnosisCaseStatus: 'resolved_cleared', resolutionOutcome: 'cleared', resolutionNotes: 'Cleared by L2 investigator after full analysis.' }, 'Case cleared - no fraud found.')}
-                disabled={actionBusy}
-                className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-green-600 text-green-700 text-sm font-medium hover:bg-green-50 disabled:opacity-50 transition-colors"
-              >
-                <CheckCircle size={14} />
-                Clear Case - No Fraud Found
-              </button>
-              <button onClick={() => setShowNoteForm((v) => !v)} className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border text-gray-700 text-sm font-medium hover:bg-gray-50">
-                <StickyNote size={14} />
-                {showNoteForm ? 'Cancel' : 'Add Notes'}
-              </button>
             </div>
-
-            {showNoteForm && (
-              <div className="mt-3 space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Investigation notes (internal)</label>
-                  <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={2}
-                    placeholder="Document investigation findings..."
-                    className="w-full border rounded-lg px-3 py-2 text-sm resize-none" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Customer-visible note</label>
-                  <textarea value={customerNoteText} onChange={(e) => setCustomerNoteText(e.target.value)} rows={2}
-                    placeholder="e.g. We have completed our review. Your account has been secured."
-                    className="w-full border rounded-lg px-3 py-2 text-sm resize-none" />
-                </div>
-                <button
-                  onClick={() => handleAction({
-                    ...(noteText ? { fraudDiagnosisCaseNotes: noteText } : {}),
-                    ...(customerNoteText ? { fraudDiagnosisCustomerSubjectNotes: customerNoteText } : {}),
-                  }, 'Notes saved.')}
-                  disabled={actionBusy || (!noteText && !customerNoteText)}
-                  className="w-full py-2 px-4 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-medium disabled:opacity-50"
-                >
-                  Save Notes
-                </button>
-              </div>
-            )}
 
             {actionMsg && (
               <div className={`mt-2 text-sm rounded p-2 ${actionMsg.startsWith('Error') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
@@ -620,7 +526,7 @@ export default function DemoCaseDetailPage() {
           </div>
         )}
 
-        {/* ── Audit trail ── */}
+        {/* -- Audit trail -- */}
         <div className="bg-white rounded-xl border p-5">
           <h2 className="font-semibold mb-3">Activity Log</h2>
           {events.length === 0 ? (
@@ -653,7 +559,7 @@ export default function DemoCaseDetailPage() {
           )}
         </div>
 
-        {/* ── PCI DSS (debug mode only) ── */}
+        {/* -- PCI DSS (debug mode only) -- */}
         {debugMode && (
           <div className="bg-[#001E2B]/5 border border-[#001E2B]/20 rounded-xl p-4 text-sm">
             <strong>PCI DSS v4.0 alignment:</strong> Field-level access control via Queryable Encryption
@@ -662,7 +568,7 @@ export default function DemoCaseDetailPage() {
           </div>
         )}
 
-        {/* ── Debug: raw JSON ── */}
+        {/* -- Debug: raw JSON -- */}
         {debugMode && (
           <RawMongoPanel
             token={token}
@@ -670,28 +576,28 @@ export default function DemoCaseDetailPage() {
             sections={[
               {
                 kind: 'static',
-                label: 'API — GET /api/v1/fraud/:id',
+                label: 'API - GET /api/v1/fraud/:id',
                 labelColor: 'text-yellow-400',
                 description: 'Fraud case document (application layer response)',
                 data: fraudCase,
               },
               {
                 kind: 'static',
-                label: 'API — GET /api/v1/fraud/:id/events',
+                label: 'API - GET /api/v1/fraud/:id/events',
                 labelColor: 'text-yellow-400',
                 description: 'Audit trail events',
                 data: events,
               },
               {
                 kind: 'static',
-                label: 'API — GET /api/v1/fraud/hrpc/check',
+                label: 'API - GET /api/v1/fraud/hrpc/check',
                 labelColor: 'text-yellow-400',
                 description: 'HRPC risk profile for the linked account',
                 data: hrpc,
               },
               {
                 kind: 'static',
-                label: 'API — GET /api/v1/customer/by-id/:id',
+                label: 'API - GET /api/v1/customer/by-id/:id',
                 labelColor: 'text-yellow-400',
                 description: 'Customer agreement profile (auto-loaded from customerAgreementInstanceReference)',
                 data: customerProfile,
@@ -708,14 +614,14 @@ export default function DemoCaseDetailPage() {
                 collection: 'cardTransactionLog',
                 id: fraudCase.cardTransactionInstanceReference,
                 label: 'cardTransactionLog',
-                description: 'QE:equality (accountRef) + QE:none (rawGatewayPayload, processorMetadata) — BSON ciphertext',
+                description: 'QE:equality (accountRef) + QE:none (rawGatewayPayload, processorMetadata) - BSON ciphertext',
               },
               {
                 kind: 'mongo',
                 collection: 'customerAgreementProcedure',
                 id: fraudCase.customerAgreementInstanceReference,
                 label: 'customerAgreementProcedure',
-                description: 'QE:equality (accountRef) + QE:none (address, govId, riskNotes) — BSON ciphertext',
+                description: 'QE:equality (accountRef) + QE:none (address, govId, riskNotes) - BSON ciphertext',
               },
             ]}
           />

@@ -25,7 +25,7 @@ const EXPECTED_COLLECTIONS = [
   'consentAccessLog',
 ];
 
-// Unique index (primary ref field) per collection — representative index check
+// Unique index (primary ref field) per collection - representative index check
 const EXPECTED_UNIQUE_INDEXES: Record<string, string> = {
   party:                            'partyInstanceReference',
   cardTransactionLog:               'cardTransactionInstanceReference',
@@ -40,7 +40,7 @@ const EXPECTED_UNIQUE_INDEXES: Record<string, string> = {
   consentAccessLog:                 'consentAccessLogInstanceReference',
 };
 
-// ── Result tracking ──────────────────────────────────────────────────────────
+// -- Result tracking ----------------------------------------------------------
 
 type Status = 'pass' | 'fail' | 'warn' | 'skip';
 
@@ -50,14 +50,14 @@ let warn = 0;
 
 function check(status: Status, label: string, detail?: string) {
   const tag = status === 'pass' ? '[PASS]' : status === 'fail' ? '[FAIL]' : status === 'warn' ? '[WARN]' : '[SKIP]';
-  const suffix = detail ? ` — ${detail}` : '';
+  const suffix = detail ? ` - ${detail}` : '';
   console.log(`  ${tag} ${label}${suffix}`);
   if (status === 'pass') pass++;
   else if (status === 'fail') fail++;
   else if (status === 'warn') warn++;
 }
 
-// ── HTTP Digest Auth helpers ─────────────────────────────────────────────────
+// -- HTTP Digest Auth helpers ------------------------------------------------─
 
 function md5(s: string): string {
   return crypto.createHash('md5').update(s).digest('hex');
@@ -126,20 +126,20 @@ async function atlasGet(path: string, publicKey: string, privateKey: string): Pr
   }
 }
 
-// ── Section checks ───────────────────────────────────────────────────────────
+// -- Section checks ----------------------------------------------------------─
 
 function checkEnvVars(): boolean {
   console.log('\n1. Environment variables');
 
   const kms = process.env.KMS_PROVIDER;
 
-  // ── 1.1 Core (required) ────────────────────────────────────────────────────
+  // -- 1.1 Core (required) ----------------------------------------------------
   console.log('   1.1 Core (required)');
 
   for (const v of ['MONGODB_URI', 'MONGODB_DB_NAME', 'KMS_PROVIDER', 'JWT_SECRET']) {
     process.env[v]
       ? check('pass', v, v === 'MONGODB_DB_NAME' ? process.env[v] : undefined)
-      : check('fail', v, 'not set — required');
+      : check('fail', v, 'not set - required');
   }
 
   // Semantic: MONGODB_URI format
@@ -150,24 +150,24 @@ function checkEnvVars(): boolean {
 
   // Semantic: JWT_SECRET must not be the demo default
   if (process.env.JWT_SECRET === 'demo-local-secret-change-in-production') {
-    check('warn', 'JWT_SECRET', 'using the hardcoded demo default — change before any non-local deployment');
+    check('warn', 'JWT_SECRET', 'using the hardcoded demo default - change before any non-local deployment');
   }
 
-  // ── 1.2 KMS-specific ────────────────────────────────────────────────────────
+  // -- 1.2 KMS-specific --------------------------------------------------------
   console.log('   1.2 KMS-specific');
 
   if (kms === 'local') {
     const localKey = process.env.LOCAL_MASTER_KEY_BASE64;
     localKey
       ? check('pass', 'LOCAL_MASTER_KEY_BASE64')
-      : check('fail', 'LOCAL_MASTER_KEY_BASE64', 'not set — required for KMS_PROVIDER=local');
+      : check('fail', 'LOCAL_MASTER_KEY_BASE64', 'not set - required for KMS_PROVIDER=local');
 
     if (localKey) {
       try {
         const decoded = Buffer.from(localKey, 'base64');
         decoded.length === 96
           ? check('pass', 'LOCAL_MASTER_KEY_BASE64 length', '96 bytes ✓')
-          : check('fail', 'LOCAL_MASTER_KEY_BASE64 length', `expected 96 bytes, got ${decoded.length} — regenerate with setup:key`);
+          : check('fail', 'LOCAL_MASTER_KEY_BASE64 length', `expected 96 bytes, got ${decoded.length} - regenerate with setup:key`);
       } catch {
         check('fail', 'LOCAL_MASTER_KEY_BASE64', 'invalid base64 encoding');
       }
@@ -176,41 +176,41 @@ function checkEnvVars(): boolean {
     for (const v of ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_CMK_ARN', 'AWS_REGION']) {
       process.env[v]
         ? check('pass', v)
-        : check('fail', v, `not set — required for KMS_PROVIDER=aws`);
+        : check('fail', v, `not set - required for KMS_PROVIDER=aws`);
     }
   } else if (kms) {
-    check('warn', 'KMS_PROVIDER', `unknown value '${kms}' — expected 'local' or 'aws'`);
+    check('warn', 'KMS_PROVIDER', `unknown value '${kms}' - expected 'local' or 'aws'`);
   }
 
-  // ── 1.3 Role pool URIs (optional) ──────────────────────────────────────────
+  // -- 1.3 Role pool URIs (optional) ------------------------------------------
   console.log('   1.3 Role pool URIs (optional)');
 
   for (const v of ['MONGODB_URI_LEVEL1', 'MONGODB_URI_LEVEL2']) {
     process.env[v]
       ? check('pass', v)
-      : check('warn', v, 'not set — Level 1/2 role pools will fall back to main URI');
+      : check('warn', v, 'not set - Level 1/2 role pools will fall back to main URI');
   }
 
-  // ── 1.4 Atlas API (optional) ───────────────────────────────────────────────
+  // -- 1.4 Atlas API (optional) ----------------------------------------------─
   console.log('   1.4 Atlas API (optional)');
 
   for (const v of ['ATLAS_PUBLIC_KEY', 'ATLAS_PRIVATE_KEY', 'ATLAS_PROJECT_ID']) {
     process.env[v]
       ? check('pass', v)
-      : check('warn', v, 'not set — Atlas role/user checks will be skipped');
+      : check('warn', v, 'not set - Atlas role/user checks will be skipped');
   }
   for (const v of ['ATLAS_DB_USER_LEVEL1', 'ATLAS_DB_USER_LEVEL2']) {
     process.env[v]
       ? check('pass', v)
-      : check('warn', v, 'not set — Atlas DB user checks will be skipped');
+      : check('warn', v, 'not set - Atlas DB user checks will be skipped');
   }
 
-  // ── 1.5 Application runtime (optional) ────────────────────────────────────
+  // -- 1.5 Application runtime (optional) ------------------------------------
   console.log('   1.5 Application runtime (optional)');
 
   const apiPort = process.env.API_PORT;
   if (!apiPort) {
-    check('warn', 'API_PORT', 'not set — defaulting to 3001');
+    check('warn', 'API_PORT', 'not set - defaulting to 3001');
   } else {
     const p = parseInt(apiPort, 10);
     (!isNaN(p) && p > 0 && p < 65536)
@@ -220,33 +220,33 @@ function checkEnvVars(): boolean {
 
   process.env.API_HOST
     ? check('pass', 'API_HOST', process.env.API_HOST)
-    : check('warn', 'API_HOST', 'not set — defaulting to 0.0.0.0');
+    : check('warn', 'API_HOST', 'not set - defaulting to 0.0.0.0');
 
   process.env.CORS_ORIGIN
     ? check('pass', 'CORS_ORIGIN', process.env.CORS_ORIGIN)
-    : check('warn', 'CORS_ORIGIN', 'not set — defaulting to http://localhost:3000 (update for non-local deployments)');
+    : check('warn', 'CORS_ORIGIN', 'not set - defaulting to http://localhost:3000 (update for non-local deployments)');
 
   process.env.JWT_EXPIRES_IN
     ? check('pass', 'JWT_EXPIRES_IN', process.env.JWT_EXPIRES_IN)
-    : check('warn', 'JWT_EXPIRES_IN', 'not set — defaulting to 24h');
+    : check('warn', 'JWT_EXPIRES_IN', 'not set - defaulting to 24h');
 
   const nodeEnv = process.env.NODE_ENV;
   if (!nodeEnv) {
-    check('warn', 'NODE_ENV', 'not set — recommend setting to development or production');
+    check('warn', 'NODE_ENV', 'not set - recommend setting to development or production');
   } else if (!['development', 'production', 'test'].includes(nodeEnv)) {
-    check('warn', 'NODE_ENV', `unexpected value '${nodeEnv}' — expected development, production, or test`);
+    check('warn', 'NODE_ENV', `unexpected value '${nodeEnv}' - expected development, production, or test`);
   } else {
     check('pass', 'NODE_ENV', nodeEnv);
   }
 
-  // ── 1.6 QE shared library (optional) ──────────────────────────────────────
+  // -- 1.6 QE shared library (optional) --------------------------------------
   console.log('   1.6 QE shared library (optional)');
 
   const cryptPath = process.env.MONGODB_CRYPT_SHARED_LIB_PATH;
   if (!cryptPath) {
-    check('warn', 'MONGODB_CRYPT_SHARED_LIB_PATH', 'not set — library will be auto-detected from default platform locations');
+    check('warn', 'MONGODB_CRYPT_SHARED_LIB_PATH', 'not set - library will be auto-detected from default platform locations');
   } else if (!existsSync(cryptPath)) {
-    check('fail', 'MONGODB_CRYPT_SHARED_LIB_PATH', `file not found at '${cryptPath}' — QE will fail to initialize`);
+    check('fail', 'MONGODB_CRYPT_SHARED_LIB_PATH', `file not found at '${cryptPath}' - QE will fail to initialize`);
   } else {
     check('pass', 'MONGODB_CRYPT_SHARED_LIB_PATH', cryptPath);
   }
@@ -257,14 +257,14 @@ function checkEnvVars(): boolean {
 async function checkMongoDB(client: MongoClient): Promise<void> {
   const dbName = process.env.MONGODB_DB_NAME ?? 'pci_demo';
 
-  // ── Connectivity ────────────────────────────────────────────────────────────
+  // -- Connectivity ------------------------------------------------------------
   console.log('\n2. MongoDB connectivity');
 
   try {
     await client.db().admin().ping();
     check('pass', 'main URI connected');
   } catch (e) {
-    check('fail', 'main URI', `cannot connect — ${(e as Error).message}`);
+    check('fail', 'main URI', `cannot connect - ${(e as Error).message}`);
     return;
   }
 
@@ -277,13 +277,13 @@ async function checkMongoDB(client: MongoClient): Promise<void> {
       await c.db().admin().ping();
       check('pass', `${key} connected`);
     } catch (e) {
-      check('fail', key, `cannot connect — ${(e as Error).message}`);
+      check('fail', key, `cannot connect - ${(e as Error).message}`);
     } finally {
       await c.close().catch(() => {});
     }
   }
 
-  // ── Application database ────────────────────────────────────────────────────
+  // -- Application database ----------------------------------------------------
   console.log(`\n3. Application database (${dbName})`);
 
   const db = client.db(dbName);
@@ -294,46 +294,46 @@ async function checkMongoDB(client: MongoClient): Promise<void> {
   const found   = EXPECTED_COLLECTIONS.length - missing.length;
 
   if (missing.length === 0) {
-    check('pass', `collections — all ${EXPECTED_COLLECTIONS.length}/${EXPECTED_COLLECTIONS.length} present`);
+    check('pass', `collections - all ${EXPECTED_COLLECTIONS.length}/${EXPECTED_COLLECTIONS.length} present`);
   } else {
-    check('fail', `collections — ${found}/${EXPECTED_COLLECTIONS.length} present`, `missing: ${missing.join(', ')}`);
+    check('fail', `collections - ${found}/${EXPECTED_COLLECTIONS.length} present`, `missing: ${missing.join(', ')}`);
   }
 
-  // ── Indexes ─────────────────────────────────────────────────────────────────
+  // -- Indexes ----------------------------------------------------------------─
   console.log('\n4. Indexes');
 
   for (const [col, field] of Object.entries(EXPECTED_UNIQUE_INDEXES)) {
     if (!existingSet.has(col)) {
-      check('skip', `${col} — collection missing`);
+      check('skip', `${col} - collection missing`);
       continue;
     }
     try {
       const indexes = await db.collection(col).listIndexes().toArray();
       const hasIt   = indexes.some((idx) => idx.key?.[field] !== undefined && idx.unique === true);
       hasIt
-        ? check('pass', `${col} — unique index on ${field}`)
-        : check('fail', `${col} — unique index on ${field} not found`);
+        ? check('pass', `${col} - unique index on ${field}`)
+        : check('fail', `${col} - unique index on ${field} not found`);
     } catch (e) {
-      check('warn', `${col} — index check error: ${(e as Error).message}`);
+      check('warn', `${col} - index check error: ${(e as Error).message}`);
     }
   }
 
-  // ── Key vault ───────────────────────────────────────────────────────────────
+  // -- Key vault --------------------------------------------------------------─
   console.log('\n5. QE key vault (encryption.__keyVault)');
 
   try {
     const kvDb      = client.db('encryption');
     const kvList    = await kvDb.listCollections({ name: '__keyVault' }).toArray();
     if (kvList.length === 0) {
-      check('fail', '__keyVault collection', 'not found — run setup:db');
+      check('fail', '__keyVault collection', 'not found - run setup:db');
       return;
     }
     check('pass', '__keyVault collection exists');
 
     const dekCount = await kvDb.collection('__keyVault').countDocuments();
     dekCount > 0
-      ? check('pass', `DEKs present — ${dekCount} key(s)`)
-      : check('fail', 'DEKs', 'no DEKs found — run setup:db');
+      ? check('pass', `DEKs present - ${dekCount} key(s)`)
+      : check('fail', 'DEKs', 'no DEKs found - run setup:db');
 
     const kvIndexes = await kvDb.collection('__keyVault').listIndexes().toArray();
     const hasKvIdx  = kvIndexes.some((i) => i.key?.keyAltNames !== undefined);
@@ -363,7 +363,7 @@ async function checkAtlas(): Promise<void> {
       publicKey, privateKey,
     );
     if (status === 200)     check('pass', `custom role ${role}`);
-    else if (status === 404) check('fail', `custom role ${role}`, 'not found — run setup:db');
+    else if (status === 404) check('fail', `custom role ${role}`, 'not found - run setup:db');
     else                     check('warn', `custom role ${role}`, `Atlas API returned HTTP ${status}`);
   }
 
@@ -375,19 +375,19 @@ async function checkAtlas(): Promise<void> {
       publicKey, privateKey,
     );
     if (status === 200)     check('pass', `DB user ${user}`);
-    else if (status === 404) check('fail', `DB user ${user}`, 'not found — run setup:db');
+    else if (status === 404) check('fail', `DB user ${user}`, 'not found - run setup:db');
     else                     check('warn', `DB user ${user}`, `Atlas API returned HTTP ${status}`);
   }
 }
 
-// ── Entry point ───────────────────────────────────────────────────────────────
+// -- Entry point --------------------------------------------------------------─
 
 export async function runValidate(): Promise<void> {
   console.log('=== Setup Validation ===');
 
   const envOk = checkEnvVars();
   if (!envOk) {
-    console.log('\n[FAIL] Required environment variables missing — fix .env before continuing.\n');
+    console.log('\n[FAIL] Required environment variables missing - fix .env before continuing.\n');
     console.log(`=== Summary: ${pass} pass, ${fail} fail, ${warn} warn ===`);
     process.exitCode = 1;
     return;
@@ -406,6 +406,6 @@ export async function runValidate(): Promise<void> {
 
   console.log('');
   const status = fail > 0 ? '[FAIL]' : warn > 0 ? '[WARN]' : '[PASS]';
-  console.log(`=== Summary: ${pass} pass, ${fail} fail, ${warn} warn — ${status} ===`);
+  console.log(`=== Summary: ${pass} pass, ${fail} fail, ${warn} warn - ${status} ===`);
   if (fail > 0) process.exitCode = 1;
 }

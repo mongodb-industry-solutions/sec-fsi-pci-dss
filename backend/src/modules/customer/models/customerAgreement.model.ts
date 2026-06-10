@@ -15,10 +15,10 @@ export interface CustomerAgreementControlRecord {
   customerAgreementInstanceReference: string;
   partyInstanceReference: string;               // FK to party (SD-13)
 
-  // QE:equality (DEK-lookup tier) — searchable, Level 1+
+  // QE:equality (DEK-lookup tier) - searchable, Level 1+
   customerAgreementReference: string;
 
-  // QE:none (DEK-sensitive tier) — non-searchable, Level 2+ only
+  // QE:none (DEK-sensitive tier) - non-searchable, Level 2+ only
   // Present as decrypted value with L2 QE client; Binary ciphertext with L1 client.
   customerAgreementResidentialAddress?: ResidentialAddress;
   governmentIdentificationReference?: string;

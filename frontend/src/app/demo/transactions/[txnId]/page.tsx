@@ -165,7 +165,7 @@ export default function TransactionDetailPage() {
         </div>
       </div>
 
-      {/* Cardholder Data — all fields that identify the cardholder */}
+      {/* Cardholder Data - all fields that identify the cardholder */}
       <div className="bg-white rounded-xl border p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-sm text-gray-700">Cardholder Data</h2>
@@ -191,10 +191,10 @@ export default function TransactionDetailPage() {
             )}
           </div>
 
-          {/* Account Reference — QE:equality encrypted */}
+          {/* Account Reference - QE:equality encrypted */}
           <div className="bg-blue-50 rounded-lg p-3">
             {debugMode && (
-              <p className="text-xs font-semibold text-blue-700 uppercase mb-2">QE:equality  —  searchable while encrypted</p>
+              <p className="text-xs font-semibold text-blue-700 uppercase mb-2">QE:equality  -  searchable while encrypted</p>
             )}
             {txn.cardTransactionAccountReference ? (
               <RevealField
@@ -210,12 +210,12 @@ export default function TransactionDetailPage() {
             )}
           </div>
 
-          {/* QE:none — debug only: explains system architecture (DEK-sensitive, L2 escalation) */}
+          {/* QE:none - debug only: explains system architecture (DEK-sensitive, L2 escalation) */}
           {debugMode && (
             <div className={`rounded-lg p-3 ${canSeeSensitive ? 'bg-purple-50' : 'bg-gray-50'}`}>
               <div className="flex items-center justify-between mb-2">
                 <p className={`text-xs font-semibold uppercase ${canSeeSensitive ? 'text-purple-700' : 'text-gray-500'}`}>
-                  QE:none  —  sensitive (DEK-sensitive)
+                  QE:none  -  sensitive (DEK-sensitive)
                 </p>
                 {!canSeeSensitive && isL2 && !escalationToken && (
                   <button
@@ -345,7 +345,7 @@ export default function TransactionDetailPage() {
               id: txnId,
               label: 'cardTransactionLog',
               labelColor: 'text-amber-400',
-              description: 'SD-27 — QE:equality (accountRef) + QE:none (raw gateway payload, processor metadata)',
+              description: 'SD-27 - QE:equality (accountRef) + QE:none (raw gateway payload, processor metadata)',
             },
             ...(txn.paymentCardReference ? [{
               kind: 'mongo' as const,
@@ -353,7 +353,7 @@ export default function TransactionDetailPage() {
               id: txn.paymentCardReference,
               label: 'paymentCardManagement',
               labelColor: 'text-blue-400',
-              description: 'SD-170 — card token (QE:equality), PAN mask, network, expiry',
+              description: 'SD-170 - card token (QE:equality), PAN mask, network, expiry',
             }] : []),
             ...(linkedCase ? [{
               kind: 'mongo' as const,
@@ -361,7 +361,7 @@ export default function TransactionDetailPage() {
               id: linkedCase.id,
               label: 'fraudDiagnosisCase',
               labelColor: 'text-red-400',
-              description: 'SD-92 — investigation case, risk indicators, resolution record',
+              description: 'SD-92 - investigation case, risk indicators, resolution record',
             }] : []),
           ]}
         />

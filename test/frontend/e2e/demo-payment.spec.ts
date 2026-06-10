@@ -1,5 +1,5 @@
 /**
- * E2E: Application Mode — Payment Flow (FR-v1-01, FR-v1-03)
+ * E2E: Application Mode - Payment Flow (FR-v1-01, FR-v1-03)
  * Authenticated 3-step checkout: card masking, confirmation, fraud alert.
  */
 import { test, expect } from '@playwright/test';

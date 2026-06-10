@@ -90,7 +90,7 @@ function DemoShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Sidebar + content row — document scrolls, sidebar is sticky */}
+      {/* Sidebar + content row - document scrolls, sidebar is sticky */}
       <div className="flex flex-1">
         <DemoSidebar />
         <div className="flex-1 min-w-0 pb-16 md:pb-0">

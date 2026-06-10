@@ -2,7 +2,7 @@
  * Integration tests: RBAC API Layer (FR-v2-13)
  * Source: backend/src/vendors/middleware/rbac.ts + customerAgreement.controller.ts
  *
- * Requires TEST_MONGODB_URI env var — skips gracefully when not set.
+ * Requires TEST_MONGODB_URI env var - skips gracefully when not set.
  * Spins up a real Fastify app against a seeded test Atlas cluster.
  *
  * Acceptance criteria:
@@ -82,7 +82,7 @@ describe('FR-v2-13: RBAC API Layer', () => {
   });
 
   skip('NFR-v2-02: forged X-Demo-Role level2_investigator without token → 403', async () => {
-    // L1 user's JWT, but header claims L2 — must still be blocked without token
+    // L1 user's JWT, but header claims L2 - must still be blocked without token
     const res = await supertest(app.server)
       .get(`/api/v1/customer-agreements?email=${encodeURIComponent(TEST_EMAIL)}`)
       .set('Authorization', `Bearer ${l1Token}`)

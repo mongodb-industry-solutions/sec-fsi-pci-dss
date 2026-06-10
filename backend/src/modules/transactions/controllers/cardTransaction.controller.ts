@@ -8,6 +8,7 @@ import {
   getAllTransactions,
 } from '../services/cardTransaction.service';
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
+import { getCaseNotes } from '../../fraud/services/fraudDiagnosis.service';
 
 export async function cardTransactionController(fastify: FastifyInstance) {
   fastify.get('/merchants', {
@@ -301,18 +302,15 @@ role to retrieve.`,
     return reply.send(txn);
   });
 
-  // GET /api/v1/transactions/:id/notes  -  customer-safe endpoint: returns only public notes
-  // accessible to any authenticated user (including customer role)
+  // GET /api/v1/transactions/:id/notes  -  customer-safe: returns customer-visible notes list
   fastify.get('/:id/notes', {
     schema: {
       tags: ['transactions'],
-      summary: 'Get customer-visible notes for a transaction',
-      description: `Returns the customer-facing investigation notes and case status for a
-transaction, without exposing internal analyst notes or sensitive case details.
-
+      summary: 'Get customer-visible notes for a transaction (list)',
+      description: `Returns the customer-facing investigation notes and case status.
 Accessible to the \`customer\` role (unlike direct fraud case endpoints).
-Only \`fraudDiagnosisCustomerSubjectNotes\` is returned  -  internal \`fraudDiagnosisCaseNotes\`
-are never included in this response.`,
+Only \`visibility:'customer'\` notes are returned - internal notes are never exposed here.
+Retracted notes are excluded from the list.`,
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
@@ -323,12 +321,25 @@ are never included in this response.`,
         200: {
           type: 'object',
           properties: {
-            caseFound:                        { type: 'boolean' },
-            fraudDiagnosisCaseReference:      { type: 'string', nullable: true },
-            fraudDiagnosisCaseStatus:         { type: 'string', nullable: true },
-            fraudDiagnosisCaseSeverity:       { type: 'string', nullable: true },
-            fraudDiagnosisCustomerSubjectNotes: { type: 'string', nullable: true },
-            fraudDiagnosisResolutionOutcome:  { type: 'string', nullable: true },
+            caseFound:                       { type: 'boolean' },
+            fraudDiagnosisCaseReference:     { type: 'string', nullable: true },
+            fraudDiagnosisCaseStatus:        { type: 'string', nullable: true },
+            fraudDiagnosisCaseSeverity:      { type: 'string', nullable: true },
+            fraudDiagnosisResolutionOutcome: { type: 'string', nullable: true },
+            notes: {
+              type: 'array',
+              description: 'Chronological list of customer-visible, non-retracted notes.',
+              items: {
+                type: 'object',
+                properties: {
+                  noteId:          { type: 'string' },
+                  noteText:        { type: 'string' },
+                  performedByRole: { type: 'string' },
+                  actionDateTime:  { type: 'string', format: 'date-time' },
+                  isRetracted:     { type: 'boolean' },
+                },
+              },
+            },
           },
         },
         401: { $ref: 'Error#' },
@@ -340,19 +351,41 @@ are never included in this response.`,
 
     const fraudCase = await fastify.db
       .collection(FRAUD_DIAGNOSIS_COLLECTION)
-      .findOne({ linkedCardTransactionReference: id });
+      .findOne({ cardTransactionInstanceReference: id });
 
     if (!fraudCase) {
-      return reply.send({ caseFound: false, fraudDiagnosisCaseReference: null, fraudDiagnosisCaseStatus: null, fraudDiagnosisCaseSeverity: null, fraudDiagnosisCustomerSubjectNotes: null, fraudDiagnosisResolutionOutcome: null });
+      return reply.send({ caseFound: false, fraudDiagnosisCaseReference: null, fraudDiagnosisCaseStatus: null, fraudDiagnosisCaseSeverity: null, fraudDiagnosisResolutionOutcome: null, notes: [] });
     }
 
+    const caseId = fraudCase['fraudDiagnosisInstanceReference'] as string;
+
+    // Fetch customer-visible notes from event log
+    let notes = await getCaseNotes(fastify.db, caseId, 'customer');
+
+    // Legacy fallback: if no event-log notes exist but the deprecated string field does, synthesise one entry
+    if (notes.length === 0 && fraudCase['fraudDiagnosisCustomerSubjectNotes']) {
+      notes = [{
+        noteId: 'legacy',
+        noteText: fraudCase['fraudDiagnosisCustomerSubjectNotes'] as string,
+        visibility: 'customer',
+        performedByRole: 'level1_analyst',
+        actionDateTime: (fraudCase['recordCreatedDateTime'] as Date | undefined)?.toISOString() ?? new Date().toISOString(),
+        isRetracted: false,
+        retractionReason: null,
+        retractionDateTime: null,
+      }];
+    }
+
+    // Exclude retracted notes from the customer-facing list
+    const visibleNotes = notes.filter(n => !n.isRetracted);
+
     return reply.send({
-      caseFound:                          true,
-      fraudDiagnosisCaseReference:        fraudCase['fraudDiagnosisCaseReference'] ?? null,
-      fraudDiagnosisCaseStatus:           fraudCase['fraudDiagnosisCaseStatus'] ?? null,
-      fraudDiagnosisCaseSeverity:         fraudCase['fraudDiagnosisCaseSeverity'] ?? null,
-      fraudDiagnosisCustomerSubjectNotes: fraudCase['fraudDiagnosisCustomerSubjectNotes'] ?? null,
-      fraudDiagnosisResolutionOutcome:    (fraudCase['fraudDiagnosisResolutionRecord'] as Record<string, unknown> | null)?.resolutionOutcome ?? null,
+      caseFound:                       true,
+      fraudDiagnosisCaseReference:     fraudCase['fraudDiagnosisCaseReference'] ?? null,
+      fraudDiagnosisCaseStatus:        fraudCase['fraudDiagnosisCaseStatus'] ?? null,
+      fraudDiagnosisCaseSeverity:      fraudCase['fraudDiagnosisCaseSeverity'] ?? null,
+      fraudDiagnosisResolutionOutcome: (fraudCase['fraudDiagnosisResolutionRecord'] as Record<string, unknown> | null)?.resolutionOutcome ?? null,
+      notes: visibleNotes,
     });
   });
 

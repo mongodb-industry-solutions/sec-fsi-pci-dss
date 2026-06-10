@@ -158,7 +158,7 @@ QE-protected fields appear as BSON binary ciphertext  -  this is the core of the
 
     const { collection, id } = request.params as { collection: string; id: string };
 
-    // v2: *Sensitive collections removed — sensitive fields live inline in their parent collection.
+    // v2: *Sensitive collections removed - sensitive fields live inline in their parent collection.
     const allowedCollections = new Set([
       'party', 'customerAuthenticationAssessment',
       'cardTransactionLog',
@@ -188,7 +188,7 @@ QE-protected fields appear as BSON binary ciphertext  -  this is the core of the
             resolvedId = agreementDoc.customerAgreementInstanceReference;
           }
         } catch {
-          // Resolution failed — fall through with original id, will 404 gracefully
+          // Resolution failed - fall through with original id, will 404 gracefully
         }
       }
 

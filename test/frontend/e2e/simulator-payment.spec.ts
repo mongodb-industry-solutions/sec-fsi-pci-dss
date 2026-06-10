@@ -1,5 +1,5 @@
 /**
- * E2E: Simulator Mode — Payment Flow (FR-v1-01)
+ * E2E: Simulator Mode - Payment Flow (FR-v1-01)
  * Primary demo flow: card entry → masking → encryption explainer → confirmation.
  * Covers: card masking, 3-step wizard, PCI DSS note, fraud alert on creation.
  */
@@ -16,7 +16,7 @@ test.describe('FR-v1-01: Simulator Payment Flow', () => {
     await expect(page.locator('input').first()).toBeVisible();
   });
 
-  test('01.2 masks PAN after 12 digits — raw digits never displayed in full', async ({ page }) => {
+  test('01.2 masks PAN after 12 digits - raw digits never displayed in full', async ({ page }) => {
     const cardInput = page.locator('input[placeholder*="card" i], input[type="text"]').first();
     await cardInput.fill('4111111111111111');
     // After 12+ digits, the display shows **** groups

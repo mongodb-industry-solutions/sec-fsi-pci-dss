@@ -140,7 +140,7 @@ function killProcessOnPort(port: number): void {
         try { process.kill(parseInt(pid, 10), 'SIGTERM'); } catch {}
       }
     }
-  } catch { /* no process on port — nothing to kill */ }
+  } catch { /* no process on port - nothing to kill */ }
 }
 
 /** Spawns a new frontend dev server from the project root (detached, untracked). */
@@ -526,7 +526,7 @@ export async function adminController(fastify: FastifyInstance) {
     return reply.send({ os: osInfo, node: nodeInfo, package: pkgInfo, env, dotenvKeys });
   });
 
-  // PATCH /admin/env  —  update a single env var in .env and process.env
+  // PATCH /admin/env  -  update a single env var in .env and process.env
   fastify.patch('/env', {
     schema: {
       tags: ['admin'],
@@ -590,8 +590,8 @@ export async function adminController(fastify: FastifyInstance) {
       tags: ['admin'],
       summary: 'Restart backend or frontend server',
       description: [
-        'backend — calls process.exit(0); tsx watch auto-restarts the backend.',
-        'frontend — kills the process on the configured frontend port (CORS_ORIGIN) and spawns a new dev server.',
+        'backend - calls process.exit(0); tsx watch auto-restarts the backend.',
+        'frontend - kills the process on the configured frontend port (CORS_ORIGIN) and spawns a new dev server.',
       ].join(' '),
       security: [{ adminAuth: [] }],
       body: {

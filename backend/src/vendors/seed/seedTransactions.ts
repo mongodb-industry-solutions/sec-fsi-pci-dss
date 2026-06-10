@@ -5,7 +5,7 @@ import { CARD_TRANSACTION_COLLECTION } from '../../modules/transactions/models/c
 
 // v2: cardTransactions.json contains merged sensitive fields (rawGatewayPayload,
 // processorTransactionMetadata). The QE client encrypts them with DEK-sensitive tier
-// on write — no separate *Sensitive file.
+// on write - no separate *Sensitive file.
 export async function seedTransactions(db: Db) {
   const txns = JSON.parse(
     fs.readFileSync(path.join(__dirname, '../../../data/cardTransactions.json'), 'utf-8')

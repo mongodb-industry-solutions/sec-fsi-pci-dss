@@ -2,7 +2,7 @@
 
 **Project:** FSI PCI DSS Payment Security Demo
 **Status:** Approved: design decisions resolved
-**Last updated:** 2026-05-27
+**Last updated:** 2026-06-10
 **PRD reference:** [PRD.md](PRD.md)
 **Roadmap reference:** [roadmap.md](roadmap.md)
 **Technical spec:** [technical-spec.md](technical-spec.md)
@@ -16,10 +16,10 @@ The demo exposes two entry points from the landing page. Each targets a differen
 ```
 ┌────────────────────────────────────────────────────────────┐
 │                                                            │
-│       FSI PCI DSS Payment Security Demo                    │
+│       FSI PCI DSS Payment Gateway Demo                     │
 │       MongoDB Queryable Encryption · AWS KMS               │
 │                                                            │
-│  ┌───────────────────────────┐  ┌─────────────────────b─┐  │
+│  ┌───────────────────────────┐  ┌───────────────────────┐  │
 │  │   Simulator Mode          │  │   Application Mode    │  │
 │  │                           │  │                       │  │
 │  │  Story-driven. No login.  │  │  Real login. Roles.   │  │
@@ -440,13 +440,19 @@ All users and their bcrypt-hashed passwords are inserted by the seeder (`bin/see
 │  Our fraud team is reviewing this transaction.                   │
 │  You will be notified of the outcome.                            │
 │                                                                  │
+│  Messages from security team                                     │
+│  ─────────────────────────────────────────────────────────────   │
+│  2026-05-27 14:45 UTC                                            │
+│  We have received your case and are reviewing the transaction.   │
+│  A decision will be made within 24 hours.                        │
+│                                                                  │
 │  If you did not make this purchase, please contact support.      │
 │                                                                  │
 │  [← Back to Transactions]                                        │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-The customer sees the outcome state only: `under investigation`, `cleared`, or `confirmed fraud`. They do not see the investigation detail or analyst actions.
+The customer sees the outcome state only: `under investigation`, `cleared`, or `confirmed fraud`. They do not see the investigation detail or analyst actions. The "Messages from security team" section shows only notes with `visibility:'customer'` that have not been retracted, listed in chronological order. There is no add or retract capability on the customer side.
 
 ### 4.5 Role: Level 1 Analyst (Sarah)
 
@@ -575,6 +581,15 @@ The customer sees the outcome state only: `under investigation`, `cleared`, or `
 │  ⚠️  Field access logged: address, gov_id, risk_notes           │
 ```
 
+#### Escalation Approval Persistence
+
+Once L2 approves an escalation (clicks "Approve Escalation"), the `escalationAcceptedAt` timestamp is written to the case document. On subsequent loads of the case detail page, the "Approve Escalation" button is replaced by two elements:
+
+- The escalation token info (approver, accepted timestamp)
+- A "Reject Escalation" button
+
+This state persists across page refresh because it is derived from `escalationAcceptedAt` on the stored case document, not from local UI state.
+
 #### Resolution Dialog
 
 ```
@@ -622,6 +637,116 @@ After resolution: case status changes to `resolved_cleared`. Customer (Luis) see
 ```
 
 The auditor role is read-only. No case modification is possible from this view.
+
+### 4.8 Case Notes Panel
+
+The Case Notes Panel appears on the case detail page (`/demo/investigation/[caseId]`) for all analyst roles. It is a separate panel below the transaction and customer fields.
+
+#### Layout
+
+The panel is divided into two visually distinct sections:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Case Notes                                      [+ Add Note]    │
+│                                                                  │
+│  Internal Notes                                                  │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  (gray background — L1 / L2 / Auditor only)                │  │
+│  │                                                            │  │
+│  │  2026-05-27 14:35 UTC · Level 1 Analyst                    │  │
+│  │  Checked customer transaction history. No prior flags.     │  │
+│  │                                              [trash icon]  │  │
+│  │                                                            │  │
+│  │  2026-05-27 14:37 UTC · Level 1 Analyst      [Retracted]   │  │
+│  │  ~~Initial note before full review. Disregard.~~           │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  Customer-Visible Notes                                          │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  (green background — also shown to customer)               │  │
+│  │                                                            │  │
+│  │  2026-05-27 14:45 UTC · Level 1 Analyst                    │  │
+│  │  We have received your case and are reviewing it.          │  │
+│  │  A decision will be made within 24 hours.                  │  │
+│  │                                              [trash icon]  │  │
+│  └────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+- **Internal notes** (gray background): visible only to L1 analysts, L2 investigators, and security auditors.
+- **Customer-visible notes** (green background): visible to analysts in the panel and also shown to the customer on `/demo/payment/history/[txnId]` as "Messages from security team".
+- **Retracted notes** appear with strikethrough text and a "Retracted" badge. They remain visible to analysts for audit trail purposes but are excluded from the customer view.
+- Each note displays: note text, role of the author, and timestamp.
+
+#### Role-Based Capabilities
+
+| Role | Read internal notes | Read customer-visible notes | Add note | Retract note |
+|---|---|---|---|---|
+| Level 1 Analyst | Yes | Yes | Yes | Own notes only |
+| Level 2 Investigator | Yes | Yes | Yes | Own notes only |
+| Security Auditor | Yes | Yes | No | No |
+| Customer | No | Yes (non-retracted only) | No | No |
+
+The "[+ Add Note]" button in the top-right of the panel is only rendered for L1 and L2 roles. The trash icon on a note is only rendered if the current user's role matches the role that wrote the note.
+
+#### Add Note Flow (L1 and L2 only)
+
+1. Click the "[+ Add Note]" button in the top-right of the panel.
+2. A note composition form opens with two tabs: **Internal** and **Customer-visible**.
+3. Select the desired tab and write the note text.
+4. If **Customer-visible** is selected, clicking "Save Note" first shows a confirmation modal:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Confirm: Customer-Visible Note                                  │
+│                                                                  │
+│  This note will be immediately visible to the customer.          │
+│  It cannot be edited after saving — only retracted.              │
+│                                                                  │
+│  [Cancel]                                    [Confirm & Save]    │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+5. On confirm, the note is saved as a `note_added` event in `diagnosisActionLog`. The panel reloads to show the new note.
+6. If **Internal** is selected, no confirmation modal is shown — the note is saved directly.
+
+#### Retract Note Flow (L1 and L2 only — own notes)
+
+1. The trash icon is visible on notes whose `performedByRole` matches the current user's role.
+2. Clicking the trash icon opens the retraction modal:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Retract Note                                                    │
+│                                                                  │
+│  Original note:                                                  │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  ~~Initial note before full review. Disregard.~~           │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  Reason (optional):                                              │
+│  [ Written in error before full case review.         ]           │
+│                                                                  │
+│  [Cancel]                                    [Confirm Retraction]│
+└──────────────────────────────────────────────────────────────────┘
+```
+
+3. On confirm, a `note_retracted` event is appended to `diagnosisActionLog` (no physical delete). The note is marked retracted in the panel with strikethrough and a "Retracted" badge. If the note had `visibility:'customer'`, it is no longer shown on the customer side.
+
+#### Storage Model
+
+Notes are stored inside `diagnosisActionLog` entries with `actionType: 'note_added'`. The `actionDetails` object for a note entry carries:
+
+```typescript
+{
+  noteText: string;           // original note content
+  visibility: 'internal' | 'customer';
+  retracted?: boolean;        // true after a note_retracted event references this entry
+}
+```
+
+A retraction appends a separate `note_retracted` entry that references the original note's log index or a note ID. No document mutation occurs on the original entry: retraction is recorded as an append, preserving the full audit trail.
 
 ---
 
@@ -708,6 +833,7 @@ interface FraudDiagnosisCase {
       | 'case_opened'
       | 'assigned'
       | 'note_added'
+      | 'note_retracted'
       | 'field_accessed'
       | 'escalated'
       | 'resolved'

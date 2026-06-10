@@ -38,7 +38,7 @@ export default function TerminalPage() {
     else sessionStorage.setItem(TERMINAL_LOGS_KEY, JSON.stringify(termLogs));
   }, [termLogs, logsLoaded]);
 
-  // Persist command history (keep even when empty — preserves arrow-key history)
+  // Persist command history (keep even when empty - preserves arrow-key history)
   useEffect(() => {
     if (!logsLoaded) return;
     sessionStorage.setItem(TERMINAL_HISTORY_KEY, JSON.stringify(history));

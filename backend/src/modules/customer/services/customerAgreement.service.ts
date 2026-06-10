@@ -15,7 +15,7 @@ import { appendAuditEvent } from '../../fraud/services/fraudDiagnosis.service';
  * Build the API response from a unified customerAgreementProcedure document.
  *
  * With the Level 1 QE client, sensitive fields (address, govId, riskNotes) come back
- * as Binary ciphertext — isSensitiveDecrypted() returns false and they are omitted.
+ * as Binary ciphertext - isSensitiveDecrypted() returns false and they are omitted.
  * With the Level 2 QE client the driver has already auto-decrypted them.
  */
 function buildResponse(
@@ -51,7 +51,7 @@ function buildResponse(
   return base;
 }
 
-// ── Internal helpers ─────────────────────────────────────────────────────────
+// -- Internal helpers --------------------------------------------------------─
 
 async function resolveDb(role: UserRole, escalationToken: string | undefined): Promise<{ db: Db; hasValidToken: boolean; caseId?: string }> {
   const tokenResult = validateToken(escalationToken);
@@ -81,7 +81,7 @@ async function maybeAudit(db: Db, caseId: string | undefined, role: UserRole, do
   });
 }
 
-// ── Public query functions ───────────────────────────────────────────────────
+// -- Public query functions --------------------------------------------------─
 
 export async function getByEmail(db: Db, email: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
   const { db: roleDb, caseId } = await resolveDb(role, escalationToken);

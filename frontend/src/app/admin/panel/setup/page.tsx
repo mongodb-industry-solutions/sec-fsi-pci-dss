@@ -110,7 +110,7 @@ export default function SetupPage() {
   return (
     <>
       <div className="flex flex-col lg:flex-row gap-6 lg:h-full">
-        {/* Left column — command list */}
+        {/* Left column - command list */}
         <div className="flex-shrink-0 space-y-4 lg:w-1/2 lg:overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/60">
           <CommandGroup label="Setup" cmds={setupCmds} activeCommand={activeCommand} running={running} onRun={handleRun} />
           <CommandGroup label="Test & Quality" cmds={testCmds} activeCommand={activeCommand} running={running} onRun={handleRun} />
@@ -118,7 +118,7 @@ export default function SetupPage() {
             <DangerCommandGroup cmds={dangerCmds} activeCommand={activeCommand} running={running} onRun={handleRun} />
           )}
         </div>
-        {/* Right column — output panel fills remaining height */}
+        {/* Right column - output panel fills remaining height */}
         <div className="min-h-[280px] lg:flex-1 lg:min-h-0">
           <LogPanel
             title={activeCommand ? `npm run ${activeCommand}` : 'Output'}

@@ -124,7 +124,7 @@ describe('createTransaction', () => {
     const db = makeDb();
     const result = await createTransaction(db, {
       ...baseInput,
-      cardTransactionNarrative: 'PURCHASE at Safe Store — ref AB12CD34',
+      cardTransactionNarrative: 'PURCHASE at Safe Store - ref AB12CD34',
     });
     expect(result.cardTransactionStatus).toBe('authorized');
   });
@@ -140,7 +140,7 @@ describe('createTransaction', () => {
 });
 
 describe('getTransactionById', () => {
-  it('returns projected transaction (no accountReference — Level 1 response)', async () => {
+  it('returns projected transaction (no accountReference - Level 1 response)', async () => {
     const doc = {
       cardTransactionInstanceReference: 'txn-001',
       cardTransactionAmount: { amount: 100, currency: 'USD' },

@@ -5,9 +5,22 @@ import {
   FRAUD_DIAGNOSIS_EVENTS_COLLECTION,
   FraudDiagnosisControlRecord,
   FraudDiagnosisCaseEventRecord,
+  AnalystRole,
 } from '../models/fraudDiagnosis.model';
 import { RiskSeverity } from '../../../shared/models/risk.model';
 import { TransactionSnapshot } from '../../../shared/models/transaction.model';
+
+// -- BIAN SD-83: Note entry - resolved view of a note_added event enriched with retraction info
+export interface NoteEntry {
+  noteId: string;
+  noteText: string;
+  visibility: 'internal' | 'customer';
+  performedByRole: string;
+  actionDateTime: string;           // ISO 8601
+  isRetracted: boolean;
+  retractionReason: string | null;
+  retractionDateTime: string | null;
+}
 
 let caseCounter = 1000;
 
@@ -189,4 +202,118 @@ export async function appendAuditEvent(
     schemaVersion: 1,
   };
   await db.collection(FRAUD_DIAGNOSIS_EVENTS_COLLECTION).insertOne(event as object);
+}
+
+// -- BIAN SD-83 append-only notes --------------------------------------------
+
+export async function addCaseNote(
+  db: Db,
+  caseId: string,
+  noteText: string,
+  visibility: 'internal' | 'customer',
+  performedByRole: AnalystRole
+): Promise<{ noteId: string; actionDateTime: Date }> {
+  const noteId = uuidv4();
+  const actionDateTime = new Date();
+  const event: FraudDiagnosisCaseEventRecord = {
+    fraudDiagnosisInstanceReference: caseId,
+    actionDateTime,
+    actionType: 'note_added',
+    performedByInstanceReference: 'rbac-layer',
+    performedByRole,
+    actionDetails: { noteId, noteText, visibility },
+    schemaVersion: 1,
+  };
+  await db.collection(FRAUD_DIAGNOSIS_EVENTS_COLLECTION).insertOne(event as object);
+  return { noteId, actionDateTime };
+}
+
+export async function retractCaseNote(
+  db: Db,
+  caseId: string,
+  retractedNoteId: string,
+  retractionReason: string | undefined,
+  performedByRole: AnalystRole
+): Promise<'ok' | 'not_found' | 'already_retracted' | 'wrong_role'> {
+  const col = db.collection<FraudDiagnosisCaseEventRecord>(FRAUD_DIAGNOSIS_EVENTS_COLLECTION);
+
+  const original = await col.findOne({
+    fraudDiagnosisInstanceReference: caseId,
+    actionType: 'note_added',
+    'actionDetails.noteId': retractedNoteId,
+  } as object);
+
+  if (!original) return 'not_found';
+  if (original.performedByRole !== performedByRole) return 'wrong_role';
+
+  const alreadyRetracted = await col.findOne({
+    fraudDiagnosisInstanceReference: caseId,
+    actionType: 'note_retracted',
+    'actionDetails.retractedNoteId': retractedNoteId,
+  } as object);
+  if (alreadyRetracted) return 'already_retracted';
+
+  const now = new Date();
+  const retractionEvent: FraudDiagnosisCaseEventRecord = {
+    fraudDiagnosisInstanceReference: caseId,
+    actionDateTime: now,
+    actionType: 'note_retracted',
+    performedByInstanceReference: 'rbac-layer',
+    performedByRole,
+    actionDetails: {
+      noteId: uuidv4(),
+      retractedNoteId,
+      retractionReason: retractionReason ?? null,
+      visibility: original.actionDetails['visibility'],
+    },
+    schemaVersion: 1,
+  };
+  await db.collection(FRAUD_DIAGNOSIS_EVENTS_COLLECTION).insertOne(retractionEvent as object);
+  return 'ok';
+}
+
+export async function getCaseNotes(
+  db: Db,
+  caseId: string,
+  visibilityFilter?: 'internal' | 'customer'
+): Promise<NoteEntry[]> {
+  const col = db.collection<FraudDiagnosisCaseEventRecord>(FRAUD_DIAGNOSIS_EVENTS_COLLECTION);
+
+  const events = await col
+    .find({
+      fraudDiagnosisInstanceReference: caseId,
+      actionType: { $in: ['note_added', 'note_retracted'] },
+    } as object)
+    .sort({ actionDateTime: 1 })
+    .toArray();
+
+  // Build retraction index: retractedNoteId → retraction event
+  const retractions = new Map<string, FraudDiagnosisCaseEventRecord>();
+  for (const e of events) {
+    if (e.actionType === 'note_retracted') {
+      retractions.set(e.actionDetails['retractedNoteId'] as string, e);
+    }
+  }
+
+  const notes: NoteEntry[] = [];
+  for (const e of events) {
+    if (e.actionType !== 'note_added') continue;
+    const noteId = e.actionDetails['noteId'] as string;
+    const visibility = e.actionDetails['visibility'] as 'internal' | 'customer';
+
+    if (visibilityFilter && visibility !== visibilityFilter) continue;
+
+    const retraction = retractions.get(noteId);
+    notes.push({
+      noteId,
+      noteText: e.actionDetails['noteText'] as string,
+      visibility,
+      performedByRole: e.performedByRole,
+      actionDateTime: e.actionDateTime.toISOString(),
+      isRetracted: !!retraction,
+      retractionReason: retraction ? (retraction.actionDetails['retractionReason'] as string | null) : null,
+      retractionDateTime: retraction ? retraction.actionDateTime.toISOString() : null,
+    });
+  }
+  return notes;
 }

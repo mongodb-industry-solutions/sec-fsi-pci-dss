@@ -46,7 +46,7 @@ describe('validateToken', () => {
   });
 
   it('returns invalid for an expired token', () => {
-    // Issue with 1ms TTL — will be expired by the time validateToken runs
+    // Issue with 1ms TTL - will be expired by the time validateToken runs
     const token = generateToken('case-456', 'level2_investigator', 1);
     return new Promise<void>((resolve) => {
       setTimeout(() => {

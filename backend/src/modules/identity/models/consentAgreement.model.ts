@@ -1,7 +1,7 @@
 // Open Banking / Open Finance: Consent Agreement
 // Stores customer consent grants for Third-Party Provider (TPP) access.
 // Satisfies PSD2 (Payment Services Directive 2) and CDR (Consumer Data Right) audit requirements.
-// This is a stub for v3 — full OAuth 2.0 / FAPI token validation is a v4 concern.
+// This is a stub for v3 - full OAuth 2.0 / FAPI token validation is a v4 concern.
 
 export const CONSENT_AGREEMENT_COLLECTION = 'consentAgreement';
 

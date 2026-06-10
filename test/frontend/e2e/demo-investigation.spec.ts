@@ -1,5 +1,5 @@
 /**
- * E2E: Application Mode — Investigation Flow (FR-v1-02, FR-v1-04)
+ * E2E: Application Mode - Investigation Flow (FR-v1-02, FR-v1-04)
  * L1 case dashboard, case detail, encryption badges, audit log, raw document toggle.
  */
 import { test, expect } from '@playwright/test';

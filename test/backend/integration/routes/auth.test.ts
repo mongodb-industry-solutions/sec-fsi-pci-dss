@@ -2,7 +2,7 @@
  * Integration tests: auth routes (FR-v1-05)
  * Source: backend/src/controllers/auth.controller.ts
  *
- * Requires TEST_MONGODB_URI env var — skips gracefully when not set.
+ * Requires TEST_MONGODB_URI env var - skips gracefully when not set.
  * This test spins up a real Fastify app against a test Atlas cluster.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';

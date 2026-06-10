@@ -10,7 +10,7 @@ import { getByEmail, getByPhone, getByAccountRef } from '../../../../backend/src
 
 const mockAgreement = {
   customerAgreementInstanceReference: 'ca-001',
-  // QE equality fields — search predicates, stripped from response
+  // QE equality fields - search predicates, stripped from response
   customerEmailAddress: 'customer@example.com',
   customerMobilePhoneNumber: '+1-555-0001',
   customerAgreementReference: 'ACC-REF-001',

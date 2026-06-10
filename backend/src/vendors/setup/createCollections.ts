@@ -21,7 +21,7 @@ export async function createCollections(
 
   // v2: *Sensitive collections removed. Sensitive fields (QE:none, DEK-sensitive tier)
   // are now co-located in the main collection. Field-level access is enforced by the
-  // role-aware QE client pool (roleClients.ts) — Level 1 map omits sensitive fields so
+  // role-aware QE client pool (roleClients.ts) - Level 1 map omits sensitive fields so
   // they are returned as Binary ciphertext; Level 2 map includes them for auto-decryption.
   const qeCollections = [
     // SD-13: Party Data Management  -  canonical PII store

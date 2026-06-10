@@ -148,7 +148,7 @@ export default function DemoLoginPage() {
             )}
           </div>
 
-          {/* ── Redirect-based flow (OIDC / SAML / authorization_code) ── */}
+          {/* -- Redirect-based flow (OIDC / SAML / authorization_code) -- */}
           {!isCredentialFlow && currentDomain && (
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3">
               <p className="text-sm text-blue-800">
@@ -166,7 +166,7 @@ export default function DemoLoginPage() {
             </div>
           )}
 
-          {/* ── Client-credentials form (local domain) ── */}
+          {/* -- Client-credentials form (local domain) -- */}
           {isCredentialFlow && (
             <>
               {/* User selector (local domain only) */}

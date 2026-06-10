@@ -45,12 +45,12 @@ export type RawPanelSection = StaticSection | MongoSection;
 
 interface Props {
   sections: RawPanelSection[];
-  /** JWT token — required only when one or more sections have kind: 'mongo'. */
+  /** JWT token - required only when one or more sections have kind: 'mongo'. */
   token?: string;
   title?: string;
 }
 
-// ── Internal section state (used only for mongo sections) ─────────────────────
+// -- Internal section state (used only for mongo sections) --------------------─
 interface SectionState {
   expanded: boolean;
   doc: unknown;
@@ -112,7 +112,7 @@ export function RawMongoPanel({
       return;
     }
 
-    // Mongo: first expand — fetch from Atlas
+    // Mongo: first expand - fetch from Atlas
     setState(p => ({ ...p, [k]: { ...p[k], loading: true, expanded: true } }));
     try {
       const res = await api.system.rawDocument(section.collection, section.id, token);
@@ -183,7 +183,7 @@ export function RawMongoPanel({
             {s.expanded && (
               <div className="border-t border-[#00ED64]/20">
 
-                {/* Atlas provenance banner — shown for every mongo section */}
+                {/* Atlas provenance banner - shown for every mongo section */}
                 {section.kind === 'mongo' && (
                   <div className="bg-[#001020] border-b border-[#00ED64]/20 border-l-2 border-l-[#00ED64]/50 px-4 py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span className="flex items-center gap-1.5 text-[#00ED64] text-xs font-semibold shrink-0">
@@ -229,7 +229,7 @@ export function RawMongoPanel({
                 {/* Static with null data */}
                 {section.kind === 'static' && data == null && !s.loading && (
                   <p className="px-4 py-3 text-xs text-gray-600 font-mono bg-[#001E2B] italic">
-                    null — data not yet loaded
+                    null - data not yet loaded
                   </p>
                 )}
               </div>

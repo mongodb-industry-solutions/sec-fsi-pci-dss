@@ -9,7 +9,7 @@
  *   pci_level2_role  → FIND + UPDATE + INSERT on all PCI collections
  *                      Paired with L2 QE client: sensitive fields auto-decrypted by driver.
  *
- * Both roles cover the same collections — the QE encryptedFieldsMap tier (not RBAC) controls
+ * Both roles cover the same collections - the QE encryptedFieldsMap tier (not RBAC) controls
  * what each user can actually read. The separate DB credentials produce distinct Atlas audit
  * log entries, satisfying PCI DSS Req 10 (non-repudiation per data-sensitivity tier).
  *
@@ -53,7 +53,7 @@ function buildActions(dbName: string, actions: string[]): AtlasAction[] {
   }));
 }
 
-// ── HTTP Digest Auth (RFC 7616 MD5) ─────────────────────────────────────────
+// -- HTTP Digest Auth (RFC 7616 MD5) ----------------------------------------─
 
 function md5(s: string): string {
   return crypto.createHash('md5').update(s).digest('hex');
@@ -105,7 +105,7 @@ function parseWwwAuthenticate(header: string): DigestChallenge {
   };
 }
 
-// ── Raw HTTPS request helper ─────────────────────────────────────────────────
+// -- Raw HTTPS request helper ------------------------------------------------─
 
 function httpsRequest(
   method: string,
@@ -165,7 +165,7 @@ async function atlasPost(
   return { status: res.status, body: parsed };
 }
 
-// ── Role + user creation ─────────────────────────────────────────────────────
+// -- Role + user creation ----------------------------------------------------─
 
 async function upsertCustomRole(
   projectId: string,
@@ -214,7 +214,7 @@ async function upsertDbUser(
   }
 }
 
-// ── Public entry point ───────────────────────────────────────────────────────
+// -- Public entry point ------------------------------------------------------─
 
 export async function createAtlasRoles(): Promise<void> {
   const publicKey  = process.env.ATLAS_PUBLIC_KEY;
@@ -223,7 +223,7 @@ export async function createAtlasRoles(): Promise<void> {
   const dbName     = process.env.MONGODB_DB_NAME;
 
   if (!publicKey || !privateKey || !projectId || !dbName) {
-    console.log('   ATLAS_PUBLIC_KEY / ATLAS_PRIVATE_KEY / ATLAS_PROJECT_ID not set — skipping Atlas role automation.');
+    console.log('   ATLAS_PUBLIC_KEY / ATLAS_PRIVATE_KEY / ATLAS_PROJECT_ID not set - skipping Atlas role automation.');
     console.log('   Roles must be created manually in Atlas UI, or set those env vars and re-run setup.');
     return;
   }
@@ -244,12 +244,12 @@ export async function createAtlasRoles(): Promise<void> {
   if (l1User && l1Pass) {
     await upsertDbUser(projectId, publicKey, privateKey, l1User, l1Pass, 'pci_level1_role', dbName);
   } else {
-    console.log('   ATLAS_DB_USER_LEVEL1 / PASSWORD not set — Level 1 DB user not created.');
+    console.log('   ATLAS_DB_USER_LEVEL1 / PASSWORD not set - Level 1 DB user not created.');
   }
 
   if (l2User && l2Pass) {
     await upsertDbUser(projectId, publicKey, privateKey, l2User, l2Pass, 'pci_level2_role', dbName);
   } else {
-    console.log('   ATLAS_DB_USER_LEVEL2 / PASSWORD not set — Level 2 DB user not created.');
+    console.log('   ATLAS_DB_USER_LEVEL2 / PASSWORD not set - Level 2 DB user not created.');
   }
 }

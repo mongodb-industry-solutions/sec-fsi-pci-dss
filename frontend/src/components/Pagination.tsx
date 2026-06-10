@@ -48,7 +48,7 @@ export function Pagination({
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-2 select-none">
 
-      {/* Left — count */}
+      {/* Left - count */}
       <p className="text-xs text-gray-400 shrink-0 order-last sm:order-first">
         {total === 0
           ? <span>No {noun}</span>
@@ -63,7 +63,7 @@ export function Pagination({
         }
       </p>
 
-      {/* Center — navigation */}
+      {/* Center - navigation */}
       {totalPages > 1 && (
         <nav className="flex items-center gap-0.5 order-first sm:order-none" aria-label="Pagination">
           <button
@@ -147,7 +147,7 @@ export function Pagination({
         </nav>
       )}
 
-      {/* Right — per-page toggle */}
+      {/* Right - per-page toggle */}
       {onLimitChange && (
         <div className="flex items-center gap-2 shrink-0 order-first sm:order-last">
           <span className="text-xs text-gray-400">Per page</span>

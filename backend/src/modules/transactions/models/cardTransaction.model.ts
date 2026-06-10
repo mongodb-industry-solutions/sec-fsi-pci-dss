@@ -15,10 +15,10 @@ export interface CardTransactionLogControlRecord {
   // Plaintext: token is a card surrogate, not CHD under PCI DSS v4.0
   paymentCardReference: string;
 
-  // QE:equality (DEK-lookup tier) — searchable, Level 1+
+  // QE:equality (DEK-lookup tier) - searchable, Level 1+
   cardTransactionAccountReference: string;
 
-  // QE:none (DEK-sensitive tier) — non-searchable, Level 2+ only
+  // QE:none (DEK-sensitive tier) - non-searchable, Level 2+ only
   // Present as decrypted value with L2 QE client; Binary ciphertext with L1 client.
   rawGatewayPayload?: object;
   processorTransactionMetadata?: object;
@@ -34,7 +34,7 @@ export interface CardTransactionLogControlRecord {
   cardTransactionMerchantName: string;
   cardTransactionMaskedPanDisplay: string;
 
-  // BIAN SD-254 transaction description (not CHD — plaintext, no QE)
+  // BIAN SD-254 transaction description (not CHD - plaintext, no QE)
   // cardTransactionDescription: statement descriptor visible on the cardholder's bank statement (max 22 chars)
   // cardTransactionNarrative: extended free-text context for L1/L2 fraud investigation
   cardTransactionDescription: string;

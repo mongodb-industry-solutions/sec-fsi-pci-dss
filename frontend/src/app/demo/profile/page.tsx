@@ -261,7 +261,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Identity card — inline editable */}
+      {/* Identity card - inline editable */}
       <div className="bg-white rounded-xl border p-5">
         {/* Header: avatar + name (editable) + status */}
         <div className="flex items-center gap-4 mb-5">
@@ -291,7 +291,7 @@ export default function ProfilePage() {
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-t pt-4 items-start min-w-0">
 
-          {/* Email — always read-only (login identity) */}
+          {/* Email - always read-only (login identity) */}
           <RevealField
             label="Email"
             plainValue={ag?.customerEmailAddress ?? profile.email}
@@ -300,7 +300,7 @@ export default function ProfilePage() {
             collection="party"
           />
 
-          {/* Phone — editable (customer only) */}
+          {/* Phone - editable (customer only) */}
           {(editing && ag) ? (
             <>
               <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
@@ -328,7 +328,7 @@ export default function ProfilePage() {
             </>
           )}
 
-          {/* Account Reference — read-only */}
+          {/* Account Reference - read-only */}
           {ag?.customerAgreementReference ? (
             <RevealField label="Account Reference" plainValue={ag.customerAgreementReference} maskedValue={maskAccountRef(ag.customerAgreementReference)} type="qe-equality" collection="customerAgreementProcedure" />
           ) : (
@@ -338,11 +338,11 @@ export default function ProfilePage() {
             </>
           )}
 
-          {/* Segment / member since — read-only */}
+          {/* Segment / member since - read-only */}
           {ag?.customerSegment && <PlainField label="Account type" value={SEGMENT_LABELS[ag.customerSegment] ?? ag.customerSegment} collection="customerAgreementProcedure" />}
           {ag?.customerAgreementEnrollmentDate && <PlainField label="Member since" value={new Date(ag.customerAgreementEnrollmentDate).toLocaleDateString()} collection="customerAgreementProcedure" />}
 
-          {/* Language — editable (customer only) */}
+          {/* Language - editable (customer only) */}
           {(editing && ag) ? (
             <>
               <span className="text-gray-500 text-sm pt-0.5">Language</span>
@@ -362,7 +362,7 @@ export default function ProfilePage() {
             <PlainField label="Language" value={ag.customerAgreementPreferredLanguage.toUpperCase()} collection="customerAgreementProcedure" />
           )}
 
-          {/* Address — editable (QE:none, customer only) */}
+          {/* Address - editable (QE:none, customer only) */}
           {(editing && ag) ? (
             <>
               <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
@@ -419,7 +419,7 @@ export default function ProfilePage() {
             </>
           )}
 
-          {/* Government ID — read-only */}
+          {/* Government ID - read-only */}
           {hasGovId ? (
             <RevealField label="Government ID" plainValue={hasGovId} maskedValue={maskGovId(hasGovId)} type="qe-none" collection="customerAgreementProcedure" />
           ) : ag !== null && (
@@ -433,7 +433,7 @@ export default function ProfilePage() {
             </>
           )}
 
-          {/* Inline Save / Cancel — only when editing */}
+          {/* Inline Save / Cancel - only when editing */}
           {editing && (
             <div className="col-span-2 flex gap-2 pt-3 mt-1 border-t">
               <button
@@ -456,7 +456,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Legend — only visible in debug mode */}
+      {/* Legend - only visible in debug mode */}
       {debugMode && (
         <div className="bg-white rounded-xl border p-4 text-sm">
           <p className="font-semibold text-gray-700 mb-2">Field encryption legend</p>
@@ -495,7 +495,7 @@ export default function ProfilePage() {
               id: profile.sub,
               label: 'customerAuthenticationAssessment',
               labelColor: 'text-yellow-400',
-              description: 'SD-91 — login identity, role, QE:equality (email), bcrypt hash',
+              description: 'SD-91 - login identity, role, QE:equality (email), bcrypt hash',
             },
             ...(profile.partyInstanceReference ? [{
               kind: 'mongo' as const,
@@ -503,7 +503,7 @@ export default function ProfilePage() {
               id: profile.partyInstanceReference,
               label: 'party',
               labelColor: 'text-emerald-400',
-              description: 'SD-13 PII store — QE:equality (email, phone) + plaintext (name, segment)',
+              description: 'SD-13 PII store - QE:equality (email, phone) + plaintext (name, segment)',
             }] : []),
             ...(profile.agreement?.customerAgreementInstanceReference ? [{
               kind: 'mongo' as const,
@@ -511,17 +511,17 @@ export default function ProfilePage() {
               id: profile.agreement.customerAgreementInstanceReference,
               label: 'customerAgreementProcedure',
               labelColor: 'text-blue-400',
-              description: 'QE:equality (accountRef) + QE:none (address, govId) — v2 unified document',
+              description: 'QE:equality (accountRef) + QE:none (address, govId) - v2 unified document',
             }] : []),
           ]}
         />
       )}
 
-      {/* QE field definition reference — same style as RawMongoPanel, debug only */}
+      {/* QE field definition reference - same style as RawMongoPanel, debug only */}
       {debugMode && (
         <div className="rounded-xl overflow-hidden border border-[#00ED64]/20">
 
-          {/* Header — identical to RawMongoPanel header */}
+          {/* Header - identical to RawMongoPanel header */}
           <div className="bg-[#001E2B] px-4 py-2.5 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-[#00ED64] text-xs font-semibold shrink-0">
@@ -543,7 +543,7 @@ export default function ProfilePage() {
             </a>
           </div>
 
-          {/* Three code sections + comparison table — all accordion rows */}
+          {/* Three code sections + comparison table - all accordion rows */}
           {([
             {
               key: 'equality',
@@ -560,7 +560,7 @@ export default function ProfilePage() {
             {
               key: 'plaintext',
               badge: <span className="bg-gray-800 text-gray-400 border border-gray-700 px-1.5 py-0.5 rounded font-mono text-xs shrink-0">plaintext</span>,
-              desc: 'Not listed in encryptedFieldsMap. Atlas stores the raw value — readable without any key.',
+              desc: 'Not listed in encryptedFieldsMap. Atlas stores the raw value - readable without any key.',
               code: `// Simply omit the field from encryptedFieldsMap\n// Atlas stores:   "customerName": "Luis Fernandez"        ← plaintext\n// QE stores:      "customerEmailAddress": { "$binary": { "subType": "06" ... } }`,
             },
           ] as const).map(({ key, badge, desc, code }) => (
@@ -590,7 +590,7 @@ export default function ProfilePage() {
             </div>
           ))}
 
-          {/* Comparison table — accordion row */}
+          {/* Comparison table - accordion row */}
           <div className="border-t border-[#00ED64]/60">
             <button
               onClick={() => toggleQe('table')}

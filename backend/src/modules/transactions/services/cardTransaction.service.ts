@@ -53,7 +53,7 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
     cardTransactionInstanceReference: txnId,
     paymentCardReference: input.cardToken,
     cardTransactionAccountReference: input.accountReference,
-    // QE:none fields — encrypted by L2 QE client on write
+    // QE:none fields - encrypted by L2 QE client on write
     rawGatewayPayload: input.gatewayPayload,
     processorTransactionMetadata: { processedAt: now.toISOString() },
     cardTransactionAmount: { amount: input.amount, currency: input.currency },
@@ -103,7 +103,7 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
         customerAgreementUuid = agreementDoc.customerAgreementInstanceReference;
       }
     } catch {
-      // Keep account reference as fallback — raw document lookup will fail but fraud case still created
+      // Keep account reference as fallback - raw document lookup will fail but fraud case still created
     }
 
     const fraudCase = await createFraudCase(db, txnId, customerAgreementUuid, reasons, severity, snapshot);

@@ -1,7 +1,7 @@
 /**
  * v2: Role-aware QE client pools.
  *
- * Two MongoClient instances are maintained — one per DEK tier:
+ * Two MongoClient instances are maintained - one per DEK tier:
  *
  *   Level 1 pool (qeClientL1):
  *     encryptedFieldsMap includes only QE:equality (lookup) fields.
@@ -13,9 +13,9 @@
  *     Driver auto-decrypts every encrypted field before the service sees the document.
  *
  * Connection strings per pool are driven by env vars:
- *   MONGODB_URI_LEVEL1  — connection string for the Atlas DB user with pci_level1_role
- *   MONGODB_URI_LEVEL2  — connection string for the Atlas DB user with pci_level2_role
- *   MONGODB_URI         — fallback for both pools when role-specific URIs are not set
+ *   MONGODB_URI_LEVEL1  - connection string for the Atlas DB user with pci_level1_role
+ *   MONGODB_URI_LEVEL2  - connection string for the Atlas DB user with pci_level2_role
+ *   MONGODB_URI         - fallback for both pools when role-specific URIs are not set
  *
  * In KMS_PROVIDER=local (offline demo) mode both pools use the same local URI and
  * the DEK tier distinction is still enforced at the encryptedFieldsMap level.

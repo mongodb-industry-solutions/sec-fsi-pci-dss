@@ -53,7 +53,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
         </div>
       </div>
 
-      {/* Tabs — horizontally scrollable on mobile */}
+      {/* Tabs - horizontally scrollable on mobile */}
       <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
         <div className="flex gap-1 border-b border-gray-800 min-w-max sm:min-w-0">
           {TABS.map(({ path, label, shortLabel, icon: Icon }) => {
@@ -77,7 +77,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
         </div>
       </div>
 
-      {/* Page content — fills remaining height on desktop; flows naturally on mobile */}
+      {/* Page content - fills remaining height on desktop; flows naturally on mobile */}
       <div className="min-w-0 lg:flex-1 lg:min-h-0">{children}</div>
     </div>
   );

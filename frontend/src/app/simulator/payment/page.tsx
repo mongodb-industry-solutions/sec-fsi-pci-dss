@@ -72,7 +72,7 @@ function simulateCipher(seed: string): string {
   return `\\x${bytes.slice(0, 4).join('\\x')}...`;
 }
 
-// ── Merchant combobox ────────────────────────────────────────────────────────
+// -- Merchant combobox --------------------------------------------------------
 function MerchantCombobox({
   value,
   mcc,
@@ -133,7 +133,7 @@ function MerchantCombobox({
   );
 }
 
-// ── Amount selector ──────────────────────────────────────────────────────────
+// -- Amount selector ----------------------------------------------------------
 function AmountSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [custom, setCustom] = useState(!AMOUNT_PRESETS.includes(value));
 
@@ -193,7 +193,7 @@ function AmountSelector({ value, onChange }: { value: string; onChange: (v: stri
   );
 }
 
-// ── Card selector ─────────────────────────────────────────────────────────────
+// -- Card selector ------------------------------------------------------------─
 function CardSelector({
   maskedCard,
   onCardChange,
@@ -264,7 +264,7 @@ function CardSelector({
   );
 }
 
-// ── Validation ────────────────────────────────────────────────────────────────
+// -- Validation ----------------------------------------------------------------
 interface ValidationErrors {
   cardNumber?: string;
   email?: string;
@@ -284,7 +284,7 @@ function validateStep1(form: FormData, maskedCard: string): ValidationErrors {
   return errors;
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// -- Main component ------------------------------------------------------------
 export default function PaymentPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
@@ -413,7 +413,7 @@ export default function PaymentPage() {
     cardTokenRef.current = generateToken();
   }
 
-  // ── Step indicator ──────────────────────────────────────────────────────────
+  // -- Step indicator ----------------------------------------------------------
   const stepLabels = ['Card Details', 'Review & Encrypt', 'Confirmation'];
 
   return (
@@ -441,7 +441,7 @@ export default function PaymentPage() {
         </span>
       </div>
 
-      {/* ── STEP 1: Card Details ───────────────────────────────────────────── */}
+      {/* -- STEP 1: Card Details --------------------------------------------─ */}
       {step === 1 && (
         <div className="bg-white rounded-xl border p-6 space-y-4">
           <div className="flex items-center justify-between">
@@ -610,7 +610,7 @@ export default function PaymentPage() {
         </div>
       )}
 
-      {/* ── STEP 2: Review (Encryption Explainer) ─────────────────────────── */}
+      {/* -- STEP 2: Review (Encryption Explainer) --------------------------─ */}
       {step === 2 && (
         <div className="bg-white rounded-xl border p-6 space-y-4">
           <div className="flex items-center justify-between">
@@ -745,7 +745,7 @@ export default function PaymentPage() {
         </div>
       )}
 
-      {/* ── STEP 3: Confirmation + Fraud Alert ────────────────────────────── */}
+      {/* -- STEP 3: Confirmation + Fraud Alert ------------------------------ */}
       {step === 3 && result && (
         <div className="bg-white rounded-xl border p-6 space-y-4">
           {returning && (

@@ -15,14 +15,14 @@ const KEY_VAULT_NAMESPACE = 'encryption.__keyVault';
  *   - Sensitive DEKs → QE:none fields accessible only to Level 2 Investigator
  */
 export interface DEKs {
-  // ── Lookup tier (QE:equality, Level 1+) ─────────────────────────────────
+  // -- Lookup tier (QE:equality, Level 1+) --------------------------------─
   txAccountRef: Binary;           // cardTransactionLog.cardTransactionAccountReference
   partyEmail: Binary;             // party.partyEmailAddress (SD-13)
   partyPhone: Binary;             // party.partyMobilePhoneNumber (SD-13)
   customerAccountRef: Binary;     // customerAgreementProcedure.customerAgreementReference
   authEmail: Binary;              // customerAuthenticationAssessment.customerAuthenticationEmailAddress
 
-  // ── Sensitive tier (QE:none, Level 2 only) ──────────────────────────────
+  // -- Sensitive tier (QE:none, Level 2 only) ------------------------------
   txRawPayload: Binary;           // cardTransactionLogSensitive.rawGatewayPayload
   txProcessorMeta: Binary;        // cardTransactionLogSensitive.processorTransactionMetadata
   customerAddress: Binary;        // customerAgreementProcedureSensitive.customerAgreementResidentialAddress

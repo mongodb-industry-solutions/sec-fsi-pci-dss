@@ -82,17 +82,18 @@ To begin the process of testing, installation, and execution, please follow the 
 
 ## 🗄️ Data Architecture
 
-The data model follows **BIAN Service Domain** naming conventions across 7 collections:
+The data model follows **BIAN Service Domain** naming conventions across 8 collections:
 
 | Collection | BIAN Service Domain | QE Protection |
 |---|---|---|
-| `partyAuthentication` | Party Authentication (SD-16) | equality: user email |
-| `cardTransaction` | Card Transaction (SD-254) | equality: account reference; card token is plaintext (not CHD) |
-| `cardTransactionSensitive` | Card Transaction: Sensitive | none: gateway payload, processor metadata |
-| `customerAgreement` | Customer Agreement (SD-53) | equality: email, phone, account reference |
-| `customerAgreementSensitive` | Customer Agreement: Sensitive | none: address, government ID, risk notes |
-| `paymentCard` | Payment Card (SD-88) | none: expiry date; card token is plaintext (not CHD) |
+| `partyAuthenticationAssessment` | Party Authentication (SD-16) | equality: user email |
+| `cardTransactionLog` | Card Transaction (SD-254) | equality: account reference; QE:none fields (gateway payload, processor metadata) are **inline** in the same document — no separate sensitive collection |
+| `customerAgreementProcedure` | Customer Agreement (SD-53) | equality: email, phone, account reference; QE:none: address, government ID |
+| `paymentCardManagement` | Payment Card (SD-88) | none: expiry date; card token is plaintext (not CHD) |
 | `fraudDiagnosisCase` | Fraud Diagnosis (SD-83) | plaintext: operational metadata only |
+| `fraudDiagnosisCaseEvents` | Fraud Diagnosis (SD-83) — audit log | plaintext: immutable event records (notes, escalations, accesses) |
+| `party` | Party (SD-13) | equality: PII identifiers |
+| `customerAuthenticationAssessment` | Customer Authentication (SD-91) | equality: credential hash |
 
 > Full schema definitions, field-level QE modes, index strategy, and collection relationships are in [docs/technical-spec.md](docs/technical-spec.md).
 

@@ -3,7 +3,7 @@
 ## Status
 
 Draft  
-Version: 1.2: Author: Antonio Membrides Espinosa: Last updated: 2026-06-08  
+Version: 1.3: Author: Antonio Membrides Espinosa: Last updated: 2026-06-10  
 PRD reference: [docs/PRD.md](PRD.md)
 
 ---
@@ -153,6 +153,9 @@ GET    /api/v1/fraud                     list cases (filter: status, severity)  
 GET    /api/v1/fraud/:id                 case detail
 POST   /api/v1/fraud/:id/escalate        [v2]
 GET    /api/v1/fraud/:id/events          audit events per case
+POST   /api/v1/fraud/:id/notes           add a note event (internal or customer-visible)  ← Ch-03
+DELETE /api/v1/fraud/:id/notes/:noteId   retract a note (appends note_retracted event)     ← Ch-03
+GET    /api/v1/transactions/:id/notes    list note events for a transaction case            ← Ch-03
 GET    /api/v1/diagnostics/query-timing  [v3]
 GET    /api/v1/system/health
 ```
@@ -599,3 +602,58 @@ Both modes connect to the same Fastify API and the same Atlas cluster. The mode 
 + Simulator mode degrades gracefully without Atlas connectivity for the raw doc toggle (shows a static ciphertext snippet as fallback).  
 + Application mode demonstrates a realistic auth + RBAC flow end-to-end.  
 - Two frontend entrypoints (`/simulator/*` and `/demo/*`) require distinct route trees in the App Router.
+
+---
+
+## ADR-005: Case Notes as Append-Only Events (Ch-03)
+
+**Date:** 2026-06-10  
+**Status:** Accepted
+
+### Context
+
+Notes were stored as two mutable string fields directly on the `fraudDiagnosisCase` document:
+
+- `fraudDiagnosisCaseNotes?: string` — internal analyst note, overwritable
+- `fraudDiagnosisCustomerSubjectNotes?: string` — customer-visible note, overwritable
+
+This design had four compounding problems:
+
+1. **Overwrite destroys history.** Any `PATCH` to either field silently discards the previous content. BIAN SD-83 mandates an append-only principle for case records: case state transitions and communications must be preserved in full.
+2. **Unbounded-array anti-pattern risk.** If notes were migrated to arrays on the case document they would grow without bound and bloat the primary document over time, a known MongoDB anti-pattern for high-volume subdocument growth.
+3. **PCI DSS Req 10.3 audit-log integrity.** PCI DSS v4.0 Requirement 10.3 requires that audit-log records cannot be altered or deleted. Storing notes as mutable fields on the case document allows any write to bypass that guarantee.
+4. **Customer visibility.** With a single mutable field the customer saw only the most recent note, never the full communication history.
+
+### Decision
+
+Notes are stored as discrete events in the **`fraudDiagnosisCaseEvents`** collection — the same collection already used for all case audit events (status changes, escalations, assignments). Each note event is an immutable document with the following fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `noteId` | `string` | UUID assigned at creation; stable reference for retraction |
+| `noteText` | `string` | Immutable content of the note |
+| `visibility` | `'internal' \| 'customer'` | Controls which roles receive the note in API responses |
+| `actionType` | `'note_added' \| 'note_retracted'` | Event discriminator, shared with existing event schema |
+| `performedByRole` | `UserRole` | Role of the actor who created or retracted the note |
+| `actionDateTime` | `Date` | Immutable creation timestamp |
+
+**Error correction without physical delete:** A note error is corrected by appending a `note_retracted` event that references the original `noteId`. No document is updated or removed. The event log remains complete. Only the role that authored the original `note_added` event may append its retraction (enforced in the service layer).
+
+**Deprecated fields:** `fraudDiagnosisCaseNotes` and `fraudDiagnosisCustomerSubjectNotes` are deprecated on the `fraudDiagnosisCase` document. They are retained as read-only for legacy seed data. Any API write that targets these fields is rejected with HTTP 400.
+
+**New API surface (3 endpoints):**
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/v1/fraud/:id/notes` | Add a `note_added` event; body: `{ noteText, visibility }` |
+| `DELETE` | `/api/v1/fraud/:id/notes/:noteId` | Append a `note_retracted` event; no physical delete |
+| `GET` | `/api/v1/transactions/:id/notes` | Return `notes: NoteEntry[]` — all non-retracted notes for the linked case, filtered by the caller's role |
+
+### Consequences
+
++ **Full audit trail** — every note creation and retraction is a permanent event; satisfies PCI DSS Req 10.3.  
++ **Customer communication history** — `GET /transactions/:id/notes` returns a chronological list of `visibility: 'customer'` notes rather than a single overwritten string.  
++ **Consistent event model** — notes reuse the existing `fraudDiagnosisCaseEvents` schema and indexes; no new collection required.  
++ **Role-based retraction** — the constraint that only the authoring role can retract a note is enforced in the service layer, not by a database-level ACL, keeping the enforcement explicit and testable.  
+- The deprecated string fields must be preserved on the document interface (as optional) to avoid breaking seed-data reads until a future migration removes them.  
+- The `DELETE /fraud/:id/notes/:noteId` route performs a logical delete (append), which may surprise consumers expecting a 204 with no body; the response shape must be clearly documented in `technical-spec.md §6`.

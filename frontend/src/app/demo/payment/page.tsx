@@ -158,7 +158,7 @@ export default function DemoPaymentPage() {
   const isFraudRisk = amountNum > 500 || ['7995', '5813', '5812', '6011'].includes(mcc);
   const descPresets = descriptorPresets(merchant);
 
-  // ── Step indicator ──────────────────────────────────────────────────────────
+  // -- Step indicator ----------------------------------------------------------
   const STEPS = ['Card & amount', 'Review & describe', 'Confirmed'];
 
   return (
@@ -184,7 +184,7 @@ export default function DemoPaymentPage() {
           ))}
         </div>
 
-        {/* ── STEP 1 ───────────────────────────────────────────────────────── */}
+        {/* -- STEP 1 --------------------------------------------------------─ */}
         {step === 1 && (
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -269,7 +269,7 @@ export default function DemoPaymentPage() {
               </div>
             </div>
 
-            {/* Action row — global, outside panels, same pattern as Step 2 */}
+            {/* Action row - global, outside panels, same pattern as Step 2 */}
             {error && <p className="text-red-600 text-sm">{error}</p>}
             <div className="flex gap-3">
               <Link href="/demo/payment/history"
@@ -285,7 +285,7 @@ export default function DemoPaymentPage() {
           </div>
         )}
 
-        {/* ── STEP 2 ───────────────────────────────────────────────────────── */}
+        {/* -- STEP 2 --------------------------------------------------------─ */}
         {step === 2 && (
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -500,7 +500,7 @@ export default function DemoPaymentPage() {
           </div>
         )}
 
-        {/* ── STEP 3 ───────────────────────────────────────────────────────── */}
+        {/* -- STEP 3 --------------------------------------------------------─ */}
         {step === 3 && result && (
           <div className="space-y-4">
             <div className="bg-white rounded-xl border p-6 space-y-4">

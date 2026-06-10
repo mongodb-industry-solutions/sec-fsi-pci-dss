@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { api, FraudCase, ActionEvent } from '../../../../../lib/api';
+import { api, FraudCase, ActionEvent, TransactionNotesResponse } from '../../../../../lib/api';
 import { getToken, decodeToken } from '../../../../../lib/auth';
 import { useDebugMode } from '../../../../../lib/debugMode';
 import { Eye, EyeOff } from 'lucide-react';
@@ -88,14 +88,7 @@ export default function TransactionDetailPage() {
     cardTransactionNarrative?: string;
   } | null>(null);
   const [fraudCase, setFraudCase] = useState<FraudCase | null>(null);
-  const [caseNotes, setCaseNotes] = useState<{
-    caseFound: boolean;
-    fraudDiagnosisCaseReference: string | null;
-    fraudDiagnosisCaseStatus: string | null;
-    fraudDiagnosisCaseSeverity: string | null;
-    fraudDiagnosisCustomerSubjectNotes: string | null;
-    fraudDiagnosisResolutionOutcome: string | null;
-  } | null>(null);
+  const [caseNotes, setCaseNotes] = useState<TransactionNotesResponse | null>(null);
   const [events, setEvents] = useState<ActionEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -322,14 +315,21 @@ export default function TransactionDetailPage() {
             </div>
           )}
 
-          {/* Customer-visible note from agents */}
-          {caseNotes.fraudDiagnosisCustomerSubjectNotes ? (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-xs font-semibold text-blue-700 uppercase mb-1">✉ Message from security team</p>
-              <p className="text-sm text-blue-900">{caseNotes.fraudDiagnosisCustomerSubjectNotes}</p>
+          {/* Customer-visible notes list */}
+          {caseNotes.notes && caseNotes.notes.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-blue-700 uppercase">✉ Messages from security team</p>
+              {caseNotes.notes.map((note) => (
+                <div key={note.noteId} className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-900">{note.noteText}</p>
+                  <p className="text-xs text-blue-500 mt-1">
+                    {new Date(note.actionDateTime).toLocaleString()}
+                  </p>
+                </div>
+              ))}
             </div>
           ) : (
-            <p className="text-xs text-gray-400 italic">No message from the security team yet.</p>
+            <p className="text-xs text-gray-400 italic">No messages from the security team yet.</p>
           )}
 
           {/* Resolution outcome */}
@@ -401,7 +401,7 @@ export default function TransactionDetailPage() {
         </div>
       )}
 
-      {/* Debug: unified raw data panel — separated with proportional margin */}
+      {/* Debug: unified raw data panel - separated with proportional margin */}
       {debugMode && (
         <div className="p-5 mb-4">
           <RawMongoPanel
@@ -410,20 +410,20 @@ export default function TransactionDetailPage() {
           sections={[
             {
               kind: 'static',
-              label: 'localStorage — stored transaction',
+              label: 'localStorage - stored transaction',
               description: 'Data saved locally when this payment was made',
               data: txn,
             },
             {
               kind: 'static',
-              label: 'API — GET /api/v1/transactions/:id',
+              label: 'API - GET /api/v1/transactions/:id',
               labelColor: 'text-yellow-400',
               description: 'Backend response including decrypted QE:equality fields',
               data: apiTxn,
             },
             {
               kind: 'static',
-              label: 'API — GET /api/v1/transactions/:id/notes',
+              label: 'API - GET /api/v1/transactions/:id/notes',
               labelColor: 'text-yellow-400',
               description: 'Customer-visible case notes from the investigation module',
               data: caseNotes,
@@ -434,7 +434,7 @@ export default function TransactionDetailPage() {
               id: txnId,
               label: 'cardTransactionLog',
               labelColor: 'text-blue-400',
-              description: 'QE:equality (accountRef) + QE:none (rawGatewayPayload, processorMetadata) inline — v2 unified document',
+              description: 'QE:equality (accountRef) + QE:none (rawGatewayPayload, processorMetadata) inline - v2 unified document',
             },
             ...(txn.caseId ? [{
               kind: 'mongo' as const,

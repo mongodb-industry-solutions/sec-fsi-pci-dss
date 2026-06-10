@@ -2,7 +2,7 @@
  * Integration tests: card transaction + fraud diagnosis routes (FR-v1-03, FR-v1-04)
  * Source: backend/src/controllers/cardTransaction.controller.ts
  *
- * Requires TEST_MONGODB_URI — skips gracefully when not set.
+ * Requires TEST_MONGODB_URI - skips gracefully when not set.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import supertest from 'supertest';
@@ -112,7 +112,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
     expect(res.body.fraudCaseCreated).toBe(true);
   });
 
-  // FR-v1-03.3: GET by ID — Level 1 response (no QE fields)
+  // FR-v1-03.3: GET by ID - Level 1 response (no QE fields)
   skip('GET /card-transactions/:id does not return QE account reference', async () => {
     const createRes = await supertest(app.server)
       .post('/api/v1/card-transactions')
@@ -184,7 +184,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
     expect(res.body.diagnosisActionLog).toBeDefined();
   });
 
-  // FR-v1-04.3: GET /fraud-diagnosis-cases?status= — every result matches the filter
+  // FR-v1-04.3: GET /fraud-diagnosis-cases?status= - every result matches the filter
   skip('GET /fraud-diagnosis-cases?status=open returns only open cases', async () => {
     const res = await supertest(app.server)
       .get('/api/v1/fraud-diagnosis-cases?status=open')
@@ -200,7 +200,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
     const res = await supertest(app.server)
       .get('/api/v1/customer-agreements?email=sarah.chen@leafybank.demo')
       .set('Authorization', `Bearer ${authToken}`);
-    // 200 if seeded, 404 if not — both are valid in a clean test cluster
+    // 200 if seeded, 404 if not - both are valid in a clean test cluster
     expect([200, 404]).toContain(res.status);
     if (res.status === 200) {
       // QE search predicate fields must not be echoed in the response (spec §technical-spec §2)
@@ -235,7 +235,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
         cardTransactionMaskedPanDisplay: '****-****-****-7777',
         cardTransactionType: 'purchase',
         cardTransactionDescription: 'COFFEE SHOP',
-        cardTransactionNarrative: 'PURCHASE at Coffee Shop — ref AA11BB22',
+        cardTransactionNarrative: 'PURCHASE at Coffee Shop - ref AA11BB22',
         gatewayPayload: {},
       });
     expect(postRes.status).toBe(201);
@@ -247,7 +247,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
     expect(getRes.status).toBe(200);
     expect(getRes.body.cardTransactionDescription).toBe('COFFEE SHOP');
     expect(getRes.body.cardTransactionType).toBe('purchase');
-    expect(getRes.body.cardTransactionNarrative).toBe('PURCHASE at Coffee Shop — ref AA11BB22');
+    expect(getRes.body.cardTransactionNarrative).toBe('PURCHASE at Coffee Shop - ref AA11BB22');
   });
 
   // I-02: POST missing cardTransactionDescription → 400

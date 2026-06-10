@@ -1,5 +1,5 @@
 /**
- * E2E: Application Mode — Authentication Flow (FR-v1-05)
+ * E2E: Application Mode - Authentication Flow (FR-v1-05)
  * Login, role-based redirect, auth guard, sign out.
  */
 import { test, expect } from '@playwright/test';
@@ -100,7 +100,7 @@ async function submitLogin(page: import('@playwright/test').Page, email: string,
     const pwInput = page.locator('input[type="password"]').first();
     if (await pwInput.isVisible({ timeout: 500 }).catch(() => false)) await pwInput.fill(password);
   } else {
-    // User card/button UI — click by user's display name derived from email
+    // User card/button UI - click by user's display name derived from email
     const nameParts = email.split('@')[0].split('.');
     const displayName = nameParts.map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
     const btn = page.locator(`button:has-text("${displayName}"), [data-email="${email}"]`).first();

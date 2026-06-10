@@ -14,7 +14,7 @@ function warn(msg: string) {
   console.log(`  [WARN] ${msg}`);
 }
 
-// ── HTTP Digest Auth (RFC 7616 MD5) — same algorithm as createAtlasRoles ─────
+// -- HTTP Digest Auth (RFC 7616 MD5) - same algorithm as createAtlasRoles ----─
 
 function md5(s: string): string {
   return crypto.createHash('md5').update(s).digest('hex');
@@ -93,8 +93,8 @@ async function atlasDelete(
 ): Promise<void> {
   try {
     const probe = await httpsDeleteRequest(path);
-    if (probe.status === 404) { warn(`${label} — not found in Atlas, skipping`); return; }
-    if (probe.status !== 401) { warn(`${label} — unexpected HTTP ${probe.status} on probe, skipping`); return; }
+    if (probe.status === 404) { warn(`${label} - not found in Atlas, skipping`); return; }
+    if (probe.status !== 401) { warn(`${label} - unexpected HTTP ${probe.status} on probe, skipping`); return; }
 
     const challenge   = parseWwwAuthenticate(probe.wwwAuthenticate ?? '');
     const authHeader  = buildDigestHeader(publicKey, privateKey, 'DELETE', path, challenge.realm, challenge.nonce, challenge.opaque);
@@ -103,12 +103,12 @@ async function atlasDelete(
     if (res.status === 200 || res.status === 204) {
       console.log(`  deleted: ${label}`);
     } else if (res.status === 404) {
-      warn(`${label} — not found in Atlas, skipping`);
+      warn(`${label} - not found in Atlas, skipping`);
     } else {
-      warn(`${label} — HTTP ${res.status}, may need manual deletion in Atlas UI`);
+      warn(`${label} - HTTP ${res.status}, may need manual deletion in Atlas UI`);
     }
   } catch (e) {
-    warn(`${label} — ${(e as Error).message}`);
+    warn(`${label} - ${(e as Error).message}`);
   }
 }
 
@@ -118,7 +118,7 @@ async function dropAtlasRolesAndUsers(): Promise<void> {
   const projectId  = process.env.ATLAS_PROJECT_ID;
 
   if (!publicKey || !privateKey || !projectId) {
-    warn('ATLAS_PUBLIC_KEY / ATLAS_PRIVATE_KEY / ATLAS_PROJECT_ID not set — skipping Atlas cleanup.');
+    warn('ATLAS_PUBLIC_KEY / ATLAS_PRIVATE_KEY / ATLAS_PROJECT_ID not set - skipping Atlas cleanup.');
     warn('Delete manually in Atlas UI: roles pci_level1_role, pci_level2_role and the Level 1/2 DB users.');
     return;
   }
@@ -137,7 +137,7 @@ async function dropAtlasRolesAndUsers(): Promise<void> {
   ].filter(Boolean) as string[];
 
   if (users.length === 0) {
-    warn('ATLAS_DB_USER_LEVEL1 / ATLAS_DB_USER_LEVEL2 not set — skipping DB user deletion.');
+    warn('ATLAS_DB_USER_LEVEL1 / ATLAS_DB_USER_LEVEL2 not set - skipping DB user deletion.');
   }
   for (const user of users) {
     await atlasDelete(
@@ -162,7 +162,7 @@ export async function runDrop(): Promise<void> {
 
   try {
     await client.connect();
-    console.log(`Connected — dropping database '${dbName}'\n`);
+    console.log(`Connected - dropping database '${dbName}'\n`);
     console.log('WARNING: This operation is irreversible. All data will be lost.\n');
 
     const db = client.db(dbName);
@@ -176,10 +176,10 @@ export async function runDrop(): Promise<void> {
         await db.dropDatabase();
         console.log(`  dropped: database '${dbName}'`);
       } else {
-        warn(`database '${dbName}' — not found, skipping`);
+        warn(`database '${dbName}' - not found, skipping`);
       }
     } catch (e) {
-      warn(`database '${dbName}' — drop failed: ${(e as Error).message}, continuing`);
+      warn(`database '${dbName}' - drop failed: ${(e as Error).message}, continuing`);
     }
     console.log('');
 
@@ -192,10 +192,10 @@ export async function runDrop(): Promise<void> {
         await client.db('encryption').dropDatabase();
         console.log('  dropped: database \'encryption\'');
       } else {
-        warn('database \'encryption\' — not found, skipping');
+        warn('database \'encryption\' - not found, skipping');
       }
     } catch (e) {
-      warn(`key vault — drop failed: ${(e as Error).message}, continuing`);
+      warn(`key vault - drop failed: ${(e as Error).message}, continuing`);
     }
     console.log('');
 

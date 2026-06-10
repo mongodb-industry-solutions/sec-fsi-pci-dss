@@ -70,7 +70,7 @@ const DESCRIPTOR_TEMPLATES = [
 function descriptorFor(merchantName: string, txType: string): { description: string; narrative: string } {
   const template = DESCRIPTOR_TEMPLATES[Math.floor(Math.random() * DESCRIPTOR_TEMPLATES.length)];
   const description = template(merchantName).slice(0, 22);
-  const narrative = `${txType.replace('_', ' ').toUpperCase()} at ${merchantName} — ref ${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+  const narrative = `${txType.replace('_', ' ').toUpperCase()} at ${merchantName} - ref ${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
   return { description, narrative };
 }
 
@@ -79,7 +79,7 @@ const NOW = new Date('2026-05-27T14:00:00Z');
 async function main() {
   const demoPassword = await bcrypt.hash('demo-password', 12);
 
-  // ── 1. Parties (SD-13 Party Data Management) ─────────────────────
+  // -- 1. Parties (SD-13 Party Data Management) --------------------─
   // 50 customer parties + 3 employee parties
   const customerPartyIds: string[] = [];
   const customerEmails: string[] = [];
@@ -156,7 +156,7 @@ async function main() {
     });
   }
 
-  // ── 2. Customer authentication assessments (SD-91) ────────────────
+  // -- 2. Customer authentication assessments (SD-91) ----------------
   const customerAuthentications = [
     {
       customerAuthenticationInstanceReference: uuid(),
@@ -230,7 +230,7 @@ async function main() {
     },
   ];
 
-  // ── 3. Customer agreements (SD-53) ───────────────────────────────
+  // -- 3. Customer agreements (SD-53) ------------------------------─
   // PII removed: email, phone, name now live in party (SD-13)
   const customerAgreementIds: string[] = [];
   const customerAgreementRefs: string[] = [];
@@ -272,7 +272,7 @@ async function main() {
     });
   }
 
-  // ── 4. Payment cards (SD-88) ──────────────────────────────────────
+  // -- 4. Payment cards (SD-88) --------------------------------------
   const cardTokenMap: Record<string, string> = {};
   const paymentCards = [];
 
@@ -303,7 +303,7 @@ async function main() {
     customerAgreements[i].customerAgreementPreferredPaymentCardReference = paymentCards[i].paymentCardInstanceReference as unknown as null;
   }
 
-  // ── 5. Card transactions (SD-254) ─────────────────────────────────
+  // -- 5. Card transactions (SD-254) --------------------------------─
   const txnIds: string[] = [];
   const cardTransactions = [];
 
@@ -353,7 +353,7 @@ async function main() {
     });
   }
 
-  // ── 6. Fraud cases + events (SD-83) ──────────────────────────────
+  // -- 6. Fraud cases + events (SD-83) ------------------------------
   const fraudCases = [];
   const fraudCaseEvents = [];
 
@@ -408,7 +408,7 @@ async function main() {
     });
   }
 
-  // ── Write files ───────────────────────────────────────────────────
+  // -- Write files --------------------------------------------------─
   const write = (name: string, data: unknown[]) => {
     const filePath = path.join(OUT_DIR, name);
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2));

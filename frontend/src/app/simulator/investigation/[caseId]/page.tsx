@@ -65,7 +65,7 @@ const STEP_ICONS: Record<string, string> = {
 // v2 demo document: sensitive fields are inline (no *Sensitive collection).
 // QE:equality field (cardTransactionAccountReference) and QE:none fields
 // (rawGatewayPayload, processorTransactionMetadata) both appear as BSON Binary
-// when read by the Level 1 client — Atlas never stores plaintext.
+// when read by the Level 1 client - Atlas never stores plaintext.
 const DEMO_RAW_TRANSACTION: Record<string, unknown> = {
   _id: { $oid: '6650a2b3c4d5e6f700000001' },
   cardTransactionInstanceReference: 'a7f3d891-2c45-4b67-8e12-9f0a1b2c3d4e',
@@ -485,13 +485,13 @@ function L1OpenView({
 
           <div className="rounded-lg border p-3 bg-purple-50 opacity-75">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-bold text-purple-700 uppercase">customerAgreementProcedure (SD-53) — QE:none fields</span>
+              <span className="text-xs font-bold text-purple-700 uppercase">customerAgreementProcedure (SD-53) - QE:none fields</span>
               <span className="text-xs bg-purple-200 text-purple-800 px-1.5 py-0.5 rounded">L2 only</span>
             </div>
             <p className="text-xs text-purple-700">
               Residential address (<code>customerAgreementResidentialAddress</code>) and government ID
               (<code>governmentIdentificationReference</code>) are stored <strong>inline</strong> in the
-              same <code>customerAgreementProcedure</code> document — there is no separate sensitive collection.
+              same <code>customerAgreementProcedure</code> document - there is no separate sensitive collection.
               These QE:none fields use <code>DEK-sensitive</code> (a different key from <code>DEK-lookup</code>).
               The L1 client never receives <code>DEK-sensitive</code>, so these fields arrive as BSON Binary
               ciphertext and are stripped by the service layer before the response is returned.
@@ -511,7 +511,7 @@ function L1OpenView({
         <strong>MongoDB QE in action:</strong> Sarah can search by email, phone, or account reference
         using Queryable Encryption. Atlas receives and matches ciphertext-to-ciphertext.
         Plaintext never reaches the server. Sensitive fields (QE:none) are stored inline in
-        the same document but returned as Binary ciphertext to the L1 client — the DEK-sensitive
+        the same document but returned as Binary ciphertext to the L1 client - the DEK-sensitive
         key never leaves the L2 application context.
       </div>
     </div>
@@ -724,7 +724,7 @@ function L2ReviewView({
             <div className="flex gap-2">
               <span className="text-purple-500 font-bold mt-0.5">+</span>
               <div>
-                <p className="font-medium">cardTransactionLog (SD-254) — QE:none fields</p>
+                <p className="font-medium">cardTransactionLog (SD-254) - QE:none fields</p>
                 <p className="text-gray-500">
                   <code>rawGatewayPayload</code> and <code>processorTransactionMetadata</code> are stored
                   inline in the same <code>cardTransactionLog</code> document as QE:none fields.

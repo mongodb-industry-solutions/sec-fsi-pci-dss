@@ -72,7 +72,7 @@ describe('loginUser', () => {
 });
 
 describe('getDemoUsers', () => {
-  it('returns name, email, role — no password hash', async () => {
+  it('returns name, email, role - no password hash', async () => {
     const raw = {
       partyAuthenticationUserName: 'Sarah Chen',
       partyAuthenticationUserEmailAddress: 'sarah.chen@leafybank.demo',

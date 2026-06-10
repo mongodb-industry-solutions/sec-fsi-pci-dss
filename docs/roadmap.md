@@ -3,7 +3,7 @@
 **Project:** FSI PCI DSS Payment Security Demo  
 **PRD reference:** [PRD.md](PRD.md)  
 **Engineering Proposal:** [engineering-proposal.md](engineering-proposal.md)  
-**Last updated:** 2026-06-08
+**Last updated:** 2026-06-10
 
 ---
 
@@ -152,6 +152,10 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 - [ ] Audit trail shows every field-access event for a given case
 - [ ] QE range query on `transactionAmount.amount` works (e.g., "find transactions between $200 and $1000")
 - [ ] KMS key rotation walkthrough is demonstrable (step-by-step in the UI or docs)
+- [x] Case notes as BIAN append-only events (`POST`/`DELETE`/`GET /api/v1/fraud/:id/notes`)
+- [x] Customer-visible notes list in transaction detail
+- [x] Note retraction with audit event (BIAN + PCI DSS Req 10.3 compliant)
+- [x] `escalationAcceptedAt` persisted on case document (L2 accept survives refresh)
 
 ---
 
@@ -217,6 +221,19 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 | NFR-v2-03 | Auditability | Every sensitive field reveal is persisted in the action log | No reveal occurs without a corresponding audit event |
 | NFR-v2-04 | Maintainability | Adding a new demo role requires changes in one place: the RBAC middleware | New role added without modifying controllers or services |
 | NFR-v2-05 | Backward compatibility | v1 API endpoints continue to work unchanged | v1 integration test suite passes without modification |
+
+---
+
+### Ch-03 / Architecture Changes *(implemented 2026-06-10)*
+
+These changes were applied during v2 development and are now part of the v2 baseline. All v2 acceptance criteria inherit them.
+
+| Change | Detail | Status |
+|---|---|---|
+| Case notes migrated to append-only events | `POST /api/v1/fraud/:id/notes`, `DELETE /api/v1/fraud/:id/notes/:noteId`, and `GET /api/v1/fraud/:id/notes` replace the deprecated note fields on the `PATCH` endpoint. Each note is stored as an immutable `note_added` event in `fraudDiagnosisCaseEvents`. Errors are corrected via a `note_retracted` event (BIAN SD-83 append-only principle, PCI DSS Req 10.3). | ✅ Done |
+| `escalationAcceptedAt` on case document | `GET /api/v1/fraud/:id` now returns `escalationAcceptedAt`. The timestamp is persisted on the `fraudDiagnosisCase` document when a Level 2 Investigator approves an escalation, so the approval state survives a page refresh. | ✅ Done |
+| Deprecated: `fraudDiagnosisCaseNotes` | The single-string `fraudDiagnosisCaseNotes` field on `fraudDiagnosisCase` is **deprecated**. New writes must use the notes event endpoints above. Existing seed data retains the field for backward compatibility; it will be removed in v3. | ⚠️ Deprecated |
+| Deprecated: `fraudDiagnosisCustomerSubjectNotes` | The single-string `fraudDiagnosisCustomerSubjectNotes` field is **deprecated** for the same reason. Customer-visible notes are now the chronological list of `visibility:'customer'` events returned by `GET /api/v1/fraud/:id/notes`. | ⚠️ Deprecated |
 
 ---
 

@@ -5,7 +5,7 @@
 | **Version** | 1.1 |
 | **Status** | Active |
 | **Author** | Antonio Membrides Espinosa |
-| **Date** | 2026-06-05 |
+| **Date** | 2026-06-10 |
 | **Repository** | sec-fsi-pci-dss |
 | **Demo Type** | IST Standalone Demo: FSI / Security |
 
@@ -342,8 +342,31 @@ interface FraudDiagnosisControlRecord {
   assignedAnalystRole: 'level1_analyst' | 'level2_investigator';
   escalationFlag: boolean;
   escalationDateTime?: Date;
+  escalationAcceptedAt?: Date;                   // set when L2 approves; persisted so approval survives refresh
   caseResolutionOutcome?: 'fraud_confirmed' | 'false_positive' | 'chargeback_initiated' | 'under_review';
-  caseNotes: string;                             // non-sensitive operational notes
+
+  // DEPRECATED fields — do not write; use the notes event endpoints instead
+  // (Ch-03, 2026-06-10: replaced by fraudDiagnosisCaseEvents append-only log)
+  /** @deprecated Use POST/DELETE/GET /api/v1/fraud/:id/notes instead */
+  fraudDiagnosisCaseNotes?: string;
+  /** @deprecated Customer-visible notes are now visibility:'customer' events in fraudDiagnosisCaseEvents */
+  fraudDiagnosisCustomerSubjectNotes?: string;
+
+  // Case notes — append-only event log (Ch-03)
+  // Notes are stored as immutable `note_added` events. Errors are corrected via a `note_retracted`
+  // event (BIAN SD-83 append-only principle, PCI DSS Req 10.3).
+  // The customer sees a chronological list of visibility:'customer' notes in their transaction detail view.
+  // Managed via: POST /api/v1/fraud/:id/notes · DELETE /api/v1/fraud/:id/notes/:noteId
+  //              GET  /api/v1/fraud/:id/notes
+  fraudDiagnosisCaseEvents: Array<{
+    eventId: string;                             // UUID
+    eventDateTime: Date;
+    eventType: 'note_added' | 'note_retracted';
+    performedByRole: string;
+    noteText?: string;                           // present on note_added; absent on note_retracted
+    retractedEventId?: string;                   // present on note_retracted; references the note_added event
+    visibility: 'internal' | 'customer';         // 'customer' notes appear in transaction detail view
+  }>;
 
   // Audit log (embedded: append-only)
   diagnosisActionLog: Array<{

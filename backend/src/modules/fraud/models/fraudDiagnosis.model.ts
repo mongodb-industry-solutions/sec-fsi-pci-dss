@@ -51,10 +51,16 @@ export interface FraudDiagnosisControlRecord {
   // Set when L2 approves the escalation; cleared when L2 rejects it back to L1
   fraudDiagnosisEscalationAcceptedAt?: Date | null;
 
-  // Operational notes (appended by analysts, visible to L1/L2/Auditor)
+  /**
+   * @deprecated Use POST /api/v1/fraud/:id/notes with visibility:'internal' instead.
+   * Kept for reading legacy data only. New writes are rejected by the API.
+   */
   fraudDiagnosisCaseNotes?: string;
 
-  // Customer-facing notes (visible to the customer in their transaction detail view)
+  /**
+   * @deprecated Use POST /api/v1/fraud/:id/notes with visibility:'customer' instead.
+   * Kept for reading legacy data only. New writes are rejected by the API.
+   */
   fraudDiagnosisCustomerSubjectNotes?: string;
 
   // Resolution record (populated on close)
@@ -87,6 +93,14 @@ export interface FraudDiagnosisControlRecord {
 // Audit event document, stored in fraudDiagnosisCaseEvents (separate collection).
 // Replaces the embedded diagnosisActionLog array (Unbounded Array anti-pattern fix).
 // Indexed on (fraudDiagnosisInstanceReference, actionDateTime) for ordered retrieval.
+//
+// actionDetails shape per actionType:
+//   note_added:     { noteId: string, noteText: string, visibility: 'internal'|'customer' }
+//   note_retracted: { noteId: string, retractedNoteId: string, retractionReason: string|null, visibility: string }
+//   escalated:      { escalationReason: string, escalationDateTime: string }
+//   field_accessed: { action: string, ... }
+//   assigned:       { action?: string, newStatus?: string }
+//   resolved:       { newStatus: string, resolutionOutcome?: string }
 export interface FraudDiagnosisCaseEventRecord {
   fraudDiagnosisInstanceReference: string;               // FK to fraudDiagnosisCase
   actionDateTime: Date;
@@ -109,6 +123,7 @@ export type ActionType =
   | 'case_opened'
   | 'assigned'
   | 'note_added'
+  | 'note_retracted'
   | 'field_accessed'
   | 'escalated'
   | 'ai_review'

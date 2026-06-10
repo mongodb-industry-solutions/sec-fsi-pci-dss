@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../modules/customer/models/customerAgreement.model';
 
 // v2: customerAgreements.json contains merged sensitive fields (address, govId, riskNotes).
-// The QE client encrypts them with DEK-sensitive tier on write — no separate *Sensitive file.
+// The QE client encrypts them with DEK-sensitive tier on write - no separate *Sensitive file.
 export async function seedCustomers(db: Db) {
   const agreements = JSON.parse(
     fs.readFileSync(path.join(__dirname, '../../../data/customerAgreements.json'), 'utf-8')

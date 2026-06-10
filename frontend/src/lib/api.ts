@@ -150,6 +150,30 @@ export interface CaseEventsResponse {
   events: ActionEvent[];
 }
 
+export interface NoteEntry {
+  noteId: string;
+  noteText: string;
+  visibility: 'internal' | 'customer';
+  performedByRole: string;
+  actionDateTime: string;
+  isRetracted: boolean;
+  retractionReason: string | null;
+  retractionDateTime: string | null;
+}
+
+export interface CaseNotesResponse {
+  notes: NoteEntry[];
+}
+
+export interface TransactionNotesResponse {
+  caseFound: boolean;
+  fraudDiagnosisCaseReference: string | null;
+  fraudDiagnosisCaseStatus: string | null;
+  fraudDiagnosisCaseSeverity: string | null;
+  fraudDiagnosisResolutionOutcome: string | null;
+  notes: NoteEntry[];
+}
+
 export const api = {
   auth: {
     login: (body: { email: string; password: string; domain: string }) =>
@@ -225,14 +249,7 @@ export const api = {
         `/api/v1/transactions?cardToken=${encodeURIComponent(cardToken)}`, {}, token
       ),
     getNotes: (txnId: string, token: string) =>
-      apiFetch<{
-        caseFound: boolean;
-        fraudDiagnosisCaseReference: string | null;
-        fraudDiagnosisCaseStatus: string | null;
-        fraudDiagnosisCaseSeverity: string | null;
-        fraudDiagnosisCustomerSubjectNotes: string | null;
-        fraudDiagnosisResolutionOutcome: string | null;
-      }>(`/api/v1/transactions/${txnId}/notes`, {}, token),
+      apiFetch<TransactionNotesResponse>(`/api/v1/transactions/${txnId}/notes`, {}, token),
     listAll: (
       params: { status?: string; merchant?: string; cardToken?: string; email?: string; page?: number; limit?: number },
       token: string
@@ -335,6 +352,29 @@ export const api = {
       apiFetch<{ fraudDiagnosisInstanceReference: string; fraudDiagnosisCaseStatus: string; rejectedAt: string }>(
         `/api/v1/fraud/${id}/escalate/reject`,
         { method: 'POST', body: JSON.stringify(body) },
+        token
+      ),
+    getNotes: (caseId: string, token: string) =>
+      apiFetch<CaseNotesResponse>(`/api/v1/fraud/${caseId}/notes`, {}, token),
+    addNote: (
+      caseId: string,
+      body: { noteText: string; visibility: 'internal' | 'customer' },
+      token: string
+    ) =>
+      apiFetch<{ noteId: string; actionDateTime: string }>(
+        `/api/v1/fraud/${caseId}/notes`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token
+      ),
+    retractNote: (
+      caseId: string,
+      noteId: string,
+      body: { retractionReason?: string },
+      token: string
+    ) =>
+      apiFetch<{ retractedNoteId: string; retractionDateTime: string }>(
+        `/api/v1/fraud/${caseId}/notes/${noteId}`,
+        { method: 'DELETE', body: JSON.stringify(body) },
         token
       ),
     open: (body: { transactionId: string; reason?: string }, token: string) =>
