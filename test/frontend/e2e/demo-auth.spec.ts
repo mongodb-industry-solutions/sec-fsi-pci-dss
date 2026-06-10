@@ -15,11 +15,11 @@ function buildFakeJwt(payload: Record<string, unknown>): string {
 }
 
 const MOCK_USERS = [
-  { email: 'luis.fernandez@leafybank.demo', name: 'Luis Fernandez', role: 'customer' },
-  { email: 'julia.santos@leafybank.demo', name: 'Julia Santos', role: 'customer' },
-  { email: 'sarah.chen@leafybank.demo', name: 'Sarah Chen', role: 'level1_analyst' },
-  { email: 'michael.obi@leafybank.demo', name: 'Michael Obi', role: 'level2_investigator' },
-  { email: 'admin@leafybank.demo', name: 'Admin User', role: 'security_auditor' },
+  { email: 'luis.fernandez@back.es', name: 'Luis Fernandez', role: 'customer' },
+  { email: 'julia.santos@back.es', name: 'Julia Santos', role: 'customer' },
+  { email: 'sarah.chen@back.es', name: 'Sarah Chen', role: 'level1_analyst' },
+  { email: 'michael.obi@back.es', name: 'Michael Obi', role: 'level2_investigator' },
+  { email: 'admin@back.es', name: 'Admin User', role: 'security_auditor' },
 ];
 
 test.describe('FR-v1-05: Application Mode Authentication', () => {
@@ -39,11 +39,11 @@ test.describe('FR-v1-05: Application Mode Authentication', () => {
     await page.route('**/api/v1/auth/login', (route) => {
       route.fulfill({
         status: 201, contentType: 'application/json',
-        body: JSON.stringify({ token: buildFakeJwt({ sub: 'u3', email: 'sarah.chen@leafybank.demo', role: 'level1_analyst', name: 'Sarah Chen', domain: 'local' }), user: MOCK_USERS[2] }),
+        body: JSON.stringify({ token: buildFakeJwt({ sub: 'u3', email: 'sarah.chen@back.es', role: 'level1_analyst', name: 'Sarah Chen', domain: 'local' }), user: MOCK_USERS[2] }),
       });
     });
     await page.goto('/demo');
-    await submitLogin(page, 'sarah.chen@leafybank.demo');
+    await submitLogin(page, 'sarah.chen@back.es');
     await expect(page).toHaveURL(/\/demo\/investigation/, { timeout: 6_000 });
   });
 
@@ -51,11 +51,11 @@ test.describe('FR-v1-05: Application Mode Authentication', () => {
     await page.route('**/api/v1/auth/login', (route) => {
       route.fulfill({
         status: 201, contentType: 'application/json',
-        body: JSON.stringify({ token: buildFakeJwt({ sub: 'u1', email: 'luis.fernandez@leafybank.demo', role: 'customer', name: 'Luis Fernandez', domain: 'local' }), user: MOCK_USERS[0] }),
+        body: JSON.stringify({ token: buildFakeJwt({ sub: 'u1', email: 'luis.fernandez@back.es', role: 'customer', name: 'Luis Fernandez', domain: 'local' }), user: MOCK_USERS[0] }),
       });
     });
     await page.goto('/demo');
-    await submitLogin(page, 'luis.fernandez@leafybank.demo');
+    await submitLogin(page, 'luis.fernandez@back.es');
     await expect(page).toHaveURL(/\/demo\/payment/, { timeout: 6_000 });
   });
 
@@ -64,7 +64,7 @@ test.describe('FR-v1-05: Application Mode Authentication', () => {
       route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: 'Invalid credentials' }) });
     });
     await page.goto('/demo');
-    await submitLogin(page, 'sarah.chen@leafybank.demo', 'wrong-password');
+    await submitLogin(page, 'sarah.chen@back.es', 'wrong-password');
     await expect(page.locator('text=/invalid|incorrect|error/i').first()).toBeVisible({ timeout: 5_000 });
     await expect(page).toHaveURL('/demo');
   });
@@ -79,14 +79,14 @@ test.describe('FR-v1-05: Application Mode Authentication', () => {
     await page.route('**/api/v1/auth/login', (route) => {
       route.fulfill({
         status: 201, contentType: 'application/json',
-        body: JSON.stringify({ token: buildFakeJwt({ sub: 'u3', email: 'sarah.chen@leafybank.demo', role: 'level1_analyst', name: 'Sarah Chen', domain: 'local' }), user: MOCK_USERS[2] }),
+        body: JSON.stringify({ token: buildFakeJwt({ sub: 'u3', email: 'sarah.chen@back.es', role: 'level1_analyst', name: 'Sarah Chen', domain: 'local' }), user: MOCK_USERS[2] }),
       });
     });
     await page.route('**/api/v1/fraud-cases**', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ results: [], total: 0, page: 1, limit: 20 }) });
     });
     await page.goto('/demo');
-    await submitLogin(page, 'sarah.chen@leafybank.demo');
+    await submitLogin(page, 'sarah.chen@back.es');
     await expect(page).toHaveURL(/\/demo\/investigation/, { timeout: 6_000 });
     await page.locator('a:has-text("Sign out"), button:has-text("Sign out")').first().click();
     await expect(page).toHaveURL('/demo', { timeout: 4_000 });

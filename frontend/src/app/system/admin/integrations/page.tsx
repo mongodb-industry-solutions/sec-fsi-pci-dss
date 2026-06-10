@@ -194,7 +194,7 @@ export default function IntegrationsListPage() {
 
         {debugMode && (
           <div className="mt-4 text-xs text-gray-400 font-mono">
-            {ROLE_LABELS['system_admin']} · PCI DSS Req 12.8.1 — maintained list of all third-party service providers
+            {ROLE_LABELS['manager']} · PCI DSS Req 12.8.1 — maintained list of all third-party service providers
           </div>
         )}
       </main>

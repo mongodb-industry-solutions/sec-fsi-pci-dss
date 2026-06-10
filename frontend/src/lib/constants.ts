@@ -3,24 +3,24 @@ export const API_BASE_URL =
 
 export const DEMO_USERS_PASSWORDS: Record<string, string> = {
   // Customers
-  'luis.fernandez@leafybank.demo': 'demo-password',
-  'julia.santos@leafybank.demo': 'demo-password',
-  'carlos.garcia@leafybank.demo': 'demo-password',
-  'priya.patel@leafybank.demo': 'demo-password',
+  'luis.fernandez@back.es': 'demo-password',
+  'julia.santos@back.es': 'demo-password',
+  'carlos.garcia@back.es': 'demo-password',
+  'priya.patel@back.es': 'demo-password',
   // Analysts (L1)
-  'sarah.chen@leafybank.demo': 'demo-password',
-  'anna.kowalski@leafybank.demo': 'demo-password',
+  'sarah.chen@back.es': 'demo-password',
+  'anna.kowalski@back.es': 'demo-password',
   // Investigators (L2)
-  'michael.obi@leafybank.demo': 'demo-password',
-  'james.wright@leafybank.demo': 'demo-password',
+  'michael.obi@back.es': 'demo-password',
+  'james.wright@back.es': 'demo-password',
   // Security Auditors
-  'diego.sans@leafybank.demo': 'demo-password',
-  'sophie.martin@leafybank.demo': 'demo-password',
+  'diego.sans@back.es': 'demo-password',
+  'sophie.martin@back.es': 'demo-password',
   // Merchant Officers
   'officer@bank.demo': 'demo-password',
   'marco.rossi@bank.demo': 'demo-password',
-  // System Admin
-  'admin.system@leafybank.demo': 'demo-password',
+  // Manager
+  'alex.rivera@back.es': 'demo-password',
 };
 
 export const ROLE_LABELS: Record<string, string> = {
@@ -29,7 +29,7 @@ export const ROLE_LABELS: Record<string, string> = {
   level2_investigator: 'L2 Investigator',
   security_auditor: 'Security Auditor',
   merchant_officer: 'Merchant Officer',
-  system_admin:     'System Administrator',
+  manager:          'Manager',
 };
 
 export const PERFORMER_LABELS: Record<string, string> = {

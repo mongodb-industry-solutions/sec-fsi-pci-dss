@@ -21,7 +21,7 @@ import type { FastifyInstance } from 'fastify';
 const SKIP = !process.env.TEST_MONGODB_URI;
 const skip = SKIP ? it.skip : it;
 
-const TEST_EMAIL = 'sarah.chen@leafybank.demo';
+const TEST_EMAIL = 'sarah.chen@back.es';
 const TEST_CASE_ID = 'test-case-fr-v2-13';
 
 describe('FR-v2-13: RBAC API Layer', () => {
@@ -39,12 +39,12 @@ describe('FR-v2-13: RBAC API Layer', () => {
     // Obtain JWT tokens for L1 and L2 demo users
     const l1Res = await supertest(app.server)
       .post('/api/v1/auth/login')
-      .send({ email: 'sarah.chen@leafybank.demo', password: 'demo-password', domain: 'local' });
+      .send({ email: 'sarah.chen@back.es', password: 'demo-password', domain: 'local' });
     l1Token = l1Res.body.token;
 
     const l2Res = await supertest(app.server)
       .post('/api/v1/auth/login')
-      .send({ email: 'michael.obi@leafybank.demo', password: 'demo-password', domain: 'local' });
+      .send({ email: 'michael.obi@back.es', password: 'demo-password', domain: 'local' });
     l2Token = l2Res.body.token;
   });
 

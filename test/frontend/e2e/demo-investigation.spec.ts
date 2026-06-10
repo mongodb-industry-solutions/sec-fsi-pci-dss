@@ -10,7 +10,7 @@ function buildFakeJwt(payload: Record<string, unknown>): string {
   return `${header}.${body}.fake-signature`;
 }
 
-const ANALYST_TOKEN = buildFakeJwt({ sub: 'u3', email: 'sarah.chen@leafybank.demo', role: 'level1_analyst', name: 'Sarah Chen', domain: 'local' });
+const ANALYST_TOKEN = buildFakeJwt({ sub: 'u3', email: 'sarah.chen@back.es', role: 'level1_analyst', name: 'Sarah Chen', domain: 'local' });
 
 const MOCK_CASES = {
   results: [

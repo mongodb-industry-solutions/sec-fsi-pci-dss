@@ -17,7 +17,7 @@ const PAGE_SIZE = 10;
 
 export default function SimulatorInvestigationPage() {
   const [searchField, setSearchField]     = useState<SearchField>('email');
-  const [searchValue, setSearchValue]     = useState('luis.fernandez@leafybank.demo');
+  const [searchValue, setSearchValue]     = useState('luis.fernandez@back.es');
   const [filterStatus, setFilterStatus]   = useState('');
   const [filterSeverity, setFilterSeverity] = useState('');
   const [cases, setCases]   = useState<FraudCase[]>([]);

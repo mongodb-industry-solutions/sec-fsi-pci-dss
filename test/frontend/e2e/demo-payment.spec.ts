@@ -10,7 +10,7 @@ function buildFakeJwt(payload: Record<string, unknown>): string {
   return `${header}.${body}.fake-signature`;
 }
 
-const CUSTOMER_TOKEN = buildFakeJwt({ sub: 'u1', email: 'luis.fernandez@leafybank.demo', role: 'customer', name: 'Luis Fernandez', domain: 'local' });
+const CUSTOMER_TOKEN = buildFakeJwt({ sub: 'u1', email: 'luis.fernandez@back.es', role: 'customer', name: 'Luis Fernandez', domain: 'local' });
 
 test.describe('FR-v1-01/03: App Mode Payment', () => {
   test.beforeEach(async ({ page }) => {

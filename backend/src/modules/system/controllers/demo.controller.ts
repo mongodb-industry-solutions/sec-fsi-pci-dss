@@ -65,17 +65,16 @@ export async function demoController(fastify: FastifyInstance) {
   fastify.get('/users', {
     schema: {
       tags: ['system'],
-      summary: 'List demo users for quick login (max 5)',
-      description: `Returns up to 5 active pre-seeded demo user accounts for the local authentication domain.
+      summary: 'List demo users for quick login',
+      description: `Returns all active pre-seeded demo user accounts for the local authentication domain.
 **Public  -  no JWT required.** Intended for the login UI to populate the user selector. Passwords are never returned.`,
       response: {
         200: {
-          description: 'List of available demo users (max 5).',
+          description: 'List of available demo users.',
           type: 'object',
           properties: {
             users: {
               type: 'array',
-              maxItems: 5,
               description: 'Active demo accounts for the local domain.',
               items: {
                 type: 'object',
@@ -84,7 +83,7 @@ export async function demoController(fastify: FastifyInstance) {
                   name: { type: 'string', description: 'Display name.' },
                   role: {
                     type: 'string',
-                    enum: ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor'],
+                    enum: ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor', 'merchant_officer', 'manager'],
                     description: 'Role encoded in the JWT on login.',
                   },
                 },
@@ -99,7 +98,7 @@ export async function demoController(fastify: FastifyInstance) {
     try {
       const db = (fastify as FastifyInstance & { db?: Db }).db as Db;
       const users = await getDemoUsers(db);
-      return reply.send({ users: users.slice(0, 5) });
+      return reply.send({ users });
     } catch (err) {
       fastify.log.error(err);
       return reply.status(500).send({ error: 'Failed to load demo users' });

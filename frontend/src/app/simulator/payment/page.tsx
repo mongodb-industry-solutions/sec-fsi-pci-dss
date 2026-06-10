@@ -36,7 +36,7 @@ const TEST_CARDS = [
 const DEFAULTS: FormData = {
   cardholderName: 'Luis Fernandez',
   expiry: '12/28',
-  email: 'luis.fernandez@leafybank.demo',
+  email: 'luis.fernandez@back.es',
   phone: '+44 7700 900123',
   amount: '850.00',
   merchantName: 'TechGadgets Ltd.',

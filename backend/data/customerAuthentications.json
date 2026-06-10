@@ -2,7 +2,7 @@
   {
     "customerAuthenticationInstanceReference": "ec06cbfa-96e2-4867-892b-b74987e78d7a",
     "partyInstanceReference": "b0000001-0000-4000-8000-000000000001",
-    "customerAuthenticationEmailAddress": "luis.fernandez@leafybank.demo",
+    "customerAuthenticationEmailAddress": "luis.fernandez@back.es",
     "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
     "customerAuthenticationUserRole": "customer",
     "customerAuthenticationUserName": "Luis Fernandez",
@@ -16,7 +16,7 @@
   {
     "customerAuthenticationInstanceReference": "71ee3674-a603-4015-84b3-80e59c895d7e",
     "partyInstanceReference": "b0000002-0000-4000-8000-000000000002",
-    "customerAuthenticationEmailAddress": "julia.santos@leafybank.demo",
+    "customerAuthenticationEmailAddress": "julia.santos@back.es",
     "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
     "customerAuthenticationUserRole": "customer",
     "customerAuthenticationUserName": "Julia Santos",
@@ -30,7 +30,7 @@
   {
     "customerAuthenticationInstanceReference": "a9797f8a-31de-4cc0-a5aa-890ce4559db0",
     "partyInstanceReference": "b0000051-0000-4000-8000-000000000051",
-    "customerAuthenticationEmailAddress": "sarah.chen@leafybank.demo",
+    "customerAuthenticationEmailAddress": "sarah.chen@back.es",
     "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
     "customerAuthenticationUserRole": "level1_analyst",
     "customerAuthenticationUserName": "Sarah Chen",
@@ -44,7 +44,7 @@
   {
     "customerAuthenticationInstanceReference": "1413fbfc-26a1-42b3-8e32-098e2a8d9834",
     "partyInstanceReference": "b0000052-0000-4000-8000-000000000052",
-    "customerAuthenticationEmailAddress": "michael.obi@leafybank.demo",
+    "customerAuthenticationEmailAddress": "michael.obi@back.es",
     "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
     "customerAuthenticationUserRole": "level2_investigator",
     "customerAuthenticationUserName": "Michael Obi",
@@ -58,7 +58,7 @@
   {
     "customerAuthenticationInstanceReference": "5f05a02f-478a-4d59-acdb-c43da6192b03",
     "partyInstanceReference": "b0000053-0000-4000-8000-000000000053",
-    "customerAuthenticationEmailAddress": "diego.sans@leafybank.demo",
+    "customerAuthenticationEmailAddress": "diego.sans@back.es",
     "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
     "customerAuthenticationUserRole": "security_auditor",
     "customerAuthenticationUserName": "Diego Sans",
@@ -128,7 +128,7 @@
   {
     "customerAuthenticationInstanceReference": "a1000060-0000-4000-8000-000000000060",
     "partyInstanceReference": "b0000060-0000-4000-8000-000000000060",
-    "customerAuthenticationEmailAddress": "carlos.garcia@leafybank.demo",
+    "customerAuthenticationEmailAddress": "carlos.garcia@back.es",
     "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
     "customerAuthenticationUserRole": "customer",
     "customerAuthenticationUserName": "Carlos Garcia",
@@ -142,7 +142,7 @@
   {
     "customerAuthenticationInstanceReference": "a1000061-0000-4000-8000-000000000061",
     "partyInstanceReference": "b0000061-0000-4000-8000-000000000061",
-    "customerAuthenticationEmailAddress": "priya.patel@leafybank.demo",
+    "customerAuthenticationEmailAddress": "priya.patel@back.es",
     "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
     "customerAuthenticationUserRole": "customer",
     "customerAuthenticationUserName": "Priya Patel",
@@ -156,7 +156,7 @@
   {
     "customerAuthenticationInstanceReference": "a1000062-0000-4000-8000-000000000062",
     "partyInstanceReference": "b0000062-0000-4000-8000-000000000062",
-    "customerAuthenticationEmailAddress": "anna.kowalski@leafybank.demo",
+    "customerAuthenticationEmailAddress": "anna.kowalski@back.es",
     "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
     "customerAuthenticationUserRole": "level1_analyst",
     "customerAuthenticationUserName": "Anna Kowalski",
@@ -170,7 +170,7 @@
   {
     "customerAuthenticationInstanceReference": "a1000063-0000-4000-8000-000000000063",
     "partyInstanceReference": "b0000063-0000-4000-8000-000000000063",
-    "customerAuthenticationEmailAddress": "james.wright@leafybank.demo",
+    "customerAuthenticationEmailAddress": "james.wright@back.es",
     "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
     "customerAuthenticationUserRole": "level2_investigator",
     "customerAuthenticationUserName": "James Wright",
@@ -184,7 +184,7 @@
   {
     "customerAuthenticationInstanceReference": "a1000064-0000-4000-8000-000000000064",
     "partyInstanceReference": "b0000064-0000-4000-8000-000000000064",
-    "customerAuthenticationEmailAddress": "sophie.martin@leafybank.demo",
+    "customerAuthenticationEmailAddress": "sophie.martin@back.es",
     "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
     "customerAuthenticationUserRole": "security_auditor",
     "customerAuthenticationUserName": "Sophie Martin",
@@ -212,10 +212,10 @@
   {
     "customerAuthenticationInstanceReference": "a1000070-0000-4000-8000-000000000070",
     "partyInstanceReference": "b0000070-0000-4000-8000-000000000070",
-    "customerAuthenticationEmailAddress": "admin.system@bank.demo",
+    "customerAuthenticationEmailAddress": "alex.rivera@back.es",
     "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
-    "customerAuthenticationUserRole": "system_admin",
-    "customerAuthenticationUserName": "System Administrator",
+    "customerAuthenticationUserRole": "manager",
+    "customerAuthenticationUserName": "Alex Rivera",
     "customerAuthenticationLoginDomain": "local",
     "customerAuthenticationAccountStatus": "active",
     "bianServiceDomain": "Customer Authentication",

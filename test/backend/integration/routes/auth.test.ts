@@ -32,7 +32,7 @@ describe('FR-v1-05: Auth routes', () => {
   skip('POST /api/v1/auth/login returns 200 + JWT for valid credentials', async () => {
     const res = await supertest(app.server)
       .post('/api/v1/auth/login')
-      .send({ email: 'sarah.chen@leafybank.demo', password: 'demo-password', domain: 'local' });
+      .send({ email: 'sarah.chen@back.es', password: 'demo-password', domain: 'local' });
     expect(res.status).toBe(200);
     expect(res.body.token).toBeTruthy();
     expect(res.body.user.role).toBe('level1_analyst');
@@ -41,14 +41,14 @@ describe('FR-v1-05: Auth routes', () => {
   skip('POST /api/v1/auth/login returns 401 for wrong password', async () => {
     const res = await supertest(app.server)
       .post('/api/v1/auth/login')
-      .send({ email: 'sarah.chen@leafybank.demo', password: 'wrong', domain: 'local' });
+      .send({ email: 'sarah.chen@back.es', password: 'wrong', domain: 'local' });
     expect(res.status).toBe(401);
   });
 
   skip('POST /api/v1/auth/login returns 401 for unknown user', async () => {
     const res = await supertest(app.server)
       .post('/api/v1/auth/login')
-      .send({ email: 'nobody@leafybank.demo', password: 'demo-password', domain: 'local' });
+      .send({ email: 'nobody@back.es', password: 'demo-password', domain: 'local' });
     expect(res.status).toBe(401);
   });
 

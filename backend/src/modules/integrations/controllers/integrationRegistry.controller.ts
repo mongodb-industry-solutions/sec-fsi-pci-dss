@@ -36,7 +36,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
     },
     handler: async (request, reply) => {
       const { demoRole } = request as unknown as DemoRequest;
-      if (demoRole !== 'system_admin') return reply.status(403).send({ error: 'Forbidden: system_admin role required' });
+      if (demoRole !== 'manager') return reply.status(403).send({ error: 'Forbidden: manager role required' });
 
       const { type, status } = request.query as { type?: string; status?: string };
       const integrations = await listIntegrations(
@@ -74,7 +74,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
     },
     handler: async (request, reply) => {
       const { demoRole } = request as unknown as DemoRequest;
-      if (demoRole !== 'system_admin') return reply.status(403).send({ error: 'Forbidden: system_admin role required' });
+      if (demoRole !== 'manager') return reply.status(403).send({ error: 'Forbidden: manager role required' });
 
       try {
         const body = request.body as Record<string, unknown>;
@@ -110,7 +110,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
     },
     handler: async (request, reply) => {
       const { demoRole } = request as unknown as DemoRequest;
-      if (demoRole !== 'system_admin') return reply.status(403).send({ error: 'Forbidden: system_admin role required' });
+      if (demoRole !== 'manager') return reply.status(403).send({ error: 'Forbidden: manager role required' });
 
       const { id } = request.params as { id: string };
       const integration = await getIntegration(fastify.db, id);
@@ -145,7 +145,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
     },
     handler: async (request, reply) => {
       const { demoRole } = request as unknown as DemoRequest;
-      if (demoRole !== 'system_admin') return reply.status(403).send({ error: 'Forbidden: system_admin role required' });
+      if (demoRole !== 'manager') return reply.status(403).send({ error: 'Forbidden: manager role required' });
 
       const { id } = request.params as { id: string };
       const body = request.body as Record<string, unknown>;
@@ -180,7 +180,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
     },
     handler: async (request, reply) => {
       const { demoRole } = request as unknown as DemoRequest;
-      if (demoRole !== 'system_admin') return reply.status(403).send({ error: 'Forbidden: system_admin role required' });
+      if (demoRole !== 'manager') return reply.status(403).send({ error: 'Forbidden: manager role required' });
 
       const { id } = request.params as { id: string };
       try {
@@ -209,7 +209,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
     },
     handler: async (request, reply) => {
       const { demoRole } = request as unknown as DemoRequest;
-      if (demoRole !== 'system_admin') return reply.status(403).send({ error: 'Forbidden: system_admin role required' });
+      if (demoRole !== 'manager') return reply.status(403).send({ error: 'Forbidden: manager role required' });
 
       const { id } = request.params as { id: string };
       try {
@@ -238,7 +238,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
     },
     handler: async (request, reply) => {
       const { demoRole } = request as unknown as DemoRequest;
-      if (demoRole !== 'system_admin') return reply.status(403).send({ error: 'Forbidden: system_admin role required' });
+      if (demoRole !== 'manager') return reply.status(403).send({ error: 'Forbidden: manager role required' });
 
       const { id } = request.params as { id: string };
       try {
@@ -273,7 +273,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
     },
     handler: async (request, reply) => {
       const { demoRole } = request as unknown as DemoRequest;
-      if (demoRole !== 'system_admin') return reply.status(403).send({ error: 'Forbidden: system_admin role required' });
+      if (demoRole !== 'manager') return reply.status(403).send({ error: 'Forbidden: manager role required' });
 
       const { id } = request.params as { id: string };
       const { page, limit } = request.query as { page?: string; limit?: string };

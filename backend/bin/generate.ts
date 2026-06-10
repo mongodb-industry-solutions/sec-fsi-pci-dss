@@ -92,21 +92,21 @@ async function main() {
   const employeeParties = [
     {
       partyInstanceReference: uuid(),
-      partyEmailAddress: 'sarah.chen@leafybank.demo',
+      partyEmailAddress: 'sarah.chen@back.es',
       partyMobilePhoneNumber: '+44 7900 000051',
       partyName: 'Sarah Chen',
       partyType: 'employee',
     },
     {
       partyInstanceReference: uuid(),
-      partyEmailAddress: 'michael.obi@leafybank.demo',
+      partyEmailAddress: 'michael.obi@back.es',
       partyMobilePhoneNumber: '+44 7900 000052',
       partyName: 'Michael Obi',
       partyType: 'employee',
     },
     {
       partyInstanceReference: uuid(),
-      partyEmailAddress: 'diego.sans@leafybank.demo',
+      partyEmailAddress: 'diego.sans@back.es',
       partyMobilePhoneNumber: '+44 7900 000053',
       partyName: 'Diego Sans',
       partyType: 'employee',
@@ -114,7 +114,7 @@ async function main() {
   ];
 
   // 50 customer parties (first 2 linked to demo customer auth users)
-  const demoCustomerEmails = ['luis.fernandez@leafybank.demo', 'julia.santos@leafybank.demo'];
+  const demoCustomerEmails = ['luis.fernandez@back.es', 'julia.santos@back.es'];
   const demoCustomerNames = ['Luis Fernandez', 'Julia Santos'];
   const demoCustomerPhones = ['+44 7900 000001', '+44 7900 000002'];
 
@@ -161,7 +161,7 @@ async function main() {
     {
       customerAuthenticationInstanceReference: uuid(),
       partyInstanceReference: customerPartyIds[0],
-      customerAuthenticationEmailAddress: 'luis.fernandez@leafybank.demo',
+      customerAuthenticationEmailAddress: 'luis.fernandez@back.es',
       customerAuthenticationCredentialHash: demoPassword,
       customerAuthenticationUserRole: 'customer',
       customerAuthenticationUserName: 'Luis Fernandez',
@@ -175,7 +175,7 @@ async function main() {
     {
       customerAuthenticationInstanceReference: uuid(),
       partyInstanceReference: customerPartyIds[1],
-      customerAuthenticationEmailAddress: 'julia.santos@leafybank.demo',
+      customerAuthenticationEmailAddress: 'julia.santos@back.es',
       customerAuthenticationCredentialHash: demoPassword,
       customerAuthenticationUserRole: 'customer',
       customerAuthenticationUserName: 'Julia Santos',
@@ -189,7 +189,7 @@ async function main() {
     {
       customerAuthenticationInstanceReference: uuid(),
       partyInstanceReference: employeeParties[0].partyInstanceReference,
-      customerAuthenticationEmailAddress: 'sarah.chen@leafybank.demo',
+      customerAuthenticationEmailAddress: 'sarah.chen@back.es',
       customerAuthenticationCredentialHash: demoPassword,
       customerAuthenticationUserRole: 'level1_analyst',
       customerAuthenticationUserName: 'Sarah Chen',
@@ -203,7 +203,7 @@ async function main() {
     {
       customerAuthenticationInstanceReference: uuid(),
       partyInstanceReference: employeeParties[1].partyInstanceReference,
-      customerAuthenticationEmailAddress: 'michael.obi@leafybank.demo',
+      customerAuthenticationEmailAddress: 'michael.obi@back.es',
       customerAuthenticationCredentialHash: demoPassword,
       customerAuthenticationUserRole: 'level2_investigator',
       customerAuthenticationUserName: 'Michael Obi',
@@ -217,7 +217,7 @@ async function main() {
     {
       customerAuthenticationInstanceReference: uuid(),
       partyInstanceReference: employeeParties[2].partyInstanceReference,
-      customerAuthenticationEmailAddress: 'diego.sans@leafybank.demo',
+      customerAuthenticationEmailAddress: 'diego.sans@back.es',
       customerAuthenticationCredentialHash: demoPassword,
       customerAuthenticationUserRole: 'security_auditor',
       customerAuthenticationUserName: 'Diego Sans',

@@ -179,7 +179,7 @@ export default function NewIntegrationPage() {
               <input
                 value={form.callbackUrl}
                 onChange={e => set('callbackUrl', e.target.value)}
-                placeholder="https://leafybank.demo/webhooks/fds/:id/callback"
+                placeholder="https://back.es/webhooks/fds/:id/callback"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#001E2B]/30 focus:border-[#001E2B]"
               />
               <p className="text-xs text-gray-400 mt-1">LeafyBank&apos;s inbound HMAC-validated webhook URL for this provider type.</p>

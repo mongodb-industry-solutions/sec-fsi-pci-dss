@@ -27,7 +27,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
 
     const loginRes = await supertest(app.server)
       .post('/api/v1/auth/login')
-      .send({ email: 'sarah.chen@leafybank.demo', password: 'demo-password', domain: 'local' });
+      .send({ email: 'sarah.chen@back.es', password: 'demo-password', domain: 'local' });
     authToken = loginRes.body.token;
   });
 
@@ -198,7 +198,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
   // FR-v1-04.1: QE equality search by customerEmailAddress
   skip('GET /customer-agreements?email= performs QE equality search', async () => {
     const res = await supertest(app.server)
-      .get('/api/v1/customer-agreements?email=sarah.chen@leafybank.demo')
+      .get('/api/v1/customer-agreements?email=sarah.chen@back.es')
       .set('Authorization', `Bearer ${authToken}`);
     // 200 if seeded, 404 if not - both are valid in a clean test cluster
     expect([200, 404]).toContain(res.status);

@@ -4,19 +4,10 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  BriefcaseMedical,
-  CreditCard,
-  Users,
-  BarChart3,
-  ClipboardList,
-  User,
-  PlusCircle,
-  Store,
-  ClipboardCheck,
-  ChevronLeft,
-  ChevronRight,
-  Settings2,
-  Plug,
+  BriefcaseMedical, CreditCard, Users, BarChart3, ClipboardList,
+  User, PlusCircle, Store, ClipboardCheck,
+  ChevronLeft, ChevronRight, Settings2, Plug,
+  ShieldAlert, ScanLine, UserCheck, Building2, AlertTriangle,
   type LucideIcon,
 } from 'lucide-react';
 import { getToken, decodeToken } from '../lib/auth';
@@ -62,9 +53,16 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'All Merchants',path: '/system/merchant',        icon: Store, exact: true },
     { label: 'My Profile',   path: '/system/profile',         icon: User },
   ],
-  system_admin: [
-    { label: 'Integrations', path: '/system/admin/integrations', icon: Plug },
-    { label: 'Dashboard',    path: '/system/admin',              icon: Settings2, exact: true },
+  manager: [
+    { label: 'Hub',             path: '/system/admin',                                          icon: Settings2,    exact: true },
+    { label: 'Registry',        path: '/system/admin/integrations',                             icon: Plug,         exact: true },
+    { label: 'Fraud Detection', path: '/system/admin/integrations?type=fraud_detection',        icon: ShieldAlert },
+    { label: 'HRP / Sanctions', path: '/system/admin/integrations?type=hrp_sanctions',          icon: ScanLine },
+    { label: 'KYC / Identity',  path: '/system/admin/integrations?type=kyc_identity',           icon: UserCheck },
+    { label: 'KYB / Business',  path: '/system/admin/integrations?type=kyb_business',           icon: Building2 },
+    { label: 'AML Monitoring',  path: '/system/admin/integrations?type=aml_monitoring',         icon: AlertTriangle },
+    { label: 'Credit Bureau',   path: '/system/admin/integrations?type=credit_bureau',          icon: CreditCard },
+    { label: '+ Register',      path: '/system/admin/integrations/new',                         icon: PlusCircle },
   ],
 };
 

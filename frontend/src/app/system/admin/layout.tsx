@@ -9,7 +9,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     const t = getToken() ?? '';
     const u = t ? decodeToken(t) : null;
-    if (!u || u.role !== 'system_admin') {
+    if (!u || u.role !== 'manager') {
       router.replace('/system');
     }
   }, [router]);

@@ -134,7 +134,7 @@ This means what the presenter shows is the actual Atlas storage state: not a sim
 │  Cardholder     [ Luis Fernandez                 ]               │
 │  Expiry         [ 12 / 28  ]  Card token generated client-side   │
 │                                                                  │
-│  Email          [ luis.fernandez@leafybank.demo  ]               │
+│  Email          [ luis.fernandez@back.es  ]               │
 │  Phone          [ +44 7700 900123                ]               │
 │  Amount         [ $ 850.00                       ]               │
 │  Merchant       [ TechGadgets Ltd.               ]               │
@@ -205,7 +205,7 @@ After confirmation: auto-switch to Investigation pre-loaded with case FD-2026-00
 ┌──────────────────────────────────────────────────────────────────┐
 │  🕵️ Fraud Investigation              [🕵 Level 1 Analyst ▼] v2  │
 │                                                                  │
-│  Search  [email ▼] [ luis.fernandez@leafybank.demo ] [🔍]        │
+│  Search  [email ▼] [ luis.fernandez@back.es ] [🔍]        │
 │          email / phone / account ref / card token                │
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐    │
@@ -219,7 +219,7 @@ After confirmation: auto-switch to Investigation pre-loaded with case FD-2026-00
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-The email search matches `luis.fernandez@leafybank.demo` against the encrypted `customerEmailAddress` field in Atlas. The QE driver computes a deterministic search token from the plaintext query value and the DEK, then Atlas matches token-to-token. The server never holds or sees the plaintext value. Card token search (`cardToken=`) uses a standard MongoDB index: the payment token is a card surrogate, not CHD under PCI DSS v4.0, so QE is not required or appropriate for it.
+The email search matches `luis.fernandez@back.es` against the encrypted `customerEmailAddress` field in Atlas. The QE driver computes a deterministic search token from the plaintext query value and the DEK, then Atlas matches token-to-token. The server never holds or sees the plaintext value. Card token search (`cardToken=`) uses a standard MongoDB index: the payment token is a card surrogate, not CHD under PCI DSS v4.0, so QE is not required or appropriate for it.
 
 #### Case Detail: Level 1 View
 
@@ -255,7 +255,7 @@ The email search matches `luis.fernandez@leafybank.demo` against the encrypted `
 │                                                                  │
 │  BUSINESS VIEW                  ATLAS STORAGE (actual document)  │
 │  ─────────────────              ───────────────────────────────  │
-│  Email:  luis@leafybank.demo →  "customerEmailAddress":          │
+│  Email:  luis@back.es →  "customerEmailAddress":          │
 │                                   "\x06\x12\x89\xf4\xa3\x2c..."  │
 │                                   🔒 QE ciphertext               │
 │                                                                  │
@@ -270,7 +270,7 @@ The email search matches `luis.fernandez@leafybank.demo` against the encrypted `
 │  Amount: 850.00                 "transactionAmount.amount": 850  │
 │  (v2: stored as QE range field)   ← plaintext in v1              │
 │                                                                  │
-│  "The analyst searched customerEmailAddress = luis@leafybank.demo│
+│  "The analyst searched customerEmailAddress = luis@back.es│
 │   while Atlas stored only ciphertext. The card token is stored   │
 │   plaintext: it is a surrogate, not cardholder data under PCI    │
 │   DSS v4.0. The server never decrypted the email or phone."      │
@@ -371,12 +371,12 @@ All `/demo/*` routes require a valid JWT. Middleware reads role from token and g
 │                                ├ local (demo users)              │
 │                                └ (MS Entra ID: coming in v2)     │
 │                                                                  │
-│   Username  [ luis.fernandez@leafybank.demo   ▼ ]                │
-│             ├ luis.fernandez@leafybank.demo  (Customer)          │
-│             ├ julia.santos@leafybank.demo    (Customer)          │
-│             ├ sarah.chen@leafybank.demo      (L1 Analyst)        │
-│             ├ michael.obi@leafybank.demo     (L2 Investigator)   │
-│             └ admin@leafybank.demo           (Security Auditor)  │
+│   Username  [ luis.fernandez@back.es   ▼ ]                │
+│             ├ luis.fernandez@back.es  (Customer)          │
+│             ├ julia.santos@back.es    (Customer)          │
+│             ├ sarah.chen@back.es      (L1 Analyst)        │
+│             ├ michael.obi@back.es     (L2 Investigator)   │
+│             └ admin@back.es           (Security Auditor)  │
 │                                                                  │
 │   Password  [ ••••••••••••••• ]  (auto-filled on selection)      │
 │                                                                  │
@@ -394,11 +394,11 @@ The username dropdown lists pre-defined users from the database. Selecting a use
 
 | User | Email | Role | Description |
 |---|---|---|---|
-| Luis Fernandez | luis.fernandez@leafybank.demo | customer | Retail: has card transactions and open cases |
-| Julia Santos | julia.santos@leafybank.demo | customer | Premium: has saved card, recurrent payments (v3) |
-| Sarah Chen | sarah.chen@leafybank.demo | level1_analyst | L1 Fraud Analyst: default investigation view |
-| Michael Obi | michael.obi@leafybank.demo | level2_investigator | L2 Investigator: receives escalated cases |
-| Admin | admin@leafybank.demo | security_auditor | Read-only: audit log and system status |
+| Luis Fernandez | luis.fernandez@back.es | customer | Retail: has card transactions and open cases |
+| Julia Santos | julia.santos@back.es | customer | Premium: has saved card, recurrent payments (v3) |
+| Sarah Chen | sarah.chen@back.es | level1_analyst | L1 Fraud Analyst: default investigation view |
+| Michael Obi | michael.obi@back.es | level2_investigator | L2 Investigator: receives escalated cases |
+| Admin | admin@back.es | security_auditor | Read-only: audit log and system status |
 
 All users and their bcrypt-hashed passwords are inserted by the seeder (`bin/seed.ts`). Seeding is idempotent: upsert by `partyAuthenticationInstanceReference`.
 
@@ -908,7 +908,7 @@ The JWT is a signed HS256 token (secret from `JWT_SECRET` env var). Payload:
 ```json
 {
   "sub": "partyAuthenticationInstanceReference",
-  "email": "sarah.chen@leafybank.demo",
+  "email": "sarah.chen@back.es",
   "role": "level1_analyst",
   "domain": "local",
   "iat": 1716816000,

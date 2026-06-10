@@ -7,7 +7,7 @@ export const VALID_DEMO_ROLES: ReadonlySet<UserRole> = new Set([
   'level2_investigator',
   'security_auditor',
   'merchant_officer',     // Ch-05: SD-89 Merchant Acquiring officer
-  'system_admin',         // Ch-07: SD-193 Integration Hub administrator
+  'manager',             // Ch-07: SD-193 Integration Hub administrator
 ]);
 
 export function extractDemoRole(request: FastifyRequest): UserRole {

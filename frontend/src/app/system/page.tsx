@@ -1,124 +1,176 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import {
+  Eye, EyeOff, Bug,
+  BriefcaseMedical, CreditCard, Users, BarChart3, ClipboardList, User,
+  PlusCircle, Store, ClipboardCheck, ShieldAlert, ScanLine, UserCheck,
+  Building2, AlertTriangle, Plug,
+  type LucideIcon,
+} from 'lucide-react';
 import { api, AuthUser, AuthDomain } from '../../lib/api';
-import { Eye, EyeOff, Bug } from 'lucide-react';
-import { setToken, decodeToken } from '../../lib/auth';
+import { getToken, setToken, decodeToken, isTokenExpired } from '../../lib/auth';
 import { DEMO_USERS_PASSWORDS, ROLE_LABELS } from '../../lib/constants';
 import { Tooltip } from '../../components/Tooltip';
 import { useDebugMode } from '../../lib/debugMode';
+import { UserMenu } from '../../components/UserMenu';
 
-const ROLE_REDIRECTS: Record<string, string> = {
-  customer: '/system/payment/history',
-  level1_analyst: '/system/investigation',
-  level2_investigator: '/system/investigation',
-  security_auditor: '/system/audit',
+type DecodedUser = NonNullable<ReturnType<typeof decodeToken>>;
+
+// ── Role order (user dropdown in login form) ──────────────────────────────────
+
+const ROLE_ORDER: Record<string, number> = {
+  customer:            0,
+  level1_analyst:      1,
+  level2_investigator: 2,
+  security_auditor:    3,
+  merchant_officer:    4,
+  manager:             5,
 };
+
+// ── Login form constants ──────────────────────────────────────────────────────
 
 const FLOW_TYPE_LABELS: Record<string, string> = {
   client_credentials: 'Client Credentials',
   authorization_code: 'Authorization Code (OIDC)',
-  saml: 'SAML 2.0',
-  oidc: 'OIDC',
+  saml:               'SAML 2.0',
+  oidc:               'OIDC',
 };
 
 const FLOW_TYPE_COLORS: Record<string, string> = {
   client_credentials: 'bg-gray-100 text-gray-600',
   authorization_code: 'bg-blue-100 text-blue-700',
-  saml: 'bg-purple-100 text-purple-700',
-  oidc: 'bg-blue-100 text-blue-700',
+  saml:               'bg-purple-100 text-purple-700',
+  oidc:               'bg-blue-100 text-blue-700',
 };
 
-export default function DemoLoginPage() {
-  const router = useRouter();
-  const { debugMode, toggleDebug } = useDebugMode();
-  const [users, setUsers] = useState<AuthUser[]>([]);
-  const [domains, setDomains] = useState<AuthDomain[]>([]);
-  const [selectedDomain, setSelectedDomain] = useState('local');
-  const [selectedEmail, setSelectedEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+// ── Dashboard card definitions ────────────────────────────────────────────────
 
-  // Reset form state on every mount so the router cache never restores stale
-  // credentials from a previous session (causes hydration mismatch on the
-  // disabled button when the cached render had the form filled in).
+interface DashboardCard {
+  label:       string;
+  description: string;
+  icon:        LucideIcon;
+  href:        string;
+  bianSd?:     string;
+  pciDss?:     string;
+}
+
+const ROLE_CARDS: Record<string, DashboardCard[]> = {
+  customer: [
+    { label: 'Transaction History', description: 'View your payment and transaction history',   icon: ClipboardList,    href: '/system/payment/history', bianSd: 'SD-27',  pciDss: 'Req 7.2' },
+    { label: 'New Payment',         description: 'Initiate a new card payment',                  icon: PlusCircle,       href: '/system/payment',         bianSd: 'SD-27',  pciDss: 'Req 3' },
+    { label: 'My Profile',          description: 'Manage your account and personal details',     icon: User,             href: '/system/profile',         bianSd: 'SD-53',  pciDss: 'Req 8' },
+    { label: 'Merchant Catalogue',  description: 'Browse registered merchant profiles',          icon: Store,            href: '/system/merchant',        bianSd: 'SD-89',  pciDss: 'Req 12' },
+  ],
+  level1_analyst: [
+    { label: 'Investigation Cases', description: 'Review open fraud investigation cases',        icon: BriefcaseMedical, href: '/system/investigation',   bianSd: 'SD-63',  pciDss: 'Req 10.4' },
+    { label: 'Transactions',        description: 'Browse and search all card transactions',      icon: CreditCard,       href: '/system/transactions',    bianSd: 'SD-27',  pciDss: 'Req 10.2' },
+    { label: 'Customer Lookup',     description: 'Look up customer agreement records',           icon: Users,            href: '/system/users',           bianSd: 'SD-53',  pciDss: 'Req 12.3' },
+    { label: 'Merchant Lookup',     description: 'Browse and search merchant accounts',          icon: Store,            href: '/system/merchant',        bianSd: 'SD-89',  pciDss: 'Req 12.8' },
+  ],
+  level2_investigator: [
+    { label: 'Investigation Cases', description: 'Manage and escalate fraud investigation cases',icon: BriefcaseMedical, href: '/system/investigation',   bianSd: 'SD-63',  pciDss: 'Req 10.4' },
+    { label: 'Transactions',        description: 'Deep-dive forensic transaction analysis',      icon: CreditCard,       href: '/system/transactions',    bianSd: 'SD-27',  pciDss: 'Req 10.2' },
+    { label: 'Customer Lookup',     description: 'Customer agreement audit trail',               icon: Users,            href: '/system/users',           bianSd: 'SD-53',  pciDss: 'Req 12.3' },
+    { label: 'Merchant Lookup',     description: 'Merchant due-diligence records',               icon: Store,            href: '/system/merchant',        bianSd: 'SD-89',  pciDss: 'Req 12.8' },
+  ],
+  security_auditor: [
+    { label: 'Cases',               description: 'Review all fraud investigation cases',         icon: BriefcaseMedical, href: '/system/investigation',   bianSd: 'SD-63',  pciDss: 'Req 10.4' },
+    { label: 'Transaction Audit',   description: 'Full card transaction audit trail',            icon: CreditCard,       href: '/system/transactions',    bianSd: 'SD-27',  pciDss: 'Req 10.2.1' },
+    { label: 'User Accounts',       description: 'Customer and staff account compliance review', icon: Users,            href: '/system/users',           bianSd: 'SD-91',  pciDss: 'Req 8.2' },
+    { label: 'Audit Log',           description: 'System-wide security event audit log',        icon: BarChart3,        href: '/system/audit',           bianSd: 'SD-16',  pciDss: 'Req 10' },
+    { label: 'Merchant Audit',      description: 'Merchant entity compliance and due-diligence', icon: Store,            href: '/system/merchant',        bianSd: 'SD-89',  pciDss: 'Req 12.8' },
+  ],
+  merchant_officer: [
+    { label: 'Review Queue',        description: 'Process pending merchant onboarding requests', icon: ClipboardCheck,   href: '/system/merchant/review', bianSd: 'SD-89',  pciDss: 'Req 12.8' },
+    { label: 'All Merchants',       description: 'View and manage all merchant accounts',        icon: Store,            href: '/system/merchant',        bianSd: 'SD-89',  pciDss: 'Req 12.8' },
+    { label: 'My Profile',          description: 'Manage your officer profile',                  icon: User,             href: '/system/profile',         bianSd: 'SD-53',  pciDss: 'Req 8' },
+  ],
+  manager: [
+    { label: 'Fraud Detection',      description: 'Real-time transaction scoring and fraud signals', icon: ShieldAlert,  href: '/system/admin/integrations?type=fraud_detection', bianSd: 'SD-63',  pciDss: 'Req 10.2.1' },
+    { label: 'HRP / Sanctions',      description: 'High-risk person and sanctions list screening',   icon: ScanLine,     href: '/system/admin/integrations?type=hrp_sanctions',   bianSd: 'SD-13',  pciDss: 'Req 12.8.1' },
+    { label: 'KYC / Identity',       description: 'Customer identity verification and onboarding',   icon: UserCheck,    href: '/system/admin/integrations?type=kyc_identity',    bianSd: 'SD-53',  pciDss: 'Req 8.1' },
+    { label: 'KYB / Business',       description: 'Merchant business entity verification',           icon: Building2,    href: '/system/admin/integrations?type=kyb_business',    bianSd: 'SD-89',  pciDss: 'Req 12.8.3' },
+    { label: 'AML Monitoring',       description: 'Anti-money laundering pattern analysis',          icon: AlertTriangle,href: '/system/admin/integrations?type=aml_monitoring',  bianSd: 'SD-99',  pciDss: 'Req 10.2.1' },
+    { label: 'Credit Bureau',        description: 'Credit scoring and bureau checks',                icon: CreditCard,   href: '/system/admin/integrations?type=credit_bureau',   bianSd: 'SD-83',  pciDss: 'Req 12.8.1' },
+    { label: 'Integration Registry', description: 'Manage all external provider arrangements',       icon: Plug,         href: '/system/admin/integrations',                      bianSd: 'SD-193', pciDss: 'Req 12.8' },
+  ],
+};
+
+const ROLE_ACCENT: Record<string, { iconBg: string; iconText: string; badge: string }> = {
+  customer:            { iconBg: 'bg-blue-50',   iconText: 'text-blue-600',   badge: 'bg-blue-50 text-blue-700 border-blue-200' },
+  level1_analyst:      { iconBg: 'bg-amber-50',  iconText: 'text-amber-600',  badge: 'bg-amber-50 text-amber-700 border-amber-200' },
+  level2_investigator: { iconBg: 'bg-orange-50', iconText: 'text-orange-600', badge: 'bg-orange-50 text-orange-700 border-orange-200' },
+  security_auditor:    { iconBg: 'bg-purple-50', iconText: 'text-purple-600', badge: 'bg-purple-50 text-purple-700 border-purple-200' },
+  merchant_officer:    { iconBg: 'bg-teal-50',   iconText: 'text-teal-600',   badge: 'bg-teal-50 text-teal-700 border-teal-200' },
+  manager:             { iconBg: 'bg-slate-100', iconText: 'text-slate-600',  badge: 'bg-slate-50 text-slate-700 border-slate-200' },
+};
+
+// ── Login form ────────────────────────────────────────────────────────────────
+
+function LoginForm({ onLogin }: { onLogin: () => void }) {
+  const { debugMode, toggleDebug } = useDebugMode();
+  const [users, setUsers]       = useState<AuthUser[]>([]);
+  const [domains, setDomains]   = useState<AuthDomain[]>([]);
+  const [selectedDomain, setSelectedDomain] = useState('local');
+  const [selectedEmail, setSelectedEmail]   = useState('');
+  const [password, setPassword]             = useState('');
+  const [showPassword, setShowPassword]     = useState(false);
+  const [submitting, setSubmitting]         = useState(false);
+  const [error, setError]                   = useState<string | null>(null);
+
+  const displayUsers = useMemo(() => {
+    const sorted = [...users].sort((a, b) => (ROLE_ORDER[a.role] ?? 99) - (ROLE_ORDER[b.role] ?? 99));
+    let n = 0;
+    return sorted.filter((u) => (u.role === 'customer' ? ++n <= 4 : true));
+  }, [users]);
+
   useEffect(() => {
-    setSelectedEmail('');
-    setPassword('');
-    setSubmitting(false);
-    setError(null);
+    setSelectedEmail(''); setPassword(''); setSubmitting(false); setError(null);
   }, []);
 
   useEffect(() => {
-    api.system.users().then((res) => setUsers(res.users)).catch(() => {
-      api.auth.users().then((res) => setUsers(res.users)).catch(() => {});
-    });
+    api.system.users().then((r) => setUsers(r.users)).catch(() =>
+      api.auth.users().then((r) => setUsers(r.users)).catch(() => {}));
     api.auth.domains()
-      .then((res) => {
-        setDomains(res.domains);
-        if (res.domains.length > 0) setSelectedDomain(res.domains[0].name);
-      })
-      .catch(() => {
-        setDomains([{ name: 'local', displayName: 'Local (Demo Users)', type: 'local', flowType: 'client_credentials' }]);
-      });
+      .then((r) => { setDomains(r.domains); if (r.domains.length > 0) setSelectedDomain(r.domains[0].name); })
+      .catch(() => setDomains([{ name: 'local', displayName: 'Local (Demo Users)', type: 'local', flowType: 'client_credentials' }]));
   }, []);
 
   function handleDomainChange(name: string) {
-    setSelectedDomain(name);
-    setSelectedEmail('');
-    setPassword('');
-    setError(null);
-    setShowPassword(false);
+    setSelectedDomain(name); setSelectedEmail(''); setPassword(''); setError(null); setShowPassword(false);
   }
 
   function handleUserSelect(email: string) {
-    setSelectedEmail(email);
-    setPassword(DEMO_USERS_PASSWORDS[email] ?? '');
-    setError(null);
+    setSelectedEmail(email); setPassword(DEMO_USERS_PASSWORDS[email] ?? ''); setError(null);
   }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-
     try {
       const { token } = await api.auth.login({ email: selectedEmail, password, domain: selectedDomain });
       setToken(token);
-      const payload = decodeToken(token);
-      const redirect = payload ? (ROLE_REDIRECTS[payload.role] ?? '/system') : '/system';
-      router.push(redirect);
+      onLogin();
     } catch (err) {
       setError((err as Error).message ?? 'Login failed');
-    } finally {
       setSubmitting(false);
     }
   }
 
-  const selectedUser = users.find((u) => u.email === selectedEmail);
-  const currentDomain = domains.find((d) => d.name === selectedDomain);
-  const flowType = currentDomain?.flowType ?? (currentDomain?.type === 'local' ? 'client_credentials' : currentDomain?.type);
+  const currentDomain  = domains.find((d) => d.name === selectedDomain);
+  const flowType       = currentDomain?.flowType ?? (currentDomain?.type === 'local' ? 'client_credentials' : currentDomain?.type);
   const isCredentialFlow = !flowType || flowType === 'client_credentials';
-  const isLocalDomain = selectedDomain === 'local';
+  const isLocalDomain    = selectedDomain === 'local';
 
   return (
     <div className="min-h-screen bg-[#001E2B] flex items-center justify-center p-6">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
-        {/* Header */}
         <div className="relative text-center mb-6">
-          <button
-            type="button"
-            onClick={toggleDebug}
+          <button type="button" onClick={toggleDebug}
             title={debugMode ? 'Debug mode on - click to disable' : 'Enable debug mode'}
-            className={`absolute top-0 right-0 p-1.5 rounded-lg transition-colors ${
-              debugMode
-                ? 'bg-amber-100 text-amber-600 hover:bg-amber-200'
-                : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'
-            }`}
-          >
+            className={`absolute top-0 right-0 p-1.5 rounded-lg transition-colors ${debugMode ? 'bg-amber-100 text-amber-600 hover:bg-amber-200' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}>
             <Bug size={14} />
           </button>
           <div className="text-4xl mb-2">🏦</div>
@@ -130,7 +182,7 @@ export default function DemoLoginPage() {
           {/* Authentication Domain */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
                 Authentication Domain
                 <Tooltip text="Select the identity provider. client_credentials domains show a login form; OIDC/SAML domains redirect to the external provider." />
               </label>
@@ -141,134 +193,78 @@ export default function DemoLoginPage() {
               )}
             </div>
             {domains.length === 0 ? (
-              <div className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-400 animate-pulse">
-                Loading domains…
-              </div>
+              <div className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-400 animate-pulse">Loading domains…</div>
             ) : (
-              <select
-                value={selectedDomain}
-                onChange={(e) => handleDomainChange(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm bg-white"
-              >
-                {domains.map((d) => (
-                  <option key={d.name} value={d.name}>
-                    {d.displayName}
-                  </option>
-                ))}
+              <select value={selectedDomain} onChange={(e) => handleDomainChange(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                {domains.map((d) => <option key={d.name} value={d.name}>{d.displayName}</option>)}
               </select>
             )}
-            {currentDomain?.alertMessage && (
-              <p className="text-xs text-amber-600 mt-0.5">{currentDomain.alertMessage}</p>
-            )}
+            {currentDomain?.alertMessage && <p className="text-xs text-amber-600 mt-0.5">{currentDomain.alertMessage}</p>}
           </div>
 
-          {/* -- Redirect-based flow (OIDC / SAML / authorization_code) -- */}
+          {/* Redirect-based flow */}
           {!isCredentialFlow && currentDomain && (
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3">
               <p className="text-sm text-blue-800">
-                <strong>{currentDomain.displayName}</strong> uses{' '}
-                <strong>{FLOW_TYPE_LABELS[flowType ?? ''] ?? flowType}</strong>. You will be
-                redirected to the provider to complete login.
+                <strong>{currentDomain.displayName}</strong> uses <strong>{FLOW_TYPE_LABELS[flowType ?? ''] ?? flowType}</strong>. You will be redirected to the provider to complete login.
               </p>
-              <button
-                type="button"
-                className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-                onClick={() => setError('External SSO redirect is not active in this demo build.')}
-              >
+              <button type="button" className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                onClick={() => setError('External SSO redirect is not active in this demo build.')}>
                 Sign in with {currentDomain.displayName} →
               </button>
             </div>
           )}
 
-          {/* -- Client-credentials form (local domain) -- */}
+          {/* Client-credentials form */}
           {isCredentialFlow && (
             <>
-              {/* User selector - local domain, debug mode only */}
               {isLocalDomain && debugMode && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
                     Select User
                     <Tooltip text="Pre-seeded demo users for the local domain. Select one to auto-fill credentials. Passwords are bcrypt-hashed in the database, never stored in plaintext." />
                   </label>
                   {users.length === 0 ? (
-                    <div className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-400 animate-pulse">
-                      Loading users…
-                    </div>
+                    <div className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-400 animate-pulse">Loading users…</div>
                   ) : (
-                    <select
-                      value={users.some((u) => u.email === selectedEmail) ? selectedEmail : ''}
-                      onChange={(e) => handleUserSelect(e.target.value)}
-                      className="w-full border rounded-lg px-3 py-2 text-sm"
-                    >
+                    <select value={displayUsers.some((u) => u.email === selectedEmail) ? selectedEmail : ''} onChange={(e) => handleUserSelect(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
                       <option value="">Select a user…</option>
-                      {users.map((u) => (
-                        <option key={u.email} value={u.email}>
-                          {u.name} ({ROLE_LABELS[u.role] ?? u.role})
-                        </option>
-                      ))}
+                      {displayUsers.map((u) => <option key={u.email} value={u.email}>{u.name} ({ROLE_LABELS[u.role] ?? u.role})</option>)}
                     </select>
                   )}
                 </div>
               )}
 
-              {/* Email field */}
               {isLocalDomain && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
                     Email
                     {debugMode && <Tooltip text="Select a user above to auto-fill, or type a custom email address." />}
                   </label>
-                  <input
-                    type="email"
-                    value={selectedEmail}
-                    onChange={(e) => {
-                      const email = e.target.value;
-                      setSelectedEmail(email);
-                      if (DEMO_USERS_PASSWORDS[email]) setPassword(DEMO_USERS_PASSWORDS[email]);
-                      setError(null);
-                    }}
-                    placeholder="user@example.com"
-                    className="w-full border rounded-lg px-3 py-2 text-sm"
-                  />
+                  <input type="email" value={selectedEmail}
+                    onChange={(e) => { setSelectedEmail(e.target.value); if (DEMO_USERS_PASSWORDS[e.target.value]) setPassword(DEMO_USERS_PASSWORDS[e.target.value]); setError(null); }}
+                    placeholder="user@example.com" className="w-full border rounded-lg px-3 py-2 text-sm" />
                 </div>
               )}
 
-              {/* Email field for non-local domains */}
               {!isLocalDomain && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={selectedEmail}
-                    onChange={(e) => { setSelectedEmail(e.target.value); setError(null); }}
-                    placeholder="user@example.com"
-                    className="w-full border rounded-lg px-3 py-2 text-sm"
-                    required
-                  />
+                  <input type="email" value={selectedEmail} onChange={(e) => { setSelectedEmail(e.target.value); setError(null); }} placeholder="user@example.com" className="w-full border rounded-lg px-3 py-2 text-sm" required />
                 </div>
               )}
 
-              {/* Password with show/hide toggle */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
                   Password
                   <Tooltip text="Auto-filled from the demo credential store for local users. The actual password is hashed (bcrypt, 12 rounds) in MongoDB. Atlas never sees the plaintext." />
                 </label>
                 <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder={isLocalDomain ? 'Auto-filled on user selection' : 'Enter password'}
-                    className="w-full border rounded-lg px-3 py-2 pr-10 text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors text-sm"
-                    tabIndex={-1}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
+                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
+                    placeholder={isLocalDomain ? 'Auto-filled on user selection' : 'Enter password'} className="w-full border rounded-lg px-3 py-2 pr-10 text-sm" />
+                  <button type="button" onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors" tabIndex={-1}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}>
                     {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
@@ -276,40 +272,118 @@ export default function DemoLoginPage() {
             </>
           )}
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
-              {error}
-            </div>
-          )}
+          {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{error}</div>}
 
           {isCredentialFlow && (
-            <button
-              type="submit"
-              disabled={!selectedEmail || !password || submitting}
-              suppressHydrationWarning
-              className="w-full bg-[#001E2B] text-[#00ED64] py-2.5 rounded-lg font-semibold hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors disabled:opacity-40"
-            >
+            <button type="submit" disabled={!selectedEmail || !password || submitting} suppressHydrationWarning
+              className="w-full bg-[#001E2B] text-[#00ED64] py-2.5 rounded-lg font-semibold hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors disabled:opacity-40">
               {submitting ? 'Signing in…' : 'Sign In'}
             </button>
           )}
         </form>
 
         <p className="mt-4 text-xs text-gray-400 text-center">
-          {isLocalDomain && debugMode
-            ? 'Select a user to auto-fill credentials. All local demo accounts share the same demo password.'
-            : isLocalDomain
-            ? 'Enter your credentials to sign in.'
-            : isCredentialFlow
-            ? 'Enter credentials for the selected identity provider.'
+          {isLocalDomain && debugMode ? 'Select a user to auto-fill credentials. All local demo accounts share the same demo password.'
+            : isLocalDomain ? 'Enter your credentials to sign in.'
+            : isCredentialFlow ? 'Enter credentials for the selected identity provider.'
             : 'You will be redirected to complete authentication.'}
         </p>
-
         <div className="mt-4 text-center">
-          <Link href="/" className="text-xs text-gray-400 hover:text-[#001E2B] transition-colors">
-            ← Back to Mode Selection
-          </Link>
+          <Link href="/" className="text-xs text-gray-400 hover:text-[#001E2B] transition-colors">← Back to Mode Selection</Link>
         </div>
       </div>
     </div>
   );
+}
+
+// ── Role dashboard ────────────────────────────────────────────────────────────
+
+function RoleDashboard({ user, onSignOut }: { user: DecodedUser; onSignOut: () => void }) {
+  const { debugMode } = useDebugMode();
+  const cards  = ROLE_CARDS[user.role]  ?? [];
+  const accent = ROLE_ACCENT[user.role] ?? ROLE_ACCENT.customer;
+
+  return (
+    <div className="min-h-screen bg-[#001E2B] flex flex-col">
+      {/* Standalone header */}
+      <header className="sticky top-0 z-20 bg-[#001E2B] border-b border-white/8 px-3 sm:px-5 h-12 flex items-center justify-between shrink-0 gap-3">
+        <Link href="/system" className="flex items-center gap-2 text-[#00ED64] font-bold text-sm whitespace-nowrap hover:text-[#00ED64]/80 transition-colors">
+          <span className="text-base">🏦</span>
+          <span>Payment Gateway</span>
+        </Link>
+        <UserMenu user={user} onSignOut={onSignOut} />
+      </header>
+
+      {/* Content */}
+      <main className="flex-1 bg-gray-50">
+        <div className="w-full px-5 sm:px-8 lg:px-12 py-8">
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-gray-900">Welcome, {user.name.split(' ')[0]}</h1>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${accent.badge}`}>
+                {ROLE_LABELS[user.role] ?? user.role}
+              </span>
+              <span className="text-sm text-gray-400">Payment Gateway Demo</span>
+              {debugMode && <span className="text-xs font-mono text-gray-400">· BIAN-aligned · PCI DSS</span>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {cards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <Link key={card.href} href={card.href}
+                  className="group block bg-white rounded-xl border p-5 hover:border-[#001E2B]/30 hover:shadow-md transition-all">
+                  <div className="mb-3">
+                    <div className={`inline-flex p-2 rounded-lg ${accent.iconBg}`}>
+                      <Icon size={20} className={accent.iconText} />
+                    </div>
+                  </div>
+                  <p className="font-semibold text-gray-900 text-sm">{card.label}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{card.description}</p>
+                  {debugMode && card.bianSd && (
+                    <p className="mt-2 text-[10px] font-mono text-gray-400">{card.bianSd} · {card.pciDss}</p>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+
+          {debugMode && (
+            <div className="mt-6 bg-slate-900 rounded-xl p-4 text-xs font-mono text-slate-300">
+              <p className="text-slate-400 mb-2">Session context</p>
+              <p>sub: <span className="text-[#00ED64]">{user.sub}</span></p>
+              <p>role: <span className="text-[#00ED64]">{user.role}</span></p>
+              <p>email: <span className="text-[#00ED64]">{user.email}</span></p>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+
+export default function SystemPage() {
+  const [user, setUser]       = useState<DecodedUser | null>(null);
+  const [checked, setChecked] = useState(false);
+
+  const checkAuth = useCallback(() => {
+    const token = getToken();
+    setUser(token && !isTokenExpired(token) ? decodeToken(token) : null);
+    setChecked(true);
+  }, []);
+
+  useEffect(() => { checkAuth(); }, [checkAuth]);
+
+  function signOut() {
+    localStorage.removeItem('demo_token');
+    setUser(null);
+    setChecked(true);
+  }
+
+  if (!checked) return <div className="min-h-screen bg-[#001E2B]" suppressHydrationWarning />;
+  if (user)    return <RoleDashboard user={user} onSignOut={signOut} />;
+  return <LoginForm onLogin={checkAuth} />;
 }

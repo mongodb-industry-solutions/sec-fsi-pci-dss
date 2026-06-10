@@ -1,7 +1,7 @@
 [
   {
     "partyInstanceReference": "b0000001-0000-4000-8000-000000000001",
-    "partyEmailAddress": "luis.fernandez@leafybank.demo",
+    "partyEmailAddress": "luis.fernandez@back.es",
     "partyMobilePhoneNumber": "+1-555-0142",
     "partyName": "Luis Fernandez",
     "partyType": "customer",
@@ -13,7 +13,7 @@
   },
   {
     "partyInstanceReference": "b0000002-0000-4000-8000-000000000002",
-    "partyEmailAddress": "julia.santos@leafybank.demo",
+    "partyEmailAddress": "julia.santos@back.es",
     "partyMobilePhoneNumber": "+1-555-0198",
     "partyName": "Julia Santos",
     "partyType": "customer",
@@ -601,7 +601,7 @@
   },
   {
     "partyInstanceReference": "b0000051-0000-4000-8000-000000000051",
-    "partyEmailAddress": "sarah.chen@leafybank.demo",
+    "partyEmailAddress": "sarah.chen@back.es",
     "partyMobilePhoneNumber": "+1-555-0201",
     "partyName": "Sarah Chen",
     "partyType": "employee",
@@ -613,7 +613,7 @@
   },
   {
     "partyInstanceReference": "b0000052-0000-4000-8000-000000000052",
-    "partyEmailAddress": "michael.obi@leafybank.demo",
+    "partyEmailAddress": "michael.obi@back.es",
     "partyMobilePhoneNumber": "+1-555-0202",
     "partyName": "Michael Obi",
     "partyType": "employee",
@@ -625,7 +625,7 @@
   },
   {
     "partyInstanceReference": "b0000053-0000-4000-8000-000000000053",
-    "partyEmailAddress": "diego.sans@leafybank.demo",
+    "partyEmailAddress": "diego.sans@back.es",
     "partyMobilePhoneNumber": "+1-555-0203",
     "partyName": "Diego Sans",
     "partyType": "employee",
@@ -686,7 +686,7 @@
   },
   {
     "partyInstanceReference": "b0000060-0000-4000-8000-000000000060",
-    "partyEmailAddress": "carlos.garcia@leafybank.demo",
+    "partyEmailAddress": "carlos.garcia@back.es",
     "partyMobilePhoneNumber": "+34-555-0260",
     "partyName": "Carlos Garcia",
     "partyType": "customer",
@@ -698,7 +698,7 @@
   },
   {
     "partyInstanceReference": "b0000061-0000-4000-8000-000000000061",
-    "partyEmailAddress": "priya.patel@leafybank.demo",
+    "partyEmailAddress": "priya.patel@back.es",
     "partyMobilePhoneNumber": "+1-555-0261",
     "partyName": "Priya Patel",
     "partyType": "customer",
@@ -710,7 +710,7 @@
   },
   {
     "partyInstanceReference": "b0000062-0000-4000-8000-000000000062",
-    "partyEmailAddress": "anna.kowalski@leafybank.demo",
+    "partyEmailAddress": "anna.kowalski@back.es",
     "partyMobilePhoneNumber": "+48-555-0262",
     "partyName": "Anna Kowalski",
     "partyType": "employee",
@@ -722,7 +722,7 @@
   },
   {
     "partyInstanceReference": "b0000063-0000-4000-8000-000000000063",
-    "partyEmailAddress": "james.wright@leafybank.demo",
+    "partyEmailAddress": "james.wright@back.es",
     "partyMobilePhoneNumber": "+44-555-0263",
     "partyName": "James Wright",
     "partyType": "employee",
@@ -734,7 +734,7 @@
   },
   {
     "partyInstanceReference": "b0000064-0000-4000-8000-000000000064",
-    "partyEmailAddress": "sophie.martin@leafybank.demo",
+    "partyEmailAddress": "sophie.martin@back.es",
     "partyMobilePhoneNumber": "+33-555-0264",
     "partyName": "Sophie Martin",
     "partyType": "employee",
@@ -759,9 +759,9 @@
   },
   {
     "partyInstanceReference": "b0000070-0000-4000-8000-000000000070",
-    "partyEmailAddress": "admin.system@bank.demo",
+    "partyEmailAddress": "alex.rivera@back.es",
     "partyMobilePhoneNumber": "+1-555-0270",
-    "partyName": "System Administrator",
+    "partyName": "Alex Rivera",
     "partyType": "employee",
     "partyDepartment": "Technology Operations",
     "bianServiceDomain": "Party Data Management",

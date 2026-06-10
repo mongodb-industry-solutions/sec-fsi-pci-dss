@@ -1445,7 +1445,7 @@ Validates credentials against `customerAuthenticationAssessment` (SD-91, QE equa
 **Request body:**
 ```json
 {
-  "email": "sarah.chen@leafybank.demo",
+  "email": "sarah.chen@back.es",
   "password": "demo-password",
   "domain": "local"
 }
@@ -1458,7 +1458,7 @@ Validates credentials against `customerAuthenticationAssessment` (SD-91, QE equa
   "user": {
     "customerAuthenticationInstanceReference": "uuid-v4",
     "name": "Sarah Chen",
-    "email": "sarah.chen@leafybank.demo",
+    "email": "sarah.chen@back.es",
     "role": "level1_analyst"
   }
 }
@@ -1476,11 +1476,11 @@ Returns the list of local domain demo users for the login screen dropdown. Data 
 ```json
 {
   "users": [
-    { "email": "luis.fernandez@leafybank.demo", "name": "Luis Fernandez", "role": "customer" },
-    { "email": "julia.santos@leafybank.demo",   "name": "Julia Santos",   "role": "customer" },
-    { "email": "sarah.chen@leafybank.demo",     "name": "Sarah Chen",     "role": "level1_analyst" },
-    { "email": "michael.obi@leafybank.demo",    "name": "Michael Obi",    "role": "level2_investigator" },
-    { "email": "admin@leafybank.demo",          "name": "Admin",          "role": "security_auditor" }
+    { "email": "luis.fernandez@back.es", "name": "Luis Fernandez", "role": "customer" },
+    { "email": "julia.santos@back.es",   "name": "Julia Santos",   "role": "customer" },
+    { "email": "sarah.chen@back.es",     "name": "Sarah Chen",     "role": "level1_analyst" },
+    { "email": "michael.obi@back.es",    "name": "Michael Obi",    "role": "level2_investigator" },
+    { "email": "admin@back.es",          "name": "Admin",          "role": "security_auditor" }
   ]
 }
 ```
@@ -1634,11 +1634,11 @@ Credentials are stored in `customerAuthenticationAssessment` (SD-91). Passwords 
 
 | Email | Role | Display Name |
 |---|---|---|
-| `luis.fernandez@leafybank.demo` | `customer` | Luis Fernandez |
-| `julia.santos@leafybank.demo` | `customer` | Julia Santos |
-| `sarah.chen@leafybank.demo` | `level1_analyst` | Sarah Chen |
-| `michael.obi@leafybank.demo` | `level2_investigator` | Michael Obi |
-| `admin@leafybank.demo` | `security_auditor` | Admin |
+| `luis.fernandez@back.es` | `customer` | Luis Fernandez |
+| `julia.santos@back.es` | `customer` | Julia Santos |
+| `sarah.chen@back.es` | `level1_analyst` | Sarah Chen |
+| `michael.obi@back.es` | `level2_investigator` | Michael Obi |
+| `admin@back.es` | `security_auditor` | Admin |
 
 Each of these 5 users has a corresponding `party` document in `parties.json` linked via `partyInstanceReference`.
 

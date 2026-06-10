@@ -12,11 +12,11 @@ import {
 } from '../../../../frontend/src/lib/constants';
 
 const EXPECTED_USERS = [
-  'luis.fernandez@leafybank.demo',
-  'julia.santos@leafybank.demo',
-  'sarah.chen@leafybank.demo',
-  'michael.obi@leafybank.demo',
-  'admin@leafybank.demo',
+  'luis.fernandez@back.es',
+  'julia.santos@back.es',
+  'sarah.chen@back.es',
+  'michael.obi@back.es',
+  'admin@back.es',
 ];
 
 describe('DEMO_USERS_PASSWORDS', () => {

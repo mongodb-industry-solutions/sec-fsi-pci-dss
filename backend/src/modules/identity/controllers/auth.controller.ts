@@ -25,10 +25,10 @@ Atlas stores only ciphertext and never sees the plaintext address.
 
 | Email | Role |
 |---|---|
-| \`luis.fernandez@leafybank.demo\` | customer |
-| \`sarah.chen@leafybank.demo\` | level1_analyst |
-| \`michael.obi@leafybank.demo\` | level2_investigator |
-| \`admin@leafybank.demo\` | security_auditor |
+| \`luis.fernandez@back.es\` | customer |
+| \`sarah.chen@back.es\` | level1_analyst |
+| \`michael.obi@back.es\` | level2_investigator |
+| \`admin@back.es\` | security_auditor |
 
 Password for all demo users: \`demo-password\``,
       body: {
@@ -136,7 +136,7 @@ Data is read directly from the seed file to avoid QE-decryption overhead on this
                   name: { type: 'string', description: 'Display name.' },
                   role: {
                     type: 'string',
-                    enum: ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor'],
+                    enum: ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor', 'merchant_officer', 'manager'],
                     description: 'Role that will be encoded in the JWT on login.',
                   },
                 },

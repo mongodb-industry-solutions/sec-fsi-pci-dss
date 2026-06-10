@@ -18,15 +18,15 @@ function buildJwt(payload: Record<string, unknown>): string {
 
 const SYSTEM_ADMIN_JWT = buildJwt({
   sub: 'a1000070-0000-4000-8000-000000000070',
-  email: 'admin.system@leafybank.demo',
-  role: 'system_admin',
-  name: 'System Administrator',
+  email: 'alex.rivera@back.es',
+  role: 'manager',
+  name: 'Alex Rivera',
   domain: 'leafybank',
 });
 
 const ANALYST_JWT = buildJwt({
   sub: 'analyst-id-001',
-  email: 'sarah.chen@leafybank.demo',
+  email: 'sarah.chen@back.es',
   role: 'level1_analyst',
   name: 'Sarah Chen',
   domain: 'leafybank',
@@ -40,15 +40,15 @@ const MOCK_INTEGRATIONS = [
 
 // ── Auth guard tests ─────────────────────────────────────────────────────────
 
-test.describe('FR-v6-01: system_admin access guard', () => {
-  test('01.1 non-system_admin is redirected away from /system/admin', async ({ page }) => {
+test.describe('FR-v6-01: manager access guard', () => {
+  test('01.1 non-manager is redirected away from /system/admin', async ({ page }) => {
     await page.evaluate((jwt) => localStorage.setItem('demo_token', jwt), ANALYST_JWT);
     await page.goto('/system/admin');
     await page.waitForURL('**/system**', { timeout: 5_000 });
     expect(page.url()).not.toContain('/system/admin');
   });
 
-  test('01.2 system_admin can access /system/admin without redirect', async ({ page }) => {
+  test('01.2 manager can access /system/admin without redirect', async ({ page }) => {
     await page.route('**/api/v1/integrations**', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ integrations: MOCK_INTEGRATIONS }) });
     });

@@ -1,10 +1,12 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { api, AuditEventWithCase } from '../../../lib/api';
 import { getToken } from '../../../lib/auth';
 import { PERFORMER_LABELS } from '../../../lib/constants';
 import Link from 'next/link';
 import { Filter, X, ShieldCheck } from 'lucide-react';
+import { useDebugMode } from '../../../lib/debugMode';
+import { Pagination } from '../../../components/Pagination';
 
 const ACTION_TYPE_LABELS: Record<string, string> = {
   case_opened: 'Case Opened',
@@ -28,20 +30,60 @@ const ACTION_TYPE_COLORS: Record<string, string> = {
   closed: 'bg-gray-100 text-gray-600',
 };
 
+const PAGE_SIZE = 10;
+
 export default function AuditPage() {
+  const { debugMode } = useDebugMode();
   const [events, setEvents] = useState<AuditEventWithCase[]>([]);
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [filterRole, setFilterRole] = useState('');
   const [filterAction, setFilterAction] = useState('');
 
-  useEffect(() => {
+  const load = useCallback(async (p: number, ps: number) => {
+    setLoading(true);
     const t = getToken() ?? '';
-    api.fraud.allEvents({ page: 1, limit: 100 }, t)
-      .then((res) => { setEvents(res.events); setTotal(res.total); })
-      .catch(() => setEvents([]))
-      .finally(() => setLoading(false));
+    try {
+      const res = await api.fraud.allEvents({ page: p, limit: ps }, t);
+      setEvents(res.events);
+      setTotal(res.total);
+    } catch {
+      setEvents([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    load(1, pageSize);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handlePageChange(newPage: number) {
+    setPage(newPage);
+    load(newPage, pageSize);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function handleLimitChange(newLimit: number) {
+    setPageSize(newLimit);
+    setPage(1);
+    load(1, newLimit);
+  }
+
+  function handleRoleFilter(role: string) {
+    setFilterRole(role);
+    setPage(1);
+    load(1, pageSize);
+  }
+
+  function handleActionFilter(action: string) {
+    setFilterAction(action);
+    setPage(1);
+    load(1, pageSize);
+  }
 
   const filtered = events.filter((e) => {
     if (filterRole && e.performedByRole !== filterRole) return false;
@@ -51,6 +93,7 @@ export default function AuditPage() {
 
   const uniqueRoles = [...new Set(events.map((e) => e.performedByRole))];
   const uniqueActions = [...new Set(events.map((e) => e.actionType))];
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -63,24 +106,24 @@ export default function AuditPage() {
               Immutable event trail across all fraud investigation cases. PCI DSS Requirement 10 compliance.
             </p>
           </div>
-          <div className="text-right text-sm text-gray-500">
-            {!loading && <span>{total} total events</span>}
-          </div>
+
         </div>
 
-        {/* Access model context */}
-        <div className="bg-[#001E2B]/5 border border-[#001E2B]/20 rounded-xl p-4 text-sm mb-5">
-          <strong>Security Auditor access (Level 4):</strong> Read-only oversight across all cases and roles.
-          You can inspect access logs, escalations, field accesses, and control evidence.
-          You cannot modify cases, rules, or customer data. Segregation of duties is enforced.
-        </div>
+        {/* Access model context — debug mode only */}
+        {debugMode && (
+          <div className="bg-[#001E2B]/5 border border-[#001E2B]/20 rounded-xl p-4 text-sm mb-5">
+            <strong>Security Auditor access (Level 4):</strong> Read-only oversight across all cases and roles.
+            You can inspect access logs, escalations, field accesses, and control evidence.
+            You cannot modify cases, rules, or customer data. Segregation of duties is enforced.
+          </div>
+        )}
 
         {/* Filters */}
         <div className="flex gap-3 mb-4 flex-wrap items-center">
           <Filter size={14} className="text-gray-400 shrink-0" />
           <select
             value={filterRole}
-            onChange={(e) => setFilterRole(e.target.value)}
+            onChange={(e) => handleRoleFilter(e.target.value)}
             className="border rounded-lg px-3 py-1.5 text-sm bg-white"
           >
             <option value="">All roles</option>
@@ -90,7 +133,7 @@ export default function AuditPage() {
           </select>
           <select
             value={filterAction}
-            onChange={(e) => setFilterAction(e.target.value)}
+            onChange={(e) => handleActionFilter(e.target.value)}
             className="border rounded-lg px-3 py-1.5 text-sm bg-white"
           >
             <option value="">All action types</option>
@@ -100,7 +143,7 @@ export default function AuditPage() {
           </select>
           {(filterRole || filterAction) && (
             <button
-              onClick={() => { setFilterRole(''); setFilterAction(''); }}
+              onClick={() => { setFilterRole(''); setFilterAction(''); setPage(1); load(1, pageSize); }}
               className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
             >
               <X size={13} />
@@ -112,75 +155,82 @@ export default function AuditPage() {
         {loading ? (
           <div className="text-center py-8 text-gray-400">Loading audit events...</div>
         ) : (
-          <div className="bg-white rounded-xl border overflow-x-auto">
-            <table className="min-w-full text-sm divide-y divide-gray-100">
-              <thead className="bg-gray-50">
-                <tr>
-                  {['Datetime (UTC)', 'Case', 'Action', 'Role', 'Details'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {filtered.length === 0 ? (
+          <>
+            <div className="bg-white rounded-xl border overflow-x-auto">
+              <table className="min-w-full text-sm divide-y divide-gray-100">
+                <thead className="bg-gray-50">
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
-                      {events.length === 0
-                        ? 'No audit events found. Events are recorded when fraud cases are created, escalated, or resolved.'
-                        : 'No events match the current filters.'}
-                    </td>
+                    {['Datetime (UTC)', 'Case', 'Action', 'Role', 'Details'].map((h) => (
+                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        {h}
+                      </th>
+                    ))}
                   </tr>
-                ) : (
-                  filtered.map((e, i) => (
-                    <tr key={i} className="hover:bg-gray-50">
-                      <td className="px-4 py-2.5 font-mono text-xs text-gray-500 whitespace-nowrap">
-                        {new Date(e.actionDateTime).toISOString().replace('T', ' ').slice(0, 19)}
-                      </td>
-                      <td className="px-4 py-2.5 font-mono text-xs">
-                        {e.fraudDiagnosisCaseReference ? (
-                          <Link
-                            href={`/system/investigation/${e.fraudDiagnosisInstanceReference}`}
-                            className="text-blue-600 hover:underline"
-                          >
-                            {e.fraudDiagnosisCaseReference}
-                          </Link>
-                        ) : (
-                          <span className="text-gray-400">{e.fraudDiagnosisInstanceReference?.slice(0, 8)}...</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${ACTION_TYPE_COLORS[e.actionType] ?? 'bg-gray-100 text-gray-700'}`}>
-                          {ACTION_TYPE_LABELS[e.actionType] ?? e.actionType.replace(/_/g, ' ')}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-gray-600 text-xs">
-                        {PERFORMER_LABELS[e.performedByRole] ?? e.performedByRole}
-                      </td>
-                      <td className="px-4 py-2.5 text-gray-500 text-xs max-w-xs truncate">
-                        {e.actionDetails && Object.keys(e.actionDetails).length > 0
-                          ? Object.entries(e.actionDetails)
-                              .map(([k, v]) => `${k}: ${v}`)
-                              .join(', ')
-                          : '-'}
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                        {events.length === 0
+                          ? 'No audit events found. Events are recorded when fraud cases are created, escalated, or resolved.'
+                          : 'No events match the current filters.'}
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-            {filtered.length > 0 && (
-              <div className="px-4 py-2.5 border-t bg-gray-50 text-xs text-gray-500">
-                Showing {filtered.length} of {total} events
-                {(filterRole || filterAction) && ' (filtered)'}
-              </div>
-            )}
-          </div>
+                  ) : (
+                    filtered.map((e, i) => (
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="px-4 py-2.5 font-mono text-xs text-gray-500 whitespace-nowrap">
+                          {new Date(e.actionDateTime).toISOString().replace('T', ' ').slice(0, 19)}
+                        </td>
+                        <td className="px-4 py-2.5 font-mono text-xs">
+                          {e.fraudDiagnosisCaseReference ? (
+                            <Link
+                              href={`/system/investigation/${e.fraudDiagnosisInstanceReference}`}
+                              className="text-blue-600 hover:underline"
+                            >
+                              {e.fraudDiagnosisCaseReference}
+                            </Link>
+                          ) : (
+                            <span className="text-gray-400">{e.fraudDiagnosisInstanceReference?.slice(0, 8)}...</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${ACTION_TYPE_COLORS[e.actionType] ?? 'bg-gray-100 text-gray-700'}`}>
+                            {ACTION_TYPE_LABELS[e.actionType] ?? e.actionType.replace(/_/g, ' ')}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-gray-600 text-xs">
+                          {PERFORMER_LABELS[e.performedByRole] ?? e.performedByRole}
+                        </td>
+                        <td className="px-4 py-2.5 text-gray-500 text-xs max-w-xs truncate">
+                          {e.actionDetails && Object.keys(e.actionDetails).length > 0
+                            ? Object.entries(e.actionDetails)
+                                .map(([k, v]) => `${k}: ${v}`)
+                                .join(', ')
+                            : '-'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              limit={pageSize}
+              onPageChange={handlePageChange}
+              onLimitChange={handleLimitChange}
+              limitOptions={[10, 20, 50, 100]}
+              noun="events"
+            />
+          </>
         )}
 
-        {/* Audit control context */}
-        {!loading && events.length > 0 && (
+        {/* Audit control context — debug mode only */}
+        {debugMode && !loading && events.length > 0 && (
           <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
             <div className="bg-white border rounded-xl p-4">
               <div className="flex items-center gap-1.5 mb-1">
