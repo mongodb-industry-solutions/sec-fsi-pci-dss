@@ -65,7 +65,7 @@ export default function NewIntegrationPage() {
 
   if (newKey && newId) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="w-full px-5 sm:px-8 lg:px-12 py-6 flex justify-center">
         <div className="w-full max-w-lg bg-white rounded-2xl border shadow-sm p-8">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2.5 bg-green-100 rounded-lg"><KeyRound size={18} className="text-green-700" /></div>
@@ -97,8 +97,7 @@ export default function NewIntegrationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="w-full px-5 sm:px-8 lg:px-12 py-6">
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6">
         <div className="mb-5">
           <Link href="/system/admin/integrations" className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors w-fit">
             <ArrowLeft size={12} />
@@ -202,7 +201,6 @@ export default function NewIntegrationPage() {
             </Link>
           </div>
         </form>
-      </main>
     </div>
   );
 }

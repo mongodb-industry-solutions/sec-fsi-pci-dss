@@ -1,13 +1,15 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Plus, CheckCircle2, AlertCircle, Clock, WifiOff, RefreshCw, Pause,
+  Filter, Search, X,
 } from 'lucide-react';
 import { api } from '../../../../lib/api';
 import { getToken } from '../../../../lib/auth';
 import { useDebugMode } from '../../../../lib/debugMode';
 import { ROLE_LABELS } from '../../../../lib/constants';
+import { Pagination } from '../../../../components/Pagination';
 
 interface Integration {
   externalProviderArrangementInstanceReference: string;
@@ -34,6 +36,15 @@ const TYPE_LABEL: Record<string, string> = {
   credit_bureau:   'Credit Bureau',
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  active:    'Active',
+  inactive:  'Inactive',
+  test:      'Test',
+  suspended: 'Suspended',
+};
+
+const PAGE_SIZE = 10;
+
 function HealthDot({ status }: { status?: string }) {
   if (!status || status === 'unknown')  return <span title="Unknown"><Clock size={14} className="text-gray-400" /></span>;
   if (status === 'ok')                  return <span title="Healthy"><CheckCircle2 size={14} className="text-green-600" /></span>;
@@ -43,29 +54,86 @@ function HealthDot({ status }: { status?: string }) {
 }
 
 export default function IntegrationsListPage() {
-  const [integrations, setIntegrations] = useState<Integration[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [testing, setTesting] = useState<string | null>(null);
+  const [allIntegrations, setAllIntegrations] = useState<Integration[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [testing, setTesting]   = useState<string | null>(null);
   const [testResult, setTestResult] = useState<Record<string, { status: string; latencyMs: number }>>({});
   const { debugMode } = useDebugMode();
 
+  // Filters
+  const [nameInput, setNameInput]   = useState('');
+  const [nameFilter, setNameFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
+  // Pagination
+  const [page, setPage]         = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
+
   const token = getToken() ?? '';
 
-  function reload() {
+  const load = useCallback(async (type: string, status: string) => {
     setLoading(true);
-    api.integrations.list(token)
-      .then(d => { setIntegrations(d.integrations as unknown as Integration[]); setLoading(false); })
-      .catch(() => setLoading(false));
+    try {
+      const params: { type?: string; status?: string } = {};
+      if (type)   params.type   = type;
+      if (status) params.status = status;
+      const d = await api.integrations.list(token, params);
+      setAllIntegrations(d.integrations as unknown as Integration[]);
+    } catch {
+      setAllIntegrations([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => { load('', ''); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Client-side name filter + pagination
+  const filtered = allIntegrations.filter(i =>
+    !nameFilter || i.externalProviderArrangementName.toLowerCase().includes(nameFilter.toLowerCase())
+  );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const hasFilters = !!nameFilter || !!typeFilter || !!statusFilter;
+
+  function handleSearch() {
+    setNameFilter(nameInput.trim());
+    setPage(1);
   }
 
-  useEffect(() => { reload(); }, []);
+  function handleTypeChange(v: string) {
+    setTypeFilter(v);
+    setPage(1);
+    load(v, statusFilter);
+  }
+
+  function handleStatusChange(v: string) {
+    setStatusFilter(v);
+    setPage(1);
+    load(typeFilter, v);
+  }
+
+  function handleClear() {
+    setNameInput('');
+    setNameFilter('');
+    setTypeFilter('');
+    setStatusFilter('');
+    setPage(1);
+    load('', '');
+  }
+
+  function handlePageChange(p: number) {
+    setPage(p);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   async function handleTest(id: string) {
     setTesting(id);
     try {
       const r = await api.integrations.test(id, token);
       setTestResult(prev => ({ ...prev, [id]: r }));
-      reload();
+      load(typeFilter, statusFilter);
     } catch {
       setTestResult(prev => ({ ...prev, [id]: { status: 'error', latencyMs: 0 } }));
     } finally {
@@ -76,32 +144,89 @@ export default function IntegrationsListPage() {
   async function handleSuspend(id: string) {
     try {
       await api.integrations.suspend(id, token);
-      reload();
+      load(typeFilter, statusFilter);
     } catch (err) {
       alert((err as Error).message);
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="w-full px-5 sm:px-8 lg:px-12 py-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Integrations</h1>
-            <p className="text-sm text-gray-500 mt-0.5">SD-193 External Provider Arrangements</p>
-          </div>
-          <Link
-            href="/system/admin/integrations/new"
-            className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Integrations</h1>
+          {debugMode && <p className="text-xs text-gray-400 font-mono mt-0.5">SD-193 · ExternalProviderArrangement · PCI DSS Req 12.8.1</p>}
+        </div>
+        <Link
+          href="/system/admin/integrations/new"
+          className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
+        >
+          <Plus size={14} />
+          Register Provider
+        </Link>
+      </div>
+
+      {/* Search + filters */}
+      <div className="bg-white rounded-xl border p-4 space-y-3">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            placeholder="Search by provider name…"
+            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+          />
+          <button
+            onClick={handleSearch}
+            disabled={!nameInput.trim()}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold disabled:opacity-50"
           >
-            <Plus size={14} />
-            Register Provider
-          </Link>
+            <Search size={14} />
+            <span className="hidden sm:inline">Search</span>
+          </button>
+          {hasFilters && (
+            <button
+              onClick={handleClear}
+              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50"
+            >
+              <X size={14} />
+              <span className="hidden sm:inline">Clear</span>
+            </button>
+          )}
         </div>
 
-        {loading ? (
-          <div className="text-center py-12 text-gray-400">Loading integrations...</div>
-        ) : (
+        <div className="flex gap-3 flex-wrap items-center">
+          <Filter size={14} className="text-gray-400 shrink-0" />
+          <select
+            value={typeFilter}
+            onChange={(e) => handleTypeChange(e.target.value)}
+            className="border rounded-lg px-3 py-1.5 text-sm bg-white"
+          >
+            <option value="">All types</option>
+            {Object.entries(TYPE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => handleStatusChange(e.target.value)}
+            className="border rounded-lg px-3 py-1.5 text-sm bg-white"
+          >
+            <option value="">All statuses</option>
+            {Object.entries(STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+          <span className="text-gray-400 text-sm self-center ml-auto">{filtered.length} providers</span>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-12 text-gray-400">Loading integrations...</div>
+      ) : paginated.length === 0 ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
+          No integrations found{hasFilters ? ' matching the current filters.' : '.'}
+        </div>
+      ) : (
+        <>
           <div className="bg-white rounded-xl border overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -116,7 +241,7 @@ export default function IntegrationsListPage() {
                 </tr>
               </thead>
               <tbody>
-                {integrations.map(i => (
+                {paginated.map(i => (
                   <tr key={i.externalProviderArrangementInstanceReference} className="border-b last:border-0 hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -142,7 +267,7 @@ export default function IntegrationsListPage() {
                         i.externalProviderArrangementStatus === 'test'      ? 'bg-blue-100 text-blue-700' :
                                                                               'bg-red-100 text-red-700'
                       }`}>
-                        {i.externalProviderArrangementStatus}
+                        {STATUS_LABEL[i.externalProviderArrangementStatus] ?? i.externalProviderArrangementStatus}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -190,14 +315,25 @@ export default function IntegrationsListPage() {
               </tbody>
             </table>
           </div>
-        )}
 
-        {debugMode && (
-          <div className="mt-4 text-xs text-gray-400 font-mono">
-            {ROLE_LABELS['manager']} · PCI DSS Req 12.8.1 — maintained list of all third-party service providers
-          </div>
-        )}
-      </main>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={filtered.length}
+            limit={pageSize}
+            onPageChange={handlePageChange}
+            onLimitChange={(l) => { setPageSize(l); setPage(1); }}
+            limitOptions={[10, 20, 50]}
+            noun="providers"
+          />
+        </>
+      )}
+
+      {debugMode && (
+        <div className="text-xs text-gray-400 font-mono">
+          {ROLE_LABELS['manager']} · PCI DSS Req 12.8.1 — maintained list of all third-party service providers
+        </div>
+      )}
     </div>
   );
 }
