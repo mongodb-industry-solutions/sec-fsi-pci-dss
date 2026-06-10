@@ -1373,3 +1373,226 @@ Create a new `integrationRegistry` MongoDB collection implementing BIAN SD-193. 
 - New collection `integrationRegistry` and `integrationEvents` must be created, indexed, and seeded.
 - Dispatch layer adds latency to fraud scoring hot path (~2–5ms for internal dispatch, timeout budget for external).
 - HMAC validation requires the callback secret to be stored in hashed form, separate from the API key — adds complexity to the callback controller.
+
+---
+
+## ADR-013 — Multi-Provider Routing Groups
+
+**Date:** 2026-06-10  
+**Status:** Proposed  
+**Iteration:** v6+  
+**Deciders:** Antonio Membrides Espinosa  
+**Full design:** [docs/integration-hub-enhancement.md §3.3](integration-hub-enhancement.md)
+
+### Context
+
+ADR-012 established a unique compound index on `(externalProviderArrangementType, externalProviderApiEndpoint)` to prevent duplicate provider registrations. `getActiveProviderForType()` returns exactly one provider. This prevents:
+- Registering two fraud detection engines (one real-time, one ML batch) for the same type
+- Configuring a fallback AML provider if the primary is unreachable
+- Running parallel KYC checks for higher confidence (two providers must both verify)
+- Gradually migrating from one provider to another with weighted traffic split
+
+**Option A — Keep single provider per type**: Simple but blocks real-world multi-provider setups. Organizations routinely use 2+ compliance providers for resilience and performance.
+
+**Option B — Priority field on each provider**: Allow multiple active providers; dispatch picks by priority. Simple but only supports primary/fallback, not round-robin or weighted.
+
+**Option C — Dedicated routing group (chosen)**: A new `integrationRoutingGroups` collection defines the strategy. Individual providers reference a group. Dispatch resolves the group first, then applies strategy.
+
+### Decision
+
+Create an `integrationRoutingGroups` collection. Each record defines a `RoutingStrategy` (`primary_fallback | round_robin | weighted | parallel`) and references member providers. Providers can exist without a group (single provider behavior, unchanged). Remove the unique constraint on `(type, endpoint)` — uniqueness is no longer enforced because organizations may use the same endpoint with different credentials.
+
+Supported strategies and their aggregation semantics are defined in `integration-hub-enhancement.md §3.3`.
+
+### PCI DSS Alignment
+
+Each member of a routing group is a separate `ExternalProviderArrangement` record. PCI DSS Req 12.8.1 (maintain list of all TPSPs) is satisfied because every provider is individually documented, health-checked, and key-rotated. The routing group is an operational artifact; it does not replace individual compliance tracking.
+
+### Consequences
+
++ Organizations can run primary/fallback setups for critical KYC and AML paths.
++ Parallel enrichment enables consensus fraud scoring without additional code.
++ Weighted routing supports zero-downtime provider migrations.
+- New collection `integrationRoutingGroups` adds a schema to manage.
+- Dispatch hot path now includes a group resolution step (adds ~1ms for group lookup, cacheable in application memory with 30s TTL).
+- Parallel strategy multiplies outbound request volume — timeout budgets must account for the slowest member.
+
+---
+
+## ADR-014 — Configurable Field Mapping (No-Code Adapter Pattern)
+
+**Date:** 2026-06-10  
+**Status:** Proposed  
+**Iteration:** v6+  
+**Deciders:** Antonio Membrides Espinosa  
+**Full design:** [docs/integration-hub-enhancement.md §3.2](integration-hub-enhancement.md)
+
+### Context
+
+External compliance systems (fraud detection, AML, KYC providers) use different field names and value conventions than the internal data model. Today, field name mismatches require a code-level adapter deployed with the application. This means:
+- Adding a new provider requires a code change and deployment
+- A legacy system that cannot change its API contract blocks integration
+- Inbound webhook field name differences require hardcoded per-provider parsing logic
+
+Three approaches were considered:
+
+**Option A — Hardcode adapters per provider**: Reliable but inflexible. Every new provider or field name change requires code deployment.
+
+**Option B — Custom scripting (JavaScript eval in admin panel)**: Maximum flexibility but creates a code injection surface and is excluded by PCI DSS (Req 6.2.4: prevent code injection).
+
+**Option C — Declarative transformation rules stored in MongoDB (chosen)**: A finite set of safe transform operations (rename, value_map, scale, date_format, nested path, constant_inject, drop) stored as configuration. The dispatch and callback services apply them at runtime. No scripting, no eval.
+
+### Decision
+
+Add a `fieldMappingConfig` sub-document to `ExternalProviderArrangement`. The `FieldMappingEngine` service applies outbound rules before HTTP dispatch and inbound rules before the domain handler receives the payload. The admin UI exposes a table-based rule editor with a "Test with Sample Payload" feature.
+
+**Security constraint**: The engine maintains a PCI DSS blocklist of fields that cannot be read, written, or transformed: PAN, CVV, cardholderName, expiryDate, and all credential hash fields. Mapping rules targeting these fields are rejected at save time.
+
+### BIAN Alignment
+
+`fieldMappingConfig` maps to BIAN SD-193 `ExternalProviderArrangementSpecification` — the technical specification of how the arrangement operates. Field mapping is an arrangement specification detail, not a compliance record.
+
+### Consequences
+
++ New external providers can be onboarded without code changes by configuring field mappings in the admin UI.
++ Legacy systems with fixed API contracts can be integrated by mapping their field names to internal expectations.
++ The "Test with Sample Payload" endpoint validates mapping rules before they affect live traffic.
+- The mapping engine adds a transformation step to the hot path (~0.5–2ms for typical payload sizes).
+- Mapping rules stored in MongoDB must be kept current if either the internal model or the external API changes.
+- The blocklist approach protects PCI DSS fields but must be actively maintained when new sensitive fields are added.
+
+---
+
+## ADR-015 — Structured Authentication Configuration per Integration
+
+**Date:** 2026-06-10  
+**Status:** Proposed  
+**Iteration:** v6+  
+**Deciders:** Antonio Membrides Espinosa  
+**Full design:** [docs/integration-hub-enhancement.md §3.5](integration-hub-enhancement.md)
+
+### Context
+
+ADR-012 stores API keys as bcrypt hashes and HMAC callback secrets as bcrypt hashes. This satisfies PCI DSS for the outbound API key (shown once, never stored in plaintext). However, several auth patterns that real external providers require are not configurable at runtime:
+
+- **API key location**: Some providers want the key in `X-API-Key` header, others in `Authorization`, others as a query parameter. Currently hardcoded to `Authorization`.
+- **OAuth2 Client Credentials**: Many enterprise compliance providers (Refinitiv, Kroll, ComplyAdvantage) use OAuth2. There is no place to store `clientId`, `tokenEndpoint`, or `scopes`.
+- **Outbound HMAC signatures**: Some providers require us to sign our outbound requests (not just validate their inbound ones). The current model only supports inbound HMAC validation.
+- **Bearer token prefix**: Most providers use `Bearer <token>` but some use `Token <token>` or no prefix. Currently hardcoded to `Bearer`.
+
+**Option A — Extend env vars per provider**: Simple but can't be managed by `system_admin` from the UI and can't change at runtime.
+
+**Option B — Additional flat fields on ExternalProviderArrangement**: Low structure. 15+ new fields with overlapping semantics depending on auth type.
+
+**Option C — Typed `authConfig` sub-document + QE-encrypted credential fields (chosen)**: A discriminated union of auth configurations per scheme type. Credential values (tokens, secrets, client secrets) are stored as MongoDB QE-encrypted fields with a dedicated `integrationCredentialsDEK`.
+
+### Decision
+
+Add `authConfig: IntegrationAuthConfig` to `ExternalProviderArrangement`. Add five QE-encrypted fields for credential storage: `authTokenEncrypted`, `authApiKeyEncrypted`, `authHmacSecretEncrypted`, `callbackHmacSecretEncrypted`, `authOauth2SecretEncrypted`. Create a new `integrationCredentialsDEK` under the existing AWS KMS CMK.
+
+The existing `externalProviderApiKeyHash` and `externalProviderCallbackSecretHash` bcrypt fields are retained for backward compatibility but deprecated for new registrations.
+
+### PCI DSS Alignment
+
+| Requirement | How `authConfig` + QE satisfies it |
+|---|---|
+| Req 3.6 — Protect cryptographic keys | `integrationCredentialsDEK` is a dedicated DEK under the KMS CMK; credential key rotation does not require re-encrypting cardholder data |
+| Req 3.5 — Protect keys used to protect stored data | QE ensures credential values are never stored in plaintext in MongoDB |
+| Req 12.3.4 — Review all hardware/software annually | `bearer.tokenExpiresAt` field enables expiry tracking and UI warnings |
+| Req 6.3.3 — Protect against known vulnerabilities | QE encryption prevents credential exposure from a compromised database |
+
+### Consequences
+
++ OAuth2, outbound HMAC, and flexible API key location are configurable from the admin UI without code changes.
++ `integrationCredentialsDEK` limits the blast radius of a credential compromise to integration credentials only.
++ The dispatch service can now build correct auth headers for any supported scheme from configuration alone.
+- New QE encrypted fields on `integrationRegistry` require QE to be enabled for this collection (previously plaintext only — see ADR-012).
+- `integrationCredentialsDEK` adds a sixth DEK to manage (existing: lookupDEK, sensitiveDEK, plus future additions).
+- The `system_admin` UI must handle QE-encrypted fields differently from plaintext fields (write-only; no read-back of credential values).
+
+---
+
+## ADR-016 — Category-Specific Extended Configuration
+
+**Date:** 2026-06-10  
+**Status:** Proposed  
+**Iteration:** v6+  
+**Deciders:** Antonio Membrides Espinosa  
+**Full design:** [docs/integration-hub-enhancement.md §3.4](integration-hub-enhancement.md)
+
+### Context
+
+The six compliance integration categories (fraud_detection, aml_monitoring, kyc_identity, kyb_business, hrp_sanctions, credit_bureau) have fundamentally different operational parameters:
+- A fraud detection provider needs score thresholds and response field names.
+- A KYC provider needs verification levels, document types, and re-verification periods.
+- A sanctions screening provider needs watchlist sources and fuzzy match thresholds.
+- A credit bureau needs pull type (soft/hard), scoring model, and jurisdiction.
+
+Today none of these parameters are configurable — they are either hardcoded or absent. This limits the demo's ability to show realistic integration management and prevents the admin from configuring provider behavior without code changes.
+
+**Option A — Flat fields on ExternalProviderArrangement**: Adds 30+ optional fields to the model, most of which are irrelevant for any given category. Validation is complex.
+
+**Option B — Per-category collections**: Six new collections. Clean schema per type but massive overhead for a registry that will have at most ~20 records.
+
+**Option C — Typed `categoryConfig` discriminated union (chosen)**: A polymorphic sub-document with one interface per category. MongoDB's document model handles this naturally. The backend validates the config shape against the declared type. The admin UI renders a different form per type.
+
+### Decision
+
+Add `categoryConfig` as a polymorphic sub-document to `ExternalProviderArrangement`. Define six typed config interfaces (FraudDetectionConfig, AmlMonitoringConfig, KycIdentityConfig, KybBusinessConfig, HrpSanctionsConfig, CreditBureauConfig) plus a GenericIntegrationConfig. Backend validation uses a Zod discriminated union keyed on `externalProviderArrangementType`.
+
+### BIAN Alignment
+
+`categoryConfig` maps to `ExternalProviderArrangement.ExternalProviderArrangementRecord` in BIAN SD-193 — the record of agreed terms and specifications for the arrangement. Each category config captures the domain-specific terms of the third-party arrangement.
+
+| Category | BIAN SD | Key config fields and their BIAN equivalent |
+|---|---|---|
+| fraud_detection | SD-63 Fraud Evaluation | scoreThresholds → FraudEvaluationAssessmentPreconditions |
+| aml_monitoring | SD-99 Suspicious Activity Analysis | watchlistSources → SuspiciousActivityAnalysisDataSources |
+| kyc_identity | SD-53 Customer Agreement | verificationLevels → CustomerAgreementKycCheckSpecification |
+| kyb_business | SD-89 Merchant Relations | uboDisclosureThreshold → MerchantAgreementKybCheckSpecification |
+| hrp_sanctions | SD-13 Party Reference Data | screeningLists → PartyReferenceDataDirectoryQualityThreshold |
+| credit_bureau | SD-83 Customer Credit Rating | pullTypes → CustomerCreditRatingExternalReference |
+
+### Consequences
+
++ Admin can configure provider-specific thresholds (score cutoffs, match sensitivity, re-verification periods) from the UI.
++ BIAN compliance is strengthened — arrangement records now capture domain-specific terms as the standard prescribes.
++ Demo presentations can show realistic operational configuration that maps to real-world compliance workflows.
+- Backend must validate `categoryConfig` shape against `externalProviderArrangementType` — a Zod discriminated union adds ~50 lines of schema definition per category.
+- Changing a category config type after registration requires clearing and re-setting the sub-document.
+
+---
+
+## ADR-017 — Generic Integration Category
+
+**Date:** 2026-06-10  
+**Status:** Proposed  
+**Iteration:** v6+  
+**Deciders:** Antonio Membrides Espinosa  
+**Full design:** [docs/integration-hub-enhancement.md §3.4](integration-hub-enhancement.md)
+
+### Context
+
+The six compliance categories (fraud, AML, KYC, KYB, HRP/sanctions, credit bureau) cover the primary regulated compliance functions. However, enterprise financial systems need integrations for operational events that don't fit a compliance domain: contract signing callbacks, document archival, notification dispatch, audit export, regulatory reporting pipelines.
+
+Today these would either be hardcoded outside the integration registry (losing the audit trail, health monitoring, and API key management that the registry provides) or forced into an inappropriate compliance category (misrepresenting the BIAN alignment).
+
+**Option A — Refuse to register non-compliance integrations**: Simplest but forces operational integrations out of the registry and its PCI DSS audit trail.
+
+**Option B — Extend each existing category**: Add catch-all fields to existing types. Breaks the clean category-specific config model.
+
+**Option C — Add a `generic` category type (chosen)**: A seventh category with `GenericIntegrationConfig` that allows user-defined labels, event types, and an optional JSON Schema for payload validation. No BIAN compliance domain is claimed; BIAN reference is set to SD-193 itself.
+
+### Decision
+
+Add `'generic'` to `IntegrationProviderType`. The `bianServiceDomain` for generic integrations is set to `"External Provider Arrangements"` (SD-193) and `bianControlRecordType` to `"ExternalProviderArrangementPortfolio"`. All registry infrastructure (health monitoring, event audit log, API key management, field mapping) applies to generic integrations identically.
+
+**PCI DSS note**: Generic integrations are still listed in the registry (Req 12.8.1 — list of all TPSPs). The `GenericIntegrationConfig.description` field should be used to document the business purpose of the integration for Req 12.8.2 (written agreement acknowledging responsibility).
+
+### Consequences
+
++ Non-compliance integrations benefit from the same health monitoring, audit trail, and key management as compliance integrations.
++ The registry becomes a single source of truth for all external system dependencies, not just compliance providers.
++ Generic integrations are visible in PCI DSS TPSP lists (Req 12.8.1), improving audit completeness.
+- The `system_admin` UI must clearly distinguish generic integrations from compliance integrations to avoid confusion during audits.
+- `generic` integrations have no BIAN SD alignment beyond SD-193 itself — this must be documented clearly in audit reports.

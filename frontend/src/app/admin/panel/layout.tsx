@@ -3,13 +3,14 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { ADMIN_TOKEN_KEY } from '../../../lib/adminHelpers';
-import { Package, Terminal, ScrollText, Info, LogOut, Home } from 'lucide-react';
+import { Package, Terminal, ScrollText, Info, LogOut, Home, Webhook } from 'lucide-react';
 
 const TABS = [
   { path: '/admin/panel/setup',    label: 'Setup',       icon: Package,    shortLabel: 'Setup' },
   { path: '/admin/panel/terminal', label: 'Terminal',    icon: Terminal,   shortLabel: 'Term' },
   { path: '/admin/panel/logs',     label: 'Server Logs', icon: ScrollText, shortLabel: 'Logs' },
   { path: '/admin/panel/info',     label: 'System Info', icon: Info,       shortLabel: 'Info' },
+  { path: '/admin/panel/webhook',  label: 'Webhook',     icon: Webhook,    shortLabel: 'Hook' },
 ];
 
 export default function PanelLayout({ children }: { children: React.ReactNode }) {
