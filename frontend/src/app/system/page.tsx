@@ -88,13 +88,13 @@ const ROLE_CARDS: Record<string, DashboardCard[]> = {
     { label: 'My Profile',          description: 'Manage your officer profile',                  icon: User,             href: '/system/profile',         bianSd: 'SD-53',  pciDss: 'Req 8' },
   ],
   manager: [
-    { label: 'Fraud Detection',      description: 'Real-time transaction scoring and fraud signals', icon: ShieldAlert,  href: '/system/admin/integrations?type=fraud_detection', bianSd: 'SD-63',  pciDss: 'Req 10.2.1' },
-    { label: 'HRP / Sanctions',      description: 'High-risk person and sanctions list screening',   icon: ScanLine,     href: '/system/admin/integrations?type=hrp_sanctions',   bianSd: 'SD-13',  pciDss: 'Req 12.8.1' },
-    { label: 'KYC / Identity',       description: 'Customer identity verification and onboarding',   icon: UserCheck,    href: '/system/admin/integrations?type=kyc_identity',    bianSd: 'SD-53',  pciDss: 'Req 8.1' },
-    { label: 'KYB / Business',       description: 'Merchant business entity verification',           icon: Building2,    href: '/system/admin/integrations?type=kyb_business',    bianSd: 'SD-89',  pciDss: 'Req 12.8.3' },
-    { label: 'AML Monitoring',       description: 'Anti-money laundering pattern analysis',          icon: AlertTriangle,href: '/system/admin/integrations?type=aml_monitoring',  bianSd: 'SD-99',  pciDss: 'Req 10.2.1' },
-    { label: 'Credit Bureau',        description: 'Credit scoring and bureau checks',                icon: CreditCard,   href: '/system/admin/integrations?type=credit_bureau',   bianSd: 'SD-83',  pciDss: 'Req 12.8.1' },
-    { label: 'Integration Registry', description: 'Manage all external provider arrangements',       icon: Plug,         href: '/system/admin/integrations',                      bianSd: 'SD-193', pciDss: 'Req 12.8' },
+    { label: 'Fraud Detection',      description: 'Real-time transaction scoring and fraud signals', icon: ShieldAlert,  href: '/system/admin/fraud-detection', bianSd: 'SD-63',  pciDss: 'Req 10.2.1' },
+    { label: 'HRP / Sanctions',      description: 'High-risk person and sanctions list screening',   icon: ScanLine,     href: '/system/admin/hrp',             bianSd: 'SD-13',  pciDss: 'Req 12.8.1' },
+    { label: 'KYC / Identity',       description: 'Customer identity verification and onboarding',   icon: UserCheck,    href: '/system/admin/kyc',             bianSd: 'SD-53',  pciDss: 'Req 8.1' },
+    { label: 'KYB / Business',       description: 'Merchant business entity verification',           icon: Building2,    href: '/system/admin/kyb',             bianSd: 'SD-89',  pciDss: 'Req 12.8.3' },
+    { label: 'AML Monitoring',       description: 'Anti-money laundering pattern analysis',          icon: AlertTriangle,href: '/system/admin/aml',             bianSd: 'SD-99',  pciDss: 'Req 10.2.1' },
+    { label: 'Credit Bureau',        description: 'Credit scoring and bureau checks',                icon: CreditCard,   href: '/system/admin/credit-bureau',   bianSd: 'SD-83',  pciDss: 'Req 12.8.1' },
+    { label: 'Integration Registry', description: 'Manage all external provider arrangements',       icon: Plug,         href: '/system/admin/integrations',    bianSd: 'SD-193', pciDss: 'Req 12.8' },
   ],
 };
 

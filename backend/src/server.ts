@@ -54,11 +54,11 @@ export async function buildApp(): Promise<FastifyInstance> {
   fastify.addHook('preHandler', authMiddleware);
 
   // DB availability guard: return 503 for all /api/* routes when the DB is down.
-  // Excludes /api/v1/system/health so it can report degraded status even when Atlas is unreachable.
+  // Excludes health endpoints so they can report degraded status even when Atlas is unreachable.
   // This runs after auth so unauthenticated requests still get 401, not 503.
   fastify.addHook('preHandler', async (_request, reply) => {
     const url = _request.url;
-    const isHealthCheck = url.startsWith('/api/v1/system/health');
+    const isHealthCheck = url === '/health' || url.startsWith('/api/v1/system/health');
     const isAdminRoute = url.startsWith('/api/v1/admin');
     if (fastify.dbError !== null && url.startsWith('/api/') && !isHealthCheck && !isAdminRoute) {
       return reply.status(503).send({
@@ -84,6 +84,50 @@ export async function buildApp(): Promise<FastifyInstance> {
       response: { 302: { type: 'null', description: 'Redirect to /doc' } },
     },
   }, async (_request, reply) => reply.redirect('/doc'));
+
+  // Public /health alias — compatibility for infra probes that expect this standard path
+  fastify.get('/health', {
+    schema: {
+      tags: ['system'],
+      summary: 'Health check (standard alias)',
+      description: 'Alias for `/api/v1/system/health`. **Public — no JWT required.** Intended for load balancers, k8s liveness probes, and monitoring systems that expect `/health`.',
+      response: {
+        200: {
+          description: 'Healthy: Atlas reachable',
+          type: 'object',
+          properties: {
+            status:      { type: 'string', enum: ['ok'] },
+            atlas:       { type: 'string', enum: ['connected'] },
+            kmsProvider: { type: 'string', enum: ['aws', 'local'] },
+            timestamp:   { type: 'string', format: 'date-time' },
+          },
+        },
+        503: {
+          description: 'Degraded: Atlas unreachable',
+          type: 'object',
+          properties: {
+            status:    { type: 'string', enum: ['error'] },
+            atlas:     { type: 'string', enum: ['disconnected'] },
+            error:     { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' },
+          },
+        },
+      },
+    },
+  }, async (_request, reply) => {
+    const timestamp = new Date().toISOString();
+    const f = fastify as FastifyInstance & { dbError?: string | null; db?: { command: (cmd: object) => Promise<unknown> } };
+    if (f.dbError) {
+      return reply.status(503).send({ status: 'error', atlas: 'disconnected', error: f.dbError, timestamp });
+    }
+    try {
+      await f.db?.command({ ping: 1 });
+      return reply.send({ status: 'ok', atlas: 'connected', kmsProvider: process.env.KMS_PROVIDER ?? 'aws', timestamp });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : 'ping failed';
+      return reply.status(503).send({ status: 'error', atlas: 'disconnected', error: reason, timestamp });
+    }
+  });
 
   // API routes  -  each module registers its own routes internally
   await fastify.register(identityModule,     { prefix: '/api/v1' });

@@ -10,7 +10,11 @@ import {
   IntegrationMode,
   IntegrationAuth,
   RetryPolicy,
+  CategoryConfig,
+  IntegrationAuthConfig,
+  FieldMappingConfig,
 } from '../models/externalProviderArrangement.model';
+import { validateMappingRules } from './fieldMapping.service';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -41,6 +45,13 @@ export interface CreateIntegrationInput {
   mode: IntegrationMode;
   timeoutMs?: number;
   retryPolicy?: RetryPolicy;
+  categoryConfig?: CategoryConfig;
+  authConfig?: IntegrationAuthConfig;
+  fieldMappingConfig?: FieldMappingConfig;
+  routingGroupId?: string;
+  routingPriority?: number;
+  routingWeight?: number;
+  initialStatus?: 'active' | 'inactive' | 'test';
 }
 
 export async function createIntegration(
@@ -49,7 +60,18 @@ export async function createIntegration(
 ): Promise<{ integration: IntegrationSummary; apiKey?: string }> {
   const col = db.collection<ExternalProviderArrangement>(INTEGRATION_REGISTRY_COLLECTION);
 
-  // Reject duplicate type+endpoint
+  // Validate field mapping rules for PCI DSS blocklist
+  if (input.fieldMappingConfig) {
+    const errors = [
+      ...validateMappingRules(input.fieldMappingConfig.outbound),
+      ...validateMappingRules(input.fieldMappingConfig.inbound),
+    ];
+    if (errors.length > 0) {
+      throw Object.assign(new Error(errors.join('; ')), { code: 422 });
+    }
+  }
+
+  // Reject duplicate type+endpoint (non-unique index — check manually for better error message)
   if (input.endpoint) {
     const existing = await col.findOne({
       externalProviderArrangementType: input.type,
@@ -68,14 +90,13 @@ export async function createIntegration(
 
   const id = uuidv4();
   const now = new Date();
-
   const bianMeta = bianMetaFor(input.type);
 
   const record: ExternalProviderArrangement = {
     externalProviderArrangementInstanceReference: id,
     externalProviderArrangementName: input.name,
     externalProviderArrangementType: input.type,
-    externalProviderArrangementStatus: 'inactive',
+    externalProviderArrangementStatus: input.initialStatus ?? 'inactive',
     externalProviderIsInternal: false,
     externalProviderApiEndpoint: input.endpoint,
     externalProviderApiKeyHash: keyHash,
@@ -91,12 +112,18 @@ export async function createIntegration(
     externalProviderTimeoutMs: input.timeoutMs ?? 5000,
     externalProviderRetryPolicy: input.retryPolicy ?? { maxAttempts: 3, backoffMs: 1000 },
     externalProviderHealthStatus: 'unknown',
+    categoryConfig: input.categoryConfig,
+    authConfig: input.authConfig,
+    fieldMappingConfig: input.fieldMappingConfig,
+    routingGroupId: input.routingGroupId,
+    routingPriority: input.routingPriority ?? 100,
+    routingWeight: input.routingWeight,
     bianServiceDomain: bianMeta.domain,
     bianControlRecordType: bianMeta.controlRecordType,
     pciDssRequirements: bianMeta.pciDss,
     recordCreatedDateTime: now,
     recordUpdatedDateTime: now,
-    schemaVersion: 1,
+    schemaVersion: 2,
   };
 
   await col.insertOne(record);
@@ -130,19 +157,38 @@ export async function listIntegrations(
   return docs.map(stripSecrets);
 }
 
+type UpdateablePatch = Partial<Pick<
+  ExternalProviderArrangement,
+  | 'externalProviderApiEndpoint'
+  | 'externalProviderTriggerEvents'
+  | 'externalProviderMode'
+  | 'externalProviderTimeoutMs'
+  | 'externalProviderRetryPolicy'
+  | 'externalProviderArrangementStatus'
+  | 'categoryConfig'
+  | 'authConfig'
+  | 'fieldMappingConfig'
+  | 'routingGroupId'
+  | 'routingPriority'
+  | 'routingWeight'
+>>;
+
 export async function updateIntegration(
   db: Db,
   id: string,
-  patch: Partial<Pick<
-    ExternalProviderArrangement,
-    | 'externalProviderApiEndpoint'
-    | 'externalProviderTriggerEvents'
-    | 'externalProviderMode'
-    | 'externalProviderTimeoutMs'
-    | 'externalProviderRetryPolicy'
-    | 'externalProviderArrangementStatus'
-  >>
+  patch: UpdateablePatch
 ): Promise<IntegrationSummary | null> {
+  // Validate field mapping rules if being updated
+  if (patch.fieldMappingConfig) {
+    const errors = [
+      ...validateMappingRules(patch.fieldMappingConfig.outbound),
+      ...validateMappingRules(patch.fieldMappingConfig.inbound),
+    ];
+    if (errors.length > 0) {
+      throw Object.assign(new Error(errors.join('; ')), { code: 422 });
+    }
+  }
+
   const col = db.collection<ExternalProviderArrangement>(INTEGRATION_REGISTRY_COLLECTION);
   const result = await col.findOneAndUpdate(
     { externalProviderArrangementInstanceReference: id },
@@ -189,6 +235,19 @@ export async function suspendIntegration(
   return result ? stripSecrets(result) : null;
 }
 
+export async function deleteIntegration(
+  db: Db,
+  id: string
+): Promise<boolean> {
+  const col = db.collection<ExternalProviderArrangement>(INTEGRATION_REGISTRY_COLLECTION);
+  const doc = await col.findOne({ externalProviderArrangementInstanceReference: id });
+  if (!doc) return false;
+  if (doc.externalProviderIsInternal)
+    throw Object.assign(new Error('Built-in providers cannot be deleted'), { code: 400 });
+  await col.deleteOne({ externalProviderArrangementInstanceReference: id });
+  return true;
+}
+
 export async function verifyApiKey(
   db: Db,
   id: string,
@@ -201,13 +260,33 @@ export async function verifyApiKey(
   return bcrypt.compare(plainKey, doc.externalProviderApiKeyHash);
 }
 
+// Returns the single active provider for a type (internal-first, then external by priority)
 export async function getActiveProviderForType(
   db: Db,
   type: IntegrationProviderType
 ): Promise<ExternalProviderArrangement | null> {
-  return db.collection<ExternalProviderArrangement>(INTEGRATION_REGISTRY_COLLECTION).findOne({
-    externalProviderArrangementType: type,
-    externalProviderArrangementStatus: 'active',
+  const providers = await getActiveProvidersForType(db, type);
+  return providers[0] ?? null;
+}
+
+// Returns all active providers for a type, sorted by priority (internal first, then by routingPriority ASC)
+export async function getActiveProvidersForType(
+  db: Db,
+  type: IntegrationProviderType
+): Promise<ExternalProviderArrangement[]> {
+  const docs = await db
+    .collection<ExternalProviderArrangement>(INTEGRATION_REGISTRY_COLLECTION)
+    .find({
+      externalProviderArrangementType: type,
+      externalProviderArrangementStatus: 'active',
+    })
+    .toArray();
+
+  // Sort: internal providers first, then by routingPriority (lower = higher priority)
+  return docs.sort((a, b) => {
+    if (a.externalProviderIsInternal && !b.externalProviderIsInternal) return -1;
+    if (!a.externalProviderIsInternal && b.externalProviderIsInternal) return 1;
+    return (a.routingPriority ?? 100) - (b.routingPriority ?? 100);
   });
 }
 
@@ -222,7 +301,7 @@ export async function updateHealthStatus(
   );
 }
 
-function bianMetaFor(type: IntegrationProviderType): { domain: string; controlRecordType: string; pciDss: string[] } {
+export function bianMetaFor(type: IntegrationProviderType): { domain: string; controlRecordType: string; pciDss: string[] } {
   const map: Record<IntegrationProviderType, { domain: string; controlRecordType: string; pciDss: string[] }> = {
     fraud_detection: { domain: 'Fraud Evaluation',                  controlRecordType: 'FraudEvaluationAssessment',                  pciDss: ['Req 10.2.1', 'Req 12.3.1'] },
     hrp_sanctions:   { domain: 'Party Reference Data',              controlRecordType: 'PartyReferenceDataDirectoryEntry',           pciDss: ['Req 12.8.1', 'Req 12.8.5'] },
@@ -230,6 +309,7 @@ function bianMetaFor(type: IntegrationProviderType): { domain: string; controlRe
     kyb_business:    { domain: 'Merchant Relations',                 controlRecordType: 'MerchantAgreementProcedure',                 pciDss: ['Req 12.8.1', 'Req 12.8.3'] },
     aml_monitoring:  { domain: 'Suspicious Activity Analysis',       controlRecordType: 'SuspiciousActivityAnalysisAssessment',       pciDss: ['Req 10.2.1', 'Req 12.3.1'] },
     credit_bureau:   { domain: 'Customer Credit Rating',             controlRecordType: 'CustomerCreditRatingState',                  pciDss: ['Req 12.8.1'] },
+    generic:         { domain: 'External Provider Arrangements',     controlRecordType: 'ExternalProviderArrangementPortfolio',       pciDss: ['Req 12.8.1'] },
   };
   return map[type];
 }

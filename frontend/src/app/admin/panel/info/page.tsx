@@ -4,6 +4,18 @@ import { API_BASE_URL } from '../../../../lib/constants';
 import { getAdminToken, downloadText } from '../../../../lib/adminHelpers';
 import { Download, Pencil, X, Check, RotateCcw, Plus, RefreshCw } from 'lucide-react';
 
+interface HealthResult {
+  label: string;
+  url: string;
+  httpStatus: number;
+  status?: string;
+  atlas?: string;
+  kmsProvider?: string;
+  timestamp?: string;
+  error?: string;
+  responseMs: number;
+}
+
 interface SystemInfo {
   os: Record<string, unknown>;
   node: Record<string, unknown>;
@@ -27,10 +39,13 @@ function isAppVar(key: string, dotenvSet: Set<string>): boolean {
 
 type RestartTarget = 'backend' | 'frontend';
 
+const HEALTH_URL = `${API_BASE_URL}/api/v1/system/health`;
+
 export default function InfoPage() {
   const [sysInfo, setSysInfo] = useState<SystemInfo | null>(null);
   const [sysLoading, setSysLoading] = useState(false);
   const [sysError, setSysError] = useState<string | null>(null);
+  const [health, setHealth] = useState<HealthResult | null>(null);
   const [envFilter, setEnvFilter] = useState('');
   const [restartRequired, setRestartRequired] = useState(false);
   const [addingVar, setAddingVar] = useState(false);
@@ -66,6 +81,17 @@ export default function InfoPage() {
       lines.push(`${k}=${v}`);
     }
     downloadText(`system-info-${Date.now()}.txt`, lines.join('\n'));
+  }
+
+  async function fetchHealth() {
+    const t0 = Date.now();
+    try {
+      const res = await fetch(HEALTH_URL);
+      const data = await res.json() as Record<string, unknown>;
+      setHealth({ label: '/api/v1/system/health', url: HEALTH_URL, httpStatus: res.status, responseMs: Date.now() - t0, ...data } as HealthResult);
+    } catch (err) {
+      setHealth({ label: '/api/v1/system/health', url: HEALTH_URL, httpStatus: 0, status: 'error', error: (err as Error).message, responseMs: Date.now() - t0 });
+    }
   }
 
   async function fetchSysInfo() {
@@ -146,13 +172,14 @@ export default function InfoPage() {
 
   useEffect(() => {
     fetchSysInfo();
+    fetchHealth();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex flex-col gap-4 lg:h-full">
       <div className="flex-shrink-0 flex items-center gap-3 flex-wrap">
         <button
-          onClick={fetchSysInfo}
+          onClick={() => { fetchSysInfo(); fetchHealth(); }}
           disabled={sysLoading}
           className="text-xs bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded disabled:opacity-40 transition-colors"
         >
@@ -250,6 +277,7 @@ export default function InfoPage() {
       {sysInfo && (
         <div className="lg:flex-1 lg:min-h-0">
           <div className="grid grid-cols-1 lg:grid-cols-2 lg:grid-rows-[auto_1fr] gap-4 lg:h-full">
+
             <InfoCard title="Operating System" icon="💻" fixed>
               {Object.entries(sysInfo.os).map(([k, v]) => (
                 <InfoRow key={k} label={k} value={String(v)} />
@@ -260,6 +288,22 @@ export default function InfoPage() {
               {Object.entries(sysInfo.node).map(([k, v]) => (
                 <InfoRow key={k} label={k} value={String(v)} />
               ))}
+              {health && (() => {
+                const ok = health.httpStatus === 200 && health.status === 'ok';
+                const degraded = health.httpStatus === 503;
+                const colour = ok ? 'text-green-400' : degraded ? 'text-yellow-400' : 'text-red-400';
+                const summary = ok
+                  ? `ok · atlas ${health.atlas} · ${health.responseMs}ms`
+                  : health.error
+                    ? `${health.error} (${health.responseMs}ms)`
+                    : `HTTP ${health.httpStatus} · ${health.responseMs}ms`;
+                return (
+                  <div className="text-xs py-0.5 border-b border-gray-800/60 flex gap-2 items-center group">
+                    <span className="min-w-[140px] flex-shrink-0 text-gray-500 font-mono truncate">/api/v1/system/health</span>
+                    <span className={`${colour} flex-1 min-w-0 break-all`}>{summary}</span>
+                  </div>
+                );
+              })()}
             </InfoCard>
 
             <InfoCard title="package.json" icon="📦">

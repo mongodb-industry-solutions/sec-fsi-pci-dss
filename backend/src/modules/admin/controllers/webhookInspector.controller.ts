@@ -43,6 +43,11 @@ export async function webhookInspectorController(fastify: FastifyInstance) {
     method: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
     url: '/hook',
     config: { skipAuth: true },
+    schema: {
+      tags: ['admin'],
+      summary: 'Webhook catch-all receiver',
+      description: 'Public endpoint that accepts any HTTP method and records the request in the in-memory buffer for inspection in the admin panel.',
+    },
     handler: async (request, reply) => {
       const entry: WebhookEntry = {
         id: uuidv4(),
@@ -62,7 +67,14 @@ export async function webhookInspectorController(fastify: FastifyInstance) {
   });
 
   // GET /webhook/stream — SSE, admin only; replays buffer on connect
-  fastify.get('/stream', async (request, reply) => {
+  fastify.get('/stream', {
+    schema: {
+      tags: ['admin'],
+      summary: 'Webhook SSE stream',
+      description: 'Server-Sent Events stream. Replays the in-memory buffer on connect, then pushes new events in real time. Admin JWT required.',
+      security: [{ adminAuth: [] }],
+    },
+  }, async (request, reply) => {
     if (!authorized(request.headers.authorization)) {
       return reply.status(401).send({ error: 'Unauthorized' });
     }
@@ -82,7 +94,14 @@ export async function webhookInspectorController(fastify: FastifyInstance) {
   });
 
   // DELETE /webhook/requests — clear buffer, admin only
-  fastify.delete('/requests', async (request, reply) => {
+  fastify.delete('/requests', {
+    schema: {
+      tags: ['admin'],
+      summary: 'Clear all webhook requests',
+      description: 'Clears the entire in-memory buffer and broadcasts a clear event to all connected SSE clients. Admin JWT required.',
+      security: [{ adminAuth: [] }],
+    },
+  }, async (request, reply) => {
     if (!authorized(request.headers.authorization)) {
       return reply.status(401).send({ error: 'Unauthorized' });
     }
@@ -92,7 +111,19 @@ export async function webhookInspectorController(fastify: FastifyInstance) {
   });
 
   // DELETE /webhook/requests/:id — remove single entry, admin only
-  fastify.delete<{ Params: { id: string } }>('/requests/:id', async (request, reply) => {
+  fastify.delete<{ Params: { id: string } }>('/requests/:id', {
+    schema: {
+      tags: ['admin'],
+      summary: 'Delete a single webhook request',
+      description: 'Removes one entry from the buffer by ID and broadcasts a delete event to all connected SSE clients. Admin JWT required.',
+      security: [{ adminAuth: [] }],
+      params: {
+        type: 'object',
+        properties: { id: { type: 'string', description: 'UUID of the webhook entry to delete' } },
+        required: ['id'],
+      },
+    },
+  }, async (request, reply) => {
     if (!authorized(request.headers.authorization)) {
       return reply.status(401).send({ error: 'Unauthorized' });
     }

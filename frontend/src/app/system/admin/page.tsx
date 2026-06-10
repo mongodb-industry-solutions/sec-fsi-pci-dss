@@ -20,13 +20,13 @@ interface Integration {
   bianServiceDomain: string;
 }
 
-const TYPE_META: Record<string, { label: string; icon: LucideIcon; description: string; bianSd: string }> = {
-  fraud_detection: { label: 'Fraud Detection',    icon: ShieldAlert,    description: 'Real-time transaction scoring and fraud signals', bianSd: 'SD-63' },
-  hrp_sanctions:   { label: 'HRP / Sanctions',    icon: ScanLine,       description: 'High-risk person and sanctions list screening',   bianSd: 'SD-13' },
-  kyc_identity:    { label: 'KYC / Identity',     icon: UserCheck,      description: 'Customer identity verification (KYC)',            bianSd: 'SD-53' },
-  kyb_business:    { label: 'KYB / Business',     icon: Building2,      description: 'Merchant business entity verification (KYB)',     bianSd: 'SD-89' },
-  aml_monitoring:  { label: 'AML Monitoring',     icon: AlertTriangle,  description: 'Anti-money laundering pattern analysis',          bianSd: 'SD-99' },
-  credit_bureau:   { label: 'Credit Bureau',      icon: CreditCard,     description: 'Credit scoring and bureau checks',                bianSd: 'SD-83' },
+const TYPE_META: Record<string, { label: string; icon: LucideIcon; description: string; bianSd: string; href: string }> = {
+  fraud_detection: { label: 'Fraud Detection',    icon: ShieldAlert,    description: 'Real-time transaction scoring and fraud signals', bianSd: 'SD-63',  href: '/system/admin/fraud-detection' },
+  hrp_sanctions:   { label: 'HRP / Sanctions',    icon: ScanLine,       description: 'High-risk person and sanctions list screening',   bianSd: 'SD-13',  href: '/system/admin/hrp' },
+  kyc_identity:    { label: 'KYC / Identity',     icon: UserCheck,      description: 'Customer identity verification (KYC)',            bianSd: 'SD-53',  href: '/system/admin/kyc' },
+  kyb_business:    { label: 'KYB / Business',     icon: Building2,      description: 'Merchant business entity verification (KYB)',     bianSd: 'SD-89',  href: '/system/admin/kyb' },
+  aml_monitoring:  { label: 'AML Monitoring',     icon: AlertTriangle,  description: 'Anti-money laundering pattern analysis',          bianSd: 'SD-99',  href: '/system/admin/aml' },
+  credit_bureau:   { label: 'Credit Bureau',      icon: CreditCard,     description: 'Credit scoring and bureau checks',                bianSd: 'SD-83',  href: '/system/admin/credit-bureau' },
 };
 
 function HealthBadge({ status }: { status?: string }) {
@@ -78,7 +78,7 @@ export default function AdminDashboardPage() {
               const active = activeByType[type];
               const Icon = meta.icon;
               return (
-                <Link key={type} href="/system/admin/integrations" className="group block bg-white rounded-xl border p-5 hover:border-[#001E2B]/30 hover:shadow-md transition-all">
+                <Link key={type} href={meta.href} className="group block bg-white rounded-xl border p-5 hover:border-[#001E2B]/30 hover:shadow-md transition-all">
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-slate-200 transition-colors">
                       <Icon size={20} className="text-slate-600" />

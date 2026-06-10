@@ -6,6 +6,7 @@ import {
   processKycCallback,
   processKybCallback,
   processHrpCallback,
+  processGenericCallback,
 } from '../services/integrationCallback.service';
 
 export async function integrationWebhookController(fastify: FastifyInstance) {
@@ -80,6 +81,19 @@ export async function integrationWebhookController(fastify: FastifyInstance) {
     if (!valid) return reply.code(errorCode ?? 401).send({ error: 'Invalid or missing webhook signature' });
 
     await processHrpCallback(fastify.db, provider!, request.body as never);
+    return { received: true };
+  });
+
+  // ── POST /webhooks/generic/:id/callback ────────────────────────────────────
+  fastify.post<{ Params: { id: string } }>('/generic/:id/callback', webhookOpts, async (request, reply) => {
+    const { id } = request.params;
+    const signature = request.headers['x-webhook-signature'] as string | undefined;
+    const bodyRaw = JSON.stringify(request.body);
+
+    const { valid, provider, errorCode } = await validateCallback(fastify.db, id, bodyRaw, signature);
+    if (!valid) return reply.code(errorCode ?? 401).send({ error: 'Invalid or missing webhook signature' });
+
+    await processGenericCallback(fastify.db, provider!, request.body as never);
     return { received: true };
   });
 }

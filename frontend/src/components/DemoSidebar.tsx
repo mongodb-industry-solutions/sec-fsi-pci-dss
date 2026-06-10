@@ -54,15 +54,15 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'My Profile',   path: '/system/profile',         icon: User },
   ],
   manager: [
-    { label: 'Hub',             path: '/system/admin',                                          icon: Settings2,    exact: true },
-    { label: 'Registry',        path: '/system/admin/integrations',                             icon: Plug,         exact: true },
-    { label: 'Fraud Detection', path: '/system/admin/integrations?type=fraud_detection',        icon: ShieldAlert },
-    { label: 'HRP / Sanctions', path: '/system/admin/integrations?type=hrp_sanctions',          icon: ScanLine },
-    { label: 'KYC / Identity',  path: '/system/admin/integrations?type=kyc_identity',           icon: UserCheck },
-    { label: 'KYB / Business',  path: '/system/admin/integrations?type=kyb_business',           icon: Building2 },
-    { label: 'AML Monitoring',  path: '/system/admin/integrations?type=aml_monitoring',         icon: AlertTriangle },
-    { label: 'Credit Bureau',   path: '/system/admin/integrations?type=credit_bureau',          icon: CreditCard },
-    { label: '+ Register',      path: '/system/admin/integrations/new',                         icon: PlusCircle },
+    { label: 'Hub',             path: '/system/admin',                    icon: Settings2,    exact: true },
+    { label: 'Registry',        path: '/system/admin/integrations',       icon: Plug,         exact: true },
+    { label: 'Fraud Detection', path: '/system/admin/fraud-detection',    icon: ShieldAlert },
+    { label: 'HRP / Sanctions', path: '/system/admin/hrp',                icon: ScanLine },
+    { label: 'KYC / Identity',  path: '/system/admin/kyc',                icon: UserCheck },
+    { label: 'KYB / Business',  path: '/system/admin/kyb',                icon: Building2 },
+    { label: 'AML Monitoring',  path: '/system/admin/aml',                icon: AlertTriangle },
+    { label: 'Credit Bureau',   path: '/system/admin/credit-bureau',      icon: CreditCard },
+    { label: '+ Register',      path: '/system/admin/integrations/new',   icon: PlusCircle },
   ],
 };
 
@@ -132,7 +132,12 @@ export function DemoSidebar() {
         })}
       </nav>
 
-      <div className="border-t border-white/10 p-3 flex flex-col items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => setCollapsed(c => !c)}
+        title={collapsed ? 'Expand menu' : 'Collapse menu'}
+        className="border-t border-white/10 p-3 flex flex-col items-center gap-1.5 w-full hover:bg-white/5 transition-colors"
+      >
         <div className={`overflow-hidden rounded-full shrink-0 ${collapsed ? 'w-8 h-8' : 'w-12 h-12'}`}>
           <Image
             src="/mongodb-badge.png"
@@ -147,7 +152,7 @@ export function DemoSidebar() {
             Built on<br />MongoDB Atlas
           </span>
         )}
-      </div>
+      </button>
     </aside>
   );
 }

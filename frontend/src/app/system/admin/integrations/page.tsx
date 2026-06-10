@@ -22,6 +22,8 @@ interface Integration {
   externalProviderApiEndpoint?: string;
   externalProviderHealthStatus?: string;
   externalProviderLastHealthCheckAt?: string;
+  routingGroupId?: string;
+  routingPriority?: number;
   bianServiceDomain: string;
   pciDssRequirements: string[];
   recordCreatedDateTime: string;
@@ -34,6 +36,7 @@ const TYPE_LABEL: Record<string, string> = {
   kyb_business:    'KYB / Business',
   aml_monitoring:  'AML Monitoring',
   credit_bureau:   'Credit Bureau',
+  generic:         'Generic',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -236,6 +239,7 @@ export default function IntegrationsListPage() {
                   <th className="text-left px-4 py-3 font-medium">Mode</th>
                   <th className="text-left px-4 py-3 font-medium">Status</th>
                   <th className="text-left px-4 py-3 font-medium">Health</th>
+                  <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Routing</th>
                   {debugMode && <th className="text-left px-4 py-3 font-medium">BIAN</th>}
                   <th className="text-right px-4 py-3 font-medium">Actions</th>
                 </tr>
@@ -279,6 +283,15 @@ export default function IntegrationsListPage() {
                           </span>
                         )}
                       </div>
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      {i.routingGroupId ? (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200 font-medium">
+                          {(i.routingPriority ?? 100) <= 50 ? 'Primary' : 'Fallback'}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">Single</span>
+                      )}
                     </td>
                     {debugMode && (
                       <td className="px-4 py-3 text-xs text-gray-400 font-mono">{i.bianServiceDomain}</td>

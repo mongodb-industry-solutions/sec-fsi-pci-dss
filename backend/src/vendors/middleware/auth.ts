@@ -7,6 +7,7 @@ const JWT_SECRET = process.env.JWT_SECRET ?? 'demo-local-secret-change-in-produc
 // Exact URL matches that bypass JWT auth
 const PUBLIC_EXACT: Set<string> = new Set([
   '/',
+  '/health',
   '/api/v1/system/health',
   '/api/v1/system/users',
   '/api/v1/auth/login',
