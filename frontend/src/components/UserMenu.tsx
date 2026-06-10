@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Bug, ChevronDown, LogOut, UserCircle2 } from 'lucide-react';
 import { ROLE_LABELS } from '../lib/constants';
 import { useDebugMode } from '../lib/debugMode';
-import { decodeToken } from '../lib/auth';
+import { clearToken, decodeToken } from '../lib/auth';
 
 export type DecodedUser = NonNullable<ReturnType<typeof decodeToken>>;
 
@@ -67,7 +67,7 @@ export function UserMenu({ user, onSignOut }: UserMenuProps) {
 
   function handleSignOut() {
     setOpen(false);
-    localStorage.removeItem('demo_token');
+    clearToken();
     if (onSignOut) {
       onSignOut();
     } else {

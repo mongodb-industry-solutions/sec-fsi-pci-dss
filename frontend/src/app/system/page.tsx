@@ -9,7 +9,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { api, AuthUser, AuthDomain } from '../../lib/api';
-import { getToken, setToken, decodeToken, isTokenExpired } from '../../lib/auth';
+import { getToken, setToken, clearToken, decodeToken, isTokenExpired } from '../../lib/auth';
 import { DEMO_USERS_PASSWORDS, ROLE_LABELS } from '../../lib/constants';
 import { Tooltip } from '../../components/Tooltip';
 import { useDebugMode } from '../../lib/debugMode';
@@ -378,7 +378,7 @@ export default function SystemPage() {
   useEffect(() => { checkAuth(); }, [checkAuth]);
 
   function signOut() {
-    localStorage.removeItem('demo_token');
+    clearToken();
     setUser(null);
     setChecked(true);
   }
