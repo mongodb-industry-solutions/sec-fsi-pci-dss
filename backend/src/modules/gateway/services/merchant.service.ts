@@ -37,19 +37,25 @@ export interface CreateMerchantInput {
 
 export async function getMerchants(
   db: Db,
-  filters: { status?: MerchantAgreementStatus; mcc?: string }
+  filters: { status?: MerchantAgreementStatus; mcc?: string; name?: string; risk?: string; page?: number; limit?: number }
 ) {
   const query: Record<string, unknown> = {};
   if (filters.status) query.merchantAgreementStatus = filters.status;
   if (filters.mcc) query.merchantCategoryCode = filters.mcc;
+  if (filters.name) query.merchantName = { $regex: filters.name, $options: 'i' };
+  if (filters.risk) query.merchantRiskCategory = filters.risk;
 
-  const results = await db
-    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
-    .find(query)
-    .project({ merchantApiKeys: 0 }) // Never expose key hashes
-    .toArray();
+  const page = Math.max(1, filters.page ?? 1);
+  const limit = Math.min(100, Math.max(1, filters.limit ?? 20));
+  const skip = (page - 1) * limit;
 
-  return { results, total: results.length };
+  const col = db.collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION);
+  const [results, total] = await Promise.all([
+    col.find(query).project({ merchantApiKeys: 0 }).skip(skip).limit(limit).toArray(),
+    col.countDocuments(query),
+  ]);
+
+  return { results, total };
 }
 
 // Ch-05: dual-role lookup — customer finds their own merchant by partyRef (SD-13 FK)

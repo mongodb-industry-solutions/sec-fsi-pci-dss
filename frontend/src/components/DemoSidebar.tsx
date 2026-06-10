@@ -87,7 +87,7 @@ export function DemoSidebar() {
   const role    = useRole();
   const items   = NAV_BY_ROLE[role] ?? [];
   const isActive = useActiveItem();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   return (
     <aside className={`

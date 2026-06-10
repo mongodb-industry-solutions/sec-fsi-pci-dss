@@ -14,6 +14,7 @@ import { DEMO_USERS_PASSWORDS, ROLE_LABELS } from '../../lib/constants';
 import { Tooltip } from '../../components/Tooltip';
 import { useDebugMode } from '../../lib/debugMode';
 import { UserMenu } from '../../components/UserMenu';
+import { DemoSidebar, MobileBottomNav } from '../../components/DemoSidebar';
 
 type DecodedUser = NonNullable<ReturnType<typeof decodeToken>>;
 
@@ -314,8 +315,10 @@ function RoleDashboard({ user, onSignOut }: { user: DecodedUser; onSignOut: () =
         <UserMenu user={user} onSignOut={onSignOut} />
       </header>
 
-      {/* Content */}
-      <main className="flex-1 bg-gray-50">
+      {/* Sidebar + Content */}
+      <div className="flex flex-1">
+        <DemoSidebar />
+        <main className="flex-1 min-w-0 bg-gray-50 pb-16 md:pb-0">
         <div className="w-full px-5 sm:px-8 lg:px-12 py-8">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900">Welcome, {user.name.split(' ')[0]}</h1>
@@ -358,7 +361,9 @@ function RoleDashboard({ user, onSignOut }: { user: DecodedUser; onSignOut: () =
             </div>
           )}
         </div>
-      </main>
+        </main>
+      </div>
+      <MobileBottomNav />
     </div>
   );
 }

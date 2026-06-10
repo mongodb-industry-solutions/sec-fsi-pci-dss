@@ -432,7 +432,7 @@ export const api = {
         { method: 'PATCH', body: JSON.stringify(body) },
         token
       ),
-    list: (filters: { status?: string; mcc?: string }, token: string) => {
+    list: (filters: { status?: string; mcc?: string; name?: string; risk?: string; page?: number; limit?: number }, token: string) => {
       const qs = new URLSearchParams(
         Object.entries(filters).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])
       ).toString();

@@ -2,7 +2,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
-import { CheckCircle2, XCircle, Clock, AlertTriangle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Search, X } from 'lucide-react';
+import { useDebugMode } from '../../../../lib/debugMode';
+import { Pagination } from '../../../../components/Pagination';
 
 interface MerchantRecord {
   merchantAgreementInstanceReference: string;
@@ -27,11 +29,13 @@ interface ReviewState {
 }
 
 const MCC_LABELS: Record<string, string> = {
-  '5812': 'Restaurants',
   '5411': 'Grocery Stores',
+  '5812': 'Restaurants',
   '5999': 'Retail',
-  '7389': 'Consulting',
   '6011': 'ATM / Cash',
+  '7371': 'IT Services',
+  '7372': 'Software',
+  '7389': 'Consulting',
   '7995': 'Gambling',
 };
 
@@ -42,15 +46,68 @@ export default function MerchantReviewPage() {
   const [loading, setLoading] = useState(true);
   const [reviewState, setReviewState] = useState<Record<string, ReviewState>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [searchInput, setSearchInput] = useState('');
+  const [filterName, setFilterName] = useState('');
+  const [filterMcc, setFilterMcc] = useState('');
+  const [filterRisk, setFilterRisk] = useState('');
+  const { debugMode } = useDebugMode();
 
-  const loadQueue = useCallback(async (tok: string) => {
+  const loadQueue = useCallback(async (
+    tok: string,
+    p = 1,
+    ps = 10,
+    name = '',
+    mcc = '',
+    risk = '',
+  ) => {
     setLoading(true);
     try {
-      const res = await api.merchants.list({ status: 'under_review' }, tok);
+      const res = await api.merchants.list({
+        status: 'under_review',
+        page: p,
+        limit: ps,
+        ...(name && { name }),
+        ...(mcc && { mcc }),
+        ...(risk && { risk }),
+      }, tok);
       setMerchants(res.results as unknown as MerchantRecord[]);
+      setTotal(res.total);
     } catch {}
     setLoading(false);
   }, []);
+
+  function applySearch() {
+    const name = searchInput.trim();
+    setFilterName(name);
+    setPage(1);
+    loadQueue(token, 1, pageSize, name, filterMcc, filterRisk);
+  }
+
+  function handleMccChange(mcc: string) {
+    setFilterMcc(mcc);
+    setPage(1);
+    loadQueue(token, 1, pageSize, filterName, mcc, filterRisk);
+  }
+
+  function handleRiskChange(risk: string) {
+    setFilterRisk(risk);
+    setPage(1);
+    loadQueue(token, 1, pageSize, filterName, filterMcc, risk);
+  }
+
+  function clearFilters() {
+    setSearchInput('');
+    setFilterName('');
+    setFilterMcc('');
+    setFilterRisk('');
+    setPage(1);
+    loadQueue(token, 1, pageSize, '', '', '');
+  }
+
+  const hasFilters = filterName || filterMcc || filterRisk;
 
   useEffect(() => {
     const t = getToken() ?? '';
@@ -58,7 +115,7 @@ export default function MerchantReviewPage() {
     if (!t) return;
     const decoded = decodeToken(t);
     setRole(decoded?.role ?? '');
-    loadQueue(t);
+    loadQueue(t, 1, pageSize, '', '', '');
   }, [loadQueue]);
 
   function initReview(merchantId: string, action: 'approve' | 'reject') {
@@ -110,26 +167,26 @@ export default function MerchantReviewPage() {
         <div className="text-sm text-gray-500">
           This page is restricted to <code className="bg-gray-100 px-1 rounded">merchant_officer</code> and <code className="bg-gray-100 px-1 rounded">security_auditor</code> roles.
         </div>
-        <div className="text-xs text-gray-400 mt-2">PCI DSS Req 7.1 — Least privilege access control</div>
+        {debugMode && <div className="text-xs text-gray-400 mt-2">PCI DSS Req 7.1 — Least privilege access control</div>}
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <Clock size={20} className="text-amber-500" />
+            <Clock size={20} className="text-[#001E2B]" />
             <h1 className="text-xl font-bold text-gray-900">Merchant Review Queue</h1>
           </div>
           <p className="text-sm text-gray-500 mt-0.5">
-            KYB review — BIAN SD-89 Action: Control. Approve or reject pending merchant applications.
+            {debugMode ? 'KYB review — BIAN SD-89 Action: Control. Approve or reject pending merchant applications.' : 'Approve or reject pending merchant applications.'}
           </p>
         </div>
         <button
-          onClick={() => loadQueue(token)}
+          onClick={() => loadQueue(token, page, pageSize, filterName, filterMcc, filterRisk)}
           disabled={loading}
           className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 transition-colors disabled:opacity-40"
         >
@@ -138,14 +195,74 @@ export default function MerchantReviewPage() {
         </button>
       </div>
 
-      {/* BIAN + PCI info strip */}
-      <div className="flex flex-wrap gap-2">
-        <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 text-xs text-blue-700 font-medium">
-          <span className="font-bold">BIAN SD-89</span> · Action: Control
-        </span>
-        <span className="inline-flex items-center gap-1 bg-purple-50 border border-purple-200 rounded-full px-3 py-1 text-xs text-purple-700">
-          PCI DSS Req 7.1 · Req 12.8
-        </span>
+      {/* BIAN + PCI info strip — debug mode only */}
+      {debugMode && (
+        <div className="flex flex-wrap gap-2">
+          <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 text-xs text-blue-700 font-medium">
+            <span className="font-bold">BIAN SD-89</span> · Action: Control
+          </span>
+          <span className="inline-flex items-center gap-1 bg-purple-50 border border-purple-200 rounded-full px-3 py-1 text-xs text-purple-700">
+            PCI DSS Req 7.1 · Req 12.8
+          </span>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="bg-white border rounded-xl p-4 space-y-3">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && applySearch()}
+            placeholder="Search by merchant name…"
+            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+          />
+          <button
+            onClick={applySearch}
+            disabled={!searchInput.trim() && !filterName}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold disabled:opacity-50"
+          >
+            <Search size={14} />
+            <span className="hidden sm:inline">Search</span>
+          </button>
+          {hasFilters && (
+            <button
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50"
+            >
+              <X size={14} />
+              <span className="hidden sm:inline">Clear</span>
+            </button>
+          )}
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <select
+            value={filterMcc}
+            onChange={(e) => handleMccChange(e.target.value)}
+            className="border rounded-lg px-3 py-1.5 text-sm bg-white"
+          >
+            <option value="">All categories</option>
+            {Object.entries(MCC_LABELS).map(([code, label]) => (
+              <option key={code} value={code}>{label}</option>
+            ))}
+          </select>
+          <select
+            value={filterRisk}
+            onChange={(e) => handleRiskChange(e.target.value)}
+            className="border rounded-lg px-3 py-1.5 text-sm bg-white"
+          >
+            <option value="">All risk levels</option>
+            <option value="low">Low risk</option>
+            <option value="medium">Medium risk</option>
+            <option value="high">High risk</option>
+          </select>
+          {!loading && (
+            <span className="text-sm text-gray-400 self-center ml-auto">
+              {total} application{total !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Queue */}
@@ -158,6 +275,7 @@ export default function MerchantReviewPage() {
           <div className="text-sm text-gray-500">No applications pending review.</div>
         </div>
       ) : (
+        <>
         <div className="space-y-3">
           {merchants.map((m) => {
             const rs = reviewState[m.merchantAgreementInstanceReference];
@@ -177,15 +295,18 @@ export default function MerchantReviewPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-gray-800">{m.merchantName}</span>
-                      <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">under_review</span>
+                      <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">Pending Review</span>
+                      <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+                        {MCC_LABELS[m.merchantCategoryCode] ?? m.merchantCategoryCode}
+                      </span>
                       {isHighRisk && (
                         <span className="text-xs px-2 py-0.5 bg-red-100 text-red-600 rounded-full flex items-center gap-1">
-                          <AlertTriangle size={10} /> high risk MCC
+                          <AlertTriangle size={10} /> High risk
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-gray-400 mt-0.5 font-mono">
-                      MCC {m.merchantCategoryCode}{MCC_LABELS[m.merchantCategoryCode] ? ` (${MCC_LABELS[m.merchantCategoryCode]})` : ''} · {m.merchantCountryCode}
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      {m.merchantCountryCode}
                       {m.recordCreatedDateTime && ` · Submitted ${new Date(m.recordCreatedDateTime).toLocaleDateString()}`}
                     </div>
                   </div>
@@ -228,16 +349,18 @@ export default function MerchantReviewPage() {
                       }`}>
                         <div className={`flex items-center gap-2 font-medium ${rs.action === 'approve' ? 'text-green-700' : 'text-gray-600'}`}>
                           {rs.action === 'approve'
-                            ? <><CheckCircle2 size={16} /> Application approved — status → agreed</>
+                            ? <><CheckCircle2 size={16} /> Application approved</>
                             : <><XCircle size={16} /> Application rejected</>
                           }
                         </div>
-                        <div className="mt-1.5 text-xs text-gray-500 font-mono">
-                          KYB: merchantAgreementKybCheckStatus → <span className={rs.action === 'approve' ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>
-                            {rs.action === 'approve' ? 'verified' : 'rejected'}
-                          </span>
-                          {' '}· SD-89 BQ:Step · PCI Req 12.8
-                        </div>
+                        {debugMode && (
+                          <div className="mt-1.5 text-xs text-gray-500 font-mono">
+                            KYB: merchantAgreementKybCheckStatus → <span className={rs.action === 'approve' ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>
+                              {rs.action === 'approve' ? 'verified' : 'rejected'}
+                            </span>
+                            {' '}· SD-89 BQ:Step · PCI Req 12.8
+                          </div>
+                        )}
                       </div>
                     ) : rs ? (
                       <div className="space-y-3 bg-gray-50 rounded-lg p-3">
@@ -246,7 +369,7 @@ export default function MerchantReviewPage() {
                         </div>
                         <div>
                           <label className="block text-xs text-gray-500 mb-1">
-                            KYB Note {rs.action === 'reject' && <span className="text-red-500">*</span>}
+                            Review note {rs.action === 'reject' && <span className="text-red-500">*</span>}
                             {rs.action === 'approve' && <span className="text-gray-400"> (optional)</span>}
                           </label>
                           <textarea
@@ -301,10 +424,23 @@ export default function MerchantReviewPage() {
             );
           })}
         </div>
+
+        <Pagination
+          page={page}
+          totalPages={Math.max(1, Math.ceil(total / pageSize))}
+          total={total}
+          limit={pageSize}
+          onPageChange={(p) => { setPage(p); loadQueue(token, p, pageSize, filterName, filterMcc, filterRisk); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          onLimitChange={(ps) => { setPageSize(ps); setPage(1); loadQueue(token, 1, ps, filterName, filterMcc, filterRisk); }}
+          limitOptions={[5, 10, 20, 50]}
+          noun="applications"
+        />
+      </>
       )}
 
       <div className="text-xs text-gray-400 text-center pt-2">
-        Reviewed by: <span className="font-medium">{role}</span> · Approval recorded to audit trail (SD-89 → merchantReviewedByPartyReference)
+        Reviewed by: <span className="font-medium">{role}</span>
+        {debugMode && ' · Approval recorded to audit trail (SD-89 → merchantReviewedByPartyReference)'}
       </div>
     </div>
   );

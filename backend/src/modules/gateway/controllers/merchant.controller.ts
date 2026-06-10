@@ -24,6 +24,10 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
         properties: {
           status: { type: 'string', enum: ['initiated', 'under_review', 'agreed', 'active', 'amended', 'suspended', 'rejected', 'closed'], description: 'Filter by agreement status.' },
           mcc: { type: 'string', description: 'Filter by Merchant Category Code (ISO 18245).' },
+          name: { type: 'string', description: 'Case-insensitive partial match on merchant name.' },
+          risk: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Filter by risk category.' },
+          page: { type: 'integer', minimum: 1, default: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
         },
       },
       response: {
@@ -61,8 +65,8 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
     if (user?.role === 'customer') {
       return reply.status(403).send({ error: 'Access denied: use GET /merchants/:id to view your own merchant.' });
     }
-    const { status, mcc } = request.query as { status?: string; mcc?: string };
-    const result = await getMerchants(fastify.db, { status: status as never, mcc });
+    const { status, mcc, name, risk, page, limit } = request.query as { status?: string; mcc?: string; name?: string; risk?: string; page?: number; limit?: number };
+    const result = await getMerchants(fastify.db, { status: status as never, mcc, name, risk, page, limit });
     return reply.send(result);
   });
 

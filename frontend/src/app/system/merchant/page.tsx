@@ -1,14 +1,14 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { useDebugMode } from '../../../lib/debugMode';
 import {
   Link2, ShoppingCart, Key, Webhook, Copy, Check, Plus, Trash2, ExternalLink,
   Clock, CheckCircle2, XCircle, Store, ChevronRight, ShieldCheck,
-  Building2, MapPin, FileText, ArrowRight, Info,
+  Building2, MapPin, FileText, ArrowRight, Info, Filter, Search, X,
 } from 'lucide-react';
+import { Pagination } from '../../../components/Pagination';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -127,7 +127,7 @@ function MerchantApplicationForm({ token, onSubmitted }: { token: string; onSubm
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <Store size={20} className="text-gray-500" />
+          <Store size={20} className="text-[#001E2B]" />
           <h1 className="text-2xl font-bold">Request Merchant Account</h1>
         </div>
         <p className="text-sm text-gray-500">
@@ -669,7 +669,7 @@ function MerchantSandbox({ token, merchants, onRefresh }: { token: string; merch
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <CheckCircle2 size={18} className="text-gray-500" />
+            <CheckCircle2 size={18} className="text-[#00ED64]" />
             <h1 className="text-2xl font-bold">Merchant Sandbox</h1>
           </div>
           <p className="text-sm text-gray-500 mt-0.5">Test Redirect Checkout and Payment Links integration.</p>
@@ -975,82 +975,210 @@ function MerchantSandbox({ token, merchants, onRefresh }: { token: string; merch
 
 // ── Analyst View (full merchant list) ─────────────────────────────────────────
 
-function AnalystMerchantView({ token }: { token: string }) {
+const MERCHANT_PAGE_SIZE = 10;
+
+const STATUS_COLORS: Record<string, string> = {
+  active:       'bg-green-100 text-green-700',
+  agreed:       'bg-blue-100 text-blue-700',
+  under_review: 'bg-amber-100 text-amber-700',
+  suspended:    'bg-red-100 text-red-700',
+  rejected:     'bg-gray-100 text-gray-500',
+  closed:       'bg-gray-100 text-gray-500',
+};
+
+// Statuses accessible to merchant_officer (PCI DSS Req 7.1 — least privilege)
+const STATUS_LABELS: Record<string, string> = {
+  initiated:    'Initiated',
+  under_review: 'Under Review',
+  agreed:       'Agreed',
+  active:       'Active',
+  amended:      'Amended',
+  suspended:    'Suspended',
+  rejected:     'Rejected',
+  closed:       'Closed',
+};
+
+const OFFICER_STATUSES = ['under_review', 'agreed', 'rejected'];
+const ALL_STATUSES     = ['initiated', 'under_review', 'agreed', 'active', 'amended', 'suspended', 'rejected', 'closed'];
+
+function AnalystMerchantView({ token, role }: { token: string; role: string }) {
   const { debugMode } = useDebugMode();
-  const [merchants, setMerchants] = useState<MerchantRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('');
+  const isMerchantOfficer = role === 'merchant_officer';
 
-  useEffect(() => {
+  const [merchants, setMerchants]   = useState<MerchantRecord[]>([]);
+  const [total, setTotal]           = useState(0);
+  const [page, setPage]             = useState(1);
+  const [pageSize, setPageSize]     = useState(MERCHANT_PAGE_SIZE);
+  const [loading, setLoading]       = useState(true);
+  const [statusFilter, setStatusFilter] = useState(isMerchantOfficer ? 'under_review' : '');
+  const [nameInput, setNameInput]   = useState('');
+  const [nameFilter, setNameFilter] = useState('');
+
+  const load = useCallback(async (p: number, ps: number, status: string, name: string) => {
     setLoading(true);
-    api.merchants.list(statusFilter ? { status: statusFilter } : {}, token)
-      .then((res) => setMerchants(res.results as unknown as MerchantRecord[]))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [token, statusFilter]);
+    try {
+      const filters: { page: number; limit: number; status?: string; name?: string } = { page: p, limit: ps };
+      if (status) filters.status = status;
+      if (name)   filters.name   = name;
+      const res = await api.merchants.list(filters, token);
+      setMerchants(res.results as unknown as MerchantRecord[]);
+      setTotal(res.total);
+    } catch {
+      setMerchants([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const STATUS_COLORS: Record<string, string> = {
-    active: 'bg-green-100 text-green-700',
-    agreed: 'bg-blue-100 text-blue-700',
-    under_review: 'bg-amber-100 text-amber-700',
-    suspended: 'bg-red-100 text-red-700',
-    rejected: 'bg-gray-100 text-gray-500',
-    closed: 'bg-gray-100 text-gray-500',
-  };
+  useEffect(() => { load(1, pageSize, statusFilter, nameFilter); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleSearch() {
+    const v = nameInput.trim();
+    setNameFilter(v);
+    setPage(1);
+    load(1, pageSize, statusFilter, v);
+  }
+
+  function handleStatusChange(s: string) {
+    setStatusFilter(s);
+    setPage(1);
+    load(1, pageSize, s, nameFilter);
+  }
+
+  function handleClear() {
+    const defaultStatus = isMerchantOfficer ? 'under_review' : '';
+    setNameInput('');
+    setNameFilter('');
+    setStatusFilter(defaultStatus);
+    setPage(1);
+    load(1, pageSize, defaultStatus, '');
+  }
+
+  function handlePageChange(newPage: number) {
+    setPage(newPage);
+    load(newPage, pageSize, statusFilter, nameFilter);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function handleLimitChange(newLimit: number) {
+    setPageSize(newLimit);
+    setPage(1);
+    load(1, newLimit, statusFilter, nameFilter);
+  }
+
+  const totalPages  = Math.max(1, Math.ceil(total / pageSize));
+  const hasFilters  = !!nameFilter || (isMerchantOfficer ? statusFilter !== 'under_review' : !!statusFilter);
+  const statuses    = isMerchantOfficer ? OFFICER_STATUSES : ALL_STATUSES;
 
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Merchant Agreements</h1>
-          {debugMode && <p className="text-xs text-gray-400 font-mono mt-0.5">SD-89 · MerchantAgreementProcedure</p>}
+
+      <div>
+        <h1 className="text-2xl font-bold">
+          {isMerchantOfficer ? 'Merchant Review Queue' : 'Merchant Agreements'}
+        </h1>
+        {debugMode && (
+          <p className="text-xs text-gray-400 font-mono mt-0.5">
+            SD-89 · MerchantAgreementProcedure
+            {isMerchantOfficer && ' · PCI DSS Req 7.1 — scope: review states only'}
+          </p>
+        )}
+      </div>
+
+      {/* Search + filters */}
+      <div className="bg-white rounded-xl border p-4 space-y-3">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            placeholder="Search by merchant name…"
+            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+          />
+          <button
+            onClick={handleSearch}
+            disabled={!nameInput.trim()}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold disabled:opacity-50"
+          >
+            <Search size={14} />
+            <span className="hidden sm:inline">Search</span>
+          </button>
+          {hasFilters && (
+            <button
+              onClick={handleClear}
+              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50"
+            >
+              <X size={14} />
+              <span className="hidden sm:inline">Clear</span>
+            </button>
+          )}
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
-        >
-          <option value="">All statuses</option>
-          {['initiated','under_review','agreed','active','amended','suspended','rejected','closed'].map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
+
+        <div className="flex gap-3 flex-wrap items-center">
+          <Filter size={14} className="text-gray-400 shrink-0" />
+          <select
+            value={statusFilter}
+            onChange={(e) => handleStatusChange(e.target.value)}
+            className="border rounded-lg px-3 py-1.5 text-sm bg-white"
+          >
+            {!isMerchantOfficer && <option value="">All statuses</option>}
+            {statuses.map((s) => <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>)}
+          </select>
+          <span className="text-gray-400 text-sm self-center ml-auto">{total} merchants</span>
+        </div>
       </div>
 
       {loading ? (
         <div className="text-center py-12 text-gray-400 text-sm">Loading...</div>
       ) : merchants.length === 0 ? (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">No merchants found.</div>
-      ) : (
-        <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
-          {merchants.map((m) => (
-            <div key={m.merchantAgreementInstanceReference} className="px-5 py-4 flex items-center gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-800">{m.merchantName}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[m.merchantAgreementStatus] ?? 'bg-gray-100 text-gray-600'}`}>
-                    {m.merchantAgreementStatus}
-                  </span>
-                  {m.merchantRiskCategory === 'high' && (
-                    <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-600 rounded-full">high risk</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span className="text-xs text-gray-400 font-mono">
-                    MCC {m.merchantCategoryCode} · {m.merchantCountryCode}
-                    {m.merchantTier && ` · ${m.merchantTier}`}
-                  </span>
-                  {m.merchantAgreementKybCheck && (
-                    <KybStatusBadge kyb={m.merchantAgreementKybCheck} compact />
-                  )}
-                </div>
-              </div>
-              <div className="text-xs text-gray-400 font-mono shrink-0 hidden sm:block truncate max-w-[180px]">
-                {m.merchantAgreementInstanceReference}
-              </div>
-            </div>
-          ))}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
+          No merchants found{hasFilters ? ' matching the current filters.' : '.'}
         </div>
+      ) : (
+        <>
+          <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+            {merchants.map((m) => (
+              <div key={m.merchantAgreementInstanceReference} className="px-5 py-4 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-gray-800">{m.merchantName}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[m.merchantAgreementStatus] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {STATUS_LABELS[m.merchantAgreementStatus] ?? m.merchantAgreementStatus}
+                    </span>
+                    {m.merchantRiskCategory === 'high' && (
+                      <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-600 rounded-full">high risk</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-xs text-gray-400 font-mono">
+                      MCC {m.merchantCategoryCode} · {m.merchantCountryCode}
+                      {m.merchantTier && ` · ${m.merchantTier}`}
+                    </span>
+                    {m.merchantAgreementKybCheck && (
+                      <KybStatusBadge kyb={m.merchantAgreementKybCheck} compact />
+                    )}
+                  </div>
+                </div>
+                <div className="text-xs text-gray-400 font-mono shrink-0 hidden sm:block truncate max-w-[180px]">
+                  {m.merchantAgreementInstanceReference}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={pageSize}
+            onPageChange={handlePageChange}
+            onLimitChange={handleLimitChange}
+            limitOptions={[10, 20, 50]}
+            noun="merchants"
+          />
+        </>
       )}
     </div>
   );
@@ -1059,7 +1187,6 @@ function AnalystMerchantView({ token }: { token: string }) {
 // ── Root Page: Role-Based State Machine ───────────────────────────────────────
 
 export default function MerchantPage() {
-  const router = useRouter();
   const [token, setToken] = useState('');
   const [role, setRole] = useState('');
   const [merchantState, setMerchantState] = useState<MerchantState>('loading');
@@ -1102,19 +1229,12 @@ export default function MerchantPage() {
     const r = decoded?.role ?? '';
     setRole(r);
 
-    if (r === 'merchant_officer') {
-      // Officers have a dedicated review page
-      router.replace('/system/merchant/review');
-      return;
-    }
-
     if (r === 'customer') {
       loadOwnMerchant(t);
     } else {
-      // level1_analyst, level2_investigator, security_auditor
       loadAnalystList(t);
     }
-  }, [router, loadOwnMerchant, loadAnalystList]);
+  }, [loadOwnMerchant, loadAnalystList]);
 
   if (merchantState === 'loading') {
     return (
@@ -1150,13 +1270,10 @@ export default function MerchantPage() {
     );
   }
 
-  // Analysts: full list view + sandbox
+  // Staff roles (analyst, merchant_officer, auditor): full merchant list only
   if (merchantState === 'analyst_list') {
-    if (analystMerchants.length === 0) {
-      return <AnalystMerchantView token={token} />;
-    }
-    return <MerchantSandbox token={token} merchants={analystMerchants} onRefresh={() => loadAnalystList(token)} />;
+    return <AnalystMerchantView token={token} role={role} />;
   }
 
-  return <AnalystMerchantView token={token} />;
+  return <AnalystMerchantView token={token} role={role} />;
 }
