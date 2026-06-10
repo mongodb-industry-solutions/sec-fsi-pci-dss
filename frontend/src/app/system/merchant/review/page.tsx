@@ -223,13 +223,21 @@ export default function MerchantReviewPage() {
 
                     {/* Review form */}
                     {rs?.done ? (
-                      <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${
-                        rs.action === 'approve' ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-600'
+                      <div className={`rounded-lg px-3 py-2.5 text-sm ${
+                        rs.action === 'approve' ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'
                       }`}>
-                        {rs.action === 'approve'
-                          ? <><CheckCircle2 size={16} /> Application approved — status → agreed</>
-                          : <><XCircle size={16} /> Application rejected</>
-                        }
+                        <div className={`flex items-center gap-2 font-medium ${rs.action === 'approve' ? 'text-green-700' : 'text-gray-600'}`}>
+                          {rs.action === 'approve'
+                            ? <><CheckCircle2 size={16} /> Application approved — status → agreed</>
+                            : <><XCircle size={16} /> Application rejected</>
+                          }
+                        </div>
+                        <div className="mt-1.5 text-xs text-gray-500 font-mono">
+                          KYB: merchantAgreementKybCheckStatus → <span className={rs.action === 'approve' ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>
+                            {rs.action === 'approve' ? 'verified' : 'rejected'}
+                          </span>
+                          {' '}· SD-89 BQ:Step · PCI Req 12.8
+                        </div>
                       </div>
                     ) : rs ? (
                       <div className="space-y-3 bg-gray-50 rounded-lg p-3">

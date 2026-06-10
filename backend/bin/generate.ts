@@ -264,11 +264,18 @@ async function main() {
       customerAgreementEnrollmentDate: faker.date.past({ years: 2 }),
       customerAgreementPreferredLanguage: 'en',
       customerAgreementPreferredPaymentCardReference: null,
+      // Ch-06: BQ:Step — KYC identity verification (BIAN SD-53 BQ:Step). PCI DSS Req 8.1.
+      customerAgreementKycCheck: {
+        customerAgreementKycCheckStatus: 'verified',
+        customerAgreementKycCheckCompletedDate: faker.date.recent({ days: 365 }),
+        customerAgreementKycCheckReference: `KYC-${faker.string.alphanumeric(8).toUpperCase()}`,
+        customerAgreementKycCheckNotes: 'Identity verified via document check at onboarding',
+      },
       bianServiceDomain: 'Customer Agreement',
       bianControlRecordType: 'CustomerAgreementProcedure',
       recordCreatedDateTime: faker.date.past({ years: 2 }),
       recordUpdatedDateTime: NOW,
-      schemaVersion: 2,
+      schemaVersion: 3,
     });
   }
 

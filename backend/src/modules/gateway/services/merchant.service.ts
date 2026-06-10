@@ -9,6 +9,8 @@ import {
   MERCHANT_AGREEMENT_COLLECTION,
   MerchantAgreementControlRecord,
   MerchantAgreementStatus,
+  MerchantAgreementKybCheck,
+  KybCheckStatus,
   MerchantApiKeyRecord,
 } from '../models/merchantAgreement.model';
 
@@ -98,6 +100,10 @@ export async function createMerchant(db: Db, input: CreateMerchantInput) {
     merchantCountryCode: input.merchantCountryCode,
     merchantAgreementStatus: 'under_review',   // Ch-05: starts at under_review — officer must approve
     ...(input.merchantOwnerPartyReference && { merchantOwnerPartyReference: input.merchantOwnerPartyReference }),
+    // Ch-06: BQ:Step — KYB initiated at application time (BIAN SD-89 BQ:Step)
+    merchantAgreementKybCheck: {
+      merchantAgreementKybCheckStatus: 'initiated' as KybCheckStatus,
+    } satisfies MerchantAgreementKybCheck,
     merchantTier: input.merchantTier ?? 'standard',
     merchantAllowedCurrencies: input.merchantAllowedCurrencies ?? ['USD'],
     merchantTransactionLimitAmount: input.merchantTransactionLimitAmount ?? 10000,
@@ -144,14 +150,24 @@ export async function reviewMerchantApplication(
   const newStatus: MerchantAgreementStatus = action === 'approve' ? 'agreed' : 'rejected';
   const now = new Date();
 
+  const kybStatus: KybCheckStatus = action === 'approve' ? 'verified' : 'rejected';
+
   await db.collection(MERCHANT_AGREEMENT_COLLECTION).updateOne(
     { merchantAgreementInstanceReference: merchantId },
     {
       $set: {
         merchantAgreementStatus: newStatus,
+        // Top-level fields kept for backward compat (Ch-05)
         merchantReviewNote: reviewNote ?? '',
         merchantReviewedByPartyReference: reviewerPartyRef,
         merchantReviewedDateTime: now,
+        // Ch-06: BQ:Step — formal KYB check record (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
+        merchantAgreementKybCheck: {
+          merchantAgreementKybCheckStatus: kybStatus,
+          merchantAgreementKybCheckCompletedDate: now,
+          merchantAgreementKybCheckNotes: reviewNote ?? '',
+          merchantAgreementKybCheckPerformedByPartyReference: reviewerPartyRef,
+        } satisfies MerchantAgreementKybCheck,
         recordUpdatedDateTime: now,
       },
     }

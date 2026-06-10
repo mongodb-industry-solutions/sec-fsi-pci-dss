@@ -19,7 +19,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2024-01-15T09:00:00.000Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-01-15T09:00:00.000Z",
+      "customerAgreementKycCheckReference": "KYC-B0000001-001",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "d4d288de-8a3f-40c9-a0ec-e7e3f857dffa",
@@ -41,7 +47,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2023-12-01T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2023-12-01T10:00:00.000Z",
+      "customerAgreementKycCheckReference": "KYC-B0000002-002",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "b57261f4-e956-4026-82f9-b2e9d47c93e3",
@@ -63,7 +75,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2026-02-27T20:23:42.734Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-12-04T04:22:53.631Z",
+      "customerAgreementKycCheckReference": "KYC-B0000003-003",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "ef94403e-3530-4c08-959b-bd85cafa5ffc",
@@ -85,7 +103,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2026-05-19T12:53:01.516Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-05-11T17:54:17.083Z",
+      "customerAgreementKycCheckReference": "KYC-B0000004-004",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "33a46103-01bd-4509-b1d9-e52b802beb40",
@@ -107,7 +131,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-04-24T23:06:37.993Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-09-16T07:36:05.840Z",
+      "customerAgreementKycCheckReference": "KYC-B0000005-005",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "499f8479-43ac-4ba3-adde-3cb64b96a94a",
@@ -129,7 +159,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-02-23T13:08:54.280Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2026-02-23T13:13:30.227Z",
+      "customerAgreementKycCheckReference": "KYC-B0000006-006",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "73b6880a-0f6a-4607-a3da-5fe701e1817c",
@@ -151,7 +187,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2024-11-07T10:14:48.834Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-10-19T02:56:26.021Z",
+      "customerAgreementKycCheckReference": "KYC-B0000007-007",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "6c18ffbe-6283-4fd0-b197-9d7af4e7815a",
@@ -173,7 +215,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2024-07-23T21:28:19.824Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2026-01-02T11:23:00.433Z",
+      "customerAgreementKycCheckReference": "KYC-B0000008-008",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "189d5b8f-3cdf-4ce3-9a43-006066fe0d4c",
@@ -195,7 +243,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2026-05-07T02:55:04.426Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-11-20T09:56:53.781Z",
+      "customerAgreementKycCheckReference": "KYC-B0000009-009",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "616f62e9-1f61-4b68-a4ae-21f9b90c7ff5",
@@ -217,7 +271,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-04-05T09:02:39.278Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-04-02T01:03:25.509Z",
+      "customerAgreementKycCheckReference": "KYC-B0000010-010",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "3f778384-51ec-45f2-b093-6ab1242c8bf2",
@@ -239,7 +299,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2024-08-22T07:59:47.379Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-03-28T02:10:11.011Z",
+      "customerAgreementKycCheckReference": "KYC-B0000011-011",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "d1bea47e-bb79-41e8-ae4a-4834f4dad78d",
@@ -261,7 +327,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2024-12-09T08:42:10.132Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-03-05T09:49:30.595Z",
+      "customerAgreementKycCheckReference": "KYC-B0000012-012",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "055a212f-3b82-4bdf-b588-b1c54005fa85",
@@ -283,7 +355,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2024-06-15T18:10:05.907Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-01-13T14:02:48.328Z",
+      "customerAgreementKycCheckReference": "KYC-B0000013-013",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "62e6270e-bd62-4d27-81f3-6cc8128a97b5",
@@ -305,7 +383,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-06-05T16:54:52.169Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-06-03T23:24:26.623Z",
+      "customerAgreementKycCheckReference": "KYC-B0000014-014",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "d75b1048-9c4a-4db0-9bc4-5d51faff9fe6",
@@ -327,7 +411,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-06-10T20:50:24.903Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-08-01T18:25:47.764Z",
+      "customerAgreementKycCheckReference": "KYC-B0000015-015",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "e497e7d8-5f5f-448a-a1fa-f6ebaaa8547e",
@@ -349,7 +439,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-09-03T12:25:53.055Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-03-16T17:33:33.352Z",
+      "customerAgreementKycCheckReference": "KYC-B0000016-016",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "da01b491-d9ae-43da-89b7-7d6f73643323",
@@ -371,7 +467,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2026-04-28T01:47:32.449Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-11-20T01:51:32.462Z",
+      "customerAgreementKycCheckReference": "KYC-B0000017-017",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "8a8fa4fd-b4b9-4b27-92be-0c149b574247",
@@ -393,7 +495,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2026-03-12T10:58:23.295Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-07-06T20:34:33.524Z",
+      "customerAgreementKycCheckReference": "KYC-B0000018-018",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "ef4ae506-9804-42bd-9d76-df70e42881ed",
@@ -415,7 +523,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-04-17T22:38:01.405Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-02-16T23:42:17.964Z",
+      "customerAgreementKycCheckReference": "KYC-B0000019-019",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "ca377496-2999-4f61-97f0-0c0fce3cd6b4",
@@ -437,7 +551,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2026-05-09T01:31:49.941Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-04-04T20:17:41.724Z",
+      "customerAgreementKycCheckReference": "KYC-B0000020-020",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "2bbd9a85-6def-44d7-9745-43e4d102be6a",
@@ -459,7 +579,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-01-05T11:28:55.773Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-03-16T11:04:28.121Z",
+      "customerAgreementKycCheckReference": "KYC-B0000021-021",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "73991d43-8892-4bd5-b9ac-c233c5d272e2",
@@ -481,7 +607,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-01-20T09:46:31.044Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-03-02T01:11:24.672Z",
+      "customerAgreementKycCheckReference": "KYC-B0000022-022",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "984ddc9e-efe2-4900-b606-229117e40dab",
@@ -503,7 +635,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2026-01-18T17:11:29.938Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-01-01T20:37:11.305Z",
+      "customerAgreementKycCheckReference": "KYC-B0000023-023",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "196655df-9ba9-4ee7-8a16-af2bbc52f3f2",
@@ -525,7 +663,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-05-04T16:32:46.767Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-10-12T15:25:28.529Z",
+      "customerAgreementKycCheckReference": "KYC-B0000024-024",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "76fc2f03-37d4-48df-80e5-ec1241ef82e2",
@@ -547,7 +691,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2024-11-23T17:21:11.931Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-03-14T13:14:47.829Z",
+      "customerAgreementKycCheckReference": "KYC-B0000025-025",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "12a62fde-24e1-444b-8a0b-397d3b53f05f",
@@ -569,7 +719,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-01-15T11:58:33.883Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-10-09T23:37:34.025Z",
+      "customerAgreementKycCheckReference": "KYC-B0000026-026",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "04dd6da7-e8b3-4a60-a838-a6184a126789",
@@ -591,7 +747,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-01-04T07:30:25.500Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2026-05-23T13:38:03.139Z",
+      "customerAgreementKycCheckReference": "KYC-B0000027-027",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "440bacd9-9179-49eb-b488-f6f316b6a125",
@@ -613,7 +775,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-12-28T06:14:42.470Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-06-24T22:37:09.102Z",
+      "customerAgreementKycCheckReference": "KYC-B0000028-028",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "091eb14a-1896-4dc8-aceb-ef1e1c8f1dfd",
@@ -635,7 +803,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-08-13T09:36:17.354Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-12-17T20:15:54.526Z",
+      "customerAgreementKycCheckReference": "KYC-B0000029-029",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "19e5c310-acb0-43d0-84c5-28030b00a502",
@@ -657,7 +831,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-11-05T16:32:48.437Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-06-11T16:31:45.493Z",
+      "customerAgreementKycCheckReference": "KYC-B0000030-030",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "b517180d-bec6-4366-b211-aa259f337ec7",
@@ -679,7 +859,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2026-05-25T10:49:47.008Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2026-03-14T18:33:29.027Z",
+      "customerAgreementKycCheckReference": "KYC-B0000031-031",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "e907261d-ef98-4be3-bd67-d6c223f79aee",
@@ -701,7 +887,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2024-11-20T11:20:15.424Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2026-01-31T17:19:31.637Z",
+      "customerAgreementKycCheckReference": "KYC-B0000032-032",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "1bf0b11b-f4ff-42f5-9ec4-2250e5a95836",
@@ -723,7 +915,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-03-03T15:44:52.089Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-08-05T12:35:18.803Z",
+      "customerAgreementKycCheckReference": "KYC-B0000033-033",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "322c0f0f-51a4-4e09-b5cc-0b3bc111b8b7",
@@ -745,7 +943,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-12-03T14:49:29.576Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-03-20T01:51:21.209Z",
+      "customerAgreementKycCheckReference": "KYC-B0000034-034",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "76230470-338d-4bba-944a-3c2919dec4d6",
@@ -767,7 +971,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-08-07T16:28:28.192Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-10-15T19:10:06.116Z",
+      "customerAgreementKycCheckReference": "KYC-B0000035-035",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "cc61ad66-4e72-450e-8a38-7af791e53a1b",
@@ -789,7 +999,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2026-05-14T02:55:49.342Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-09-06T20:49:08.242Z",
+      "customerAgreementKycCheckReference": "KYC-B0000036-036",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "721f44f0-7b7f-48d0-adee-7d4fcc2db5bb",
@@ -811,7 +1027,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2024-11-25T08:00:59.691Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2026-01-22T16:28:42.930Z",
+      "customerAgreementKycCheckReference": "KYC-B0000037-037",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "2cfa71f3-8d2c-4f44-b40d-8ce8da922528",
@@ -833,7 +1055,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-03-02T19:20:43.460Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-07-24T21:46:24.969Z",
+      "customerAgreementKycCheckReference": "KYC-B0000038-038",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "eaa4f350-f5be-4f36-b807-7c3cfab0c8ab",
@@ -855,7 +1083,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-03-29T00:57:27.031Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-12-20T15:24:11.219Z",
+      "customerAgreementKycCheckReference": "KYC-B0000039-039",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "55e77972-cbf0-4934-89d4-b7f2c89f1a8c",
@@ -877,7 +1111,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-11-26T15:42:33.402Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-07-17T23:03:00.002Z",
+      "customerAgreementKycCheckReference": "KYC-B0000040-040",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "66ba7237-721b-408a-a070-57b4c98c267f",
@@ -899,7 +1139,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2026-02-08T15:51:30.768Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-06-08T07:09:31.113Z",
+      "customerAgreementKycCheckReference": "KYC-B0000041-041",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "cc23b89d-e957-4e96-b875-ecbd8ee1096f",
@@ -921,7 +1167,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2024-12-16T03:00:30.499Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-09-26T08:15:41.183Z",
+      "customerAgreementKycCheckReference": "KYC-B0000042-042",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "9820bc3e-df74-44f9-8fe9-a04b767949f2",
@@ -943,7 +1195,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-08-15T06:23:06.412Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2026-04-19T14:48:10.199Z",
+      "customerAgreementKycCheckReference": "KYC-B0000043-043",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "aacfc6b9-ea14-49e0-b1a1-02b930c195e5",
@@ -965,7 +1223,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2024-06-09T05:56:53.738Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-07-10T12:03:42.303Z",
+      "customerAgreementKycCheckReference": "KYC-B0000044-044",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "474fac9f-c0d8-4272-8e67-fd2fc1c8cb68",
@@ -987,7 +1251,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-01-15T08:27:19.533Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-08-17T01:38:06.092Z",
+      "customerAgreementKycCheckReference": "KYC-B0000045-045",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "052397d8-344b-49a6-a31e-f432f2af5ca3",
@@ -1009,7 +1279,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-04-07T07:43:36.851Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-08-06T07:13:36.673Z",
+      "customerAgreementKycCheckReference": "KYC-B0000046-046",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "335d0a6c-f37b-4234-bddb-946d6ba72267",
@@ -1031,7 +1307,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-10-24T00:26:03.979Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-12-06T01:18:39.669Z",
+      "customerAgreementKycCheckReference": "KYC-B0000047-047",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "6761a6fb-4902-4622-a470-0d704a7fb64c",
@@ -1053,7 +1335,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-09-12T07:39:41.683Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2024-09-20T13:38:43.211Z",
+      "customerAgreementKycCheckReference": "KYC-B0000048-048",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   },
   {
     "customerAgreementInstanceReference": "cc9ba57d-7f5f-424b-a9ed-df9311fd4da7",
@@ -1075,7 +1363,13 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2025-04-25T21:26:49.169Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "expired",
+      "customerAgreementKycCheckCompletedDate": "2025-04-10T09:00:00.000Z",
+      "customerAgreementKycCheckReference": "KYC-B0000049",
+      "customerAgreementKycCheckNotes": "KYC expired — annual renewal required per AML policy"
+    }
   },
   {
     "customerAgreementInstanceReference": "26487f52-efd7-4e95-ac67-5c8ac90c6ba0",
@@ -1097,6 +1391,10 @@
     "bianControlRecordType": "CustomerAgreementProcedure",
     "recordCreatedDateTime": "2024-06-04T17:19:53.665Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "initiated",
+      "customerAgreementKycCheckNotes": "KYC document check in progress — awaiting ID upload"
+    }
   }
 ]

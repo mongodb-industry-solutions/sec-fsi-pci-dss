@@ -18,11 +18,18 @@
     "merchantReviewNote": "KYB passed — business registered, tax ID verified, no adverse media",
     "merchantReviewedByPartyReference": "b0000056-0000-4000-8000-000000000056",
     "merchantReviewedDateTime": "2026-05-15T10:30:00.000Z",
+    "merchantAgreementKybCheck": {
+      "merchantAgreementKybCheckStatus": "verified",
+      "merchantAgreementKybCheckCompletedDate": "2026-05-15T10:30:00.000Z",
+      "merchantAgreementKybCheckReference": "KYB-US-2026-001",
+      "merchantAgreementKybCheckNotes": "KYB passed — business registered, tax ID verified, no adverse media",
+      "merchantAgreementKybCheckPerformedByPartyReference": "b0000056-0000-4000-8000-000000000056"
+    },
     "bianServiceDomain": "Merchant Relations",
     "bianControlRecordType": "MerchantAgreementProcedure",
     "recordCreatedDateTime": "2026-05-14T09:00:00.000Z",
     "recordUpdatedDateTime": "2026-05-15T10:30:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 2
   },
   {
     "merchantAgreementInstanceReference": "m0000002-0000-4000-8000-000000000002",
@@ -40,11 +47,14 @@
     "merchantTransactionCount30d": 0,
     "merchantRiskCategory": "low",
     "merchantApiKeys": [],
+    "merchantAgreementKybCheck": {
+      "merchantAgreementKybCheckStatus": "initiated"
+    },
     "bianServiceDomain": "Merchant Relations",
     "bianControlRecordType": "MerchantAgreementProcedure",
     "recordCreatedDateTime": "2026-06-08T11:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-08T11:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 2
   },
   {
     "merchantAgreementInstanceReference": "m0000003-0000-4000-8000-000000000003",
@@ -65,10 +75,17 @@
     "merchantReviewNote": "KYB passed — German trade register verified, VAT ID confirmed",
     "merchantReviewedByPartyReference": "b0000056-0000-4000-8000-000000000056",
     "merchantReviewedDateTime": "2026-05-20T14:15:00.000Z",
+    "merchantAgreementKybCheck": {
+      "merchantAgreementKybCheckStatus": "verified",
+      "merchantAgreementKybCheckCompletedDate": "2026-05-20T14:15:00.000Z",
+      "merchantAgreementKybCheckReference": "KYB-DE-2026-003",
+      "merchantAgreementKybCheckNotes": "KYB passed — German trade register verified, VAT ID confirmed",
+      "merchantAgreementKybCheckPerformedByPartyReference": "b0000056-0000-4000-8000-000000000056"
+    },
     "bianServiceDomain": "Merchant Relations",
     "bianControlRecordType": "MerchantAgreementProcedure",
     "recordCreatedDateTime": "2026-05-19T08:00:00.000Z",
     "recordUpdatedDateTime": "2026-05-20T14:15:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 2
   }
 ]

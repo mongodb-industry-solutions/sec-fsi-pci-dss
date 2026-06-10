@@ -141,6 +141,14 @@ Used by customers to detect their onboarding state: no application / under_revie
               type: 'object',
               nullable: true,
               additionalProperties: true,
+              properties: {
+                merchantAgreementKybCheck: {
+                  type: 'object',
+                  nullable: true,
+                  additionalProperties: true,
+                  description: 'BQ:Step — KYB check result (BIAN SD-89). PCI DSS Req 12.8.',
+                },
+              },
             },
           },
         },
@@ -172,7 +180,7 @@ Used by customers to detect their onboarding state: no application / under_revie
             merchantName: { type: 'string' },
             merchantCategoryCode: { type: 'string' },
             merchantCountryCode: { type: 'string' },
-            merchantAgreementStatus: { type: 'string', enum: ['active', 'suspended', 'closed'] },
+            merchantAgreementStatus: { type: 'string', enum: ['initiated', 'under_review', 'agreed', 'active', 'amended', 'suspended', 'rejected', 'closed'] },
             merchantRiskCategory: { type: 'string', enum: ['low', 'medium', 'high'] },
             merchantTransactionLimitAmount: { type: 'number' },
             merchantAverageTransactionAmount: { type: 'number' },
@@ -180,6 +188,12 @@ Used by customers to detect their onboarding state: no application / under_revie
             merchantAllowedCurrencies: { type: 'array', items: { type: 'string' } },
             merchantWebhookEndpoint: { type: 'string' },
             merchantSettlementSchedule: { type: 'string', enum: ['T+1', 'T+2', 'T+3'] },
+            merchantAgreementKybCheck: {
+              type: 'object',
+              nullable: true,
+              additionalProperties: true,
+              description: 'BQ:Step — KYB check result (BIAN SD-89). PCI DSS Req 12.8.',
+            },
           },
         },
         401: { $ref: 'Error#' },
@@ -222,6 +236,7 @@ The reviewing officer's partyRef is recorded for audit trail.
             merchantAgreementInstanceReference: { type: 'string' },
             merchantAgreementStatus: { type: 'string', enum: ['agreed', 'rejected'] },
             merchantReviewedDateTime: { type: 'string' },
+            merchantAgreementKybCheckStatus: { type: 'string', enum: ['verified', 'rejected'], description: 'BQ:Step outcome (BIAN SD-89). PCI DSS Req 12.8.' },
           },
         },
         400: { $ref: 'Error#' },
@@ -255,6 +270,7 @@ The reviewing officer's partyRef is recorded for audit trail.
       merchantAgreementInstanceReference: id,
       merchantAgreementStatus: updated?.merchantAgreementStatus,
       merchantReviewedDateTime: updated?.merchantReviewedDateTime?.toISOString(),
+      merchantAgreementKybCheckStatus: updated?.merchantAgreementKybCheck?.merchantAgreementKybCheckStatus,
     });
   });
 

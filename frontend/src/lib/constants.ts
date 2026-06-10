@@ -7,6 +7,10 @@ export const DEMO_USERS_PASSWORDS: Record<string, string> = {
   'sarah.chen@leafybank.demo': 'demo-password',
   'michael.obi@leafybank.demo': 'demo-password',
   'diego.sans@leafybank.demo': 'demo-password',
+  'officer@bank.demo': 'demo-password',
+  'customer2@demo.com': 'demo-password',
+  'customer3@demo.com': 'demo-password',
+  'customer4@demo.com': 'demo-password',
 };
 
 export const ROLE_LABELS: Record<string, string> = {
@@ -14,6 +18,7 @@ export const ROLE_LABELS: Record<string, string> = {
   level1_analyst: 'L1 Analyst',
   level2_investigator: 'L2 Investigator',
   security_auditor: 'Security Auditor',
+  merchant_officer: 'Merchant Officer',
 };
 
 export const PERFORMER_LABELS: Record<string, string> = {

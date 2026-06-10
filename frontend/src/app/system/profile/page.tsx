@@ -1,11 +1,38 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
+import { Store } from 'lucide-react';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { ROLE_LABELS } from '../../../lib/constants';
 import { useDebugMode } from '../../../lib/debugMode';
 import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck } from 'lucide-react';
 import { RawMongoPanel } from '../../../components/RawMongoPanel';
+
+type KycCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
+
+interface CustomerAgreementKycCheck {
+  customerAgreementKycCheckStatus: KycCheckStatus;
+  customerAgreementKycCheckCompletedDate?: string;
+  customerAgreementKycCheckReference?: string;
+  customerAgreementKycCheckNotes?: string;
+}
+
+type KybCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
+
+interface MerchantKybCheck {
+  merchantAgreementKybCheckStatus: KybCheckStatus;
+  merchantAgreementKybCheckCompletedDate?: string;
+  merchantAgreementKybCheckReference?: string;
+  merchantAgreementKybCheckNotes?: string;
+}
+
+interface MerchantProfileData {
+  merchantAgreementInstanceReference: string;
+  merchantAgreementStatus: string;
+  merchantAgreementName?: string;
+  merchantAgreementMerchantCategoryCode?: string;
+  merchantAgreementKybCheck?: MerchantKybCheck | null;
+}
 
 interface ProfileData {
   sub: string;
@@ -25,6 +52,7 @@ interface ProfileData {
     customerAgreementStatus?: string;
     customerAgreementEnrollmentDate?: string;
     customerAgreementPreferredLanguage?: string;
+    customerAgreementKycCheck?: CustomerAgreementKycCheck;  // BQ:Step — SD-53. PCI DSS Req 8.1
     sensitive?: {
       customerAgreementResidentialAddress?: {
         streetAddress?: string;
@@ -49,6 +77,78 @@ const STATUS_COLORS: Record<string, string> = {
   suspended: 'bg-amber-100 text-amber-800',
   closed:    'bg-red-100 text-red-800',
 };
+
+const KYC_STATUS_COLORS: Record<KycCheckStatus, string> = {
+  verified: 'bg-green-100 text-green-800 border-green-200',
+  initiated: 'bg-amber-100 text-amber-800 border-amber-200',
+  rejected: 'bg-red-100 text-red-800 border-red-200',
+  expired: 'bg-orange-100 text-orange-800 border-orange-200',
+};
+
+const KYC_STATUS_LABELS: Record<KycCheckStatus, string> = {
+  verified: 'KYC Verified',
+  initiated: 'KYC Pending',
+  rejected: 'KYC Rejected',
+  expired: 'KYC Expired',
+};
+
+const KYB_STATUS_COLORS: Record<KybCheckStatus, string> = {
+  verified: 'bg-green-100 text-green-800 border-green-200',
+  initiated: 'bg-amber-100 text-amber-800 border-amber-200',
+  rejected: 'bg-red-100 text-red-800 border-red-200',
+  expired: 'bg-orange-100 text-orange-800 border-orange-200',
+};
+
+const KYB_STATUS_LABELS: Record<KybCheckStatus, string> = {
+  verified: 'KYB Verified',
+  initiated: 'KYB Pending',
+  rejected: 'KYB Rejected',
+  expired: 'KYB Expired',
+};
+
+function KybStatusBadge({ kyb, debugMode }: { kyb: MerchantKybCheck; debugMode: boolean }) {
+  const colorClass = KYB_STATUS_COLORS[kyb.merchantAgreementKybCheckStatus] ?? 'bg-gray-100 text-gray-700 border-gray-200';
+  const label = KYB_STATUS_LABELS[kyb.merchantAgreementKybCheckStatus] ?? kyb.merchantAgreementKybCheckStatus;
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <span className={`text-xs px-2 py-0.5 rounded border font-medium ${colorClass}`}>
+        <Store size={10} className="inline mr-1 mb-0.5" />{label}
+      </span>
+      {debugMode && (
+        <>
+          <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-teal-50 text-teal-700 border-teal-200">
+            SD-89 · BQ:Step · KybCheck
+          </span>
+          <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-slate-50 text-slate-600 border-slate-200">
+            PCI Req 12.8
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
+function KycStatusBadge({ kyc, debugMode }: { kyc: CustomerAgreementKycCheck; debugMode: boolean }) {
+  const colorClass = KYC_STATUS_COLORS[kyc.customerAgreementKycCheckStatus] ?? 'bg-gray-100 text-gray-700 border-gray-200';
+  const label = KYC_STATUS_LABELS[kyc.customerAgreementKycCheckStatus] ?? kyc.customerAgreementKycCheckStatus;
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <span className={`text-xs px-2 py-0.5 rounded border font-medium ${colorClass}`}>
+        <ShieldCheck size={10} className="inline mr-1 mb-0.5" />{label}
+      </span>
+      {debugMode && (
+        <>
+          <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-teal-50 text-teal-700 border-teal-200">
+            SD-53 · BQ:Step · KycCheck
+          </span>
+          <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-slate-50 text-slate-600 border-slate-200">
+            PCI Req 8.1
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
 
 function maskPhone(phone: string) {
   return phone.slice(0, 4) + ' ●●●● ' + phone.slice(-3);
@@ -141,6 +241,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState('');
+  const [merchant, setMerchant] = useState<MerchantProfileData | null>(null);
 
   // Edit state
   const [editing, setEditing] = useState(false);
@@ -182,6 +283,11 @@ export default function ProfilePage() {
     if (!t) { setLoading(false); setError('Session not found.'); return; }
 
     reload(t)
+      .then(() => {
+        api.merchants.getMe(t)
+          .then(res => { if (res.found && res.merchant) setMerchant(res.merchant as unknown as MerchantProfileData); })
+          .catch(() => null);
+      })
       .catch(() => {
         const user = decodeToken(t);
         if (user) {
@@ -286,6 +392,11 @@ export default function ProfilePage() {
               </span>
               {debugMode && <CollectionChip name="party" />}
             </div>
+            {ag?.customerAgreementKycCheck && (
+              <div className="mt-1.5">
+                <KycStatusBadge kyc={ag.customerAgreementKycCheck} debugMode={false} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -477,12 +588,128 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Data protection notice */}
-      <div className="bg-[#001E2B]/5 border border-[#001E2B]/20 rounded-xl p-4 text-sm text-gray-600">
-        <p className="font-semibold text-[#001E2B] mb-1">Data protection</p>
-        Sensitive fields are stored encrypted using MongoDB Queryable Encryption. They are never
-        accessible in plaintext to database administrators or support staff.
-      </div>
+      {/* KYC Compliance Status — visible when agreement data is present */}
+      {ag?.customerAgreementKycCheck && (
+        <div className="bg-white rounded-xl border p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={16} className="text-gray-500 shrink-0" />
+              <h2 className="font-semibold text-gray-800 text-sm">Identity Verification (KYC)</h2>
+            </div>
+            {debugMode && (
+              <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-teal-50 text-teal-700 border-teal-200 shrink-0">
+                SD-53 · BQ:Step · KycCheck · PCI Req 8.1
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm items-start">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-gray-500">KYC Status</span>
+              {debugMode && <CollectionChip name="customerAgreementProcedure" />}
+            </div>
+            <div>
+              <KycStatusBadge kyc={ag.customerAgreementKycCheck} debugMode={debugMode} />
+            </div>
+            {ag.customerAgreementKycCheck.customerAgreementKycCheckCompletedDate && (
+              <>
+                <span className="text-gray-500">Verified on</span>
+                <span className="text-gray-800">
+                  {new Date(ag.customerAgreementKycCheck.customerAgreementKycCheckCompletedDate).toLocaleDateString()}
+                </span>
+              </>
+            )}
+            {debugMode && ag.customerAgreementKycCheck.customerAgreementKycCheckReference && (
+              <>
+                <span className="text-gray-500 text-sm">Reference</span>
+                <span className="font-mono text-xs text-gray-500">{ag.customerAgreementKycCheck.customerAgreementKycCheckReference}</span>
+              </>
+            )}
+            {debugMode && ag.customerAgreementKycCheck.customerAgreementKycCheckNotes && (
+              <>
+                <span className="text-gray-500 text-sm">Notes</span>
+                <span className="text-xs text-gray-500">{ag.customerAgreementKycCheck.customerAgreementKycCheckNotes}</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Merchant Agreement & KYB — visible when customer has a merchant application */}
+      {merchant && (
+        <div className="bg-white rounded-xl border p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Store size={16} className="text-gray-500 shrink-0" />
+              <h2 className="font-semibold text-gray-800 text-sm">Merchant Agreement</h2>
+            </div>
+            {debugMode && (
+              <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-teal-50 text-teal-700 border-teal-200 shrink-0">
+                SD-89 · MerchantAgreementProcedure · PCI Req 12.8
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm items-start">
+            {merchant.merchantAgreementName && (
+              <>
+                <span className="text-gray-500">Business name</span>
+                <span className="text-gray-800 font-medium">{merchant.merchantAgreementName}</span>
+              </>
+            )}
+            {merchant.merchantAgreementMerchantCategoryCode && (
+              <>
+                <span className="text-gray-500">MCC</span>
+                <span className="font-mono text-xs text-gray-700">{merchant.merchantAgreementMerchantCategoryCode}</span>
+              </>
+            )}
+            <>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-gray-500">Agreement status</span>
+                {debugMode && <CollectionChip name="merchantAgreementProcedure" />}
+              </div>
+              <span className={`text-xs px-2 py-0.5 rounded font-medium inline-block ${
+                merchant.merchantAgreementStatus === 'active' || merchant.merchantAgreementStatus === 'agreed'
+                  ? 'bg-green-100 text-green-800'
+                  : merchant.merchantAgreementStatus === 'under_review'
+                  ? 'bg-amber-100 text-amber-800'
+                  : merchant.merchantAgreementStatus === 'rejected'
+                  ? 'bg-red-100 text-red-800'
+                  : 'bg-gray-100 text-gray-600'
+              }`}>{merchant.merchantAgreementStatus}</span>
+            </>
+            {merchant.merchantAgreementKybCheck && (
+              <>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-gray-500">KYB Status</span>
+                </div>
+                <KybStatusBadge kyb={merchant.merchantAgreementKybCheck} debugMode={debugMode} />
+              </>
+            )}
+            {merchant.merchantAgreementKybCheck?.merchantAgreementKybCheckCompletedDate && (
+              <>
+                <span className="text-gray-500">KYB completed</span>
+                <span className="text-gray-800">
+                  {new Date(merchant.merchantAgreementKybCheck.merchantAgreementKybCheckCompletedDate).toLocaleDateString()}
+                </span>
+              </>
+            )}
+            {debugMode && merchant.merchantAgreementKybCheck?.merchantAgreementKybCheckReference && (
+              <>
+                <span className="text-gray-500">KYB reference</span>
+                <span className="font-mono text-xs text-gray-500">{merchant.merchantAgreementKybCheck.merchantAgreementKybCheckReference}</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Data protection notice — debug mode only */}
+      {debugMode && (
+        <div className="bg-[#001E2B]/5 border border-[#001E2B]/20 rounded-xl p-4 text-sm text-gray-600">
+          <p className="font-semibold text-[#001E2B] mb-1">Data protection</p>
+          Sensitive fields are stored encrypted using MongoDB Queryable Encryption. They are never
+          accessible in plaintext to database administrators or support staff.
+        </div>
+      )}
 
       {/* Debug: raw MongoDB documents via RawMongoPanel */}
       {debugMode && (

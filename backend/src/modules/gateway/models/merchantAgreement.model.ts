@@ -24,10 +24,13 @@ export interface MerchantAgreementControlRecord {
   // D-21: Party owner link — BIAN-canonical cross-domain reference via SD-13 Party.
   merchantOwnerPartyReference?: string;             // FK → party.partyInstanceReference (SD-13)
 
-  // Ch-05: Review metadata — populated by merchant_officer on approve/reject (BIAN Action: Control)
+  // Ch-05: Review metadata (top-level — kept for backward compat). Populated by merchant_officer.
   merchantReviewNote?: string;
   merchantReviewedByPartyReference?: string;        // FK → party.partyInstanceReference of reviewing officer
   merchantReviewedDateTime?: Date;
+
+  // Ch-06: BQ:Step — KYB business verification (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
+  merchantAgreementKybCheck?: MerchantAgreementKybCheck;
 
   // Gateway configuration
   merchantAllowedCurrencies: string[];              // ISO 4217 codes
@@ -63,5 +66,16 @@ export type MerchantAgreementStatus =
   | 'suspended'       // Fraud hold or compliance flag
   | 'rejected'        // KYB failed or policy issue (Control: reject)
   | 'closed';         // Agreement terminated (Terminate)
+// BQ:Step — KYB business verification (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
+export type KybCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
+
+export interface MerchantAgreementKybCheck {
+  merchantAgreementKybCheckStatus: KybCheckStatus;
+  merchantAgreementKybCheckCompletedDate?: Date;
+  merchantAgreementKybCheckReference?: string;       // trade register / AML screening reference
+  merchantAgreementKybCheckNotes?: string;
+  merchantAgreementKybCheckPerformedByPartyReference?: string;  // FK → party (reviewing officer)
+}
+
 export type MerchantRiskCategory = 'low' | 'medium' | 'high';
 export type SettlementSchedule = 'T+1' | 'T+2' | 'T+3';

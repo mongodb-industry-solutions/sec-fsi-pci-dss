@@ -6,7 +6,7 @@ import { ROLE_LABELS } from '../../lib/constants';
 import { DebugModeProvider, useDebugMode } from '../../lib/debugMode';
 import { DemoSidebar, MobileBottomNav } from '../../components/DemoSidebar';
 import Link from 'next/link';
-import { Settings, LogOut } from 'lucide-react';
+import { Bug, LogOut } from 'lucide-react';
 
 const NO_SHELL_PATHS = ['/system'];
 
@@ -80,7 +80,7 @@ function DemoShell({ children }: { children: React.ReactNode }) {
                 : 'text-gray-400 border-white/20 hover:border-white/40'
             }`}
           >
-            <Settings size={13} />
+            <Bug size={13} />
             <span className="hidden sm:inline">{debugMode ? 'Debug ON' : 'Debug'}</span>
           </button>
           <Link href="/system" className="inline-flex items-center gap-1 text-gray-400 hover:text-white shrink-0">

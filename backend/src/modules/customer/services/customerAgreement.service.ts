@@ -35,6 +35,7 @@ function buildResponse(
     customerAgreementStatus:            doc.customerAgreementStatus,
     customerAgreementEnrollmentDate:    doc.customerAgreementEnrollmentDate,
     customerAgreementPreferredLanguage: doc.customerAgreementPreferredLanguage,
+    customerAgreementKycCheck:          doc.customerAgreementKycCheck ?? null,
     bianServiceDomain:                  doc.bianServiceDomain,
     bianControlRecordType:              doc.bianControlRecordType,
   };
@@ -140,6 +141,7 @@ export async function getSelfProfile(db: Db, email: string): Promise<Record<stri
     customerAgreementStatus:            doc.customerAgreementStatus,
     customerAgreementEnrollmentDate:    doc.customerAgreementEnrollmentDate,
     customerAgreementPreferredLanguage: doc.customerAgreementPreferredLanguage,
+    customerAgreementKycCheck:          doc.customerAgreementKycCheck ?? null,
     sensitive: isSensitiveDecrypted(doc.customerAgreementResidentialAddress) ? {
       customerAgreementResidentialAddress: doc.customerAgreementResidentialAddress,
       governmentIdentificationReference:   doc.governmentIdentificationReference,

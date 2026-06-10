@@ -32,6 +32,9 @@ export interface CustomerAgreementControlRecord {
   // v4: recurring payment mandate
   customerAgreementPreferredPaymentCardReference?: string;
 
+  // Ch-06: BQ:Step — KYC identity verification (BIAN SD-53 BQ:Step). PCI DSS Req 8.1.
+  customerAgreementKycCheck?: CustomerAgreementKycCheck;
+
   bianServiceDomain: 'Customer Agreement';
   bianControlRecordType: 'CustomerAgreementProcedure';
   recordCreatedDateTime: Date;
@@ -52,6 +55,16 @@ export function isSensitiveDecrypted(field: unknown): boolean {
   // MongoDB Binary objects have a 'buffer' property and a 'sub_type' number
   if (typeof field === 'object' && field !== null && 'sub_type' in field && 'buffer' in field) return false;
   return true;
+}
+
+// BQ:Step — KYC identity verification (BIAN SD-53 BQ:Step). PCI DSS Req 8.1.
+export type KycCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
+
+export interface CustomerAgreementKycCheck {
+  customerAgreementKycCheckStatus: KycCheckStatus;
+  customerAgreementKycCheckCompletedDate?: Date;
+  customerAgreementKycCheckReference?: string;  // external provider ref (e.g. Jumio, Onfido)
+  customerAgreementKycCheckNotes?: string;
 }
 
 export type CustomerSegment = 'retail' | 'premium' | 'corporate' | 'sme';

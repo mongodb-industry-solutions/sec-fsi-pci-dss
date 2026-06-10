@@ -3,7 +3,7 @@
 ## Status
 
 Draft  
-Version: 1.3: Author: Antonio Membrides Espinosa: Last updated: 2026-06-10  
+Version: 1.4: Author: Antonio Membrides Espinosa: Last updated: 2026-06-10  
 PRD reference: [docs/PRD.md](PRD.md)
 
 ---
@@ -859,6 +859,8 @@ The `Control` Action Term is used because it represents a **state change of the 
 
 KYB is modelled as a Behavior Qualifier type `Step` within SD-89 (BQ: `KYBAssessment`). In the demo it is a manual review by the `merchant_officer`. In production, KYB would invoke SD-132 (Regulatory Compliance) with automated checks (business registry lookup, sanctions screening, adverse media). The demo omits automated KYB to keep the scope focused on the MongoDB and encryption story.
 
+> **Ch-06 update (ADR-008)**: KYB is now persisted as a proper BIAN BQ:Step sub-document `merchantAgreementKybCheck` on the `MerchantAgreementControlRecord`. The BIAN-canonical status vocabulary (`initiated | verified | rejected | expired`) replaces ad-hoc review notes. See ADR-008 for the full design.
+
 #### Full `MerchantAgreementStatus` Lifecycle
 
 ```
@@ -880,9 +882,19 @@ under_review → rejected  ← KYB failed (Control: reject)
 #### New Review Metadata Fields on `MerchantAgreementControlRecord`
 
 ```typescript
+// Top-level fields (backward-compat from Ch-05):
 merchantReviewNote?: string;                     // Officer's audit comment
 merchantReviewedByPartyReference?: string;       // FK → party.partyInstanceReference (SD-13)
 merchantReviewedDateTime?: Date;                 // ISO timestamp of review decision
+
+// Ch-06 — BQ:Step sub-document (authoritative KYB record):
+merchantAgreementKybCheck?: {
+  merchantAgreementKybCheckStatus: 'initiated' | 'verified' | 'rejected' | 'expired';
+  merchantAgreementKybCheckCompletedDate?: Date;
+  merchantAgreementKybCheckReference?: string;  // Trade register / AML screening reference
+  merchantAgreementKybCheckNotes?: string;
+  merchantAgreementKybCheckPerformedByPartyReference?: string;  // FK → party (reviewing officer)
+};
 ```
 
 ### BIAN Alignment
@@ -890,10 +902,10 @@ merchantReviewedDateTime?: Date;                 // ISO timestamp of review deci
 | Concept | BIAN Reference | Implementation |
 |---|---|---|
 | SD-89 Merchant Relations | `MerchantAgreementProcedure` Control Record | `merchantAgreementProcedure` collection |
-| `Initiate` Action Term | Customer submits application | `POST /api/v1/merchants` → `under_review` |
+| `Initiate` Action Term | Customer submits application | `POST /api/v1/merchants` → `under_review`; KYB set to `initiated` |
 | `Control` Action Term | Officer approves or rejects | `PATCH /api/v1/merchants/:id/review` |
 | `merchant_officer` Party | SD-13 `partyType: 'employee'` | Seeded as PTY-056 (Rachel Torres) |
-| KYB as BQ | SD-89 BQ type: Step | `merchantReviewNote` captures the KYB outcome |
+| KYB as BQ:Step | SD-89 BQ type: Step | `merchantAgreementKybCheck` sub-document with BIAN status vocabulary |
 | Dual-role pattern | SD-13 Party anchor (ADR-006) | `merchantOwnerPartyReference → party.partyInstanceReference` |
 
 ### PCI DSS Alignment
@@ -902,7 +914,8 @@ merchantReviewedDateTime?: Date;                 // ISO timestamp of review deci
 |---|---|
 | Req 7.1 (Least privilege) | `merchant_officer` is the only role that can call `PATCH /merchants/:id/review`; customer cannot self-approve |
 | Req 8.1 (User accounts) | `merchant_officer` has a distinct auth record in `customerAuthenticationProcedure` (SD-91) |
-| Req 12.8 (Merchant agreements) | The `MerchantAgreementProcedure` document is the formal agreement record; `merchantReviewedByPartyReference` links to the approving officer for audit |
+| Req 12.8 (Merchant agreements) | The `MerchantAgreementProcedure` document is the formal agreement record; `merchantAgreementKybCheck.merchantAgreementKybCheckPerformedByPartyReference` links to the approving officer for audit |
+| Req 12.8.3 (Due diligence documentation) | `merchantAgreementKybCheckReference` stores the external trade register / AML screening reference |
 
 ### Consequences
 
@@ -1021,3 +1034,138 @@ Debug Mode access to raw MongoDB documents requires careful scoping:
 - Adds ~5 new React components and a context provider to the frontend.
 - `NEXT_PUBLIC_DEMO_DEBUG_ENABLED` must be added to the `.env.local` template and deployment docs.
 - The raw document viewer introduces a dependency on the Simulator Mode `/system/raw` endpoint — any changes to that endpoint must be backward compatible.
+
+---
+
+## ADR-009: KYC (SD-53) and KYB (SD-89) as BIAN BQ:Step Sub-Documents (Ch-06)
+
+**Date:** 2026-06-10  
+**Status:** Accepted
+
+### Context
+
+Prior to Ch-06, the demo had no formal representation of the Know Your Customer (KYC) or Know Your Business (KYB) compliance checks:
+
+- **KYC (SD-53)**: `CustomerAgreementControlRecord` had no identity-verification fields. The fact that a customer had passed KYC was implicit (they existed in the system). There was no way to demonstrate KYC lifecycle states (`initiated`, `verified`, `expired`) or link to an AML screening reference.
+- **KYB (SD-89)**: `MerchantAgreementControlRecord` had three loose top-level fields (`merchantReviewNote`, `merchantReviewedByPartyReference`, `merchantReviewedDateTime`) added in Ch-05. These captured the outcome but violated BIAN naming conventions (no BQ prefix) and used ad-hoc vocabulary (`passed/failed` implied) rather than the BIAN lifecycle terms.
+
+Neither representation could be shown to FSI architects as "BIAN-aligned" without qualification. For a demo targeting compliance architects and CISO roles, the absence of formal KYC/KYB structures is a significant gap.
+
+### Decision
+
+**Model both KYC and KYB as BIAN Behavior Qualifier type Step (BQ:Step) sub-documents**, following the BIAN Service Domain specifications for SD-53 and SD-89 respectively.
+
+#### BIAN Design Rationale
+
+The BIAN Business Object Model defines **Behavior Qualifier** as a typed attribute of a Control Record. BQ type **Step** represents a sequential step within a procedure. Both KYC (identity check during customer onboarding) and KYB (business verification during merchant onboarding) are canonical BQ:Step instances:
+
+```
+SD-53 CustomerAgreementProcedure (Control Record)
+  └── BQ:Step  customerAgreementKycCheck      ← NEW Ch-06
+        customerAgreementKycCheckStatus       initiated | verified | rejected | expired
+        customerAgreementKycCheckCompletedDate
+        customerAgreementKycCheckReference    (AML / document check reference)
+        customerAgreementKycCheckNotes
+
+SD-89 MerchantAgreementProcedure (Control Record)
+  └── BQ:Step  merchantAgreementKybCheck      ← Ch-05 formalized in Ch-06
+        merchantAgreementKybCheckStatus       initiated | verified | rejected | expired
+        merchantAgreementKybCheckCompletedDate
+        merchantAgreementKybCheckReference    (trade register / AML reference)
+        merchantAgreementKybCheckNotes
+        merchantAgreementKybCheckPerformedByPartyReference
+```
+
+**Why not a flat field on the Control Record?**
+
+BIAN mandates that every attribute in a BQ namespace carries the BQ name as a prefix. A flat `kycStatus` field would violate this rule and conflate the step's lifecycle with the agreement's lifecycle. The sub-document boundary makes the scope explicit.
+
+**Why not a separate collection?**
+
+KYC and KYB are integral steps of their respective procedures — they do not exist independently. A separate collection would introduce an unnecessary join, add seed complexity, and contradict the BIAN model where BQ:Step is an attribute of the CR, not a standalone entity.
+
+**Why not store in SD-13 Party?**
+
+SD-13 (Party Data Management) is the identity anchor — it stores WHO the party is (name, address, contact). KYC status is a COMPLIANCE OUTCOME of the agreement procedure, not a property of the identity. Placing it in Party would conflate identity management with compliance lifecycle — a BIAN anti-pattern. The correct owner is the SD that runs the procedure that includes the check.
+
+#### BIAN Status Vocabulary
+
+Both checks use the same four-value lifecycle: `initiated | verified | rejected | expired`.
+
+| Status | Meaning |
+|---|---|
+| `initiated` | Check started; awaiting outcome (onboarding in progress) |
+| `verified` | Check passed; identity / business verified |
+| `rejected` | Check failed; application denied |
+| `expired` | Check passed but is no longer valid (time-based renewal required) |
+
+Note: `passed` and `failed` are **not** used — they are not BIAN vocabulary. The correct terms are `verified` and `rejected`.
+
+#### BIAN Naming Convention
+
+Every field in a BQ sub-document must include the BQ name as a prefix:
+- Correct: `customerAgreementKycCheckStatus`
+- Incorrect: `kycStatus`, `kycCheckStatus`, `customerAgreementKycStatus`
+
+This rule ensures BQ fields remain unambiguous when the Control Record is serialised and when queried in Atlas.
+
+### Implementation
+
+#### `createMerchant()` — KYB initiated at submission
+
+```typescript
+merchantAgreementKybCheck: {
+  merchantAgreementKybCheckStatus: 'initiated',
+} satisfies MerchantAgreementKybCheck,
+```
+
+#### `reviewMerchantApplication()` — Dual-write on review (backward compat + BQ:Step)
+
+```typescript
+const kybStatus: KybCheckStatus = action === 'approve' ? 'verified' : 'rejected';
+
+// In $set:
+merchantAgreementKybCheck: {
+  merchantAgreementKybCheckStatus: kybStatus,
+  merchantAgreementKybCheckCompletedDate: now,
+  merchantAgreementKybCheckNotes: reviewNote ?? '',
+  merchantAgreementKybCheckPerformedByPartyReference: reviewerPartyRef,
+} satisfies MerchantAgreementKybCheck,
+// Top-level legacy fields also written for backward compat
+merchantReviewNote: reviewNote ?? '',
+merchantReviewedByPartyReference: reviewerPartyRef,
+merchantReviewedDateTime: now,
+```
+
+#### Seed data strategy
+
+| Collection | schemaVersion | KYC/KYB field |
+|---|---|---|
+| `customerAgreementProcedure` | 3 | All 50 records — 48 `verified`, 1 `expired`, 1 `initiated` |
+| `merchantAgreementProcedure` | 2 | All 3 records — 2 `verified`, 1 `initiated` |
+
+### BIAN Alignment
+
+| Concept | BIAN Reference | Implementation |
+|---|---|---|
+| KYC BQ:Step | SD-53 Behavior Qualifier type Step | `customerAgreementKycCheck` sub-document |
+| KYB BQ:Step | SD-89 Behavior Qualifier type Step | `merchantAgreementKybCheck` sub-document |
+| BQ naming rule | BIAN BQ field prefix convention | All fields prefixed `customerAgreementKycCheck*` / `merchantAgreementKybCheck*` |
+| Status vocabulary | BIAN lifecycle terms | `initiated | verified | rejected | expired` (not `pending/passed/failed`) |
+
+### PCI DSS Alignment
+
+| Requirement | Mapping |
+|---|---|
+| Req 8.1 (Unique user ID) | `customerAgreementKycCheck` documents the identity verification step that establishes a unique, verified customer identity |
+| Req 12.8 (Merchant agreements) | `merchantAgreementKybCheck` is the formal documented evidence of KYB due diligence per merchant |
+| Req 12.8.3 (Due diligence) | `merchantAgreementKybCheckReference` stores the external trade register / AML screening reference as audit evidence |
+
+### Consequences
+
++ Demo can now show KYC and KYB status to FSI architects with full BIAN citation — no more informal notes.
++ Frontend can render color-coded compliance pills (verified=green, initiated=amber, rejected=red, expired=orange).
++ The BIAN audit trail is complete: who performed the check (`merchantAgreementKybCheckPerformedByPartyReference`), when (`merchantAgreementKybCheckCompletedDate`), and what reference (`merchantAgreementKybCheckReference`).
++ `expired` status enables future demo scenarios (KYC renewal workflows, risk-based re-verification).
+- `schemaVersion` bumped on both collections — seed re-seeding required to align existing data.
+- Top-level review fields (`merchantReviewNote` etc.) are retained for backward compat but are now secondary to the BQ:Step sub-document.

@@ -5,13 +5,23 @@ import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import {
   Link2, ShoppingCart, Key, Webhook, Copy, Check, Plus, Trash2, ExternalLink,
-  Clock, CheckCircle2, XCircle, Store, ChevronRight,
+  Clock, CheckCircle2, XCircle, Store, ChevronRight, ShieldCheck,
 } from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type Tab = 'checkout' | 'links' | 'keys' | 'webhook';
 type MerchantState = 'loading' | 'no_merchant' | 'under_review' | 'agreed' | 'active' | 'rejected' | 'analyst_list';
+
+type KybCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
+
+interface MerchantAgreementKybCheck {
+  merchantAgreementKybCheckStatus: KybCheckStatus;
+  merchantAgreementKybCheckCompletedDate?: string;
+  merchantAgreementKybCheckReference?: string;
+  merchantAgreementKybCheckNotes?: string;
+  merchantAgreementKybCheckPerformedByPartyReference?: string;
+}
 
 interface MerchantRecord {
   merchantAgreementInstanceReference: string;
@@ -26,7 +36,43 @@ interface MerchantRecord {
   merchantTransactionLimitAmount?: number;
   merchantSettlementSchedule?: string;
   merchantReviewNote?: string;
+  merchantAgreementKybCheck?: MerchantAgreementKybCheck;  // BQ:Step — BIAN SD-89. PCI DSS Req 12.8
   recordCreatedDateTime?: string;
+}
+
+const KYB_STATUS_COLORS: Record<KybCheckStatus, string> = {
+  verified: 'bg-green-100 text-green-800 border-green-200',
+  initiated: 'bg-amber-100 text-amber-800 border-amber-200',
+  rejected: 'bg-red-100 text-red-800 border-red-200',
+  expired: 'bg-orange-100 text-orange-800 border-orange-200',
+};
+
+const KYB_STATUS_LABELS: Record<KybCheckStatus, string> = {
+  verified: 'KYB Verified',
+  initiated: 'KYB Pending',
+  rejected: 'KYB Rejected',
+  expired: 'KYB Expired',
+};
+
+function KybStatusBadge({ kyb, compact }: { kyb: MerchantAgreementKybCheck; compact?: boolean }) {
+  const status = kyb.merchantAgreementKybCheckStatus;
+  const colorClass = KYB_STATUS_COLORS[status] ?? 'bg-gray-100 text-gray-700 border-gray-200';
+  const label = KYB_STATUS_LABELS[status] ?? status;
+  if (compact) {
+    return (
+      <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border font-medium ${colorClass}`}>
+        <ShieldCheck size={10} />{label}
+      </span>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border font-medium ${colorClass}`}>
+        <ShieldCheck size={10} />{label}
+      </span>
+      <span className="text-xs text-gray-400 font-mono">SD-89 · BQ:Step · KybCheck · PCI Req 12.8</span>
+    </div>
+  );
 }
 
 interface PaymentLink {
@@ -71,11 +117,11 @@ function MerchantApplicationForm({ token, onSubmitted }: { token: string; onSubm
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-6 space-y-5">
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <div>
         <div className="flex items-center gap-2 mb-1">
           <Store size={20} className="text-[#00ED64]" />
-          <h1 className="text-xl font-bold text-gray-900">Request Merchant Account</h1>
+          <h1 className="text-2xl font-bold">Request Merchant Account</h1>
         </div>
         <p className="text-sm text-gray-500">
           Submit your merchant application. A Merchant Acquiring officer will review within 2 business days.
@@ -167,10 +213,10 @@ function MerchantApplicationForm({ token, onSubmitted }: { token: string; onSubm
 
 function UnderReviewView({ merchant }: { merchant: MerchantRecord }) {
   return (
-    <div className="max-w-lg mx-auto px-4 py-6 space-y-5">
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <div className="flex items-center gap-2">
         <Clock size={20} className="text-amber-500" />
-        <h1 className="text-xl font-bold text-gray-900">Application Under Review</h1>
+        <h1 className="text-2xl font-bold">Application Under Review</h1>
       </div>
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
@@ -215,6 +261,12 @@ function UnderReviewView({ merchant }: { merchant: MerchantRecord }) {
             <dt className="text-gray-500">Application ID</dt>
             <dd className="font-mono text-xs text-gray-400 truncate max-w-[180px]">{merchant.merchantAgreementInstanceReference}</dd>
           </div>
+          {merchant.merchantAgreementKybCheck && (
+            <div className="flex justify-between items-center pt-1 border-t border-gray-100">
+              <dt className="text-gray-500">KYB Check</dt>
+              <dd><KybStatusBadge kyb={merchant.merchantAgreementKybCheck} compact /></dd>
+            </div>
+          )}
         </dl>
       </div>
 
@@ -232,10 +284,10 @@ function UnderReviewView({ merchant }: { merchant: MerchantRecord }) {
 
 function RejectedView({ merchant, onReapply }: { merchant: MerchantRecord; onReapply: () => void }) {
   return (
-    <div className="max-w-lg mx-auto px-4 py-6 space-y-5">
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <div className="flex items-center gap-2">
         <XCircle size={20} className="text-red-500" />
-        <h1 className="text-xl font-bold text-gray-900">Application Not Approved</h1>
+        <h1 className="text-2xl font-bold">Application Not Approved</h1>
       </div>
 
       <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-2">
@@ -406,12 +458,12 @@ function MerchantSandbox({ token, merchants, onRefresh }: { token: string; merch
   ];
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
             <CheckCircle2 size={18} className="text-[#00ED64]" />
-            <h1 className="text-xl font-bold text-gray-900">Merchant Sandbox</h1>
+            <h1 className="text-2xl font-bold">Merchant Sandbox</h1>
           </div>
           <p className="text-sm text-gray-500 mt-0.5">Test Redirect Checkout and Payment Links integration.</p>
         </div>
@@ -433,8 +485,13 @@ function MerchantSandbox({ token, merchants, onRefresh }: { token: string; merch
           ))}
         </select>
         {selectedMerchant && (
-          <div className="mt-2 text-xs text-gray-400 font-mono truncate">
-            ID: {selectedMerchant.merchantAgreementInstanceReference}
+          <div className="mt-2 flex items-center gap-3 flex-wrap">
+            <span className="text-xs text-gray-400 font-mono truncate">
+              ID: {selectedMerchant.merchantAgreementInstanceReference}
+            </span>
+            {selectedMerchant.merchantAgreementKybCheck && (
+              <KybStatusBadge kyb={selectedMerchant.merchantAgreementKybCheck} compact />
+            )}
           </div>
         )}
       </div>
@@ -734,10 +791,10 @@ function AnalystMerchantView({ token }: { token: string }) {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Merchant Agreements</h1>
+          <h1 className="text-2xl font-bold">Merchant Agreements</h1>
           <p className="text-sm text-gray-500 mt-0.5">BIAN SD-89 — MerchantAgreementProcedure records</p>
         </div>
         <select
@@ -770,9 +827,14 @@ function AnalystMerchantView({ token }: { token: string }) {
                     <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-600 rounded-full">high risk</span>
                   )}
                 </div>
-                <div className="text-xs text-gray-400 mt-0.5 font-mono">
-                  MCC {m.merchantCategoryCode} · {m.merchantCountryCode}
-                  {m.merchantTier && ` · ${m.merchantTier}`}
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <span className="text-xs text-gray-400 font-mono">
+                    MCC {m.merchantCategoryCode} · {m.merchantCountryCode}
+                    {m.merchantTier && ` · ${m.merchantTier}`}
+                  </span>
+                  {m.merchantAgreementKybCheck && (
+                    <KybStatusBadge kyb={m.merchantAgreementKybCheck} compact />
+                  )}
                 </div>
               </div>
               <div className="text-xs text-gray-400 font-mono shrink-0 hidden sm:block truncate max-w-[180px]">

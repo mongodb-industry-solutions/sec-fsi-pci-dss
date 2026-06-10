@@ -86,9 +86,11 @@ export type CustomerAuthRole =
   | 'merchant_officer';   // SD-89 Merchant Relations — Merchant Acquiring bank employee
 ```
 
-### `customerAgreement.model.ts` (SD-53 — v2 updated)
+### `customerAgreement.model.ts` (SD-53 — v3 updated)
 
 > **v2 change**: `customerAgreementProcedureSensitive` collection removed. Sensitive QE:none fields are now **inline** in `customerAgreementProcedure`. The QE tier (Level 1 / Level 2 client) controls whether they are returned as Binary or decrypted.
+>
+> **v3 change (Ch-06)**: Added `customerAgreementKycCheck` as a **BIAN BQ:Step** sub-document (SD-53 Behavior Qualifier type Step). This is the formal KYC identity-verification record for the onboarding lifecycle. PCI DSS Req 8.1. All fields use the BIAN-canonical BQ naming prefix `customerAgreementKycCheck*`. `schemaVersion` bumped to 3.
 
 ```typescript
 // BIAN SD-53: Customer Agreement
@@ -97,6 +99,18 @@ export type CustomerAuthRole =
 
 export const CUSTOMER_AGREEMENT_COLLECTION = 'customerAgreementProcedure';
 // CUSTOMER_AGREEMENT_SENSITIVE_COLLECTION removed in v2
+
+// BQ:Step — KYC identity verification (BIAN SD-53 Behavior Qualifier type Step).
+// Status vocabulary follows BIAN lifecycle: initiated | verified | rejected | expired.
+// PCI DSS Req 8.1 — unique user identity verification at onboarding.
+export type KycCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
+
+export interface CustomerAgreementKycCheck {
+  customerAgreementKycCheckStatus: KycCheckStatus;
+  customerAgreementKycCheckCompletedDate?: Date;
+  customerAgreementKycCheckReference?: string;  // External AML/ID verification reference
+  customerAgreementKycCheckNotes?: string;
+}
 
 export interface CustomerAgreementControlRecord {
   customerAgreementInstanceReference: string;         // PK, UUID
@@ -117,11 +131,14 @@ export interface CustomerAgreementControlRecord {
   customerAgreementPreferredLanguage: string;          // ISO 639-1
   customerAgreementPreferredPaymentCardReference?: string; // FK to paymentCardManagement UUID
 
+  // Ch-06: BQ:Step — KYC identity check (BIAN SD-53). PCI DSS Req 8.1.
+  customerAgreementKycCheck?: CustomerAgreementKycCheck;
+
   bianServiceDomain: 'Customer Agreement';
   bianControlRecordType: 'CustomerAgreementProcedure';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
-  schemaVersion: number;
+  schemaVersion: number;                              // Current: 3
 }
 
 // Binary field detection helper: returns false if field is BSON Binary (not decrypted by L1 client)
@@ -1784,6 +1801,8 @@ export interface PaymentLinkRecord {
 
 #### `MerchantAgreementControlRecord` update (SD-89 — `merchantAgreementProcedure`)
 
+> **Ch-06 update**: Added `merchantAgreementKybCheck` as a **BIAN BQ:Step** sub-document. This replaces the loose top-level review fields as the authoritative KYB record. Top-level fields (`merchantReviewNote`, `merchantReviewedByPartyReference`, `merchantReviewedDateTime`) are retained for backward compatibility. `schemaVersion` bumped to 2.
+
 Added to the existing merchant model:
 
 ```typescript
@@ -1808,22 +1827,38 @@ merchantWebhookSecret?: string;          // HMAC signing secret for webhook deli
 // 'customer' is a role-scoped concept (SD-53 contract), while 'Party' is the identity anchor.
 merchantOwnerPartyReference?: string;    // FK → party.partyInstanceReference (SD-13)
 
-// Ch-05: Review metadata — set by merchant_officer when approving/rejecting (BIAN Action: Control)
+// Ch-05: Review metadata (top-level) — kept for backward compat. Set by merchant_officer.
 merchantReviewNote?: string;                     // Officer's comment for audit trail
 merchantReviewedByPartyReference?: string;       // FK → party.partyInstanceReference (SD-13) of reviewing employee
 merchantReviewedDateTime?: Date;                 // When the review decision was made
+
+// Ch-06: BQ:Step — KYB business verification (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
+// Authoritative KYB record. Status vocabulary: initiated | verified | rejected | expired.
+// All fields use BIAN-canonical BQ naming prefix: merchantAgreementKybCheck*.
+merchantAgreementKybCheck?: MerchantAgreementKybCheck;
 
 // Ch-05: Full BIAN SD-89 Agreement lifecycle including KYB review states.
 // BIAN Action Terms: Initiate (customer) → Control (merchant_officer) → Update (amend) → Terminate (close)
 type MerchantAgreementStatus =
   | 'initiated'      // Customer submits application (Initiate)
-  | 'under_review'   // merchant_officer performing KYB validation (BQ: KYBAssessment)
+  | 'under_review'   // merchant_officer performing KYB validation (BQ:Step KybCheck)
   | 'agreed'         // KYB passed; T&C presented to applicant (Control: approve)
   | 'active'         // Applicant accepted T&C; API key issued; can process payments
   | 'amended'        // Terms updated by merchant_officer (Update)
   | 'suspended'      // Temporarily blocked — fraud investigation or compliance hold
   | 'rejected'       // KYB failed or compliance issue (Control: reject)
   | 'closed';        // Agreement terminated (Terminate)
+
+// Ch-06: BQ:Step — KYB business verification types
+type KybCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
+
+interface MerchantAgreementKybCheck {
+  merchantAgreementKybCheckStatus: KybCheckStatus;
+  merchantAgreementKybCheckCompletedDate?: Date;
+  merchantAgreementKybCheckReference?: string;      // Trade register / AML screening reference
+  merchantAgreementKybCheckNotes?: string;
+  merchantAgreementKybCheckPerformedByPartyReference?: string;  // FK → party (reviewing officer)
+}
 ```
 
 Key format: `lbpk_live_<32 hex chars>` — plaintext returned once on generation; only bcrypt hash persisted.
@@ -1948,10 +1983,11 @@ Error codes: 404 merchant not found, 410 link expired/deactivated/completed.
 
 | Method | Route | Auth | Roles | Description |
 |---|---|---|---|---|
-| `POST` | `/merchants` | JWT | `customer` | Submit new merchant application (BIAN Action: Initiate). Sets status `under_review`. |
-| `GET` | `/merchants/:id` | JWT | `customer`, `merchant_officer`, `security_auditor` | Retrieve merchant agreement details |
+| `POST` | `/merchants` | JWT | `customer` | Submit new merchant application (BIAN Action: Initiate). Sets status `under_review`. Initialises `merchantAgreementKybCheck.status = 'initiated'`. |
+| `GET` | `/merchants/me` | JWT | `customer` | Return the merchant agreement owned by the caller's `partyRef`. Returns `{ found: false }` when none exists. Enables role-based state machine in frontend. |
+| `GET` | `/merchants/:id` | JWT | `customer`, `merchant_officer`, `security_auditor` | Retrieve merchant agreement details. Response includes `merchantAgreementKybCheck` sub-document. |
 | `GET` | `/merchants` | JWT | `merchant_officer`, `security_auditor` | List all merchant applications (officer review queue) |
-| `PATCH` | `/merchants/:id/review` | JWT | `merchant_officer`, `security_auditor` | Approve or reject application (BIAN Action: Control). Transitions status to `agreed` or `rejected`. |
+| `PATCH` | `/merchants/:id/review` | JWT | `merchant_officer`, `security_auditor` | Approve or reject application (BIAN Action: Control). Transitions status to `agreed` or `rejected`. Writes `merchantAgreementKybCheck` BQ:Step. |
 | `POST` | `/merchants/:id/keys` | JWT | `customer` | Generate new API key (plaintext returned once) |
 | `DELETE` | `/merchants/:id/keys/:keyId` | JWT | `customer` | Revoke API key |
 
@@ -1999,11 +2035,12 @@ or
 {
   "merchantAgreementInstanceReference": "uuid",
   "merchantAgreementStatus": "agreed",
-  "merchantReviewedDateTime": "2026-06-10T14:30:00Z"
+  "merchantReviewedDateTime": "2026-06-10T14:30:00Z",
+  "merchantAgreementKybCheckStatus": "verified"
 }
 ```
 
-Status transitions: `approve` → `agreed`; `reject` → `rejected`. Emits webhook event `merchant.agreement.activated` on approve.
+Status transitions: `approve` → `agreed` (KYB `verified`); `reject` → `rejected` (KYB `rejected`). Emits webhook event `merchant.agreement.activated` on approve.
 
 Error codes: 404 merchant not found, 403 insufficient role, 400 invalid status transition.
 
@@ -2029,9 +2066,11 @@ New seed files required for the merchant onboarding + debug mode features.
 | partyInstanceReference | partyName | partyType | Notes |
 |---|---|---|---|
 | `PTY-056` | `Rachel Torres` | `employee` | Merchant Acquiring officer — has `merchant_officer` auth role |
-| `PTY-057` | `David Chen` | `individual` | Customer 2 — no merchant, simple cardholder |
-| `PTY-058` | `Amara Okafor` | `individual` | Customer 3 — has a pending merchant application |
-| `PTY-059` | `Lena Fischer` | `individual` | Customer 4 — dual-role (customer + active merchant) |
+| `PTY-057` | `David Chen` | `customer` | Customer 2 — no merchant, simple cardholder |
+| `PTY-058` | `Amara Okafor` | `customer` | Customer 3 — has a pending merchant application |
+| `PTY-059` | `Lena Fischer` | `customer` | Customer 4 — dual-role (customer + active merchant) |
+
+> Note: `partyType` must be one of the defined values: `'customer' | 'employee' | 'service_account'`. The value `'individual'` does not exist in the project model — it is a BIAN term, not a project-level enum value.
 
 #### `backend/data/customerAuthentications.json` — Additional auth records
 
@@ -2042,15 +2081,25 @@ New seed files required for the merchant onboarding + debug mode features.
 | `customer3@demo.com` / `demo1234` | `customer` | `PTY-058` | Customer with pending merchant app |
 | `customer4@demo.com` / `demo1234` | `customer` | `PTY-059` | Dual-role customer + merchant |
 
-#### `backend/data/merchants.json` — Demo merchant records
+#### `backend/data/merchants.json` — Demo merchant records (`schemaVersion: 2`)
 
-| merchantName | status | owner | Purpose |
-|---|---|---|---|
-| `Espresso Works Ltd` | `active` | `PTY-001` | Dual-role demo — main customer also owns a merchant |
-| `Okafor Digital Services` | `under_review` | `PTY-058` | Pending approval — demonstrates review queue for `merchant_officer` |
-| `Fischer Web Studio` | `active` | `PTY-059` | Active merchant — customer4 owns this |
+| merchantName | status | kybCheckStatus | owner | Purpose |
+|---|---|---|---|---|
+| `Espresso Works Ltd` | `active` | `verified` | `PTY-001` | Dual-role demo — main customer also owns an active merchant |
+| `Okafor Digital Services` | `under_review` | `initiated` | `PTY-058` | Pending approval — demonstrates review queue for `merchant_officer` |
+| `Fischer Web Studio` | `active` | `verified` | `PTY-059` | Active merchant — customer4 owns this |
 
-All merchant records include `merchantOwnerPartyReference`, `merchantCategoryCode`, `merchantLegalEntityType`, and `merchantSettlementSchedule`.
+All merchant records include `merchantOwnerPartyReference`, `merchantCategoryCode`, `merchantLegalEntityReference`, `merchantSettlementSchedule`, and `merchantAgreementKybCheck` (Ch-06 BQ:Step).
+
+#### `backend/data/customerAgreements.json` — KYC seed distribution (`schemaVersion: 3`)
+
+| customerAgreementKycCheckStatus | Count | Notes |
+|---|---|---|
+| `verified` | 48 | Standard onboarded customers — KYC passed at enrollment |
+| `expired` | 1 | `b0000049` — KYC completed >12 months ago with no renewal |
+| `initiated` | 1 | `b0000050` — KYC in progress (onboarding not yet complete) |
+
+All 50 records include `customerAgreementKycCheck` with BIAN BQ:Step sub-document (Ch-06).
 
 ---
 
