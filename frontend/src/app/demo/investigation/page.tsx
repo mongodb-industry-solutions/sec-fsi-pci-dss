@@ -5,6 +5,7 @@ import { api, FraudCase } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { CaseTable } from '../../../components/CaseTable';
 import { Pagination } from '../../../components/Pagination';
+import { useDebugMode } from '../../../lib/debugMode';
 
 type SearchField = 'email' | 'phone' | 'accountRef' | 'cardToken';
 
@@ -26,6 +27,7 @@ const FIELD_PLACEHOLDERS: Record<SearchField, string> = {
 
 export default function InvestigationPage() {
   const router = useRouter();
+  const { debugMode } = useDebugMode();
   const [token, setToken] = useState('');
   const [user, setUser] = useState<ReturnType<typeof decodeToken>>(null);
 
@@ -276,7 +278,7 @@ export default function InvestigationPage() {
                 <option key={s} value={s}>{s.toUpperCase()}</option>
               ))}
             </select>
-            {user?.role === 'level2_investigator' && filterStatus === 'escalated' && (
+            {debugMode && user?.role === 'level2_investigator' && filterStatus === 'escalated' && (
               <span className="text-xs text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded">
                 Showing escalated cases (L2 default)
               </span>
