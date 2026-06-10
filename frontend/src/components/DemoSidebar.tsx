@@ -8,6 +8,7 @@ import {
   User, PlusCircle, Store, ClipboardCheck,
   ChevronLeft, ChevronRight, Settings2, Plug,
   ShieldAlert, ScanLine, UserCheck, Building2, AlertTriangle,
+  HelpCircle,
   type LucideIcon,
 } from 'lucide-react';
 import { getToken, decodeToken } from '../lib/auth';
@@ -91,7 +92,7 @@ export function DemoSidebar() {
 
   return (
     <aside className={`
-      hidden md:flex flex-col
+      hidden md:flex print:hidden flex-col
       sticky top-[44px] h-[calc(100vh-44px)] flex-shrink-0
       bg-[#001E2B] border-r border-white/10
       transition-all duration-200
@@ -132,6 +133,18 @@ export function DemoSidebar() {
         })}
       </nav>
 
+      {/* Universal Help link — visible to all roles */}
+      <div className="px-2 pb-1">
+        <Link
+          href="/system/help"
+          title="Help & PCI DSS Guide"
+          className={`flex items-center gap-2.5 px-2 py-2 text-sm font-medium rounded-lg transition-colors text-gray-500 hover:text-white hover:bg-white/5`}
+        >
+          <HelpCircle size={15} className="shrink-0" />
+          {!collapsed && <span className="truncate text-xs">Help & Guide</span>}
+        </Link>
+      </div>
+
       <button
         type="button"
         onClick={() => setCollapsed(c => !c)}
@@ -166,7 +179,7 @@ export function MobileBottomNav() {
   if (items.length === 0) return null;
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#001E2B] border-t border-white/10 flex">
+    <nav className="md:hidden print:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#001E2B] border-t border-white/10 flex">
       {items.map((item) => {
         const Icon   = item.icon;
         const active = isActive(item);

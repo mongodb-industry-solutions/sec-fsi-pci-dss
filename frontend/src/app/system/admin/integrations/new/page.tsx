@@ -117,8 +117,8 @@ function NewIntegrationForm() {
 
   if (newKey && newId) {
     return (
-      <div className="w-full px-5 sm:px-8 lg:px-12 py-6 flex justify-center">
-        <div className="w-full max-w-lg bg-white rounded-2xl border shadow-sm p-8">
+      <div className="w-full px-5 sm:px-8 lg:px-12 py-6">
+        <div className="bg-white rounded-2xl border shadow-sm p-8">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2.5 bg-green-100 rounded-lg"><KeyRound size={18} className="text-green-700" /></div>
             <h1 className="text-lg font-bold text-gray-900">Provider registered</h1>
@@ -159,7 +159,7 @@ function NewIntegrationForm() {
         <p className="text-sm text-gray-500 mt-0.5">Add an external service provider to the SD-193 Integration Registry.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="max-w-xl bg-white rounded-xl border p-6 space-y-5">
+      <form onSubmit={handleSubmit} className="bg-white rounded-xl border p-6 space-y-5">
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">{error}</div>
         )}

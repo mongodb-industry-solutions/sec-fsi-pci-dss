@@ -335,7 +335,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
           limit: { type: 'string' },
         },
       },
-      response: { 200: { type: 'object' }, 403: E },
+      response: { 200: { type: 'object', additionalProperties: true }, 403: E },
     },
     handler: async (request, reply) => {
       if (!isAuthorized(request as unknown as DemoRequest))
