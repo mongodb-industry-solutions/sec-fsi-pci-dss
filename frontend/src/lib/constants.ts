@@ -6,7 +6,7 @@ export const DEMO_USERS_PASSWORDS: Record<string, string> = {
   'julia.santos@leafybank.demo': 'demo-password',
   'sarah.chen@leafybank.demo': 'demo-password',
   'michael.obi@leafybank.demo': 'demo-password',
-  'admin@leafybank.demo': 'demo-password',
+  'diego.sans@leafybank.demo': 'demo-password',
 };
 
 export const ROLE_LABELS: Record<string, string> = {

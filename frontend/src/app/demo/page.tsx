@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, AuthUser, AuthDomain } from '../../lib/api';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Bug } from 'lucide-react';
 import { setToken, decodeToken } from '../../lib/auth';
 import { DEMO_USERS_PASSWORDS, ROLE_LABELS } from '../../lib/constants';
 import { Tooltip } from '../../components/Tooltip';
+import { useDebugMode } from '../../lib/debugMode';
 
 const ROLE_REDIRECTS: Record<string, string> = {
   customer: '/demo/payment/history',
@@ -31,6 +32,7 @@ const FLOW_TYPE_COLORS: Record<string, string> = {
 
 export default function DemoLoginPage() {
   const router = useRouter();
+  const { debugMode, toggleDebug } = useDebugMode();
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [domains, setDomains] = useState<AuthDomain[]>([]);
   const [selectedDomain, setSelectedDomain] = useState('local');
@@ -106,7 +108,19 @@ export default function DemoLoginPage() {
     <div className="min-h-screen bg-[#001E2B] flex items-center justify-center p-6">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         {/* Header */}
-        <div className="text-center mb-6">
+        <div className="relative text-center mb-6">
+          <button
+            type="button"
+            onClick={toggleDebug}
+            title={debugMode ? 'Debug mode on - click to disable' : 'Enable debug mode'}
+            className={`absolute top-0 right-0 p-1.5 rounded-lg transition-colors ${
+              debugMode
+                ? 'bg-amber-100 text-amber-600 hover:bg-amber-200'
+                : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            <Bug size={14} />
+          </button>
           <div className="text-4xl mb-2">🏦</div>
           <h1 className="text-2xl font-bold">Payment Gateway Demo</h1>
           <p className="text-gray-500 text-sm mt-1">Application Mode: Sign In</p>
@@ -169,51 +183,53 @@ export default function DemoLoginPage() {
           {/* -- Client-credentials form (local domain) -- */}
           {isCredentialFlow && (
             <>
-              {/* User selector (local domain only) */}
-              {isLocalDomain && (
-                <div className="space-y-2">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Select User
-                      <Tooltip text="Pre-seeded demo users for the local domain. Select one to auto-fill credentials. Passwords are bcrypt-hashed in the database, never stored in plaintext." />
-                    </label>
-                    {users.length === 0 ? (
-                      <div className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-400 animate-pulse">
-                        Loading users…
-                      </div>
-                    ) : (
-                      <select
-                        value={users.some((u) => u.email === selectedEmail) ? selectedEmail : ''}
-                        onChange={(e) => handleUserSelect(e.target.value)}
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
-                      >
-                        <option value="">Select a user…</option>
-                        {users.map((u) => (
-                          <option key={u.email} value={u.email}>
-                            {u.name} ({ROLE_LABELS[u.role] ?? u.role})
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email
-                      <Tooltip text="Select a user above to auto-fill, or type a custom email address." />
-                    </label>
-                    <input
-                      type="email"
-                      value={selectedEmail}
-                      onChange={(e) => {
-                        const email = e.target.value;
-                        setSelectedEmail(email);
-                        if (DEMO_USERS_PASSWORDS[email]) setPassword(DEMO_USERS_PASSWORDS[email]);
-                        setError(null);
-                      }}
-                      placeholder="user@example.com"
+              {/* User selector - local domain, debug mode only */}
+              {isLocalDomain && debugMode && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Select User
+                    <Tooltip text="Pre-seeded demo users for the local domain. Select one to auto-fill credentials. Passwords are bcrypt-hashed in the database, never stored in plaintext." />
+                  </label>
+                  {users.length === 0 ? (
+                    <div className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-400 animate-pulse">
+                      Loading users…
+                    </div>
+                  ) : (
+                    <select
+                      value={users.some((u) => u.email === selectedEmail) ? selectedEmail : ''}
+                      onChange={(e) => handleUserSelect(e.target.value)}
                       className="w-full border rounded-lg px-3 py-2 text-sm"
-                    />
-                  </div>
+                    >
+                      <option value="">Select a user…</option>
+                      {users.map((u) => (
+                        <option key={u.email} value={u.email}>
+                          {u.name} ({ROLE_LABELS[u.role] ?? u.role})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
+              {/* Email field */}
+              {isLocalDomain && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email
+                    {debugMode && <Tooltip text="Select a user above to auto-fill, or type a custom email address." />}
+                  </label>
+                  <input
+                    type="email"
+                    value={selectedEmail}
+                    onChange={(e) => {
+                      const email = e.target.value;
+                      setSelectedEmail(email);
+                      if (DEMO_USERS_PASSWORDS[email]) setPassword(DEMO_USERS_PASSWORDS[email]);
+                      setError(null);
+                    }}
+                    placeholder="user@example.com"
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                  />
                 </div>
               )}
 
@@ -279,8 +295,10 @@ export default function DemoLoginPage() {
         </form>
 
         <p className="mt-4 text-xs text-gray-400 text-center">
-          {isLocalDomain
-            ? 'Select any user to auto-fill credentials. All local demo accounts share the same demo password.'
+          {isLocalDomain && debugMode
+            ? 'Select a user to auto-fill credentials. All local demo accounts share the same demo password.'
+            : isLocalDomain
+            ? 'Enter your credentials to sign in.'
             : isCredentialFlow
             ? 'Enter credentials for the selected identity provider.'
             : 'You will be redirected to complete authentication.'}
