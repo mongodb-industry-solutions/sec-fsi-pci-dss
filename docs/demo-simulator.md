@@ -1101,10 +1101,238 @@ Inside the demo layout. Accessible to all authenticated roles via the "Merchant"
 
 ### 10.5 Sidebar Navigation
 
-`Store` icon added to `DemoSidebar` for all roles pointing to `/demo/merchant`.
+`Store` icon added to `DemoSidebar` for all roles pointing to `/system/merchant`.
 
 ```typescript
-{ label: 'Merchant', path: '/demo/merchant', icon: Store }
+{ label: 'Merchant', path: '/system/merchant', icon: Store }
 ```
 
-Added to: `level1_analyst`, `level2_investigator`, `security_auditor`, `customer`.
+Added to: `level1_analyst`, `level2_investigator`, `security_auditor`, `customer`, `merchant_officer`.
+
+---
+
+## 11. Debug Mode (Ch-05)
+
+Debug Mode converts Application Mode from a clean business narrative into a technical deep-dive view. It is the primary mechanism for explaining MongoDB Queryable Encryption, BIAN alignment, and PCI DSS compliance to FSI architects without leaving the application.
+
+### 11.1 Toggle
+
+- **Location:** Top navigation bar (right side, next to user avatar).
+- **Label:** `⚡ Debug` (off) / `⚡ Debug ON` (on, with accent color).
+- **Guard:** Only rendered when `NEXT_PUBLIC_DEMO_DEBUG_ENABLED=true` is set at build time. Hidden otherwise.
+- **Persistence:** State stored in `localStorage` key `demo_debug_mode`. Survives navigation and page refresh.
+- **No reload required:** Toggle is instant (React context update propagates synchronously).
+
+### 11.2 Business Mode (Debug OFF)
+
+Default state. The UI is identical to what a non-technical bank employee would see:
+- Professional card-based layout with BIAN field names in plain English.
+- No technical badges, no BSON notation, no QE labels.
+- Login screen: standard username + password form.
+- Forms: empty fields, manual entry.
+
+### 11.3 Technical Mode (Debug ON)
+
+Every UI element gains a technical context layer.
+
+#### BIAN Badges
+
+Every entity card shows:
+- BIAN Service Domain chip: e.g. `SD-89 · Merchant Relations`
+- Collection name chip: e.g. `merchantAgreementProcedure`
+- PCI DSS scope classification: `CDE-adjacent` / `in-scope` / `non-CDE`
+
+#### Field Labels
+
+Each form/display field shows a debug tag:
+- `[unencrypted · SD-89 BQ: MerchantName]` for plaintext fields
+- `[QE:none 🔒 · PCI DSS Req 3.5.1]` for encrypted-at-rest fields
+- `[QE:equality 🔒 · PCI DSS Req 3.5.1]` for searchably-encrypted fields
+
+Hovering the lock icon shows: `"Stored as BSON Binary subtype 6 — MongoDB Atlas server never decrypts this field"`
+
+#### Action Button Info Panel
+
+Every action button has an `[ℹ]` icon. Clicking it expands an info panel:
+
+```
+BIAN Action Term:   Initiate
+HTTP Endpoint:      POST /api/v1/merchants
+MongoDB Operation:  insertOne → merchantAgreementProcedure
+PCI DSS Control:    Req 12.8 — Document merchant agreement
+Business Logic:     Creates agreement at under_review status.
+                    A merchant_officer must approve before activation.
+```
+
+#### Raw Document Panel (`DebugRawDoc`)
+
+Available on: Merchant detail, Transaction detail, Fraud Case detail.
+
+The panel shows the live MongoDB document with encrypted fields displayed as `Binary('hex...', 6)` — the actual BSON ciphertext on disk:
+
+```json
+{
+  "_id": { "$oid": "..." },
+  "bianServiceDomain": "Merchant Relations",
+  "merchantName": "Espresso Works Ltd",
+  "merchantApiKeyHash": "Binary('a1b2c3...', 6)",
+  "merchantCategoryCode": "5812",
+  "merchantAgreementStatus": "active"
+}
+```
+
+- Fetched live from `GET /api/v1/system/raw/merchantAgreementProcedure/:id`.
+- `[⟳]` button re-fetches in real time (demonstrates the document is live, not a screenshot).
+- `[Copy]` button copies the full JSON to clipboard.
+
+### 11.4 Debug Mode by Page
+
+| Page | Debug Additions |
+|---|---|
+| `/system` (home) | BIAN architecture map panel showing all SD modules in scope |
+| `/system/merchant` | SD-89 badge, field QE labels, Raw Document panel, action info panels |
+| `/system/merchant/review` | SD-89 badge per application, `Control` action term badge on Approve/Reject buttons |
+| `/system/investigation` | SD-83 badge, field QE labels, Raw Document panel on transaction detail |
+| `/gateway/checkout/:id` | SD-64 badge, tokenization field label on card number, checkout session raw doc |
+| Login | All 8 demo user cards with role badges and BIAN IDs |
+
+---
+
+## 12. Login UX — Enhanced (Ch-05)
+
+### 12.1 Business Mode Login (Debug OFF)
+
+Standard credential form — unchanged from the current implementation. A subtle "Demo hints?" toggle reveals available usernames without passwords.
+
+### 12.2 Debug Mode Login (Debug ON)
+
+The credential form is replaced by a full user card grid. One-click login: clicking the card authenticates the user immediately via `POST /api/v1/auth/login` — no password entry required.
+
+**Role badge color scheme:**
+
+| Role | Color |
+|---|---|
+| `customer` | Blue |
+| `level1_analyst` | Amber |
+| `level2_investigator` | Orange |
+| `security_auditor` | Red |
+| `merchant_officer` | Purple |
+
+In debug mode, each card also shows the BIAN reference IDs:
+- `partyInstanceReference` (SD-13 Party anchor)
+- `customerAuthenticationInstanceReference` (SD-91 CustomerAuthentication)
+
+### 12.3 Demo Users (Post Ch-05 — 8 Total)
+
+| Display Name | Username | Role | Department | Party Ref |
+|---|---|---|---|---|
+| Alex Johnson | `customer@demo.com` | customer | — | PTY-001 |
+| David Chen | `customer2@demo.com` | customer | — | PTY-057 |
+| Amara Okafor | `customer3@demo.com` | customer | — | PTY-058 |
+| Lena Fischer | `customer4@demo.com` | customer | — | PTY-059 |
+| Level 1 Analyst | `analyst@bank.demo` | level1_analyst | Fraud Detection Services | — |
+| Level 2 Investigator | `investigator@bank.demo` | level2_investigator | Fraud Investigation | — |
+| Security Auditor | `auditor@bank.demo` | security_auditor | Compliance | — |
+| Rachel Torres | `officer@bank.demo` | merchant_officer | Merchant Acquiring | PTY-056 |
+
+All passwords: `demo1234`
+
+---
+
+## 13. Merchant Onboarding UX (Ch-05)
+
+### 13.1 Route Structure
+
+| Route | Role | Purpose |
+|---|---|---|
+| `/system/merchant` | `customer` | Apply for merchant account OR view active merchant portal |
+| `/system/merchant/review` | `merchant_officer`, `security_auditor` | Review queue — approve or reject applications |
+
+### 13.2 Customer Flow — Submitting a Merchant Application
+
+**State A: Customer has no linked merchant — Application entry point**
+
+```
+Merchant Portal
+You don't have a merchant account yet.
+
+[ Request Merchant Account ]
+
+Processing fees: 2.9% + $0.30 per transaction
+Settlements: T+2 business days
+```
+
+**Merchant Application Form** (with debug mode test data presets):
+
+In debug mode, a "Load test data" dropdown appears above the form with 3 presets:
+
+| Preset | Business Name | MCC | Volume | Type |
+|---|---|---|---|---|
+| Freelancer | Ana Reyes Consulting | 7392 Management Consulting | $8,000/mo | Sole Proprietorship |
+| Online Store | CubaShop Digital | 5999 General Merchandise | $25,000/mo | LLC |
+| Restaurant | Espresso Works Ltd | 5812 Eating Places | $15,000/mo | LLC |
+
+Form fields with debug labels (shown only when debug ON):
+
+| Field | Debug Label | BIAN Field |
+|---|---|---|
+| Business Name | `unencrypted · SD-89 BQ: MerchantType` | `merchantName` |
+| Tax ID (EIN) | `QE:none 🔒 · PCI DSS Req 3.5.1` | `merchantTaxId` |
+| Industry (MCC) | `unencrypted · ISO 18245` | `merchantCategoryCode` |
+| Monthly Volume | `unencrypted` | `merchantExpectedMonthlyVolume` |
+| Settlement Schedule | `unencrypted` | `merchantSettlementSchedule` |
+
+The Submit button info panel (debug mode):
+```
+BIAN Action Term:   Initiate
+HTTP Endpoint:      POST /api/v1/merchants
+MongoDB Operation:  insertOne → merchantAgreementProcedure
+PCI DSS:            Req 12.8 — Document agreement with service providers
+Business Logic:     Sets merchantAgreementStatus = under_review.
+                    Notifies Merchant Acquiring department for KYB review.
+```
+
+**State B: Application under review**
+
+```
+Application Status: [⏳ Under Review]
+
+Business Name:  Espresso Works Ltd
+Industry:       Food Service (MCC 5812)
+Submitted:      2026-06-10 at 14:23
+
+A Merchant Acquiring officer will review your application
+within 2 business days.
+```
+
+**State C: Approved — Active merchant portal**
+
+The existing merchant portal view from Ch-04 (checkout sessions, payment links, API keys, webhooks tab). Status badge: `[✓ Active]`.
+
+### 13.3 Merchant Officer Flow — Review Queue
+
+Route: `/system/merchant/review`
+
+**Pending Applications List:**
+
+Each application card shows:
+- Merchant name, owner name (Party reference), MCC, monthly volume, submission date.
+- Status badge: `[⏳ Under Review]`.
+- KYB Review Notes text input.
+- `[ ✓ Approve ]` and `[ ✗ Reject ]` buttons.
+
+On approve: calls `PATCH /api/v1/merchants/:id/review` with `{ action: 'approve', reviewNote }`. Card status badge transitions to `[✓ Agreed]`.
+
+On reject: calls `PATCH /api/v1/merchants/:id/review` with `{ action: 'reject', reviewNote }`. Card status badge transitions to `[✗ Rejected]`.
+
+In debug mode, each card shows:
+- `merchantAgreementInstanceReference` (SD-89 FK).
+- BIAN badge: `SD-89 · Merchant Relations · Control`.
+- Approve button info panel:
+  ```
+  BIAN Action Term:   Control
+  HTTP Endpoint:      PATCH /api/v1/merchants/:id/review
+  MongoDB Operation:  updateOne — set status: agreed, populate review metadata
+  PCI DSS:            Req 12.8 — Documented approval by authorized officer
+  Req 7.1:            Only merchant_officer role can approve (least privilege)
+  ```

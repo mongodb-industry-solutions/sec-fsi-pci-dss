@@ -182,6 +182,7 @@ Merchant System        LeafyBank Gateway
 | **Level 2 Investigator** | Read: equality + `none` mode QE fields | Full record reveal after escalation approval |
 | **Security Auditor** | Read: audit log, case history only | Review access events, export case timeline |
 | **Merchant** *(Ch-04)* | Write: checkout sessions, payment links; Read: own merchant data | Create checkout sessions, create payment links, manage API keys, view webhook logs |
+| **Merchant Officer** *(Ch-05)* | Write: merchant agreement Control actions; Read: all merchant applications | Review pending merchant onboarding applications; approve or reject with KYB notes (BIAN SD-89, Action: Control) |
 
 ---
 
@@ -223,6 +224,17 @@ Merchant System        LeafyBank Gateway
 [5. Case Resolution]
    Investigator marks the transaction as confirmed fraud or false positive.
    Case status updates. Audit trail is complete and exportable.
+
+        ↓
+
+[6. Merchant Onboarding (Ch-05)]
+   A customer submits a merchant application via the Merchant portal.
+   Status becomes 'under_review' — the document is in the merchantAgreementProcedure collection.
+   A Merchant Acquiring officer (merchant_officer role) reviews the application
+   and performs a KYB (Know Your Business) check before approving.
+   On approval: status transitions to 'agreed', then 'active' upon T&C acceptance.
+   The same Party (SD-13) record that holds the CustomerAgreement (SD-53)
+   now also owns the MerchantAgreement (SD-89) — the BIAN dual-role pattern.
 ```
 
 ### Key Demo Moments (Explainability)
@@ -934,10 +946,84 @@ The following is a high-level summary. Refer to the roadmap for the full specifi
 | **v1** | Mode selector landing, simulator flow (payment + investigation + Atlas toggle), application mode (login + role-based routing) | JWT auth, QE writes, equality search, auto-fraud-case creation, `/health` endpoint |
 | **v2** | Role selector (Level 1 / Level 2 / Auditor), escalation workflow, audit trail timeline | RBAC middleware, escalation endpoint, audit log queries, range queries on amount |
 | **v3** | Save card / recurring payment flow, performance comparison panel | Tokenization endpoint, query-timing diagnostic endpoint, Leafy Bank API contracts |
-| **v4** | Simulator step 0 (merchant creates payment intent), merchant profile panel in fraud case detail, merchant portal in Application Mode | Backend modular refactor (BIAN SD modules), gateway API (`/gateway/payments`, `/merchants`, `/gateway/tokens`), 3 new collections (merchantAgreementProcedure · paymentOrderProcedure · cardEtokenProcedure), merchant seed data |
+| **v4** | Simulator step 0 (merchant creates payment intent), merchant profile panel in fraud case detail, merchant portal in Application Mode; **Ch-05 additions:** Merchant onboarding form (with test data presets), Merchant Officer dashboard (review queue), Debug Mode toggle (BIAN annotations + raw MongoDB document viewer), Enhanced Login screen (all 7 roles as clickable cards) | Backend modular refactor (BIAN SD modules), gateway API (`/gateway/payments`, `/merchants`, `/gateway/tokens`), 3 new collections (merchantAgreementProcedure · paymentOrderProcedure · cardEtokenProcedure), merchant seed data; **Ch-05 additions:** `PATCH /merchants/:id/review` (BIAN Action: Control), `merchant_officer` role, expanded `MerchantAgreementStatus` (`under_review`, `rejected`), 4 new seed users |
 | **v5** | AI draft inline in case detail, agent confidence indicator, agent action log | Magenta agent integration, structured draft diagnosis output |
 
 See [docs/roadmap.md](roadmap.md) for the complete FR and NFR specification with acceptance criteria per iteration.
+
+---
+
+## 11. Debug Mode Requirements (Ch-05)
+
+Debug Mode is a demo-presenter feature that converts the application from a "business narrative" view to a "technical deep-dive" view. It is the primary tool for explaining MongoDB Queryable Encryption, BIAN alignment, and PCI DSS compliance to FSI architects and security practitioners.
+
+### 11.1 Toggle Behaviour
+
+- A `[⚡ Debug]` button appears in the top navigation bar.
+- The toggle is only visible when the environment variable `DEMO_DEBUG_ENABLED=true` is set.
+- State persists across page navigation via `localStorage` key `demo_debug_mode`.
+- Toggling does not require a page reload.
+
+### 11.2 Business Mode (Debug OFF — default)
+
+- Clean, professional UI suitable for executive or business audience.
+- No technical jargon, no ciphertext, no BIAN SD annotations.
+- Forms show empty fields; user fills them in naturally.
+- Login screen shows a minimal credential form.
+
+### 11.3 Technical Mode (Debug ON)
+
+Every UI element in the application gains technical context overlays:
+
+| Overlay Type | Where it appears | Content |
+|---|---|---|
+| **BIAN Badge** | Entity cards, page headers, form sections | Service Domain chip: `SD-89 · Merchant Relations`, collection name |
+| **PCI DSS Badge** | Alongside BIAN badge | Requirement citation: `PCI DSS Req 3.5.1` |
+| **Field Label** | Every form/display field | QE mode: `QE:equality`, `QE:none`, or `unencrypted` |
+| **Lock Tooltip** | Encrypted fields | `"Stored as BSON Binary subtype 6 — server never sees plaintext"` |
+| **Info Panel** | Action buttons (`[ℹ]`) | BIAN Action Term, HTTP method, MongoDB write op, PCI DSS control, business logic explanation |
+| **Raw Document Panel** | Key entity pages | Live MongoDB document showing Binary ciphertext; fetched from `/api/v1/system/raw/:collection/:id` |
+| **Login Cards** | Login screen | All demo users shown as role cards with one-click login |
+| **Form Presets** | All forms | "Load test data" dropdown with 2–3 realistic presets per form |
+
+### 11.4 Raw Document Viewer
+
+- Uses the existing `GET /api/v1/system/raw/:collection/:id` endpoint (Simulator Mode infrastructure).
+- Encrypted fields are displayed as `Binary('hex...')` notation — visually demonstrates QE at rest.
+- A "Refresh" button re-fetches in real time.
+- A copy-to-clipboard icon copies the full JSON.
+- Only available for entity types that have a direct MongoDB document (transactions, merchants, fraud cases).
+
+---
+
+## 12. Login UX Requirements (Ch-05)
+
+### 12.1 Business Mode Login
+
+- Standard credential form: email/username + password fields.
+- A subtle "Demo hints?" toggle reveals a list of available usernames (without passwords).
+
+### 12.2 Debug Mode Login
+
+- Full user card grid replaces the credential form.
+- Each card shows: **Name**, **Role badge** (color-coded), **Department**, **One-click "Log in as this user"** button.
+- Role badge colors: `customer`=blue, `level1_analyst`=amber, `level2_investigator`=orange, `security_auditor`=red, `merchant_officer`=purple.
+- In debug mode, each card also shows: `partyInstanceReference` (SD-13 FK), `customerAuthenticationInstanceReference` (SD-91 FK).
+
+### 12.3 Demo Users (7 total after Ch-05)
+
+| Display Name | Username | Role | Department | Party Ref |
+|---|---|---|---|---|
+| Alex Johnson | `customer@demo.com` | customer | — | PTY-001 |
+| David Chen | `customer2@demo.com` | customer | — | PTY-057 |
+| Amara Okafor | `customer3@demo.com` | customer | — | PTY-058 |
+| Lena Fischer | `customer4@demo.com` | customer | — | PTY-059 |
+| Level 1 Analyst | `analyst@bank.demo` | level1_analyst | Fraud Detection | — |
+| Level 2 Investigator | `investigator@bank.demo` | level2_investigator | Fraud Investigation | — |
+| Security Auditor | `auditor@bank.demo` | security_auditor | Compliance | — |
+| Rachel Torres | `officer@bank.demo` | merchant_officer | Merchant Acquiring | PTY-056 |
+
+Password for all demo users: `demo1234`
 
 ---
 

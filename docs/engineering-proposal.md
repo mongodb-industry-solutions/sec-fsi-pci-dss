@@ -812,3 +812,212 @@ Two new MongoDB collections, both plaintext (no QE — neither contains CHD or P
 - Checkout sessions add a MongoDB write per payment attempt (TTL-expired sessions accumulate but are auto-deleted by the TTL index).
 - Payment link codes require collision-checking on generation (low probability with 8 alphanumeric chars = 36^8 space, but worth retrying on insert conflict).
 - Webhook delivery is best-effort in this demo (3 attempts with exponential backoff). A production system would require a persistent delivery queue (e.g., MongoDB change stream + worker).
+
+---
+
+## ADR-007: Merchant Onboarding Lifecycle (SD-89 — Ch-05)
+
+**Date:** 2026-06-10  
+**Status:** Accepted
+
+### Context
+
+ADR-006 established `merchantAgreementProcedure` (SD-89) as a fully MongoDB-backed collection and introduced the dual-role Party pattern. However, Ch-04 seeds all merchants with `status: 'active'` from inception, bypassing the regulated onboarding lifecycle entirely. This omission makes the demo incomplete in two ways:
+
+1. **BIAN SD-89 defines a multi-step Agreement lifecycle.** `MerchantAgreementProcedure` uses Behavior Qualifier type **Agreement** with canonical states: `initiated → under_review → agreed → active`, plus `amended`, `suspended`, `rejected`, and `closed`. The demo showing only `active` merchants is architecturally misleading to financial architects.
+
+2. **KYB (Know Your Business) is a regulated obligation.** Any payment institution accepting merchant funds must perform entity-level due diligence before activating payment capability. PCI DSS Req 12.8 requires documented agreements with all entities that handle or could affect card data security. Without a review step, the demo cannot illustrate the compliance lifecycle.
+
+3. **No internal review role exists.** Approving or rejecting a merchant application is the responsibility of a Merchant Acquiring department employee — a different BIAN actor from a fraud investigator (SD-83), security auditor (SD-116), or customer (SD-53). A new role `merchant_officer` is required.
+
+### Decision
+
+**Add the complete BIAN SD-89 merchant onboarding lifecycle with `merchant_officer` review capability.**
+
+#### BIAN Action Term Mapping
+
+| Actor | BIAN Action Term | Outcome | HTTP Method |
+|---|---|---|---|
+| Customer | `Initiate` | Creates `MerchantAgreementProcedure` at `under_review` | `POST /api/v1/merchants` |
+| Merchant Officer | `Control` (approve) | Transitions to `agreed`, populates review metadata | `PATCH /api/v1/merchants/:id/review` |
+| Merchant Officer | `Control` (reject) | Transitions to `rejected`, populates review metadata | `PATCH /api/v1/merchants/:id/review` |
+| Merchant | `Update` | Amends terms (future: `PATCH /api/v1/merchants/:id`) | — |
+| Bank System | `Terminate` | Transitions to `closed` | — |
+
+The `Control` Action Term is used because it represents a **state change of the Control Record** — the officer is controlling whether the agreement proceeds. This is the correct BIAN term for approval/rejection workflows, not `Update` (which modifies data fields) and not `Execute` (which runs a step in a process).
+
+#### New Role: `merchant_officer`
+
+`merchant_officer` maps to a BIAN `Party` (SD-13) with `partyType: 'employee'` and a `CustomerAuthenticationAssessment` (SD-91) role claim of `merchant_officer`. The officer belongs to the "Merchant Acquiring" department of the bank.
+
+**Why not reuse `security_auditor`?**
+- `security_auditor` maps to SD-116 (IT Systems Management / Compliance) — responsible for audit logs and access events.
+- `merchant_officer` maps to SD-89 (Merchant Relations) — responsible for merchant commercial agreements.
+- Conflating these roles violates the BIAN principle of single-responsibility per Service Domain actor. Least-privilege (PCI DSS Req 7.1) also requires separation.
+
+#### KYB Process (Simplified for Demo)
+
+KYB is modelled as a Behavior Qualifier type `Step` within SD-89 (BQ: `KYBAssessment`). In the demo it is a manual review by the `merchant_officer`. In production, KYB would invoke SD-132 (Regulatory Compliance) with automated checks (business registry lookup, sanctions screening, adverse media). The demo omits automated KYB to keep the scope focused on the MongoDB and encryption story.
+
+#### Full `MerchantAgreementStatus` Lifecycle
+
+```
+initiated       ← customer submits application (Initiate)
+    ↓
+under_review    ← merchant_officer begins KYB (Control: started)
+    ↓
+agreed          ← KYB passed; T&C presented (Control: approve)
+    ↓
+active          ← T&C accepted; API key issued; payments enabled
+    ↓
+amended         ← terms updated (Update)
+suspended       ← fraud hold or compliance flag
+closed          ← agreement terminated (Terminate)
+
+under_review → rejected  ← KYB failed (Control: reject)
+```
+
+#### New Review Metadata Fields on `MerchantAgreementControlRecord`
+
+```typescript
+merchantReviewNote?: string;                     // Officer's audit comment
+merchantReviewedByPartyReference?: string;       // FK → party.partyInstanceReference (SD-13)
+merchantReviewedDateTime?: Date;                 // ISO timestamp of review decision
+```
+
+### BIAN Alignment
+
+| Concept | BIAN Reference | Implementation |
+|---|---|---|
+| SD-89 Merchant Relations | `MerchantAgreementProcedure` Control Record | `merchantAgreementProcedure` collection |
+| `Initiate` Action Term | Customer submits application | `POST /api/v1/merchants` → `under_review` |
+| `Control` Action Term | Officer approves or rejects | `PATCH /api/v1/merchants/:id/review` |
+| `merchant_officer` Party | SD-13 `partyType: 'employee'` | Seeded as PTY-056 (Rachel Torres) |
+| KYB as BQ | SD-89 BQ type: Step | `merchantReviewNote` captures the KYB outcome |
+| Dual-role pattern | SD-13 Party anchor (ADR-006) | `merchantOwnerPartyReference → party.partyInstanceReference` |
+
+### PCI DSS Alignment
+
+| Requirement | Mapping |
+|---|---|
+| Req 7.1 (Least privilege) | `merchant_officer` is the only role that can call `PATCH /merchants/:id/review`; customer cannot self-approve |
+| Req 8.1 (User accounts) | `merchant_officer` has a distinct auth record in `customerAuthenticationProcedure` (SD-91) |
+| Req 12.8 (Merchant agreements) | The `MerchantAgreementProcedure` document is the formal agreement record; `merchantReviewedByPartyReference` links to the approving officer for audit |
+
+### Consequences
+
++ Demo tells a realistic, end-to-end merchant onboarding story that FSI architects recognise.
++ `merchant_officer` introduces a new role that showcases RBAC on a BIAN-specific Action Term boundary.
++ Seed data includes an `under_review` merchant — the officer can approve live during the demo for a "before/after" effect.
++ Webhook event `merchant.agreement.activated` demonstrates the event-driven integration pattern.
+- Adds a new frontend route (`/system/merchant/review`) and a new role to the auth model.
+- Seed complexity increases: `parties.json`, `customerAuthentications.json`, and `merchants.json` all require new entries.
+
+---
+
+## ADR-008: Debug Mode Architecture (Ch-05)
+
+**Date:** 2026-06-10  
+**Status:** Accepted
+
+### Context
+
+The demo currently operates in one mode: a clean business narrative suitable for a general audience. However, the primary target buyers — CISO / Security Architects and MongoDB SEs — need technical depth to evaluate Queryable Encryption, BIAN alignment, and PCI DSS compliance. Without a way to show the raw MongoDB documents (with ciphertext), BIAN Service Domain annotations, and PCI DSS requirement citations directly in the UI, presenters must switch to external tools (Atlas Data Explorer, terminal) and break the demo narrative.
+
+The existing Simulator Mode has a raw document toggle for the encryption visual, but it is limited to one step and one collection. Application Mode has no technical overlays at all.
+
+### Decision
+
+**Introduce Debug Mode: a global UI toggle that adds technical deep-dive overlays across all Application Mode pages.**
+
+Debug Mode is a **demo-only feature** and must not be enabled in any production or staging environment. It is guarded by the `DEMO_DEBUG_ENABLED=true` environment variable. If the env var is absent or false, the toggle button is not rendered and no debug components are mounted.
+
+#### Architecture
+
+```
+frontend/src/
+  context/
+    DebugContext.tsx          — React context + useDebugMode() hook
+  components/debug/
+    DebugBadge.tsx            — BIAN SD chip + PCI DSS requirement badge
+    DebugInfo.tsx             — Expandable info panel (BIAN Action Term, HTTP, MongoDB op, PCI control)
+    DebugRawDoc.tsx           — Live MongoDB document viewer (calls /api/v1/system/raw/)
+    DebugFieldLabel.tsx       — Field wrapper: QE mode + PCI classification
+```
+
+**`DebugContext`** wraps the entire `layout.tsx`. It reads `process.env.NEXT_PUBLIC_DEMO_DEBUG_ENABLED` at build time and `localStorage.demo_debug_mode` at runtime.
+
+**`useDebugMode()` hook returns:**
+```typescript
+{
+  debugMode: boolean;        // current toggle state
+  toggleDebug: () => void;   // toggle and persist to localStorage
+  debugEnabled: boolean;     // true only when NEXT_PUBLIC_DEMO_DEBUG_ENABLED=true
+}
+```
+
+#### Debug Overlays Specification
+
+| Component | Trigger | Content |
+|---|---|---|
+| `DebugBadge` | Any entity card | BIAN Service Domain chip (e.g., `SD-89 · Merchant Relations`) + collection name chip |
+| `DebugBadge` | Any encrypted field | `PCI DSS Req 3.5.1` badge |
+| `DebugFieldLabel` | Form/display fields | `QE:equality`, `QE:none`, or `unencrypted` tag; lock icon for encrypted |
+| Lock Tooltip | Encrypted fields | `"Stored as BSON Binary subtype 6 — MongoDB Atlas server never decrypts this field"` |
+| `DebugInfo` | Every action button | BIAN Action Term · HTTP method · MongoDB write op · PCI DSS control reference · Business logic description |
+| `DebugRawDoc` | Merchant, Transaction, Case pages | Live MongoDB document panel; `GET /api/v1/system/raw/:collection/:id`; formatted JSON with Binary notation |
+
+#### Raw Document Viewer (`DebugRawDoc`)
+
+Reuses the same `/api/v1/system/raw/:collection/:id` endpoint already in production for Simulator Mode. The endpoint returns documents with a standard MongoDB driver (bypassing the QE-enabled client), so encrypted fields appear as BSON Binary objects. The component:
+- Renders the document as formatted JSON with syntax highlighting.
+- Replaces Binary values with a readable notation: `Binary('hex...', 6)`.
+- Shows a "Refresh" button (re-fetches on demand).
+- Shows a copy-to-clipboard icon.
+- Never exposes credentials or connection strings.
+
+#### Login Cards (Debug Mode)
+
+When debug mode is ON, the login screen replaces the credential form with a grid of user cards — one per demo user. Each card:
+- Shows the user's **name**, **role badge** (color-coded), **department**, and a **"Log in"** button.
+- In debug mode: also shows `partyInstanceReference` (SD-13) and `customerAuthenticationInstanceReference` (SD-91).
+- One click authenticates via the existing `POST /api/v1/auth/login` endpoint with the user's pre-configured credentials (no manual entry required in debug mode).
+
+Role badge color mapping:
+
+| Role | Color |
+|---|---|
+| `customer` | Blue |
+| `level1_analyst` | Amber |
+| `level2_investigator` | Orange |
+| `security_auditor` | Red |
+| `merchant_officer` | Purple |
+
+#### Form Presets (Debug Mode)
+
+Each form in the application has a "Load test data" dropdown (visible only in debug mode) with 2–3 realistic presets. Selecting a preset fills all form fields instantly. This eliminates manual data entry during live demos.
+
+Example presets for the Merchant Application Form:
+
+| Preset | Business Name | MCC | Monthly Volume | Entity Type |
+|---|---|---|---|---|
+| Freelancer | "Ana Reyes Consulting" | 7392 (Management Consulting) | $8,000 | Sole Proprietorship |
+| Online Store | "CubaShop Digital" | 5999 (General Merchandise) | $25,000 | LLC |
+| Restaurant | "Espresso Works Ltd" | 5812 (Eating Places) | $15,000 | LLC |
+
+### PCI DSS Alignment
+
+Debug Mode access to raw MongoDB documents requires careful scoping:
+- The `/api/v1/system/raw/` endpoint requires a valid JWT. No unauthenticated access.
+- Raw documents show **encrypted** field values (ciphertext) — not decrypted PAN or PII.
+- The `DEMO_DEBUG_ENABLED` environment variable ensures this feature can never accidentally be enabled in a production deployment (missing env var = feature absent at build time).
+
+### Consequences
+
++ Presenters can demonstrate the full QE technical story (ciphertext visible, BIAN SD labels, PCI DSS citations) without leaving the UI.
++ Debug Mode is self-contained — it can be turned off for a business audience without any code change.
++ Form presets eliminate typing errors during live demos.
++ Login cards make role-switching instant for workshop scenarios.
+- Adds ~5 new React components and a context provider to the frontend.
+- `NEXT_PUBLIC_DEMO_DEBUG_ENABLED` must be added to the `.env.local` template and deployment docs.
+- The raw document viewer introduces a dependency on the Simulator Mode `/system/raw` endpoint — any changes to that endpoint must be backward compatible.

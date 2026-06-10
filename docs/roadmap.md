@@ -318,7 +318,7 @@ v4 also finalises the external integration surface introduced in v3: OpenAPI sch
 - [ ] All v3 DoD criteria still pass
 - [ ] `npm run build` exits 0; no TypeScript errors after structural refactor
 - [ ] No file remains in `backend/src/controllers/`, `backend/src/services/`, `backend/src/models/`, `backend/src/middleware/` (all moved to modules)
-- [ ] `npm run setup:db` creates `merchantAgreement`, `paymentOrder`, `tokenVault` collections
+- [ ] `npm run setup:db` creates `merchantAgreementProcedure`, `paymentOrderProcedure`, `cardEtokenProcedure` collections
 - [ ] Atlas Data Explorer confirms `merchantApiKeyHash` is ciphertext (QE:none)
 - [ ] `POST /api/v1/gateway/payments` creates a payment order with status `initiated`
 - [ ] Full authorize flow: create → confirm → authorize creates a linked `cardTransactionLog` entry and `fraudDiagnosisCase` (if MCC/amount triggers)
@@ -376,7 +376,43 @@ v4 also finalises the external integration surface introduced in v3: OpenAPI sch
 |---|---|---|
 | P5.1 | Simulator Mode: step 0 "Merchant creates payment intent" is inserted before the checkout step | Step visible; shows merchant card (name, MCC, risk category) and the generated payment order reference |
 | P5.2 | Fraud case detail (Simulator + Application Mode): "Merchant Profile" panel shows merchant name, MCC description, risk category, average transaction amount, and amount ratio | Panel visible; ratio calculated as `transactionAmount / merchantAverageTransactionAmount`; label "78x merchant average" when ratio ≥ 10 |
-| P5.3 | Application Mode: route `/demo/merchant` accessible to users with role `merchant_portal` | Route loads without errors; shows merchant's payment orders list and profile |
+| P5.3 | Application Mode: route `/system/merchant` accessible to users with role `customer` | Route loads without errors; shows merchant's payment links, checkout sessions, and profile |
+
+#### FR-v4-P6: Merchant Onboarding Lifecycle (Ch-05)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| P6.1 | Customer can submit a merchant application via `POST /api/v1/merchants` — application starts at `under_review` | Atlas document has `merchantAgreementStatus: 'under_review'`; `merchantOwnerPartyReference` FK populated from JWT |
+| P6.2 | `merchant_officer` role can list all pending applications via `GET /api/v1/merchants?status=under_review` | Officer dashboard shows applications with merchant name, category, owner, submitted date |
+| P6.3 | `merchant_officer` can approve an application via `PATCH /api/v1/merchants/:id/review` — body `{ action: 'approve', reviewNote: '...' }` | Status transitions to `agreed`; `merchantReviewedByPartyReference`, `merchantReviewedDateTime`, `merchantReviewNote` populated |
+| P6.4 | `merchant_officer` can reject an application via `PATCH /api/v1/merchants/:id/review` — body `{ action: 'reject', reviewNote: '...' }` | Status transitions to `rejected`; review metadata populated |
+| P6.5 | Webhook event `merchant.agreement.activated` is emitted when a merchant is approved | Event payload includes `merchantAgreementInstanceReference`, `merchantName`, `reviewedByPartyReference` |
+| P6.6 | Frontend: `/system/merchant` shows "Request Merchant Account" form when authenticated customer has no linked merchant | Form includes all required BIAN fields; "Load test data" dropdown with 3 presets |
+| P6.7 | Frontend: after submission, merchant portal shows "Application under review" state with application details | Status badge displayed; timestamp shown |
+| P6.8 | Frontend: `/system/merchant/review` route accessible to `merchant_officer` — shows pending applications queue | Each card has Approve / Reject buttons; review notes input field |
+| P6.9 | Seed data: `backend/data/merchants.json` contains 3 records — 1 `active`, 1 `under_review`, 1 `active` (different owner) | `npm run db:seed` inserts all 3 without error |
+
+#### FR-v4-P7: Debug Mode (Ch-05)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| P7.1 | `[⚡ Debug]` button visible in top nav bar when `DEMO_DEBUG_ENABLED=true` env var is set | Button absent when env var is absent or false |
+| P7.2 | Toggle persists across navigation via `localStorage` key `demo_debug_mode` | Reload browser tab — debug state unchanged |
+| P7.3 | When debug ON: every entity card shows a BIAN Service Domain chip (e.g., `SD-89 · Merchant Relations`) | Chip visible on merchant cards, transaction cards, case cards |
+| P7.4 | When debug ON: every encrypted field shows a lock icon with QE mode tooltip | Tooltip text: `"QE:equality — BSON Binary subtype 6 · PCI DSS Req 3.5.1"` |
+| P7.5 | When debug ON: key entity pages show a `DebugRawDoc` panel with live MongoDB document | Panel uses `GET /api/v1/system/raw/:collection/:id`; encrypted fields show as `Binary('...')` |
+| P7.6 | When debug ON: action buttons have `[ℹ]` icon opening an info panel | Info panel shows: BIAN Action Term, HTTP endpoint, MongoDB operation, PCI DSS control |
+| P7.7 | When debug ON: forms show "Load test data" dropdown | Dropdown has 2–3 realistic presets; selecting one fills all form fields |
+
+#### FR-v4-P8: Enhanced Login UX (Ch-05)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| P8.1 | When debug OFF: standard login form (username + password) | Functional login with all demo credentials |
+| P8.2 | When debug ON: login page shows all 7 demo users as clickable cards | Cards replace the form; each shows name, role badge, department |
+| P8.3 | Role badge colors: customer=blue, analyst=amber, investigator=orange, auditor=red, merchant_officer=purple | Color consistent across all pages that reference roles |
+| P8.4 | Clicking a user card logs in immediately (no password required in debug mode) | JWT issued; user redirected to role-appropriate home page |
+| P8.5 | In debug mode: each login card shows `partyInstanceReference` and `customerAuthenticationInstanceReference` | BIAN SD-13 and SD-91 references visible on card |
 
 ---
 
@@ -390,6 +426,9 @@ v4 also finalises the external integration surface introduced in v3: OpenAPI sch
 | NFR-v4-04 | Idempotency | Duplicate `X-Idempotency-Key` on any gateway write endpoint returns 409 within P95 < 100ms | Load test with duplicate key; verify consistent 409 response |
 | NFR-v4-05 | Demo explainability | A non-technical AE can narrate the gateway flow (merchant → intent → authorization → fraud case) in ≤ 2 minutes | Validated by IST team walkthrough |
 | NFR-v4-06 | Module isolation | No module imports from another module's `controllers/` or `models/` directory directly | `grep -r "from '../../[^s]" backend/src/modules` returns zero cross-module direct imports (only `shared/` and `vendors/` allowed) |
+| NFR-v4-07 | Debug Mode safety | `DebugRawDoc` component is only rendered when `DEMO_DEBUG_ENABLED=true`; never in production | Build time check: component import guarded by env var; E2E test confirms panel absent when env var unset |
+| NFR-v4-08 | Onboarding realism | Merchant application flow (submit → review → approve) completes without manual DB edits | Full end-to-end test: customer submits, officer approves, merchant portal shows `agreed` status |
+| NFR-v4-09 | Seed completeness | `npm run db:seed` populates all 7 demo users and 3 merchants without error on a clean Atlas cluster | CI: seed runs against a test cluster and all collections have expected document counts |
 
 ---
 

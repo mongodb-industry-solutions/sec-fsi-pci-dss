@@ -25,6 +25,7 @@ export interface CreateMerchantInput {
   merchantLegalEntityReference: string;
   merchantCategoryCode: string;
   merchantCountryCode: string;
+  merchantOwnerPartyReference?: string;  // Ch-05: FK → party.partyInstanceReference (SD-13)
   merchantTier?: 'standard' | 'enterprise';
   merchantAllowedCurrencies?: string[];
   merchantTransactionLimitAmount?: number;
@@ -47,6 +48,17 @@ export async function getMerchants(
     .toArray();
 
   return { results, total: results.length };
+}
+
+// Ch-05: dual-role lookup — customer finds their own merchant by partyRef (SD-13 FK)
+export async function getMerchantByOwnerPartyRef(db: Db, partyRef: string) {
+  const merchant = await db
+    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
+    .findOne(
+      { merchantOwnerPartyReference: partyRef } as Partial<MerchantAgreementControlRecord>,
+      { projection: { merchantApiKeys: 0, merchantWebhookSecret: 0 } }
+    );
+  return merchant ?? null;
 }
 
 export async function getMerchantById(db: Db, id: string) {
@@ -84,7 +96,8 @@ export async function createMerchant(db: Db, input: CreateMerchantInput) {
     merchantLegalEntityReference: input.merchantLegalEntityReference,
     merchantCategoryCode: input.merchantCategoryCode,
     merchantCountryCode: input.merchantCountryCode,
-    merchantAgreementStatus: 'active',
+    merchantAgreementStatus: 'under_review',   // Ch-05: starts at under_review — officer must approve
+    ...(input.merchantOwnerPartyReference && { merchantOwnerPartyReference: input.merchantOwnerPartyReference }),
     merchantTier: input.merchantTier ?? 'standard',
     merchantAllowedCurrencies: input.merchantAllowedCurrencies ?? ['USD'],
     merchantTransactionLimitAmount: input.merchantTransactionLimitAmount ?? 10000,
@@ -107,11 +120,44 @@ export async function createMerchant(db: Db, input: CreateMerchantInput) {
   return {
     merchantAgreementInstanceReference: id,
     merchantName: input.merchantName,
-    merchantAgreementStatus: 'active' as MerchantAgreementStatus,
+    merchantAgreementStatus: 'under_review' as MerchantAgreementStatus,
     merchantRiskCategory,
-    // Plaintext key returned ONCE - never retrievable again
-    merchantApiKey: plaintext,
+    message: 'Application submitted. A Merchant Acquiring officer will review within 2 business days.',
   };
+}
+
+// Ch-05: BIAN Action Term: Control — merchant_officer approves or rejects an application
+export async function reviewMerchantApplication(
+  db: Db,
+  merchantId: string,
+  reviewerPartyRef: string,
+  action: 'approve' | 'reject',
+  reviewNote?: string
+): Promise<'ok' | 'not_found' | 'invalid_status'> {
+  const merchant = await db
+    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
+    .findOne({ merchantAgreementInstanceReference: merchantId } as Partial<MerchantAgreementControlRecord>);
+
+  if (!merchant) return 'not_found';
+  if (merchant.merchantAgreementStatus !== 'under_review') return 'invalid_status';
+
+  const newStatus: MerchantAgreementStatus = action === 'approve' ? 'agreed' : 'rejected';
+  const now = new Date();
+
+  await db.collection(MERCHANT_AGREEMENT_COLLECTION).updateOne(
+    { merchantAgreementInstanceReference: merchantId },
+    {
+      $set: {
+        merchantAgreementStatus: newStatus,
+        merchantReviewNote: reviewNote ?? '',
+        merchantReviewedByPartyReference: reviewerPartyRef,
+        merchantReviewedDateTime: now,
+        recordUpdatedDateTime: now,
+      },
+    }
+  );
+
+  return 'ok';
 }
 
 export async function updateMerchant(

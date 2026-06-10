@@ -22,10 +22,12 @@ export interface MerchantAgreementControlRecord {
   merchantTier: 'standard' | 'enterprise';
 
   // D-21: Party owner link — BIAN-canonical cross-domain reference via SD-13 Party.
-  // Points to the partyInstanceReference of the individual or legal entity that owns
-  // this merchant agreement. Enables dual-role: same Party can hold both a
-  // CustomerAgreement (SD-53) and a MerchantAgreement (SD-89).
   merchantOwnerPartyReference?: string;             // FK → party.partyInstanceReference (SD-13)
+
+  // Ch-05: Review metadata — populated by merchant_officer on approve/reject (BIAN Action: Control)
+  merchantReviewNote?: string;
+  merchantReviewedByPartyReference?: string;        // FK → party.partyInstanceReference of reviewing officer
+  merchantReviewedDateTime?: Date;
 
   // Gateway configuration
   merchantAllowedCurrencies: string[];              // ISO 4217 codes
@@ -50,7 +52,16 @@ export interface MerchantAgreementControlRecord {
   schemaVersion: number;
 }
 
-// D-22: Full BIAN lifecycle states for an Agreement control record.
-export type MerchantAgreementStatus = 'initiated' | 'agreed' | 'active' | 'amended' | 'suspended' | 'closed';
+// Ch-05: Full BIAN SD-89 Agreement lifecycle.
+// Initiate (customer) → Control (merchant_officer approve/reject) → Update (amend) → Terminate (close)
+export type MerchantAgreementStatus =
+  | 'initiated'       // Application submitted; not yet in review
+  | 'under_review'    // merchant_officer performing KYB check
+  | 'agreed'          // KYB passed; officer approved (Control: approve)
+  | 'active'          // T&C accepted; API keys usable; payments enabled
+  | 'amended'         // Terms updated (Update)
+  | 'suspended'       // Fraud hold or compliance flag
+  | 'rejected'        // KYB failed or policy issue (Control: reject)
+  | 'closed';         // Agreement terminated (Terminate)
 export type MerchantRiskCategory = 'low' | 'medium' | 'high';
 export type SettlementSchedule = 'T+1' | 'T+2' | 'T+3';

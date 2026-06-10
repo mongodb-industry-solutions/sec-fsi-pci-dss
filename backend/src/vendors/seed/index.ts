@@ -5,6 +5,7 @@ import { execSync } from 'child_process';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
 import { seedParties } from './seedParties';
 import { seedUsers } from './seedUsers';
+import { seedMerchants } from './seedMerchants';
 import { seedAuthDomains } from './seedAuthDomains';
 import { seedCustomers } from './seedCustomers';
 import { seedCards } from './seedCards';
@@ -88,6 +89,9 @@ export async function runSeed() {
 
     console.log('Seeding customerCreditRatingState...');
     await seedCreditRatings(db);
+
+    console.log('Seeding merchantAgreementProcedure (SD-89, Ch-05)...');
+    await seedMerchants(db);
 
     console.log('\nSeed complete.');
   } finally {

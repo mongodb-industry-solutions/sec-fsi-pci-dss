@@ -26,4 +26,5 @@ export type CustomerAuthRole =
   | 'customer'
   | 'level1_analyst'
   | 'level2_investigator'
-  | 'security_auditor';
+  | 'security_auditor'
+  | 'merchant_officer';   // Ch-05: SD-89 Merchant Acquiring bank employee

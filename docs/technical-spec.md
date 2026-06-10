@@ -82,7 +82,8 @@ export type CustomerAuthRole =
   | 'customer'
   | 'level1_analyst'
   | 'level2_investigator'
-  | 'security_auditor';
+  | 'security_auditor'
+  | 'merchant_officer';   // SD-89 Merchant Relations — Merchant Acquiring bank employee
 ```
 
 ### `customerAgreement.model.ts` (SD-53 — v2 updated)
@@ -1807,8 +1808,22 @@ merchantWebhookSecret?: string;          // HMAC signing secret for webhook deli
 // 'customer' is a role-scoped concept (SD-53 contract), while 'Party' is the identity anchor.
 merchantOwnerPartyReference?: string;    // FK → party.partyInstanceReference (SD-13)
 
-// D-22 (BIAN audit 2026-06-10): Full BIAN Agreement lifecycle states.
-type MerchantAgreementStatus = 'initiated' | 'agreed' | 'active' | 'amended' | 'suspended' | 'closed';
+// Ch-05: Review metadata — set by merchant_officer when approving/rejecting (BIAN Action: Control)
+merchantReviewNote?: string;                     // Officer's comment for audit trail
+merchantReviewedByPartyReference?: string;       // FK → party.partyInstanceReference (SD-13) of reviewing employee
+merchantReviewedDateTime?: Date;                 // When the review decision was made
+
+// Ch-05: Full BIAN SD-89 Agreement lifecycle including KYB review states.
+// BIAN Action Terms: Initiate (customer) → Control (merchant_officer) → Update (amend) → Terminate (close)
+type MerchantAgreementStatus =
+  | 'initiated'      // Customer submits application (Initiate)
+  | 'under_review'   // merchant_officer performing KYB validation (BQ: KYBAssessment)
+  | 'agreed'         // KYB passed; T&C presented to applicant (Control: approve)
+  | 'active'         // Applicant accepted T&C; API key issued; can process payments
+  | 'amended'        // Terms updated by merchant_officer (Update)
+  | 'suspended'      // Temporarily blocked — fraud investigation or compliance hold
+  | 'rejected'       // KYB failed or compliance issue (Control: reject)
+  | 'closed';        // Agreement terminated (Terminate)
 ```
 
 Key format: `lbpk_live_<32 hex chars>` — plaintext returned once on generation; only bcrypt hash persisted.
@@ -1822,6 +1837,7 @@ Key format: `lbpk_live_<32 hex chars>` — plaintext returned once on generation
 { merchantAgreementInstanceReference: 1 }  // unique
 { merchantAgreementStatus: 1 }
 { merchantCategoryCode: 1 }
+{ merchantOwnerPartyReference: 1 }         // Ch-05: dual-role lookup — find merchant by owner Party
 
 // checkoutSessionLog
 { checkoutSessionInstanceReference: 1 }    // unique
@@ -1928,12 +1944,70 @@ Error codes: 404 not found, 409 already completed, 410 expired/cancelled.
 
 Error codes: 404 merchant not found, 410 link expired/deactivated/completed.
 
-#### Merchant Key Management — prefix `/merchants`
+#### Merchant Onboarding & Review — prefix `/merchants`
 
-| Method | Route | Auth | Description |
-|---|---|---|---|
-| `POST` | `/merchants/:id/keys` | JWT | Generate new API key (plaintext returned once) |
-| `DELETE` | `/merchants/:id/keys/:keyId` | JWT | Revoke API key |
+| Method | Route | Auth | Roles | Description |
+|---|---|---|---|---|
+| `POST` | `/merchants` | JWT | `customer` | Submit new merchant application (BIAN Action: Initiate). Sets status `under_review`. |
+| `GET` | `/merchants/:id` | JWT | `customer`, `merchant_officer`, `security_auditor` | Retrieve merchant agreement details |
+| `GET` | `/merchants` | JWT | `merchant_officer`, `security_auditor` | List all merchant applications (officer review queue) |
+| `PATCH` | `/merchants/:id/review` | JWT | `merchant_officer`, `security_auditor` | Approve or reject application (BIAN Action: Control). Transitions status to `agreed` or `rejected`. |
+| `POST` | `/merchants/:id/keys` | JWT | `customer` | Generate new API key (plaintext returned once) |
+| `DELETE` | `/merchants/:id/keys/:keyId` | JWT | `customer` | Revoke API key |
+
+**POST `/merchants` request (BIAN Action: Initiate):**
+```json
+{
+  "merchantName": "Espresso Works Ltd",
+  "merchantBusinessDescription": "Specialty coffee shop and online roastery",
+  "merchantCategoryCode": "5814",
+  "merchantLegalEntityType": "LLC",
+  "merchantTaxId": "12-3456789",
+  "merchantCountry": "US",
+  "merchantExpectedMonthlyVolume": 15000,
+  "merchantSettlementSchedule": "T+2",
+  "merchantOwnerPartyReference": "PTY-001"
+}
+```
+
+**POST `/merchants` response (201):**
+```json
+{
+  "merchantAgreementInstanceReference": "uuid",
+  "merchantAgreementStatus": "under_review",
+  "message": "Application submitted. A Merchant Acquiring officer will review within 2 business days."
+}
+```
+
+**PATCH `/merchants/:id/review` request (BIAN Action: Control):**
+```json
+{
+  "action": "approve",
+  "reviewNote": "KYB passed — business registered, tax ID verified, no adverse media"
+}
+```
+or
+```json
+{
+  "action": "reject",
+  "reviewNote": "KYB failed — tax ID not found in business registry"
+}
+```
+
+**PATCH `/merchants/:id/review` response (200):**
+```json
+{
+  "merchantAgreementInstanceReference": "uuid",
+  "merchantAgreementStatus": "agreed",
+  "merchantReviewedDateTime": "2026-06-10T14:30:00Z"
+}
+```
+
+Status transitions: `approve` → `agreed`; `reject` → `rejected`. Emits webhook event `merchant.agreement.activated` on approve.
+
+Error codes: 404 merchant not found, 403 insufficient role, 400 invalid status transition.
+
+#### Merchant Key Management — prefix `/merchants`
 
 **POST `/merchants/:id/keys` response (201):**
 ```json
@@ -1946,7 +2020,41 @@ Error codes: 404 merchant not found, 410 link expired/deactivated/completed.
 
 ---
 
-### 8.4 PCI DSS + Security Notes
+### 8.4 Seed Data Schema (Ch-05)
+
+New seed files required for the merchant onboarding + debug mode features.
+
+#### `backend/data/parties.json` — Additional Party records
+
+| partyInstanceReference | partyName | partyType | Notes |
+|---|---|---|---|
+| `PTY-056` | `Rachel Torres` | `employee` | Merchant Acquiring officer — has `merchant_officer` auth role |
+| `PTY-057` | `David Chen` | `individual` | Customer 2 — no merchant, simple cardholder |
+| `PTY-058` | `Amara Okafor` | `individual` | Customer 3 — has a pending merchant application |
+| `PTY-059` | `Lena Fischer` | `individual` | Customer 4 — dual-role (customer + active merchant) |
+
+#### `backend/data/customerAuthentications.json` — Additional auth records
+
+| login | role | linkedPartyRef | Notes |
+|---|---|---|---|
+| `officer@bank.demo` / `demo1234` | `merchant_officer` | `PTY-056` | Merchant Acquiring officer |
+| `customer2@demo.com` / `demo1234` | `customer` | `PTY-057` | Simple customer, no merchant |
+| `customer3@demo.com` / `demo1234` | `customer` | `PTY-058` | Customer with pending merchant app |
+| `customer4@demo.com` / `demo1234` | `customer` | `PTY-059` | Dual-role customer + merchant |
+
+#### `backend/data/merchants.json` — Demo merchant records
+
+| merchantName | status | owner | Purpose |
+|---|---|---|---|
+| `Espresso Works Ltd` | `active` | `PTY-001` | Dual-role demo — main customer also owns a merchant |
+| `Okafor Digital Services` | `under_review` | `PTY-058` | Pending approval — demonstrates review queue for `merchant_officer` |
+| `Fischer Web Studio` | `active` | `PTY-059` | Active merchant — customer4 owns this |
+
+All merchant records include `merchantOwnerPartyReference`, `merchantCategoryCode`, `merchantLegalEntityType`, and `merchantSettlementSchedule`.
+
+---
+
+### 8.5 PCI DSS + Security Notes
 
 | Concern | Implementation |
 |---|---|
@@ -1959,7 +2067,36 @@ Error codes: 404 merchant not found, 410 link expired/deactivated/completed.
 
 ---
 
-### 8.5 FRONTEND_URL Environment Variable
+### 8.6 Debug Mode Architecture
+
+Debug Mode is a demo-only UX toggle that switches from the business narrative to a technical deep-dive view. It is protected by the environment variable `DEMO_DEBUG_ENABLED=true` (must be set; absent or `false` = hidden in production-like deployments).
+
+**Client-side state:** `DebugContext` React context provider wraps the application layout. State persisted to `localStorage` key `demo_debug_mode`.
+
+**Hook:** `useDebugMode(): { debugMode: boolean; toggleDebug: () => void; debugEnabled: boolean }`
+
+**Components introduced in Ch-05:**
+
+| Component | Purpose |
+|---|---|
+| `DebugBadge` | Chip showing BIAN Service Domain (e.g., `SD-89 · Merchant Relations`) and PCI DSS requirement |
+| `DebugInfo` | Expandable info panel on action buttons — shows BIAN Action Term, HTTP method, MongoDB op, PCI DSS control |
+| `DebugRawDoc` | Raw MongoDB document viewer — fetches from `/api/v1/system/raw/:collection/:id`; shows encrypted fields as Binary hex |
+| `DebugFieldLabel` | Field wrapper showing QE mode (`QE:equality`, `QE:none`, `unencrypted`) and PCI classification |
+
+**When debug mode is ON:**
+- Every entity card shows a `DebugBadge` with BIAN SD and collection name
+- Every encrypted field has a lock icon tooltip: `"QE:equality — BSON Binary subtype 6 · PCI DSS Req 3.5.1"`
+- Every action button has an `[ℹ]` icon expanding a `DebugInfo` panel
+- Key entity pages (merchant, transaction, case, checkout) show a `DebugRawDoc` panel with live ciphertext
+- Login screen shows all demo users as cards (role badge + click-to-fill)
+- Forms show "Load test data" dropdowns with 2–3 realistic presets
+
+**When debug mode is OFF:** Clean business UI with no technical annotations.
+
+---
+
+### 8.7 FRONTEND_URL Environment Variable
 
 The `FRONTEND_URL` env var is used to construct hosted page URLs:
 - `paymentPageUrl = ${FRONTEND_URL}/checkout/{sessionId}`

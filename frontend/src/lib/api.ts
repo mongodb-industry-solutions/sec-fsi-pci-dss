@@ -422,6 +422,16 @@ export const api = {
   health: () => apiFetch<{ status: string; atlas: string; kmsProvider: string; timestamp: string }>('/api/v1/system/health'),
 
   merchants: {
+    getMe: (token: string) =>
+      apiFetch<{ found: boolean; merchant: Record<string, unknown> | null }>(
+        '/api/v1/merchants/me', {}, token
+      ),
+    review: (merchantId: string, body: { action: 'approve' | 'reject'; reviewNote?: string }, token: string) =>
+      apiFetch<{ merchantAgreementInstanceReference: string; merchantAgreementStatus: string; merchantReviewedDateTime: string }>(
+        `/api/v1/merchants/${merchantId}/review`,
+        { method: 'PATCH', body: JSON.stringify(body) },
+        token
+      ),
     list: (filters: { status?: string; mcc?: string }, token: string) => {
       const qs = new URLSearchParams(
         Object.entries(filters).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])

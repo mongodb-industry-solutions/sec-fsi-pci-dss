@@ -12,6 +12,7 @@ import {
   User,
   PlusCircle,
   Store,
+  ClipboardCheck,
   ChevronLeft,
   ChevronRight,
   type LucideIcon,
@@ -53,6 +54,11 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'New Payment',  path: '/system/payment',         icon: PlusCircle, exact: true },
     { label: 'Merchant',     path: '/system/merchant',        icon: Store },
     { label: 'Profile',      path: '/system/profile',         icon: User },
+  ],
+  merchant_officer: [
+    { label: 'Review Queue', path: '/system/merchant/review', icon: ClipboardCheck },
+    { label: 'All Merchants',path: '/system/merchant',        icon: Store, exact: true },
+    { label: 'My Profile',   path: '/system/profile',         icon: User },
   ],
 };
 

@@ -88,6 +88,7 @@ export async function createIndexes(client: MongoClient) {
     { key: { merchantAgreementInstanceReference: 1 }, unique: true },
     { key: { merchantAgreementStatus: 1 } },
     { key: { merchantCategoryCode: 1 } },
+    { key: { merchantOwnerPartyReference: 1 } },   // Ch-05: dual-role Party lookup
   ]);
 
   // SD-64: Checkout Session Log (TTL on expiry field)

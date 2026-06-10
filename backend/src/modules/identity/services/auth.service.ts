@@ -7,11 +7,12 @@ import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRec
 import { AUTHENTICATION_DOMAIN_COLLECTION, AuthenticationDomainRecord } from '../models/authenticationDomain.model';
 
 export interface JwtPayload {
-  sub: string;   // customerAuthenticationInstanceReference
+  sub: string;       // customerAuthenticationInstanceReference
   email: string;
   role: string;
   name: string;
   domain: string;
+  partyRef?: string; // Ch-05: partyInstanceReference (SD-13) — present for all users with a Party record
 }
 
 export async function loginUser(
@@ -43,6 +44,7 @@ export async function loginUser(
     role: user.customerAuthenticationUserRole,
     name: user.customerAuthenticationUserName,
     domain: user.customerAuthenticationLoginDomain,
+    ...(user.partyInstanceReference && { partyRef: user.partyInstanceReference }),
   };
 
   const secret = process.env.JWT_SECRET ?? 'demo-local-secret-change-in-production';
@@ -57,6 +59,7 @@ export async function loginUser(
       role: payload.role,
       name: payload.name,
       domain: payload.domain,
+      ...(payload.partyRef && { partyRef: payload.partyRef }),
     },
   };
 }

@@ -121,7 +121,7 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
 export async function getTransactionById(
   db: Db,
   id: string,
-  role: 'level1_analyst' | 'level2_investigator' | 'security_auditor' | 'customer' = 'level1_analyst',
+  role: 'level1_analyst' | 'level2_investigator' | 'security_auditor' | 'customer' | 'merchant_officer' = 'level1_analyst',
   escalationToken?: string
 ) {
   // v2: use role-aware QE client. L2 auto-decrypts sensitive fields; L1 returns Binary.

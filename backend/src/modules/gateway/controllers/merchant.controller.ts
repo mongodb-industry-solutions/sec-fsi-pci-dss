@@ -2,7 +2,8 @@
 // Routes mounted at /merchants → /api/v1/merchants
 
 import { FastifyInstance } from 'fastify';
-import { getMerchants, getMerchantById, createMerchant, updateMerchant, registerWebhook, generateApiKey, revokeApiKey } from '../services/merchant.service';
+import type { JwtDemoPayload } from '../../../shared/models/identity.model';
+import { getMerchants, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, generateApiKey, revokeApiKey, reviewMerchantApplication } from '../services/merchant.service';
 
 export async function merchantController(fastify: FastifyInstance) {
 
@@ -20,7 +21,7 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
       querystring: {
         type: 'object',
         properties: {
-          status: { type: 'string', enum: ['active', 'suspended', 'closed'], description: 'Filter by agreement status.' },
+          status: { type: 'string', enum: ['initiated', 'under_review', 'agreed', 'active', 'amended', 'suspended', 'rejected', 'closed'], description: 'Filter by agreement status.' },
           mcc: { type: 'string', description: 'Filter by Merchant Category Code (ISO 18245).' },
         },
       },
@@ -37,7 +38,7 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
                   merchantName: { type: 'string' },
                   merchantCategoryCode: { type: 'string' },
                   merchantCountryCode: { type: 'string' },
-                  merchantAgreementStatus: { type: 'string', enum: ['active', 'suspended', 'closed'] },
+                  merchantAgreementStatus: { type: 'string', enum: ['initiated', 'under_review', 'agreed', 'active', 'amended', 'suspended', 'rejected', 'closed'] },
                   merchantRiskCategory: { type: 'string', enum: ['low', 'medium', 'high'] },
                   merchantTransactionLimitAmount: { type: 'number' },
                   merchantAverageTransactionAmount: { type: 'number' },
@@ -50,9 +51,15 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
           },
         },
         401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
+    const user = (request as { user?: JwtDemoPayload }).user;
+    // Ch-05: customers cannot list all merchants; they can only see their own via GET /:id
+    if (user?.role === 'customer') {
+      return reply.status(403).send({ error: 'Access denied: use GET /merchants/:id to view your own merchant.' });
+    }
     const { status, mcc } = request.query as { status?: string; mcc?: string };
     const result = await getMerchants(fastify.db, { status: status as never, mcc });
     return reply.send(result);
@@ -82,6 +89,7 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
           merchantTier: { type: 'string', enum: ['standard', 'enterprise'], default: 'standard' },
           merchantAllowedCurrencies: { type: 'array', items: { type: 'string' }, description: 'ISO 4217 currency codes the merchant may accept.' },
           merchantTransactionLimitAmount: { type: 'number', description: 'Maximum per-transaction amount in the settlement currency.' },
+          merchantOwnerPartyReference: { type: 'string', description: 'Ch-05: FK → party.partyInstanceReference (SD-13). Enables dual-role (customer + merchant).' },
           merchantWebhookEndpoint: { type: 'string', format: 'uri', description: 'HTTPS URL for payment event callbacks.' },
           merchantSettlementSchedule: { type: 'string', enum: ['T+1', 'T+2', 'T+3'], default: 'T+2' },
         },
@@ -90,10 +98,10 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
         201: {
           type: 'object',
           properties: {
-            merchantAgreementInstanceReference: { type: 'string', description: 'UUID of the created merchant agreement. Use in /gateway/payments.' },
+            merchantAgreementInstanceReference: { type: 'string', description: 'UUID of the created merchant agreement.' },
             merchantName: { type: 'string' },
-            merchantAgreementStatus: { type: 'string', enum: ['active'] },
-            merchantApiKey: { type: 'string', description: '⚠️ Shown once. Store securely. Subsequent requests require this key in the X-Merchant-Api-Key header.' },
+            merchantAgreementStatus: { type: 'string', enum: ['under_review'] },
+            message: { type: 'string' },
           },
         },
         400: { $ref: 'Error#' },
@@ -101,12 +109,51 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
       },
     },
   }, async (request, reply) => {
+    const user = (request as { user?: JwtDemoPayload }).user;
     const body = request.body as Parameters<typeof createMerchant>[1];
     if (!body.merchantName || !body.merchantCategoryCode) {
       return reply.status(400).send({ error: 'merchantName and merchantCategoryCode are required' });
     }
+    // Ch-05: inject ownerPartyReference from JWT if not provided explicitly
+    if (!body.merchantOwnerPartyReference && user?.partyRef) {
+      body.merchantOwnerPartyReference = user.partyRef as string;
+    }
     const result = await createMerchant(fastify.db, body);
     return reply.status(201).send(result);
+  });
+
+  // GET /api/v1/merchants/me  — Ch-05: customer fetches their own merchant by JWT partyRef
+  // MUST be registered before /:id to prevent "me" being matched as a UUID param
+  fastify.get('/me', {
+    schema: {
+      tags: ['merchants'],
+      summary: "Get current user's merchant agreement (SD-89)",
+      description: `Returns the \`merchantAgreementProcedure\` owned by the authenticated user's Party (SD-13).
+Returns \`{ found: false }\` when no merchant is linked to the caller's \`partyRef\`.
+Used by customers to detect their onboarding state: no application / under_review / agreed / active.`,
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            found: { type: 'boolean' },
+            merchant: {
+              type: 'object',
+              nullable: true,
+              additionalProperties: true,
+            },
+          },
+        },
+        401: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const user = (request as { user?: JwtDemoPayload }).user;
+    const partyRef = user?.partyRef;
+    if (!partyRef) return reply.send({ found: false, merchant: null });
+    const merchant = await getMerchantByOwnerPartyRef(fastify.db, partyRef);
+    if (!merchant) return reply.send({ found: false, merchant: null });
+    return reply.send({ found: true, merchant });
   });
 
   // GET /api/v1/merchants/:id
@@ -146,13 +193,80 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
     return reply.send(merchant);
   });
 
+  // PATCH /api/v1/merchants/:id/review  (Ch-05 — BIAN Action Term: Control)
+  fastify.patch('/:id/review', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Approve or reject a merchant application — BIAN Action: Control (SD-89)',
+      description: `**Roles:** \`merchant_officer\`, \`security_auditor\` only.
+
+Transitions a \`merchantAgreementProcedure\` in \`under_review\` status to \`agreed\` (approve) or \`rejected\` (reject).
+The reviewing officer's partyRef is recorded for audit trail.
+
+**PCI DSS:** Req 7.1 (least privilege) — only \`merchant_officer\` role may approve/reject.
+**PCI DSS:** Req 12.8 — documented agreement approval by authorized officer.`,
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      body: {
+        type: 'object',
+        required: ['action'],
+        properties: {
+          action: { type: 'string', enum: ['approve', 'reject'], description: 'BIAN Control: approve → agreed; reject → rejected.' },
+          reviewNote: { type: 'string', description: 'KYB outcome note for the audit trail. Required on reject.' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            merchantAgreementInstanceReference: { type: 'string' },
+            merchantAgreementStatus: { type: 'string', enum: ['agreed', 'rejected'] },
+            merchantReviewedDateTime: { type: 'string' },
+          },
+        },
+        400: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+        409: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const user = (request as { user?: JwtDemoPayload }).user;
+    const role = user?.role;
+
+    // RBAC: only merchant_officer and security_auditor can review applications
+    if (role !== 'merchant_officer' && role !== 'security_auditor') {
+      return reply.status(403).send({ error: 'Access denied: merchant review requires merchant_officer or security_auditor role.' });
+    }
+
+    const { id } = request.params as { id: string };
+    const { action, reviewNote } = request.body as { action: 'approve' | 'reject'; reviewNote?: string };
+
+    // reviewerPartyRef: prefer JWT partyRef claim; fall back to sub
+    const reviewerPartyRef = (user as { partyRef?: string })?.partyRef ?? user?.sub ?? 'unknown';
+
+    const outcome = await reviewMerchantApplication(fastify.db, id, reviewerPartyRef, action, reviewNote);
+
+    if (outcome === 'not_found') return reply.status(404).send({ error: 'Merchant not found' });
+    if (outcome === 'invalid_status') return reply.status(409).send({ error: 'Merchant application is not in under_review status. Cannot review.' });
+
+    const updated = await getMerchantById(fastify.db, id);
+    return reply.send({
+      merchantAgreementInstanceReference: id,
+      merchantAgreementStatus: updated?.merchantAgreementStatus,
+      merchantReviewedDateTime: updated?.merchantReviewedDateTime?.toISOString(),
+    });
+  });
+
   // PATCH /api/v1/merchants/:id
   fastify.patch('/:id', {
     schema: {
       tags: ['merchants'],
       summary: 'Update merchant configuration (SD-89)',
       description: `Partial update of a \`merchantAgreement\`. Only the provided fields are updated.
-Allowed fields: \`merchantTransactionLimitAmount\`, \`merchantWebhookEndpoint\`, \`merchantSettlementSchedule\`, \`merchantAgreementStatus\`, \`merchantAllowedCurrencies\`.`,
+Allowed fields: \`merchantTransactionLimitAmount\`, \`merchantWebhookEndpoint\`, \`merchantSettlementSchedule\`, \`merchantAgreementStatus\`, \`merchantAllowedCurrencies\`.
+
+**Roles:** \`merchant_officer\`, \`security_auditor\` only.`,
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       body: {
@@ -168,10 +282,15 @@ Allowed fields: \`merchantTransactionLimitAmount\`, \`merchantWebhookEndpoint\`,
       response: {
         200: { type: 'object', additionalProperties: true, description: 'Updated merchant agreement (partial).' },
         401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
         404: { $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
+    const user = (request as { user?: JwtDemoPayload }).user;
+    if (user?.role !== 'merchant_officer' && user?.role !== 'security_auditor') {
+      return reply.status(403).send({ error: 'Access denied: merchant configuration update requires merchant_officer or security_auditor role.' });
+    }
     const { id } = request.params as { id: string };
     const patch = request.body as Record<string, unknown>;
     const result = await updateMerchant(fastify.db, id, patch as never);

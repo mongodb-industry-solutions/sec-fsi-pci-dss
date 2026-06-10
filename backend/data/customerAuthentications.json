@@ -68,5 +68,61 @@
     "bianControlRecordType": "CustomerAuthenticationAssessment",
     "recordCreatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
+  },
+  {
+    "customerAuthenticationInstanceReference": "a1000056-0000-4000-8000-000000000056",
+    "partyInstanceReference": "b0000056-0000-4000-8000-000000000056",
+    "customerAuthenticationEmailAddress": "officer@bank.demo",
+    "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
+    "customerAuthenticationUserRole": "merchant_officer",
+    "customerAuthenticationUserName": "Rachel Torres",
+    "customerAuthenticationLoginDomain": "local",
+    "customerAuthenticationAccountStatus": "active",
+    "bianServiceDomain": "Customer Authentication",
+    "bianControlRecordType": "CustomerAuthenticationAssessment",
+    "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "customerAuthenticationInstanceReference": "a1000057-0000-4000-8000-000000000057",
+    "partyInstanceReference": "b0000057-0000-4000-8000-000000000057",
+    "customerAuthenticationEmailAddress": "customer2@demo.com",
+    "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
+    "customerAuthenticationUserRole": "customer",
+    "customerAuthenticationUserName": "David Chen",
+    "customerAuthenticationLoginDomain": "local",
+    "customerAuthenticationAccountStatus": "active",
+    "bianServiceDomain": "Customer Authentication",
+    "bianControlRecordType": "CustomerAuthenticationAssessment",
+    "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "customerAuthenticationInstanceReference": "a1000058-0000-4000-8000-000000000058",
+    "partyInstanceReference": "b0000058-0000-4000-8000-000000000058",
+    "customerAuthenticationEmailAddress": "customer3@demo.com",
+    "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
+    "customerAuthenticationUserRole": "customer",
+    "customerAuthenticationUserName": "Amara Okafor",
+    "customerAuthenticationLoginDomain": "local",
+    "customerAuthenticationAccountStatus": "active",
+    "bianServiceDomain": "Customer Authentication",
+    "bianControlRecordType": "CustomerAuthenticationAssessment",
+    "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "customerAuthenticationInstanceReference": "a1000059-0000-4000-8000-000000000059",
+    "partyInstanceReference": "b0000059-0000-4000-8000-000000000059",
+    "customerAuthenticationEmailAddress": "customer4@demo.com",
+    "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
+    "customerAuthenticationUserRole": "customer",
+    "customerAuthenticationUserName": "Lena Fischer",
+    "customerAuthenticationLoginDomain": "local",
+    "customerAuthenticationAccountStatus": "active",
+    "bianServiceDomain": "Customer Authentication",
+    "bianControlRecordType": "CustomerAuthenticationAssessment",
+    "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 1
   }
 ]
