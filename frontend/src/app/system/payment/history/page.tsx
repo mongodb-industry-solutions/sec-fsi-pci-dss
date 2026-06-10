@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Plus } from 'lucide-react';
 import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { Pagination } from '../../../../components/Pagination';
@@ -117,7 +118,8 @@ export default function TransactionHistoryPage() {
       <main className="w-full px-5 sm:px-8 lg:px-12 py-6">
         <div className="flex flex-wrap justify-between items-center gap-2 mb-5">
           <h1 className="text-2xl font-bold">My Transactions</h1>
-          <Link href="/system/payment" className="bg-[#001E2B] text-[#00ED64] px-4 py-2 rounded-lg text-sm font-semibold">
+          <Link href="/system/payment" className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium">
+            <Plus size={14} />
             New Payment
           </Link>
         </div>
