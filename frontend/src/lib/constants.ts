@@ -2,15 +2,23 @@ export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export const DEMO_USERS_PASSWORDS: Record<string, string> = {
+  // Customers
   'luis.fernandez@leafybank.demo': 'demo-password',
   'julia.santos@leafybank.demo': 'demo-password',
+  'carlos.garcia@leafybank.demo': 'demo-password',
+  'priya.patel@leafybank.demo': 'demo-password',
+  // Analysts (L1)
   'sarah.chen@leafybank.demo': 'demo-password',
+  'anna.kowalski@leafybank.demo': 'demo-password',
+  // Investigators (L2)
   'michael.obi@leafybank.demo': 'demo-password',
+  'james.wright@leafybank.demo': 'demo-password',
+  // Security Auditors
   'diego.sans@leafybank.demo': 'demo-password',
+  'sophie.martin@leafybank.demo': 'demo-password',
+  // Merchant Officers
   'officer@bank.demo': 'demo-password',
-  'customer2@demo.com': 'demo-password',
-  'customer3@demo.com': 'demo-password',
-  'customer4@demo.com': 'demo-password',
+  'marco.rossi@bank.demo': 'demo-password',
 };
 
 export const ROLE_LABELS: Record<string, string> = {

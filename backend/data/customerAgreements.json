@@ -1396,5 +1396,61 @@
       "customerAgreementKycCheckStatus": "initiated",
       "customerAgreementKycCheckNotes": "KYC document check in progress — awaiting ID upload"
     }
+  },
+  {
+    "customerAgreementInstanceReference": "c0000060-0000-4000-8000-000000000060",
+    "partyInstanceReference": "b0000060-0000-4000-8000-000000000060",
+    "customerAgreementReference": "ACC-CG-20260610",
+    "customerSegment": "retail",
+    "customerAgreementStatus": "active",
+    "customerAgreementEnrollmentDate": "2026-06-10T10:00:00.000Z",
+    "customerAgreementPreferredLanguage": "es",
+    "customerAgreementResidentialAddress": {
+      "streetAddress": "Calle Mayor 42",
+      "city": "Madrid",
+      "postalCode": "28013",
+      "countryCode": "ES"
+    },
+    "governmentIdentificationReference": "SYNTH-CG-2060",
+    "customerAgreementRiskNotes": "No prior fraud history.",
+    "bianServiceDomain": "Customer Agreement",
+    "bianControlRecordType": "CustomerAgreementProcedure",
+    "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2026-06-10T10:00:00.000Z",
+      "customerAgreementKycCheckReference": "KYC-B0000060-060",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
+  },
+  {
+    "customerAgreementInstanceReference": "c0000061-0000-4000-8000-000000000061",
+    "partyInstanceReference": "b0000061-0000-4000-8000-000000000061",
+    "customerAgreementReference": "ACC-PP-20260610",
+    "customerSegment": "premium",
+    "customerAgreementStatus": "active",
+    "customerAgreementEnrollmentDate": "2026-06-10T10:00:00.000Z",
+    "customerAgreementPreferredLanguage": "en",
+    "customerAgreementResidentialAddress": {
+      "streetAddress": "18 Nehru Place",
+      "city": "New Delhi",
+      "postalCode": "110019",
+      "countryCode": "IN"
+    },
+    "governmentIdentificationReference": "SYNTH-PP-2061",
+    "customerAgreementRiskNotes": "No prior fraud history.",
+    "bianServiceDomain": "Customer Agreement",
+    "bianControlRecordType": "CustomerAgreementProcedure",
+    "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2026-06-10T10:00:00.000Z",
+      "customerAgreementKycCheckReference": "KYC-B0000061-061",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   }
 ]

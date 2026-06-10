@@ -683,5 +683,78 @@
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
     "schemaVersion": 1
+  },
+  {
+    "partyInstanceReference": "b0000060-0000-4000-8000-000000000060",
+    "partyEmailAddress": "carlos.garcia@leafybank.demo",
+    "partyMobilePhoneNumber": "+34-555-0260",
+    "partyName": "Carlos Garcia",
+    "partyType": "customer",
+    "bianServiceDomain": "Party Data Management",
+    "bianControlRecordType": "Party",
+    "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "partyInstanceReference": "b0000061-0000-4000-8000-000000000061",
+    "partyEmailAddress": "priya.patel@leafybank.demo",
+    "partyMobilePhoneNumber": "+1-555-0261",
+    "partyName": "Priya Patel",
+    "partyType": "customer",
+    "bianServiceDomain": "Party Data Management",
+    "bianControlRecordType": "Party",
+    "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "partyInstanceReference": "b0000062-0000-4000-8000-000000000062",
+    "partyEmailAddress": "anna.kowalski@leafybank.demo",
+    "partyMobilePhoneNumber": "+48-555-0262",
+    "partyName": "Anna Kowalski",
+    "partyType": "employee",
+    "bianServiceDomain": "Party Data Management",
+    "bianControlRecordType": "Party",
+    "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "partyInstanceReference": "b0000063-0000-4000-8000-000000000063",
+    "partyEmailAddress": "james.wright@leafybank.demo",
+    "partyMobilePhoneNumber": "+44-555-0263",
+    "partyName": "James Wright",
+    "partyType": "employee",
+    "bianServiceDomain": "Party Data Management",
+    "bianControlRecordType": "Party",
+    "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "partyInstanceReference": "b0000064-0000-4000-8000-000000000064",
+    "partyEmailAddress": "sophie.martin@leafybank.demo",
+    "partyMobilePhoneNumber": "+33-555-0264",
+    "partyName": "Sophie Martin",
+    "partyType": "employee",
+    "bianServiceDomain": "Party Data Management",
+    "bianControlRecordType": "Party",
+    "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "partyInstanceReference": "b0000065-0000-4000-8000-000000000065",
+    "partyEmailAddress": "marco.rossi@bank.demo",
+    "partyMobilePhoneNumber": "+39-555-0265",
+    "partyName": "Marco Rossi",
+    "partyType": "employee",
+    "partyDepartment": "Merchant Acquiring",
+    "bianServiceDomain": "Party Data Management",
+    "bianControlRecordType": "Party",
+    "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 1
   }
 ]
