@@ -756,5 +756,18 @@
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
     "schemaVersion": 1
+  },
+  {
+    "partyInstanceReference": "b0000070-0000-4000-8000-000000000070",
+    "partyEmailAddress": "admin.system@bank.demo",
+    "partyMobilePhoneNumber": "+1-555-0270",
+    "partyName": "System Administrator",
+    "partyType": "employee",
+    "partyDepartment": "Technology Operations",
+    "bianServiceDomain": "Party Data Management",
+    "bianControlRecordType": "Party",
+    "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 1
   }
 ]

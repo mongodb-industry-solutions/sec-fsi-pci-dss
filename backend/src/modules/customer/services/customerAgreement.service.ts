@@ -10,6 +10,7 @@ import type { UserRole } from '../../../shared/models/identity.model';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { validateToken } from '../../../vendors/security/escalationTokens';
 import { appendAuditEvent } from '../../fraud/services/fraudDiagnosis.service';
+import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
 
 /**
  * Build the API response from a unified customerAgreementProcedure document.
@@ -205,6 +206,13 @@ export async function updateSelfProfile(
       { $set: agreementPatch }
     );
     if (res.matchedCount > 0) matched = true;
+  }
+
+  if (matched) {
+    void dispatchIntegration(db, 'kyc_identity', 'auth.updateProfile', {
+      partyInstanceReference: party.partyInstanceReference,
+      fieldsUpdated: Object.keys({ ...partyPatch, ...agreementPatch }).filter(k => k !== 'recordUpdatedDateTime'),
+    }).catch(() => { /* fire-and-forget */ });
   }
 
   return matched;

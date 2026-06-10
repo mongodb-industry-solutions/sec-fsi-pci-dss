@@ -16,6 +16,7 @@ const ROLE_AVATAR: Record<string, { bg: string; text: string }> = {
   level2_investigator: { bg: 'bg-orange-500', text: 'text-white' },
   security_auditor:    { bg: 'bg-purple-500', text: 'text-white' },
   merchant_officer:    { bg: 'bg-teal-500',   text: 'text-white' },
+  system_admin:        { bg: 'bg-slate-600',  text: 'text-white' },
 };
 
 const ROLE_BADGE: Record<string, string> = {
@@ -24,6 +25,7 @@ const ROLE_BADGE: Record<string, string> = {
   level2_investigator: 'bg-orange-500/15 text-orange-300 border-orange-500/30',
   security_auditor:    'bg-purple-500/15 text-purple-300 border-purple-500/30',
   merchant_officer:    'bg-teal-500/15 text-teal-300 border-teal-500/30',
+  system_admin:        'bg-slate-500/15 text-slate-300 border-slate-500/30',
 };
 
 function getInitials(name: string): string {
@@ -206,6 +208,8 @@ function DemoShell({ children }: { children: React.ReactNode }) {
     level1_analyst:      '/system/investigation',
     level2_investigator: '/system/investigation',
     security_auditor:    '/system/audit',
+    merchant_officer:    '/system/merchant',
+    system_admin:        '/system/admin',
   };
   const roleHome = (user && ROLE_HOME[user.role]) ?? '/system/payment/history';
 

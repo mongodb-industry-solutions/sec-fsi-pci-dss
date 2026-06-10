@@ -1169,3 +1169,207 @@ merchantReviewedDateTime: now,
 + `expired` status enables future demo scenarios (KYC renewal workflows, risk-based re-verification).
 - `schemaVersion` bumped on both collections — seed re-seeding required to align existing data.
 - Top-level review fields (`merchantReviewNote` etc.) are retained for backward compat but are now secondary to the BQ:Step sub-document.
+
+---
+
+## ADR-010 — Internal-First Integration Pattern
+
+**Date:** 2026-06-10  
+**Status:** Accepted  
+**Iteration:** v6  
+**Deciders:** Antonio Membrides Espinosa
+
+### Context
+
+The demo is a fully self-contained system. All compliance functions (fraud scoring, sanctions screening, KYC/KYB verification, AML monitoring, credit bureau checks) are implemented internally. An FSI architect evaluating the system needs to understand how it would connect to their existing compliance stack (Refinitiv, FICO, Onfido, NICE Actimize, Equifax, etc.).
+
+Two approaches were considered:
+
+**Option A — External-only**: Require external provider credentials to make compliance functions work. Realistic, but the demo breaks without configuration. Poor first-impression for offline or air-gapped demos.
+
+**Option B — Internal-First (chosen)**: Ship working internal implementations for every compliance function. External providers are optional overrides registered in the integration registry. When an external provider is configured and active, it takes precedence. When not configured, the internal default runs. The system is never broken.
+
+### Decision
+
+Adopt the **Internal-First integration pattern** for all six compliance integration types:
+
+| Integration type | Internal default | Trigger event | Mode |
+|---|---|---|---|
+| `fraud_detection` | `fraudDiagnosis.internalFraudScoring` | `transaction.authorized` | sync |
+| `hrp_sanctions` | `fraudDiagnosis.hrpcCheck` (existing HRPC endpoint) | `case.created`, `merchant.application.submitted` | sync |
+| `kyc_identity` | `customerAgreementKycCheck` BQ:Step status | `kyc.initiated` | async |
+| `kyb_business` | `merchantAgreementKybCheck` BQ:Step status | `kyb.initiated` | async |
+| `aml_monitoring` | Suspicious pattern analysis stub | `transaction.batch.processed`, `case.escalated` | async |
+| `credit_bureau` | `customerCreditRatingState` collection read | `case.created` | sync |
+
+**Routing rule**: For each integration event, the dispatch service checks whether an active external provider is registered for the event type. If yes, dispatch outbound (HTTP or SDK). If no, invoke the internal handler. Both paths log an `IntegrationEvent` record for audit.
+
+**Internal providers are pre-seeded** in `integrationRegistry` with `externalProviderIsInternal: true`. They cannot be suspended via the API. They are displayed in the admin portal with a "Built-in" badge.
+
+### Rationale
+
+- **Demo reliability**: works offline, in air-gapped environments, and without any external credentials.
+- **Proof of concept**: shows FSI architects that the plumbing exists — they can swap in their vendor by registering a provider.
+- **PCI DSS Req 12.8**: every integration (including internal ones) is documented in the registry with its BIAN SD and PCI DSS requirement mapping — satisfying the "documented relationships with third-party service providers" requirement for external providers.
+- **Preserves existing work**: HRPC endpoint (`GET /fraud/hrpc/check`), KYC/KYB BQ:Step sub-documents, and fraud scoring service are not replaced — they become the default implementations.
+
+### Alternatives Rejected
+
+| Alternative | Reason rejected |
+|---|---|
+| External-only providers | Demo breaks without credentials; poor offline experience |
+| Internal-only (no external path) | Answers "how does MongoDB store fraud data" but not "how does it integrate with my stack" |
+| Mock/stub external calls | Misleading; an FSI architect would see through it |
+
+### Consequences
+
++ Demo is always fully functional without any external configuration.
++ A prospect can register their own FDS/AML/KYC provider in the same demo session and see end-to-end flow.
++ BIAN SD-193 External Provider Arrangements is formally introduced as the registry control record.
++ PCI DSS Req 12.8 audit evidence is automatic for every registered provider.
+- A new `integrationRegistry` collection must be seeded and maintained.
+- `dispatchIntegration()` adds a call to the critical path for fraud scoring and KYC/KYB initiation.
+- Internal handlers must be wrapped behind a `InternalIntegrationHandler` interface to allow future substitution.
+
+---
+
+## ADR-011 — system_admin Role as Business Integration Administrator
+
+**Date:** 2026-06-10  
+**Status:** Accepted  
+**Iteration:** v6  
+**Deciders:** Antonio Membrides Espinosa
+
+### Context
+
+The existing codebase has a devops `admin` controller (`backend/src/modules/admin/controllers/admin.controller.ts`) with 7 endpoints: `POST /admin/login`, `POST /admin/run`, `POST /admin/exec`, `GET /admin/logs` (SSE stream), `GET /admin/system`, `GET /admin/env`, `POST /admin/restart`. This is an infrastructure-management tool for demo operators, not a business user.
+
+The Integration Hub (v6) requires a business role that can:
+- Register, configure, and suspend external compliance providers
+- Manage API key lifecycle (create, rotate, revoke)
+- View the integration event audit log
+- Test provider connectivity
+
+This is fundamentally different from devops admin. Conflating the two roles would violate the Separation of Duties principle (PCI DSS Req 7.1) and confuse the demo narrative.
+
+### Decision
+
+Introduce a new application role `system_admin` with the following profile:
+
+| Attribute | Value |
+|---|---|
+| Role key | `system_admin` |
+| Display label | `System Administrator` |
+| Avatar color | `bg-slate-600 text-white` |
+| Role badge | `bg-slate-500/15 text-slate-300 border-slate-500/30` |
+| Login path | `/system` (same as all application roles) |
+| Home route after login | `/system/admin` |
+| BIAN SD | SD-193 External Provider Arrangements |
+| PCI DSS context | Req 12.8 (third-party service provider relationships) |
+
+**What system_admin CAN do:**
+- View all integration providers (GET /api/v1/integrations)
+- Register a new provider (POST /api/v1/integrations)
+- Update provider configuration — endpoint, events, timeout, retry (PATCH /api/v1/integrations/:id)
+- Rotate API keys (POST /api/v1/integrations/:id/rotate-key)
+- Test provider connectivity (POST /api/v1/integrations/:id/test)
+- Suspend external providers (POST /api/v1/integrations/:id/suspend) — internal providers are immutable
+- View integration event audit log (GET /api/v1/integrations/:id/events)
+- View all fraud cases in read-only mode (same as security_auditor)
+
+**What system_admin CANNOT do:**
+- Execute server commands (`/admin/exec`, `/admin/run`)
+- Restart the application (`/admin/restart`)
+- Modify environment variables (`/admin/env`)
+- Approve or reject merchant applications (merchant_officer responsibility)
+- Investigate fraud cases (level2_investigator responsibility)
+- Update customer profile data (customer responsibility)
+
+### Rationale
+
+- **Separation of Duties**: PCI DSS Req 7.1 requires distinct roles for infrastructure management and business configuration. The devops admin manages servers; the system_admin manages compliance integrations.
+- **Demo narrative**: the system_admin persona is the FSI prospect's "compliance technology owner" or "fintech integration manager" — a business role, not a sysadmin.
+- **BIAN alignment**: SD-193 External Provider Arrangements defines an "External Provider Arrangements Administrator" role that maps directly to system_admin.
+- **Auditability**: every action taken by system_admin is logged in the integration event sub-document with the actor role, enabling PCI DSS Req 10.2 (audit log of all privileged access).
+
+### Consequences
+
++ Clean demo narrative: prospect sees a business admin configuring integrations, not a developer restarting servers.
++ PCI DSS Req 7.1 (Separation of Duties) is demonstrably satisfied in the demo.
++ system_admin can be shown as the persona that "connects LeafyBank to your existing compliance stack."
+- New auth/role infrastructure: `system_admin` must be added to ROLE_LABELS, DEMO_USERS_PASSWORDS, ROLE_AVATAR, ROLE_BADGE, and ROLE_HOME in the frontend layout.
+- A new seed record must be added to `customerAuthentications.json` and `parties.json`.
+
+---
+
+## ADR-012 — Integration Registry as BIAN SD-193 External Provider Arrangements
+
+**Date:** 2026-06-10  
+**Status:** Accepted  
+**Iteration:** v6  
+**Deciders:** Antonio Membrides Espinosa
+
+### Context
+
+The Integration Hub requires a persistent store for provider configuration (endpoint, API key hash, trigger events, timeout, retry policy), health state, and event audit log. Several models were considered:
+
+**Option A — Flat JSON config file**: Simple, no DB. No audit trail, no runtime updates, no UI management.
+
+**Option B — Environment variables per provider**: Standard for simple integrations. Doesn't support multiple providers of the same type, has no audit trail, can't be managed by a non-developer.
+
+**Option C — Dedicated MongoDB collection (chosen)**: Full CRUD, runtime updates, API key hashing, health tracking, event audit log sub-document, UI management portal.
+
+The chosen model maps precisely to BIAN SD-193 External Provider Arrangements, which defines:
+- **Control Record**: `ExternalProviderArrangement` — the provider registration
+- **Behavior Qualifier: Assessment**: health check and connectivity test
+- **Behavior Qualifier: Update**: key rotation and configuration change
+- **Action Log**: integration event log (dispatch, callback, health check, test)
+
+### Decision
+
+Create a new `integrationRegistry` MongoDB collection implementing BIAN SD-193. The TypeScript model is `ExternalProviderArrangement` (see technical-spec.md §1).
+
+**Key design decisions:**
+
+1. **API key security**: API keys are hashed with bcrypt (cost factor 12) before storage. The plaintext key is returned once at creation (and once after rotation) — never stored, never re-exposed. The `externalProviderApiKeyPrefix` field stores a visible prefix (e.g., `fds_live_...`) for UI identification.
+
+2. **HMAC-based inbound callbacks**: External providers send results to `/webhooks/{type}/{id}/callback`. Every inbound request is validated with `X-Webhook-Signature: sha256=<hmac(body, callbackSecret)>`. The callback secret is stored hashed separately from the API key.
+
+3. **Internal providers are immutable**: The 3 pre-seeded internal providers (`int-internal-fds-001`, `int-internal-hrp-001`, `int-internal-aml-001`) have `externalProviderIsInternal: true`. The `suspendIntegration()` service function rejects calls for internal providers with a 400 error. This ensures the demo always has a working baseline.
+
+4. **Event log with TTL**: Integration events are stored in a separate `integrationEvents` collection with a TTL index of 90 days (`expireAfterSeconds: 7776000`) per PCI DSS Req 10.7 (retain audit logs for at least 90 days online).
+
+5. **Unique constraint**: A compound unique index on `(externalProviderArrangementType, externalProviderApiEndpoint)` with `sparse: true` prevents duplicate registrations of the same provider endpoint for the same integration type.
+
+### BIAN Service Domain Mapping for the Registry
+
+| Integration type | BIAN SD | Control Record Type | PCI DSS Requirements |
+|---|---|---|---|
+| `fraud_detection` | SD-63 Fraud Evaluation | FraudEvaluationAssessment | Req 10.2.1, Req 12.3.1 |
+| `hrp_sanctions` | SD-13 Party Reference Data | PartyReferenceDataDirectoryEntry | Req 12.8.1, Req 12.8.5 |
+| `kyc_identity` | SD-53 Customer Agreement | CustomerAgreementProcedure | Req 8.1, Req 12.8.1 |
+| `kyb_business` | SD-89 Merchant Relations | MerchantAgreementProcedure | Req 12.8.1, Req 12.8.3 |
+| `aml_monitoring` | SD-99 Suspicious Activity Analysis | SuspiciousActivityAnalysisAssessment | Req 10.2.1, Req 12.3.1 |
+| `credit_bureau` | SD-83 Customer Credit Rating | CustomerCreditRatingState | Req 12.8.1 |
+
+### PCI DSS Alignment
+
+| PCI DSS Requirement | How the registry satisfies it |
+|---|---|
+| Req 12.8.1 — Maintain list of all third-party service providers | `integrationRegistry` IS the maintained list; each provider record has name, type, endpoint, and status |
+| Req 12.8.2 — Written agreement acknowledging responsibility | `pciDssRequirements` field on each record; `externalProviderArrangementStatus` lifecycle tracks agreement state |
+| Req 12.8.3 — Due diligence before engagement | `externalProviderLastHealthCheckAt` + `externalProviderHealthStatus` as documented due diligence evidence |
+| Req 12.8.5 — Monitor providers' PCI DSS compliance status | Integration event log with health check events; `externalProviderHealthStatus` updated after each test |
+| Req 10.2.1 — Audit log of all system access | Every dispatch, callback, health check, and test fires an `IntegrationEvent` record with timestamp, actor, and outcome |
+| Req 10.7 — Retain audit logs for at least 90 days | TTL index on `integrationEvents` collection: `expireAfterSeconds: 7776000` |
+| Req 6.3.3 — Protect against known vulnerabilities | bcrypt key hashing prevents credential exposure if DB is compromised |
+
+### Consequences
+
++ Full BIAN SD-193 citation available for the registry in demo presentations.
++ PCI DSS Req 12.8 compliance evidence is built into the registry schema.
++ External providers can be registered, tested, and activated without any code change or restart.
++ API key security matches industry standard (bcrypt hash, plaintext shown once).
+- New collection `integrationRegistry` and `integrationEvents` must be created, indexed, and seeded.
+- Dispatch layer adds latency to fraud scoring hot path (~2–5ms for internal dispatch, timeout budget for external).
+- HMAC validation requires the callback secret to be stored in hashed form, separate from the API key — adds complexity to the callback controller.

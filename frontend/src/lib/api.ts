@@ -540,4 +540,32 @@ export const api = {
         token
       ),
   },
+  integrations: {
+    list: (token: string, params?: { type?: string; status?: string }) => {
+      const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([,v]) => v) as [string,string][]).toString() : '';
+      return apiFetch<{ integrations: Record<string, unknown>[] }>(`/api/v1/integrations${qs}`, {}, token);
+    },
+    get: (id: string, token: string) =>
+      apiFetch<{ integration: Record<string, unknown> }>(`/api/v1/integrations/${id}`, {}, token),
+    create: (body: Record<string, unknown>, token: string) =>
+      apiFetch<{ integration: Record<string, unknown>; apiKey?: string }>(
+        '/api/v1/integrations', { method: 'POST', body: JSON.stringify(body) }, token
+      ),
+    update: (id: string, body: Record<string, unknown>, token: string) =>
+      apiFetch<{ integration: Record<string, unknown> }>(
+        `/api/v1/integrations/${id}`, { method: 'PATCH', body: JSON.stringify(body) }, token
+      ),
+    rotateKey: (id: string, token: string) =>
+      apiFetch<{ integration: Record<string, unknown>; apiKey: string }>(
+        `/api/v1/integrations/${id}/rotate-key`, { method: 'POST' }, token
+      ),
+    test: (id: string, token: string) =>
+      apiFetch<{ status: string; latencyMs: number }>(`/api/v1/integrations/${id}/test`, { method: 'POST' }, token),
+    suspend: (id: string, token: string) =>
+      apiFetch<{ integration: Record<string, unknown> }>(`/api/v1/integrations/${id}/suspend`, { method: 'POST' }, token),
+    events: (id: string, token: string, page = 1, limit = 20) =>
+      apiFetch<{ events: Record<string, unknown>[]; total: number; page: number }>(
+        `/api/v1/integrations/${id}/events?page=${page}&limit=${limit}`, {}, token
+      ),
+  },
 };

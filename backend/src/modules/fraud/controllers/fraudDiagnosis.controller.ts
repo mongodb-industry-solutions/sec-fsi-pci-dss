@@ -6,6 +6,7 @@ import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import type { DemoRequest } from '../../../shared/models/identity.model';
 import type { AnalystRole } from '../models/fraudDiagnosis.model';
+import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
 
@@ -655,6 +656,13 @@ Returns an empty \`hrpcFlags\` array when the account is not in any HRPC categor
       return (riskOrder[lvl] ?? 0) > riskOrder[acc] ? (lvl as 'low' | 'medium' | 'high') : acc;
     }, 'none');
 
+    void dispatchIntegration(fastify.db, 'hrp_sanctions', 'fraud.hrpcCheck', {
+      accountRef,
+      hrpcMatch: flags.length > 0,
+      highestRiskLevel,
+      flagCount: flags.length,
+    }).catch(() => { /* fire-and-forget */ });
+
     return reply.send({
       accountRef,
       hrpcMatch: flags.length > 0,
@@ -910,7 +918,7 @@ Errors are corrected via \`DELETE /fraud/:id/notes/:noteId\` (retraction), which
     const fraudCase = await getCaseById(fastify.db, id);
     if (!fraudCase) return reply.status(404).send({ error: 'Fraud case not found' });
 
-    const result = await addCaseNote(fastify.db, id, noteText, visibility, demoRole);
+    const result = await addCaseNote(fastify.db, id, noteText, visibility, demoRole as import('../../../shared/models/identity.model').AnalystRole);
     return reply.status(201).send({ noteId: result.noteId, actionDateTime: result.actionDateTime });
   });
 
@@ -958,7 +966,7 @@ Retracted notes are hidden from the customer but remain visible in the internal 
       return reply.status(403).send({ error: 'Only L1 and L2 analysts may retract notes' });
     }
 
-    const outcome = await retractCaseNote(fastify.db, id, noteId, retractionReason, demoRole);
+    const outcome = await retractCaseNote(fastify.db, id, noteId, retractionReason, demoRole as import('../../../shared/models/identity.model').AnalystRole);
     if (outcome === 'not_found')        return reply.status(404).send({ error: 'Note not found for this case' });
     if (outcome === 'wrong_role')       return reply.status(403).send({ error: 'Only the author role may retract this note' });
     if (outcome === 'already_retracted') return reply.status(409).send({ error: 'Note has already been retracted' });

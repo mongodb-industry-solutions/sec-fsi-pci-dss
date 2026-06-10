@@ -497,6 +497,105 @@ As with v3 and v4, external agent adoption (e.g. Agentic ThreatSight360 performi
 
 ---
 
+## v6 — Integration Hub & Compliance Orchestration
+
+**Goal:** Connect the demo to external compliance systems using BIAN SD-193 External Provider Arrangements. Every compliance function ships with an internal default provider that works out-of-the-box. External providers (Refinitiv, FICO, Onfido, NICE Actimize, etc.) can be registered at runtime and override the internal defaults. This transforms the demo from an isolated proof-of-concept to an integration-ready reference architecture.
+
+**Key deliverables:** `integrationRegistry` collection (SD-193), integration dispatch service, inbound callback + HMAC validation, `system_admin` business role, `/system/admin` management portal.
+
+**BIAN Service Domains:** SD-193 (External Provider Arrangements) + all existing SDs for internal defaults (SD-63, SD-13, SD-53, SD-89, SD-99, SD-83)
+
+**PCI DSS:** Req 12.8 (third-party service provider list and agreements), Req 10.2.1 (audit log of provider access), Req 10.7 (log retention 90 days), Req 6.3.3 (credential protection), Req 7.1 (Separation of Duties — system_admin vs devops admin)
+
+**Pre-requisites:** v5 (AI Agent fraud investigation) complete.
+
+---
+
+### v6 Functional Requirements
+
+| ID | Feature | Acceptance Criteria | Priority |
+|---|---|---|---|
+| FR-v6-01 | Integration Registry — CRUD | system_admin can register, view, update, and list integration providers via `/api/v1/integrations`. Non-system_admin roles receive 403. | Critical |
+| FR-v6-02 | Integration Registry — API key management | POST /integrations returns plaintext key exactly once. Subsequent GET never exposes the key — only a visible prefix (e.g. `fds_live_...`). POST /rotate-key invalidates old key and returns new key once. | Critical |
+| FR-v6-03 | Internal-First dispatch | For each integration type, the dispatch service uses the internal handler when no active external provider is registered. The system never returns errors due to absent external configuration. | Critical |
+| FR-v6-04 | External provider dispatch (sync) | When an active external provider is registered for `fraud_detection` or `hrp_sanctions`, the dispatch service calls the provider's endpoint, parses the response, and updates the relevant record. Timeout and retry policy are respected. | High |
+| FR-v6-05 | External provider dispatch (async + callback) | When an active external provider is registered for `kyc_identity`, `kyb_business`, or `aml_monitoring` in async mode, the dispatch service sends a request and waits for a callback on `/webhooks/{type}/{id}/callback`. | High |
+| FR-v6-06 | Inbound callback — HMAC validation | Every POST to `/webhooks/*` validates the `X-Webhook-Signature: sha256=<hmac>` header. Requests without a valid signature return 401. | Critical |
+| FR-v6-07 | Integration Event audit log | Every dispatch, callback, health check, and test fires an `IntegrationEvent` record. The record includes timestamp, event type, arrangement reference, status, latency, and a SHA-256 hash of the payload (not the payload itself). | Critical |
+| FR-v6-08 | Provider health check + test | POST /integrations/:id/test fires a synthetic event to the configured endpoint and returns `{ status, latencyMs }`. The `externalProviderHealthStatus` field is updated after every test. | High |
+| FR-v6-09 | Suspend integration | POST /integrations/:id/suspend sets status to `suspended`. Internal providers (externalProviderIsInternal: true) return 400 — cannot be suspended. | High |
+| FR-v6-10 | system_admin role | A new `system_admin` role can log in via `/system`. After login, the user is redirected to `/system/admin`. The role has no access to fraud investigation or merchant approval workflows. | Critical |
+| FR-v6-11 | Admin portal — integration dashboard | `/system/admin` shows 6 integration type tiles (one per type), each with the active provider name, health status indicator, and last check time. Internal providers show a "Built-in" badge. | High |
+| FR-v6-12 | Admin portal — integration list | `/system/admin/integrations` lists all providers with name, type, status, mode (sync/async), health, and last event timestamp. | High |
+| FR-v6-13 | Admin portal — integration detail + test | `/system/admin/integrations/[id]` shows full provider config (no key hash visible), event log (last 20), and a "Test connection" button. After test, latency and status are displayed. | High |
+| FR-v6-14 | Admin portal — register new integration | `/system/admin/integrations/new` wizard: select type → enter name/endpoint/auth scheme → paste API key → select trigger events → submit. API key is shown in a one-time reveal panel after creation. | High |
+| FR-v6-15 | Admin portal — token lifecycle | `/system/admin/tokens` lists API tokens by prefix, creation date, and last-used date. "Rotate key" and "Suspend" actions available. | Medium |
+| FR-v6-16 | Pre-seeded internal providers | On first seed, 3 internal providers are created: FDS (fraud_detection), HRPC (hrp_sanctions), AML (aml_monitoring). All have `externalProviderIsInternal: true` and `externalProviderArrangementStatus: active`. | Critical |
+
+---
+
+### v6 Non-Functional Requirements
+
+| ID | Category | Requirement | Measure |
+|---|---|---|---|
+| NFR-v6-01 | Security | API key never stored in plaintext | bcrypt hash only in DB; plaintext returned at creation/rotation ONCE, not retrievable after |
+| NFR-v6-02 | Security | Inbound callbacks authenticated | Every POST to /webhooks/* rejected without valid HMAC-SHA256 `X-Webhook-Signature` |
+| NFR-v6-03 | Security | Separation of Duties | `system_admin` role has zero access to: server exec, env vars, service restart (devops admin) |
+| NFR-v6-04 | Reliability | Internal-First guarantee | System operates with zero external providers configured: all 3 internal providers active from seed |
+| NFR-v6-05 | Performance | Dispatch adds <5ms on internal path | Internal dispatch (no HTTP call) completes within 5ms on the fraud scoring hot path |
+| NFR-v6-06 | Observability | Every provider interaction logged | IntegrationEvent record created for every dispatch, callback, health check, test |
+| NFR-v6-07 | Compliance | Event log retention ≥ 90 days | TTL index on integrationEvents: expireAfterSeconds: 7776000 (PCI DSS Req 10.7) |
+| NFR-v6-08 | Compliance | Provider list maintained | All registered providers (internal + external) visible in registry (PCI DSS Req 12.8.1) |
+| NFR-v6-09 | Backward compat | v1–v5 flows unchanged | All existing fraud investigation, KYC/KYB, merchant onboarding flows work with internal providers active |
+| NFR-v6-10 | Type safety | No `any` types | `npm run build` exits 0 on backend + frontend |
+
+---
+
+### v6 BIAN Service Domain Coverage
+
+| BIAN SD | Role in v6 | New or Existing |
+|---|---|---|
+| SD-193 External Provider Arrangements | `integrationRegistry` collection — the Integration Hub registry | **New** |
+| SD-63 Fraud Evaluation | Internal FDS default provider | Existing (SD-63 already implemented) |
+| SD-13 Party Reference Data | Internal HRPC sanctions default | Existing (HRPC endpoint already implemented) |
+| SD-53 Customer Agreement | Internal KYC identity default (BQ:Step) | Existing (KYC BQ:Step already implemented) |
+| SD-89 Merchant Relations | Internal KYB business default (BQ:Step) | Existing (KYB BQ:Step already implemented) |
+| SD-99 Suspicious Activity Analysis | Internal AML monitoring stub | New stub (simple pattern matching) |
+| SD-83 Customer Credit Rating | Internal credit bureau default | Existing (customerCreditRatingState already seeded) |
+
+---
+
+### v6 New Collections
+
+| Collection | BIAN SD | Control Record Type | QE | Index strategy |
+|---|---|---|---|---|
+| `integrationRegistry` | SD-193 | ExternalProviderArrangement | No | type+endpoint unique; type+status; isInternal |
+| `integrationEvents` | SD-193 | ExternalProviderArrangementActionLog | No | arrangementRef + recordCreatedDateTime; TTL 90d |
+
+---
+
+### v6 Definition of Done
+
+- [ ] `npm run build` exits 0 (backend + frontend)
+- [ ] `npm run seed` completes without errors; 3 internal providers visible in `integrationRegistry`
+- [ ] `POST /api/v1/integrations` (system_admin token): returns 201 with plaintext `apiKey`
+- [ ] Subsequent `GET /api/v1/integrations/:id`: no `apiKey` or `externalProviderApiKeyHash` in response
+- [ ] `POST /webhooks/fds/:id/callback` without signature: returns 401
+- [ ] `POST /webhooks/fds/:id/callback` with valid HMAC: returns 200 and updates fraud case
+- [ ] `POST /api/v1/integrations/:id/suspend` on internal provider: returns 400
+- [ ] `system_admin` login at `/system`: redirected to `/system/admin`
+- [ ] Non-system_admin login: `/system/admin` redirects to `/system`
+- [ ] Integration dashboard shows 3 internal providers with "Built-in" badges
+- [ ] `POST /api/v1/integrations/:id/test` returns `{ status: 'ok', latencyMs: <n> }` for a reachable endpoint
+- [ ] Integration event log records: at least one event per dispatch + callback
+- [ ] TTL index on `integrationEvents` set to 7776000 seconds
+- [ ] All FR-v6-01 to FR-v6-16 acceptance criteria pass
+- [ ] All NFR-v6-01 to NFR-v6-10 measures pass
+- [ ] Phase 7 test suite (unit + integration + E2E) passes with 0 failures
+- [ ] `docs/technical-spec.md` §1, §5, §6 updated with new models, indexes, and API contracts before first commit
+
+---
+
 ## Cross-iteration NFRs
 
 These requirements apply to all versions from v1 onward:

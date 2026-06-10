@@ -15,6 +15,8 @@ import {
   ClipboardCheck,
   ChevronLeft,
   ChevronRight,
+  Settings2,
+  Plug,
   type LucideIcon,
 } from 'lucide-react';
 import { getToken, decodeToken } from '../lib/auth';
@@ -59,6 +61,10 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'Review Queue', path: '/system/merchant/review', icon: ClipboardCheck },
     { label: 'All Merchants',path: '/system/merchant',        icon: Store, exact: true },
     { label: 'My Profile',   path: '/system/profile',         icon: User },
+  ],
+  system_admin: [
+    { label: 'Integrations', path: '/system/admin/integrations', icon: Plug },
+    { label: 'Dashboard',    path: '/system/admin',              icon: Settings2, exact: true },
   ],
 };
 

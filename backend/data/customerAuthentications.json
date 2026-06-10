@@ -208,5 +208,19 @@
     "bianControlRecordType": "CustomerAuthenticationAssessment",
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "schemaVersion": 1
+  },
+  {
+    "customerAuthenticationInstanceReference": "a1000070-0000-4000-8000-000000000070",
+    "partyInstanceReference": "b0000070-0000-4000-8000-000000000070",
+    "customerAuthenticationEmailAddress": "admin.system@bank.demo",
+    "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
+    "customerAuthenticationUserRole": "system_admin",
+    "customerAuthenticationUserName": "System Administrator",
+    "customerAuthenticationLoginDomain": "local",
+    "customerAuthenticationAccountStatus": "active",
+    "bianServiceDomain": "Customer Authentication",
+    "bianControlRecordType": "CustomerAuthenticationAssessment",
+    "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 1
   }
 ]

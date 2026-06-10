@@ -4,6 +4,7 @@
 import { FastifyInstance } from 'fastify';
 import type { JwtDemoPayload } from '../../../shared/models/identity.model';
 import { getMerchants, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, generateApiKey, revokeApiKey, reviewMerchantApplication } from '../services/merchant.service';
+import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
 
 export async function merchantController(fastify: FastifyInstance) {
 
@@ -119,6 +120,14 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
       body.merchantOwnerPartyReference = user.partyRef as string;
     }
     const result = await createMerchant(fastify.db, body);
+
+    void dispatchIntegration(fastify.db, 'kyb_business', 'merchant.onboard', {
+      merchantAgreementInstanceReference: result.merchantAgreementInstanceReference,
+      merchantName: body.merchantName,
+      merchantCategoryCode: body.merchantCategoryCode,
+      merchantCountryCode: body.merchantCountryCode,
+    }).catch(() => { /* fire-and-forget */ });
+
     return reply.status(201).send(result);
   });
 

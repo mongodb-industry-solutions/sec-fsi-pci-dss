@@ -297,7 +297,7 @@ role to retrieve.`,
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { demoRole, escalationToken } = request as unknown as DemoRequest;
-    const txn = await getTransactionById(fastify.db, id, demoRole, escalationToken);
+    const txn = await getTransactionById(fastify.db, id, demoRole as Parameters<typeof getTransactionById>[2], escalationToken);
     if (!txn) return reply.status(404).send({ error: 'Transaction not found' });
     return reply.send(txn);
   });

@@ -9,6 +9,7 @@ import {
 } from '../models/fraudDiagnosis.model';
 import { RiskSeverity } from '../../../shared/models/risk.model';
 import { TransactionSnapshot } from '../../../shared/models/transaction.model';
+import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
 
 // -- BIAN SD-83: Note entry - resolved view of a note_added event enriched with retraction info
 export interface NoteEntry {
@@ -71,6 +72,15 @@ export async function createFraudCase(
 
   await db.collection(FRAUD_DIAGNOSIS_COLLECTION).insertOne(fraudCase as object);
   await db.collection(FRAUD_DIAGNOSIS_EVENTS_COLLECTION).insertOne(openEvent as object);
+
+  void dispatchIntegration(db, 'fraud_detection', 'fraud.createCase', {
+    fraudDiagnosisInstanceReference: caseId,
+    cardTransactionInstanceReference: txnId,
+    customerAgreementInstanceReference: customerRef,
+    fraudDiagnosisScore: fraudCase.fraudDiagnosisAssessment.fraudDiagnosisScore,
+    riskIndicatorCount: riskIndicators.length,
+    severity,
+  }).catch(() => { /* fire-and-forget: dispatch failure does not block case creation */ });
 
   return { fraudDiagnosisInstanceReference: caseId };
 }

@@ -18,6 +18,7 @@ import { fraudModule }        from './modules/fraud';
 import { gatewayModule }      from './modules/gateway';
 import { systemModule }       from './modules/system';
 import { adminModule }        from './modules/admin';
+import { integrationsModule } from './modules/integrations';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
@@ -94,6 +95,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   // /api/v1/system/raw returns 403 in production (enforced inside the controller)
   await fastify.register(systemModule,       { prefix: '/api/v1' });
   await fastify.register(adminModule,        { prefix: '/api/v1' });
+  await fastify.register(integrationsModule, { prefix: '/api/v1' });
 
   return fastify;
 }

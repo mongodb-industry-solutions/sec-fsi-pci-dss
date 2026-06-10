@@ -1179,4 +1179,134 @@ npm run dev
 
 ---
 
+---
+
+## 16. Integration Hub & Compliance Orchestration
+
+### 16.1 Business Motivation
+
+LeafyBank's demo currently answers two questions well:
+
+1. *How does MongoDB protect sensitive payment data?* (Queryable Encryption, RBAC, audit trail)
+2. *How does a fraud investigation workflow work?* (L1/L2/Auditor, BIAN SD-83, case lifecycle)
+
+But it fails to answer a third question that every FSI enterprise buyer will ask:
+
+> *"How would this integrate with our existing compliance stack — Refinitiv World-Check, FICO Falcon, Onfido, NICE Actimize, Equifax?"*
+
+Without an answer, the demo is a standalone showcase, not a reference architecture. The Integration Hub closes this gap by formalizing every compliance function as a pluggable provider using BIAN SD-193 External Provider Arrangements.
+
+### 16.2 The Internal-First Principle
+
+The Integration Hub is built on a non-negotiable principle: **the demo must always work without any external provider configured**.
+
+Every compliance function ships with a working internal default implementation. External providers are optional overrides. This means:
+
+- The demo works offline, in air-gapped environments, and without any vendor credentials.
+- A prospect can register their own provider in a live demo session and see it work end-to-end.
+- The FSI architect can say: *"I can see exactly where my existing Refinitiv integration would plug in."*
+
+### 16.3 Integration Catalog
+
+| Integration Type | Internal Default | External Providers | BIAN SD | PCI DSS |
+|---|---|---|---|---|
+| `fraud_detection` | Internal amount/MCC fraud scoring (existing) | FICO Falcon, Featurespace, ThreatMetrix | SD-63 Fraud Evaluation | Req 10.2.1, 12.3.1 |
+| `hrp_sanctions` | HRPC check engine — 9 categories, 4 risk levels (existing) | Refinitiv World-Check, OFAC SDN, LexisNexis | SD-13 Party Reference Data | Req 12.8.1, 12.8.5 |
+| `kyc_identity` | KYC BQ:Step sub-document status (existing) | Jumio, Onfido, Socure, iDenfy | SD-53 Customer Agreement | Req 8.1, 12.8.1 |
+| `kyb_business` | KYB BQ:Step sub-document status (existing) | ComplyAdvantage, Creditsafe, Onfido Business | SD-89 Merchant Relations | Req 12.8.1, 12.8.3 |
+| `aml_monitoring` | Suspicious pattern analysis stub (new) | NICE Actimize, Oracle FCCM, Napier AI | SD-99 Suspicious Activity Analysis | Req 10.2.1, 12.3.1 |
+| `credit_bureau` | `customerCreditRatingState` read (existing) | Experian, Equifax, TransUnion | SD-83 Customer Credit Rating | Req 12.8.1 |
+
+### 16.4 New BIAN Service Domain: SD-193 External Provider Arrangements
+
+SD-193 External Provider Arrangements is a BIAN service domain that manages the formal relationships between a financial institution and its third-party compliance service providers. The Integration Hub's `integrationRegistry` collection is the Control Record for this service domain.
+
+Key SD-193 concepts mapped to LeafyBank:
+
+| BIAN SD-193 concept | LeafyBank implementation |
+|---|---|
+| Control Record | `ExternalProviderArrangement` — one document per registered provider |
+| BQ: Assessment | `externalProviderHealthStatus` + health check events |
+| BQ: Update | API key rotation, endpoint update, trigger event reconfiguration |
+| Action Log | `integrationEvents` collection — append-only audit log |
+| Arrangement Status | `active | inactive | test | suspended` lifecycle |
+
+### 16.5 New Persona: System Administrator
+
+**Role:** `system_admin`  
+**Name (demo):** "Alex Morgan, Integration & Compliance Technology Manager"  
+**Avatar:** Slate — `bg-slate-600`
+
+The System Administrator is the business-side owner of the compliance integration stack. They are not a developer (they don't restart servers or edit config files) and not a fraud analyst (they don't investigate cases). Their job is to ensure the bank's automated compliance functions are properly configured, tested, and auditable.
+
+**User stories:**
+
+| Story | Persona | As a... | I want to... | So that... |
+|---|---|---|---|---|
+| US-v6-01 | System Admin | System Administrator | see all registered compliance providers and their health status on a single dashboard | I can verify our entire compliance stack is operational at a glance |
+| US-v6-02 | System Admin | System Administrator | register a new external fraud detection provider with its endpoint and API key | my team can switch from internal scoring to a specialized FDS without code changes |
+| US-v6-03 | System Admin | System Administrator | rotate an API key for a registered provider | I can comply with PCI DSS Req 12.8.5 without disrupting the integration |
+| US-v6-04 | System Admin | System Administrator | test connectivity to a registered provider and see the response latency | I can validate the integration before activating it in production |
+| US-v6-05 | System Admin | System Administrator | view the audit log of all provider interactions (dispatches, callbacks, tests) | I can satisfy PCI DSS Req 10.2.1 audit requirements for automated compliance functions |
+| US-v6-06 | System Admin | System Administrator | suspend a provider that is failing or has a compliance issue | I can fall back to the internal default without service disruption |
+| US-v6-07 | FSI Architect | Demo observer | see the three internal providers pre-configured with "Built-in" badges | I understand the system works without vendor credentials, and I know exactly where my stack plugs in |
+
+### 16.6 Integration Flow: Fraud Detection (example end-to-end)
+
+```
+Customer submits payment
+        │
+        ▼
+POST /api/v1/transactions
+        │
+        ▼
+fraudDiagnosis.service.ts
+  ├── Compute internal fraud score (always runs)
+  ├── Check: is active external FDS registered?
+  │     Yes → dispatchIntegration('fraud_detection', event)
+  │           ├── Sync mode: HTTP POST to external endpoint, await response
+  │           │   └── Update fraud case with externalFraudScore + recommendation
+  │           └── Log IntegrationEvent { type:'dispatch', latencyMs, status }
+  │     No → use internal score only
+  └── Create fraud case if score > threshold
+```
+
+**Fallback behavior**: If the external provider returns an error, times out, or is unreachable, the system falls back to the internal fraud score. The fallback is logged as an `IntegrationEvent` with `status: 'error'`. The fraud investigation workflow continues uninterrupted.
+
+### 16.7 PCI DSS Compliance Coverage
+
+The Integration Hub is designed around PCI DSS v4.0 third-party service provider requirements:
+
+| PCI DSS Requirement | Integration Hub response |
+|---|---|
+| Req 12.8.1 — Maintain list of all TPSPs | `integrationRegistry` is the maintained list; each provider has name, type, endpoint, status, and PCI DSS requirement mapping |
+| Req 12.8.2 — Written agreement | `externalProviderArrangementStatus` lifecycle tracks the agreement state; BQ:Update logs all changes |
+| Req 12.8.3 — Due diligence before engagement | `externalProviderLastHealthCheckAt` + `POST /test` result stored as evidence |
+| Req 12.8.5 — Monitor compliance status | Health check events + health status field; key rotation tracked via rotate-key events |
+| Req 10.2.1 — Audit log of system access | Every dispatch, callback, and key rotation creates an `IntegrationEvent` record |
+| Req 10.7 — Retain logs ≥ 90 days | TTL index on `integrationEvents`: 7776000 seconds |
+| Req 6.3.3 — Protect credentials | bcrypt hash storage; plaintext key shown once and never stored |
+| Req 7.1 — Separation of Duties | `system_admin` (business) vs devops `admin` (infrastructure) — distinct roles with disjoint capabilities |
+
+### 16.8 Demo Narrative for FSI Presentations
+
+**Scene 1 (no external providers):** Present the system to an FSI team. Everything works — fraud scoring, KYC, merchant onboarding. Show the integration dashboard with 3 built-in providers. Explain: "This is a fully functional compliance system with no vendor dependencies. Zero configuration required."
+
+**Scene 2 (live registration):** An architect says "we use Refinitiv World-Check." Open the admin portal → register a new `hrp_sanctions` provider with the Refinitiv endpoint and API key → test it → activate it. The HRPC check is now routed to Refinitiv. Show the event log. Explain: "The next HRPC check will use your provider — and if it fails, the system falls back to our internal check automatically."
+
+**Scene 3 (audit):** Open the integration event log. Show PCI DSS Req 10.2.1 compliance — every provider interaction is logged. Open the integration registry. Explain: "This IS your PCI DSS Req 12.8.1 third-party service provider list. Every provider you register is automatically documented."
+
+### 16.9 Decision Log
+
+| # | Decision | Choice | Rationale | Date |
+|---|---|---|---|---|
+| D-v6-01 | Internal vs external first | Internal-First pattern (ADR-010) | Demo reliability; preserves existing HRPC/KYC/KYB work; offline capable | 2026-06-10 |
+| D-v6-02 | New admin role vs extend existing | New `system_admin` role (ADR-011) | PCI DSS Req 7.1 Separation of Duties; distinct business vs devops persona | 2026-06-10 |
+| D-v6-03 | Registry storage | MongoDB collection as SD-193 (ADR-012) | Full BIAN citation; runtime updates; audit log; key hashing; UI management | 2026-06-10 |
+| D-v6-04 | API key security | bcrypt hash, shown once | Industry standard (matches Stripe, GitHub token model); PCI DSS Req 6.3.3 | 2026-06-10 |
+| D-v6-05 | Callback authentication | HMAC-SHA256 `X-Webhook-Signature` | Standard pattern (Stripe, GitHub webhooks); no JWT required for inbound | 2026-06-10 |
+| D-v6-06 | Event log retention | TTL index 90 days | PCI DSS Req 10.7 minimum retention; avoids unbounded collection growth | 2026-06-10 |
+
+---
+
 *This document is a living artifact. Update the Decisions Log with any architectural or scope change agreed during development.*

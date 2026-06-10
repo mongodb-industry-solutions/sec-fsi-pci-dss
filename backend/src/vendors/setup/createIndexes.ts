@@ -108,4 +108,20 @@ export async function createIndexes(client: MongoClient) {
     // Sparse TTL: only applies to documents with paymentLinkExpiresAt set
     { key: { paymentLinkExpiresAt: 1 }, expireAfterSeconds: 0, sparse: true },
   ]);
+
+  // SD-193: Integration Registry (Ch-07)
+  await db.collection('integrationRegistry').createIndexes([
+    { key: { externalProviderArrangementInstanceReference: 1 }, unique: true },
+    { key: { externalProviderArrangementType: 1, externalProviderArrangementStatus: 1 } },
+    { key: { externalProviderIsInternal: 1 } },
+    { key: { externalProviderArrangementType: 1, externalProviderApiEndpoint: 1 }, unique: true, sparse: true },
+  ]);
+
+  // SD-193: Integration Events — append-only audit log with 90-day TTL (PCI DSS Req 10.7)
+  await db.collection('integrationEvents').createIndexes([
+    { key: { integrationEventInstanceReference: 1 }, unique: true },
+    { key: { externalProviderArrangementInstanceReference: 1, recordCreatedDateTime: -1 } },
+    { key: { integrationEventType: 1, recordCreatedDateTime: -1 } },
+    { key: { recordCreatedDateTime: 1 }, expireAfterSeconds: 7776000 },
+  ]);
 }

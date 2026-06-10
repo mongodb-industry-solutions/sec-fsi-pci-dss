@@ -523,6 +523,96 @@ export interface CustomerCreditRatingStateControlRecord {
 
 ---
 
+### 1.13 SD-193 — `integrationRegistry` (ExternalProviderArrangement)
+
+```typescript
+export const INTEGRATION_REGISTRY_COLLECTION = 'integrationRegistry';
+export const INTEGRATION_EVENTS_COLLECTION = 'integrationEvents';
+
+export type IntegrationProviderType =
+  | 'fraud_detection'
+  | 'aml_monitoring'
+  | 'kyc_identity'
+  | 'kyb_business'
+  | 'hrp_sanctions'
+  | 'credit_bureau';
+
+export type IntegrationStatus = 'active' | 'inactive' | 'test' | 'suspended';
+export type IntegrationMode   = 'sync' | 'async';
+export type IntegrationAuth   = 'bearer' | 'api_key' | 'hmac' | 'oauth2_cc';
+
+export interface ExternalProviderArrangement {
+  externalProviderArrangementInstanceReference: string;    // UUID, primary key
+  externalProviderArrangementName: string;
+  externalProviderArrangementType: IntegrationProviderType;
+  externalProviderArrangementStatus: IntegrationStatus;
+
+  // Internal provider flag — pre-seeded, cannot be suspended
+  externalProviderIsInternal: boolean;
+  externalProviderInternalHandler?: string;               // e.g. "fraudDiagnosis.internalFraudScoring"
+
+  // Outbound REST (external providers only)
+  externalProviderApiEndpoint?: string;
+  externalProviderApiKeyHash?: string;                    // bcrypt — NEVER returned in API responses
+  externalProviderApiKeyPrefix?: string;                  // visible prefix for UI (e.g. "fds_live_...")
+  externalProviderAuthScheme?: IntegrationAuth;
+
+  // Inbound callback config (async providers)
+  externalProviderCallbackEnabled: boolean;
+  externalProviderCallbackPath?: string;                  // /webhooks/{type}/{arrangementId}/callback
+  externalProviderCallbackSecretHash?: string;            // bcrypt — never returned
+
+  // Event routing
+  externalProviderTriggerEvents: string[];                // ['transaction.authorized', 'kyc.initiated']
+  externalProviderMode: IntegrationMode;
+
+  // Reliability
+  externalProviderTimeoutMs: number;
+  externalProviderRetryPolicy: { maxAttempts: number; backoffMs: number };
+
+  // Health
+  externalProviderLastHealthCheckAt?: Date;
+  externalProviderHealthStatus?: 'ok' | 'degraded' | 'unreachable' | 'unknown';
+
+  // BIAN + PCI DSS metadata
+  bianServiceDomain: string;
+  bianControlRecordType: string;
+  pciDssRequirements: string[];
+
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+  schemaVersion: number;
+}
+
+export interface IntegrationEvent {
+  integrationEventInstanceReference: string;              // UUID
+  externalProviderArrangementInstanceReference: string;   // FK to integrationRegistry
+  integrationEventType: 'dispatch' | 'callback' | 'health_check' | 'test';
+  integrationEventStatus: 'sent' | 'received' | 'error' | 'timeout';
+  integrationEventPayloadHash?: string;                   // sha256 of payload — never the payload itself
+  integrationEventResponseCode?: number;
+  integrationEventLatencyMs?: number;
+  integrationEventErrorMessage?: string;
+  integrationEventTriggeredBy: string;                    // 'transaction.authorized', 'kyc.initiated', etc.
+  bianServiceDomain: string;
+  bianControlRecordType: string;
+  recordCreatedDateTime: Date;
+}
+```
+
+**Collections:**
+- `integrationRegistry` — plaintext, no QE. Provider configuration, key hashes, health state.
+- `integrationEvents` — plaintext, no QE. Append-only audit log with 90-day TTL.
+
+**Seed file:** `backend/data/integrationRegistry.json` — 3 pre-seeded internal providers (FDS, HRPC, AML).
+
+**Security notes:**
+- `externalProviderApiKeyHash` and `externalProviderCallbackSecretHash` are bcrypt hashes — never returned in API responses.
+- Plaintext API key returned exactly once at creation and once at rotation.
+- Payload content is never logged; only a SHA-256 hash is stored for audit reference.
+
+---
+
 ## 2. QE encryptedFieldsMaps
 
 All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `keyId` values are per-field BSON Binary UUIDs resolved at runtime from the provisioned DEKs via `provisionDEKs.ts`.
@@ -866,6 +956,27 @@ async function createIndexes(client: MongoClient, dbName: string) {
 ```
 
 > **Important:** Do not create manual indexes on QE-encrypted fields (`paymentCardReference`, `customerEmailAddress`, etc.). QE manages its own `__safeContent__` metadata index automatically.
+
+```typescript
+  // ── integrationRegistry (SD-193) ─────────────────────────────────
+  await db.collection('integrationRegistry').createIndexes([
+    { key: { externalProviderArrangementInstanceReference: 1 }, unique: true },
+    { key: { externalProviderArrangementType: 1, externalProviderArrangementStatus: 1 } },
+    { key: { externalProviderIsInternal: 1 } },
+    // Unique: one provider per type+endpoint combination (sparse allows null endpoints for internal)
+    { key: { externalProviderArrangementType: 1, externalProviderApiEndpoint: 1 },
+      unique: true, sparse: true },
+  ]);
+
+  // ── integrationEvents (SD-193 Action Log) ────────────────────────
+  await db.collection('integrationEvents').createIndexes([
+    { key: { integrationEventInstanceReference: 1 }, unique: true },
+    { key: { externalProviderArrangementInstanceReference: 1, recordCreatedDateTime: -1 } },
+    { key: { integrationEventType: 1, recordCreatedDateTime: -1 } },
+    // TTL: auto-delete events older than 90 days (PCI DSS Req 10.7)
+    { key: { recordCreatedDateTime: 1 }, expireAfterSeconds: 7776000 },
+  ]);
+```
 
 ---
 
@@ -2152,3 +2263,75 @@ The `FRONTEND_URL` env var is used to construct hosted page URLs:
 - `paymentUrl = ${FRONTEND_URL}/pay/{linkCode}`
 
 Defaults to `http://localhost:3000` when not set.
+
+---
+
+## 9. Integration Hub (SD-193) — API Contracts & Implementation
+
+### 9.1 Integration Registry Routes (requires role: `system_admin`)
+
+```
+GET    /api/v1/integrations
+       → 200 { integrations: IntegrationSummary[] }
+
+POST   /api/v1/integrations
+       body: { name, type, endpoint?, authScheme?, apiKey?, callbackEnabled, triggerEvents[], mode, timeoutMs?, retryPolicy? }
+       → 201 { integration: ExternalProviderArrangement, apiKey?: string }   ← plaintext key ONCE
+
+GET    /api/v1/integrations/:id
+       → 200 { integration: ExternalProviderArrangement }                    ← no keyHash field
+
+PATCH  /api/v1/integrations/:id
+       body: { endpoint?, triggerEvents?, mode?, timeoutMs?, retryPolicy? }  ← no key update
+       → 200 { integration: ExternalProviderArrangement }
+
+POST   /api/v1/integrations/:id/rotate-key
+       → 200 { integration: ExternalProviderArrangement, apiKey: string }    ← new key ONCE
+
+POST   /api/v1/integrations/:id/test
+       → 200 { status: 'ok'|'error', latencyMs: number, response?: object }
+
+POST   /api/v1/integrations/:id/suspend
+       body: {}
+       → 200 { integration: ExternalProviderArrangement }  ← 400 if internal provider
+
+GET    /api/v1/integrations/:id/events?page=1&limit=20
+       → 200 { events: IntegrationEvent[], total: number, page: number }
+```
+
+**Role guard:** All routes require `X-Demo-Role: system_admin`. Returns 403 for any other role.
+
+**Key management rules:**
+- `externalProviderApiKeyHash` and `externalProviderCallbackSecretHash` are **never** returned in any API response.
+- `externalProviderApiKeyPrefix` (first 12 chars of the plaintext key) is always returned for UI identification.
+- Plaintext key is returned exactly once in the `apiKey` field of POST and POST /rotate-key responses.
+
+### 9.2 Inbound Callback Routes (no JWT — HMAC validated)
+
+All callbacks require `X-Webhook-Signature: sha256=<hmac-sha256-of-body>` header.
+
+```
+POST   /webhooks/fds/:arrangementId/callback
+       body: { fraudScore: number, recommendation: string, caseId?: string, metadata?: object }
+       → 200 { received: true }  |  401 (invalid signature)  |  404 (unknown arrangement)
+
+POST   /webhooks/aml/:arrangementId/callback
+       body: { alertType: string, severity: string, entities: string[], caseId?: string }
+       → 200 { received: true }
+
+POST   /webhooks/kyc/:arrangementId/callback
+       body: { status: 'verified'|'rejected'|'expired', agreementRef: string, reference?: string }
+       → 200 { received: true }
+
+POST   /webhooks/kyb/:arrangementId/callback
+       body: { status: 'verified'|'rejected'|'expired', merchantRef: string, reference?: string }
+       → 200 { received: true }
+
+POST   /webhooks/hrp/:arrangementId/callback
+       body: { hrpcMatch: boolean, flags: string[], accountRef: string }
+       → 200 { received: true }
+```
+
+### 9.3 Index Strategy
+
+See §5 above for the full `integrationRegistry` and `integrationEvents` index definitions.

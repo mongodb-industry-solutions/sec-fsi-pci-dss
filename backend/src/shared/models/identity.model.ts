@@ -5,7 +5,8 @@ export type UserRole =
   | 'level1_analyst'
   | 'level2_investigator'
   | 'security_auditor'
-  | 'merchant_officer';   // Ch-05: SD-89 Merchant Acquiring officer
+  | 'merchant_officer'    // Ch-05: SD-89 Merchant Acquiring officer
+  | 'system_admin';       // Ch-07: SD-193 Integration Hub administrator
 
 export type AnalystRole =
   | 'payment_service'
