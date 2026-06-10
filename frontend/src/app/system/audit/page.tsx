@@ -141,7 +141,7 @@ export default function AuditPage() {
                       <td className="px-4 py-2.5 font-mono text-xs">
                         {e.fraudDiagnosisCaseReference ? (
                           <Link
-                            href={`/demo/investigation/${e.fraudDiagnosisInstanceReference}`}
+                            href={`/system/investigation/${e.fraudDiagnosisInstanceReference}`}
                             className="text-blue-600 hover:underline"
                           >
                             {e.fraudDiagnosisCaseReference}

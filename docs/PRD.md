@@ -110,6 +110,57 @@ A synthetic digital bank (standalone, Leafy Bank-ready) runs a payment flow wher
 | Database Auditing | Trace every access event to encrypted fields |
 | TLS 1.3 default | Wire encryption for all Atlas connections |
 | Private Endpoint (documented) | Network isolation architecture pattern shown in diagrams |
+| TTL Indexes | Auto-expire checkout sessions (30 min) and optional payment link expiry |
+
+### Payment Integration Use Case (Ch-04)
+
+**Problem:** External merchants want to accept card payments through the LeafyBank Payment Gateway without handling cardholder data themselves — the standard "easy integration" requirement that every payment provider answers with a hosted payment page.
+
+**Solution — two integration patterns, lowest PCI scope:**
+
+#### Redirect Checkout
+
+An external merchant's backend creates a checkout session via API. The buyer is redirected to a hosted payment page on the gateway domain where card entry happens. After payment the buyer is redirected back to the merchant.
+
+**PCI DSS scope for external merchant:** SAQ A — the merchant's system never sees cardholder data at any point.
+
+```
+Merchant System        LeafyBank Gateway                    Buyer Browser
+    │                         │                                     │
+    ├── POST /checkout/sessions ──►                                 │
+    │◄── { paymentPageUrl } ──────                                  │
+    │                                                               │
+    ├── redirect buyer ──────────────────────────────────────────► │
+    │                         │◄── load /checkout/{sessionId} ─── │
+    │                         ├── show card form ───────────────► │
+    │                         │◄── submit card token ─────────── │
+    │                         ├── create cardTransactionLog ───►  │
+    │◄── webhook event ───────│                                    │
+    │                         ├── redirect to returnUrl ────────► │
+    │◄── GET /checkout/sessions/{id} (verify)                      │
+```
+
+#### Payment Links
+
+A merchant creates a shareable URL ahead of time. No buyer session is required on the merchant side. The URL can be emailed, printed as a QR code, or embedded in a social media post.
+
+```
+Merchant System        LeafyBank Gateway
+    │                         │
+    ├── POST /payment-links ──►
+    │◄── { paymentUrl } ──────
+    │
+    │  (merchant shares paymentUrl anywhere)
+    │
+                        │◄── buyer opens /pay/{code}
+                        ├── show card form
+                        │◄── submit card token
+                        ├── create cardTransactionLog
+                        ├── show success screen
+                        ├── webhook event ──► merchant (optional)
+```
+
+**Key BIAN insight:** Both patterns store their session/link state in MongoDB using SD-64 (Payment Order) collections. The card transaction created on payment is the same `cardTransactionLog` (SD-254) document that feeds into the fraud investigation workflow. The PCI DSS boundary is the gateway's hosted pages, not the merchant's system.
 
 ---
 
@@ -130,6 +181,7 @@ A synthetic digital bank (standalone, Leafy Bank-ready) runs a payment flow wher
 | **Level 1 Analyst** | Read: equality QE fields only | Search by email (QE), phone (QE), account ref (QE); card token search via standard index |
 | **Level 2 Investigator** | Read: equality + `none` mode QE fields | Full record reveal after escalation approval |
 | **Security Auditor** | Read: audit log, case history only | Review access events, export case timeline |
+| **Merchant** *(Ch-04)* | Write: checkout sessions, payment links; Read: own merchant data | Create checkout sessions, create payment links, manage API keys, view webhook logs |
 
 ---
 
@@ -204,14 +256,15 @@ BIAN (Banking Industry Architecture Network) provides a standardized vocabulary 
 | 11 | **Consent Agreement** *(stub)* | SD-36 | Open Banking consent grants | `consentAgreement` | v3 stub |
 | 12 | **Consent Access Log** *(stub)* | SD-36 | Open Banking API access audit trail | `consentAccessLog` | v3 stub |
 
-#### v4: Payment Gateway SDs (new)
+#### v4: Payment Gateway SDs (Ch-04 - Redirect Checkout + Payment Links)
 
 | # | BIAN Service Domain | SD Reference | Role in Demo | Collection | Version |
 |---|---|---|---|---|---|
-| 8 | **Merchant Relations** | SD-89 | Merchant profile, MCC, limits, API key | `merchantAgreement` | v4 |
-| 9 | **Payment Order** | SD-64 | Payment intent lifecycle (initiated → settled) | `paymentOrder` | v4 |
-| 10 | **Payment Execution** | SD-65 | Gateway routing and authorization orchestration | *(service layer, no dedicated collection)* | v4 |
-| 11 | **Card Etoken** | SD-57 | Token vault: card token references and network tokens | `tokenVault` | v4 |
+| 8 | **Merchant Relations** | SD-89 | Merchant profile, MCC, limits, API key management | `merchantAgreementProcedure` | v4 |
+| 9 | **Payment Order** (Checkout Session) | SD-64 | Redirect Checkout: hosted payment page session lifecycle | `checkoutSessionLog` | v4 |
+| 10 | **Payment Order** (Payment Link) | SD-64 | Payment Links: shareable pre-configured payment URL | `paymentLinkRecord` | v4 |
+| 11 | **Payment Execution** | SD-65 | Gateway routing and authorization orchestration | *(service layer, no dedicated collection)* | v4 |
+| 12 | **Card Etoken** | SD-57 | Token vault: card token references and network tokens | `tokenVault` | v4 stub |
 
 > **Note 1:** BIAN does not define separate "sensitive" collections; the split is an architectural pattern for separating searchable QE fields from non-searchable QE fields, as required by MongoDB QE design constraints.
 >

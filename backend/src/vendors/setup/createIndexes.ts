@@ -82,4 +82,29 @@ export async function createIndexes(client: MongoClient) {
     { key: { consentAgreementInstanceReference: 1, accessDateTime: -1 } },
     { key: { accessDateTime: -1 } },
   ]);
+
+  // SD-89: Merchant Agreement Procedure
+  await db.collection('merchantAgreementProcedure').createIndexes([
+    { key: { merchantAgreementInstanceReference: 1 }, unique: true },
+    { key: { merchantAgreementStatus: 1 } },
+    { key: { merchantCategoryCode: 1 } },
+  ]);
+
+  // SD-64: Checkout Session Log (TTL on expiry field)
+  await db.collection('checkoutSessionLog').createIndexes([
+    { key: { checkoutSessionInstanceReference: 1 }, unique: true },
+    { key: { merchantAgreementInstanceReference: 1 } },
+    { key: { checkoutSessionMerchantReference: 1, merchantAgreementInstanceReference: 1 } },
+    { key: { checkoutSessionExpiresAt: 1 }, expireAfterSeconds: 0 },
+  ]);
+
+  // SD-64: Payment Link Record
+  await db.collection('paymentLinkRecord').createIndexes([
+    { key: { paymentLinkInstanceReference: 1 }, unique: true },
+    { key: { paymentLinkCode: 1 }, unique: true },
+    { key: { merchantAgreementInstanceReference: 1 } },
+    { key: { paymentLinkStatus: 1 } },
+    // Sparse TTL: only applies to documents with paymentLinkExpiresAt set
+    { key: { paymentLinkExpiresAt: 1 }, expireAfterSeconds: 0, sparse: true },
+  ]);
 }

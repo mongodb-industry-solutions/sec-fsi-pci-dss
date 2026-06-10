@@ -146,4 +146,40 @@ export async function createCollections(
   } else {
     console.log('  skip:    consentAccessLog (already exists)');
   }
+
+  // SD-89: Merchant Agreement Procedure  -  plaintext (API key stored as bcrypt hash)
+  if (!existingNames.has('merchantAgreementProcedure') || reset) {
+    if (existingNames.has('merchantAgreementProcedure') && reset) {
+      await db.collection('merchantAgreementProcedure').drop();
+      console.log('  dropped: merchantAgreementProcedure');
+    }
+    await db.createCollection('merchantAgreementProcedure');
+    console.log('  created: merchantAgreementProcedure');
+  } else {
+    console.log('  skip:    merchantAgreementProcedure (already exists)');
+  }
+
+  // SD-64: Checkout Session Log  -  plaintext (TTL-indexed, 30-min session lifecycle)
+  if (!existingNames.has('checkoutSessionLog') || reset) {
+    if (existingNames.has('checkoutSessionLog') && reset) {
+      await db.collection('checkoutSessionLog').drop();
+      console.log('  dropped: checkoutSessionLog');
+    }
+    await db.createCollection('checkoutSessionLog');
+    console.log('  created: checkoutSessionLog');
+  } else {
+    console.log('  skip:    checkoutSessionLog (already exists)');
+  }
+
+  // SD-64: Payment Link Record  -  plaintext (unique short code, optional TTL)
+  if (!existingNames.has('paymentLinkRecord') || reset) {
+    if (existingNames.has('paymentLinkRecord') && reset) {
+      await db.collection('paymentLinkRecord').drop();
+      console.log('  dropped: paymentLinkRecord');
+    }
+    await db.createCollection('paymentLinkRecord');
+    console.log('  created: paymentLinkRecord');
+  } else {
+    console.log('  skip:    paymentLinkRecord (already exists)');
+  }
 }

@@ -37,7 +37,7 @@ export default function InvestigationPage() {
     setToken(t);
     setUser(u);
     if (u?.role === 'customer') {
-      router.replace('/demo/payment/history');
+      router.replace('/system/payment/history');
       return;
     }
     if (u?.role === 'level2_investigator') {
@@ -292,7 +292,7 @@ export default function InvestigationPage() {
           <div className="text-center py-10 text-gray-400">Loading...</div>
         ) : (
           <>
-            <CaseTable cases={cases} basePath="/demo/investigation" />
+            <CaseTable cases={cases} basePath="/system/investigation" />
             <Pagination
               page={page}
               totalPages={totalPages}

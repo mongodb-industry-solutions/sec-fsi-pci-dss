@@ -35,7 +35,7 @@ export default function LandingPage() {
           </Link>
 
           <Link
-            href="/demo"
+            href="/system"
             className="group block rounded-xl border border-blue-500/30 bg-[#001E2B] hover:bg-blue-500/10 p-6 text-left transition-all"
           >
             <div className="text-3xl mb-3">🔐</div>

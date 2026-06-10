@@ -29,21 +29,6 @@ This answers the most common FSI prospect question:
 
 ---
 
-## 📚 Documentation
-
-| Document | Description |
-|---|---|
-| 📖 [Project Wiki](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki) | Installation guide, Q&A, and additional resources for non-engineering readers |
-| 📋 [PRD](docs/PRD.md) | What and why: audience, storyline, BIAN data model, QE design overview |
-| 🗺️ [Roadmap](docs/roadmap.md) | FR and NFR per iteration (v1 / v2 / v3 / v4) with acceptance criteria and Definition of Done |
-| 🛠️ [Technical Specification](docs/technical-spec.md) | BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index strategy |
-| 🏗️ [Engineering Proposal](docs/engineering-proposal.md) | Architecture decisions, implementation phases, risks, alternatives, ADRs |
-| 🗂️ [Architecture Overview](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki/architecture) | Data model, PII fields, encryption design, collection relationships, and role model |
-| ❓ [Q&A: PCI DSS](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki/q&a) | Common FSI client questions about MongoDB and PCI DSS compliance |
-| 🐛 [Issues](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/issues) | Bug reports, feature requests, and task tracking |
-
----
-
 ## 🏛️ Regulatory Alignment
 
 - **PCI DSS v4.0**: MongoDB Atlas certified September 2023
@@ -147,6 +132,30 @@ sec-fsi-pci-dss/
 | 🟣 **v4** | Advanced Capabilities | Save card / recurring payment, range queries, performance visualization, Leafy Bank scaffold |
 
 See [docs/roadmap.md](docs/roadmap.md) for the complete FR, NFR, and acceptance criteria per iteration.
+
+
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|---|---|
+| 📖 [Project Wiki](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki) | Installation guide, Q&A, and additional resources for non-engineering readers |
+| 📋 [PRD](docs/PRD.md) | What and why: audience, storyline, BIAN data model, QE design overview |
+| 🗺️ [Roadmap](docs/roadmap.md) | FR and NFR per iteration (v1 / v2 / v3 / v4) with acceptance criteria and Definition of Done |
+| 🛠️ [Technical Specification](docs/technical-spec.md) | BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index strategy |
+| 🏗️ [Engineering Proposal](docs/engineering-proposal.md) | Architecture decisions, implementation phases, risks, alternatives, ADRs |
+| 🗂️ [Architecture Overview](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki/architecture) | Data model, PII fields, encryption design, collection relationships, and role model |
+| ❓ [Q&A: PCI DSS](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki/q&a) | Common FSI client questions about MongoDB and PCI DSS compliance |
+| 🐛 [Issues](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/issues) | Bug reports, feature requests, and task tracking |
+
+### External References 
+- [Redsys: Continue with the Integration](https://pagosonline.redsys.es/desarrolladores-inicio/continar-integracion/)
+- [Redsys: Virtual POS Integration Models](https://pagosonline.redsys.es/desarrolladores-inicio/)
+- [Redsys: Make a payment](https://pagosonline.redsys.es/desarrolladores-inicio/documentacion-operativa/autorizacion/#rest)
+- [Redsys: Card validation (authentication)](https://pagosonline.redsys.es/desarrolladores-inicio/documentacion-operativa/operacion-autenticacion/)
+- [Redsys: PSD2 and Strong Customer Authentication (SCA)](https://pagosonline.redsys.es/desarrolladores-inicio/documentacion-operativa/autenticacion-reforzada-sca-y-normativa-psd2/)
 
 ---
 

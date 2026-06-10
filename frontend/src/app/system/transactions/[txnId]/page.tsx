@@ -67,7 +67,7 @@ export default function TransactionDetailPage() {
   useEffect(() => {
     const t = getToken() ?? '';
     const user = t ? decodeToken(t) : null;
-    if (user?.role === 'customer') { router.replace('/demo/payment/history'); return; }
+    if (user?.role === 'customer') { router.replace('/system/payment/history'); return; }
     setToken(t);
     setRole(user?.role ?? 'level1_analyst');
 
@@ -114,7 +114,7 @@ export default function TransactionDetailPage() {
   if (notFound || !txn) return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 text-gray-500 space-y-3">
       <p>Transaction not found.</p>
-      <Link href="/demo/transactions" className="text-blue-600 hover:underline text-sm">← Back to transactions</Link>
+      <Link href="/system/transactions" className="text-blue-600 hover:underline text-sm">← Back to transactions</Link>
     </div>
   );
 
@@ -124,7 +124,7 @@ export default function TransactionDetailPage() {
 
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
-      <Link href="/demo/transactions" className="text-sm text-blue-600 hover:underline">← Back to transactions</Link>
+      <Link href="/system/transactions" className="text-sm text-blue-600 hover:underline">← Back to transactions</Link>
 
       {/* Header */}
       <div className="bg-white rounded-xl border p-5">
@@ -280,7 +280,7 @@ export default function TransactionDetailPage() {
               </div>
             </div>
             <Link
-              href={`/demo/investigation/${linkedCase.id}`}
+              href={`/system/investigation/${linkedCase.id}`}
               className="text-sm px-4 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors font-semibold"
             >
               Open case

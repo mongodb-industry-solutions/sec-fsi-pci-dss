@@ -102,7 +102,7 @@ export default function DemoCaseDetailPage() {
 
     // Customers must not access investigation cases directly
     if (resolvedRole === 'customer') {
-      router.replace('/demo/payment/history');
+      router.replace('/system/payment/history');
       return;
     }
 
@@ -221,8 +221,8 @@ export default function DemoCaseDetailPage() {
     <div className="min-h-full bg-gray-50">
       <main className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
         <div className="flex items-center justify-between">
-          <Link href="/demo/investigation" className="text-sm text-blue-600 hover:underline">Back to cases</Link>
-          {isAuditor && <Link href="/demo/audit" className="text-sm text-blue-600 hover:underline">Full audit log</Link>}
+          <Link href="/system/investigation" className="text-sm text-blue-600 hover:underline">Back to cases</Link>
+          {isAuditor && <Link href="/system/audit" className="text-sm text-blue-600 hover:underline">Full audit log</Link>}
         </div>
 
         {/* -- Case header -- */}

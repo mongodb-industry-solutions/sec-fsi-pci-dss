@@ -420,4 +420,114 @@ export const api = {
   },
 
   health: () => apiFetch<{ status: string; atlas: string; kmsProvider: string; timestamp: string }>('/api/v1/system/health'),
+
+  merchants: {
+    list: (filters: { status?: string; mcc?: string }, token: string) => {
+      const qs = new URLSearchParams(
+        Object.entries(filters).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])
+      ).toString();
+      return apiFetch<{ results: Record<string, unknown>[]; total: number }>(
+        `/api/v1/merchants${qs ? `?${qs}` : ''}`, {}, token
+      );
+    },
+    getById: (id: string, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}`, {}, token),
+    create: (body: Record<string, unknown>, token: string) =>
+      apiFetch<{ merchantAgreementInstanceReference: string; merchantName: string; merchantAgreementStatus: string; merchantApiKey: string }>(
+        '/api/v1/merchants', { method: 'POST', body: JSON.stringify(body) }, token
+      ),
+    generateKey: (merchantId: string, token: string) =>
+      apiFetch<{ keyId: string; keyPrefix: string; merchantApiKey: string }>(
+        `/api/v1/merchants/${merchantId}/keys`, { method: 'POST', body: JSON.stringify({}) }, token
+      ),
+    revokeKey: (merchantId: string, keyId: string, token: string) =>
+      apiFetch<{ revoked: boolean; keyId: string }>(
+        `/api/v1/merchants/${merchantId}/keys/${keyId}`, { method: 'DELETE' }, token
+      ),
+    registerWebhook: (merchantId: string, webhookEndpoint: string, token: string) =>
+      apiFetch<{ merchantAgreementInstanceReference: string; merchantWebhookEndpoint: string }>(
+        `/api/v1/merchants/${merchantId}/webhooks`,
+        { method: 'POST', body: JSON.stringify({ webhookEndpoint }) },
+        token
+      ),
+  },
+
+  checkout: {
+    createSession: (body: {
+      merchantAgreementInstanceReference: string;
+      amount: number;
+      currency: string;
+      description: string;
+      returnUrl: string;
+      cancelUrl: string;
+      merchantReference: string;
+    }, token: string) =>
+      apiFetch<{ checkoutSessionInstanceReference: string; paymentPageUrl: string; expiresAt: string }>(
+        '/api/v1/checkout/sessions', { method: 'POST', body: JSON.stringify(body) }, token
+      ),
+    getSession: (sessionId: string) =>
+      apiFetch<{
+        checkoutSessionInstanceReference: string;
+        checkoutSessionAmount: number;
+        checkoutSessionCurrency: string;
+        checkoutSessionDescription: string;
+        merchantName: string;
+        checkoutSessionStatus: string;
+        checkoutSessionExpiresAt: string;
+        checkoutSessionReturnUrl: string;
+        checkoutSessionCancelUrl: string;
+      }>(`/api/v1/checkout/sessions/${sessionId}`),
+    pay: (sessionId: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth: string; cardExpiryYear: string }) =>
+      apiFetch<{ success: boolean; cardTransactionInstanceReference: string; redirectUrl: string }>(
+        `/api/v1/checkout/sessions/${sessionId}/pay`, { method: 'POST', body: JSON.stringify(body) }
+      ),
+    cancelSession: (sessionId: string, merchantAgreementInstanceReference: string, token: string) =>
+      apiFetch<{ checkoutSessionInstanceReference: string; checkoutSessionStatus: string }>(
+        `/api/v1/checkout/sessions/${sessionId}`,
+        { method: 'DELETE', body: JSON.stringify({ merchantAgreementInstanceReference }) },
+        token
+      ),
+  },
+
+  paymentLinks: {
+    create: (body: {
+      merchantAgreementInstanceReference: string;
+      amount: number;
+      currency: string;
+      description: string;
+      customerMessage?: string;
+      usageType: 'single_use' | 'multi_use';
+      maxUses?: number;
+      expiresAt?: string;
+    }, token: string) =>
+      apiFetch<{ paymentLinkInstanceReference: string; paymentLinkCode: string; paymentUrl: string }>(
+        '/api/v1/payment-links', { method: 'POST', body: JSON.stringify(body) }, token
+      ),
+    list: (merchantId: string, token: string, page = 1, limit = 20) =>
+      apiFetch<{ results: Record<string, unknown>[]; total: number }>(
+        `/api/v1/payment-links?merchantId=${encodeURIComponent(merchantId)}&page=${page}&limit=${limit}`,
+        {}, token
+      ),
+    resolve: (code: string) =>
+      apiFetch<{
+        paymentLinkCode: string;
+        paymentLinkAmount: number;
+        paymentLinkCurrency: string;
+        paymentLinkDescription: string;
+        merchantName: string;
+        paymentLinkCustomerMessage?: string;
+        paymentLinkStatus: string;
+        paymentLinkExpiresAt?: string;
+      }>(`/api/v1/payment-links/${code}`),
+    pay: (code: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth: string; cardExpiryYear: string; customerEmail?: string }) =>
+      apiFetch<{ success: boolean; cardTransactionInstanceReference: string }>(
+        `/api/v1/payment-links/${code}/pay`, { method: 'POST', body: JSON.stringify(body) }
+      ),
+    deactivate: (id: string, merchantAgreementInstanceReference: string, token: string) =>
+      apiFetch<{ paymentLinkInstanceReference: string; paymentLinkStatus: string }>(
+        `/api/v1/payment-links/${id}`,
+        { method: 'PATCH', body: JSON.stringify({ action: 'deactivate', merchantAgreementInstanceReference }) },
+        token
+      ),
+  },
 };

@@ -37,7 +37,7 @@ export default function TransactionsPage() {
     const t = getToken() ?? '';
     const user = t ? decodeToken(t) : null;
     if (user?.role === 'customer') {
-      router.replace('/demo/payment/history');
+      router.replace('/system/payment/history');
       return;
     }
     setToken(t);
@@ -269,7 +269,7 @@ export default function TransactionsPage() {
                     <td className="px-4 py-2.5">
                       {txn.cardTransactionInstanceReference && (
                         <Link
-                          href={`/demo/transactions/${txn.cardTransactionInstanceReference}`}
+                          href={`/system/transactions/${txn.cardTransactionInstanceReference}`}
                           className="text-xs text-blue-600 hover:underline whitespace-nowrap flex items-center gap-1"
                         >
                           View details <span className="opacity-0 group-hover:opacity-100 transition-opacity">›</span>

@@ -117,7 +117,7 @@ export default function TransactionHistoryPage() {
       <main className="w-full px-5 sm:px-8 lg:px-12 py-6">
         <div className="flex flex-wrap justify-between items-center gap-2 mb-5">
           <h1 className="text-2xl font-bold">My Transactions</h1>
-          <Link href="/demo/payment" className="bg-[#001E2B] text-[#00ED64] px-4 py-2 rounded-lg text-sm font-semibold">
+          <Link href="/system/payment" className="bg-[#001E2B] text-[#00ED64] px-4 py-2 rounded-lg text-sm font-semibold">
             New Payment
           </Link>
         </div>
@@ -127,7 +127,7 @@ export default function TransactionHistoryPage() {
         ) : allTxns.length === 0 ? (
           <div className="bg-white rounded-xl border p-6 text-center text-gray-500">
             <p className="mb-2">No transactions yet.</p>
-            <Link href="/demo/payment" className="mt-4 inline-block text-blue-600 hover:underline text-sm">
+            <Link href="/system/payment" className="mt-4 inline-block text-blue-600 hover:underline text-sm">
               Make your first payment
             </Link>
           </div>
@@ -139,7 +139,7 @@ export default function TransactionHistoryPage() {
                 return (
                   <Link
                     key={txn.txnId}
-                    href={`/demo/payment/history/${txn.txnId}`}
+                    href={`/system/payment/history/${txn.txnId}`}
                     className="group block bg-white rounded-xl border p-4 hover:border-[#001E2B]/30 hover:shadow-md transition-all cursor-pointer"
                   >
                     <div className="flex items-start justify-between gap-3 mb-2">

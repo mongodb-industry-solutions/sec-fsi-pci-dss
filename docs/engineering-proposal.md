@@ -657,3 +657,148 @@ Notes are stored as discrete events in the **`fraudDiagnosisCaseEvents`** collec
 + **Role-based retraction** — the constraint that only the authoring role can retract a note is enforced in the service layer, not by a database-level ACL, keeping the enforcement explicit and testable.  
 - The deprecated string fields must be preserved on the document interface (as optional) to avoid breaking seed-data reads until a future migration removes them.  
 - The `DELETE /fraud/:id/notes/:noteId` route performs a logical delete (append), which may surprise consumers expecting a 204 with no body; the response shape must be clearly documented in `technical-spec.md §6`.
+
+---
+
+## ADR-006: Payment Gateway Integration - Redirect Checkout + Payment Links (Ch-04)
+
+**Date:** 2026-06-10
+**Status:** Accepted
+
+### Context
+
+The existing demo simulates payment transactions from the customer's perspective: the customer fills a form, the API creates a `cardTransactionLog` document, and a fraud case is optionally opened. This is a closed loop that only demonstrates the data and encryption model.
+
+The request was to extend the system to allow **external merchants** to integrate payment collection into their own systems — a fundamental capability of any real payment gateway. The goal: maximum ease of integration for external merchants, minimum PCI DSS scope for those merchants.
+
+This ADR documents the study of four integration patterns and the rationale for the selected approach.
+
+### Integration Methods Compared
+
+#### Method A: Redirect Checkout (Hosted Payment Page)
+
+The merchant's backend creates a checkout session via API, then redirects the buyer's browser to a hosted payment page (HPP) on the gateway domain. The buyer enters card details on the gateway's page. After payment the buyer is redirected back to the merchant's `returnUrl`.
+
+**PCI DSS scope for the merchant:** SAQ A — the simplest possible. The merchant's system never touches cardholder data at any point; only the gateway (this system) handles card entry.
+
+**External integration surface (3 steps):**
+```javascript
+// 1. Merchant creates session
+const { paymentPageUrl } = await fetch('/api/v1/checkout/sessions', {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${apiKey}` },
+  body: JSON.stringify({ amount, currency, returnUrl, cancelUrl, description })
+}).then(r => r.json());
+
+// 2. Merchant redirects buyer
+res.redirect(paymentPageUrl);
+
+// 3. Merchant verifies result (buyer is sent back to returnUrl)
+const session = await fetch(`/api/v1/checkout/sessions/${sessionId}`).then(r => r.json());
+// session.checkoutSessionStatus === 'completed'
+```
+
+**Used by:** Stripe Checkout, PayPal Checkout, Adyen HPP, Redsys TPV Hosted, PagoOnline, SumUp.
+
+**Session security:** The session is server-side; the URL contains only a UUID. The amount, currency, and returnUrl are stored on the server and cannot be tampered with by a buyer intercepting the URL. Sessions expire after 30 minutes (TTL index).
+
+#### Method B: Payment Links
+
+The merchant creates a shareable URL ahead of time. The URL can be embedded in an email, printed as a QR code, shared on social media, or sent via SMS. No buyer session is required on the merchant side; any buyer who receives the URL can pay.
+
+**PCI DSS scope for the merchant:** SAQ A — same as Method A.
+
+**External integration surface (2 steps):**
+```javascript
+// 1. Merchant creates link
+const { paymentUrl } = await fetch('/api/v1/payment-links', {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${apiKey}` },
+  body: JSON.stringify({ amount, currency, description, usageType: 'single_use' })
+}).then(r => r.json());
+
+// 2. Merchant shares the URL (email, QR code, etc.)
+sendEmail(customerEmail, `Pay here: ${paymentUrl}`);
+```
+
+**Key differences from Redirect Checkout:**
+- No buyer web session on the merchant side at creation time
+- No `returnUrl` — success is shown on the gateway page
+- Can be `single_use` (invoice-style) or `multi_use` (store payment button)
+- Optional expiry date
+
+**Used by:** Stripe Payment Links, PayPal.me, Square Pay Links, Redsys Link de Pago, Kushki.
+
+#### Method C: Embedded Checkout JS SDK (proposed for v5)
+
+A JavaScript SDK renders a payment form inside an iframe on the merchant's own page. The buyer never leaves the merchant's site; the iframe calls the gateway API directly.
+
+**PCI DSS scope for the merchant:** SAQ A-EP — slightly more complex than A. The merchant's domain loads a third-party script that handles card entry.
+
+**Not implemented in this iteration** because: (1) requires building and hosting a JS SDK bundle; (2) requires CSP and X-Frame-Options configuration; (3) the incremental demo value over Method A is low for a first iteration. Documented here as the recommended v5 enhancement.
+
+#### Method D: API Direct (merchant-side card form + tokenization API)
+
+The merchant builds their own card form, calls a tokenization endpoint to convert the card to a token, then calls the payment API with the token. Requires `libmongocrypt` or equivalent on the merchant's stack.
+
+**PCI DSS scope for the merchant:** SAQ D — the most complex category. The merchant's frontend must be fully PCI DSS compliant because it renders the card form.
+
+**Not implemented and not recommended** for the "easy external integration" goal. SAQ D compliance requires extensive merchant-side controls that negate the integration simplicity goal.
+
+### Decision
+
+**Implement Method A (Redirect Checkout) and Method B (Payment Links) in Ch-04.** Propose Method C (Embedded SDK) for v5. Exclude Method D.
+
+**Rationale:**
+1. **SAQ A scope for all external merchants** — no cardholder data ever passes through merchant systems.
+2. **Minimal integration surface** — merchants need 1-3 API calls; no SDK, no JavaScript embed required.
+3. **Industry standard** — every major payment provider (Stripe, PayPal, Adyen) offers these two patterns as the default recommended integration.
+4. **BIAN alignment** — both patterns map naturally onto SD-64 (Payment Order) with distinct Control Record Types (`CheckoutSession` vs. `PaymentLink`).
+
+### BIAN Alignment
+
+| New Collection | BIAN SD | Control Record Type | Purpose |
+|---|---|---|---|
+| `checkoutSessionLog` | SD-64 Payment Order | `CheckoutSession` | Hosted payment page session (Method A) |
+| `paymentLinkRecord` | SD-64 Payment Order | `PaymentLink` | Pre-configured shareable payment invitation (Method B) |
+| `merchantAgreementProcedure` | SD-89 Merchant Relations | `MerchantAgreement` | Existing stub converted to full MongoDB persistence |
+
+Both `checkoutSessionLog` and `paymentLinkRecord` use SD-64 because in BIAN terms a checkout session and a payment link are both forms of **payment order initiation** — the SD-64 Control Record captures the payment amount, currency, and status lifecycle regardless of how the buyer arrived at the payment form.
+
+### Security Model
+
+| Concern | Solution |
+|---|---|
+| Session amount/returnUrl cannot be tampered | Stored server-side; URL contains only UUID |
+| Session expiry | TTL index on `checkoutSessionExpiresAt` (30 min) |
+| Payment link expiry | TTL index on `paymentLinkExpiresAt` (optional, sparse) |
+| Single-use link enforcement | `status = 'completed'` after first payment; subsequent `POST /pay` returns 410 |
+| Merchant API key storage | bcrypt hash in DB; plaintext returned only once on key generation |
+| Webhook authenticity (merchant receiving) | `X-Webhook-Signature: sha256=<hmac(payload, webhookSecret)>` — mirrors Stripe/GitHub pattern |
+| Card data isolation | Raw card numbers never sent to or stored by the API; client-side tokenization (`tok_<random>`) |
+| PCI DSS SAQ A | The hosted payment pages (`/checkout/*`, `/pay/*`) are on the gateway domain; buyers enter card details only on those pages |
+
+### API Key Design
+
+Format: `lbpk_live_<32 random hex characters>` (44 chars total)
+
+The prefix `lbpk` identifies LeafyBank Payment Key, `live` distinguishes production from `test` environment keys. Only the first 8 characters (`keyPrefix`) are stored in plaintext for display purposes. The rest of the key is stored as a bcrypt hash. The plaintext key is returned exactly once, on key generation.
+
+### New Collections
+
+Two new MongoDB collections, both plaintext (no QE — neither contains CHD or PII at rest):
+
+**`checkoutSessionLog`** — TTL-indexed on `checkoutSessionExpiresAt`. Each document represents one checkout session with its full lifecycle from `pending` to `completed | expired | cancelled`.
+
+**`paymentLinkRecord`** — uniquely indexed on `paymentLinkCode`. Supports both `single_use` and `multi_use` links. TTL index on `paymentLinkExpiresAt` (sparse — only applies to links with explicit expiry).
+
+### Consequences
+
++ External merchants can integrate in minutes with a 3-step API call (create session, redirect, verify).
++ Payment links require no buyer session on the merchant side — suitable for invoices, QR codes, and social commerce.
++ Both patterns deliver SAQ A scope, the lowest PCI DSS compliance burden, to integrated merchants.
++ Webhook delivery gives merchants real-time notification without polling.
++ The gateway's core QE story is preserved: checkout and payment link services ultimately call `cardTransaction.service.createTransaction()`, so all card transactions go through the existing QE-protected `cardTransactionLog` collection.
+- Checkout sessions add a MongoDB write per payment attempt (TTL-expired sessions accumulate but are auto-deleted by the TTL index).
+- Payment link codes require collision-checking on generation (low probability with 8 alphanumeric chars = 36^8 space, but worth retrying on insert conflict).
+- Webhook delivery is best-effort in this demo (3 attempts with exponential backoff). A production system would require a persistent delivery queue (e.g., MongoDB change stream + worker).

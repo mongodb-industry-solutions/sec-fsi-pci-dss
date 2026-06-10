@@ -50,7 +50,7 @@ export default function UsersPage() {
     const t = getToken() ?? '';
     const user = t ? decodeToken(t) : null;
     if (user?.role === 'customer') {
-      router.replace('/demo/payment/history');
+      router.replace('/system/payment/history');
       return;
     }
     setToken(t);
@@ -298,7 +298,7 @@ export default function UsersPage() {
                   ) : linkedCase && !isClosed ? (
                     // Active case: direct link
                     <Link
-                      href={`/demo/investigation/${linkedCase.id}`}
+                      href={`/system/investigation/${linkedCase.id}`}
                       className="text-xs px-2 py-1 rounded bg-[#001E2B] text-[#00ED64] hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors font-medium"
                     >
                       Open case

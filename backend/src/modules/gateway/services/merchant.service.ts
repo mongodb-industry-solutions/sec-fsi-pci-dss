@@ -1,8 +1,24 @@
-// BIAN SD-89: Merchant Relations  -  prototype stub service
-// Full implementation scheduled for v5. Returns typed stub data.
+// BIAN SD-89: Merchant Relations service
+// Full MongoDB-backed implementation (replaces in-memory stub from v4 prototype).
 
+import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
-import { MerchantAgreementControlRecord, MerchantAgreementStatus } from '../models/merchantAgreement.model';
+import { randomBytes } from 'crypto';
+import { hash as bcryptHash, compare as bcryptCompare } from 'bcryptjs';
+import {
+  MERCHANT_AGREEMENT_COLLECTION,
+  MerchantAgreementControlRecord,
+  MerchantAgreementStatus,
+  MerchantApiKeyRecord,
+} from '../models/merchantAgreement.model';
+
+const BCRYPT_ROUNDS = 10;
+const API_KEY_PREFIX = 'lbpk_live_';
+const API_KEY_RANDOM_BYTES = 16; // 32 hex chars
+
+function generatePlaintextApiKey(): string {
+  return API_KEY_PREFIX + randomBytes(API_KEY_RANDOM_BYTES).toString('hex');
+}
 
 export interface CreateMerchantInput {
   merchantName: string;
@@ -16,84 +32,195 @@ export interface CreateMerchantInput {
   merchantSettlementSchedule?: 'T+1' | 'T+2' | 'T+3';
 }
 
-const STUB_MERCHANTS: Omit<MerchantAgreementControlRecord, 'merchantApiKeyHash'>[] = [
-  {
-    merchantAgreementInstanceReference: 'mrch-5732-001',
-    merchantName: 'TechStore Online',
-    merchantLegalEntityReference: 'TSO-TAX-001',
-    merchantCategoryCode: '5732',
-    merchantCountryCode: 'US',
-    merchantAgreementStatus: 'active',
-    merchantTier: 'standard',
-    merchantAllowedCurrencies: ['USD', 'EUR'],
-    merchantTransactionLimitAmount: 5000,
-    merchantWebhookEndpoint: 'https://techstore.example.com/webhooks/payments',
-    merchantSettlementSchedule: 'T+2',
-    merchantAverageTransactionAmount: 45.50,
-    merchantTransactionCount30d: 1240,
-    merchantRiskCategory: 'medium',
-    bianServiceDomain: 'MerchantRelations',
-    bianControlRecordType: 'MerchantAgreement',
-    recordCreatedDateTime: new Date('2026-01-01'),
-    recordUpdatedDateTime: new Date('2026-05-01'),
-    schemaVersion: 1,
-  },
-  {
-    merchantAgreementInstanceReference: 'mrch-5812-002',
-    merchantName: 'Coffee Shop Beta',
-    merchantLegalEntityReference: 'CSB-TAX-002',
-    merchantCategoryCode: '5812',
-    merchantCountryCode: 'US',
-    merchantAgreementStatus: 'active',
-    merchantTier: 'standard',
-    merchantAllowedCurrencies: ['USD'],
-    merchantTransactionLimitAmount: 500,
-    merchantSettlementSchedule: 'T+1',
-    merchantAverageTransactionAmount: 12.00,
-    merchantTransactionCount30d: 890,
-    merchantRiskCategory: 'high',
-    bianServiceDomain: 'MerchantRelations',
-    bianControlRecordType: 'MerchantAgreement',
-    recordCreatedDateTime: new Date('2026-01-15'),
-    recordUpdatedDateTime: new Date('2026-05-01'),
-    schemaVersion: 1,
-  },
-];
+export async function getMerchants(
+  db: Db,
+  filters: { status?: MerchantAgreementStatus; mcc?: string }
+) {
+  const query: Record<string, unknown> = {};
+  if (filters.status) query.merchantAgreementStatus = filters.status;
+  if (filters.mcc) query.merchantCategoryCode = filters.mcc;
 
-export async function getMerchants(filters: { status?: MerchantAgreementStatus; mcc?: string }) {
-  let results = [...STUB_MERCHANTS];
-  if (filters.status) results = results.filter((m) => m.merchantAgreementStatus === filters.status);
-  if (filters.mcc) results = results.filter((m) => m.merchantCategoryCode === filters.mcc);
+  const results = await db
+    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
+    .find(query)
+    .project({ merchantApiKeys: 0 }) // Never expose key hashes
+    .toArray();
+
   return { results, total: results.length };
 }
 
-export async function getMerchantById(id: string) {
-  return STUB_MERCHANTS.find((m) => m.merchantAgreementInstanceReference === id) ?? null;
+export async function getMerchantById(db: Db, id: string) {
+  const merchant = await db
+    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
+    .findOne(
+      { merchantAgreementInstanceReference: id } as Partial<MerchantAgreementControlRecord>,
+      { projection: { merchantApiKeys: 0, merchantWebhookSecret: 0 } }
+    );
+  return merchant ?? null;
 }
 
-export async function createMerchant(input: CreateMerchantInput) {
+export async function createMerchant(db: Db, input: CreateMerchantInput) {
   const id = uuidv4();
+  const now = new Date();
+
+  // Generate initial API key
+  const plaintext = generatePlaintextApiKey();
+  const keyHashBcrypt = await bcryptHash(plaintext, BCRYPT_ROUNDS);
+  const initialKey: MerchantApiKeyRecord = {
+    keyId: uuidv4(),
+    keyPrefix: plaintext.slice(0, 12),
+    keyHashBcrypt,
+    keyStatus: 'active',
+    keyCreatedDateTime: now,
+  };
+
+  const riskMcc = ['5812', '6011', '7995'];
+  const merchantRiskCategory =
+    riskMcc.includes(input.merchantCategoryCode) ? 'high' : 'low';
+
+  const merchant: MerchantAgreementControlRecord = {
+    merchantAgreementInstanceReference: id,
+    merchantName: input.merchantName,
+    merchantLegalEntityReference: input.merchantLegalEntityReference,
+    merchantCategoryCode: input.merchantCategoryCode,
+    merchantCountryCode: input.merchantCountryCode,
+    merchantAgreementStatus: 'active',
+    merchantTier: input.merchantTier ?? 'standard',
+    merchantAllowedCurrencies: input.merchantAllowedCurrencies ?? ['USD'],
+    merchantTransactionLimitAmount: input.merchantTransactionLimitAmount ?? 10000,
+    merchantWebhookEndpoint: input.merchantWebhookEndpoint,
+    merchantWebhookSecret: randomBytes(20).toString('hex'),
+    merchantSettlementSchedule: input.merchantSettlementSchedule ?? 'T+2',
+    merchantAverageTransactionAmount: 0,
+    merchantTransactionCount30d: 0,
+    merchantRiskCategory,
+    merchantApiKeys: [initialKey],
+    bianServiceDomain: 'Merchant Relations',
+    bianControlRecordType: 'MerchantAgreementProcedure',
+    recordCreatedDateTime: now,
+    recordUpdatedDateTime: now,
+    schemaVersion: 1,
+  };
+
+  await db.collection(MERCHANT_AGREEMENT_COLLECTION).insertOne(merchant as object);
+
   return {
     merchantAgreementInstanceReference: id,
     merchantName: input.merchantName,
-    merchantCategoryCode: input.merchantCategoryCode,
     merchantAgreementStatus: 'active' as MerchantAgreementStatus,
-    merchantRiskCategory: 'low' as const,
-    // API key returned ONCE on creation; never stored in plaintext after this
-    merchantApiKey: `mk_live_${uuidv4().replace(/-/g, '')}`,
-    _stub: true,
-    _note: 'v5: this will persist to merchantAgreement collection with merchantApiKeyHash as QE:none',
+    merchantRiskCategory,
+    // Plaintext key returned ONCE - never retrievable again
+    merchantApiKey: plaintext,
   };
 }
 
-export async function updateMerchant(id: string, patch: Partial<CreateMerchantInput>) {
-  const existing = await getMerchantById(id);
-  if (!existing) return null;
-  return { ...existing, ...patch, recordUpdatedDateTime: new Date(), _stub: true };
+export async function updateMerchant(
+  db: Db,
+  id: string,
+  patch: Partial<Pick<
+    MerchantAgreementControlRecord,
+    | 'merchantTransactionLimitAmount'
+    | 'merchantWebhookEndpoint'
+    | 'merchantSettlementSchedule'
+    | 'merchantAgreementStatus'
+    | 'merchantAllowedCurrencies'
+  >>
+) {
+  const result = await db.collection(MERCHANT_AGREEMENT_COLLECTION).findOneAndUpdate(
+    { merchantAgreementInstanceReference: id },
+    { $set: { ...patch, recordUpdatedDateTime: new Date() } },
+    { returnDocument: 'after', projection: { merchantApiKeys: 0, merchantWebhookSecret: 0 } }
+  );
+  return result ?? null;
 }
 
-export async function registerWebhook(merchantId: string, url: string) {
-  const existing = await getMerchantById(merchantId);
-  if (!existing) return null;
-  return { merchantAgreementInstanceReference: merchantId, merchantWebhookEndpoint: url, _stub: true };
+export async function registerWebhook(db: Db, merchantId: string, url: string) {
+  const result = await db.collection(MERCHANT_AGREEMENT_COLLECTION).findOneAndUpdate(
+    { merchantAgreementInstanceReference: merchantId },
+    { $set: { merchantWebhookEndpoint: url, recordUpdatedDateTime: new Date() } },
+    { returnDocument: 'after', projection: { merchantWebhookEndpoint: 1, merchantAgreementInstanceReference: 1 } }
+  );
+  if (!result) return null;
+  return {
+    merchantAgreementInstanceReference: merchantId,
+    merchantWebhookEndpoint: url,
+  };
+}
+
+export async function generateApiKey(
+  db: Db,
+  merchantId: string
+): Promise<{ keyId: string; keyPrefix: string; merchantApiKey: string } | null> {
+  const merchant = await db
+    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
+    .findOne({ merchantAgreementInstanceReference: merchantId } as Partial<MerchantAgreementControlRecord>);
+
+  if (!merchant) return null;
+
+  const plaintext = generatePlaintextApiKey();
+  const keyHashBcrypt = await bcryptHash(plaintext, BCRYPT_ROUNDS);
+  const now = new Date();
+
+  const newKey: MerchantApiKeyRecord = {
+    keyId: uuidv4(),
+    keyPrefix: plaintext.slice(0, 12),
+    keyHashBcrypt,
+    keyStatus: 'active',
+    keyCreatedDateTime: now,
+  };
+
+  await db.collection(MERCHANT_AGREEMENT_COLLECTION).updateOne(
+    { merchantAgreementInstanceReference: merchantId },
+    { $push: { merchantApiKeys: newKey }, $set: { recordUpdatedDateTime: now } } as object
+  );
+
+  return {
+    keyId: newKey.keyId,
+    keyPrefix: newKey.keyPrefix,
+    merchantApiKey: plaintext, // Returned ONCE - never stored in plaintext
+  };
+}
+
+export async function revokeApiKey(
+  db: Db,
+  merchantId: string,
+  keyId: string
+): Promise<'ok' | 'not_found'> {
+  const result = await db.collection(MERCHANT_AGREEMENT_COLLECTION).updateOne(
+    {
+      merchantAgreementInstanceReference: merchantId,
+      'merchantApiKeys.keyId': keyId,
+    },
+    { $set: { 'merchantApiKeys.$.keyStatus': 'revoked', recordUpdatedDateTime: new Date() } }
+  );
+
+  return result.matchedCount > 0 ? 'ok' : 'not_found';
+}
+
+export async function verifyApiKey(
+  db: Db,
+  merchantId: string,
+  plaintext: string
+): Promise<boolean> {
+  const merchant = await db
+    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
+    .findOne({ merchantAgreementInstanceReference: merchantId } as Partial<MerchantAgreementControlRecord>);
+
+  if (!merchant) return false;
+
+  const activeKeys = merchant.merchantApiKeys?.filter((k) => k.keyStatus === 'active') ?? [];
+
+  for (const key of activeKeys) {
+    const match = await bcryptCompare(plaintext, key.keyHashBcrypt);
+    if (match) {
+      // Update last used timestamp (fire-and-forget)
+      db.collection(MERCHANT_AGREEMENT_COLLECTION).updateOne(
+        { merchantAgreementInstanceReference: merchantId, 'merchantApiKeys.keyId': key.keyId },
+        { $set: { 'merchantApiKeys.$.keyLastUsedDateTime': new Date() } }
+      ).catch(() => {});
+      return true;
+    }
+  }
+
+  return false;
 }

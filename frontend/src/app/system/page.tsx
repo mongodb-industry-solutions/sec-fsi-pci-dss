@@ -10,10 +10,10 @@ import { Tooltip } from '../../components/Tooltip';
 import { useDebugMode } from '../../lib/debugMode';
 
 const ROLE_REDIRECTS: Record<string, string> = {
-  customer: '/demo/payment/history',
-  level1_analyst: '/demo/investigation',
-  level2_investigator: '/demo/investigation',
-  security_auditor: '/demo/audit',
+  customer: '/system/payment/history',
+  level1_analyst: '/system/investigation',
+  level2_investigator: '/system/investigation',
+  security_auditor: '/system/audit',
 };
 
 const FLOW_TYPE_LABELS: Record<string, string> = {
@@ -89,7 +89,7 @@ export default function DemoLoginPage() {
       const { token } = await api.auth.login({ email: selectedEmail, password, domain: selectedDomain });
       setToken(token);
       const payload = decodeToken(token);
-      const redirect = payload ? (ROLE_REDIRECTS[payload.role] ?? '/demo') : '/demo';
+      const redirect = payload ? (ROLE_REDIRECTS[payload.role] ?? '/system') : '/system';
       router.push(redirect);
     } catch (err) {
       setError((err as Error).message ?? 'Login failed');

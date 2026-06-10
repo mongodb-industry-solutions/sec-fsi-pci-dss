@@ -1710,3 +1710,248 @@ runSeed().then(() => process.exit(0)).catch(err => { console.error(err); process
   }
 }
 ```
+
+---
+
+## 8. Ch-04 Payment Integration: Redirect Checkout + Payment Links
+
+### 8.1 New TypeScript Models
+
+#### `CheckoutSessionRecord` (SD-64 — `checkoutSessionLog`)
+
+```typescript
+// backend/src/modules/gateway/models/checkoutSession.model.ts
+export const CHECKOUT_SESSION_COLLECTION = 'checkoutSessionLog';
+
+export type CheckoutSessionStatus = 'pending' | 'completed' | 'expired' | 'cancelled';
+
+export interface CheckoutSessionRecord {
+  bianServiceDomain: 'Payment Order';
+  bianControlRecordType: 'CheckoutSession';
+  schemaVersion: 1;
+  checkoutSessionInstanceReference: string;        // UUID
+  merchantAgreementInstanceReference: string;      // FK → merchantAgreementProcedure
+  merchantName: string;
+  checkoutSessionAmount: number;
+  checkoutSessionCurrency: string;                 // ISO 4217
+  checkoutSessionDescription: string;
+  checkoutSessionStatus: CheckoutSessionStatus;
+  checkoutSessionReturnUrl: string;
+  checkoutSessionCancelUrl: string;
+  checkoutSessionMerchantReference: string;        // Merchant's own order ID
+  checkoutSessionCreatedDateTime: Date;
+  checkoutSessionExpiresAt: Date;                  // TTL index target — 30 min default
+  checkoutSessionCompletedDateTime?: Date;
+  cardTransactionInstanceReference?: string;       // Set on completion
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+}
+```
+
+#### `PaymentLinkRecord` (SD-64 — `paymentLinkRecord`)
+
+```typescript
+// backend/src/modules/gateway/models/paymentLink.model.ts
+export const PAYMENT_LINK_COLLECTION = 'paymentLinkRecord';
+
+export type PaymentLinkStatus = 'active' | 'completed' | 'expired' | 'deactivated';
+export type PaymentLinkUsageType = 'single_use' | 'multi_use';
+
+export interface PaymentLinkRecord {
+  bianServiceDomain: 'Payment Order';
+  bianControlRecordType: 'PaymentLink';
+  schemaVersion: 1;
+  paymentLinkInstanceReference: string;            // UUID
+  paymentLinkCode: string;                         // 8-char, unique index
+  merchantAgreementInstanceReference: string;      // FK → merchantAgreementProcedure
+  merchantName: string;
+  paymentLinkAmount: number;
+  paymentLinkCurrency: string;                     // ISO 4217
+  paymentLinkDescription: string;
+  paymentLinkCustomerMessage?: string;
+  paymentLinkStatus: PaymentLinkStatus;
+  paymentLinkUsageType: PaymentLinkUsageType;
+  paymentLinkCurrentUses: number;
+  paymentLinkMaxUses?: number;                     // multi_use cap
+  paymentLinkCreatedDateTime: Date;
+  paymentLinkExpiresAt?: Date;                     // Sparse TTL index — optional
+  paymentLinkTransactionReferences: string[];      // FK array → cardTransactionLog
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+}
+```
+
+#### `MerchantAgreementControlRecord` update (SD-89 — `merchantAgreementProcedure`)
+
+Added to the existing merchant model:
+
+```typescript
+export interface MerchantApiKeyRecord {
+  keyId: string;           // UUID — used for revocation
+  keyPrefix: string;       // First 12 chars for display (e.g., "lbpk_live_ab")
+  keyHashBcrypt: string;   // bcrypt hash — NEVER store plaintext
+  keyStatus: 'active' | 'revoked';
+  keyCreatedDateTime: Date;
+  keyLastUsedDateTime?: Date;
+}
+
+// Added fields on MerchantAgreementControlRecord:
+merchantApiKeys: MerchantApiKeyRecord[];
+merchantWebhookSecret?: string;          // HMAC signing secret for webhook delivery
+```
+
+Key format: `lbpk_live_<32 hex chars>` — plaintext returned once on generation; only bcrypt hash persisted.
+
+---
+
+### 8.2 New Index Strategy
+
+```typescript
+// merchantAgreementProcedure
+{ merchantAgreementInstanceReference: 1 }  // unique
+{ merchantAgreementStatus: 1 }
+{ merchantCategoryCode: 1 }
+
+// checkoutSessionLog
+{ checkoutSessionInstanceReference: 1 }    // unique
+{ merchantAgreementInstanceReference: 1 }
+{ checkoutSessionMerchantReference: 1, merchantAgreementInstanceReference: 1 }
+{ checkoutSessionExpiresAt: 1 }             // TTL: expireAfterSeconds: 0
+
+// paymentLinkRecord
+{ paymentLinkInstanceReference: 1 }        // unique
+{ paymentLinkCode: 1 }                      // unique
+{ merchantAgreementInstanceReference: 1 }
+{ paymentLinkStatus: 1 }
+{ paymentLinkExpiresAt: 1 }                 // Sparse TTL: expireAfterSeconds: 0, sparse: true
+```
+
+---
+
+### 8.3 API Contracts
+
+All routes are under the `/api/v1` prefix.
+
+#### Redirect Checkout (Method A) — prefix `/checkout`
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| `POST` | `/checkout/sessions` | JWT | Create checkout session; returns `paymentPageUrl` |
+| `GET` | `/checkout/sessions/:id` | Public | Get session display data; used by hosted payment page |
+| `POST` | `/checkout/sessions/:id/pay` | Public | Process card payment; returns `redirectUrl` |
+| `DELETE` | `/checkout/sessions/:id` | JWT | Cancel session |
+
+**POST `/checkout/sessions` request:**
+```json
+{
+  "merchantAgreementInstanceReference": "uuid",
+  "amount": 99.00,
+  "currency": "USD",
+  "description": "Order #1234",
+  "returnUrl": "https://merchant.com/success",
+  "cancelUrl": "https://merchant.com/cancel",
+  "merchantReference": "ORDER-1234"
+}
+```
+
+**POST `/checkout/sessions` response (201):**
+```json
+{
+  "checkoutSessionInstanceReference": "uuid",
+  "paymentPageUrl": "http://localhost:3000/checkout/{id}",
+  "expiresAt": "2026-06-10T12:30:00Z"
+}
+```
+
+**POST `/checkout/sessions/:id/pay` request:**
+```json
+{
+  "cardToken": "tok_abc123...",
+  "cardholderName": "Jane Smith",
+  "cardExpiryMonth": "12",
+  "cardExpiryYear": "2027"
+}
+```
+
+**POST `/checkout/sessions/:id/pay` response (200):**
+```json
+{
+  "success": true,
+  "cardTransactionInstanceReference": "uuid",
+  "redirectUrl": "https://merchant.com/success?status=success&session={id}"
+}
+```
+
+Error codes: 404 not found, 409 already completed, 410 expired/cancelled.
+
+#### Payment Links (Method B) — prefix `/payment-links`
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| `POST` | `/payment-links` | JWT | Create shareable payment link |
+| `GET` | `/payment-links` | JWT | List links for a merchant |
+| `GET` | `/payment-links/:code` | Public | Resolve link by 8-char code |
+| `POST` | `/payment-links/:code/pay` | Public | Process card payment |
+| `PATCH` | `/payment-links/:id` | JWT | Deactivate link |
+
+**POST `/payment-links` request:**
+```json
+{
+  "merchantAgreementInstanceReference": "uuid",
+  "amount": 49.99,
+  "currency": "USD",
+  "description": "Consulting Session",
+  "customerMessage": "Thank you for booking!",
+  "usageType": "single_use"
+}
+```
+
+**POST `/payment-links` response (201):**
+```json
+{
+  "paymentLinkInstanceReference": "uuid",
+  "paymentLinkCode": "ab3x7yzm",
+  "paymentUrl": "http://localhost:3000/pay/ab3x7yzm"
+}
+```
+
+Error codes: 404 merchant not found, 410 link expired/deactivated/completed.
+
+#### Merchant Key Management — prefix `/merchants`
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| `POST` | `/merchants/:id/keys` | JWT | Generate new API key (plaintext returned once) |
+| `DELETE` | `/merchants/:id/keys/:keyId` | JWT | Revoke API key |
+
+**POST `/merchants/:id/keys` response (201):**
+```json
+{
+  "keyId": "uuid",
+  "keyPrefix": "lbpk_live_ab",
+  "merchantApiKey": "lbpk_live_<32hex>"
+}
+```
+
+---
+
+### 8.4 PCI DSS + Security Notes
+
+| Concern | Implementation |
+|---|---|
+| SAQ A scope | Card data entered only on `{FRONTEND_URL}/checkout/` and `{FRONTEND_URL}/pay/` — merchant domain never handles CHD |
+| Card tokenization | Frontend generates `tok_<random>` surrogate; raw PAN never sent to backend API |
+| API key storage | bcrypt hash only (`bcryptjs`, 10 rounds); plaintext returned once at generation, never stored |
+| Webhook integrity | `X-Webhook-Signature: sha256=<hmac>` signed with per-merchant secret; constant-time comparison |
+| Session TTL | MongoDB TTL index on `checkoutSessionExpiresAt` auto-deletes expired sessions after 30 min |
+| Payment link codes | 8-char charset `[a-z2-9]` excluding ambiguous characters (O/0, I/l); unique index enforced |
+
+---
+
+### 8.5 FRONTEND_URL Environment Variable
+
+The `FRONTEND_URL` env var is used to construct hosted page URLs:
+- `paymentPageUrl = ${FRONTEND_URL}/checkout/{sessionId}`
+- `paymentUrl = ${FRONTEND_URL}/pay/{linkCode}`
+
+Defaults to `http://localhost:3000` when not set.

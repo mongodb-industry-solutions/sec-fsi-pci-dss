@@ -1,6 +1,15 @@
 // BIAN SD-89: Merchant Relations Control Record
 
-export const MERCHANT_AGREEMENT_COLLECTION = 'merchantAgreement';
+export const MERCHANT_AGREEMENT_COLLECTION = 'merchantAgreementProcedure';
+
+export interface MerchantApiKeyRecord {
+  keyId: string;            // UUID
+  keyPrefix: string;        // First 8 chars for display: "lbpk_liv..."
+  keyHashBcrypt: string;    // bcrypt(fullPlaintextKey, 12) - plaintext never stored
+  keyStatus: 'active' | 'revoked';
+  keyCreatedDateTime: Date;
+  keyLastUsedDateTime?: Date;
+}
 
 export interface MerchantAgreementControlRecord {
   // Identifiers
@@ -15,7 +24,8 @@ export interface MerchantAgreementControlRecord {
   // Gateway configuration
   merchantAllowedCurrencies: string[];              // ISO 4217 codes
   merchantTransactionLimitAmount: number;           // Per-transaction limit (base currency)
-  merchantWebhookEndpoint?: string;                 // Notification URL
+  merchantWebhookEndpoint?: string;                 // Notification URL for payment events
+  merchantWebhookSecret?: string;                   // HMAC-SHA256 signing secret for webhook delivery
   merchantSettlementSchedule: SettlementSchedule;
 
   // Risk profile (derived, updated on settlement)
@@ -23,12 +33,12 @@ export interface MerchantAgreementControlRecord {
   merchantTransactionCount30d: number;
   merchantRiskCategory: MerchantRiskCategory;
 
-  // QE:none  -  API key hash (not CHD, but operationally sensitive)
-  merchantApiKeyHash: string;
+  // API key management (replaces single merchantApiKeyHash)
+  merchantApiKeys: MerchantApiKeyRecord[];
 
   // BIAN metadata
-  bianServiceDomain: 'MerchantRelations';
-  bianControlRecordType: 'MerchantAgreement';
+  bianServiceDomain: 'Merchant Relations';
+  bianControlRecordType: 'MerchantAgreementProcedure';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
   schemaVersion: number;

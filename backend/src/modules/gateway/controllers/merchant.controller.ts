@@ -2,7 +2,7 @@
 // Routes mounted at /merchants → /api/v1/merchants
 
 import { FastifyInstance } from 'fastify';
-import { getMerchants, getMerchantById, createMerchant, updateMerchant, registerWebhook } from '../services/merchant.service';
+import { getMerchants, getMerchantById, createMerchant, updateMerchant, registerWebhook, generateApiKey, revokeApiKey } from '../services/merchant.service';
 
 export async function merchantController(fastify: FastifyInstance) {
 
@@ -54,7 +54,7 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
     },
   }, async (request, reply) => {
     const { status, mcc } = request.query as { status?: string; mcc?: string };
-    const result = await getMerchants({ status: status as never, mcc });
+    const result = await getMerchants(fastify.db, { status: status as never, mcc });
     return reply.send(result);
   });
 
@@ -101,11 +101,11 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
       },
     },
   }, async (request, reply) => {
-    const body = request.body as Parameters<typeof createMerchant>[0];
+    const body = request.body as Parameters<typeof createMerchant>[1];
     if (!body.merchantName || !body.merchantCategoryCode) {
       return reply.status(400).send({ error: 'merchantName and merchantCategoryCode are required' });
     }
-    const result = await createMerchant(body);
+    const result = await createMerchant(fastify.db, body);
     return reply.status(201).send(result);
   });
 
@@ -141,7 +141,7 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const merchant = await getMerchantById(id);
+    const merchant = await getMerchantById(fastify.db, id);
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
     return reply.send(merchant);
   });
@@ -174,7 +174,7 @@ Allowed fields: \`merchantTransactionLimitAmount\`, \`merchantWebhookEndpoint\`,
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const patch = request.body as Record<string, unknown>;
-    const result = await updateMerchant(id, patch as never);
+    const result = await updateMerchant(fastify.db, id, patch as never);
     if (!result) return reply.status(404).send({ error: 'Merchant not found' });
     return reply.send(result);
   });
@@ -213,8 +213,65 @@ Delivery includes up to 3 retry attempts with exponential backoff.`,
     const { id } = request.params as { id: string };
     const { webhookEndpoint } = request.body as { webhookEndpoint: string };
     if (!webhookEndpoint) return reply.status(400).send({ error: 'webhookEndpoint is required' });
-    const result = await registerWebhook(id, webhookEndpoint);
+    const result = await registerWebhook(fastify.db, id, webhookEndpoint);
     if (!result) return reply.status(404).send({ error: 'Merchant not found' });
     return reply.send(result);
+  });
+
+  // POST /api/v1/merchants/:id/keys
+  fastify.post('/:id/keys', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Generate a new API key for a merchant (SD-89)',
+      description: `Generates a new API key (\`lbpk_live_<32hex>\`) for the specified merchant.
+
+**Security:** The plaintext key is returned **once** in this response. Only a bcrypt hash is stored. Store the key securely immediately - it cannot be retrieved again.`,
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            keyId: { type: 'string', description: 'UUID to reference this key (for revocation).' },
+            keyPrefix: { type: 'string', description: 'First 12 chars for display: "lbpk_live_ab".' },
+            merchantApiKey: { type: 'string', description: 'Full API key. Store securely. Shown once only.' },
+          },
+        },
+        401: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const result = await generateApiKey(fastify.db, id);
+    if (!result) return reply.status(404).send({ error: 'Merchant not found' });
+    return reply.status(201).send(result);
+  });
+
+  // DELETE /api/v1/merchants/:id/keys/:keyId
+  fastify.delete('/:id/keys/:keyId', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Revoke a merchant API key (SD-89)',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['id', 'keyId'],
+        properties: { id: { type: 'string' }, keyId: { type: 'string' } },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: { revoked: { type: 'boolean' }, keyId: { type: 'string' } },
+        },
+        401: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id, keyId } = request.params as { id: string; keyId: string };
+    const result = await revokeApiKey(fastify.db, id, keyId);
+    if (result === 'not_found') return reply.status(404).send({ error: 'Merchant or key not found' });
+    return reply.send({ revoked: true, keyId });
   });
 }

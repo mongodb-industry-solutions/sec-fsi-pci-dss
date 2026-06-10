@@ -272,7 +272,7 @@ export default function DemoPaymentPage() {
             {/* Action row - global, outside panels, same pattern as Step 2 */}
             {error && <p className="text-red-600 text-sm">{error}</p>}
             <div className="flex gap-3">
-              <Link href="/demo/payment/history"
+              <Link href="/system/payment/history"
                 className="flex-1 sm:flex-none sm:w-32 border rounded-lg py-2.5 text-sm text-center text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancel
               </Link>
@@ -538,7 +538,7 @@ export default function DemoPaymentPage() {
                   caseId={result.caseId}
                   severity="high"
                   caseRef={`FD-${result.caseId.slice(-6).toUpperCase()}`}
-                  investigationPath="/demo/investigation"
+                  investigationPath="/system/investigation"
                 />
               )}
 
@@ -551,7 +551,7 @@ export default function DemoPaymentPage() {
               )}
             </div>
 
-            <button onClick={() => router.push('/demo/payment/history')}
+            <button onClick={() => router.push('/system/payment/history')}
               className="w-full border rounded-lg py-2.5 text-sm text-gray-700 hover:bg-gray-50 bg-white">
               View My Transactions
             </button>

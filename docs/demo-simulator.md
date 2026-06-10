@@ -986,3 +986,125 @@ backend/
 | 5 | v2 role selector in simulator | Resolved: dropdown inside Investigation view header |
 | 6 | MS Entra ID auth (v2) | Pending: extension hook designed, implementation deferred |
 | 7 | v3 AI agent (Magenta) integration point | Pending: defined in roadmap.md v3 FR, design TBD |
+
+---
+
+## 10. Ch-04 Payment Integration Routes
+
+Three new routes added in Ch-04. Two are **public** (no auth, no sidebar); one is inside the demo layout.
+
+### 10.1 Route Map
+
+| Route | Layout | Auth | Purpose |
+|---|---|---|---|
+| `/checkout/[sessionId]` | Standalone (no sidebar) | None | Hosted Payment Page for Redirect Checkout |
+| `/pay/[linkCode]` | Standalone (no sidebar) | None | Payment Link Landing Page |
+| `/demo/merchant` | Demo layout (sidebar) | JWT (any role) | Merchant Sandbox — integration demo tool |
+
+### 10.2 Hosted Payment Page — `/checkout/[sessionId]`
+
+Public page. Buyer is redirected here by the merchant after calling `POST /api/v1/checkout/sessions`.
+
+**State machine:**
+
+| State | Trigger | UI |
+|---|---|---|
+| `loading` | On mount | Spinner |
+| `ready` | Session loaded, status `pending` | Card form |
+| `paying` | Form submit | Submit button disabled, "Processing..." |
+| `success` | `POST /pay` returns 200 | Success screen with countdown redirect |
+| `expired` | Session `status = expired/cancelled` | Error screen with cancel URL link |
+| `completed` | Session `status = completed` | "Already paid" screen |
+| `error` | 404 or network failure | Error screen |
+
+**Card form fields:**
+- Cardholder name (required)
+- Card number (16 digits, last 4 used to generate display mask)
+- Expiry month / year (MM / YY)
+- CVV (UI only — not sent to backend)
+
+**Tokenization (demo):** Frontend generates `tok_<12 random hex><last4>` as the card token. Raw PAN is never sent to the backend. This is the PCI DSS SAQ A pattern.
+
+**On success:** `router.push(redirectUrl)` after 2 seconds — `redirectUrl` is `returnUrl?status=success&session={id}` from the pay response.
+
+**On cancel:** `<a href={cancelUrl}>Cancel and return to merchant</a>` link at the bottom.
+
+### 10.3 Payment Link Landing Page — `/pay/[linkCode]`
+
+Public page. Buyer opens link shared by merchant via email, QR code, or social media.
+
+**State machine:**
+
+| State | Trigger | UI |
+|---|---|---|
+| `loading` | On mount | Spinner |
+| `ready` | Link loaded, status `active` | Card form + optional customer message |
+| `paying` | Form submit | Submit button disabled |
+| `success` | `POST /pay` returns 200 | Inline success screen with transaction ref |
+| `unavailable` | Link status `completed/expired/deactivated` | Status-specific message |
+| `error` | 404 or network failure | Not found screen |
+
+**Differences from checkout page:**
+- No timer or "session expires in X min" notice (links are long-lived)
+- No cancel link (buyer just closes the tab)
+- Shows `paymentLinkCustomerMessage` if present (merchant-provided context)
+- Optional email field for linking payment to customer record
+- Success is inline (no redirect) — buyer sees confirmation on the same page
+
+**Status messages:**
+- `completed` (single_use): "This payment link has already been used."
+- `expired`: "This payment link has expired."
+- `deactivated`: "This payment link is no longer active."
+
+### 10.4 Merchant Sandbox — `/demo/merchant`
+
+Inside the demo layout. Accessible to all authenticated roles via the "Merchant" nav item in the sidebar.
+
+**Purpose:** Allows demo viewers to act as a merchant and test both payment integration patterns without leaving the browser.
+
+**Tab layout:**
+
+| Tab | Label | Content |
+|---|---|---|
+| `checkout` | Checkout Session | Create session form + paymentPageUrl display with copy/open |
+| `links` | Payment Links | Create link form + active links list with deactivate action |
+| `keys` | API Keys | Generate key (shown once) |
+| `webhook` | Webhook | Configure HTTPS endpoint for payment event callbacks |
+
+**Merchant selector:** Dropdown at the top populated from `GET /api/v1/merchants`. Changing selection resets all result state.
+
+**Checkout Session tab:**
+- Form: amount, currency, description, merchantReference, returnUrl, cancelUrl
+- On submit: `POST /api/v1/checkout/sessions` with JWT
+- Result: green panel with `paymentPageUrl` + copy button + external link button
+
+**Payment Links tab:**
+- Create form: amount, currency, description, customerMessage (optional), usageType (single_use/multi_use)
+- On submit: `POST /api/v1/payment-links` with JWT
+- Result: green panel with `paymentUrl` + code + copy/open buttons
+- Active links list: fetched from `GET /api/v1/payment-links?merchantId=...`
+  - Shows: code, status badge, usage type, amount, use count
+  - Deactivate button (calls `PATCH /api/v1/payment-links/:id`)
+  - External link button (opens `/pay/{code}` in new tab)
+
+**API Keys tab:**
+- "Generate New API Key" button
+- On generate: shows full `lbpk_live_<32hex>` key in green panel with copy button
+- Warning: "Shown once. Save it now."
+- Shows keyId and keyPrefix for reference
+
+**Webhook tab:**
+- HTTPS URL input
+- "Save Webhook URL" button (calls `POST /api/v1/merchants/:id/webhooks`)
+- Event documentation: `checkout.completed`, `payment_link.completed`
+- Signature info: `X-Webhook-Signature: sha256=<hmac>`
+
+### 10.5 Sidebar Navigation
+
+`Store` icon added to `DemoSidebar` for all roles pointing to `/demo/merchant`.
+
+```typescript
+{ label: 'Merchant', path: '/demo/merchant', icon: Store }
+```
+
+Added to: `level1_analyst`, `level2_investigator`, `security_auditor`, `customer`.

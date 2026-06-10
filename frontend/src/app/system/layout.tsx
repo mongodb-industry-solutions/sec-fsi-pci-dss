@@ -8,7 +8,7 @@ import { DemoSidebar, MobileBottomNav } from '../../components/DemoSidebar';
 import Link from 'next/link';
 import { Settings, LogOut } from 'lucide-react';
 
-const NO_SHELL_PATHS = ['/demo'];
+const NO_SHELL_PATHS = ['/system'];
 
 function DemoShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -17,23 +17,23 @@ function DemoShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<ReturnType<typeof decodeToken>>(null);
 
   useEffect(() => {
-    if (pathname === '/demo') return;
+    if (pathname === '/system') return;
 
     const token = getToken();
     if (!token || isTokenExpired(token)) {
-      router.replace('/demo');
+      router.replace('/system');
       return;
     }
 
     const payload = decodeToken(token);
     setUser(payload);
 
-    if (payload && pathname === '/demo') {
+    if (payload && pathname === '/system') {
       const roleRedirects: Record<string, string> = {
-        customer:            '/demo/payment/history',
-        level1_analyst:      '/demo/investigation',
-        level2_investigator: '/demo/investigation',
-        security_auditor:    '/demo/audit',
+        customer:            '/system/payment/history',
+        level1_analyst:      '/system/investigation',
+        level2_investigator: '/system/investigation',
+        security_auditor:    '/system/audit',
       };
       const redirect = roleRedirects[payload.role];
       if (redirect) router.replace(redirect);
@@ -45,12 +45,12 @@ function DemoShell({ children }: { children: React.ReactNode }) {
   }
 
   const ROLE_HOME: Record<string, string> = {
-    customer:            '/demo/payment/history',
-    level1_analyst:      '/demo/investigation',
-    level2_investigator: '/demo/investigation',
-    security_auditor:    '/demo/audit',
+    customer:            '/system/payment/history',
+    level1_analyst:      '/system/investigation',
+    level2_investigator: '/system/investigation',
+    security_auditor:    '/system/audit',
   };
-  const roleHome = (user && ROLE_HOME[user.role]) ?? '/demo/payment/history';
+  const roleHome = (user && ROLE_HOME[user.role]) ?? '/system/payment/history';
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -61,13 +61,13 @@ function DemoShell({ children }: { children: React.ReactNode }) {
         </Link>
         <div className="flex items-center gap-2 sm:gap-3 text-sm min-w-0">
           {user && (
-            <Link href="/demo/profile" className="hidden sm:inline bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded truncate max-w-48 hover:bg-blue-500/30 transition-colors">
+            <Link href="/system/profile" className="hidden sm:inline bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded truncate max-w-48 hover:bg-blue-500/30 transition-colors">
               {user.name} · {ROLE_LABELS[user.role] ?? user.role}
             </Link>
           )}
           {/* Compact user chip on small screens */}
           {user && (
-            <Link href="/demo/profile" className="sm:hidden bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded text-xs truncate max-w-24 hover:bg-blue-500/30 transition-colors">
+            <Link href="/system/profile" className="sm:hidden bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded text-xs truncate max-w-24 hover:bg-blue-500/30 transition-colors">
               {user.name.split(' ')[0]}
             </Link>
           )}
@@ -83,7 +83,7 @@ function DemoShell({ children }: { children: React.ReactNode }) {
             <Settings size={13} />
             <span className="hidden sm:inline">{debugMode ? 'Debug ON' : 'Debug'}</span>
           </button>
-          <Link href="/demo" className="inline-flex items-center gap-1 text-gray-400 hover:text-white shrink-0">
+          <Link href="/system" className="inline-flex items-center gap-1 text-gray-400 hover:text-white shrink-0">
             <LogOut size={14} />
             <span className="hidden sm:inline text-sm">Sign out</span>
           </Link>

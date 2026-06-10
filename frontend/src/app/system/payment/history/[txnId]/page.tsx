@@ -160,7 +160,7 @@ export default function TransactionDetailPage() {
     <PageShell {...shell}>
       <div className="text-center py-12 text-gray-500">
         <p className="mb-3">Transaction not found.</p>
-        <Link href="/demo/payment/history" className="inline-flex items-center gap-1.5 text-blue-600 hover:underline text-sm">
+        <Link href="/system/payment/history" className="inline-flex items-center gap-1.5 text-blue-600 hover:underline text-sm">
           ← Back to transactions
         </Link>
       </div>
@@ -171,7 +171,7 @@ export default function TransactionDetailPage() {
 
   return (
     <PageShell {...shell}>
-      <Link href="/demo/payment/history" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline mb-4">
+      <Link href="/system/payment/history" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline mb-4">
         ← Back to transactions
       </Link>
 
