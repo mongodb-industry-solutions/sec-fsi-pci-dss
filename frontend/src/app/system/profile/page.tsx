@@ -78,6 +78,26 @@ const STATUS_COLORS: Record<string, string> = {
   closed:    'bg-red-100 text-red-800',
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  active:       'Active',
+  agreed:       'Approved',
+  under_review: 'Under Review',
+  initiated:    'Pending',
+  rejected:     'Not Approved',
+  suspended:    'Suspended',
+  closed:       'Closed',
+};
+
+const MERCHANT_STATUS_COLORS: Record<string, string> = {
+  active:       'bg-green-100 text-green-800',
+  agreed:       'bg-green-100 text-green-800',
+  under_review: 'bg-amber-100 text-amber-800',
+  initiated:    'bg-amber-100 text-amber-800',
+  rejected:     'bg-red-100 text-red-800',
+  suspended:    'bg-orange-100 text-orange-800',
+  closed:       'bg-gray-100 text-gray-600',
+};
+
 const KYC_STATUS_COLORS: Record<KycCheckStatus, string> = {
   verified: 'bg-green-100 text-green-800 border-green-200',
   initiated: 'bg-amber-100 text-amber-800 border-amber-200',
@@ -385,7 +405,7 @@ export default function ProfilePage() {
             )}
             <div className="flex items-center gap-2 flex-wrap">
               <span className={`text-xs px-2 py-0.5 rounded font-medium ${STATUS_COLORS[status] ?? 'bg-gray-100 text-gray-700'}`}>
-                {status.charAt(0).toUpperCase() + status.slice(1)}
+                {STATUS_LABELS[status] ?? status}
               </span>
               <span className="text-xs bg-blue-500/10 text-blue-700 px-2 py-0.5 rounded">
                 {ROLE_LABELS[profile.role] ?? profile.role}
@@ -666,15 +686,14 @@ export default function ProfilePage() {
                 <span className="text-gray-500">Agreement status</span>
                 {debugMode && <CollectionChip name="merchantAgreementProcedure" />}
               </div>
-              <span className={`text-xs px-2 py-0.5 rounded font-medium inline-block ${
-                merchant.merchantAgreementStatus === 'active' || merchant.merchantAgreementStatus === 'agreed'
-                  ? 'bg-green-100 text-green-800'
-                  : merchant.merchantAgreementStatus === 'under_review'
-                  ? 'bg-amber-100 text-amber-800'
-                  : merchant.merchantAgreementStatus === 'rejected'
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-gray-100 text-gray-600'
-              }`}>{merchant.merchantAgreementStatus}</span>
+              <div className="flex items-center gap-1.5">
+                <span className={`text-xs px-2 py-0.5 rounded font-medium w-fit ${MERCHANT_STATUS_COLORS[merchant.merchantAgreementStatus] ?? 'bg-gray-100 text-gray-600'}`}>
+                  {STATUS_LABELS[merchant.merchantAgreementStatus] ?? merchant.merchantAgreementStatus}
+                </span>
+                {debugMode && (
+                  <span className="font-mono text-gray-400 text-[10px]">{merchant.merchantAgreementStatus}</span>
+                )}
+              </div>
             </>
             {merchant.merchantAgreementKybCheck && (
               <>

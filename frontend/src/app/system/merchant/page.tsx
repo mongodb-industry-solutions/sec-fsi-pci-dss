@@ -7,6 +7,7 @@ import { useDebugMode } from '../../../lib/debugMode';
 import {
   Link2, ShoppingCart, Key, Webhook, Copy, Check, Plus, Trash2, ExternalLink,
   Clock, CheckCircle2, XCircle, Store, ChevronRight, ShieldCheck,
+  Building2, MapPin, FileText, ArrowRight, Info,
 } from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -98,10 +99,14 @@ function MerchantApplicationForm({ token, onSubmitted }: { token: string; onSubm
   const [error, setError] = useState('');
 
   const PRESETS = [
-    { label: 'Coffee Shop', name: 'My Coffee Shop Ltd', legalRef: '12-3456789', mcc: '5812', country: 'US' },
-    { label: 'Online Store', name: 'Digital Store LLC', legalRef: '98-7654321', mcc: '5999', country: 'US' },
-    { label: 'Consulting',  name: 'Consulting Group GmbH', legalRef: 'DE123456789', mcc: '7389', country: 'DE' },
+    { label: 'Coffee Shop',  name: 'My Coffee Shop Ltd',    legalRef: '12-3456789',  mcc: '5812', country: 'US', note: 'Restaurants · US' },
+    { label: 'Online Store', name: 'Digital Store LLC',     legalRef: '98-7654321',  mcc: '5999', country: 'US', note: 'Retail · US'       },
+    { label: 'Consulting',   name: 'Consulting Group GmbH', legalRef: 'DE123456789', mcc: '7389', country: 'DE', note: 'Services · DE'     },
   ];
+
+  const selectedPreset = PRESETS.find(
+    p => p.name === name && p.legalRef === legalRef && p.mcc === mcc && p.country === country
+  );
 
   const { debugMode } = useDebugMode();
 
@@ -132,29 +137,35 @@ function MerchantApplicationForm({ token, onSubmitted }: { token: string; onSubm
 
       {/* BIAN badge + presets — debug mode only */}
       {debugMode && (
-        <>
-          <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 text-xs text-blue-700 font-medium">
-            <span className="font-bold">BIAN SD-89</span>
-            <ChevronRight size={10} />
-            <span>Action: Initiate</span>
-          </div>
-
-          <div>
-            <p className="text-xs text-gray-500 mb-2">Quick-fill with demo data:</p>
-            <div className="flex gap-2 flex-wrap">
-              {PRESETS.map((p) => (
-                <button
-                  key={p.label}
-                  type="button"
-                  onClick={() => { setName(p.name); setLegalRef(p.legalRef); setMcc(p.mcc); setCountry(p.country); }}
-                  className="px-3 py-1 rounded-full border border-gray-300 text-xs text-gray-600 hover:border-[#00ED64] hover:text-[#00ED64] transition-colors"
-                >
-                  {p.label}
-                </button>
-              ))}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-gray-700">Quick-fill with demo data</p>
+            <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-0.5 text-xs text-blue-700 font-medium">
+              <span className="font-bold">BIAN SD-89</span>
+              <ChevronRight size={9} />
+              <span>Action: Initiate</span>
             </div>
           </div>
-        </>
+          <div className="grid grid-cols-3 gap-2">
+            {PRESETS.map((p) => (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => { setName(p.name); setLegalRef(p.legalRef); setMcc(p.mcc); setCountry(p.country); }}
+                className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                  selectedPreset?.label === p.label
+                    ? 'border-[#001E2B] bg-[#001E2B] text-white'
+                    : 'hover:border-gray-400'
+                }`}
+              >
+                <div className="text-xs font-semibold truncate">{p.label}</div>
+                <div className={`text-xs mt-0.5 font-mono ${
+                  selectedPreset?.label === p.label ? 'text-gray-300' : 'text-gray-400'
+                }`}>{p.note}</div>
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
@@ -216,75 +227,261 @@ function MerchantApplicationForm({ token, onSubmitted }: { token: string; onSubm
   );
 }
 
+// ── MCC label lookup ──────────────────────────────────────────────────────────
+
+const MCC_LABELS: Record<string, string> = {
+  '5411': 'Grocery Stores',
+  '5732': 'Electronics',
+  '5812': 'Restaurants',
+  '5813': 'Bars & Nightclubs',
+  '5834': 'Pharmacy',
+  '5999': 'Retail',
+  '6011': 'ATM / Cash',
+  '7011': 'Hotels',
+  '7389': 'Consulting',
+  '7995': 'Gambling',
+};
+
+// ── BIAN SD-89 lifecycle panel (debug) ────────────────────────────────────────
+
+const SD89_STATES: { key: string; label: string; color: string }[] = [
+  { key: 'initiated',    label: 'Initiated',    color: 'bg-gray-100 text-gray-600 border-gray-300' },
+  { key: 'under_review', label: 'Under Review', color: 'bg-amber-100 text-amber-700 border-amber-400' },
+  { key: 'agreed',       label: 'Agreed',       color: 'bg-blue-100 text-blue-700 border-blue-300' },
+  { key: 'active',       label: 'Active',       color: 'bg-green-100 text-green-700 border-green-300' },
+];
+
+function BianLifecyclePanel({ currentStatus }: { currentStatus: string }) {
+  return (
+    <div className="rounded-xl border border-[#001E2B]/15 overflow-hidden">
+      {/* Header */}
+      <div className="bg-[#001E2B] px-4 py-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-[#00ED64] text-xs font-semibold">BIAN SD-89</span>
+          <span className="text-gray-500 text-xs">·</span>
+          <span className="text-gray-400 text-xs font-mono">MerchantAgreementProcedure</span>
+        </div>
+        <span className="text-gray-500 text-xs font-mono">PCI DSS Req 12.8</span>
+      </div>
+
+      {/* Lifecycle flow */}
+      <div className="bg-[#001E2B]/3 px-4 py-4 space-y-3">
+        {/* Main path */}
+        <div>
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Lifecycle · main path</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {SD89_STATES.map((s, i) => (
+              <div key={s.key} className="flex items-center gap-1.5">
+                <span className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
+                  s.key === currentStatus
+                    ? `${s.color} ring-2 ring-offset-1 ring-amber-300 font-semibold`
+                    : s.color + ' opacity-60'
+                }`}>
+                  {s.key === currentStatus && <span className="mr-1">●</span>}{s.label}
+                </span>
+                {i < SD89_STATES.length - 1 && (
+                  <ArrowRight size={12} className="text-gray-400 shrink-0" />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Rejection branch */}
+        <div className="flex items-center gap-2">
+          <div className="w-px h-5 bg-gray-300 ml-[68px]" />
+        </div>
+        <div className="flex items-center gap-2 -mt-2">
+          <div className="w-[78px] shrink-0" />
+          <ArrowRight size={12} className="text-gray-400 rotate-90 shrink-0" />
+          <span className="text-xs px-2.5 py-1 rounded-full border bg-red-50 text-red-600 border-red-200 opacity-70">
+            Rejected
+          </span>
+        </div>
+
+        {/* Control action */}
+        <div className="border-t border-gray-200 pt-3 grid grid-cols-2 gap-3 text-xs">
+          <div className="space-y-1">
+            <p className="text-gray-400 font-semibold uppercase tracking-wide text-[10px]">Pending action</p>
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-[#001E2B] bg-white border border-gray-200 px-1.5 py-0.5 rounded text-[11px]">Control</span>
+              <ArrowRight size={10} className="text-gray-400" />
+              <span className="font-mono text-gray-600 text-[11px]">approve | reject</span>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <p className="text-gray-400 font-semibold uppercase tracking-wide text-[10px]">Actor</p>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded text-[11px] font-medium w-fit">
+                Merchant Officer
+              </span>
+              <span className="font-mono text-gray-400 text-[10px]">merchant_officer</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Under Review View ─────────────────────────────────────────────────────────
+
+const REVIEW_STEPS = [
+  { label: 'Submitted',    done: true  },
+  { label: 'Under Review', done: false, active: true },
+  { label: 'Decision',     done: false },
+];
 
 function UnderReviewView({ merchant }: { merchant: MerchantRecord }) {
   const { debugMode } = useDebugMode();
+  const mccLabel = MCC_LABELS[merchant.merchantCategoryCode] ?? merchant.merchantCategoryCode;
+  const submittedDate = merchant.recordCreatedDateTime
+    ? new Date(merchant.recordCreatedDateTime).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })
+    : null;
+
   return (
-    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
-      <div className="flex items-center gap-2">
-        <Clock size={20} className="text-amber-500" />
-        <h1 className="text-2xl font-bold">Application Under Review</h1>
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-6">
+
+      {/* Page header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Merchant Application</h1>
+        <p className="text-sm text-gray-500 mt-0.5">We received your request and a compliance officer is reviewing it.</p>
       </div>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
-        <div className="flex items-start gap-3">
-          <Clock size={16} className="text-amber-600 mt-0.5 shrink-0" />
-          <div>
-            <div className="text-sm font-medium text-amber-800">Your application is being reviewed</div>
-            <div className="text-xs text-amber-700 mt-0.5">
-              A Merchant Acquiring officer will review your application within 2 business days.
-              You will be able to access the merchant sandbox once approved.
+      {/* Progress stepper */}
+      <div className="bg-white rounded-xl border p-5">
+        <div className="flex items-center gap-0">
+          {REVIEW_STEPS.map((step, i) => (
+            <div key={step.label} className="flex items-center flex-1 last:flex-none">
+              <div className="flex flex-col items-center gap-1.5 shrink-0">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                  step.done
+                    ? 'bg-green-500 text-white'
+                    : step.active
+                    ? 'bg-amber-500 text-white ring-4 ring-amber-100'
+                    : 'bg-gray-100 text-gray-400'
+                }`}>
+                  {step.done ? <Check size={14} /> : step.active ? <Clock size={14} /> : i + 1}
+                </div>
+                <span className={`text-xs font-medium whitespace-nowrap ${
+                  step.active ? 'text-amber-600' : step.done ? 'text-green-600' : 'text-gray-400'
+                }`}>{step.label}</span>
+              </div>
+              {i < REVIEW_STEPS.length - 1 && (
+                <div className={`flex-1 h-0.5 mx-2 mb-5 rounded-full ${step.done ? 'bg-green-400' : 'bg-gray-200'}`} />
+              )}
             </div>
-          </div>
+          ))}
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-        <h2 className="font-semibold text-gray-800 text-sm">Application Details</h2>
-        <dl className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <dt className="text-gray-500">Business Name</dt>
-            <dd className="font-medium text-gray-800">{merchant.merchantName}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-gray-500">MCC</dt>
-            <dd className="font-mono text-gray-700">{merchant.merchantCategoryCode}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-gray-500">Country</dt>
-            <dd className="text-gray-700">{merchant.merchantCountryCode}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-gray-500">Status</dt>
-            <dd className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">under_review</dd>
-          </div>
-          {merchant.recordCreatedDateTime && (
-            <div className="flex justify-between">
-              <dt className="text-gray-500">Submitted</dt>
-              <dd className="text-gray-600 text-xs">{new Date(merchant.recordCreatedDateTime).toLocaleString()}</dd>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+        {/* Application summary */}
+        <div className="bg-white rounded-xl border p-5 space-y-4">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Application Summary</h2>
+
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                <Building2 size={15} className="text-gray-500" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-gray-400">Business name</p>
+                <p className="text-sm font-semibold text-gray-900 truncate">{merchant.merchantName}</p>
+              </div>
             </div>
-          )}
-          <div className="flex justify-between">
-            <dt className="text-gray-500">Application ID</dt>
-            <dd className="font-mono text-xs text-gray-400 truncate max-w-[180px]">{merchant.merchantAgreementInstanceReference}</dd>
+
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                <FileText size={15} className="text-gray-500" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Category</p>
+                <p className="text-sm font-medium text-gray-800">
+                  {mccLabel}
+                  <span className="ml-1.5 font-mono text-xs text-gray-400">MCC {merchant.merchantCategoryCode}</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                <MapPin size={15} className="text-gray-500" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Country</p>
+                <p className="text-sm font-medium text-gray-800">{merchant.merchantCountryCode}</p>
+              </div>
+            </div>
+
+            {submittedDate && (
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                  <Clock size={15} className="text-gray-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400">Submitted</p>
+                  <p className="text-sm font-medium text-gray-800">{submittedDate}</p>
+                </div>
+              </div>
+            )}
           </div>
+
           {merchant.merchantAgreementKybCheck && (
-            <div className="flex justify-between items-center pt-1 border-t border-gray-100">
-              <dt className="text-gray-500">KYB Check</dt>
-              <dd><KybStatusBadge kyb={merchant.merchantAgreementKybCheck} compact /></dd>
+            <div className="border-t pt-3">
+              <p className="text-xs text-gray-400 mb-1.5">Identity verification (KYB)</p>
+              <KybStatusBadge kyb={merchant.merchantAgreementKybCheck} compact />
             </div>
           )}
-        </dl>
+        </div>
+
+        {/* What to expect */}
+        <div className="bg-white rounded-xl border p-5 space-y-4">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">What happens next</h2>
+
+          <ol className="space-y-4">
+            {[
+              {
+                n: 1,
+                title: 'Compliance review',
+                desc: 'A Merchant Acquiring officer verifies your business details and runs a KYB check against your submitted information.',
+              },
+              {
+                n: 2,
+                title: 'You get notified',
+                desc: 'Once the review is complete you will see an update here. Reviews typically complete within 2 business days.',
+              },
+              {
+                n: 3,
+                title: 'Sandbox access',
+                desc: 'After approval you can immediately start testing Checkout Sessions, Payment Links, API keys, and webhooks.',
+              },
+            ].map(item => (
+              <li key={item.n} className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-[#001E2B]/8 text-[#001E2B] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                  {item.n}
+                </span>
+                <div>
+                  <p className="text-sm font-medium text-gray-800">{item.title}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{item.desc}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          <div className="border-t pt-3">
+            <div className="flex items-start gap-2 text-xs text-gray-400">
+              <Info size={13} className="shrink-0 mt-0.5" />
+              <span>You can leave this page. Your application status will be here when you return.</span>
+            </div>
+          </div>
+        </div>
       </div>
 
+      {/* BIAN lifecycle — debug only */}
       {debugMode && (
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-xs text-gray-500 space-y-1 font-mono">
-          <div className="font-semibold text-gray-600 mb-1.5 not-italic">BIAN SD-89 · MerchantAgreementProcedure</div>
-          <div>status = <span className="text-amber-600">under_review</span></div>
-          <div>next → <span className="text-gray-700">Control (approve) → agreed</span> · actor: merchant_officer</div>
-          <div className="mt-1 text-gray-400">PCI DSS Req 12.8 · KYB review required before merchant activation</div>
-        </div>
+        <BianLifecyclePanel currentStatus={merchant.merchantAgreementStatus} />
       )}
     </div>
   );
