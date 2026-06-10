@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
+import { useDebugMode } from '../../../lib/debugMode';
 import {
   Link2, ShoppingCart, Key, Webhook, Copy, Check, Plus, Trash2, ExternalLink,
   Clock, CheckCircle2, XCircle, Store, ChevronRight, ShieldCheck,
@@ -55,22 +56,21 @@ const KYB_STATUS_LABELS: Record<KybCheckStatus, string> = {
 };
 
 function KybStatusBadge({ kyb, compact }: { kyb: MerchantAgreementKybCheck; compact?: boolean }) {
+  const { debugMode } = useDebugMode();
   const status = kyb.merchantAgreementKybCheckStatus;
   const colorClass = KYB_STATUS_COLORS[status] ?? 'bg-gray-100 text-gray-700 border-gray-200';
   const label = KYB_STATUS_LABELS[status] ?? status;
-  if (compact) {
-    return (
-      <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border font-medium ${colorClass}`}>
-        <ShieldCheck size={10} />{label}
-      </span>
-    );
-  }
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex items-center gap-1.5 flex-wrap">
       <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border font-medium ${colorClass}`}>
         <ShieldCheck size={10} />{label}
       </span>
-      <span className="text-xs text-gray-400 font-mono">SD-89 · BQ:Step · KybCheck · PCI Req 12.8</span>
+      {!compact && debugMode && (
+        <>
+          <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-teal-50 text-teal-700 border-teal-200">SD-89 · BQ:Step</span>
+          <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-slate-50 text-slate-600 border-slate-200">PCI Req 12.8</span>
+        </>
+      )}
     </div>
   );
 }
@@ -103,6 +103,8 @@ function MerchantApplicationForm({ token, onSubmitted }: { token: string; onSubm
     { label: 'Consulting',  name: 'Consulting Group GmbH', legalRef: 'DE123456789', mcc: '7389', country: 'DE' },
   ];
 
+  const { debugMode } = useDebugMode();
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -120,7 +122,7 @@ function MerchantApplicationForm({ token, onSubmitted }: { token: string; onSubm
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <Store size={20} className="text-[#00ED64]" />
+          <Store size={20} className="text-gray-500" />
           <h1 className="text-2xl font-bold">Request Merchant Account</h1>
         </div>
         <p className="text-sm text-gray-500">
@@ -128,29 +130,32 @@ function MerchantApplicationForm({ token, onSubmitted }: { token: string; onSubm
         </p>
       </div>
 
-      {/* BIAN badge */}
-      <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 text-xs text-blue-700 font-medium">
-        <span className="font-bold">BIAN SD-89</span>
-        <ChevronRight size={10} />
-        <span>Action: Initiate</span>
-      </div>
+      {/* BIAN badge + presets — debug mode only */}
+      {debugMode && (
+        <>
+          <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 text-xs text-blue-700 font-medium">
+            <span className="font-bold">BIAN SD-89</span>
+            <ChevronRight size={10} />
+            <span>Action: Initiate</span>
+          </div>
 
-      {/* Presets */}
-      <div>
-        <p className="text-xs text-gray-500 mb-2">Quick-fill with demo data:</p>
-        <div className="flex gap-2 flex-wrap">
-          {PRESETS.map((p) => (
-            <button
-              key={p.label}
-              type="button"
-              onClick={() => { setName(p.name); setLegalRef(p.legalRef); setMcc(p.mcc); setCountry(p.country); }}
-              className="px-3 py-1 rounded-full border border-gray-300 text-xs text-gray-600 hover:border-[#00ED64] hover:text-[#00ED64] transition-colors"
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
+          <div>
+            <p className="text-xs text-gray-500 mb-2">Quick-fill with demo data:</p>
+            <div className="flex gap-2 flex-wrap">
+              {PRESETS.map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => { setName(p.name); setLegalRef(p.legalRef); setMcc(p.mcc); setCountry(p.country); }}
+                  className="px-3 py-1 rounded-full border border-gray-300 text-xs text-gray-600 hover:border-[#00ED64] hover:text-[#00ED64] transition-colors"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
         <div>
@@ -201,9 +206,11 @@ function MerchantApplicationForm({ token, onSubmitted }: { token: string; onSubm
         >
           {loading ? 'Submitting…' : 'Submit Application'}
         </button>
-        <p className="text-xs text-gray-400 text-center">
-          PCI DSS Req 12.8 — documented merchant agreement required before processing payments
-        </p>
+        {debugMode && (
+          <p className="text-xs text-gray-400 text-center font-mono">
+            PCI DSS Req 12.8 · documented merchant agreement required before processing payments
+          </p>
+        )}
       </form>
     </div>
   );
@@ -212,6 +219,7 @@ function MerchantApplicationForm({ token, onSubmitted }: { token: string; onSubm
 // ── Under Review View ─────────────────────────────────────────────────────────
 
 function UnderReviewView({ merchant }: { merchant: MerchantRecord }) {
+  const { debugMode } = useDebugMode();
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <div className="flex items-center gap-2">
@@ -270,12 +278,14 @@ function UnderReviewView({ merchant }: { merchant: MerchantRecord }) {
         </dl>
       </div>
 
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-xs text-gray-500 space-y-1">
-        <div className="font-medium text-gray-600 mb-1.5">BIAN SD-89 Merchant Relations</div>
-        <div>Current status: <span className="font-mono">MerchantAgreementProcedure.status = under_review</span></div>
-        <div>Next transition: <span className="font-mono">Control (approve) → agreed</span> by merchant_officer</div>
-        <div className="mt-1.5 text-gray-400">PCI DSS Req 12.8 — KYB review required before merchant activation</div>
-      </div>
+      {debugMode && (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-xs text-gray-500 space-y-1 font-mono">
+          <div className="font-semibold text-gray-600 mb-1.5 not-italic">BIAN SD-89 · MerchantAgreementProcedure</div>
+          <div>status = <span className="text-amber-600">under_review</span></div>
+          <div>next → <span className="text-gray-700">Control (approve) → agreed</span> · actor: merchant_officer</div>
+          <div className="mt-1 text-gray-400">PCI DSS Req 12.8 · KYB review required before merchant activation</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -462,7 +472,7 @@ function MerchantSandbox({ token, merchants, onRefresh }: { token: string; merch
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <CheckCircle2 size={18} className="text-[#00ED64]" />
+            <CheckCircle2 size={18} className="text-gray-500" />
             <h1 className="text-2xl font-bold">Merchant Sandbox</h1>
           </div>
           <p className="text-sm text-gray-500 mt-0.5">Test Redirect Checkout and Payment Links integration.</p>
@@ -769,6 +779,7 @@ function MerchantSandbox({ token, merchants, onRefresh }: { token: string; merch
 // ── Analyst View (full merchant list) ─────────────────────────────────────────
 
 function AnalystMerchantView({ token }: { token: string }) {
+  const { debugMode } = useDebugMode();
   const [merchants, setMerchants] = useState<MerchantRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
@@ -795,7 +806,7 @@ function AnalystMerchantView({ token }: { token: string }) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Merchant Agreements</h1>
-          <p className="text-sm text-gray-500 mt-0.5">BIAN SD-89 — MerchantAgreementProcedure records</p>
+          {debugMode && <p className="text-xs text-gray-400 font-mono mt-0.5">SD-89 · MerchantAgreementProcedure</p>}
         </div>
         <select
           value={statusFilter}
