@@ -29,7 +29,9 @@ const METHOD_COLORS: Record<string, string> = {
   HEAD:    'bg-gray-700/60 text-gray-300 border-gray-600',
 };
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 10;
+const LIMIT_OPTIONS = [5, 10, 20, 50, 80, 100];
+const STORAGE_KEY = 'webhook_inspector_entries';
 
 function bodyText(body: unknown): string {
   if (body === null || body === undefined) return '';
@@ -38,16 +40,23 @@ function bodyText(body: unknown): string {
 }
 
 export default function WebhookPage() {
-  const [entries, setEntries] = useState<WebhookEntry[]>([]);
+  const [entries, setEntries] = useState<WebhookEntry[]>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as WebhookEntry[]) : [];
+    } catch { return []; }
+  });
   const [connected, setConnected] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'headers' | 'body'>('overview');
   const [filterMethod, setFilterMethod] = useState('');
   const [searchText, setSearchText] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [copied, setCopied] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hookUrl = `${API_BASE_URL}/api/v1/admin/webhook/hook`;
 
@@ -91,6 +100,14 @@ export default function WebhookPage() {
     connect(token);
     return () => abortRef.current?.abort();
   }, [connect]);
+
+  useEffect(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); } catch { /* quota */ }
+    }, 400);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [entries]);
 
   async function clearAll() {
     const token = getAdminToken();
@@ -137,8 +154,8 @@ export default function WebhookPage() {
     return true;
   });
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageEntries = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pageEntries = filtered.slice((page - 1) * pageSize, page * pageSize);
   const uniqueMethods = [...new Set(entries.map((e) => e.method))].sort();
 
   const expandedEntry = entries.find((e) => e.id === expanded) ?? null;
@@ -335,11 +352,12 @@ export default function WebhookPage() {
             page={page}
             totalPages={totalPages}
             total={filtered.length}
-            limit={PAGE_SIZE}
+            limit={pageSize}
             onPageChange={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            onLimitChange={() => {}}
-            limitOptions={[PAGE_SIZE]}
+            onLimitChange={(ps) => { setPageSize(ps); setPage(1); }}
+            limitOptions={LIMIT_OPTIONS}
             noun="requests"
+            variant="dark"
           />
         </div>
       )}
