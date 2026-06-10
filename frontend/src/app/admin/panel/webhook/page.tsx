@@ -291,18 +291,18 @@ export default function WebhookPage() {
                             ['IP',        expandedEntry.ip],
                             ['Timestamp', expandedEntry.timestamp],
                           ].map(([k, v]) => (
-                            <>
-                              <dt key={`k-${k}`} className="text-gray-500">{k}</dt>
-                              <dd key={`v-${k}`} className="text-gray-200 break-all">{v}</dd>
-                            </>
+                            <span key={k} className="contents">
+                              <dt className="text-gray-500">{k}</dt>
+                              <dd className="text-gray-200 break-all">{v}</dd>
+                            </span>
                           ))}
                           {Object.keys(expandedEntry.query).length > 0 && (
-                            <>
+                            <span className="contents">
                               <dt className="text-gray-500">Query</dt>
                               <dd className="text-gray-200 break-all">
                                 {new URLSearchParams(expandedEntry.query).toString()}
                               </dd>
-                            </>
+                            </span>
                           )}
                         </dl>
                       )}
@@ -310,10 +310,10 @@ export default function WebhookPage() {
                       {activeTab === 'headers' && (
                         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
                           {Object.entries(expandedEntry.headers).map(([k, v]) => (
-                            <>
-                              <dt key={`hk-${k}`} className="text-gray-500 whitespace-nowrap">{k}</dt>
-                              <dd key={`hv-${k}`} className="text-gray-200 break-all">{v}</dd>
-                            </>
+                            <span key={k} className="contents">
+                              <dt className="text-gray-500 whitespace-nowrap">{k}</dt>
+                              <dd className="text-gray-200 break-all">{v}</dd>
+                            </span>
                           ))}
                         </dl>
                       )}
