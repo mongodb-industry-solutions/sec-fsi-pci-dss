@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '../../lib/api';
 import { MerchantBrandingWrapper } from './MerchantBrandingWrapper';
 import { SimulatorStateManager } from './SimulatorStateManager';
+import { writeSimulatorTransactionToHistory } from '../../lib/simulatorHistory';
 import type { SimulatorScenario } from '../../types/simulator';
 
 interface Props {
@@ -57,6 +58,22 @@ export function PaymentLinkFlow({ scenario, merchantId }: Props) {
         linkCode,
       }));
       SimulatorStateManager.setStep(3);
+
+      writeSimulatorTransactionToHistory({
+        txnId: tid ?? '',
+        amount: prefill.amount,
+        currency: prefill.currency,
+        merchant: prefill.merchantName,
+        mcc: prefill.merchantCategoryCode,
+        channel: 'online',
+        cardTransactionType: 'purchase',
+        maskedPan: `****-****-****-${(prefill.cardHint ?? '0000').slice(-4)}`,
+        status: cid ? 'under_review' : 'authorized',
+        fraudCaseCreated: !!cid,
+        caseId: cid || null,
+        createdAt: new Date().toISOString(),
+        paymentReference: linkCode ?? null,
+      });
     }
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);

@@ -10,6 +10,7 @@ import { RedirectionPaymentFlow } from '../../../components/simulator/Redirectio
 import { PaymentLinkFlow } from '../../../components/simulator/PaymentLinkFlow';
 import type { PaymentMethodId, SimulatorScenario } from '../../../types/simulator';
 import simulatorConfig from '../../../config/simulator-methods.json';
+import { writeSimulatorTransactionToHistory } from '../../../lib/simulatorHistory';
 
 type Step = 1 | 2 | 3;
 
@@ -433,7 +434,7 @@ export default function PaymentPage() {
     try {
       const res = await api.transactions.create({
         cardToken: cardTokenRef.current,
-        accountReference: `ACC-${Date.now().toString(36).toUpperCase()}`,
+        accountReference: form.email,
         amount: parseFloat(form.amount),
         currency: 'USD',
         cardTransactionMerchantName: form.merchantName,
@@ -463,6 +464,22 @@ export default function PaymentPage() {
       } catch { /* ignore storage errors */ }
       setResult(newResult);
       setStep(3);
+
+      writeSimulatorTransactionToHistory({
+        txnId: newResult.txnId,
+        amount: parseFloat(form.amount),
+        currency: 'USD',
+        merchant: form.merchantName,
+        mcc: form.merchantCategoryCode,
+        channel: 'online',
+        cardTransactionType: 'purchase',
+        maskedPan: maskedCard || '****-****-****-1234',
+        status: newResult.fraudCaseCreated ? 'under_review' : 'authorized',
+        fraudCaseCreated: newResult.fraudCaseCreated,
+        caseId: newResult.caseId ?? null,
+        createdAt: new Date().toISOString(),
+        paymentReference: null,
+      });
     } catch (err) {
       const msg = (err as Error).message ?? '';
       if (msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('fetch')) {

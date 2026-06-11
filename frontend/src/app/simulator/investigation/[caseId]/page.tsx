@@ -685,9 +685,9 @@ function L2ReviewView({
             <p className="text-xs font-semibold text-blue-700 uppercase mb-1.5">QE:equality fields (available to L1 and L2)</p>
             <div className="space-y-2">
               {[
-                { label: 'Email', value: 'luis.fernandez@leafybank.demo' },
-                { label: 'Phone', value: '+1-555-0142' },
-                { label: 'Account Reference', value: 'ACC-LF-20240115' },
+                { label: 'Email', value: 'luis.fernandez@back.es' },
+                { label: 'Phone', value: '+44 7700 900123' },
+                { label: 'Account Reference', value: 'luis.fernandez@back.es' },
               ].map(({ label, value }) => (
                 <div key={label} className="flex items-center gap-2">
                   <EncryptionBadge label={label} type="qe-equality" />

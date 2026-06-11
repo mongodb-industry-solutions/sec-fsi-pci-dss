@@ -347,9 +347,9 @@ export default function DemoCaseDetailPage() {
               )}
               <div className="space-y-2">
                 {[
-                  { label: 'Email',             value: 'luis.fernandez@leafybank.demo' },
-                  { label: 'Phone',             value: '+1-555-0142' },
-                  { label: 'Account Reference', value: 'ACC-LF-20240115' },
+                  { label: 'Email',             value: 'luis.fernandez@back.es' },
+                  { label: 'Phone',             value: '+44 7700 900123' },
+                  { label: 'Account Reference', value: 'luis.fernandez@back.es' },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex items-center gap-2">
                     <EncryptionBadge label={label} type="qe-equality" />
