@@ -10,9 +10,10 @@ function CallbackInner() {
     const status = params.get('status') ?? 'success';
     const sessionId = params.get('session') ?? '';
     const txnId = params.get('txn') ?? '';
+    const caseId = params.get('case') ?? '';
 
     window.parent?.postMessage(
-      { type: 'sim_payment_complete', status, sessionId, txnId },
+      { type: 'sim_payment_complete', status, sessionId, txnId, caseId },
       window.location.origin
     );
   }, [params]);

@@ -136,7 +136,7 @@ export interface ProcessLinkPaymentInput {
 export async function processLinkPayment(
   db: Db,
   input: ProcessLinkPaymentInput
-): Promise<{ result: ProcessLinkPaymentResult; cardTransactionInstanceReference?: string }> {
+): Promise<{ result: ProcessLinkPaymentResult; cardTransactionInstanceReference?: string; fraudDiagnosisInstanceReference?: string }> {
   const link = await db
     .collection<PaymentLinkRecord>(PAYMENT_LINK_COLLECTION)
     .findOne({ paymentLinkCode: input.linkCode } as Partial<PaymentLinkRecord>);
@@ -196,6 +196,7 @@ export async function processLinkPayment(
   return {
     result: 'ok',
     cardTransactionInstanceReference: txResult.cardTransactionInstanceReference,
+    fraudDiagnosisInstanceReference: txResult.fraudDiagnosisInstanceReference,
   };
 }
 

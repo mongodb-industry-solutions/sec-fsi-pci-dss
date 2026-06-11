@@ -43,6 +43,14 @@ export type ProcessPaymentResult =
   | 'already_completed'
   | 'cancelled';
 
+function substitutePlaceholders(url: string, values: Record<string, string>): string {
+  let result = url;
+  for (const [key, value] of Object.entries(values)) {
+    result = result.replace(`{${key}}`, value);
+  }
+  return result;
+}
+
 export async function createCheckoutSession(
   db: Db,
   input: CreateCheckoutSessionInput,
@@ -116,7 +124,7 @@ export interface ProcessCheckoutPaymentInput {
 export async function processCheckoutPayment(
   db: Db,
   input: ProcessCheckoutPaymentInput
-): Promise<{ result: ProcessPaymentResult; cardTransactionInstanceReference?: string; redirectUrl?: string }> {
+): Promise<{ result: ProcessPaymentResult; cardTransactionInstanceReference?: string; fraudDiagnosisInstanceReference?: string; redirectUrl?: string }> {
   const session = await db
     .collection<CheckoutSessionRecord>(CHECKOUT_SESSION_COLLECTION)
     .findOne({ checkoutSessionInstanceReference: input.sessionId } as Partial<CheckoutSessionRecord>);
@@ -170,12 +178,16 @@ export async function processCheckoutPayment(
     }
   );
 
-  const separator = session.checkoutSessionReturnUrl.includes('?') ? '&' : '?';
-  const redirectUrl = `${session.checkoutSessionReturnUrl}${separator}status=success&session=${input.sessionId}`;
+  const redirectUrl = substitutePlaceholders(session.checkoutSessionReturnUrl, {
+    session_id: input.sessionId,
+    txn_id: txResult.cardTransactionInstanceReference,
+    case_id: txResult.fraudDiagnosisInstanceReference ?? '',
+  });
 
   return {
     result: 'ok',
     cardTransactionInstanceReference: txResult.cardTransactionInstanceReference,
+    fraudDiagnosisInstanceReference: txResult.fraudDiagnosisInstanceReference,
     redirectUrl,
   };
 }

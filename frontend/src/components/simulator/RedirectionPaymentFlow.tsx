@@ -19,6 +19,7 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [txnId, setTxnId] = useState<string | null>(null);
+  const [caseId, setCaseId] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const { prefill } = scenario;
@@ -27,16 +28,18 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
       if (event.origin !== window.location.origin) return;
-      const { type, status, sessionId: sid, txnId: tid } = event.data ?? {};
+      const { type, status, sessionId: sid, txnId: tid, caseId: cid } = event.data ?? {};
       if (type !== 'sim_payment_complete') return;
 
       setFlowState('complete');
       setTxnId(tid ?? null);
+      setCaseId(cid || null);
 
       if (status === 'success' || status === 'paid') {
         // Persist for investigation step
         sessionStorage.setItem('sim_payment_step3', JSON.stringify({
           cardTransactionInstanceReference: tid,
+          caseId: cid || null,
           email: prefill.email,
           amount: prefill.amount,
           currency: prefill.currency,
@@ -61,7 +64,7 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
         amount: prefill.amount,
         currency: prefill.currency,
         description: prefill.description,
-        returnUrl: `${origin}/simulator/payment/callback?status=success&session={session_id}&txn={txn_id}`,
+        returnUrl: `${origin}/simulator/payment/callback?status=success&session={session_id}&txn={txn_id}&case={case_id}`,
         cancelUrl: `${origin}/simulator/payment/callback?status=cancelled&session={session_id}`,
         merchantReference: `SIM-${scenario.id.toUpperCase()}-${Date.now()}`,
       });

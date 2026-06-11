@@ -214,6 +214,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
           properties: {
             success: { type: 'boolean' },
             cardTransactionInstanceReference: { type: 'string' },
+            fraudDiagnosisInstanceReference: { type: 'string', nullable: true },
           },
         },
         404: { $ref: 'Error#' },
@@ -230,7 +231,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
       customerEmail?: string;
     };
 
-    const { result, cardTransactionInstanceReference } = await processLinkPayment(fastify.db, {
+    const { result, cardTransactionInstanceReference, fraudDiagnosisInstanceReference } = await processLinkPayment(fastify.db, {
       linkCode: code,
       cardToken: body.cardToken,
       cardholderName: body.cardholderName,
@@ -270,7 +271,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
       }
     }
 
-    return reply.send({ success: true, cardTransactionInstanceReference });
+    return reply.send({ success: true, cardTransactionInstanceReference, fraudDiagnosisInstanceReference: fraudDiagnosisInstanceReference ?? null });
   });
 
   // PATCH /api/v1/payment-links/:id

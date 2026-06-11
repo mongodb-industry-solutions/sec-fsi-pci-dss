@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { api, FraudCase } from '../../../lib/api';
 import { CaseTable } from '../../../components/CaseTable';
 import { Pagination } from '../../../components/Pagination';
@@ -15,9 +16,24 @@ const FIELD_LABELS: Record<SearchField, string> = {
 
 const PAGE_SIZE = 10;
 
+interface SimPaymentStep3 {
+  cardTransactionInstanceReference?: string;
+  caseId?: string | null;
+  email?: string;
+  amount?: number;
+  currency?: string;
+  merchantName?: string;
+  method?: string;
+}
+
 export default function SimulatorInvestigationPage() {
+  const router = useRouter();
+  const [simPayment, setSimPayment] = useState<SimPaymentStep3 | null>(null);
+  const [pinnedCase, setPinnedCase] = useState<FraudCase | null>(null);
+  const [pinnedLoading, setPinnedLoading] = useState(false);
+
   const [searchField, setSearchField]     = useState<SearchField>('email');
-  const [searchValue, setSearchValue]     = useState('luis.fernandez@back.es');
+  const [searchValue, setSearchValue]     = useState('');
   const [filterStatus, setFilterStatus]   = useState('');
   const [filterSeverity, setFilterSeverity] = useState('');
   const [cases, setCases]   = useState<FraudCase[]>([]);
@@ -26,6 +42,26 @@ export default function SimulatorInvestigationPage() {
   const [loading, setLoading] = useState(true);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // On mount: read sim_payment_step3 and pre-populate email search
+  useEffect(() => {
+    const raw = sessionStorage.getItem('sim_payment_step3');
+    if (!raw) return;
+    try {
+      const saved: SimPaymentStep3 = JSON.parse(raw);
+      setSimPayment(saved);
+      if (saved.email) {
+        setSearchValue(saved.email);
+      }
+      // Fetch the pinned case if we have its ID
+      if (saved.caseId) {
+        setPinnedLoading(true);
+        api.fraud.getById(saved.caseId, '').then((c) => {
+          setPinnedCase(c);
+        }).catch(() => {}).finally(() => setPinnedLoading(false));
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   const loadCases = useCallback(async (targetPage: number) => {
     setLoading(true);
@@ -67,13 +103,80 @@ export default function SimulatorInvestigationPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  const formatAmount = (amount: number, currency: string) =>
+    new Intl.NumberFormat('en-EU', { style: 'currency', currency }).format(amount);
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold flex items-center gap-2">
         Fraud Investigation
       </h1>
 
-      {/* Search bar */}
+      {/* ── Pinned case banner ─────────────────────────────────────── */}
+      {simPayment && (
+        <div className="bg-[#001E2B] text-white rounded-xl border border-[#00ED64]/40 p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-[#00ED64] text-lg">✓</span>
+              <span className="font-semibold text-sm">Payment completed — fraud case opened</span>
+            </div>
+            {simPayment.amount !== undefined && simPayment.currency && (
+              <span className="text-xs text-gray-300 bg-white/10 rounded px-2 py-0.5">
+                {formatAmount(simPayment.amount, simPayment.currency)}
+                {simPayment.merchantName ? ` · ${simPayment.merchantName}` : ''}
+                {simPayment.method ? ` · ${simPayment.method}` : ''}
+              </span>
+            )}
+          </div>
+
+          {simPayment.caseId ? (
+            pinnedLoading ? (
+              <p className="text-xs text-gray-400 animate-pulse">Loading case details…</p>
+            ) : pinnedCase ? (
+              <div className="bg-white/10 rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
+                <div className="text-xs space-y-0.5">
+                  <div className="font-mono text-[#00ED64]">{pinnedCase.fraudDiagnosisCaseReference}</div>
+                  <div className="text-gray-300">
+                    Status: <span className="capitalize">{pinnedCase.caseStatus.replace(/_/g, ' ')}</span>
+                    &nbsp;·&nbsp;Severity: <span className="uppercase">{pinnedCase.riskSeverity}</span>
+                  </div>
+                  <div className="text-gray-400 font-mono text-[10px]">ID: {pinnedCase.fraudDiagnosisInstanceReference}</div>
+                </div>
+                <button
+                  onClick={() => router.push(`/simulator/investigation/${pinnedCase.fraudDiagnosisInstanceReference}`)}
+                  className="shrink-0 bg-[#00ED64] text-[#001E2B] font-semibold text-xs px-4 py-2 rounded-lg hover:bg-[#00c94f] transition-colors"
+                >
+                  Open case →
+                </button>
+              </div>
+            ) : (
+              <div className="bg-white/10 rounded-lg p-3 flex items-center justify-between gap-3">
+                <div className="text-xs text-gray-300">
+                  Case ID: <span className="font-mono text-[#00ED64]">{simPayment.caseId}</span>
+                </div>
+                <button
+                  onClick={() => router.push(`/simulator/investigation/${simPayment.caseId}`)}
+                  className="shrink-0 bg-[#00ED64] text-[#001E2B] font-semibold text-xs px-4 py-2 rounded-lg hover:bg-[#00c94f] transition-colors"
+                >
+                  Open case →
+                </button>
+              </div>
+            )
+          ) : (
+            <p className="text-xs text-amber-400">
+              No fraud case was created for this transaction. The transaction passed risk scoring without triggering a case.
+            </p>
+          )}
+
+          {simPayment.cardTransactionInstanceReference && (
+            <p className="text-[11px] text-gray-500 font-mono">
+              txn: {simPayment.cardTransactionInstanceReference}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ── Search bar ─────────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border p-4">
         <form onSubmit={handleSearch} className="flex gap-3 items-end">
           <div>
@@ -118,7 +221,7 @@ export default function SimulatorInvestigationPage() {
         )}
       </div>
 
-      {/* Filters + count */}
+      {/* ── Filters + count ─────────────────────────────────────────── */}
       <div className="flex flex-wrap gap-3 items-center">
         <span className="text-sm text-gray-500">Filter:</span>
         <select
@@ -146,7 +249,7 @@ export default function SimulatorInvestigationPage() {
         </span>
       </div>
 
-      {/* Table */}
+      {/* ── Table ──────────────────────────────────────────────────── */}
       {loading ? (
         <div className="text-center py-10 text-gray-400">Loading cases...</div>
       ) : (
@@ -164,3 +267,4 @@ export default function SimulatorInvestigationPage() {
     </div>
   );
 }
+

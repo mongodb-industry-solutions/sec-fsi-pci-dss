@@ -162,6 +162,7 @@ export async function checkoutController(fastify: FastifyInstance) {
           properties: {
             success: { type: 'boolean' },
             cardTransactionInstanceReference: { type: 'string' },
+            fraudDiagnosisInstanceReference: { type: 'string', nullable: true },
             redirectUrl: { type: 'string', description: 'Buyer should be redirected to this URL.' },
           },
         },
@@ -179,7 +180,7 @@ export async function checkoutController(fastify: FastifyInstance) {
       cardExpiryYear: string;
     };
 
-    const { result, cardTransactionInstanceReference, redirectUrl } = await processCheckoutPayment(
+    const { result, cardTransactionInstanceReference, fraudDiagnosisInstanceReference, redirectUrl } = await processCheckoutPayment(
       fastify.db,
       {
         sessionId: id,
@@ -222,6 +223,7 @@ export async function checkoutController(fastify: FastifyInstance) {
     return reply.send({
       success: true,
       cardTransactionInstanceReference,
+      fraudDiagnosisInstanceReference: fraudDiagnosisInstanceReference ?? null,
       redirectUrl,
     });
   });

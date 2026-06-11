@@ -90,7 +90,11 @@ function PaymentLinkPageInner() {
         // Notify parent frame when embedded as iframe in the simulator
         try {
           window.parent.postMessage(
-            { type: 'sim_payment_link_complete', txnId: result.cardTransactionInstanceReference },
+            {
+              type: 'sim_payment_link_complete',
+              txnId: result.cardTransactionInstanceReference,
+              caseId: result.fraudDiagnosisInstanceReference ?? null,
+            },
             window.location.origin
           );
         } catch { /* not in iframe */ }

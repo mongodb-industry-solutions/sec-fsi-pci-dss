@@ -20,6 +20,7 @@ export function PaymentLinkFlow({ scenario, merchantId }: Props) {
   const [payUrl, setPayUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [txnId, setTxnId] = useState<string | null>(null);
+  const [caseId, setCaseId] = useState<string | null>(null);
   const [copyLabel, setCopyLabel] = useState('Copy link');
 
   const { prefill } = scenario;
@@ -38,14 +39,16 @@ export function PaymentLinkFlow({ scenario, merchantId }: Props) {
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
       if (event.origin !== window.location.origin) return;
-      const { type, txnId: tid } = event.data ?? {};
+      const { type, txnId: tid, caseId: cid } = event.data ?? {};
       if (type !== 'sim_payment_link_complete') return;
 
       setFlowState('complete');
       setTxnId(tid ?? null);
+      setCaseId(cid || null);
 
       sessionStorage.setItem('sim_payment_step3', JSON.stringify({
         cardTransactionInstanceReference: tid,
+        caseId: cid || null,
         email: prefill.email,
         amount: prefill.amount,
         currency: prefill.currency,

@@ -530,7 +530,7 @@ export const api = {
         paymentLinkExpiresAt?: string;
       }>(`/api/v1/payment-links/${code}`),
     pay: (code: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth: string; cardExpiryYear: string; customerEmail?: string }) =>
-      apiFetch<{ success: boolean; cardTransactionInstanceReference: string }>(
+      apiFetch<{ success: boolean; cardTransactionInstanceReference: string; fraudDiagnosisInstanceReference?: string | null }>(
         `/api/v1/payment-links/${code}/pay`, { method: 'POST', body: JSON.stringify(body) }
       ),
     deactivate: (id: string, merchantAgreementInstanceReference: string, token: string) =>
