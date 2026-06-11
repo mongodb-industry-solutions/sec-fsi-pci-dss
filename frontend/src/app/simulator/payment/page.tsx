@@ -685,6 +685,9 @@ export default function PaymentPage() {
           >
             Next: Review & Encrypt →
           </button>
+          <button onClick={handleReset} className="w-full text-xs text-gray-400 hover:text-gray-600 transition-colors py-1">
+            ← Cancel and change scenario
+          </button>
         </div>
       )}
 

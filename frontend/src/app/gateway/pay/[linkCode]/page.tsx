@@ -1,15 +1,19 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import { api } from '../../../../lib/api';
 import { Lock, CreditCard, CheckCircle, XCircle } from 'lucide-react';
 
 type LinkData = Awaited<ReturnType<typeof api.paymentLinks.resolve>>;
-
 type PageState = 'loading' | 'ready' | 'paying' | 'success' | 'unavailable' | 'error';
 
-export default function PaymentLinkPage() {
+// Registry of GET prefill params. Add a new field here and wire it in applyPrefillParams.
+const PREFILL_PARAM_NAMES = ['name', 'card', 'expiry', 'email'] as const;
+type PrefillParam = typeof PREFILL_PARAM_NAMES[number];
+
+function PaymentLinkPageInner() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const linkCode = params.linkCode as string;
 
   const [link, setLink] = useState<LinkData | null>(null);
@@ -23,17 +27,43 @@ export default function PaymentLinkPage() {
   const [expiryYear, setExpiryYear] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
 
+  const applyPrefillParams = useCallback((sp: ReturnType<typeof useSearchParams>) => {
+    const get = (p: PrefillParam) => sp.get(p);
+    const name = get('name');
+    const card = get('card');
+    const expiry = get('expiry');
+    const email = get('email');
+
+    if (name) setCardholderName(name);
+    if (card) setCardNumber(card.replace(/(\d{4})(?=\d)/g, '$1 ').trim());
+    if (expiry) {
+      const sep = expiry.includes('/') ? '/' : expiry.length === 4 ? '' : null;
+      if (sep === '/') {
+        const [mm, yy] = expiry.split('/');
+        setExpiryMonth(mm ?? '');
+        setExpiryYear(yy?.slice(-2) ?? '');
+      } else if (sep === '') {
+        setExpiryMonth(expiry.slice(0, 2));
+        setExpiryYear(expiry.slice(2, 4));
+      }
+    }
+    if (email) setCustomerEmail(email);
+  }, []);
+
   const loadLink = useCallback(async () => {
     try {
       const data = await api.paymentLinks.resolve(linkCode);
       setLink(data);
       if (data.paymentLinkStatus !== 'active') setState('unavailable');
-      else setState('ready');
+      else {
+        setState('ready');
+        applyPrefillParams(searchParams);
+      }
     } catch {
       setState('error');
       setError('Payment link not found.');
     }
-  }, [linkCode]);
+  }, [linkCode, searchParams, applyPrefillParams]);
 
   useEffect(() => { loadLink(); }, [loadLink]);
 
@@ -57,6 +87,13 @@ export default function PaymentLinkPage() {
       if (result.success) {
         setTxRef(result.cardTransactionInstanceReference);
         setState('success');
+        // Notify parent frame when embedded as iframe in the simulator
+        try {
+          window.parent.postMessage(
+            { type: 'sim_payment_link_complete', txnId: result.cardTransactionInstanceReference },
+            window.location.origin
+          );
+        } catch { /* not in iframe */ }
       }
     } catch (err) {
       setState('ready');
@@ -162,6 +199,11 @@ export default function PaymentLinkPage() {
             <div className="flex items-center gap-2 mb-4">
               <CreditCard size={18} className="text-gray-600" />
               <span className="font-medium text-gray-700">Card Details</span>
+              {cardholderName && (
+                <span className="ml-auto text-xs text-[#00ED64] bg-[#001E2B] rounded px-2 py-0.5">
+                  Pre-filled
+                </span>
+              )}
             </div>
 
             <form onSubmit={handlePay} className="space-y-3">
@@ -260,5 +302,17 @@ export default function PaymentLinkPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function PaymentLinkPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-gray-500 text-sm">Loading payment details...</div>
+      </div>
+    }>
+      <PaymentLinkPageInner />
+    </Suspense>
   );
 }

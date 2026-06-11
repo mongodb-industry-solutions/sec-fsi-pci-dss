@@ -84,6 +84,11 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
     router.push('/simulator/investigation');
   }
 
+  function handleCancel() {
+    SimulatorStateManager.clearAll();
+    router.push('/simulator');
+  }
+
   // ── Idle / Creating ──────────────────────────────────────────────────────
   if (flowState === 'idle' || flowState === 'creating') {
     return (
@@ -104,6 +109,9 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
             className="bg-[#001E2B] text-[#00ED64] border border-[#00ED64] px-6 py-2.5 rounded-lg font-semibold text-sm hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors disabled:opacity-50"
           >
             {flowState === 'creating' ? 'Creating session…' : 'Proceed to checkout'}
+          </button>
+          <button onClick={handleCancel} className="mt-2 w-full text-xs text-gray-400 hover:text-gray-600 transition-colors py-1">
+            ← Cancel and change scenario
           </button>
         </div>
       </MerchantBrandingWrapper>
@@ -147,6 +155,9 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
           >
             Load payment form ↓
           </button>
+          <button onClick={handleCancel} className="mt-2 w-full text-xs text-gray-400 hover:text-gray-600 transition-colors py-1">
+            ← Cancel and change scenario
+          </button>
         </div>
       </MerchantBrandingWrapper>
     );
@@ -173,14 +184,19 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
           ref={iframeRef}
           src={iframeSrc}
           className="w-full rounded-lg border shadow-inner bg-white"
-          style={{ height: '640px' }}
+          style={{ height: 'min(640px, 80vh)' }}
           title="Payment Gateway, hosted payment page"
           sandbox="allow-scripts allow-same-origin allow-forms allow-top-navigation-by-user-activation"
         />
-        <p className="text-[11px] text-gray-400 mt-2 text-center">
-          The customer is completing card entry inside the hosted payment page.
-          PAN is never transmitted to the merchant.
-        </p>
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-[11px] text-gray-400">
+            The customer is completing card entry inside the hosted payment page.
+            PAN is never transmitted to the merchant.
+          </p>
+          <button onClick={handleCancel} className="text-xs text-gray-400 hover:text-gray-600 transition-colors shrink-0 ml-3">
+            ← Cancel
+          </button>
+        </div>
       </MerchantBrandingWrapper>
     );
   }
