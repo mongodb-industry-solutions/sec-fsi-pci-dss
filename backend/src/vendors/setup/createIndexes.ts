@@ -110,6 +110,12 @@ export async function createIndexes(client: MongoClient) {
   ]);
 
   // SD-193: Integration Registry (Ch-07)
+  // Drop the old unique (type+endpoint) index if it still exists — replaced with non-unique
+  // to support multi-provider configurations (ADR-010).
+  await db.collection('integrationRegistry')
+    .dropIndex('externalProviderArrangementType_1_externalProviderApiEndpoint_1')
+    .catch(() => { /* index may not exist — safe to ignore */ });
+
   await db.collection('integrationRegistry').createIndexes([
     { key: { externalProviderArrangementInstanceReference: 1 }, unique: true },
     { key: { externalProviderArrangementType: 1, externalProviderArrangementStatus: 1 } },
