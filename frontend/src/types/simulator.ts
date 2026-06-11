@@ -25,6 +25,10 @@ export interface SimulatorScenario {
     merchantName: string;
     merchantCategoryCode: string;
     description: string;
+    /** Card expiry to pre-fill the hosted checkout page, format MM/YY */
+    cardExpiry?: string;
+    /** Test card number to pre-fill the hosted checkout page */
+    cardHint?: string;
   };
 }
 

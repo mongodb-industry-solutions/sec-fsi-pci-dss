@@ -1,26 +1,69 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '../../../../lib/api';
 import { Lock, CreditCard, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 type SessionData = Awaited<ReturnType<typeof api.checkout.getSession>>;
-
 type PageState = 'loading' | 'ready' | 'paying' | 'success' | 'expired' | 'completed' | 'error';
 
-export default function CheckoutPage() {
+// ---------------------------------------------------------------------------
+// Registry of supported GET prefill params.
+// To add a new field: declare the param name here and wire its setter in
+// applyPrefillParams below. The simulator (or any other caller) just appends
+// ?<param>=<value> to the checkout URL.
+// ---------------------------------------------------------------------------
+const PREFILL_PARAM_NAMES = ['name', 'card', 'expiry'] as const;
+type PrefillParam = typeof PREFILL_PARAM_NAMES[number];
+
+function formatCountdown(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// ---------------------------------------------------------------------------
+// Inner component: uses useSearchParams (requires Suspense boundary above)
+// ---------------------------------------------------------------------------
+function CheckoutPageInner() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const sessionId = params.sessionId as string;
 
   const [session, setSession] = useState<SessionData | null>(null);
   const [state, setState] = useState<PageState>('loading');
   const [error, setError] = useState('');
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
+  // Form state
   const [cardholderName, setCardholderName] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [expiryMonth, setExpiryMonth] = useState('');
   const [expiryYear, setExpiryYear] = useState('');
+
+  // Apply GET params to form fields. Add more params here as the payment form grows.
+  const applyPrefillParams = useCallback((sp: ReturnType<typeof useSearchParams>) => {
+    const get = (p: PrefillParam) => sp.get(p);
+
+    const name = get('name');
+    const card = get('card');
+    const expiry = get('expiry');
+
+    if (name) setCardholderName(name);
+    if (card) setCardNumber(card.replace(/(\d{4})(?=\d)/g, '$1 ').trim());
+    if (expiry) {
+      const sep = expiry.includes('/') ? '/' : expiry.length === 4 ? '' : null;
+      if (sep === '/') {
+        const [mm, yy] = expiry.split('/');
+        setExpiryMonth(mm ?? '');
+        setExpiryYear(yy?.slice(-2) ?? '');
+      } else if (sep === '') {
+        setExpiryMonth(expiry.slice(0, 2));
+        setExpiryYear(expiry.slice(2, 4));
+      }
+    }
+  }, []);
 
   const loadSession = useCallback(async () => {
     try {
@@ -29,14 +72,41 @@ export default function CheckoutPage() {
       if (data.checkoutSessionStatus === 'expired') setState('expired');
       else if (data.checkoutSessionStatus === 'completed') setState('completed');
       else if (data.checkoutSessionStatus === 'cancelled') setState('expired');
-      else setState('ready');
+      else {
+        setState('ready');
+        // Apply URL prefill params once session is confirmed active
+        applyPrefillParams(searchParams);
+        // Initialise countdown
+        const expiresAtMs = new Date(data.checkoutSessionExpiresAt).getTime();
+        setSecondsLeft(Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000)));
+      }
     } catch {
       setState('error');
       setError('Session not found or expired.');
     }
-  }, [sessionId]);
+  }, [sessionId, searchParams, applyPrefillParams]);
 
   useEffect(() => { loadSession(); }, [loadSession]);
+
+  // Live countdown: ticks every second, auto-expires when it hits zero
+  useEffect(() => {
+    if (secondsLeft === null || state !== 'ready') return;
+    if (secondsLeft <= 0) {
+      setState('expired');
+      return;
+    }
+    const iv = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(iv);
+          setState('expired');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [secondsLeft === null || secondsLeft <= 0 ? secondsLeft : 'ticking', state]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handlePay(e: React.FormEvent) {
     e.preventDefault();
@@ -44,7 +114,8 @@ export default function CheckoutPage() {
     setState('paying');
     setError('');
 
-    const lastFour = cardNumber.replace(/\s/g, '').slice(-4);
+    const digits = cardNumber.replace(/\s/g, '');
+    const lastFour = digits.slice(-4);
     const cardToken = `tok_${Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}${lastFour}`;
 
     try {
@@ -69,6 +140,7 @@ export default function CheckoutPage() {
   const formatAmount = (amount: number, currency: string) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 
+  // ── Static states ──────────────────────────────────────────────────────────
   if (state === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -126,8 +198,11 @@ export default function CheckoutPage() {
     );
   }
 
-  const expiresAt = new Date(session.checkoutSessionExpiresAt);
-  const minutesLeft = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 60000));
+  // ── Countdown display ─────────────────────────────────────────────────────
+  const urgent = secondsLeft !== null && secondsLeft < 120;
+  const countdownLabel = secondsLeft !== null
+    ? `Session expires in ${formatCountdown(secondsLeft)}`
+    : null;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -139,6 +214,7 @@ export default function CheckoutPage() {
 
       <main className="flex-1 flex items-start justify-center py-8 px-4">
         <div className="w-full max-w-md space-y-4">
+          {/* Order summary */}
           <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
             <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Payment to</div>
             <div className="font-semibold text-gray-800 text-lg">{session.merchantName}</div>
@@ -149,18 +225,29 @@ export default function CheckoutPage() {
                 {formatAmount(session.checkoutSessionAmount, session.checkoutSessionCurrency)}
               </span>
             </div>
-            {minutesLeft > 0 && (
-              <div className="mt-2 flex items-center gap-1 text-xs text-amber-600">
-                <Clock size={12} />
-                Session expires in {minutesLeft} min
+            {countdownLabel && (
+              <div className={`mt-2 flex items-center gap-1.5 text-xs font-medium tabular-nums transition-colors ${urgent ? 'text-red-600' : 'text-amber-600'}`}>
+                <Clock size={12} className={urgent ? 'animate-pulse' : ''} />
+                {countdownLabel}
+                {urgent && (
+                  <span className="ml-auto bg-red-50 border border-red-200 text-red-600 rounded px-1.5 py-0.5 text-[10px]">
+                    Expiring soon
+                  </span>
+                )}
               </div>
             )}
           </div>
 
+          {/* Card form */}
           <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <CreditCard size={18} className="text-gray-600" />
               <span className="font-medium text-gray-700">Card Details</span>
+              {cardholderName && (
+                <span className="ml-auto text-xs text-[#00ED64] bg-[#001E2B] rounded px-2 py-0.5">
+                  Pre-filled
+                </span>
+              )}
             </div>
 
             <form onSubmit={handlePay} className="space-y-3">
@@ -257,5 +344,18 @@ export default function CheckoutPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+// Suspense boundary required by Next.js App Router for useSearchParams in pages
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-gray-500 text-sm">Loading payment details...</div>
+      </div>
+    }>
+      <CheckoutPageInner />
+    </Suspense>
   );
 }

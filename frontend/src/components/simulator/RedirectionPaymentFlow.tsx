@@ -154,6 +154,14 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
 
   // ── Waiting; iframe visible ──────────────────────────────────────────────
   if (flowState === 'waiting' && sessionId) {
+    // Build prefill query params from scenario. The checkout page reads these via
+    // useSearchParams; adding a new param only requires updating the registry there.
+    const prefillParams = new URLSearchParams();
+    if (prefill.cardholderName) prefillParams.set('name', prefill.cardholderName);
+    if (prefill.cardExpiry)    prefillParams.set('expiry', prefill.cardExpiry);
+    if (prefill.cardHint)      prefillParams.set('card', prefill.cardHint);
+    const iframeSrc = `/gateway/checkout/${sessionId}?${prefillParams.toString()}`;
+
     return (
       <MerchantBrandingWrapper
         merchantName={prefill.merchantName}
@@ -163,10 +171,10 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
       >
         <iframe
           ref={iframeRef}
-          src={`/gateway/checkout/${sessionId}`}
+          src={iframeSrc}
           className="w-full rounded-lg border shadow-inner bg-white"
-          style={{ height: '620px' }}
-          title="Payment Gateway; hosted payment page"
+          style={{ height: '640px' }}
+          title="Payment Gateway, hosted payment page"
           sandbox="allow-scripts allow-same-origin allow-forms allow-top-navigation-by-user-activation"
         />
         <p className="text-[11px] text-gray-400 mt-2 text-center">

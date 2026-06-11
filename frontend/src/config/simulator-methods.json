@@ -48,7 +48,9 @@
         "currency": "EUR",
         "merchantName": "TechGadgets Ltd.",
         "merchantCategoryCode": "5734",
-        "description": "Electronics purchase, TechGadgets Ltd."
+        "description": "Electronics purchase, TechGadgets Ltd.",
+        "cardExpiry": "12/28",
+        "cardHint": "4242424242424242"
       }
     },
     {
@@ -66,7 +68,9 @@
         "currency": "EUR",
         "merchantName": "Espresso Works Ltd.",
         "merchantCategoryCode": "5812",
-        "description": "Coffee and workspace, Espresso Works"
+        "description": "Coffee and workspace, Espresso Works",
+        "cardExpiry": "06/26",
+        "cardHint": "5555555555551212"
       }
     },
     {
@@ -84,7 +88,9 @@
         "currency": "EUR",
         "merchantName": "Okafor Digital Services",
         "merchantCategoryCode": "7372",
-        "description": "Software subscription, Okafor Digital"
+        "description": "Software subscription, Okafor Digital",
+        "cardExpiry": "09/27",
+        "cardHint": "4111111111111234"
       }
     }
   ]
