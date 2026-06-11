@@ -5,7 +5,7 @@ import type { MappingRule } from './_context';
 
 // ── StatusToggle ──────────────────────────────────────────────────────────────
 //
-// Instant on/off switch — calls onToggle immediately, does not require Save.
+// Instant on/off switch; calls onToggle immediately, does not require Save.
 // Use for settings whose effect should be visible right away (active/inactive,
 // callback enabled/disabled, etc.).
 
@@ -116,7 +116,7 @@ export function FieldMappingMatrix({ rules, setRules, sourceLabel, targetLabel, 
 
   if (readOnly) {
     if (rules.length === 0) return (
-      <p className="text-xs text-gray-400 italic py-2">No mapping rules — fields pass through unchanged.</p>
+      <p className="text-xs text-gray-400 italic py-2">No mapping rules; fields pass through unchanged.</p>
     );
     return (
       <table className="w-full text-xs border rounded-lg overflow-hidden">
@@ -211,7 +211,7 @@ export function FieldMappingMatrix({ rules, setRules, sourceLabel, targetLabel, 
             {rules.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-3 py-4 text-center text-gray-400 italic">
-                  No rules yet — add rows to define the expected fields.
+                  No rules yet; add rows to define the expected fields.
                 </td>
               </tr>
             )}
@@ -295,7 +295,7 @@ export function FieldLabel({ label, hint }: { label: string; hint: string }) {
       {label}
       <span className="group relative inline-flex items-center cursor-help">
         <Info size={11} className="text-gray-400 group-hover:text-gray-600 transition-colors" />
-        {/* Tooltip — appears above the icon */}
+        {/* Tooltip; appears above the icon */}
         <span
           className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2
             w-60 rounded-lg bg-gray-900 px-3 py-2 text-xs font-normal text-white leading-relaxed

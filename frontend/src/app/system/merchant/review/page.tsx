@@ -167,7 +167,7 @@ export default function MerchantReviewPage() {
         <div className="text-sm text-gray-500">
           This page is restricted to <code className="bg-gray-100 px-1 rounded">merchant_officer</code> and <code className="bg-gray-100 px-1 rounded">security_auditor</code> roles.
         </div>
-        {debugMode && <div className="text-xs text-gray-400 mt-2">PCI DSS Req 7.1 — Least privilege access control</div>}
+        {debugMode && <div className="text-xs text-gray-400 mt-2">PCI DSS Req 7.1, Least privilege access control</div>}
       </div>
     );
   }
@@ -182,7 +182,7 @@ export default function MerchantReviewPage() {
             <h1 className="text-xl font-bold text-gray-900">Merchant Review Queue</h1>
           </div>
           <p className="text-sm text-gray-500 mt-0.5">
-            {debugMode ? 'KYB review — BIAN SD-89 Action: Control. Approve or reject pending merchant applications.' : 'Approve or reject pending merchant applications.'}
+            {debugMode ? 'KYB review, BIAN SD-89 Action: Control. Approve or reject pending merchant applications.' : 'Approve or reject pending merchant applications.'}
           </p>
         </div>
         <button
@@ -195,7 +195,7 @@ export default function MerchantReviewPage() {
         </button>
       </div>
 
-      {/* BIAN + PCI info strip — debug mode only */}
+      {/* BIAN + PCI info strip, debug mode only */}
       {debugMode && (
         <div className="flex flex-wrap gap-2">
           <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 text-xs text-blue-700 font-medium">

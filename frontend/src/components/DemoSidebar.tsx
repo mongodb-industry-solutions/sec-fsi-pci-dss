@@ -133,7 +133,7 @@ export function DemoSidebar() {
         })}
       </nav>
 
-      {/* Universal Help link — visible to all roles */}
+      {/* Universal Help link, visible to all roles */}
       <div className="px-2 pb-1">
         <Link
           href="/system/help"

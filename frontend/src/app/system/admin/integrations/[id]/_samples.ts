@@ -139,7 +139,7 @@ export const OUTBOUND_SAMPLES: Record<string, Record<string, unknown>> = {
       unusualPatterns: ['LARGE_ROUND_AMOUNTS', 'MULTIPLE_JURISDICTIONS'],
     },
     triggeredAlerts: [
-      { alertCode: 'STR-001', description: 'Structuring pattern detected — 6 deposits just below €10,000', severity: 'HIGH' },
+      { alertCode: 'STR-001', description: 'Structuring pattern detected; 6 deposits just below €10,000', severity: 'HIGH' },
     ],
     requestedBy: 'leafybank-aml-engine',
     correlationId: 'corr-20260611-67231',
@@ -199,7 +199,7 @@ export const INBOUND_SAMPLES: Record<string, Record<string, unknown>> = {
           entity: {
             name: 'Carlos Mendez Ruiz',
             entityType: 'INDIVIDUAL',
-            designation: 'Listed for terrorism financing — UNSCR 1267',
+            designation: 'Listed for terrorism financing; UNSCR 1267',
             listedDate: '2019-07-22',
             listingAuthority: 'UN Security Council',
           },
@@ -219,7 +219,7 @@ export const INBOUND_SAMPLES: Record<string, Record<string, unknown>> = {
     riskLevel: 'HIGH',
     decision: 'DECLINE',
     triggeredRules: [
-      { ruleId: 'VEL-003', description: 'Unusual location — transaction in DE, account typically active in ES', weight: 0.38 },
+      { ruleId: 'VEL-003', description: 'Unusual location; transaction in DE, account typically active in ES', weight: 0.38 },
       { ruleId: 'DEV-011', description: 'New device fingerprint not previously seen on this account', weight: 0.31 },
       { ruleId: 'AMT-007', description: 'Amount exceeds 90th percentile for merchant category 5732', weight: 0.18 },
     ],
@@ -260,7 +260,7 @@ export const INBOUND_SAMPLES: Record<string, Record<string, unknown>> = {
       { checkType: 'COMPANY_REGISTRY',     status: 'PASSED' },
       { checkType: 'BENEFICIAL_OWNERSHIP', status: 'PASSED' },
       { checkType: 'SANCTIONS_SCREEN',     status: 'PASSED' },
-      { checkType: 'ADVERSE_MEDIA',        status: 'REVIEW', note: 'Minor adverse media detected — monitoring recommended' },
+      { checkType: 'ADVERSE_MEDIA',        status: 'REVIEW', note: 'Minor adverse media detected; monitoring recommended' },
     ],
     riskRating: 'MEDIUM',
     reviewRequired: true,

@@ -49,7 +49,7 @@ interface RoutingGroup {
   routingGroupMembers: RoutingGroupMember[];
 }
 
-// Only serializable values — no React components
+// Only serializable values, no React components
 export interface CategoryMeta {
   type: string;
   label: string;

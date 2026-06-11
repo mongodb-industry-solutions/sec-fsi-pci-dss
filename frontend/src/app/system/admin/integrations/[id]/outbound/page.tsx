@@ -165,7 +165,7 @@ export default function OutboundPage() {
         <p className="text-sm text-gray-600 leading-relaxed mb-4">
           {isInternal
             ? 'The outbound section configures the API endpoint that LeafyBank calls when this built-in integration is triggered. Even built-in providers follow the API-first approach and call a backend endpoint with the specified fields.'
-            : 'The outbound section configures where and how LeafyBank sends data when this integration is triggered — endpoint, authentication, field mapping, and transport settings.'}
+            : 'The outbound section configures where and how LeafyBank sends data when this integration is triggered; endpoint, authentication, field mapping, and transport settings.'}
         </p>
         <StatusToggle
           enabled={isActive}
@@ -355,7 +355,7 @@ export default function OutboundPage() {
 
           {scheme === 'oauth2_cc' && (
             <p className="text-xs text-gray-400 border-t pt-3">
-              OAuth2 client credentials — token endpoint and client secret are managed by the LeafyBank vault. Contact the platform team to configure credentials.
+              OAuth2 client credentials; token endpoint and client secret are managed by the LeafyBank vault. Contact the platform team to configure credentials.
             </p>
           )}
         </div>
@@ -392,7 +392,7 @@ export default function OutboundPage() {
             <span className="font-medium text-gray-500 shrink-0">Target</span>
             {endpoint
               ? <code className="flex-1 font-mono text-gray-800 break-all">{endpoint}</code>
-              : <span className="flex-1 italic text-gray-400">No endpoint configured — set the URL in the Endpoint section above.</span>}
+              : <span className="flex-1 italic text-gray-400">No endpoint configured; set the URL in the Endpoint section above.</span>}
           </div>
 
           {/* Payload editor */}
@@ -407,7 +407,7 @@ export default function OutboundPage() {
               spellCheck={false}
               className={`w-full border rounded-lg px-3 py-2 text-xs font-mono resize-y focus:outline-none focus:ring-2 focus:ring-violet-400 ${testPayloadError ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
             {testPayloadError && (
-              <p className="mt-1 text-xs text-red-600">⚠ Invalid JSON — {testPayloadError}</p>
+              <p className="mt-1 text-xs text-red-600">⚠ Invalid JSON; {testPayloadError}</p>
             )}
           </div>
 

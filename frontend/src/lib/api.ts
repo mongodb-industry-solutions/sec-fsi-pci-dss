@@ -540,6 +540,32 @@ export const api = {
         token
       ),
   },
+  simulator: {
+    createCheckoutSession: (body: {
+      merchantAgreementInstanceReference: string;
+      amount: number;
+      currency: string;
+      description: string;
+      returnUrl: string;
+      cancelUrl: string;
+      merchantReference: string;
+    }) =>
+      apiFetch<{ checkoutSessionInstanceReference: string; paymentPageUrl: string; expiresAt: string }>(
+        '/api/v1/checkout/sessions', { method: 'POST', body: JSON.stringify(body) }
+      ),
+    createPaymentLink: (body: {
+      merchantAgreementInstanceReference: string;
+      amount: number;
+      currency: string;
+      description: string;
+      customerMessage?: string;
+      usageType: 'single_use' | 'multi_use';
+    }) =>
+      apiFetch<{ paymentLinkInstanceReference: string; paymentLinkCode: string; paymentUrl: string }>(
+        '/api/v1/payment-links', { method: 'POST', body: JSON.stringify(body) }
+      ),
+  },
+
   integrations: {
     list: (token: string, params?: { type?: string; status?: string }) => {
       const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([,v]) => v) as [string,string][]).toString() : '';

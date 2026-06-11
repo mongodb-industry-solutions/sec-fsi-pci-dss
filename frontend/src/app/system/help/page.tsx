@@ -394,7 +394,7 @@ export default function HelpPage() {
           /* ── Reference links ── */
           .p-ref-link { font-size: 7.5pt; color: #1d4ed8; display: block; margin-bottom: 3px; }
 
-          /* Page numbers — suppress browser default headers/footers, show only page number at bottom-right */
+          /* Page numbers, suppress browser default headers/footers, show only page number at bottom-right */
           @page {
             @top-left    { content: ""; }
             @top-center  { content: ""; }
@@ -627,7 +627,7 @@ export default function HelpPage() {
             </p>
           </div>
 
-          {/* Requirements — one unified card, homogeneous background */}
+          {/* Requirements, one unified card, homogeneous background */}
           <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
           {REQUIREMENTS.map((req, reqIdx) => {
             const doneCount  = req.items.filter(i => checked.has(i.id)).length;
@@ -680,7 +680,7 @@ export default function HelpPage() {
                   </div>
                 </div>
 
-                {/* Screen body — shown when expanded, hidden when collapsed */}
+                {/* Screen body, shown when expanded, hidden when collapsed */}
                 <div className={isExpanded ? '' : 'hidden'}>
 
                   {/* Summary */}
@@ -695,7 +695,7 @@ export default function HelpPage() {
                     </div>
                   </div>
 
-                  {/* Items — rows directly on the card background */}
+                  {/* Items, rows directly on the card background */}
                   <div className="px-5 pb-1">
                     {req.items.map((item, idx) => {
                       const isDone = checked.has(item.id);
@@ -744,7 +744,7 @@ export default function HelpPage() {
                   )}
                 </div>
 
-                {/* Print body — always visible in print, hidden on screen via print-only */}
+                {/* Print body, always visible in print, hidden on screen via print-only */}
                 <div className="print-only">
                   <div className="p-req-summary">{req.summary}</div>
                   <div className="p-req-freq">⏱ {req.frequency}</div>

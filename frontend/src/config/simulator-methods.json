@@ -1,0 +1,91 @@
+{
+  "merchantId": "m0000003-0000-4000-8000-000000000003",
+  "merchantName": "Fischer Web Studio",
+  "methods": [
+    {
+      "id": "api-card",
+      "label": "API Card",
+      "icon": "💳",
+      "description": "Direct card tokenization; PAN never leaves the browser in plaintext.",
+      "enabled": true
+    },
+    {
+      "id": "redirection",
+      "label": "Redirection Payment",
+      "icon": "🔀",
+      "description": "Merchant site redirects customer into the hosted payment page (iframe demo).",
+      "enabled": true
+    },
+    {
+      "id": "payment-link",
+      "label": "Payment Link",
+      "icon": "🔗",
+      "description": "Merchant sends a shareable link; customer completes payment on a hosted page.",
+      "enabled": true
+    },
+    {
+      "id": "insite",
+      "label": "InSite Payment",
+      "icon": "🖥️",
+      "description": "Embedded widget loaded inline; zero redirect friction.",
+      "enabled": false,
+      "comingSoon": true
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "luis-fraud",
+      "label": "Luis Fernandez, Suspected Fraud",
+      "description": "High-value electronics purchase from an unusual location triggers automated fraud detection.",
+      "persona": "Luis Fernandez",
+      "expectedOutcome": "fraud",
+      "outcomeLabel": "🚨 Fraud case auto-created",
+      "prefill": {
+        "cardholderName": "Luis Fernandez",
+        "email": "luis.fernandez@back.es",
+        "phone": "+44 7700 900123",
+        "amount": 850.00,
+        "currency": "EUR",
+        "merchantName": "TechGadgets Ltd.",
+        "merchantCategoryCode": "5734",
+        "description": "Electronics purchase, TechGadgets Ltd."
+      }
+    },
+    {
+      "id": "maria-legit",
+      "label": "Maria Garcia, Legitimate Purchase",
+      "description": "Low-value coffee purchase; routine transaction clears without fraud flags.",
+      "persona": "Maria Garcia",
+      "expectedOutcome": "legit",
+      "outcomeLabel": "✅ Payment approved",
+      "prefill": {
+        "cardholderName": "Maria Garcia",
+        "email": "maria.garcia@back.es",
+        "phone": "+34 600 123 456",
+        "amount": 45.00,
+        "currency": "EUR",
+        "merchantName": "Espresso Works Ltd.",
+        "merchantCategoryCode": "5812",
+        "description": "Coffee and workspace, Espresso Works"
+      }
+    },
+    {
+      "id": "ahmed-border",
+      "label": "Ahmed Hassan, Borderline Case",
+      "description": "Mid-value payment with mixed risk signals; borderline review required.",
+      "persona": "Ahmed Hassan",
+      "expectedOutcome": "borderline",
+      "outcomeLabel": "⚠️ Manual review triggered",
+      "prefill": {
+        "cardholderName": "Ahmed Hassan",
+        "email": "ahmed.hassan@back.es",
+        "phone": "+971 50 000 9999",
+        "amount": 499.00,
+        "currency": "EUR",
+        "merchantName": "Okafor Digital Services",
+        "merchantCategoryCode": "7372",
+        "description": "Software subscription, Okafor Digital"
+      }
+    }
+  ]
+}

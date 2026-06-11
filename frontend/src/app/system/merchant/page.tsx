@@ -38,7 +38,7 @@ interface MerchantRecord {
   merchantTransactionLimitAmount?: number;
   merchantSettlementSchedule?: string;
   merchantReviewNote?: string;
-  merchantAgreementKybCheck?: MerchantAgreementKybCheck;  // BQ:Step — BIAN SD-89. PCI DSS Req 12.8
+  merchantAgreementKybCheck?: MerchantAgreementKybCheck;  // BQ:Step, BIAN SD-89. PCI DSS Req 12.8
   recordCreatedDateTime?: string;
 }
 
@@ -135,7 +135,7 @@ function MerchantApplicationForm({ token, onSubmitted }: { token: string; onSubm
         </p>
       </div>
 
-      {/* BIAN badge + presets — debug mode only */}
+      {/* BIAN badge + presets, debug mode only */}
       {debugMode && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -192,12 +192,12 @@ function MerchantApplicationForm({ token, onSubmitted }: { token: string; onSubm
               value={mcc} onChange={(e) => setMcc(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
             >
-              <option value="5812">5812 — Restaurants</option>
-              <option value="5411">5411 — Grocery Stores</option>
-              <option value="5999">5999 — Retail</option>
-              <option value="7389">7389 — Consulting</option>
-              <option value="6011">6011 — ATM / Cash (High Risk)</option>
-              <option value="7995">7995 — Gambling (High Risk)</option>
+              <option value="5812">5812, Restaurants</option>
+              <option value="5411">5411, Grocery Stores</option>
+              <option value="5999">5999, Retail</option>
+              <option value="7389">7389, Consulting</option>
+              <option value="6011">6011, ATM / Cash (High Risk)</option>
+              <option value="7995">7995, Gambling (High Risk)</option>
             </select>
           </div>
           <div>
@@ -479,7 +479,7 @@ function UnderReviewView({ merchant }: { merchant: MerchantRecord }) {
         </div>
       </div>
 
-      {/* BIAN lifecycle — debug only */}
+      {/* BIAN lifecycle, debug only */}
       {debugMode && (
         <BianLifecyclePanel currentStatus={merchant.merchantAgreementStatus} />
       )}
@@ -986,7 +986,7 @@ const STATUS_COLORS: Record<string, string> = {
   closed:       'bg-gray-100 text-gray-500',
 };
 
-// Statuses accessible to merchant_officer (PCI DSS Req 7.1 — least privilege)
+// Statuses accessible to merchant_officer (PCI DSS Req 7.1, least privilege)
 const STATUS_LABELS: Record<string, string> = {
   initiated:    'Initiated',
   under_review: 'Under Review',
@@ -1081,7 +1081,7 @@ function AnalystMerchantView({ token, role }: { token: string; role: string }) {
         {debugMode && (
           <p className="text-xs text-gray-400 font-mono mt-0.5">
             SD-89 · MerchantAgreementProcedure
-            {isMerchantOfficer && ' · PCI DSS Req 7.1 — scope: review states only'}
+            {isMerchantOfficer && ' · PCI DSS Req 7.1, scope: review states only'}
           </p>
         )}
       </div>

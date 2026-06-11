@@ -36,7 +36,7 @@ function DemoShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Top header — sticky */}
+      {/* Top header, sticky */}
       <header className="sticky top-0 z-20 bg-[#001E2B] border-b border-white/8 px-3 sm:px-5 h-12 flex items-center justify-between shrink-0 gap-3">
         {/* Brand */}
         <Link

@@ -196,7 +196,7 @@ export default function InboundPage() {
 
       {/* ── Security ───────────────────────────────────────────────────────── */}
       <Card
-        title="Security — sender verification"
+        title="Security; sender verification"
         subtitle="Validates each incoming request with a cryptographic signature. Without this, any HTTP client that knows the callback URL can send data.">
         <div className="space-y-4">
           <label className="flex items-center gap-3 cursor-pointer">
@@ -205,7 +205,7 @@ export default function InboundPage() {
             <div className="flex items-center gap-1.5">
               {secEnabled ? <Shield size={14} className="text-green-600" /> : <ShieldOff size={14} className="text-gray-400" />}
               <span className={`text-sm font-medium ${secEnabled ? 'text-green-700' : 'text-gray-500'}`}>
-                {secEnabled ? 'Signature verification enabled' : 'Signature verification disabled — any caller will be accepted'}
+                {secEnabled ? 'Signature verification enabled' : 'Signature verification disabled; any caller will be accepted'}
               </span>
             </div>
           </label>
@@ -300,7 +300,7 @@ export default function InboundPage() {
       {/* ── Simulate inbound data ──────────────────────────────────────────── */}
       <Card
         title="Simulate inbound data reception"
-        subtitle="Preview how LeafyBank processes an incoming webhook payload — applies the inbound field mapping rules and shows the result. A confirmation is required before running.">
+        subtitle="Preview how LeafyBank processes an incoming webhook payload; applies the inbound field mapping rules and shows the result. A confirmation is required before running.">
         <div className="space-y-4">
 
           {/* Callback URL banner */}
@@ -313,7 +313,7 @@ export default function InboundPage() {
           <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
             <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-600" />
             <p className="text-xs text-amber-800">
-              You will be asked to confirm before the test runs. This is a dry-run — field mapping rules are applied but no data is written to production systems.
+              You will be asked to confirm before the test runs. This is a dry-run; field mapping rules are applied but no data is written to production systems.
             </p>
           </div>
 
@@ -329,7 +329,7 @@ export default function InboundPage() {
               spellCheck={false}
               className={`w-full border rounded-lg px-3 py-2 text-xs font-mono resize-y focus:outline-none focus:ring-2 focus:ring-amber-400 ${inboundSampleError ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
             {inboundSampleError && (
-              <p className="mt-1 text-xs text-red-600">⚠ Invalid JSON — {inboundSampleError}</p>
+              <p className="mt-1 text-xs text-red-600">⚠ Invalid JSON; {inboundSampleError}</p>
             )}
           </div>
 

@@ -22,16 +22,16 @@ const TYPE_PURPOSE: Record<string, string> = {
 
 function HealthStatus({ status }: { status?: string }) {
   if (!status || status === 'unknown') return (
-    <span className="flex items-center gap-1.5 text-sm text-gray-400"><Clock size={14} />Unknown — no test run yet</span>
+    <span className="flex items-center gap-1.5 text-sm text-gray-400"><Clock size={14} />Unknown; no test run yet</span>
   );
   if (status === 'ok') return (
     <span className="flex items-center gap-1.5 text-sm text-green-700 font-medium"><CheckCircle2 size={14} />Healthy</span>
   );
   if (status === 'degraded') return (
-    <span className="flex items-center gap-1.5 text-sm text-amber-700 font-medium"><AlertCircle size={14} />Degraded — elevated response times</span>
+    <span className="flex items-center gap-1.5 text-sm text-amber-700 font-medium"><AlertCircle size={14} />Degraded; elevated response times</span>
   );
   if (status === 'unreachable') return (
-    <span className="flex items-center gap-1.5 text-sm text-red-600 font-medium"><WifiOff size={14} />Unreachable — connection failed</span>
+    <span className="flex items-center gap-1.5 text-sm text-red-600 font-medium"><WifiOff size={14} />Unreachable; connection failed</span>
   );
   return null;
 }
@@ -53,7 +53,7 @@ export default function OverviewPage() {
     setTestMsg(null);
     try {
       const r = await api.integrations.test(id, token);
-      setTestMsg({ ok: r.status === 'ok', text: r.status === 'ok' ? `Connection OK — ${r.latencyMs}ms` : `Test failed: ${r.status}` });
+      setTestMsg({ ok: r.status === 'ok', text: r.status === 'ok' ? `Connection OK; ${r.latencyMs}ms` : `Test failed: ${r.status}` });
       reload();
     } catch (err) {
       setTestMsg({ ok: false, text: (err as Error).message });

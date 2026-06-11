@@ -109,7 +109,7 @@ export default function AuditPage() {
 
         </div>
 
-        {/* Access model context — debug mode only */}
+        {/* Access model context, debug mode only */}
         {debugMode && (
           <div className="bg-[#001E2B]/5 border border-[#001E2B]/20 rounded-xl p-4 text-sm mb-5">
             <strong>Security Auditor access (Level 4):</strong> Read-only oversight across all cases and roles.
@@ -229,7 +229,7 @@ export default function AuditPage() {
           </>
         )}
 
-        {/* Audit control context — debug mode only */}
+        {/* Audit control context, debug mode only */}
         {debugMode && !loading && events.length > 0 && (
           <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
             <div className="bg-white border rounded-xl p-4">

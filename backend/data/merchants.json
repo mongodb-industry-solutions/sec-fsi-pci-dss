@@ -15,14 +15,14 @@
     "merchantTransactionCount30d": 142,
     "merchantRiskCategory": "low",
     "merchantApiKeys": [],
-    "merchantReviewNote": "KYB passed — business registered, tax ID verified, no adverse media",
+    "merchantReviewNote": "KYB passed, business registered, tax ID verified, no adverse media",
     "merchantReviewedByPartyReference": "b0000056-0000-4000-8000-000000000056",
     "merchantReviewedDateTime": "2026-05-15T10:30:00.000Z",
     "merchantAgreementKybCheck": {
       "merchantAgreementKybCheckStatus": "verified",
       "merchantAgreementKybCheckCompletedDate": "2026-05-15T10:30:00.000Z",
       "merchantAgreementKybCheckReference": "KYB-US-2026-001",
-      "merchantAgreementKybCheckNotes": "KYB passed — business registered, tax ID verified, no adverse media",
+      "merchantAgreementKybCheckNotes": "KYB passed, business registered, tax ID verified, no adverse media",
       "merchantAgreementKybCheckPerformedByPartyReference": "b0000056-0000-4000-8000-000000000056"
     },
     "bianServiceDomain": "Merchant Relations",
@@ -72,14 +72,14 @@
     "merchantTransactionCount30d": 28,
     "merchantRiskCategory": "low",
     "merchantApiKeys": [],
-    "merchantReviewNote": "KYB passed — German trade register verified, VAT ID confirmed",
+    "merchantReviewNote": "KYB passed, German trade register verified, VAT ID confirmed",
     "merchantReviewedByPartyReference": "b0000056-0000-4000-8000-000000000056",
     "merchantReviewedDateTime": "2026-05-20T14:15:00.000Z",
     "merchantAgreementKybCheck": {
       "merchantAgreementKybCheckStatus": "verified",
       "merchantAgreementKybCheckCompletedDate": "2026-05-20T14:15:00.000Z",
       "merchantAgreementKybCheckReference": "KYB-DE-2026-003",
-      "merchantAgreementKybCheckNotes": "KYB passed — German trade register verified, VAT ID confirmed",
+      "merchantAgreementKybCheckNotes": "KYB passed, German trade register verified, VAT ID confirmed",
       "merchantAgreementKybCheckPerformedByPartyReference": "b0000056-0000-4000-8000-000000000056"
     },
     "bianServiceDomain": "Merchant Relations",

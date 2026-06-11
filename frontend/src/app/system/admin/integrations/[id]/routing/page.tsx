@@ -101,7 +101,7 @@ export default function RoutingPage() {
     finally { setCreating(false); }
   }
 
-  // ── What is routing — explanation ─────────────────────────────────────────
+  // ── What is routing; explanation ─────────────────────────────────────────
 
   return (
     <div className="space-y-5">
@@ -182,7 +182,7 @@ export default function RoutingPage() {
         </Card>
       ) : (
         <div className="bg-gray-50 border rounded-xl p-4 text-sm text-gray-500">
-          This integration is not part of any routing group — it handles all requests independently.
+          This integration is not part of any routing group; it handles all requests independently.
         </div>
       )}
 

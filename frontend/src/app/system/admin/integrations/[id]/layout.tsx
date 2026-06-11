@@ -145,7 +145,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
 
         {newKey && (
           <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs">
-            <strong className="text-amber-900">New API Key — save it now, it will not be shown again:</strong>
+            <strong className="text-amber-900">New API Key, save it now, it will not be shown again:</strong>
             <code className="block mt-1 font-mono text-amber-800 break-all select-all bg-white border border-amber-200 rounded px-2 py-1 mt-1">{newKey}</code>
             <button onClick={() => setNewKey(null)} className="mt-1 text-amber-600 underline">Dismiss</button>
           </div>

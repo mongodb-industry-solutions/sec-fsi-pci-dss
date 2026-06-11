@@ -1,11 +1,29 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
+const METHOD_LABELS: Record<string, string> = {
+  'api-card': '💳 API Card',
+  'redirection': '🔀 Redirection',
+  'payment-link': '🔗 Payment Link',
+  'insite': '🖥️ InSite',
+};
 
 export default function SimulatorLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isPayment = pathname?.includes('/payment');
   const isInvestigation = pathname?.includes('/investigation');
+  const [activeMethod, setActiveMethod] = useState<string | null>(null);
+
+  useEffect(() => {
+    const m = sessionStorage.getItem('sim_method');
+    setActiveMethod(m);
+    // Re-read whenever navigation happens (shallow update)
+    const onStorage = () => setActiveMethod(sessionStorage.getItem('sim_method'));
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [pathname]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -36,11 +54,19 @@ export default function SimulatorLayout({ children }: { children: React.ReactNod
           </nav>
         </div>
         <div className="flex items-center gap-3">
+          {activeMethod && METHOD_LABELS[activeMethod] && (
+            <span className="text-xs text-[#00ED64] border border-[#00ED64]/40 rounded px-2 py-0.5">
+              {METHOD_LABELS[activeMethod]}
+            </span>
+          )}
           <span className="text-xs text-gray-400 border border-gray-600 rounded px-2 py-0.5">
             Simulator Mode
           </span>
+          <Link href="/simulator" className="text-xs text-gray-400 hover:text-white transition-colors">
+            ← Change
+          </Link>
           <Link href="/" className="text-xs text-gray-400 hover:text-white transition-colors">
-            ← Exit
+            Exit
           </Link>
         </div>
       </header>

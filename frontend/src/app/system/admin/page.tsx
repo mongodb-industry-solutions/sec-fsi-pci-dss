@@ -123,7 +123,7 @@ export default function AdminDashboardPage() {
 
         {debugMode && (
           <div className="mt-6 bg-slate-900 rounded-xl p-4 text-xs font-mono text-slate-300">
-            <p className="text-slate-400 mb-2">SD-193 External Provider Arrangements — Registry snapshot</p>
+            <p className="text-slate-400 mb-2">SD-193 External Provider Arrangements, Registry snapshot</p>
             <p>Total registered: <span className="text-[#00ED64]">{integrations.length}</span></p>
             <p>Internal (built-in): <span className="text-[#00ED64]">{integrations.filter(i => i.externalProviderIsInternal).length}</span></p>
             <p>External: <span className="text-[#00ED64]">{integrations.filter(i => !i.externalProviderIsInternal).length}</span></p>

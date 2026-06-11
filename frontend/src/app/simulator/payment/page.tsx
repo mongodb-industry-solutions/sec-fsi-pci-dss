@@ -6,6 +6,10 @@ import { FraudAlert } from '../../../components/FraudAlert';
 import { EncryptionBadge } from '../../../components/EncryptionBadge';
 import { Tooltip } from '../../../components/Tooltip';
 import { StepExplainer } from '../../../components/StepExplainer';
+import { RedirectionPaymentFlow } from '../../../components/simulator/RedirectionPaymentFlow';
+import { PaymentLinkFlow } from '../../../components/simulator/PaymentLinkFlow';
+import type { PaymentMethodId, SimulatorScenario } from '../../../types/simulator';
+import simulatorConfig from '../../../config/simulator-methods.json';
 
 type Step = 1 | 2 | 3;
 
@@ -287,6 +291,9 @@ function validateStep1(form: FormData, maskedCard: string): ValidationErrors {
 // -- Main component ------------------------------------------------------------
 export default function PaymentPage() {
   const router = useRouter();
+  const [simMethod, setSimMethod] = useState<PaymentMethodId | null>(null);
+  const [simScenario, setSimScenario] = useState<SimulatorScenario | null>(null);
+  const [methodReady, setMethodReady] = useState(false);
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<FormData>(DEFAULTS);
   const [maskedCard, setMaskedCard] = useState<string>(maskCardNumber(DEMO_CARD_NUMBER));
@@ -304,7 +311,41 @@ export default function PaymentPage() {
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const cardTokenRef = useRef<string>(generateToken());
 
+  // Read sim_method + sim_scenario from sessionStorage on mount
   useEffect(() => {
+    const method = (sessionStorage.getItem('sim_method') as PaymentMethodId) ?? null;
+    const scenarioId = sessionStorage.getItem('sim_scenario');
+    setSimMethod(method);
+
+    if (scenarioId) {
+      const found = (simulatorConfig.scenarios as SimulatorScenario[]).find(s => s.id === scenarioId) ?? null;
+      setSimScenario(found);
+      if (found && method === 'api-card') {
+        // Pre-fill form from scenario
+        setForm({
+          cardholderName: found.prefill.cardholderName,
+          expiry: '12/28',
+          email: found.prefill.email,
+          phone: found.prefill.phone,
+          amount: String(found.prefill.amount),
+          merchantName: found.prefill.merchantName,
+          merchantCategoryCode: found.prefill.merchantCategoryCode,
+        });
+      }
+    }
+
+    if (!method) {
+      // No method selected; guard: redirect to landing
+      router.replace('/simulator');
+      return;
+    }
+    setMethodReady(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Restore step 3 from sessionStorage (existing api-card flow)
+  useEffect(() => {
+    if (simMethod !== 'api-card' || !methodReady) return;
     try {
       const saved = sessionStorage.getItem('sim_payment_step3');
       if (saved) {
@@ -325,18 +366,51 @@ export default function PaymentPage() {
       .then((res) => {
         if (res.merchants.length > 0) {
           setMerchants(res.merchants);
-          const defaultMerchant = res.merchants.find((m) => m.name === DEFAULTS.merchantName)
-            ?? res.merchants[0];
-          setForm((f) => ({
-            ...f,
-            merchantName: defaultMerchant.name,
-            merchantCategoryCode: defaultMerchant.mcc,
-          }));
+          if (!simScenario) {
+            const defaultMerchant = res.merchants.find((m) => m.name === DEFAULTS.merchantName)
+              ?? res.merchants[0];
+            setForm((f) => ({
+              ...f,
+              merchantName: defaultMerchant.name,
+              merchantCategoryCode: defaultMerchant.mcc,
+            }));
+          }
         }
       })
       .catch(() => {/* keep fallback list */});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [simMethod, methodReady]);
+
+  // ── Route to non-api-card flows ──────────────────────────────────────────
+  if (!methodReady) {
+    return (
+      <div className="max-w-xl mx-auto text-center py-16 text-gray-400 text-sm">
+        Loading…
+      </div>
+    );
+  }
+
+  if (simMethod === 'redirection') {
+    const scenario = simScenario ?? (simulatorConfig.scenarios[0] as SimulatorScenario);
+    return (
+      <RedirectionPaymentFlow
+        scenario={scenario}
+        merchantId={simulatorConfig.merchantId}
+      />
+    );
+  }
+
+  if (simMethod === 'payment-link') {
+    const scenario = simScenario ?? (simulatorConfig.scenarios[0] as SimulatorScenario);
+    return (
+      <PaymentLinkFlow
+        scenario={scenario}
+        merchantId={simulatorConfig.merchantId}
+      />
+    );
+  }
+
+  // ── API Card flow (default) ───────────────────────────────────────────────
 
   function handleMerchantChange(name: string, mcc: string) {
     setForm((f) => ({ ...f, merchantName: name, merchantCategoryCode: mcc }));
@@ -403,6 +477,9 @@ export default function PaymentPage() {
 
   function handleReset() {
     try { sessionStorage.removeItem('sim_payment_step3'); } catch { /* ignore */ }
+    sessionStorage.removeItem('sim_method');
+    sessionStorage.removeItem('sim_scenario');
+    sessionStorage.removeItem('sim_step');
     setStep(1);
     setForm(DEFAULTS);
     setMaskedCard(maskCardNumber(DEMO_CARD_NUMBER));
@@ -411,6 +488,7 @@ export default function PaymentPage() {
     setError(null);
     setValidationErrors({});
     cardTokenRef.current = generateToken();
+    router.push('/simulator');
   }
 
   // -- Step indicator ----------------------------------------------------------

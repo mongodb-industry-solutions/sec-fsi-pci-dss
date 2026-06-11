@@ -52,7 +52,7 @@ interface ProfileData {
     customerAgreementStatus?: string;
     customerAgreementEnrollmentDate?: string;
     customerAgreementPreferredLanguage?: string;
-    customerAgreementKycCheck?: CustomerAgreementKycCheck;  // BQ:Step — SD-53. PCI DSS Req 8.1
+    customerAgreementKycCheck?: CustomerAgreementKycCheck;  // BQ:Step, SD-53. PCI DSS Req 8.1
     sensitive?: {
       customerAgreementResidentialAddress?: {
         streetAddress?: string;
@@ -608,7 +608,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* KYC Compliance Status — visible when agreement data is present */}
+      {/* KYC Compliance Status, visible when agreement data is present */}
       {ag?.customerAgreementKycCheck && (
         <div className="bg-white rounded-xl border p-5 space-y-3">
           <div className="flex items-center justify-between">
@@ -654,7 +654,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Merchant Agreement & KYB — visible when customer has a merchant application */}
+      {/* Merchant Agreement & KYB, visible when customer has a merchant application */}
       {merchant && (
         <div className="bg-white rounded-xl border p-5 space-y-3">
           <div className="flex items-center justify-between">
@@ -721,7 +721,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Data protection notice — debug mode only */}
+      {/* Data protection notice, debug mode only */}
       {debugMode && (
         <div className="bg-[#001E2B]/5 border border-[#001E2B]/20 rounded-xl p-4 text-sm text-gray-600">
           <p className="font-semibold text-[#001E2B] mb-1">Data protection</p>

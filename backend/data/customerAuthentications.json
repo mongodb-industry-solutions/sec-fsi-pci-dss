@@ -222,5 +222,33 @@
     "bianControlRecordType": "CustomerAuthenticationAssessment",
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "schemaVersion": 1
+  },
+  {
+    "customerAuthenticationInstanceReference": "a1000071-0000-4000-8000-000000000071",
+    "partyInstanceReference": "b0000071-0000-4000-8000-000000000071",
+    "customerAuthenticationEmailAddress": "maria.garcia@back.es",
+    "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
+    "customerAuthenticationUserRole": "customer",
+    "customerAuthenticationUserName": "Maria Garcia",
+    "customerAuthenticationLoginDomain": "local",
+    "customerAuthenticationAccountStatus": "active",
+    "bianServiceDomain": "Customer Authentication",
+    "bianControlRecordType": "CustomerAuthenticationAssessment",
+    "recordCreatedDateTime": "2026-06-11T10:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "customerAuthenticationInstanceReference": "a1000072-0000-4000-8000-000000000072",
+    "partyInstanceReference": "b0000072-0000-4000-8000-000000000072",
+    "customerAuthenticationEmailAddress": "ahmed.hassan@back.es",
+    "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
+    "customerAuthenticationUserRole": "customer",
+    "customerAuthenticationUserName": "Ahmed Hassan",
+    "customerAuthenticationLoginDomain": "local",
+    "customerAuthenticationAccountStatus": "active",
+    "bianServiceDomain": "Customer Authentication",
+    "bianControlRecordType": "CustomerAuthenticationAssessment",
+    "recordCreatedDateTime": "2026-06-11T10:00:00.000Z",
+    "schemaVersion": 1
   }
 ]

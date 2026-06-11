@@ -1,5 +1,5 @@
 // Category data contracts and trigger events for each IntegrationProviderType.
-// These are canonical definitions — not fetched from the API. They describe the
+// These are canonical definitions; not fetched from the API. They describe the
 // protocol between LeafyBank and any provider of that type.
 
 export interface ContractField {
@@ -136,11 +136,11 @@ export const CATEGORY_CONTRACTS: Record<string, CategoryContract> = {
     inputs: [
       { name: 'subjectReference', type: 'string', description: 'Reference to the subject entity (configurable)', required: true },
       { name: 'eventType',        type: 'string', description: 'Custom event type (per categoryConfig.customEventTypes)', required: true },
-      { name: 'eventPayload',     type: 'object', description: 'Event data — structure defined by outbound field mappings', required: false },
+      { name: 'eventPayload',     type: 'object', description: 'Event data; structure defined by outbound field mappings', required: false },
     ],
     outputs: [
       { name: 'status',          type: 'string', description: 'Processing result from external provider', required: true },
-      { name: 'responsePayload', type: 'object', description: 'Response data — structure defined by inbound field mappings', required: false },
+      { name: 'responsePayload', type: 'object', description: 'Response data; structure defined by inbound field mappings', required: false },
     ],
   },
 };
@@ -173,7 +173,7 @@ export const CATEGORY_TRIGGER_EVENTS: Record<string, TriggerEvent[]> = {
     { event: 'sar.threshold.exceeded',        description: 'Aggregate transaction amount crossed SAR reporting threshold' },
   ],
   credit_bureau: [
-    { event: 'customer.onboarding.initiated', description: 'New customer onboarding — initial credit pull' },
+    { event: 'customer.onboarding.initiated', description: 'New customer onboarding; initial credit pull' },
     { event: 'credit.assessment.requested',   description: 'Explicit credit assessment requested for loan/limit review' },
     { event: 'customer.agreement.review',     description: 'Periodic customer agreement review requires credit refresh' },
   ],

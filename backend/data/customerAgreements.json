@@ -1368,7 +1368,7 @@
       "customerAgreementKycCheckStatus": "expired",
       "customerAgreementKycCheckCompletedDate": "2025-04-10T09:00:00.000Z",
       "customerAgreementKycCheckReference": "KYC-B0000049",
-      "customerAgreementKycCheckNotes": "KYC expired — annual renewal required per AML policy"
+      "customerAgreementKycCheckNotes": "KYC expired; annual renewal required per AML policy"
     }
   },
   {
@@ -1394,7 +1394,7 @@
     "schemaVersion": 3,
     "customerAgreementKycCheck": {
       "customerAgreementKycCheckStatus": "initiated",
-      "customerAgreementKycCheckNotes": "KYC document check in progress — awaiting ID upload"
+      "customerAgreementKycCheckNotes": "KYC document check in progress; awaiting ID upload"
     }
   },
   {
@@ -1451,6 +1451,62 @@
       "customerAgreementKycCheckCompletedDate": "2026-06-10T10:00:00.000Z",
       "customerAgreementKycCheckReference": "KYC-B0000061-061",
       "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
+  },
+  {
+    "customerAgreementInstanceReference": "f1000071-0000-4000-8000-000000000071",
+    "partyInstanceReference": "b0000071-0000-4000-8000-000000000071",
+    "customerAgreementReference": "ACC-MG-20260101",
+    "customerSegment": "retail",
+    "customerAgreementStatus": "active",
+    "customerAgreementEnrollmentDate": "2026-01-01T10:00:00.000Z",
+    "customerAgreementPreferredLanguage": "es",
+    "customerAgreementResidentialAddress": {
+      "streetAddress": "Calle Gran Via 45",
+      "city": "Madrid",
+      "postalCode": "28013",
+      "countryCode": "ES"
+    },
+    "governmentIdentificationReference": "SYNTH-MG-2601",
+    "customerAgreementRiskNotes": "No prior fraud history.",
+    "bianServiceDomain": "Customer Agreement",
+    "bianControlRecordType": "CustomerAgreementProcedure",
+    "recordCreatedDateTime": "2026-01-01T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-11T10:00:00.000Z",
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2026-01-01T10:00:00.000Z",
+      "customerAgreementKycCheckReference": "KYC-B0000071-001",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
+  },
+  {
+    "customerAgreementInstanceReference": "f1000072-0000-4000-8000-000000000072",
+    "partyInstanceReference": "b0000072-0000-4000-8000-000000000072",
+    "customerAgreementReference": "ACC-AH-20260201",
+    "customerSegment": "premium",
+    "customerAgreementStatus": "active",
+    "customerAgreementEnrollmentDate": "2026-02-01T10:00:00.000Z",
+    "customerAgreementPreferredLanguage": "en",
+    "customerAgreementResidentialAddress": {
+      "streetAddress": "Sheikh Zayed Road 12",
+      "city": "Dubai",
+      "postalCode": "00000",
+      "countryCode": "AE"
+    },
+    "governmentIdentificationReference": "SYNTH-AH-2602",
+    "customerAgreementRiskNotes": "Cross-border transaction profile; manual review flagged on first high-value transfer.",
+    "bianServiceDomain": "Customer Agreement",
+    "bianControlRecordType": "CustomerAgreementProcedure",
+    "recordCreatedDateTime": "2026-02-01T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-11T10:00:00.000Z",
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2026-02-01T10:00:00.000Z",
+      "customerAgreementKycCheckReference": "KYC-B0000072-001",
+      "customerAgreementKycCheckNotes": "Enhanced due diligence completed; cross-border risk noted."
     }
   }
 ]
