@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { API_BASE_URL } from '../../../../lib/constants';
 import { getAdminToken, readSSE, LogEntry, downloadText } from '../../../../lib/adminHelpers';
-import { Download } from 'lucide-react';
+import { Download, Copy, CheckCheck } from 'lucide-react';
 
 const SETUP_LOGS_KEY = 'admin_setup_logs';
 
@@ -42,6 +42,7 @@ export default function SetupPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [running, setRunning] = useState(false);
   const [activeCommand, setActiveCommand] = useState<string | null>(null);
+  const [commandStatus, setCommandStatus] = useState<null | 'success' | 'failure'>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const [logsLoaded, setLogsLoaded] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<CommandDef | null>(null);
@@ -73,6 +74,7 @@ export default function SetupPage() {
     if (running || !token) return;
     setRunning(true);
     setActiveCommand(commandId);
+    setCommandStatus(null);
     setLogs([]);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/admin/run`, {
@@ -83,11 +85,16 @@ export default function SetupPage() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText }));
         setLogs([{ type: 'error', text: (err as { error?: string }).error ?? 'Request failed' }]);
+        setCommandStatus('failure');
         return;
       }
-      await readSSE(res, (type, text) =>
-        setLogs((prev) => [...prev, { type: type as LogEntry['type'], text }])
-      );
+      await readSSE(res, (type, text) => {
+        if (type === 'done') {
+          const match = /code\s+(\d+)/i.exec(text);
+          setCommandStatus(match?.[1] === '0' ? 'success' : 'failure');
+        }
+        setLogs((prev) => [...prev, { type: type as LogEntry['type'], text }]);
+      });
     } finally {
       setRunning(false);
       setActiveCommand(null);
@@ -124,7 +131,8 @@ export default function SetupPage() {
             title={activeCommand ? `npm run ${activeCommand}` : 'Output'}
             logs={logs}
             endRef={logsEndRef}
-            onClear={() => setLogs([])}
+            status={commandStatus}
+            onClear={() => { setLogs([]); setCommandStatus(null); }}
             onDownload={() => downloadText(`setup-${activeCommand ?? 'output'}-${Date.now()}.txt`, logs.map((e) => e.text).join('\n'))}
           />
         </div>
@@ -185,18 +193,38 @@ function CommandGroup({ label, cmds, activeCommand, running, onRun }: {
   );
 }
 
-function LogPanel({ title, logs, endRef, onClear, onDownload }: {
+function LogPanel({ title, logs, endRef, onClear, onDownload, status }: {
   title: string;
   logs: LogEntry[];
   endRef: React.RefObject<HTMLDivElement | null>;
   onClear: () => void;
   onDownload: () => void;
+  status: null | 'success' | 'failure';
 }) {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    const text = logs.map((e) => (e.type === 'error' ? '[ERR] ' : '') + e.text).join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col h-[50vh] lg:h-full">
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-950">
         <span className="text-xs font-mono text-gray-400 truncate">{title}</span>
         <div className="flex items-center gap-3 ml-2 flex-shrink-0">
+          <button
+            onClick={handleCopy}
+            disabled={logs.length === 0}
+            className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-300 disabled:opacity-30 transition-colors"
+            title="Copy all output to clipboard"
+          >
+            {copied ? <CheckCheck size={12} /> : <Copy size={12} />}
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
           <button
             onClick={onDownload}
             disabled={logs.length === 0}
@@ -208,6 +236,17 @@ function LogPanel({ title, logs, endRef, onClear, onDownload }: {
           <button onClick={onClear} className="text-xs text-gray-600 hover:text-gray-400">Clear</button>
         </div>
       </div>
+      {status && (
+        <div className={`px-4 py-2 flex items-center gap-2 text-xs font-semibold border-b ${
+          status === 'success'
+            ? 'bg-green-900/30 border-green-800/50 text-green-400'
+            : 'bg-red-900/30 border-red-800/50 text-red-400'
+        }`}>
+          {status === 'success'
+            ? '✓ Command completed successfully (exit code 0)'
+            : '✗ Command failed — check output above for details'}
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-0.5 [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/70 [&::-webkit-scrollbar-corner]:bg-gray-900">
         {logs.length === 0 && <div className="text-gray-600 italic">Select a command to run...</div>}
         {logs.map((e, i) => (

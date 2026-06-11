@@ -5,7 +5,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import { spawn, execSync } from 'child_process';
 import * as path from 'path';
-import { logBuffer, appendLog } from '../../../shared/logBuffer';
+import { logBuffer, appendLog, writeCount } from '../../../shared/logBuffer';
 
 // __dirname = backend/src/modules/admin/controllers/ (tsx dev mode)
 // 5 levels up -> project root
@@ -422,17 +422,16 @@ export async function adminController(fastify: FastifyInstance) {
       reply.raw.write(`event: log\ndata: ${JSON.stringify({ text: line })}\n\n`);
     });
 
-    let lastLen = logBuffer.length;
+    let lastWrite = writeCount;
     const interval = setInterval(() => {
       if (!reply.raw.writable) { clearInterval(interval); return; }
-      const cur = logBuffer.length;
-      if (cur > lastLen) {
-        logBuffer.slice(lastLen).forEach((line) => {
+      const cur = writeCount;
+      if (cur > lastWrite) {
+        const newCount = Math.min(cur - lastWrite, logBuffer.length);
+        logBuffer.slice(logBuffer.length - newCount).forEach((line) => {
           reply.raw.write(`event: log\ndata: ${JSON.stringify({ text: line })}\n\n`);
         });
-        lastLen = cur;
-      } else if (cur < lastLen) {
-        lastLen = cur;
+        lastWrite = cur;
       }
     }, 2000);
 

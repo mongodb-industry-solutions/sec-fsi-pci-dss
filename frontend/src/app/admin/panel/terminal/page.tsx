@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { API_BASE_URL } from '../../../../lib/constants';
 import { getAdminToken, readSSE, LogEntry, downloadText } from '../../../../lib/adminHelpers';
-import { Download } from 'lucide-react';
+import { Download, Copy, CheckCheck } from 'lucide-react';
 
 const TERMINAL_LOGS_KEY    = 'admin_terminal_logs';
 const TERMINAL_HISTORY_KEY = 'admin_terminal_history';
@@ -13,9 +13,18 @@ export default function TerminalPage() {
   const [termRunning, setTermRunning] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
   const [historyIdx, setHistoryIdx] = useState(-1);
+  const [copied, setCopied] = useState(false);
   const termEndRef = useRef<HTMLDivElement>(null);
   const termInputRef = useRef<HTMLInputElement>(null);
   const [logsLoaded, setLogsLoaded] = useState(false);
+
+  function handleCopy() {
+    const text = termLogs.map((e) => e.text).join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
 
   // Restore logs and history from sessionStorage on mount.
   // All setState calls here are batched by React 18 into one render.
@@ -103,6 +112,15 @@ export default function TerminalPage() {
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-950">
         <span className="text-xs font-mono text-gray-400">Shell · project root</span>
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleCopy}
+            disabled={termLogs.length === 0}
+            className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-300 disabled:opacity-30 transition-colors"
+            title="Copy all output to clipboard"
+          >
+            {copied ? <CheckCheck size={12} /> : <Copy size={12} />}
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
           <button
             onClick={() => downloadText(`terminal-${Date.now()}.txt`, termLogs.map((e) => e.text).join('\n'))}
             disabled={termLogs.length === 0}
