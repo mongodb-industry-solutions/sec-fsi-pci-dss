@@ -197,7 +197,9 @@ export interface IntegrationRoutingGroup {
   routingGroupStrategy: RoutingStrategy;
   routingGroupStatus: 'active' | 'inactive';
   routingGroupMembers: RoutingGroupMember[];
+  isDefaultGroup: boolean;
   bianServiceDomain: string;
+  bianControlRecordType: string;
   pciDssRequirements: string[];
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;

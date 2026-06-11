@@ -525,9 +525,12 @@ export interface CustomerCreditRatingStateControlRecord {
 
 ### 1.13 SD-193 — `integrationRegistry` (ExternalProviderArrangement)
 
+> **Schema v2** — Updated 2026-06-11. Adds `generic` type, enhanced config sub-documents, multi-provider routing, and default routing groups.
+
 ```typescript
-export const INTEGRATION_REGISTRY_COLLECTION = 'integrationRegistry';
-export const INTEGRATION_EVENTS_COLLECTION = 'integrationEvents';
+export const INTEGRATION_REGISTRY_COLLECTION       = 'integrationRegistry';
+export const INTEGRATION_EVENTS_COLLECTION         = 'integrationEvents';
+export const INTEGRATION_ROUTING_GROUPS_COLLECTION = 'integrationRoutingGroups';
 
 export type IntegrationProviderType =
   | 'fraud_detection'
@@ -535,11 +538,14 @@ export type IntegrationProviderType =
   | 'kyc_identity'
   | 'kyb_business'
   | 'hrp_sanctions'
-  | 'credit_bureau';
+  | 'credit_bureau'
+  | 'generic';               // SD-193 catch-all for custom event-driven integrations
 
-export type IntegrationStatus = 'active' | 'inactive' | 'test' | 'suspended';
-export type IntegrationMode   = 'sync' | 'async';
-export type IntegrationAuth   = 'bearer' | 'api_key' | 'hmac' | 'oauth2_cc';
+export type IntegrationStatus  = 'active' | 'inactive' | 'test' | 'suspended';
+export type IntegrationMode    = 'sync' | 'async';
+export type IntegrationAuth    = 'bearer' | 'api_key' | 'hmac' | 'oauth2_cc';
+export type IntegrationHealth  = 'ok' | 'degraded' | 'unreachable' | 'unknown';
+export type RoutingStrategy    = 'primary_fallback' | 'round_robin' | 'weighted' | 'parallel';
 
 export interface ExternalProviderArrangement {
   externalProviderArrangementInstanceReference: string;    // UUID, primary key
@@ -547,7 +553,7 @@ export interface ExternalProviderArrangement {
   externalProviderArrangementType: IntegrationProviderType;
   externalProviderArrangementStatus: IntegrationStatus;
 
-  // Internal provider flag — pre-seeded, cannot be suspended
+  // Internal provider flag — pre-seeded, cannot be deleted or suspended
   externalProviderIsInternal: boolean;
   externalProviderInternalHandler?: string;               // e.g. "fraudDiagnosis.internalFraudScoring"
 
@@ -567,12 +573,26 @@ export interface ExternalProviderArrangement {
   externalProviderMode: IntegrationMode;
 
   // Reliability
-  externalProviderTimeoutMs: number;
+  externalProviderTimeoutMs: number;                      // 100–30000 ms
   externalProviderRetryPolicy: { maxAttempts: number; backoffMs: number };
 
   // Health
   externalProviderLastHealthCheckAt?: Date;
-  externalProviderHealthStatus?: 'ok' | 'degraded' | 'unreachable' | 'unknown';
+  externalProviderHealthStatus?: IntegrationHealth;
+
+  // v2: Category-specific operational config (discriminated by type)
+  categoryConfig?: CategoryConfig;
+
+  // v2: Structured authentication config
+  authConfig?: IntegrationAuthConfig;
+
+  // v2: Field mapping — outbound (pre-dispatch) and inbound (post-callback)
+  fieldMappingConfig?: FieldMappingConfig;
+
+  // v2: Multi-provider routing — auto-set on creation to default group of the type
+  routingGroupId?: string;                                // FK to integrationRoutingGroups
+  routingPriority?: number;                               // lower = higher priority; internals use 999
+  routingWeight?: number;                                 // 0–100 for weighted strategy
 
   // BIAN + PCI DSS metadata
   bianServiceDomain: string;
@@ -581,8 +601,37 @@ export interface ExternalProviderArrangement {
 
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
-  schemaVersion: number;
+  schemaVersion: number;                                  // current: 2
 }
+
+// ── Routing Groups ──────────────────────────────────────────────────────────
+// One default group per IntegrationProviderType is seeded automatically.
+// External providers auto-join their type's default group on creation.
+// Internal providers are members at priority=999 as fallback terminals.
+
+export interface RoutingGroupMember {
+  externalProviderArrangementInstanceReference: string;
+  memberPriority: number;                                 // lower = tried first
+  memberWeight?: number;                                  // 0–100 for weighted strategy
+  memberRole?: 'primary' | 'fallback' | 'peer';
+}
+
+export interface IntegrationRoutingGroup {
+  routingGroupInstanceReference: string;                  // UUID, primary key
+  routingGroupName: string;
+  routingGroupProviderType: IntegrationProviderType;      // all members must be this type
+  routingGroupStrategy: RoutingStrategy;
+  routingGroupStatus: 'active' | 'inactive';
+  routingGroupMembers: RoutingGroupMember[];
+  isDefaultGroup: boolean;                                // true = system-managed, one per type
+  bianServiceDomain: string;
+  bianControlRecordType: string;                          // 'ExternalProviderArrangementPortfolio'
+  pciDssRequirements: string[];
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+}
+
+// ── Event Audit Log ─────────────────────────────────────────────────────────
 
 export interface IntegrationEvent {
   integrationEventInstanceReference: string;              // UUID
@@ -593,7 +642,8 @@ export interface IntegrationEvent {
   integrationEventResponseCode?: number;
   integrationEventLatencyMs?: number;
   integrationEventErrorMessage?: string;
-  integrationEventTriggeredBy: string;                    // 'transaction.authorized', 'kyc.initiated', etc.
+  integrationEventTriggeredBy: string;
+  integrationEventMeta?: Record<string, unknown>;         // fieldMappingApplied, mappingRulesCount, etc.
   bianServiceDomain: string;
   bianControlRecordType: string;
   recordCreatedDateTime: Date;
@@ -602,14 +652,23 @@ export interface IntegrationEvent {
 
 **Collections:**
 - `integrationRegistry` — plaintext, no QE. Provider configuration, key hashes, health state.
+- `integrationRoutingGroups` — plaintext, no QE. One default group per type + user-created groups.
 - `integrationEvents` — plaintext, no QE. Append-only audit log with 90-day TTL.
 
-**Seed file:** `backend/data/integrationRegistry.json` — 3 pre-seeded internal providers (FDS, HRPC, AML).
+**Seed files:**
+- `backend/data/integrationRegistry.json` — 6 pre-seeded internal providers (FDS, HRP, AML, KYC, KYB, CreditBureau) at `routingPriority=999`.
+- Default routing groups seeded programmatically by `seedRoutingGroups.ts` (called from `seedIntegrations`).
+
+**Default group invariant:**
+- Exactly one `isDefaultGroup=true` document per `IntegrationProviderType` (7 total).
+- Each internal provider is a group member at `memberPriority=999`, `memberRole='fallback'`.
+- External providers auto-join on creation: `memberPriority = max(external priorities) + 10`, minimum 10.
 
 **Security notes:**
 - `externalProviderApiKeyHash` and `externalProviderCallbackSecretHash` are bcrypt hashes — never returned in API responses.
 - Plaintext API key returned exactly once at creation and once at rotation.
 - Payload content is never logged; only a SHA-256 hash is stored for audit reference.
+- Field mapping engine enforces a PCI DSS blocklist: PAN, CVV, expiryDate, cardholderName cannot be mapped.
 
 ---
 
@@ -963,9 +1022,18 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { externalProviderArrangementInstanceReference: 1 }, unique: true },
     { key: { externalProviderArrangementType: 1, externalProviderArrangementStatus: 1 } },
     { key: { externalProviderIsInternal: 1 } },
-    // Unique: one provider per type+endpoint combination (sparse allows null endpoints for internal)
-    { key: { externalProviderArrangementType: 1, externalProviderApiEndpoint: 1 },
-      unique: true, sparse: true },
+    // Non-unique: multi-provider support — multiple providers can share the same type+endpoint
+    { key: { externalProviderArrangementType: 1, externalProviderApiEndpoint: 1 }, sparse: true },
+    { key: { routingGroupId: 1 }, sparse: true },
+    { key: { routingPriority: 1, externalProviderArrangementType: 1 } },
+  ]);
+
+  // ── integrationRoutingGroups (SD-193) ────────────────────────────
+  // One default group (isDefaultGroup=true) per IntegrationProviderType, seeded programmatically.
+  await db.collection('integrationRoutingGroups').createIndexes([
+    { key: { routingGroupInstanceReference: 1 }, unique: true },
+    { key: { routingGroupProviderType: 1, routingGroupStatus: 1 } },
+    { key: { isDefaultGroup: 1 }, sparse: true },
   ]);
 
   // ── integrationEvents (SD-193 Action Log) ────────────────────────

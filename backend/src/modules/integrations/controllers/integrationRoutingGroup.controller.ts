@@ -7,6 +7,7 @@ import {
   updateRoutingGroup,
   addMemberToGroup,
   removeMemberFromGroup,
+  getDefaultGroupForType,
 } from '../services/integrationRoutingGroup.service';
 
 const E = { type: 'object', properties: { error: { type: 'string' } } };
@@ -140,6 +141,25 @@ export async function integrationRoutingGroupController(fastify: FastifyInstance
       const body = request.body as { providerId: string; priority?: number; weight?: number };
       const group = await addMemberToGroup(fastify.db, id, body.providerId, body.priority, body.weight);
       if (!group) return reply.status(404).send({ error: 'Routing group not found' });
+      return { group };
+    },
+  });
+
+  // ── GET /integration-groups/default/:type ────────────────────────────────
+  fastify.get('/default/:type', {
+    schema: {
+      tags: ['integrations'],
+      summary: 'Get default routing group for a provider type (SD-193)',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['type'], properties: { type: { type: 'string' } } },
+      response: { 200: { type: 'object', additionalProperties: true }, 403: E, 404: E },
+    },
+    handler: async (request, reply) => {
+      if (!isAuthorized(request as unknown as DemoRequest))
+        return reply.status(403).send({ error: 'Forbidden' });
+      const { type } = request.params as { type: string };
+      const group = await getDefaultGroupForType(fastify.db, type as never);
+      if (!group) return reply.status(404).send({ error: 'No default group for this type' });
       return { group };
     },
   });

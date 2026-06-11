@@ -599,5 +599,11 @@ export const api = {
       apiFetch<{ group: Record<string, unknown> }>(
         `/api/v1/integrations/groups/${groupId}/members/${providerId}`, { method: 'DELETE' }, token
       ),
+    getDefault: (type: string, token: string) =>
+      apiFetch<{ group: Record<string, unknown> }>(`/api/v1/integrations/groups/default/${type}`, {}, token),
+    updateStrategy: (groupId: string, strategy: string, token: string) =>
+      apiFetch<{ group: Record<string, unknown> }>(
+        `/api/v1/integrations/groups/${groupId}`, { method: 'PATCH', body: JSON.stringify({ routingGroupStrategy: strategy }) }, token
+      ),
   },
 };

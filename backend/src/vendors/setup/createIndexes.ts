@@ -114,7 +114,17 @@ export async function createIndexes(client: MongoClient) {
     { key: { externalProviderArrangementInstanceReference: 1 }, unique: true },
     { key: { externalProviderArrangementType: 1, externalProviderArrangementStatus: 1 } },
     { key: { externalProviderIsInternal: 1 } },
-    { key: { externalProviderArrangementType: 1, externalProviderApiEndpoint: 1 }, unique: true, sparse: true },
+    // Non-unique: allows multiple providers of same type at same endpoint (multi-provider support)
+    { key: { externalProviderArrangementType: 1, externalProviderApiEndpoint: 1 }, sparse: true },
+    { key: { routingGroupId: 1 }, sparse: true },
+    { key: { routingPriority: 1, externalProviderArrangementType: 1 } },
+  ]);
+
+  // SD-193: Integration Routing Groups (Ch-07)
+  await db.collection('integrationRoutingGroups').createIndexes([
+    { key: { routingGroupInstanceReference: 1 }, unique: true },
+    { key: { routingGroupProviderType: 1, routingGroupStatus: 1 } },
+    { key: { isDefaultGroup: 1 }, sparse: true },
   ]);
 
   // SD-193: Integration Events — append-only audit log with 90-day TTL (PCI DSS Req 10.7)

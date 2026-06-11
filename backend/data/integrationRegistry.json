@@ -7,14 +7,22 @@
     "externalProviderIsInternal": true,
     "externalProviderInternalHandler": "fraudDiagnosis.internalFraudScoring",
     "externalProviderCallbackEnabled": false,
-    "externalProviderTriggerEvents": ["transaction.authorized"],
+    "externalProviderTriggerEvents": [
+      "transaction.authorized"
+    ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 500,
-    "externalProviderRetryPolicy": { "maxAttempts": 1, "backoffMs": 0 },
+    "externalProviderRetryPolicy": {
+      "maxAttempts": 1,
+      "backoffMs": 0
+    },
     "externalProviderHealthStatus": "ok",
     "externalProviderLastHealthCheckAt": "2026-06-10T10:00:00.000Z",
     "categoryConfig": {
-      "scoreThresholds": { "low": 30, "medium": 70 },
+      "scoreThresholds": {
+        "low": 30,
+        "medium": 70
+      },
       "scoreField": "fraudScore",
       "recommendationField": "recommendation",
       "realTimeRequired": true,
@@ -22,11 +30,18 @@
       "modelVersion": "internal-v1",
       "scoreScaleMax": 100
     },
-    "fieldMappingConfig": { "outbound": [], "inbound": [], "schemaVersion": 1 },
-    "routingPriority": 100,
+    "fieldMappingConfig": {
+      "outbound": [],
+      "inbound": [],
+      "schemaVersion": 1
+    },
+    "routingPriority": 999,
     "bianServiceDomain": "Fraud Evaluation",
     "bianControlRecordType": "FraudEvaluationAssessment",
-    "pciDssRequirements": ["Req 10.2.1", "Req 12.3.1"],
+    "pciDssRequirements": [
+      "Req 10.2.1",
+      "Req 12.3.1"
+    ],
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
     "schemaVersion": 2
@@ -39,25 +54,47 @@
     "externalProviderIsInternal": true,
     "externalProviderInternalHandler": "fraudDiagnosis.hrpcCheck",
     "externalProviderCallbackEnabled": false,
-    "externalProviderTriggerEvents": ["case.created", "merchant.application.submitted"],
+    "externalProviderTriggerEvents": [
+      "case.created",
+      "merchant.application.submitted"
+    ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 500,
-    "externalProviderRetryPolicy": { "maxAttempts": 1, "backoffMs": 0 },
+    "externalProviderRetryPolicy": {
+      "maxAttempts": 1,
+      "backoffMs": 0
+    },
     "externalProviderHealthStatus": "ok",
     "externalProviderLastHealthCheckAt": "2026-06-10T10:00:00.000Z",
     "categoryConfig": {
-      "screeningLists": ["OFAC_SDN", "EU_Consolidated", "UN_Consolidated", "PEP_Global"],
+      "screeningLists": [
+        "OFAC_SDN",
+        "EU_Consolidated",
+        "UN_Consolidated",
+        "PEP_Global"
+      ],
       "matchThreshold": 85,
-      "screeningDimensions": ["name", "dob", "nationality"],
+      "screeningDimensions": [
+        "name",
+        "dob",
+        "nationality"
+      ],
       "realTimeScreening": true,
       "hitDispositionRequired": true,
       "autoApproveBelow": 50
     },
-    "fieldMappingConfig": { "outbound": [], "inbound": [], "schemaVersion": 1 },
-    "routingPriority": 100,
+    "fieldMappingConfig": {
+      "outbound": [],
+      "inbound": [],
+      "schemaVersion": 1
+    },
+    "routingPriority": 999,
     "bianServiceDomain": "Party Reference Data",
     "bianControlRecordType": "PartyReferenceDataDirectoryEntry",
-    "pciDssRequirements": ["Req 12.8.1", "Req 12.8.5"],
+    "pciDssRequirements": [
+      "Req 12.8.1",
+      "Req 12.8.5"
+    ],
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
     "schemaVersion": 2
@@ -70,25 +107,54 @@
     "externalProviderIsInternal": true,
     "externalProviderInternalHandler": "fraudDiagnosis.amlPatternCheck",
     "externalProviderCallbackEnabled": false,
-    "externalProviderTriggerEvents": ["transaction.batch.processed", "case.escalated"],
+    "externalProviderTriggerEvents": [
+      "transaction.batch.processed",
+      "case.escalated"
+    ],
     "externalProviderMode": "async",
     "externalProviderTimeoutMs": 2000,
-    "externalProviderRetryPolicy": { "maxAttempts": 2, "backoffMs": 1000 },
+    "externalProviderRetryPolicy": {
+      "maxAttempts": 2,
+      "backoffMs": 1000
+    },
     "externalProviderHealthStatus": "ok",
     "externalProviderLastHealthCheckAt": "2026-06-10T10:00:00.000Z",
     "categoryConfig": {
-      "screeningTypes": ["transaction", "batch_periodic"],
-      "watchlistSources": ["OFAC_SDN", "FATF", "EU_Consolidated"],
-      "jurisdictions": ["US", "EU", "GB"],
+      "screeningTypes": [
+        "transaction",
+        "batch_periodic"
+      ],
+      "watchlistSources": [
+        "OFAC_SDN",
+        "FATF",
+        "EU_Consolidated"
+      ],
+      "jurisdictions": [
+        "US",
+        "EU",
+        "GB"
+      ],
       "continuousMonitoring": false,
       "batchSchedule": "0 2 * * *",
-      "alertSeverityLevels": ["low", "medium", "high", "critical"]
+      "alertSeverityLevels": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
     },
-    "fieldMappingConfig": { "outbound": [], "inbound": [], "schemaVersion": 1 },
-    "routingPriority": 100,
+    "fieldMappingConfig": {
+      "outbound": [],
+      "inbound": [],
+      "schemaVersion": 1
+    },
+    "routingPriority": 999,
     "bianServiceDomain": "Suspicious Activity Analysis",
     "bianControlRecordType": "SuspiciousActivityAnalysisAssessment",
-    "pciDssRequirements": ["Req 10.2.1", "Req 12.3.1"],
+    "pciDssRequirements": [
+      "Req 10.2.1",
+      "Req 12.3.1"
+    ],
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
     "schemaVersion": 2
@@ -101,27 +167,47 @@
     "externalProviderIsInternal": true,
     "externalProviderInternalHandler": "customerAgreement.internalKycCheck",
     "externalProviderCallbackEnabled": false,
-    "externalProviderTriggerEvents": ["customer.onboarding.initiated", "kyc.renewal.due"],
+    "externalProviderTriggerEvents": [
+      "customer.onboarding.initiated",
+      "kyc.renewal.due"
+    ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 1000,
-    "externalProviderRetryPolicy": { "maxAttempts": 1, "backoffMs": 0 },
+    "externalProviderRetryPolicy": {
+      "maxAttempts": 1,
+      "backoffMs": 0
+    },
     "externalProviderHealthStatus": "ok",
     "externalProviderLastHealthCheckAt": "2026-06-10T10:00:00.000Z",
     "categoryConfig": {
-      "verificationLevels": ["basic", "enhanced"],
+      "verificationLevels": [
+        "basic",
+        "enhanced"
+      ],
       "defaultLevel": "basic",
-      "documentTypesAccepted": ["passport", "national_id", "drivers_license"],
+      "documentTypesAccepted": [
+        "passport",
+        "national_id",
+        "drivers_license"
+      ],
       "livenessCheckRequired": false,
       "biometricSupported": false,
       "reVerificationDays": 365,
       "dataRetentionDays": 2555,
       "consentRequired": true
     },
-    "fieldMappingConfig": { "outbound": [], "inbound": [], "schemaVersion": 1 },
-    "routingPriority": 100,
+    "fieldMappingConfig": {
+      "outbound": [],
+      "inbound": [],
+      "schemaVersion": 1
+    },
+    "routingPriority": 999,
     "bianServiceDomain": "Customer Agreement",
     "bianControlRecordType": "CustomerAgreementProcedure",
-    "pciDssRequirements": ["Req 8.1", "Req 12.8.1"],
+    "pciDssRequirements": [
+      "Req 8.1",
+      "Req 12.8.1"
+    ],
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
     "schemaVersion": 2
@@ -134,26 +220,48 @@
     "externalProviderIsInternal": true,
     "externalProviderInternalHandler": "merchantRelations.internalKybCheck",
     "externalProviderCallbackEnabled": false,
-    "externalProviderTriggerEvents": ["merchant.application.submitted", "kyb.renewal.due"],
+    "externalProviderTriggerEvents": [
+      "merchant.application.submitted",
+      "kyb.renewal.due"
+    ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 1000,
-    "externalProviderRetryPolicy": { "maxAttempts": 1, "backoffMs": 0 },
+    "externalProviderRetryPolicy": {
+      "maxAttempts": 1,
+      "backoffMs": 0
+    },
     "externalProviderHealthStatus": "ok",
     "externalProviderLastHealthCheckAt": "2026-06-10T10:00:00.000Z",
     "categoryConfig": {
       "uboDisclosureThreshold": 25,
-      "businessTypesSupported": ["llc", "corporation", "partnership", "sole_proprietor"],
-      "registrationCountries": ["US", "GB", "EU"],
+      "businessTypesSupported": [
+        "llc",
+        "corporation",
+        "partnership",
+        "sole_proprietor"
+      ],
+      "registrationCountries": [
+        "US",
+        "GB",
+        "EU"
+      ],
       "dueDiligenceLevel": "standard",
       "renewalDays": 730,
       "pepScreeningIncluded": true,
       "adverseMediaScreening": false
     },
-    "fieldMappingConfig": { "outbound": [], "inbound": [], "schemaVersion": 1 },
-    "routingPriority": 100,
+    "fieldMappingConfig": {
+      "outbound": [],
+      "inbound": [],
+      "schemaVersion": 1
+    },
+    "routingPriority": 999,
     "bianServiceDomain": "Merchant Relations",
     "bianControlRecordType": "MerchantAgreementProcedure",
-    "pciDssRequirements": ["Req 12.8.1", "Req 12.8.3"],
+    "pciDssRequirements": [
+      "Req 12.8.1",
+      "Req 12.8.3"
+    ],
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
     "schemaVersion": 2
@@ -166,29 +274,45 @@
     "externalProviderIsInternal": true,
     "externalProviderInternalHandler": "customerCredit.internalCreditAssessment",
     "externalProviderCallbackEnabled": false,
-    "externalProviderTriggerEvents": ["loan.application.submitted", "credit.review.requested"],
+    "externalProviderTriggerEvents": [
+      "loan.application.submitted",
+      "credit.review.requested"
+    ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 1500,
-    "externalProviderRetryPolicy": { "maxAttempts": 1, "backoffMs": 0 },
+    "externalProviderRetryPolicy": {
+      "maxAttempts": 1,
+      "backoffMs": 0
+    },
     "externalProviderHealthStatus": "ok",
     "externalProviderLastHealthCheckAt": "2026-06-10T10:00:00.000Z",
     "categoryConfig": {
       "bureauName": "Internal",
       "bureauRegion": "US",
-      "pullTypes": ["soft"],
+      "pullTypes": [
+        "soft"
+      ],
       "defaultPullType": "soft",
       "scoringModel": "internal-v1",
       "scoreRangeMin": 300,
       "scoreRangeMax": 850,
       "consentRequired": true,
       "refreshFrequencyDays": 90,
-      "jurisdictions": ["US"]
+      "jurisdictions": [
+        "US"
+      ]
     },
-    "fieldMappingConfig": { "outbound": [], "inbound": [], "schemaVersion": 1 },
-    "routingPriority": 100,
+    "fieldMappingConfig": {
+      "outbound": [],
+      "inbound": [],
+      "schemaVersion": 1
+    },
+    "routingPriority": 999,
     "bianServiceDomain": "Customer Credit Rating",
     "bianControlRecordType": "CustomerCreditRatingState",
-    "pciDssRequirements": ["Req 12.8.1"],
+    "pciDssRequirements": [
+      "Req 12.8.1"
+    ],
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
     "schemaVersion": 2

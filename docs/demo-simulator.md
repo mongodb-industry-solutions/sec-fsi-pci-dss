@@ -1,8 +1,8 @@
 # Demo Modes: UX Flow Design
 
 **Project:** FSI PCI DSS Payment Security Demo
-**Status:** Approved: design decisions resolved
-**Last updated:** 2026-06-10
+**Status:** Approved: design decisions resolved — Multi-method simulator in progress (see `tmp/dev.simulator.plan.md`)
+**Last updated:** 2026-06-11
 **PRD reference:** [PRD.md](PRD.md)
 **Roadmap reference:** [roadmap.md](roadmap.md)
 **Technical spec:** [technical-spec.md](technical-spec.md)
@@ -97,16 +97,80 @@ This means what the presenter shows is the actual Atlas storage state: not a sim
 
 ## 3. Mode 1: Simulator
 
+### 3.0 Pre-Simulation Selector (Step 0)
+
+Before any payment flow starts, the presenter selects **which integration pattern to demonstrate** and **which story to tell**. This screen replaces the static landing text with an interactive selector.
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  🎬 Simulator Mode — Configure your demo                         │
+│                                                                  │
+│  How should the payment be made?                                 │
+│  ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐ │
+│  │  💳 API Payment  │ │  🔀 Redirection  │ │  🔗 Payment Link │ │
+│  │  Card            │ │  Payment         │ │                  │ │
+│  │  SD-64 · Order   │ │  Checkout Sess.  │ │  Shareable URL   │ │
+│  │  [Selected ✓]    │ │                  │ │                  │ │
+│  └──────────────────┘ └──────────────────┘ └──────────────────┘ │
+│  ┌──────────────────┐                                            │
+│  │  📦 InSite       │                                            │
+│  │  Payment         │                                            │
+│  │  [Coming Soon]   │                                            │
+│  └──────────────────┘                                            │
+│                                                                  │
+│  Which story?                                                    │
+│  ┌──────────────────────┐ ┌──────────────────────┐              │
+│  │ 👤 Luis Fernandez    │ │ 👤 María González     │              │
+│  │ €850 · TechGadgets   │ │ €45 · Supermercado   │              │
+│  │ [🔴 Fraude HIGH]     │ │ [🟢 Legítima]         │              │
+│  └──────────────────────┘ └──────────────────────┘              │
+│  ┌──────────────────────┐                                        │
+│  │ 👤 Ahmed Khalil      │                                        │
+│  │ €499 · GameZone      │                                        │
+│  │ [🟡 Caso límite]     │                                        │
+│  └──────────────────────┘                                        │
+│                                                                  │
+│  Story: Luis makes a high-value electronics purchase.            │
+│  It triggers fraud detection → L1 escalates → L2 resolves.      │
+│                                                                  │
+│  [Start Demo →]  (disabled until method + scenario selected)     │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Config source:** `frontend/src/config/simulator-methods.json` — controls which methods and scenarios are visible. Setting `enabled: false` hides a method; `comingSoon: true` shows a disabled card.
+
+**State persistence:** Selections are stored in `sessionStorage` (`sim_method`, `sim_scenario`) and survive navigation within the simulator. Cleared on "Restart Simulation."
+
+**Payment methods:**
+
+| ID | Label | Backend endpoint | Status |
+|---|---|---|---|
+| `api-card` | API Payment Card | `POST /api/v1/gateway/payments` | ✅ Enabled |
+| `redirection` | Redirection Payment | `POST /api/v1/checkout/sessions` | ✅ Enabled |
+| `payment-link` | Payment Link | `POST /api/v1/payment-links` | ✅ Enabled |
+| `insite` | InSite Payment | N/A | 🔜 Coming Soon (disabled) |
+
+**Pre-defined scenarios:**
+
+| ID | Persona | Amount | MCC | Expected outcome |
+|---|---|---|---|---|
+| `luis-fraud` | Luis Fernandez | €850 | 5734 Computer/Software | Fraud HIGH → L1→L2 investigation |
+| `maria-legit` | María González | €45 | 5411 Grocery | No fraud → clean confirmation |
+| `ahmed-border` | Ahmed Khalil | €499 | 5945 Toys/Games | Borderline score → L1 can resolve |
+
 ### 3.1 Route Structure
 
 ```
-/                                   Landing (mode selector)
-/simulator                          Simulator landing
-/simulator/payment                  Step 1-3: checkout flow
-/simulator/investigation            Analyst dashboard
-/simulator/investigation/:caseId    Case detail (auto-loaded)
-/simulator/audit                    Audit trail viewer (v2)
+/                                        Landing (mode selector)
+/simulator                               Step 0: method + scenario selector
+/simulator/payment                       Payment flow (branches by method)
+/simulator/payment/callback              postMessage bridge for iframe flows
+/simulator/investigation                 Analyst dashboard
+/simulator/investigation/:caseId         Case detail (auto-loaded)
+/simulator/audit                         Audit trail viewer (v2)
 ```
+
+**Note:** `/simulator/payment/callback` is a standalone page (no simulator layout). It receives the redirect from the hosted payment page (inside an iframe) and sends a `window.parent.postMessage` to the parent simulator. It does not render any navigable UI.
 
 ### 3.2 Header
 
@@ -123,7 +187,76 @@ This means what the presenter shows is the actual Atlas storage state: not a sim
 
 ### 3.3 Payment Flow
 
-#### Step 1: Card Details
+The payment page (`/simulator/payment`) branches on `sim_method` from sessionStorage.
+
+#### 3.3a — API Payment Card (existing flow)
+
+Pre-fills Step 1 with the selected scenario's `paymentData`. The 3-step wizard is unchanged.
+
+#### 3.3b — Redirection Payment (iframe flow)
+
+The simulator acts as a **merchant** that creates a checkout session and embeds the hosted payment page in an iframe — demonstrating exactly how an external integration partner would use the gateway.
+
+```
+┌─────────────────── Simulator: Redirection Payment ──────────────┐
+│  Step: Merchant creates checkout session                         │
+│  POST /api/v1/checkout/sessions                                  │
+│  returnUrl = /simulator/payment/callback?status=success&...      │
+│                                                                  │
+│  ┌────────── 🛒 TechGadgets Ltd. — Secure Checkout ──────────┐  │
+│  │  Order: Laptop Pro 16 + accessories   Total: €850.00      │  │
+│  │  ─────────────────────────────────────────────────────    │  │
+│  │  ┌──────────────────────────────────────────────────┐    │  │
+│  │  │  [iframe: /gateway/checkout/{sessionId}]         │    │  │
+│  │  │  (real hosted payment page — not a mock)         │    │  │
+│  │  └──────────────────────────────────────────────────┘    │  │
+│  │  🔒 Secure payment powered by LeafyBank PGW              │  │
+│  └─────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  ℹ️ This iframe loads the real /gateway/checkout page —          │
+│     the same code your integration partner embeds.               │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**postMessage protocol:**
+1. Checkout session created with `returnUrl = {origin}/simulator/payment/callback`
+2. `/gateway/checkout/[sessionId]` iframe: on success, `router.push(redirectUrl)` navigates the iframe to `/simulator/payment/callback?status=success&session={id}`
+3. `/simulator/payment/callback` page (standalone, no layout) fires:
+   ```javascript
+   window.parent.postMessage(
+     { type: 'sim_payment_complete', status: 'success', sessionId: id },
+     window.location.origin   // origin-validated
+   )
+   ```
+4. Parent simulator receives message, validates origin, advances to confirmation
+
+**Why same-origin iframe:** Both the simulator and `/gateway/checkout` are served by the same Next.js app on the same origin. No CORS or CSP headers block this. This is also exactly how a real merchant integration would work (the gateway page is loaded from the gateway domain).
+
+#### 3.3c — Payment Link (polling flow)
+
+The simulator creates a payment link and previews it inline — demonstrating the shareable URL pattern.
+
+```
+┌─────────────────── Simulator: Payment Link ─────────────────────┐
+│  📎 Payment Link Created                                         │
+│  https://pay.leafybank.demo/lnk/ABC123DEF456                     │
+│  [Copy URL]  [Open in new tab]                                   │
+│                                                                  │
+│  Share via: [Email] [WhatsApp] [QR Code]  (mockup badges)        │
+│                                                                  │
+│  Preview — what your customer sees:                              │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  [iframe: /pay/{code}]                                   │   │
+│  │  (real payment link page — customer fills card here)     │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                  │
+│  ⏳ Waiting for payment... (polls every 2s, max 2 min)           │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+Completion detected via polling `GET /api/v1/payment-links/{code}`. When status = `completed`, simulator advances to confirmation.
+
+### 3.4 Step 1: Card Details
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -321,26 +454,43 @@ The raw document is fetched live from Atlas via `GET /api/v1/demo/raw-document/c
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-### 3.5 Presenter Script (10-minute path)
+### 3.6 Presenter Script (12-minute path — Redirection Payment, Luis scenario)
 
 | Min | Action | Talking point |
 |---|---|---|
-| 0:00 | Open landing page | "This is a digital bank running entirely on MongoDB Atlas." |
-| 0:30 | Click Simulator Mode | "Let's follow a customer checkout from start to investigation." |
-| 1:00 | Fill card form | "Luis is paying for tech gear. He enters his card details." |
-| 1:30 | Click Next: Review | "Watch what happens before this reaches MongoDB Atlas." |
-| 2:00 | Point at encryption table | "These fields are encrypted in the browser. The server receives ciphertext." |
-| 2:30 | Click Confirm | "Payment submitted. MongoDB flagged it as suspicious: amount over threshold, high-risk merchant category." |
-| 3:00 | Auto-switch to Investigation | "We are now the fraud analyst. The case opened automatically." |
-| 3:30 | Run email search | "I search by Luis's email. That field is encrypted in Atlas." |
-| 4:00 | Results appear | "I found the record. The server matched ciphertext to ciphertext." |
-| 4:30 | Click Raw Atlas Document | "This is what Atlas actually stores. Ciphertext." |
-| 5:00 | Show split view | "On the left: what the analyst sees. On the right: what Atlas stores." |
-| 5:30 | Point at KMS reference | "That key lives in AWS KMS. MongoDB has zero access to the key. Zero." |
-| 6:00 | v2: Switch to Level 2 | "Now I'll escalate. Let me show you the access control layer." |
-| 7:00 | v2: Show sensitive fields | "Level 2 approved. Address and government ID are now visible. And immediately logged." |
-| 7:30 | v2: Open audit trail | "Every field access: who, what field, what time, which role. PCI DSS Requirement 10." |
-| 8:00 | Recap | "Encrypted at origin. Queryable without server-side decryption. Keys are yours. Audited by default." |
+| 0:00 | Open `/simulator` landing | "This is a digital bank running entirely on MongoDB Atlas." |
+| 0:20 | Select **Redirection Payment** method | "Let's demonstrate the integration pattern that external merchants use to connect their checkout to our gateway." |
+| 0:40 | Select **Luis — Alto valor** scenario | "Luis is buying a €850 laptop. This amount will trigger our fraud detection." |
+| 1:00 | Click **Start Demo →** | "We're now acting as the merchant. Watch what happens." |
+| 1:15 | Simulator creates checkout session | "The merchant calls our API: POST /checkout/sessions. The gateway returns a hosted payment page URL." |
+| 1:30 | Merchant branding wrapper appears | "The merchant embeds our hosted page in an iframe — that's what you see here. This is the actual gateway page, not a mock." |
+| 2:00 | Fill card in iframe | "Luis enters his card details. The raw PAN never leaves the browser — a token is generated client-side." |
+| 2:30 | Click Pay in iframe | "Payment submitted inside the iframe. The gateway tokenizes and processes." |
+| 3:00 | postMessage fires, simulator advances | "The checkout page redirects to our callback URL. The merchant's system receives the result." |
+| 3:30 | Fraud alert appears | "Amount €850 exceeded the threshold. A fraud case was auto-created." |
+| 4:00 | Auto-redirect to investigation | "We're now the fraud analyst. The case appeared automatically." |
+| 4:30 | Run email search | "I search by Luis's email — that field is encrypted in Atlas." |
+| 5:00 | Results appear | "Found the record. Server matched ciphertext to ciphertext — no decryption." |
+| 5:30 | Click Raw Atlas Document | "This is what Atlas actually stores. Ciphertext blobs. MongoDB has zero access to the plaintext." |
+| 6:00 | L1 view — encryption matrix | "Level 1 can search by email, phone, account ref — all encrypted. Cannot see address or gov ID." |
+| 7:00 | Escalate to L2 | "Score 85/100 exceeds the L1 authority threshold. Sarah escalates." |
+| 7:30 | L2 review | "Michael gets the escalation token. He can now decrypt address and gov ID using a different DEK." |
+| 8:00 | Show sensitive fields | "742 Evergreen Terrace... These are decrypted client-side only. Atlas never saw the plaintext." |
+| 8:30 | L2 resolves | "Fraud confirmed. Card revoked. Chargeback initiated. Audit trail sealed." |
+| 9:00 | Customer view | "Luis sees: fraud confirmed, full refund, new card in transit." |
+| 9:30 | Recap | "End-to-end encrypted. Queryable without decryption. Keys are yours. Integration via iframe or direct API. Audited by default." |
+
+**Alternative 5-minute path (API Card, María scenario):**
+
+| Min | Action | Talking point |
+|---|---|---|
+| 0:00 | Select API Card + María | "Direct API integration. €45 grocery — legitimate transaction." |
+| 0:30 | Complete 3 steps | "Encrypted in browser. Server sees ciphertext." |
+| 1:30 | No fraud alert | "Below threshold, low-risk MCC. Clean confirmation." |
+| 2:00 | Show raw Atlas document | "Even a clean transaction — all PII is ciphertext in Atlas." |
+| 2:30 | Recap | "Zero-trust storage. Query without decrypt. Works for every transaction, not just fraud cases." |
+
+
 
 ---
 
@@ -986,6 +1136,8 @@ backend/
 | 5 | v2 role selector in simulator | Resolved: dropdown inside Investigation view header |
 | 6 | MS Entra ID auth (v2) | Pending: extension hook designed, implementation deferred |
 | 7 | v3 AI agent (Magenta) integration point | Pending: defined in roadmap.md v3 FR, design TBD |
+| 8 | Multi-method simulator: method + scenario selection | **In progress** — see `tmp/dev.simulator.plan.md` |
+| 9 | InSite Payment | Deferred: `enabled: false` in `simulator-methods.json`. Requires embedded widget SDK — future iteration. Not blocking current roadmap. |
 
 ---
 
@@ -1336,3 +1488,93 @@ In debug mode, each card shows:
   PCI DSS:            Req 12.8 — Documented approval by authorized officer
   Req 7.1:            Only merchant_officer role can approve (least privilege)
   ```
+
+---
+
+## 14. Multi-Method Simulator (Ch-06)
+
+Adds payment method selection and scenario selection to the Simulator before the payment flow starts. Implements Redirection Payment via a real same-origin iframe and Payment Link via inline iframe + polling. InSite Payment is deferred.
+
+### 14.1 Simulator Config File
+
+**Location:** `frontend/src/config/simulator-methods.json`
+
+This file is the single source of truth for which methods and scenarios are visible in the Simulator. Editing this file is the only change required to show/hide a method or scenario — no code changes needed.
+
+**Structure:**
+```json
+{
+  "version": "1.0",
+  "paymentMethods": [
+    { "id": "api-card",     "label": "API Payment Card",   "enabled": true },
+    { "id": "redirection",  "label": "Redirection Payment","enabled": true },
+    { "id": "payment-link", "label": "Payment Link",       "enabled": true },
+    { "id": "insite",       "label": "InSite Payment",     "enabled": false, "comingSoon": true }
+  ],
+  "scenarios": [
+    { "id": "luis-fraud",   "outcome": "fraud",      "paymentData": { "amount": "850.00", ... } },
+    { "id": "maria-legit",  "outcome": "clear",      "paymentData": { "amount": "45.00",  ... } },
+    { "id": "ahmed-border", "outcome": "borderline", "paymentData": { "amount": "499.00", ... } }
+  ]
+}
+```
+
+### 14.2 Simulator sessionStorage State
+
+All simulator selections persist across navigation with a `sim_` prefix:
+
+| Key | Type | Description |
+|---|---|---|
+| `sim_method` | string | Selected payment method ID |
+| `sim_scenario` | string | Selected scenario ID |
+| `sim_step` | number | Current step in the payment flow |
+| `sim_payment_step3` | JSON | Confirmation result (existing key, unchanged) |
+| `sim_checkout_session` | JSON | `{ sessionId, paymentPageUrl, amount, merchant }` for redirection flow |
+| `sim_payment_link` | JSON | `{ code, url, amount, merchant }` for payment link flow |
+
+**Manager:** `frontend/src/components/simulator/SimulatorStateManager.ts` provides typed `getState()`, `setState(partial)`, `clearState()` helpers.
+
+### 14.3 Callback Route — `/simulator/payment/callback`
+
+**Layout:** Standalone — no simulator header/nav (uses its own layout that returns children unwrapped).
+
+**Purpose:** Acts as the postMessage bridge between the hosted checkout page (running inside an iframe) and the parent simulator page.
+
+**Flow:**
+1. The `/gateway/checkout/[sessionId]` page completes payment and calls `router.push(redirectUrl)` where `redirectUrl = /simulator/payment/callback?status=success&session={id}`
+2. The iframe navigates to this callback page
+3. On mount, the page reads `status` + `session` from URL params and fires:
+   ```javascript
+   window.parent.postMessage(
+     { type: 'sim_payment_complete', status, sessionId },
+     window.location.origin   // origin-validated by parent
+   )
+   ```
+4. If navigated to directly (not in iframe): shows "Return to /simulator" message
+
+**Security:** `window.location.origin` is passed as `targetOrigin`. Parent validates `event.origin === window.location.origin` before acting.
+
+### 14.4 Backend Auth Extension for Simulator
+
+Checkout sessions and payment links require a merchant JWT. In Simulator mode:
+
+**Headers sent by simulator frontend:**
+- `X-Simulator-Mode: true`
+- `X-Demo-Merchant-Id: {merchantId}` — ID of the pre-seeded simulator merchant
+
+**Backend middleware extension** (`vendors/middleware/auth.ts`): when `X-Simulator-Mode: true`, populate `req.merchant` from the value of `X-Demo-Merchant-Id` (after verifying the merchant exists in DB). This extends the existing `X-Demo-Role` simulator pattern.
+
+**Env var required:** `SIMULATOR_MERCHANT_ID` — UUID of the pre-seeded merchant used for simulator flows. Added to `.env.example`.
+
+### 14.5 New Frontend Components
+
+| Component | Location | Purpose |
+|---|---|---|
+| `PaymentMethodSelector` | `components/simulator/` | Grid of method cards, enabled/disabled states |
+| `ScenarioSelector` | `components/simulator/` | 3-card strip with outcome badges |
+| `RedirectionPaymentFlow` | `components/simulator/` | Creates checkout session, renders iframe |
+| `MerchantBrandingWrapper` | `components/simulator/` | Merchant site mockup wrapping the iframe |
+| `PaymentLinkFlow` | `components/simulator/` | Creates link, shows URL+QR mockup, polls status |
+| `SimulatorStateManager` | `components/simulator/` | sessionStorage read/write helpers |
+
+**Implementation plan:** `tmp/dev.simulator.plan.md` — 7 phases with pre/post checklists, TDD test specs, and risk register.

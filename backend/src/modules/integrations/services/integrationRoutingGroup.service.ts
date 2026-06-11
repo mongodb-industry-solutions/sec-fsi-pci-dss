@@ -34,7 +34,9 @@ export async function createRoutingGroup(
     routingGroupStrategy: input.strategy,
     routingGroupStatus: 'active',
     routingGroupMembers: [],
+    isDefaultGroup: false,
     bianServiceDomain: bianMeta.domain,
+    bianControlRecordType: 'ExternalProviderArrangementPortfolio',
     pciDssRequirements: bianMeta.pciDss,
     recordCreatedDateTime: now,
     recordUpdatedDateTime: now,
@@ -76,12 +78,23 @@ export async function updateRoutingGroup(
   );
 }
 
+export async function getDefaultGroupForType(
+  db: Db,
+  type: IntegrationProviderType
+): Promise<IntegrationRoutingGroup | null> {
+  return db.collection<IntegrationRoutingGroup>(INTEGRATION_ROUTING_GROUPS_COLLECTION).findOne({
+    routingGroupProviderType: type,
+    isDefaultGroup: true,
+  });
+}
+
 export async function addMemberToGroup(
   db: Db,
   groupId: string,
   providerId: string,
   priority = 100,
-  weight?: number
+  weight?: number,
+  role?: 'primary' | 'fallback' | 'peer'
 ): Promise<IntegrationRoutingGroup | null> {
   const group = await getRoutingGroup(db, groupId);
   if (!group) return null;
@@ -91,7 +104,9 @@ export async function addMemberToGroup(
     m => m.externalProviderArrangementInstanceReference === providerId
   );
   if (!alreadyMember) {
-    const role = group.routingGroupMembers.length === 0 ? 'primary' : 'fallback';
+    // Role: explicit override, or primary if no external (non-internal) members exist yet
+    const hasExternalMembers = group.routingGroupMembers.some(m => m.memberPriority < 999);
+    const assignedRole = role ?? (hasExternalMembers ? 'fallback' : 'primary');
     await db.collection<IntegrationRoutingGroup>(INTEGRATION_ROUTING_GROUPS_COLLECTION).updateOne(
       { routingGroupInstanceReference: groupId },
       {
@@ -100,7 +115,7 @@ export async function addMemberToGroup(
             externalProviderArrangementInstanceReference: providerId,
             memberPriority: priority,
             memberWeight: weight,
-            memberRole: role,
+            memberRole: assignedRole,
           },
         },
         $set: { recordUpdatedDateTime: new Date() },

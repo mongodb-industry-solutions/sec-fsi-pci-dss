@@ -6,6 +6,7 @@ import {
   INTEGRATION_EVENTS_COLLECTION,
   ExternalProviderArrangement,
 } from '../../modules/integrations/models/externalProviderArrangement.model';
+import { seedRoutingGroups } from './seedRoutingGroups';
 
 const DATA_DIR: string = process.env.SEED_DATA_DIR ?? join(process.cwd(), 'data');
 
@@ -35,4 +36,7 @@ export async function seedIntegrations(db: Db): Promise<void> {
       { upsert: true }
     );
   }
+
+  // Seed default routing groups (one per IntegrationProviderType) and bind internal providers
+  await seedRoutingGroups(db);
 }

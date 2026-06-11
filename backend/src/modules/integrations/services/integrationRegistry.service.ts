@@ -15,6 +15,7 @@ import {
   FieldMappingConfig,
 } from '../models/externalProviderArrangement.model';
 import { validateMappingRules } from './fieldMapping.service';
+import { getDefaultGroupForType, addMemberToGroup } from './integrationRoutingGroup.service';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -127,6 +128,23 @@ export async function createIntegration(
   };
 
   await col.insertOne(record);
+
+  // Auto-join to default group unless caller provided an explicit routingGroupId
+  if (!input.routingGroupId) {
+    const defaultGroup = await getDefaultGroupForType(db, input.type);
+    if (defaultGroup) {
+      // Next available priority = max external priority in group + 10, minimum 10
+      const externalMembers = defaultGroup.routingGroupMembers.filter(m => m.memberPriority < 999);
+      const maxPriority = externalMembers.length > 0
+        ? Math.max(...externalMembers.map(m => m.memberPriority))
+        : 0;
+      const nextPriority = maxPriority + 10;
+      await addMemberToGroup(db, defaultGroup.routingGroupInstanceReference, id, nextPriority);
+      record.routingGroupId = defaultGroup.routingGroupInstanceReference;
+      record.routingPriority = nextPriority;
+    }
+  }
+
   return { integration: stripSecrets(record), apiKey: plainKey };
 }
 
