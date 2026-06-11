@@ -415,8 +415,8 @@ export default function HelpPage() {
 
       {/* ─── Printable cover ────────────────────────────────────────────────── */}
       <div className="print-only p-cover">
-        <div className="p-cover-title">FSI Payment Gateway</div>
-        <div className="p-cover-sub">PCI DSS Compliance Guide</div>
+        <div className="p-cover-title">Compliance Guide</div>
+        <div className="p-cover-sub">PCI DSS v4.0.1 Checklist · Architecture Proposal</div>
         <div className="p-cover-meta">Powered by MongoDB Atlas · Built for digital banks and card issuers</div>
         <div className="p-cover-badge">PCI DSS v4.0.1 (June 2024) · All requirements mandatory as of March 31, 2025</div>
         <div className="p-cover-meta" style={{ marginTop: '1cm', fontSize: '7.5pt', color: '#aaa' }}>
@@ -434,8 +434,8 @@ export default function HelpPage() {
               <Shield size={17} className="text-[#001E2B]" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-[#001E2B] leading-tight">PCI DSS Compliance Guide</h1>
-              <p className="text-gray-500 text-sm mt-0.5">PCI DSS v4.0.1 Checklist · MongoDB Architecture Proposal</p>
+              <h1 className="text-lg font-bold text-[#001E2B] leading-tight">Compliance Guide</h1>
+              <p className="text-gray-500 text-sm mt-0.5">PCI DSS v4.0.1 Checklist · Architecture Proposal</p>
             </div>
           </div>
           <div className="relative group shrink-0">
@@ -456,7 +456,7 @@ export default function HelpPage() {
           {([
             { id: 'overview',  label: 'Demo Overview',    icon: Eye },
             { id: 'checklist', label: 'PCI DSS v4.0.1 Checklist',     icon: CheckSquare },
-            { id: 'mongodb',   label: 'MongoDB Architecture Proposal', icon: Database },
+            { id: 'mongodb',   label: 'Architecture Proposal', icon: Database },
           ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -899,7 +899,7 @@ export default function HelpPage() {
                   items: ['AWS KMS / Azure Key Vault / GCP Cloud KMS / KMIP for master key management.', 'Envelope encryption; data keys encrypted by master keys you control exclusively.', 'Key rotation policy; annual minimum, automated rotation recommended.', 'Split knowledge and dual control for key custodians (Req 3.7).'] },
               ].map(l => (
                 <div key={l.label} className={`rounded-lg border border-gray-700/50 bg-gray-800/30 border-l-4 ${l.color.border} p-4 p-arch-layer`}>
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-4">
                     <span className={`text-sm font-black ${l.color.text}`}>{l.num}</span>
                     <p className={`text-sm font-semibold ${l.color.text} p-arch-title`}>{l.label}</p>
                   </div>
