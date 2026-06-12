@@ -1650,3 +1650,29 @@ A card payment has two sides: the **cardholder** (issuing) view — already show
 - (+) The merchant id is queryable without decryption, and the merchant never sees cardholder PII.
 - (−) `merchantAgreementInstanceReference` is optional: legacy/direct transactions (e.g. the generic app-mode "New Payment" without a merchant context) carry no merchant link and won't appear under any merchant. Intended.
 - (▷) Settlement/payout aggregation (fees, T+2 batching — BIAN Settlement) and Merchant Activity Analysis remain out of scope; this delivers the transaction-level acquiring view only.
+
+---
+
+## ADR-020 — Merchant panel as nested routes with sidebar, analytics dashboard
+
+**Status:** Accepted (2026-06-12)
+
+**Context**
+
+The merchant owner panel (`/system/merchant`) was a single page with client-side tab state for all sections (checkout, payment links, payments received, API keys, webhook). This had no per-section URLs (no deep-linking, back-button, or bookmarking), a horizontal tab bar that doesn't scale as sections grow, and no consolidated view of merchant activity — only raw lists.
+
+**Decision**
+
+- **Nested routes + shared layout.** `/system/merchant` becomes a Next.js nested layout that loads the caller's merchant once (`GET /merchants/me`) and exposes it via React context (`lib/merchantContext.tsx`). Each section is its own route with a dedicated URL: `/overview`, `/checkout`, `/links`, `/payments`, `/api-keys`, `/webhooks`. The index renders onboarding states (no merchant / under review / rejected) and the staff list; active owners are redirected to `/overview`. A `useRequireActiveMerchant()` hook guards section routes (redirects non-owners).
+- **Vertical sidebar sub-navigation** (`components/merchant/MerchantNav.tsx`) instead of horizontal tabs — scales to more sections and is the conventional PSP console layout.
+- **Overview dashboard** backed by a new aggregation endpoint `GET /merchants/:id/stats` (MongoDB `$group`): KPI cards (operations, gross volume, average ticket, this-month), an operations-by-month bar chart, status and currency breakdowns, recent activity, and quick-access cards. Charts are lightweight inline CSS/SVG (no charting dependency added).
+- **List UX**: `/payments` adds pagination, status filter, and search (masked PAN / descriptor / merchant name).
+- **Standards**: the analytics align with BIAN Merchant Activity Analysis over SD-89; all aggregates and the transaction projection exclude payer PII (PCI DSS Req 3 & 7). Authorization on `/transactions` and `/stats` is owner / merchant_officer / security_auditor.
+
+**Consequences**
+
+- (+) Every section is independently addressable (deep-link, back-button, future growth); the panel reads like a real PSP merchant console.
+- (+) The Overview turns raw lists into decision-useful analytics, and showcases MongoDB's aggregation pipeline — without exposing any cardholder data.
+- (+) No new frontend dependency (charts are hand-rolled).
+- (−) Gross-volume mixes currencies into a primary figure; the by-currency breakdown is provided alongside to keep it honest. Settlement/payout (fees, T+2) remains out of scope.
+- (−) The legacy monolithic `MerchantSandbox` component was removed; section logic now lives in per-route pages.

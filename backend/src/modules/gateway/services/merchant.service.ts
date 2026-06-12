@@ -59,6 +59,35 @@ export async function getMerchants(
 }
 
 // Ch-05: dual-role lookup — customer finds their own merchant by partyRef (SD-13 FK)
+export async function getMerchantPicker(
+  db: Db,
+  filters: { q?: string; limit?: number }
+) {
+  const query: Record<string, unknown> = { merchantAgreementStatus: 'active' };
+  if (filters.q) query.merchantName = { $regex: filters.q, $options: 'i' };
+
+  const limit = Math.min(50, Math.max(1, filters.limit ?? 4));
+  const col = db.collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION);
+
+  const [results, total] = await Promise.all([
+    col
+      .find(query)
+      .project({
+        _id: 0,
+        merchantAgreementInstanceReference: 1,
+        merchantName: 1,
+        merchantCategoryCode: 1,
+        merchantRiskCategory: 1,
+      })
+      .sort({ merchantName: 1 })
+      .limit(limit)
+      .toArray(),
+    col.countDocuments(query),
+  ]);
+
+  return { results, total };
+}
+
 export async function getMerchantByOwnerPartyRef(db: Db, partyRef: string) {
   const merchant = await db
     .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)

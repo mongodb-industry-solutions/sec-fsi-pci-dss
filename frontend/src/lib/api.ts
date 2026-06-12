@@ -423,6 +423,20 @@ export const api = {
   health: () => apiFetch<{ status: string; atlas: string; kmsProvider: string; timestamp: string }>('/api/v1/system/health'),
 
   merchants: {
+    picker: (params: { q?: string; limit?: number }, token: string) => {
+      const qs = new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])
+      ).toString();
+      return apiFetch<{
+        results: Array<{
+          merchantAgreementInstanceReference: string;
+          merchantName: string;
+          merchantCategoryCode: string;
+          merchantRiskCategory: 'low' | 'medium' | 'high';
+        }>;
+        total: number;
+      }>(`/api/v1/merchants/picker${qs ? `?${qs}` : ''}`, {}, token);
+    },
     getMe: (token: string) =>
       apiFetch<{ found: boolean; merchant: Record<string, unknown> | null }>(
         '/api/v1/merchants/me', {}, token
@@ -444,9 +458,9 @@ export const api = {
     getById: (id: string, token: string) =>
       apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}`, {}, token),
     // Acquiring-side: payments this merchant received (no payer PII returned).
-    transactions: (merchantId: string, params: { page?: number; limit?: number }, token: string) => {
+    transactions: (merchantId: string, params: { page?: number; limit?: number; status?: string; search?: string }, token: string) => {
       const qs = new URLSearchParams(
-        Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
       ).toString();
       return apiFetch<{
         results: Array<{
@@ -465,6 +479,16 @@ export const api = {
         limit: number;
       }>(`/api/v1/merchants/${merchantId}/transactions${qs ? `?${qs}` : ''}`, {}, token);
     },
+    // Acquiring analytics (BIAN Merchant Activity Analysis): totals + breakdowns, no PII.
+    stats: (merchantId: string, token: string) =>
+      apiFetch<{
+        count: number;
+        totalAmount: number;
+        avgAmount: number;
+        byStatus: Array<{ status: string; count: number; amount: number }>;
+        byMonth: Array<{ year: number; month: number; count: number; amount: number }>;
+        byCurrency: Array<{ currency: string; count: number; amount: number }>;
+      }>(`/api/v1/merchants/${merchantId}/stats`, {}, token),
     create: (body: Record<string, unknown>, token: string) =>
       apiFetch<{ merchantAgreementInstanceReference: string; merchantName: string; merchantAgreementStatus: string; merchantApiKey: string }>(
         '/api/v1/merchants', { method: 'POST', body: JSON.stringify(body) }, token

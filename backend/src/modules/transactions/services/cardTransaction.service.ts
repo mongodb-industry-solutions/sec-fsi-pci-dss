@@ -284,8 +284,24 @@ export async function getAllTransactions(
  * sees only the acquiring essentials: masked PAN, amount, status, type, channel,
  * descriptor and timestamp. No QE client needed (no encrypted field is queried).
  */
-export async function getMerchantTransactions(db: Db, merchantId: string, page: number, limit: number) {
-  const query = { merchantAgreementInstanceReference: merchantId };
+export async function getMerchantTransactions(
+  db: Db,
+  merchantId: string,
+  page: number,
+  limit: number,
+  filters?: { status?: string; search?: string },
+) {
+  const query: Record<string, unknown> = { merchantAgreementInstanceReference: merchantId };
+  if (filters?.status) query['cardTransactionStatus'] = filters.status;
+  if (filters?.search) {
+    // Plaintext fields only (no PII): masked PAN suffix or descriptor. Case-insensitive.
+    const rx = { $regex: filters.search, $options: 'i' };
+    query['$or'] = [
+      { cardTransactionMaskedPanDisplay: rx },
+      { cardTransactionDescription: rx },
+      { cardTransactionMerchantName: rx },
+    ];
+  }
   const projection = {
     _id: 0,
     cardTransactionInstanceReference: 1,
@@ -310,4 +326,46 @@ export async function getMerchantTransactions(db: Db, merchantId: string, page: 
     db.collection(CARD_TRANSACTION_COLLECTION).countDocuments(query),
   ]);
   return { results, total, page, limit };
+}
+
+/**
+ * Acquiring-side analytics (BIAN Merchant Activity Analysis flavor) for a merchant's
+ * received payments. Pure aggregation over plaintext fields — no PII, no decryption.
+ * `$toDate` tolerates both Date and ISO-string `cardTransactionDateTime` values.
+ */
+export async function getMerchantStats(db: Db, merchantId: string) {
+  const coll = db.collection(CARD_TRANSACTION_COLLECTION);
+  const match = { merchantAgreementInstanceReference: merchantId };
+
+  const [totalsAgg, byStatus, byMonth, byCurrency] = await Promise.all([
+    coll.aggregate([
+      { $match: match },
+      { $group: { _id: null, count: { $sum: 1 }, totalAmount: { $sum: '$cardTransactionAmount.amount' }, avgAmount: { $avg: '$cardTransactionAmount.amount' } } },
+    ]).toArray(),
+    coll.aggregate([
+      { $match: match },
+      { $group: { _id: '$cardTransactionStatus', count: { $sum: 1 }, amount: { $sum: '$cardTransactionAmount.amount' } } },
+      { $sort: { count: -1 } },
+    ]).toArray(),
+    coll.aggregate([
+      { $match: match },
+      { $group: { _id: { y: { $year: { $toDate: '$cardTransactionDateTime' } }, m: { $month: { $toDate: '$cardTransactionDateTime' } } }, count: { $sum: 1 }, amount: { $sum: '$cardTransactionAmount.amount' } } },
+      { $sort: { '_id.y': 1, '_id.m': 1 } },
+    ]).toArray(),
+    coll.aggregate([
+      { $match: match },
+      { $group: { _id: '$cardTransactionAmount.currency', count: { $sum: 1 }, amount: { $sum: '$cardTransactionAmount.amount' } } },
+      { $sort: { amount: -1 } },
+    ]).toArray(),
+  ]);
+
+  const totals = totalsAgg[0] ?? { count: 0, totalAmount: 0, avgAmount: 0 };
+  return {
+    count: totals.count ?? 0,
+    totalAmount: totals.totalAmount ?? 0,
+    avgAmount: totals.avgAmount ?? 0,
+    byStatus:   byStatus.map((s) => ({ status: s._id as string, count: s.count as number, amount: s.amount as number })),
+    byMonth:    byMonth.map((s) => ({ year: (s._id as { y: number }).y, month: (s._id as { m: number }).m, count: s.count as number, amount: s.amount as number })),
+    byCurrency: byCurrency.map((s) => ({ currency: s._id as string, count: s.count as number, amount: s.amount as number })),
+  };
 }

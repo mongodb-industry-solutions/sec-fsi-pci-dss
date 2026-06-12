@@ -3,8 +3,8 @@
 
 import { FastifyInstance } from 'fastify';
 import type { JwtDemoPayload } from '../../../shared/models/identity.model';
-import { getMerchants, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, generateApiKey, revokeApiKey, reviewMerchantApplication } from '../services/merchant.service';
-import { getMerchantTransactions } from '../../transactions/services/cardTransaction.service';
+import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, generateApiKey, revokeApiKey, reviewMerchantApplication } from '../services/merchant.service';
+import { getMerchantTransactions, getMerchantStats } from '../../transactions/services/cardTransaction.service';
 import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
 
 export async function merchantController(fastify: FastifyInstance) {
@@ -136,6 +136,51 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
     return reply.status(201).send(result);
   });
 
+  // GET /api/v1/merchants/picker
+  // MUST be registered before /:id to prevent "picker" being matched as a UUID param
+  fastify.get('/picker', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Merchant picker list for payment forms (SD-89)',
+      description: `Returns active merchant agreements (name + MCC + risk only) for use in payment-form dropdowns.
+Accessible to any authenticated user — returns only non-sensitive business-public fields.
+Supports optional name search and limit for progressive disclosure UX.`,
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          q:     { type: 'string', description: 'Case-insensitive partial name search.' },
+          limit: { type: 'integer', minimum: 1, maximum: 50, default: 4 },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            results: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  merchantAgreementInstanceReference: { type: 'string' },
+                  merchantName:        { type: 'string' },
+                  merchantCategoryCode: { type: 'string' },
+                  merchantRiskCategory: { type: 'string', enum: ['low', 'medium', 'high'] },
+                },
+              },
+            },
+            total: { type: 'number' },
+          },
+        },
+        401: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { q, limit } = request.query as { q?: string; limit?: number };
+    const result = await getMerchantPicker(fastify.db, { q, limit });
+    return reply.send(result);
+  });
+
   // GET /api/v1/merchants/me  — Ch-05: customer fetches their own merchant by JWT partyRef
   // MUST be registered before /:id to prevent "me" being matched as a UUID param
   fastify.get('/me', {
@@ -239,8 +284,10 @@ Used by customers to detect their onboarding state: no application / under_revie
       querystring: {
         type: 'object',
         properties: {
-          page:  { type: 'integer', minimum: 1, default: 1 },
-          limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+          page:   { type: 'integer', minimum: 1, default: 1 },
+          limit:  { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+          status: { type: 'string', enum: ['authorized', 'declined', 'pending', 'settled', 'disputed'], description: 'Filter by transaction status.' },
+          search: { type: 'string', description: 'Case-insensitive match on masked PAN suffix, descriptor or merchant name (no PII).' },
         },
       },
       response: {
@@ -276,7 +323,7 @@ Used by customers to detect their onboarding state: no application / under_revie
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { page = 1, limit = 20 } = request.query as { page?: number; limit?: number };
+    const { page = 1, limit = 20, status, search } = request.query as { page?: number; limit?: number; status?: string; search?: string };
     const user = (request as { user?: JwtDemoPayload }).user;
 
     const merchant = await getMerchantById(fastify.db, id);
@@ -289,8 +336,50 @@ Used by customers to detect their onboarding state: no application / under_revie
       return reply.status(403).send({ error: 'Access denied: only the merchant owner, a merchant officer, or a security auditor can view received payments.' });
     }
 
-    const result = await getMerchantTransactions(fastify.db, id, Number(page), Number(limit));
+    const result = await getMerchantTransactions(fastify.db, id, Number(page), Number(limit), { status, search });
     return reply.send(result);
+  });
+
+  // GET /api/v1/merchants/:id/stats  — Acquiring analytics (BIAN Merchant Activity Analysis)
+  // Aggregates over the merchant's received payments. No PII; same authorization as
+  // /:id/transactions (owner / merchant_officer / security_auditor).
+  fastify.get('/:id/stats', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Merchant received-payments analytics (SD-89)',
+      description: 'Aggregated statistics for the merchant: totals, average ticket, breakdown by status, by currency, and operations per month. Pure aggregation over plaintext fields — no payer PII.',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            count:       { type: 'number' },
+            totalAmount: { type: 'number' },
+            avgAmount:   { type: 'number' },
+            byStatus:    { type: 'array', items: { type: 'object', properties: { status: { type: 'string' }, count: { type: 'number' }, amount: { type: 'number' } } } },
+            byMonth:     { type: 'array', items: { type: 'object', properties: { year: { type: 'number' }, month: { type: 'number' }, count: { type: 'number' }, amount: { type: 'number' } } } },
+            byCurrency:  { type: 'array', items: { type: 'object', properties: { currency: { type: 'string' }, count: { type: 'number' }, amount: { type: 'number' } } } },
+          },
+        },
+        401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const user = (request as { user?: JwtDemoPayload }).user;
+    const merchant = await getMerchantById(fastify.db, id);
+    if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
+    const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
+    const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
+    const isStaff = user?.role === 'merchant_officer' || user?.role === 'security_auditor';
+    if (!isOwner && !isStaff) {
+      return reply.status(403).send({ error: 'Access denied: only the merchant owner, a merchant officer, or a security auditor can view merchant analytics.' });
+    }
+    const stats = await getMerchantStats(fastify.db, id);
+    return reply.send(stats);
   });
 
   // PATCH /api/v1/merchants/:id/review  (Ch-05 — BIAN Action Term: Control)

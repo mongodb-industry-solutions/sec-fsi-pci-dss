@@ -15,17 +15,36 @@ interface CardPreset {
   network: 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
 }
 
+interface MerchantOption {
+  id: string;
+  label: string;
+  mcc: string;
+  risk: 'low' | 'medium' | 'high';
+}
+
+// MCC category hints for display
+function mccNote(mcc: string): string {
+  const map: Record<string, string> = {
+    '5411': 'Grocery', '5734': 'Electronics', '5812': 'Restaurant',
+    '5813': 'Nightlife', '6011': 'ATM/Cash', '7995': 'Gambling',
+    '4816': 'Internet Svcs', '5999': 'Retail', '5045': 'Computers',
+    '7011': 'Hotels', '5912': 'Pharmacy',
+  };
+  return map[mcc] ?? `MCC ${mcc}`;
+}
+
 const CARD_PRESETS: CardPreset[] = [
   { label: 'Visa Demo 4291',       lastFour: '4291', network: 'VISA' },
   { label: 'Mastercard Demo 8734', lastFour: '8734', network: 'MASTERCARD' },
   { label: 'Amex Demo 0052',       lastFour: '0052', network: 'AMEX' },
 ];
 
-const MERCHANT_PRESETS = [
-  { label: 'TechGadgets Ltd.',  mcc: '5734', note: 'Electronics', risk: 'low' },
-  { label: 'Casino Royale',     mcc: '7995', note: 'Gambling',    risk: 'high' },
-  { label: 'Metro Supermarket', mcc: '5411', note: 'Grocery',     risk: 'low' },
-  { label: 'Night Club XL',     mcc: '5813', note: 'Nightlife',   risk: 'high' },
+// Static fallback — shown only if the API call fails (network error, not yet seeded)
+const MERCHANT_FALLBACK: MerchantOption[] = [
+  { id: '', label: 'TechGadgets Ltd.',  mcc: '5734', risk: 'low' },
+  { id: '', label: 'Casino Royale',     mcc: '7995', risk: 'high' },
+  { id: '', label: 'Metro Supermarket', mcc: '5411', risk: 'low' },
+  { id: '', label: 'Night Club XL',     mcc: '5813', risk: 'high' },
 ];
 
 const AMOUNT_PRESETS = ['120.00', '499.00', '850.00', '1250.00'];
@@ -64,17 +83,65 @@ export default function DemoPaymentPage() {
   const [token, setToken] = useState('');
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
-  useEffect(() => { setToken(getToken() ?? ''); }, []);
+  // Merchant list state
+  const [merchantPresets, setMerchantPresets] = useState<MerchantOption[]>(MERCHANT_FALLBACK);
+  const [merchantsLoading, setMerchantsLoading] = useState(true);
+  const [merchantSearch, setMerchantSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<MerchantOption[] | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  useEffect(() => {
+    const t = getToken() ?? '';
+    setToken(t);
+    if (!t) { setMerchantsLoading(false); return; }
+    api.merchants.picker({ limit: 4 }, t)
+      .then(({ results }) => {
+        if (results.length > 0) {
+          setMerchantPresets(results.map(r => ({
+            id: r.merchantAgreementInstanceReference,
+            label: r.merchantName,
+            mcc: r.merchantCategoryCode,
+            risk: r.merchantRiskCategory,
+          })));
+        }
+      })
+      .catch(() => { /* keep fallback */ })
+      .finally(() => setMerchantsLoading(false));
+  }, []);
+
+  // Debounced merchant search
+  useEffect(() => {
+    if (!merchantSearch.trim()) { setSearchResults(null); return; }
+    const t = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const tok = getToken() ?? '';
+        const { results } = await api.merchants.picker({ q: merchantSearch.trim(), limit: 8 }, tok);
+        setSearchResults(results.map(r => ({
+          id: r.merchantAgreementInstanceReference,
+          label: r.merchantName,
+          mcc: r.merchantCategoryCode,
+          risk: r.merchantRiskCategory,
+        })));
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [merchantSearch]);
 
   const [selectedPreset, setSelectedPreset] = useState<CardPreset | null>(CARD_PRESETS[0]);
   const [maskedCard, setMaskedCard]         = useState(`****-****-****-${CARD_PRESETS[0].lastFour}`);
   const [amount, setAmount]                 = useState('850.00');
-  const [merchant, setMerchant]             = useState('TechGadgets Ltd.');
-  const [mcc, setMcc]                       = useState('5734');
+  const [merchant, setMerchant]             = useState('');
+  const [mcc, setMcc]                       = useState('');
+  const [selectedMerchantId, setSelectedMerchantId] = useState('');
   const [channel, setChannel]               = useState('online');
   const [initiationType, setInitiationType] = useState('customerInitiated');
   const [paymentReference, setPaymentReference] = useState('');
-  const [txDescription, setTxDescription]   = useState(() => descriptorPresets('TechGadgets Ltd.')[0]);
+  const [txDescription, setTxDescription]   = useState('');
   const [txNarrative, setTxNarrative]       = useState(NARRATIVE_PRESETS[0]);
   const [submitting, setSubmitting]         = useState(false);
   const [error, setError]                   = useState<string | null>(null);
@@ -82,6 +149,17 @@ export default function DemoPaymentPage() {
   const [result, setResult] = useState<{
     txnId: string; fraudCaseCreated: boolean; caseId?: string; maskedPan: string
   } | null>(null);
+
+  // Once merchant presets load, auto-select the first one (replaces old hard-coded default)
+  useEffect(() => {
+    if (!merchantsLoading && merchant === '' && merchantPresets.length > 0) {
+      const first = merchantPresets[0];
+      setMerchant(first.label);
+      setMcc(first.mcc);
+      setSelectedMerchantId(first.id);
+      setTxDescription(first.label.toUpperCase().slice(0, 22));
+    }
+  }, [merchantsLoading, merchantPresets, merchant]);
 
   // stable token per render so it matches what gets submitted
   const [cardToken] = useState(() => `tok_${Math.random().toString(36).slice(2, 10)}`);
@@ -99,13 +177,16 @@ export default function DemoPaymentPage() {
     setMaskedCard(`****-****-****-${p.lastFour}`);
   }
 
-  function selectMerchantPreset(m: typeof MERCHANT_PRESETS[0]) {
+  function selectMerchantOption(m: MerchantOption) {
     setMerchant(m.label);
     setMcc(m.mcc);
+    setSelectedMerchantId(m.id);
     setTxDescription(m.label.toUpperCase().slice(0, 22));
+    setMerchantSearch('');
+    setSearchResults(null);
   }
 
-  const selectedMerchantPreset = MERCHANT_PRESETS.find(m => m.mcc === mcc && m.label === merchant);
+  const selectedMerchantPreset = merchantPresets.find(m => m.label === merchant && m.mcc === mcc);
 
   async function handleConfirm() {
     if (!maskedCard) { setError('Please enter or select a card number.'); return; }
@@ -128,6 +209,7 @@ export default function DemoPaymentPage() {
         cardTransactionType: 'purchase',
         cardTransactionDescription: (txDescription.trim() || merchant.toUpperCase()).slice(0, 22),
         cardTransactionNarrative: txNarrative.trim() || undefined,
+        ...(selectedMerchantId ? { merchantAgreementInstanceReference: selectedMerchantId } : {}),
         gatewayPayload: { source: 'app-mode', paymentReference: paymentReference || undefined },
       }, token);
 
@@ -230,24 +312,70 @@ export default function DemoPaymentPage() {
               <div className="bg-white rounded-xl border p-5 space-y-4">
                 <h2 className="font-semibold text-gray-800">Merchant</h2>
 
-                <div className="grid grid-cols-2 gap-2">
-                  {MERCHANT_PRESETS.map((m) => (
-                    <button key={m.mcc} onClick={() => selectMerchantPreset(m)}
-                      className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                        selectedMerchantPreset?.mcc === m.mcc
-                          ? 'border-[#001E2B] bg-[#001E2B] text-white'
-                          : 'hover:border-gray-400'
-                      }`}>
-                      <div className="text-xs font-semibold truncate">{m.label}</div>
-                      <div className={`text-xs mt-0.5 flex items-center gap-1 ${selectedMerchantPreset?.mcc === m.mcc ? 'text-gray-300' : m.risk === 'high' ? 'text-amber-500' : 'text-gray-400'}`}>
-                        {m.risk === 'high' && '⚠ '}{m.note}
-                      </div>
-                    </button>
-                  ))}
+                {/* Preset grid — first 4 active merchants from SD-89 */}
+                {merchantsLoading ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {[0, 1, 2, 3].map(i => (
+                      <div key={i} className="rounded-lg border px-3 py-2.5 animate-pulse bg-gray-50 h-[52px]" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {merchantPresets.map((m) => (
+                      <button key={`${m.label}-${m.mcc}`} onClick={() => selectMerchantOption(m)}
+                        className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                          selectedMerchantPreset?.label === m.label && selectedMerchantPreset?.mcc === m.mcc
+                            ? 'border-[#001E2B] bg-[#001E2B] text-white'
+                            : 'hover:border-gray-400'
+                        }`}>
+                        <div className="text-xs font-semibold truncate">{m.label}</div>
+                        <div className={`text-xs mt-0.5 flex items-center gap-1 ${
+                          selectedMerchantPreset?.label === m.label && selectedMerchantPreset?.mcc === m.mcc
+                            ? 'text-gray-300'
+                            : m.risk === 'high' ? 'text-amber-500' : 'text-gray-400'
+                        }`}>
+                          {m.risk === 'high' && '⚠ '}{mccNote(m.mcc)}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Search for merchants not in the initial 4 */}
+                <div className="relative">
+                  <input
+                    value={merchantSearch}
+                    onChange={(e) => setMerchantSearch(e.target.value)}
+                    placeholder="Search more merchants..."
+                    className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#001E2B]/30"
+                  />
+                  {searchLoading && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">Loading…</span>
+                  )}
+                  {searchResults !== null && searchResults.length === 0 && !searchLoading && (
+                    <div className="absolute z-10 left-0 right-0 mt-1 bg-white border rounded-lg shadow-md px-3 py-2 text-sm text-gray-400">
+                      No active merchants found
+                    </div>
+                  )}
+                  {searchResults !== null && searchResults.length > 0 && (
+                    <ul className="absolute z-10 left-0 right-0 mt-1 bg-white border rounded-lg shadow-md divide-y overflow-y-auto max-h-48">
+                      {searchResults.map(m => (
+                        <li key={`${m.label}-${m.mcc}`}>
+                          <button onClick={() => selectMerchantOption(m)}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors">
+                            <span className="font-medium">{m.label}</span>
+                            <span className={`ml-2 text-xs ${m.risk === 'high' ? 'text-amber-500' : 'text-gray-400'}`}>
+                              {m.risk === 'high' && '⚠ '}{mccNote(m.mcc)}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <input value={merchant} onChange={(e) => setMerchant(e.target.value)}
+                  <input value={merchant} onChange={(e) => { setMerchant(e.target.value); setSelectedMerchantId(''); }}
                     placeholder="Merchant name"
                     className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#001E2B]/30" />
                   <input value={mcc} onChange={(e) => setMcc(e.target.value)}
