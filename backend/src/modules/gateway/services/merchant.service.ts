@@ -108,6 +108,51 @@ export async function getMerchantById(db: Db, id: string) {
   return merchant ?? null;
 }
 
+// ── Merchant lifecycle audit trail (BIAN SD-89, PCI DSS Req 10) ─────────────────
+// Append-only event log of merchant relationship actions (submitted, approved,
+// rejected, KYB, config updates). No cardholder data — operational metadata only.
+export const MERCHANT_EVENTS_COLLECTION = 'merchantAgreementEvents';
+
+export interface MerchantAgreementEvent {
+  merchantAgreementEventInstanceReference: string;
+  merchantAgreementInstanceReference: string;
+  eventType: string;
+  eventDateTime: Date;
+  performedByPartyReference?: string;
+  performedByRole?: string;
+  details?: Record<string, unknown>;
+  bianServiceDomain: 'Merchant Relations';
+  bianControlRecordType: 'MerchantAgreementProcedure';
+}
+
+export async function appendMerchantEvent(
+  db: Db,
+  merchantId: string,
+  eventType: string,
+  opts?: { performedByPartyReference?: string; performedByRole?: string; details?: Record<string, unknown> },
+): Promise<void> {
+  const event: MerchantAgreementEvent = {
+    merchantAgreementEventInstanceReference: uuidv4(),
+    merchantAgreementInstanceReference: merchantId,
+    eventType,
+    eventDateTime: new Date(),
+    ...(opts?.performedByPartyReference && { performedByPartyReference: opts.performedByPartyReference }),
+    ...(opts?.performedByRole && { performedByRole: opts.performedByRole }),
+    ...(opts?.details && { details: opts.details }),
+    bianServiceDomain: 'Merchant Relations',
+    bianControlRecordType: 'MerchantAgreementProcedure',
+  };
+  await db.collection(MERCHANT_EVENTS_COLLECTION).insertOne(event as object);
+}
+
+export async function getMerchantEvents(db: Db, merchantId: string) {
+  return db.collection<MerchantAgreementEvent>(MERCHANT_EVENTS_COLLECTION)
+    .find({ merchantAgreementInstanceReference: merchantId })
+    .sort({ eventDateTime: 1 })
+    .limit(200)
+    .toArray();
+}
+
 export async function createMerchant(db: Db, input: CreateMerchantInput) {
   const id = uuidv4();
   const now = new Date();
@@ -157,6 +202,12 @@ export async function createMerchant(db: Db, input: CreateMerchantInput) {
   };
 
   await db.collection(MERCHANT_AGREEMENT_COLLECTION).insertOne(merchant as object);
+
+  await appendMerchantEvent(db, id, 'merchant.submitted', {
+    performedByPartyReference: input.merchantOwnerPartyReference,
+    performedByRole: 'customer',
+    details: { merchantAgreementStatus: 'under_review', kyb: 'initiated' },
+  });
 
   return {
     merchantAgreementInstanceReference: id,
@@ -208,6 +259,12 @@ export async function reviewMerchantApplication(
     }
   );
 
+  await appendMerchantEvent(db, merchantId, action === 'approve' ? 'merchant.approved' : 'merchant.rejected', {
+    performedByPartyReference: reviewerPartyRef,
+    performedByRole: 'merchant_officer',
+    details: { merchantAgreementStatus: newStatus, kybStatus, reviewNote: reviewNote ?? '' },
+  });
+
   return 'ok';
 }
 
@@ -228,6 +285,9 @@ export async function updateMerchant(
     { $set: { ...patch, recordUpdatedDateTime: new Date() } },
     { returnDocument: 'after', projection: { merchantApiKeys: 0, merchantWebhookSecret: 0 } }
   );
+  if (result) {
+    await appendMerchantEvent(db, id, 'merchant.updated', { details: { fields: Object.keys(patch) } });
+  }
   return result ?? null;
 }
 

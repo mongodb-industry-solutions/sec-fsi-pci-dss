@@ -26,6 +26,27 @@ const STATUS_BADGE: Record<string, string> = {
 const SALE_STATUS = (s: string) =>
   s === 'authorized' || s === 'settled' ? 'bg-green-500' : s === 'disputed' ? 'bg-red-500' : s === 'declined' ? 'bg-gray-400' : 'bg-amber-500';
 
+const EVENT_LABEL: Record<string, string> = {
+  'merchant.submitted': 'Application submitted',
+  'merchant.approved': 'Approved · KYB verified',
+  'merchant.rejected': 'Application rejected',
+  'merchant.updated': 'Configuration updated',
+};
+
+type AuditRow = { label: string; date?: string; role?: string };
+
+// Fallback for merchants seeded before the event log existed: reconstruct lifecycle
+// milestones from the authoritative record fields (clearly labelled as derived).
+function recordMilestones(m: Record<string, unknown>, kyb?: Record<string, unknown>): AuditRow[] {
+  const rows: AuditRow[] = [];
+  if (m.recordCreatedDateTime) rows.push({ label: 'Application submitted', date: String(m.recordCreatedDateTime), role: 'customer' });
+  if (kyb?.merchantAgreementKybCheckCompletedDate) {
+    rows.push({ label: `KYB ${String(kyb.merchantAgreementKybCheckStatus ?? 'completed')}`, date: String(kyb.merchantAgreementKybCheckCompletedDate), role: 'merchant_officer' });
+  }
+  if (m.merchantReviewedDateTime) rows.push({ label: 'Reviewed by officer', date: String(m.merchantReviewedDateTime), role: 'merchant_officer' });
+  return rows.sort((a, b) => new Date(a.date ?? 0).getTime() - new Date(b.date ?? 0).getTime());
+}
+
 function InfoRow({ label, value }: { label: string; value?: string | number }) {
   return (
     <div className="flex justify-between gap-3 py-1.5 text-sm">
@@ -43,6 +64,7 @@ export default function StaffMerchantDetailPage() {
   const [merchant, setMerchant] = useState<Record<string, unknown> | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [recent, setRecent] = useState<Sale[]>([]);
+  const [events, setEvents] = useState<Awaited<ReturnType<typeof api.merchants.events>>['events']>([]);
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
 
@@ -58,12 +80,14 @@ export default function StaffMerchantDetailPage() {
       const isOwner = !!partyRef && (m as Record<string, unknown>).merchantOwnerPartyReference === partyRef;
       if (!isStaff && !isOwner) { setDenied(true); setLoading(false); return; }
 
-      const [s, r] = await Promise.all([
+      const [s, r, e] = await Promise.all([
         api.merchants.stats(id, token).catch(() => null),
         api.merchants.transactions(id, { limit: 8 }, token).catch(() => ({ results: [] as Sale[] })),
+        api.merchants.events(id, token).catch(() => ({ events: [] })),
       ]);
       setStats(s);
       setRecent(r.results as Sale[]);
+      setEvents(e.events);
     } catch {
       setMerchant(null);
     }
@@ -94,6 +118,10 @@ export default function StaffMerchantDetailPage() {
   const fmt = (a: number, c: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency: c }).format(a);
   const isOfficer = role === 'merchant_officer';
   const pending = status === 'under_review' || status === 'initiated';
+  const auditDerived = events.length === 0;
+  const auditRows: AuditRow[] = auditDerived
+    ? recordMilestones(m, kyb)
+    : events.map((e) => ({ label: EVENT_LABEL[e.eventType] ?? e.eventType, date: e.eventDateTime, role: e.performedByRole }));
 
   return (
     <div className="w-full px-5 sm:px-8 py-6 space-y-6">
@@ -186,6 +214,32 @@ export default function StaffMerchantDetailPage() {
               </div>
             </div>
           </>
+        )}
+      </div>
+
+      {/* Audit trail (BIAN SD-89 lifecycle · PCI DSS Req 10) */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5"><ClipboardCheck size={14} className="text-[#001E2B]" /> Audit trail</h2>
+          <span className="text-[10px] font-mono text-gray-400">SD-89 · Req 10{auditDerived ? ' · derived from record' : ' · append-only log'}</span>
+        </div>
+        {auditRows.length === 0 ? (
+          <p className="text-sm text-gray-400">No lifecycle events recorded.</p>
+        ) : (
+          <ol className="relative border-l border-gray-200 ml-2 space-y-4">
+            {auditRows.map((row, i) => (
+              <li key={i} className="ml-4">
+                <span className="absolute -left-[5px] w-2.5 h-2.5 rounded-full bg-[#00ED64] border border-white" />
+                <p className="text-sm font-medium text-gray-800">{row.label}</p>
+                <p className="text-xs text-gray-400">
+                  {row.date ? new Date(row.date).toLocaleString() : '—'}{row.role ? ` · ${row.role.replace(/_/g, ' ')}` : ''}
+                </p>
+              </li>
+            ))}
+          </ol>
+        )}
+        {auditDerived && auditRows.length > 0 && (
+          <p className="mt-3 text-xs text-amber-600">Reconstructed from the merchant record (created before the append-only event log). New actions are logged as immutable events.</p>
         )}
       </div>
     </div>

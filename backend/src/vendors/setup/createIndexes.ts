@@ -93,6 +93,11 @@ export async function createIndexes(client: MongoClient) {
     { key: { merchantOwnerPartyReference: 1 } },   // Ch-05: dual-role Party lookup
   ]);
 
+  // SD-89: Merchant lifecycle audit trail (append-only, PCI DSS Req 10)
+  await db.collection('merchantAgreementEvents').createIndexes([
+    { key: { merchantAgreementInstanceReference: 1, eventDateTime: 1 } },
+  ]);
+
   // SD-64: Checkout Session Log (TTL on expiry field)
   await db.collection('checkoutSessionLog').createIndexes([
     { key: { checkoutSessionInstanceReference: 1 }, unique: true },

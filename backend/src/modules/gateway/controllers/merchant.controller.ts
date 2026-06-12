@@ -3,7 +3,7 @@
 
 import { FastifyInstance } from 'fastify';
 import type { JwtDemoPayload } from '../../../shared/models/identity.model';
-import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, generateApiKey, revokeApiKey, reviewMerchantApplication } from '../services/merchant.service';
+import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, generateApiKey, revokeApiKey, reviewMerchantApplication, getMerchantEvents } from '../services/merchant.service';
 import { getMerchantTransactions, getMerchantStats } from '../../transactions/services/cardTransaction.service';
 import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
 
@@ -380,6 +380,56 @@ Used by customers to detect their onboarding state: no application / under_revie
     }
     const stats = await getMerchantStats(fastify.db, id);
     return reply.send(stats);
+  });
+
+  // GET /api/v1/merchants/:id/events  — Merchant lifecycle audit trail (SD-89, PCI DSS Req 10)
+  // Append-only log of submitted / approved / rejected / updated actions. No PII.
+  // Same authorization as /:id/transactions (owner / merchant_officer / security_auditor).
+  fastify.get('/:id/events', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Merchant lifecycle audit trail (SD-89, Req 10)',
+      description: 'Append-only event log of merchant relationship actions (submitted, approved, rejected, KYB, config updates). Operational metadata only — no cardholder data.',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            events: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  merchantAgreementEventInstanceReference: { type: 'string' },
+                  eventType:                 { type: 'string' },
+                  eventDateTime:             { type: 'string', format: 'date-time' },
+                  performedByPartyReference: { type: 'string' },
+                  performedByRole:           { type: 'string' },
+                  details:                   { type: 'object', additionalProperties: true },
+                },
+              },
+            },
+          },
+        },
+        401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const user = (request as { user?: JwtDemoPayload }).user;
+    const merchant = await getMerchantById(fastify.db, id);
+    if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
+    const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
+    const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
+    const isStaff = user?.role === 'merchant_officer' || user?.role === 'security_auditor';
+    if (!isOwner && !isStaff) {
+      return reply.status(403).send({ error: 'Access denied: only the merchant owner, a merchant officer, or a security auditor can view the audit trail.' });
+    }
+    const events = await getMerchantEvents(fastify.db, id);
+    return reply.send({ events });
   });
 
   // PATCH /api/v1/merchants/:id/review  (Ch-05 — BIAN Action Term: Control)

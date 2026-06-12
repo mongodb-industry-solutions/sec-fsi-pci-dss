@@ -1724,3 +1724,26 @@ In `/system/merchant`, the Merchant Officer view was scoped to review states onl
 - (+) The officer can service and monitor the whole portfolio, and the auditor can review any merchant end-to-end — matching SD-89 and PCI DSS Req 10/12.8.
 - (+) Reuses existing endpoints and shared chart components; no new backend.
 - (−) Broadens the officer's read scope beyond the earlier review-only restriction (deliberate, per SD-89). Mutations stay gated.
+
+---
+
+## ADR-023 — Merchant lifecycle audit trail (append-only, PCI DSS Req 10)
+
+**Status:** Accepted (2026-06-12)
+
+**Context**
+
+The staff merchant detail (ADR-022) showed identity, KYB, and activity, but there was no audit trail of the merchant relationship's lifecycle actions. PCI DSS Req 10 calls for an audit log of administrative actions, and BIAN SD-89 tracks the agreement lifecycle (Initiate → Evaluate/KYB → Agree/Reject → Update). The merchant record captured the latest state (KYB dates, reviewer, status) but not an immutable per-action history.
+
+**Decision**
+
+- Add an **append-only** `merchantAgreementEvents` collection (mirroring `fraudDiagnosisCaseEvents`), indexed on `(merchantAgreementInstanceReference, eventDateTime)`. Events are inserted, never updated or deleted.
+- Emit events on lifecycle actions: `merchant.submitted` (createMerchant), `merchant.approved` / `merchant.rejected` (reviewMerchantApplication, with KYB outcome and reviewer), `merchant.updated` (updateMerchant, with changed field names). Each event records actor (`performedByPartyReference`, `performedByRole`), timestamp, and operational `details` — **no cardholder data**.
+- Expose `GET /merchants/:id/events` with the same authorization as the other acquiring endpoints (owner / merchant_officer / security_auditor).
+- Render an **Audit trail** timeline in the staff detail view (`/system/merchant/[id]`). For merchants seeded before the log existed (no events), the UI reconstructs lifecycle milestones from the authoritative record fields (created, KYB completed, reviewed) and labels them clearly as derived.
+
+**Consequences**
+
+- (+) Officers and auditors get an immutable lifecycle history per merchant, satisfying PCI DSS Req 10 and BIAN SD-89 lifecycle tracking, without exposing CHD.
+- (+) Consistent with the existing append-only events pattern used for fraud cases.
+- (−) Historical (seeded) merchants show a *derived* timeline until they accrue real events; this is explicitly labelled. A one-off backfill seed could be added if a fully event-backed history is needed for the demo.

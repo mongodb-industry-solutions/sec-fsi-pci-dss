@@ -497,6 +497,18 @@ export const api = {
         byMonth: Array<{ year: number; month: number; count: number; amount: number }>;
         byCurrency: Array<{ currency: string; count: number; amount: number }>;
       }>(`/api/v1/merchants/${merchantId}/stats`, {}, token),
+    // Merchant lifecycle audit trail (SD-89, PCI DSS Req 10).
+    events: (merchantId: string, token: string) =>
+      apiFetch<{
+        events: Array<{
+          merchantAgreementEventInstanceReference: string;
+          eventType: string;
+          eventDateTime: string;
+          performedByPartyReference?: string;
+          performedByRole?: string;
+          details?: Record<string, unknown>;
+        }>;
+      }>(`/api/v1/merchants/${merchantId}/events`, {}, token),
     create: (body: Record<string, unknown>, token: string) =>
       apiFetch<{ merchantAgreementInstanceReference: string; merchantName: string; merchantAgreementStatus: string; merchantApiKey: string }>(
         '/api/v1/merchants', { method: 'POST', body: JSON.stringify(body) }, token
