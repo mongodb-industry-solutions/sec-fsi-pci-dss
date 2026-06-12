@@ -6,13 +6,25 @@ import { useDebugMode } from '../../../lib/debugMode';
 import {
   Link2, ShoppingCart, Key, Webhook, Copy, Check, Plus, Trash2, ExternalLink,
   Clock, CheckCircle2, XCircle, Store, ChevronRight, ShieldCheck,
-  Building2, MapPin, FileText, ArrowRight, Info, Filter, Search, X,
+  Building2, MapPin, FileText, ArrowRight, Info, Filter, Search, X, Receipt,
 } from 'lucide-react';
 import { Pagination } from '../../../components/Pagination';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = 'checkout' | 'links' | 'keys' | 'webhook';
+type Tab = 'checkout' | 'links' | 'keys' | 'webhook' | 'sales';
+
+interface MerchantSale {
+  cardTransactionInstanceReference: string;
+  cardTransactionAmount: { amount: number; currency: string };
+  cardTransactionDateTime: string;
+  cardTransactionStatus: string;
+  cardTransactionType?: string;
+  cardTransactionChannel?: string;
+  cardTransactionMerchantName: string;
+  cardTransactionMaskedPanDisplay: string;
+  cardTransactionDescription?: string;
+}
 type MerchantState = 'loading' | 'no_merchant' | 'under_review' | 'agreed' | 'active' | 'rejected' | 'analyst_list';
 
 type KybCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
@@ -523,6 +535,9 @@ function MerchantSandbox({ token, merchants, onRefresh }: { token: string; merch
   const [selectedMerchantId, setSelectedMerchantId] = useState(merchants[0]?.merchantAgreementInstanceReference ?? '');
   const [links, setLinks] = useState<PaymentLink[]>([]);
   const [loadingLinks, setLoadingLinks] = useState(false);
+  const [sales, setSales] = useState<MerchantSale[]>([]);
+  const [loadingSales, setLoadingSales] = useState(false);
+  const [salesTotal, setSalesTotal] = useState(0);
 
   const [csAmount, setCsAmount] = useState('99.00');
   const [csCurrency, setCsCurrency] = useState('USD');
@@ -574,9 +589,21 @@ function MerchantSandbox({ token, merchants, onRefresh }: { token: string; merch
     setLoadingLinks(false);
   }, [token, selectedMerchantId]);
 
+  const loadSales = useCallback(async () => {
+    if (!token || !selectedMerchantId) return;
+    setLoadingSales(true);
+    try {
+      const res = await api.merchants.transactions(selectedMerchantId, { limit: 50 }, token);
+      setSales(res.results);
+      setSalesTotal(res.total);
+    } catch { setSales([]); setSalesTotal(0); }
+    setLoadingSales(false);
+  }, [token, selectedMerchantId]);
+
   useEffect(() => {
     if (tab === 'links') loadLinks();
-  }, [tab, loadLinks]);
+    if (tab === 'sales') loadSales();
+  }, [tab, loadLinks, loadSales]);
 
   async function handleCreateSession(e: React.FormEvent) {
     e.preventDefault();
@@ -660,6 +687,7 @@ function MerchantSandbox({ token, merchants, onRefresh }: { token: string; merch
   const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: 'checkout', label: 'Checkout Session', icon: <ShoppingCart size={15} /> },
     { key: 'links',    label: 'Payment Links',    icon: <Link2 size={15} /> },
+    { key: 'sales',    label: 'Payments Received', icon: <Receipt size={15} /> },
     { key: 'keys',     label: 'API Keys',          icon: <Key size={15} /> },
     { key: 'webhook',  label: 'Webhook',           icon: <Webhook size={15} /> },
   ];
@@ -890,6 +918,62 @@ function MerchantSandbox({ token, merchants, onRefresh }: { token: string; merch
                           <Trash2 size={13} />
                         </button>
                       )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Payments Received (acquiring view — SD-89) */}
+      {tab === 'sales' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl border border-gray-200">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+              <div>
+                <h2 className="font-semibold text-gray-800 text-sm">Payments Received</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Card payments settled to this merchant{salesTotal > 0 ? ` · ${salesTotal} total` : ''}.
+                </p>
+              </div>
+              <button onClick={loadSales} className="text-xs text-[#00ED64] hover:underline">Refresh</button>
+            </div>
+
+            <div className="px-5 py-2 bg-blue-50 border-b border-blue-100 flex items-start gap-2">
+              <ShieldCheck size={14} className="text-blue-600 mt-0.5 shrink-0" />
+              <p className="text-xs text-blue-700">
+                Data minimization (PCI DSS Req 3 &amp; 7): only the masked PAN and acquiring details are shown.
+                The payer&apos;s account, email and gateway payload are never exposed to the merchant.
+              </p>
+            </div>
+
+            {loadingSales ? (
+              <div className="px-5 py-6 text-center text-sm text-gray-400">Loading...</div>
+            ) : sales.length === 0 ? (
+              <div className="px-5 py-6 text-center text-sm text-gray-400">No payments received yet.</div>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {sales.map((s) => (
+                  <li key={s.cardTransactionInstanceReference} className="px-5 py-3 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-xs text-gray-600">{s.cardTransactionMaskedPanDisplay}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                          s.cardTransactionStatus === 'authorized' || s.cardTransactionStatus === 'settled' ? 'bg-green-100 text-green-700' :
+                          s.cardTransactionStatus === 'disputed' ? 'bg-red-100 text-red-700' :
+                          s.cardTransactionStatus === 'declined' ? 'bg-gray-200 text-gray-600' : 'bg-amber-100 text-amber-700'
+                        }`}>{s.cardTransactionStatus}</span>
+                        {s.cardTransactionChannel && <span className="text-xs text-gray-400 capitalize">{s.cardTransactionChannel}</span>}
+                      </div>
+                      {s.cardTransactionDescription && <div className="text-sm text-gray-700 mt-0.5 truncate">{s.cardTransactionDescription}</div>}
+                      <div className="text-xs text-gray-400">{new Date(s.cardTransactionDateTime).toLocaleString()}</div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-bold text-gray-900">
+                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: s.cardTransactionAmount.currency }).format(s.cardTransactionAmount.amount)}
+                      </p>
                     </div>
                   </li>
                 ))}

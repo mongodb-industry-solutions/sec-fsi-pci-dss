@@ -4,6 +4,7 @@
 import { FastifyInstance } from 'fastify';
 import type { JwtDemoPayload } from '../../../shared/models/identity.model';
 import { getMerchants, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, generateApiKey, revokeApiKey, reviewMerchantApplication } from '../services/merchant.service';
+import { getMerchantTransactions } from '../../transactions/services/cardTransaction.service';
 import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
 
 export async function merchantController(fastify: FastifyInstance) {
@@ -218,6 +219,78 @@ Used by customers to detect their onboarding state: no application / under_revie
     const merchant = await getMerchantById(fastify.db, id);
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
     return reply.send(merchant);
+  });
+
+  // GET /api/v1/merchants/:id/transactions  — Acquiring-side view (BIAN SD-89)
+  // Lists payments the merchant RECEIVED. PCI DSS Req 3/7: the payer's PII
+  // (account reference / email / raw gateway payload) is never returned — only
+  // masked PAN, amount, status, type, channel, descriptor and timestamp.
+  fastify.get('/:id/transactions', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'List a merchant\'s received payments (acquiring view, SD-89)',
+      description: `Returns the card transactions where this merchant was the payee, newest first.
+
+**Authorization:** the merchant **owner** (JWT \`partyRef\` matches \`merchantOwnerPartyReference\`), a \`merchant_officer\`, or a \`security_auditor\`. Any other caller receives 403.
+
+**PCI DSS Req 3 / Req 7 (data minimization):** the payer's PII is **never** included — no account reference, email, or raw gateway payload. Only acquiring essentials (masked PAN, amount, status, type, channel, descriptor, timestamp).`,
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string', description: '`merchantAgreementInstanceReference` UUID.' } } },
+      querystring: {
+        type: 'object',
+        properties: {
+          page:  { type: 'integer', minimum: 1, default: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            results: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  cardTransactionInstanceReference: { type: 'string' },
+                  cardTransactionAmount:            { $ref: 'MonetaryAmount#' },
+                  cardTransactionDateTime:          { type: 'string', format: 'date-time' },
+                  cardTransactionStatus:            { type: 'string' },
+                  cardTransactionType:              { type: 'string' },
+                  cardTransactionChannel:           { type: 'string' },
+                  cardTransactionMerchantName:      { type: 'string' },
+                  cardTransactionMaskedPanDisplay:  { type: 'string' },
+                  cardTransactionDescription:       { type: 'string' },
+                },
+              },
+            },
+            total: { type: 'number' },
+            page:  { type: 'number' },
+            limit: { type: 'number' },
+          },
+        },
+        401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { page = 1, limit = 20 } = request.query as { page?: number; limit?: number };
+    const user = (request as { user?: JwtDemoPayload }).user;
+
+    const merchant = await getMerchantById(fastify.db, id);
+    if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
+
+    const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
+    const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
+    const isStaff = user?.role === 'merchant_officer' || user?.role === 'security_auditor';
+    if (!isOwner && !isStaff) {
+      return reply.status(403).send({ error: 'Access denied: only the merchant owner, a merchant officer, or a security auditor can view received payments.' });
+    }
+
+    const result = await getMerchantTransactions(fastify.db, id, Number(page), Number(limit));
+    return reply.send(result);
   });
 
   // PATCH /api/v1/merchants/:id/review  (Ch-05 — BIAN Action Term: Control)

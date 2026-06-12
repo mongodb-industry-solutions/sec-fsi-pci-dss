@@ -427,6 +427,9 @@ export default function PaymentPage() {
         cardTransactionMaskedPanDisplay: maskedCard || '****-****-****-1234',
         cardTransactionType: 'purchase',
         cardTransactionDescription: form.merchantName.toUpperCase().slice(0, 22),
+        // Acquiring-side link: the API-card flow charges the simulator merchant,
+        // so the payment also surfaces in that merchant's received-payments view.
+        merchantAgreementInstanceReference: simulatorConfig.merchantId,
         gatewayPayload: { source: 'simulator', timestamp: new Date().toISOString() },
       });
 

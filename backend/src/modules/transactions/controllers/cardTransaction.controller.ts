@@ -111,6 +111,10 @@ the Merchant Name selector. No authentication required (public, simulator mode).
             type: 'string',
             description: 'Extended free-text narrative for fraud investigation context. Optional.',
           },
+          merchantAgreementInstanceReference: {
+            type: 'string',
+            description: 'Acquiring-side link (BIAN SD-89): the merchant this payment was made to. Optional; set by checkout/payment-link flows and the simulator. Not CHD/PII — stored plaintext and indexed so the merchant owner can list received payments.',
+          },
           gatewayPayload: {
             type: 'object',
             description: 'Raw JSON response from the PSP authorization flow. Stored as QE:none in the `cardTransactionSensitive` collection; requires DEK-sensitive key (Level 2 Investigator role) to read.',
@@ -160,6 +164,7 @@ the Merchant Name selector. No authentication required (public, simulator mode).
       cardTransactionType: string;
       cardTransactionDescription: string;
       cardTransactionNarrative?: string;
+      merchantAgreementInstanceReference?: string;
       gatewayPayload: object;
     };
 

@@ -183,6 +183,7 @@ export async function processCheckoutPayment(
     cardTransactionType: 'purchase',
     cardTransactionDescription: session.checkoutSessionDescription.slice(0, 22),
     cardTransactionNarrative: `Checkout session ${session.checkoutSessionMerchantReference}`,
+    merchantAgreementInstanceReference: session.merchantAgreementInstanceReference,
     gatewayPayload: {
       source: 'checkout_session',
       sessionId: session.checkoutSessionInstanceReference,

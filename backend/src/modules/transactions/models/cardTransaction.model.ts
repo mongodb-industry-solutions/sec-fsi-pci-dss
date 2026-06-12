@@ -34,6 +34,12 @@ export interface CardTransactionLogControlRecord {
   cardTransactionMerchantName: string;
   cardTransactionMaskedPanDisplay: string;
 
+  // Acquiring-side link (BIAN SD-89 Merchant Relations): the merchant the payment
+  // was made TO. Plaintext + indexed — a merchant identifier, not CHD/PII — so the
+  // merchant owner can list their received payments. Optional: legacy/direct
+  // transactions created without a merchant context omit it.
+  merchantAgreementInstanceReference?: string;
+
   // BIAN SD-254 transaction description (not CHD - plaintext, no QE)
   // cardTransactionDescription: statement descriptor visible on the cardholder's bank statement (max 22 chars)
   // cardTransactionNarrative: extended free-text context for L1/L2 fraud investigation

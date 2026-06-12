@@ -186,6 +186,7 @@ export async function processLinkPayment(
     cardTransactionType: 'purchase',
     cardTransactionDescription: link.paymentLinkDescription.slice(0, 22),
     cardTransactionNarrative: `Payment link ${link.paymentLinkCode}`,
+    merchantAgreementInstanceReference: link.merchantAgreementInstanceReference,
     gatewayPayload: {
       source: 'payment_link',
       linkCode: link.paymentLinkCode,

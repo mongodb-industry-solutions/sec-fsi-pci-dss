@@ -21,6 +21,8 @@ export interface CreateTransactionInput {
   cardTransactionType: string;
   cardTransactionDescription: string;
   cardTransactionNarrative?: string;
+  // Acquiring-side link (SD-89): the merchant this payment was made to. Optional.
+  merchantAgreementInstanceReference?: string;
   gatewayPayload: object;
 }
 
@@ -100,6 +102,7 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
     cardTransactionMerchantCategoryCode: input.cardTransactionMerchantCategoryCode,
     cardTransactionMerchantName: input.cardTransactionMerchantName,
     cardTransactionMaskedPanDisplay: input.cardTransactionMaskedPanDisplay,
+    ...(input.merchantAgreementInstanceReference && { merchantAgreementInstanceReference: input.merchantAgreementInstanceReference }),
     cardTransactionDescription: input.cardTransactionDescription,
     ...(input.cardTransactionNarrative && { cardTransactionNarrative: input.cardTransactionNarrative }),
     bianServiceDomain: 'Card Transaction',
@@ -269,5 +272,42 @@ export async function getAllTransactions(
     readDb.collection(CARD_TRANSACTION_COLLECTION).countDocuments(query),
   ]);
 
+  return { results, total, page, limit };
+}
+
+/**
+ * Acquiring-side view (BIAN SD-89 Merchant Relations): list the payments a merchant
+ * RECEIVED, scoped by merchantAgreementInstanceReference (plaintext, indexed).
+ *
+ * PCI DSS data minimization (Req 3 / Req 7): the projection deliberately EXCLUDES
+ * the payer's PII — no account reference / email, no rawGatewayPayload. The merchant
+ * sees only the acquiring essentials: masked PAN, amount, status, type, channel,
+ * descriptor and timestamp. No QE client needed (no encrypted field is queried).
+ */
+export async function getMerchantTransactions(db: Db, merchantId: string, page: number, limit: number) {
+  const query = { merchantAgreementInstanceReference: merchantId };
+  const projection = {
+    _id: 0,
+    cardTransactionInstanceReference: 1,
+    cardTransactionAmount: 1,
+    cardTransactionDateTime: 1,
+    cardTransactionStatus: 1,
+    cardTransactionType: 1,
+    cardTransactionChannel: 1,
+    cardTransactionMerchantName: 1,
+    cardTransactionMaskedPanDisplay: 1,
+    cardTransactionDescription: 1,
+  };
+  const skip = (page - 1) * limit;
+  const [results, total] = await Promise.all([
+    db.collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION)
+      .find(query)
+      .project(projection)
+      .sort({ cardTransactionDateTime: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray(),
+    db.collection(CARD_TRANSACTION_COLLECTION).countDocuments(query),
+  ]);
   return { results, total, page, limit };
 }

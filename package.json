@@ -1,5 +1,5 @@
 {
-  "name": "fsi-pci-dss-demo",
+  "name": "fsi-psp-platform",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -27,10 +27,14 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.6",
     "@vitejs/plugin-react": "^4.3.0",
     "@vitest/coverage-v8": "^4.1.0",
+    "bcryptjs": "^2.4.3",
     "concurrently": "^8.2.2",
     "jsdom": "^25.0.0",
+    "jsonwebtoken": "^9.0.2",
     "supertest": "^6.3.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5",

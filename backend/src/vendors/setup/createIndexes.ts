@@ -14,6 +14,8 @@ export async function createIndexes(client: MongoClient) {
     { key: { paymentCardReference: 1 } },
     { key: { cardTransactionDateTime: -1 } },
     { key: { cardTransactionStatus: 1 } },
+    // Acquiring-side: list a merchant's received payments, newest first (SD-89)
+    { key: { merchantAgreementInstanceReference: 1, cardTransactionDateTime: -1 } },
   ]);
 
   // SD-53: Customer Agreement Procedure

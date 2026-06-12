@@ -1,9 +1,25 @@
 /**
  * Unit tests: fraudDiagnosis.service (FR-v1-04)
- * Source: backend/src/services/fraudDiagnosis.service.ts
+ * Source: backend/src/modules/fraud/services/fraudDiagnosis.service.ts
  */
 import { describe, it, expect, vi } from 'vitest';
-import { createFraudCase, getCases, getCaseById } from '../../../../backend/src/services/fraudDiagnosis.service';
+
+// dispatchIntegration is a fire-and-forget side effect (outbound webhook). Stub it so
+// case creation is tested in isolation and no real dispatch is attempted.
+vi.mock('../../../../backend/src/modules/integrations/services/integrationDispatch.service', () => ({
+  dispatchIntegration: vi.fn().mockResolvedValue(undefined),
+}));
+
+import { createFraudCase, getCases, getCaseById } from '../../../../backend/src/modules/fraud/services/fraudDiagnosis.service';
+
+// Minimal transaction snapshot embedded in every fraud case (BIAN SD-254).
+const snapshot = {
+  cardTransactionAmount: { amount: 850, currency: 'USD' },
+  cardTransactionMerchantName: 'Test Merchant',
+  cardTransactionDateTime: new Date(),
+  cardTransactionStatus: 'authorized' as const,
+  cardTransactionMaskedPanDisplay: '****-****-****-1234',
+};
 
 function makeDb(overrides?: { findResults?: unknown[]; total?: number; findOneResult?: unknown }) {
   const insertOneMock = vi.fn().mockResolvedValue({ insertedId: 'mock' });
@@ -25,51 +41,53 @@ function makeDb(overrides?: { findResults?: unknown[]; total?: number; findOneRe
 }
 
 describe('createFraudCase', () => {
-  it('inserts document and returns UUID reference', async () => {
+  // The service writes two documents: the case (FraudDiagnosis collection) and a
+  // case_opened audit event (FraudDiagnosisEvents collection). The mock shares one
+  // insertOne spy, so calls[0] = case doc, calls[1] = event doc.
+  it('inserts case + opening event and returns a UUID reference', async () => {
     const db = makeDb();
-    const result = await createFraudCase(db, 'txn-001', 'cust-001', ['amount_threshold'], 'high');
+    const result = await createFraudCase(db, 'txn-001', 'cust-001', ['amount_threshold'], 'high', snapshot);
     expect(result.fraudDiagnosisInstanceReference).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
     );
-    expect(db._insertOne).toHaveBeenCalledTimes(1);
+    expect(db._insertOne).toHaveBeenCalledTimes(2);
   });
 
   it('document starts with status = open', async () => {
     const db = makeDb();
-    await createFraudCase(db, 'txn-001', 'cust-001', ['amount_threshold'], 'medium');
+    await createFraudCase(db, 'txn-001', 'cust-001', ['amount_threshold'], 'medium', snapshot);
     expect(db._insertOne.mock.calls[0][0].fraudDiagnosisCaseStatus).toBe('open');
   });
 
   it('fraudDiagnosisCaseReference follows FD-YYYY-NNNNNN pattern', async () => {
     const db = makeDb();
-    await createFraudCase(db, 'txn-001', 'cust-001', ['amount_threshold'], 'high');
+    await createFraudCase(db, 'txn-001', 'cust-001', ['amount_threshold'], 'high', snapshot);
     expect(db._insertOne.mock.calls[0][0].fraudDiagnosisCaseReference).toMatch(/^FD-\d{4}-\d{6}$/);
   });
 
-  it('diagnosisActionLog has a single case_opened entry authored by payment_service', async () => {
+  it('opening event is a single case_opened entry authored by payment_service', async () => {
     const db = makeDb();
-    await createFraudCase(db, 'txn-001', 'cust-001', ['amount_threshold'], 'high');
-    const doc = db._insertOne.mock.calls[0][0];
-    expect(doc.diagnosisActionLog).toHaveLength(1);
-    expect(doc.diagnosisActionLog[0].actionType).toBe('case_opened');
-    expect(doc.diagnosisActionLog[0].performedByRole).toBe('payment_service');
+    await createFraudCase(db, 'txn-001', 'cust-001', ['amount_threshold'], 'high', snapshot);
+    const event = db._insertOne.mock.calls[1][0];
+    expect(event.actionType).toBe('case_opened');
+    expect(event.performedByRole).toBe('payment_service');
   });
 
   it('links to the correct transaction and customer references', async () => {
     const db = makeDb();
-    await createFraudCase(db, 'txn-xyz', 'cust-abc', ['high_risk_mcc'], 'critical');
+    await createFraudCase(db, 'txn-xyz', 'cust-abc', ['high_risk_mcc'], 'critical', snapshot);
     const doc = db._insertOne.mock.calls[0][0];
-    expect(doc.linkedCardTransactionReference).toBe('txn-xyz');
-    expect(doc.linkedCustomerAgreementReference).toBe('cust-abc');
+    expect(doc.cardTransactionInstanceReference).toBe('txn-xyz');
+    expect(doc.customerAgreementInstanceReference).toBe('cust-abc');
   });
 
   it('fraudDiagnosisScore grows with more risk indicators', async () => {
     const db1 = makeDb();
-    await createFraudCase(db1, 'txn-1', 'c-1', ['amount_threshold'], 'high');
+    await createFraudCase(db1, 'txn-1', 'c-1', ['amount_threshold'], 'high', snapshot);
     const score1 = db1._insertOne.mock.calls[0][0].fraudDiagnosisAssessment.fraudDiagnosisScore;
 
     const db2 = makeDb();
-    await createFraudCase(db2, 'txn-2', 'c-1', ['amount_threshold', 'high_risk_mcc'], 'critical');
+    await createFraudCase(db2, 'txn-2', 'c-1', ['amount_threshold', 'high_risk_mcc'], 'critical', snapshot);
     const score2 = db2._insertOne.mock.calls[0][0].fraudDiagnosisAssessment.fraudDiagnosisScore;
 
     expect(score1).toBeLessThan(score2);

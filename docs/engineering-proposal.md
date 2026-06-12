@@ -1626,3 +1626,27 @@ ADR-004 established the dual-mode frontend. In practice the Simulator had drifte
 - (+) Removed dead/duplicated resources: `users.json`, the hard-coded password map, fictional investigation constants, `simulatorHistory.ts`, and the legacy `*Sensitive.json` export files.
 - (−) The Simulator now depends on the auth and fraud endpoints behaving correctly; an RBAC bug surfaces in the Simulator (intended — it is now an honest test surface).
 - (−) Customer-facing case status in Application-mode transaction **history list** is not shown (customers are blocked from `/fraud`); customer-visible case notes remain available on the detail page via the dedicated customer-safe notes endpoint. A customer-safe case-status projection on `/transactions/all` is a possible follow-up.
+
+---
+
+## ADR-019 — Acquiring-side view: merchant received-payments (SD-89)
+
+**Status:** Accepted (2026-06-12)
+
+**Context**
+
+A card payment has two sides: the **cardholder** (issuing) view — already shown in the payer's transaction history — and the **merchant/acquiring** view — the payments a merchant *received*. The latter was absent: `cardTransactionLog` stored the merchant only as a free-text name + MCC (no queryable merchant id; the id was buried in the encrypted `rawGatewayPayload`), there was no merchant-scoped query, and the merchant owner's dashboard exposed only onboarding (KYB) and payment-tooling (checkout/links/keys/webhooks) — no "sales/received payments" view. So a redirection payment by Luis to Amara's merchant appeared for Luis but was invisible to Amara.
+
+**Decision**
+
+- Persist `merchantAgreementInstanceReference` as a **plaintext, indexed** field on `cardTransactionLog` (it is a merchant identifier, not CHD/PII; index `(merchantAgreementInstanceReference, cardTransactionDateTime: -1)`). Set by the checkout, payment-link, and simulator API-card flows.
+- Add `GET /api/v1/merchants/:id/transactions` (BIAN SD-89 Merchant Relations, acquiring projection). **Authorization:** the merchant owner (`partyRef` = `merchantOwnerPartyReference`), `merchant_officer`, or `security_auditor`; anyone else gets 403.
+- **PCI DSS Req 3 & 7 (data minimization):** the projection deliberately excludes the payer's PII — no account reference/email, no `rawGatewayPayload`. The merchant sees only acquiring essentials (masked PAN, amount, status, type, channel, descriptor, timestamp). No QE client is needed (no encrypted field is queried).
+- Add a "Payments Received" tab to the merchant owner's dashboard.
+
+**Consequences**
+
+- (+) Both sides of a payment are now visible to their respective actors — a faithful PSP model; the same simulator payment shows for the payer (issuing) and the merchant (acquiring).
+- (+) The merchant id is queryable without decryption, and the merchant never sees cardholder PII.
+- (−) `merchantAgreementInstanceReference` is optional: legacy/direct transactions (e.g. the generic app-mode "New Payment" without a merchant context) carry no merchant link and won't appear under any merchant. Intended.
+- (▷) Settlement/payout aggregation (fees, T+2 batching — BIAN Settlement) and Merchant Activity Analysis remain out of scope; this delivers the transaction-level acquiring view only.

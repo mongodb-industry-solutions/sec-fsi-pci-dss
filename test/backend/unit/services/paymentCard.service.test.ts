@@ -1,9 +1,9 @@
 /**
  * Unit tests: paymentCard.service (FR-v1-03.2)
- * Source: backend/src/services/paymentCard.service.ts
+ * Source: backend/src/modules/customer/services/paymentCard.service.ts
  */
 import { describe, it, expect, vi } from 'vitest';
-import { createCard, getCardsByCustomer } from '../../../../backend/src/services/paymentCard.service';
+import { createCard, getCardsByCustomer } from '../../../../backend/src/modules/customer/services/paymentCard.service';
 
 function makeDb(overrides?: { findResults?: unknown[] }) {
   const insertOneMock = vi.fn().mockResolvedValue({ insertedId: 'mock' });

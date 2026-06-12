@@ -973,6 +973,8 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { paymentCardReference: 1 } },                 // standard index: token is not QE
     { key: { cardTransactionDateTime: -1 } },
     { key: { cardTransactionStatus: 1 } },
+    // Acquiring-side: list a merchant's received payments, newest first (SD-89). Plaintext id, not QE.
+    { key: { merchantAgreementInstanceReference: 1, cardTransactionDateTime: -1 } },
   ]);
 
   // Note: cardTransactionLogSensitive collection removed in v2 (fields inline)
@@ -2167,6 +2169,7 @@ Error codes: 404 merchant not found, 410 link expired/deactivated/completed.
 | `POST` | `/merchants` | JWT | `customer` | Submit new merchant application (BIAN Action: Initiate). Sets status `under_review`. Initialises `merchantAgreementKybCheck.status = 'initiated'`. |
 | `GET` | `/merchants/me` | JWT | `customer` | Return the merchant agreement owned by the caller's `partyRef`. Returns `{ found: false }` when none exists. Enables role-based state machine in frontend. |
 | `GET` | `/merchants/:id` | JWT | `customer`, `merchant_officer`, `security_auditor` | Retrieve merchant agreement details. Response includes `merchantAgreementKybCheck` sub-document. |
+| `GET` | `/merchants/:id/transactions` | JWT | owner (`partyRef` = `merchantOwnerPartyReference`), `merchant_officer`, `security_auditor` | Acquiring-side view (SD-89): payments the merchant **received**, newest first. PCI DSS Req 3/7 — payer PII (account ref, email, raw gateway payload) is **never** returned; only masked PAN, amount, status, type, channel, descriptor, timestamp. Non-owner customers get 403. |
 | `GET` | `/merchants` | JWT | `merchant_officer`, `security_auditor` | List all merchant applications (officer review queue) |
 | `PATCH` | `/merchants/:id/review` | JWT | `merchant_officer`, `security_auditor` | Approve or reject application (BIAN Action: Control). Transitions status to `agreed` or `rejected`. Writes `merchantAgreementKybCheck` BQ:Step. |
 | `POST` | `/merchants/:id/keys` | JWT | `customer` | Generate new API key (plaintext returned once) |
