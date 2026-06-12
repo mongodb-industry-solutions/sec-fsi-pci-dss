@@ -10,6 +10,7 @@ import {
   PaymentLinkUsageType,
 } from '../models/paymentLink.model';
 import { createTransaction } from '../../transactions/services/cardTransaction.service';
+import { authorizeCard, linkAuthToTransaction } from './cardAuthorization.service';
 
 // 8-char alphanumeric code (URL-safe, no ambiguous chars O/0 I/l)
 const CODE_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -50,7 +51,8 @@ export type ProcessLinkPaymentResult =
   | 'not_found'
   | 'expired'
   | 'deactivated'
-  | 'completed';
+  | 'completed'
+  | 'declined';
 
 export async function createPaymentLink(
   db: Db,
@@ -131,6 +133,7 @@ export interface ProcessLinkPaymentInput {
   cardExpiryMonth: string;
   cardExpiryYear: string;
   customerEmail?: string;
+  cardAuthOutcome?: 'approved' | 'declined' | 'challenge';
 }
 
 export async function processLinkPayment(
@@ -156,6 +159,21 @@ export async function processLinkPayment(
 
   const maskedPan = `****-****-****-${input.cardToken.slice(-4).padStart(4, '0')}`;
 
+  // SD-15: Card Authorization — run before creating the transaction
+  const authResult = await authorizeCard(db, {
+    checkoutSessionInstanceReference: link.paymentLinkInstanceReference,
+    cardToken: input.cardToken,
+    amount: link.paymentLinkAmount,
+    currency: link.paymentLinkCurrency,
+    mcc: '5999',
+    merchantCode: link.merchantAgreementInstanceReference,
+    cardAuthOutcome: input.cardAuthOutcome,
+  });
+
+  if (authResult.result === 'declined') {
+    return { result: 'declined' };
+  }
+
   const txResult = await createTransaction(db, {
     cardToken: input.cardToken,
     accountReference: input.customerEmail ?? input.cardToken,
@@ -172,8 +190,13 @@ export async function processLinkPayment(
       source: 'payment_link',
       linkCode: link.paymentLinkCode,
       linkInstanceReference: link.paymentLinkInstanceReference,
+      cardAuthorizationInstanceReference: authResult.recordId,
+      cardAuthorizationCode: authResult.authCode,
     },
   });
+
+  // Link auth record to the transaction
+  await linkAuthToTransaction(db, authResult.recordId, txResult.cardTransactionInstanceReference);
 
   // Determine new status for single_use links
   const newStatus: PaymentLinkStatus =

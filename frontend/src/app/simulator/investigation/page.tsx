@@ -24,6 +24,7 @@ interface SimPaymentStep3 {
   currency?: string;
   merchantName?: string;
   method?: string;
+  customerName?: string;
 }
 
 export default function SimulatorInvestigationPage() {
@@ -31,6 +32,7 @@ export default function SimulatorInvestigationPage() {
   const [simPayment, setSimPayment] = useState<SimPaymentStep3 | null>(null);
   const [pinnedCase, setPinnedCase] = useState<FraudCase | null>(null);
   const [pinnedLoading, setPinnedLoading] = useState(false);
+  const [dbTxCount, setDbTxCount] = useState<number | null>(null);
 
   const [searchField, setSearchField]     = useState<SearchField>('email');
   const [searchValue, setSearchValue]     = useState('');
@@ -52,6 +54,10 @@ export default function SimulatorInvestigationPage() {
       setSimPayment(saved);
       if (saved.email) {
         setSearchValue(saved.email);
+        // Confirm DB state: how many transactions exist for this email
+        api.simulator.getTransactions(saved.email)
+          .then((res: { transactions: unknown[]; total: number }) => setDbTxCount(res.total))
+          .catch(() => null);
       }
       // Fetch the pinned case if we have its ID
       if (saved.caseId) {
@@ -118,15 +124,30 @@ export default function SimulatorInvestigationPage() {
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
               <span className="text-[#00ED64] text-lg">✓</span>
-              <span className="font-semibold text-sm">Payment completed — fraud case opened</span>
+              <div>
+                <span className="font-semibold text-sm">Payment completed — fraud case opened</span>
+                {simPayment.customerName && (
+                  <div className="text-xs text-gray-300 mt-0.5">
+                    Paid by <span className="text-white font-medium">{simPayment.customerName}</span>
+                    {simPayment.email && <span className="text-gray-400"> · {simPayment.email}</span>}
+                  </div>
+                )}
+              </div>
             </div>
-            {simPayment.amount !== undefined && simPayment.currency && (
-              <span className="text-xs text-gray-300 bg-white/10 rounded px-2 py-0.5">
-                {formatAmount(simPayment.amount, simPayment.currency)}
-                {simPayment.merchantName ? ` · ${simPayment.merchantName}` : ''}
-                {simPayment.method ? ` · ${simPayment.method}` : ''}
-              </span>
-            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              {dbTxCount !== null && (
+                <span className="text-xs text-[#00ED64] bg-[#00ED64]/10 border border-[#00ED64]/30 rounded px-2 py-0.5 font-mono">
+                  {dbTxCount} txn{dbTxCount !== 1 ? 's' : ''} in MongoDB
+                </span>
+              )}
+              {simPayment.amount !== undefined && simPayment.currency && (
+                <span className="text-xs text-gray-300 bg-white/10 rounded px-2 py-0.5">
+                  {formatAmount(simPayment.amount, simPayment.currency)}
+                  {simPayment.merchantName ? ` · ${simPayment.merchantName}` : ''}
+                  {simPayment.method ? ` · ${simPayment.method}` : ''}
+                </span>
+              )}
+            </div>
           </div>
 
           {simPayment.caseId ? (

@@ -59,6 +59,20 @@ const DEFAULT_GROUP_DEFS: DefaultGroupDef[] = [
     pciDssRequirements: ['Req 12.8.1'],
   },
   {
+    id: 'default-group-card-authorization',
+    type: 'card_authorization',
+    name: 'Default Card Authorization Group',
+    bianServiceDomain: 'Card Authorization',
+    pciDssRequirements: ['Req 3.3.1', 'Req 10.2.1'],
+  },
+  {
+    id: 'default-group-card-issuer',
+    type: 'card_issuer',
+    name: 'Default Card Issuer Group',
+    bianServiceDomain: 'Payment Card',
+    pciDssRequirements: ['Req 3.3.1', 'Req 3.5.1', 'Req 8.3.6'],
+  },
+  {
     id: 'default-group-generic',
     type: 'generic',
     name: 'Default Generic Integration Group',

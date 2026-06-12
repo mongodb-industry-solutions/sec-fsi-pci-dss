@@ -8,7 +8,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-[#001E2B] text-white flex flex-col items-center justify-center p-6">
       <div className="max-w-3xl w-full text-center">
         <div className="text-6xl mb-4">🏦</div>
-        <h1 className="text-3xl font-bold mb-2">Payment Gateway (FSI - PCI DSS Demo)</h1>
+        <h1 className="text-3xl font-bold mb-2">PSP Platform (FSI - PCI DSS Demo)</h1>
         <p className="text-[#00ED64] text-lg mb-8 font-medium">
           MongoDB Queryable Encryption · AWS KMS
         </p>

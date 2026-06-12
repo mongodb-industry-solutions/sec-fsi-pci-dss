@@ -77,7 +77,9 @@ export interface Integration {
 export const TYPE_LABEL: Record<string, string> = {
   fraud_detection: 'Fraud Detection', hrp_sanctions: 'HRP / Sanctions',
   kyc_identity: 'KYC / Identity',     kyb_business: 'KYB / Business',
-  aml_monitoring: 'AML Monitoring',   credit_bureau: 'Credit Bureau', generic: 'Generic',
+  aml_monitoring: 'AML Monitoring',   credit_bureau: 'Credit Bureau',
+  card_authorization: 'Card Authorization', card_issuer: 'Card Issuer',
+  generic: 'Generic',
 };
 
 export const TYPE_CATEGORY_PATH: Record<string, string> = {
@@ -87,6 +89,8 @@ export const TYPE_CATEGORY_PATH: Record<string, string> = {
   kyb_business:    '/system/admin/kyb',
   aml_monitoring:  '/system/admin/aml',
   credit_bureau:   '/system/admin/credit-bureau',
+  card_authorization: '/system/admin/card-authorization',
+  card_issuer:        '/system/admin/card-issuer',
 };
 
 // ── Context ──────────────────────────────────────────────────────────────────

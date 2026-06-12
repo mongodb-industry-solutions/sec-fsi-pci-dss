@@ -1508,5 +1508,33 @@
       "customerAgreementKycCheckReference": "KYC-B0000072-001",
       "customerAgreementKycCheckNotes": "Enhanced due diligence completed; cross-border risk noted."
     }
+  },
+  {
+    "customerAgreementInstanceReference": "ca000058-0000-4000-8000-000000000058",
+    "partyInstanceReference": "b0000058-0000-4000-8000-000000000058",
+    "customerAgreementReference": "ACC-AO-20260101",
+    "customerSegment": "retail",
+    "customerAgreementStatus": "active",
+    "customerAgreementEnrollmentDate": "2026-01-01T09:00:00.000Z",
+    "customerAgreementPreferredLanguage": "en",
+    "customerAgreementResidentialAddress": {
+      "streetAddress": "14 Calle Gran Via",
+      "city": "Madrid",
+      "postalCode": "28013",
+      "countryCode": "ES"
+    },
+    "governmentIdentificationReference": "SYNTH-AO-5891",
+    "customerAgreementRiskNotes": "Owner of Okafor Digital Services (m0000002); transactions to own merchant warrant conflict-of-interest review.",
+    "bianServiceDomain": "Customer Agreement",
+    "bianControlRecordType": "CustomerAgreementProcedure",
+    "recordCreatedDateTime": "2026-01-01T09:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-10T09:00:00.000Z",
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2026-01-01T09:00:00.000Z",
+      "customerAgreementKycCheckReference": "KYC-B0000058-001",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
+    }
   }
 ]

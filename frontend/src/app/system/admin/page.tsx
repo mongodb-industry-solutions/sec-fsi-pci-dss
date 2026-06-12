@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   ShieldAlert, ScanLine, UserCheck, Building2, AlertTriangle, CreditCard,
-  CheckCircle2, AlertCircle, Clock, WifiOff, Wrench, type LucideIcon,
+  CheckCircle2, AlertCircle, Clock, WifiOff, Wrench, Zap, KeyRound, type LucideIcon,
 } from 'lucide-react';
 import { api } from '../../../lib/api';
 import { getToken } from '../../../lib/auth';
@@ -21,12 +21,14 @@ interface Integration {
 }
 
 const TYPE_META: Record<string, { label: string; icon: LucideIcon; description: string; bianSd: string; href: string }> = {
-  fraud_detection: { label: 'Fraud Detection',    icon: ShieldAlert,    description: 'Real-time transaction scoring and fraud signals', bianSd: 'SD-63',  href: '/system/admin/fraud-detection' },
-  hrp_sanctions:   { label: 'HRP / Sanctions',    icon: ScanLine,       description: 'High-risk person and sanctions list screening',   bianSd: 'SD-13',  href: '/system/admin/hrp' },
-  kyc_identity:    { label: 'KYC / Identity',     icon: UserCheck,      description: 'Customer identity verification (KYC)',            bianSd: 'SD-53',  href: '/system/admin/kyc' },
-  kyb_business:    { label: 'KYB / Business',     icon: Building2,      description: 'Merchant business entity verification (KYB)',     bianSd: 'SD-89',  href: '/system/admin/kyb' },
-  aml_monitoring:  { label: 'AML Monitoring',     icon: AlertTriangle,  description: 'Anti-money laundering pattern analysis',          bianSd: 'SD-99',  href: '/system/admin/aml' },
-  credit_bureau:   { label: 'Credit Bureau',      icon: CreditCard,     description: 'Credit scoring and bureau checks',                bianSd: 'SD-83',  href: '/system/admin/credit-bureau' },
+  fraud_detection:   { label: 'Fraud Detection',    icon: ShieldAlert,  description: 'Real-time transaction scoring and fraud signals', bianSd: 'SD-63',  href: '/system/admin/fraud-detection' },
+  hrp_sanctions:     { label: 'HRP / Sanctions',    icon: ScanLine,     description: 'High-risk person and sanctions list screening',   bianSd: 'SD-13',  href: '/system/admin/hrp' },
+  kyc_identity:      { label: 'KYC / Identity',     icon: UserCheck,    description: 'Customer identity verification (KYC)',            bianSd: 'SD-53',  href: '/system/admin/kyc' },
+  kyb_business:      { label: 'KYB / Business',     icon: Building2,    description: 'Merchant business entity verification (KYB)',     bianSd: 'SD-89',  href: '/system/admin/kyb' },
+  aml_monitoring:    { label: 'AML Monitoring',     icon: AlertTriangle, description: 'Anti-money laundering pattern analysis',         bianSd: 'SD-99',  href: '/system/admin/aml' },
+  credit_bureau:     { label: 'Credit Bureau',      icon: CreditCard,   description: 'Credit scoring and bureau checks',                bianSd: 'SD-83',  href: '/system/admin/credit-bureau' },
+  card_authorization: { label: 'Card Authorization', icon: Zap,         description: 'Card transaction authorization via payment networks', bianSd: 'SD-15', href: '/system/admin/card-authorization' },
+  card_issuer:       { label: 'Card Issuer',        icon: KeyRound,     description: 'CVV and PIN validation from card-issuing processors', bianSd: 'SD-88', href: '/system/admin/card-issuer' },
 };
 
 function HealthBadge({ status }: { status?: string }) {

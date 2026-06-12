@@ -132,7 +132,7 @@ function PaymentLinkPageInner() {
               Ref: {txRef.slice(0, 8)}...
             </div>
           )}
-          <div className="mt-4 text-xs text-gray-400">Powered by MongoDB Payment Gateway</div>
+          <div className="mt-4 text-xs text-gray-400">Powered by MongoDB PSP Platform</div>
         </div>
       </div>
     );

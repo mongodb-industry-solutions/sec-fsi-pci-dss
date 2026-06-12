@@ -11,6 +11,8 @@ export type IntegrationProviderType =
   | 'kyb_business'
   | 'hrp_sanctions'
   | 'credit_bureau'
+  | 'card_authorization'
+  | 'card_issuer'
   | 'generic';
 
 export type IntegrationStatus  = 'active' | 'inactive' | 'test' | 'suspended';
@@ -165,6 +167,24 @@ export interface CreditBureauConfig {
   jurisdictions: string[];
 }
 
+export interface CardAuthorizationConfig {
+  merchantCode: string;
+  terminalNumber?: string;
+  signatureVersion: 'HMAC_SHA256' | 'HMAC_SHA512_V2';
+  enableThreeDS: boolean;
+  mockMode: boolean;
+  simulatorMode: 'always_approve' | 'scenario_driven';
+}
+
+export interface CardIssuerConfig {
+  issuerBin?: string;
+  cardNetworks: ('visa' | 'mastercard' | 'amex' | 'discover')[];
+  cvvValidationEnabled: boolean;
+  pinValidationEnabled: boolean;
+  mockMode: boolean;
+  pinBlockFormat: 'ISO-0' | 'ISO-3' | 'ISO-4';
+}
+
 export interface GenericIntegrationConfig {
   categoryLabel: string;
   customEventTypes: string[];
@@ -179,6 +199,8 @@ export type CategoryConfig =
   | KybBusinessConfig
   | HrpSanctionsConfig
   | CreditBureauConfig
+  | CardAuthorizationConfig
+  | CardIssuerConfig
   | GenericIntegrationConfig;
 
 // ── Routing Groups ────────────────────────────────────────────────────────────

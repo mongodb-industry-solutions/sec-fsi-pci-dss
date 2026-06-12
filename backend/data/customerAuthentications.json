@@ -86,9 +86,9 @@
   {
     "customerAuthenticationInstanceReference": "a1000057-0000-4000-8000-000000000057",
     "partyInstanceReference": "b0000057-0000-4000-8000-000000000057",
-    "customerAuthenticationEmailAddress": "customer2@demo.com",
+    "customerAuthenticationEmailAddress": "david.chen@demo.com",
     "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
-    "customerAuthenticationUserRole": "customer",
+    "customerAuthenticationUserRole": "merchant_officer",
     "customerAuthenticationUserName": "David Chen",
     "customerAuthenticationLoginDomain": "local",
     "customerAuthenticationAccountStatus": "active",
@@ -100,7 +100,7 @@
   {
     "customerAuthenticationInstanceReference": "a1000058-0000-4000-8000-000000000058",
     "partyInstanceReference": "b0000058-0000-4000-8000-000000000058",
-    "customerAuthenticationEmailAddress": "customer3@demo.com",
+    "customerAuthenticationEmailAddress": "amara.okafor@demo.com",
     "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
     "customerAuthenticationUserRole": "customer",
     "customerAuthenticationUserName": "Amara Okafor",

@@ -113,7 +113,7 @@ the Merchant Name selector. No authentication required (public, simulator mode).
           },
           gatewayPayload: {
             type: 'object',
-            description: 'Raw JSON response from the payment gateway. Stored as QE:none in the `cardTransactionSensitive` collection; requires DEK-sensitive key (Level 2 Investigator role) to read.',
+            description: 'Raw JSON response from the PSP authorization flow. Stored as QE:none in the `cardTransactionSensitive` collection; requires DEK-sensitive key (Level 2 Investigator role) to read.',
             additionalProperties: true,
           },
         },

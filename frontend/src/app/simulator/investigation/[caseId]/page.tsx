@@ -854,7 +854,7 @@ function L2ResolveView({ fraudCase }: { fraudCase: FraudCase }) {
             { icon: '🔒', title: 'Card token revoked', desc: 'Token invalidated in the vault. Surrogate token, not CHD.' },
             { icon: '📧', title: 'Fraud alert dispatched', desc: 'Customer notified via encrypted channel with resolution details.' },
             { icon: '📋', title: 'Audit log sealed', desc: 'All actions immutably recorded with role, timestamp, and reference.' },
-            { icon: '🏦', title: 'Chargeback initiated', desc: 'BIAN SD-83 conclusion propagated to card network via payment gateway.' },
+            { icon: '🏦', title: 'Chargeback initiated', desc: 'BIAN SD-83 conclusion propagated to card network via PSP.' },
           ].map((item) => (
             <div key={item.title} className="flex gap-3">
               <span className="text-lg mt-0.5">{item.icon}</span>

@@ -6,15 +6,15 @@ import { MerchantBrandingWrapper } from './MerchantBrandingWrapper';
 import { SimulatorStateManager } from './SimulatorStateManager';
 import { writeSimulatorTransactionToHistory } from '../../lib/simulatorHistory';
 import type { SimulatorScenario } from '../../types/simulator';
+import simulatorConfig from '../../config/simulator.json';
 
 interface Props {
   scenario: SimulatorScenario;
-  merchantId: string;
 }
 
 type FlowState = 'idle' | 'creating' | 'ready' | 'waiting' | 'complete' | 'error';
 
-export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
+export function RedirectionPaymentFlow({ scenario }: Props) {
   const router = useRouter();
   const [flowState, setFlowState] = useState<FlowState>('idle');
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -46,6 +46,7 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
           currency: prefill.currency,
           merchantName: prefill.merchantName,
           method: 'redirection',
+          customerName: scenario.persona,
           sessionId: sid,
         }));
         SimulatorStateManager.setStep(3);
@@ -77,7 +78,7 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
     try {
       const origin = window.location.origin;
       const result = await api.simulator.createCheckoutSession({
-        merchantAgreementInstanceReference: merchantId,
+        merchantId: simulatorConfig.merchantId,
         amount: prefill.amount,
         currency: prefill.currency,
         description: prefill.description,
@@ -166,7 +167,7 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
             ✅ Session created · ID: <code className="font-mono">{sessionId.slice(0, 12)}…</code>
           </div>
           <p className="text-sm text-gray-600 mb-4">
-            The gateway has returned a <strong>paymentPageUrl</strong>. The merchant site now
+            The PSP has returned a <strong>paymentPageUrl</strong>. The merchant site now
             loads this URL inside an iframe for the customer to complete payment.
           </p>
           <button
@@ -191,6 +192,7 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
     if (prefill.cardholderName) prefillParams.set('name', prefill.cardholderName);
     if (prefill.cardExpiry)    prefillParams.set('expiry', prefill.cardExpiry);
     if (prefill.cardHint)      prefillParams.set('card', prefill.cardHint);
+    if (prefill.email)         prefillParams.set('email', prefill.email);
     const iframeSrc = `/gateway/checkout/${sessionId}?${prefillParams.toString()}`;
 
     return (
@@ -205,7 +207,7 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
           src={iframeSrc}
           className="w-full rounded-lg border shadow-inner bg-white"
           style={{ height: 'min(640px, 80vh)' }}
-          title="Payment Gateway, hosted payment page"
+          title="PSP Hosted Payment Page"
           sandbox="allow-scripts allow-same-origin allow-forms allow-top-navigation-by-user-activation"
         />
         <div className="flex items-center justify-between mt-2">

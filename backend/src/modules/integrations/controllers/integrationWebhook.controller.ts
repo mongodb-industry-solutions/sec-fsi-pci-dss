@@ -6,6 +6,8 @@ import {
   processKycCallback,
   processKybCallback,
   processHrpCallback,
+  processCardAuthorizationCallback,
+  processCardIssuerCallback,
   processGenericCallback,
 } from '../services/integrationCallback.service';
 
@@ -94,6 +96,32 @@ export async function integrationWebhookController(fastify: FastifyInstance) {
     if (!valid) return reply.code(errorCode ?? 401).send({ error: 'Invalid or missing webhook signature' });
 
     await processGenericCallback(fastify.db, provider!, request.body as never);
+    return { received: true };
+  });
+
+  // ── POST /webhooks/card/authorization/:id/callback ─────────────────────────
+  fastify.post<{ Params: { id: string } }>('/card/authorization/:id/callback', webhookOpts, async (request, reply) => {
+    const { id } = request.params;
+    const signature = request.headers['x-webhook-signature'] as string | undefined;
+    const bodyRaw = JSON.stringify(request.body);
+
+    const { valid, provider, errorCode } = await validateCallback(fastify.db, id, bodyRaw, signature);
+    if (!valid) return reply.code(errorCode ?? 401).send({ error: 'Invalid or missing webhook signature' });
+
+    await processCardAuthorizationCallback(fastify.db, provider!, request.body as never);
+    return { received: true };
+  });
+
+  // ── POST /webhooks/card/issuer/:id/callback ────────────────────────────────
+  fastify.post<{ Params: { id: string } }>('/card/issuer/:id/callback', webhookOpts, async (request, reply) => {
+    const { id } = request.params;
+    const signature = request.headers['x-webhook-signature'] as string | undefined;
+    const bodyRaw = JSON.stringify(request.body);
+
+    const { valid, provider, errorCode } = await validateCallback(fastify.db, id, bodyRaw, signature);
+    if (!valid) return reply.code(errorCode ?? 401).send({ error: 'Invalid or missing webhook signature' });
+
+    await processCardIssuerCallback(fastify.db, provider!, request.body as never);
     return { received: true };
   });
 }

@@ -1,5 +1,5 @@
 // BIAN SD-64: Payment Order - Payment Link REST controller
-// Routes mounted at /payment-links → /api/v1/payment-links
+// Routes mounted at /payment/links → /api/v1/payment/links
 
 import { FastifyInstance } from 'fastify';
 import {
@@ -20,21 +20,21 @@ export async function paymentLinkController(fastify: FastifyInstance) {
   // POST /api/v1/payment-links
   fastify.post('/', {
     schema: {
-      tags: ['payment-links'],
+      tags: ['payment/links'],
       summary: 'Create a payment link',
       description: `Creates a shareable payment link. The returned \`paymentUrl\` (/pay/{code}) can be shared via email, QR code, or embedded in a web page.
 
 **Integration flow:**
 1. Merchant calls this endpoint with payment details
 2. Receives \`paymentUrl\` - share this however needed
-3. Buyer opens the URL and completes payment on the gateway hosted page
+3. Buyer opens the URL and completes payment on the PSP-hosted payment page
 4. Merchant is notified via webhook (if configured)
 
 **Usage types:**
 - \`single_use\`: Link becomes inactive after first successful payment (invoice-style)
 - \`multi_use\`: Link stays active for multiple payments (store button style)
 
-**PCI DSS:** SAQ A - buyer enters card details on the gateway domain, not the merchant's.`,
+**PCI DSS:** SAQ A - buyer enters card details on the PSP domain, not the merchant's.`,
       security: [{ bearerAuth: [] }],
       body: {
         type: 'object',
@@ -102,7 +102,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
   // GET /api/v1/payment-links
   fastify.get('/', {
     schema: {
-      tags: ['payment-links'],
+      tags: ['payment/links'],
       summary: 'List payment links',
       security: [{ bearerAuth: [] }],
       querystring: {
@@ -154,7 +154,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
   // GET /api/v1/payment-links/:code  (public - no auth)
   fastify.get('/:code', {
     schema: {
-      tags: ['payment-links'],
+      tags: ['payment/links'],
       summary: 'Resolve a payment link by code (public)',
       description: 'Returns payment display data for the payment page. Never exposes internal merchant IDs or hashes.',
       params: {
@@ -189,7 +189,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
   // POST /api/v1/payment-links/:code/pay  (public)
   fastify.post('/:code/pay', {
     schema: {
-      tags: ['payment-links'],
+      tags: ['payment/links'],
       summary: 'Process payment via payment link (public)',
       description: 'Called by the payment link page after buyer submits card form. Card data is tokenized client-side before this call.',
       params: {
@@ -218,6 +218,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
           },
         },
         404: { $ref: 'Error#' },
+        402: { description: 'Card authorization declined.', $ref: 'Error#' },
         410: { description: 'Link expired, completed, or deactivated.', $ref: 'Error#' },
       },
     },
@@ -229,6 +230,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
       cardExpiryMonth: string;
       cardExpiryYear: string;
       customerEmail?: string;
+      cardAuthOutcome?: 'approved' | 'declined' | 'challenge';
     };
 
     const { result, cardTransactionInstanceReference, fraudDiagnosisInstanceReference } = await processLinkPayment(fastify.db, {
@@ -238,12 +240,14 @@ export async function paymentLinkController(fastify: FastifyInstance) {
       cardExpiryMonth: body.cardExpiryMonth,
       cardExpiryYear: body.cardExpiryYear,
       customerEmail: body.customerEmail,
+      cardAuthOutcome: body.cardAuthOutcome,
     });
 
     if (result === 'not_found') return reply.status(404).send({ error: 'Payment link not found' });
     if (result === 'expired') return reply.status(410).send({ error: 'Payment link has expired' });
     if (result === 'deactivated') return reply.status(410).send({ error: 'Payment link is no longer active' });
     if (result === 'completed') return reply.status(410).send({ error: 'This payment link has already been used' });
+    if (result === 'declined') return reply.status(402).send({ error: 'Card authorization declined', code: '0190' });
 
     // Fire webhook asynchronously
     if (result === 'ok') {
@@ -253,6 +257,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
           .collection('merchantAgreementProcedure')
           .findOne({ merchantName: link.merchantName }) as Record<string, unknown> | null;
         if (merchantDoc?.merchantWebhookEndpoint && merchantDoc?.merchantWebhookSecret) {
+          const maskedPan = `****-****-****-${body.cardToken.slice(-4).padStart(4, '0')}`;
           deliverWebhook(
             merchantDoc.merchantWebhookEndpoint as string,
             {
@@ -261,6 +266,10 @@ export async function paymentLinkController(fastify: FastifyInstance) {
               data: {
                 paymentLinkCode: code,
                 cardTransactionInstanceReference,
+                fraudDiagnosisInstanceReference: fraudDiagnosisInstanceReference ?? null,
+                fraudCaseCreated: !!fraudDiagnosisInstanceReference,
+                cardToken: body.cardToken,
+                maskedPan,
                 amount: link.paymentLinkAmount,
                 currency: link.paymentLinkCurrency,
               },
@@ -277,7 +286,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
   // PATCH /api/v1/payment-links/:id
   fastify.patch('/:id', {
     schema: {
-      tags: ['payment-links'],
+      tags: ['payment/links'],
       summary: 'Update or deactivate a payment link',
       security: [{ bearerAuth: [] }],
       params: {

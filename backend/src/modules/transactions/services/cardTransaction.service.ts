@@ -90,17 +90,31 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
     };
 
     // Resolve the customerAgreementInstanceReference UUID from the account reference.
-    // input.accountReference is the QE:equality value (customerAgreementReference);
-    // fraudDiagnosisCase.customerAgreementInstanceReference must be the UUID primary key
-    // so the raw document endpoint can find the linked customerAgreementProcedure document.
+    // Two paths:
+    //   Email path:     accountReference is an email → resolve party by email → find agreement by partyInstanceReference
+    //   Reference path: accountReference is a business key → find agreement by customerAgreementReference
     let customerAgreementUuid = input.accountReference;
     try {
       const l1Db = await getDbForRole('level1_analyst', false);
-      const agreementDoc = await l1Db
-        .collection<{ customerAgreementInstanceReference: string }>(CUSTOMER_AGREEMENT_COLLECTION)
-        .findOne({ customerAgreementReference: input.accountReference } as Record<string, unknown>);
-      if (agreementDoc?.customerAgreementInstanceReference) {
-        customerAgreementUuid = agreementDoc.customerAgreementInstanceReference;
+      if (input.accountReference.includes('@')) {
+        const partyDoc = await db
+          .collection<PartyControlRecord>(PARTY_COLLECTION)
+          .findOne({ partyEmailAddress: input.accountReference } as Partial<PartyControlRecord>);
+        if (partyDoc?.partyInstanceReference) {
+          const agreementDoc = await l1Db
+            .collection<{ customerAgreementInstanceReference: string }>(CUSTOMER_AGREEMENT_COLLECTION)
+            .findOne({ partyInstanceReference: partyDoc.partyInstanceReference } as Record<string, unknown>);
+          if (agreementDoc?.customerAgreementInstanceReference) {
+            customerAgreementUuid = agreementDoc.customerAgreementInstanceReference;
+          }
+        }
+      } else {
+        const agreementDoc = await l1Db
+          .collection<{ customerAgreementInstanceReference: string }>(CUSTOMER_AGREEMENT_COLLECTION)
+          .findOne({ customerAgreementReference: input.accountReference } as Record<string, unknown>);
+        if (agreementDoc?.customerAgreementInstanceReference) {
+          customerAgreementUuid = agreementDoc.customerAgreementInstanceReference;
+        }
       }
     } catch {
       // Keep account reference as fallback - raw document lookup will fail but fraud case still created

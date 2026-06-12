@@ -293,7 +293,7 @@ shared/models/   ←── imported by any module that needs the type (no runtim
 vendors/encryption/  ←── imported by QE-enabled modules only
 ```
 
-PCI CDE boundary at code level: modules `customer`, `transactions`, and `gateway` (v5) are in scope. `fraud` and `identity` are adjacent. `system` is non-CDE. This mirrors the network segmentation principle in [payment_gateway.md §7.2](payment_gateway.md).
+PCI CDE boundary at code level: modules `customer`, `transactions`, and `gateway` (v5) are in scope. `fraud` and `identity` are adjacent. `system` is non-CDE. This mirrors the network segmentation principle in [psp-architecture.md §7.2](psp-architecture.md).
 
 #### 3.8.5 Backend source structure
 
@@ -669,7 +669,7 @@ Notes are stored as discrete events in the **`fraudDiagnosisCaseEvents`** collec
 
 The existing demo simulates payment transactions from the customer's perspective: the customer fills a form, the API creates a `cardTransactionLog` document, and a fraud case is optionally opened. This is a closed loop that only demonstrates the data and encryption model.
 
-The request was to extend the system to allow **external merchants** to integrate payment collection into their own systems — a fundamental capability of any real payment gateway. The goal: maximum ease of integration for external merchants, minimum PCI DSS scope for those merchants.
+The request was to extend the system to allow **external merchants** to integrate payment collection into their own systems — a fundamental capability of any real PSP. The goal: maximum ease of integration for external merchants, minimum PCI DSS scope for those merchants.
 
 This ADR documents the study of four integration patterns and the rationale for the selected approach.
 
@@ -677,9 +677,9 @@ This ADR documents the study of four integration patterns and the rationale for 
 
 #### Method A: Redirect Checkout (Hosted Payment Page)
 
-The merchant's backend creates a checkout session via API, then redirects the buyer's browser to a hosted payment page (HPP) on the gateway domain. The buyer enters card details on the gateway's page. After payment the buyer is redirected back to the merchant's `returnUrl`.
+The merchant's backend creates a checkout session via API, then redirects the buyer's browser to a hosted payment page (HPP) on the PSP domain. The buyer enters card details on the PSP's page. After payment the buyer is redirected back to the merchant's `returnUrl`.
 
-**PCI DSS scope for the merchant:** SAQ A — the simplest possible. The merchant's system never touches cardholder data at any point; only the gateway (this system) handles card entry.
+**PCI DSS scope for the merchant:** SAQ A — the simplest possible. The merchant's system never touches cardholder data at any point; only the PSP (this system) handles card entry.
 
 **External integration surface (3 steps):**
 ```javascript
@@ -731,7 +731,7 @@ sendEmail(customerEmail, `Pay here: ${paymentUrl}`);
 
 #### Method C: Embedded Checkout JS SDK (proposed for v5)
 
-A JavaScript SDK renders a payment form inside an iframe on the merchant's own page. The buyer never leaves the merchant's site; the iframe calls the gateway API directly.
+A JavaScript SDK renders a payment form inside an iframe on the merchant's own page. The buyer never leaves the merchant's site; the iframe calls the PSP API directly.
 
 **PCI DSS scope for the merchant:** SAQ A-EP — slightly more complex than A. The merchant's domain loads a third-party script that handles card entry.
 
@@ -786,7 +786,7 @@ The correct cross-domain FK is `merchantOwnerPartyReference → party.partyInsta
 | Merchant API key storage | bcrypt hash in DB; plaintext returned only once on key generation |
 | Webhook authenticity (merchant receiving) | `X-Webhook-Signature: sha256=<hmac(payload, webhookSecret)>` — mirrors Stripe/GitHub pattern |
 | Card data isolation | Raw card numbers never sent to or stored by the API; client-side tokenization (`tok_<random>`) |
-| PCI DSS SAQ A | The hosted payment pages (`/checkout/*`, `/pay/*`) are on the gateway domain; buyers enter card details only on those pages |
+| PCI DSS SAQ A | The hosted payment pages (`/checkout/*`, `/pay/*`) are on the PSP domain; buyers enter card details only on those pages |
 
 ### API Key Design
 

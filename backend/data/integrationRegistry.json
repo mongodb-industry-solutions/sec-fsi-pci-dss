@@ -316,5 +316,94 @@
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
     "schemaVersion": 2
+  },
+  {
+    "externalProviderArrangementInstanceReference": "int-internal-card-auth-001",
+    "externalProviderArrangementName": "Card Authorization Stub (SD-15)",
+    "externalProviderArrangementType": "card_authorization",
+    "externalProviderArrangementStatus": "active",
+    "externalProviderIsInternal": true,
+    "externalProviderInternalHandler": "cardAuthorization.stubAdapter",
+    "externalProviderCallbackEnabled": false,
+    "externalProviderTriggerEvents": [
+      "checkout.pay",
+      "payment_link.pay"
+    ],
+    "externalProviderMode": "sync",
+    "externalProviderTimeoutMs": 200,
+    "externalProviderRetryPolicy": {
+      "maxAttempts": 1,
+      "backoffMs": 0
+    },
+    "externalProviderHealthStatus": "ok",
+    "externalProviderLastHealthCheckAt": "2026-06-11T09:00:00.000Z",
+    "categoryConfig": {
+      "merchantCode": "MC-LEAFYBANK-001",
+      "terminalNumber": "T001",
+      "signatureVersion": "HMAC_SHA256",
+      "enableThreeDS": false,
+      "mockMode": true,
+      "simulatorMode": "scenario_driven"
+    },
+    "fieldMappingConfig": {
+      "outbound": [],
+      "inbound": [],
+      "schemaVersion": 1
+    },
+    "routingPriority": 999,
+    "bianServiceDomain": "Card Authorization",
+    "bianControlRecordType": "CardAuthorizationRecord",
+    "pciDssRequirements": [
+      "Req 3.3.1",
+      "Req 10.2.1"
+    ],
+    "recordCreatedDateTime": "2026-06-11T09:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-11T09:00:00.000Z",
+    "schemaVersion": 2
+  },
+  {
+    "externalProviderArrangementInstanceReference": "int-internal-card-issuer-001",
+    "externalProviderArrangementName": "Card Issuer CVV/PIN Validation Stub",
+    "externalProviderArrangementType": "card_issuer",
+    "externalProviderArrangementStatus": "active",
+    "externalProviderIsInternal": true,
+    "externalProviderInternalHandler": "cardIssuer.cvvPinStub",
+    "externalProviderCallbackEnabled": false,
+    "externalProviderTriggerEvents": [
+      "checkout.cvv.validation",
+      "payment.pin.verification",
+      "card.activation.cvv"
+    ],
+    "externalProviderMode": "sync",
+    "externalProviderTimeoutMs": 150,
+    "externalProviderRetryPolicy": {
+      "maxAttempts": 1,
+      "backoffMs": 0
+    },
+    "externalProviderHealthStatus": "ok",
+    "externalProviderLastHealthCheckAt": "2026-06-11T09:00:00.000Z",
+    "categoryConfig": {
+      "cardNetworks": ["visa", "mastercard"],
+      "cvvValidationEnabled": true,
+      "pinValidationEnabled": true,
+      "mockMode": true,
+      "pinBlockFormat": "ISO-0"
+    },
+    "fieldMappingConfig": {
+      "outbound": [],
+      "inbound": [],
+      "schemaVersion": 1
+    },
+    "routingPriority": 999,
+    "bianServiceDomain": "Payment Card",
+    "bianControlRecordType": "PaymentCardProcedure",
+    "pciDssRequirements": [
+      "Req 3.3.1",
+      "Req 3.5.1",
+      "Req 8.3.6"
+    ],
+    "recordCreatedDateTime": "2026-06-11T09:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-11T09:00:00.000Z",
+    "schemaVersion": 2
   }
 ]

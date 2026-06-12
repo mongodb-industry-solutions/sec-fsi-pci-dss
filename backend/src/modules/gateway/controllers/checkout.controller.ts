@@ -29,7 +29,7 @@ export async function checkoutController(fastify: FastifyInstance) {
 4. Buyer is redirected back to \`returnUrl?status=success\` or \`cancelUrl?status=failed\`
 5. Merchant optionally verifies via \`GET /checkout/sessions/:id\`
 
-**PCI DSS:** The merchant never receives cardholder data. Only the hosted page on the gateway domain handles card entry. Qualifies for SAQ A compliance.`,
+**PCI DSS:** The merchant never receives cardholder data. Only the hosted page on the PSP domain handles card entry. Qualifies for SAQ A compliance.`,
       security: [{ bearerAuth: [] }],
       body: {
         type: 'object',
@@ -154,6 +154,9 @@ export async function checkoutController(fastify: FastifyInstance) {
           cardholderName: { type: 'string', minLength: 1, maxLength: 100 },
           cardExpiryMonth: { type: 'string', pattern: '^(0[1-9]|1[0-2])$' },
           cardExpiryYear: { type: 'string', pattern: '^20[2-9][0-9]$' },
+          cardholderEmail: { type: 'string', format: 'email', description: 'Customer email — used as accountReference to link transaction to customer record.' },
+          saveCard: { type: 'boolean', description: 'When true, saves the card token to the customer\'s SD-57 paymentCardManagement record.' },
+          cardAuthOutcome: { type: 'string', enum: ['approved', 'declined', 'challenge'], description: 'Simulator-only: drives stub card auth result.' },
         },
       },
       response: {
@@ -166,6 +169,7 @@ export async function checkoutController(fastify: FastifyInstance) {
             redirectUrl: { type: 'string', description: 'Buyer should be redirected to this URL.' },
           },
         },
+        402: { description: 'Card authorization declined.', $ref: 'Error#' },
         404: { $ref: 'Error#' },
         409: { description: 'Session already completed.', $ref: 'Error#' },
         410: { description: 'Session expired or cancelled.', $ref: 'Error#' },
@@ -178,6 +182,9 @@ export async function checkoutController(fastify: FastifyInstance) {
       cardholderName: string;
       cardExpiryMonth: string;
       cardExpiryYear: string;
+      cardholderEmail?: string;
+      saveCard?: boolean;
+      cardAuthOutcome?: 'approved' | 'declined' | 'challenge';
     };
 
     const { result, cardTransactionInstanceReference, fraudDiagnosisInstanceReference, redirectUrl } = await processCheckoutPayment(
@@ -188,12 +195,16 @@ export async function checkoutController(fastify: FastifyInstance) {
         cardholderName: body.cardholderName,
         cardExpiryMonth: body.cardExpiryMonth,
         cardExpiryYear: body.cardExpiryYear,
+        customerEmail: body.cardholderEmail,
+        saveCard: body.saveCard,
+        cardAuthOutcome: body.cardAuthOutcome,
       }
     );
 
     if (result === 'not_found') return reply.status(404).send({ error: 'Checkout session not found' });
     if (result === 'expired' || result === 'cancelled') return reply.status(410).send({ error: `Session ${result}` });
     if (result === 'already_completed') return reply.status(409).send({ error: 'Session already completed' });
+    if (result === 'declined') return reply.status(402).send({ error: 'Card authorization declined', code: '0190' });
 
     // Fire webhook asynchronously (non-blocking)
     if (result === 'ok') {
@@ -202,6 +213,7 @@ export async function checkoutController(fastify: FastifyInstance) {
         const merchant = await getMerchantById(fastify.db, (session as unknown as Record<string, unknown>).merchantAgreementInstanceReference as string ?? '');
         const merchantDoc = merchant as Record<string, unknown> | null;
         if (merchantDoc?.merchantWebhookEndpoint && merchantDoc?.merchantWebhookSecret) {
+          const maskedPan = `****-****-****-${body.cardToken.slice(-4).padStart(4, '0')}`;
           deliverWebhook(
             merchantDoc.merchantWebhookEndpoint as string,
             {
@@ -210,6 +222,10 @@ export async function checkoutController(fastify: FastifyInstance) {
               data: {
                 checkoutSessionInstanceReference: id,
                 cardTransactionInstanceReference,
+                fraudDiagnosisInstanceReference: fraudDiagnosisInstanceReference ?? null,
+                fraudCaseCreated: !!fraudDiagnosisInstanceReference,
+                cardToken: body.cardToken,
+                maskedPan,
                 amount: session.checkoutSessionAmount,
                 currency: session.checkoutSessionCurrency,
               },

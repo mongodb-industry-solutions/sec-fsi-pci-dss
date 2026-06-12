@@ -25,6 +25,10 @@ export default function SimulatorLayout({ children }: { children: React.ReactNod
   const [activeMethod, setActiveMethod] = useState<string | null>(null);
 
   useEffect(() => {
+    document.title = 'PSP - Simulator';
+  }, []);
+
+  useEffect(() => {
     const m = sessionStorage.getItem('sim_method');
     setActiveMethod(m);
     const onStorage = () => setActiveMethod(sessionStorage.getItem('sim_method'));
@@ -40,7 +44,7 @@ export default function SimulatorLayout({ children }: { children: React.ReactNod
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <div className="flex items-center gap-1.5 shrink-0">
             <Building2 size={18} className="text-[#00ED64]" />
-            <span className="font-bold text-[#00ED64] text-sm hidden md:block">PCI DSS Demo · MongoDB</span>
+            <span className="font-bold text-[#00ED64] text-sm hidden md:block">PSP Simulator</span>
             <span className="font-bold text-[#00ED64] text-xs md:hidden">PCI DSS</span>
           </div>
           <nav className="flex gap-1">

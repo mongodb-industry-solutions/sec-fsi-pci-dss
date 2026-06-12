@@ -9,7 +9,7 @@ import { StepExplainer } from '../../../components/StepExplainer';
 import { RedirectionPaymentFlow } from '../../../components/simulator/RedirectionPaymentFlow';
 import { PaymentLinkFlow } from '../../../components/simulator/PaymentLinkFlow';
 import type { PaymentMethodId, SimulatorScenario } from '../../../types/simulator';
-import simulatorConfig from '../../../config/simulator-methods.json';
+import simulatorConfig from '../../../config/simulator.json';
 import { writeSimulatorTransactionToHistory } from '../../../lib/simulatorHistory';
 
 type Step = 1 | 2 | 3;
@@ -25,18 +25,10 @@ interface FormData {
 }
 
 // Default card number for demo (masked immediately on mount)
-const DEMO_CARD_NUMBER = '4111111111111234';
+const DEMO_CARD_NUMBER = simulatorConfig.defaultCard;
 
 // Test card presets for demo selection
-const TEST_CARDS = [  
-  { label: "Visa Standard (4242-4242-4242-4242)", number: "4242424242424242" },    
-  { label: "Visa Business (2223-0000-4840-0010)", number: "2223000048400010" },    
-  { label: "Mastercard Standard (5555-5555-5555-1212)", number: "5555555555551212" },    
-  { label: "Mastercard Prepaid (5200-8282-8282-8210)", number: "5200828282828210" },    
-  { label: "Amex Gold (3782-8224-6301-0005)", number: "378282246310005" },    
-  { label: "Amex Platinum (3714-4963-5309-8431)", number: "371449635398431" },    
-  { label: "Demo Card (Pre-filled Example)", number: DEMO_CARD_NUMBER },    
-] ;
+const TEST_CARDS = simulatorConfig.testCards;
 
 const DEFAULTS: FormData = {
   cardholderName: 'Luis Fernandez',
@@ -49,16 +41,10 @@ const DEFAULTS: FormData = {
 };
 
 // Preset amount options for quick selection
-const AMOUNT_PRESETS = ['100.00', '250.00', '500.00', '850.00', '1200.00'];
+const AMOUNT_PRESETS = simulatorConfig.amountPresets;
 
 // Fallback merchant list when DB is unavailable
-const FALLBACK_MERCHANTS: Merchant[] = [
-  { name: 'TechGadgets Ltd.', mcc: '5734' },
-  { name: 'Global Electronics', mcc: '5734' },
-  { name: 'City Restaurant', mcc: '5812' },
-  { name: 'ATM Cash Withdrawal', mcc: '6011' },
-  { name: 'Online Casino', mcc: '7995' },
-];
+const FALLBACK_MERCHANTS: Merchant[] = simulatorConfig.fallbackMerchants;
 
 function maskCardNumber(raw: string): string {
   const digits = raw.replace(/\D/g, '').slice(0, 16);
@@ -192,7 +178,7 @@ function AmountSelector({ value, onChange }: { value: string; onChange: (v: stri
         </button>
       </div>
       <p className="text-xs text-amber-700">
-        ⚠ Amounts above $500 trigger automatic fraud case creation.
+        ⚠ Amounts above ${simulatorConfig.fraudAmountThreshold} trigger automatic fraud case creation.
       </p>
     </div>
   );
@@ -350,7 +336,8 @@ export default function PaymentPage() {
     try {
       const saved = sessionStorage.getItem('sim_payment_step3');
       if (saved) {
-        const { savedResult, savedForm, savedMasked } = JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        const { savedResult, savedForm, savedMasked } = parsed._restore ?? parsed;
         cardTokenRef.current = savedResult.cardToken || cardTokenRef.current;
         setResult(savedResult);
         setForm(savedForm);
@@ -396,7 +383,6 @@ export default function PaymentPage() {
     return (
       <RedirectionPaymentFlow
         scenario={scenario}
-        merchantId={simulatorConfig.merchantId}
       />
     );
   }
@@ -406,7 +392,6 @@ export default function PaymentPage() {
     return (
       <PaymentLinkFlow
         scenario={scenario}
-        merchantId={simulatorConfig.merchantId}
       />
     );
   }
@@ -436,7 +421,7 @@ export default function PaymentPage() {
         cardToken: cardTokenRef.current,
         accountReference: form.email,
         amount: parseFloat(form.amount),
-        currency: 'USD',
+        currency: simulatorConfig.defaultCurrency,
         cardTransactionMerchantName: form.merchantName,
         cardTransactionMerchantCategoryCode: form.merchantCategoryCode,
         cardTransactionChannel: 'online',
@@ -457,9 +442,15 @@ export default function PaymentPage() {
       };
       try {
         sessionStorage.setItem('sim_payment_step3', JSON.stringify({
-          savedResult: newResult,
-          savedForm: form,
-          savedMasked: maskedCard,
+          cardTransactionInstanceReference: newResult.txnId,
+          caseId: newResult.caseId ?? null,
+          email: form.email,
+          amount: parseFloat(form.amount),
+          currency: simulatorConfig.defaultCurrency,
+          merchantName: form.merchantName,
+          method: 'api-card',
+          customerName: simScenario?.persona ?? form.cardholderName,
+          _restore: { savedResult: newResult, savedForm: form, savedMasked: maskedCard },
         }));
       } catch { /* ignore storage errors */ }
       setResult(newResult);
@@ -468,7 +459,7 @@ export default function PaymentPage() {
       writeSimulatorTransactionToHistory({
         txnId: newResult.txnId,
         amount: parseFloat(form.amount),
-        currency: 'USD',
+        currency: simulatorConfig.defaultCurrency,
         merchant: form.merchantName,
         mcc: form.merchantCategoryCode,
         channel: 'online',
@@ -643,7 +634,7 @@ export default function PaymentPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Amount (USD)
-                <Tooltip text="Transaction amount. Stored as plaintext in cardTransactionAmount. Amounts above $500 automatically trigger fraud case creation (configurable via FRAUD_AMOUNT_THRESHOLD env var). Selecting $850 will trigger a fraud alert." />
+                <Tooltip text={`Transaction amount. Stored as plaintext in cardTransactionAmount. Amounts above $${simulatorConfig.fraudAmountThreshold} automatically trigger fraud case creation (configurable via FRAUD_AMOUNT_THRESHOLD env var). Selecting $850 will trigger a fraud alert.`} />
               </label>
               <AmountSelector value={form.amount} onChange={(v) => { setForm((f) => ({ ...f, amount: v })); setValidationErrors((v2) => ({ ...v2, amount: undefined })); }} />
               {validationErrors.amount && (
@@ -865,7 +856,7 @@ export default function PaymentPage() {
                 as opaque ciphertext; no plaintext PII ever reaches the database server.
               </p>
               <p>
-                If the amount exceeded <strong>$500</strong> or the MCC is high-risk, a
+                If the amount exceeded <strong>${simulatorConfig.fraudAmountThreshold}</strong> or the MCC is high-risk, a
                 <strong> FraudDiagnosisCase</strong> (BIAN SD-83) was automatically opened and you
                 will be redirected to the Investigation Dashboard.
               </p>

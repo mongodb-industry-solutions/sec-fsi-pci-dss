@@ -120,7 +120,7 @@ A synthetic digital bank (standalone, Leafy Bank-ready) runs a payment flow wher
 
 #### Redirect Checkout
 
-An external merchant's backend creates a checkout session via API. The buyer is redirected to a hosted payment page on the gateway domain where card entry happens. After payment the buyer is redirected back to the merchant.
+An external merchant's backend creates a checkout session via API. The buyer is redirected to a hosted payment page on the PSP domain where card entry happens. After payment the buyer is redirected back to the merchant.
 
 **PCI DSS scope for external merchant:** SAQ A — the merchant's system never sees cardholder data at any point.
 
@@ -160,7 +160,7 @@ Merchant System        LeafyBank Gateway
                         ├── webhook event ──► merchant (optional)
 ```
 
-**Key BIAN insight:** Both patterns store their session/link state in MongoDB using SD-64 (Payment Order) collections. The card transaction created on payment is the same `cardTransactionLog` (SD-254) document that feeds into the fraud investigation workflow. The PCI DSS boundary is the gateway's hosted pages, not the merchant's system.
+**Key BIAN insight:** Both patterns store their session/link state in MongoDB using SD-64 (Payment Order) collections. The card transaction created on payment is the same `cardTransactionLog` (SD-254) document that feeds into the fraud investigation workflow. The PCI DSS boundary is the PSP's hosted pages, not the merchant's system.
 
 ---
 
@@ -842,12 +842,12 @@ v3: Advanced Capabilities  (TBD: after v2 validated)
   Range queries, tokenization for recurring payments, performance visualization
   Goal: Leafy Bank integration-ready, Solutions Library publishable
 
-v4: Payment Gateway + Modular Architecture  (TBD: after v3 validated)
+v4: PSP Payment Platform + Modular Architecture  (TBD: after v3 validated)
   Backend refactored to domain modules (BIAN SD clusters) + new gateway module
   New BIAN SDs: SD-89 Merchant Relations · SD-64 Payment Order · SD-65 Payment Execution · SD-57 Card Etoken
   New collections: merchantAgreementProcedure · paymentOrderProcedure · cardEtokenProcedure
   New actors: Merchant (first-class entity with MCC risk profile, limits, settlement config)
-  Goal: API-first payment platform story — MongoDB as the data backbone for a full card payment gateway
+  Goal: API-first payment platform story — MongoDB as the data backbone for a full PSP platform
 
 v5: Agentic Fraud Investigation  (TBD: after v4 validated)
   AI pre-review on fraud trigger: MongoDB Agentic Platform (Magenta preferred)
@@ -904,20 +904,20 @@ v5: Agentic Fraud Investigation  (TBD: after v4 validated)
 - Solutions Library article draft
 - Slide deck (ks-mongodb-writer-deck standard)
 
-### v4: Payment Gateway + Modular Architecture
+### v4: PSP Payment Platform + Modular Architecture
 
-**Theme:** MongoDB as the data backbone of a full card payment gateway, structured around BIAN Service Domains.
+**Theme:** MongoDB as the data backbone of a full PSP platform, structured around BIAN Service Domains.
 
 **Deliverables:**
 - Backend refactored to domain module layout: `src/modules/<sd-cluster>/` + `src/shared/` — zero API surface change, all existing tests pass
 - Four new BIAN Service Domains: SD-89 Merchant Relations, SD-64 Payment Order, SD-65 Payment Execution, SD-57 Card Etoken
 - Three new collections: `merchantAgreementProcedure` (plaintext, bcrypt-hashed API keys), `paymentOrderProcedure` (intent lifecycle with TTL index), `cardEtokenProcedure` (QE:none on network token)
 - Merchant as first-class actor: MCC risk category, transaction limits, settlement schedule, webhook endpoint
-- Gateway API: `POST /gateway/payments` (create intent with idempotency key) → confirm → authorize → capture → void/refund
+- PSP Payment API: `POST /gateway/payments` (create intent with idempotency key) → confirm → authorize → capture → void/refund
 - Payment Order lifecycle: `initiated → confirmed → authorized → captured → settled/refunded/voided`
 - Merchant context in fraud investigation: investigator sees merchant's average transaction amount, volume, risk category alongside the case
 - Simulator Mode: new step 0 showing merchant creating the payment intent before customer checkout
-- `shared/services/fraudTrigger.service.ts`: shared fraud evaluation extracted so both `transactions` and `gateway` modules trigger fraud cases through the same path
+- `shared/services/fraudTrigger.service.ts`: shared fraud evaluation extracted so both `transactions` and `gateway` modules trigger fraud cases through the same path (PSP-internal)
 
 ### v5: Agentic Fraud Investigation
 

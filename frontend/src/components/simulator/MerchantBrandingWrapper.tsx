@@ -36,7 +36,7 @@ export function MerchantBrandingWrapper({ merchantName, amount, currency, descri
       {/* Checkout section, iframe lives here */}
       <div className="bg-gray-50 border-x border-b rounded-b-xl px-6 py-5">
         <div className="mb-3 flex items-center gap-2 text-xs text-gray-500">
-          <span>↓ Embedded payment form (hosted by payment gateway)</span>
+          <span>↓ Embedded payment form (hosted by PSP)</span>
           <span className="bg-blue-50 text-blue-700 border border-blue-200 rounded px-1.5">iframe</span>
         </div>
         {children}

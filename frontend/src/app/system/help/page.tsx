@@ -484,7 +484,7 @@ export default function HelpPage() {
           {/* About card */}
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
             <p className="text-[11px] font-semibold text-[#00ED64] uppercase tracking-widest mb-2">About this demo</p>
-            <h2 className="text-base font-semibold text-white mb-3">FSI Payment Gateway on MongoDB Atlas</h2>
+            <h2 className="text-base font-semibold text-white mb-3">FSI PSP on MongoDB Atlas</h2>
             <p className="text-gray-400 text-sm leading-relaxed mb-3">
               This demo shows how a <span className="text-gray-200 font-medium">digital bank or card issuer</span> can use{' '}
               <span className="text-[#00ED64] font-medium">MongoDB Atlas</span> to run a PCI DSS-aligned payment fraud

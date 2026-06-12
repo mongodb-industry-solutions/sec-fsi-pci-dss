@@ -132,6 +132,37 @@ export const CATEGORY_CONTRACTS: Record<string, CategoryContract> = {
     ],
   },
 
+  card_authorization: {
+    inputs: [
+      { name: 'cardToken',                      type: 'string',        description: 'Tokenized card reference (no PAN)', required: true, pciSensitive: true },
+      { name: 'transactionAmount',              type: 'number',        description: 'Authorization amount in minor currency units', required: true },
+      { name: 'transactionCurrency',            type: 'string (ISO 4217)', description: 'Currency code e.g. USD, EUR', required: true },
+      { name: 'merchantCode',                   type: 'string',        description: 'Merchant code from categoryConfig', required: true },
+      { name: 'cardAuthorizationOutcome',       type: 'string',        description: 'Hint for simulator: approved | declined | challenge', required: false },
+    ],
+    outputs: [
+      { name: 'authorizationResult',             type: 'string',  description: 'Result: approved | declined | pending_3ds', required: true },
+      { name: 'cardTransactionInstanceReference', type: 'string', description: 'Authorization reference for audit trail', required: true },
+      { name: 'responseCode',                    type: 'string',  description: 'ISO 8583 response code (e.g. 00, 05, 51)', required: true },
+    ],
+  },
+
+  card_issuer: {
+    inputs: [
+      { name: 'cardToken',      type: 'string',        description: 'Tokenized card reference (no PAN in transit)', required: true, pciSensitive: true },
+      { name: 'cvvHash',        type: 'string',        description: 'Hashed CVV2/CVC2 value for validation (never plaintext)', required: false, pciSensitive: true },
+      { name: 'pinBlock',       type: 'string',        description: 'Encrypted PIN block (ISO-0/ISO-3/ISO-4 format per categoryConfig)', required: false, pciSensitive: true },
+      { name: 'cardNetwork',    type: 'string',        description: 'Card network: visa | mastercard | amex | discover', required: true },
+      { name: 'validationMode', type: 'string',        description: 'Validation type: cvv | pin | cvv_and_pin', required: true },
+    ],
+    outputs: [
+      { name: 'cvvValidationResult', type: 'string',  description: 'CVV result: match | no_match | not_processed', required: false },
+      { name: 'pinValidationResult', type: 'string',  description: 'PIN result: verified | wrong_pin | blocked | not_processed', required: false },
+      { name: 'responseCode',        type: 'string',  description: 'Issuer response code (e.g. 00 = ok, 55 = wrong PIN)', required: true },
+      { name: 'issuerAuthCode',      type: 'string',  description: 'Issuer authorization code (6 chars, only when approved)', required: false },
+    ],
+  },
+
   generic: {
     inputs: [
       { name: 'subjectReference', type: 'string', description: 'Reference to the subject entity (configurable)', required: true },
@@ -147,7 +178,7 @@ export const CATEGORY_CONTRACTS: Record<string, CategoryContract> = {
 
 export const CATEGORY_TRIGGER_EVENTS: Record<string, TriggerEvent[]> = {
   fraud_detection: [
-    { event: 'transaction.authorized',  description: 'Transaction authorized by the payment gateway' },
+    { event: 'transaction.authorized',  description: 'Transaction authorized by the PSP' },
     { event: 'transaction.flagged',     description: 'Transaction flagged by an internal rule engine' },
     { event: 'fraud.case.opened',       description: 'Fraud investigation case opened manually by analyst' },
   ],
@@ -179,5 +210,14 @@ export const CATEGORY_TRIGGER_EVENTS: Record<string, TriggerEvent[]> = {
   ],
   generic: [
     { event: '(custom)',  description: 'Events defined in categoryConfig.customEventTypes for this provider' },
+  ],
+  card_authorization: [
+    { event: 'checkout.pay',       description: 'Checkout session pay action triggered by cardholder' },
+    { event: 'payment_link.pay',   description: 'Payment link pay action triggered by cardholder' },
+  ],
+  card_issuer: [
+    { event: 'checkout.cvv.validation',   description: 'CVV2/CVC2 validation check triggered during checkout' },
+    { event: 'payment.pin.verification',  description: 'PIN verification requested for POS or high-value transaction' },
+    { event: 'card.activation.cvv',       description: 'CVV check required as part of card activation workflow' },
   ],
 };

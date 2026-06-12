@@ -177,6 +177,40 @@ export async function processHrpCallback(
   });
 }
 
+export async function processCardAuthorizationCallback(
+  db: Db,
+  provider: ExternalProviderArrangement,
+  body: { authorizationResult: string; cardTransactionInstanceReference?: string; responseCode: string }
+): Promise<void> {
+  const mapped = applyInboundMapping(provider, body as unknown as Record<string, unknown>) as typeof body;
+
+  await logEvent(db, {
+    arrangementId: provider.externalProviderArrangementInstanceReference,
+    type: 'callback',
+    status: 'received',
+    triggeredBy: 'external.card_authorization.callback',
+    payload: mapped as unknown as Record<string, unknown>,
+    latencyMs: 0,
+  });
+}
+
+export async function processCardIssuerCallback(
+  db: Db,
+  provider: ExternalProviderArrangement,
+  body: { responseCode: string; cvvValidationResult?: string; pinValidationResult?: string }
+): Promise<void> {
+  const mapped = applyInboundMapping(provider, body as unknown as Record<string, unknown>) as typeof body;
+
+  await logEvent(db, {
+    arrangementId: provider.externalProviderArrangementInstanceReference,
+    type: 'callback',
+    status: 'received',
+    triggeredBy: 'external.card_issuer.callback',
+    payload: mapped as unknown as Record<string, unknown>,
+    latencyMs: 0,
+  });
+}
+
 export async function processGenericCallback(
   db: Db,
   provider: ExternalProviderArrangement,

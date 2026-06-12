@@ -321,13 +321,15 @@ export async function updateHealthStatus(
 
 export function bianMetaFor(type: IntegrationProviderType): { domain: string; controlRecordType: string; pciDss: string[] } {
   const map: Record<IntegrationProviderType, { domain: string; controlRecordType: string; pciDss: string[] }> = {
-    fraud_detection: { domain: 'Fraud Evaluation',                  controlRecordType: 'FraudEvaluationAssessment',                  pciDss: ['Req 10.2.1', 'Req 12.3.1'] },
-    hrp_sanctions:   { domain: 'Party Reference Data',              controlRecordType: 'PartyReferenceDataDirectoryEntry',           pciDss: ['Req 12.8.1', 'Req 12.8.5'] },
-    kyc_identity:    { domain: 'Customer Agreement',                 controlRecordType: 'CustomerAgreementProcedure',                 pciDss: ['Req 8.1', 'Req 12.8.1'] },
-    kyb_business:    { domain: 'Merchant Relations',                 controlRecordType: 'MerchantAgreementProcedure',                 pciDss: ['Req 12.8.1', 'Req 12.8.3'] },
-    aml_monitoring:  { domain: 'Suspicious Activity Analysis',       controlRecordType: 'SuspiciousActivityAnalysisAssessment',       pciDss: ['Req 10.2.1', 'Req 12.3.1'] },
-    credit_bureau:   { domain: 'Customer Credit Rating',             controlRecordType: 'CustomerCreditRatingState',                  pciDss: ['Req 12.8.1'] },
-    generic:         { domain: 'External Provider Arrangements',     controlRecordType: 'ExternalProviderArrangementPortfolio',       pciDss: ['Req 12.8.1'] },
+    fraud_detection:    { domain: 'Fraud Evaluation',                  controlRecordType: 'FraudEvaluationAssessment',                  pciDss: ['Req 10.2.1', 'Req 12.3.1'] },
+    hrp_sanctions:      { domain: 'Party Reference Data',              controlRecordType: 'PartyReferenceDataDirectoryEntry',           pciDss: ['Req 12.8.1', 'Req 12.8.5'] },
+    kyc_identity:       { domain: 'Customer Agreement',                 controlRecordType: 'CustomerAgreementProcedure',                 pciDss: ['Req 8.1', 'Req 12.8.1'] },
+    kyb_business:       { domain: 'Merchant Relations',                 controlRecordType: 'MerchantAgreementProcedure',                 pciDss: ['Req 12.8.1', 'Req 12.8.3'] },
+    aml_monitoring:     { domain: 'Suspicious Activity Analysis',       controlRecordType: 'SuspiciousActivityAnalysisAssessment',       pciDss: ['Req 10.2.1', 'Req 12.3.1'] },
+    credit_bureau:      { domain: 'Customer Credit Rating',             controlRecordType: 'CustomerCreditRatingState',                  pciDss: ['Req 12.8.1'] },
+    card_authorization: { domain: 'Card Authorization',                 controlRecordType: 'CardAuthorizationRecord',                    pciDss: ['Req 3.3.1', 'Req 10.2.1'] },
+    card_issuer:        { domain: 'Payment Card',                       controlRecordType: 'PaymentCardProcedure',                        pciDss: ['Req 3.3.1', 'Req 3.5.1', 'Req 8.3.6'] },
+    generic:            { domain: 'External Provider Arrangements',     controlRecordType: 'ExternalProviderArrangementPortfolio',       pciDss: ['Req 12.8.1'] },
   };
   return map[type];
 }

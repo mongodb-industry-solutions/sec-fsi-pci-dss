@@ -42,6 +42,24 @@ export async function createCard(db: Db, input: CreateCardInput) {
   };
 }
 
+// Upsert by token — creates if not exists, otherwise updates expiry/maskedPan
+export async function upsertCardByToken(db: Db, input: CreateCardInput): Promise<{ paymentCardInstanceReference: string }> {
+  const now = new Date();
+  const existing = await db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION)
+    .findOne({ paymentCardReference: input.cardToken });
+
+  if (existing) {
+    await db.collection(PAYMENT_CARD_COLLECTION).updateOne(
+      { paymentCardReference: input.cardToken },
+      { $set: { paymentCardExpirationDate: input.paymentCardExpirationDate, paymentCardMaskedPanDisplay: input.paymentCardMaskedPanDisplay, recordUpdatedDateTime: now } }
+    );
+    return { paymentCardInstanceReference: existing.paymentCardInstanceReference };
+  }
+
+  const result = await createCard(db, input);
+  return { paymentCardInstanceReference: result.paymentCardInstanceReference };
+}
+
 export async function getCardsByCustomer(db: Db, customerRef: string) {
   const results = await db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION)
     .find({ customerAgreementInstanceReference: customerRef })
@@ -56,3 +74,4 @@ export async function getCardsByCustomer(db: Db, customerRef: string) {
 
   return { results };
 }
+

@@ -7,13 +7,15 @@ import { api } from '../../../../../lib/api';
 import { getToken } from '../../../../../lib/auth';
 
 const TYPE_OPTIONS = [
-  { value: 'fraud_detection', label: 'Fraud Detection',  hint: 'SD-63' },
-  { value: 'hrp_sanctions',   label: 'HRP / Sanctions',  hint: 'SD-13' },
-  { value: 'kyc_identity',    label: 'KYC / Identity',   hint: 'SD-53' },
-  { value: 'kyb_business',    label: 'KYB / Business',   hint: 'SD-89' },
-  { value: 'aml_monitoring',  label: 'AML Monitoring',   hint: 'SD-99' },
-  { value: 'credit_bureau',   label: 'Credit Bureau',    hint: 'SD-83' },
-  { value: 'generic',         label: 'Generic',          hint: 'SD-193' },
+  { value: 'fraud_detection',   label: 'Fraud Detection',     hint: 'SD-63' },
+  { value: 'hrp_sanctions',     label: 'HRP / Sanctions',     hint: 'SD-13' },
+  { value: 'kyc_identity',      label: 'KYC / Identity',      hint: 'SD-53' },
+  { value: 'kyb_business',      label: 'KYB / Business',      hint: 'SD-89' },
+  { value: 'aml_monitoring',    label: 'AML Monitoring',      hint: 'SD-99' },
+  { value: 'credit_bureau',     label: 'Credit Bureau',       hint: 'SD-83' },
+  { value: 'card_authorization', label: 'Card Authorization', hint: 'SD-15' },
+  { value: 'card_issuer',       label: 'Card Issuer',         hint: 'SD-88' },
+  { value: 'generic',           label: 'Generic',             hint: 'SD-193' },
 ];
 
 const AUTH_OPTIONS = [
@@ -29,8 +31,10 @@ const DEFAULT_CATEGORY_CONFIGS: Record<string, Record<string, unknown>> = {
   kyc_identity:    { verificationLevels: ['basic', 'enhanced'], defaultLevel: 'basic', documentTypesAccepted: ['passport', 'national_id'], livenessCheckRequired: false, biometricSupported: false, reVerificationDays: 365, dataRetentionDays: 2555, consentRequired: true },
   kyb_business:    { uboDisclosureThreshold: 25, businessTypesSupported: ['llc', 'corporation'], registrationCountries: [], dueDiligenceLevel: 'standard', renewalDays: 730, pepScreeningIncluded: true, adverseMediaScreening: false },
   aml_monitoring:  { screeningTypes: ['transaction'], watchlistSources: ['OFAC_SDN', 'FATF'], jurisdictions: [], continuousMonitoring: false, alertSeverityLevels: ['medium', 'high', 'critical'] },
-  credit_bureau:   { bureauName: '', bureauRegion: 'US', pullTypes: ['soft'], defaultPullType: 'soft', scoreRangeMin: 300, scoreRangeMax: 850, consentRequired: true, refreshFrequencyDays: 90, jurisdictions: [] },
-  generic:         { categoryLabel: '', customEventTypes: [], description: '' },
+  credit_bureau:      { bureauName: '', bureauRegion: 'US', pullTypes: ['soft'], defaultPullType: 'soft', scoreRangeMin: 300, scoreRangeMax: 850, consentRequired: true, refreshFrequencyDays: 90, jurisdictions: [] },
+  card_authorization: { merchantCode: '', signatureVersion: 'HMAC_SHA256', enableThreeDS: false, mockMode: false, simulatorMode: 'scenario_driven' },
+  card_issuer:        { cardNetworks: ['visa', 'mastercard'], cvvValidationEnabled: true, pinValidationEnabled: false, mockMode: false, pinBlockFormat: 'ISO-0' },
+  generic:            { categoryLabel: '', customEventTypes: [], description: '' },
 };
 
 function NewIntegrationForm() {

@@ -22,8 +22,8 @@ const PUBLIC_EXACT: Set<string> = new Set([
 
 // URL prefixes that bypass JWT auth (Swagger UI and its static assets)
 // Admin run/logs endpoints handle their own admin token verification internally
-// Checkout and payment-link routes are public so the simulator can use them without a JWT session
-const PUBLIC_PREFIXES: string[] = ['/doc', '/api/v1/admin', '/api/v1/checkout', '/api/v1/payment-links'];
+// Checkout, payment-link, and simulator routes are public (simulator endpoints block themselves in production via NODE_ENV guard)
+const PUBLIC_PREFIXES: string[] = ['/doc', '/api/v1/admin', '/api/v1/checkout', '/api/v1/payment/links', '/api/v1/system/simulator'];
 
 // Prefixes that bypass JWT auth only for GET requests (simulator read-only mode).
 // Mutation routes (PATCH /fraud/:id, POST /fraud/:id/escalate) still require JWT.

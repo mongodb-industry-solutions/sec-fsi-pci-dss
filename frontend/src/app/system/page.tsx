@@ -5,7 +5,8 @@ import {
   Eye, EyeOff, Bug,
   BriefcaseMedical, CreditCard, Users, BarChart3, ClipboardList, User,
   PlusCircle, Store, ClipboardCheck, ShieldAlert, ScanLine, UserCheck,
-  Building2, AlertTriangle, Plug,
+  Building2, AlertTriangle, Plug, Zap, KeyRound, LayoutGrid,
+  CheckCircle2, AlertCircle, Clock, WifiOff, Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import { api, AuthUser, AuthDomain } from '../../lib/api';
@@ -87,15 +88,7 @@ const ROLE_CARDS: Record<string, DashboardCard[]> = {
     { label: 'All Merchants',       description: 'View and manage all merchant accounts',        icon: Store,            href: '/system/merchant',        bianSd: 'SD-89',  pciDss: 'Req 12.8' },
     { label: 'My Profile',          description: 'Manage your officer profile',                  icon: User,             href: '/system/profile',         bianSd: 'SD-53',  pciDss: 'Req 8' },
   ],
-  manager: [
-    { label: 'Fraud Detection',      description: 'Real-time transaction scoring and fraud signals', icon: ShieldAlert,  href: '/system/admin/fraud-detection', bianSd: 'SD-63',  pciDss: 'Req 10.2.1' },
-    { label: 'HRP / Sanctions',      description: 'High-risk person and sanctions list screening',   icon: ScanLine,     href: '/system/admin/hrp',             bianSd: 'SD-13',  pciDss: 'Req 12.8.1' },
-    { label: 'KYC / Identity',       description: 'Customer identity verification and onboarding',   icon: UserCheck,    href: '/system/admin/kyc',             bianSd: 'SD-53',  pciDss: 'Req 8.1' },
-    { label: 'KYB / Business',       description: 'Merchant business entity verification',           icon: Building2,    href: '/system/admin/kyb',             bianSd: 'SD-89',  pciDss: 'Req 12.8.3' },
-    { label: 'AML Monitoring',       description: 'Anti-money laundering pattern analysis',          icon: AlertTriangle,href: '/system/admin/aml',             bianSd: 'SD-99',  pciDss: 'Req 10.2.1' },
-    { label: 'Credit Bureau',        description: 'Credit scoring and bureau checks',                icon: CreditCard,   href: '/system/admin/credit-bureau',   bianSd: 'SD-83',  pciDss: 'Req 12.8.1' },
-    { label: 'Integration Registry', description: 'Manage all external provider arrangements',       icon: Plug,         href: '/system/admin/integrations',    bianSd: 'SD-193', pciDss: 'Req 12.8' },
-  ],
+  manager: [],
 };
 
 const ROLE_ACCENT: Record<string, { iconBg: string; iconText: string; badge: string }> = {
@@ -175,7 +168,7 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
             <Bug size={14} />
           </button>
           <div className="text-4xl mb-2">🏦</div>
-          <h1 className="text-2xl font-bold">Payment Gateway Demo</h1>
+          <h1 className="text-2xl font-bold">PSP Demo</h1>
           <p className="text-gray-500 text-sm mt-1">Application Mode: Sign In</p>
         </div>
 
@@ -297,6 +290,143 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
   );
 }
 
+// ── Integration Hub (manager role) ───────────────────────────────────────────
+
+interface Integration {
+  externalProviderArrangementInstanceReference: string;
+  externalProviderArrangementName: string;
+  externalProviderArrangementType: string;
+  externalProviderArrangementStatus: string;
+  externalProviderIsInternal: boolean;
+  externalProviderHealthStatus?: string;
+  bianServiceDomain: string;
+}
+
+const TYPE_META: Record<string, { label: string; icon: LucideIcon; description: string; bianSd: string; href: string }> = {
+  fraud_detection:    { label: 'Fraud Detection',    icon: ShieldAlert,   description: 'Real-time transaction scoring and fraud signals',       bianSd: 'SD-63',  href: '/system/admin/fraud-detection' },
+  hrp_sanctions:      { label: 'HRP / Sanctions',    icon: ScanLine,      description: 'High-risk person and sanctions list screening',         bianSd: 'SD-13',  href: '/system/admin/hrp' },
+  kyc_identity:       { label: 'KYC / Identity',     icon: UserCheck,     description: 'Customer identity verification (KYC)',                  bianSd: 'SD-53',  href: '/system/admin/kyc' },
+  kyb_business:       { label: 'KYB / Business',     icon: Building2,     description: 'Merchant business entity verification (KYB)',           bianSd: 'SD-89',  href: '/system/admin/kyb' },
+  aml_monitoring:     { label: 'AML Monitoring',     icon: AlertTriangle, description: 'Anti-money laundering pattern analysis',                bianSd: 'SD-99',  href: '/system/admin/aml' },
+  credit_bureau:      { label: 'Credit Bureau',      icon: CreditCard,    description: 'Credit scoring and bureau checks',                      bianSd: 'SD-83',  href: '/system/admin/credit-bureau' },
+  card_authorization: { label: 'Card Authorization', icon: Zap,           description: 'Card transaction authorization via payment networks',   bianSd: 'SD-15',  href: '/system/admin/card-authorization' },
+  card_issuer:        { label: 'Card Issuer',        icon: KeyRound,      description: 'CVV and PIN validation from card-issuing processors',   bianSd: 'SD-88',  href: '/system/admin/card-issuer' },
+};
+
+function HealthBadge({ status }: { status?: string }) {
+  if (!status || status === 'unknown') return <span className="flex items-center gap-1 text-xs text-gray-400"><Clock size={12} />Unknown</span>;
+  if (status === 'ok')          return <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 size={12} />Healthy</span>;
+  if (status === 'degraded')    return <span className="flex items-center gap-1 text-xs text-amber-600"><AlertCircle size={12} />Degraded</span>;
+  if (status === 'unreachable') return <span className="flex items-center gap-1 text-xs text-red-600"><WifiOff size={12} />Unreachable</span>;
+  return null;
+}
+
+function ManagerIntegrationHub({ debugMode }: { debugMode: boolean }) {
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = getToken() ?? '';
+    api.integrations.list(token)
+      .then(d => { setIntegrations(d.integrations as unknown as Integration[]); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const activeByType = Object.fromEntries(
+    integrations.map(i => [i.externalProviderArrangementType, i])
+  );
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Integration Hub</h2>
+          <p className="text-sm text-gray-500 mt-0.5">BIAN SD-193 External Provider Arrangements · PCI DSS Req 12.8</p>
+        </div>
+        <Link
+          href="/system/admin/integrations"
+          className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
+        >
+          <Wrench size={14} />
+          Manage Integrations
+        </Link>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-12 text-gray-400">Loading integration status...</div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Object.entries(TYPE_META).map(([type, meta]) => {
+            const active = activeByType[type];
+            const Icon = meta.icon;
+            return (
+              <Link key={type} href={meta.href} className="group block bg-white rounded-xl border p-5 hover:border-[#001E2B]/30 hover:shadow-md transition-all">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-slate-200 transition-colors">
+                    <Icon size={20} className="text-slate-600" />
+                  </div>
+                  {active ? (
+                    <HealthBadge status={active.externalProviderHealthStatus} />
+                  ) : (
+                    <span className="text-xs text-gray-400">Not configured</span>
+                  )}
+                </div>
+                <p className="font-semibold text-gray-900 text-sm">{meta.label}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{meta.description}</p>
+                {active && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <p className="text-xs text-gray-700 font-medium truncate">{active.externalProviderArrangementName}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {active.externalProviderIsInternal && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium border border-slate-200">Built-in</span>
+                      )}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                        active.externalProviderArrangementStatus === 'active'   ? 'bg-green-100 text-green-700' :
+                        active.externalProviderArrangementStatus === 'inactive' ? 'bg-gray-100 text-gray-600' :
+                        active.externalProviderArrangementStatus === 'test'     ? 'bg-blue-100 text-blue-700' :
+                                                                                  'bg-red-100 text-red-700'
+                      }`}>
+                        {active.externalProviderArrangementStatus}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {debugMode && (
+                  <p className="mt-2 text-[10px] font-mono text-gray-400">{meta.bianSd} · {meta.label}</p>
+                )}
+              </Link>
+            );
+          })}
+
+          {/* Integration Registry card */}
+          <Link href="/system/admin/integrations" className="group block bg-white rounded-xl border p-5 hover:border-[#001E2B]/30 hover:shadow-md transition-all">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-slate-200 transition-colors">
+                <Plug size={20} className="text-slate-600" />
+              </div>
+              <span className="text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded font-mono">
+                {integrations.length} registered
+              </span>
+            </div>
+            <p className="font-semibold text-gray-900 text-sm">Integration Registry</p>
+            <p className="text-xs text-gray-500 mt-0.5">Manage all external provider arrangements</p>
+            {debugMode && <p className="mt-2 text-[10px] font-mono text-gray-400">SD-193 · Req 12.8</p>}
+          </Link>
+        </div>
+      )}
+
+      {debugMode && (
+        <div className="mt-6 bg-slate-900 rounded-xl p-4 text-xs font-mono text-slate-300">
+          <p className="text-slate-400 mb-2">SD-193 External Provider Arrangements, Registry snapshot</p>
+          <p>Total registered: <span className="text-[#00ED64]">{integrations.length}</span></p>
+          <p>Internal (built-in): <span className="text-[#00ED64]">{integrations.filter(i => i.externalProviderIsInternal).length}</span></p>
+          <p>External: <span className="text-[#00ED64]">{integrations.filter(i => !i.externalProviderIsInternal).length}</span></p>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ── Role dashboard ────────────────────────────────────────────────────────────
 
 function RoleDashboard({ user, onSignOut }: { user: DecodedUser; onSignOut: () => void }) {
@@ -310,7 +440,7 @@ function RoleDashboard({ user, onSignOut }: { user: DecodedUser; onSignOut: () =
       <header className="sticky top-0 z-20 bg-[#001E2B] border-b border-white/8 px-3 sm:px-5 h-12 flex items-center justify-between shrink-0 gap-3">
         <Link href="/system" className="flex items-center gap-2 text-[#00ED64] font-bold text-sm whitespace-nowrap hover:text-[#00ED64]/80 transition-colors">
           <span className="text-base">🏦</span>
-          <span>Payment Gateway</span>
+          <span>PSP</span>
         </Link>
         <UserMenu user={user} onSignOut={onSignOut} />
       </header>
@@ -326,31 +456,35 @@ function RoleDashboard({ user, onSignOut }: { user: DecodedUser; onSignOut: () =
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${accent.badge}`}>
                 {ROLE_LABELS[user.role] ?? user.role}
               </span>
-              <span className="text-sm text-gray-400">Payment Gateway Demo</span>
+              <span className="text-sm text-gray-400">PSP Demo</span>
               {debugMode && <span className="text-xs font-mono text-gray-400">· BIAN-aligned · PCI DSS</span>}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {cards.map((card) => {
-              const Icon = card.icon;
-              return (
-                <Link key={card.href} href={card.href}
-                  className="group block bg-white rounded-xl border p-5 hover:border-[#001E2B]/30 hover:shadow-md transition-all">
-                  <div className="mb-3">
-                    <div className={`inline-flex p-2 rounded-lg ${accent.iconBg}`}>
-                      <Icon size={20} className={accent.iconText} />
+          {user.role === 'manager' ? (
+            <ManagerIntegrationHub debugMode={debugMode} />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {cards.map((card) => {
+                const Icon = card.icon;
+                return (
+                  <Link key={card.href} href={card.href}
+                    className="group block bg-white rounded-xl border p-5 hover:border-[#001E2B]/30 hover:shadow-md transition-all">
+                    <div className="mb-3">
+                      <div className={`inline-flex p-2 rounded-lg ${accent.iconBg}`}>
+                        <Icon size={20} className={accent.iconText} />
+                      </div>
                     </div>
-                  </div>
-                  <p className="font-semibold text-gray-900 text-sm">{card.label}</p>
-                  <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{card.description}</p>
-                  {debugMode && card.bianSd && (
-                    <p className="mt-2 text-[10px] font-mono text-gray-400">{card.bianSd} · {card.pciDss}</p>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
+                    <p className="font-semibold text-gray-900 text-sm">{card.label}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{card.description}</p>
+                    {debugMode && card.bianSd && (
+                      <p className="mt-2 text-[10px] font-mono text-gray-400">{card.bianSd} · {card.pciDss}</p>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
 
           {debugMode && (
             <div className="mt-6 bg-slate-900 rounded-xl p-4 text-xs font-mono text-slate-300">

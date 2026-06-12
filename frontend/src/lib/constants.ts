@@ -5,6 +5,7 @@ export const DEMO_USERS_PASSWORDS: Record<string, string> = {
   // Customers
   'luis.fernandez@back.es': 'demo-password',
   'julia.santos@back.es': 'demo-password',
+  'amara.okafor@demo.com': 'demo-password',
   'carlos.garcia@back.es': 'demo-password',
   'priya.patel@back.es': 'demo-password',
   // Analysts (L1)
@@ -17,6 +18,7 @@ export const DEMO_USERS_PASSWORDS: Record<string, string> = {
   'diego.sans@back.es': 'demo-password',
   'sophie.martin@back.es': 'demo-password',
   // Merchant Officers
+  'david.chen@demo.com': 'demo-password',
   'officer@bank.demo': 'demo-password',
   'marco.rossi@bank.demo': 'demo-password',
   // Manager

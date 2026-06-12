@@ -6,15 +6,15 @@ import { MerchantBrandingWrapper } from './MerchantBrandingWrapper';
 import { SimulatorStateManager } from './SimulatorStateManager';
 import { writeSimulatorTransactionToHistory } from '../../lib/simulatorHistory';
 import type { SimulatorScenario } from '../../types/simulator';
+import simulatorConfig from '../../config/simulator.json';
 
 interface Props {
   scenario: SimulatorScenario;
-  merchantId: string;
 }
 
 type FlowState = 'idle' | 'creating' | 'link_ready' | 'iframe_open' | 'complete' | 'error';
 
-export function PaymentLinkFlow({ scenario, merchantId }: Props) {
+export function PaymentLinkFlow({ scenario }: Props) {
   const router = useRouter();
   const [flowState, setFlowState] = useState<FlowState>('idle');
   const [linkCode, setLinkCode] = useState<string | null>(null);
@@ -55,6 +55,7 @@ export function PaymentLinkFlow({ scenario, merchantId }: Props) {
         currency: prefill.currency,
         merchantName: prefill.merchantName,
         method: 'payment-link',
+        customerName: scenario.persona,
         linkCode,
       }));
       SimulatorStateManager.setStep(3);
@@ -84,7 +85,7 @@ export function PaymentLinkFlow({ scenario, merchantId }: Props) {
     setErrorMsg(null);
     try {
       const result = await api.simulator.createPaymentLink({
-        merchantAgreementInstanceReference: merchantId,
+        merchantId: simulatorConfig.merchantId,
         amount: prefill.amount,
         currency: prefill.currency,
         description: prefill.description,

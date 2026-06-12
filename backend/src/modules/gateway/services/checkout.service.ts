@@ -9,6 +9,11 @@ import {
   CheckoutSessionStatus,
 } from '../models/checkoutSession.model';
 import { createTransaction } from '../../transactions/services/cardTransaction.service';
+import { authorizeCard, linkAuthToTransaction } from './cardAuthorization.service';
+import { upsertCardByToken } from '../../customer/services/paymentCard.service';
+import { PARTY_COLLECTION } from '../../identity/models/party.model';
+import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
+import type { PaymentCardManagementControlRecord } from '../../customer/models/paymentCard.model';
 
 const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -41,7 +46,8 @@ export type ProcessPaymentResult =
   | 'not_found'
   | 'expired'
   | 'already_completed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'declined';
 
 function substitutePlaceholders(url: string, values: Record<string, string>): string {
   let result = url;
@@ -119,6 +125,9 @@ export interface ProcessCheckoutPaymentInput {
   cardExpiryMonth: string;
   cardExpiryYear: string;
   merchantCategoryCode?: string;
+  customerEmail?: string;
+  saveCard?: boolean;
+  cardAuthOutcome?: 'approved' | 'declined' | 'challenge';
 }
 
 export async function processCheckoutPayment(
@@ -145,14 +154,30 @@ export async function processCheckoutPayment(
   // Build masked PAN from token: show last 4 chars of token as display
   const maskedPan = `****-****-****-${input.cardToken.slice(-4).padStart(4, '0')}`;
 
+  // SD-15: Card Authorization — run before creating the transaction
+  const mcc = input.merchantCategoryCode ?? '5999';
+  const authResult = await authorizeCard(db, {
+    checkoutSessionInstanceReference: input.sessionId,
+    cardToken: input.cardToken,
+    amount: session.checkoutSessionAmount,
+    currency: session.checkoutSessionCurrency,
+    mcc,
+    merchantCode: session.merchantAgreementInstanceReference,
+    cardAuthOutcome: input.cardAuthOutcome,
+  });
+
+  if (authResult.result === 'declined') {
+    return { result: 'declined' };
+  }
+
   // Create the underlying card transaction
   const txResult = await createTransaction(db, {
     cardToken: input.cardToken,
-    accountReference: input.cardToken, // For checkout sessions, use token as account reference
+    accountReference: input.customerEmail ?? input.cardToken,
     amount: session.checkoutSessionAmount,
     currency: session.checkoutSessionCurrency,
     cardTransactionMerchantName: session.merchantName,
-    cardTransactionMerchantCategoryCode: input.merchantCategoryCode ?? '5999',
+    cardTransactionMerchantCategoryCode: mcc,
     cardTransactionChannel: 'online',
     cardTransactionMaskedPanDisplay: maskedPan,
     cardTransactionType: 'purchase',
@@ -162,8 +187,39 @@ export async function processCheckoutPayment(
       source: 'checkout_session',
       sessionId: session.checkoutSessionInstanceReference,
       merchantReference: session.checkoutSessionMerchantReference,
+      cardAuthorizationInstanceReference: authResult.recordId,
+      cardAuthorizationCode: authResult.authCode,
     },
   });
+
+  // Link auth record to the transaction
+  await linkAuthToTransaction(db, authResult.recordId, txResult.cardTransactionInstanceReference);
+
+  // SD-57: Auto-save card if customer opted in
+  if (input.saveCard && input.customerEmail) {
+    try {
+      const party = await db.collection(PARTY_COLLECTION).findOne({ partyEmailAddress: input.customerEmail });
+      if (party) {
+        const agreement = await db.collection(CUSTOMER_AGREEMENT_COLLECTION)
+          .findOne({ partyInstanceReference: (party as Record<string, unknown>).partyInstanceReference });
+        if (agreement) {
+          const expiryDate = `${input.cardExpiryMonth}/${input.cardExpiryYear.slice(-2)}`;
+          const maskedPanForCard = `****-****-****-${input.cardToken.slice(-4).padStart(4, '0')}`;
+          const network: PaymentCardManagementControlRecord['paymentCardNetwork'] = 'VISA';
+          await upsertCardByToken(db, {
+            customerAgreementInstanceReference: (agreement as Record<string, unknown>).customerAgreementInstanceReference as string,
+            cardToken: input.cardToken,
+            paymentCardExpirationDate: expiryDate,
+            paymentCardMaskedPanDisplay: maskedPanForCard,
+            paymentCardNetwork: network,
+            paymentCardIsPreferred: false,
+          });
+        }
+      }
+    } catch {
+      // Non-fatal: card save failure does not block payment confirmation
+    }
+  }
 
   // Update session to completed
   await db.collection(CHECKOUT_SESSION_COLLECTION).updateOne(

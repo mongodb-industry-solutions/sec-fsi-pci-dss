@@ -14,7 +14,7 @@
 | **v1** | Security Foundation | Working end-to-end: payment → QE encryption → fraud investigation | 2–3 weeks |
 | **v2** | Investigation & Control | CISO (Chief Information Security Officer)  ready: RBAC, escalation, audit trail, KMS key rotation | 4–6 weeks after v1 |
 | **v3** | Integration-ready API Surface | Expose stable webhook events and API contracts that external systems can consume; recurring payment; performance story. External adoption (e.g. Leafy Bank) is decoupled and does not gate this iteration. | TBD after v2 validated |
-| **v4** | Payment Gateway + Integration Refinement | Full gateway layer (SD-64/65/89/57), modular backend, finalised OpenAPI contracts and webhook schemas for external integrators. | TBD after v3 validated |
+| **v4** | PSP Payment Platform + Integration Refinement | Full PSP payment layer (SD-64/65/89/57), modular backend, finalised OpenAPI contracts and webhook schemas for external integrators. | TBD after v3 validated |
 | **v5** | Agentic Integration | AI agent integration for fraud investigation: MongoDB Agentic Platform (Magenta) and/or external agentic systems such as Agentic ThreatSight360. | TBD after v4 validated |
 
 ---
@@ -243,7 +243,7 @@ These changes were applied during v2 development and are now part of the v2 base
 
 Expose the integration-ready API surface that external systems can consume without this demo having to wait for them. Add the save-card / recurring payment flow, stable webhook event contracts, a performance visualisation, and optionally prefix/substring QE (Queryable Encryption) queries if MongoDB 8.2 is available.
 
-External systems such as Leafy Bank or Agentic ThreatSight360 **may** consume the endpoints and events published in this iteration, but their adoption is entirely decoupled. If a peer system has not yet performed its own refactoring, the payment gateway roadmap is unaffected: v3 is complete when the contracts are published and the gateway implements them, regardless of whether any external consumer has integrated.
+External systems such as Leafy Bank or Agentic ThreatSight360 **may** consume the endpoints and events published in this iteration, but their adoption is entirely decoupled. If a peer system has not yet performed its own refactoring, the PSP platform roadmap is unaffected: v3 is complete when the contracts are published and the PSP implements them, regardless of whether any external consumer has integrated.
 
 ### Definition of Done
 
@@ -281,7 +281,7 @@ External systems such as Leafy Bank or Agentic ThreatSight360 **may** consume th
 
 #### FR-v3-22: External Integration API Surface
 
-This feature exposes the contracts and events that any external system can consume. No external system is required to adopt them in v3; this iteration is complete when the payment gateway publishes the contracts, not when a consumer has integrated.
+This feature exposes the contracts and events that any external system can consume. No external system is required to adopt them in v3; this iteration is complete when the PSP platform publishes the contracts, not when a consumer has integrated.
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -298,7 +298,7 @@ This feature exposes the contracts and events that any external system can consu
 |---|---|---|---|
 | NFR-v3-01 | Performance | QE overhead for equality search is below a defined threshold | Overhead < 20% vs plaintext on Atlas M10 under single-user demo load |
 | NFR-v3-02 | UX | Returning customer payment with saved card completes in fewer steps than first-time payment | Saved card flow requires ≤ 2 steps vs 3 for new card |
-| NFR-v3-03 | Portability | Any external system with a service credential can call all v3 endpoints without changes to the payment gateway | Validated by IST team design review against the published integration contract in technical-spec.md; no dependency on external team availability |
+| NFR-v3-03 | Portability | Any external system with a service credential can call all v3 endpoints without changes to the PSP platform | Validated by IST team design review against the published integration contract in technical-spec.md; no dependency on external team availability |
 | NFR-v3-04 | Content readiness | Solutions Library article passes the four-section template check | Validated using ks-mongodb-ist-content checklist |
 
 ---
@@ -307,11 +307,11 @@ This feature exposes the contracts and events that any external system can consu
 
 ### Objective
 
-Extend the demo from a **fraud investigation tool** to a **full payment platform story**: MongoDB as the PCI DSS-aligned data backbone for a card payment gateway. The backend is restructured into domain modules (one per BIAN SD cluster) and a new gateway module adds four BIAN Service Domains (SD-89, SD-64, SD-65, SD-57), three collections, and a full payment order lifecycle API. The frontend adds the merchant as a visible actor in the demo flow.
+Extend the demo from a **fraud investigation tool** to a **full payment platform story**: MongoDB as the PCI DSS-aligned data backbone for a PSP platform. The backend is restructured into domain modules (one per BIAN SD cluster) and a new gateway module adds four BIAN Service Domains (SD-89, SD-64, SD-65, SD-57), three collections, and a full payment order lifecycle API. The frontend adds the merchant as a visible actor in the demo flow.
 
 The structural refactor (P1) has zero functional impact: same API surface, same QE behaviour, same frontend. The gateway module (P2–P5) adds new capabilities on top.
 
-v4 also finalises the external integration surface introduced in v3: OpenAPI schemas are published for all gateway endpoints, webhook contracts are versioned, and the OAuth (Open Authorization) 2.0 groundwork is documented so that external systems (such as Leafy Bank's Open Finance Service or Agentic ThreatSight360) can integrate at their own pace without requiring changes to the payment gateway. Integration by external systems is optional and does not gate any v4 acceptance criteria.
+v4 also finalises the external integration surface introduced in v3: OpenAPI schemas are published for all PSP payment endpoints, webhook contracts are versioned, and the OAuth (Open Authorization) 2.0 groundwork is documented so that external systems (such as Leafy Bank's Open Finance Service or Agentic ThreatSight360) can integrate at their own pace without requiring changes to the PSP platform. Integration by external systems is optional and does not gate any v4 acceptance criteria.
 
 ### Definition of Done
 
@@ -440,7 +440,7 @@ Introduce AI agent integration into the fraud investigation workflow. The primar
 
 The agent automatically pre-reviews each fraud case when it opens, queries the encrypted QE collections to gather context, produces a structured draft diagnosis, and presents it to the L1 analyst as a suggested action. The human analyst confirms, overrides, or escalates. This demonstrates how agentic AI integrates with existing encrypted data workflows without relaxing security controls.
 
-As with v3 and v4, external agent adoption (e.g. Agentic ThreatSight360 performing its own integration work) is fully decoupled: v5 is complete when the payment gateway publishes the agent-accessible API contracts and the Magenta-based agent works end-to-end, regardless of whether any third-party agent has integrated.
+As with v3 and v4, external agent adoption (e.g. Agentic ThreatSight360 performing its own integration work) is fully decoupled: v5 is complete when the PSP platform publishes the agent-accessible API contracts and the Magenta-based agent works end-to-end, regardless of whether any third-party agent has integrated.
 
 ### Definition of Done
 

@@ -333,7 +333,7 @@ Allowed fields: \`merchantTransactionLimitAmount\`, \`merchantWebhookEndpoint\`,
       tags: ['merchants'],
       summary: 'Register a webhook endpoint for a merchant (SD-89)',
       description: `Registers or updates the HTTPS webhook URL for payment event notifications.
-The gateway delivers \`POST\` callbacks on: \`payment.authorized\`, \`payment.captured\`, \`payment.refunded\`, \`payment.voided\`.
+The PSP delivers \`POST\` callbacks on: \`payment.authorized\`, \`payment.captured\`, \`payment.refunded\`, \`payment.voided\`.
 Delivery includes up to 3 retry attempts with exponential backoff.`,
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string', description: '`merchantAgreementInstanceReference`' } } },

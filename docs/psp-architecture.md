@@ -1,8 +1,11 @@
-# PCI DSS Aligned Card Payment Gateway Blueprint
+# PSP Platform — PCI DSS Aligned Payment Architecture
+
+> **Note:** This document describes the **PSP (Payment Service Provider) platform's** internal payment processing architecture. The PSP is the complete payment platform providing merchant onboarding, fraud detection, compliance (AML/KYC/KYB), and payment execution. The *payment gateway subsystem* described in this document is one internal component of the PSP responsible for routing and authorization — it is not the name for the PSP as a whole.
+
 ## 1. Purpose and scope
 ### 1.1 Objective
 
-- Define the engineering and security blueprint for building a payment gateway that supports card payments and is designed to operate in alignment with PCI DSS (Payment Card Industry Data Security Standard) requirements.
+- Define the engineering and security blueprint for the PSP platform's payment processing subsystem, which supports card payments and is designed to operate in alignment with PCI DSS (Payment Card Industry Data Security Standard) requirements.
 - Position the system as a PCI DSS aligned architecture and implementation guide, not as an automatic compliance claim. MongoDB Atlas is a PCI DSS validated service provider, but the customer remains responsible for their own PCI DSS program, deployment controls, and assessor validation.
 ### 1.2 In scope
 
@@ -10,7 +13,7 @@
 - Authorization flow
 - Tokenization and vaulting strategy
 - Merchant API (Application Programming Interface) design
-- Gateway orchestration and routing
+- Payment gateway orchestration and routing (internal PSP subsystem)
 - PCI cardholder data environment design
 - Key management and cryptographic controls
 - Identity, access, auditing, logging, monitoring, and operational controls

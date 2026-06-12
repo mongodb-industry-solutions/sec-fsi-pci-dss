@@ -5,7 +5,7 @@ import {
   Plus, CheckCircle2, AlertCircle, Clock, WifiOff,
   RefreshCw, Trash2, Search, X, Filter, Pencil, Eye,
   ShieldAlert, ScanLine, UserCheck, Building2, AlertTriangle, CreditCard, Puzzle,
-  GitBranch, ArrowRight, Zap, ChevronDown,
+  GitBranch, ArrowRight, Zap, ChevronDown, KeyRound,
 } from 'lucide-react';
 import { api } from '../../../../lib/api';
 import { getToken } from '../../../../lib/auth';
@@ -58,13 +58,15 @@ export interface CategoryMeta {
 }
 
 const ICON_BY_TYPE: Record<string, React.ElementType> = {
-  fraud_detection: ShieldAlert,
-  hrp_sanctions:   ScanLine,
-  kyc_identity:    UserCheck,
-  kyb_business:    Building2,
-  aml_monitoring:  AlertTriangle,
-  credit_bureau:   CreditCard,
-  generic:         Puzzle,
+  fraud_detection:   ShieldAlert,
+  hrp_sanctions:     ScanLine,
+  kyc_identity:      UserCheck,
+  kyb_business:      Building2,
+  aml_monitoring:    AlertTriangle,
+  credit_bureau:     CreditCard,
+  card_authorization: Zap,
+  card_issuer:       KeyRound,
+  generic:           Puzzle,
 };
 
 const STRATEGY_LABELS: Record<string, string> = {

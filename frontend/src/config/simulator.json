@@ -1,6 +1,32 @@
 {
   "merchantId": "m0000003-0000-4000-8000-000000000003",
   "merchantName": "Fischer Web Studio",
+
+  "defaultCurrency": "USD",
+  "fraudAmountThreshold": 500,
+
+  "amountPresets": ["100.00", "250.00", "500.00", "850.00", "1200.00"],
+
+  "defaultCard": "4111111111111234",
+
+  "testCards": [
+    { "label": "Visa Standard (4242-4242-4242-4242)", "number": "4242424242424242" },
+    { "label": "Visa Business (2223-0000-4840-0010)", "number": "2223000048400010" },
+    { "label": "Mastercard Standard (5555-5555-5555-1212)", "number": "5555555555551212" },
+    { "label": "Mastercard Prepaid (5200-8282-8282-8210)", "number": "5200828282828210" },
+    { "label": "Amex Gold (3782-8224-6301-0005)", "number": "378282246310005" },
+    { "label": "Amex Platinum (3714-4963-5309-8431)", "number": "371449635398431" },
+    { "label": "Demo Card (Pre-filled Example)", "number": "4111111111111234" }
+  ],
+
+  "fallbackMerchants": [
+    { "name": "TechGadgets Ltd.", "mcc": "5734" },
+    { "name": "Global Electronics", "mcc": "5734" },
+    { "name": "City Restaurant", "mcc": "5812" },
+    { "name": "ATM Cash Withdrawal", "mcc": "6011" },
+    { "name": "Online Casino", "mcc": "7995" }
+  ],
+
   "methods": [
     {
       "id": "api-card",
@@ -32,6 +58,7 @@
       "comingSoon": true
     }
   ],
+
   "scenarios": [
     {
       "id": "luis-fraud",
@@ -50,7 +77,8 @@
         "merchantCategoryCode": "5734",
         "description": "Electronics purchase, TechGadgets Ltd.",
         "cardExpiry": "12/28",
-        "cardHint": "4242424242424242"
+        "cardHint": "4242424242424242",
+        "cardAuthOutcome": "approved"
       }
     },
     {
@@ -70,19 +98,20 @@
         "merchantCategoryCode": "5812",
         "description": "Coffee and workspace, Espresso Works",
         "cardExpiry": "06/26",
-        "cardHint": "5555555555551212"
+        "cardHint": "5555555555551212",
+        "cardAuthOutcome": "approved"
       }
     },
     {
-      "id": "ahmed-border",
-      "label": "Carlos Garcia, Borderline Case",
-      "description": "Mid-value payment with mixed risk signals; borderline review required.",
-      "persona": "Carlos Garcia",
+      "id": "amara-border",
+      "label": "Amara Okafor, Borderline Case",
+      "description": "Mid-value software payment to Okafor Digital Services; Amara pays her own company. Mixed risk signals trigger manual review.",
+      "persona": "Amara Okafor",
       "expectedOutcome": "borderline",
       "outcomeLabel": "⚠️ Manual review triggered",
       "prefill": {
-        "cardholderName": "Carlos Garcia",
-        "email": "carlos.garcia@back.es",
+        "cardholderName": "Amara Okafor",
+        "email": "amara.okafor@demo.com",
         "phone": "+34 650 000 9999",
         "amount": 499.00,
         "currency": "EUR",
@@ -90,7 +119,8 @@
         "merchantCategoryCode": "7372",
         "description": "Software subscription, Okafor Digital",
         "cardExpiry": "09/27",
-        "cardHint": "4111111111111234"
+        "cardHint": "4111111111111234",
+        "cardAuthOutcome": "approved"
       }
     }
   ]

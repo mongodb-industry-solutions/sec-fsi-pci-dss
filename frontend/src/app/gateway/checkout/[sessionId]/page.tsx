@@ -13,7 +13,7 @@ type PageState = 'loading' | 'ready' | 'paying' | 'success' | 'expired' | 'compl
 // applyPrefillParams below. The simulator (or any other caller) just appends
 // ?<param>=<value> to the checkout URL.
 // ---------------------------------------------------------------------------
-const PREFILL_PARAM_NAMES = ['name', 'card', 'expiry'] as const;
+const PREFILL_PARAM_NAMES = ['name', 'card', 'expiry', 'email', 'savecard'] as const;
 type PrefillParam = typeof PREFILL_PARAM_NAMES[number];
 
 function formatCountdown(totalSeconds: number): string {
@@ -41,6 +41,8 @@ function CheckoutPageInner() {
   const [cardNumber, setCardNumber] = useState('');
   const [expiryMonth, setExpiryMonth] = useState('');
   const [expiryYear, setExpiryYear] = useState('');
+  const [cardholderEmail, setCardholderEmail] = useState('');
+  const [saveCard, setSaveCard] = useState(false);
 
   // Apply GET params to form fields. Add more params here as the payment form grows.
   const applyPrefillParams = useCallback((sp: ReturnType<typeof useSearchParams>) => {
@@ -49,9 +51,13 @@ function CheckoutPageInner() {
     const name = get('name');
     const card = get('card');
     const expiry = get('expiry');
+    const email = get('email');
+    const savecardParam = get('savecard');
 
     if (name) setCardholderName(name);
     if (card) setCardNumber(card.replace(/(\d{4})(?=\d)/g, '$1 ').trim());
+    if (email) setCardholderEmail(email);
+    if (savecardParam === 'true') setSaveCard(true);
     if (expiry) {
       const sep = expiry.includes('/') ? '/' : expiry.length === 4 ? '' : null;
       if (sep === '/') {
@@ -124,6 +130,8 @@ function CheckoutPageInner() {
         cardholderName,
         cardExpiryMonth: expiryMonth.padStart(2, '0'),
         cardExpiryYear: `20${expiryYear}`,
+        cardholderEmail: cardholderEmail || undefined,
+        saveCard: saveCard || undefined,
       });
       if (result.success) {
         setState('success');
@@ -180,7 +188,7 @@ function CheckoutPageInner() {
           <CheckCircle className="mx-auto mb-3 text-green-500" size={48} />
           <h2 className="text-lg font-semibold text-gray-800 mb-2">Payment Successful</h2>
           <p className="text-sm text-gray-500 mb-2">Redirecting you back to the merchant...</p>
-          <div className="text-xs text-gray-400">Powered by MongoDB Payment Gateway</div>
+          <div className="text-xs text-gray-400">Powered by MongoDB PSP</div>
         </div>
       </div>
     );
@@ -311,6 +319,18 @@ function CheckoutPageInner() {
                   <p className="text-xs text-gray-400 mt-0.5">Demo: not sent to server</p>
                 </div>
               </div>
+
+              {cardholderEmail && (
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={saveCard}
+                    onChange={(e) => setSaveCard(e.target.checked)}
+                    className="accent-[#00ED64] w-4 h-4"
+                  />
+                  <span className="text-xs text-gray-600">Save this card for future payments</span>
+                </label>
+              )}
 
               {error && (
                 <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">

@@ -8,6 +8,7 @@ import {
   User, PlusCircle, Store, ClipboardCheck,
   ChevronLeft, ChevronRight, Settings2, Plug,
   ShieldAlert, ScanLine, UserCheck, Building2, AlertTriangle,
+  Zap, KeyRound,
   HelpCircle,
   type LucideIcon,
 } from 'lucide-react';
@@ -55,7 +56,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'My Profile',   path: '/system/profile',         icon: User },
   ],
   manager: [
-    { label: 'Hub',             path: '/system/admin',                    icon: Settings2,    exact: true },
+    { label: 'Hub',             path: '/system',                          icon: Settings2,    exact: true },
     { label: 'Registry',        path: '/system/admin/integrations',       icon: Plug,         exact: true },
     { label: 'Fraud Detection', path: '/system/admin/fraud-detection',    icon: ShieldAlert },
     { label: 'HRP / Sanctions', path: '/system/admin/hrp',                icon: ScanLine },
@@ -63,6 +64,8 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'KYB / Business',  path: '/system/admin/kyb',                icon: Building2 },
     { label: 'AML Monitoring',  path: '/system/admin/aml',                icon: AlertTriangle },
     { label: 'Credit Bureau',   path: '/system/admin/credit-bureau',      icon: CreditCard },
+    { label: 'Card Auth',       path: '/system/admin/card-authorization', icon: Zap },
+    { label: 'Card Issuer',     path: '/system/admin/card-issuer',        icon: KeyRound },
     { label: '+ Register',      path: '/system/admin/integrations/new',   icon: PlusCircle },
   ],
 };

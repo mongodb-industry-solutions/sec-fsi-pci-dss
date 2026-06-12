@@ -1,7 +1,7 @@
 # Demo Modes: UX Flow Design
 
 **Project:** FSI PCI DSS Payment Security Demo
-**Status:** Approved: design decisions resolved — Multi-method simulator in progress (see `tmp/dev.simulator.plan.md`)
+**Status:** Approved — Multi-method simulator in progress · Card Authorization integration + Full DB cycle planned (see `tmp/dev.simulator.plan.md`)
 **Last updated:** 2026-06-11
 **PRD reference:** [PRD.md](PRD.md)
 **Roadmap reference:** [roadmap.md](roadmap.md)
@@ -195,7 +195,7 @@ Pre-fills Step 1 with the selected scenario's `paymentData`. The 3-step wizard i
 
 #### 3.3b — Redirection Payment (iframe flow)
 
-The simulator acts as a **merchant** that creates a checkout session and embeds the hosted payment page in an iframe — demonstrating exactly how an external integration partner would use the gateway.
+The simulator acts as a **merchant** that creates a checkout session and embeds the hosted payment page in an iframe — demonstrating exactly how an external integration partner would use the PSP.
 
 ```
 ┌─────────────────── Simulator: Redirection Payment ──────────────┐
@@ -230,7 +230,7 @@ The simulator acts as a **merchant** that creates a checkout session and embeds 
    ```
 4. Parent simulator receives message, validates origin, advances to confirmation
 
-**Why same-origin iframe:** Both the simulator and `/gateway/checkout` are served by the same Next.js app on the same origin. No CORS or CSP headers block this. This is also exactly how a real merchant integration would work (the gateway page is loaded from the gateway domain).
+**Why same-origin iframe:** Both the simulator and `/gateway/checkout` are served by the same Next.js app on the same origin. No CORS or CSP headers block this. This is also exactly how a real merchant integration would work (the PSP's hosted payment page is loaded from the PSP domain).
 
 #### 3.3c — Payment Link (polling flow)
 
@@ -459,13 +459,13 @@ The raw document is fetched live from Atlas via `GET /api/v1/demo/raw-document/c
 | Min | Action | Talking point |
 |---|---|---|
 | 0:00 | Open `/simulator` landing | "This is a digital bank running entirely on MongoDB Atlas." |
-| 0:20 | Select **Redirection Payment** method | "Let's demonstrate the integration pattern that external merchants use to connect their checkout to our gateway." |
+| 0:20 | Select **Redirection Payment** method | "Let's demonstrate the integration pattern that external merchants use to connect their checkout to our PSP." |
 | 0:40 | Select **Luis — Alto valor** scenario | "Luis is buying a €850 laptop. This amount will trigger our fraud detection." |
 | 1:00 | Click **Start Demo →** | "We're now acting as the merchant. Watch what happens." |
-| 1:15 | Simulator creates checkout session | "The merchant calls our API: POST /checkout/sessions. The gateway returns a hosted payment page URL." |
-| 1:30 | Merchant branding wrapper appears | "The merchant embeds our hosted page in an iframe — that's what you see here. This is the actual gateway page, not a mock." |
+| 1:15 | Simulator creates checkout session | "The merchant calls our API: POST /checkout/sessions. The PSP returns a hosted payment page URL." |
+| 1:30 | Merchant branding wrapper appears | "The merchant embeds our hosted page in an iframe — that's what you see here. This is the actual PSP-hosted payment page, not a mock." |
 | 2:00 | Fill card in iframe | "Luis enters his card details. The raw PAN never leaves the browser — a token is generated client-side." |
-| 2:30 | Click Pay in iframe | "Payment submitted inside the iframe. The gateway tokenizes and processes." |
+| 2:30 | Click Pay in iframe | "Payment submitted inside the iframe. The PSP tokenizes and processes." |
 | 3:00 | postMessage fires, simulator advances | "The checkout page redirects to our callback URL. The merchant's system receives the result." |
 | 3:30 | Fraud alert appears | "Amount €850 exceeded the threshold. A fraud case was auto-created." |
 | 4:00 | Auto-redirect to investigation | "We're now the fraud analyst. The case appeared automatically." |
@@ -1374,20 +1374,23 @@ In debug mode, each card also shows the BIAN reference IDs:
 - `partyInstanceReference` (SD-13 Party anchor)
 - `customerAuthenticationInstanceReference` (SD-91 CustomerAuthentication)
 
-### 12.3 Demo Users (Post Ch-05 — 8 Total)
+### 12.3 Demo Users (Current — post-simulator expansion)
 
-| Display Name | Username | Role | Department | Party Ref |
-|---|---|---|---|---|
-| Alex Johnson | `customer@demo.com` | customer | — | PTY-001 |
-| David Chen | `customer2@demo.com` | customer | — | PTY-057 |
-| Amara Okafor | `customer3@demo.com` | customer | — | PTY-058 |
-| Lena Fischer | `customer4@demo.com` | customer | — | PTY-059 |
-| Level 1 Analyst | `analyst@bank.demo` | level1_analyst | Fraud Detection Services | — |
-| Level 2 Investigator | `investigator@bank.demo` | level2_investigator | Fraud Investigation | — |
-| Security Auditor | `auditor@bank.demo` | security_auditor | Compliance | — |
-| Rachel Torres | `officer@bank.demo` | merchant_officer | Merchant Acquiring | PTY-056 |
+| Display Name | Username | Role | Department | Party Ref | Simulator use |
+|---|---|---|---|---|---|
+| Luis Fernandez | `luis.fernandez@back.es` | customer | — | b0000001 | Fraud scenario (€850) |
+| Julia Santos | `julia.santos@back.es` | customer | — | b0000002 | Legit scenario (€45) |
+| Amara Okafor | `amara.okafor@demo.com` | customer | — | b0000058 | Borderline scenario (€499) |
+| David Chen | `david.chen@demo.com` | merchant_officer | — | b0000057 | Fischer Web Studio merchant |
+| Sarah Chen | `sarah.chen@back.es` | level1_analyst | Fraud Detection Services | b0000051 | — |
+| Michael Obi | `michael.obi@back.es` | level2_investigator | Fraud Investigation | b0000052 | — |
+| Diego Sans | `diego.sans@back.es` | security_auditor | Compliance | b0000053 | — |
+| Rachel Torres | `rachel.torres@bank.demo` | merchant_officer | Merchant Acquiring | b0000056 | Merchant review officer |
 
 All passwords: `demo1234`
+
+**Simulator merchant:** Fischer Web Studio (`m0000003`), owned by David Chen. All simulator payments are processed through this merchant.  
+**Simulator users:** Only `luis.fernandez@back.es`, `julia.santos@back.es`, and `amara.okafor@demo.com` are used as payers in simulator scenarios. After a simulator payment, these users can log in to `/system/payment/history` and see the transaction written to the database.
 
 ---
 
@@ -1577,4 +1580,199 @@ Checkout sessions and payment links require a merchant JWT. In Simulator mode:
 | `PaymentLinkFlow` | `components/simulator/` | Creates link, shows URL+QR mockup, polls status |
 | `SimulatorStateManager` | `components/simulator/` | sessionStorage read/write helpers |
 
-**Implementation plan:** `tmp/dev.simulator.plan.md` — 7 phases with pre/post checklists, TDD test specs, and risk register.
+**Implementation plan:** `tmp/dev.simulator.plan.md` — 8 phases with pre/post checklists, TDD test specs, and risk register.
+
+### 14.6 Simulator Endpoint Namespace (/api/v1/system/simulator/)
+
+Simulator frontend components route all payment operations through a dedicated backend namespace that does not require a merchant JWT. These endpoints are gated by `NODE_ENV !== 'production'`.
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/v1/system/simulator/checkout-session` | Creates a checkout session using `SIMULATOR_MERCHANT_ID`; accepts `customerEmail` for transaction binding |
+| `POST /api/v1/system/simulator/payment-link` | Creates a payment link for the simulator merchant |
+| `GET /api/v1/system/simulator/transactions/:email` | Returns recent transactions for a user by email (QE search) |
+
+**Why separate from PSP API:** The PSP-facing endpoints (`/api/v1/checkout/sessions`, `/api/v1/payment/links`) require a valid merchant JWT. In simulator mode, there is no logged-in merchant user. These system endpoints pre-fill the merchant context from the environment variable, keeping the PSP API contract clean.
+
+**Env var:** `SIMULATOR_MERCHANT_ID=m0000003-0000-4000-8000-000000000003`
+
+### 14.7 Full DB Transaction Cycle (Real Payment Guarantee)
+
+Every simulator payment must produce a real MongoDB document in `cardTransactionLog` that is:
+- Linked to the correct `customerAgreementInstanceReference` (via `customerEmail` on the checkout session)
+- Visible in `/system/payment/history` when the payer logs in
+- Visible to L1/L2 analysts in the investigation dashboard
+- Associated with a `fraudDiagnosisCase` if fraud criteria are met
+
+**accountReference fix:** The checkout service historically set `accountReference = cardToken` (random), producing orphaned transactions. The fix: `accountReference = session.checkoutSessionCustomerEmail ?? cardToken`. The `customerEmail` is passed by the simulator when creating the session.
+
+**localStorage bridge:** `simulatorHistory.ts` writes to `localStorage` as a UI-fast fallback. This remains in place but is secondary — the DB record is the authoritative source.
+
+---
+
+## 15. Card Authorization Integration (SD-15)
+
+### 15.1 Overview
+
+A real payment gateway calls the card issuer for authorization before confirming a transaction. This demo models that step via the Integration Hub's `card_authorization` provider category (SD-193 External Provider + SD-15 Card Authorization).
+
+**Authorization flow (Redsys/PayPal-inspired):**
+
+```
+Simulator/Merchant   Gateway (checkout.service)    CARD_AUTH Provider
+       │                        │                       │
+       │── Pay form submit ────▶│                       │
+       │                        │── authorize() ───────▶│
+       │                        │   { cardToken,        │  Stub: always 0000
+       │                        │     amount,           │  Real: Redsys REST /
+       │                        │     currency, mcc }   │        Stripe /
+       │                        │                       │        PayPal
+       │                        │◀── AuthResponse ──────│
+       │                        │   { approved,         │
+       │                        │     responseCode,     │
+       │                        │     authCode }        │
+       │                        │                       │
+       │                        │── createTransaction() │ (only if approved)
+       │                        │── FDS fraud check     │
+       │◀── result / case ID ───│                       │
+```
+
+### 15.2 Response Codes (Redsys-aligned)
+
+| Code | Meaning | Demo behavior |
+|---|---|---|
+| `0000` | Approved | Transaction proceeds normally |
+| `0101` | Card expired | HTTP 402, no transaction created |
+| `0180` | Unknown card / invalid token | HTTP 402, no transaction created |
+| `0190` | Denied — generic | HTTP 402, no transaction created |
+| `9915` | Payment cancelled | HTTP 402, no transaction created |
+
+### 15.2 Response Codes (Redsys-aligned)
+
+| Code | Meaning | Demo behavior |
+|---|---|---|
+| `0000` | Approved | Transaction proceeds normally |
+| `0101` | Card expired | HTTP 402, no transaction created |
+| `0180` | Unknown card / invalid token | HTTP 402, no transaction created |
+| `0190` | Denied — generic | HTTP 402, no transaction created |
+| `9915` | Payment cancelled | HTTP 402, no transaction created |
+
+### 15.3 Stub Behavior — Scenario-Driven
+
+The stub honors the `cardAuthOutcome` field on the scenario prefill:
+
+| Scenario prefill `cardAuthOutcome` | Stub returns | UI behavior |
+|---|---|---|
+| `'approved'` (default) | responseCode `0000` | Transaction proceeds |
+| `'declined'` | responseCode `0190` | HTTP 402, checkout shows "Card declined" |
+| `'challenge'` | responseCode `0000` + `requiresChallenge: true` | 3DS mock screen shown before transaction |
+
+All current simulator scenarios use `'approved'`. A future "declined card" scenario can set `'declined'` without code changes.
+
+### 15.4 3DS Challenge Mock Screen
+
+When a scenario has `cardAuthOutcome: 'challenge'`, the hosted checkout page shows an intermediate 3DS verification step:
+
+```
+┌───────────────────────────────────────────────────────┐
+│  🔐 Additional Verification Required                   │
+│                                                        │
+│  Your bank is requesting identity verification.        │
+│  Enter the one-time code sent to your device.          │
+│                                                        │
+│  OTP Code  [ 1 2 3 4 5 6 ]  (pre-filled for demo)     │
+│                                                        │
+│  [ Verify →]                                           │
+│                                                        │
+│  ℹ️  This is EMV 3DS V2 (simulated)                   │
+│     Real flow: cardholder redirects to ACS URL         │
+└───────────────────────────────────────────────────────┘
+```
+
+After [Verify], the challenge token is submitted via `POST /api/v1/checkout/{sessionId}/pay-challenge` and the transaction is created. The `cardAuthorizationRecord` is updated with `challengeCompletedAt`.
+
+**Presenter talking point:** "In production with a real issuer configured, this screen would redirect to the bank's ACS — the customer authenticates via their bank app. Here we simulate that step. The important thing is the architecture: authorization happens BEFORE the transaction is recorded."
+
+### 15.4 CardAuthorizationConfig Interface
+
+```typescript
+interface CardAuthorizationConfig {
+  merchantCode: string;           // Redsys: FUC code | Stripe: merchant ID
+  terminalNumber?: string;        // Redsys-specific terminal
+  authorizationUrl?: string;      // Override endpoint for sandbox testing
+  signatureVersion: 'HMAC_SHA256' | 'HMAC_SHA512_V2';
+  enableThreeDS: boolean;         // Request EMV 3DS V2 challenge flow
+  mockMode: boolean;              // true = never calls external
+  simulatorMode?: 'always_approve' | 'scenario_driven';
+}
+```
+
+### 15.5 Storage — `cardAuthorizationRecord` (SD-15 New Collection)
+
+Every authorization request creates a document in `cardAuthorizationRecord`. No QE — no PII, no CHD. Linked to `cardTransactionLog` via `cardTransactionInstanceReference` (null if declined).
+
+The Raw Atlas Document toggle on the transaction detail page shows both documents side-by-side:
+- `cardTransactionLog` — the transaction (with QE-encrypted PII fields)
+- `cardAuthorizationRecord` — the authorization result (plaintext, no sensitive data)
+
+**Presenter talking point:** "Notice two documents: the authorization record shows the bank approved the card — response code 0000. The transaction record shows the fraud system then flagged it. These are two different steps: the issuer said 'yes', but our fraud engine said 'investigate'. PCI DSS requires both steps to be auditable independently."
+
+| Aspect | Detail |
+|---|---|
+| BIAN Service Domain | SD-15 Card Authorization — `CardAuthorizationRecord` |
+| BIAN Behavior Qualifier | `Authorize` |
+| PCI DSS Req 3.3 | CVV is NOT passed to the authorization provider (demo constraint; documented) |
+| PCI DSS Req 3.4 | Only `cardToken` (surrogate) is sent — never raw PAN |
+| PCI DSS Req 6.4 | Authorization calls use TLS; HMAC-SHA256 signature on payload |
+| PCI DSS Req 10.2 | Authorization request/response logged in `cardAuthorizationRecord` collection (SD-15) |
+
+### 15.6 External Provider Configuration (Integration Hub UI)
+
+Admins can configure a real external CARD_AUTH provider from the Integration Hub admin panel:
+
+```
+Provider Type: Card Authorization (SD-15)
+Provider Name: [e.g., Redsys REST / Stripe Issuing / PayPal]
+Merchant Code: [FUC or merchant ID]
+Authorization URL: [sandbox endpoint]
+Signature: HMAC_SHA512_V2 (Redsys) or HMAC_SHA256
+Mock Mode: ☑ (uncheck to enable real calls)
+```
+
+When `mockMode: false` and a valid URL is configured, the dispatch service sends real authorization requests. No code changes required — the adapter resolves from the hub configuration at runtime.
+
+---
+
+## 16. David Chen — Merchant Scenario
+
+### 16.1 Role
+
+David Chen (`david.chen@demo.com`) is the owner of **Fischer Web Studio** (`m0000003`), an active merchant in the system with KYB verified. He represents the merchant perspective in the demo.
+
+**Login:** `david.chen@demo.com` / `demo1234`  
+**Role:** `merchant_officer`  
+**Post-login redirect:** `/system/merchant` — Fischer Web Studio merchant portal pre-selected.
+
+### 16.2 What David Sees
+
+After login, David accesses the standard merchant portal (Ch-04 §10.4):
+- **Checkout Session tab:** Create checkout sessions (same as simulator scenarios use)
+- **Payment Links tab:** View active links, create new ones, deactivate
+- **API Keys tab:** Manage API credentials
+- **Webhook tab:** Configure callback endpoint for payment events
+
+**Webhook events received:** `checkout.completed`, `payment_link.completed` — payload now includes `cardToken`, `maskedPan`, `fraudCaseCreated`, `caseId` (if applicable).
+
+### 16.3 Presenter Talking Point
+
+> "David is a merchant who integrated his web studio billing with our gateway. He doesn't see card data — only the result: paid, amount, fraud flag. When Luis's €850 payment triggered a fraud case, David got a webhook: `fraudCaseCreated: true`. He doesn't need to do anything — the bank handles the investigation. This is the correct separation of responsibility under PCI DSS."
+
+### 16.4 Demo Flow (David perspective)
+
+| Step | Action | What David sees |
+|---|---|---|
+| 1 | Log in as David | Fischer Web Studio portal |
+| 2 | Go to Webhook tab | Configured endpoint |
+| 3 | (After simulator ran Luis scenario) | Webhook log: `checkout.completed, amount: €850, fraudCaseCreated: true` |
+| 4 | Go to Payment Links tab | Luis's payment link shows status: `completed` |
+| 5 | Present Debug Mode | Shows raw MongoDB document — `merchantName` plaintext, customer fields encrypted |

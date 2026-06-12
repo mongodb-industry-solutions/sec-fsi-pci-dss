@@ -487,7 +487,7 @@ export const api = {
         checkoutSessionReturnUrl: string;
         checkoutSessionCancelUrl: string;
       }>(`/api/v1/checkout/sessions/${sessionId}`),
-    pay: (sessionId: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth: string; cardExpiryYear: string }) =>
+    pay: (sessionId: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth: string; cardExpiryYear: string; cardholderEmail?: string; saveCard?: boolean }) =>
       apiFetch<{ success: boolean; cardTransactionInstanceReference: string; redirectUrl: string }>(
         `/api/v1/checkout/sessions/${sessionId}/pay`, { method: 'POST', body: JSON.stringify(body) }
       ),
@@ -511,11 +511,11 @@ export const api = {
       expiresAt?: string;
     }, token: string) =>
       apiFetch<{ paymentLinkInstanceReference: string; paymentLinkCode: string; paymentUrl: string }>(
-        '/api/v1/payment-links', { method: 'POST', body: JSON.stringify(body) }, token
+        '/api/v1/payment/links', { method: 'POST', body: JSON.stringify(body) }, token
       ),
     list: (merchantId: string, token: string, page = 1, limit = 20) =>
       apiFetch<{ results: Record<string, unknown>[]; total: number }>(
-        `/api/v1/payment-links?merchantId=${encodeURIComponent(merchantId)}&page=${page}&limit=${limit}`,
+        `/api/v1/payment/links?merchantId=${encodeURIComponent(merchantId)}&page=${page}&limit=${limit}`,
         {}, token
       ),
     resolve: (code: string) =>
@@ -528,21 +528,21 @@ export const api = {
         paymentLinkCustomerMessage?: string;
         paymentLinkStatus: string;
         paymentLinkExpiresAt?: string;
-      }>(`/api/v1/payment-links/${code}`),
+      }>(`/api/v1/payment/links/${code}`),
     pay: (code: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth: string; cardExpiryYear: string; customerEmail?: string }) =>
       apiFetch<{ success: boolean; cardTransactionInstanceReference: string; fraudDiagnosisInstanceReference?: string | null }>(
-        `/api/v1/payment-links/${code}/pay`, { method: 'POST', body: JSON.stringify(body) }
+        `/api/v1/payment/links/${code}/pay`, { method: 'POST', body: JSON.stringify(body) }
       ),
     deactivate: (id: string, merchantAgreementInstanceReference: string, token: string) =>
       apiFetch<{ paymentLinkInstanceReference: string; paymentLinkStatus: string }>(
-        `/api/v1/payment-links/${id}`,
+        `/api/v1/payment/links/${id}`,
         { method: 'PATCH', body: JSON.stringify({ action: 'deactivate', merchantAgreementInstanceReference }) },
         token
       ),
   },
   simulator: {
     createCheckoutSession: (body: {
-      merchantAgreementInstanceReference: string;
+      merchantId: string;
       amount: number;
       currency: string;
       description: string;
@@ -551,10 +551,10 @@ export const api = {
       merchantReference: string;
     }) =>
       apiFetch<{ checkoutSessionInstanceReference: string; paymentPageUrl: string; expiresAt: string }>(
-        '/api/v1/checkout/sessions', { method: 'POST', body: JSON.stringify(body) }
+        '/api/v1/system/simulator/checkout-session', { method: 'POST', body: JSON.stringify(body) }
       ),
     createPaymentLink: (body: {
-      merchantAgreementInstanceReference: string;
+      merchantId: string;
       amount: number;
       currency: string;
       description: string;
@@ -562,7 +562,11 @@ export const api = {
       usageType: 'single_use' | 'multi_use';
     }) =>
       apiFetch<{ paymentLinkInstanceReference: string; paymentLinkCode: string; paymentUrl: string }>(
-        '/api/v1/payment-links', { method: 'POST', body: JSON.stringify(body) }
+        '/api/v1/system/simulator/payment-link', { method: 'POST', body: JSON.stringify(body) }
+      ),
+    getTransactions: (email: string) =>
+      apiFetch<{ transactions: Record<string, unknown>[]; total: number }>(
+        `/api/v1/system/simulator/transactions/${encodeURIComponent(email)}`
       ),
   },
 

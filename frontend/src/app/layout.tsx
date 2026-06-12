@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Payment Gateway Demo · MongoDB',
+  title: 'PSP - Platform',
   description: 'MongoDB Queryable Encryption · AWS KMS · PCI DSS Payment Security Demo',
 };
 

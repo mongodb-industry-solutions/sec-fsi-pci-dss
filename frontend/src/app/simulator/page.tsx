@@ -5,7 +5,7 @@ import { PaymentMethodSelector } from '../../components/simulator/PaymentMethodS
 import { ScenarioSelector } from '../../components/simulator/ScenarioSelector';
 import { SimulatorStateManager } from '../../components/simulator/SimulatorStateManager';
 import type { PaymentMethodId, SimulatorScenario, PaymentMethod } from '../../types/simulator';
-import config from '../../config/simulator-methods.json';
+import config from '../../config/simulator.json';
 
 const METHODS = config.methods as PaymentMethod[];
 const SCENARIOS = config.scenarios as SimulatorScenario[];
@@ -60,6 +60,7 @@ export default function SimulatorLandingPage() {
       {/* CTA */}
       <div className="text-center">
         <button
+          suppressHydrationWarning
           disabled={!ready}
           onClick={handleStart}
           className={`inline-block px-8 py-3 rounded-lg font-semibold text-sm transition-all ${

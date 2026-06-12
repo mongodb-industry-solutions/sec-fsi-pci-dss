@@ -17,6 +17,10 @@ function DemoShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<ReturnType<typeof decodeToken>>(null);
 
   useEffect(() => {
+    document.title = 'PSP - Platform';
+  }, []);
+
+  useEffect(() => {
     if (pathname === '/system') return;
 
     const token = getToken();
@@ -44,8 +48,8 @@ function DemoShell({ children }: { children: React.ReactNode }) {
           className="flex items-center gap-2 text-[#00ED64] font-bold text-sm whitespace-nowrap hover:text-[#00ED64]/80 transition-colors"
         >
           <span className="text-base">🏦</span>
-          <span className="hidden xs:inline">Payment Gateway</span>
-          <span className="xs:hidden">PG</span>
+          <span className="hidden xs:inline">PSP</span>
+          <span className="xs:hidden">PSP</span>
         </Link>
 
         {/* Right side */}
