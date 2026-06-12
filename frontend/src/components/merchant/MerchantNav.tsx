@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, ShoppingCart, Link2, Receipt, Key, Webhook, type LucideIcon,
 } from 'lucide-react';
+import { CarouselNav } from '../CarouselNav';
 
 interface NavItem { href: string; label: string; icon: LucideIcon }
 
@@ -24,12 +25,13 @@ export function MerchantNav({ merchantName }: { merchantName?: string }) {
         <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Merchant</p>
         {merchantName && <p className="text-sm font-semibold text-gray-800 truncate mt-0.5">{merchantName}</p>}
       </div>
-      <ul className="flex md:flex-col gap-1 px-2 pb-2 overflow-x-auto">
+      {/* Desktop: vertical list */}
+      <ul className="hidden md:flex md:flex-col gap-1 px-2 pb-2">
         {ITEMS.map((it) => {
           const active = pathname === it.href;
           const Icon = it.icon;
           return (
-            <li key={it.href} className="shrink-0">
+            <li key={it.href}>
               <Link
                 href={it.href}
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
@@ -43,6 +45,11 @@ export function MerchantNav({ merchantName }: { merchantName?: string }) {
           );
         })}
       </ul>
+
+      {/* Mobile: horizontal carousel */}
+      <div className="md:hidden border-b border-gray-200">
+        <CarouselNav items={ITEMS} isActive={(href) => pathname === href} variant="light" />
+      </div>
     </nav>
   );
 }

@@ -13,6 +13,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { getToken, decodeToken } from '../lib/auth';
+import { CarouselNav } from './CarouselNav';
 
 interface NavItem {
   label: string;
@@ -182,23 +183,15 @@ export function MobileBottomNav() {
   if (items.length === 0) return null;
 
   return (
-    <nav className="md:hidden print:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#001E2B] border-t border-white/10 flex">
-      {items.map((item) => {
-        const Icon   = item.icon;
-        const active = isActive(item);
-        return (
-          <Link
-            key={item.path}
-            href={item.path}
-            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors ${
-              active ? 'text-[#00ED64]' : 'text-gray-500 hover:text-gray-300'
-            }`}
-          >
-            <Icon size={20} className="shrink-0" />
-            <span className="truncate max-w-[56px] text-center leading-tight">{item.label}</span>
-          </Link>
-        );
-      })}
+    <nav className="md:hidden print:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#001E2B] border-t border-white/10">
+      <CarouselNav
+        items={items.map((item) => ({ href: item.path, label: item.label, icon: item.icon }))}
+        isActive={(href) => {
+          const item = items.find((i) => i.path === href);
+          return item ? isActive(item) : false;
+        }}
+        variant="dark"
+      />
     </nav>
   );
 }
