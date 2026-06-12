@@ -1,17 +1,21 @@
 /**
  * E2E: Simulator Mode - Investigation Flow (FR-v1-02)
  * Search by QE fields, case table, case detail with encryption badges, raw document toggle.
+ *
+ * API: api.fraud.list  → GET /api/v1/fraud (NOT /api/v1/fraud-cases)
+ *      api.fraud.getById → GET /api/v1/fraud/:id
+ * Mock fields: FraudCase uses caseStatus / riskSeverity (internal names, not BIAN names).
  */
 import { test, expect } from '@playwright/test';
 
 const MOCK_CASE = {
   fraudDiagnosisInstanceReference: 'case-sim-e2e',
   fraudDiagnosisCaseReference: 'FD-2026-001001',
-  fraudDiagnosisCaseStatus: 'open',
-  fraudDiagnosisCaseSeverity: 'high',
-  linkedCardTransactionReference: 'txn-001',
-  linkedCustomerAgreementReference: 'cust-001',
-  fraudDiagnosisRequestDateTime: '2026-05-27T10:00:00Z',
+  caseStatus: 'open',
+  riskSeverity: 'high',
+  cardTransactionInstanceReference: 'txn-001',
+  customerAgreementInstanceReference: 'cust-001',
+  requestDateTime: '2026-05-27T10:00:00Z',
   fraudDiagnosisAssessment: { riskIndicators: ['amount_threshold'], fraudDiagnosisScore: 40 },
   diagnosisActionLog: [
     { actionDateTime: '2026-05-27T10:00:00Z', actionType: 'case_opened', performedByInstanceReference: 'system', performedByRole: 'payment_service', actionDetails: {} },
@@ -29,11 +33,12 @@ test.describe('FR-v1-02: Simulator Investigation', () => {
     await expect(page.locator('select, [role="combobox"]').first()).toBeVisible();
   });
 
-  test('02.2 submitting search calls the customer-agreements API', async ({ page }) => {
+  test('02.2 submitting search calls the fraud API', async ({ page }) => {
     let requestMade = false;
-    await page.route('**/api/v1/customer-agreements**', (route) => {
+    // api.fraud.list calls GET /api/v1/fraud (not /api/v1/fraud-cases)
+    await page.route('**/api/v1/fraud**', (route) => {
       requestMade = true;
-      route.fulfill({ status: 200, body: JSON.stringify(null) });
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ results: [], total: 0, page: 1, limit: 20 }) });
     });
     await page.locator('input[type="text"]').first().fill('test@example.com');
     await page.locator('button[type="submit"], button:has-text("Search")').first().click();
@@ -42,7 +47,7 @@ test.describe('FR-v1-02: Simulator Investigation', () => {
   });
 
   test('02.3 case table renders when fraud cases are returned', async ({ page }) => {
-    await page.route('**/api/v1/fraud-cases**', (route) => {
+    await page.route('**/api/v1/fraud**', (route) => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -59,7 +64,8 @@ test.describe('FR-v1-02: Case Detail Page', () => {
   const CASE_ID = 'case-sim-e2e';
 
   test.beforeEach(async ({ page }) => {
-    await page.route(`**/api/v1/fraud-cases/${CASE_ID}`, (route) => {
+    // api.fraud.getById calls GET /api/v1/fraud/:id (not /api/v1/fraud-cases/:id)
+    await page.route(`**/api/v1/fraud/${CASE_ID}`, (route) => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',

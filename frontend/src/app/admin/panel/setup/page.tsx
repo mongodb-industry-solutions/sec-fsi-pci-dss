@@ -23,10 +23,11 @@ const COMMANDS: CommandDef[] = [
   { id: 'setup:generate',   label: 'Generate Data',     description: 'Generate synthetic demo dataset',                  icon: '🎲', group: 'setup' },
   { id: 'setup:seed',       label: 'Seed Database',     description: 'Insert generated data into MongoDB Atlas',         icon: '🌱', group: 'setup' },
   { id: 'setup:check',     label: 'Validate Setup',    description: 'Check env vars, collections, indexes, DEKs, and Atlas roles are provisioned', icon: '✅', group: 'setup' },
-  { id: 'test',             label: 'All Tests',         description: 'Run unit + integration test suites',               icon: '🧪', group: 'test'  },
-  { id: 'test:unit',        label: 'Unit Tests',        description: 'Run unit tests only',                              icon: '🔬', group: 'test'  },
-  { id: 'test:integration', label: 'Integration Tests', description: 'Run integration tests only',                       icon: '🔗', group: 'test'  },
-  { id: 'type-check',       label: 'Type Check',        description: 'TypeScript type check (no emit)',                  icon: '📐', group: 'test'  },
+  { id: 'test',             label: 'All Tests',         description: 'Run unit + integration test suites',                              icon: '🧪', group: 'test'  },
+  { id: 'test:unit',        label: 'Unit Tests',        description: 'Run unit tests only',                                             icon: '🔬', group: 'test'  },
+  { id: 'test:integration', label: 'Integration Tests', description: 'Run integration tests only',                                      icon: '🔗', group: 'test'  },
+  { id: 'test:e2e',         label: 'E2E Tests',         description: 'Run Playwright end-to-end tests (requires live stack on :3000)',   icon: '🎭', group: 'test'  },
+  { id: 'type-check',       label: 'Type Check',        description: 'TypeScript type check (no emit)',                                  icon: '📐', group: 'test'  },
   {
     id: 'setup:db:drop',
     label: 'Drop Everything',
@@ -45,7 +46,7 @@ function formatElapsed(ms: number): string {
   return `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, '0')}s`;
 }
 
-const TEST_COMMANDS = new Set(['test', 'test:unit', 'test:integration']);
+const TEST_COMMANDS = new Set(['test', 'test:unit', 'test:integration', 'test:e2e']);
 
 interface TestCount { passed: number; failed: number; total: number; }
 interface TestFailure { title: string; reason?: string; }
@@ -54,6 +55,28 @@ interface TestSummaryData {
   tests?: TestCount;
   duration?: string;
   failures: TestFailure[];
+}
+
+/** Determines the CSS color class for a single log line.
+ * Handles both vitest ([FAIL]/[PASS]) and Playwright (× / ✓ / Error:) output formats. */
+function logLineClass(e: LogEntry): string {
+  if (e.type === 'error') return 'text-red-400';
+  if (e.type === 'start') return 'text-orange-400 font-semibold';
+  if (e.type === 'done')  return 'text-green-400 font-semibold';
+  const t = e.text;
+  // Vitest markers
+  if (t.includes('[FAIL]') || /\bFAILED\b/.test(t))         return 'text-red-400';
+  if (t.includes('[WARN]'))                                   return 'text-yellow-400';
+  if (t.includes('[PASS]') || /\bPASSED\b/.test(t))         return 'text-green-400';
+  if (t.includes('[SKIP]'))                                   return 'text-gray-500';
+  // Playwright: numbered failure lines "  1) [chromium] ›…"
+  if (/^\s+\d+\)\s/.test(t))                                 return 'text-red-400';
+  // Playwright: Error / exception type lines
+  if (/\b(Error|AssertionError|SecurityError|TimeoutError|TypeError|ReferenceError)[\s:]/.test(t)) return 'text-red-400';
+  // Playwright: × failure marker and ✓ pass marker
+  if (/[×✘]/.test(t))                                        return 'text-red-400';
+  if (/[✓✔]/.test(t))                                        return 'text-green-400';
+  return 'text-gray-300';
 }
 
 /** Pulls a `N failed | M passed (T)` style count out of a vitest summary line. */
@@ -212,7 +235,7 @@ export default function SetupPage() {
     <>
       <div className="flex flex-col lg:flex-row gap-6 lg:h-full">
         {/* Left column - command list */}
-        <div className="flex-shrink-0 space-y-4 lg:w-1/2 lg:overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/60">
+        <div className="flex-shrink-0 space-y-4 lg:w-2/5 lg:overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/60">
           <CommandGroup label="Setup" cmds={setupCmds} activeCommand={activeCommand} running={running} onRun={handleRun} />
           <CommandGroup label="Test & Quality" cmds={testCmds} activeCommand={activeCommand} running={running} onRun={handleRun} />
           {dangerCmds.length > 0 && (
@@ -379,16 +402,7 @@ function LogPanel({ title, logs, endRef, onClear, onDownload, status, running, e
       <div className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-0.5 [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/70 [&::-webkit-scrollbar-corner]:bg-gray-900">
         {logs.length === 0 && <div className="text-gray-600 italic">Select a command to run...</div>}
         {logs.map((e, i) => (
-          <div key={i} className={
-            e.type === 'error'            ? 'text-red-400' :
-            e.type === 'start'            ? 'text-orange-400 font-semibold' :
-            e.type === 'done'             ? 'text-green-400 font-semibold' :
-            e.text.includes('[FAIL]')     ? 'text-red-400' :
-            e.text.includes('[WARN]')     ? 'text-yellow-400' :
-            e.text.includes('[PASS]')     ? 'text-green-400' :
-            e.text.includes('[SKIP]')     ? 'text-gray-500' :
-            'text-gray-300'
-          }>
+          <div key={i} className={logLineClass(e)}>
             {e.type === 'error' ? '[ERR] ' : ''}{e.text}
           </div>
         ))}

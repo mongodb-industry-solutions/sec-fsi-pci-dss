@@ -164,6 +164,7 @@ const ALLOWED_NPM_COMMANDS: Record<string, string[]> = {
   'test':              ['run', 'test'],
   'test:unit':         ['run', 'test:unit'],
   'test:integration':  ['run', 'test:integration'],
+  'test:e2e':          ['run', 'test:e2e'],
   'type-check':        ['run', 'type-check'],
   'setup:db:drop':     ['run', 'setup:db:drop'],
   'setup:check':       ['run', 'setup:check'],

@@ -1,58 +1,31 @@
 /**
  * E2E: Admin Integration Hub portal (FR-v6-01, FR-v6-02, FR-v6-03, FR-v6-06)
  * Routes: /system/admin, /system/admin/integrations, /system/admin/integrations/new
+ *
+ * Auth: injected via demo_token cookie using loginAs (NOT localStorage — app reads cookies only).
  */
 import { test, expect } from '@playwright/test';
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function buildJwt(payload: Record<string, unknown>): string {
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-  const body = Buffer.from(JSON.stringify({
-    ...payload,
-    iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + 86400,
-  })).toString('base64url');
-  return `${header}.${body}.fake-signature`;
-}
-
-const SYSTEM_ADMIN_JWT = buildJwt({
-  sub: 'a1000070-0000-4000-8000-000000000070',
-  email: 'alex.rivera@back.es',
-  role: 'manager',
-  name: 'Alex Rivera',
-  domain: 'leafybank',
-});
-
-const ANALYST_JWT = buildJwt({
-  sub: 'analyst-id-001',
-  email: 'sarah.chen@back.es',
-  role: 'level1_analyst',
-  name: 'Sarah Chen',
-  domain: 'leafybank',
-});
+import { loginAs, json } from './support/auth';
 
 const MOCK_INTEGRATIONS = [
-  { externalProviderArrangementInstanceReference: 'int-internal-fds-001', externalProviderArrangementName: 'Internal Fraud Scoring', externalProviderArrangementType: 'fraud_detection',  externalProviderIsInternal: true,  externalProviderArrangementStatus: 'active', externalProviderMode: 'sync', externalProviderHealthStatus: 'ok', bianServiceDomain: 'Fraud Diagnosis', pciDssRequirements: ['Req.10.2.1'] },
-  { externalProviderArrangementInstanceReference: 'int-internal-hrp-001', externalProviderArrangementName: 'Internal HRPC Check',   externalProviderArrangementType: 'hrp_sanctions',   externalProviderIsInternal: true,  externalProviderArrangementStatus: 'active', externalProviderMode: 'sync', externalProviderHealthStatus: 'ok', bianServiceDomain: 'Party Reference Data', pciDssRequirements: ['Req.12.8'] },
-  { externalProviderArrangementInstanceReference: 'int-internal-aml-001', externalProviderArrangementName: 'Internal AML Monitor',  externalProviderArrangementType: 'aml_monitoring',  externalProviderIsInternal: true,  externalProviderArrangementStatus: 'active', externalProviderMode: 'async', externalProviderHealthStatus: 'ok', bianServiceDomain: 'Regulatory Compliance', pciDssRequirements: ['Req.12.8'] },
+  { externalProviderArrangementInstanceReference: 'int-internal-fds-001', externalProviderArrangementName: 'Internal Fraud Scoring', externalProviderArrangementType: 'fraud_detection',  externalProviderIsInternal: true,  externalProviderArrangementStatus: 'active', externalProviderMode: 'sync',  externalProviderHealthStatus: 'ok', bianServiceDomain: 'Fraud Diagnosis',       pciDssRequirements: ['Req.10.2.1'] },
+  { externalProviderArrangementInstanceReference: 'int-internal-hrp-001', externalProviderArrangementName: 'Internal HRPC Check',   externalProviderArrangementType: 'hrp_sanctions',   externalProviderIsInternal: true,  externalProviderArrangementStatus: 'active', externalProviderMode: 'sync',  externalProviderHealthStatus: 'ok', bianServiceDomain: 'Party Reference Data', pciDssRequirements: ['Req.12.8']    },
+  { externalProviderArrangementInstanceReference: 'int-internal-aml-001', externalProviderArrangementName: 'Internal AML Monitor',  externalProviderArrangementType: 'aml_monitoring',  externalProviderIsInternal: true,  externalProviderArrangementStatus: 'active', externalProviderMode: 'async', externalProviderHealthStatus: 'ok', bianServiceDomain: 'Regulatory Compliance', pciDssRequirements: ['Req.12.8']    },
 ];
 
-// ── Auth guard tests ─────────────────────────────────────────────────────────
+// ── Auth guard tests ──────────────────────────────────────────────────────────
 
 test.describe('FR-v6-01: manager access guard', () => {
-  test('01.1 non-manager is redirected away from /system/admin', async ({ page }) => {
-    await page.evaluate((jwt) => localStorage.setItem('demo_token', jwt), ANALYST_JWT);
+  test('01.1 non-manager is redirected away from /system/admin', async ({ page, context }) => {
+    await loginAs(context, 'level1_analyst');
     await page.goto('/system/admin');
-    await page.waitForURL('**/system**', { timeout: 5_000 });
-    expect(page.url()).not.toContain('/system/admin');
+    // Wait specifically for /system (login/dashboard), not /system/admin
+    await expect(page).toHaveURL('/system', { timeout: 5_000 });
   });
 
-  test('01.2 manager can access /system/admin without redirect', async ({ page }) => {
-    await page.route('**/api/v1/integrations**', (route) => {
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ integrations: MOCK_INTEGRATIONS }) });
-    });
-    await page.evaluate((jwt) => localStorage.setItem('demo_token', jwt), SYSTEM_ADMIN_JWT);
+  test('01.2 manager can access /system/admin without redirect', async ({ page, context }) => {
+    await page.route('**/api/v1/integrations**', (route) => route.fulfill(json({ integrations: MOCK_INTEGRATIONS })));
+    await loginAs(context, 'manager');
     await page.goto('/system/admin');
     await expect(page.locator('h1').first()).toBeVisible({ timeout: 8_000 });
   });
@@ -61,11 +34,9 @@ test.describe('FR-v6-01: manager access guard', () => {
 // ── Admin dashboard tests ─────────────────────────────────────────────────────
 
 test.describe('FR-v6-02: Admin Integration Hub dashboard', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.route('**/api/v1/integrations**', (route) => {
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ integrations: MOCK_INTEGRATIONS }) });
-    });
-    await page.evaluate((jwt) => localStorage.setItem('demo_token', jwt), SYSTEM_ADMIN_JWT);
+  test.beforeEach(async ({ page, context }) => {
+    await page.route('**/api/v1/integrations**', (route) => route.fulfill(json({ integrations: MOCK_INTEGRATIONS })));
+    await loginAs(context, 'manager');
   });
 
   test('02.1 dashboard shows the Integration Hub heading', async ({ page }) => {
@@ -75,34 +46,25 @@ test.describe('FR-v6-02: Admin Integration Hub dashboard', () => {
 
   test('02.2 dashboard shows 6 integration type tiles', async ({ page }) => {
     await page.goto('/system/admin');
-    const tiles = [
-      'Fraud Detection',
-      'HRP / Sanctions',
-      'KYC / Identity',
-      'KYB / Business',
-      'AML Monitoring',
-      'Credit Bureau',
-    ];
+    const tiles = ['Fraud Detection', 'HRP / Sanctions', 'KYC / Identity', 'KYB / Business', 'AML Monitoring', 'Credit Bureau'];
     for (const tile of tiles) {
-      await expect(page.getByText(tile)).toBeVisible({ timeout: 8_000 });
+      // .first() avoids strict-mode violation when sidebar nav also contains the tile name
+      await expect(page.getByText(tile).first()).toBeVisible({ timeout: 8_000 });
     }
   });
 
   test('02.3 internal providers show "Built-in" badge', async ({ page }) => {
     await page.goto('/system/admin');
-    const builtInBadges = page.getByText('Built-in');
-    await expect(builtInBadges.first()).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText('Built-in').first()).toBeVisible({ timeout: 8_000 });
   });
 });
 
 // ── Integrations list tests ───────────────────────────────────────────────────
 
 test.describe('FR-v6-03: Integrations list page', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.route('**/api/v1/integrations**', (route) => {
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ integrations: MOCK_INTEGRATIONS }) });
-    });
-    await page.evaluate((jwt) => localStorage.setItem('demo_token', jwt), SYSTEM_ADMIN_JWT);
+  test.beforeEach(async ({ page, context }) => {
+    await page.route('**/api/v1/integrations**', (route) => route.fulfill(json({ integrations: MOCK_INTEGRATIONS })));
+    await loginAs(context, 'manager');
   });
 
   test('03.1 shows provider names and types', async ({ page }) => {
@@ -113,8 +75,7 @@ test.describe('FR-v6-03: Integrations list page', () => {
 
   test('03.2 shows Built-in badge for internal providers', async ({ page }) => {
     await page.goto('/system/admin/integrations');
-    const badges = page.getByText('Built-in');
-    await expect(badges.first()).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText('Built-in').first()).toBeVisible({ timeout: 8_000 });
   });
 
   test('03.3 has "Register Provider" link to /system/admin/integrations/new', async ({ page }) => {
@@ -126,9 +87,7 @@ test.describe('FR-v6-03: Integrations list page', () => {
 
   test('03.4 internal providers do not show Suspend button', async ({ page }) => {
     await page.goto('/system/admin/integrations');
-    // Wait for table to load
     await expect(page.getByText('Internal Fraud Scoring')).toBeVisible({ timeout: 8_000 });
-    // The first row (internal) should not have a Suspend button visible for it
     const firstRow = page.locator('tbody tr').first();
     await expect(firstRow.getByRole('button', { name: 'Suspend' })).not.toBeVisible();
   });
@@ -137,44 +96,41 @@ test.describe('FR-v6-03: Integrations list page', () => {
 // ── Register provider tests ───────────────────────────────────────────────────
 
 test.describe('FR-v6-06: Register integration wizard', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.evaluate((jwt) => localStorage.setItem('demo_token', jwt), SYSTEM_ADMIN_JWT);
+  test.beforeEach(async ({ context }) => {
+    await loginAs(context, 'manager');
   });
 
   test('06.1 /system/admin/integrations/new renders the registration form', async ({ page }) => {
     await page.goto('/system/admin/integrations/new');
-    await expect(page.getByText('Register Provider')).toBeVisible({ timeout: 8_000 });
-    await expect(page.getByPlaceholder(/sardine|provider/i)).toBeVisible({ timeout: 8_000 });
+    // Use heading role to avoid strict-mode: page has both an <h1> and a submit button with this text
+    await expect(page.getByRole('heading', { name: 'Register Provider' })).toBeVisible({ timeout: 8_000 });
+    // Use exact placeholder — URL input also matches /provider/i but we want the name field
+    await expect(page.getByPlaceholder('e.g. Sardine Fraud API')).toBeVisible({ timeout: 8_000 });
   });
 
   test('06.2 submitting the form calls POST /api/v1/integrations and shows the API key once', async ({ page }) => {
     const fakeApiKey = 'sk_demo_abcdef1234567890abcdef1234567890';
     await page.route('**/api/v1/integrations', (route) => {
       if (route.request().method() === 'POST') {
-        route.fulfill({
-          status: 201,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            integration: {
-              externalProviderArrangementInstanceReference: 'ext-test-001',
-              externalProviderArrangementName: 'Sardine FDS Test',
-              externalProviderArrangementStatus: 'test',
-            },
-            apiKey: fakeApiKey,
-          }),
-        });
+        route.fulfill(json({
+          integration: {
+            externalProviderArrangementInstanceReference: 'ext-test-001',
+            externalProviderArrangementName: 'Sardine FDS Test',
+            externalProviderArrangementStatus: 'test',
+          },
+          apiKey: fakeApiKey,
+        }, 201));
       } else {
-        route.fulfill({ status: 200, contentType: 'application/json', body: '{"integrations":[]}' });
+        route.fulfill(json({ integrations: [] }));
       }
     });
 
     await page.goto('/system/admin/integrations/new');
-    await page.getByPlaceholder(/sardine|provider/i).fill('Sardine FDS Test');
+    await page.getByPlaceholder('e.g. Sardine Fraud API').fill('Sardine FDS Test');
     await page.locator('select').first().selectOption('fraud_detection');
     await page.fill('input[type="url"]', 'https://api.sardine.ai/v1/score');
     await page.getByRole('button', { name: 'Register Provider' }).click();
 
-    // The API key should appear exactly once in the success screen
     await expect(page.getByText(fakeApiKey)).toBeVisible({ timeout: 8_000 });
     await expect(page.getByText('save it now', { exact: false })).toBeVisible();
   });

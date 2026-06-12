@@ -1,6 +1,11 @@
 /**
  * E2E: Application Mode - Authentication Flow (FR-v1-05)
- * Login, role-based redirect, auth guard, sign out.
+ * Login, post-login dashboard, auth guard, sign out.
+ *
+ * Routes: Application Mode lives at /system (login + dashboard after auth).
+ * After login the URL stays at /system — there is no post-login redirect to a
+ * sub-route. Auth guard in system/layout.tsx redirects sub-routes to /system
+ * when no valid token is present.
  */
 import { test, expect } from '@playwright/test';
 
@@ -16,100 +21,110 @@ function buildFakeJwt(payload: Record<string, unknown>): string {
 
 const MOCK_USERS = [
   { email: 'luis.fernandez@back.es', name: 'Luis Fernandez', role: 'customer' },
-  { email: 'julia.santos@back.es', name: 'Julia Santos', role: 'customer' },
-  { email: 'sarah.chen@back.es', name: 'Sarah Chen', role: 'level1_analyst' },
-  { email: 'michael.obi@back.es', name: 'Michael Obi', role: 'level2_investigator' },
-  { email: 'admin@back.es', name: 'Admin User', role: 'security_auditor' },
+  { email: 'julia.santos@back.es',   name: 'Julia Santos',   role: 'customer' },
+  { email: 'sarah.chen@back.es',     name: 'Sarah Chen',     role: 'level1_analyst' },
+  { email: 'michael.obi@back.es',    name: 'Michael Obi',    role: 'level2_investigator' },
+  { email: 'admin@back.es',          name: 'Admin User',     role: 'security_auditor' },
 ];
 
 test.describe('FR-v1-05: Application Mode Authentication', () => {
   test.beforeEach(async ({ page }) => {
     await page.context().clearCookies();
-    await page.route('**/api/v1/auth/users', (route) => {
+    // Stub users list (used by debug-mode select dropdown)
+    await page.route('**/api/v1/auth/users**', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USERS) });
     });
+    await page.route('**/api/v1/system/users**', (route) => {
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ users: MOCK_USERS }) });
+    });
   });
 
-  test('05.1 login page renders and lists demo users', async ({ page }) => {
-    await page.goto('/demo');
-    await expect(page.locator('text=/sarah.chen|leafybank/i').first()).toBeVisible({ timeout: 8_000 });
+  test('05.1 login page at /system renders email input and Sign In button', async ({ page }) => {
+    await page.goto('/system');
+    // Login form shows email input and Sign In button (no auth token set)
+    await expect(page.locator('input[type="email"]').first()).toBeVisible({ timeout: 8_000 });
+    await expect(page.locator('button[type="submit"]').first()).toBeVisible({ timeout: 4_000 });
   });
 
-  test('05.2 level1_analyst login redirects to /demo/investigation', async ({ page }) => {
+  test('05.2 level1_analyst login shows welcome dashboard at /system', async ({ page }) => {
     await page.route('**/api/v1/auth/login', (route) => {
       route.fulfill({
         status: 201, contentType: 'application/json',
-        body: JSON.stringify({ token: buildFakeJwt({ sub: 'u3', email: 'sarah.chen@back.es', role: 'level1_analyst', name: 'Sarah Chen', domain: 'local' }), user: MOCK_USERS[2] }),
+        body: JSON.stringify({
+          token: buildFakeJwt({ sub: 'u3', email: 'sarah.chen@back.es', role: 'level1_analyst', name: 'Sarah Chen', domain: 'local' }),
+          user: MOCK_USERS[2],
+        }),
       });
     });
-    await page.goto('/demo');
+    await page.goto('/system');
     await submitLogin(page, 'sarah.chen@back.es');
-    await expect(page).toHaveURL(/\/demo\/investigation/, { timeout: 6_000 });
+    // After login: URL stays /system, RoleDashboard renders with user name
+    await expect(page).toHaveURL('/system');
+    await expect(page.locator('text=/Welcome, Sarah/i').first()).toBeVisible({ timeout: 8_000 });
   });
 
-  test('05.3 customer login redirects to /demo/payment', async ({ page }) => {
+  test('05.3 customer login shows welcome dashboard at /system', async ({ page }) => {
     await page.route('**/api/v1/auth/login', (route) => {
       route.fulfill({
         status: 201, contentType: 'application/json',
-        body: JSON.stringify({ token: buildFakeJwt({ sub: 'u1', email: 'luis.fernandez@back.es', role: 'customer', name: 'Luis Fernandez', domain: 'local' }), user: MOCK_USERS[0] }),
+        body: JSON.stringify({
+          token: buildFakeJwt({ sub: 'u1', email: 'luis.fernandez@back.es', role: 'customer', name: 'Luis Fernandez', domain: 'local' }),
+          user: MOCK_USERS[0],
+        }),
       });
     });
-    await page.goto('/demo');
+    await page.goto('/system');
     await submitLogin(page, 'luis.fernandez@back.es');
-    await expect(page).toHaveURL(/\/demo\/payment/, { timeout: 6_000 });
+    await expect(page).toHaveURL('/system');
+    await expect(page.locator('text=/Welcome, Luis/i').first()).toBeVisible({ timeout: 8_000 });
   });
 
-  test('05.4 invalid credentials shows error and stays on /demo', async ({ page }) => {
+  test('05.4 invalid credentials shows error and stays on /system', async ({ page }) => {
     await page.route('**/api/v1/auth/login', (route) => {
       route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: 'Invalid credentials' }) });
     });
-    await page.goto('/demo');
+    await page.goto('/system');
     await submitLogin(page, 'sarah.chen@back.es', 'wrong-password');
     await expect(page.locator('text=/invalid|incorrect|error/i').first()).toBeVisible({ timeout: 5_000 });
-    await expect(page).toHaveURL('/demo');
+    await expect(page).toHaveURL('/system');
   });
 
-  test('05.5 unauthenticated access to protected route redirects to /demo', async ({ page }) => {
+  test('05.5 unauthenticated access to protected route redirects to /system', async ({ page }) => {
     await page.context().clearCookies();
-    await page.goto('/demo/investigation');
-    await expect(page).toHaveURL('/demo', { timeout: 6_000 });
+    await page.goto('/system/investigation');
+    // system/layout.tsx redirects to /system when no valid token
+    await expect(page).toHaveURL('/system', { timeout: 6_000 });
   });
 
-  test('05.6 sign out navigates back to /demo', async ({ page }) => {
+  test('05.6 sign out returns to login form at /system', async ({ page }) => {
     await page.route('**/api/v1/auth/login', (route) => {
       route.fulfill({
         status: 201, contentType: 'application/json',
-        body: JSON.stringify({ token: buildFakeJwt({ sub: 'u3', email: 'sarah.chen@back.es', role: 'level1_analyst', name: 'Sarah Chen', domain: 'local' }), user: MOCK_USERS[2] }),
+        body: JSON.stringify({
+          token: buildFakeJwt({ sub: 'u3', email: 'sarah.chen@back.es', role: 'level1_analyst', name: 'Sarah Chen', domain: 'local' }),
+          user: MOCK_USERS[2],
+        }),
       });
     });
-    await page.route('**/api/v1/fraud-cases**', (route) => {
+    await page.route('**/api/v1/fraud**', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ results: [], total: 0, page: 1, limit: 20 }) });
     });
-    await page.goto('/demo');
+    await page.goto('/system');
     await submitLogin(page, 'sarah.chen@back.es');
-    await expect(page).toHaveURL(/\/demo\/investigation/, { timeout: 6_000 });
-    await page.locator('a:has-text("Sign out"), button:has-text("Sign out")').first().click();
-    await expect(page).toHaveURL('/demo', { timeout: 4_000 });
+    await expect(page.locator('text=/Welcome, Sarah/i').first()).toBeVisible({ timeout: 8_000 });
+    // Click sign out button from UserMenu
+    await page.locator('button:has-text("Sign out")').first().click();
+    // LoginForm renders again at same /system URL
+    await expect(page.locator('input[type="email"]').first()).toBeVisible({ timeout: 4_000 });
   });
 });
 
 async function submitLogin(page: import('@playwright/test').Page, email: string, password = 'demo-password') {
-  const emailInput = page.locator('input[type="email"], input[name="email"], input[placeholder*="email" i]').first();
-  if (await emailInput.isVisible({ timeout: 1_000 }).catch(() => false)) {
-    await emailInput.fill(email);
-    const pwInput = page.locator('input[type="password"]').first();
-    if (await pwInput.isVisible({ timeout: 500 }).catch(() => false)) await pwInput.fill(password);
-  } else {
-    // User card/button UI - click by user's display name derived from email
-    const nameParts = email.split('@')[0].split('.');
-    const displayName = nameParts.map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
-    const btn = page.locator(`button:has-text("${displayName}"), [data-email="${email}"]`).first();
-    if (await btn.isVisible({ timeout: 1_000 }).catch(() => false)) {
-      await btn.click();
-      await page.waitForTimeout(300);
-      return;
-    }
-  }
-  await page.locator('button[type="submit"], button:has-text("Sign in"), button:has-text("Login")').first().click();
-  await page.waitForTimeout(400);
+  const emailInput = page.locator('input[type="email"], input[name="email"]').first();
+  await emailInput.waitFor({ state: 'visible', timeout: 6_000 });
+  await emailInput.fill(email);
+  const pwInput = page.locator('input[type="password"]').first();
+  if (await pwInput.isVisible({ timeout: 500 }).catch(() => false)) await pwInput.fill(password);
+  await page.locator('button[type="submit"]').first().click();
+  await page.waitForTimeout(300);
 }

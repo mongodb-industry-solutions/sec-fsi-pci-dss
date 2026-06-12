@@ -1,27 +1,26 @@
 /**
  * E2E: Application Mode - Investigation Flow (FR-v1-02, FR-v1-04)
  * L1 case dashboard, case detail, encryption badges, audit log, raw document toggle.
+ *
+ * Routes: Application Mode at /system/investigation and /system/investigation/:id
+ * API:    api.fraud.list  → GET /api/v1/fraud
+ *         api.fraud.getById → GET /api/v1/fraud/:id
+ * Auth:   demo_token cookie injected directly (fake JWT, signature not verified client-side)
+ * Mock fields: FraudCase uses caseStatus / riskSeverity (internal names), not BIAN names.
  */
 import { test, expect } from '@playwright/test';
-
-function buildFakeJwt(payload: Record<string, unknown>): string {
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-  const body = Buffer.from(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 86400 })).toString('base64url');
-  return `${header}.${body}.fake-signature`;
-}
-
-const ANALYST_TOKEN = buildFakeJwt({ sub: 'u3', email: 'sarah.chen@back.es', role: 'level1_analyst', name: 'Sarah Chen', domain: 'local' });
+import { loginAs } from './support/auth';
 
 const MOCK_CASES = {
   results: [
     {
       fraudDiagnosisInstanceReference: 'case-app-001',
       fraudDiagnosisCaseReference: 'FD-2026-002001',
-      fraudDiagnosisCaseStatus: 'open',
-      fraudDiagnosisCaseSeverity: 'high',
-      linkedCardTransactionReference: 'txn-app-001',
-      linkedCustomerAgreementReference: 'cust-app-001',
-      fraudDiagnosisRequestDateTime: '2026-05-27T12:00:00Z',
+      caseStatus: 'open',
+      riskSeverity: 'high',
+      cardTransactionInstanceReference: 'txn-app-001',
+      customerAgreementInstanceReference: 'cust-app-001',
+      requestDateTime: '2026-05-27T12:00:00Z',
       fraudDiagnosisAssessment: { riskIndicators: ['amount_threshold'], fraudDiagnosisScore: 40 },
       diagnosisActionLog: [
         { actionDateTime: '2026-05-27T12:00:00Z', actionType: 'case_opened', performedByInstanceReference: 'system', performedByRole: 'payment_service', actionDetails: {} },
@@ -34,35 +33,38 @@ const MOCK_CASES = {
 };
 
 test.describe('FR-v1-04: Investigation Dashboard', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.context().addCookies([{ name: 'demo_token', value: ANALYST_TOKEN, domain: 'localhost', path: '/', expires: Math.floor(Date.now() / 1000) + 86400 }]);
-    await page.route('**/api/v1/fraud-cases**', (route, req) => {
-      if (!req.url().includes('/case-app-')) {
+  test.beforeEach(async ({ page, context }) => {
+    await loginAs(context, 'level1_analyst');
+    // Stub fraud list: /api/v1/fraud (list) but let detail requests through
+    await page.route('**/api/v1/fraud**', (route, req) => {
+      if (!req.url().includes('/case-app-') && !req.url().includes('/stats')) {
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_CASES) });
-      } else route.continue();
+      } else {
+        route.continue();
+      }
     });
   });
 
   test('04.1 investigation dashboard shows case table', async ({ page }) => {
-    await page.goto('/demo/investigation');
+    await page.goto('/system/investigation');
     await expect(page.locator('text=/FD-2026-002001/').first()).toBeVisible({ timeout: 8_000 });
   });
 
   test('04.2 cases display severity badge', async ({ page }) => {
-    await page.goto('/demo/investigation');
+    await page.goto('/system/investigation');
     await expect(page.locator('text=/HIGH/i').first()).toBeVisible({ timeout: 5_000 });
   });
 
   test('04.3 header shows logged-in analyst identity', async ({ page }) => {
-    await page.goto('/demo/investigation');
+    await page.goto('/system/investigation');
     await expect(page.locator('text=/Sarah Chen/').first()).toBeVisible({ timeout: 5_000 });
   });
 
   test('04.4 clicking case reference navigates to case detail', async ({ page }) => {
-    await page.route('**/api/v1/fraud-cases/case-app-001', (route) => {
+    await page.route('**/api/v1/fraud/case-app-001', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_CASES.results[0]) });
     });
-    await page.goto('/demo/investigation');
+    await page.goto('/system/investigation');
     await page.locator('a[href*="case-app-001"], a:has-text("FD-2026-002001")').first().click();
     await expect(page).toHaveURL(/case-app-001/, { timeout: 5_000 });
   });
@@ -71,12 +73,12 @@ test.describe('FR-v1-04: Investigation Dashboard', () => {
 test.describe('FR-v1-04: Case Detail', () => {
   const CASE_ID = 'case-app-001';
 
-  test.beforeEach(async ({ page }) => {
-    await page.context().addCookies([{ name: 'demo_token', value: ANALYST_TOKEN, domain: 'localhost', path: '/', expires: Math.floor(Date.now() / 1000) + 86400 }]);
-    await page.route(`**/api/v1/fraud-cases/${CASE_ID}`, (route) => {
+  test.beforeEach(async ({ page, context }) => {
+    await loginAs(context, 'level1_analyst');
+    await page.route(`**/api/v1/fraud/${CASE_ID}`, (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_CASES.results[0]) });
     });
-    await page.goto(`/demo/investigation/${CASE_ID}`);
+    await page.goto(`/system/investigation/${CASE_ID}`);
     await expect(page.locator('text=/FD-2026-002001/').first()).toBeVisible({ timeout: 8_000 });
   });
 
@@ -106,6 +108,6 @@ test.describe('FR-v1-04: Case Detail', () => {
 
   test('04.9 back navigation returns to investigation list', async ({ page }) => {
     await page.locator('a:has-text("Back"), a:has-text("←")').first().click();
-    await expect(page).toHaveURL(/\/demo\/investigation$/, { timeout: 4_000 });
+    await expect(page).toHaveURL(/\/system\/investigation$/, { timeout: 4_000 });
   });
 });
