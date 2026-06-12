@@ -306,8 +306,9 @@ export async function registerWebhook(db: Db, merchantId: string, url: string) {
 
 export async function generateApiKey(
   db: Db,
-  merchantId: string
-): Promise<{ keyId: string; keyPrefix: string; merchantApiKey: string } | null> {
+  merchantId: string,
+  label?: string,
+): Promise<{ keyId: string; keyPrefix: string; keyLabel?: string; merchantApiKey: string } | null> {
   const merchant = await db
     .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
     .findOne({ merchantAgreementInstanceReference: merchantId } as Partial<MerchantAgreementControlRecord>);
@@ -324,6 +325,7 @@ export async function generateApiKey(
     keyHashBcrypt,
     keyStatus: 'active',
     keyCreatedDateTime: now,
+    ...(label?.trim() && { keyLabel: label.trim() }),
   };
 
   await db.collection(MERCHANT_AGREEMENT_COLLECTION).updateOne(
@@ -334,8 +336,31 @@ export async function generateApiKey(
   return {
     keyId: newKey.keyId,
     keyPrefix: newKey.keyPrefix,
+    keyLabel: newKey.keyLabel,
     merchantApiKey: plaintext, // Returned ONCE - never stored in plaintext
   };
+}
+
+/**
+ * Returns API key METADATA only (never the hash or plaintext): id, prefix, label,
+ * status, created/last-used dates. BIAN SD-89 credential management; PCI DSS Req 3/8.
+ */
+export async function getMerchantApiKeys(db: Db, merchantId: string) {
+  const merchant = await db
+    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
+    .findOne(
+      { merchantAgreementInstanceReference: merchantId } as Partial<MerchantAgreementControlRecord>,
+      { projection: { merchantApiKeys: 1 } },
+    );
+  if (!merchant) return null;
+  return (merchant.merchantApiKeys ?? []).map((k) => ({
+    keyId: k.keyId,
+    keyPrefix: k.keyPrefix,
+    keyLabel: k.keyLabel ?? null,
+    keyStatus: k.keyStatus,
+    keyCreatedDateTime: k.keyCreatedDateTime,
+    keyLastUsedDateTime: k.keyLastUsedDateTime ?? null,
+  }));
 }
 
 export async function revokeApiKey(

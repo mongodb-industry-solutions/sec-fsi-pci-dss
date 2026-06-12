@@ -5,8 +5,9 @@ import { Store } from 'lucide-react';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { ROLE_LABELS } from '../../../lib/constants';
 import { useDebugMode } from '../../../lib/debugMode';
-import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, CreditCard } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, CreditCard, User } from 'lucide-react';
 import { RawMongoPanel } from '../../../components/RawMongoPanel';
+import { SectionHeader } from '../../../components/SectionHeader';
 
 type KycCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
 
@@ -375,9 +376,12 @@ export default function ProfilePage() {
 
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">My Profile</h1>
-        {!editing && (
+      <SectionHeader
+        icon={User}
+        title="My Profile"
+        description="Your account and contact details."
+        debugInfo="BIAN SD-53 Customer Agreement · PCI DSS Req 8 (identity) · Req 3 (QE at rest)"
+        actions={!editing && (
           <button
             onClick={() => { setEditing(true); setSaveMsg(null); }}
             className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
@@ -386,7 +390,7 @@ export default function ProfilePage() {
             Edit Profile
           </button>
         )}
-      </div>
+      />
 
       {saveMsg && (
         <div className={`rounded-xl p-3 text-sm ${saveMsg.startsWith('Error') ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>

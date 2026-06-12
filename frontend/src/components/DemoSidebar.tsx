@@ -8,7 +8,7 @@ import {
   User, PlusCircle, Store, ClipboardCheck,
   ChevronLeft, ChevronRight, Settings2, Plug,
   ShieldAlert, ScanLine, UserCheck, Building2, AlertTriangle,
-  Zap, KeyRound,
+  Zap, KeyRound, ShieldCheck,
   HelpCircle,
   type LucideIcon,
 } from 'lucide-react';
@@ -38,12 +38,13 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'My Profile',   path: '/system/profile',       icon: User },
   ],
   security_auditor: [
-    { label: 'Cases',        path: '/system/investigation', icon: BriefcaseMedical },
-    { label: 'Transactions', path: '/system/transactions',  icon: CreditCard },
-    { label: 'Users',        path: '/system/users',         icon: Users },
-    { label: 'Audit Log',    path: '/system/audit',         icon: BarChart3 },
-    { label: 'Merchant',     path: '/system/merchant',      icon: Store },
-    { label: 'My Profile',   path: '/system/profile',       icon: User },
+    { label: 'Cases',          path: '/system/investigation', icon: BriefcaseMedical },
+    { label: 'Transactions',   path: '/system/transactions',  icon: CreditCard },
+    { label: 'Users',          path: '/system/users',         icon: Users },
+    { label: 'Audit Log',      path: '/system/audit',         icon: BarChart3 },
+    { label: 'Data Integrity', path: '/system/integrity',     icon: ShieldCheck },
+    { label: 'Merchant',       path: '/system/merchant',      icon: Store },
+    { label: 'My Profile',     path: '/system/profile',       icon: User },
   ],
   customer: [
     { label: 'Transactions', path: '/system/payment/history', icon: ClipboardList },

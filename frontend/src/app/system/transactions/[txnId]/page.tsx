@@ -325,8 +325,8 @@ export default function TransactionDetailPage() {
         )}
       </div>
 
-      {/* PCI DSS note for Auditor */}
-      {isAuditor && (
+      {/* PCI DSS note for Auditor — debug/educational annotation only */}
+      {isAuditor && debugMode && (
         <div className="bg-[#001E2B]/5 border border-[#001E2B]/20 rounded-xl p-4 text-sm text-gray-600">
           <strong className="text-[#001E2B]">Security Auditor (read-only):</strong> All fields visible for audit review.
           Sensitive fields (QE:none) are accessible without escalation token per the role access model.

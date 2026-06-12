@@ -270,7 +270,7 @@ export default function MerchantReviewPage() {
         <div className="text-center py-12 text-gray-400 text-sm">Loading review queue...</div>
       ) : merchants.length === 0 ? (
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-8 text-center space-y-2">
-          <CheckCircle2 size={28} className="text-[#00ED64] mx-auto" />
+          <CheckCircle2 size={28} className="text-green-600 mx-auto" />
           <div className="text-gray-700 font-medium">All caught up!</div>
           <div className="text-sm text-gray-500">No applications pending review.</div>
         </div>

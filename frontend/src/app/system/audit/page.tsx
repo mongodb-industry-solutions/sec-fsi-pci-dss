@@ -4,7 +4,8 @@ import { api, AuditEventWithCase } from '../../../lib/api';
 import { getToken } from '../../../lib/auth';
 import { PERFORMER_LABELS } from '../../../lib/constants';
 import Link from 'next/link';
-import { Filter, X, ShieldCheck } from 'lucide-react';
+import { Filter, X, ShieldCheck, BarChart3 } from 'lucide-react';
+import { SectionHeader } from '../../../components/SectionHeader';
 import { useDebugMode } from '../../../lib/debugMode';
 import { Pagination } from '../../../components/Pagination';
 
@@ -99,14 +100,13 @@ export default function AuditPage() {
     <div className="min-h-screen bg-gray-50">
 
       <main className="w-full px-5 sm:px-8 lg:px-12 py-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold">Audit Log</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Immutable event trail across all fraud investigation cases. PCI DSS Requirement 10 compliance.
-            </p>
-          </div>
-
+        <div className="mb-4">
+          <SectionHeader
+            icon={BarChart3}
+            title="Audit Log"
+            description="Immutable event trail across all fraud cases."
+            debugInfo="BIAN SD-16 (append-only events) · PCI DSS Req 10 (logging & monitoring)"
+          />
         </div>
 
         {/* Access model context, debug mode only */}

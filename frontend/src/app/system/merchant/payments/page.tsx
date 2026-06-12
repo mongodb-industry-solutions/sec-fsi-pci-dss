@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Search, ShieldCheck } from 'lucide-react';
+import { Search, ShieldCheck, Receipt } from 'lucide-react';
+import { SectionHeader } from '../../../../components/SectionHeader';
 import { useRequireActiveMerchant } from '../../../../lib/merchantContext';
 import { api } from '../../../../lib/api';
 import { Pagination } from '../../../../components/Pagination';
@@ -64,10 +65,12 @@ export default function PaymentsSectionPage() {
 
   return (
     <div className="w-full px-5 sm:px-8 py-6 space-y-5">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Payments Received</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Card payments settled to {merchant.merchantName}. BIAN SD-89 (acquiring view).</p>
-      </div>
+      <SectionHeader
+        icon={Receipt}
+        title="Payments Received"
+        description={`Card payments settled to ${merchant.merchantName}.`}
+        debugInfo="BIAN SD-89 acquiring view · PCI DSS Req 3 & 7 (masked PAN only, no payer PII)"
+      />
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex items-start gap-2">
         <ShieldCheck size={14} className="text-blue-600 mt-0.5 shrink-0" />

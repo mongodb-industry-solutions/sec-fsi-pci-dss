@@ -106,16 +106,24 @@ test.describe('FR-v1-05: Application Mode Authentication', () => {
         }),
       });
     });
-    await page.route('**/api/v1/fraud**', (route) => {
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ results: [], total: 0, page: 1, limit: 20 }) });
+    // Stub fraud stats with the correct shape so RoleStats doesn't crash on render
+    await page.route('**/api/v1/fraud/stats**', (route) => {
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ total: 0, open: 0, underReview: 0, escalated: 0, resolvedFraud: 0, resolvedCleared: 0, byStatus: [], bySeverity: [], byMonth: [] }) });
     });
     await page.goto('/system');
     await submitLogin(page, 'sarah.chen@back.es');
     await expect(page.locator('text=/Welcome, Sarah/i').first()).toBeVisible({ timeout: 8_000 });
-    // Click sign out button from UserMenu
-    await page.locator('button:has-text("Sign out")').first().click();
+    // Sign out is in a UserMenu dropdown — open via the header trigger first
+    const trigger = page.locator('header button[aria-haspopup="menu"]');
+    if (await trigger.isVisible({ timeout: 1_000 }).catch(() => false)) {
+      await trigger.click();
+      await page.getByRole('menuitem', { name: /sign out/i }).click({ timeout: 4_000 });
+    } else {
+      // Fallback: direct sign-out button (some layouts expose it without a dropdown)
+      await page.locator('button:has-text("Sign out"), button:has-text("sign out")').first().click({ timeout: 4_000 });
+    }
     // LoginForm renders again at same /system URL
-    await expect(page.locator('input[type="email"]').first()).toBeVisible({ timeout: 4_000 });
+    await expect(page.locator('input[type="email"]').first()).toBeVisible({ timeout: 6_000 });
   });
 });
 

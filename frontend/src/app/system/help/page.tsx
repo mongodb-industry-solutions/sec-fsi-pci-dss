@@ -5,6 +5,7 @@ import {
   ExternalLink, Shield, Database, Lock, Eye, FileText,
   AlertTriangle, CheckCircle2,
 } from 'lucide-react';
+import { SectionHeader } from '../../../components/SectionHeader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -428,27 +429,25 @@ export default function HelpPage() {
       <div className="help-page-root w-full px-5 sm:px-8 lg:px-12 py-6 pb-24">
 
         {/* Header */}
-        <div className="screen-only flex items-center justify-between gap-4 mb-7">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[#001E2B]/10 border border-[#001E2B]/20 flex items-center justify-center shrink-0">
-              <Shield size={17} className="text-[#001E2B]" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-[#001E2B] leading-tight">Compliance Guide</h1>
-              <p className="text-gray-500 text-sm mt-0.5">PCI DSS v4.0.1 Checklist · Architecture Proposal</p>
-            </div>
-          </div>
-          <div className="relative group shrink-0">
-            <button
-              onClick={() => window.print()}
-              className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
-            >
-              <Download size={14} /> Export PDF
-            </button>
-            <div className="pointer-events-none absolute right-0 top-full mt-2 hidden group-hover:block z-50 bg-gray-900 border border-gray-700 text-gray-300 text-[11px] rounded-lg px-3 py-2 whitespace-nowrap shadow-xl">
-              In the print dialog, uncheck &ldquo;Headers and footers&rdquo;
-            </div>
-          </div>
+        <div className="screen-only mb-7">
+          <SectionHeader
+            icon={Shield}
+            title="Compliance Guide"
+            description="PCI DSS v4.0.1 checklist and architecture proposal."
+            actions={
+              <div className="relative group shrink-0">
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
+                >
+                  <Download size={14} /> Export PDF
+                </button>
+                <div className="pointer-events-none absolute right-0 top-full mt-2 hidden group-hover:block z-50 bg-gray-900 border border-gray-700 text-gray-300 text-[11px] rounded-lg px-3 py-2 whitespace-nowrap shadow-xl">
+                  In the print dialog, uncheck &ldquo;Headers and footers&rdquo;
+                </div>
+              </div>
+            }
+          />
         </div>
 
         {/* Tabs */}

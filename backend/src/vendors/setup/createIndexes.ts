@@ -40,6 +40,23 @@ export async function createIndexes(client: MongoClient) {
     { key: { fraudDiagnosisCaseStatus: 1, fraudDiagnosisCaseSeverity: -1 } },
   ]);
 
+  // Unique business key: the human-readable case reference identifies one case
+  // (BIAN control-record reference). Wrapped so a pre-existing dataset with
+  // duplicate references (from the old in-memory counter) doesn't abort startup —
+  // clean/re-seed the fraud collection and the unique constraint will hold.
+  try {
+    await db.collection('fraudDiagnosisCase').createIndex(
+      { fraudDiagnosisCaseReference: 1 },
+      { unique: true },
+    );
+  } catch (err) {
+    console.warn(
+      '[indexes] Unique index on fraudDiagnosisCaseReference not created — duplicate references present. ' +
+      'Re-seed a clean fraudDiagnosisCase collection to enforce uniqueness.',
+      (err as Error).message,
+    );
+  }
+
   await db.collection('fraudDiagnosisCaseEvents').createIndexes([
     { key: { fraudDiagnosisInstanceReference: 1, actionDateTime: -1 } },
   ]);

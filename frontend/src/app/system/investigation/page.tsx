@@ -6,12 +6,16 @@ import { getToken, decodeToken } from '../../../lib/auth';
 import { CaseTable } from '../../../components/CaseTable';
 import { Pagination } from '../../../components/Pagination';
 import { useDebugMode } from '../../../lib/debugMode';
+import { SectionHeader } from '../../../components/SectionHeader';
+import { BriefcaseMedical } from 'lucide-react';
+import { useInitialQueryParams } from '../../../lib/useInitialQueryParams';
 
-type SearchField = 'email' | 'phone' | 'accountRef' | 'cardToken';
+type SearchField = 'caseRef' | 'email' | 'phone' | 'accountRef' | 'cardToken';
 
 const PAGE_SIZE = 10;
 
 const FIELD_LABELS: Record<SearchField, string> = {
+  caseRef:    'Case Reference',
   email:      'Email (QE:equality)',
   phone:      'Phone (QE:equality)',
   accountRef: 'Account Ref (QE:equality)',
@@ -19,6 +23,7 @@ const FIELD_LABELS: Record<SearchField, string> = {
 };
 
 const FIELD_PLACEHOLDERS: Record<SearchField, string> = {
+  caseRef:    'FD-2026-001001',
   email:      'customer@example.com',
   phone:      '+1-555-0000',
   accountRef: 'ACC-001',
@@ -89,8 +94,29 @@ export default function InvestigationPage() {
     }
   }, [filterStatus, filterSeverity, token, isSearchMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleSearch() {
-    const value = searchValue.trim();
+  // Deep-linkable filters: prefill from ?field=&q=&status=&severity= and auto-run once.
+  const qp = useInitialQueryParams();
+  const [autoApplied, setAutoApplied] = useState(false);
+  useEffect(() => {
+    if (autoApplied || !token) return;
+    const field = qp.get('field') as SearchField | null;
+    const q = qp.get('q');
+    const status = qp.get('status');
+    const severity = qp.get('severity');
+    if (!field && !q && !status && !severity) { setAutoApplied(true); return; }
+    if (status) setFilterStatus(status);
+    if (severity) setFilterSeverity(severity);
+    if (field && FIELD_LABELS[field]) setSearchField(field);
+    if (q) {
+      setSearchValue(q);
+      handleSearch(q, field && FIELD_LABELS[field] ? field : undefined);
+    }
+    setAutoApplied(true);
+  }, [token, autoApplied, qp]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleSearch(valueOverride?: string, fieldOverride?: SearchField) {
+    const field = fieldOverride ?? searchField;
+    const value = (valueOverride ?? searchValue).trim();
     if (!value) {
       // Clear search  -  back to full list
       setIsSearchMode(false);
@@ -107,7 +133,12 @@ export default function InvestigationPage() {
     try {
       let foundCases: FraudCase[] = [];
 
-      if (searchField === 'cardToken') {
+      if (field === 'caseRef') {
+        // Case reference (e.g. FD-2026-001001): direct backend filter on the human reference.
+        const res = await api.fraud.list({ caseReference: value, limit: 50 }, token);
+        foundCases = res.results;
+
+      } else if (field === 'cardToken') {
         // Card token: get transactions for this token, then find their fraud cases
         const txnRes = await api.transactions.getByCardToken(value, token);
         if (!txnRes.results.length) {
@@ -138,11 +169,11 @@ export default function InvestigationPage() {
         // QE equality search: resolve customer UUID, then filter cases by customerId
         let customerData: Record<string, unknown> | null = null;
         try {
-          if (searchField === 'email')      customerData = await api.customer.getByEmail(value, token);
-          else if (searchField === 'phone') customerData = await api.customer.getByPhone(value, token);
-          else                              customerData = await api.customer.getByAccountRef(value, token);
+          if (field === 'email')      customerData = await api.customer.getByEmail(value, token);
+          else if (field === 'phone') customerData = await api.customer.getByPhone(value, token);
+          else                        customerData = await api.customer.getByAccountRef(value, token);
         } catch {
-          setSearchError(`No customer found for this ${FIELD_LABELS[searchField].replace(' (QE:equality)', '')}.`);
+          setSearchError(`No customer found for this ${FIELD_LABELS[field].replace(' (QE:equality)', '')}.`);
           setCases([]);
           setTotal(0);
           return;
@@ -209,7 +240,12 @@ export default function InvestigationPage() {
   return (
     <div className="min-h-full bg-gray-50">
       <main className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
-        <h1 className="text-2xl font-bold">Case Dashboard</h1>
+        <SectionHeader
+          icon={BriefcaseMedical}
+          title="Cases"
+          description="Review, escalate and resolve fraud cases."
+          debugInfo="BIAN SD-83 Fraud Diagnosis · PCI DSS Req 10.4 (audit trail)"
+        />
 
         {/* Search */}
         <div className="bg-white rounded-xl border p-4 space-y-3">
@@ -232,7 +268,7 @@ export default function InvestigationPage() {
               className="flex-1 border rounded-lg px-3 py-2 text-sm"
             />
             <button
-              onClick={handleSearch}
+              onClick={() => handleSearch()}
               disabled={loading}
               className="bg-[#001E2B] text-[#00ED64] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors disabled:opacity-50"
             >

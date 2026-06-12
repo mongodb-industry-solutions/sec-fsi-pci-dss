@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, appendAuditEvent, createFraudCase, addCaseNote, retractCaseNote, getCaseNotes, getFraudStats } from '../services/fraudDiagnosis.service';
+import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, appendAuditEvent, createFraudCase, addCaseNote, retractCaseNote, getCaseNotes, getFraudStats, getFraudIntegrity } from '../services/fraudDiagnosis.service';
 import { getTransactionById } from '../../transactions/services/cardTransaction.service';
 import { generateToken } from '../../../vendors/security/escalationTokens';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
@@ -47,6 +47,10 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
           customerId: {
             type: 'string',
             description: 'Filter by `customerAgreementInstanceReference` UUID. Returns all cases for a specific customer.',
+          },
+          caseReference: {
+            type: 'string',
+            description: 'Filter by human-readable case reference (e.g. `FD-2026-001001`); case-insensitive contains match.',
           },
           page: {
             type: 'string',
@@ -103,6 +107,7 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
       severity,
       transactionId,
       customerId,
+      caseReference,
       page = '1',
       limit = '20',
     } = request.query as {
@@ -110,13 +115,14 @@ Use \`GET /api/v1/fraud/:id/events\` to retrieve the full chronological audit lo
       severity?: string;
       transactionId?: string;
       customerId?: string;
+      caseReference?: string;
       page?: string;
       limit?: string;
     };
 
     const result = await getCases(
       fastify.db,
-      { status, severity, transactionId, customerId },
+      { status, severity, transactionId, customerId, caseReference },
       parseInt(page, 10),
       parseInt(limit, 10)
     );
@@ -277,6 +283,38 @@ without creating a duplicate.
   }, async (_request, reply) => {
     const stats = await getFraudStats(fastify.db);
     return reply.send(stats);
+  });
+
+  // GET /api/v1/fraud/integrity — Security Auditor data-integrity oversight (PCI DSS Req 10).
+  // Registered before /:id. Auditor-only: verifies control-record integrity (no PII).
+  fastify.get('/integrity', {
+    schema: {
+      tags: ['fraud'],
+      summary: 'Fraud case data-integrity check (auditor, Req 10)',
+      description: 'Read-only integrity oversight for the Security Auditor: duplicate case references, orphaned transaction/customer references, and case totals. Aggregates only — no PII.',
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            totalCases:           { type: 'number' },
+            duplicateCount:       { type: 'number' },
+            duplicateReferences:  { type: 'array', items: { type: 'object', properties: { reference: { type: 'string' }, count: { type: 'number' } } } },
+            orphanTransactionRefs:{ type: 'number' },
+            orphanCustomerRefs:   { type: 'number' },
+            healthy:              { type: 'boolean' },
+          },
+        },
+        403: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const role = (request as { user?: { role?: string } }).user?.role;
+    if (role !== 'security_auditor') {
+      return reply.status(403).send({ error: 'Access denied: data-integrity oversight is available to the security auditor role.' });
+    }
+    const integrity = await getFraudIntegrity(fastify.db);
+    return reply.send(integrity);
   });
 
   fastify.get('/:id', {

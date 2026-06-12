@@ -108,9 +108,10 @@ test.describe('FR-v6-06: Register integration wizard', () => {
     await expect(page.getByPlaceholder('e.g. Sardine Fraud API')).toBeVisible({ timeout: 8_000 });
   });
 
-  test('06.2 submitting the form calls POST /api/v1/integrations and shows the API key once', async ({ page }) => {
+  test('06.2 submitting the form calls POST /api/v1/integrations/providers and shows the API key once', async ({ page }) => {
     const fakeApiKey = 'sk_demo_abcdef1234567890abcdef1234567890';
-    await page.route('**/api/v1/integrations', (route) => {
+    // api.integrations.create calls POST /api/v1/integrations/providers (not /api/v1/integrations)
+    await page.route('**/api/v1/integrations/providers', (route) => {
       if (route.request().method() === 'POST') {
         route.fulfill(json({
           integration: {
@@ -132,6 +133,6 @@ test.describe('FR-v6-06: Register integration wizard', () => {
     await page.getByRole('button', { name: 'Register Provider' }).click();
 
     await expect(page.getByText(fakeApiKey)).toBeVisible({ timeout: 8_000 });
-    await expect(page.getByText('save it now', { exact: false })).toBeVisible();
+    await expect(page.getByText('not be shown again', { exact: false })).toBeVisible();
   });
 });

@@ -1219,7 +1219,7 @@ Returns cards linked to a customer (plaintext lookup by FK).
 
 #### `GET /fraud`
 
-**Query params:** `status`, `severity`, `page` (default 1), `limit` (default 20)
+**Query params:** `status`, `severity`, `transactionId`, `customerId`, `caseReference` (case-insensitive contains on the human reference, e.g. `FD-2026-001001`), `page` (default 1), `limit` (default 20)
 
 **Response 200:**
 ```json
@@ -1549,6 +1549,10 @@ Validates credentials against `customerAuthenticationAssessment` (SD-91, QE equa
 Returns the list of local domain demo users for the login screen dropdown. Data is read from `backend/data/customerAuthentications.json` (seed file) rather than the QE-encrypted collection to avoid decryption overhead on this helper endpoint. Passwords are never included.
 
 Pass `?featured=true` to return only the curated demo roster (`customerAuthenticationDemoFeatured: true`) surfaced in the debug-mode user picker (application mode) and used by the simulator. The full set of seeded users remains available without the filter for ad-hoc testing.
+
+#### `GET /fraud/integrity` *(security_auditor only)*
+
+Data-integrity oversight for the auditor dashboard (PCI DSS Req 10). Returns `totalCases`, `duplicateCount` + `duplicateReferences[]` (case references on more than one case — must be 0; enforced by the unique index, ADR-024), `orphanTransactionRefs`, `orphanCustomerRefs`, and a `healthy` flag. Aggregates only — no PII. Non-auditor roles receive 403.
 
 **Response 200:**
 ```json

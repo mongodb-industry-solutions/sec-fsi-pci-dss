@@ -17,7 +17,7 @@ async function stubCommon(page: import('@playwright/test').Page) {
   await page.route('**/api/v1/auth/domains', (r) => r.fulfill(json(DOMAINS)));
   await page.route('**/api/v1/system/users**', (r) => r.fulfill(json(USERS)));
   await page.route('**/api/v1/auth/users**', (r) => r.fulfill(json(USERS)));
-  await page.route('**/api/v1/fraud/stats**', (r) => r.fulfill(json({ total: 0, byStatus: [], bySeverity: [] })));
+  await page.route('**/api/v1/fraud/stats**', (r) => r.fulfill(json({ total: 0, open: 0, underReview: 0, escalated: 0, resolvedFraud: 0, resolvedCleared: 0, byStatus: [], bySeverity: [], byMonth: [] })));
   await page.route('**/api/v1/integrations/providers**', (r) => r.fulfill(json({ integrations: [] })));
   await page.route('**/api/v1/integrations**', (r) => r.fulfill(json({ integrations: [] })));
 }
@@ -56,8 +56,8 @@ test.describe('FR-v1-05: role-based dashboards', () => {
   // Each role lands on /system and sees its own dashboard cards (rendered inline).
   const CASES: { role: DemoRole; marker: RegExp }[] = [
     { role: 'customer',            marker: /New Payment/ },
-    { role: 'level1_analyst',      marker: /Investigation Cases/ },
-    { role: 'level2_investigator', marker: /Investigation Cases/ },
+    { role: 'level1_analyst',      marker: /Cases/ },
+    { role: 'level2_investigator', marker: /Cases/ },
     { role: 'security_auditor',    marker: /Audit Log/ },
     { role: 'merchant_officer',    marker: /Review Queue/ },
     { role: 'manager',             marker: /Integration Hub/ },
@@ -78,8 +78,10 @@ test.describe('FR-v1-05: role-based dashboards', () => {
     await loginAs(context, 'level1_analyst');
     await page.goto('/system');
     await expect(page.getByRole('heading', { name: /Welcome,/ })).toBeVisible({ timeout: 15000 });
-    // Sign out lives in the UserMenu dropdown — open it via the header trigger first.
-    const trigger = page.locator('header button[aria-haspopup="menu"]');
+    // Sign out lives in the UserMenu dropdown — open it via the header trigger
+    // (identified by the signed-in user's name) once the dashboard is hydrated.
+    const trigger = page.getByRole('button', { name: /Sarah Chen/i });
+    await expect(trigger).toBeVisible({ timeout: 8000 });
     await trigger.click();
     const signOut = page.getByRole('menuitem', { name: 'Sign out' });
     await expect(signOut).toBeVisible({ timeout: 4000 });

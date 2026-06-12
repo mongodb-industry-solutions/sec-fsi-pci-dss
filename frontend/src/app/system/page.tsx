@@ -6,7 +6,7 @@ import {
   BriefcaseMedical, CreditCard, Users, BarChart3, ClipboardList, User,
   PlusCircle, Store, ClipboardCheck, ShieldAlert, ScanLine, UserCheck,
   Building2, AlertTriangle, Plug, Zap, KeyRound, LayoutGrid,
-  CheckCircle2, AlertCircle, Clock, WifiOff, Wrench,
+  CheckCircle2, AlertCircle, Clock, WifiOff, Wrench, ShieldCheck,
   type LucideIcon,
 } from 'lucide-react';
 import { api, AuthUser, AuthDomain } from '../../lib/api';
@@ -17,6 +17,7 @@ import { useDebugMode } from '../../lib/debugMode';
 import { UserMenu } from '../../components/UserMenu';
 import { DemoSidebar, MobileBottomNav } from '../../components/DemoSidebar';
 import { RoleStats } from '../../components/dashboard/RoleStats';
+import { SectionHeader } from '../../components/SectionHeader';
 
 type DecodedUser = NonNullable<ReturnType<typeof decodeToken>>;
 
@@ -60,34 +61,35 @@ interface DashboardCard {
 
 const ROLE_CARDS: Record<string, DashboardCard[]> = {
   customer: [
-    { label: 'Transaction History', description: 'View your payment and transaction history',   icon: ClipboardList,    href: '/system/payment/history', bianSd: 'SD-27',  pciDss: 'Req 7.2' },
-    { label: 'New Payment',         description: 'Initiate a new card payment',                  icon: PlusCircle,       href: '/system/payment',         bianSd: 'SD-27',  pciDss: 'Req 3' },
-    { label: 'My Profile',          description: 'Manage your account and personal details',     icon: User,             href: '/system/profile',         bianSd: 'SD-53',  pciDss: 'Req 8' },
-    { label: 'Merchant Catalogue',  description: 'Browse registered merchant profiles',          icon: Store,            href: '/system/merchant',        bianSd: 'SD-89',  pciDss: 'Req 12' },
+    { label: 'Transactions', description: 'Your payment history, with the status and any fraud review of each transaction.',            icon: ClipboardList, href: '/system/payment/history', bianSd: 'SD-27', pciDss: 'Req 7.2' },
+    { label: 'New Payment',  description: 'Make a new card payment. The card is tokenized in the browser; the PAN never reaches Atlas.', icon: PlusCircle,    href: '/system/payment',         bianSd: 'SD-27', pciDss: 'Req 3' },
+    { label: 'Merchant',     description: 'Browse the registered merchants you can pay.',                                                icon: Store,         href: '/system/merchant',        bianSd: 'SD-89', pciDss: 'Req 12' },
+    { label: 'Profile',      description: 'Your account and contact details. Sensitive fields are encrypted at rest with Queryable Encryption.', icon: User,    href: '/system/profile',         bianSd: 'SD-53', pciDss: 'Req 8' },
   ],
   level1_analyst: [
-    { label: 'Investigation Cases', description: 'Review open fraud investigation cases',        icon: BriefcaseMedical, href: '/system/investigation',   bianSd: 'SD-63',  pciDss: 'Req 10.4' },
-    { label: 'Transactions',        description: 'Browse and search all card transactions',      icon: CreditCard,       href: '/system/transactions',    bianSd: 'SD-27',  pciDss: 'Req 10.2' },
-    { label: 'Customer Lookup',     description: 'Look up customer agreement records',           icon: Users,            href: '/system/users',           bianSd: 'SD-53',  pciDss: 'Req 12.3' },
-    { label: 'Merchant Lookup',     description: 'Browse and search merchant accounts',          icon: Store,            href: '/system/merchant',        bianSd: 'SD-89',  pciDss: 'Req 12.8' },
+    { label: 'Cases',        description: 'Fraud investigation cases. Search by case reference (FD-…), email, phone or card token, and escalate to L2.', icon: BriefcaseMedical, href: '/system/investigation', bianSd: 'SD-63', pciDss: 'Req 10.4' },
+    { label: 'Transactions', description: 'Search all card transactions. Sensitive gateway data stays encrypted (QE:none) at the L1 access level.',     icon: CreditCard,       href: '/system/transactions',  bianSd: 'SD-27', pciDss: 'Req 10.2' },
+    { label: 'Users',        description: 'Look up a customer by encrypted email, phone or account reference (QE equality — no plaintext leaves the app).', icon: Users,          href: '/system/users',         bianSd: 'SD-53', pciDss: 'Req 12.3' },
+    { label: 'Merchant',     description: 'Browse merchants and open one for its KYB status and received-payment activity.',              icon: Store,            href: '/system/merchant',      bianSd: 'SD-89', pciDss: 'Req 12.8' },
   ],
   level2_investigator: [
-    { label: 'Investigation Cases', description: 'Manage and escalate fraud investigation cases',icon: BriefcaseMedical, href: '/system/investigation',   bianSd: 'SD-63',  pciDss: 'Req 10.4' },
-    { label: 'Transactions',        description: 'Deep-dive forensic transaction analysis',      icon: CreditCard,       href: '/system/transactions',    bianSd: 'SD-27',  pciDss: 'Req 10.2' },
-    { label: 'Customer Lookup',     description: 'Customer agreement audit trail',               icon: Users,            href: '/system/users',           bianSd: 'SD-53',  pciDss: 'Req 12.3' },
-    { label: 'Merchant Lookup',     description: 'Merchant due-diligence records',               icon: Store,            href: '/system/merchant',        bianSd: 'SD-89',  pciDss: 'Req 12.8' },
+    { label: 'Cases',        description: 'Approve escalations, unlock QE:none PII with an escalation token, and resolve cases as fraud or cleared.', icon: BriefcaseMedical, href: '/system/investigation', bianSd: 'SD-63', pciDss: 'Req 10.4' },
+    { label: 'Transactions', description: 'Forensic transaction analysis. With an escalation token, raw gateway/processor fields decrypt for review.',  icon: CreditCard,       href: '/system/transactions',  bianSd: 'SD-27', pciDss: 'Req 10.2' },
+    { label: 'Users',        description: 'Customer records and agreement detail, including escalated access to sensitive fields.',        icon: Users,            href: '/system/users',         bianSd: 'SD-53', pciDss: 'Req 12.3' },
+    { label: 'Merchant',     description: 'Merchant due-diligence: KYB, risk and received-payment activity.',                             icon: Store,            href: '/system/merchant',      bianSd: 'SD-89', pciDss: 'Req 12.8' },
   ],
   security_auditor: [
-    { label: 'Cases',               description: 'Review all fraud investigation cases',         icon: BriefcaseMedical, href: '/system/investigation',   bianSd: 'SD-63',  pciDss: 'Req 10.4' },
-    { label: 'Transaction Audit',   description: 'Full card transaction audit trail',            icon: CreditCard,       href: '/system/transactions',    bianSd: 'SD-27',  pciDss: 'Req 10.2.1' },
-    { label: 'User Accounts',       description: 'Customer and staff account compliance review', icon: Users,            href: '/system/users',           bianSd: 'SD-91',  pciDss: 'Req 8.2' },
-    { label: 'Audit Log',           description: 'System-wide security event audit log',        icon: BarChart3,        href: '/system/audit',           bianSd: 'SD-16',  pciDss: 'Req 10' },
-    { label: 'Merchant Audit',      description: 'Merchant entity compliance and due-diligence', icon: Store,            href: '/system/merchant',        bianSd: 'SD-89',  pciDss: 'Req 12.8' },
+    { label: 'Cases',        description: 'Read-only view of every fraud case and its complete, append-only audit trail.',               icon: BriefcaseMedical, href: '/system/investigation', bianSd: 'SD-63', pciDss: 'Req 10.4' },
+    { label: 'Transactions', description: 'Full transaction audit view — all fields visible for review, no modifications permitted.',     icon: CreditCard,       href: '/system/transactions',  bianSd: 'SD-27', pciDss: 'Req 10.2.1' },
+    { label: 'Users',        description: 'Customer and staff account compliance review (authentication records, roles).',               icon: Users,            href: '/system/users',         bianSd: 'SD-91', pciDss: 'Req 8.2' },
+    { label: 'Audit Log',      description: 'System-wide, append-only security event log across all cases (who did what, when).',          icon: BarChart3,  href: '/system/audit',     bianSd: 'SD-16', pciDss: 'Req 10' },
+    { label: 'Data Integrity', description: 'Verify control-record integrity: no duplicate case references, links resolve, counts reconcile.', icon: ShieldCheck, href: '/system/integrity', bianSd: 'SD-83', pciDss: 'Req 10' },
+    { label: 'Merchant',       description: 'Merchant compliance, KYB and lifecycle audit trail across the whole portfolio.',             icon: Store,      href: '/system/merchant',  bianSd: 'SD-89', pciDss: 'Req 12.8' },
   ],
   merchant_officer: [
-    { label: 'Review Queue',        description: 'Process pending merchant onboarding requests', icon: ClipboardCheck,   href: '/system/merchant/review', bianSd: 'SD-89',  pciDss: 'Req 12.8' },
-    { label: 'All Merchants',       description: 'View and manage all merchant accounts',        icon: Store,            href: '/system/merchant',        bianSd: 'SD-89',  pciDss: 'Req 12.8' },
-    { label: 'My Profile',          description: 'Manage your officer profile',                  icon: User,             href: '/system/profile',         bianSd: 'SD-53',  pciDss: 'Req 8' },
+    { label: 'Review Queue', description: 'Approve or reject pending merchant applications — the KYB decision (BIAN Control action).',    icon: ClipboardCheck, href: '/system/merchant/review', bianSd: 'SD-89', pciDss: 'Req 12.8' },
+    { label: 'All Merchants',description: 'Full merchant portfolio. Open any merchant for its KYB, activity and lifecycle audit trail.',   icon: Store,          href: '/system/merchant',        bianSd: 'SD-89', pciDss: 'Req 12.8' },
+    { label: 'My Profile',   description: 'Manage your officer profile and contact details.',                                            icon: User,           href: '/system/profile',         bianSd: 'SD-53', pciDss: 'Req 8' },
   ],
   manager: [],
 };
@@ -452,14 +454,12 @@ function RoleDashboard({ user, onSignOut }: { user: DecodedUser; onSignOut: () =
         <main className="flex-1 min-w-0 bg-gray-50 pb-16 md:pb-0">
         <div className="w-full px-5 sm:px-8 lg:px-12 py-8">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Welcome, {user.name.split(' ')[0]}</h1>
-            <div className="flex flex-wrap items-center gap-2 mt-1">
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${accent.badge}`}>
-                {ROLE_LABELS[user.role] ?? user.role}
-              </span>
-              <span className="text-sm text-gray-400">PSP Demo</span>
-              {debugMode && <span className="text-xs font-mono text-gray-400">· BIAN-aligned · PCI DSS</span>}
-            </div>
+            <SectionHeader
+              icon={LayoutGrid}
+              title={`Welcome, ${user.name.split(' ')[0]}`}
+              description={`Signed in as ${ROLE_LABELS[user.role] ?? user.role}`}
+              debugInfo="BIAN-aligned data model · PCI DSS v4.0 controls"
+            />
           </div>
 
           {user.role === 'manager' ? (

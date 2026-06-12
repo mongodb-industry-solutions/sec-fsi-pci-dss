@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { Copy, Check, ExternalLink } from 'lucide-react';
+import { Copy, Check, ExternalLink, ShoppingCart } from 'lucide-react';
+import { SectionHeader } from '../../../../components/SectionHeader';
 import { useRequireActiveMerchant } from '../../../../lib/merchantContext';
 import { api } from '../../../../lib/api';
 
@@ -38,10 +39,12 @@ export default function CheckoutSectionPage() {
 
   return (
     <div className="w-full px-5 sm:px-8 py-6 space-y-5 max-w-2xl">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Checkout Session</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Merchant redirects the buyer to the hosted payment page (SAQ A). BIAN SD-64 Payment Order.</p>
-      </div>
+      <SectionHeader
+        icon={ShoppingCart}
+        title="Checkout Session"
+        description="Create a hosted checkout session for the buyer."
+        debugInfo="BIAN SD-64 Payment Order · PCI DSS SAQ A / Req 3 (PAN not handled by the merchant site)"
+      />
 
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <form onSubmit={submit} className="space-y-3">

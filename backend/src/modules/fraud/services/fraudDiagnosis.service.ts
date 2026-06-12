@@ -10,6 +10,8 @@ import {
 import { RiskSeverity } from '../../../shared/models/risk.model';
 import { TransactionSnapshot } from '../../../shared/models/transaction.model';
 import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
+import { CARD_TRANSACTION_COLLECTION } from '../../transactions/models/cardTransaction.model';
+import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 
 // -- BIAN SD-83: Note entry - resolved view of a note_added event enriched with retraction info
 export interface NoteEntry {
@@ -23,10 +25,25 @@ export interface NoteEntry {
   retractionDateTime: string | null;
 }
 
-let caseCounter = 1000;
+const COUNTERS_COLLECTION = 'counters';
+const CASE_REF_SEQUENCE = 'fraudDiagnosisCaseReference';
 
-function nextCaseRef(): string {
-  return `FD-2026-${String(++caseCounter).padStart(6, '0')}`;
+// Atomic, restart-safe sequence for the human-readable case reference.
+// The previous in-memory counter reset on every server start, producing DUPLICATE
+// references (e.g. two cases both "FD-2026-001001"). The case reference is the
+// BIAN business key of the Fraud Diagnosis control record and must be unique;
+// a unique index on the field enforces it at the data layer (see createIndexes).
+async function nextCaseRef(db: Db): Promise<string> {
+  const res = await db
+    .collection<{ _id: string; seq: number }>(COUNTERS_COLLECTION)
+    .findOneAndUpdate(
+      { _id: CASE_REF_SEQUENCE },
+      { $inc: { seq: 1 } },
+      { upsert: true, returnDocument: 'after' },
+    );
+  const seq = (res as { seq?: number } | null)?.seq ?? 1;
+  const year = new Date().getFullYear();
+  return `FD-${year}-${String(seq).padStart(6, '0')}`;
 }
 
 export async function createFraudCase(
@@ -42,7 +59,7 @@ export async function createFraudCase(
 
   const fraudCase: Omit<FraudDiagnosisControlRecord, never> = {
     fraudDiagnosisInstanceReference: caseId,
-    fraudDiagnosisCaseReference: nextCaseRef(),
+    fraudDiagnosisCaseReference: await nextCaseRef(db),
     cardTransactionInstanceReference: txnId,
     customerAgreementInstanceReference: customerRef,
     transactionSnapshot,
@@ -87,7 +104,7 @@ export async function createFraudCase(
 
 export async function getCases(
   db: Db,
-  filters: { status?: string; severity?: string; transactionId?: string; customerId?: string },
+  filters: { status?: string; severity?: string; transactionId?: string; customerId?: string; caseReference?: string },
   page: number,
   limit: number
 ) {
@@ -96,6 +113,8 @@ export async function getCases(
   if (filters.severity)      query['fraudDiagnosisCaseSeverity']        = filters.severity;
   if (filters.transactionId) query['cardTransactionInstanceReference']   = filters.transactionId;
   if (filters.customerId)    query['customerAgreementInstanceReference'] = filters.customerId;
+  // Case-reference search (e.g. "FD-2026-001001"); case-insensitive contains.
+  if (filters.caseReference) query['fraudDiagnosisCaseReference']        = { $regex: filters.caseReference, $options: 'i' };
 
   const skip = (page - 1) * limit;
   const [results, total] = await Promise.all([
@@ -151,6 +170,55 @@ export async function getFraudStats(db: Db) {
     byStatus:   byStatus.map((s) => ({ status: s._id as string, count: s.count as number })),
     bySeverity: bySeverity.map((s) => ({ severity: s._id as string, count: s.count as number })),
     byMonth:    byMonth.map((s) => ({ year: (s._id as { y: number }).y, month: (s._id as { m: number }).m, count: s.count as number })),
+  };
+}
+
+/**
+ * Data-integrity oversight for the Security Auditor (PCI DSS Req 10): verifies the
+ * Fraud Diagnosis control records are well-formed. Aggregates only — no PII.
+ *  - duplicateReferences: case references appearing on more than one case (must be 0;
+ *    enforced by the unique index after a clean re-seed — see ADR-024).
+ *  - orphan references: cases whose linked transaction / customer no longer resolve.
+ */
+export async function getFraudIntegrity(db: Db) {
+  const cases = db.collection(FRAUD_DIAGNOSIS_COLLECTION);
+
+  // NOTE: use find()+projection, NOT distinct(): under CSFLE/QE the driver attaches
+  // encryptionInformation to `distinct`, which the server rejects (code 40415).
+  // The referenced ids are plaintext fields, so a projected find reads them fine.
+  const [dupAgg, totalCases, caseRefs, txnDocs, custDocs] = await Promise.all([
+    cases.aggregate([
+      { $group: { _id: '$fraudDiagnosisCaseReference', count: { $sum: 1 } } },
+      { $match: { count: { $gt: 1 } } },
+      { $sort: { count: -1 } },
+    ]).toArray(),
+    cases.countDocuments({}),
+    cases.find({}, { projection: { _id: 0, cardTransactionInstanceReference: 1, customerAgreementInstanceReference: 1 } }).toArray(),
+    db.collection(CARD_TRANSACTION_COLLECTION).find({}, { projection: { _id: 0, cardTransactionInstanceReference: 1 } }).toArray(),
+    db.collection(CUSTOMER_AGREEMENT_COLLECTION).find({}, { projection: { _id: 0, customerAgreementInstanceReference: 1 } }).toArray(),
+  ]);
+
+  const txnSet = new Set(
+    (txnDocs as Array<{ cardTransactionInstanceReference?: string }>).map((t) => t.cardTransactionInstanceReference).filter(Boolean) as string[],
+  );
+  const custSet = new Set(
+    (custDocs as Array<{ customerAgreementInstanceReference?: string }>).map((c) => c.customerAgreementInstanceReference).filter(Boolean) as string[],
+  );
+  let orphanTransactionRefs = 0;
+  let orphanCustomerRefs = 0;
+  for (const c of caseRefs as Array<{ cardTransactionInstanceReference?: string; customerAgreementInstanceReference?: string }>) {
+    if (c.cardTransactionInstanceReference && !txnSet.has(c.cardTransactionInstanceReference)) orphanTransactionRefs++;
+    if (c.customerAgreementInstanceReference && !custSet.has(c.customerAgreementInstanceReference)) orphanCustomerRefs++;
+  }
+
+  const duplicateReferences = dupAgg.map((d) => ({ reference: d._id as string, count: d.count as number }));
+  return {
+    totalCases,
+    duplicateReferences,
+    duplicateCount: duplicateReferences.length,
+    orphanTransactionRefs,
+    orphanCustomerRefs,
+    healthy: duplicateReferences.length === 0 && orphanTransactionRefs === 0 && orphanCustomerRefs === 0,
   };
 }
 

@@ -9,6 +9,7 @@ export interface MerchantApiKeyRecord {
   keyStatus: 'active' | 'revoked';
   keyCreatedDateTime: Date;
   keyLastUsedDateTime?: Date;
+  keyLabel?: string;        // Human label to identify/differentiate keys (never a secret)
 }
 
 export interface MerchantAgreementControlRecord {

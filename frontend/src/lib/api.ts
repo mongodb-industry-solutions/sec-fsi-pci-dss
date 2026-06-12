@@ -311,7 +311,7 @@ export const api = {
 
   fraud: {
     list: (
-      params: { status?: string; severity?: string; transactionId?: string; customerId?: string; page?: number; limit?: number },
+      params: { status?: string; severity?: string; transactionId?: string; customerId?: string; caseReference?: string; page?: number; limit?: number },
       token: string
     ) => {
       const qs = new URLSearchParams(
@@ -333,6 +333,16 @@ export const api = {
         bySeverity: Array<{ severity: string; count: number }>;
         byMonth: Array<{ year: number; month: number; count: number }>;
       }>('/api/v1/fraud/stats', {}, token),
+    // Auditor data-integrity oversight (PCI DSS Req 10) — no PII.
+    integrity: (token: string) =>
+      apiFetch<{
+        totalCases: number;
+        duplicateCount: number;
+        duplicateReferences: Array<{ reference: string; count: number }>;
+        orphanTransactionRefs: number;
+        orphanCustomerRefs: number;
+        healthy: boolean;
+      }>('/api/v1/fraud/integrity', {}, token),
     getEvents: (id: string, token: string) =>
       apiFetch<CaseEventsResponse>(`/api/v1/fraud/${id}/events`, {}, token),
     allEvents: (params: { page?: number; limit?: number }, token: string) => {
@@ -513,9 +523,21 @@ export const api = {
       apiFetch<{ merchantAgreementInstanceReference: string; merchantName: string; merchantAgreementStatus: string; merchantApiKey: string }>(
         '/api/v1/merchants', { method: 'POST', body: JSON.stringify(body) }, token
       ),
-    generateKey: (merchantId: string, token: string) =>
-      apiFetch<{ keyId: string; keyPrefix: string; merchantApiKey: string }>(
-        `/api/v1/merchants/${merchantId}/keys`, { method: 'POST', body: JSON.stringify({}) }, token
+    // API key metadata (no secret/hash) — id, prefix, label, status, dates.
+    listKeys: (merchantId: string, token: string) =>
+      apiFetch<{
+        keys: Array<{
+          keyId: string;
+          keyPrefix: string;
+          keyLabel: string | null;
+          keyStatus: 'active' | 'revoked';
+          keyCreatedDateTime: string;
+          keyLastUsedDateTime: string | null;
+        }>;
+      }>(`/api/v1/merchants/${merchantId}/keys`, {}, token),
+    generateKey: (merchantId: string, token: string, label?: string) =>
+      apiFetch<{ keyId: string; keyPrefix: string; keyLabel?: string | null; merchantApiKey: string }>(
+        `/api/v1/merchants/${merchantId}/keys`, { method: 'POST', body: JSON.stringify({ label }) }, token
       ),
     revokeKey: (merchantId: string, keyId: string, token: string) =>
       apiFetch<{ revoked: boolean; keyId: string }>(

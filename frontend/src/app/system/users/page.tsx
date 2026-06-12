@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
+import { SectionHeader } from '../../../components/SectionHeader';
+import { Users } from 'lucide-react';
 
 type SearchField = 'email' | 'phone' | 'accountRef';
 
@@ -147,11 +149,12 @@ export default function UsersPage() {
 
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
-      <h1 className="text-2xl font-bold">Customer Lookup</h1>
-      <p className="text-sm text-gray-500">
-        When a customer contacts support, search by their email, phone, or account reference
-        to identify them via Queryable Encryption. You can then view their transactions and open an investigation case.
-      </p>
+      <SectionHeader
+        icon={Users}
+        title="Users"
+        description="Find a customer by encrypted email, phone or account reference."
+        debugInfo="BIAN SD-53 Customer Agreement / SD-91 · PCI DSS Req 12.3 · QE equality search (no plaintext leaves the app)"
+      />
 
       {/* QE search */}
       <div className="bg-white rounded-xl border p-5 space-y-4">

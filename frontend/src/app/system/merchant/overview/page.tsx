@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Receipt, TrendingUp, CreditCard, CalendarDays, ArrowRight, ShoppingCart, Link2 } from 'lucide-react';
+import { Receipt, TrendingUp, CreditCard, CalendarDays, ArrowRight, ShoppingCart, Link2, LayoutDashboard } from 'lucide-react';
+import { SectionHeader } from '../../../../components/SectionHeader';
 import { useRequireActiveMerchant } from '../../../../lib/merchantContext';
 import { api } from '../../../../lib/api';
 
@@ -73,10 +74,12 @@ export default function OverviewSectionPage() {
 
   return (
     <div className="w-full px-5 sm:px-8 py-6 space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Overview</h1>
-        <p className="text-sm text-gray-500 mt-0.5">{merchant.merchantName} · acquiring activity (BIAN Merchant Activity Analysis). Aggregates only — no payer PII.</p>
-      </div>
+      <SectionHeader
+        icon={LayoutDashboard}
+        title="Overview"
+        description={`Acquiring activity for ${merchant.merchantName}.`}
+        debugInfo="BIAN Merchant Activity Analysis (SD-89) · PCI DSS Req 3 & 7 (aggregates only, no payer PII)"
+      />
 
       {loading ? (
         <div className="text-center py-12 text-gray-400 text-sm">Loading analytics…</div>
@@ -151,7 +154,7 @@ export default function OverviewSectionPage() {
             <div className="md:col-span-2 bg-white rounded-xl border border-gray-200 p-5">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-semibold text-gray-800 text-sm">Recent payments</h2>
-                <Link href="/system/merchant/payments" className="text-xs text-[#00ED64] hover:underline flex items-center gap-1">View all <ArrowRight size={12} /></Link>
+                <Link href="/system/merchant/payments" className="text-xs text-[#001E2B] font-medium hover:underline flex items-center gap-1">View all <ArrowRight size={12} /></Link>
               </div>
               {recent.length === 0 ? (
                 <p className="text-sm text-gray-400">No payments yet.</p>

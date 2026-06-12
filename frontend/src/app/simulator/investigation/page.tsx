@@ -5,9 +5,10 @@ import { api, FraudCase } from '../../../lib/api';
 import { CaseTable } from '../../../components/CaseTable';
 import { Pagination } from '../../../components/Pagination';
 
-type SearchField = 'email' | 'phone' | 'accountRef' | 'cardToken';
+type SearchField = 'caseRef' | 'email' | 'phone' | 'accountRef' | 'cardToken';
 
 const FIELD_LABELS: Record<SearchField, string> = {
+  caseRef:    'Case Reference',
   email:      'Email',
   phone:      'Phone',
   accountRef: 'Account Reference',
@@ -72,10 +73,12 @@ export default function SimulatorInvestigationPage() {
   const loadCases = useCallback(async (targetPage: number) => {
     setLoading(true);
     try {
+      const caseReference = searchField === 'caseRef' && searchValue.trim() ? searchValue.trim() : undefined;
       const res = await api.fraud.list(
         {
           status:   filterStatus   || undefined,
           severity: filterSeverity || undefined,
+          caseReference,
           page:     targetPage,
           limit:    PAGE_SIZE,
         },
@@ -89,7 +92,7 @@ export default function SimulatorInvestigationPage() {
     } finally {
       setLoading(false);
     }
-  }, [filterStatus, filterSeverity]);
+  }, [filterStatus, filterSeverity, searchField, searchValue]);
 
   // Reload from page 1 when filters change
   useEffect(() => {
@@ -125,7 +128,7 @@ export default function SimulatorInvestigationPage() {
             <div className="flex items-center gap-2">
               <span className="text-[#00ED64] text-lg">✓</span>
               <div>
-                <span className="font-semibold text-sm">Payment completed — fraud case opened</span>
+                <span className="font-semibold text-sm">Payment completed, fraud case opened</span>
                 {simPayment.customerName && (
                   <div className="text-xs text-gray-300 mt-0.5">
                     Paid by <span className="text-white font-medium">{simPayment.customerName}</span>
@@ -229,7 +232,12 @@ export default function SimulatorInvestigationPage() {
             Search
           </button>
         </form>
-        {searchField !== 'cardToken' ? (
+        {searchField === 'caseRef' ? (
+          <p className="mt-2 text-xs text-gray-500">
+            Case reference (e.g. <span className="font-mono">FD-2026-001001</span>) is operational case
+            metadata (no PII); matched directly on the fraud case record.
+          </p>
+        ) : searchField !== 'cardToken' ? (
           <p className="mt-2 text-xs text-gray-500">
             {FIELD_LABELS[searchField]} is a QE equality-searchable encrypted field. The server
             matches ciphertext-to-ciphertext without decrypting.

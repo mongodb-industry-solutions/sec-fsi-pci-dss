@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { Pagination } from '../../../components/Pagination';
+import { SectionHeader } from '../../../components/SectionHeader';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -614,27 +615,20 @@ function AnalystMerchantView({ token, role }: { token: string; role: string }) {
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
 
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold">Merchant Agreements</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {isMerchantOfficer
-              ? 'Full merchant portfolio across the lifecycle. Open any merchant for KYB and activity. BIAN SD-89.'
-              : 'Read-only oversight of all merchant agreements. Open any merchant for KYB and activity. BIAN SD-89.'}
-          </p>
-          {debugMode && (
-            <p className="text-xs text-gray-400 font-mono mt-0.5">
-              SD-89 · MerchantAgreementProcedure · PCI DSS Req 7 (no CHD in merchant records) · Req 12.8
-            </p>
-          )}
-        </div>
-        {isMerchantOfficer && (
+      <SectionHeader
+        icon={Store}
+        title="Merchant Agreements"
+        description={isMerchantOfficer
+          ? 'Full merchant portfolio across the lifecycle.'
+          : 'Read-only oversight of all merchant agreements.'}
+        debugInfo="BIAN SD-89 MerchantAgreementProcedure · PCI DSS Req 7 (no CHD in merchant records) · Req 12.8"
+        actions={isMerchantOfficer && (
           <Link href="/system/merchant/review"
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] text-sm font-medium hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors shrink-0">
             <ClipboardCheck size={14} /> Review queue
           </Link>
         )}
-      </div>
+      />
 
       {/* Search + filters */}
       <div className="bg-white rounded-xl border p-4 space-y-3">

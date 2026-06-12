@@ -1747,3 +1747,26 @@ The staff merchant detail (ADR-022) showed identity, KYB, and activity, but ther
 - (+) Officers and auditors get an immutable lifecycle history per merchant, satisfying PCI DSS Req 10 and BIAN SD-89 lifecycle tracking, without exposing CHD.
 - (+) Consistent with the existing append-only events pattern used for fraud cases.
 - (−) Historical (seeded) merchants show a *derived* timeline until they accrue real events; this is explicitly labelled. A one-off backfill seed could be added if a fully event-backed history is needed for the demo.
+
+---
+
+## ADR-024 — Unique, restart-safe fraud case reference (SD-83 business key)
+
+**Status:** Accepted (2026-06-12)
+
+**Context**
+
+The human-readable case reference (`fraudDiagnosisCaseReference`, e.g. `FD-2026-001001`) was generated from an **in-memory** counter (`let caseCounter = 1000; ++caseCounter`). The counter reset to its initial value on every backend restart, so cases created in different process lifetimes received **duplicate** references. In BIAN, the case reference is the business key of the Fraud Diagnosis (SD-83) control record and must uniquely identify one case (the UUID `fraudDiagnosisInstanceReference` is the technical PK; the reference is the operational identifier used by analysts and in search).
+
+**Decision**
+
+- Replace the in-memory counter with an **atomic MongoDB sequence**: a `counters` collection document incremented via `findOneAndUpdate({_id:'fraudDiagnosisCaseReference'}, {$inc:{seq:1}}, {upsert, returnDocument:'after'})`. Atomic and durable across restarts and concurrent creates.
+- Seed initializes the sequence to **1000** (`$setOnInsert`, so it never resets an advanced counter) — above the seeded references `FD-YYYY-000001..000020`, so runtime cases start at `001001` with no collision.
+- Add a **unique index** on `fraudDiagnosisCaseReference` to enforce uniqueness at the data layer. Index creation is wrapped in try/catch so a pre-existing dataset containing duplicates (from the old counter) does not abort startup; a clean/re-seed lets the constraint take hold.
+- The year prefix derives from the creation date (`FD-${year}-…`).
+
+**Consequences**
+
+- (+) Case references are now unique and stable across restarts; search-by-reference (WS14) returns exactly one case.
+- (+) Defense in depth: the unique index prevents duplicates even if generation logic regresses.
+- (−) Databases already containing duplicates must be cleaned (drop/re-seed the fraud collection) before the unique index can build; until then it is skipped with a logged warning.

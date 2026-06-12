@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Webhook, Check } from 'lucide-react';
+import { SectionHeader } from '../../../../components/SectionHeader';
 import { useRequireActiveMerchant } from '../../../../lib/merchantContext';
 import { api } from '../../../../lib/api';
 
@@ -28,10 +29,12 @@ export default function WebhooksSectionPage() {
 
   return (
     <div className="w-full px-5 sm:px-8 py-6 space-y-5 max-w-2xl">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Webhook</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Endpoint that receives payment event notifications. BIAN SD-89.</p>
-      </div>
+      <SectionHeader
+        icon={Webhook}
+        title="Webhook"
+        description="Endpoint for payment event notifications."
+        debugInfo="BIAN SD-89 · PCI DSS Req 12.8 (managed integration endpoint)"
+      />
 
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <form onSubmit={save} className="space-y-3">

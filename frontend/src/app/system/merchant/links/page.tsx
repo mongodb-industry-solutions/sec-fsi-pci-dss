@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Copy, Check, ExternalLink, Trash2 } from 'lucide-react';
+import { Copy, Check, ExternalLink, Trash2, Link2 } from 'lucide-react';
+import { SectionHeader } from '../../../../components/SectionHeader';
 import { useRequireActiveMerchant } from '../../../../lib/merchantContext';
 import { api } from '../../../../lib/api';
 
@@ -69,10 +70,12 @@ export default function LinksSectionPage() {
 
   return (
     <div className="w-full px-5 sm:px-8 py-6 space-y-5 max-w-2xl">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Payment Links</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Shareable URL for email, QR codes, or social media. BIAN SD-64 Payment Order.</p>
-      </div>
+      <SectionHeader
+        icon={Link2}
+        title="Payment Links"
+        description="Create a shareable payment link."
+        debugInfo="BIAN SD-64 Payment Order · PCI DSS Req 3 (PAN captured on the hosted page)"
+      />
 
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <form onSubmit={create} className="space-y-3">
@@ -135,7 +138,7 @@ export default function LinksSectionPage() {
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
           <h3 className="font-medium text-gray-800 text-sm">Active Links</h3>
-          <button onClick={loadLinks} className="text-xs text-[#00ED64] hover:underline">Refresh</button>
+          <button onClick={loadLinks} className="text-xs text-[#001E2B] font-medium hover:underline">Refresh</button>
         </div>
         {loadingLinks ? (
           <div className="px-5 py-6 text-center text-sm text-gray-400">Loading...</div>

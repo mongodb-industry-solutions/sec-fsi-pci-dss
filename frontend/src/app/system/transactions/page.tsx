@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { Pagination } from '../../../components/Pagination';
-import { Mail, Type, Search, X, Lock } from 'lucide-react';
+import { Mail, Type, Search, X, Lock, CreditCard } from 'lucide-react';
+import { SectionHeader } from '../../../components/SectionHeader';
 
 interface Transaction {
   cardTransactionInstanceReference?: string;
@@ -120,7 +121,12 @@ export default function TransactionsPage() {
 
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
-      <h1 className="text-2xl font-bold">Transactions</h1>
+      <SectionHeader
+        icon={CreditCard}
+        title="Transactions"
+        description="Search and review card transactions."
+        debugInfo="BIAN SD-254 Card Transaction · PCI DSS Req 10.2 · QE:none fields decrypt only for L2/auditor"
+      />
 
       {/* Search + filters */}
       <div className="bg-white rounded-xl border p-4 space-y-3">

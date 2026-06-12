@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { Plus, ClipboardList } from 'lucide-react';
+import { SectionHeader } from '../../../../components/SectionHeader';
 import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { Pagination } from '../../../../components/Pagination';
@@ -128,12 +129,19 @@ export default function TransactionHistoryPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="w-full px-5 sm:px-8 lg:px-12 py-6">
-        <div className="flex flex-wrap justify-between items-center gap-2 mb-5">
-          <h1 className="text-2xl font-bold">My Transactions</h1>
-          <Link href="/system/payment" className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium">
-            <Plus size={14} />
-            New Payment
-          </Link>
+        <div className="mb-5">
+          <SectionHeader
+            icon={ClipboardList}
+            title="Transactions"
+            description="Your payment history and the status of each transaction."
+            debugInfo="BIAN SD-254 Card Transaction · PCI DSS Req 7.2 (need-to-know: own data only)"
+            actions={
+              <Link href="/system/payment" className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium">
+                <Plus size={14} />
+                New Payment
+              </Link>
+            }
+          />
         </div>
 
         {loading ? (

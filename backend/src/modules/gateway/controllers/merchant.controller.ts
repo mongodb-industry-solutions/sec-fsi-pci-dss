@@ -3,7 +3,7 @@
 
 import { FastifyInstance } from 'fastify';
 import type { JwtDemoPayload } from '../../../shared/models/identity.model';
-import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, generateApiKey, revokeApiKey, reviewMerchantApplication, getMerchantEvents } from '../services/merchant.service';
+import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, generateApiKey, revokeApiKey, reviewMerchantApplication, getMerchantEvents, getMerchantApiKeys } from '../services/merchant.service';
 import { getMerchantTransactions, getMerchantStats } from '../../transactions/services/cardTransaction.service';
 import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
 
@@ -578,6 +578,55 @@ Delivery includes up to 3 retry attempts with exponential backoff.`,
     return reply.send(result);
   });
 
+  // GET /api/v1/merchants/:id/keys  — list API key METADATA (no secret/hash)
+  // BIAN SD-89 credential management. Owner / merchant_officer / security_auditor.
+  fastify.get('/:id/keys', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'List a merchant\'s API keys (metadata only, SD-89)',
+      description: 'Returns API key metadata (id, prefix, label, status, created/last-used dates). The secret and its hash are **never** returned (PCI DSS Req 3).',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            keys: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  keyId:               { type: 'string' },
+                  keyPrefix:           { type: 'string' },
+                  keyLabel:            { type: 'string', nullable: true },
+                  keyStatus:           { type: 'string', enum: ['active', 'revoked'] },
+                  keyCreatedDateTime:  { type: 'string', format: 'date-time' },
+                  keyLastUsedDateTime: { type: 'string', format: 'date-time', nullable: true },
+                },
+              },
+            },
+          },
+        },
+        401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const user = (request as { user?: JwtDemoPayload }).user;
+    const merchant = await getMerchantById(fastify.db, id);
+    if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
+    const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
+    const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
+    const isStaff = user?.role === 'merchant_officer' || user?.role === 'security_auditor';
+    if (!isOwner && !isStaff) {
+      return reply.status(403).send({ error: 'Access denied: only the merchant owner, a merchant officer, or a security auditor can view API keys.' });
+    }
+    const keys = await getMerchantApiKeys(fastify.db, id);
+    return reply.send({ keys: keys ?? [] });
+  });
+
   // POST /api/v1/merchants/:id/keys
   fastify.post('/:id/keys', {
     schema: {
@@ -588,12 +637,17 @@ Delivery includes up to 3 retry attempts with exponential backoff.`,
 **Security:** The plaintext key is returned **once** in this response. Only a bcrypt hash is stored. Store the key securely immediately - it cannot be retrieved again.`,
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      body: {
+        type: 'object',
+        properties: { label: { type: 'string', description: 'Optional human label to identify this key.' } },
+      },
       response: {
         201: {
           type: 'object',
           properties: {
             keyId: { type: 'string', description: 'UUID to reference this key (for revocation).' },
             keyPrefix: { type: 'string', description: 'First 12 chars for display: "lbpk_live_ab".' },
+            keyLabel: { type: 'string', nullable: true, description: 'The label assigned to this key, if any.' },
             merchantApiKey: { type: 'string', description: 'Full API key. Store securely. Shown once only.' },
           },
         },
@@ -603,7 +657,8 @@ Delivery includes up to 3 retry attempts with exponential backoff.`,
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const result = await generateApiKey(fastify.db, id);
+    const { label } = (request.body ?? {}) as { label?: string };
+    const result = await generateApiKey(fastify.db, id, label);
     if (!result) return reply.status(404).send({ error: 'Merchant not found' });
     return reply.status(201).send(result);
   });
