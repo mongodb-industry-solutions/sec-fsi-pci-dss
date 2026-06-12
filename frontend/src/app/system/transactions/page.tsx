@@ -86,6 +86,23 @@ export default function TransactionsPage() {
     if (token) load(page, pageSize);
   }, [token, filterStatus, filterMerchant, filterCardToken, filterEmail]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Deep-linkable filters: prefill from ?status=&email=&cardToken=&merchant= once after mount.
+  // Read window.location.search inside the effect so it works with Next client navigation too.
+  const [autoApplied, setAutoApplied] = useState(false);
+  useEffect(() => {
+    if (autoApplied || !token || typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    const status = sp.get('status');
+    const email = sp.get('email');
+    const cardToken = sp.get('cardToken');
+    const merchant = sp.get('merchant');
+    if (status) setFilterStatus(status);
+    if (email) { setSearchType('email'); setSearchInput(email); setFilterEmail(email); }
+    else if (cardToken) { setSearchType('text'); setSearchInput(cardToken); setFilterCardToken(cardToken); }
+    else if (merchant) { setSearchType('text'); setSearchInput(merchant); setFilterMerchant(merchant); }
+    setAutoApplied(true);
+  }, [token, autoApplied]);
+
   function handleSearch() {
     const v = searchInput.trim();
     if (searchType === 'email') {

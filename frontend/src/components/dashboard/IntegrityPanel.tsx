@@ -118,6 +118,39 @@ export function IntegrityPanel({ token }: { token: string }) {
           </div>
         </div>
       )}
+
+      {/* Orphaned customer references — dedicated, interactive review card */}
+      {d.orphanCustomerReferences && d.orphanCustomerReferences.length > 0 && (
+        <div className="bg-white rounded-xl border border-amber-200 overflow-hidden">
+          <div className="bg-amber-50 border-b border-amber-200 px-5 py-3 flex items-center gap-3">
+            <span className="inline-flex w-9 h-9 rounded-lg bg-amber-100 items-center justify-center shrink-0">
+              <AlertTriangle size={18} className="text-amber-600" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="font-semibold text-amber-900 text-sm">Unresolved customer references</h2>
+              <p className="text-xs text-amber-700">Cases pointing to a customer record that no longer resolves. Open the cases to review and remediate.</p>
+            </div>
+            <span className="ml-auto text-xs font-semibold bg-amber-600 text-white rounded-full px-2.5 py-1 shrink-0">{d.orphanCustomerReferences.length}</span>
+          </div>
+          <ul className="divide-y divide-gray-100">
+            {d.orphanCustomerReferences.map((r) => (
+              <li key={r.reference} className="group flex items-center gap-3 px-5 py-3 hover:bg-amber-50/50 transition-colors">
+                <span className="font-mono text-sm text-gray-800 truncate">{r.reference}</span>
+                <span className="text-[11px] font-medium bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 shrink-0">×{r.count} case{r.count !== 1 ? 's' : ''}</span>
+                <Link
+                  href={`/system/investigation?field=customerId&q=${encodeURIComponent(r.reference)}`}
+                  className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors shrink-0"
+                >
+                  <Search size={13} /> Review in Cases <ArrowRight size={12} className="opacity-0 -ml-1 group-hover:opacity-100 group-hover:ml-0 transition-all" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-500">
+            Remediation: restore the missing customer agreement, or re-link the case to the correct customer{debugMode ? ' (SD-83 ↔ SD-13 referential integrity)' : ''}.
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -302,6 +302,7 @@ without creating a duplicate.
             duplicateReferences:  { type: 'array', items: { type: 'object', properties: { reference: { type: 'string' }, count: { type: 'number' } } } },
             orphanTransactionRefs:{ type: 'number' },
             orphanCustomerRefs:   { type: 'number' },
+            orphanCustomerReferences: { type: 'array', items: { type: 'object', properties: { reference: { type: 'string' }, count: { type: 'number' } } } },
             healthy:              { type: 'boolean' },
           },
         },

@@ -205,11 +205,18 @@ export async function getFraudIntegrity(db: Db) {
     (custDocs as Array<{ customerAgreementInstanceReference?: string }>).map((c) => c.customerAgreementInstanceReference).filter(Boolean) as string[],
   );
   let orphanTransactionRefs = 0;
-  let orphanCustomerRefs = 0;
+  // Group unresolved customer references with how many cases point at each, so the
+  // auditor can review them as a list (each links to Cases filtered by that customerId).
+  const orphanCustomerMap = new Map<string, number>();
   for (const c of caseRefs as Array<{ cardTransactionInstanceReference?: string; customerAgreementInstanceReference?: string }>) {
     if (c.cardTransactionInstanceReference && !txnSet.has(c.cardTransactionInstanceReference)) orphanTransactionRefs++;
-    if (c.customerAgreementInstanceReference && !custSet.has(c.customerAgreementInstanceReference)) orphanCustomerRefs++;
+    if (c.customerAgreementInstanceReference && !custSet.has(c.customerAgreementInstanceReference)) {
+      orphanCustomerMap.set(c.customerAgreementInstanceReference, (orphanCustomerMap.get(c.customerAgreementInstanceReference) ?? 0) + 1);
+    }
   }
+  const orphanCustomerReferences = Array.from(orphanCustomerMap.entries())
+    .map(([reference, count]) => ({ reference, count }))
+    .sort((a, b) => b.count - a.count);
 
   const duplicateReferences = dupAgg.map((d) => ({ reference: d._id as string, count: d.count as number }));
   return {
@@ -217,8 +224,9 @@ export async function getFraudIntegrity(db: Db) {
     duplicateReferences,
     duplicateCount: duplicateReferences.length,
     orphanTransactionRefs,
-    orphanCustomerRefs,
-    healthy: duplicateReferences.length === 0 && orphanTransactionRefs === 0 && orphanCustomerRefs === 0,
+    orphanCustomerReferences,
+    orphanCustomerRefs: orphanCustomerReferences.length,
+    healthy: duplicateReferences.length === 0 && orphanTransactionRefs === 0 && orphanCustomerReferences.length === 0,
   };
 }
 

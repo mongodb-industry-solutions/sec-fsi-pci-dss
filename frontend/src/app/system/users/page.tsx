@@ -78,8 +78,10 @@ export default function UsersPage() {
     setCardToken('');
   }
 
-  async function handleSearch() {
-    if (!searchValue.trim()) return;
+  async function handleSearch(valueOverride?: string, fieldOverride?: SearchField) {
+    const field = fieldOverride ?? searchField;
+    const value = (valueOverride ?? searchValue).trim();
+    if (!value) return;
     setSearchLoading(true);
     setSearchError(null);
     setCustomer(null);
@@ -87,9 +89,9 @@ export default function UsersPage() {
     setCardToken('');
     try {
       let result: Record<string, unknown>;
-      if (searchField === 'email') result = await api.customer.getByEmail(searchValue.trim(), token);
-      else if (searchField === 'phone') result = await api.customer.getByPhone(searchValue.trim(), token);
-      else result = await api.customer.getByAccountRef(searchValue.trim(), token);
+      if (field === 'email') result = await api.customer.getByEmail(value, token);
+      else if (field === 'phone') result = await api.customer.getByPhone(value, token);
+      else result = await api.customer.getByAccountRef(value, token);
       setCustomer(result as CustomerResult);
     } catch {
       setSearchError('No customer found for the given value. Verify the field and try again.');
@@ -97,6 +99,21 @@ export default function UsersPage() {
       setSearchLoading(false);
     }
   }
+
+  // Deep-linkable search: prefill from ?field=&q= once after mount and auto-run.
+  const [autoApplied, setAutoApplied] = useState(false);
+  useEffect(() => {
+    if (autoApplied || !token || typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    const field = sp.get('field') as SearchField | null;
+    const q = sp.get('q');
+    if (field && FIELD_LABELS[field]) setSearchField(field);
+    if (q) {
+      setSearchValue(q);
+      handleSearch(q, field && FIELD_LABELS[field] ? field : undefined);
+    }
+    setAutoApplied(true);
+  }, [token, autoApplied]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadTransactions() {
     if (!cardToken.trim()) return;
@@ -182,7 +199,7 @@ export default function UsersPage() {
             className="flex-1 border rounded-lg px-3 py-2 text-sm"
           />
           <button
-            onClick={handleSearch}
+            onClick={() => handleSearch()}
             disabled={searchLoading || !searchValue.trim()}
             className="px-4 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold disabled:opacity-50"
           >

@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Copy, Check, ExternalLink, Trash2, Link2 } from 'lucide-react';
+import { Copy, Check, ExternalLink, Trash2, Link2, Search } from 'lucide-react';
 import { SectionHeader } from '../../../../components/SectionHeader';
+import { Pagination } from '../../../../components/Pagination';
 import { useRequireActiveMerchant } from '../../../../lib/merchantContext';
 import { api } from '../../../../lib/api';
 
@@ -32,6 +33,10 @@ export default function LinksSectionPage() {
 
   const [links, setLinks] = useState<PaymentLink[]>([]);
   const [loadingLinks, setLoadingLinks] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed' | 'inactive'>('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const loadLinks = useCallback(async () => {
     if (!merchantId) return;
@@ -67,6 +72,19 @@ export default function LinksSectionPage() {
   async function deactivate(id: string) {
     try { await api.paymentLinks.deactivate(id, merchantId, token); loadLinks(); } catch {}
   }
+
+  const q = search.trim().toLowerCase();
+  const filtered = links.filter((link) => {
+    if (statusFilter === 'active' && link.paymentLinkStatus !== 'active') return false;
+    if (statusFilter === 'completed' && link.paymentLinkStatus !== 'completed') return false;
+    if (statusFilter === 'inactive' && (link.paymentLinkStatus === 'active' || link.paymentLinkStatus === 'completed')) return false;
+    if (q && !(link.paymentLinkCode.toLowerCase().includes(q) || (link.paymentLinkDescription ?? '').toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const activeCount = links.filter((l) => l.paymentLinkStatus === 'active').length;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paginated = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   return (
     <div className="w-full px-5 sm:px-8 py-6 space-y-5 max-w-2xl">
@@ -137,16 +155,42 @@ export default function LinksSectionPage() {
 
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
-          <h3 className="font-medium text-gray-800 text-sm">Active Links</h3>
+          <h3 className="font-medium text-gray-800 text-sm">
+            Payment links <span className="text-gray-400 font-normal">({activeCount} active of {links.length})</span>
+          </h3>
           <button onClick={loadLinks} className="text-xs text-[#001E2B] font-medium hover:underline">Refresh</button>
         </div>
+
+        {/* Filter + search */}
+        <div className="flex flex-wrap gap-2 items-center px-5 py-3 border-b border-gray-100 bg-gray-50/60">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Search by code or description…"
+              className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value as 'all' | 'active' | 'completed' | 'inactive'); setPage(1); }}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white"
+          >
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+
         {loadingLinks ? (
           <div className="px-5 py-6 text-center text-sm text-gray-400">Loading...</div>
-        ) : links.length === 0 ? (
-          <div className="px-5 py-6 text-center text-sm text-gray-400">No payment links yet.</div>
+        ) : filtered.length === 0 ? (
+          <div className="px-5 py-6 text-center text-sm text-gray-400">{links.length === 0 ? 'No payment links yet.' : 'No links match the current filters.'}</div>
         ) : (
           <ul className="divide-y divide-gray-100">
-            {links.map((link) => (
+            {paginated.map((link) => (
               <li key={link.paymentLinkInstanceReference} className="px-5 py-3 flex items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -178,6 +222,21 @@ export default function LinksSectionPage() {
               </li>
             ))}
           </ul>
+        )}
+
+        {!loadingLinks && filtered.length > 0 && (
+          <div className="px-3 py-2 border-t border-gray-100">
+            <Pagination
+              page={safePage}
+              totalPages={totalPages}
+              total={filtered.length}
+              limit={pageSize}
+              onPageChange={setPage}
+              onLimitChange={(l) => { setPageSize(l); setPage(1); }}
+              limitOptions={[10, 20, 50]}
+              noun="links"
+            />
+          </div>
         )}
       </div>
     </div>

@@ -341,6 +341,7 @@ export const api = {
         duplicateReferences: Array<{ reference: string; count: number }>;
         orphanTransactionRefs: number;
         orphanCustomerRefs: number;
+        orphanCustomerReferences: Array<{ reference: string; count: number }>;
         healthy: boolean;
       }>('/api/v1/fraud/integrity', {}, token),
     getEvents: (id: string, token: string) =>
@@ -475,6 +476,24 @@ export const api = {
     },
     getById: (id: string, token: string) =>
       apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}`, {}, token),
+    // Partial update of merchant configuration (PATCH /:id). Owner may self-serve
+    // operational fields; risk-governed fields require PSP staff.
+    update: (
+      id: string,
+      patch: Partial<{
+        merchantAllowedCurrencies: string[];
+        merchantSettlementSchedule: string;
+        merchantWebhookEndpoint: string;
+        merchantTransactionLimitAmount: number;
+        merchantAgreementStatus: string;
+      }>,
+      token: string,
+    ) =>
+      apiFetch<Record<string, unknown>>(
+        `/api/v1/merchants/${id}`,
+        { method: 'PATCH', body: JSON.stringify(patch) },
+        token,
+      ),
     // Acquiring-side: payments this merchant received (no payer PII returned).
     transactions: (merchantId: string, params: { page?: number; limit?: number; status?: string; search?: string }, token: string) => {
       const qs = new URLSearchParams(

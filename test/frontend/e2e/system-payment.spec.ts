@@ -18,19 +18,25 @@ test.describe('FR-v1-01/03: new payment wizard', () => {
 
   test('renders step 1 with card presets', async ({ page }) => {
     await page.goto('/system/payment');
-    await expect(page.getByText('Visa Demo 4291').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: 'Card', exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: /VISA \.\.\.4291/ })).toBeVisible();
   });
+
+  // Step 1 comes pre-filled (default card/amount/merchant from the picker), so the
+  // wizard can advance immediately; we still select a card + amount to exercise them.
+  async function advanceToConfirmation(page: Page) {
+    await page.goto('/system/payment');
+    await page.getByRole('button', { name: /VISA \.\.\.4291/ }).click();
+    await page.getByRole('button', { name: '$120.00' }).click();
+    await page.getByRole('button', { name: /^Next/ }).click();
+    await page.getByRole('button', { name: /Confirm Payment/i }).click();
+  }
 
   test('completes the 3-step flow to a confirmation', async ({ page }) => {
     await page.route('**/api/v1/transactions', (route) => route.request().method() === 'POST'
       ? route.fulfill(json({ cardTransactionInstanceReference: 'txn-ok-1', cardTransactionStatus: 'authorized', fraudCaseCreated: false }, 201))
       : route.continue());
-    await page.goto('/system/payment');
-    await page.getByText('Visa Demo 4291').first().click();
-    await page.getByText('$120.00').first().click();
-    await page.getByRole('button', { name: 'TechGadgets Ltd.' }).first().click();
-    await page.getByRole('button', { name: /^Next/ }).click();
-    await page.getByRole('button', { name: /Confirm Payment/i }).click();
+    await advanceToConfirmation(page);
     await expect(page.getByText(/Payment Confirmed/i)).toBeVisible({ timeout: 8000 });
   });
 
@@ -38,12 +44,7 @@ test.describe('FR-v1-01/03: new payment wizard', () => {
     await page.route('**/api/v1/transactions', (route) => route.request().method() === 'POST'
       ? route.fulfill(json({ cardTransactionInstanceReference: 'txn-fraud-1', cardTransactionStatus: 'authorized', fraudCaseCreated: true, fraudDiagnosisInstanceReference: 'FD-9' }, 201))
       : route.continue());
-    await page.goto('/system/payment');
-    await page.getByText('Visa Demo 4291').first().click();
-    await page.getByText('$120.00').first().click();
-    await page.getByRole('button', { name: 'TechGadgets Ltd.' }).first().click();
-    await page.getByRole('button', { name: /^Next/ }).click();
-    await page.getByRole('button', { name: /Confirm Payment/i }).click();
+    await advanceToConfirmation(page);
     await expect(page.getByText(/fraud|review|investigation/i).first()).toBeVisible({ timeout: 8000 });
   });
 });
@@ -55,7 +56,7 @@ test.describe('FR-v1-01: payment history', () => {
     ] })));
     await loginAs(context, 'customer');
     await page.goto('/system/payment/history');
-    await expect(page.getByRole('heading', { name: 'My Transactions' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: 'Transactions', exact: true })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('TechGadgets Ltd.').first()).toBeVisible({ timeout: 8000 });
   });
 });

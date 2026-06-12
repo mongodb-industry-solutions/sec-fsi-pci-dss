@@ -100,6 +100,41 @@ export default function SimulatorInvestigationPage() {
     loadCases(1);
   }, [filterStatus, filterSeverity]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Deep-linkable: prefill from ?field=&q=&status=&severity= once on mount and run the query.
+  const [autoApplied, setAutoApplied] = useState(false);
+  useEffect(() => {
+    if (autoApplied || typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    const field = sp.get('field') as SearchField | null;
+    const q = sp.get('q');
+    const status = sp.get('status');
+    const severity = sp.get('severity');
+    setAutoApplied(true);
+    if (!field && !q && !status && !severity) return;
+    if (field && FIELD_LABELS[field]) setSearchField(field);
+    if (q) setSearchValue(q);
+    if (status) setFilterStatus(status);
+    if (severity) setFilterSeverity(severity);
+    (async () => {
+      setLoading(true);
+      try {
+        const caseReference = field === 'caseRef' && q ? q : undefined;
+        const res = await api.fraud.list(
+          { status: status || undefined, severity: severity || undefined, caseReference, page: 1, limit: PAGE_SIZE },
+          '',
+        );
+        setCases(res.results);
+        setTotal(res.total);
+        setPage(1);
+      } catch {
+        setCases([]);
+        setTotal(0);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [autoApplied]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     setPage(1);

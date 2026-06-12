@@ -8,9 +8,8 @@ import { Pagination } from '../../../components/Pagination';
 import { useDebugMode } from '../../../lib/debugMode';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { BriefcaseMedical } from 'lucide-react';
-import { useInitialQueryParams } from '../../../lib/useInitialQueryParams';
 
-type SearchField = 'caseRef' | 'email' | 'phone' | 'accountRef' | 'cardToken';
+type SearchField = 'caseRef' | 'email' | 'phone' | 'accountRef' | 'cardToken' | 'customerId';
 
 const PAGE_SIZE = 10;
 
@@ -20,6 +19,7 @@ const FIELD_LABELS: Record<SearchField, string> = {
   phone:      'Phone (QE:equality)',
   accountRef: 'Account Ref (QE:equality)',
   cardToken:  'Card Token',
+  customerId: 'Customer Ref (internal)',
 };
 
 const FIELD_PLACEHOLDERS: Record<SearchField, string> = {
@@ -28,6 +28,7 @@ const FIELD_PLACEHOLDERS: Record<SearchField, string> = {
   phone:      '+1-555-0000',
   accountRef: 'ACC-001',
   cardToken:  'tok_xxxxxxxx',
+  customerId: 'CUST-...',
 };
 
 export default function InvestigationPage() {
@@ -95,14 +96,16 @@ export default function InvestigationPage() {
   }, [filterStatus, filterSeverity, token, isSearchMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Deep-linkable filters: prefill from ?field=&q=&status=&severity= and auto-run once.
-  const qp = useInitialQueryParams();
+  // Read window.location.search INSIDE the effect (post-commit) so it works with Next
+  // client-side navigation (a Link click), not only on a full page load.
   const [autoApplied, setAutoApplied] = useState(false);
   useEffect(() => {
-    if (autoApplied || !token) return;
-    const field = qp.get('field') as SearchField | null;
-    const q = qp.get('q');
-    const status = qp.get('status');
-    const severity = qp.get('severity');
+    if (autoApplied || !token || typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    const field = sp.get('field') as SearchField | null;
+    const q = sp.get('q');
+    const status = sp.get('status');
+    const severity = sp.get('severity');
     if (!field && !q && !status && !severity) { setAutoApplied(true); return; }
     if (status) setFilterStatus(status);
     if (severity) setFilterSeverity(severity);
@@ -112,7 +115,7 @@ export default function InvestigationPage() {
       handleSearch(q, field && FIELD_LABELS[field] ? field : undefined);
     }
     setAutoApplied(true);
-  }, [token, autoApplied, qp]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [token, autoApplied]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSearch(valueOverride?: string, fieldOverride?: SearchField) {
     const field = fieldOverride ?? searchField;
@@ -136,6 +139,12 @@ export default function InvestigationPage() {
       if (field === 'caseRef') {
         // Case reference (e.g. FD-2026-001001): direct backend filter on the human reference.
         const res = await api.fraud.list({ caseReference: value, limit: 50 }, token);
+        foundCases = res.results;
+
+      } else if (field === 'customerId') {
+        // Internal customer reference: cases referencing a customerAgreementInstanceReference.
+        // Used to review orphaned references flagged by the data-integrity oversight.
+        const res = await api.fraud.list({ customerId: value, limit: 50 }, token);
         foundCases = res.results;
 
       } else if (field === 'cardToken') {

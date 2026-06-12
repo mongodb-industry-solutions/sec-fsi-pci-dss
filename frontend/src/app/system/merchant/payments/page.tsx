@@ -58,6 +58,18 @@ export default function PaymentsSectionPage() {
 
   useEffect(() => { setPage(1); load(1); }, [load]);
 
+  // Deep-linkable: prefill status + search from ?status=&q= once after the merchant loads.
+  const [autoApplied, setAutoApplied] = useState(false);
+  useEffect(() => {
+    if (autoApplied || !merchantId || typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    const s = sp.get('status');
+    const q = sp.get('q');
+    if (s) setStatus(s);
+    if (q) { setSearchInput(q); setSearch(q); }
+    setAutoApplied(true);
+  }, [merchantId, autoApplied]);
+
   if (!merchant) return null;
 
   function onSearch(e: React.FormEvent) { e.preventDefault(); setSearch(searchInput.trim()); }

@@ -78,7 +78,7 @@ export default function SimulatorCaseDetailPage() {
       const l1 = await getSimTokenForRole('level1_analyst');
       await api.fraud.escalate(caseId, { escalationReason: 'Risk exceeds L1 threshold. Requesting L2 review.' }, l1);
       await refreshCase(l1);
-      setMsg('Case escalated to Level 2 — persisted in MongoDB.');
+      setMsg('Case escalated to Level 2; persisted in MongoDB.');
       setCurrentStep('l2-review');
     });
   }
@@ -98,7 +98,7 @@ export default function SimulatorCaseDetailPage() {
         api.system.rawDocument('cardTransactionLog', c.cardTransactionInstanceReference, l2)
           .then(setRawDoc).catch(() => null);
       }
-      setMsg('Escalation approved — escalation token issued, sensitive fields unlocked.');
+      setMsg('Escalation approved. Escalation token issued, sensitive fields unlocked.');
     });
   }
 
@@ -112,12 +112,12 @@ export default function SimulatorCaseDetailPage() {
           resolutionOutcome: outcome,
           resolutionNotes: outcome === 'confirmed_fraud'
             ? 'Confirmed fraud after forensic review. Card blocked, dispute filed.'
-            : 'Cleared after review — legitimate transaction.',
+            : 'Cleared after review: legitimate transaction.',
         },
         l2,
       );
       await refreshCase(l2);
-      setMsg(`Case resolved as ${outcome === 'confirmed_fraud' ? 'confirmed fraud' : 'cleared'} — persisted.`);
+      setMsg(`Case resolved as ${outcome === 'confirmed_fraud' ? 'confirmed fraud' : 'cleared'}; persisted.`);
       setCurrentStep('customer-view');
     });
   }
@@ -293,7 +293,7 @@ function L1OpenView({ fraudCase, showRaw, rawDoc, onToggleRaw }: {
         <RiskBlock fraudCase={fraudCase} />
         <div className="rounded-lg border divide-y text-sm">
           <div className="px-3 py-2 bg-blue-50">
-            <p className="text-xs font-semibold text-blue-700 uppercase mb-1.5">L1 can search (QE:equality — encrypted but queryable)</p>
+            <p className="text-xs font-semibold text-blue-700 uppercase mb-1.5">L1 can search (QE:equality, encrypted but queryable)</p>
             <div className="flex flex-wrap gap-2">
               <EncryptionBadge label="Email" type="qe-equality" />
               <EncryptionBadge label="Phone" type="qe-equality" />
@@ -301,7 +301,7 @@ function L1OpenView({ fraudCase, showRaw, rawDoc, onToggleRaw }: {
             </div>
           </div>
           <div className="px-3 py-2 bg-gray-50">
-            <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">L2 only (QE:none — separate DEK)</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">L2 only (QE:none, separate DEK)</p>
             <div className="flex flex-wrap gap-2">
               <EncryptionBadge label="Physical Address" type="qe-none" />
               <EncryptionBadge label="Government ID" type="qe-none" />
@@ -412,7 +412,7 @@ function L2ReviewView({ fraudCase, customer, escalationToken, l2HasAccepted, isE
             <Field label="Account Reference" value={accountRef} type="qe-equality" />
           </div>
           <div className="px-3 py-2 bg-purple-50 space-y-2">
-            <p className="text-xs font-semibold text-purple-700 uppercase">QE:none (L2 only — after approval)</p>
+            <p className="text-xs font-semibold text-purple-700 uppercase">QE:none (L2 only, after approval)</p>
             <Field
               label="Physical Address"
               value={addr ? [addr.streetAddress, addr.city, addr.postalCode, addr.countryCode].filter(Boolean).join(', ') : undefined}
@@ -448,7 +448,7 @@ function Field({ label, value, type, locked }: { label: string; value?: string; 
     <div className="flex items-center gap-2">
       <EncryptionBadge label={label} type={type} />
       {locked
-        ? <span className="text-gray-400 text-xs italic">🔒 locked — requires L2 escalation</span>
+        ? <span className="text-gray-400 text-xs italic">🔒 locked, requires L2 escalation</span>
         : <span className="text-green-700 font-mono text-xs">{value ?? '—'}</span>}
     </div>
   );

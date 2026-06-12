@@ -572,7 +572,19 @@ function AnalystMerchantView({ token, role }: { token: string; role: string }) {
     }
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { load(1, pageSize, statusFilter, nameFilter); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Deep-linkable: prefill status + name from ?status=&q= once on mount, then load.
+  useEffect(() => {
+    let status = statusFilter;
+    let name = nameFilter;
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      const s = sp.get('status');
+      const q = sp.get('q');
+      if (s) { status = s; setStatusFilter(s); }
+      if (q) { name = q; setNameInput(q); setNameFilter(q); }
+    }
+    load(1, pageSize, status, name);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSearch() {
     const v = nameInput.trim();

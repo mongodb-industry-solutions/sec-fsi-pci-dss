@@ -507,7 +507,10 @@ The reviewing officer's partyRef is recorded for audit trail.
       description: `Partial update of a \`merchantAgreement\`. Only the provided fields are updated.
 Allowed fields: \`merchantTransactionLimitAmount\`, \`merchantWebhookEndpoint\`, \`merchantSettlementSchedule\`, \`merchantAgreementStatus\`, \`merchantAllowedCurrencies\`.
 
-**Roles:** \`merchant_officer\`, \`security_auditor\` only.`,
+**Roles:** \`merchant_officer\` and \`security_auditor\` may update any allowed field on any merchant.
+A merchant owner (\`customer\` role) may self-serve operational settings on their OWN merchant only:
+\`merchantAllowedCurrencies\`, \`merchantSettlementSchedule\`, \`merchantWebhookEndpoint\`.
+Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementStatus\`) remain PSP staff only.`,
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       body: {
@@ -529,11 +532,26 @@ Allowed fields: \`merchantTransactionLimitAmount\`, \`merchantWebhookEndpoint\`,
     },
   }, async (request, reply) => {
     const user = (request as { user?: JwtDemoPayload }).user;
-    if (user?.role !== 'merchant_officer' && user?.role !== 'security_auditor') {
-      return reply.status(403).send({ error: 'Access denied: merchant configuration update requires merchant_officer or security_auditor role.' });
-    }
     const { id } = request.params as { id: string };
     const patch = request.body as Record<string, unknown>;
+    const isStaff = user?.role === 'merchant_officer' || user?.role === 'security_auditor';
+
+    if (!isStaff) {
+      // Merchant owner self-service: must own this merchant and may only touch operational fields.
+      const OWNER_FIELDS = ['merchantAllowedCurrencies', 'merchantSettlementSchedule', 'merchantWebhookEndpoint'];
+      if (user?.role !== 'customer' || !user?.partyRef) {
+        return reply.status(403).send({ error: 'Access denied: merchant configuration update requires merchant_officer, security_auditor or the merchant owner.' });
+      }
+      const own = await getMerchantByOwnerPartyRef(fastify.db, user.partyRef);
+      if (!own || own.merchantAgreementInstanceReference !== id) {
+        return reply.status(403).send({ error: 'Access denied: you can only update your own merchant.' });
+      }
+      const disallowed = Object.keys(patch).filter((k) => !OWNER_FIELDS.includes(k));
+      if (disallowed.length > 0) {
+        return reply.status(403).send({ error: `Access denied: merchant owners can only update operational settings (${OWNER_FIELDS.join(', ')}). Risk-governed fields are PSP staff only.` });
+      }
+    }
+
     const result = await updateMerchant(fastify.db, id, patch as never);
     if (!result) return reply.status(404).send({ error: 'Merchant not found' });
     return reply.send(result);

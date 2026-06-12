@@ -21,17 +21,18 @@ async function stub(page: Page) {
 test.describe('FR-v1-04: customer lookup', () => {
   test.beforeEach(async ({ page }) => { await stub(page); });
 
-  test('analyst sees the Customer Lookup page', async ({ page, context }) => {
+  test('analyst sees the customer lookup (Users) page', async ({ page, context }) => {
     await loginAs(context, 'level1_analyst');
     await page.goto('/system/users');
-    await expect(page.getByRole('heading', { name: 'Customer Lookup' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: 'Search by encrypted field' })).toBeVisible();
   });
 
   test('a QE equality search returns a customer result', async ({ page, context }) => {
     await loginAs(context, 'level1_analyst');
     await page.goto('/system/users');
-    await expect(page.getByRole('heading', { name: 'Customer Lookup' })).toBeVisible({ timeout: 15000 });
-    await page.locator('input[type="text"]').first().fill('jane@example.com');
+    await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible({ timeout: 15000 });
+    await page.getByPlaceholder('customer@example.com').fill('jane@example.com');
     await page.getByRole('button', { name: /^Search/ }).first().click();
     await expect(page.getByText('Jane Doe').first()).toBeVisible({ timeout: 8000 });
   });

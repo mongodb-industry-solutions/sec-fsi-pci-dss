@@ -48,7 +48,7 @@ test.describe('FR-v1-04: case dashboard', () => {
     test(`${role} sees the Case Dashboard with a case row`, async ({ page, context }) => {
       await loginAs(context, role);
       await page.goto('/system/investigation');
-      await expect(page.getByRole('heading', { name: 'Case Dashboard' })).toBeVisible({ timeout: 15000 });
+      await expect(page.getByRole('heading', { name: 'Cases', exact: true })).toBeVisible({ timeout: 15000 });
       await expect(page.getByText('CASE-2026-0001').first()).toBeVisible({ timeout: 8000 });
     });
   }
