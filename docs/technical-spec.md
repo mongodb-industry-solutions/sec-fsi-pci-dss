@@ -1233,6 +1233,12 @@ Returns cards linked to a customer (plaintext lookup by FK).
 
 ---
 
+#### `GET /fraud/stats`
+
+Investigation analytics for the L1 / L2 / auditor dashboards. MongoDB aggregation returning case `total`, counts by lifecycle (`open`, `underReview`, `escalated`, `resolvedFraud`, `resolvedCleared`), and breakdowns `byStatus`, `bySeverity`, `byMonth`. Aggregates over operational case metadata only — `fraudDiagnosisCase` holds no cardholder PII (PCI DSS Req 3/7). Registered before `/:id` so `stats` is not matched as a case id. (Customers are blocked from `/fraud` by middleware.)
+
+---
+
 #### `GET /fraud/:id`
 
 **Response 200:**

@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, appendAuditEvent, createFraudCase, addCaseNote, retractCaseNote, getCaseNotes } from '../services/fraudDiagnosis.service';
+import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, appendAuditEvent, createFraudCase, addCaseNote, retractCaseNote, getCaseNotes, getFraudStats } from '../services/fraudDiagnosis.service';
 import { getTransactionById } from '../../transactions/services/cardTransaction.service';
 import { generateToken } from '../../../vendors/security/escalationTokens';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
@@ -247,6 +247,36 @@ without creating a duplicate.
       fraudDiagnosisCaseReference:     '', // will be populated once fetched
       alreadyExisted: false,
     });
+  });
+
+  // GET /api/v1/fraud/stats — investigation analytics for L1/L2/auditor dashboards.
+  // Registered before /:id so "stats" is not matched as a case id.
+  // Aggregates over case metadata only — no cardholder PII (PCI DSS Req 3/7).
+  fastify.get('/stats', {
+    schema: {
+      tags: ['fraud'],
+      summary: 'Fraud investigation analytics',
+      description: 'Aggregated case counts by status, severity, and month for the investigation dashboards. No PII — fraud cases carry only operational metadata.',
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            total:           { type: 'number' },
+            open:            { type: 'number' },
+            underReview:     { type: 'number' },
+            escalated:       { type: 'number' },
+            resolvedFraud:   { type: 'number' },
+            resolvedCleared: { type: 'number' },
+            byStatus:   { type: 'array', items: { type: 'object', properties: { status: { type: 'string' }, count: { type: 'number' } } } },
+            bySeverity: { type: 'array', items: { type: 'object', properties: { severity: { type: 'string' }, count: { type: 'number' } } } },
+            byMonth:    { type: 'array', items: { type: 'object', properties: { year: { type: 'number' }, month: { type: 'number' }, count: { type: 'number' } } } },
+          },
+        },
+      },
+    },
+  }, async (_request, reply) => {
+    const stats = await getFraudStats(fastify.db);
+    return reply.send(stats);
   });
 
   fastify.get('/:id', {

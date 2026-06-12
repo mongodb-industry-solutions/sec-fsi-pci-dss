@@ -116,6 +116,44 @@ export async function getCaseById(db: Db, id: string) {
     .findOne({ fraudDiagnosisInstanceReference: id });
 }
 
+/**
+ * Fraud investigation analytics for L1 / L2 / auditor dashboards.
+ * Aggregation over operational case metadata only — fraudDiagnosisCase carries no
+ * cardholder PII (PCI DSS Req 3/7). `$toDate` tolerates Date or ISO-string dates.
+ */
+export async function getFraudStats(db: Db) {
+  const coll = db.collection(FRAUD_DIAGNOSIS_COLLECTION);
+
+  const [byStatus, bySeverity, byMonth, totalAgg] = await Promise.all([
+    coll.aggregate([
+      { $group: { _id: '$fraudDiagnosisCaseStatus', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]).toArray(),
+    coll.aggregate([
+      { $group: { _id: '$fraudDiagnosisCaseSeverity', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]).toArray(),
+    coll.aggregate([
+      { $group: { _id: { y: { $year: { $toDate: '$fraudDiagnosisRequestDateTime' } }, m: { $month: { $toDate: '$fraudDiagnosisRequestDateTime' } } }, count: { $sum: 1 } } },
+      { $sort: { '_id.y': 1, '_id.m': 1 } },
+    ]).toArray(),
+    coll.aggregate([{ $count: 'total' }]).toArray(),
+  ]);
+
+  const countFor = (status: string) => (byStatus.find((s) => s._id === status)?.count as number) ?? 0;
+  return {
+    total: (totalAgg[0]?.total as number) ?? 0,
+    open: countFor('open'),
+    underReview: countFor('under_review'),
+    escalated: countFor('escalated'),
+    resolvedFraud: countFor('resolved_fraud'),
+    resolvedCleared: countFor('resolved_cleared'),
+    byStatus:   byStatus.map((s) => ({ status: s._id as string, count: s.count as number })),
+    bySeverity: bySeverity.map((s) => ({ severity: s._id as string, count: s.count as number })),
+    byMonth:    byMonth.map((s) => ({ year: (s._id as { y: number }).y, month: (s._id as { m: number }).m, count: s.count as number })),
+  };
+}
+
 export async function updateCase(
   db: Db,
   id: string,

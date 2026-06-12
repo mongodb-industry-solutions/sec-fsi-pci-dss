@@ -1676,3 +1676,29 @@ The merchant owner panel (`/system/merchant`) was a single page with client-side
 - (+) No new frontend dependency (charts are hand-rolled).
 - (−) Gross-volume mixes currencies into a primary figure; the by-currency breakdown is provided alongside to keep it honest. Settlement/payout (fees, T+2) remains out of scope.
 - (−) The legacy monolithic `MerchantSandbox` component was removed; section logic now lives in per-route pages.
+
+---
+
+## ADR-021 — Role dashboards with embedded analytics
+
+**Status:** Accepted (2026-06-12)
+
+**Context**
+
+The `/system` role dashboard showed only action cards (quick links) per role — no at-a-glance insight into the data each role works with. ADR-020 introduced an analytics dashboard for merchants; the same value applies to every role.
+
+**Decision**
+
+- Add a role-aware **Insights** section below the action cards on `/system`, reusing dependency-free chart primitives (`components/dashboard/Stats.tsx`: `StatCard`, `MonthlyBars`, `BreakdownBars`) and a `RoleStats` dispatcher (`components/dashboard/RoleStats.tsx`).
+- Data sources, chosen to reuse existing endpoints and add only one new aggregation:
+  - **L1 / L2 / Security Auditor** → new `GET /api/v1/fraud/stats` (MongoDB `$group`): cases total + by status / severity / month. Shared by all three investigation roles.
+  - **Customer** → own payments via `GET /transactions/all` (backend scopes to the caller's email); aggregated client-side (count, spend by currency, by month, by status).
+  - **Merchant Officer** → `GET /merchants` aggregated client-side (by status, by risk; pending-review KPI).
+  - **Manager** → `GET /integrations` aggregated client-side (internal/external, by health).
+- **Standards**: every figure is an aggregate or the caller's own data — no other party's PII is exposed (PCI DSS Req 3 & 7). Fraud analytics align with BIAN SD-83 (Fraud Diagnosis), merchant analytics with SD-89, integrations with SD-193. Customers remain blocked from `/fraud` and `/customer` by middleware.
+
+**Consequences**
+
+- (+) Each role lands on a dashboard with relevant KPIs and trends, matching PSP-console expectations, with consistent visuals across the app and the merchant panel.
+- (+) Only one new backend endpoint (`/fraud/stats`); other roles reuse existing list endpoints.
+- (−) Customer/officer/manager aggregations are computed client-side over a capped page (≤100); for demo data volumes this is exact. A server-side aggregation could be added later if datasets grow.

@@ -325,6 +325,14 @@ export const api = {
     },
     getById: (id: string, token: string) =>
       apiFetch<FraudCase>(`/api/v1/fraud/${id}`, {}, token),
+    // Investigation analytics for L1/L2/auditor dashboards (no PII).
+    stats: (token: string) =>
+      apiFetch<{
+        total: number; open: number; underReview: number; escalated: number; resolvedFraud: number; resolvedCleared: number;
+        byStatus: Array<{ status: string; count: number }>;
+        bySeverity: Array<{ severity: string; count: number }>;
+        byMonth: Array<{ year: number; month: number; count: number }>;
+      }>('/api/v1/fraud/stats', {}, token),
     getEvents: (id: string, token: string) =>
       apiFetch<CaseEventsResponse>(`/api/v1/fraud/${id}/events`, {}, token),
     allEvents: (params: { page?: number; limit?: number }, token: string) => {

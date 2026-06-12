@@ -16,6 +16,7 @@ import { Tooltip } from '../../components/Tooltip';
 import { useDebugMode } from '../../lib/debugMode';
 import { UserMenu } from '../../components/UserMenu';
 import { DemoSidebar, MobileBottomNav } from '../../components/DemoSidebar';
+import { RoleStats } from '../../components/dashboard/RoleStats';
 
 type DecodedUser = NonNullable<ReturnType<typeof decodeToken>>;
 
@@ -485,6 +486,15 @@ function RoleDashboard({ user, onSignOut }: { user: DecodedUser; onSignOut: () =
               })}
             </div>
           )}
+
+          {/* Role-relevant analytics (BIAN-aligned; aggregates only — no cardholder PII) */}
+          <div className="mt-8">
+            <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+              Insights
+              {debugMode && <span className="text-[10px] font-mono text-gray-400">· aggregates only · PCI DSS Req 3/7</span>}
+            </h2>
+            <RoleStats role={user.role} token={getToken() ?? ''} />
+          </div>
 
           {debugMode && (
             <div className="mt-6 bg-slate-900 rounded-xl p-4 text-xs font-mono text-slate-300">
