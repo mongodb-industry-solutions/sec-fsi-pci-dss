@@ -1702,3 +1702,25 @@ The `/system` role dashboard showed only action cards (quick links) per role —
 - (+) Each role lands on a dashboard with relevant KPIs and trends, matching PSP-console expectations, with consistent visuals across the app and the merchant panel.
 - (+) Only one new backend endpoint (`/fraud/stats`); other roles reuse existing list endpoints.
 - (−) Customer/officer/manager aggregations are computed client-side over a capped page (≤100); for demo data volumes this is exact. A server-side aggregation could be added later if datasets grow.
+
+---
+
+## ADR-022 — Staff merchant visibility: full portfolio + drill-in (SD-89)
+
+**Status:** Accepted (2026-06-12)
+
+**Context**
+
+In `/system/merchant`, the Merchant Officer view was scoped to review states only (`under_review`, `agreed`, `rejected`) — it excluded `active`/approved merchants — and merchant rows were not clickable, so neither the officer nor the auditor could open a merchant to inspect its KYB and activity. BIAN SD-89 (Merchant Relations) assigns the Merchant Officer the **full relationship lifecycle** (servicing/monitoring of active merchants, not just onboarding control), and the auditor needs read-only oversight of all merchants (PCI DSS Req 10, Req 12.8). Merchant records carry **no cardholder data**, so broader read access is consistent with PCI DSS Req 7.
+
+**Decision**
+
+- **Full lifecycle for the Merchant Officer**: the merchant list (`AnalystMerchantView`) now shows **all statuses** (incl. `active`/`suspended`/`closed`) for both officer and auditor; the officer keeps a quick link to the focused **Review queue** (`/system/merchant/review`) for pending approvals. Write actions (approve/reject) remain in the review flow (separation of duties on mutations, not reads).
+- **Drill-in detail** at `/system/merchant/[id]` (dynamic route alongside the owner section routes): merchant identity, KYB (SD-89 BQ:Step), and **acquiring analytics** (reusing `GET /merchants/:id/stats` and `/:id/transactions`, which already authorize owner / merchant_officer / security_auditor). Authorization in the page: staff roles or the merchant's own owner; otherwise access-denied. Read-only presentation.
+- **PCI DSS**: every figure shown is an aggregate or PII-minimized (masked PAN, no payer identity / account / gateway payload). Merchant business data contains no CHD.
+
+**Consequences**
+
+- (+) The officer can service and monitor the whole portfolio, and the auditor can review any merchant end-to-end — matching SD-89 and PCI DSS Req 10/12.8.
+- (+) Reuses existing endpoints and shared chart components; no new backend.
+- (−) Broadens the officer's read scope beyond the earlier review-only restriction (deliberate, per SD-89). Mutations stay gated.

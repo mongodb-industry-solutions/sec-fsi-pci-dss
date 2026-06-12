@@ -6,8 +6,9 @@ import { useMerchant } from '../../../lib/merchantContext';
 import { useDebugMode } from '../../../lib/debugMode';
 import {
   Check, Clock, CheckCircle2, XCircle, Store, ChevronRight, ShieldCheck,
-  Building2, MapPin, FileText, ArrowRight, Info, Filter, Search, X,
+  Building2, MapPin, FileText, ArrowRight, Info, Filter, Search, X, ClipboardCheck,
 } from 'lucide-react';
+import Link from 'next/link';
 import { Pagination } from '../../../components/Pagination';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -538,8 +539,7 @@ const STATUS_LABELS: Record<string, string> = {
   closed:       'Closed',
 };
 
-const OFFICER_STATUSES = ['under_review', 'agreed', 'rejected'];
-const ALL_STATUSES     = ['initiated', 'under_review', 'agreed', 'active', 'amended', 'suspended', 'rejected', 'closed'];
+const ALL_STATUSES = ['initiated', 'under_review', 'agreed', 'active', 'amended', 'suspended', 'rejected', 'closed'];
 
 function AnalystMerchantView({ token, role }: { token: string; role: string }) {
   const { debugMode } = useDebugMode();
@@ -550,7 +550,7 @@ function AnalystMerchantView({ token, role }: { token: string; role: string }) {
   const [page, setPage]             = useState(1);
   const [pageSize, setPageSize]     = useState(MERCHANT_PAGE_SIZE);
   const [loading, setLoading]       = useState(true);
-  const [statusFilter, setStatusFilter] = useState(isMerchantOfficer ? 'under_review' : '');
+  const [statusFilter, setStatusFilter] = useState('');
   const [nameInput, setNameInput]   = useState('');
   const [nameFilter, setNameFilter] = useState('');
 
@@ -587,7 +587,7 @@ function AnalystMerchantView({ token, role }: { token: string; role: string }) {
   }
 
   function handleClear() {
-    const defaultStatus = isMerchantOfficer ? 'under_review' : '';
+    const defaultStatus = '';
     setNameInput('');
     setNameFilter('');
     setStatusFilter(defaultStatus);
@@ -608,21 +608,31 @@ function AnalystMerchantView({ token, role }: { token: string; role: string }) {
   }
 
   const totalPages  = Math.max(1, Math.ceil(total / pageSize));
-  const hasFilters  = !!nameFilter || (isMerchantOfficer ? statusFilter !== 'under_review' : !!statusFilter);
-  const statuses    = isMerchantOfficer ? OFFICER_STATUSES : ALL_STATUSES;
+  const hasFilters  = !!nameFilter || !!statusFilter;
+  const statuses    = ALL_STATUSES;
 
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
 
-      <div>
-        <h1 className="text-2xl font-bold">
-          {isMerchantOfficer ? 'Merchant Review Queue' : 'Merchant Agreements'}
-        </h1>
-        {debugMode && (
-          <p className="text-xs text-gray-400 font-mono mt-0.5">
-            SD-89 · MerchantAgreementProcedure
-            {isMerchantOfficer && ' · PCI DSS Req 7.1, scope: review states only'}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold">Merchant Agreements</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {isMerchantOfficer
+              ? 'Full merchant portfolio across the lifecycle. Open any merchant for KYB and activity. BIAN SD-89.'
+              : 'Read-only oversight of all merchant agreements. Open any merchant for KYB and activity. BIAN SD-89.'}
           </p>
+          {debugMode && (
+            <p className="text-xs text-gray-400 font-mono mt-0.5">
+              SD-89 · MerchantAgreementProcedure · PCI DSS Req 7 (no CHD in merchant records) · Req 12.8
+            </p>
+          )}
+        </div>
+        {isMerchantOfficer && (
+          <Link href="/system/merchant/review"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] text-sm font-medium hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors shrink-0">
+            <ClipboardCheck size={14} /> Review queue
+          </Link>
         )}
       </div>
 
@@ -663,7 +673,7 @@ function AnalystMerchantView({ token, role }: { token: string; role: string }) {
             onChange={(e) => handleStatusChange(e.target.value)}
             className="border rounded-lg px-3 py-1.5 text-sm bg-white"
           >
-            {!isMerchantOfficer && <option value="">All statuses</option>}
+            <option value="">All statuses</option>
             {statuses.map((s) => <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>)}
           </select>
           <span className="text-gray-400 text-sm self-center ml-auto">{total} merchants</span>
@@ -680,7 +690,11 @@ function AnalystMerchantView({ token, role }: { token: string; role: string }) {
         <>
           <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
             {merchants.map((m) => (
-              <div key={m.merchantAgreementInstanceReference} className="px-5 py-4 flex items-center gap-4">
+              <Link
+                key={m.merchantAgreementInstanceReference}
+                href={`/system/merchant/${m.merchantAgreementInstanceReference}`}
+                className="px-5 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors group"
+              >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-gray-800">{m.merchantName}</span>
@@ -701,10 +715,11 @@ function AnalystMerchantView({ token, role }: { token: string; role: string }) {
                     )}
                   </div>
                 </div>
-                <div className="text-xs text-gray-400 font-mono shrink-0 hidden sm:block truncate max-w-[180px]">
+                <div className="text-xs text-gray-400 font-mono shrink-0 hidden sm:block truncate max-w-[160px]">
                   {m.merchantAgreementInstanceReference}
                 </div>
-              </div>
+                <ChevronRight size={16} className="text-gray-300 group-hover:text-[#001E2B] transition-colors shrink-0" />
+              </Link>
             ))}
           </div>
 

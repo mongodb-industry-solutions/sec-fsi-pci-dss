@@ -23,6 +23,7 @@ export interface TokenPayload {
   role: string;
   name: string;
   domain: string;
+  partyRef?: string;   // partyInstanceReference (SD-13); present for users with a Party record
   iat: number;
   exp: number;
 }
