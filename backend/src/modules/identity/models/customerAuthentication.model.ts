@@ -16,6 +16,10 @@ export interface CustomerAuthenticationAssessmentRecord {
   customerAuthenticationLoginDomain: 'local' | 'msentra';
   customerAuthenticationAccountStatus: 'active' | 'suspended';
   customerAuthenticationLastLoginDateTime?: Date;
+  // Demo-only: marks the curated roster surfaced in the debug-mode user picker
+  // (application mode) and used by the simulator. Non-featured users remain
+  // seeded and fully usable for testing.
+  customerAuthenticationDemoFeatured?: boolean;
   bianServiceDomain: 'Customer Authentication';
   bianControlRecordType: 'CustomerAuthenticationAssessment';
   recordCreatedDateTime: Date;
@@ -27,4 +31,5 @@ export type CustomerAuthRole =
   | 'level1_analyst'
   | 'level2_investigator'
   | 'security_auditor'
-  | 'merchant_officer';   // Ch-05: SD-89 Merchant Acquiring bank employee
+  | 'merchant_officer'    // Ch-05: SD-89 Merchant Acquiring bank employee
+  | 'manager';            // SD-193: Integration Hub administrator

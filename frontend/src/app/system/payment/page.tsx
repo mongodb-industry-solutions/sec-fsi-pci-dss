@@ -112,9 +112,12 @@ export default function DemoPaymentPage() {
     setSubmitting(true);
     setError(null);
     try {
+      const payload = decodeToken(token);
       const res = await api.transactions.create({
         cardToken,
-        accountReference: `ACC-DEMO-${Date.now().toString(36).toUpperCase()}`,
+        // Use the authenticated customer's email so the backend normalizes the
+        // transaction to their canonical account reference and it shows in history.
+        accountReference: payload?.email ?? `ACC-DEMO-${Date.now().toString(36).toUpperCase()}`,
         amount: parseFloat(amount),
         currency: 'USD',
         cardTransactionMerchantName: merchant,
@@ -128,23 +131,8 @@ export default function DemoPaymentPage() {
         gatewayPayload: { source: 'app-mode', paymentReference: paymentReference || undefined },
       }, token);
 
-      const txnId   = res.cardTransactionInstanceReference;
-      const payload = decodeToken(token);
-      const key     = payload?.sub ? `demo_transactions_${payload.sub}` : 'demo_transactions_guest';
-      const stored  = JSON.parse(localStorage.getItem(key) ?? '[]') as object[];
-      stored.unshift({
-        txnId, cardToken, amount: parseFloat(amount), currency: 'USD',
-        merchant, mcc, channel, initiationType,
-        cardTransactionType: 'purchase',
-        maskedPan: maskedCard, network: selectedPreset?.network ?? null,
-        status: res.fraudCaseCreated ? 'under_review' : 'authorized',
-        fraudCaseCreated: res.fraudCaseCreated,
-        caseId: res.fraudDiagnosisInstanceReference,
-        createdAt: new Date().toISOString(),
-        paymentReference: paymentReference || null,
-      });
-      localStorage.setItem(key, JSON.stringify(stored.slice(0, 50)));
-
+      const txnId = res.cardTransactionInstanceReference;
+      // Persisted server-side; history reads from the real API (no local mirror).
       setResult({ txnId, fraudCaseCreated: res.fraudCaseCreated, caseId: res.fraudDiagnosisInstanceReference, maskedPan: maskedCard });
       setStep(3);
     } catch (err) {

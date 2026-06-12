@@ -83,28 +83,40 @@ export default function TransactionHistoryPage() {
       const t = getToken() ?? '';
       const u = t ? decodeToken(t) : null;
 
-      const storageKey = u?.sub ? `demo_transactions_${u.sub}` : 'demo_transactions_guest';
-      const stored: StoredTransaction[] = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
-      if (stored.length === 0) { setLoading(false); return; }
-
-      const enriched: TransactionWithCase[] = await Promise.all(
-        stored.map(async (txn) => {
-          if (!txn.caseId) return txn;
-          try {
-            const c = await api.fraud.getById(txn.caseId, t);
-            return {
-              ...txn,
-              caseStatus: c.caseStatus,
-              caseRef: c.fraudDiagnosisCaseReference,
-              customerNote: c.fraudDiagnosisCustomerSubjectNotes,
-              resolutionOutcome: c.fraudDiagnosisResolutionRecord?.resolutionOutcome ?? null,
-            };
-          } catch {
-            return txn;
-          }
-        })
-      );
-      setAllTxns(enriched);
+      try {
+        // Real, single source of truth. The backend scopes a customer to their own
+        // transactions (it ignores the email param for the customer role).
+        const res = await api.transactions.listAll({ email: u?.email, limit: 100 }, t);
+        const mapped: TransactionWithCase[] = res.results.map((r) => {
+          const row = r as {
+            cardTransactionInstanceReference: string;
+            cardTransactionAmount: { amount: number; currency: string };
+            cardTransactionDateTime: string;
+            cardTransactionStatus: string;
+            cardTransactionType?: string;
+            cardTransactionMerchantName: string;
+            cardTransactionMerchantCategoryCode?: string;
+            cardTransactionChannel?: string;
+            cardTransactionMaskedPanDisplay: string;
+          };
+          return {
+            txnId:               row.cardTransactionInstanceReference,
+            amount:              row.cardTransactionAmount?.amount ?? 0,
+            currency:            row.cardTransactionAmount?.currency ?? 'USD',
+            merchant:            row.cardTransactionMerchantName,
+            mcc:                 row.cardTransactionMerchantCategoryCode ?? '',
+            channel:             row.cardTransactionChannel ?? '',
+            cardTransactionType: row.cardTransactionType,
+            maskedPan:           row.cardTransactionMaskedPanDisplay,
+            status:              row.cardTransactionStatus,
+            fraudCaseCreated:    false,
+            createdAt:           row.cardTransactionDateTime,
+          };
+        });
+        setAllTxns(mapped);
+      } catch {
+        setAllTxns([]);
+      }
       setLoading(false);
     };
     load();

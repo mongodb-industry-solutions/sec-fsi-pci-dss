@@ -1596,3 +1596,33 @@ Add `'generic'` to `IntegrationProviderType`. The `bianServiceDomain` for generi
 + Generic integrations are visible in PCI DSS TPSP lists (Req 12.8.1), improving audit completeness.
 - The `system_admin` UI must clearly distinguish generic integrations from compliance integrations to avoid confusion during audits.
 - `generic` integrations have no BIAN SD alignment beyond SD-193 itself — this must be documented clearly in audit reports.
+
+---
+
+## ADR-018 — Simulator/Application Parity: real auth, account-reference normalization, curated roster
+
+**Status:** Accepted (2026-06-12)
+
+**Context**
+
+ADR-004 established the dual-mode frontend. In practice the Simulator had drifted from being a faithful demonstration of the real system:
+
+1. The investigation flow (`simulator/investigation/[caseId]`) was a static, hard-coded narrative. Escalation, L2 approval, and resolution were **not** persisted — they never called the real API. It also rendered **fictional data** (a Springfield address, a fake government ID, fabricated ciphertext), violating the principle that the Simulator runs on real system data.
+2. The Simulator performed no authentication; it relied on public-GET routes and could not exercise role-gated mutations, so a case "escalated" in the Simulator never appeared for an L2 user in Application mode.
+3. The demo user roster was duplicated and inconsistent across four sources (`users.json` [dead], `customerAuthentications.json`, a hard-coded frontend map, and the docs), with mixed email domains.
+4. `cardTransactionAccountReference` (QE:equality) held **heterogeneous** values — seeded transactions used the business key `ACC-xxx`, while the Simulator wrote the payer email — so no single query surfaced a customer's full history, and Application-mode history relied on a `localStorage` mirror (a second source of truth).
+
+**Decision**
+
+- **Real authentication, no bypass.** The Simulator obtains a real per-role JWT via the existing `POST /api/v1/auth/login` using the shared demo credential (centralized as `DEMO_PASSWORD`). A frontend helper (`lib/simulatorAuth.ts`) caches tokens per role. Escalate → approve → resolve now hit the real `/api/v1/fraud/*` endpoints and persist, achieving bidirectional parity. No demo-only auth endpoint was added.
+- **No fictional data.** The investigation flow reads the real case, customer record, and live Atlas ciphertext (raw document) with the real L2 escalation token. All fabricated constants were removed.
+- **Curated roster flag.** `customerAuthenticationDemoFeatured: boolean` marks the curated set (4 customers incl. the simulator merchant owner, 2 L1, 2 L2, 2 auditors, 2 merchant officers, 1 manager). `GET /api/v1/auth/users?featured=true` (and `/system/users`) returns it; the debug-mode picker and Simulator consume it. The full seed stays intact for ad-hoc testing. Emails unified to `@back.es`. `users.json` deleted (dead).
+- **Account-reference normalization.** `createTransaction` resolves the payer (email **or** `ACC-xxx`) to the customer's canonical `customerAgreementReference` and stores **that** in `cardTransactionAccountReference`. History lookups (`getAllTransactions` `email` filter and the Simulator transactions endpoint) resolve email → `ACC-xxx` and match the QE:equality field, covering both seeded and Simulator-created transactions. The `localStorage` mirror (`simulatorHistory.ts`) was removed; Application mode reads history from `GET /api/v1/transactions/all`, scoped server-side to the customer's own email for the `customer` role (privacy).
+
+**Consequences**
+
+- (+) A Simulator action is now indistinguishable from an Application-mode action in the database; the demo proves the real security model (RBAC + QE) rather than narrating it.
+- (+) Single source of truth for the roster and for transaction history.
+- (+) Removed dead/duplicated resources: `users.json`, the hard-coded password map, fictional investigation constants, `simulatorHistory.ts`, and the legacy `*Sensitive.json` export files.
+- (−) The Simulator now depends on the auth and fraud endpoints behaving correctly; an RBAC bug surfaces in the Simulator (intended — it is now an honest test surface).
+- (−) Customer-facing case status in Application-mode transaction **history list** is not shown (customers are blocked from `/fraud`); customer-visible case notes remain available on the detail page via the dedicated customer-safe notes endpoint. A customer-safe case-status projection on `/transactions/all` is a possible follow-up.

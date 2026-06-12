@@ -637,7 +637,7 @@
   },
   {
     "partyInstanceReference": "b0000056-0000-4000-8000-000000000056",
-    "partyEmailAddress": "rachel.torres@bank.demo",
+    "partyEmailAddress": "rachel.torres@back.es",
     "partyMobilePhoneNumber": "+1-555-0256",
     "partyName": "Rachel Torres",
     "partyType": "employee",
@@ -650,7 +650,7 @@
   },
   {
     "partyInstanceReference": "b0000057-0000-4000-8000-000000000057",
-    "partyEmailAddress": "david.chen@demo.com",
+    "partyEmailAddress": "david.chen@back.es",
     "partyMobilePhoneNumber": "+1-555-0257",
     "partyName": "David Chen",
     "partyType": "customer",
@@ -662,7 +662,7 @@
   },
   {
     "partyInstanceReference": "b0000058-0000-4000-8000-000000000058",
-    "partyEmailAddress": "amara.okafor@demo.com",
+    "partyEmailAddress": "amara.okafor@back.es",
     "partyMobilePhoneNumber": "+1-555-0258",
     "partyName": "Amara Okafor",
     "partyType": "customer",
@@ -674,7 +674,7 @@
   },
   {
     "partyInstanceReference": "b0000059-0000-4000-8000-000000000059",
-    "partyEmailAddress": "lena.fischer@demo.com",
+    "partyEmailAddress": "lena.fischer@back.es",
     "partyMobilePhoneNumber": "+49-555-0259",
     "partyName": "Lena Fischer",
     "partyType": "customer",

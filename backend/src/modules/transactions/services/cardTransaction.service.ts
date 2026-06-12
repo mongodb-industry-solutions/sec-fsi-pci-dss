@@ -8,7 +8,6 @@ import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { createFraudCase } from '../../fraud/services/fraudDiagnosis.service';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
-import { PAYMENT_CARD_COLLECTION } from '../../customer/models/paymentCard.model';
 
 export interface CreateTransactionInput {
   cardToken: string;
@@ -41,6 +40,36 @@ function deriveSeverity(amount: number, riskIndicators: string[]): 'low' | 'medi
   return 'low';
 }
 
+/**
+ * Resolve a customer's agreement from an account reference that may be either an
+ * email (QE:equality on party) or a business key (customerAgreementReference).
+ * Returns both the agreement UUID (for fraud-case linkage) and the canonical
+ * account reference (ACC-xxx) used to normalize cardTransactionAccountReference.
+ */
+export async function resolveCustomerAgreement(db: Db, accountReference: string): Promise<{ uuid?: string; reference?: string }> {
+  try {
+    const l1Db = await getDbForRole('level1_analyst', false);
+    let agreement: { customerAgreementInstanceReference?: string; customerAgreementReference?: string } | null = null;
+    if (accountReference.includes('@')) {
+      const party = await db
+        .collection<PartyControlRecord>(PARTY_COLLECTION)
+        .findOne({ partyEmailAddress: accountReference } as Partial<PartyControlRecord>);
+      if (party?.partyInstanceReference) {
+        agreement = await l1Db
+          .collection<{ customerAgreementInstanceReference: string; customerAgreementReference: string }>(CUSTOMER_AGREEMENT_COLLECTION)
+          .findOne({ partyInstanceReference: party.partyInstanceReference } as Record<string, unknown>);
+      }
+    } else {
+      agreement = await l1Db
+        .collection<{ customerAgreementInstanceReference: string; customerAgreementReference: string }>(CUSTOMER_AGREEMENT_COLLECTION)
+        .findOne({ customerAgreementReference: accountReference } as Record<string, unknown>);
+    }
+    return { uuid: agreement?.customerAgreementInstanceReference, reference: agreement?.customerAgreementReference };
+  } catch {
+    return {};
+  }
+}
+
 export async function createTransaction(db: Db, input: CreateTransactionInput) {
   const txnId = uuidv4();
   const now = new Date();
@@ -49,10 +78,16 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
   // Use the Level 2 QE client so the driver encrypts them with the correct DEKs.
   const txWriteDb = await getDbForRole('security_auditor', false);
 
+  // Normalize the account reference to the customer's canonical business key
+  // (ACC-xxx) so seeded and simulator-created transactions share one convention.
+  // Falls back to the raw input (e.g. email) if the customer can't be resolved.
+  const resolved = await resolveCustomerAgreement(db, input.accountReference);
+  const canonicalAccountRef = resolved.reference ?? input.accountReference;
+
   const txn: CardTransactionLogControlRecord = {
     cardTransactionInstanceReference: txnId,
     paymentCardReference: input.cardToken,
-    cardTransactionAccountReference: input.accountReference,
+    cardTransactionAccountReference: canonicalAccountRef,
     // QE:none fields - encrypted by L2 QE client on write
     rawGatewayPayload: input.gatewayPayload,
     processorTransactionMetadata: { processedAt: now.toISOString() },
@@ -89,36 +124,8 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
       cardTransactionMaskedPanDisplay: input.cardTransactionMaskedPanDisplay,
     };
 
-    // Resolve the customerAgreementInstanceReference UUID from the account reference.
-    // Two paths:
-    //   Email path:     accountReference is an email → resolve party by email → find agreement by partyInstanceReference
-    //   Reference path: accountReference is a business key → find agreement by customerAgreementReference
-    let customerAgreementUuid = input.accountReference;
-    try {
-      const l1Db = await getDbForRole('level1_analyst', false);
-      if (input.accountReference.includes('@')) {
-        const partyDoc = await db
-          .collection<PartyControlRecord>(PARTY_COLLECTION)
-          .findOne({ partyEmailAddress: input.accountReference } as Partial<PartyControlRecord>);
-        if (partyDoc?.partyInstanceReference) {
-          const agreementDoc = await l1Db
-            .collection<{ customerAgreementInstanceReference: string }>(CUSTOMER_AGREEMENT_COLLECTION)
-            .findOne({ partyInstanceReference: partyDoc.partyInstanceReference } as Record<string, unknown>);
-          if (agreementDoc?.customerAgreementInstanceReference) {
-            customerAgreementUuid = agreementDoc.customerAgreementInstanceReference;
-          }
-        }
-      } else {
-        const agreementDoc = await l1Db
-          .collection<{ customerAgreementInstanceReference: string }>(CUSTOMER_AGREEMENT_COLLECTION)
-          .findOne({ customerAgreementReference: input.accountReference } as Record<string, unknown>);
-        if (agreementDoc?.customerAgreementInstanceReference) {
-          customerAgreementUuid = agreementDoc.customerAgreementInstanceReference;
-        }
-      }
-    } catch {
-      // Keep account reference as fallback - raw document lookup will fail but fraud case still created
-    }
+    // Reuse the agreement resolved above for the fraud-case customer linkage.
+    const customerAgreementUuid = resolved.uuid ?? input.accountReference;
 
     const fraudCase = await createFraudCase(db, txnId, customerAgreementUuid, reasons, severity, snapshot);
     fraudCaseRef = fraudCase.fraudDiagnosisInstanceReference;
@@ -227,61 +234,39 @@ export async function getAllTransactions(
   if (filters.merchant)  query['cardTransactionMerchantName'] = { $regex: filters.merchant, $options: 'i' };
   if (filters.cardToken) query['paymentCardReference']        = filters.cardToken;
 
-  // Four-step lookup by email using only plaintext fields after the initial QE search.
-  // Step 1: QE:equality search on party.partyEmailAddress (SD-13)
-  // Step 2: plaintext FK lookup on customerAgreementProcedure.partyInstanceReference
-  // Step 3: plaintext FK lookup on paymentCardManagement.customerAgreementInstanceReference
-  // Step 4: plaintext $in filter on cardTransactionLog.paymentCardReference
+  // Lookup by email resolves the customer's canonical account reference, then
+  // matches cardTransactionAccountReference (QE:equality) directly. This covers
+  // BOTH seeded transactions (accountReference = ACC-xxx) and simulator-created
+  // ones (normalized to ACC-xxx on write), regardless of saved-card linkage.
+  // A QE-capable client is required for the equality token on the encrypted field.
+  let readDb = db;
   if (filters.email) {
-    const party = await db
+    const qeDb = await getDbForRole('level1_analyst', false);
+    readDb = qeDb;
+
+    const party = await qeDb
       .collection<PartyControlRecord>(PARTY_COLLECTION)
       .findOne({ partyEmailAddress: filters.email } as Partial<PartyControlRecord>);
+    if (!party) return { results: [], total: 0, page, limit };
 
-    if (!party) {
-      return { results: [], total: 0, page, limit };
-    }
-
-    const agreement = await db
-      .collection(CUSTOMER_AGREEMENT_COLLECTION)
+    const agreement = await qeDb
+      .collection<{ customerAgreementReference?: string }>(CUSTOMER_AGREEMENT_COLLECTION)
       .findOne({ partyInstanceReference: party.partyInstanceReference } as Record<string, unknown>);
+    const accRef = agreement?.customerAgreementReference;
+    if (!accRef) return { results: [], total: 0, page, limit };
 
-    if (!agreement) {
-      return { results: [], total: 0, page, limit };
-    }
-
-    const customerUuid = (agreement as Record<string, unknown>).customerAgreementInstanceReference as string;
-    if (!customerUuid) {
-      return { results: [], total: 0, page, limit };
-    }
-
-    // Get all card tokens for this customer via the plaintext paymentCardManagement FK
-    const cards = await db
-      .collection(PAYMENT_CARD_COLLECTION)
-      .find({ customerAgreementInstanceReference: customerUuid })
-      .project({ paymentCardReference: 1 })
-      .toArray();
-
-    const cardTokens = cards
-      .map(c => (c as Record<string, unknown>)['paymentCardReference'] as string)
-      .filter(Boolean);
-
-    if (cardTokens.length === 0) {
-      return { results: [], total: 0, page, limit };
-    }
-
-    // Filter transactions by the collected card tokens (paymentCardReference is plaintext)
-    query['paymentCardReference'] = { $in: cardTokens };
+    query['cardTransactionAccountReference'] = accRef;
   }
 
   const skip = (page - 1) * limit;
   const [results, total] = await Promise.all([
-    db.collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION)
+    readDb.collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION)
       .find(query)
       .sort({ cardTransactionDateTime: -1 })
       .skip(skip)
       .limit(limit)
       .toArray(),
-    db.collection(CARD_TRANSACTION_COLLECTION).countDocuments(query),
+    readDb.collection(CARD_TRANSACTION_COLLECTION).countDocuments(query),
   ]);
 
   return { results, total, page, limit };

@@ -526,7 +526,7 @@ All `/demo/*` routes require a valid JWT. Middleware reads role from token and g
 │             ├ julia.santos@back.es    (Customer)          │
 │             ├ sarah.chen@back.es      (L1 Analyst)        │
 │             ├ michael.obi@back.es     (L2 Investigator)   │
-│             └ admin@back.es           (Security Auditor)  │
+│             └ diego.sans@back.es      (Security Auditor)  │
 │                                                                  │
 │   Password  [ ••••••••••••••• ]  (auto-filled on selection)      │
 │                                                                  │
@@ -538,17 +538,19 @@ All `/demo/*` routes require a valid JWT. Middleware reads role from token and g
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-The username dropdown lists pre-defined users from the database. Selecting a user auto-fills the password field with the demo credential. The domain selector defaults to `local` (JWT against MongoDB). The MS Entra ID entry is wired but not active in v1.
+The username dropdown (shown in **debug mode**) lists the **featured roster** from the database via `GET /api/v1/auth/users?featured=true`. Selecting a user auto-fills the password with the shared demo credential (`DEMO_PASSWORD`). The domain selector defaults to `local` (JWT against MongoDB). The MS Entra ID entry is wired but not active in v1. See §12.3 for the full featured roster (13 users).
 
 ### 4.3 Pre-defined Users and Roles
 
+The curated featured roster is the authoritative list — see **§12.3 Demo Users** for the full table (4 customers, 2 L1, 2 L2, 2 auditors, 2 merchant officers, 1 manager). A representative subset:
+
 | User | Email | Role | Description |
 |---|---|---|---|
-| Luis Fernandez | luis.fernandez@back.es | customer | Retail: has card transactions and open cases |
-| Julia Santos | julia.santos@back.es | customer | Premium: has saved card, recurrent payments (v3) |
+| Luis Fernandez | luis.fernandez@back.es | customer | Retail: card transactions and open cases; fraud scenario |
+| Amara Okafor | amara.okafor@back.es | customer | Owns the simulator merchant (Okafor Digital Services) |
 | Sarah Chen | sarah.chen@back.es | level1_analyst | L1 Fraud Analyst: default investigation view |
 | Michael Obi | michael.obi@back.es | level2_investigator | L2 Investigator: receives escalated cases |
-| Admin | admin@back.es | security_auditor | Read-only: audit log and system status |
+| Diego Sans | diego.sans@back.es | security_auditor | Read-only: audit log and system status |
 
 All users and their bcrypt-hashed passwords are inserted by the seeder (`bin/seed.ts`). Seeding is idempotent: upsert by `partyAuthenticationInstanceReference`.
 
@@ -1374,23 +1376,31 @@ In debug mode, each card also shows the BIAN reference IDs:
 - `partyInstanceReference` (SD-13 Party anchor)
 - `customerAuthenticationInstanceReference` (SD-91 CustomerAuthentication)
 
-### 12.3 Demo Users (Current — post-simulator expansion)
+### 12.3 Demo Users (Current — curated featured roster)
 
-| Display Name | Username | Role | Department | Party Ref | Simulator use |
-|---|---|---|---|---|---|
-| Luis Fernandez | `luis.fernandez@back.es` | customer | — | b0000001 | Fraud scenario (€850) |
-| Julia Santos | `julia.santos@back.es` | customer | — | b0000002 | Legit scenario (€45) |
-| Amara Okafor | `amara.okafor@demo.com` | customer | — | b0000058 | Borderline scenario (€499) |
-| David Chen | `david.chen@demo.com` | merchant_officer | — | b0000057 | Fischer Web Studio merchant |
-| Sarah Chen | `sarah.chen@back.es` | level1_analyst | Fraud Detection Services | b0000051 | — |
-| Michael Obi | `michael.obi@back.es` | level2_investigator | Fraud Investigation | b0000052 | — |
-| Diego Sans | `diego.sans@back.es` | security_auditor | Compliance | b0000053 | — |
-| Rachel Torres | `rachel.torres@bank.demo` | merchant_officer | Merchant Acquiring | b0000056 | Merchant review officer |
+The **featured roster** (13 users, `customerAuthenticationDemoFeatured: true`) drives the debug-mode user picker in Application mode and the Simulator. The full seed contains more users (e.g. Lena Fischer, Priya Patel, Marco Rossi, Maria Garcia, Ahmed Hassan) which remain available for ad-hoc login/testing but are not surfaced in the picker. `GET /api/v1/auth/users?featured=true` returns only the featured set. All emails use the `@back.es` domain.
 
-All passwords: `demo1234`
+| Display Name | Username | Role | Party Ref | Simulator use |
+|---|---|---|---|---|
+| Luis Fernandez | `luis.fernandez@back.es` | customer | b0000001 | Fraud scenario (€850) |
+| Julia Santos | `julia.santos@back.es` | customer | b0000002 | Legit scenario (€45) |
+| Amara Okafor | `amara.okafor@back.es` | customer | b0000058 | Borderline scenario (€499); **owns the simulator merchant** |
+| Carlos Garcia | `carlos.garcia@back.es` | customer | b0000060 | — |
+| Sarah Chen | `sarah.chen@back.es` | level1_analyst | b0000051 | L1 escalation actor |
+| Anna Kowalski | `anna.kowalski@back.es` | level1_analyst | b0000062 | — |
+| Michael Obi | `michael.obi@back.es` | level2_investigator | b0000052 | L2 approval/resolution actor |
+| James Wright | `james.wright@back.es` | level2_investigator | b0000063 | — |
+| Diego Sans | `diego.sans@back.es` | security_auditor | b0000053 | — |
+| Sophie Martin | `sophie.martin@back.es` | security_auditor | b0000064 | — |
+| Rachel Torres | `rachel.torres@back.es` | merchant_officer | b0000056 | KYB reviewer |
+| David Chen | `david.chen@back.es` | merchant_officer | b0000057 | — |
+| Alex Rivera | `alex.rivera@back.es` | manager | b0000070 | Integration Hub admin |
 
-**Simulator merchant:** Fischer Web Studio (`m0000003`), owned by David Chen. All simulator payments are processed through this merchant.  
-**Simulator users:** Only `luis.fernandez@back.es`, `julia.santos@back.es`, and `amara.okafor@demo.com` are used as payers in simulator scenarios. After a simulator payment, these users can log in to `/system/payment/history` and see the transaction written to the database.
+All passwords: `demo-password` (shared bcrypt hash; the plaintext is a fixed demo convention, centralized as `DEMO_PASSWORD` in the frontend).
+
+**Simulator merchant:** Okafor Digital Services (`m0000002`), owned by Amara Okafor (`b0000058`, KYB-verified). All simulator payments are processed through this merchant.  
+**Simulator authentication:** the Simulator obtains a **real JWT per role** via `POST /api/v1/auth/login` (no auth bypass). Escalate (L1) → approve (L2) → resolve actions hit the real `/api/v1/fraud/*` endpoints and persist — a case escalated in the Simulator appears as `escalated` when logging into Application mode as an L2 user.  
+**Simulator history:** after a simulator payment, the payer (`luis`/`julia`/`amara`) can log in to `/system/payment/history` and see the transaction, read from the real API (`GET /api/v1/transactions/all`, scoped to their own account). The previous `localStorage` mirror was removed.
 
 ---
 

@@ -425,6 +425,7 @@ Not accessible to the \`customer\` role (enforced by RBAC middleware).`,
                   cardTransactionAmount:             { $ref: 'MonetaryAmount#' },
                   cardTransactionDateTime:           { type: 'string', format: 'date-time' },
                   cardTransactionStatus:             { type: 'string' },
+                  cardTransactionType:               { type: 'string' },
                   cardTransactionMerchantName:       { type: 'string' },
                   cardTransactionMerchantCategoryCode: { type: 'string' },
                   cardTransactionChannel:            { type: 'string' },
@@ -444,9 +445,14 @@ Not accessible to the \`customer\` role (enforced by RBAC middleware).`,
     const { status, merchant, cardToken, email, page = '1', limit = '20' } = request.query as {
       status?: string; merchant?: string; cardToken?: string; email?: string; page?: string; limit?: string;
     };
+    // Privacy: a customer may only list their OWN transactions. Ignore any email
+    // they pass and scope to the email in their JWT.
+    const { demoRole } = request as unknown as DemoRequest;
+    const jwtEmail = (request as unknown as { user?: { email?: string } }).user?.email;
+    const effectiveEmail = demoRole === 'customer' ? jwtEmail : email;
     const result = await getAllTransactions(
       fastify.db,
-      { status, merchant, cardToken, email },
+      { status, merchant, cardToken, email: effectiveEmail },
       parseInt(page, 10),
       parseInt(limit, 10)
     );

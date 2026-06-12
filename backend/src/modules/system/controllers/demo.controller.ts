@@ -66,8 +66,16 @@ export async function demoController(fastify: FastifyInstance) {
     schema: {
       tags: ['system'],
       summary: 'List demo users for quick login',
-      description: `Returns all active pre-seeded demo user accounts for the local authentication domain.
-**Public  -  no JWT required.** Intended for the login UI to populate the user selector. Passwords are never returned.`,
+      description: `Returns active pre-seeded demo user accounts for the local authentication domain.
+**Public  -  no JWT required.** Intended for the login UI to populate the user selector. Passwords are never returned.
+
+Pass \`?featured=true\` to return only the curated demo roster (debug-mode picker + simulator).`,
+      querystring: {
+        type: 'object',
+        properties: {
+          featured: { type: 'string', enum: ['true', 'false'], description: 'When "true", only customerAuthenticationDemoFeatured users.' },
+        },
+      },
       response: {
         200: {
           description: 'List of available demo users.',
@@ -94,10 +102,11 @@ export async function demoController(fastify: FastifyInstance) {
         500: { $ref: 'Error#' },
       },
     },
-  }, async (_request, reply) => {
+  }, async (request, reply) => {
     try {
       const db = (fastify as FastifyInstance & { db?: Db }).db as Db;
-      const users = await getDemoUsers(db);
+      const { featured } = request.query as { featured?: string };
+      const users = await getDemoUsers(db, { featured: featured === 'true' });
       return reply.send({ users });
     } catch (err) {
       fastify.log.error(err);

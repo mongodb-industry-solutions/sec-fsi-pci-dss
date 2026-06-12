@@ -32,6 +32,7 @@ export interface AuthUser {
   email: string;
   name: string;
   role: string;
+  featured?: boolean;
 }
 
 export interface AuthDomain {
@@ -181,8 +182,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(body),
       }),
-    users: () =>
-      apiFetch<{ users: AuthUser[] }>('/api/v1/auth/users'),
+    users: (featured?: boolean) =>
+      apiFetch<{ users: AuthUser[] }>(`/api/v1/auth/users${featured ? '?featured=true' : ''}`),
     domains: () =>
       apiFetch<{ domains: AuthDomain[] }>('/api/v1/auth/domains'),
     updateMe: (
@@ -411,8 +412,8 @@ export const api = {
   },
 
   system: {
-    users: () =>
-      apiFetch<{ users: AuthUser[] }>('/api/v1/system/users'),
+    users: (featured?: boolean) =>
+      apiFetch<{ users: AuthUser[] }>(`/api/v1/system/users${featured ? '?featured=true' : ''}`),
     rawDocument: (collection: string, id: string, token: string) =>
       apiFetch<RawDocumentResponse>(
         `/api/v1/system/raw/${collection}/${id}`, {}, token

@@ -1,6 +1,6 @@
 {
-  "merchantId": "m0000003-0000-4000-8000-000000000003",
-  "merchantName": "Fischer Web Studio",
+  "merchantId": "m0000002-0000-4000-8000-000000000002",
+  "merchantName": "Okafor Digital Services",
 
   "defaultCurrency": "USD",
   "fraudAmountThreshold": 500,
@@ -111,7 +111,7 @@
       "outcomeLabel": "⚠️ Manual review triggered",
       "prefill": {
         "cardholderName": "Amara Okafor",
-        "email": "amara.okafor@demo.com",
+        "email": "amara.okafor@back.es",
         "phone": "+34 650 000 9999",
         "amount": 499.00,
         "currency": "EUR",

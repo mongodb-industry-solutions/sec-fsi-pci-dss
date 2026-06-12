@@ -1538,7 +1538,9 @@ Validates credentials against `customerAuthenticationAssessment` (SD-91, QE equa
 
 #### `GET /auth/users`
 
-Returns the list of local domain demo users for the login screen dropdown. Data is read from `backend/data/users.json` (seed file) rather than the QE-encrypted collection to avoid decryption overhead on this helper endpoint. Passwords are never included.
+Returns the list of local domain demo users for the login screen dropdown. Data is read from `backend/data/customerAuthentications.json` (seed file) rather than the QE-encrypted collection to avoid decryption overhead on this helper endpoint. Passwords are never included.
+
+Pass `?featured=true` to return only the curated demo roster (`customerAuthenticationDemoFeatured: true`) surfaced in the debug-mode user picker (application mode) and used by the simulator. The full set of seeded users remains available without the filter for ad-hoc testing.
 
 **Response 200:**
 ```json

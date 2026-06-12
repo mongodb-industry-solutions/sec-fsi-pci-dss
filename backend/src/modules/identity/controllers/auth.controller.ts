@@ -28,7 +28,7 @@ Atlas stores only ciphertext and never sees the plaintext address.
 | \`luis.fernandez@back.es\` | customer |
 | \`sarah.chen@back.es\` | level1_analyst |
 | \`michael.obi@back.es\` | level2_investigator |
-| \`admin@back.es\` | security_auditor |
+| \`diego.sans@back.es\` | security_auditor |
 
 Password for all demo users: \`demo-password\``,
       body: {
@@ -118,9 +118,22 @@ Password for all demo users: \`demo-password\``,
     schema: {
       tags: ['auth'],
       summary: 'List demo users (local domain)',
-      description: `Returns all active pre-seeded demo user accounts for the local authentication domain.
+      description: `Returns active pre-seeded demo user accounts for the local authentication domain.
 Intended for the UI to display one-click login shortcuts; passwords are **never** returned.
-Data is read directly from the seed file to avoid QE-decryption overhead on this helper endpoint.`,
+Data is read directly from the seed file to avoid QE-decryption overhead on this helper endpoint.
+
+Pass \`?featured=true\` to return only the curated demo roster surfaced in the
+debug-mode user picker (application mode) and used by the simulator.`,
+      querystring: {
+        type: 'object',
+        properties: {
+          featured: {
+            type: 'string',
+            enum: ['true', 'false'],
+            description: 'When "true", returns only users flagged customerAuthenticationDemoFeatured.',
+          },
+        },
+      },
       response: {
         200: {
           description: 'List of available demo users.',
@@ -139,6 +152,10 @@ Data is read directly from the seed file to avoid QE-decryption overhead on this
                     enum: ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor', 'merchant_officer', 'manager'],
                     description: 'Role that will be encoded in the JWT on login.',
                   },
+                  featured: {
+                    type: 'boolean',
+                    description: 'True if this user is part of the curated demo roster.',
+                  },
                 },
               },
             },
@@ -146,8 +163,9 @@ Data is read directly from the seed file to avoid QE-decryption overhead on this
         },
       },
     },
-  }, async (_request, reply) => {
-    const users = await getDemoUsers(fastify.db);
+  }, async (request, reply) => {
+    const { featured } = request.query as { featured?: string };
+    const users = await getDemoUsers(fastify.db, { featured: featured === 'true' });
     return reply.send({ users });
   });
 

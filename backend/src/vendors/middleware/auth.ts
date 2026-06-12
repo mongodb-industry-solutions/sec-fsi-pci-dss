@@ -55,17 +55,20 @@ function tryVerifyToken(authHeader: string | undefined): jwt.JwtPayload | null {
 
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const { url, method } = request;
+  // Match against the pathname only — query strings (e.g. ?featured=true) must
+  // not break public-route matching.
+  const path = url.split('?')[0];
 
-  if (PUBLIC_EXACT.has(url)) {
+  if (PUBLIC_EXACT.has(path)) {
     attachRbacContext(request);
     return;
   }
-  if (PUBLIC_PREFIXES.some((p) => url.startsWith(p))) {
+  if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) {
     attachRbacContext(request);
     return;
   }
 
-  if (method === 'GET' && PUBLIC_GET_PREFIXES.some((p) => url.startsWith(p))) {
+  if (method === 'GET' && PUBLIC_GET_PREFIXES.some((p) => path.startsWith(p))) {
     // Simulator mode: allow unauthenticated GET requests.
     // But if a Bearer token is present, validate it and enforce customer block.
     const payload = tryVerifyToken(request.headers.authorization);

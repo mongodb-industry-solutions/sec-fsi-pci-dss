@@ -38,6 +38,13 @@ const COMMANDS: CommandDef[] = [
   },
 ];
 
+/** Formats elapsed milliseconds as `12s` or `2m 05s`. */
+function formatElapsed(ms: number): string {
+  const total = Math.floor(ms / 1000);
+  if (total < 60) return `${total}s`;
+  return `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, '0')}s`;
+}
+
 export default function SetupPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [running, setRunning] = useState(false);
@@ -46,6 +53,15 @@ export default function SetupPage() {
   const logsEndRef = useRef<HTMLDivElement>(null);
   const [logsLoaded, setLogsLoaded] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<CommandDef | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [now, setNow] = useState<number>(() => Date.now());
+
+  // Tick a live clock while a command runs so the elapsed time updates.
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [running]);
 
   // Restore logs from sessionStorage on mount.
   // setLogs + setLogsLoaded are batched by React 18 into one render,
@@ -76,6 +92,8 @@ export default function SetupPage() {
     setActiveCommand(commandId);
     setCommandStatus(null);
     setLogs([]);
+    setStartedAt(Date.now());
+    setNow(Date.now());
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/admin/run`, {
         method: 'POST',
@@ -96,6 +114,7 @@ export default function SetupPage() {
         setLogs((prev) => [...prev, { type: type as LogEntry['type'], text }]);
       });
     } finally {
+      setNow(Date.now()); // freeze elapsed at the final value
       setRunning(false);
       setActiveCommand(null);
     }
@@ -114,6 +133,11 @@ export default function SetupPage() {
   const testCmds   = COMMANDS.filter((c) => c.group === 'test');
   const dangerCmds = COMMANDS.filter((c) => c.group === 'danger');
 
+  const elapsedMs = startedAt ? Math.max(0, now - startedAt) : 0;
+  // Latest meaningful line drives the "current activity" label.
+  const currentStep =
+    [...logs].reverse().find((e) => e.type !== 'done' && e.text.trim())?.text ?? 'Starting…';
+
   return (
     <>
       <div className="flex flex-col lg:flex-row gap-6 lg:h-full">
@@ -126,13 +150,16 @@ export default function SetupPage() {
           )}
         </div>
         {/* Right column - output panel fills remaining height */}
-        <div className="min-h-[280px] lg:flex-1 lg:min-h-0">
+        <div className="min-h-[280px] lg:flex-1 lg:min-h-0 min-w-0">
           <LogPanel
             title={activeCommand ? `npm run ${activeCommand}` : 'Output'}
             logs={logs}
             endRef={logsEndRef}
             status={commandStatus}
-            onClear={() => { setLogs([]); setCommandStatus(null); }}
+            running={running}
+            elapsedMs={elapsedMs}
+            currentStep={currentStep}
+            onClear={() => { setLogs([]); setCommandStatus(null); setStartedAt(null); }}
             onDownload={() => downloadText(`setup-${activeCommand ?? 'output'}-${Date.now()}.txt`, logs.map((e) => e.text).join('\n'))}
           />
         </div>
@@ -193,13 +220,16 @@ function CommandGroup({ label, cmds, activeCommand, running, onRun }: {
   );
 }
 
-function LogPanel({ title, logs, endRef, onClear, onDownload, status }: {
+function LogPanel({ title, logs, endRef, onClear, onDownload, status, running, elapsedMs, currentStep }: {
   title: string;
   logs: LogEntry[];
   endRef: React.RefObject<HTMLDivElement | null>;
   onClear: () => void;
   onDownload: () => void;
   status: null | 'success' | 'failure';
+  running: boolean;
+  elapsedMs: number;
+  currentStep: string;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -236,6 +266,32 @@ function LogPanel({ title, logs, endRef, onClear, onDownload, status }: {
           <button onClick={onClear} className="text-xs text-gray-600 hover:text-gray-400">Clear</button>
         </div>
       </div>
+      {(running || (status && elapsedMs > 0)) && (
+        <div className="px-4 py-2.5 border-b border-gray-800 bg-gray-950/60">
+          <div className="flex items-center justify-between gap-3 mb-1.5">
+            <span className="text-xs font-mono text-gray-400 min-w-0 flex-1 flex items-center gap-2">
+              {running && (
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#00ED64] animate-pulse flex-shrink-0" />
+              )}
+              <span className="truncate min-w-0">{running ? currentStep : 'Finished'}</span>
+            </span>
+            <span className="text-xs font-mono text-gray-500 tabular-nums flex-shrink-0">
+              {formatElapsed(elapsedMs)}
+            </span>
+          </div>
+          <div className="relative h-1.5 w-full rounded-full bg-gray-800 overflow-hidden">
+            {running ? (
+              <div className="admin-progress-sweep" />
+            ) : (
+              <div
+                className={`absolute inset-0 rounded-full ${
+                  status === 'success' ? 'bg-[#00ED64]' : 'bg-red-500'
+                }`}
+              />
+            )}
+          </div>
+        </div>
+      )}
       {status && (
         <div className={`px-4 py-2 flex items-center gap-2 text-xs font-semibold border-b ${
           status === 'success'

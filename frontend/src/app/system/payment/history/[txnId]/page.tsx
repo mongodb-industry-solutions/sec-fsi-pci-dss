@@ -100,44 +100,38 @@ export default function TransactionDetailPage() {
       setUser(u);
       setToken(t);
 
-      const storageKey = u?.sub ? `demo_transactions_${u.sub}` : 'demo_transactions_guest';
-      const stored: StoredTransaction[] = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
-      const found = stored.find((s) => s.txnId === txnId);
+      // Real source of truth: fetch the transaction from the API.
+      const data = await api.transactions.getById(txnId, t).catch(() => null);
+      if (!data) { setNotFound(true); setLoading(false); return; }
 
-      if (!found) { setNotFound(true); setLoading(false); return; }
-      setTxn(found);
+      setTxn({
+        txnId:          data.cardTransactionInstanceReference,
+        cardToken:      data.paymentCardReference ?? null,
+        amount:         data.cardTransactionAmount?.amount ?? 0,
+        currency:       data.cardTransactionAmount?.currency ?? 'USD',
+        merchant:       data.cardTransactionMerchantName,
+        mcc:            data.cardTransactionMerchantCategoryCode ?? '',
+        channel:        data.cardTransactionChannel ?? '',
+        initiationType: data.cardTransactionInitiationType ?? null,
+        maskedPan:      data.cardTransactionMaskedPanDisplay,
+        status:         data.cardTransactionStatus,
+        fraudCaseCreated: false,
+        createdAt:      data.cardTransactionDateTime,
+      });
+      setApiTxn({
+        paymentCardReference:                data.paymentCardReference,
+        cardTransactionMerchantCategoryCode: data.cardTransactionMerchantCategoryCode,
+        cardTransactionChannel:              data.cardTransactionChannel,
+        cardTransactionInitiationType:       data.cardTransactionInitiationType,
+        cardTransactionType:                 data.cardTransactionType,
+        cardTransactionDescription:          data.cardTransactionDescription,
+        cardTransactionNarrative:            data.cardTransactionNarrative,
+      });
 
-      // Fetch customer-visible case notes (works even for customer role  -  dedicated endpoint)
-      api.transactions.getNotes(txnId, t)
-        .then(setCaseNotes)
-        .catch(() => null);
+      // Customer-visible case notes via the dedicated customer-safe endpoint
+      // (the /fraud endpoints themselves are not accessible to the customer role).
+      api.transactions.getNotes(txnId, t).then(setCaseNotes).catch(() => null);
 
-      // Fetch full transaction details from the API to get card token and all fields
-      // even for transactions created before the localStorage cardToken field was added
-      api.transactions.getById(txnId, t)
-        .then((data) => setApiTxn({
-          paymentCardReference:                data.paymentCardReference,
-          cardTransactionMerchantCategoryCode: data.cardTransactionMerchantCategoryCode,
-          cardTransactionChannel:              data.cardTransactionChannel,
-          cardTransactionInitiationType:       data.cardTransactionInitiationType,
-          cardTransactionType:                 data.cardTransactionType,
-          cardTransactionDescription:          data.cardTransactionDescription,
-          cardTransactionNarrative:            data.cardTransactionNarrative,
-        }))
-        .catch(() => null);
-
-      if (found.caseId) {
-        try {
-          const [c, eventsData] = await Promise.all([
-            api.fraud.getById(found.caseId, t),
-            api.fraud.getEvents(found.caseId, t).catch(() => ({ caseId: found.caseId!, events: [] })),
-          ]);
-          setFraudCase(c);
-          setEvents(eventsData.events);
-        } catch {
-          // Case not accessible; show transaction data only
-        }
-      }
       setLoading(false);
     };
     load();

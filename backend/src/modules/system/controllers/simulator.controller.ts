@@ -6,6 +6,7 @@ import { createCheckoutSession } from '../../gateway/services/checkout.service';
 import { createPaymentLink } from '../../gateway/services/paymentLink.service';
 import { getMerchantById } from '../../gateway/services/merchant.service';
 import { CARD_TRANSACTION_COLLECTION } from '../../transactions/models/cardTransaction.model';
+import { resolveCustomerAgreement } from '../../transactions/services/cardTransaction.service';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 
 export async function simulatorController(fastify: FastifyInstance) {
@@ -195,12 +196,15 @@ export async function simulatorController(fastify: FastifyInstance) {
     const { email } = request.params as { email: string };
     const { limit = 20 } = request.query as { limit?: number };
 
-    // cardTransactionAccountReference is a QE:equality field — must use a QE-capable
-    // client so the driver can build the equality token for the encrypted query.
+    // Transactions store the canonical account reference (ACC-xxx). Resolve the
+    // payer email to that reference, then match cardTransactionAccountReference
+    // (QE:equality) — must use a QE-capable client to build the equality token.
     const l1Db = await getDbForRole('level1_analyst', false);
+    const resolved = await resolveCustomerAgreement(fastify.db, email);
+    const accRef = resolved.reference ?? email;
     const transactions = await l1Db
       .collection(CARD_TRANSACTION_COLLECTION)
-      .find({ cardTransactionAccountReference: email })
+      .find({ cardTransactionAccountReference: accRef })
       .sort({ cardTransactionDateTime: -1 })
       .limit(Math.min(limit, 50))
       .toArray();

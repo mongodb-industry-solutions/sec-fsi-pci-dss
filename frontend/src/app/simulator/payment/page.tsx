@@ -10,7 +10,6 @@ import { RedirectionPaymentFlow } from '../../../components/simulator/Redirectio
 import { PaymentLinkFlow } from '../../../components/simulator/PaymentLinkFlow';
 import type { PaymentMethodId, SimulatorScenario } from '../../../types/simulator';
 import simulatorConfig from '../../../config/simulator.json';
-import { writeSimulatorTransactionToHistory } from '../../../lib/simulatorHistory';
 
 type Step = 1 | 2 | 3;
 
@@ -455,22 +454,8 @@ export default function PaymentPage() {
       } catch { /* ignore storage errors */ }
       setResult(newResult);
       setStep(3);
-
-      writeSimulatorTransactionToHistory({
-        txnId: newResult.txnId,
-        amount: parseFloat(form.amount),
-        currency: simulatorConfig.defaultCurrency,
-        merchant: form.merchantName,
-        mcc: form.merchantCategoryCode,
-        channel: 'online',
-        cardTransactionType: 'purchase',
-        maskedPan: maskedCard || '****-****-****-1234',
-        status: newResult.fraudCaseCreated ? 'under_review' : 'authorized',
-        fraudCaseCreated: newResult.fraudCaseCreated,
-        caseId: newResult.caseId ?? null,
-        createdAt: new Date().toISOString(),
-        paymentReference: null,
-      });
+      // Transaction is persisted server-side; application-mode history reads it
+      // from the real API (GET /api/v1/transactions/all), no local mirror needed.
     } catch (err) {
       const msg = (err as Error).message ?? '';
       if (msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('fetch')) {

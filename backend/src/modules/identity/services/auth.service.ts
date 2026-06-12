@@ -70,17 +70,21 @@ export async function loginUser(
  * already contains plaintext emails and names (passwords are bcrypt-hashed and
  * are NOT returned). This is safe for demo purposes only.
  */
-export async function getDemoUsers(_db: Db) {
+export async function getDemoUsers(_db: Db, opts?: { featured?: boolean }) {
   const dataDir = process.env.SEED_DATA_DIR ?? path.join(__dirname, '../../../../data');
   const filePath = path.join(dataDir, 'customerAuthentications.json');
   const records: CustomerAuthenticationAssessmentRecord[] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
 
   return records
     .filter((u) => u.customerAuthenticationAccountStatus === 'active')
+    // featured=true → only the curated demo roster (debug-mode picker + simulator).
+    // Non-featured users stay available for ad-hoc login/testing.
+    .filter((u) => (opts?.featured ? u.customerAuthenticationDemoFeatured === true : true))
     .map((u) => ({
       email: u.customerAuthenticationEmailAddress,
       name: u.customerAuthenticationUserName,
       role: u.customerAuthenticationUserRole,
+      featured: u.customerAuthenticationDemoFeatured === true,
     }));
 }
 

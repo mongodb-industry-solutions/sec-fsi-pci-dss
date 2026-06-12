@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import { api } from '../../lib/api';
 import { MerchantBrandingWrapper } from './MerchantBrandingWrapper';
 import { SimulatorStateManager } from './SimulatorStateManager';
-import { writeSimulatorTransactionToHistory } from '../../lib/simulatorHistory';
 import type { SimulatorScenario } from '../../types/simulator';
 import simulatorConfig from '../../config/simulator.json';
 
@@ -50,22 +49,7 @@ export function RedirectionPaymentFlow({ scenario }: Props) {
           sessionId: sid,
         }));
         SimulatorStateManager.setStep(3);
-
-        writeSimulatorTransactionToHistory({
-          txnId: tid ?? '',
-          amount: prefill.amount,
-          currency: prefill.currency,
-          merchant: prefill.merchantName,
-          mcc: prefill.merchantCategoryCode,
-          channel: 'online',
-          cardTransactionType: 'purchase',
-          maskedPan: `****-****-****-${(prefill.cardHint ?? '0000').slice(-4)}`,
-          status: cid ? 'under_review' : 'authorized',
-          fraudCaseCreated: !!cid,
-          caseId: cid || null,
-          createdAt: new Date().toISOString(),
-          paymentReference: null,
-        });
+        // Persisted server-side; app-mode history reads it from the real API.
       }
     }
     window.addEventListener('message', handleMessage);

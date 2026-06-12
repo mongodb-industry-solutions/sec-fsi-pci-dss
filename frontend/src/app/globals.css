@@ -10,3 +10,19 @@
 body {
   @apply bg-gray-50 text-gray-900;
 }
+
+/* Indeterminate progress bar (admin setup panel).
+   npm scripts emit no real percentage, so the bar sweeps to signal liveness. */
+@keyframes admin-indeterminate {
+  0%   { left: -45%; }
+  100% { left: 100%; }
+}
+.admin-progress-sweep {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, var(--mongodb-green), transparent);
+  animation: admin-indeterminate 1.2s ease-in-out infinite;
+}

@@ -1,29 +1,11 @@
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-export const DEMO_USERS_PASSWORDS: Record<string, string> = {
-  // Customers
-  'luis.fernandez@back.es': 'demo-password',
-  'julia.santos@back.es': 'demo-password',
-  'amara.okafor@demo.com': 'demo-password',
-  'carlos.garcia@back.es': 'demo-password',
-  'priya.patel@back.es': 'demo-password',
-  // Analysts (L1)
-  'sarah.chen@back.es': 'demo-password',
-  'anna.kowalski@back.es': 'demo-password',
-  // Investigators (L2)
-  'michael.obi@back.es': 'demo-password',
-  'james.wright@back.es': 'demo-password',
-  // Security Auditors
-  'diego.sans@back.es': 'demo-password',
-  'sophie.martin@back.es': 'demo-password',
-  // Merchant Officers
-  'david.chen@demo.com': 'demo-password',
-  'officer@bank.demo': 'demo-password',
-  'marco.rossi@bank.demo': 'demo-password',
-  // Manager
-  'alex.rivera@back.es': 'demo-password',
-};
+// All seeded demo accounts share the same bcrypt-hashed credential.
+// The plaintext is a fixed demo convention (documented in auth.controller.ts);
+// the seed stores only the hash. Used to auto-fill the login form (debug mode)
+// and by the simulator to obtain a real JWT per role via POST /api/v1/auth/login.
+export const DEMO_PASSWORD = 'demo-password';
 
 export const ROLE_LABELS: Record<string, string> = {
   customer: 'Customer',
