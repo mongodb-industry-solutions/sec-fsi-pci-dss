@@ -10,10 +10,6 @@ import {
 } from '../models/checkoutSession.model';
 import { createTransaction } from '../../transactions/services/cardTransaction.service';
 import { authorizeCard, linkAuthToTransaction } from './cardAuthorization.service';
-import { upsertCardByToken } from '../../customer/services/paymentCard.service';
-import { PARTY_COLLECTION } from '../../identity/models/party.model';
-import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
-import type { PaymentCardManagementControlRecord } from '../../customer/models/paymentCard.model';
 
 const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -184,6 +180,11 @@ export async function processCheckoutPayment(
     cardTransactionDescription: session.checkoutSessionDescription.slice(0, 22),
     cardTransactionNarrative: `Checkout session ${session.checkoutSessionMerchantReference}`,
     merchantAgreementInstanceReference: session.merchantAgreementInstanceReference,
+    // Pass the expiry through so the card-on-file (auto-registered in createTransaction) carries
+    // it. The card is saved for the payer regardless of any "save card" choice (SD-88).
+    ...(input.cardExpiryMonth && input.cardExpiryYear
+      ? { paymentCardExpirationDate: `${input.cardExpiryMonth}/${input.cardExpiryYear.slice(-2)}` }
+      : {}),
     gatewayPayload: {
       source: 'checkout_session',
       sessionId: session.checkoutSessionInstanceReference,
@@ -193,34 +194,9 @@ export async function processCheckoutPayment(
     },
   });
 
-  // Link auth record to the transaction
+  // Link auth record to the transaction. The card-on-file is auto-registered inside
+  // createTransaction for every payment, so no separate opt-in save is needed here.
   await linkAuthToTransaction(db, authResult.recordId, txResult.cardTransactionInstanceReference);
-
-  // SD-57: Auto-save card if customer opted in
-  if (input.saveCard && input.customerEmail) {
-    try {
-      const party = await db.collection(PARTY_COLLECTION).findOne({ partyEmailAddress: input.customerEmail });
-      if (party) {
-        const agreement = await db.collection(CUSTOMER_AGREEMENT_COLLECTION)
-          .findOne({ partyInstanceReference: (party as Record<string, unknown>).partyInstanceReference });
-        if (agreement) {
-          const expiryDate = `${input.cardExpiryMonth}/${input.cardExpiryYear.slice(-2)}`;
-          const maskedPanForCard = `****-****-****-${input.cardToken.slice(-4).padStart(4, '0')}`;
-          const network: PaymentCardManagementControlRecord['paymentCardNetwork'] = 'VISA';
-          await upsertCardByToken(db, {
-            customerAgreementInstanceReference: (agreement as Record<string, unknown>).customerAgreementInstanceReference as string,
-            cardToken: input.cardToken,
-            paymentCardExpirationDate: expiryDate,
-            paymentCardMaskedPanDisplay: maskedPanForCard,
-            paymentCardNetwork: network,
-            paymentCardIsPreferred: false,
-          });
-        }
-      }
-    } catch {
-      // Non-fatal: card save failure does not block payment confirmation
-    }
-  }
 
   // Update session to completed
   await db.collection(CHECKOUT_SESSION_COLLECTION).updateOne(

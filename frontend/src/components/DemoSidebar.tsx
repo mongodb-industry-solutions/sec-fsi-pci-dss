@@ -45,9 +45,10 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'Merchant',       path: '/system/merchant',      icon: Store },
   ],
   customer: [
-    { label: 'Transactions', path: '/system/payment/history', icon: ClipboardList },
-    { label: 'New Payment',  path: '/system/payment',         icon: PlusCircle, exact: true },
-    { label: 'Merchant',     path: '/system/merchant',        icon: Store },
+    { label: 'Transactions',    path: '/system/payment/history', icon: ClipboardList },
+    { label: 'New Payment',     path: '/system/payment',         icon: PlusCircle, exact: true },
+    { label: 'Payment Methods', path: '/system/cards',           icon: CreditCard },
+    { label: 'Merchant',        path: '/system/merchant',        icon: Store },
   ],
   merchant_officer: [
     { label: 'Review Queue', path: '/system/merchant/review', icon: ClipboardCheck },

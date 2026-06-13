@@ -6,6 +6,7 @@ import {
   getTransactionsByCardToken,
   getDistinctMerchants,
   getAllTransactions,
+  CardNotActiveError,
 } from '../services/cardTransaction.service';
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
 import { getCaseNotes } from '../../fraud/services/fraudDiagnosis.service';
@@ -115,6 +116,15 @@ the Merchant Name selector. No authentication required (public, simulator mode).
             type: 'string',
             description: 'Acquiring-side link (BIAN SD-89): the merchant this payment was made to. Optional; set by checkout/payment-link flows and the simulator. Not CHD/PII — stored plaintext and indexed so the merchant owner can list received payments.',
           },
+          paymentCardExpirationDate: {
+            type: 'string',
+            description: 'Card expiry (MM/YY). Optional; supplied for a NEW card so the PSP auto-registers it as a card-on-file (SD-88) after payment. Never required for an already-saved card.',
+          },
+          paymentCardNetwork: {
+            type: 'string',
+            enum: ['VISA', 'MASTERCARD', 'AMEX', 'ELO'],
+            description: 'Card network. Optional; supplied alongside the expiry for card-on-file auto-registration.',
+          },
           gatewayPayload: {
             type: 'object',
             description: 'Raw JSON response from the PSP authorization flow. Stored as QE:none in the `cardTransactionSensitive` collection; requires DEK-sensitive key (Level 2 Investigator role) to read.',
@@ -148,6 +158,7 @@ the Merchant Name selector. No authentication required (public, simulator mode).
         },
         400: { description: 'Required fields missing or invalid.', $ref: 'Error#' },
         401: { description: 'Missing or invalid Bearer token.', $ref: 'Error#' },
+        422: { description: 'Card-on-file is deactivated or removed — PSP declined.', $ref: 'Error#' },
         500: { description: 'Unexpected server error.', $ref: 'Error#' },
       },
     },
@@ -165,6 +176,8 @@ the Merchant Name selector. No authentication required (public, simulator mode).
       cardTransactionDescription: string;
       cardTransactionNarrative?: string;
       merchantAgreementInstanceReference?: string;
+      paymentCardExpirationDate?: string;
+      paymentCardNetwork?: 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
       gatewayPayload: object;
     };
 
@@ -172,8 +185,15 @@ the Merchant Name selector. No authentication required (public, simulator mode).
       return reply.status(400).send({ error: 'cardToken, accountReference, and amount are required' });
     }
 
-    const result = await createTransaction(fastify.db, body);
-    return reply.status(201).send(result);
+    try {
+      const result = await createTransaction(fastify.db, body);
+      return reply.status(201).send(result);
+    } catch (err) {
+      if (err instanceof CardNotActiveError) {
+        return reply.status(422).send({ error: 'This card has been deactivated. Reactivate it to make payments, or use a different card.' });
+      }
+      throw err;
+    }
   });
 
   fastify.get('/', {

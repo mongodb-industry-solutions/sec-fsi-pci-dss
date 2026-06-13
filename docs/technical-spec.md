@@ -2801,3 +2801,91 @@ POST   /webhooks/hrp/:arrangementId/callback
 ### 9.3 Index Strategy
 
 See §5 above for the full `integrationRegistry` and `integrationEvents` index definitions.
+
+---
+
+## 10. Stored Payment Card Management (SD-88) — customer card-on-file
+
+Customer-managed card-on-file (view / add / remove). Aligns with BIAN SD-88 (Payment Card) and
+PCI DSS Req 3 (no PAN/CVV stored; only masked PAN + QE:none expiry + surrogate token), Req 7
+(least privilege / ownership), Req 10 (audit of lifecycle).
+
+### 10.1 API contracts (`/api/v1/customer/:customerId/cards`)
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| GET | `/api/v1/customer/:customerId/cards` | owner (customer) **or** L1/L2/auditor (read) | Lists non-revoked cards; masked PAN + network + status + surrogate token + alias + registration date. Sorted preferred-first. Expiry (QE:none) NOT returned. |
+| GET | `/api/v1/customer/:customerId/cards/:cardId` | **owner only** | Self-service detail: surrogate token, expiry (QE:none, **owner-visible**), lifecycle dates, status, mandate, alias/note. Emits `card.accessed`. |
+| POST | `/api/v1/customer/:customerId/cards` | owner only | Registers a card (token + expiry + masked PAN + network + optional alias). **No CVV accepted.** Emits `card.registered`. |
+| PATCH | `/api/v1/customer/:customerId/cards/:cardId` | owner only | Edits the **only** mutable attributes — `paymentCardAlias` (≤40) and `paymentCardCustomerNote` (≤280). Emits `card.updated`. |
+| PATCH | `/api/v1/customer/:customerId/cards/:cardId/status` | owner only | Deactivate/reactivate (`active`↔`suspended`). A suspended card stays on file but is declined by the PSP. Emits `card.deactivated`/`card.reactivated`. |
+| DELETE | `/api/v1/customer/:customerId/cards/:cardId` | owner only | Soft-delete: `paymentCardStatus='revoked'`, mandate `cancelled`; record retained. Emits `card.removed`. |
+
+### 10.1.1 Tokenization, activation control & auto-registration
+- **Registration (client-side tokenization).** `POST` never receives the PAN or CVV. The browser
+  (`frontend/src/lib/cardTokenize.ts`) validates the PAN (Luhn + network), expiry (future MM/YY) and
+  CVV (3, or 4 for AMEX), then derives the masked PAN + a surrogate token and sends only those. The
+  **CVV (SAD) is validated and discarded — never transmitted or stored** at any layer (PCI DSS Req 3.2).
+  UI: `/system/cards/new`.
+- **Deactivation = PSP-level decline.** A `suspended` card is retained (never physically deleted) but
+  the PSP **declines every authorization** with it regardless of the issuer's decision. Enforced at two
+  points via `getCardByToken`: the gateway authorizer (`authorizeCard`, BIAN SD-15 — response code
+  `0540`, provider `psp-policy`, *before* any issuer/provider call) and the app-mode transaction path
+  (`createTransaction` throws `CardNotActiveError` → HTTP 422). `revoked` (removed) cards are likewise
+  declined. New/unsaved tokens have no card-on-file and pass through. Only `active`↔`suspended` are
+  customer-toggleable; `expired`/issuer-`blocked`/`revoked` are not.
+- **Auto-registration on every payment (any source).** `createTransaction` is the single chokepoint
+  for all payment flows — app-mode, hosted checkout, payment links, the simulator, and any external
+  system integrating with the PSP. It **unconditionally** calls `upsertCardByToken` (idempotent) for
+  the resolved customer, so **using a card to pay IS the registration** — there is no "save card"
+  opt-in (the old `saveCard` flag is gone). Expiry/network are stored when the source reports them
+  (`paymentCardExpirationDate` + `paymentCardNetwork`, both optional); otherwise the card is still
+  registered (masked PAN + surrogate token) and the customer can complete the details later. Cards
+  with no resolvable owner (token-only, no customer) are not registered. The `/system/payment` picker
+  shows at most 4 active cards (default first, auto-selected) plus a search/autocomplete for the rest.
+- **Optional card fields.** `paymentCardNetwork` and `paymentCardExpirationDate` are optional on the
+  model and in `CreateCardInput` to support externally-originated registrations; the list/detail
+  responses omit them when absent and the UI shows a neutral fallback.
+
+- **Ownership** is enforced server-side: the caller's JWT `partyRef` must resolve to a
+  `customerAgreement` whose `customerAgreementInstanceReference` equals `:customerId`
+  (`getOwnAgreementId`). All read/detail/update/delete are additionally scoped by `customerRef` in
+  the query filter (defense in depth). The auth middleware carves the own-card path out of the
+  customer block (`CUSTOMER_OWN_CARD_PATH`, which also matches `/cards/:cardId`).
+- **Editable attributes:** only `paymentCardAlias` (nickname) and `paymentCardCustomerNote` are
+  customer-editable — non-CHD display metadata (BIAN SD-88 presentation attributes). The PAN, token,
+  expiry, network and status are immutable from the customer side. The alias/note MUST NOT contain a
+  PAN/CVV (free-text labels only).
+- **Surrogate token in the list:** `paymentCardReference` is returned in the list so the payment
+  flow can pay with a saved card and so investigators can correlate transactions. It is **not CHD**
+  under PCI DSS v4.0. The QE:none expiry stays out of the list (detail endpoint only).
+- **Payment integration:** `/system/payment` step 1 lists the customer's **active** saved cards;
+  selecting one reuses its surrogate token so the transaction references the real card-on-file.
+- **Auto-save:** every payment auto-registers the card-on-file in `createTransaction` (see §10.1.1);
+  there is no opt-in.
+- **Step-up MFA:** production re-auth/TOTP plugs in at POST/PATCH/DELETE; the demo gates DELETE with
+  an explicit client confirmation. CVV/PIN are never accepted or stored at any layer.
+
+### 10.2 Model additions (BIAN SD-88)
+`PaymentCardManagementControlRecord` adds optional `paymentCardAlias`, `paymentCardCustomerNote`
+(non-CHD, customer-editable) and `recordUpdatedDateTime`.
+
+### 10.3 Audit
+Lifecycle actions emit a **compliance** event (`complianceProcessEvent`) with
+`processType: 'card_management'`, `entityType: 'card'`,
+`processAction: 'card.registered' | 'card.accessed' | 'card.updated' | 'card.deactivated' | 'card.reactivated' | 'card.removed'`,
+`performedByPartyReference`/`performedByRole` from the JWT. Visible in the unified audit
+(`/system/audit-events`). `eventSummary` carries masked PAN + network only (no CHD).
+
+### 10.4 Seed data
+`backend/data/paymentCards.json` provides 3–4 cards per real `customerAgreement` (generator:
+`backend/bin/generateCards.mjs`): valid future expiry (`MM/YY`), masked PAN, surrogate token,
+unique alias per customer, one preferred card each, with a few non-active (expired/blocked) for
+list-filter realism.
+
+### 10.5 Frontend
+- `/system/cards` — list with search (nickname / last-4), network + status filters, pagination
+  (`Pagination`), rows link to detail. Customer-only (own section, not part of the profile).
+- `/system/cards/[cardId]` — owner self-service detail: token, expiry, dates, status; inline edit
+  of alias/note; remove (soft-delete with confirm). Technical labels (QE/token) only in debug mode.
+
+*Added 2026-06-13; detail/edit/seed/payment-integration extension same day (doc + code together per repo rules).*

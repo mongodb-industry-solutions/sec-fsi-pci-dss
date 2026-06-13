@@ -12,9 +12,12 @@ import {
 import { getActiveProviderForType } from '../../integrations/services/integrationRegistry.service';
 import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
 import { CardAuthorizationConfig } from '../../integrations/models/externalProviderArrangement.model';
+import { getCardByToken } from '../../customer/services/paymentCard.service';
 
 const RESPONSE_CODE_APPROVED = '0000';
 const RESPONSE_CODE_DECLINED = '0190';
+// PSP-level decline: the card-on-file is deactivated/removed (not an issuer decision).
+const RESPONSE_CODE_CARD_INACTIVE = '0540';
 
 export interface CardAuthRequest {
   checkoutSessionInstanceReference: string;
@@ -50,6 +53,35 @@ export async function authorizeCard(
   req: CardAuthRequest
 ): Promise<CardAuthResponse> {
   const requestAt = new Date();
+
+  // PSP-level control (precedes the issuer): if the token belongs to a card-on-file the customer
+  // has DEACTIVATED (suspended) or REMOVED (revoked), decline immediately — even a valid card the
+  // issuer would approve is rejected here. New/unsaved tokens have no card-on-file and pass through.
+  const onFile = await getCardByToken(db, req.cardToken);
+  if (onFile && onFile.paymentCardStatus !== 'active') {
+    const responseAt = new Date();
+    const recordId = generateAuthRef();
+    const record: CardAuthorizationRecord = {
+      cardAuthorizationInstanceReference: recordId,
+      checkoutSessionInstanceReference: req.checkoutSessionInstanceReference,
+      cardAuthorizationRequestDateTime: requestAt,
+      cardAuthorizationResponseDateTime: responseAt,
+      cardAuthorizationResult: 'declined',
+      cardAuthorizationResponseCode: RESPONSE_CODE_CARD_INACTIVE,
+      cardAuthorizationChallengeRequired: false,
+      cardAuthorizationProviderReference: 'psp-policy',
+      cardAuthorizationMerchantCode: req.merchantCode || 'MC-STUB',
+      cardAuthorizationAmount: req.amount,
+      cardAuthorizationCurrency: req.currency,
+      cardAuthorizationMcc: req.mcc,
+      bianServiceDomain: 'Card Authorization',
+      bianControlRecordType: 'CardAuthorizationRecord',
+      recordCreatedDateTime: requestAt,
+      schemaVersion: 1,
+    };
+    await db.collection(CARD_AUTHORIZATION_COLLECTION).insertOne(record as object);
+    return { result: 'declined', responseCode: RESPONSE_CODE_CARD_INACTIVE, challengeRequired: false, recordId };
+  }
 
   const provider = await getActiveProviderForType(db, 'card_authorization');
 

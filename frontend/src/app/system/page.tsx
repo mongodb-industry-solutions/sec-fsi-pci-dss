@@ -64,6 +64,7 @@ const ROLE_CARDS: Record<string, DashboardCard[]> = {
   customer: [
     { label: 'Transactions', description: 'Your payment history, with the status and any fraud review of each transaction.',            icon: ClipboardList, href: '/system/payment/history', bianSd: 'SD-27', pciDss: 'Req 7.2' },
     { label: 'New Payment',  description: 'Make a new card payment. The card is tokenized in the browser; the PAN never reaches Atlas.', icon: PlusCircle,    href: '/system/payment',         bianSd: 'SD-27', pciDss: 'Req 3' },
+    { label: 'Payment Methods', description: 'View, add and remove your saved cards. Only the masked number is shown; the PAN and CVV are never stored.', icon: CreditCard, href: '/system/cards', bianSd: 'SD-88', pciDss: 'Req 3' },
     { label: 'Merchant',     description: 'Browse the registered merchants you can pay.',                                                icon: Store,         href: '/system/merchant',        bianSd: 'SD-89', pciDss: 'Req 12' },
     { label: 'Profile',      description: 'Your account and contact details. Sensitive fields are encrypted at rest with Queryable Encryption.', icon: User,    href: '/system/profile',         bianSd: 'SD-53', pciDss: 'Req 8' },
   ],

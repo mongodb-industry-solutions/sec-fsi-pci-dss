@@ -7,12 +7,18 @@ import { getToken, decodeToken } from '../../../lib/auth';
 import { useDebugMode } from '../../../lib/debugMode';
 import { FraudAlert } from '../../../components/FraudAlert';
 import { Tooltip } from '../../../components/Tooltip';
+import { detectNetwork, tokenizeCard } from '../../../lib/cardTokenize';
 import Link from 'next/link';
 
-interface CardPreset {
-  label: string;
-  lastFour: string;
+// A saved card-on-file (BIAN SD-88) the customer can pay with. The surrogate token is reused so
+// the transaction references the real stored card; the full PAN/CVV are never present here.
+interface SavedCard {
+  id: string;
+  alias: string;
+  masked: string;
   network: 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
+  token: string;
+  isPreferred: boolean;
 }
 
 interface MerchantOption {
@@ -33,11 +39,7 @@ function mccNote(mcc: string): string {
   return map[mcc] ?? `MCC ${mcc}`;
 }
 
-const CARD_PRESETS: CardPreset[] = [
-  { label: 'Visa Demo 4291',       lastFour: '4291', network: 'VISA' },
-  { label: 'Mastercard Demo 8734', lastFour: '8734', network: 'MASTERCARD' },
-  { label: 'Amex Demo 0052',       lastFour: '0052', network: 'AMEX' },
-];
+const genToken = () => `tok_${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 10)}`;
 
 // Static fallback — shown only if the API call fails (network error, not yet seeded)
 const MERCHANT_FALLBACK: MerchantOption[] = [
@@ -132,8 +134,21 @@ export default function DemoPaymentPage() {
     return () => clearTimeout(t);
   }, [merchantSearch]);
 
-  const [selectedPreset, setSelectedPreset] = useState<CardPreset | null>(CARD_PRESETS[0]);
-  const [maskedCard, setMaskedCard]         = useState(`****-****-****-${CARD_PRESETS[0].lastFour}`);
+  // Saved cards the customer can pay with (their own card-on-file, SD-88).
+  const [savedCards, setSavedCards]         = useState<SavedCard[]>([]);
+  const [cardsLoading, setCardsLoading]     = useState(true);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [selectedNetwork, setSelectedNetwork] = useState<SavedCard['network'] | null>(null);
+  const [maskedCard, setMaskedCard]         = useState('');
+  const [cardToken, setCardToken]           = useState(() => genToken());
+  // Card picker: 'saved' = pay with a card-on-file; 'new' = enter a fresh card (gets auto-saved).
+  const [cardMode, setCardMode]             = useState<'saved' | 'new'>('saved');
+  const [cardSearch, setCardSearch]         = useState('');
+  // New-card entry (tokenized in-browser on Next; CVV validated, never sent/stored).
+  const [newPan, setNewPan]                 = useState('');
+  const [newExpiry, setNewExpiry]           = useState('');
+  const [newCvv, setNewCvv]                 = useState('');
+  const [newCardExpiry, setNewCardExpiry]   = useState('');
   const [amount, setAmount]                 = useState('850.00');
   const [merchant, setMerchant]             = useState('');
   const [mcc, setMcc]                       = useState('');
@@ -161,21 +176,71 @@ export default function DemoPaymentPage() {
     }
   }, [merchantsLoading, merchantPresets, merchant]);
 
-  // stable token per render so it matches what gets submitted
-  const [cardToken] = useState(() => `tok_${Math.random().toString(36).slice(2, 10)}`);
-
-  function handleCardInput(e: React.ChangeEvent<HTMLInputElement>) {
-    const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 16);
-    setSelectedPreset(null);
-    if      (digits.length === 0)   setMaskedCard('');
-    else if (digits.length <= 12)   setMaskedCard(digits.replace(/(.{4})/g, '$1-').replace(/-$/, ''));
-    else                            setMaskedCard(`****-****-****-${digits.slice(-4)}`);
+  // Select one of the customer's saved cards: reuse its masked PAN, network and surrogate token.
+  function selectSavedCard(c: SavedCard) {
+    setCardMode('saved');
+    setSelectedCardId(c.id);
+    setSelectedNetwork(c.network);
+    setMaskedCard(c.masked);
+    setCardToken(c.token);
+    setCardSearch('');
   }
 
-  function selectPreset(p: CardPreset) {
-    setSelectedPreset(p);
-    setMaskedCard(`****-****-****-${p.lastFour}`);
+  // Switch to entering a brand-new card. It is tokenized on Next and auto-saved on payment.
+  function enterNewCardMode() {
+    setCardMode('new');
+    setSelectedCardId(null);
+    setSelectedNetwork(null);
+    setMaskedCard('');
+    setCardToken(genToken());
   }
+
+  // Live formatting / network detection while typing a new card (display only).
+  function handleNewPan(v: string) {
+    const digits = v.replace(/\D/g, '').slice(0, 19);
+    setNewPan(digits.replace(/(.{4})/g, '$1 ').trim());
+    setSelectedNetwork(detectNetwork(digits));
+    setMaskedCard(digits.length >= 4 ? `****-****-****-${digits.slice(-4)}` : '');
+  }
+  function handleNewExpiry(v: string) {
+    const digits = v.replace(/\D/g, '').slice(0, 4);
+    setNewExpiry(digits.length >= 3 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits);
+  }
+
+  // Load the customer's saved cards (SD-88) to offer as payment methods.
+  useEffect(() => {
+    const t = getToken() ?? '';
+    if (!t) { setCardsLoading(false); return; }
+    api.auth.me(t)
+      .then(async (me) => {
+        const agId = (me.agreement as { customerAgreementInstanceReference?: string } | null)?.customerAgreementInstanceReference;
+        if (!agId) return;
+        const { results } = await api.customer.getCards(agId, t);
+        const active = (results ?? [])
+          .filter((c) => c.paymentCardStatus === 'active')
+          .map((c) => ({
+            id: c.paymentCardInstanceReference as string,
+            alias: (c.paymentCardAlias as string | undefined) || (c.paymentCardNetwork as string | undefined) || 'Card',
+            masked: c.paymentCardMaskedPanDisplay as string,
+            network: c.paymentCardNetwork as SavedCard['network'],
+            token: c.paymentCardReference as string,
+            isPreferred: !!c.paymentCardIsPreferred,
+          }));
+        // Default card first so it lands among the (max 4) preselected and is auto-selected.
+        active.sort((a, b) => Number(b.isPreferred) - Number(a.isPreferred));
+        setSavedCards(active);
+      })
+      .catch(() => { /* manual entry remains available */ })
+      .finally(() => setCardsLoading(false));
+  }, []);
+
+  // Auto-select the customer's DEFAULT card (the one marked preferred), falling back to the first.
+  // With no saved cards, default to new-card entry.
+  useEffect(() => {
+    if (cardsLoading || selectedCardId || maskedCard !== '') return;
+    if (savedCards.length > 0) selectSavedCard(savedCards.find((c) => c.isPreferred) ?? savedCards[0]);
+    else setCardMode('new');
+  }, [cardsLoading, savedCards]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function selectMerchantOption(m: MerchantOption) {
     setMerchant(m.label);
@@ -187,6 +252,12 @@ export default function DemoPaymentPage() {
   }
 
   const selectedMerchantPreset = merchantPresets.find(m => m.label === merchant && m.mcc === mcc);
+
+  // Card picker: show at most 4 cards; the rest are reachable via the search/autocomplete box.
+  const cardPresets = savedCards.slice(0, 4);
+  const cardSearchResults = cardSearch.trim()
+    ? savedCards.filter(c => `${c.alias} ${c.masked} ${c.network}`.toLowerCase().includes(cardSearch.trim().toLowerCase()))
+    : null;
 
   async function handleConfirm() {
     if (!maskedCard) { setError('Please enter or select a card number.'); return; }
@@ -210,6 +281,8 @@ export default function DemoPaymentPage() {
         cardTransactionDescription: (txDescription.trim() || merchant.toUpperCase()).slice(0, 22),
         cardTransactionNarrative: txNarrative.trim() || undefined,
         ...(selectedMerchantId ? { merchantAgreementInstanceReference: selectedMerchantId } : {}),
+        // New card → send expiry + network so the PSP auto-registers it as a card-on-file (SD-88).
+        ...(cardMode === 'new' && selectedNetwork ? { paymentCardExpirationDate: newCardExpiry, paymentCardNetwork: selectedNetwork } : {}),
         gatewayPayload: { source: 'app-mode', paymentReference: paymentReference || undefined },
       }, token);
 
@@ -261,31 +334,120 @@ export default function DemoPaymentPage() {
 
               {/* Card + amount */}
               <div className="bg-white rounded-xl border p-5 space-y-5">
-                <h2 className="font-semibold text-gray-800">Card</h2>
-
-                <div className="grid grid-cols-3 gap-2">
-                  {CARD_PRESETS.map((p) => (
-                    <button key={p.lastFour} onClick={() => selectPreset(p)}
-                      className={`rounded-lg border px-2 py-2 text-left transition-colors ${
-                        selectedPreset?.lastFour === p.lastFour
-                          ? 'border-[#001E2B] bg-[#001E2B] text-white'
-                          : 'hover:border-gray-400'
-                      }`}>
-                      <div className="text-xs font-bold">{p.network}</div>
-                      <div className={`font-mono text-xs mt-0.5 ${selectedPreset?.lastFour === p.lastFour ? 'text-gray-300' : 'text-gray-400'}`}>
-                        ...{p.lastFour}
-                      </div>
-                    </button>
-                  ))}
+                <div className="flex items-center justify-between">
+                  <h2 className="flex items-center gap-1.5 font-semibold text-gray-800">
+                    Card
+                    <Tooltip text="The card to charge. Pick one of your saved cards, search for another, or enter a new card — new cards are tokenized in your browser and saved to your wallet after payment." />
+                  </h2>
+                  <Link href="/system/cards" className="text-xs text-[#001E2B] hover:underline">Manage cards</Link>
                 </div>
 
-                <input type="text" inputMode="numeric" value={maskedCard} onChange={handleCardInput}
-                  placeholder="Or enter card number manually"
-                  maxLength={19}
-                  className="w-full border rounded-lg px-3 py-2.5 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#001E2B]/30" />
+                {/* Saved-card picker (SD-88): up to 4 presets + search/autocomplete for the rest,
+                    mirroring the Merchant picker. Selecting one reuses its surrogate token. */}
+                {cardsLoading ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {[0, 1].map(i => <div key={i} className="rounded-lg border px-3 py-2.5 animate-pulse bg-gray-50 h-[52px]" />)}
+                  </div>
+                ) : savedCards.length > 0 ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      {cardPresets.map((c) => {
+                        const active = cardMode === 'saved' && selectedCardId === c.id;
+                        return (
+                          <button key={c.id} onClick={() => selectSavedCard(c)}
+                            className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                              active ? 'border-[#001E2B] bg-[#001E2B] text-white' : 'hover:border-gray-400'
+                            }`}>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-semibold truncate">{c.alias}</span>
+                              {c.isPreferred && (
+                                <span className={`text-[10px] px-1 py-0.5 rounded font-medium shrink-0 ${active ? 'bg-white/20 text-[#00ED64]' : 'bg-amber-50 text-amber-600'}`}>
+                                  Default
+                                </span>
+                              )}
+                            </div>
+                            <div className={`font-mono text-xs mt-0.5 ${active ? 'text-gray-300' : 'text-gray-400'}`}>
+                              {c.network ? `${c.network} ` : ''}...{c.masked.slice(-4)}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Search the rest of the wallet */}
+                    {savedCards.length > 4 && (
+                      <div className="relative">
+                        <input
+                          value={cardSearch}
+                          onChange={(e) => setCardSearch(e.target.value)}
+                          placeholder="Search your other cards..."
+                          className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#001E2B]/30"
+                        />
+                        {cardSearchResults !== null && cardSearchResults.length === 0 && (
+                          <div className="absolute z-10 left-0 right-0 mt-1 bg-white border rounded-lg shadow-md px-3 py-2 text-sm text-gray-400">
+                            No matching cards
+                          </div>
+                        )}
+                        {cardSearchResults !== null && cardSearchResults.length > 0 && (
+                          <ul className="absolute z-10 left-0 right-0 mt-1 bg-white border rounded-lg shadow-md divide-y overflow-y-auto max-h-48">
+                            {cardSearchResults.map((c) => (
+                              <li key={c.id}>
+                                <button onClick={() => selectSavedCard(c)}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors">
+                                  <span className="font-medium">{c.alias}</span>
+                                  <span className="ml-2 text-xs text-gray-400 font-mono">{c.network ? `${c.network} ` : ''}...{c.masked.slice(-4)}</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </>
+                ) : null}
+
+                {/* New-card entry: tokenized in-browser on Next; CVV validated, never stored. */}
+                {cardMode === 'new' ? (
+                  <div className="space-y-2 rounded-lg border border-[#001E2B]/20 bg-[#001E2B]/[0.03] p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        New card
+                        <Tooltip text="Enter a card not yet in your wallet. It is validated and tokenized in your browser (only the last 4 digits are stored) and saved to your wallet after a successful payment." />
+                      </span>
+                      {savedCards.length > 0 && (
+                        <button onClick={() => selectSavedCard(savedCards[0])} className="text-xs text-[#001E2B] hover:underline">
+                          Use a saved card
+                        </button>
+                      )}
+                    </div>
+                    <input value={newPan} onChange={(e) => handleNewPan(e.target.value)} inputMode="numeric"
+                      placeholder="Card number" maxLength={23}
+                      className="w-full border rounded-lg px-3 py-2.5 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#001E2B]/30" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input value={newExpiry} onChange={(e) => handleNewExpiry(e.target.value)} inputMode="numeric"
+                        placeholder="MM/YY" maxLength={5}
+                        className="w-full border rounded-lg px-3 py-2.5 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#001E2B]/30" />
+                      <input value={newCvv} onChange={(e) => setNewCvv(e.target.value.replace(/\D/g, '').slice(0, 4))} inputMode="numeric"
+                        placeholder={selectedNetwork === 'AMEX' ? 'CVV (4)' : 'CVV (3)'}
+                        className="w-full border rounded-lg px-3 py-2.5 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#001E2B]/30" />
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      {selectedNetwork ? `${selectedNetwork} · ` : ''}Validated in your browser. The security code is never stored
+                      {debugMode ? ' (PCI DSS Req 3.2; SAD prohibited).' : '.'}
+                    </p>
+                  </div>
+                ) : (
+                  <button onClick={enterNewCardMode}
+                    className="w-full border border-dashed rounded-lg px-3 py-2.5 text-sm text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors">
+                    + Use a new card
+                  </button>
+                )}
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Amount (USD)</label>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-2">
+                    Amount (USD)
+                    <Tooltip text="The purchase amount to authorize. Amounts above the risk threshold (default $500) automatically open a fraud review case." />
+                  </label>
                   <div className="flex gap-2 mb-2 flex-wrap">
                     {AMOUNT_PRESETS.map((a) => (
                       <button key={a} onClick={() => setAmount(a)}
@@ -310,7 +472,10 @@ export default function DemoPaymentPage() {
 
               {/* Merchant */}
               <div className="bg-white rounded-xl border p-5 space-y-4">
-                <h2 className="font-semibold text-gray-800">Merchant</h2>
+                <h2 className="flex items-center gap-1.5 font-semibold text-gray-800">
+                  Merchant
+                  <Tooltip text="The business you are paying (BIAN SD-89). Pick one of the first four, search for another, or type a name and MCC manually. Some categories (e.g. gambling) are higher risk and influence fraud scoring." />
+                </h2>
 
                 {/* Preset grid — first 4 active merchants from SD-89 */}
                 {merchantsLoading ? (
@@ -375,9 +540,17 @@ export default function DemoPaymentPage() {
                 </div>
 
                 <div className="space-y-2">
+                  <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+                    Merchant name
+                    <Tooltip text="The display name of the business. Auto-filled when you pick or search a merchant; editable for ad-hoc payments." />
+                  </label>
                   <input value={merchant} onChange={(e) => { setMerchant(e.target.value); setSelectedMerchantId(''); }}
                     placeholder="Merchant name"
                     className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#001E2B]/30" />
+                  <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+                    MCC code
+                    <Tooltip text="ISO 18245 Merchant Category Code — a 4-digit code identifying the merchant's business type (e.g. 5411 grocery, 7995 gambling). Drives risk scoring." />
+                  </label>
                   <input value={mcc} onChange={(e) => setMcc(e.target.value)}
                     placeholder="MCC code"
                     className="w-full border rounded-lg px-3 py-2.5 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#001E2B]/30" />
@@ -393,7 +566,20 @@ export default function DemoPaymentPage() {
                 Cancel
               </Link>
               <button
-                onClick={() => { if (!maskedCard) { setError('Please select or enter a card.'); return; } setError(null); setStep(2); }}
+                onClick={() => {
+                  if (cardMode === 'new') {
+                    try {
+                      const tk = tokenizeCard({ pan: newPan, expiry: newExpiry, cvv: newCvv });
+                      setMaskedCard(tk.maskedPan);
+                      setCardToken(tk.token);
+                      setSelectedNetwork(tk.network);
+                      setNewCardExpiry(tk.expiry);
+                    } catch (e) { setError(e instanceof Error ? e.message : 'Invalid card details.'); return; }
+                  } else if (!maskedCard) {
+                    setError('Please select or enter a card.'); return;
+                  }
+                  setError(null); setStep(2);
+                }}
                 className="flex-1 bg-[#001E2B] text-[#00ED64] py-2.5 rounded-lg font-semibold text-sm hover:opacity-90 transition-opacity">
                 Next
               </button>
@@ -423,7 +609,7 @@ export default function DemoPaymentPage() {
                     </div>
                     <div className="flex justify-between items-center py-2">
                       <span className="text-gray-500">Card</span>
-                      <span className="font-mono">{maskedCard}{selectedPreset ? ` (${selectedPreset.network})` : ''}</span>
+                      <span className="font-mono">{maskedCard}{selectedNetwork ? ` (${selectedNetwork})` : ''}</span>
                     </div>
                     <div className="flex justify-between items-center py-2">
                       <span className="text-gray-500">Category</span>

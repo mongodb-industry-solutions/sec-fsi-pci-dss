@@ -10,6 +10,7 @@ import { createFraudCase } from '../../fraud/services/fraudDiagnosis.service';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
 import { emitProcessEvent } from '../../integrations/services/businessProcessEvent.service';
+import { getCardByToken, upsertCardByToken } from '../../customer/services/paymentCard.service';
 
 export interface CreateTransactionInput {
   cardToken: string;
@@ -25,7 +26,20 @@ export interface CreateTransactionInput {
   cardTransactionNarrative?: string;
   // Acquiring-side link (SD-89): the merchant this payment was made to. Optional.
   merchantAgreementInstanceReference?: string;
+  // Card-on-file auto-registration (SD-88): present for a NEW card so the PSP can save it to the
+  // payer's wallet after a successful payment. Omitted when paying with an already-saved card.
+  paymentCardExpirationDate?: string;
+  paymentCardNetwork?: 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
   gatewayPayload: object;
+}
+
+// Thrown when a payment is attempted with a card-on-file the customer has deactivated (suspended)
+// or removed (revoked). The PSP rejects it regardless of the issuer's decision (BIAN SD-15).
+export class CardNotActiveError extends Error {
+  constructor(public readonly status: string) {
+    super(`Card is ${status}: the PSP declined this operation`);
+    this.name = 'CardNotActiveError';
+  }
 }
 
 function shouldCreateFraudCase(amount: number, mcc: string): { create: boolean; reasons: string[] } {
@@ -82,6 +96,14 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
   // Use the Level 2 QE client so the driver encrypts them with the correct DEKs.
   const txWriteDb = await getDbForRole('security_auditor', false);
 
+  // PSP-level control (BIAN SD-15): if this token belongs to a card-on-file the customer has
+  // DEACTIVATED (suspended) or REMOVED (revoked), the PSP rejects the operation regardless of
+  // what the issuer would say. New/unsaved tokens have no card-on-file and pass through.
+  const onFile = await getCardByToken(db, input.cardToken);
+  if (onFile && onFile.paymentCardStatus !== 'active') {
+    throw new CardNotActiveError(onFile.paymentCardStatus);
+  }
+
   // Normalize the account reference to the customer's canonical business key
   // (ACC-xxx) so seeded and simulator-created transactions share one convention.
   // Falls back to the raw input (e.g. email) if the customer can't be resolved.
@@ -115,6 +137,25 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
   };
 
   await txWriteDb.collection(CARD_TRANSACTION_COLLECTION).insertOne(txn as object);
+
+  // Card-on-file auto-registration (SD-88): EVERY payment that resolves to a customer saves the
+  // card to their wallet — regardless of channel or origin (app, hosted checkout, payment link,
+  // simulator, or any external system integrating with the PSP). There is no "save card" opt-in:
+  // using a card to pay IS the registration. Expiry/network are stored when the source reports
+  // them; otherwise the card is still registered (masked PAN + token) and the customer can complete
+  // the details later. upsertCardByToken is idempotent, so re-using a saved card is a safe no-op.
+  if (resolved.uuid) {
+    try {
+      await upsertCardByToken(db, {
+        customerAgreementInstanceReference: resolved.uuid,
+        cardToken: input.cardToken,
+        paymentCardMaskedPanDisplay: input.cardTransactionMaskedPanDisplay,
+        paymentCardIsPreferred: false,
+        ...(input.paymentCardExpirationDate ? { paymentCardExpirationDate: input.paymentCardExpirationDate } : {}),
+        ...(input.paymentCardNetwork ? { paymentCardNetwork: input.paymentCardNetwork } : {}),
+      });
+    } catch { /* never block the payment on card-on-file save */ }
+  }
 
   const { create, reasons } = shouldCreateFraudCase(input.amount, input.cardTransactionMerchantCategoryCode);
   let fraudCaseRef: string | undefined;

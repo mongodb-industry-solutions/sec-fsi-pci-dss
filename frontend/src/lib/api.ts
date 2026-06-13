@@ -372,12 +372,47 @@ export const api = {
         paymentCardMaskedPanDisplay: string;
         paymentCardNetwork: 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
         paymentCardIsPreferred?: boolean;
+        paymentCardAlias?: string;
       },
       token: string
     ) =>
       apiFetch<{ paymentCardInstanceReference: string; paymentCardStatus: string }>(
         `/api/v1/customer/${encodeURIComponent(customerId)}/cards`,
         { method: 'POST', body: JSON.stringify(body) },
+        token
+      ),
+    // Owner self-service card detail: surrogate token, expiry (QE:none), dates, alias/note.
+    getCardById: (customerId: string, cardId: string, token: string) =>
+      apiFetch<Record<string, unknown>>(
+        `/api/v1/customer/${encodeURIComponent(customerId)}/cards/${encodeURIComponent(cardId)}`,
+        {},
+        token
+      ),
+    // Edit the alias/note — the only mutable attributes of a saved card. Owner-only; audited.
+    updateCard: (
+      customerId: string,
+      cardId: string,
+      body: { paymentCardAlias?: string; paymentCardCustomerNote?: string },
+      token: string
+    ) =>
+      apiFetch<Record<string, unknown>>(
+        `/api/v1/customer/${encodeURIComponent(customerId)}/cards/${encodeURIComponent(cardId)}`,
+        { method: 'PATCH', body: JSON.stringify(body) },
+        token
+      ),
+    // Activate / deactivate a saved card. Owner-only; audited. A deactivated card is declined by
+    // the PSP on every operation, even if the issuer would approve.
+    setCardActive: (customerId: string, cardId: string, active: boolean, token: string) =>
+      apiFetch<Record<string, unknown>>(
+        `/api/v1/customer/${encodeURIComponent(customerId)}/cards/${encodeURIComponent(cardId)}/status`,
+        { method: 'PATCH', body: JSON.stringify({ active }) },
+        token
+      ),
+    // Remove (soft-delete) a saved card. Owner-only; emits a compliance audit event server-side.
+    deleteCard: (customerId: string, cardId: string, token: string) =>
+      apiFetch<{ removed: boolean }>(
+        `/api/v1/customer/${encodeURIComponent(customerId)}/cards/${encodeURIComponent(cardId)}`,
+        { method: 'DELETE' },
         token
       ),
   },

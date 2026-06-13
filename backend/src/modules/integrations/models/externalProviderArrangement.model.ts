@@ -299,7 +299,8 @@ export type ComplianceProcessType =
   | 'kyc_verification'
   | 'kyb_verification'
   | 'merchant_onboarding'
-  | 'customer_onboarding';
+  | 'customer_onboarding'
+  | 'card_management';   // SD-88 stored-card lifecycle (register / remove) — PCI DSS Req 10
 
 export type ProcessEventOutcome = 'approved' | 'rejected' | 'pending' | 'failed' | 'escalated';
 

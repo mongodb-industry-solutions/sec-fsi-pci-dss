@@ -45,6 +45,18 @@ const CUSTOMER_BLOCKED_EXACT: Set<string> = new Set([
   '/api/v1/audit-events',
 ]);
 
+// Carve-out: a customer MAY manage their own stored cards (SD-88) even though the general
+// /api/v1/customer search prefix is blocked. The card sub-routes enforce ownership in-handler
+// (the path :customerId must match the caller's own agreement), so allowing the customer here
+// does not expose other customers' data. Pattern: /api/v1/customer/{id}/cards[/{cardId}].
+const CUSTOMER_OWN_CARD_PATH = /^\/api\/v1\/customer\/[^/]+\/cards(\/[^/]+){0,2}$/;
+function isCustomerBlocked(role: string | undefined, url: string): boolean {
+  if (role !== 'customer') return false;
+  const path = url.split('?')[0];
+  if (CUSTOMER_OWN_CARD_PATH.test(path)) return false; // own-card management is allowed
+  return CUSTOMER_BLOCKED_PREFIXES.some((p) => url.startsWith(p)) || CUSTOMER_BLOCKED_EXACT.has(path);
+}
+
 // Investigation (BIAN SD-83 Fraud Diagnosis) is restricted to fraud analyst and auditor
 // roles. The platform/integration `manager`, `merchant_officer` and `customer` roles must
 // not read or act on fraud cases (PCI DSS Req 7 least privilege). The unauthenticated
@@ -87,12 +99,7 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     if (payload) {
       (request as FastifyRequest & { user: jwt.JwtPayload }).user = payload;
       const role = (payload as { role?: string }).role;
-      if (
-        role === 'customer' && (
-          CUSTOMER_BLOCKED_PREFIXES.some((p) => url.startsWith(p)) ||
-          CUSTOMER_BLOCKED_EXACT.has(url.split('?')[0])
-        )
-      ) {
+      if (isCustomerBlocked(role, url)) {
         return reply.status(403).send({ error: 'Access denied: this endpoint is not available to the customer role' });
       }
       if (blockedFromInvestigation(role, path)) {
@@ -118,13 +125,10 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     return reply.status(401).send({ error: 'Invalid or expired token' });
   }
 
-  // Customers are blocked from investigation, customer-search, and audit endpoints.
-  // They must use /api/v1/auth/me for their own profile data.
+  // Customers are blocked from investigation, customer-search, and audit endpoints (but may
+  // manage their own stored cards — see isCustomerBlocked). They use /api/v1/auth/me otherwise.
   const role = (payload as { role?: string }).role;
-  if (role === 'customer' && (
-    CUSTOMER_BLOCKED_PREFIXES.some((p) => url.startsWith(p)) ||
-    CUSTOMER_BLOCKED_EXACT.has(url.split('?')[0])
-  )) {
+  if (isCustomerBlocked(role, url)) {
     return reply.status(403).send({ error: 'Access denied: this endpoint is not available to the customer role' });
   }
 

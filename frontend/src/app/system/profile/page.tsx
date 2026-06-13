@@ -5,7 +5,7 @@ import { Store } from 'lucide-react';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { ROLE_LABELS } from '../../../lib/constants';
 import { useDebugMode } from '../../../lib/debugMode';
-import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, CreditCard, User } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, User } from 'lucide-react';
 import { RawMongoPanel } from '../../../components/RawMongoPanel';
 import { SectionHeader } from '../../../components/SectionHeader';
 
@@ -263,7 +263,6 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState('');
   const [merchant, setMerchant] = useState<MerchantProfileData | null>(null);
-  const [savedCards, setSavedCards] = useState<Record<string, unknown>[]>([]);
 
   // Edit state
   const [editing, setEditing] = useState(false);
@@ -305,13 +304,7 @@ export default function ProfilePage() {
     if (!t) { setLoading(false); setError('Session not found.'); return; }
 
     reload(t)
-      .then((data) => {
-        const agreementId = data?.agreement?.customerAgreementInstanceReference;
-        if (agreementId && typeof agreementId === 'string') {
-          api.customer.getCards(agreementId, t)
-            .then(res => setSavedCards(res.results ?? []))
-            .catch(() => null);
-        }
+      .then(() => {
         api.merchants.getMe(t)
           .then(res => { if (res.found && res.merchant) setMerchant(res.merchant as unknown as MerchantProfileData); })
           .catch(() => null);
@@ -732,41 +725,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Saved Payment Methods (SD-57), visible when customer has a payment agreement */}
-      {savedCards.length > 0 && (
-        <div className="bg-white rounded-xl border p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CreditCard size={16} className="text-gray-500 shrink-0" />
-              <h2 className="font-semibold text-gray-800 text-sm">Saved Payment Methods</h2>
-            </div>
-            {debugMode && (
-              <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-teal-50 text-teal-700 border-teal-200 shrink-0">
-                SD-88 · paymentCardManagement · PCI Req 3.4
-              </span>
-            )}
-          </div>
-          <div className="space-y-2">
-            {savedCards.map((card) => (
-              <div key={card.paymentCardInstanceReference as string} className="flex items-center justify-between py-2 px-3 rounded-lg border border-gray-100 bg-gray-50">
-                <div className="flex items-center gap-3">
-                  <CreditCard size={16} className="text-gray-400 shrink-0" />
-                  <div>
-                    <span className="text-sm font-mono text-gray-800">{card.paymentCardMaskedPanDisplay as string}</span>
-                    <span className="ml-2 text-xs text-gray-400">{card.paymentCardNetwork as string}</span>
-                  </div>
-                </div>
-                <span className={`text-xs px-2 py-0.5 rounded font-medium ${card.paymentCardStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                  {card.paymentCardStatus as string}
-                </span>
-              </div>
-            ))}
-          </div>
-          {debugMode && (
-            <p className="text-xs text-gray-400">Card tokens are surrogates — not CHD under PCI DSS v4.0. Expiry date stored as QE:none.</p>
-          )}
-        </div>
-      )}
+      {/* Payment-card management lives in its own section: /system/cards (BIAN SD-88). */}
 
       {/* Data protection notice, debug mode only */}
       {debugMode && (
