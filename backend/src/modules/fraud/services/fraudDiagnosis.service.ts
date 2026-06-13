@@ -61,7 +61,9 @@ function isCaseRefDuplicate(e: unknown): boolean {
 // $inc (seq starting at 1) before the seed ran, or when the DB predates ADR-024. That
 // makes nextCaseRef hand out references that already exist (E11000 on insert). Calling
 // this on a collision realigns the counter so the very next allocation is unique, with
-// no DB reset required. Uses a $max pipeline update so we never lower an advanced counter.
+// no DB reset required. Uses the $max UPDATE OPERATOR (not an aggregation pipeline): the
+// QE/CSFLE-enabled client rejects pipeline updates (analyze_query, code 31146), and $max
+// only ever raises the counter — never lowers an already-advanced one.
 async function reconcileCaseRefCounter(db: Db): Promise<void> {
   const docs = await db
     .collection(FRAUD_DIAGNOSIS_COLLECTION)
@@ -74,7 +76,7 @@ async function reconcileCaseRefCounter(db: Db): Promise<void> {
   }
   await db.collection<{ _id: string; seq: number }>(COUNTERS_COLLECTION).updateOne(
     { _id: CASE_REF_SEQUENCE },
-    [{ $set: { seq: { $max: [{ $ifNull: ['$seq', 0] }, max] } } }],
+    { $max: { seq: max } },
     { upsert: true },
   );
 }

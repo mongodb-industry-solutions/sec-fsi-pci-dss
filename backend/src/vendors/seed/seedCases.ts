@@ -27,8 +27,9 @@ export async function seedCases(db: Db) {
   // collide with an existing reference. The counter must sit at least at 1000 (above the
   // seeded FD-YYYY-000001..000020 band) AND above the highest numeric suffix actually
   // present, in case the counter document drifted below the data (e.g. created by a
-  // runtime $inc starting at 1, or a pre-ADR-024 DB). A $max pipeline update only ever
-  // raises the counter, never lowers an already-advanced one.
+  // runtime $inc starting at 1, or a pre-ADR-024 DB). The $max update operator only ever
+  // raises the counter, never lowers an already-advanced one (and avoids pipeline updates,
+  // which the QE/CSFLE client rejects).
   const existing = await db
     .collection('fraudDiagnosisCase')
     .find({}, { projection: { _id: 0, fraudDiagnosisCaseReference: 1 } })
@@ -40,7 +41,7 @@ export async function seedCases(db: Db) {
   }
   await db.collection<{ _id: string; seq: number }>('counters').updateOne(
     { _id: 'fraudDiagnosisCaseReference' },
-    [{ $set: { seq: { $max: [{ $ifNull: ['$seq', 0] }, maxSeq] } } }],
+    { $max: { seq: maxSeq } },
     { upsert: true }
   );
 }

@@ -6,6 +6,7 @@ import { MerchantBrandingWrapper } from './MerchantBrandingWrapper';
 import { SimulatorStateManager } from './SimulatorStateManager';
 import type { SimulatorScenario } from '../../types/simulator';
 import simulatorConfig from '../../config/simulator.json';
+import { variedAmountNum, variedDescription } from '../../lib/simVary';
 
 interface Props {
   scenario: SimulatorScenario;
@@ -24,6 +25,19 @@ export function RedirectionPaymentFlow({ scenario }: Props) {
 
   const { prefill } = scenario;
 
+  // Editable payment options (persona + merchant stay fixed). Initialized from the scenario.
+  const [amount, setAmount] = useState<number>(prefill.amount);
+  const [description, setDescription] = useState<string>(prefill.description ?? '');
+  const [varyNote, setVaryNote] = useState<string | null>(null);
+
+  function handleVary() {
+    const a = variedAmountNum(amount);
+    const d = variedDescription(prefill.merchantName, description);
+    setAmount(a);
+    setDescription(d);
+    setVaryNote(`Distinct values generated. Find it by amount ${new Intl.NumberFormat('en-EU', { style: 'currency', currency: prefill.currency }).format(a)} or descriptor “${d}”.`);
+  }
+
   // Listen for postMessage from iframe callback page
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
@@ -41,7 +55,7 @@ export function RedirectionPaymentFlow({ scenario }: Props) {
           cardTransactionInstanceReference: tid,
           caseId: cid || null,
           email: prefill.email,
-          amount: prefill.amount,
+          amount,
           currency: prefill.currency,
           merchantName: prefill.merchantName,
           method: 'redirection',
@@ -54,7 +68,7 @@ export function RedirectionPaymentFlow({ scenario }: Props) {
     }
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [prefill]);
+  }, [prefill, amount]);
 
   async function initSession() {
     setFlowState('creating');
@@ -63,9 +77,9 @@ export function RedirectionPaymentFlow({ scenario }: Props) {
       const origin = window.location.origin;
       const result = await api.simulator.createCheckoutSession({
         merchantId: simulatorConfig.merchantId,
-        amount: prefill.amount,
+        amount,
         currency: prefill.currency,
-        description: prefill.description,
+        description: description.trim() || prefill.description,
         returnUrl: `${origin}/simulator/payment/callback?status=success&session={session_id}&txn={txn_id}&case={case_id}`,
         cancelUrl: `${origin}/simulator/payment/callback?status=cancelled&session={session_id}`,
         merchantReference: `SIM-${scenario.id.toUpperCase()}-${Date.now()}`,
@@ -99,22 +113,63 @@ export function RedirectionPaymentFlow({ scenario }: Props) {
     return (
       <MerchantBrandingWrapper
         merchantName={prefill.merchantName}
-        amount={prefill.amount}
+        amount={amount}
         currency={prefill.currency}
-        description={prefill.description}
+        description={description.trim() || prefill.description}
       >
-        <div className="text-center py-8">
-          <p className="text-sm text-gray-600 mb-4">
+        <div className="py-6">
+          {flowState === 'idle' && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 mb-4 space-y-3 text-left">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-xs text-blue-800">
+                  The customer and merchant are fixed by this scenario. Adjust the payment options
+                  below, or use <strong>Vary values</strong> to generate a distinct variation.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleVary}
+                  className="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors"
+                >
+                  🎲 Vary values
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Amount ({prefill.currency})</label>
+                  <input
+                    type="number" step="0.01" min="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Description</label>
+                  <input
+                    type="text" maxLength={22}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder={prefill.merchantName.toUpperCase().slice(0, 22)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                  />
+                </div>
+              </div>
+              {varyNote && <p className="text-xs text-blue-700 font-medium">{varyNote}</p>}
+            </div>
+          )}
+          <p className="text-sm text-gray-600 mb-4 text-center">
             Click below to simulate the merchant creating a checkout session and
             embedding the payment page in an iframe.
           </p>
-          <button
-            onClick={initSession}
-            disabled={flowState === 'creating'}
-            className="bg-[#001E2B] text-[#00ED64] border border-[#00ED64] px-6 py-2.5 rounded-lg font-semibold text-sm hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors disabled:opacity-50"
-          >
-            {flowState === 'creating' ? 'Creating session…' : 'Proceed to checkout'}
-          </button>
+          <div className="text-center">
+            <button
+              onClick={initSession}
+              disabled={flowState === 'creating'}
+              className="bg-[#001E2B] text-[#00ED64] border border-[#00ED64] px-6 py-2.5 rounded-lg font-semibold text-sm hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors disabled:opacity-50"
+            >
+              {flowState === 'creating' ? 'Creating session…' : 'Proceed to checkout'}
+            </button>
+          </div>
           <button onClick={handleCancel} className="mt-2 w-full text-xs text-gray-400 hover:text-gray-600 transition-colors py-1">
             ← Cancel and change scenario
           </button>
@@ -142,9 +197,9 @@ export function RedirectionPaymentFlow({ scenario }: Props) {
     return (
       <MerchantBrandingWrapper
         merchantName={prefill.merchantName}
-        amount={prefill.amount}
+        amount={amount}
         currency={prefill.currency}
-        description={prefill.description}
+        description={description.trim() || prefill.description}
       >
         <div className="text-center py-6">
           <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-2 text-xs mb-4">
@@ -182,9 +237,9 @@ export function RedirectionPaymentFlow({ scenario }: Props) {
     return (
       <MerchantBrandingWrapper
         merchantName={prefill.merchantName}
-        amount={prefill.amount}
+        amount={amount}
         currency={prefill.currency}
-        description={prefill.description}
+        description={description.trim() || prefill.description}
       >
         <iframe
           ref={iframeRef}

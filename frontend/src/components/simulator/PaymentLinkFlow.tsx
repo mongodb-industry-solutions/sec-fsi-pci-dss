@@ -6,6 +6,7 @@ import { MerchantBrandingWrapper } from './MerchantBrandingWrapper';
 import { SimulatorStateManager } from './SimulatorStateManager';
 import type { SimulatorScenario } from '../../types/simulator';
 import simulatorConfig from '../../config/simulator.json';
+import { variedAmountNum, variedDescription } from '../../lib/simVary';
 
 interface Props {
   scenario: SimulatorScenario;
@@ -24,6 +25,19 @@ export function PaymentLinkFlow({ scenario }: Props) {
   const [copyLabel, setCopyLabel] = useState('Copy link');
 
   const { prefill } = scenario;
+
+  // Editable payment options (persona + merchant stay fixed). Initialized from the scenario.
+  const [amount, setAmount] = useState<number>(prefill.amount);
+  const [description, setDescription] = useState<string>(prefill.description ?? '');
+  const [varyNote, setVaryNote] = useState<string | null>(null);
+
+  function handleVary() {
+    const a = variedAmountNum(amount);
+    const d = variedDescription(prefill.merchantName, description);
+    setAmount(a);
+    setDescription(d);
+    setVaryNote(`Distinct values generated. Find it by amount ${new Intl.NumberFormat('en-EU', { style: 'currency', currency: prefill.currency }).format(a)} or descriptor “${d}”.`);
+  }
 
   // Restore from sessionStorage on reload
   useEffect(() => {
@@ -50,7 +64,7 @@ export function PaymentLinkFlow({ scenario }: Props) {
         cardTransactionInstanceReference: tid,
         caseId: cid || null,
         email: prefill.email,
-        amount: prefill.amount,
+        amount,
         currency: prefill.currency,
         merchantName: prefill.merchantName,
         method: 'payment-link',
@@ -62,7 +76,7 @@ export function PaymentLinkFlow({ scenario }: Props) {
     }
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [prefill, linkCode]);
+  }, [prefill, linkCode, amount]);
 
   async function createLink() {
     setFlowState('creating');
@@ -70,9 +84,9 @@ export function PaymentLinkFlow({ scenario }: Props) {
     try {
       const result = await api.simulator.createPaymentLink({
         merchantId: simulatorConfig.merchantId,
-        amount: prefill.amount,
+        amount,
         currency: prefill.currency,
-        description: prefill.description,
+        description: description.trim() || prefill.description,
         customerMessage: `Hi ${prefill.cardholderName}, please complete your payment using the link below.`,
         usageType: 'single_use',
       });
@@ -123,11 +137,51 @@ export function PaymentLinkFlow({ scenario }: Props) {
               <div className="text-xs text-gray-500">Merchant generates a link, shares with customer, customer pays</div>
             </div>
           </div>
-          <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 mb-4 space-y-1">
+          {/* Fixed by the scenario */}
+          <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 mb-3 space-y-1">
             <div><span className="font-medium">Customer:</span> {prefill.cardholderName}</div>
-            <div><span className="font-medium">Amount:</span> {new Intl.NumberFormat('en-EU', { style: 'currency', currency: prefill.currency }).format(prefill.amount)}</div>
             <div><span className="font-medium">Merchant:</span> {prefill.merchantName}</div>
           </div>
+
+          {/* Editable payment options */}
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 mb-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-xs text-blue-800">
+                The customer and merchant are fixed by this scenario. Adjust the payment options
+                below, or use <strong>Vary values</strong> to generate a distinct variation.
+              </p>
+              <button
+                type="button"
+                onClick={handleVary}
+                className="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors"
+              >
+                🎲 Vary values
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Amount ({prefill.currency})</label>
+                <input
+                  type="number" step="0.01" min="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Description</label>
+                <input
+                  type="text" maxLength={22}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder={prefill.merchantName.toUpperCase().slice(0, 22)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                />
+              </div>
+            </div>
+            {varyNote && <p className="text-xs text-blue-700 font-medium">{varyNote}</p>}
+          </div>
+
           <button
             onClick={createLink}
             className="w-full bg-[#001E2B] text-[#00ED64] border border-[#00ED64] py-2.5 rounded-lg font-semibold text-sm hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors"
@@ -226,9 +280,9 @@ export function PaymentLinkFlow({ scenario }: Props) {
     return (
       <MerchantBrandingWrapper
         merchantName={prefill.merchantName}
-        amount={prefill.amount}
+        amount={amount}
         currency={prefill.currency}
-        description={prefill.description}
+        description={description.trim() || prefill.description}
       >
         <iframe
           src={iframeSrc}
