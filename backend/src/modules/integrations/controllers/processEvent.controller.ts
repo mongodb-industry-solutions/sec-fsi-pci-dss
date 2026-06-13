@@ -26,14 +26,16 @@ export async function processEventController(fastify: FastifyInstance) {
       querystring: {
         type: 'object',
         properties: {
-          source:  { type: 'string', enum: ['all', 'business', 'compliance', 'integration'] },
-          type:    { type: 'string' },
-          outcome: { type: 'string' },
-          q:       { type: 'string' },
-          from:    { type: 'string', format: 'date-time' },
-          to:      { type: 'string', format: 'date-time' },
-          page:    { type: 'integer', minimum: 1, default: 1 },
-          limit:   { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+          source:     { type: 'string', enum: ['all', 'business', 'compliance', 'integration'] },
+          type:       { type: 'string' },
+          entityType: { type: 'string', enum: ['fraud_case', 'transaction', 'customer', 'merchant', 'integration'] },
+          outcome:    { type: 'string' },
+          q:          { type: 'string' },
+          minScore:   { type: 'integer', minimum: 0, maximum: 100 },
+          from:       { type: 'string', format: 'date-time' },
+          to:         { type: 'string', format: 'date-time' },
+          page:       { type: 'integer', minimum: 1, default: 1 },
+          limit:      { type: 'integer', minimum: 1, maximum: 100, default: 20 },
         },
       },
       response: {
@@ -46,14 +48,16 @@ export async function processEventController(fastify: FastifyInstance) {
         return reply.status(403).send({ error: 'Forbidden: security_auditor or manager role required' });
       const q = request.query as Record<string, string>;
       const result = await listAuditEvents(fastify.db, {
-        source:  (q.source as AuditSource | 'all' | undefined) ?? 'all',
-        type:    q.type || undefined,
-        outcome: q.outcome || undefined,
-        q:       q.q || undefined,
-        from:    q.from ? new Date(q.from) : undefined,
-        to:      q.to   ? new Date(q.to)   : undefined,
-        page:    q.page  ? parseInt(q.page,  10) : 1,
-        limit:   q.limit ? parseInt(q.limit, 10) : 20,
+        source:     (q.source as AuditSource | 'all' | undefined) ?? 'all',
+        type:       q.type || undefined,
+        entityType: q.entityType || undefined,
+        outcome:    q.outcome || undefined,
+        q:          q.q || undefined,
+        minScore:   q.minScore !== undefined ? parseInt(q.minScore, 10) : undefined,
+        from:       q.from ? new Date(q.from) : undefined,
+        to:         q.to   ? new Date(q.to)   : undefined,
+        page:       q.page  ? parseInt(q.page,  10) : 1,
+        limit:      q.limit ? parseInt(q.limit, 10) : 20,
       });
       return reply.send(result);
     },

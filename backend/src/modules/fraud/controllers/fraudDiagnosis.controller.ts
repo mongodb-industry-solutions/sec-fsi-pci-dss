@@ -7,8 +7,10 @@ import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgr
 import type { DemoRequest } from '../../../shared/models/identity.model';
 import type { AnalystRole } from '../models/fraudDiagnosis.model';
 import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
+import { getCaseEnrichment } from '../services/caseEnrichment.service';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
+const ENRICHMENT_ROLES = ['level1_analyst', 'level2_investigator', 'security_auditor'];
 
 export async function fraudDiagnosisController(fastify: FastifyInstance) {
   fastify.get('/', {
@@ -412,6 +414,40 @@ without creating a duplicate.
       escalationAcceptedAt: fraudCase.fraudDiagnosisEscalationAcceptedAt ?? null,
       requestDateTime: fraudCase.fraudDiagnosisRequestDateTime,
     });
+  });
+
+  // GET /api/v1/fraud/:id/enrichment
+  // Aggregated read-model (BFF) over the event-driven core: one role-gated, consistently
+  // redacted summary of the case (operation + SDF + HRP + KYC + KYB) for investigation.
+  // Sensitive PII is included only when a valid escalation token already unlocked it; the
+  // heavy/sensitive detail otherwise stays on-demand at the existing escalation-gated routes.
+  fastify.get('/:id/enrichment', {
+    schema: {
+      tags: ['fraud'],
+      summary: 'Investigation case enrichment read-model (operation + SDF + HRP + KYC + KYB)',
+      description: `Composes a single, role-gated summary of the case from the control records and the
+event streams. KYC/KYB summaries are visible to analysts and auditors; sensitive KYC PII (QE:none)
+appears only when a valid \`X-Escalation-Token\` is presented (L2) or for the auditor. Aligns with
+BIAN SD-83 (Fraud Diagnosis), SD-53 (Customer Agreement), SD-89 (Merchant Relations) and PCI DSS
+Req 7 (least privilege) and Req 10 (audit of sensitive access).`,
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      response: {
+        200: { type: 'object', additionalProperties: true, description: 'Case enrichment read-model.' },
+        401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { demoRole, escalationToken } = request as unknown as DemoRequest;
+    if (!ENRICHMENT_ROLES.includes(demoRole)) {
+      return reply.status(403).send({ error: 'Access denied: investigation enrichment requires an analyst or auditor role.' });
+    }
+    const { id } = request.params as { id: string };
+    const result = await getCaseEnrichment(fastify.db, id, demoRole, escalationToken);
+    if (!result) return reply.status(404).send({ error: 'Fraud case not found' });
+    return reply.send(result);
   });
 
   // PATCH /api/v1/fraud/:id

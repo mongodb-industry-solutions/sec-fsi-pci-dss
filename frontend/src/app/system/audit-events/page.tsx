@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, RefreshCw, Search, ChevronDown, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
+import { Activity, RefreshCw, Search, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { Pagination } from '../../../components/Pagination';
 import { api } from '../../../lib/api';
@@ -41,6 +42,22 @@ const SOURCE_STYLES: Record<string, string> = {
   integration: 'bg-violet-50 text-violet-700 border-violet-200',
 };
 
+// Deep-link an audit event to the business entity it relates to. Customer (KYC) has no
+// dedicated by-id route, so it is shown without a link.
+function entityHref(entityType?: string, entityId?: string | null): string | null {
+  if (!entityId) return null;
+  switch (entityType) {
+    case 'fraud_case':  return `/system/investigation/${entityId}`;
+    case 'transaction': return `/system/transactions/${entityId}`;
+    case 'merchant':    return `/system/merchant/${entityId}`;
+    case 'integration': return `/system/admin/integrations/${entityId}`;
+    default:            return null;
+  }
+}
+const ENTITY_LABEL: Record<string, string> = {
+  fraud_case: 'case', transaction: 'transaction', merchant: 'merchant', customer: 'customer', integration: 'integration',
+};
+
 export default function AuditEventsPage() {
   const router = useRouter();
   const [token, setToken] = useState('');
@@ -54,8 +71,10 @@ export default function AuditEventsPage() {
 
   const [source, setSource] = useState('all');
   const [typeInput, setTypeInput] = useState('');
+  const [entityType, setEntityType] = useState('');
   const [outcome, setOutcome] = useState('');
   const [q, setQ] = useState('');
+  const [minScore, setMinScore] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
@@ -74,7 +93,9 @@ export default function AuditEventsPage() {
     setLoading(true);
     try {
       const res = await api.processEvents.audit(token, {
-        source, type: typeInput || undefined, outcome: outcome || undefined, q: q || undefined,
+        source, type: typeInput || undefined, entityType: entityType || undefined,
+        outcome: outcome || undefined, q: q || undefined,
+        minScore: minScore ? parseInt(minScore, 10) : undefined,
         from: from ? new Date(from).toISOString() : undefined,
         to: to ? new Date(to).toISOString() : undefined,
         page, limit: pageSize,
@@ -84,7 +105,7 @@ export default function AuditEventsPage() {
       setCapped(res.capped);
     } catch { setEvents([]); setTotal(0); }
     finally { setLoading(false); }
-  }, [token, source, typeInput, outcome, q, from, to, page, pageSize]);
+  }, [token, source, typeInput, entityType, outcome, q, minScore, from, to, page, pageSize]);
 
   useEffect(() => { if (authorized) load(); }, [authorized, load]);
 
@@ -140,6 +161,25 @@ export default function AuditEventsPage() {
           </select>
         </div>
         <div>
+          <label className="block text-xs text-gray-500 mb-1">Related entity</label>
+          <select value={entityType} onChange={(e) => { setEntityType(e.target.value); resetToFirst(); }}
+            className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white">
+            <option value="">All entities</option>
+            <option value="fraud_case">Investigation case</option>
+            <option value="transaction">Transaction</option>
+            <option value="customer">Customer (KYC)</option>
+            <option value="merchant">Merchant (KYB)</option>
+            <option value="integration">Integration</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Min risk score (SDF)</label>
+          <input type="number" min={0} max={100} value={minScore}
+            onChange={(e) => { setMinScore(e.target.value); resetToFirst(); }}
+            placeholder="e.g. 70"
+            className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm" />
+        </div>
+        <div>
           <label className="block text-xs text-gray-500 mb-1">From</label>
           <input type="datetime-local" value={from} onChange={(e) => { setFrom(e.target.value); resetToFirst(); }}
             className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm" />
@@ -150,8 +190,8 @@ export default function AuditEventsPage() {
             className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm" />
         </div>
         <div className="flex items-end gap-2">
-          {(q || typeInput || outcome || from || to) && (
-            <button onClick={() => { setQ(''); setTypeInput(''); setOutcome(''); setFrom(''); setTo(''); resetToFirst(); }}
+          {(q || typeInput || entityType || outcome || minScore || from || to) && (
+            <button onClick={() => { setQ(''); setTypeInput(''); setEntityType(''); setOutcome(''); setMinScore(''); setFrom(''); setTo(''); resetToFirst(); }}
               className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">Clear</button>
           )}
           <button onClick={load} className="text-xs px-3 py-1.5 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors inline-flex items-center gap-1">
@@ -176,27 +216,38 @@ export default function AuditEventsPage() {
           <ul className="divide-y divide-gray-100">
             {events.map((ev) => {
               const open = expanded === ev.id;
+              const href = entityHref(ev.entityType, ev.entityId);
+              const score = (ev.summary as { score?: unknown } | undefined)?.score;
               return (
                 <li key={ev.id} className="px-5 py-3">
-                  <button onClick={() => setExpanded(open ? null : ev.id)} className="w-full flex items-start gap-3 text-left">
-                    {open ? <ChevronDown size={14} className="mt-1 text-gray-400 shrink-0" /> : <ChevronRight size={14} className="mt-1 text-gray-400 shrink-0" />}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-[11px] px-1.5 py-0.5 rounded-full border font-medium ${SOURCE_STYLES[ev.source] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>{ev.source}</span>
-                        <span className="font-mono text-xs text-[#001E2B] font-semibold break-all">{ev.action}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${OUTCOME_STYLES[ev.outcome] ?? 'bg-gray-100 text-gray-600'}`}>{ev.outcome}</span>
-                        <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">{ev.type}</span>
-                        {ev.context && <span className="text-xs text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">{ev.context}</span>}
+                  <div className="flex items-start gap-2">
+                    <button onClick={() => setExpanded(open ? null : ev.id)} className="flex-1 min-w-0 flex items-start gap-3 text-left">
+                      {open ? <ChevronDown size={14} className="mt-1 text-gray-400 shrink-0" /> : <ChevronRight size={14} className="mt-1 text-gray-400 shrink-0" />}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-[11px] px-1.5 py-0.5 rounded-full border font-medium ${SOURCE_STYLES[ev.source] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>{ev.source}</span>
+                          <span className="font-mono text-xs text-[#001E2B] font-semibold break-all">{ev.action}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${OUTCOME_STYLES[ev.outcome] ?? 'bg-gray-100 text-gray-600'}`}>{ev.outcome}</span>
+                          <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">{ev.type}</span>
+                          {ev.context && <span className="text-xs text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">{ev.context}</span>}
+                          {typeof score === 'number' && <span className="text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full font-medium">risk {score}</span>}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {ev.entityType && <span className="font-medium">{ENTITY_LABEL[ev.entityType] ?? ev.entityType}</span>}
+                          {ev.entityId && <> · <span className="font-mono">{ev.entityId.slice(0, 16)}…</span></>}
+                          {ev.performedByRole && <> · <span>{ev.performedByRole}</span></>}
+                          {ev.bianServiceDomain && <> · <span className="text-gray-400">{ev.bianServiceDomain}</span></>}
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {ev.entityType && <span className="font-medium">{ev.entityType}</span>}
-                        {ev.entityId && <> · <span className="font-mono">{ev.entityId.slice(0, 16)}…</span></>}
-                        {ev.performedByRole && <> · <span>{ev.performedByRole}</span></>}
-                        {ev.bianServiceDomain && <> · <span className="text-gray-400">{ev.bianServiceDomain}</span></>}
-                      </div>
-                    </div>
-                    <div className="text-xs text-gray-400 shrink-0 tabular-nums">{new Date(ev.eventDateTime).toLocaleString()}</div>
-                  </button>
+                      <div className="text-xs text-gray-400 shrink-0 tabular-nums">{new Date(ev.eventDateTime).toLocaleString()}</div>
+                    </button>
+                    {href && (
+                      <Link href={href} title={`Open related ${ENTITY_LABEL[ev.entityType ?? ''] ?? 'entity'}`}
+                        className="shrink-0 inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline mt-0.5">
+                        Open <ExternalLink size={12} />
+                      </Link>
+                    )}
+                  </div>
                   {open && ev.summary && (
                     <div className="mt-2 ml-7">
                       <JsonView data={ev.summary} maxHeight="15rem" />

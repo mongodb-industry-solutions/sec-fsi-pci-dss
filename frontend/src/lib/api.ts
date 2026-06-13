@@ -113,6 +113,64 @@ export interface RawDocumentResponse {
   document: Record<string, unknown>;
 }
 
+export interface CaseEnrichment {
+  caseId: string;
+  asOf: string;
+  operation: {
+    transactionId: string;
+    type: string;
+    status: string;
+    channel: string | null;
+    merchantCategoryCode: string | null;
+    merchantName: string;
+    maskedPan: string;
+    amount: { amount: number; currency: string };
+    dateTime: string;
+    description: string | null;
+  } | null;
+  sdf: {
+    score: number | null;
+    scorePending: boolean;
+    indicators: string[];
+    conclusion: string | null;
+    events: Array<{ dateTime: string; action: string; outcome: string; summary?: Record<string, unknown> }>;
+  };
+  hrp: {
+    available: boolean;
+    match?: boolean;
+    highestRiskLevel?: 'none' | 'low' | 'medium' | 'high';
+    flags?: Array<{ category: string; riskLevel: string; label: string; description: string; detectedAt: string; source: string; reviewRequired: boolean }>;
+  };
+  kyc: {
+    customerId: string;
+    name: string | null;
+    segment: string | null;
+    status: string | null;
+    enrollmentDate: string | null;
+    kycCheck: Record<string, unknown> | null;
+    accountRef: string | null;
+    sensitiveUnlocked: boolean;
+    sensitive: Record<string, unknown> | null;
+  } | null;
+  kyb: {
+    merchantId: string;
+    name: string;
+    status: string;
+    kybCheck: Record<string, unknown> | null;
+    riskCategory: string | null;
+    tier: string | null;
+    countryCode: string | null;
+    categoryCode: string | null;
+  } | null;
+  references: {
+    caseId: string;
+    transactionId: string | null;
+    customerId: string | null;
+    merchantId: string | null;
+    accountRef: string | null;
+  };
+}
+
 export interface HrpcFlag {
   category: string;
   riskLevel: 'low' | 'medium' | 'high';
@@ -329,6 +387,14 @@ export const api = {
     },
     getById: (id: string, token: string) =>
       apiFetch<FraudCase>(`/api/v1/fraud/${id}`, {}, token),
+    // Aggregated case read-model (operation + SDF + HRP + KYC + KYB). Sensitive KYC PII is
+    // included only when a valid escalation token is supplied (L2) or for the auditor.
+    enrichment: (id: string, token: string, escalationToken?: string) =>
+      apiFetch<CaseEnrichment>(
+        `/api/v1/fraud/${id}/enrichment`,
+        escalationToken ? { headers: { 'X-Escalation-Token': escalationToken } } : {},
+        token,
+      ),
     // Investigation analytics for L1/L2/auditor dashboards (no PII).
     stats: (token: string) =>
       apiFetch<{
@@ -760,7 +826,7 @@ export const api = {
 
   processEvents: {
     // Unified audit stream: business + compliance + integration events.
-    audit: (token: string, params?: { source?: string; type?: string; outcome?: string; q?: string; from?: string; to?: string; page?: number; limit?: number }) => {
+    audit: (token: string, params?: { source?: string; type?: string; entityType?: string; outcome?: string; q?: string; minScore?: number; from?: string; to?: string; page?: number; limit?: number }) => {
       const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString() : '';
       return apiFetch<{
         events: Array<{ id: string; source: string; eventDateTime: string; type: string; action: string; outcome: string; entityType?: string; entityId?: string; performedByRole?: string | null; bianServiceDomain?: string; context?: string; summary?: Record<string, unknown> }>;

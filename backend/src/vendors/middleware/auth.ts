@@ -45,6 +45,17 @@ const CUSTOMER_BLOCKED_EXACT: Set<string> = new Set([
   '/api/v1/audit-events',
 ]);
 
+// Investigation (BIAN SD-83 Fraud Diagnosis) is restricted to fraud analyst and auditor
+// roles. The platform/integration `manager`, `merchant_officer` and `customer` roles must
+// not read or act on fraud cases (PCI DSS Req 7 least privilege). The unauthenticated
+// simulator (no token) keeps read-only access; the role check only applies when a token is
+// present, so an authenticated non-analyst role is denied on BOTH read and mutation routes.
+const INVESTIGATION_PREFIX = '/api/v1/fraud';
+const INVESTIGATION_ROLES = new Set(['level1_analyst', 'level2_investigator', 'security_auditor']);
+function blockedFromInvestigation(role: string | undefined, path: string): boolean {
+  return path.startsWith(INVESTIGATION_PREFIX) && !!role && !INVESTIGATION_ROLES.has(role);
+}
+
 function tryVerifyToken(authHeader: string | undefined): jwt.JwtPayload | null {
   if (!authHeader?.startsWith('Bearer ')) return null;
   try {
@@ -75,13 +86,17 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     const payload = tryVerifyToken(request.headers.authorization);
     if (payload) {
       (request as FastifyRequest & { user: jwt.JwtPayload }).user = payload;
+      const role = (payload as { role?: string }).role;
       if (
-        (payload as { role?: string }).role === 'customer' && (
+        role === 'customer' && (
           CUSTOMER_BLOCKED_PREFIXES.some((p) => url.startsWith(p)) ||
           CUSTOMER_BLOCKED_EXACT.has(url.split('?')[0])
         )
       ) {
         return reply.status(403).send({ error: 'Access denied: this endpoint is not available to the customer role' });
+      }
+      if (blockedFromInvestigation(role, path)) {
+        return reply.status(403).send({ error: 'Access denied: investigation is restricted to fraud analyst and auditor roles' });
       }
     }
     attachRbacContext(request);
@@ -105,12 +120,17 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
 
   // Customers are blocked from investigation, customer-search, and audit endpoints.
   // They must use /api/v1/auth/me for their own profile data.
-  const customerRole = (payload as { role?: string }).role === 'customer';
-  if (customerRole && (
+  const role = (payload as { role?: string }).role;
+  if (role === 'customer' && (
     CUSTOMER_BLOCKED_PREFIXES.some((p) => url.startsWith(p)) ||
     CUSTOMER_BLOCKED_EXACT.has(url.split('?')[0])
   )) {
     return reply.status(403).send({ error: 'Access denied: this endpoint is not available to the customer role' });
+  }
+
+  // Investigation (SD-83) is for fraud analyst/auditor roles only; deny manager/officer/etc.
+  if (blockedFromInvestigation(role, path)) {
+    return reply.status(403).send({ error: 'Access denied: investigation is restricted to fraud analyst and auditor roles' });
   }
 
   // Always populate demoRole and escalationToken after auth resolves

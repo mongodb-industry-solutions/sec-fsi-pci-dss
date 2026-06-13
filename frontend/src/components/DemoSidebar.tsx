@@ -28,14 +28,12 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'Transactions', path: '/system/transactions',  icon: CreditCard },
     { label: 'Users',        path: '/system/users',         icon: Users },
     { label: 'Merchant',     path: '/system/merchant',      icon: Store },
-    { label: 'My Profile',   path: '/system/profile',       icon: User },
   ],
   level2_investigator: [
     { label: 'Cases',        path: '/system/investigation', icon: BriefcaseMedical },
     { label: 'Transactions', path: '/system/transactions',  icon: CreditCard },
     { label: 'Users',        path: '/system/users',         icon: Users },
     { label: 'Merchant',     path: '/system/merchant',      icon: Store },
-    { label: 'My Profile',   path: '/system/profile',       icon: User },
   ],
   security_auditor: [
     { label: 'Cases',          path: '/system/investigation', icon: BriefcaseMedical },
@@ -45,18 +43,15 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'Audit Events',   path: '/system/audit-events',  icon: Activity },
     { label: 'Data Integrity', path: '/system/integrity',     icon: ShieldCheck },
     { label: 'Merchant',       path: '/system/merchant',      icon: Store },
-    { label: 'My Profile',     path: '/system/profile',       icon: User },
   ],
   customer: [
     { label: 'Transactions', path: '/system/payment/history', icon: ClipboardList },
     { label: 'New Payment',  path: '/system/payment',         icon: PlusCircle, exact: true },
     { label: 'Merchant',     path: '/system/merchant',        icon: Store },
-    { label: 'Profile',      path: '/system/profile',         icon: User },
   ],
   merchant_officer: [
     { label: 'Review Queue', path: '/system/merchant/review', icon: ClipboardCheck },
     { label: 'All Merchants',path: '/system/merchant',        icon: Store, exact: true },
-    { label: 'My Profile',   path: '/system/profile',         icon: User },
   ],
   manager: [
     { label: 'Hub',             path: '/system',                          icon: Settings2,    exact: true },
@@ -74,6 +69,13 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: '+ Register',      path: '/system/admin/integrations/new',   icon: PlusCircle },
   ],
 };
+
+// Account-level links pinned to the bottom of the sidebar, visually separated
+// from the role-specific navigation above (profile + help, available to all roles).
+const ACCOUNT_ITEMS: NavItem[] = [
+  { label: 'My Profile',   path: '/system/profile', icon: User },
+  { label: 'Help & Guide', path: '/system/help',    icon: HelpCircle },
+];
 
 function useRole() {
   const [role, setRole] = useState('');
@@ -141,16 +143,27 @@ export function DemoSidebar() {
         })}
       </nav>
 
-      {/* Universal Help link, visible to all roles */}
-      <div className="px-2 pb-1">
-        <Link
-          href="/system/help"
-          title="Help & PCI DSS Guide"
-          className={`flex items-center gap-2.5 px-2 py-2 text-sm font-medium rounded-lg transition-colors text-gray-500 hover:text-white hover:bg-white/5`}
-        >
-          <HelpCircle size={15} className="shrink-0" />
-          {!collapsed && <span className="truncate text-xs">Help & Guide</span>}
-        </Link>
+      {/* Account-level links (profile + help), separated from role navigation */}
+      <div className="border-t border-white/10 py-1">
+        {ACCOUNT_ITEMS.map((item) => {
+          const Icon   = item.icon;
+          const active = isActive(item);
+          return (
+            <Link
+              key={item.path}
+              href={item.path}
+              title={item.label}
+              className={`flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium transition-colors ${
+                active
+                  ? 'bg-[#00ED64]/10 text-[#00ED64] border-r-2 border-[#00ED64]'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Icon size={16} className="shrink-0" />
+              {!collapsed && <span className="truncate">{item.label}</span>}
+            </Link>
+          );
+        })}
       </div>
 
       <button
@@ -181,8 +194,10 @@ export function DemoSidebar() {
 /** Mobile bottom tab bar (visible below md breakpoint only) */
 export function MobileBottomNav() {
   const role     = useRole();
-  const items    = NAV_BY_ROLE[role] ?? [];
   const isActive = useActiveItem();
+  // Append the account-level Profile link (pulled out of the per-role lists for
+  // the desktop sidebar) so it stays reachable on mobile.
+  const items    = role ? [...(NAV_BY_ROLE[role] ?? []), ACCOUNT_ITEMS[0]] : [];
 
   if (items.length === 0) return null;
 

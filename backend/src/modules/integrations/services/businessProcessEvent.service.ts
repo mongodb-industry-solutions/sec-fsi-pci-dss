@@ -173,8 +173,10 @@ export async function listAuditEvents(
   opts: {
     source?: AuditSource | 'all';
     type?: string;
+    entityType?: string;
     outcome?: string;
     q?: string;
+    minScore?: number;
     from?: Date;
     to?: Date;
     page?: number;
@@ -256,9 +258,16 @@ export async function listAuditEvents(
     }
   }
 
-  // In-memory narrowing (outcome, free-text), merge-sort, paginate
+  // In-memory narrowing (entity, outcome, risk score, free-text), merge-sort, paginate
   let merged = rows;
+  if (opts.entityType) merged = merged.filter((r) => r.entityType === opts.entityType);
   if (opts.outcome) merged = merged.filter((r) => r.outcome === opts.outcome);
+  if (opts.minScore !== undefined) {
+    merged = merged.filter((r) => {
+      const s = (r.summary as { score?: unknown } | undefined)?.score;
+      return typeof s === 'number' && s >= (opts.minScore as number);
+    });
+  }
   if (opts.q) {
     const q = opts.q.toLowerCase();
     merged = merged.filter((r) =>

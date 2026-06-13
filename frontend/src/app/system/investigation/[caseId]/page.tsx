@@ -2,14 +2,14 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api, FraudCase, ActionEvent, HrpcCheckResponse } from '../../../../lib/api';
+import { api, FraudCase, ActionEvent, HrpcCheckResponse, CaseEnrichment } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { EncryptionBadge } from '../../../../components/EncryptionBadge';
 import { RawMongoPanel } from '../../../../components/RawMongoPanel';
 import { CaseNotesPanel } from '../../../../components/CaseNotesPanel';
 import { SEVERITY_COLORS, STATUS_COLORS, ROLE_LABELS, formatRiskIndicator } from '../../../../lib/constants';
 import { useDebugMode } from '../../../../lib/debugMode';
-import { ArrowUpFromLine, CheckCircle, XCircle, ShieldAlert } from 'lucide-react';
+import { ArrowUpFromLine, CheckCircle, XCircle, ShieldAlert, Activity, Store, CreditCard, UserCheck, ChevronRight } from 'lucide-react';
 
 const ACTION_LABELS: Record<string, string> = {
   case_opened: 'Case opened',
@@ -64,6 +64,7 @@ export default function DemoCaseDetailPage() {
   const [fraudCase, setFraudCase] = useState<FraudCase | null>(null);
   const [events, setEvents] = useState<ActionEvent[]>([]);
   const [hrpc, setHrpc] = useState<HrpcCheckResponse | null>(null);
+  const [enrichment, setEnrichment] = useState<CaseEnrichment | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Customer profile linked to the case (auto-loaded from customerAgreementInstanceReference)
@@ -105,6 +106,12 @@ export default function DemoCaseDetailPage() {
       router.replace('/system/payment/history');
       return;
     }
+    // Investigation is restricted to fraud analyst/auditor roles. Manager, merchant_officer
+    // and any other authenticated role are redirected to their hub (mirrors the server guard).
+    if (!['level1_analyst', 'level2_investigator', 'security_auditor'].includes(resolvedRole)) {
+      router.replace('/system');
+      return;
+    }
 
     setToken(t);
     setRole(resolvedRole);
@@ -112,13 +119,34 @@ export default function DemoCaseDetailPage() {
     const load = async () => {
       try {
         await reload(t);
-        api.hrpc.check('ACC-003', t).then(setHrpc).catch(() => null);
       } finally {
         setLoading(false);
       }
     };
     load();
   }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load the aggregated enrichment read-model. Re-runs when the escalation token changes so
+  // sensitive KYC unlocks in place. HRP is derived from the real account reference here (no
+  // hardcoded lookup). Eventual consistency: the read-model reports `asOf` and pending fields.
+  useEffect(() => {
+    if (!token || !caseId) return;
+    api.fraud.enrichment(caseId, token, escalationToken ?? undefined)
+      .then((e) => {
+        setEnrichment(e);
+        if (e.hrp?.available && e.hrp.match) {
+          setHrpc({
+            accountRef: e.references.accountRef ?? '',
+            hrpcMatch: !!e.hrp.match,
+            highestRiskLevel: e.hrp.highestRiskLevel ?? 'none',
+            hrpcFlags: (e.hrp.flags ?? []) as HrpcCheckResponse['hrpcFlags'],
+          });
+        } else {
+          setHrpc(null);
+        }
+      })
+      .catch(() => null);
+  }, [token, caseId, escalationToken]);
 
   async function handleAction(body: Parameters<typeof api.fraud.update>[1], successMsg: string) {
     setActionBusy(true);
@@ -295,6 +323,137 @@ export default function DemoCaseDetailPage() {
             </div>
           )}
         </div>
+
+        {/* -- Investigation enrichment (read-model: operation + SDF history + KYB + KYC) -- */}
+        {enrichment && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Operation */}
+            {enrichment.operation && (
+              <div className="bg-white rounded-xl border p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <CreditCard size={15} className="text-[#001E2B]" />
+                  <h2 className="font-semibold text-sm">Operation</h2>
+                  <Link href={`/system/transactions/${enrichment.operation.transactionId}`}
+                    className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
+                    Open transaction <ChevronRight size={12} />
+                  </Link>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap mb-3">
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-[#001E2B] text-[#00ED64] capitalize">{enrichment.operation.type.replace(/_/g, ' ')}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${
+                    enrichment.operation.status === 'disputed' ? 'bg-red-100 text-red-700' :
+                    enrichment.operation.status === 'declined' ? 'bg-gray-200 text-gray-600' :
+                    'bg-green-100 text-green-700'
+                  }`}>{enrichment.operation.status}</span>
+                  {enrichment.operation.channel && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 capitalize">{enrichment.operation.channel}</span>}
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                  <span className="text-gray-500">Amount:</span>
+                  <span className="font-semibold">{new Intl.NumberFormat('en-US', { style: 'currency', currency: enrichment.operation.amount.currency }).format(enrichment.operation.amount.amount)}</span>
+                  <span className="text-gray-500">Merchant:</span>
+                  <span className="font-medium truncate">{enrichment.operation.merchantName}</span>
+                  <span className="text-gray-500">MCC:</span>
+                  <span className="font-mono text-xs">{enrichment.operation.merchantCategoryCode ?? '—'}</span>
+                  <span className="text-gray-500">Card:</span>
+                  <span className="font-mono text-xs">{enrichment.operation.maskedPan}</span>
+                  {enrichment.operation.description && (<><span className="text-gray-500">Descriptor:</span><span className="truncate">{enrichment.operation.description}</span></>)}
+                </div>
+              </div>
+            )}
+
+            {/* SDF — detection signal + history */}
+            <div className="bg-white rounded-xl border p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <ShieldAlert size={15} className="text-[#001E2B]" />
+                <h2 className="font-semibold text-sm">Fraud Detection (SDF)</h2>
+                <span className="ml-auto text-xs text-gray-400">{enrichment.sdf.scorePending ? 'score pending' : `score ${enrichment.sdf.score}/100`}</span>
+              </div>
+              {enrichment.sdf.conclusion && <p className="text-sm text-gray-700 mb-2">{enrichment.sdf.conclusion}</p>}
+              {enrichment.sdf.events.length === 0 ? (
+                <p className="text-xs text-gray-400">No detection events recorded yet.</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {enrichment.sdf.events.map((ev, i) => (
+                    <li key={i} className="text-xs flex items-start gap-2">
+                      <span className={`mt-0.5 px-1.5 py-0.5 rounded-full font-medium ${ev.outcome === 'rejected' || ev.outcome === 'failed' ? 'bg-red-100 text-red-700' : ev.outcome === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>{ev.outcome}</span>
+                      <div className="min-w-0">
+                        <span className="font-mono text-[#001E2B]">{ev.action}</span>
+                        <span className="text-gray-400"> · {new Date(ev.dateTime).toLocaleString()}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {debugMode && <p className="mt-3 text-[10px] font-mono text-gray-400">SD-83 · processType fraud_evaluation · asOf {new Date(enrichment.asOf).toLocaleTimeString()}</p>}
+            </div>
+
+            {/* KYB — merchant */}
+            {enrichment.kyb && (
+              <div className="bg-white rounded-xl border p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Store size={15} className="text-[#001E2B]" />
+                  <h2 className="font-semibold text-sm">Merchant (KYB)</h2>
+                  <Link href={`/system/merchant/${enrichment.kyb.merchantId}`}
+                    className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
+                    Open merchant <ChevronRight size={12} />
+                  </Link>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                  <span className="text-gray-500">Name:</span>
+                  <span className="font-medium truncate">{enrichment.kyb.name}</span>
+                  <span className="text-gray-500">Status:</span>
+                  <span className="capitalize">{enrichment.kyb.status}</span>
+                  <span className="text-gray-500">KYB check:</span>
+                  <span className="capitalize">{(enrichment.kyb.kybCheck as { merchantAgreementKybCheckStatus?: string } | null)?.merchantAgreementKybCheckStatus ?? 'n/a'}</span>
+                  <span className="text-gray-500">Risk:</span>
+                  <span className="capitalize">{enrichment.kyb.riskCategory ?? '—'}{enrichment.kyb.tier ? ` · ${enrichment.kyb.tier}` : ''}</span>
+                  <span className="text-gray-500">Country / MCC:</span>
+                  <span className="font-mono text-xs">{enrichment.kyb.countryCode ?? '—'} / {enrichment.kyb.categoryCode ?? '—'}</span>
+                </div>
+              </div>
+            )}
+
+            {/* KYC — customer summary (sensitive PII only when unlocked) */}
+            {enrichment.kyc && (
+              <div className="bg-white rounded-xl border p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <UserCheck size={15} className="text-[#001E2B]" />
+                  <h2 className="font-semibold text-sm">Customer (KYC)</h2>
+                  <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium ${enrichment.kyc.sensitiveUnlocked ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {enrichment.kyc.sensitiveUnlocked ? 'PII unlocked' : 'Summary only'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                  <span className="text-gray-500">Name:</span>
+                  <span className="font-medium truncate">{enrichment.kyc.name ?? '—'}</span>
+                  <span className="text-gray-500">Segment:</span>
+                  <span className="capitalize">{enrichment.kyc.segment ?? '—'}</span>
+                  <span className="text-gray-500">Status:</span>
+                  <span className="capitalize">{enrichment.kyc.status ?? '—'}</span>
+                  <span className="text-gray-500">KYC check:</span>
+                  <span className="capitalize">{(enrichment.kyc.kycCheck as { customerAgreementKycCheckStatus?: string } | null)?.customerAgreementKycCheckStatus ?? 'n/a'}</span>
+                </div>
+                {enrichment.kyc.sensitive ? (
+                  <div className="mt-3 rounded-lg border border-purple-200 bg-purple-50 p-3 text-xs space-y-1">
+                    {(() => {
+                      const s = enrichment.kyc.sensitive as { customerAgreementResidentialAddress?: { streetAddress?: string; city?: string; postalCode?: string; countryCode?: string }; governmentIdentificationReference?: string; customerAgreementRiskNotes?: string };
+                      const addr = s.customerAgreementResidentialAddress;
+                      return (
+                        <>
+                          {addr && <div><span className="text-gray-500">Address: </span><span className="font-mono">{[addr.streetAddress, addr.city, addr.postalCode, addr.countryCode].filter(Boolean).join(', ')}</span></div>}
+                          {s.governmentIdentificationReference && <div><span className="text-gray-500">Gov ID: </span><span className="font-mono">{s.governmentIdentificationReference}</span></div>}
+                          {s.customerAgreementRiskNotes && <div><span className="text-gray-500">Risk notes: </span>{s.customerAgreementRiskNotes}</div>}
+                        </>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-gray-400 italic">Sensitive PII (address, government ID, risk notes) requires {isAuditor ? 'auditor access' : 'L2 escalation acceptance'}.</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* -- Customer profile - visible to L2 and Auditor -- */}
         {canSeeAll && <div className="bg-white rounded-xl border p-5">

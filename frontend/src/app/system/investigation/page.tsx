@@ -46,6 +46,12 @@ export default function InvestigationPage() {
       router.replace('/system/payment/history');
       return;
     }
+    // Investigation is for fraud analyst/auditor roles only. Other authenticated roles
+    // (manager, merchant_officer) are sent to their own hub. Mirrors the server-side guard.
+    if (u && !['level1_analyst', 'level2_investigator', 'security_auditor'].includes(u.role)) {
+      router.replace('/system');
+      return;
+    }
     if (u?.role === 'level2_investigator') {
       setFilterStatus('escalated');
     }
