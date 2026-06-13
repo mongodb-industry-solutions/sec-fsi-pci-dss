@@ -94,6 +94,10 @@ Pass \`?featured=true\` to return only the curated demo roster (debug-mode picke
                     enum: ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor', 'merchant_officer', 'manager'],
                     description: 'Role encoded in the JWT on login.',
                   },
+                  merchant: {
+                    type: 'string',
+                    description: 'Merchant name when this user owns a merchant (customer who is also a merchant owner).',
+                  },
                 },
               },
             },

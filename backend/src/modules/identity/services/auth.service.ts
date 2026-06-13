@@ -75,6 +75,20 @@ export async function getDemoUsers(_db: Db, opts?: { featured?: boolean }) {
   const filePath = path.join(dataDir, 'customerAuthentications.json');
   const records: CustomerAuthenticationAssessmentRecord[] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
 
+  // Map each merchant-owner party → merchant name, so the demo login picker can
+  // flag which customer owns a merchant (e.g. Amara Okafor → Okafor Digital
+  // Services) without hard-coding a name. Best-effort: skip if the file is absent.
+  const ownerToMerchant = new Map<string, string>();
+  try {
+    const merchants: Array<{ merchantOwnerPartyReference?: string; merchantName?: string }> =
+      JSON.parse(fs.readFileSync(path.join(dataDir, 'merchants.json'), 'utf-8'));
+    for (const m of merchants) {
+      if (m.merchantOwnerPartyReference && m.merchantName) {
+        ownerToMerchant.set(m.merchantOwnerPartyReference, m.merchantName);
+      }
+    }
+  } catch { /* merchants file optional — no merchant flag then */ }
+
   return records
     .filter((u) => u.customerAuthenticationAccountStatus === 'active')
     // featured=true → only the curated demo roster (debug-mode picker + simulator).
@@ -85,6 +99,8 @@ export async function getDemoUsers(_db: Db, opts?: { featured?: boolean }) {
       name: u.customerAuthenticationUserName,
       role: u.customerAuthenticationUserRole,
       featured: u.customerAuthenticationDemoFeatured === true,
+      // Merchant name when this user owns a merchant (customer who is also a merchant owner).
+      merchant: ownerToMerchant.get(u.partyInstanceReference),
     }));
 }
 

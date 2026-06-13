@@ -37,6 +37,8 @@ export interface AuthUser {
   name: string;
   role: string;
   featured?: boolean;
+  /** Merchant name when this user owns a merchant (customer who is also a merchant owner). */
+  merchant?: string;
 }
 
 export interface AuthDomain {

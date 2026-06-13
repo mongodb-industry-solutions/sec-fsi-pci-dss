@@ -228,7 +228,11 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
                   ) : (
                     <select value={displayUsers.some((u) => u.email === selectedEmail) ? selectedEmail : ''} onChange={(e) => handleUserSelect(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
                       <option value="">Select a user…</option>
-                      {displayUsers.map((u) => <option key={u.email} value={u.email}>{u.name} ({ROLE_LABELS[u.role] ?? u.role})</option>)}
+                      {displayUsers.map((u) => (
+                        <option key={u.email} value={u.email}>
+                          {u.name} ({ROLE_LABELS[u.role] ?? u.role}{u.merchant ? ` · 🏬 ${u.merchant}` : ''})
+                        </option>
+                      ))}
                     </select>
                   )}
                 </div>
