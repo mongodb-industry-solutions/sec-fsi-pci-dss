@@ -27,9 +27,9 @@ export default function IntegrityPage() {
       <SectionHeader
         icon={ShieldCheck}
         title="Data Integrity"
-        description="Read-only oversight of the fraud case records."
-        info="This view checks that every case reference is unique, that each case still links to an existing transaction and customer, and that the case counts reconcile. It reports aggregates only and never shows cardholder data."
-        debugInfo="BIAN SD-83 control-record integrity · PCI DSS Req 10 (logging & monitoring) · read-only"
+        description="Read-only oversight of fraud case and payment-card records."
+        info="This view checks that every case reference is unique, that cases still link to an existing transaction and customer, that the counts reconcile, and that payment cards are not duplicated by error (same card under multiple tokens, or registry drift). It reports aggregates and masked PANs only — never cardholder data."
+        debugInfo="BIAN SD-83 / SD-88 control-record integrity · PCI DSS Req 10 (logging & monitoring) · read-only"
       />
       <IntegrityPanel token={token} />
     </div>

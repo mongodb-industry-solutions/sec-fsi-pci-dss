@@ -11,6 +11,7 @@ import { PaymentLinkFlow } from '../../../components/simulator/PaymentLinkFlow';
 import type { PaymentMethodId, SimulatorScenario } from '../../../types/simulator';
 import simulatorConfig from '../../../config/simulator.json';
 import { variedAmount, variedDescription } from '../../../lib/simVary';
+import { deriveCardToken } from '../../../lib/cardTokenize';
 
 type Step = 1 | 2 | 3;
 
@@ -286,6 +287,8 @@ export default function PaymentPage() {
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<FormData>(DEFAULTS);
   const [maskedCard, setMaskedCard] = useState<string>(maskCardNumber(DEMO_CARD_NUMBER));
+  // Raw PAN digits kept only to derive the deterministic token at submit time (never sent).
+  const [rawCard, setRawCard] = useState<string>(DEMO_CARD_NUMBER.replace(/\D/g, ''));
   const [merchants, setMerchants] = useState<Merchant[]>(FALLBACK_MERCHANTS);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{
@@ -432,6 +435,9 @@ export default function PaymentPage() {
     setSubmitting(true);
     setError(null);
     try {
+      // Deterministic token from the entered card number: paying again with the same card reuses
+      // the same token, so the card-on-file is never duplicated (dedups in the registry).
+      if (rawCard) cardTokenRef.current = await deriveCardToken(rawCard);
       const res = await api.transactions.create({
         cardToken: cardTokenRef.current,
         accountReference: form.email,
@@ -495,6 +501,7 @@ export default function PaymentPage() {
     setStep(1);
     setForm(DEFAULTS);
     setMaskedCard(maskCardNumber(DEMO_CARD_NUMBER));
+    setRawCard(DEMO_CARD_NUMBER.replace(/\D/g, ''));
     setResult(null);
     setReturning(false);
     setError(null);
@@ -581,7 +588,7 @@ export default function PaymentPage() {
             </label>
             <CardSelector
               maskedCard={maskedCard}
-              onCardChange={(raw) => setMaskedCard(maskCardNumber(raw))}
+              onCardChange={(raw) => { setRawCard(raw); setMaskedCard(maskCardNumber(raw)); }}
             />
             {validationErrors.cardNumber && (
               <p className="text-xs text-red-600 mt-0.5">{validationErrors.cardNumber}</p>

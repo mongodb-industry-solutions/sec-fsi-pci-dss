@@ -64,6 +64,8 @@ export default function TransactionDetailPage() {
   const [approving, setApproving] = useState(false);
   const [openingCase, setOpeningCase] = useState(false);
   const [openCaseError, setOpenCaseError] = useState<string | null>(null);
+  // FDS/AML: how many customers hold the card used in this transaction (shared-card signal).
+  const [cardHolders, setCardHolders] = useState<number | null>(null);
 
   // Parties involved (role-gated by the backend): customer (KYC) + merchant (KYB).
   const [partyCustomer, setPartyCustomer] = useState<Record<string, unknown> | null>(null);
@@ -146,6 +148,15 @@ export default function TransactionDetailPage() {
   const isL2 = role === 'level2_investigator';
   const isAuditor = role === 'security_auditor';
   const canSeeSensitive = txn?.sensitive != null;
+
+  // Shared-card lookup (FDS/AML): resolve how many customers hold this card on file (registry).
+  useEffect(() => {
+    const cardToken = txn?.paymentCardReference;
+    if (!token || !cardToken) return;
+    api.fraud.cardRegistry(cardToken, token)
+      .then((r) => setCardHolders(r.cardHolderCount))
+      .catch(() => setCardHolders(null));
+  }, [token, txn?.paymentCardReference]);
 
   if (loading) return <div className="w-full px-5 sm:px-8 lg:px-12 py-6 text-gray-400">Loading transaction...</div>;
   if (notFound || !txn) return (
@@ -240,6 +251,15 @@ export default function TransactionDetailPage() {
               <>
                 <span className="text-gray-500">Card token</span>
                 <span className="font-mono text-xs text-gray-600 truncate">{txn.paymentCardReference}</span>
+              </>
+            )}
+            {cardHolders !== null && cardHolders > 0 && (
+              <>
+                <span className="text-gray-500">Card held by</span>
+                <span className={cardHolders > 3 ? 'text-amber-700 font-semibold' : 'text-gray-700'}>
+                  {cardHolders} customer{cardHolders !== 1 ? 's' : ''}
+                  {cardHolders > 3 && ' ⚠ shared-card / mule risk'}
+                </span>
               </>
             )}
           </div>

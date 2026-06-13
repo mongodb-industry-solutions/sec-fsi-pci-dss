@@ -52,10 +52,29 @@ export function cvvValid(cvv: string, network: CardNetwork | null): boolean {
 export interface TokenizeInput { pan: string; expiry: string; cvv: string }
 export interface TokenizeResult { token: string; maskedPan: string; network: CardNetwork; expiry: string }
 
+// Demo tokenization key. In production the token comes from a PCI-compliant tokenization vault/HSM;
+// here we derive it deterministically with a keyed HMAC so the SAME card number always yields the
+// SAME token. PCI DSS: the token must not be reversible to the PAN — a *keyed* HMAC (not a bare hash
+// of the low-entropy PAN) is the accepted construction. NOTE: a browser cannot truly hold a secret,
+// so this key is a stand-in; a real deployment performs this server-side / in the vault.
+const TOKEN_KEY = process.env.NEXT_PUBLIC_CARD_TOKEN_KEY || 'demo-psp-tokenization-key-v1';
+
+// Deterministic surrogate token: HMAC-SHA256(PAN) keyed with TOKEN_KEY → `tok_<24 hex><last4>`.
+// Same PAN → same token, so a card is never duplicated in the registry / a customer's wallet.
+export async function deriveCardToken(panDigits: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', enc.encode(TOKEN_KEY), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(panDigits));
+  const bytes = new Uint8Array(sig);
+  let hex = '';
+  for (let i = 0; i < 12; i++) hex += bytes[i].toString(16).padStart(2, '0');
+  return `tok_${hex}${panDigits.slice(-4)}`;
+}
+
 // Validate the raw card details and return only non-sensitive, storable artifacts.
 // Throws Error(<friendly message>) on the first validation failure. The CVV is consumed here
-// and never included in the result.
-export function tokenizeCard({ pan, expiry, cvv }: TokenizeInput): TokenizeResult {
+// and never included in the result. Async because the token is derived via Web Crypto HMAC.
+export async function tokenizeCard({ pan, expiry, cvv }: TokenizeInput): Promise<TokenizeResult> {
   const digits = pan.replace(/\D/g, '');
   const network = detectNetwork(digits);
   if (!network) throw new Error('Unrecognized card network. Check the card number.');
@@ -64,10 +83,9 @@ export function tokenizeCard({ pan, expiry, cvv }: TokenizeInput): TokenizeResul
   if (!cvvValid(cvv, network)) throw new Error(`Enter a valid ${network === 'AMEX' ? '4' : '3'}-digit security code.`);
 
   const last4 = digits.slice(-4);
-  // Surrogate token — opaque, non-reversible reference (a real PSP returns this from its vault).
-  const rand = Math.random().toString(16).slice(2).padEnd(13, '0').slice(0, 13);
+  const token = await deriveCardToken(digits);
   return {
-    token: `tok_${rand}${last4}`,
+    token,
     maskedPan: `****-****-****-${last4}`,
     network,
     expiry: expiry.trim(),

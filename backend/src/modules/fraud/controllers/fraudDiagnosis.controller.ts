@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, appendAuditEvent, createFraudCase, addCaseNote, retractCaseNote, getCaseNotes, getFraudStats, getFraudIntegrity } from '../services/fraudDiagnosis.service';
+import { getCardIntegrity } from '../../customer/services/paymentCard.service';
 import { getTransactionById } from '../../transactions/services/cardTransaction.service';
 import { generateToken } from '../../../vendors/security/escalationTokens';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
@@ -308,7 +309,7 @@ without creating a duplicate.
     schema: {
       tags: ['fraud'],
       summary: 'Fraud case data-integrity check (auditor, Req 10)',
-      description: 'Read-only integrity oversight for the Security Auditor: duplicate case references, orphaned transaction/customer references, and case totals. Aggregates only — no PII.',
+      description: 'Read-only integrity oversight for the Security Auditor: duplicate case references, orphaned transaction/customer references, case totals, and payment-card duplication checks (duplicate arrangements, inconsistent tokenization, registry drift). Aggregates + masked PAN only — no CHD/PII.',
       security: [{ bearerAuth: [] }],
       response: {
         200: {
@@ -321,6 +322,19 @@ without creating a duplicate.
             orphanCustomerRefs:   { type: 'number' },
             orphanCustomerReferences: { type: 'array', items: { type: 'object', properties: { reference: { type: 'string' }, count: { type: 'number' } } } },
             healthy:              { type: 'boolean' },
+            cards: {
+              type: 'object',
+              description: 'Payment-card data-integrity (SD-88): cards duplicated by error.',
+              properties: {
+                duplicateArrangementCount: { type: 'number' },
+                duplicateArrangements: { type: 'array', items: { type: 'object', properties: { maskedPan: { type: 'string' }, count: { type: 'number' } } } },
+                tokenizationDuplicateCount: { type: 'number' },
+                tokenizationDuplicates: { type: 'array', items: { type: 'object', properties: { maskedPan: { type: 'string' }, network: { type: 'string', nullable: true }, distinctTokens: { type: 'number' } } } },
+                registryDriftCount: { type: 'number' },
+                registryDrift: { type: 'array', items: { type: 'object', properties: { maskedPan: { type: 'string' }, registryCount: { type: 'number' }, liveCount: { type: 'number' } } } },
+                healthy: { type: 'boolean' },
+              },
+            },
           },
         },
         403: { $ref: 'Error#' },
@@ -331,8 +345,11 @@ without creating a duplicate.
     if (role !== 'security_auditor') {
       return reply.status(403).send({ error: 'Access denied: data-integrity oversight is available to the security auditor role.' });
     }
-    const integrity = await getFraudIntegrity(fastify.db);
-    return reply.send(integrity);
+    const [integrity, cards] = await Promise.all([
+      getFraudIntegrity(fastify.db),
+      getCardIntegrity(fastify.db),
+    ]);
+    return reply.send({ ...integrity, healthy: integrity.healthy && cards.healthy, cards });
   });
 
   fastify.get('/:id', {

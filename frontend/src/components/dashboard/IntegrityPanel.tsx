@@ -86,7 +86,51 @@ export function IntegrityPanel({ token }: { token: string }) {
         {debugMode && <p className="mt-3 text-[10px] font-mono text-gray-400">SD-83 control-record integrity · PCI DSS Req 10 · read-only</p>}
       </div>
 
-      {/* Duplicate case references — dedicated, interactive remediation card */}
+      {/* Payment-card integrity (SD-88): cards duplicated by error */}
+      {d.cards && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+            <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5"><ShieldCheck size={14} className="text-[#001E2B]" /> Payment-card checks</h2>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${d.cards.healthy ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+              {d.cards.healthy ? 'All checks passed' : 'Attention needed'}
+            </span>
+          </div>
+          <div className="divide-y divide-gray-50">
+            <IntegrityRow ok={d.cards.duplicateArrangementCount === 0} label="No duplicate card-on-file per customer" detail={d.cards.duplicateArrangementCount === 0 ? 'OK' : `${d.cards.duplicateArrangementCount} duplicate(s)`} />
+            <IntegrityRow ok={d.cards.tokenizationDuplicateCount === 0} label="Consistent tokenization (one token per card)" detail={d.cards.tokenizationDuplicateCount === 0 ? 'OK' : `${d.cards.tokenizationDuplicateCount} inconsistent`} />
+            <IntegrityRow ok={d.cards.registryDriftCount === 0} label="Card registry reconciles with holders" detail={d.cards.registryDriftCount === 0 ? 'OK' : `${d.cards.registryDriftCount} drifted`} />
+          </div>
+          {debugMode && <p className="mt-3 text-[10px] font-mono text-gray-400">SD-88 payment-card integrity · masked PAN only · no CHD</p>}
+        </div>
+      )}
+
+      {/* Cards duplicated by error — same masked card under multiple tokens for one customer */}
+      {d.cards && d.cards.tokenizationDuplicates.length > 0 && (
+        <div className="bg-white rounded-xl border border-amber-200 overflow-hidden">
+          <div className="bg-amber-50 border-b border-amber-200 px-5 py-3 flex items-center gap-3">
+            <span className="inline-flex w-9 h-9 rounded-lg bg-amber-100 items-center justify-center shrink-0">
+              <AlertTriangle size={18} className="text-amber-600" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="font-semibold text-amber-900 text-sm">Cards duplicated by error</h2>
+              <p className="text-xs text-amber-700">Same card (masked PAN + network) stored under multiple tokens for one customer — inconsistent tokenization.</p>
+            </div>
+            <span className="ml-auto text-xs font-semibold bg-amber-600 text-white rounded-full px-2.5 py-1 shrink-0">{d.cards.tokenizationDuplicateCount}</span>
+          </div>
+          <ul className="divide-y divide-gray-100">
+            {d.cards.tokenizationDuplicates.map((r, i) => (
+              <li key={i} className="flex items-center gap-3 px-5 py-3">
+                <span className="font-mono text-sm text-gray-800">{r.maskedPan}</span>
+                {r.network && <span className="text-xs text-gray-400">{r.network}</span>}
+                <span className="ml-auto text-[11px] font-medium bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 shrink-0">{r.distinctTokens} tokens</span>
+              </li>
+            ))}
+          </ul>
+          <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-500">
+            Remediation: consolidate to a single deterministic token per card; merge the duplicate arrangements{debugMode ? ' (ADR-027)' : ''}.
+          </div>
+        </div>
+      )}
       {d.duplicateReferences.length > 0 && (
         <div className="bg-white rounded-xl border border-amber-200 overflow-hidden">
           <div className="bg-amber-50 border-b border-amber-200 px-5 py-3 flex items-center gap-3">

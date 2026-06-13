@@ -92,5 +92,40 @@ for (const ag of agreements) {
   firstActive.paymentCardIsPreferred = true;
 }
 
+// ---- Shared cards (FDS/AML): one physical card (same token) held by several customers --------
+// The same deterministic token + masked PAN + network appears as a card-on-file across multiple
+// agreements, each with their own alias. The registry deduplicates the card and counts holders.
+// One card is shared beyond the threshold (>3) so it trips the shared-card compliance signal.
+const SHARED = [
+  { token: 'tok_shared00000a4153', masked: '****-****-****-4153', network: 'VISA',       holders: 5, aliasPool: ['Family card', 'Shared home', 'Joint', 'Household', 'Shared'] },
+  { token: 'tok_shared00000b8821', masked: '****-****-****-8821', network: 'MASTERCARD', holders: 2, aliasPool: ['Shared business', 'Company card'] },
+];
+const agIds = agreements.map((a) => a.customerAgreementInstanceReference);
+let cursor = 0;
+for (const s of SHARED) {
+  for (let i = 0; i < s.holders; i++) {
+    const agId = agIds[cursor % agIds.length];
+    cursor++;
+    const created = pastDate(10, 400);
+    cards.push({
+      paymentCardInstanceReference: randomUUID(),
+      customerAgreementInstanceReference: agId,
+      paymentCardReference: s.token,                 // SAME token across holders = one physical card
+      paymentCardExpirationDate: expiry(),
+      paymentCardMaskedPanDisplay: s.masked,
+      paymentCardNetwork: s.network,
+      paymentCardStatus: 'active',
+      paymentCardIssuanceDateTime: created,
+      paymentCardIsPreferred: false,
+      paymentCardAlias: s.aliasPool[i] ?? 'Shared',
+      bianServiceDomain: 'Payment Card',
+      bianControlRecordType: 'PaymentCardManagement',
+      recordCreatedDateTime: created,
+      schemaVersion: 1,
+    });
+  }
+}
+
 writeFileSync(join(dataDir, 'paymentCards.json'), JSON.stringify(cards, null, 2) + '\n');
-console.log(`Generated ${cards.length} cards across ${agreements.length} customer agreements`);
+const sharedHolders = SHARED.reduce((n, s) => n + s.holders, 0);
+console.log(`Generated ${cards.length} cards across ${agreements.length} agreements (incl. ${SHARED.length} shared cards / ${sharedHolders} holders)`);

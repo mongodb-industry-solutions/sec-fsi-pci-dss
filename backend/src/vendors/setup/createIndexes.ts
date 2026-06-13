@@ -122,11 +122,22 @@ export async function createIndexes(client: MongoClient) {
     { key: { customerAgreementStatus: 1 } },
   ]);
 
-  // SD-88: Payment Card Management
+  // SD-88: Payment Card Management (the per-customer card-on-file arrangement).
+  // A customer may hold a given card (token) only once → unique compound index dedups per customer.
   await ensureIndexes(db, 'paymentCardManagement', [
     { key: { paymentCardInstanceReference: 1 }, unique: true },
     { key: { paymentCardReference: 1 } },
     { key: { customerAgreementInstanceReference: 1 } },
+    { key: { customerAgreementInstanceReference: 1, paymentCardReference: 1 }, unique: true },
+  ]);
+
+  // SD-88: Payment Card Registry (the physical card, one per token). Token is the unique identity;
+  // the holder array is indexed so "which cards does this customer hold" and FDS shared-card lookups
+  // are fast.
+  await ensureIndexes(db, 'paymentCardRegistry', [
+    { key: { paymentCardReference: 1 }, unique: true },
+    { key: { cardHolderAgreementReferences: 1 } },
+    { key: { cardHolderCount: -1 } },
   ]);
 
   // SD-83: Fraud Diagnosis — instance reference (natural primary key)

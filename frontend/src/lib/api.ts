@@ -459,7 +459,26 @@ export const api = {
         orphanCustomerRefs: number;
         orphanCustomerReferences: Array<{ reference: string; count: number }>;
         healthy: boolean;
+        cards?: {
+          duplicateArrangementCount: number;
+          duplicateArrangements: Array<{ maskedPan: string; count: number }>;
+          tokenizationDuplicateCount: number;
+          tokenizationDuplicates: Array<{ maskedPan: string; network?: string | null; distinctTokens: number }>;
+          registryDriftCount: number;
+          registryDrift: Array<{ maskedPan: string; registryCount: number; liveCount: number }>;
+          healthy: boolean;
+        };
       }>('/api/v1/fraud/integrity', {}, token),
+    // Shared-card registry lookup (FDS/AML) — investigation roles. Token from a transaction.
+    cardRegistry: (cardToken: string, token: string) =>
+      apiFetch<{
+        paymentCardReference: string;
+        paymentCardMaskedPanDisplay: string;
+        paymentCardNetwork?: string | null;
+        cardHolderCount: number;
+        cardHolderAgreementReferences: string[];
+        firstRegisteredDateTime?: string;
+      }>(`/api/v1/customer/card-registry/${encodeURIComponent(cardToken)}`, {}, token),
     getEvents: (id: string, token: string) =>
       apiFetch<CaseEventsResponse>(`/api/v1/fraud/${id}/events`, {}, token),
     allEvents: (params: { page?: number; limit?: number }, token: string) => {

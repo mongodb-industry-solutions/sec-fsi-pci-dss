@@ -60,8 +60,29 @@ export async function seedIntegrityIssues(client: MongoClient): Promise<{
     }
   }
 
+  // Card duplicated by ERROR (SD-88): the same customer ends up holding the same physical card
+  // (same masked PAN + network) under TWO different tokens — exactly what inconsistent/non-
+  // deterministic tokenization would produce. The auditor's Data Integrity tool surfaces this as a
+  // `tokenizationDuplicate`. (Deterministic tokens prevent it going forward; this is legacy bad data.)
+  const cardCol = db.collection('paymentCardManagement');
+  const sampleCard = await cardCol.findOne({ paymentCardStatus: 'active' });
+  let cardDuplicatesInserted = 0;
+  if (sampleCard) {
+    const dup = {
+      ...sampleCard,
+      _id: undefined,
+      paymentCardInstanceReference: uuidv4(),
+      paymentCardReference: `tok_dupERR${uuidv4().replace(/-/g, '').slice(0, 10)}`, // different token
+      paymentCardAlias: 'Duplicate (data error)',
+      recordCreatedDateTime: new Date().toISOString(),
+    };
+    delete dup._id;
+    await cardCol.insertOne(dup);
+    cardDuplicatesInserted++;
+  }
+
   console.log(
-    `  seedIntegrityIssues: inserted ${duplicatesInserted} duplicate(s) across ${DUPLICATE_PLAN.length - skippedRefs.length} case reference(s)`,
+    `  seedIntegrityIssues: inserted ${duplicatesInserted} duplicate case(s) across ${DUPLICATE_PLAN.length - skippedRefs.length} reference(s); ${cardDuplicatesInserted} duplicate card(s)`,
   );
   if (skippedRefs.length) {
     console.log(`  skipped (not found in collection): ${skippedRefs.join(', ')}`);

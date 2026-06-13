@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { createCard, getCardsByCustomer, getCardById, updateCardMetadata, setCardActivation, revokeCard, getOwnAgreementId } from '../services/paymentCard.service';
+import { registerCardForCustomer, getCardsByCustomer, getCardById, getCardHolderCount, getCardRegistryByToken, updateCardMetadata, setCardActivation, revokeCard, getOwnAgreementId } from '../services/paymentCard.service';
 import type { PaymentCardManagementControlRecord } from '../models/paymentCard.model';
 import type { JwtDemoPayload } from '../../../shared/models/identity.model';
 import { emitComplianceEvent } from '../../integrations/services/businessProcessEvent.service';
@@ -92,8 +92,11 @@ and must NOT be repeated in the request body.
             },
             paymentCardStatus: {
               type: 'string',
-              enum: ['active', 'blocked', 'expired', 'pending_activation'],
-              description: 'Initial card status (always `active` on successful creation).',
+              description: 'Card status after registration (`active` for a new/reactivated card; the existing status when reused).',
+            },
+            reused: {
+              type: 'boolean',
+              description: 'True when the customer already had this card on file — no duplicate was created.',
             },
           },
         },
@@ -127,7 +130,10 @@ and must NOT be repeated in the request body.
       return reply.status(403).send({ error: 'You can only register a card on your own account.' });
     }
 
-    const result = await createCard(fastify.db, {
+    // Dedup: a customer cannot hold the same card (deterministic token) twice. Re-adding returns
+    // the existing arrangement (reused); a removed card is reactivated. The shared registry (the
+    // physical card + holder count for FDS/AML) is synced inside the service.
+    const result = await registerCardForCustomer(fastify.db, {
       customerAgreementInstanceReference: customerId,
       cardToken: body.cardToken,
       paymentCardExpirationDate: body.paymentCardExpirationDate,
@@ -138,7 +144,7 @@ and must NOT be repeated in the request body.
     });
 
     // Audit (PCI DSS Req 10): record the card registration. No CHD in the summary.
-    emitComplianceEvent(fastify.db, {
+    if (!result.reused) emitComplianceEvent(fastify.db, {
       entityType: 'card',
       entityId: result.paymentCardInstanceReference,
       processType: 'card_management',
@@ -237,6 +243,45 @@ in this list response; it requires Level 2 access and a separate request.`,
     return reply.send(result);
   });
 
+  // GET /api/v1/customer/card-registry/:token  — FDS/AML shared-card lookup (investigation).
+  // Returns the physical card and HOW MANY customers hold it (a money-mule / shared-card signal),
+  // plus the holder agreement references. Restricted to L1/L2/auditor. Token is non-CHD.
+  fastify.get('/card-registry/:token', {
+    schema: {
+      tags: ['cards'],
+      summary: 'Shared-card registry lookup (FDS/AML, investigation roles)',
+      description: `Given a card surrogate token (e.g. from a transaction's \`paymentCardReference\`),
+returns the physical card and the set of customers holding it on file. A high \`cardHolderCount\` is a
+shared-card / money-mule indicator. Restricted to fraud analyst / investigator / auditor roles.`,
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['token'], properties: { token: { type: 'string' } } },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            paymentCardReference: { type: 'string' },
+            paymentCardMaskedPanDisplay: { type: 'string' },
+            paymentCardNetwork: { type: 'string', nullable: true },
+            cardHolderCount: { type: 'number' },
+            cardHolderAgreementReferences: { type: 'array', items: { type: 'string' } },
+            firstRegisteredDateTime: { type: 'string', format: 'date-time', nullable: true },
+          },
+        },
+        403: { description: 'Restricted to investigation roles.', $ref: 'Error#' },
+        404: { description: 'No registry entry for this token.', $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const user = (request as { user?: JwtDemoPayload }).user;
+    if (!STAFF_READ_ROLES.includes(user?.role ?? '')) {
+      return reply.status(403).send({ error: 'Shared-card oversight is restricted to investigation roles.' });
+    }
+    const { token } = request.params as { token: string };
+    const reg = await getCardRegistryByToken(fastify.db, token);
+    if (!reg) return reply.status(404).send({ error: 'No registry entry for this token' });
+    return reply.send(reg);
+  });
+
   // GET /api/v1/customer/:customerId/cards/:cardId  — owner self-service card detail.
   // Returns the full card-on-file (surrogate token, QE:none expiry, lifecycle dates, alias/note).
   // Owner-only: the cardholder may inspect their own card. CVV/PIN are never stored, never returned.
@@ -279,6 +324,7 @@ audited (Req 10).`,
             paymentCardIssuanceDateTime: { type: 'string', format: 'date-time', nullable: true },
             recordCreatedDateTime: { type: 'string', format: 'date-time', nullable: true },
             recordUpdatedDateTime: { type: 'string', format: 'date-time', nullable: true },
+            cardHolderCount: { type: 'number', description: 'How many customers hold this same physical card (FDS/AML shared-card signal). 1 = only you.' },
           },
         },
         401: { $ref: 'Error#' },
@@ -296,6 +342,10 @@ audited (Req 10).`,
     const card = await getCardById(fastify.db, customerId, cardId);
     if (!card) return reply.status(404).send({ error: 'Card not found' });
 
+    // FDS/AML shared-card signal: how many customers hold this same physical card (the number only,
+    // never the other holders' identities — PCI/PII minimization for the cardholder's own view).
+    const cardHolderCount = await getCardHolderCount(fastify.db, card.paymentCardReference as string);
+
     // Audit (PCI DSS Req 10): record self-service access to a card-on-file. No CHD in the summary.
     emitComplianceEvent(fastify.db, {
       entityType: 'card',
@@ -310,7 +360,7 @@ audited (Req 10).`,
       bianControlRecordType: 'PaymentCardManagement',
     });
 
-    return reply.send(card);
+    return reply.send({ ...card, cardHolderCount });
   });
 
   // PATCH /api/v1/customer/:customerId/cards/:cardId  — edit the alias/note (the ONLY editable

@@ -2866,8 +2866,33 @@ PCI DSS Req 3 (no PAN/CVV stored; only masked PAN + QE:none expiry + surrogate t
   an explicit client confirmation. CVV/PIN are never accepted or stored at any layer.
 
 ### 10.2 Model additions (BIAN SD-88)
-`PaymentCardManagementControlRecord` adds optional `paymentCardAlias`, `paymentCardCustomerNote`
-(non-CHD, customer-editable) and `recordUpdatedDateTime`.
+`PaymentCardManagementControlRecord` (the **per-customer card-on-file arrangement**) adds optional
+`paymentCardAlias`, `paymentCardCustomerNote` (non-CHD, customer-editable), `recordUpdatedDateTime`,
+and makes `paymentCardNetwork` / `paymentCardExpirationDate` optional (external sources may omit them).
+
+### 10.2.1 Physical-card registry + deterministic token + shared-card signal (ADR-027)
+- **Deterministic token.** The browser derives the surrogate token as a keyed HMAC-SHA256 of the PAN
+  (`deriveCardToken`), so the same PAN → the same token. PCI: irreversible (keyed), not a bare hash.
+  Production tokenizes server-side / in a vault; the demo key is a `NEXT_PUBLIC` stand-in.
+  **Every payment surface uses it** — wallet add (`/system/cards/new`), wallet payment
+  (`/system/payment`), hosted checkout (`/gateway/checkout`), payment link (`/gateway/pay`) and the
+  simulator. This is what makes dedup work end-to-end: paying repeatedly with the same card (any
+  channel) always yields the same token, so the registry/arrangement never duplicates it. (Earlier,
+  these flows minted a *random* token per payment, which created a new card-on-file each time.)
+- **Two entities (no duplicated card).** `paymentCardManagement` = per-customer arrangement (unique
+  compound index `(customerAgreementInstanceReference, paymentCardReference)` — a customer can't hold a
+  card twice). **`paymentCardRegistry`** (new, plaintext, token unique) = the physical card, with
+  `cardHolderAgreementReferences[]` + `cardHolderCount`. The card is stored once; the registry counts
+  distinct holders. `syncCardRegistry` recomputes on register/auto-register/revoke; crossing
+  `SHARED_CARD_HOLDER_THRESHOLD` (3) emits `card.shared_threshold_exceeded`.
+- **Dedup.** POST → `registerCardForCustomer` (re-adding returns the existing arrangement with
+  `reused:true`; a removed card reactivates). Auto-register → `upsertCardByToken`, scoped by
+  `(customer, token)`.
+- **FDS/AML surfaces.** Customer card detail returns `cardHolderCount` (number only). Investigation
+  (L1/L2/auditor): `GET /api/v1/customer/card-registry/:token` → holders + count; transaction detail
+  shows a shared-card indicator. Auditor Data Integrity (`/api/v1/fraud/integrity` → `cards`):
+  duplicate arrangements, inconsistent tokenization (same masked card under multiple tokens), registry
+  drift.
 
 ### 10.3 Audit
 Lifecycle actions emit a **compliance** event (`complianceProcessEvent`) with

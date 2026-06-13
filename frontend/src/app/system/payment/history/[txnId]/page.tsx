@@ -92,6 +92,8 @@ export default function TransactionDetailPage() {
   const [events, setEvents] = useState<ActionEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  // The owner's saved-card id matching this transaction's token — lets us link to the card detail.
+  const [matchedCardId, setMatchedCardId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -136,6 +138,25 @@ export default function TransactionDetailPage() {
     };
     load();
   }, [txnId]);
+
+  // Resolve the owner's saved card matching this transaction's token, so the card data can link
+  // to its detail page. Customer-only; a removed (revoked) card simply won't match (no link).
+  useEffect(() => {
+    const cardToken = apiTxn?.paymentCardReference ?? txn?.cardToken;
+    if (!token || !cardToken || decodeToken(token)?.role !== 'customer') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const me = await api.auth.me(token);
+        const agId = (me.agreement as { customerAgreementInstanceReference?: string } | null)?.customerAgreementInstanceReference;
+        if (!agId) return;
+        const { results } = await api.customer.getCards(agId, token);
+        const match = (results ?? []).find((c) => c.paymentCardReference === cardToken);
+        if (!cancelled && match) setMatchedCardId(match.paymentCardInstanceReference as string);
+      } catch { /* no link if lookup fails */ }
+    })();
+    return () => { cancelled = true; };
+  }, [token, apiTxn?.paymentCardReference, txn?.cardToken]);
 
   const currentStatus = fraudCase?.caseStatus ?? txn?.status ?? '';
   const statusMeta = STATUS_DISPLAY[currentStatus] ?? {
@@ -188,9 +209,15 @@ export default function TransactionDetailPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm border-t pt-4">
-          {/* Card info */}
+          {/* Card info — links to the saved card detail when it's one of the customer's cards */}
           <span className="text-gray-500">Card (masked)</span>
-          <span className="font-mono">{txn.maskedPan}</span>
+          {matchedCardId ? (
+            <Link href={`/system/cards/${matchedCardId}?from=history&txnId=${txnId}`} className="font-mono text-[#001E2B] hover:underline inline-flex items-center gap-1 w-fit">
+              {txn.maskedPan} <span className="text-xs text-gray-400">↗</span>
+            </Link>
+          ) : (
+            <span className="font-mono">{txn.maskedPan}</span>
+          )}
 
           {txn.network && (
             <>
@@ -203,7 +230,14 @@ export default function TransactionDetailPage() {
           {(apiTxn?.paymentCardReference || txn.cardToken) && (
             <>
               <span className="text-gray-500">Card token</span>
-              <CardTokenField token={(apiTxn?.paymentCardReference ?? txn.cardToken)!} />
+              <div className="flex items-center gap-2">
+                <CardTokenField token={(apiTxn?.paymentCardReference ?? txn.cardToken)!} />
+                {matchedCardId && (
+                  <Link href={`/system/cards/${matchedCardId}?from=history&txnId=${txnId}`} className="text-xs text-[#001E2B] hover:underline shrink-0">
+                    Manage card ↗
+                  </Link>
+                )}
+              </div>
             </>
           )}
 

@@ -6,6 +6,7 @@ import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { SavedCardsPanel } from '../../../components/SavedCardsPanel';
+import { Breadcrumb } from '../../../components/Breadcrumb';
 
 // Dedicated customer card-on-file management (BIAN SD-88). View, add and remove saved cards.
 // Customer-only: staff manage no cards here. Ownership + audit are enforced server-side.
@@ -31,6 +32,7 @@ export default function CardsPage() {
 
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
+      <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Payment Methods' }]} />
       <SectionHeader
         icon={CreditCard}
         title="Payment Methods"

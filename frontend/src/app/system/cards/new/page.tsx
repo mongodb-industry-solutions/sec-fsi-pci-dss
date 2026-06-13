@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronLeft, CreditCard, Lock } from 'lucide-react';
+import { CreditCard, Lock } from 'lucide-react';
+import { Breadcrumb } from '../../../../components/Breadcrumb';
 import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { useDebugMode } from '../../../../lib/debugMode';
@@ -60,7 +61,7 @@ export default function NewCardPage() {
     setError(null);
     let tokenized;
     try {
-      tokenized = tokenizeCard({ pan, expiry, cvv });
+      tokenized = await tokenizeCard({ pan, expiry, cvv });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid card details.');
       return;
@@ -85,9 +86,7 @@ export default function NewCardPage() {
 
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
-      <Link href="/system/cards" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-[#001E2B] transition-colors">
-        <ChevronLeft size={15} /> Payment Methods
-      </Link>
+      <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Payment Methods', href: '/system/cards' }, { label: 'Add a card' }]} />
 
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-lg bg-[#001E2B] flex items-center justify-center shrink-0">

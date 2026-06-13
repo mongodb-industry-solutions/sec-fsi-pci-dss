@@ -88,6 +88,18 @@ export async function createCollections(
     console.log('  skip:    partyAuthenticationAssessment (already exists)');
   }
 
+  // SD-88: Payment Card Registry  -  plaintext, the physical card deduplicated by token (no CHD)
+  if (!existingNames.has('paymentCardRegistry') || reset) {
+    if (existingNames.has('paymentCardRegistry') && reset) {
+      await db.collection('paymentCardRegistry').drop();
+      console.log('  dropped: paymentCardRegistry');
+    }
+    await db.createCollection('paymentCardRegistry');
+    console.log('  created: paymentCardRegistry');
+  } else {
+    console.log('  skip:    paymentCardRegistry (already exists)');
+  }
+
   // SD-83: Fraud Diagnosis Case  -  plaintext, no QE
   if (!existingNames.has('fraudDiagnosisCase') || reset) {
     if (existingNames.has('fraudDiagnosisCase') && reset) {

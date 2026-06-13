@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { api } from '../../../../lib/api';
+import { deriveCardToken } from '../../../../lib/cardTokenize';
 import { Lock, CreditCard, CheckCircle, XCircle } from 'lucide-react';
 
 type LinkData = Awaited<ReturnType<typeof api.paymentLinks.resolve>>;
@@ -77,8 +78,8 @@ function PaymentLinkPageInner() {
     setState('paying');
     setError('');
 
-    const lastFour = cardNumber.replace(/\s/g, '').slice(-4);
-    const cardToken = `tok_${Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}${lastFour}`;
+    // Deterministic token (same card → same token) so repeat payments never duplicate the card.
+    const cardToken = await deriveCardToken(cardNumber.replace(/\s/g, ''));
 
     try {
       const result = await api.paymentLinks.pay(linkCode, {

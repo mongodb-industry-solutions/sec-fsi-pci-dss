@@ -1956,3 +1956,40 @@ The controller reads `strategy.outputFile`, calls `strategy.parse()`, and emits 
 **PCI DSS / scope note**
 
 `/admin/run` is operator tooling (ADR-011 context), not a business API — the SSE `summary` event is documented here rather than in `technical-spec.md §6` (business API contracts), which is unchanged.
+
+## ADR-027 — Single physical card + per-customer arrangement; deterministic token; shared-card FDS/AML signal
+
+**Context.** A card-on-file was modelled as one `paymentCardManagement` document per customer, and the
+client minted a *random* surrogate token per registration. Two problems: (1) the same physical card,
+re-added or used by a second person, produced a *different* token and a *duplicate* record — the system
+could not tell it was the same card; (2) there was no way to answer "how many customers use this card",
+a strong shared-card / money-mule signal for FDS/AML.
+
+**Decision.**
+1. **Deterministic token (PCI-aligned).** The browser derives the surrogate token as a *keyed* HMAC-SHA256
+   of the PAN (`deriveCardToken`), so the same PAN always maps to the same token. PCI DSS permits a
+   token that is **irreversible** to the PAN — a keyed HMAC (not a bare hash of the low-entropy PAN) is
+   the accepted construction. (Demo caveat: a browser cannot truly hold the key; production performs
+   tokenization server-side / in a vault. The key is a `NEXT_PUBLIC` stand-in.)
+2. **Two entities (separate-link model).** Keep `paymentCardManagement` as the **per-customer
+   card-on-file arrangement** (alias, note, preferred, status, expiry — legitimately one row per
+   customer-card; a unique compound index `(customer, token)` prevents a customer holding the same card
+   twice). Add **`paymentCardRegistry`** — the **physical card**, one document per token (unique), holding
+   the distinct-holder set + count. The card itself is therefore never duplicated; the registry is the
+   single source of card identity and the FDS/AML holder count. Denormalising masked PAN/network onto the
+   arrangement avoids a join on the hot "my cards" path (perf).
+3. **Registry maintenance.** `syncCardRegistry(token)` recomputes a token's holders from the live
+   arrangements on every register / auto-register / revoke (cheap; few rows per token). Crossing
+   `SHARED_CARD_HOLDER_THRESHOLD` (3) emits a `card.shared_threshold_exceeded` compliance event.
+4. **Surfaces.** Holder count on the customer's card detail (number only — PII minimisation); a
+   `card-registry/:token` lookup for investigation roles (count + holder agreement refs); a shared-card
+   indicator on the transaction detail; and Data Integrity checks for the auditor (duplicate arrangements,
+   inconsistent tokenisation = same masked card under multiple tokens, registry drift).
+
+**BIAN / PCI.** SD-88: the registry is the card instrument; the arrangement is the customer relationship.
+PCI DSS Req 3 (only masked PAN + irreversible token; no PAN/CVV), Req 7 (per-customer ownership), Req 10
+(lifecycle + access audit). The registry is a plaintext collection (no CHD).
+
+**Trade-offs.** Slight denormalisation (masked PAN/network on both entities) for read performance; the
+deterministic token is the dedup key, so a tokenisation-key change would re-issue tokens (acceptable —
+the registry rebuilds from arrangements via `rebuildCardRegistry`).

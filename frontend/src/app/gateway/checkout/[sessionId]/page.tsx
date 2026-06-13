@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '../../../../lib/api';
+import { deriveCardToken } from '../../../../lib/cardTokenize';
 import { Lock, CreditCard, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 type SessionData = Awaited<ReturnType<typeof api.checkout.getSession>>;
@@ -13,7 +14,7 @@ type PageState = 'loading' | 'ready' | 'paying' | 'success' | 'expired' | 'compl
 // applyPrefillParams below. The simulator (or any other caller) just appends
 // ?<param>=<value> to the checkout URL.
 // ---------------------------------------------------------------------------
-const PREFILL_PARAM_NAMES = ['name', 'card', 'expiry', 'email', 'savecard'] as const;
+const PREFILL_PARAM_NAMES = ['name', 'card', 'expiry', 'email'] as const;
 type PrefillParam = typeof PREFILL_PARAM_NAMES[number];
 
 function formatCountdown(totalSeconds: number): string {
@@ -42,7 +43,6 @@ function CheckoutPageInner() {
   const [expiryMonth, setExpiryMonth] = useState('');
   const [expiryYear, setExpiryYear] = useState('');
   const [cardholderEmail, setCardholderEmail] = useState('');
-  const [saveCard, setSaveCard] = useState(false);
   const [cvv, setCvv] = useState('');
   const [cvvTouched, setCvvTouched] = useState(false);
   const cvvValid = /^\d{3,4}$/.test(cvv);
@@ -55,12 +55,10 @@ function CheckoutPageInner() {
     const card = get('card');
     const expiry = get('expiry');
     const email = get('email');
-    const savecardParam = get('savecard');
 
     if (name) setCardholderName(name);
     if (card) setCardNumber(card.replace(/(\d{4})(?=\d)/g, '$1 ').trim());
     if (email) setCardholderEmail(email);
-    if (savecardParam === 'true') setSaveCard(true);
     if (expiry) {
       const sep = expiry.includes('/') ? '/' : expiry.length === 4 ? '' : null;
       if (sep === '/') {
@@ -125,8 +123,9 @@ function CheckoutPageInner() {
     setError('');
 
     const digits = cardNumber.replace(/\s/g, '');
-    const lastFour = digits.slice(-4);
-    const cardToken = `tok_${Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}${lastFour}`;
+    // Deterministic token: the same card number always maps to the same token, so paying again
+    // with the same card never creates a duplicate card-on-file (it dedups in the registry).
+    const cardToken = await deriveCardToken(digits);
 
     try {
       const result = await api.checkout.pay(sessionId, {
@@ -135,7 +134,6 @@ function CheckoutPageInner() {
         cardExpiryMonth: expiryMonth.padStart(2, '0'),
         cardExpiryYear: `20${expiryYear}`,
         cardholderEmail: cardholderEmail || undefined,
-        saveCard: saveCard || undefined,
       });
       if (result.success) {
         setState('success');
@@ -337,18 +335,6 @@ function CheckoutPageInner() {
                   )}
                 </div>
               </div>
-
-              {cardholderEmail && (
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={saveCard}
-                    onChange={(e) => setSaveCard(e.target.checked)}
-                    className="accent-[#00ED64] w-4 h-4"
-                  />
-                  <span className="text-xs text-gray-600">Save this card for future payments</span>
-                </label>
-              )}
 
               {error && (
                 <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">

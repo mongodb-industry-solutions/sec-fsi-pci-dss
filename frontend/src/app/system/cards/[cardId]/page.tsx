@@ -1,12 +1,12 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { ChevronLeft, CreditCard, Pause, Pencil, Play, Save, Star, Trash2, X } from 'lucide-react';
+import { CreditCard, Pause, Pencil, Play, Save, Star, Trash2, Users, X } from 'lucide-react';
 import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { useDebugMode } from '../../../../lib/debugMode';
 import { useConfirm, useNotify } from '../../../../components/ui/ConfirmProvider';
+import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
 
 // Owner self-service detail for one saved card (BIAN SD-88). Shows the surrogate token, expiry
 // (QE:none, owner-visible), lifecycle dates and status. The alias/note are the ONLY editable
@@ -25,6 +25,7 @@ interface CardDetail {
   paymentCardIssuanceDateTime?: string;
   recordCreatedDateTime?: string;
   recordUpdatedDateTime?: string;
+  cardHolderCount?: number;
 }
 
 function statusClass(status?: string): string {
@@ -64,6 +65,14 @@ export default function CardDetailPage() {
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [toggling, setToggling] = useState(false);
+  // Breadcrumb navigation context (non-PII: where we arrived from). Read from the query string.
+  const [nav, setNav] = useState<{ from?: string; txnId?: string }>({});
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    setNav({ from: sp.get('from') ?? undefined, txnId: sp.get('txnId') ?? undefined });
+  }, []);
 
   const load = useCallback(async (t: string, agId: string) => {
     try {
@@ -160,11 +169,24 @@ export default function CardDetailPage() {
     setEditing(false);
   }
 
+  const cardLabel = card?.paymentCardAlias || card?.paymentCardNetwork
+    || (card?.paymentCardMaskedPanDisplay ? `Card ${card.paymentCardMaskedPanDisplay.slice(-4)}` : 'Card');
+  const crumbs: Crumb[] = nav.from === 'history' && nav.txnId
+    ? [
+        { label: 'Home', href: '/system' },
+        { label: 'Transactions', href: '/system/payment/history' },
+        { label: 'Payment', href: `/system/payment/history/${nav.txnId}` },
+        { label: cardLabel },
+      ]
+    : [
+        { label: 'Home', href: '/system' },
+        { label: 'Payment Methods', href: '/system/cards' },
+        { label: cardLabel },
+      ];
+
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
-      <Link href="/system/cards" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-[#001E2B] transition-colors">
-        <ChevronLeft size={15} /> Payment Methods
-      </Link>
+      <Breadcrumb items={crumbs} />
 
       {!ready ? (
         <div className="text-sm text-gray-400">Loading…</div>
@@ -204,6 +226,13 @@ export default function CardDetailPage() {
               <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-sm text-amber-800">
                 <Pause size={15} className="text-amber-600 mt-0.5 shrink-0" />
                 <span>This card is <strong>deactivated</strong>. Any payment with it will be declined by the PSP, even though the card itself is still valid. Reactivate it below to use it again.</span>
+              </div>
+            )}
+
+            {typeof card.cardHolderCount === 'number' && card.cardHolderCount > 1 && (
+              <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 text-sm text-blue-800">
+                <Users size={15} className="text-blue-600 mt-0.5 shrink-0" />
+                <span>This card is also on file for <strong>{card.cardHolderCount - 1}</strong> other {card.cardHolderCount - 1 === 1 ? 'person' : 'people'}. If you don&apos;t recognize this, contact support.</span>
               </div>
             )}
           </div>

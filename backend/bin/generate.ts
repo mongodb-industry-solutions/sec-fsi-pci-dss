@@ -280,34 +280,80 @@ async function main() {
   }
 
   // -- 4. Payment cards (SD-88) --------------------------------------
+  // Per-customer card-on-file arrangements: 3-4 cards each, with a customer alias and one preferred.
+  // cardTokenMap[agreement] = the customer's PREFERRED card token (used to link their transactions).
   const cardTokenMap: Record<string, string> = {};
   const paymentCards = [];
+  const CARD_ALIASES = ['Personal', 'Work', 'Travel', 'Backup', 'Online shopping', 'Groceries', 'Subscriptions', 'Family', 'Everyday', 'Business'];
 
   for (let i = 0; i < 50; i++) {
-    const cardId = uuid();
-    const token = cardToken();
-    cardTokenMap[customerAgreementIds[i]] = token;
+    const agId = customerAgreementIds[i];
+    const count = 3 + (i % 2); // 3 or 4 cards
+    const usedAliases = new Set<string>();
+    let preferredCardId: string | null = null;
+    let preferredToken: string | null = null;
 
-    paymentCards.push({
-      paymentCardInstanceReference: cardId,
-      customerAgreementInstanceReference: customerAgreementIds[i],
-      paymentCardReference: token,
-      paymentCardExpirationDate: futureExpiry(),
-      paymentCardMaskedPanDisplay: maskedPan(),
-      paymentCardNetwork: NETWORKS[i % NETWORKS.length],
-      paymentCardStatus: 'active',
-      paymentCardIssuanceDateTime: faker.date.past({ years: 1 }),
-      paymentCardIsPreferred: false,
-      bianServiceDomain: 'Payment Card',
-      bianControlRecordType: 'PaymentCardManagement',
-      recordCreatedDateTime: faker.date.past({ years: 1 }),
-      schemaVersion: 1,
-    });
+    for (let j = 0; j < count; j++) {
+      const cardId = uuid();
+      const token = cardToken();
+      let alias = CARD_ALIASES[(i + j) % CARD_ALIASES.length];
+      while (usedAliases.has(alias)) alias = CARD_ALIASES[(i + j + usedAliases.size) % CARD_ALIASES.length];
+      usedAliases.add(alias);
+
+      const isPreferred = j === 0; // first card is the default
+      if (isPreferred) { preferredCardId = cardId; preferredToken = token; }
+
+      paymentCards.push({
+        paymentCardInstanceReference: cardId,
+        customerAgreementInstanceReference: agId,
+        paymentCardReference: token,
+        paymentCardExpirationDate: futureExpiry(),
+        paymentCardMaskedPanDisplay: maskedPan(),
+        paymentCardNetwork: NETWORKS[(i + j) % NETWORKS.length],
+        paymentCardStatus: 'active',
+        paymentCardIssuanceDateTime: faker.date.past({ years: 1 }),
+        paymentCardIsPreferred: isPreferred,
+        paymentCardAlias: alias,
+        bianServiceDomain: 'Payment Card',
+        bianControlRecordType: 'PaymentCardManagement',
+        recordCreatedDateTime: faker.date.past({ years: 1 }),
+        schemaVersion: 1,
+      });
+    }
+
+    cardTokenMap[agId] = preferredToken!;
+    customerAgreements[i].customerAgreementPreferredPaymentCardReference = preferredCardId as unknown as null;
   }
 
-  // Update preferred card reference on agreements
-  for (let i = 0; i < 50; i++) {
-    customerAgreements[i].customerAgreementPreferredPaymentCardReference = paymentCards[i].paymentCardInstanceReference as unknown as null;
+  // Shared cards (FDS/AML): one physical card (same token) held by several customers. One exceeds
+  // the shared-card threshold (>3 holders) so it trips the compliance signal; the registry counts
+  // distinct holders. Each holder gets their own arrangement row + alias.
+  const SHARED_CARDS = [
+    { token: 'tok_shared00000a4153', masked: '****-****-****-4153', network: 'VISA',       holders: 5 },
+    { token: 'tok_shared00000b8821', masked: '****-****-****-8821', network: 'MASTERCARD', holders: 2 },
+  ];
+  let sharedCursor = 0;
+  for (const s of SHARED_CARDS) {
+    for (let h = 0; h < s.holders; h++) {
+      const agId = customerAgreementIds[sharedCursor % 50];
+      sharedCursor++;
+      paymentCards.push({
+        paymentCardInstanceReference: uuid(),
+        customerAgreementInstanceReference: agId,
+        paymentCardReference: s.token,
+        paymentCardExpirationDate: futureExpiry(),
+        paymentCardMaskedPanDisplay: s.masked,
+        paymentCardNetwork: s.network,
+        paymentCardStatus: 'active',
+        paymentCardIssuanceDateTime: faker.date.past({ years: 1 }),
+        paymentCardIsPreferred: false,
+        paymentCardAlias: 'Shared',
+        bianServiceDomain: 'Payment Card',
+        bianControlRecordType: 'PaymentCardManagement',
+        recordCreatedDateTime: faker.date.past({ years: 1 }),
+        schemaVersion: 1,
+      });
+    }
   }
 
   // -- 5. Card transactions (SD-254) --------------------------------─

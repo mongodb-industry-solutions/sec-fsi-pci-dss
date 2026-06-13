@@ -566,10 +566,10 @@ export default function DemoPaymentPage() {
                 Cancel
               </Link>
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (cardMode === 'new') {
                     try {
-                      const tk = tokenizeCard({ pan: newPan, expiry: newExpiry, cvv: newCvv });
+                      const tk = await tokenizeCard({ pan: newPan, expiry: newExpiry, cvv: newCvv });
                       setMaskedCard(tk.maskedPan);
                       setCardToken(tk.token);
                       setSelectedNetwork(tk.network);
