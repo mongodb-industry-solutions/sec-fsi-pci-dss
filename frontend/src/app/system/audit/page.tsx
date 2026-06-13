@@ -1,13 +1,89 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { api, AuditEventWithCase } from '../../../lib/api';
 import { getToken } from '../../../lib/auth';
 import { PERFORMER_LABELS } from '../../../lib/constants';
 import Link from 'next/link';
-import { Filter, X, ShieldCheck, BarChart3 } from 'lucide-react';
+import { Filter, X, ShieldCheck, BarChart3, Activity } from 'lucide-react';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { useDebugMode } from '../../../lib/debugMode';
 import { Pagination } from '../../../components/Pagination';
+
+const OUTCOME_STYLES: Record<string, string> = {
+  approved:  'bg-green-100 text-green-700',
+  rejected:  'bg-red-100 text-red-700',
+  pending:   'bg-yellow-100 text-yellow-700',
+  failed:    'bg-red-100 text-red-700',
+  escalated: 'bg-purple-100 text-purple-700',
+};
+
+function ProcessEventsTab({ compliance = false }: { compliance?: boolean }) {
+  const [events, setEvents] = useState<Record<string, unknown>[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async (p = 1, ps = 20) => {
+    const token = getToken() ?? '';
+    setLoading(true);
+    try {
+      const res = compliance
+        ? await api.processEvents.listCompliance(token, { page: p, limit: ps })
+        : await api.processEvents.list(token, { page: p, limit: ps });
+      setEvents(res.events as Record<string, unknown>[]);
+      setTotal(res.total);
+    } catch { setEvents([]); setTotal(0); }
+    setLoading(false);
+  }, [compliance]);
+
+  useEffect(() => { load(1, pageSize); }, [compliance, pageSize, load]);
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  return (
+    <div className="space-y-3">
+      {loading ? (
+        <div className="bg-white rounded-xl border border-gray-200 px-5 py-8 text-center text-sm text-gray-400">Loading…</div>
+      ) : events.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 px-5 py-8 text-center text-sm text-gray-400">No events yet. Events appear after business processes execute.</div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200">
+          <ul className="divide-y divide-gray-100">
+            {events.map((ev, i) => (
+              <li key={(ev.businessProcessEventInstanceReference as string) ?? i} className="px-5 py-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-xs text-[#001E2B] font-semibold">{ev.processAction as string}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${OUTCOME_STYLES[ev.processOutcome as string] ?? 'bg-gray-100 text-gray-600'}`}>{ev.processOutcome as string}</span>
+                      <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">{ev.processType as string}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      <span className="font-medium">{ev.entityType as string}</span>
+                      {' · '}
+                      <span className="font-mono">{(ev.entityId as string)?.slice(0, 12)}…</span>
+                      {ev.performedByRole ? <> · <span>{ev.performedByRole as string}</span></> : null}
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-400 shrink-0 tabular-nums">
+                    {new Date(ev.eventDateTime as string).toLocaleString()}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="px-3 py-2 border-t border-gray-100">
+            <Pagination page={page} totalPages={totalPages} total={total} limit={pageSize}
+              onPageChange={(p) => { setPage(p); load(p, pageSize); }}
+              onLimitChange={(l) => { setPageSize(l); setPage(1); load(1, l); }}
+              limitOptions={[10, 20, 50]} noun="events" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const ACTION_TYPE_LABELS: Record<string, string> = {
   case_opened: 'Case Opened',
@@ -33,8 +109,11 @@ const ACTION_TYPE_COLORS: Record<string, string> = {
 
 const PAGE_SIZE = 10;
 
+type AuditTab = 'fraud' | 'process' | 'compliance';
+
 export default function AuditPage() {
   const { debugMode } = useDebugMode();
+  const [activeTab, setActiveTab] = useState<AuditTab>('fraud');
   const [events, setEvents] = useState<AuditEventWithCase[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -104,11 +183,25 @@ export default function AuditPage() {
           <SectionHeader
             icon={BarChart3}
             title="Audit Log"
-            description="Immutable event trail across all fraud cases."
-            debugInfo="BIAN SD-16 (append-only events) · PCI DSS Req 10 (logging & monitoring)"
+            description="Immutable event trail across all fraud cases and business processes."
+            debugInfo="BIAN SD-16 (append-only events) · PCI DSS Req 10 (logging & monitoring) · ADR-025 (businessProcessEvent timeseries)"
           />
         </div>
 
+        {/* Tab bar */}
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit mb-5">
+          {([['fraud', 'Fraud Cases', BarChart3], ['process', 'Process Events', Activity], ['compliance', 'Compliance Events', ShieldCheck]] as [AuditTab, string, React.ElementType][]).map(([t, label, Icon]) => (
+            <button key={t} onClick={() => setActiveTab(t)}
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === t ? 'bg-white shadow text-[#001E2B]' : 'text-gray-500 hover:text-gray-700'}`}>
+              <Icon size={13} />{label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'process' && <ProcessEventsTab compliance={false} />}
+        {activeTab === 'compliance' && <ProcessEventsTab compliance={true} />}
+
+        {activeTab === 'fraud' && <>
         {/* Access model context, debug mode only */}
         {debugMode && (
           <div className="bg-[#001E2B]/5 border border-[#001E2B]/20 rounded-xl p-4 text-sm mb-5">
@@ -259,6 +352,7 @@ export default function AuditPage() {
             </div>
           </div>
         )}
+        </>}
       </main>
     </div>
   );

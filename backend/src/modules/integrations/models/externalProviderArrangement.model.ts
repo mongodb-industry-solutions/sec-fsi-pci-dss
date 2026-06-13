@@ -1,6 +1,8 @@
-export const INTEGRATION_REGISTRY_COLLECTION       = 'integrationRegistry';
-export const INTEGRATION_EVENTS_COLLECTION         = 'integrationEvents';
-export const INTEGRATION_ROUTING_GROUPS_COLLECTION = 'integrationRoutingGroups';
+export const INTEGRATION_REGISTRY_COLLECTION        = 'integrationRegistry';
+export const INTEGRATION_EVENTS_COLLECTION          = 'integrationEvents';
+export const INTEGRATION_ROUTING_GROUPS_COLLECTION  = 'integrationRoutingGroups';
+export const BUSINESS_PROCESS_EVENTS_COLLECTION     = 'businessProcessEvent';
+export const COMPLIANCE_PROCESS_EVENTS_COLLECTION   = 'complianceProcessEvent';
 
 // ── Core enumerations ─────────────────────────────────────────────────────────
 
@@ -280,6 +282,173 @@ export interface ExternalProviderArrangement {
   schemaVersion: number;
 }
 
+// ── Business Context Correlation (ADR-025) ────────────────────────────────────
+
+export type BusinessEntityType = 'transaction' | 'fraud_case' | 'customer' | 'merchant' | 'payment_link' | 'card';
+
+export type BusinessProcessType =
+  | 'payment_processing'
+  | 'fraud_evaluation'
+  | 'aml_screening'
+  | 'card_authorization'
+  | 'credit_assessment'
+  | 'sanctions_check'
+  | 'checkout';
+
+export type ComplianceProcessType =
+  | 'kyc_verification'
+  | 'kyb_verification'
+  | 'merchant_onboarding'
+  | 'customer_onboarding';
+
+export type ProcessEventOutcome = 'approved' | 'rejected' | 'pending' | 'failed' | 'escalated';
+
+export interface BusinessContextRef {
+  entityType: BusinessEntityType;
+  entityId: string;
+  processType: BusinessProcessType | ComplianceProcessType;
+}
+
+export interface ProcessEventMeta {
+  integrationEventRefs?: string[];
+  ruleIds?: string[];
+  thresholds?: Record<string, number>;
+  [key: string]: unknown;
+}
+
+export interface BusinessProcessEvent {
+  eventDateTime: Date;
+  processType: BusinessProcessType | ComplianceProcessType;
+  businessProcessEventInstanceReference: string;
+  entityType: BusinessEntityType;
+  entityId: string;
+  processAction: string;
+  processOutcome: ProcessEventOutcome;
+  performedByPartyReference: string | null;
+  performedByRole: string | null;
+  eventSummary: Record<string, unknown>;
+  bianServiceDomain: string;
+  bianControlRecordType: string;
+  processMeta?: ProcessEventMeta;
+}
+
+// ── Typed Payload Contracts per Integration Category (ADR-025) ────────────────
+
+export interface FdsOutboundPayload {
+  transactionInstanceReference: string;
+  transactionAmount: number;
+  transactionCurrency: string;
+  transactionChannel: string;
+  deviceFingerprint?: string;
+  ipAddress?: string;
+}
+export interface FdsInboundPayload {
+  riskScore: number;
+  fraudFlag: boolean;
+  recommendation: 'approve' | 'review' | 'decline';
+  rulesFired?: string[];
+}
+
+export interface AmlOutboundPayload {
+  partyInstanceReference: string;
+  transactionInstanceReference: string;
+  transactionAmount: number;
+  transactionCurrency: string;
+  counterpartyReference?: string;
+}
+export interface AmlInboundPayload {
+  alertLevel: 'none' | 'low' | 'medium' | 'high';
+  matchedPatterns?: string[];
+  requiresReview: boolean;
+}
+
+export interface KycOutboundPayload {
+  partyInstanceReference: string;
+  partyName: string;
+  partyDateOfBirth?: string;
+  partyNationality?: string;
+  documentType?: string;
+}
+export interface KycInboundPayload {
+  verificationStatus: 'pass' | 'fail' | 'manual_review';
+  confidenceScore: number;
+  failureReasons?: string[];
+}
+
+export interface KybOutboundPayload {
+  merchantAgreementInstanceReference: string;
+  merchantName: string;
+  merchantLegalEntityType?: string;
+  merchantRegistrationNumber?: string;
+  merchantCountry?: string;
+}
+export interface KybInboundPayload {
+  verificationStatus: 'pass' | 'fail' | 'manual_review';
+  businessRiskLevel: 'low' | 'medium' | 'high';
+  sanctionsMatch: boolean;
+  failureReasons?: string[];
+}
+
+export interface HrpOutboundPayload {
+  partyInstanceReference: string;
+  partyName: string;
+  transactionCountry?: string;
+  transactionAmount?: number;
+}
+export interface HrpInboundPayload {
+  sanctionsHit: boolean;
+  pepHit: boolean;
+  matchedLists?: string[];
+  riskRating: 'low' | 'medium' | 'high' | 'blocked';
+}
+
+export interface CreditBureauOutboundPayload {
+  partyInstanceReference: string;
+  partyName: string;
+  requestedCreditAmount?: number;
+}
+export interface CreditBureauInboundPayload {
+  creditScore: number;
+  creditRating: string;
+  defaultProbability: number;
+}
+
+export interface CardAuthOutboundPayload {
+  cardTransactionInstanceReference: string;
+  transactionAmount: number;
+  transactionCurrency: string;
+  merchantCategoryCode?: string;
+  transactionChannel: string;
+}
+export interface CardAuthInboundPayload {
+  authorizationCode: string;
+  authorizationStatus: 'approved' | 'declined' | 'referral';
+  responseCode: string;
+  declineReason?: string;
+}
+
+export interface CardIssuerOutboundPayload {
+  paymentCardInstanceReference: string;
+  requestType: 'activate' | 'block' | 'replace' | 'status_check';
+  reason?: string;
+}
+export interface CardIssuerInboundPayload {
+  cardStatus: 'active' | 'blocked' | 'expired' | 'replaced';
+  actionConfirmed: boolean;
+  effectiveDateTime?: string;
+}
+
+export interface GenericOutboundPayload {
+  eventType: string;
+  entityReference: string;
+  payload: Record<string, unknown>;
+}
+export interface GenericInboundPayload {
+  status: 'ok' | 'error';
+  result?: Record<string, unknown>;
+  errorMessage?: string;
+}
+
 // ── Event Model ───────────────────────────────────────────────────────────────
 
 export interface IntegrationEvent {
@@ -293,6 +462,7 @@ export interface IntegrationEvent {
   integrationEventErrorMessage?: string;
   integrationEventTriggeredBy: string;
   integrationEventMeta?: Record<string, unknown>;
+  businessContext?: BusinessContextRef;
   bianServiceDomain: string;
   bianControlRecordType: string;
   recordCreatedDateTime: Date;

@@ -3,7 +3,7 @@
 **Project:** FSI PCI DSS Payment Security Demo  
 **PRD reference:** [PRD.md](PRD.md)  
 **Engineering Proposal:** [engineering-proposal.md](engineering-proposal.md)  
-**Last updated:** 2026-06-10
+**Last updated:** 2026-06-13
 
 This document covers the implementation-level detail that the PRD deliberately omits: BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index creation, and environment configuration. Engineers start here.
 
@@ -539,6 +539,8 @@ export type IntegrationProviderType =
   | 'kyb_business'
   | 'hrp_sanctions'
   | 'credit_bureau'
+  | 'card_authorization'     // SD-254 Card Transaction Authorization
+  | 'card_issuer'            // SD-88 Payment Card Issuer
   | 'generic';               // SD-193 catch-all for custom event-driven integrations
 
 export type IntegrationStatus  = 'active' | 'inactive' | 'test' | 'suspended';
@@ -631,7 +633,18 @@ export interface IntegrationRoutingGroup {
   recordUpdatedDateTime: Date;
 }
 
+// ── Business Context Correlation ────────────────────────────────────────────
+// ADR-025: Added to IntegrationEvent to enable cross-entity audit queries.
+
+export interface BusinessContextRef {
+  entityType: 'transaction' | 'fraud_case' | 'customer' | 'merchant' | 'payment_link' | 'card';
+  entityId: string;                                       // PK of the business entity
+  processType: BusinessProcessType | ComplianceProcessType;
+}
+
 // ── Event Audit Log ─────────────────────────────────────────────────────────
+// ADR-025: integrationEvents is a timeseries collection (timeField: recordCreatedDateTime).
+// Unique secondary index removed — incompatible with MongoDB timeseries.
 
 export interface IntegrationEvent {
   integrationEventInstanceReference: string;              // UUID
@@ -644,6 +657,7 @@ export interface IntegrationEvent {
   integrationEventErrorMessage?: string;
   integrationEventTriggeredBy: string;
   integrationEventMeta?: Record<string, unknown>;         // fieldMappingApplied, mappingRulesCount, etc.
+  businessContext?: BusinessContextRef;                   // ADR-025: correlation to originating entity
   bianServiceDomain: string;
   bianControlRecordType: string;
   recordCreatedDateTime: Date;
@@ -653,7 +667,7 @@ export interface IntegrationEvent {
 **Collections:**
 - `integrationRegistry` — plaintext, no QE. Provider configuration, key hashes, health state.
 - `integrationRoutingGroups` — plaintext, no QE. One default group per type + user-created groups.
-- `integrationEvents` — plaintext, no QE. Append-only audit log with 90-day TTL.
+- `integrationEvents` — **timeseries** (ADR-025), no QE. Append-only audit log; timeField=`recordCreatedDateTime`, TTL 90 days.
 
 **Seed files:**
 - `backend/data/integrationRegistry.json` — 6 pre-seeded internal providers (FDS, HRP, AML, KYC, KYB, CreditBureau) at `routingPriority=999`.
@@ -669,6 +683,214 @@ export interface IntegrationEvent {
 - Plaintext API key returned exactly once at creation and once at rotation.
 - Payload content is never logged; only a SHA-256 hash is stored for audit reference.
 - Field mapping engine enforces a PCI DSS blocklist: PAN, CVV, expiryDate, cardholderName cannot be mapped.
+
+---
+
+### 1.14 Business Process Events — timeseries audit layer (ADR-025)
+
+> **Schema v1** — Added 2026-06-13. Unified append-only business process audit trail; two TTL-differentiated timeseries collections.
+
+```typescript
+// ── Business Process Event Log ───────────────────────────────────────────────
+
+export const BUSINESS_PROCESS_EVENTS_COLLECTION  = 'businessProcessEvent';
+export const COMPLIANCE_PROCESS_EVENTS_COLLECTION = 'complianceProcessEvent';
+
+// Transactional processes → businessProcessEvent (TTL 90 days)
+export type BusinessProcessType =
+  | 'payment_processing'       // SD-64 Payment Order
+  | 'fraud_evaluation'         // SD-83 Fraud Diagnosis
+  | 'aml_screening'            // SD-99 Suspicious Activity Analysis
+  | 'card_authorization'       // SD-254 Card Transaction
+  | 'credit_assessment'        // SD-60 Customer Credit Rating
+  | 'sanctions_check'          // SD-HRP High Risk Payments
+  | 'checkout';                // SD-64 Payment Link checkout flow
+
+// Compliance processes → complianceProcessEvent (TTL 365 days)
+export type ComplianceProcessType =
+  | 'kyc_verification'         // SD-16 Party Authentication
+  | 'kyb_verification'         // SD-89 Merchant Relations
+  | 'merchant_onboarding'      // SD-89 Merchant Relations
+  | 'customer_onboarding';     // SD-13 Party Data
+
+export type ProcessEventOutcome = 'approved' | 'rejected' | 'pending' | 'failed' | 'escalated';
+
+export interface ProcessEventMeta {
+  integrationEventRefs?: string[];      // integrationEventInstanceReference[] — correlated dispatch events
+  ruleIds?: string[];                   // compliance rule identifiers
+  thresholds?: Record<string, number>;  // e.g. { riskScoreThreshold: 75 }
+  [key: string]: unknown;
+}
+
+// Shared shape — used by both businessProcessEvent and complianceProcessEvent
+export interface BusinessProcessEvent {
+  // Timeseries fields
+  eventDateTime: Date;                                    // timeField
+  processType: BusinessProcessType | ComplianceProcessType; // metaField
+
+  // Identity
+  businessProcessEventInstanceReference: string;          // UUID, for idempotency reference
+  entityType: BusinessContextRef['entityType'];
+  entityId: string;                                       // PK of the business entity
+
+  // Action
+  processAction: string;                                  // e.g. 'transaction.authorized', 'kyc.completed'
+  processOutcome: ProcessEventOutcome;
+
+  // Actor
+  performedByPartyReference: string | null;               // null = system-initiated
+  performedByRole: string | null;
+
+  // Audit summary (CHD blocklist applied — no PAN, CVV, cardholderName, expiryDate, trackData)
+  eventSummary: Record<string, unknown>;
+
+  // BIAN
+  bianServiceDomain: string;
+  bianControlRecordType: string;
+
+  // Meta
+  processMeta?: ProcessEventMeta;
+}
+
+// ── Typed Payload Contracts per Integration Category ─────────────────────────
+// Each category has an Outbound (dispatch body) and Inbound (callback body) interface.
+// CHD blocklist enforced — PAN, CVV, expiryDate, cardholderName, trackData NEVER appear.
+
+// fraud_detection (SD-83)
+export interface FdsOutboundPayload {
+  transactionInstanceReference: string;
+  transactionAmount: number;
+  transactionCurrency: string;
+  transactionChannel: string;
+  deviceFingerprint?: string;
+  ipAddress?: string;
+}
+export interface FdsInboundPayload {
+  riskScore: number;                  // 0–100
+  fraudFlag: boolean;
+  recommendation: 'approve' | 'review' | 'decline';
+  rulesFired?: string[];
+}
+
+// aml_monitoring (SD-99)
+export interface AmlOutboundPayload {
+  partyInstanceReference: string;
+  transactionInstanceReference: string;
+  transactionAmount: number;
+  transactionCurrency: string;
+  counterpartyReference?: string;
+}
+export interface AmlInboundPayload {
+  alertLevel: 'none' | 'low' | 'medium' | 'high';
+  matchedPatterns?: string[];
+  requiresReview: boolean;
+}
+
+// kyc_identity (SD-16)
+export interface KycOutboundPayload {
+  partyInstanceReference: string;
+  partyName: string;
+  partyDateOfBirth?: string;
+  partyNationality?: string;
+  documentType?: string;
+}
+export interface KycInboundPayload {
+  verificationStatus: 'pass' | 'fail' | 'manual_review';
+  confidenceScore: number;            // 0–100
+  failureReasons?: string[];
+}
+
+// kyb_business (SD-89)
+export interface KybOutboundPayload {
+  merchantAgreementInstanceReference: string;
+  merchantName: string;
+  merchantLegalEntityType?: string;
+  merchantRegistrationNumber?: string;
+  merchantCountry?: string;
+}
+export interface KybInboundPayload {
+  verificationStatus: 'pass' | 'fail' | 'manual_review';
+  businessRiskLevel: 'low' | 'medium' | 'high';
+  sanctionsMatch: boolean;
+  failureReasons?: string[];
+}
+
+// hrp_sanctions (SD-HRP)
+export interface HrpOutboundPayload {
+  partyInstanceReference: string;
+  partyName: string;
+  transactionCountry?: string;
+  transactionAmount?: number;
+}
+export interface HrpInboundPayload {
+  sanctionsHit: boolean;
+  pepHit: boolean;
+  matchedLists?: string[];
+  riskRating: 'low' | 'medium' | 'high' | 'blocked';
+}
+
+// credit_bureau (SD-60)
+export interface CreditBureauOutboundPayload {
+  partyInstanceReference: string;
+  partyName: string;
+  requestedCreditAmount?: number;
+}
+export interface CreditBureauInboundPayload {
+  creditScore: number;
+  creditRating: string;              // e.g. 'A', 'BB+'
+  defaultProbability: number;        // 0–1
+}
+
+// card_authorization (SD-254)
+export interface CardAuthOutboundPayload {
+  cardTransactionInstanceReference: string;
+  transactionAmount: number;
+  transactionCurrency: string;
+  merchantCategoryCode?: string;
+  transactionChannel: string;
+}
+export interface CardAuthInboundPayload {
+  authorizationCode: string;
+  authorizationStatus: 'approved' | 'declined' | 'referral';
+  responseCode: string;
+  declineReason?: string;
+}
+
+// card_issuer (SD-88)
+export interface CardIssuerOutboundPayload {
+  paymentCardInstanceReference: string;
+  requestType: 'activate' | 'block' | 'replace' | 'status_check';
+  reason?: string;
+}
+export interface CardIssuerInboundPayload {
+  cardStatus: 'active' | 'blocked' | 'expired' | 'replaced';
+  actionConfirmed: boolean;
+  effectiveDateTime?: string;
+}
+
+// generic (SD-193)
+export interface GenericOutboundPayload {
+  eventType: string;
+  entityReference: string;
+  payload: Record<string, unknown>;
+}
+export interface GenericInboundPayload {
+  status: 'ok' | 'error';
+  result?: Record<string, unknown>;
+  errorMessage?: string;
+}
+```
+
+**Collections:**
+- `businessProcessEvent` — **timeseries**, no QE. timeField=`eventDateTime`, metaField=`processType`, TTL 90 days, granularity=`hours`.
+- `complianceProcessEvent` — **timeseries**, no QE. timeField=`eventDateTime`, metaField=`processType`, TTL 365 days, granularity=`hours`.
+
+**CHD blocklist** (enforced in `eventSummary` at service layer): `pan`, `cardNumber`, `cvv`, `cvv2`, `cvc`, `expiryDate`, `cardExpiry`, `cardholderName`, `trackData`, `track1`, `track2`, `pinBlock`.
+
+**Emission pattern** (fire-and-forget — never blocks request path):
+```typescript
+void db.collection(BUSINESS_PROCESS_EVENTS_COLLECTION).insertOne(event).catch(() => {});
+```
 
 ---
 
@@ -1038,14 +1260,68 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { isDefaultGroup: 1 }, sparse: true },
   ]);
 
-  // ── integrationEvents (SD-193 Action Log) ────────────────────────
+  // ── integrationEvents (SD-193 Action Log) — TIMESERIES (ADR-025) ────────
+  // Timeseries collection created in createCollections.ts with expireAfterSeconds: 7776000 (90d).
+  // TTL is set on the collection, NOT via a manual TTL index.
+  // Unique index on integrationEventInstanceReference removed — incompatible with timeseries.
   await db.collection('integrationEvents').createIndexes([
-    { key: { integrationEventInstanceReference: 1 }, unique: true },
     { key: { externalProviderArrangementInstanceReference: 1, recordCreatedDateTime: -1 } },
     { key: { integrationEventType: 1, recordCreatedDateTime: -1 } },
-    // TTL: auto-delete events older than 90 days (PCI DSS Req 10.7)
-    { key: { recordCreatedDateTime: 1 }, expireAfterSeconds: 7776000 },
+    { key: { 'businessContext.entityType': 1, 'businessContext.entityId': 1, recordCreatedDateTime: -1 }, sparse: true },
   ]);
+
+  // ── businessProcessEvent (ADR-025) — TIMESERIES ──────────────────────────
+  // Timeseries collection created in createCollections.ts with expireAfterSeconds: 7776000 (90d).
+  // Timeseries collections do NOT support unique secondary indexes.
+  await db.collection('businessProcessEvent').createIndexes([
+    { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
+    { key: { processType: 1, eventDateTime: -1 } },
+    { key: { processAction: 1, processOutcome: 1 } },
+  ]);
+
+  // ── complianceProcessEvent (ADR-025) — TIMESERIES ────────────────────────
+  // Timeseries collection created in createCollections.ts with expireAfterSeconds: 31536000 (365d).
+  await db.collection('complianceProcessEvent').createIndexes([
+    { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
+    { key: { processType: 1, eventDateTime: -1 } },
+  ]);
+```
+
+**Timeseries collection creation** (in `createCollections.ts`, not `createIndexes.ts`):
+
+```typescript
+// integrationEvents — timeseries (ADR-025: replaces standard collection)
+await db.createCollection('integrationEvents', {
+  timeseries: {
+    timeField: 'recordCreatedDateTime',
+    metaField: 'externalProviderArrangementInstanceReference',
+    granularity: 'hours',
+  },
+  expireAfterSeconds: 7776000,  // 90 days
+});
+
+// businessProcessEvent — timeseries (ADR-025)
+await db.createCollection('businessProcessEvent', {
+  timeseries: {
+    timeField: 'eventDateTime',
+    metaField: 'processType',
+    granularity: 'hours',
+  },
+  expireAfterSeconds: 7776000,  // 90 days (transactional)
+});
+
+// complianceProcessEvent — timeseries (ADR-025)
+await db.createCollection('complianceProcessEvent', {
+  timeseries: {
+    timeField: 'eventDateTime',
+    metaField: 'processType',
+    granularity: 'hours',
+  },
+  expireAfterSeconds: 31536000, // 365 days (KYC/KYB regulatory)
+});
+
+// merchantAgreementEvents — standard collection (ADR-025: was lazily created, now explicit)
+await db.createCollection('merchantAgreementEvents');
 ```
 
 ---
@@ -1642,6 +1918,111 @@ Returns the raw BSON document as stored in Atlas (ciphertext visible, no auto-de
   "timestamp": "2026-05-26T14:00:00Z"
 }
 ```
+
+---
+
+### 6.10 Business Process Events (ADR-025)
+
+> Base path: `/api/v1/events`  
+> Authorized roles: `security_auditor`, `system_admin`. All other roles → 403.
+
+#### `GET /api/v1/events/process`
+
+Returns paginated `businessProcessEvent` documents.
+
+**Query params:** `processType` (optional), `entityType` (optional), `from` (ISO date, optional), `to` (ISO date, optional), `page` (default 1), `limit` (default 20, max 100)
+
+**Response 200:**
+```json
+{
+  "events": [
+    {
+      "businessProcessEventInstanceReference": "uuid",
+      "eventDateTime": "2026-06-13T10:00:00Z",
+      "processType": "payment_processing",
+      "processAction": "transaction.authorized",
+      "processOutcome": "approved",
+      "entityType": "transaction",
+      "entityId": "txn-001",
+      "performedByPartyReference": null,
+      "performedByRole": null,
+      "eventSummary": { "amount": 850, "currency": "USD" },
+      "bianServiceDomain": "Card Transaction",
+      "bianControlRecordType": "CardTransactionRecord"
+    }
+  ],
+  "total": 42,
+  "page": 1,
+  "limit": 20
+}
+```
+
+---
+
+#### `GET /api/v1/events/process/:entityType/:entityId`
+
+Returns all process events for a specific business entity.
+
+**Path params:** `entityType` (`transaction` | `fraud_case` | `customer` | `merchant` | `payment_link` | `card`), `entityId` (entity primary key)
+
+**Query params:** `page` (default 1), `limit` (default 50)
+
+**Response 200:** Same shape as `GET /events/process` but filtered to the entity.
+
+---
+
+#### `GET /api/v1/events/compliance`
+
+Returns paginated `complianceProcessEvent` documents.
+
+**Query params:** `processType` (optional, `kyc_verification` | `kyb_verification` | `merchant_onboarding` | `customer_onboarding`), `from`, `to`, `page`, `limit`
+
+**Response 200:** Same shape as `GET /events/process`.
+
+---
+
+### 6.11 Internal Integration Stubs (ADR-025)
+
+> Base path: `/api/v1/internal`  
+> No JWT required. Validated via `X-Integration-Source: internal` header → 401 if absent.  
+> Not exposed in public Swagger.
+
+All internal stub endpoints follow the same request/response shape (typed per category).
+
+#### `POST /api/v1/internal/fds/score`
+
+**Request body:** `FdsOutboundPayload`  
+**Response 200:** `FdsInboundPayload`
+
+#### `POST /api/v1/internal/aml/score`
+
+**Request body:** `AmlOutboundPayload`  
+**Response 200:** `AmlInboundPayload`
+
+#### `POST /api/v1/internal/kyc/score`
+
+**Request body:** `KycOutboundPayload`  
+**Response 200:** `KycInboundPayload`
+
+#### `POST /api/v1/internal/kyb/score`
+
+**Request body:** `KybOutboundPayload`  
+**Response 200:** `KybInboundPayload`
+
+#### `POST /api/v1/internal/hrp/score`
+
+**Request body:** `HrpOutboundPayload`  
+**Response 200:** `HrpInboundPayload`
+
+#### `POST /api/v1/internal/card_auth/score`
+
+**Request body:** `CardAuthOutboundPayload`  
+**Response 200:** `CardAuthInboundPayload`
+
+#### `POST /api/v1/internal/card_issuer/score`
+
+**Request body:** `CardIssuerOutboundPayload`  
+**Response 200:** `CardIssuerInboundPayload`
 
 ---
 

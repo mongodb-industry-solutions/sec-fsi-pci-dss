@@ -14,11 +14,8 @@ export async function seedIntegrations(db: Db): Promise<void> {
   const raw = readFileSync(join(DATA_DIR, 'integrationRegistry.json'), 'utf8');
   const records: ExternalProviderArrangement[] = JSON.parse(raw);
 
-  // Ensure integrationEvents collection exists (no seed data needed)
-  const collections = await db.listCollections({ name: INTEGRATION_EVENTS_COLLECTION }).toArray();
-  if (collections.length === 0) {
-    await db.createCollection(INTEGRATION_EVENTS_COLLECTION);
-  }
+  // integrationEvents is a timeseries collection created by createCollections.ts (ADR-025).
+  // No explicit creation needed here.
 
   for (const record of records) {
     await db.collection(INTEGRATION_REGISTRY_COLLECTION).updateOne(

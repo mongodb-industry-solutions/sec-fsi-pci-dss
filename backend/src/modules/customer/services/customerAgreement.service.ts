@@ -11,6 +11,7 @@ import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { validateToken } from '../../../vendors/security/escalationTokens';
 import { appendAuditEvent } from '../../fraud/services/fraudDiagnosis.service';
 import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
+import { emitComplianceEvent } from '../../integrations/services/businessProcessEvent.service';
 
 /**
  * Build the API response from a unified customerAgreementProcedure document.
@@ -212,7 +213,21 @@ export async function updateSelfProfile(
     void dispatchIntegration(db, 'kyc_identity', 'auth.updateProfile', {
       partyInstanceReference: party.partyInstanceReference,
       fieldsUpdated: Object.keys({ ...partyPatch, ...agreementPatch }).filter(k => k !== 'recordUpdatedDateTime'),
-    }).catch(() => { /* fire-and-forget */ });
+    }, { entityType: 'customer', entityId: party.partyInstanceReference, processType: 'kyc_verification' })
+      .catch(() => { /* fire-and-forget */ });
+
+    emitComplianceEvent(db, {
+      entityType: 'customer',
+      entityId: party.partyInstanceReference,
+      processType: 'kyc_verification',
+      processAction: 'kyc.profile_updated',
+      processOutcome: 'approved',
+      performedByPartyReference: party.partyInstanceReference,
+      performedByRole: 'customer',
+      eventSummary: { fieldsUpdated: Object.keys({ ...partyPatch, ...agreementPatch }).filter(k => k !== 'recordUpdatedDateTime') },
+      bianServiceDomain: 'Party Authentication',
+      bianControlRecordType: 'PartyAuthenticationAssessment',
+    });
   }
 
   return matched;

@@ -1770,3 +1770,113 @@ The human-readable case reference (`fraudDiagnosisCaseReference`, e.g. `FD-2026-
 - (+) Case references are now unique and stable across restarts; search-by-reference (WS14) returns exactly one case.
 - (+) Defense in depth: the unique index prevents duplicates even if generation logic regresses.
 - (−) Databases already containing duplicates must be cleaned (drop/re-seed the fraud collection) before the unique index can build; until then it is skipped with a logged warning.
+
+---
+
+## ADR-025 — Business Process Event Log: timeseries audit layer + real endpoint dispatch
+
+**Status:** Accepted (2026-06-13)
+
+**Context**
+
+Three structural gaps were identified after v6 (Integration Hub):
+
+1. **No business-entity correlation in integration events.** `IntegrationEvent` records which provider was called, but carries no structured link back to the originating business entity (transaction, fraud case, customer, merchant). Joining audit trails across collections requires ad-hoc application logic with no schema contract.
+
+2. **No unified process event log.** Business processes that span multiple integration calls (e.g. a payment triggering FDS → AML → Card Authorization) produce isolated `integrationEvents` records but no single auditable sequence per business action. PCI DSS Req 10.2.1 requires logging for all actions; BIAN Service Domains SD-83, SD-63, SD-16, SD-13, SD-64, SD-89 each mandate lifecycle tracking per control record.
+
+3. **Internal provider dispatch bypass.** When `externalProviderIsInternal = true`, the dispatch service short-circuits the HTTP call and logs a synthetic event. Providers configured with a real `externalProviderApiEndpoint` (including `localhost` endpoints on the same API) must make a real HTTP call — this is fundamental for future external integration: if the path is never exercised, contracts cannot be validated.
+
+**Decision**
+
+### D1 — Two timeseries collections for business process auditing
+
+| Collection | TTL | Granularity | Scope |
+|---|---|---|---|
+| `businessProcessEvent` | 90 days | `hours` | Transactional processes: payment, fraud, AML, card authorization, credit bureau, checkout, sanctions |
+| `complianceProcessEvent` | 365 days | `hours` | Compliance processes: kyc_verification, kyb_verification, merchant_onboarding, customer_onboarding |
+
+Both are **append-only** MongoDB timeseries collections (MongoDB 5.0+ native). Append-only enforcement is guaranteed by the collection type — no `updateOne`/`replaceOne` is possible on existing time series buckets, satisfying PCI DSS Req 10.3 (audit log integrity).
+
+### D2 — `BusinessContextRef` added to `IntegrationEvent`
+
+A new optional embedded object `businessContext: BusinessContextRef` is added to `IntegrationEvent`. It carries `entityType`, `entityId`, and `processType`, enabling a single indexed query to reconstruct all provider calls for a given business entity without joining across collections. The field is optional (backward compatible) and is populated by the emitting service.
+
+### D3 — Endpoint-first dispatch logic
+
+The dispatch bypass for internal providers is removed. New logic:
+
+```
+if (!provider.externalProviderApiEndpoint && provider.externalProviderIsInternal)
+  → logAndReturn()          // pure stub: no endpoint, no HTTP call
+if (provider.externalProviderApiEndpoint)
+  → dispatchExternal()      // ALWAYS calls the endpoint, even for internal providers
+```
+
+This enables internal providers to target `http://localhost:3001/api/v1/internal/{type}/score`, creating a real request loop: dispatch → stub endpoint → inline response → callback handler. Future switchover to an external provider requires only updating `externalProviderApiEndpoint` in the registry.
+
+New stub endpoints are added at `POST /api/v1/internal/{fds|aml|kyc|kyb|hrp|card_auth|card_issuer}/score`. These endpoints do not require JWT; they validate a `X-Integration-Source` header and return a typed JSON response. They are never exposed in the public Swagger docs.
+
+### D4 — Typed inbound/outbound payload contracts per category
+
+Each of the 9 provider types has a named TypeScript interface pair:
+
+| Category | Outbound (dispatch body) | Inbound (callback body) |
+|---|---|---|
+| `fraud_detection` | `FdsOutboundPayload` | `FdsInboundPayload` |
+| `aml_monitoring` | `AmlOutboundPayload` | `AmlInboundPayload` |
+| `kyc_identity` | `KycOutboundPayload` | `KycInboundPayload` |
+| `kyb_business` | `KybOutboundPayload` | `KybInboundPayload` |
+| `hrp_sanctions` | `HrpOutboundPayload` | `HrpInboundPayload` |
+| `credit_bureau` | `CreditBureauOutboundPayload` | `CreditBureauInboundPayload` |
+| `card_authorization` | `CardAuthOutboundPayload` | `CardAuthInboundPayload` |
+| `card_issuer` | `CardIssuerOutboundPayload` | `CardIssuerInboundPayload` |
+| `generic` | `GenericOutboundPayload` | `GenericInboundPayload` |
+
+The `eventSummary` field in every event applies the CHD blocklist from ADR-014 at the service layer before insertion.
+
+### D5 — Formal creation of `merchantAgreementEvents`
+
+`merchantAgreementEvents` is formally created in `createCollections.ts` (was only lazily created by the index in `createIndexes.ts` with no TTL or configuration). No schema change — the fix is operational.
+
+### D6 — `integrationEvents` migrated to timeseries
+
+`integrationEvents` is re-created as a timeseries collection (timeField: `recordCreatedDateTime`, metaField: `externalProviderArrangementInstanceReference`, granularity: `hours`, TTL: 90 days). The existing TTL index and the unique index on `integrationEventInstanceReference` are removed — unique secondary indexes are incompatible with MongoDB timeseries collections.
+
+**BIAN alignment**
+
+| Integration Category | BIAN Service Domain | SD Number | Control Record |
+|---|---|---|---|
+| `fraud_detection` | Fraud Diagnosis | SD-83 | FraudDiagnosisCase |
+| `aml_monitoring` | Suspicious Activity Analysis | SD-99 | SuspiciousActivityCase |
+| `kyc_identity` | Party Authentication | SD-16 | PartyAuthenticationAssessment |
+| `kyb_business` | Merchant Relations | SD-89 | MerchantAgreement |
+| `hrp_sanctions` | High Risk Payments | SD-HRP | ComplianceAssessment |
+| `credit_bureau` | Customer Credit Rating | SD-60 | CustomerCreditAssessment |
+| `card_authorization` | Card Transaction | SD-254 | CardTransactionRecord |
+| `card_issuer` | Payment Card | SD-88 | PaymentCardRecord |
+| `generic` | External Provider Arrangements | SD-193 | ExternalProviderArrangement |
+
+`BusinessProcessType` and `ComplianceProcessType` map directly to BIAN SD control record lifecycle actions (`Initiate`, `Update`, `Evaluate`, `Execute`, `Notify`).
+
+**PCI DSS alignment**
+
+| Requirement | How ADR-025 satisfies it |
+|---|---|
+| Req 10.2.1 — Log all individual user access to system components | `performedByPartyReference` + `performedByRole` are mandatory fields on every process event; `null` is the explicit sentinel for system-initiated events |
+| Req 10.3 — Audit log integrity | Timeseries collections are append-only at the MongoDB storage layer — no update/delete possible; satisfies tamper-evidence without application-level guards |
+| Req 10.6 — Log review | `GET /api/v1/events/process` and `GET /api/v1/events/compliance` are scoped to `security_auditor` and `system_admin` roles, enabling structured log review |
+| Req 10.7 — Retain audit logs for ≥90 days | `businessProcessEvent` TTL = 90 days; `complianceProcessEvent` TTL = 365 days (KYC/KYB regulatory requirement) |
+| Req 12.8.1 — Maintain a list of TPSPs | `integrationRegistry` (ADR-010) already satisfies this; `businessContext` correlation makes TPSP interactions traceable per transaction |
+| Req 3.2 — No CHD in non-essential systems | `eventSummary` sanitization applies CHD blocklist (PAN, CVV, expiryDate, cardholderName, trackData) before any event is stored |
+| Req 7.1 — Separation of duties | Internal stub endpoints use `X-Integration-Source` header (not JWT), preventing merchant/customer roles from calling them |
+
+**Consequences**
+
+- (+) Every business process (payment, KYC, KYB, fraud, card auth) is now traceable end-to-end from originating entity to all integration calls and outcomes.
+- (+) Append-only timeseries gives MongoDB-native PCI DSS Req 10.3 compliance without triggers or application guards.
+- (+) Internal provider dispatch now validates real contract shape end-to-end; switching to an external provider requires only a registry update.
+- (+) `BusinessContextRef` on `IntegrationEvent` enables single-query audit per entity for admin and auditor roles.
+- (−) `integrationEvents` migration requires drop + recreate (timeseries cannot be created on an existing collection); existing event logs are lost — acceptable since the demo uses seeded data.
+- (−) Adding real HTTP calls for internal providers adds latency (~5–10 ms loopback); mitigated by fire-and-forget logging and async callback handling.
+- (−) Unique index removed from `integrationEvents.integrationEventInstanceReference` — dedup enforcement moves to the application layer (UUID generation guarantees uniqueness in practice).

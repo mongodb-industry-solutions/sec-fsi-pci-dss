@@ -744,4 +744,31 @@ export const api = {
         `/api/v1/integrations/groups/${groupId}`, { method: 'PATCH', body: JSON.stringify({ routingGroupStrategy: strategy }) }, token
       ),
   },
+
+  processEvents: {
+    list: (token: string, params?: { processType?: string; entityType?: string; from?: string; to?: string; page?: number; limit?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : '';
+      return apiFetch<{ events: Record<string, unknown>[]; total: number; page: number; limit: number }>(
+        `/api/v1/events/process${qs}`, {}, token
+      );
+    },
+    getByEntity: (entityType: string, entityId: string, token: string, params?: { page?: number; limit?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : '';
+      return apiFetch<{ events: Record<string, unknown>[]; total: number; page: number; limit: number }>(
+        `/api/v1/events/process/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}${qs}`, {}, token
+      );
+    },
+    listCompliance: (token: string, params?: { processType?: string; entityType?: string; from?: string; to?: string; page?: number; limit?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : '';
+      return apiFetch<{ events: Record<string, unknown>[]; total: number; page: number; limit: number }>(
+        `/api/v1/events/compliance${qs}`, {}, token
+      );
+    },
+    getComplianceByEntity: (entityType: string, entityId: string, token: string, params?: { page?: number; limit?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : '';
+      return apiFetch<{ events: Record<string, unknown>[]; total: number; page: number; limit: number }>(
+        `/api/v1/events/compliance/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}${qs}`, {}, token
+      );
+    },
+  },
 };

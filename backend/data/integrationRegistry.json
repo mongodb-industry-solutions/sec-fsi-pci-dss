@@ -5,6 +5,7 @@
     "externalProviderArrangementType": "fraud_detection",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
+    "externalProviderApiEndpoint": "http://localhost:3001/api/v1/internal/fds/score",
     "externalProviderInternalHandler": "fraudDiagnosis.internalFraudScoring",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
@@ -52,6 +53,7 @@
     "externalProviderArrangementType": "hrp_sanctions",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
+    "externalProviderApiEndpoint": "http://localhost:3001/api/v1/internal/hrp/score",
     "externalProviderInternalHandler": "fraudDiagnosis.hrpcCheck",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
@@ -105,13 +107,14 @@
     "externalProviderArrangementType": "aml_monitoring",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
+    "externalProviderApiEndpoint": "http://localhost:3001/api/v1/internal/aml/score",
     "externalProviderInternalHandler": "fraudDiagnosis.amlPatternCheck",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
       "transaction.batch.processed",
       "case.escalated"
     ],
-    "externalProviderMode": "async",
+    "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 2000,
     "externalProviderRetryPolicy": {
       "maxAttempts": 2,
@@ -165,6 +168,7 @@
     "externalProviderArrangementType": "kyc_identity",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
+    "externalProviderApiEndpoint": "http://localhost:3001/api/v1/internal/kyc/score",
     "externalProviderInternalHandler": "customerAgreement.internalKycCheck",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
@@ -218,6 +222,7 @@
     "externalProviderArrangementType": "kyb_business",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
+    "externalProviderApiEndpoint": "http://localhost:3001/api/v1/internal/kyb/score",
     "externalProviderInternalHandler": "merchantRelations.internalKybCheck",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
@@ -272,6 +277,7 @@
     "externalProviderArrangementType": "credit_bureau",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
+    "externalProviderApiEndpoint": "http://localhost:3001/api/v1/internal/credit_bureau/score",
     "externalProviderInternalHandler": "customerCredit.internalCreditAssessment",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
@@ -323,6 +329,7 @@
     "externalProviderArrangementType": "card_authorization",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
+    "externalProviderApiEndpoint": "http://localhost:3001/api/v1/internal/card_auth/score",
     "externalProviderInternalHandler": "cardAuthorization.stubAdapter",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
@@ -367,6 +374,7 @@
     "externalProviderArrangementType": "card_issuer",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
+    "externalProviderApiEndpoint": "http://localhost:3001/api/v1/internal/card_issuer/score",
     "externalProviderInternalHandler": "cardIssuer.cvvPinStub",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [

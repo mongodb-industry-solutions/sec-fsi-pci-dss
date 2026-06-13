@@ -10,6 +10,7 @@ import {
 import { RiskSeverity } from '../../../shared/models/risk.model';
 import { TransactionSnapshot } from '../../../shared/models/transaction.model';
 import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
+import { emitProcessEvent } from '../../integrations/services/businessProcessEvent.service';
 import { CARD_TRANSACTION_COLLECTION } from '../../transactions/models/cardTransaction.model';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 
@@ -97,7 +98,26 @@ export async function createFraudCase(
     fraudDiagnosisScore: fraudCase.fraudDiagnosisAssessment.fraudDiagnosisScore,
     riskIndicatorCount: riskIndicators.length,
     severity,
-  }).catch(() => { /* fire-and-forget: dispatch failure does not block case creation */ });
+  }, { entityType: 'fraud_case', entityId: caseId, processType: 'fraud_evaluation' })
+    .catch(() => { /* fire-and-forget: dispatch failure does not block case creation */ });
+
+  emitProcessEvent(db, {
+    entityType: 'fraud_case',
+    entityId: caseId,
+    processType: 'fraud_evaluation',
+    processAction: 'fraud_case.opened',
+    processOutcome: 'pending',
+    performedByPartyReference: null,
+    performedByRole: null,
+    eventSummary: {
+      transactionId: txnId,
+      severity,
+      riskIndicators,
+      score: fraudCase.fraudDiagnosisAssessment.fraudDiagnosisScore,
+    },
+    bianServiceDomain: 'Fraud Diagnosis',
+    bianControlRecordType: 'FraudDiagnosisCase',
+  });
 
   return { fraudDiagnosisInstanceReference: caseId };
 }

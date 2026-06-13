@@ -8,8 +8,15 @@ export async function seedCases(db: Db) {
   );
 
   for (const record of records) {
+    // Delete any duplicate runtime cases that share the same business key before
+    // upserting the canonical seed record. This ensures the unique index on
+    // fraudDiagnosisCaseReference can be created cleanly by createIndexes.ts.
+    await db.collection('fraudDiagnosisCase').deleteMany({
+      fraudDiagnosisCaseReference: record.fraudDiagnosisCaseReference,
+      fraudDiagnosisInstanceReference: { $ne: record.fraudDiagnosisInstanceReference },
+    });
     await db.collection('fraudDiagnosisCase').updateOne(
-      { fraudDiagnosisInstanceReference: record.fraudDiagnosisInstanceReference },
+      { fraudDiagnosisCaseReference: record.fraudDiagnosisCaseReference },
       { $set: record },
       { upsert: true }
     );

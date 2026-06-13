@@ -8,7 +8,7 @@ import {
   User, PlusCircle, Store, ClipboardCheck,
   ChevronLeft, ChevronRight, Settings2, Plug,
   ShieldAlert, ScanLine, UserCheck, Building2, AlertTriangle,
-  Zap, KeyRound, ShieldCheck,
+  Zap, KeyRound, ShieldCheck, Activity,
   HelpCircle,
   type LucideIcon,
 } from 'lucide-react';
@@ -68,6 +68,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'Credit Bureau',   path: '/system/admin/credit-bureau',      icon: CreditCard },
     { label: 'Card Auth',       path: '/system/admin/card-authorization', icon: Zap },
     { label: 'Card Issuer',     path: '/system/admin/card-issuer',        icon: KeyRound },
+    { label: 'Process Events',  path: '/system/admin/events',             icon: Activity },
     { label: '+ Register',      path: '/system/admin/integrations/new',   icon: PlusCircle },
   ],
 };

@@ -13,6 +13,7 @@ import {
   KybCheckStatus,
   MerchantApiKeyRecord,
 } from '../models/merchantAgreement.model';
+import { emitComplianceEvent } from '../../integrations/services/businessProcessEvent.service';
 
 const BCRYPT_ROUNDS = 10;
 const API_KEY_PREFIX = 'lbpk_live_';
@@ -209,6 +210,19 @@ export async function createMerchant(db: Db, input: CreateMerchantInput) {
     details: { merchantAgreementStatus: 'under_review', kyb: 'initiated' },
   });
 
+  emitComplianceEvent(db, {
+    entityType: 'merchant',
+    entityId: id,
+    processType: 'merchant_onboarding',
+    processAction: 'merchant.submitted',
+    processOutcome: 'pending',
+    performedByPartyReference: input.merchantOwnerPartyReference ?? null,
+    performedByRole: 'customer',
+    eventSummary: { merchantName: input.merchantName, merchantCategoryCode: input.merchantCategoryCode, merchantRiskCategory },
+    bianServiceDomain: 'Merchant Relations',
+    bianControlRecordType: 'MerchantAgreementProcedure',
+  });
+
   return {
     merchantAgreementInstanceReference: id,
     merchantName: input.merchantName,
@@ -263,6 +277,19 @@ export async function reviewMerchantApplication(
     performedByPartyReference: reviewerPartyRef,
     performedByRole: 'merchant_officer',
     details: { merchantAgreementStatus: newStatus, kybStatus, reviewNote: reviewNote ?? '' },
+  });
+
+  emitComplianceEvent(db, {
+    entityType: 'merchant',
+    entityId: merchantId,
+    processType: 'kyb_verification',
+    processAction: action === 'approve' ? 'kyb.verified' : 'kyb.rejected',
+    processOutcome: action === 'approve' ? 'approved' : 'rejected',
+    performedByPartyReference: reviewerPartyRef,
+    performedByRole: 'merchant_officer',
+    eventSummary: { kybStatus, reviewNote: reviewNote ?? '', merchantAgreementStatus: newStatus },
+    bianServiceDomain: 'Merchant Relations',
+    bianControlRecordType: 'MerchantAgreementProcedure',
   });
 
   return 'ok';

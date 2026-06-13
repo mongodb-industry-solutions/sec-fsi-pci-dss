@@ -103,6 +103,7 @@ export default function AdminLoginPage() {
           <button
             type="submit"
             disabled={!username || !password || submitting}
+            suppressHydrationWarning
             className="w-full bg-orange-600 text-white py-2.5 rounded-lg font-semibold hover:bg-orange-500 transition-colors disabled:opacity-40"
           >
             <span className="inline-flex items-center gap-2">

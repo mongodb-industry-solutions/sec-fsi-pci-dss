@@ -7,6 +7,7 @@ import {
   ExternalProviderArrangement,
   IntegrationRoutingGroup,
   INTEGRATION_ROUTING_GROUPS_COLLECTION,
+  BusinessContextRef,
 } from '../models/externalProviderArrangement.model';
 import {
   getActiveProviderForType,
@@ -29,7 +30,8 @@ export async function dispatchIntegration(
   db: Db,
   type: IntegrationProviderType,
   triggeredBy: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  businessContext?: BusinessContextRef
 ): Promise<DispatchResult> {
   const provider = await getActiveProviderForType(db, type);
 
@@ -50,23 +52,33 @@ export async function dispatchIntegration(
     if (group) {
       const resolved = await resolveProviderFromGroup(db, group);
       if (resolved) {
-        return resolved.externalProviderIsInternal
-          ? logAndReturn(db, resolved, triggeredBy, payload, { provider: 'internal', arrangementId: resolved.externalProviderArrangementInstanceReference, status: 'sent', latencyMs: 0 })
-          : dispatchExternal(db, resolved, triggeredBy, payload);
+        // ADR-025: endpoint-first — if resolved provider has an endpoint, dispatch externally
+        if (resolved.externalProviderApiEndpoint) {
+          return dispatchExternal(db, resolved, triggeredBy, payload, businessContext);
+        }
+        return logAndReturn(db, resolved, triggeredBy, payload, businessContext, {
+          provider: 'internal',
+          arrangementId: resolved.externalProviderArrangementInstanceReference,
+          status: 'sent',
+          latencyMs: 0,
+        });
       }
     }
   }
 
-  if (provider.externalProviderIsInternal) {
-    return logAndReturn(db, provider, triggeredBy, payload, {
-      provider: 'internal',
-      arrangementId: provider.externalProviderArrangementInstanceReference,
-      status: 'sent',
-      latencyMs: 0,
-    });
+  // ADR-025: endpoint-first dispatch logic
+  // Internal providers WITH an endpoint make a real HTTP call (enables loopback to /api/v1/internal/*)
+  if (provider.externalProviderApiEndpoint) {
+    return dispatchExternal(db, provider, triggeredBy, payload, businessContext);
   }
 
-  return dispatchExternal(db, provider, triggeredBy, payload);
+  // Pure stub: internal provider with no endpoint configured
+  return logAndReturn(db, provider, triggeredBy, payload, businessContext, {
+    provider: 'internal',
+    arrangementId: provider.externalProviderArrangementInstanceReference,
+    status: 'sent',
+    latencyMs: 0,
+  });
 }
 
 function buildAuthHeaders(provider: ExternalProviderArrangement): Record<string, string> {
@@ -105,7 +117,8 @@ async function dispatchExternal(
   db: Db,
   provider: ExternalProviderArrangement,
   triggeredBy: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  businessContext?: BusinessContextRef
 ): Promise<DispatchResult> {
   const start = Date.now();
   const arrangementId = provider.externalProviderArrangementInstanceReference;
@@ -146,6 +159,7 @@ async function dispatchExternal(
       responseCode: res.status,
       latencyMs,
       meta: { fieldMappingApplied },
+      businessContext,
     });
 
     await updateHealthStatus(db, arrangementId, res.ok ? 'ok' : 'degraded');
@@ -165,6 +179,7 @@ async function dispatchExternal(
       latencyMs,
       error: (err as Error).message,
       meta: { fieldMappingApplied },
+      businessContext,
     });
 
     await updateHealthStatus(db, arrangementId, 'unreachable');
@@ -178,6 +193,7 @@ async function logAndReturn(
   provider: ExternalProviderArrangement,
   triggeredBy: string,
   payload: Record<string, unknown>,
+  businessContext: BusinessContextRef | undefined,
   result: DispatchResult
 ): Promise<DispatchResult> {
   await logEvent(db, {
@@ -187,6 +203,7 @@ async function logAndReturn(
     triggeredBy,
     payload,
     latencyMs: result.latencyMs,
+    businessContext,
   });
   return result;
 }
@@ -203,6 +220,7 @@ export async function logEvent(
     latencyMs?: number;
     error?: string;
     meta?: Record<string, unknown>;
+    businessContext?: BusinessContextRef;
   }
 ): Promise<void> {
   const event: IntegrationEvent = {
@@ -216,12 +234,13 @@ export async function logEvent(
     integrationEventErrorMessage: opts.error,
     integrationEventTriggeredBy: opts.triggeredBy,
     integrationEventMeta: opts.meta,
+    businessContext: opts.businessContext,
     bianServiceDomain: 'External Provider Arrangements',
     bianControlRecordType: 'ExternalProviderArrangementActionLog',
     recordCreatedDateTime: new Date(),
   };
 
-  await db.collection<IntegrationEvent>(INTEGRATION_EVENTS_COLLECTION).insertOne(event);
+  void db.collection<IntegrationEvent>(INTEGRATION_EVENTS_COLLECTION).insertOne(event).catch(() => {});
 }
 
 export async function testIntegration(

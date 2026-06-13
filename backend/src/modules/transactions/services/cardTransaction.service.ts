@@ -8,6 +8,7 @@ import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { createFraudCase } from '../../fraud/services/fraudDiagnosis.service';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
+import { emitProcessEvent } from '../../integrations/services/businessProcessEvent.service';
 
 export interface CreateTransactionInput {
   cardToken: string;
@@ -133,6 +134,26 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
     const fraudCase = await createFraudCase(db, txnId, customerAgreementUuid, reasons, severity, snapshot);
     fraudCaseRef = fraudCase.fraudDiagnosisInstanceReference;
   }
+
+  emitProcessEvent(db, {
+    entityType: 'transaction',
+    entityId: txnId,
+    processType: 'payment_processing',
+    processAction: 'transaction.authorized',
+    processOutcome: 'approved',
+    performedByPartyReference: null,
+    performedByRole: null,
+    eventSummary: {
+      amount: input.amount,
+      currency: input.currency,
+      channel: input.cardTransactionChannel,
+      merchantName: input.cardTransactionMerchantName,
+      fraudCaseCreated: create,
+    },
+    bianServiceDomain: 'Card Transaction',
+    bianControlRecordType: 'CardTransactionRecord',
+    processMeta: { ruleIds: reasons },
+  });
 
   return {
     cardTransactionInstanceReference: txnId,

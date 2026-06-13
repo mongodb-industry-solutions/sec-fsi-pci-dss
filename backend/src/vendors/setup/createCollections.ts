@@ -182,4 +182,74 @@ export async function createCollections(
   } else {
     console.log('  skip:    paymentLinkRecord (already exists)');
   }
+
+  // SD-89: Merchant Agreement Events  -  plaintext, append-only lifecycle audit (ADR-025 fix)
+  if (!existingNames.has('merchantAgreementEvents') || reset) {
+    if (existingNames.has('merchantAgreementEvents') && reset) {
+      await db.collection('merchantAgreementEvents').drop();
+      console.log('  dropped: merchantAgreementEvents');
+    }
+    await db.createCollection('merchantAgreementEvents');
+    console.log('  created: merchantAgreementEvents');
+  } else {
+    console.log('  skip:    merchantAgreementEvents (already exists)');
+  }
+
+  // SD-193: Integration Events  -  timeseries, TTL 90 days (ADR-025: migration from standard)
+  // Timeseries collections cannot be converted; drop + recreate always on reset.
+  if (!existingNames.has('integrationEvents') || reset) {
+    if (existingNames.has('integrationEvents') && reset) {
+      await db.collection('integrationEvents').drop();
+      console.log('  dropped: integrationEvents (timeseries migration)');
+    }
+    await db.createCollection('integrationEvents', {
+      timeseries: {
+        timeField: 'recordCreatedDateTime',
+        metaField: 'externalProviderArrangementInstanceReference',
+        granularity: 'hours',
+      },
+      expireAfterSeconds: 7776000, // 90 days
+    });
+    console.log('  created: integrationEvents (timeseries, TTL 90d)');
+  } else {
+    console.log('  skip:    integrationEvents (already exists)');
+  }
+
+  // ADR-025: Business Process Events  -  timeseries, TTL 90 days (transactional processes)
+  if (!existingNames.has('businessProcessEvent') || reset) {
+    if (existingNames.has('businessProcessEvent') && reset) {
+      await db.collection('businessProcessEvent').drop();
+      console.log('  dropped: businessProcessEvent');
+    }
+    await db.createCollection('businessProcessEvent', {
+      timeseries: {
+        timeField: 'eventDateTime',
+        metaField: 'processType',
+        granularity: 'hours',
+      },
+      expireAfterSeconds: 7776000, // 90 days
+    });
+    console.log('  created: businessProcessEvent (timeseries, TTL 90d)');
+  } else {
+    console.log('  skip:    businessProcessEvent (already exists)');
+  }
+
+  // ADR-025: Compliance Process Events  -  timeseries, TTL 365 days (KYC/KYB regulatory)
+  if (!existingNames.has('complianceProcessEvent') || reset) {
+    if (existingNames.has('complianceProcessEvent') && reset) {
+      await db.collection('complianceProcessEvent').drop();
+      console.log('  dropped: complianceProcessEvent');
+    }
+    await db.createCollection('complianceProcessEvent', {
+      timeseries: {
+        timeField: 'eventDateTime',
+        metaField: 'processType',
+        granularity: 'hours',
+      },
+      expireAfterSeconds: 31536000, // 365 days
+    });
+    console.log('  created: complianceProcessEvent (timeseries, TTL 365d)');
+  } else {
+    console.log('  skip:    complianceProcessEvent (already exists)');
+  }
 }
