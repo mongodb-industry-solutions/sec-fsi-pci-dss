@@ -70,7 +70,7 @@
     "merchantCategoryCode": "7371",
     "merchantCountryCode": "DE",
     "merchantAgreementStatus": "active",
-    "merchantOwnerPartyReference": "b0000057-0000-4000-8000-000000000057",
+    "merchantOwnerPartyReference": "b0000059-0000-4000-8000-000000000059",
     "merchantTier": "standard",
     "merchantAllowedCurrencies": ["EUR", "USD"],
     "merchantTransactionLimitAmount": 8000,

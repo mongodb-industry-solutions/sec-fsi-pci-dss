@@ -151,6 +151,9 @@ export interface CaseEnrichment {
     enrollmentDate: string | null;
     kycCheck: Record<string, unknown> | null;
     accountRef: string | null;
+    email: string | null;
+    phone: string | null;
+    contactRestricted: boolean;
     sensitiveUnlocked: boolean;
     sensitive: Record<string, unknown> | null;
   } | null;
@@ -300,6 +303,7 @@ export const api = {
         cardTransactionNarrative?: string;
         paymentCardReference?: string;
         cardTransactionAccountReference?: string;
+        merchantAgreementInstanceReference?: string;
         sensitive?: {
           rawGatewayPayload?: Record<string, unknown>;
           processorTransactionMetadata?: Record<string, unknown>;
@@ -342,14 +346,18 @@ export const api = {
       apiFetch<Record<string, unknown>>(
         `/api/v1/customer?phone=${encodeURIComponent(phone)}`, {}, token
       ),
-    getByAccountRef: (ref: string, token: string) =>
+    getByAccountRef: (ref: string, token: string, escalationToken?: string) =>
       apiFetch<Record<string, unknown>>(
-        `/api/v1/customer?accountRef=${encodeURIComponent(ref)}`, {}, token
+        `/api/v1/customer?accountRef=${encodeURIComponent(ref)}`,
+        escalationToken ? { headers: { 'X-Escalation-Token': escalationToken } } : {},
+        token
       ),
 
-    getById: (id: string, token: string) =>
+    getById: (id: string, token: string, escalationToken?: string) =>
       apiFetch<Record<string, unknown>>(
-        `/api/v1/customer/by-id/${encodeURIComponent(id)}`, {}, token
+        `/api/v1/customer/by-id/${encodeURIComponent(id)}`,
+        escalationToken ? { headers: { 'X-Escalation-Token': escalationToken } } : {},
+        token
       ),
     getCards: (customerId: string, token: string) =>
       apiFetch<{ results: Record<string, unknown>[] }>(

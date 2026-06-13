@@ -7,7 +7,10 @@ import { getToken, decodeToken } from '../../../../lib/auth';
 import { EncryptionBadge } from '../../../../components/EncryptionBadge';
 import { useDebugMode } from '../../../../lib/debugMode';
 import { RawMongoPanel } from '../../../../components/RawMongoPanel';
-import { Eye, EyeOff } from 'lucide-react';
+import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
+import { useResource } from '../../../../lib/useResource';
+import { storeEscalationToken, readEscalationToken } from '../../../../lib/escalation';
+import { Eye, EyeOff, UserCheck, Store, ChevronRight } from 'lucide-react';
 
 type TxnDetail = Awaited<ReturnType<typeof api.transactions.getById>>;
 
@@ -55,14 +58,18 @@ export default function TransactionDetailPage() {
 
   const [token, setToken] = useState('');
   const [role, setRole] = useState('level1_analyst');
-  const [txn, setTxn] = useState<TxnDetail | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [linkedCase, setLinkedCase] = useState<{ id: string; ref: string; status: string } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
   const [escalationToken, setEscalationToken] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
   const [openingCase, setOpeningCase] = useState(false);
   const [openCaseError, setOpenCaseError] = useState<string | null>(null);
+
+  // Parties involved (role-gated by the backend): customer (KYC) + merchant (KYB).
+  const [partyCustomer, setPartyCustomer] = useState<Record<string, unknown> | null>(null);
+  const [partyMerchant, setPartyMerchant] = useState<Record<string, unknown> | null>(null);
+  // Breadcrumb context: a transaction opened from a case reflects that path.
+  const [fromCase, setFromCase] = useState<{ caseId: string; caseRef?: string } | null>(null);
 
   useEffect(() => {
     const t = getToken() ?? '';
@@ -70,34 +77,64 @@ export default function TransactionDetailPage() {
     if (user?.role === 'customer') { router.replace('/system/payment/history'); return; }
     setToken(t);
     setRole(user?.role ?? 'level1_analyst');
+    setAuthReady(true);
 
-    Promise.all([
-      api.transactions.getById(txnId, t),
-      api.fraud.list({ transactionId: txnId, limit: 1 }, t).catch(() => null),
-    ]).then(([txnData, casesData]) => {
-      setTxn(txnData);
-      const c = casesData?.results?.[0];
+    // Linked case is lightweight and independent of the cached transaction resource.
+    api.fraud.list({ transactionId: txnId, limit: 1 }, t).then((cd) => {
+      const c = cd?.results?.[0];
       if (c) setLinkedCase({ id: c.fraudDiagnosisInstanceReference, ref: c.fraudDiagnosisCaseReference, status: c.caseStatus });
-    }).catch(() => setNotFound(true))
-      .finally(() => setLoading(false));
+    }).catch(() => {});
+
+    // Breadcrumb context from the navigation that led here (no PII; ids/refs only).
+    // If we came from a case the L2 has escalated, reuse that case's token so sensitive
+    // fields and parties resolve here too (backend re-validates; expired → no PII).
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      const cid = sp.get('caseId');
+      if (sp.get('from') === 'investigation' && cid) {
+        setFromCase({ caseId: cid, caseRef: sp.get('caseRef') ?? undefined });
+        const persisted = readEscalationToken(cid);
+        if (persisted) setEscalationToken(persisted);
+      }
+    }
   }, [txnId, router]);
 
+  // Cached transaction resource (stale-while-revalidate). Key is scoped by role and by whether
+  // an escalation token is active, so obtaining a token transparently refetches the sensitive
+  // view, and revisiting via the breadcrumb renders instantly from cache.
+  const txnKey = authReady ? `txn:${txnId}:${role}:${escalationToken ? 'e' : 'n'}` : null;
+  const { data: txn, loading: resLoading, error } = useResource<TxnDetail>(
+    txnKey, () => api.transactions.getById(txnId, token, escalationToken ?? undefined),
+  );
+  const loading = !authReady || resLoading;
+  const notFound = !!error;
+
+  // Resolve the parties (customer + merchant) once the transaction is loaded. The customer
+  // endpoint redacts by role/escalation; re-fetch when an escalation token is obtained so an
+  // L2 sees the sensitive KYC fields in place. Merchant data carries no PII.
+  useEffect(() => {
+    if (!txn || !token) return;
+    const accountRef = txn.cardTransactionAccountReference;
+    if (accountRef) {
+      api.customer.getByAccountRef(accountRef, token, escalationToken ?? undefined)
+        .then(setPartyCustomer).catch(() => setPartyCustomer(null));
+    }
+    const mid = txn.merchantAgreementInstanceReference;
+    if (mid) {
+      api.merchants.getById(mid, token).then(setPartyMerchant).catch(() => setPartyMerchant(null));
+    }
+  }, [txn, token, escalationToken]);
+
   async function approveAndReveal() {
-    // Find the fraud case linked to this transaction via the investigation API,
-    // then call escalate/approve to get a token for sensitive field access.
-    // For demo purposes: use a simulated escalation token flow.
+    // Approve the escalation on the linked case to obtain a sensitive-access token. Setting the
+    // token flips the resource key, so the cached transaction transparently refetches with the
+    // sensitive (QE:none) fields decrypted — no manual re-fetch needed.
+    if (!linkedCase) return;
     setApproving(true);
     try {
-      // Try to find fraud cases for this transaction
-      const cases = await api.fraud.list({ limit: 50 }, token);
-      const linked = cases.results.find(c => c.cardTransactionInstanceReference === txnId);
-      if (linked) {
-        const res = await api.fraud.escalateApprove(linked.fraudDiagnosisInstanceReference, {}, token);
-        setEscalationToken(res.escalationToken);
-        // Re-fetch transaction with escalation token
-        const refreshed = await api.transactions.getById(txnId, token, res.escalationToken);
-        setTxn(refreshed);
-      }
+      const res = await api.fraud.escalateApprove(linkedCase.id, {}, token);
+      setEscalationToken(res.escalationToken);
+      storeEscalationToken(linkedCase.id, res.escalationToken); // persist for reload/navigation
     } catch {
       // No linked case or escalation not possible
     } finally {
@@ -122,9 +159,25 @@ export default function TransactionDetailPage() {
     ? new Intl.NumberFormat('en-US', { style: 'currency', currency: txn.cardTransactionAmount.currency }).format(txn.cardTransactionAmount.amount)
     : '-';
 
+  const crumbs: Crumb[] = fromCase
+    ? [
+        { label: 'Home', href: '/system' },
+        { label: 'Cases', href: '/system/investigation' },
+        { label: fromCase.caseRef ?? 'Case', href: `/system/investigation/${fromCase.caseId}` },
+        { label: 'Transaction' },
+      ]
+    : [
+        { label: 'Home', href: '/system' },
+        { label: 'Transactions', href: '/system/transactions' },
+        { label: txn.cardTransactionMerchantName ?? 'Transaction' },
+      ];
+
+  const acctRef = txn.cardTransactionAccountReference;
+  const custSensitive = partyCustomer?.sensitive as { customerAgreementResidentialAddress?: { streetAddress?: string; city?: string; postalCode?: string; countryCode?: string }; governmentIdentificationReference?: string; customerAgreementRiskNotes?: string } | undefined;
+
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
-      <Link href="/system/transactions" className="text-sm text-blue-600 hover:underline">← Back to transactions</Link>
+      <Breadcrumb items={crumbs} />
 
       {/* Header */}
       <div className="bg-white rounded-xl border p-5">
@@ -259,6 +312,81 @@ export default function TransactionDetailPage() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Parties — customer (KYC) + merchant (KYB), role-gated, to continue the investigation */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Customer (KYC) */}
+        <div className="bg-white rounded-xl border p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <UserCheck size={15} className="text-[#001E2B]" />
+            <h2 className="font-semibold text-sm">Customer (KYC)</h2>
+            {partyCustomer?.customerAgreementInstanceReference != null && (
+              <Link href={`/system/users/${String(partyCustomer.customerAgreementInstanceReference)}?from=transaction&txnId=${txnId}`}
+                className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
+                Open customer <ChevronRight size={12} />
+              </Link>
+            )}
+          </div>
+          {!partyCustomer ? (
+            <p className="text-xs text-gray-400">{acctRef ? 'Loading customer…' : 'No account reference on this transaction.'}</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                <span className="text-gray-500">Name</span><span className="font-medium truncate">{String(partyCustomer.customerName ?? '—')}</span>
+                <span className="text-gray-500">Segment</span><span className="capitalize">{String(partyCustomer.customerSegment ?? '—')}</span>
+                <span className="text-gray-500">Status</span><span className="capitalize">{String(partyCustomer.customerAgreementStatus ?? '—')}</span>
+                <span className="text-gray-500">KYC check</span><span className="capitalize">{String((partyCustomer.customerAgreementKycCheck as { customerAgreementKycCheckStatus?: string } | null)?.customerAgreementKycCheckStatus ?? 'n/a')}</span>
+              </div>
+              {custSensitive ? (
+                <div className="mt-3 rounded-lg border border-purple-200 bg-purple-50 p-3 text-xs space-y-1">
+                  {custSensitive.customerAgreementResidentialAddress && (
+                    <div><span className="text-gray-500">Address: </span><span className="font-mono">{[custSensitive.customerAgreementResidentialAddress.streetAddress, custSensitive.customerAgreementResidentialAddress.city, custSensitive.customerAgreementResidentialAddress.postalCode, custSensitive.customerAgreementResidentialAddress.countryCode].filter(Boolean).join(', ')}</span></div>
+                  )}
+                  {custSensitive.governmentIdentificationReference && <div><span className="text-gray-500">Gov ID: </span><span className="font-mono">{custSensitive.governmentIdentificationReference}</span></div>}
+                  {custSensitive.customerAgreementRiskNotes && <div><span className="text-gray-500">Risk notes: </span>{custSensitive.customerAgreementRiskNotes}</div>}
+                </div>
+              ) : (
+                <p className="mt-3 text-xs text-gray-400 italic">Sensitive KYC PII requires {isAuditor ? 'auditor access' : 'L2 escalation'}.</p>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Merchant (KYB) */}
+        <div className="bg-white rounded-xl border p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Store size={15} className="text-[#001E2B]" />
+            <h2 className="font-semibold text-sm">Merchant (KYB)</h2>
+            {txn.merchantAgreementInstanceReference && (
+              <Link href={`/system/merchant/${txn.merchantAgreementInstanceReference}?from=transaction&txnId=${txnId}`}
+                className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
+                Open merchant <ChevronRight size={12} />
+              </Link>
+            )}
+          </div>
+          {!txn.merchantAgreementInstanceReference ? (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                <span className="text-gray-500">Descriptor</span><span className="font-medium truncate">{txn.cardTransactionMerchantName}</span>
+                <span className="text-gray-500">MCC</span><span className="font-mono text-xs">{txn.cardTransactionMerchantCategoryCode ?? '—'}</span>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                External merchant: not acquired by this PSP, so there is no KYB record. Only the card-network descriptor (name + MCC) is available. Expected for issuer-side transactions.
+              </div>
+            </div>
+          ) : !partyMerchant ? (
+            <p className="text-xs text-gray-400">Loading merchant…</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+              <span className="text-gray-500">Name</span><span className="font-medium truncate">{String(partyMerchant.merchantName ?? txn.cardTransactionMerchantName)}</span>
+              <span className="text-gray-500">Status</span><span className="capitalize">{String(partyMerchant.merchantAgreementStatus ?? '—')}</span>
+              <span className="text-gray-500">KYB check</span><span className="capitalize">{String((partyMerchant.merchantAgreementKybCheck as { merchantAgreementKybCheckStatus?: string } | null)?.merchantAgreementKybCheckStatus ?? 'n/a')}</span>
+              <span className="text-gray-500">Risk</span><span className="capitalize">{String(partyMerchant.merchantRiskCategory ?? '—')}{partyMerchant.merchantTier ? ` · ${String(partyMerchant.merchantTier)}` : ''}</span>
+              <span className="text-gray-500">Country / MCC</span><span className="font-mono text-xs">{String(partyMerchant.merchantCountryCode ?? '—')} / {String(partyMerchant.merchantCategoryCode ?? '—')}</span>
             </div>
           )}
         </div>

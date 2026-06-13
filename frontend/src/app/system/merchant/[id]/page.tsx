@@ -2,12 +2,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Receipt, TrendingUp, CreditCard, CalendarDays, ShieldCheck, Building2, ArrowLeft, ClipboardCheck, Search, ExternalLink, BriefcaseMedical } from 'lucide-react';
+import { Receipt, TrendingUp, CreditCard, CalendarDays, ShieldCheck, Building2, ClipboardCheck, Search, ExternalLink, BriefcaseMedical } from 'lucide-react';
 import { api } from '../../../../lib/api';
 import { decodeToken } from '../../../../lib/auth';
 import { useMerchant } from '../../../../lib/merchantContext';
 import { StatCard, MonthlyBars, BreakdownBars } from '../../../../components/dashboard/Stats';
 import { Pagination } from '../../../../components/Pagination';
+import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
 
 type Stats = Awaited<ReturnType<typeof api.merchants.stats>>;
 type Sale = {
@@ -81,6 +82,15 @@ export default function StaffMerchantDetailPage() {
   const [payLoading, setPayLoading] = useState(false);
   // For the auditor only: which payments already have a linked fraud case (read-only).
   const [caseMap, setCaseMap] = useState<Record<string, { id: string; ref: string; status: string } | null>>({});
+  // Breadcrumb context: a merchant opened from a transaction or a case reflects that path.
+  const [navCtx, setNavCtx] = useState<{ from: string; txnId?: string; caseId?: string; caseRef?: string } | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    const from = sp.get('from');
+    if (from === 'transaction' && sp.get('txnId')) setNavCtx({ from, txnId: sp.get('txnId')! });
+    else if (from === 'investigation' && sp.get('caseId')) setNavCtx({ from, caseId: sp.get('caseId')!, caseRef: sp.get('caseRef') ?? undefined });
+  }, []);
 
   const load = useCallback(async () => {
     if (!token || !id) return;
@@ -165,11 +175,31 @@ export default function StaffMerchantDetailPage() {
     ? recordMilestones(m, kyb)
     : events.map((e) => ({ label: EVENT_LABEL[e.eventType] ?? e.eventType, date: e.eventDateTime, role: e.performedByRole }));
 
+  const mname = String(m.merchantName ?? 'Merchant');
+  const crumbs: Crumb[] =
+    navCtx?.from === 'investigation' && navCtx.caseId
+      ? [
+          { label: 'Home', href: '/system' },
+          { label: 'Cases', href: '/system/investigation' },
+          { label: navCtx.caseRef || 'Case', href: `/system/investigation/${navCtx.caseId}` },
+          { label: mname },
+        ]
+      : navCtx?.from === 'transaction' && navCtx.txnId
+      ? [
+          { label: 'Home', href: '/system' },
+          { label: 'Transactions', href: '/system/transactions' },
+          { label: 'Transaction', href: `/system/transactions/${navCtx.txnId}` },
+          { label: mname },
+        ]
+      : [
+          { label: 'Home', href: '/system' },
+          { label: 'Merchants', href: '/system/merchant' },
+          { label: mname },
+        ];
+
   return (
     <div className="w-full px-5 sm:px-8 py-6 space-y-6">
-      <Link href="/system/merchant" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
-        <ArrowLeft size={14} /> Back to merchants
-      </Link>
+      <Breadcrumb items={crumbs} />
 
       {/* Header */}
       <div className="flex items-start justify-between gap-3 flex-wrap">

@@ -109,6 +109,10 @@ export async function getCaseEnrichment(
     enrollmentDate: customer.customerAgreementEnrollmentDate ?? null,
     kycCheck: customer.customerAgreementKycCheck ?? null,
     accountRef: accountRef ?? null,
+    // Contact PII (QE:equality) — present only for L2/auditor (redacted server-side for L1).
+    email: (customer.customerEmailAddress as string | undefined) ?? null,
+    phone: (customer.customerMobilePhoneNumber as string | undefined) ?? null,
+    contactRestricted: customer.contactPiiRestricted === true,
     sensitiveUnlocked: !!customer.sensitive,
     sensitive: customer.sensitive ?? null,
   } : null;

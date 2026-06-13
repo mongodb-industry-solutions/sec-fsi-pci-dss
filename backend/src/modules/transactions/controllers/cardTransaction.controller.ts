@@ -284,6 +284,7 @@ role to retrieve.`,
             },
             paymentCardReference:              { type: 'string', description: 'Card token (surrogate, not the PAN).' },
             cardTransactionAccountReference:   { type: 'string', nullable: true, description: 'QE:equality  -  decrypted account reference.' },
+            merchantAgreementInstanceReference:{ type: 'string', nullable: true, description: 'Payee merchant FK (plaintext, no PII) for KYB linking.' },
             cardTransactionInitiationType:     { type: 'string', nullable: true },
             sensitive: {
               type: 'object', nullable: true,

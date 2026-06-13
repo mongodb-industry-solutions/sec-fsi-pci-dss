@@ -4,11 +4,12 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, FraudCase, ActionEvent, HrpcCheckResponse, CaseEnrichment } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
-import { EncryptionBadge } from '../../../../components/EncryptionBadge';
 import { RawMongoPanel } from '../../../../components/RawMongoPanel';
 import { CaseNotesPanel } from '../../../../components/CaseNotesPanel';
 import { SEVERITY_COLORS, STATUS_COLORS, ROLE_LABELS, formatRiskIndicator } from '../../../../lib/constants';
 import { useDebugMode } from '../../../../lib/debugMode';
+import { Breadcrumb } from '../../../../components/Breadcrumb';
+import { storeEscalationToken } from '../../../../lib/escalation';
 import { ArrowUpFromLine, CheckCircle, XCircle, ShieldAlert, Activity, Store, CreditCard, UserCheck, ChevronRight } from 'lucide-react';
 
 const ACTION_LABELS: Record<string, string> = {
@@ -126,6 +127,17 @@ export default function DemoCaseDetailPage() {
     load();
   }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-resume escalation: an L2 who has already accepted this case re-derives a fresh
+  // stateless token on load (idempotent on the backend — no audit-trail noise), so sensitive
+  // fields stay accessible across reloads and into linked entity pages without re-clicking.
+  useEffect(() => {
+    if (role !== 'level2_investigator' || !fraudCase || !token || escalationToken) return;
+    if (fraudCase.caseStatus !== 'escalated' || !fraudCase.escalationAcceptedAt) return;
+    api.fraud.escalateApprove(caseId, {}, token)
+      .then((res) => { setEscalationToken(res.escalationToken); storeEscalationToken(caseId, res.escalationToken); })
+      .catch(() => {});
+  }, [role, fraudCase, token, escalationToken, caseId]);
+
   // Load the aggregated enrichment read-model. Re-runs when the escalation token changes so
   // sensitive KYC unlocks in place. HRP is derived from the real account reference here (no
   // hardcoded lookup). Eventual consistency: the read-model reports `asOf` and pending fields.
@@ -210,6 +222,7 @@ export default function DemoCaseDetailPage() {
     try {
       const res = await api.fraud.escalateApprove(caseId, {}, token);
       setEscalationToken(res.escalationToken);
+      storeEscalationToken(caseId, res.escalationToken); // persist so it survives reload/navigation
       await reload(token);
       setActionMsg('Escalation approved. Sensitive fields are now accessible.');
     } catch (err) {
@@ -249,7 +262,11 @@ export default function DemoCaseDetailPage() {
     <div className="min-h-full bg-gray-50">
       <main className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
         <div className="flex items-center justify-between">
-          <Link href="/system/investigation" className="text-sm text-blue-600 hover:underline">Back to cases</Link>
+          <Breadcrumb items={[
+            { label: 'Home', href: '/system' },
+            { label: 'Cases', href: '/system/investigation' },
+            { label: fraudCase.fraudDiagnosisCaseReference ?? 'Case' },
+          ]} />
           {isAuditor && <Link href="/system/audit" className="text-sm text-blue-600 hover:underline">Full audit log</Link>}
         </div>
 
@@ -333,7 +350,7 @@ export default function DemoCaseDetailPage() {
                 <div className="flex items-center gap-2 mb-3">
                   <CreditCard size={15} className="text-[#001E2B]" />
                   <h2 className="font-semibold text-sm">Operation</h2>
-                  <Link href={`/system/transactions/${enrichment.operation.transactionId}`}
+                  <Link href={`/system/transactions/${enrichment.operation.transactionId}?from=investigation&caseId=${caseId}&caseRef=${encodeURIComponent(fraudCase.fraudDiagnosisCaseReference ?? '')}`}
                     className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
                     Open transaction <ChevronRight size={12} />
                   </Link>
@@ -387,17 +404,19 @@ export default function DemoCaseDetailPage() {
               {debugMode && <p className="mt-3 text-[10px] font-mono text-gray-400">SD-83 · processType fraud_evaluation · asOf {new Date(enrichment.asOf).toLocaleTimeString()}</p>}
             </div>
 
-            {/* KYB — merchant */}
-            {enrichment.kyb && (
-              <div className="bg-white rounded-xl border p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <Store size={15} className="text-[#001E2B]" />
-                  <h2 className="font-semibold text-sm">Merchant (KYB)</h2>
-                  <Link href={`/system/merchant/${enrichment.kyb.merchantId}`}
+            {/* Merchant — acquired (KYB record) or external (descriptor only, no KYB) */}
+            <div className="bg-white rounded-xl border p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Store size={15} className="text-[#001E2B]" />
+                <h2 className="font-semibold text-sm">Merchant{enrichment.kyb ? ' (KYB)' : ''}</h2>
+                {enrichment.kyb && (
+                  <Link href={`/system/merchant/${enrichment.kyb.merchantId}?from=investigation&caseId=${caseId}&caseRef=${encodeURIComponent(fraudCase.fraudDiagnosisCaseReference ?? '')}`}
                     className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
                     Open merchant <ChevronRight size={12} />
                   </Link>
-                </div>
+                )}
+              </div>
+              {enrichment.kyb ? (
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
                   <span className="text-gray-500">Name:</span>
                   <span className="font-medium truncate">{enrichment.kyb.name}</span>
@@ -410,18 +429,35 @@ export default function DemoCaseDetailPage() {
                   <span className="text-gray-500">Country / MCC:</span>
                   <span className="font-mono text-xs">{enrichment.kyb.countryCode ?? '—'} / {enrichment.kyb.categoryCode ?? '—'}</span>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                    <span className="text-gray-500">Descriptor:</span>
+                    <span className="font-medium truncate">{enrichment.operation?.merchantName ?? '—'}</span>
+                    <span className="text-gray-500">MCC:</span>
+                    <span className="font-mono text-xs">{enrichment.operation?.merchantCategoryCode ?? '—'}</span>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                    External merchant: not acquired by this PSP, so there is no KYB record. Only the card-network
+                    descriptor (name + MCC) is available. This is expected for issuer-side transactions{debugMode ? ' (BIAN SD-89 applies only to acquired merchants).' : '.'}
+                  </div>
+                </div>
+              )}
+            </div>
 
-            {/* KYC — customer summary (sensitive PII only when unlocked) */}
+            {/* KYC — single, unified customer card (summary + contact + sensitive, role-gated) */}
             {enrichment.kyc && (
               <div className="bg-white rounded-xl border p-5">
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
                   <UserCheck size={15} className="text-[#001E2B]" />
                   <h2 className="font-semibold text-sm">Customer (KYC)</h2>
-                  <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium ${enrichment.kyc.sensitiveUnlocked ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${enrichment.kyc.sensitiveUnlocked ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'}`}>
                     {enrichment.kyc.sensitiveUnlocked ? 'PII unlocked' : 'Summary only'}
                   </span>
+                  <Link href={`/system/users/${enrichment.kyc.customerId}?from=investigation&caseId=${caseId}&caseRef=${encodeURIComponent(fraudCase.fraudDiagnosisCaseReference ?? '')}`}
+                    className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
+                    Open profile <ChevronRight size={12} />
+                  </Link>
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
                   <span className="text-gray-500">Name:</span>
@@ -430,118 +466,38 @@ export default function DemoCaseDetailPage() {
                   <span className="capitalize">{enrichment.kyc.segment ?? '—'}</span>
                   <span className="text-gray-500">Status:</span>
                   <span className="capitalize">{enrichment.kyc.status ?? '—'}</span>
+                  <span className="text-gray-500">Enrolled:</span>
+                  <span>{enrichment.kyc.enrollmentDate ? new Date(enrichment.kyc.enrollmentDate).toLocaleDateString() : '—'}</span>
                   <span className="text-gray-500">KYC check:</span>
                   <span className="capitalize">{(enrichment.kyc.kycCheck as { customerAgreementKycCheckStatus?: string } | null)?.customerAgreementKycCheckStatus ?? 'n/a'}</span>
+                  {enrichment.kyc.email && (<><span className="text-gray-500">Email:</span><span className="font-mono text-xs truncate">{enrichment.kyc.email}</span></>)}
+                  {enrichment.kyc.phone && (<><span className="text-gray-500">Phone:</span><span className="font-mono text-xs">{enrichment.kyc.phone}</span></>)}
                 </div>
+                {enrichment.kyc.contactRestricted && (
+                  <p className="mt-2 text-xs text-gray-400 italic">Contact PII (email, phone) is restricted at L1 (need-to-know); available to L2 and auditor.</p>
+                )}
                 {enrichment.kyc.sensitive ? (
-                  <div className="mt-3 rounded-lg border border-purple-200 bg-purple-50 p-3 text-xs space-y-1">
+                  <div className="mt-3 rounded-lg border border-purple-200 bg-purple-50 p-3">
                     {(() => {
                       const s = enrichment.kyc.sensitive as { customerAgreementResidentialAddress?: { streetAddress?: string; city?: string; postalCode?: string; countryCode?: string }; governmentIdentificationReference?: string; customerAgreementRiskNotes?: string };
                       const addr = s.customerAgreementResidentialAddress;
                       return (
-                        <>
-                          {addr && <div><span className="text-gray-500">Address: </span><span className="font-mono">{[addr.streetAddress, addr.city, addr.postalCode, addr.countryCode].filter(Boolean).join(', ')}</span></div>}
-                          {s.governmentIdentificationReference && <div><span className="text-gray-500">Gov ID: </span><span className="font-mono">{s.governmentIdentificationReference}</span></div>}
-                          {s.customerAgreementRiskNotes && <div><span className="text-gray-500">Risk notes: </span>{s.customerAgreementRiskNotes}</div>}
-                        </>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                          {addr && (<><span className="text-gray-500">Address:</span><span className="font-mono text-xs break-all">{[addr.streetAddress, addr.city, addr.postalCode, addr.countryCode].filter(Boolean).join(', ')}</span></>)}
+                          {s.governmentIdentificationReference && (<><span className="text-gray-500">Gov ID:</span><span className="font-mono text-xs">{s.governmentIdentificationReference}</span></>)}
+                          {s.customerAgreementRiskNotes && (<><span className="text-gray-500">Risk notes:</span><span className="text-xs">{s.customerAgreementRiskNotes}</span></>)}
+                        </div>
                       );
                     })()}
                   </div>
                 ) : (
                   <p className="mt-3 text-xs text-gray-400 italic">Sensitive PII (address, government ID, risk notes) requires {isAuditor ? 'auditor access' : 'L2 escalation acceptance'}.</p>
                 )}
+                {debugMode && <p className="mt-2 text-[10px] font-mono text-gray-400">SD-53 · QE:equality (email/phone) · QE:none (address, gov ID, risk notes)</p>}
               </div>
             )}
           </div>
         )}
-
-        {/* -- Customer profile - visible to L2 and Auditor -- */}
-        {canSeeAll && <div className="bg-white rounded-xl border p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <h2 className="font-semibold">Customer Profile</h2>
-            <span className={`ml-auto text-xs px-2 py-0.5 rounded font-medium ${
-              isAuditor                    ? 'bg-gray-100 text-gray-600' :
-              l2HasAccepted                ? 'bg-purple-100 text-purple-700' :
-                                             'bg-amber-100 text-amber-700'
-            }`}>
-              {isAuditor ? 'Auditor access' : l2HasAccepted ? 'Full access' : 'Pending escalation acceptance'}
-            </span>
-          </div>
-
-          {/* Basic customer info - always visible to L2/Auditor */}
-          {customerProfile && (
-            <div className="mb-3 bg-gray-50 rounded-lg p-3 text-sm space-y-1.5">
-              {[
-                { label: 'Name',     key: 'customerName' },
-                { label: 'Segment',  key: 'customerSegment' },
-                { label: 'Status',   key: 'customerAgreementStatus' },
-                { label: 'Enrolled', key: 'customerAgreementEnrollmentDate' },
-              ].map(({ label, key }) =>
-                customerProfile[key] ? (
-                  <div key={key} className="flex gap-2">
-                    <span className="text-gray-500 w-20 shrink-0 text-xs">{label}:</span>
-                    <span className="font-medium text-xs capitalize">
-                      {key === 'customerAgreementEnrollmentDate'
-                        ? new Date(String(customerProfile[key])).toLocaleDateString()
-                        : String(customerProfile[key])}
-                    </span>
-                  </div>
-                ) : null
-              )}
-              {debugMode && (
-                <p className="text-xs text-gray-400 mt-1 font-mono">
-                  Resolved from customerAgreementInstanceReference (plaintext UUID lookup)
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="rounded-lg border divide-y text-sm">
-            {/* QE:equality - always visible to L2/Auditor */}
-            <div className="p-3 bg-blue-50">
-              {debugMode && (
-                <p className="text-xs text-blue-600 mb-2 font-medium">
-                  QE:equality - searchable while encrypted. Atlas stores ciphertext; queries match ciphertext-to-ciphertext.
-                </p>
-              )}
-              <div className="space-y-2">
-                {[
-                  { label: 'Email',             value: 'luis.fernandez@back.es' },
-                  { label: 'Phone',             value: '+44 7700 900123' },
-                  { label: 'Account Reference', value: 'luis.fernandez@back.es' },
-                ].map(({ label, value }) => (
-                  <div key={label} className="flex items-center gap-2">
-                    <EncryptionBadge label={label} type="qe-equality" />
-                    <span className="text-green-700 font-mono text-xs">{value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* QE:none - requires accepted escalation (or Auditor role) */}
-            <div className={`p-3 ${(l2HasAccepted || isAuditor) ? 'bg-purple-50' : 'bg-gray-50'}`}>
-              {debugMode && (
-                <p className={`text-xs mb-2 font-medium ${(l2HasAccepted || isAuditor) ? 'text-purple-600' : 'text-gray-400'}`}>
-                  QE:none - encrypted, not searchable. Requires DEK-sensitive key (L2 escalation approval).
-                </p>
-              )}
-              <div className="space-y-2">
-                {[
-                  { label: 'Physical Address', value: '742 Evergreen Terrace, Springfield' },
-                  { label: 'Government ID',    value: 'XXX-XX-4821 (masked)' },
-                ].map(({ label, value }) => (
-                  <div key={label} className="flex items-center gap-2">
-                    <EncryptionBadge label={label} type="qe-none" />
-                    {(l2HasAccepted || isAuditor)
-                      ? <span className="text-green-700 font-mono text-xs">{value}</span>
-                      : <span className="text-gray-400 text-xs italic">Requires escalation acceptance to access</span>
-                    }
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>}
 
         {/* -- Notes -- */}
         {token && <CaseNotesPanel caseId={caseId} token={token} role={role} />}

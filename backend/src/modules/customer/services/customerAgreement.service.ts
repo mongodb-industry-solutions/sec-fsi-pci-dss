@@ -8,6 +8,7 @@ import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/part
 import { CUSTOMER_AUTHENTICATION_COLLECTION } from '../../identity/models/customerAuthentication.model';
 import type { UserRole } from '../../../shared/models/identity.model';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
+import { canReadSensitive } from '../../../vendors/middleware/rbac';
 import { validateToken } from '../../../vendors/security/escalationTokens';
 import { appendAuditEvent } from '../../fraud/services/fraudDiagnosis.service';
 import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
@@ -24,26 +25,39 @@ function buildResponse(
   doc: CustomerAgreementControlRecord,
   party: PartyControlRecord,
   role: UserRole,
+  canSeeSensitive: boolean,
   caseId?: string,
 ): Record<string, unknown> {
+  // Least-privilege (PCI DSS Req 7 need-to-know · BIAN SD-53/SD-13): contact PII (email,
+  // phone) is QE:equality — searchable while encrypted — but is exposed in responses only to
+  // roles with an operational need to contact/verify the customer (L2 investigator, auditor).
+  // L1 triages on non-identifying attributes (name, segment, status, KYC outcome) and never
+  // receives the contact PII. Deeper QE:none PII (address, gov ID, risk notes) stays gated by
+  // escalation below. Redaction is enforced server-side; the client is never trusted.
+  const canSeeContactPii = role === 'level2_investigator' || role === 'security_auditor';
+
   const base: Record<string, unknown> = {
     customerAgreementInstanceReference: doc.customerAgreementInstanceReference,
     partyInstanceReference:             doc.partyInstanceReference,
     customerName:                       party.partyName,
-    customerEmailAddress:               party.partyEmailAddress,
-    customerMobilePhoneNumber:          party.partyMobilePhoneNumber,
+    customerEmailAddress:               canSeeContactPii ? party.partyEmailAddress : undefined,
+    customerMobilePhoneNumber:          canSeeContactPii ? party.partyMobilePhoneNumber : undefined,
     customerAgreementReference:         doc.customerAgreementReference,
     customerSegment:                    doc.customerSegment,
     customerAgreementStatus:            doc.customerAgreementStatus,
     customerAgreementEnrollmentDate:    doc.customerAgreementEnrollmentDate,
     customerAgreementPreferredLanguage: doc.customerAgreementPreferredLanguage,
     customerAgreementKycCheck:          doc.customerAgreementKycCheck ?? null,
+    contactPiiRestricted:               !canSeeContactPii,
     bianServiceDomain:                  doc.bianServiceDomain,
     bianControlRecordType:              doc.bianControlRecordType,
   };
 
-  const addressDecrypted = isSensitiveDecrypted(doc.customerAgreementResidentialAddress);
-  if (addressDecrypted) {
+  // Sensitive QE:none PII is attached ONLY when the role is explicitly authorized
+  // (auditor, or L2 with a valid escalation token) — never merely because the bytes came
+  // back decrypted. This is fail-closed: if the demo DB stores these fields in plaintext
+  // (QE not active), an unauthorized role still does NOT receive them. PCI DSS Req 7.
+  if (canSeeSensitive && isSensitiveDecrypted(doc.customerAgreementResidentialAddress)) {
     base.sensitive = {
       customerAgreementResidentialAddress: doc.customerAgreementResidentialAddress,
       governmentIdentificationReference:   doc.governmentIdentificationReference,
@@ -75,8 +89,9 @@ async function findPartyAndAgreement(
   return { doc, party };
 }
 
-async function maybeAudit(db: Db, caseId: string | undefined, role: UserRole, doc: CustomerAgreementControlRecord): Promise<void> {
+async function maybeAudit(db: Db, caseId: string | undefined, role: UserRole, doc: CustomerAgreementControlRecord, canSeeSensitive: boolean): Promise<void> {
   if (!caseId) return;
+  if (!canSeeSensitive) return; // only an actual sensitive disclosure is audited (Req 10)
   if (!isSensitiveDecrypted(doc.customerAgreementResidentialAddress)) return;
   await appendAuditEvent(db, caseId, 'field_accessed', role as 'level2_investigator' | 'security_auditor', {
     fields: ['customerAgreementResidentialAddress', 'governmentIdentificationReference', 'customerAgreementRiskNotes'],
@@ -87,43 +102,47 @@ async function maybeAudit(db: Db, caseId: string | undefined, role: UserRole, do
 // -- Public query functions --------------------------------------------------─
 
 export async function getByEmail(db: Db, email: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
-  const { db: roleDb, caseId } = await resolveDb(role, escalationToken);
+  const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
+  const canSee = canReadSensitive(role, hasValidToken);
   const result = await findPartyAndAgreement(roleDb, { partyEmailAddress: email } as Partial<PartyControlRecord>);
   if (!result) return null;
-  await maybeAudit(roleDb, caseId, role, result.doc);
-  return buildResponse(result.doc, result.party, role, caseId);
+  await maybeAudit(roleDb, caseId, role, result.doc, canSee);
+  return buildResponse(result.doc, result.party, role, canSee, caseId);
 }
 
 export async function getByPhone(db: Db, phone: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
-  const { db: roleDb, caseId } = await resolveDb(role, escalationToken);
+  const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
+  const canSee = canReadSensitive(role, hasValidToken);
   const result = await findPartyAndAgreement(roleDb, { partyMobilePhoneNumber: phone } as Partial<PartyControlRecord>);
   if (!result) return null;
-  await maybeAudit(roleDb, caseId, role, result.doc);
-  return buildResponse(result.doc, result.party, role, caseId);
+  await maybeAudit(roleDb, caseId, role, result.doc, canSee);
+  return buildResponse(result.doc, result.party, role, canSee, caseId);
 }
 
 export async function getByAccountRef(db: Db, ref: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
-  const { db: roleDb, caseId } = await resolveDb(role, escalationToken);
+  const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
+  const canSee = canReadSensitive(role, hasValidToken);
   const doc = await roleDb.collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
     .findOne({ customerAgreementReference: ref } as Partial<CustomerAgreementControlRecord>);
   if (!doc) return null;
   const party = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
     .findOne({ partyInstanceReference: doc.partyInstanceReference });
   if (!party) return null;
-  await maybeAudit(roleDb, caseId, role, doc);
-  return buildResponse(doc, party, role, caseId);
+  await maybeAudit(roleDb, caseId, role, doc, canSee);
+  return buildResponse(doc, party, role, canSee, caseId);
 }
 
 export async function getByInstanceReference(db: Db, id: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
-  const { db: roleDb, caseId } = await resolveDb(role, escalationToken);
+  const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
+  const canSee = canReadSensitive(role, hasValidToken);
   const doc = await roleDb.collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
     .findOne({ customerAgreementInstanceReference: id });
   if (!doc) return null;
   const party = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
     .findOne({ partyInstanceReference: doc.partyInstanceReference });
   if (!party) return null;
-  await maybeAudit(roleDb, caseId, role, doc);
-  return buildResponse(doc, party, role, caseId);
+  await maybeAudit(roleDb, caseId, role, doc, canSee);
+  return buildResponse(doc, party, role, canSee, caseId);
 }
 
 export async function getSelfProfile(db: Db, email: string): Promise<Record<string, unknown> | null> {

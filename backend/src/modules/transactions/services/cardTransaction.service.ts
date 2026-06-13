@@ -5,6 +5,7 @@ import {
   CardTransactionLogControlRecord,
 } from '../models/cardTransaction.model';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
+import { canReadSensitive } from '../../../vendors/middleware/rbac';
 import { createFraudCase } from '../../fraud/services/fraudDiagnosis.service';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
@@ -178,9 +179,13 @@ export async function getTransactionById(
     .findOne({ cardTransactionInstanceReference: id } as Partial<CardTransactionLogControlRecord>);
   if (!txn) return null;
 
-  // Detect whether rawGatewayPayload was decrypted (plain object) or still Binary
+  // Fail-closed authorization: sensitive QE:none fields are exposed only to roles explicitly
+  // allowed (auditor, or L2 with a valid escalation token) — never merely because the bytes
+  // came back as a plain object. Protects even if the demo DB stores them in plaintext.
+  const canSee = canReadSensitive(role, hasValidToken);
   const raw = txn.rawGatewayPayload as unknown;
   const gatewayDecrypted =
+    canSee &&
     raw !== undefined && raw !== null &&
     typeof raw === 'object' &&
     !('sub_type' in (raw as object) && 'buffer' in (raw as object));
@@ -200,6 +205,8 @@ export async function getTransactionById(
     cardTransactionNarrative:            txn.cardTransactionNarrative,
     paymentCardReference:                txn.paymentCardReference,
     cardTransactionAccountReference:     txn.cardTransactionAccountReference,
+    // Plaintext FK to the payee merchant (no PII) — lets the investigation UI link to KYB.
+    merchantAgreementInstanceReference:  txn.merchantAgreementInstanceReference,
     ...(gatewayDecrypted && {
       sensitive: {
         rawGatewayPayload:            txn.rawGatewayPayload,

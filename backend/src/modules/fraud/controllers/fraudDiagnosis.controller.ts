@@ -902,19 +902,26 @@ Token TTL: 4 hours. Use \`POST /fraud/:id/escalate/approve\` again to renew.`,
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 4 * 60 * 60 * 1000);
 
-    await updateCase(fastify.db, id, { fraudDiagnosisEscalationAcceptedAt: now });
-    await appendAuditEvent(fastify.db, id, 'field_accessed', 'level2_investigator', {
-      action: 'escalation_approved',
-      approvalNotes: approvalNotes ?? null,
-      tokenIssuedAt: now.toISOString(),
-      tokenExpiresAt: expiresAt.toISOString(),
-    });
+    // Idempotent resume: the first approval records the acceptance and audits it (PCI Req 10).
+    // Subsequent calls (e.g. the L2 reloading the case to re-derive a fresh stateless token)
+    // only re-issue the token — no duplicate acceptance timestamp, no audit-trail noise.
+    const alreadyAccepted = !!fraudCase.fraudDiagnosisEscalationAcceptedAt;
+    const approvedAt = alreadyAccepted ? new Date(fraudCase.fraudDiagnosisEscalationAcceptedAt as unknown as string) : now;
+    if (!alreadyAccepted) {
+      await updateCase(fastify.db, id, { fraudDiagnosisEscalationAcceptedAt: now });
+      await appendAuditEvent(fastify.db, id, 'field_accessed', 'level2_investigator', {
+        action: 'escalation_approved',
+        approvalNotes: approvalNotes ?? null,
+        tokenIssuedAt: now.toISOString(),
+        tokenExpiresAt: expiresAt.toISOString(),
+      });
+    }
 
     return reply.send({
       fraudDiagnosisInstanceReference: id,
       fraudDiagnosisCaseStatus: 'escalated',
       escalationToken: token,
-      escalationApprovedAt: now.toISOString(),
+      escalationApprovedAt: approvedAt.toISOString(),
       tokenExpiresAt: expiresAt.toISOString(),
     });
   });

@@ -99,8 +99,12 @@ export async function getDemoUsers(_db: Db, opts?: { featured?: boolean }) {
       name: u.customerAuthenticationUserName,
       role: u.customerAuthenticationUserRole,
       featured: u.customerAuthenticationDemoFeatured === true,
-      // Merchant name when this user owns a merchant (customer who is also a merchant owner).
-      merchant: ownerToMerchant.get(u.partyInstanceReference),
+      // Merchant name when this user owns a merchant. Ownership only applies to the
+      // customer role — staff (merchant_officer, manager, …) may be referenced by a
+      // merchant (reviewer, etc.) but are never merchant owners.
+      merchant: u.customerAuthenticationUserRole === 'customer'
+        ? ownerToMerchant.get(u.partyInstanceReference)
+        : undefined,
     }));
 }
 

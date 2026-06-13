@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { SectionHeader } from '../../../components/SectionHeader';
+import { Breadcrumb, type Crumb } from '../../../components/Breadcrumb';
 import { Users } from 'lucide-react';
 
 type SearchField = 'email' | 'phone' | 'accountRef';
@@ -47,6 +48,10 @@ const SEGMENT_LABELS: Record<string, string> = {
 export default function UsersPage() {
   const router = useRouter();
   const [token, setToken] = useState('');
+  const [role, setRole] = useState('level1_analyst');
+  const [fromTxn, setFromTxn] = useState<string | null>(null);
+  // Opening/reopening a case is an analyst action (SoD); the auditor is read-only.
+  const canOpenCase = role === 'level1_analyst' || role === 'level2_investigator';
 
   useEffect(() => {
     const t = getToken() ?? '';
@@ -56,6 +61,11 @@ export default function UsersPage() {
       return;
     }
     setToken(t);
+    setRole(user?.role ?? 'level1_analyst');
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get('from') === 'transaction' && sp.get('txnId')) setFromTxn(sp.get('txnId'));
+    }
   }, [router]);
 
   const [searchField, setSearchField] = useState<SearchField>('email');
@@ -164,8 +174,21 @@ export default function UsersPage() {
     }
   }
 
+  const crumbs: Crumb[] = fromTxn
+    ? [
+        { label: 'Home', href: '/system' },
+        { label: 'Transactions', href: '/system/transactions' },
+        { label: 'Transaction', href: `/system/transactions/${fromTxn}` },
+        { label: 'Customer' },
+      ]
+    : [
+        { label: 'Home', href: '/system' },
+        { label: 'Users' },
+      ];
+
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
+      <Breadcrumb items={crumbs} />
       <SectionHeader
         icon={Users}
         title="Users"
@@ -316,15 +339,15 @@ export default function UsersPage() {
                     // Still loading case info
                     <span className="text-xs text-gray-300">...</span>
                   ) : linkedCase && !isClosed ? (
-                    // Active case: direct link
+                    // Active case: direct link (read-only navigation, all roles)
                     <Link
                       href={`/system/investigation/${linkedCase.id}`}
                       className="text-xs px-2 py-1 rounded bg-[#001E2B] text-[#00ED64] hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors font-medium"
                     >
                       Open case
                     </Link>
-                  ) : linkedCase && isClosed ? (
-                    // Closed case: reopen button
+                  ) : canOpenCase && linkedCase && isClosed ? (
+                    // Closed case: reopen (analyst only)
                     <button
                       disabled={busy}
                       onClick={() => handleCaseAction(txnId, linkedCase)}
@@ -332,8 +355,8 @@ export default function UsersPage() {
                     >
                       {busy ? '...' : 'Reopen case'}
                     </button>
-                  ) : (
-                    // No case: open new investigation
+                  ) : canOpenCase ? (
+                    // No case: open new investigation (analyst only)
                     <button
                       disabled={busy}
                       onClick={() => handleCaseAction(txnId, null)}
@@ -341,6 +364,11 @@ export default function UsersPage() {
                     >
                       {busy ? '...' : 'Open investigation'}
                     </button>
+                  ) : linkedCase && isClosed ? (
+                    // Auditor read-only on a closed case
+                    <Link href={`/system/investigation/${linkedCase.id}`} className="text-xs text-blue-600 hover:underline">View case</Link>
+                  ) : (
+                    <span className="text-xs text-gray-400 italic">Read-only</span>
                   )}
                   {linkedCase && (
                     <p className={`text-xs ${isClosed ? 'text-gray-400' : 'text-orange-600'}`}>
