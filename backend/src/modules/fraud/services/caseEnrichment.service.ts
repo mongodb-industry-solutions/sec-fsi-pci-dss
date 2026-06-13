@@ -46,7 +46,8 @@ export async function getCaseEnrichment(
   db: Db,
   caseId: string,
   role: UserRole,
-  escalationToken?: string
+  escalationToken?: string,
+  actor?: { ref?: string; name?: string }
 ): Promise<Record<string, unknown> | null> {
   const fraudCase = await getCaseById(db, caseId);
   if (!fraudCase) return null;
@@ -98,7 +99,7 @@ export async function getCaseEnrichment(
 
   // ── KYC summary (+ sensitive only if the role/token already unlocked it) ───
   const customer = customerId
-    ? await getByInstanceReference(db, customerId, role, escalationToken).catch(() => null)
+    ? await getByInstanceReference(db, customerId, role, escalationToken, actor).catch(() => null)
     : null;
   const accountRef = customer?.customerAgreementReference as string | undefined;
   const kyc = customer ? {

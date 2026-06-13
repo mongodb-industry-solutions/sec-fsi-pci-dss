@@ -117,6 +117,7 @@ export async function createFraudCase(
     actionDateTime: now,
     actionType: 'case_opened',
     performedByInstanceReference: 'system',
+    performedByName: 'Automated detection',
     performedByRole: 'payment_service',
     actionDetails: { trigger: riskIndicators[0] ?? 'manual' },
     schemaVersion: 1,
@@ -383,18 +384,23 @@ export async function getAllAuditEvents(
   return { events, total, page, limit };
 }
 
+// PCI DSS Req 10.2.1 / 10.3.1: each audit entry must identify the INDIVIDUAL user who acted,
+// not just the role (multiple L1/L2 share a role). `actor` carries the acting user's unique id
+// (partyRef/sub) and display name from their JWT; BIAN records this as performedByPartyReference.
 export async function appendAuditEvent(
   db: Db,
   caseId: string,
   actionType: FraudDiagnosisCaseEventRecord['actionType'],
   performedByRole: FraudDiagnosisCaseEventRecord['performedByRole'],
-  details: Record<string, unknown>
+  details: Record<string, unknown>,
+  actor?: { ref?: string; name?: string }
 ): Promise<void> {
   const event: FraudDiagnosisCaseEventRecord = {
     fraudDiagnosisInstanceReference: caseId,
     actionDateTime: new Date(),
     actionType,
-    performedByInstanceReference: 'rbac-layer',
+    performedByInstanceReference: actor?.ref ?? 'rbac-layer',
+    performedByName: actor?.name,
     performedByRole,
     actionDetails: details,
     schemaVersion: 1,
@@ -409,7 +415,8 @@ export async function addCaseNote(
   caseId: string,
   noteText: string,
   visibility: 'internal' | 'customer',
-  performedByRole: AnalystRole
+  performedByRole: AnalystRole,
+  actor?: { ref?: string; name?: string }
 ): Promise<{ noteId: string; actionDateTime: Date }> {
   const noteId = uuidv4();
   const actionDateTime = new Date();
@@ -417,7 +424,8 @@ export async function addCaseNote(
     fraudDiagnosisInstanceReference: caseId,
     actionDateTime,
     actionType: 'note_added',
-    performedByInstanceReference: 'rbac-layer',
+    performedByInstanceReference: actor?.ref ?? 'rbac-layer',
+    performedByName: actor?.name,
     performedByRole,
     actionDetails: { noteId, noteText, visibility },
     schemaVersion: 1,
@@ -431,7 +439,8 @@ export async function retractCaseNote(
   caseId: string,
   retractedNoteId: string,
   retractionReason: string | undefined,
-  performedByRole: AnalystRole
+  performedByRole: AnalystRole,
+  actor?: { ref?: string; name?: string }
 ): Promise<'ok' | 'not_found' | 'already_retracted' | 'wrong_role'> {
   const col = db.collection<FraudDiagnosisCaseEventRecord>(FRAUD_DIAGNOSIS_EVENTS_COLLECTION);
 
@@ -456,7 +465,8 @@ export async function retractCaseNote(
     fraudDiagnosisInstanceReference: caseId,
     actionDateTime: now,
     actionType: 'note_retracted',
-    performedByInstanceReference: 'rbac-layer',
+    performedByInstanceReference: actor?.ref ?? 'rbac-layer',
+    performedByName: actor?.name,
     performedByRole,
     actionDetails: {
       noteId: uuidv4(),

@@ -4,8 +4,15 @@ import { getTransactionById } from '../../transactions/services/cardTransaction.
 import { generateToken } from '../../../vendors/security/escalationTokens';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
-import type { DemoRequest } from '../../../shared/models/identity.model';
+import type { DemoRequest, JwtDemoPayload } from '../../../shared/models/identity.model';
 import type { AnalystRole } from '../models/fraudDiagnosis.model';
+
+// Resolve the acting user (unique id + name) from the JWT for individual audit accountability
+// (PCI DSS Req 10.2.1). partyRef is the stable BIAN Party reference; sub is the auth fallback.
+function actorOf(request: unknown): { ref?: string; name?: string } {
+  const u = (request as { user?: JwtDemoPayload }).user;
+  return { ref: u?.partyRef ?? u?.sub, name: u?.name };
+}
 import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
 import { getCaseEnrichment } from '../services/caseEnrichment.service';
 
@@ -453,7 +460,7 @@ Req 7 (least privilege) and Req 10 (audit of sensitive access).`,
       return reply.status(403).send({ error: 'Access denied: investigation enrichment requires an analyst or auditor role.' });
     }
     const { id } = request.params as { id: string };
-    const result = await getCaseEnrichment(fastify.db, id, demoRole, escalationToken);
+    const result = await getCaseEnrichment(fastify.db, id, demoRole, escalationToken, actorOf(request));
     if (!result) return reply.status(404).send({ error: 'Fraud case not found' });
     return reply.send(result);
   });
@@ -567,7 +574,7 @@ Req 7 (least privilege) and Req 10 (audit of sensitive access).`,
         hasCustomerNote: !!body.fraudDiagnosisCustomerSubjectNotes,
         resolutionOutcome: body.resolutionOutcome,
         ...(body.fraudDiagnosisCaseStatus === 'under_review' && { action: 'escalation_cancelled' }),
-      });
+      }, actorOf(request));
     }
 
     const updated = result as unknown as { fraudDiagnosisInstanceReference: string; fraudDiagnosisCaseStatus: string; recordUpdatedDateTime: Date };
@@ -604,9 +611,10 @@ Events are append-only; they are never updated or deleted.
                   actionDateTime: { type: 'string', format: 'date-time' },
                   actionType: {
                     type: 'string',
-                    enum: ['case_opened', 'assigned', 'note_added', 'field_accessed', 'escalated', 'ai_review', 'resolved', 'closed'],
+                    enum: ['case_opened', 'assigned', 'note_added', 'note_retracted', 'field_accessed', 'escalated', 'ai_review', 'resolved', 'closed'],
                   },
                   performedByInstanceReference: { type: 'string' },
+                  performedByName: { type: 'string', nullable: true, description: 'Display name of the individual user who performed the action (PCI DSS Req 10.2.1).' },
                   performedByRole: {
                     type: 'string',
                     enum: ['payment_service', 'level1_analyst', 'level2_investigator', 'security_auditor', 'ai_agent'],
@@ -663,6 +671,7 @@ Each event records: who acted, in which role, when, on which case, and what acti
                   actionDateTime: { type: 'string', format: 'date-time' },
                   actionType: { type: 'string' },
                   performedByInstanceReference: { type: 'string' },
+                  performedByName: { type: 'string', nullable: true },
                   performedByRole: { type: 'string' },
                   actionDetails: { type: 'object', additionalProperties: true },
                 },
@@ -829,7 +838,7 @@ The Level 2 Investigator gains access to QE:none sensitive fields (DEK-sensitive
     await appendAuditEvent(fastify.db, id, 'escalated', 'level1_analyst', {
       escalationReason,
       escalationDateTime: new Date().toISOString(),
-    });
+    }, actorOf(request));
     return reply.send({
       fraudDiagnosisInstanceReference: id,
       fraudDiagnosisCaseStatus: 'escalated',
@@ -914,7 +923,7 @@ Token TTL: 4 hours. Use \`POST /fraud/:id/escalate/approve\` again to renew.`,
         approvalNotes: approvalNotes ?? null,
         tokenIssuedAt: now.toISOString(),
         tokenExpiresAt: expiresAt.toISOString(),
-      });
+      }, actorOf(request));
     }
 
     return reply.send({
@@ -979,7 +988,7 @@ The case status is set back to \`under_review\`. L1 can then close it as a false
       action: 'escalation_rejected',
       rejectionNotes: rejectionNotes ?? null,
       rejectedAt: now.toISOString(),
-    });
+    }, actorOf(request));
 
     return reply.send({
       fraudDiagnosisInstanceReference: id,
@@ -1038,7 +1047,7 @@ Errors are corrected via \`DELETE /fraud/:id/notes/:noteId\` (retraction), which
     const fraudCase = await getCaseById(fastify.db, id);
     if (!fraudCase) return reply.status(404).send({ error: 'Fraud case not found' });
 
-    const result = await addCaseNote(fastify.db, id, noteText, visibility, demoRole as import('../../../shared/models/identity.model').AnalystRole);
+    const result = await addCaseNote(fastify.db, id, noteText, visibility, demoRole as import('../../../shared/models/identity.model').AnalystRole, actorOf(request));
     return reply.status(201).send({ noteId: result.noteId, actionDateTime: result.actionDateTime });
   });
 
@@ -1086,7 +1095,7 @@ Retracted notes are hidden from the customer but remain visible in the internal 
       return reply.status(403).send({ error: 'Only L1 and L2 analysts may retract notes' });
     }
 
-    const outcome = await retractCaseNote(fastify.db, id, noteId, retractionReason, demoRole as import('../../../shared/models/identity.model').AnalystRole);
+    const outcome = await retractCaseNote(fastify.db, id, noteId, retractionReason, demoRole as import('../../../shared/models/identity.model').AnalystRole, actorOf(request));
     if (outcome === 'not_found')        return reply.status(404).send({ error: 'Note not found for this case' });
     if (outcome === 'wrong_role')       return reply.status(403).send({ error: 'Only the author role may retract this note' });
     if (outcome === 'already_retracted') return reply.status(409).send({ error: 'Note has already been retracted' });

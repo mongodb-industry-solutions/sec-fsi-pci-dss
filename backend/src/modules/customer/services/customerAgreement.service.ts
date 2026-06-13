@@ -89,37 +89,37 @@ async function findPartyAndAgreement(
   return { doc, party };
 }
 
-async function maybeAudit(db: Db, caseId: string | undefined, role: UserRole, doc: CustomerAgreementControlRecord, canSeeSensitive: boolean): Promise<void> {
+async function maybeAudit(db: Db, caseId: string | undefined, role: UserRole, doc: CustomerAgreementControlRecord, canSeeSensitive: boolean, actor?: { ref?: string; name?: string }): Promise<void> {
   if (!caseId) return;
   if (!canSeeSensitive) return; // only an actual sensitive disclosure is audited (Req 10)
   if (!isSensitiveDecrypted(doc.customerAgreementResidentialAddress)) return;
   await appendAuditEvent(db, caseId, 'field_accessed', role as 'level2_investigator' | 'security_auditor', {
     fields: ['customerAgreementResidentialAddress', 'governmentIdentificationReference', 'customerAgreementRiskNotes'],
     customerAgreementInstanceReference: doc.customerAgreementInstanceReference,
-  });
+  }, actor);
 }
 
 // -- Public query functions --------------------------------------------------─
 
-export async function getByEmail(db: Db, email: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
+export async function getByEmail(db: Db, email: string, role: UserRole = 'level1_analyst', escalationToken?: string, actor?: { ref?: string; name?: string }) {
   const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
   const canSee = canReadSensitive(role, hasValidToken);
   const result = await findPartyAndAgreement(roleDb, { partyEmailAddress: email } as Partial<PartyControlRecord>);
   if (!result) return null;
-  await maybeAudit(roleDb, caseId, role, result.doc, canSee);
+  await maybeAudit(roleDb, caseId, role, result.doc, canSee, actor);
   return buildResponse(result.doc, result.party, role, canSee, caseId);
 }
 
-export async function getByPhone(db: Db, phone: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
+export async function getByPhone(db: Db, phone: string, role: UserRole = 'level1_analyst', escalationToken?: string, actor?: { ref?: string; name?: string }) {
   const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
   const canSee = canReadSensitive(role, hasValidToken);
   const result = await findPartyAndAgreement(roleDb, { partyMobilePhoneNumber: phone } as Partial<PartyControlRecord>);
   if (!result) return null;
-  await maybeAudit(roleDb, caseId, role, result.doc, canSee);
+  await maybeAudit(roleDb, caseId, role, result.doc, canSee, actor);
   return buildResponse(result.doc, result.party, role, canSee, caseId);
 }
 
-export async function getByAccountRef(db: Db, ref: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
+export async function getByAccountRef(db: Db, ref: string, role: UserRole = 'level1_analyst', escalationToken?: string, actor?: { ref?: string; name?: string }) {
   const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
   const canSee = canReadSensitive(role, hasValidToken);
   const doc = await roleDb.collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
@@ -128,11 +128,11 @@ export async function getByAccountRef(db: Db, ref: string, role: UserRole = 'lev
   const party = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
     .findOne({ partyInstanceReference: doc.partyInstanceReference });
   if (!party) return null;
-  await maybeAudit(roleDb, caseId, role, doc, canSee);
+  await maybeAudit(roleDb, caseId, role, doc, canSee, actor);
   return buildResponse(doc, party, role, canSee, caseId);
 }
 
-export async function getByInstanceReference(db: Db, id: string, role: UserRole = 'level1_analyst', escalationToken?: string) {
+export async function getByInstanceReference(db: Db, id: string, role: UserRole = 'level1_analyst', escalationToken?: string, actor?: { ref?: string; name?: string }) {
   const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
   const canSee = canReadSensitive(role, hasValidToken);
   const doc = await roleDb.collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
@@ -141,7 +141,7 @@ export async function getByInstanceReference(db: Db, id: string, role: UserRole 
   const party = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
     .findOne({ partyInstanceReference: doc.partyInstanceReference });
   if (!party) return null;
-  await maybeAudit(roleDb, caseId, role, doc, canSee);
+  await maybeAudit(roleDb, caseId, role, doc, canSee, actor);
   return buildResponse(doc, party, role, canSee, caseId);
 }
 

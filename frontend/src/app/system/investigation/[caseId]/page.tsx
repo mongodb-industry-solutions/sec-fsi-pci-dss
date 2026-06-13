@@ -500,7 +500,7 @@ export default function DemoCaseDetailPage() {
         )}
 
         {/* -- Notes -- */}
-        {token && <CaseNotesPanel caseId={caseId} token={token} role={role} />}
+        {token && <CaseNotesPanel caseId={caseId} token={token} role={role} onActivity={() => reload(token)} />}
 
         {fraudCase.fraudDiagnosisResolutionRecord && (
           <div className={`rounded-xl border p-4 text-sm ${fraudCase.fraudDiagnosisResolutionRecord.resolutionOutcome === 'confirmed_fraud' ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
@@ -662,7 +662,14 @@ export default function DemoCaseDetailPage() {
                      e.actionType === 'assigned' && e.actionDetails?.action === 'escalation_cancelled' ? 'Escalation cancelled by L1' :
                      ACTION_LABELS[e.actionType] ?? e.actionType.replace(/_/g, ' ')}
                   </span>
-                  <span className="text-gray-500 text-xs">{PERFORMER_LABELS[e.performedByRole] ?? e.performedByRole}</span>
+                  <span className="text-gray-500 text-xs">
+                    {e.performedByName && e.performedByInstanceReference !== 'system'
+                      ? <><span className="font-medium text-gray-700">{e.performedByName}</span> · {PERFORMER_LABELS[e.performedByRole] ?? e.performedByRole}</>
+                      : <>{PERFORMER_LABELS[e.performedByRole] ?? e.performedByRole}</>}
+                    {debugMode && e.performedByInstanceReference && !['rbac-layer', 'system'].includes(e.performedByInstanceReference) && (
+                      <span className="font-mono text-gray-400"> · {e.performedByInstanceReference.slice(0, 8)}</span>
+                    )}
+                  </span>
                   {debugMode && e.actionDetails && Object.keys(e.actionDetails).length > 0 && (
                     <pre className="mt-1 w-full text-xs font-mono text-gray-400 bg-gray-50 rounded px-2 py-1 whitespace-pre-wrap break-all">
                       {JSON.stringify(e.actionDetails, null, 2)}

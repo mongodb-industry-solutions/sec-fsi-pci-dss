@@ -7,6 +7,9 @@ interface Props {
   caseId: string;
   token: string;
   role: string;
+  // Called after a note is added or retracted so the parent can refresh the case activity log
+  // in place (a note add/retract is itself an auditable event).
+  onActivity?: () => void;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -16,7 +19,7 @@ const ROLE_LABELS: Record<string, string> = {
   payment_service: 'System',
 };
 
-export function CaseNotesPanel({ caseId, token, role }: Props) {
+export function CaseNotesPanel({ caseId, token, role, onActivity }: Props) {
   const [notes, setNotes] = useState<NoteEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -56,6 +59,7 @@ export function CaseNotesPanel({ caseId, token, role }: Props) {
       setShowAddForm(false);
       setConfirmAdd(false);
       await loadNotes();
+      onActivity?.();
       setMsg('Note added.');
     } catch (err) {
       setMsg(`Error: ${err instanceof Error ? err.message : 'Unknown'}`);
@@ -82,6 +86,7 @@ export function CaseNotesPanel({ caseId, token, role }: Props) {
       setRetractTarget(null);
       setRetractionReason('');
       await loadNotes();
+      onActivity?.();
       setMsg('Note retracted.');
     } catch (err) {
       setMsg(`Error: ${err instanceof Error ? err.message : 'Unknown'}`);

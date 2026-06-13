@@ -106,6 +106,7 @@ export interface ActionEvent {
   actionDateTime: string;
   actionType: string;
   performedByInstanceReference: string;
+  performedByName?: string;
   performedByRole: string;
   actionDetails: Record<string, unknown>;
 }

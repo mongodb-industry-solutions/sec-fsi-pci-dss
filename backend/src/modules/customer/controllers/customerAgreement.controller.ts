@@ -1,6 +1,13 @@
 import { FastifyInstance } from 'fastify';
 import { getByEmail, getByPhone, getByAccountRef, getByInstanceReference } from '../services/customerAgreement.service';
-import type { DemoRequest } from '../../../shared/models/identity.model';
+import type { DemoRequest, JwtDemoPayload } from '../../../shared/models/identity.model';
+
+// Acting user (unique id + name) from the JWT — recorded in the sensitive-access audit event
+// so the case activity log identifies the individual, not just the role (PCI DSS Req 10.2.1).
+function actorOf(request: unknown): { ref?: string; name?: string } {
+  const u = (request as { user?: JwtDemoPayload }).user;
+  return { ref: u?.partyRef ?? u?.sub, name: u?.name };
+}
 
 export async function customerAgreementController(fastify: FastifyInstance) {
   fastify.get('/', {
@@ -122,19 +129,19 @@ caller has the DEK-sensitive key, i.e. \`level2_investigator\` role.`,
 
     try {
       if (email) {
-        const result = await getByEmail(fastify.db, email, demoRole, escalationToken);
+        const result = await getByEmail(fastify.db, email, demoRole, escalationToken, actorOf(request));
         if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
         return reply.send(result);
       }
 
       if (phone) {
-        const result = await getByPhone(fastify.db, phone, demoRole, escalationToken);
+        const result = await getByPhone(fastify.db, phone, demoRole, escalationToken, actorOf(request));
         if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
         return reply.send(result);
       }
 
       if (accountRef) {
-        const result = await getByAccountRef(fastify.db, accountRef, demoRole, escalationToken);
+        const result = await getByAccountRef(fastify.db, accountRef, demoRole, escalationToken, actorOf(request));
         if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
         return reply.send(result);
       }
@@ -192,7 +199,7 @@ enrollment date). QE:equality fields (email, phone, account reference) are not r
     const { id } = request.params as { id: string };
     const { demoRole, escalationToken } = request as unknown as DemoRequest;
     try {
-      const result = await getByInstanceReference(fastify.db, id, demoRole, escalationToken);
+      const result = await getByInstanceReference(fastify.db, id, demoRole, escalationToken, actorOf(request));
       if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
       return reply.send(result);
     } catch (err) {
