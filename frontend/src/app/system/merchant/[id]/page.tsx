@@ -2,11 +2,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Receipt, TrendingUp, CreditCard, CalendarDays, ShieldCheck, Building2, ArrowLeft, ClipboardCheck } from 'lucide-react';
+import { Receipt, TrendingUp, CreditCard, CalendarDays, ShieldCheck, Building2, ArrowLeft, ClipboardCheck, Search, ExternalLink, BriefcaseMedical } from 'lucide-react';
 import { api } from '../../../../lib/api';
 import { decodeToken } from '../../../../lib/auth';
 import { useMerchant } from '../../../../lib/merchantContext';
 import { StatCard, MonthlyBars, BreakdownBars } from '../../../../components/dashboard/Stats';
+import { Pagination } from '../../../../components/Pagination';
 
 type Stats = Awaited<ReturnType<typeof api.merchants.stats>>;
 type Sale = {
@@ -68,6 +69,19 @@ export default function StaffMerchantDetailPage() {
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
 
+  // Full payments list (acquiring view) with filter/search/pagination + drill-in.
+  const isAuditor = role === 'security_auditor';
+  const [payments, setPayments] = useState<Sale[]>([]);
+  const [payTotal, setPayTotal] = useState(0);
+  const [payPage, setPayPage] = useState(1);
+  const [payPageSize, setPayPageSize] = useState(10);
+  const [payStatus, setPayStatus] = useState('');
+  const [paySearchInput, setPaySearchInput] = useState('');
+  const [paySearch, setPaySearch] = useState('');
+  const [payLoading, setPayLoading] = useState(false);
+  // For the auditor only: which payments already have a linked fraud case (read-only).
+  const [caseMap, setCaseMap] = useState<Record<string, { id: string; ref: string; status: string } | null>>({});
+
   const load = useCallback(async () => {
     if (!token || !id) return;
     setLoading(true);
@@ -95,6 +109,34 @@ export default function StaffMerchantDetailPage() {
   }, [id, token, role]);
 
   useEffect(() => { if (state !== 'loading') load(); }, [state, load]);
+
+  const loadPayments = useCallback(async () => {
+    if (!token || !id || denied) return;
+    setPayLoading(true);
+    try {
+      const res = await api.merchants.transactions(
+        id, { page: payPage, limit: payPageSize, status: payStatus || undefined, search: paySearch || undefined }, token,
+      );
+      const list = res.results as Sale[];
+      setPayments(list);
+      setPayTotal(res.total);
+      // Auditor oversight (read-only): surface any existing investigation case per payment.
+      // Officer/owner are blocked from /fraud, so the lookup runs for the auditor only.
+      if (isAuditor && list.length) {
+        const entries = await Promise.all(list.map(async (s) => {
+          const cases = await api.fraud.list({ transactionId: s.cardTransactionInstanceReference, limit: 1 }, token).catch(() => null);
+          const c = cases?.results?.[0];
+          return [s.cardTransactionInstanceReference, c ? { id: c.fraudDiagnosisInstanceReference, ref: c.fraudDiagnosisCaseReference, status: c.caseStatus } : null] as const;
+        }));
+        setCaseMap(Object.fromEntries(entries));
+      } else {
+        setCaseMap({});
+      }
+    } catch { setPayments([]); setPayTotal(0); }
+    finally { setPayLoading(false); }
+  }, [id, token, denied, payPage, payPageSize, payStatus, paySearch, isAuditor]);
+
+  useEffect(() => { if (merchant && !denied) loadPayments(); }, [merchant, denied, loadPayments]);
 
   if (loading) return <div className="px-5 sm:px-8 py-8 text-center text-sm text-gray-400">Loading merchant…</div>;
   if (denied) {
@@ -214,6 +256,106 @@ export default function StaffMerchantDetailPage() {
               </div>
             </div>
           </>
+        )}
+      </div>
+
+      {/* Payments Received — full acquiring list with drill-in (and case oversight for auditor) */}
+      <div className="bg-white rounded-xl border border-gray-200">
+        <div className="flex items-center justify-between gap-2 px-5 py-3 border-b border-gray-100 flex-wrap">
+          <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5">
+            <Receipt size={14} className="text-[#001E2B]" /> Payments Received
+            <span className="text-xs font-normal text-gray-400">· masked PAN only, no payer PII (PCI DSS Req 3/7)</span>
+          </h2>
+          <span className="text-xs text-gray-400">{payTotal} payment{payTotal !== 1 ? 's' : ''}</span>
+        </div>
+
+        {isAuditor && (
+          <div className="px-5 py-2 border-b border-gray-100 bg-blue-50/60 text-xs text-blue-800 flex items-start gap-2">
+            <ShieldCheck size={13} className="mt-0.5 shrink-0 text-blue-600" />
+            <span>Auditor oversight is read-only: you can analyze any payment and open its linked investigation case to review it, but initiating a new case is an analyst action (separation of duties, PCI DSS Req 7).</span>
+          </div>
+        )}
+
+        {/* Filter + search */}
+        <div className="flex flex-wrap gap-2 items-center px-5 py-3 border-b border-gray-100 bg-gray-50/60">
+          <form onSubmit={(e) => { e.preventDefault(); setPayPage(1); setPaySearch(paySearchInput.trim()); }} className="relative flex-1 min-w-[180px]">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input value={paySearchInput} onChange={(e) => setPaySearchInput(e.target.value)}
+              placeholder="Search masked PAN or descriptor…"
+              className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
+          </form>
+          <select value={payStatus} onChange={(e) => { setPayStatus(e.target.value); setPayPage(1); }}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white">
+            <option value="">All statuses</option>
+            {['authorized', 'settled', 'pending', 'declined', 'disputed'].map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+
+        {payLoading ? (
+          <div className="px-5 py-8 text-center text-sm text-gray-400">Loading payments…</div>
+        ) : payments.length === 0 ? (
+          <div className="px-5 py-8 text-center text-sm text-gray-400">No payments match the current filters.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-gray-500 text-xs">
+                <tr>
+                  <th className="text-left font-medium px-4 py-2">Date</th>
+                  <th className="text-left font-medium px-4 py-2">Card</th>
+                  <th className="text-left font-medium px-4 py-2 hidden sm:table-cell">Description</th>
+                  <th className="text-left font-medium px-4 py-2">Status</th>
+                  <th className="text-right font-medium px-4 py-2">Amount</th>
+                  <th className="text-right font-medium px-4 py-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {payments.map((s) => {
+                  const linked = isAuditor ? caseMap[s.cardTransactionInstanceReference] : undefined;
+                  return (
+                    <tr key={s.cardTransactionInstanceReference} className="hover:bg-gray-50">
+                      <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{new Date(s.cardTransactionDateTime).toLocaleDateString()}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-gray-700">{s.cardTransactionMaskedPanDisplay}</td>
+                      <td className="px-4 py-2.5 text-gray-600 hidden sm:table-cell truncate max-w-[220px]">{s.cardTransactionDescription ?? '—'}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`inline-block w-2 h-2 rounded-full mr-1.5 align-middle ${SALE_STATUS(s.cardTransactionStatus)}`} />
+                        <span className="capitalize text-xs text-gray-600">{s.cardTransactionStatus}</span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900 whitespace-nowrap">{fmt(s.cardTransactionAmount.amount, s.cardTransactionAmount.currency)}</td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center justify-end gap-3 whitespace-nowrap">
+                          {isAuditor && linked && (
+                            <Link href={`/system/investigation/${linked.id}`} title={`${linked.ref} · ${linked.status.replace(/_/g, ' ')}`}
+                              className="inline-flex items-center gap-1 text-xs text-orange-600 font-medium hover:underline">
+                              <BriefcaseMedical size={12} /> View case
+                            </Link>
+                          )}
+                          <Link href={`/system/transactions/${s.cardTransactionInstanceReference}`}
+                            className="inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
+                            Analyze <ExternalLink size={12} />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {!payLoading && payments.length > 0 && (
+          <div className="px-3 py-2 border-t border-gray-100">
+            <Pagination
+              page={payPage}
+              totalPages={Math.max(1, Math.ceil(payTotal / payPageSize))}
+              total={payTotal}
+              limit={payPageSize}
+              onPageChange={setPayPage}
+              onLimitChange={(l) => { setPayPageSize(l); setPayPage(1); }}
+              limitOptions={[5, 10, 20, 50]}
+              noun="payments"
+            />
+          </div>
         )}
       </div>
 

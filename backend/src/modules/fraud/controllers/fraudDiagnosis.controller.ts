@@ -177,10 +177,18 @@ without creating a duplicate.
         },
         400: { $ref: 'Error#' },
         401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
         404: { description: 'Transaction not found.', $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
+    // Separation of duties (PCI DSS Req 7; BIAN SD-83): opening (initiating) a fraud case is
+    // an analyst control action. The security auditor is read-only oversight and must not
+    // initiate cases. manager/merchant_officer/customer are already blocked from /fraud.
+    const { demoRole } = request as unknown as DemoRequest;
+    if (demoRole === 'security_auditor') {
+      return reply.status(403).send({ error: 'Access denied: the auditor role is read-only and cannot open investigation cases (separation of duties, PCI DSS Req 7).' });
+    }
     const { transactionId, reason } = request.body as { transactionId: string; reason?: string };
 
     // Check if a case already exists
