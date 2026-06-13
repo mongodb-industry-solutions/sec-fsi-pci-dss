@@ -8,6 +8,8 @@ import { api } from '../../../../../../lib/api';
 import { getOutboundSample } from '../_samples';
 import { useNotify } from '../../../../../../components/ui/ConfirmProvider';
 import { classifyEndpoint } from '../_endpoint';
+import { JsonView } from '../../../../../../components/json/JsonView';
+import { JsonEditor } from '../../../../../../components/json/JsonEditor';
 
 // ── Category settings ─────────────────────────────────────────────────────────
 
@@ -455,15 +457,12 @@ export default function OutboundPage() {
             <FieldLabel
               label="Request payload"
               hint="JSON body transformed by the outbound field mapping rules above. Edit it to test different scenarios." />
-            <textarea
+            <JsonEditor
               value={testPayload}
-              onChange={e => { setTestPayload(e.target.value); setTestPayloadError(''); }}
-              rows={14}
-              spellCheck={false}
-              className={`w-full border rounded-lg px-3 py-2 text-xs font-mono resize-y focus:outline-none focus:ring-2 focus:ring-violet-400 ${testPayloadError ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
-            {testPayloadError && (
-              <p className="mt-1 text-xs text-red-600">⚠ Invalid JSON; {testPayloadError}</p>
-            )}
+              onChange={(v) => { setTestPayload(v); setTestPayloadError(''); }}
+              error={testPayloadError ? `Invalid JSON; ${testPayloadError}` : null}
+              minHeight="14rem"
+              maxHeight="28rem" />
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -496,11 +495,11 @@ export default function OutboundPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Original payload (LeafyBank internal)</p>
-                  <pre className="bg-gray-50 border rounded-lg p-3 text-xs font-mono overflow-auto max-h-52">{JSON.stringify(testResult.original, null, 2)}</pre>
+                  <JsonView data={testResult.original} maxHeight="13rem" />
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Transformed payload (would be sent)</p>
-                  <pre className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs font-mono overflow-auto max-h-52">{JSON.stringify(testResult.transformed, null, 2)}</pre>
+                  <JsonView data={testResult.transformed} maxHeight="13rem" />
                 </div>
               </div>
             </div>
@@ -520,11 +519,13 @@ export default function OutboundPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Payload sent</p>
-                  <pre className="bg-gray-50 border rounded-lg p-3 text-xs font-mono overflow-auto max-h-52">{JSON.stringify(runResult.transformed, null, 2)}</pre>
+                  <JsonView data={runResult.transformed} maxHeight="13rem" />
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Response received</p>
-                  <pre className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs font-mono overflow-auto max-h-52">{runResult.responseBody !== undefined ? (typeof runResult.responseBody === 'string' ? runResult.responseBody : JSON.stringify(runResult.responseBody, null, 2)) : (runResult.error ? 'No response (request failed).' : 'No response body.')}</pre>
+                  <JsonView
+                    data={runResult.responseBody !== undefined ? runResult.responseBody : (runResult.error ? 'No response (request failed).' : 'No response body.')}
+                    maxHeight="13rem" />
                 </div>
               </div>
             </div>

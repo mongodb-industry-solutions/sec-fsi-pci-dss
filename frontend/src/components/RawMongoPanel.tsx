@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { api } from '../lib/api';
+import { JsonView } from './json/JsonView';
 
 /**
  * Static section: data is already available (e.g. API response, localStorage).
@@ -57,15 +58,6 @@ interface SectionState {
   loading: boolean;
   error: string | null;
 }
-
-const SCROLLBAR_CLASSES = [
-  '[scrollbar-width:thin] [scrollbar-color:#00ED64_#001020]',
-  '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5',
-  '[&::-webkit-scrollbar-track]:bg-[#001020] [&::-webkit-scrollbar-track]:rounded-full',
-  '[&::-webkit-scrollbar-thumb]:bg-[#00ED64]/40 [&::-webkit-scrollbar-thumb]:rounded-full',
-  '[&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/70',
-  '[&::-webkit-scrollbar-corner]:bg-[#001020]',
-].join(' ');
 
 function key(s: RawPanelSection): string {
   return s.kind === 'mongo' ? `mongo:${s.collection}` : `static:${s.label}`;
@@ -146,7 +138,6 @@ export function RawMongoPanel({
       {sections.map(section => {
         const k = key(section);
         const s = state[k];
-        const maxH = section.maxHeight ?? (section.kind === 'static' ? 'max-h-64' : 'max-h-72');
         const data = section.kind === 'static' ? section.data : s.doc;
 
         return (
@@ -217,13 +208,9 @@ export function RawMongoPanel({
 
                 {/* Content */}
                 {data != null && !s.loading && (
-                  <pre className={[
-                    'text-xs text-green-300 whitespace-pre font-mono',
-                    `${maxH} overflow-auto bg-[#001E2B] px-4 py-3`,
-                    SCROLLBAR_CLASSES,
-                  ].join(' ')}>
-                    {typeof data === 'string' ? data : JSON.stringify(data, null, 2)}
-                  </pre>
+                  <div className="bg-[#001E2B] px-2 py-2">
+                    <JsonView data={data} theme="dark" maxHeight="16rem" />
+                  </div>
                 )}
 
                 {/* Static with null data */}

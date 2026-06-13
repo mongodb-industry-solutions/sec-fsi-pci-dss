@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Plus, Trash2, Info } from 'lucide-react';
 import type { MappingRule } from './_context';
+import { JsonEditor } from '../../../../../components/json/JsonEditor';
 
 // ── StatusToggle ──────────────────────────────────────────────────────────────
 //
@@ -177,13 +178,12 @@ export function FieldMappingMatrix({ rules, setRules, sourceLabel, targetLabel, 
             <code className="bg-gray-100 px-1 rounded">required</code> (boolean).
             Use dot notation for nested fields: <code className="bg-gray-100 px-1 rounded">payload.transaction.amount</code>.
           </p>
-          <textarea
+          <JsonEditor
             value={jsonText}
-            onChange={e => setJsonText(e.target.value)}
-            rows={Math.max(10, rules.length * 4 + 2)}
-            spellCheck={false}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono resize-y focus:outline-none focus:ring-2 focus:ring-[#001E2B]" />
-          {jsonError && <p className="text-xs text-red-600">⚠ {jsonError}</p>}
+            onChange={setJsonText}
+            error={jsonError || null}
+            minHeight={`${Math.max(10, rules.length * 4 + 2) * 1.25}rem`}
+            maxHeight="32rem" />
           <div className="flex gap-2">
             <button onClick={applyJson}
               className="text-xs px-3 py-1.5 rounded border border-gray-400 hover:border-gray-700 text-gray-800 font-medium">

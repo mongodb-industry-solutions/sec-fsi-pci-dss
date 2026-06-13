@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { API_BASE_URL } from '../../../../lib/constants';
 import { getAdminToken, readSSE, downloadText } from '../../../../lib/adminHelpers';
 import { Pagination } from '../../../../components/Pagination';
+import { JsonView } from '../../../../components/json/JsonView';
 import {
   Copy, Check, Trash2, Download, X, ChevronDown, ChevronUp,
   Wifi, WifiOff, RotateCcw,
@@ -340,7 +341,7 @@ export default function WebhookPage() {
 
                       {activeTab === 'body' && (
                         expandedEntry.body
-                          ? <pre className="whitespace-pre-wrap break-all">{bodyText(expandedEntry.body)}</pre>
+                          ? <JsonView data={expandedEntry.body} theme="dark" maxHeight="18rem" />
                           : <span className="text-gray-600 italic">No body</span>
                       )}
 
@@ -362,7 +363,7 @@ export default function WebhookPage() {
                             <div>
                               <p className="text-gray-500 mb-1">Body sent to caller</p>
                               {expandedEntry.response.body
-                                ? <pre className="whitespace-pre-wrap break-all text-gray-200">{bodyText(expandedEntry.response.body)}</pre>
+                                ? <JsonView data={expandedEntry.response.body} theme="dark" maxHeight="14rem" />
                                 : <span className="text-gray-600 italic">No body</span>}
                             </div>
                           </div>

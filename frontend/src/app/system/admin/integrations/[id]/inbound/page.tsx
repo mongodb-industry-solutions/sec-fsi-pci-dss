@@ -8,6 +8,8 @@ import { api } from '../../../../../../lib/api';
 import { getInboundSample } from '../_samples';
 import { useNotify, useConfirm } from '../../../../../../components/ui/ConfirmProvider';
 import { classifyEndpoint } from '../_endpoint';
+import { JsonView } from '../../../../../../components/json/JsonView';
+import { JsonEditor } from '../../../../../../components/json/JsonEditor';
 
 // ── Copy helper ───────────────────────────────────────────────────────────────
 
@@ -371,15 +373,12 @@ export default function InboundPage() {
             <FieldLabel
               label="Incoming payload"
               hint="Simulated JSON body that an external provider would POST to the callback URL. Edit it to test different scenarios." />
-            <textarea
+            <JsonEditor
               value={inboundSample}
-              onChange={e => { setInboundSample(e.target.value); setInboundSampleError(''); }}
-              rows={14}
-              spellCheck={false}
-              className={`w-full border rounded-lg px-3 py-2 text-xs font-mono resize-y focus:outline-none focus:ring-2 focus:ring-amber-400 ${inboundSampleError ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
-            {inboundSampleError && (
-              <p className="mt-1 text-xs text-red-600">⚠ Invalid JSON; {inboundSampleError}</p>
-            )}
+              onChange={(v) => { setInboundSample(v); setInboundSampleError(''); }}
+              error={inboundSampleError ? `Invalid JSON; ${inboundSampleError}` : null}
+              minHeight="14rem"
+              maxHeight="28rem" />
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -412,11 +411,11 @@ export default function InboundPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Received from provider</p>
-                  <pre className="bg-gray-50 border rounded-lg p-3 text-xs font-mono overflow-auto max-h-52">{JSON.stringify(inboundTestResult.original, null, 2)}</pre>
+                  <JsonView data={inboundTestResult.original} maxHeight="13rem" />
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Processed by LeafyBank (after mapping)</p>
-                  <pre className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs font-mono overflow-auto max-h-52">{JSON.stringify(inboundTestResult.transformed, null, 2)}</pre>
+                  <JsonView data={inboundTestResult.transformed} maxHeight="13rem" />
                 </div>
               </div>
             </div>
@@ -433,7 +432,7 @@ export default function InboundPage() {
               {runResult.error && <p className="text-xs text-red-600">⚠ {runResult.error}</p>}
               <div>
                 <p className="text-xs text-gray-500 mb-1">Processed payload (recorded as a callback event)</p>
-                <pre className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs font-mono overflow-auto max-h-52">{JSON.stringify(runResult.transformed, null, 2)}</pre>
+                <JsonView data={runResult.transformed} maxHeight="13rem" />
               </div>
             </div>
           )}

@@ -6,6 +6,7 @@ import { SectionHeader } from '../../../components/SectionHeader';
 import { Pagination } from '../../../components/Pagination';
 import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
+import { JsonView } from '../../../components/json/JsonView';
 
 type AuditRow = {
   id: string;
@@ -197,7 +198,9 @@ export default function AuditEventsPage() {
                     <div className="text-xs text-gray-400 shrink-0 tabular-nums">{new Date(ev.eventDateTime).toLocaleString()}</div>
                   </button>
                   {open && ev.summary && (
-                    <pre className="mt-2 ml-7 bg-gray-50 border rounded-lg p-3 text-xs font-mono overflow-auto max-h-60">{JSON.stringify(ev.summary, null, 2)}</pre>
+                    <div className="mt-2 ml-7">
+                      <JsonView data={ev.summary} maxHeight="15rem" />
+                    </div>
                   )}
                 </li>
               );

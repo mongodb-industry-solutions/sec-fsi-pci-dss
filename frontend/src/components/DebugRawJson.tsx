@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { JsonView } from './json/JsonView';
 
 interface Section {
   label: string;
@@ -29,20 +30,13 @@ export function DebugRawJson({ sections }: { sections: Section[] }) {
             <span className="text-[#00ED64] text-xs ml-2">{expanded[i] ? '▲' : '▼'}</span>
           </button>
           {expanded[i] && (
-            <pre className={[
-              'bg-[#001E2B] text-green-300 text-xs font-mono px-4 py-3',
-              'whitespace-pre break-all max-h-64 overflow-auto',
-              '[scrollbar-width:thin] [scrollbar-color:#00ED64_#001E2B]',
-              '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5',
-              '[&::-webkit-scrollbar-track]:bg-[#001020] [&::-webkit-scrollbar-track]:rounded-full',
-              '[&::-webkit-scrollbar-thumb]:bg-[#00ED64]/40 [&::-webkit-scrollbar-thumb]:rounded-full',
-              '[&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/70',
-              '[&::-webkit-scrollbar-corner]:bg-[#001020]',
-            ].join(' ')}>
-              {section.data == null
-                ? 'null - data not yet loaded'
-                : JSON.stringify(section.data, null, 2)}
-            </pre>
+            section.data == null ? (
+              <pre className="bg-[#001E2B] text-gray-500 text-xs font-mono px-4 py-3 italic">null - data not yet loaded</pre>
+            ) : (
+              <div className="bg-[#001E2B] px-2 py-2">
+                <JsonView data={section.data} theme="dark" maxHeight="16rem" />
+              </div>
+            )
           )}
         </div>
       ))}
