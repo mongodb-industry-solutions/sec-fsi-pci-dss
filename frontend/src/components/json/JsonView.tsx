@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 import ReactJsonView from '@uiw/react-json-view';
 import { lightTheme } from '@uiw/react-json-view/light';
 import { darkTheme } from '@uiw/react-json-view/dark';
@@ -20,6 +20,12 @@ export interface JsonViewProps {
   collapsed?: number | boolean;
   /** Hide the toolbar (expand/collapse all + copy). @default false */
   hideToolbar?: boolean;
+  /**
+   * Override the container background/border classes to match the surrounding
+   * section (e.g. "bg-gray-900 border-gray-800"). The JSON tree itself is always
+   * transparent and inherits this background. Defaults to the theme's surface.
+   */
+  surfaceClassName?: string;
   className?: string;
 }
 
@@ -47,6 +53,7 @@ export function JsonView({
   maxHeight = '20rem',
   collapsed = 2,
   hideToolbar = false,
+  surfaceClassName,
   className = '',
 }: JsonViewProps) {
   const [mounted, setMounted] = useState(false);
@@ -73,12 +80,20 @@ export function JsonView({
     setRenderKey((k) => k + 1);
   };
 
-  const surface = isDark
+  const surface = surfaceClassName ?? (isDark
     ? 'bg-[#001E2B] border-[#0a3a4a]'
-    : 'bg-gray-50 border-gray-200';
+    : 'bg-gray-50 border-gray-200');
+  // Neutral translucent divider works on any surface (teal, gray-900, light).
+  const divider = isDark ? 'border-white/10' : 'border-black/10';
   const btn = isDark
     ? 'text-gray-400 hover:text-gray-100'
     : 'text-gray-500 hover:text-gray-800';
+  // The tree inherits the container background instead of painting its own,
+  // so it blends with whatever surface the caller provides.
+  const treeStyle = {
+    ...(isDark ? darkTheme : lightTheme),
+    '--w-rjv-background-color': 'transparent',
+  } as CSSProperties;
 
   // Primitive / non-JSON / pre-hydration: show a themed <pre>.
   if (!mounted || !renderable) {
@@ -97,7 +112,7 @@ export function JsonView({
   return (
     <div className={`rounded-lg border overflow-hidden ${surface} ${className}`}>
       {!hideToolbar && (
-        <div className={`flex items-center gap-3 px-3 py-1.5 border-b ${isDark ? 'border-[#0a3a4a]' : 'border-gray-200'}`}>
+        <div className={`flex items-center gap-3 px-3 py-1.5 border-b ${divider}`}>
           <button type="button" onClick={() => toggle(false)} className={`inline-flex items-center gap-1 text-[11px] ${btn} transition-colors`} title="Expand all">
             <ChevronsUpDown size={12} /> Expand all
           </button>
@@ -115,7 +130,7 @@ export function JsonView({
           key={renderKey}
           value={renderable}
           collapsed={collapseState}
-          style={isDark ? darkTheme : lightTheme}
+          style={treeStyle}
           displayDataTypes={false}
           displayObjectSize
           enableClipboard

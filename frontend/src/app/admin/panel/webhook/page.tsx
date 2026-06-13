@@ -341,7 +341,7 @@ export default function WebhookPage() {
 
                       {activeTab === 'body' && (
                         expandedEntry.body
-                          ? <JsonView data={expandedEntry.body} theme="dark" maxHeight="18rem" />
+                          ? <JsonView data={expandedEntry.body} theme="dark" surfaceClassName="bg-gray-950 border-gray-800" maxHeight="18rem" />
                           : <span className="text-gray-600 italic">No body</span>
                       )}
 
@@ -363,7 +363,7 @@ export default function WebhookPage() {
                             <div>
                               <p className="text-gray-500 mb-1">Body sent to caller</p>
                               {expandedEntry.response.body
-                                ? <JsonView data={expandedEntry.response.body} theme="dark" maxHeight="14rem" />
+                                ? <JsonView data={expandedEntry.response.body} theme="dark" surfaceClassName="bg-gray-950 border-gray-800" maxHeight="14rem" />
                                 : <span className="text-gray-600 italic">No body</span>}
                             </div>
                           </div>
