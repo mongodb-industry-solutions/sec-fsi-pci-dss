@@ -154,6 +154,33 @@ export async function removeMemberFromGroup(
   return getRoutingGroup(db, groupId);
 }
 
+export interface DeleteRoutingGroupResult {
+  ok: boolean;
+  reason?: 'not_found' | 'is_default';
+}
+
+// Delete a routing group and detach its members (clear their routingGroupId). The default
+// group for a provider type cannot be deleted — it is the fallback target for dispatch.
+export async function deleteRoutingGroup(
+  db: Db,
+  groupId: string
+): Promise<DeleteRoutingGroupResult> {
+  const group = await getRoutingGroup(db, groupId);
+  if (!group) return { ok: false, reason: 'not_found' };
+  if (group.isDefaultGroup) return { ok: false, reason: 'is_default' };
+
+  const memberIds = group.routingGroupMembers.map(m => m.externalProviderArrangementInstanceReference);
+  if (memberIds.length > 0) {
+    await db.collection<ExternalProviderArrangement>(INTEGRATION_REGISTRY_COLLECTION).updateMany(
+      { externalProviderArrangementInstanceReference: { $in: memberIds } },
+      { $unset: { routingGroupId: '' }, $set: { recordUpdatedDateTime: new Date() } }
+    );
+  }
+  await db.collection<IntegrationRoutingGroup>(INTEGRATION_ROUTING_GROUPS_COLLECTION)
+    .deleteOne({ routingGroupInstanceReference: groupId });
+  return { ok: true };
+}
+
 // Resolve which provider to use given a routing group strategy
 export async function resolveProviderFromGroup(
   db: Db,

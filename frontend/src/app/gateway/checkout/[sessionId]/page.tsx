@@ -43,6 +43,9 @@ function CheckoutPageInner() {
   const [expiryYear, setExpiryYear] = useState('');
   const [cardholderEmail, setCardholderEmail] = useState('');
   const [saveCard, setSaveCard] = useState(false);
+  const [cvv, setCvv] = useState('');
+  const [cvvTouched, setCvvTouched] = useState(false);
+  const cvvValid = /^\d{3,4}$/.test(cvv);
 
   // Apply GET params to form fields. Add more params here as the payment form grows.
   const applyPrefillParams = useCallback((sp: ReturnType<typeof useSearchParams>) => {
@@ -117,6 +120,7 @@ function CheckoutPageInner() {
   async function handlePay(e: React.FormEvent) {
     e.preventDefault();
     if (!session) return;
+    if (!cvvValid) { setCvvTouched(true); setError('Enter a valid CVV (3 or 4 digits).'); return; }
     setState('paying');
     setError('');
 
@@ -311,12 +315,26 @@ function CheckoutPageInner() {
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">CVV</label>
                   <input
+                    required
                     type="text"
+                    inputMode="numeric"
+                    value={cvv}
+                    onChange={(e) => { setCvv(e.target.value.replace(/\D/g, '').slice(0, 4)); }}
+                    onBlur={() => setCvvTouched(true)}
                     placeholder="•••"
                     maxLength={4}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 focus:border-[#00ED64]"
+                    aria-invalid={cvvTouched && !cvvValid}
+                    className={`w-full border rounded-lg px-3 py-2 text-sm text-center font-mono focus:outline-none focus:ring-2 ${
+                      cvvTouched && !cvvValid
+                        ? 'border-red-300 focus:ring-red-200 focus:border-red-400'
+                        : 'border-gray-300 focus:ring-[#00ED64]/40 focus:border-[#00ED64]'
+                    }`}
                   />
-                  <p className="text-xs text-gray-400 mt-0.5">Demo: not sent to server</p>
+                  {cvvTouched && !cvvValid ? (
+                    <p className="text-xs text-red-600 mt-0.5">Enter the 3 or 4 digit code.</p>
+                  ) : (
+                    <p className="text-xs text-gray-400 mt-0.5">Validated locally, never stored (PCI DSS Req 3.2).</p>
+                  )}
                 </div>
               </div>
 
@@ -340,7 +358,7 @@ function CheckoutPageInner() {
 
               <button
                 type="submit"
-                disabled={state === 'paying'}
+                disabled={state === 'paying' || !cvvValid}
                 className="w-full bg-[#00ED64] hover:bg-[#00c94f] text-[#001E2B] font-semibold py-3 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {state === 'paying' ? 'Processing...' : `Pay ${formatAmount(session.checkoutSessionAmount, session.checkoutSessionCurrency)}`}

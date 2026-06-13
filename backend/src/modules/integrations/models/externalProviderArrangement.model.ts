@@ -457,6 +457,9 @@ export interface IntegrationEvent {
   integrationEventType: 'dispatch' | 'callback' | 'health_check' | 'test';
   integrationEventStatus: 'sent' | 'received' | 'error' | 'timeout';
   integrationEventPayloadHash?: string;
+  // Sanitized snapshot of the payload (CHD stripped, PCI DSS Req 3.2) so the audit view can
+  // show exactly what data was sent/received and support analysis or event reproduction.
+  integrationEventPayloadSnapshot?: Record<string, unknown>;
   integrationEventResponseCode?: number;
   integrationEventLatencyMs?: number;
   integrationEventErrorMessage?: string;

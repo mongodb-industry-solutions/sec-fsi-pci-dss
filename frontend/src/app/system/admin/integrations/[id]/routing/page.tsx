@@ -4,6 +4,7 @@ import { Plus, Check, Users } from 'lucide-react';
 import { useIntegration } from '../_context';
 import { Card } from '../_shared';
 import { api } from '../../../../../../lib/api';
+import { useConfirm, useNotify } from '../../../../../../components/ui/ConfirmProvider';
 
 interface RoutingGroup {
   routingGroupInstanceReference: string;
@@ -39,6 +40,8 @@ const STRATEGY_LABEL: Record<string, { label: string; description: string }> = {
 
 export default function RoutingPage() {
   const { integration, reload, token } = useIntegration();
+  const confirm = useConfirm();
+  const notify = useNotify();
   const [groups, setGroups]           = useState<RoutingGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
   const [newName, setNewName]         = useState('');
@@ -71,21 +74,28 @@ export default function RoutingPage() {
       await api.integrationGroups.addMember(groupId, { providerId: id }, token);
       const r = await api.integrationGroups.list(token, { type });
       setGroups(r.groups as unknown as RoutingGroup[]);
-      reload();
-    } catch (err) { alert((err as Error).message); }
+      reload(true);
+    } catch (err) { notify((err as Error).message, 'error'); }
     finally { setJoining(null); }
   }
 
   async function handleLeave() {
     if (!integration?.routingGroupId) return;
-    if (!confirm('Remove this integration from the routing group?')) return;
+    const ok = await confirm({
+      title: 'Leave routing group?',
+      message: 'This integration will stop receiving routed traffic from this group.',
+      confirmLabel: 'Leave group',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setLeaving(true);
     try {
       await api.integrationGroups.removeMember(integration.routingGroupId!, id, token);
       const r = await api.integrationGroups.list(token, { type });
       setGroups(r.groups as unknown as RoutingGroup[]);
-      reload();
-    } catch (err) { alert((err as Error).message); }
+      reload(true);
+      notify('Removed from routing group.', 'success');
+    } catch (err) { notify((err as Error).message, 'error'); }
     finally { setLeaving(false); }
   }
 
@@ -97,7 +107,7 @@ export default function RoutingPage() {
       const r = await api.integrationGroups.list(token, { type });
       setGroups(r.groups as unknown as RoutingGroup[]);
       setNewName('');
-    } catch (err) { alert((err as Error).message); }
+    } catch (err) { notify((err as Error).message, 'error'); }
     finally { setCreating(false); }
   }
 

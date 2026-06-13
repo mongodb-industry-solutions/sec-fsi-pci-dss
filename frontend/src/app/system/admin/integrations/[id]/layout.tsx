@@ -8,6 +8,7 @@ import {
 import { useState } from 'react';
 import { IntegrationProvider, useIntegration, TYPE_LABEL, TYPE_CATEGORY_PATH } from './_context';
 import { api } from '../../../../../lib/api';
+import { useConfirm, useNotify } from '../../../../../components/ui/ConfirmProvider';
 
 // ── Nav items ─────────────────────────────────────────────────────────────────
 
@@ -36,36 +37,56 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router   = useRouter();
   const { integration, loading, loadError, reload, token } = useIntegration();
+  const confirm = useConfirm();
+  const notify = useNotify();
   const [rotating, setRotating]   = useState(false);
   const [newKey, setNewKey]       = useState<string | null>(null);
   const [deleting, setDeleting]   = useState(false);
 
   async function handleRotate() {
-    if (!confirm('Rotate the API key? The current key will stop working immediately.')) return;
+    const ok = await confirm({
+      title: 'Rotate the API key?',
+      message: 'The current key will stop working immediately.',
+      confirmLabel: 'Rotate key',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setRotating(true);
     try {
       const r = await api.integrations.rotateKey(id, token);
       setNewKey((r as { apiKey: string }).apiKey);
-      reload();
-    } catch (err) { alert((err as Error).message); }
+      reload(true); // silent: keep the one-time key panel visible (no remount)
+    } catch (err) { notify((err as Error).message, 'error'); }
     finally { setRotating(false); }
   }
 
   async function handleSuspend() {
-    if (!confirm('Suspend this integration? Requests will fall back to the built-in default.')) return;
-    try { await api.integrations.suspend(id, token); reload(); }
-    catch (err) { alert((err as Error).message); }
+    const ok = await confirm({
+      title: 'Suspend this integration?',
+      message: 'Requests will fall back to the built-in default provider.',
+      confirmLabel: 'Suspend',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    try { await api.integrations.suspend(id, token); reload(true); }
+    catch (err) { notify((err as Error).message, 'error'); }
   }
 
   async function handleDelete() {
     if (!integration) return;
-    if (!confirm(`Delete "${integration.externalProviderArrangementName}"? This cannot be undone.`)) return;
+    const ok = await confirm({
+      title: `Delete "${integration.externalProviderArrangementName}"?`,
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setDeleting(true);
     try {
       await api.integrations.delete(id, token);
       router.push(TYPE_CATEGORY_PATH[integration.externalProviderArrangementType] ?? '/system/admin/integrations');
     } catch (err) {
-      alert((err as Error).message);
+      notify((err as Error).message, 'error');
       setDeleting(false);
     }
   }

@@ -3,7 +3,9 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   BUSINESS_PROCESS_EVENTS_COLLECTION,
   COMPLIANCE_PROCESS_EVENTS_COLLECTION,
+  INTEGRATION_EVENTS_COLLECTION,
   BusinessProcessEvent,
+  IntegrationEvent,
   BusinessProcessType,
   ComplianceProcessType,
   BusinessEntityType,
@@ -23,6 +25,21 @@ function sanitizeSummary(raw: Record<string, unknown>): Record<string, unknown> 
   return Object.fromEntries(
     Object.entries(raw).filter(([k]) => !CHD_BLOCKLIST.has(k))
   );
+}
+
+// Recursive CHD scrub for payload snapshots stored in the audit trail. Strips blocklisted
+// keys at ANY depth (payloads can be nested, e.g. card.cvv) so the stored snapshot is safe
+// to display (PCI DSS Req 3.2) while preserving the rest of the data for analysis/replay.
+export function sanitizeDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sanitizeDeep);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([k]) => !CHD_BLOCKLIST.has(k))
+        .map(([k, v]) => [k, sanitizeDeep(v)])
+    );
+  }
+  return value;
 }
 
 interface EmitProcessEventOpts {
@@ -127,6 +144,132 @@ export async function listProcessEvents(
     col.countDocuments(query),
   ]);
   return { events, total, page, limit };
+}
+
+// ── Unified audit view ──────────────────────────────────────────────────────
+// Normalized row across the three event sources so manager/auditor can audit the whole
+// system in one place: business process events, compliance events, and integration
+// (inbound/outbound test + dispatch/callback) events.
+export type AuditSource = 'business' | 'compliance' | 'integration';
+export interface AuditEventRow {
+  id: string;
+  source: AuditSource;
+  eventDateTime: Date;
+  type: string;
+  action: string;
+  outcome: string;
+  entityType?: string;
+  entityId?: string;
+  performedByRole?: string | null;
+  bianServiceDomain?: string;
+  context?: string;
+  summary?: Record<string, unknown>;
+}
+
+const AUDIT_FETCH_CAP = 1000; // per-source bound for the in-memory merge (demo volumes)
+
+export async function listAuditEvents(
+  db: Db,
+  opts: {
+    source?: AuditSource | 'all';
+    type?: string;
+    outcome?: string;
+    q?: string;
+    from?: Date;
+    to?: Date;
+    page?: number;
+    limit?: number;
+  }
+): Promise<{ events: AuditEventRow[]; total: number; page: number; limit: number; capped: boolean }> {
+  const page = Math.max(1, opts.page ?? 1);
+  const limit = Math.min(opts.limit ?? 20, 100);
+  const source = opts.source ?? 'all';
+
+  const dateClause: Record<string, Date> = {};
+  if (opts.from) dateClause.$gte = opts.from;
+  if (opts.to) dateClause.$lte = opts.to;
+  const hasDate = !!(opts.from || opts.to);
+
+  const rows: AuditEventRow[] = [];
+  let capped = false;
+
+  // Business + compliance process events (shared shape)
+  for (const [src, coll] of [
+    ['business', BUSINESS_PROCESS_EVENTS_COLLECTION] as const,
+    ['compliance', COMPLIANCE_PROCESS_EVENTS_COLLECTION] as const,
+  ]) {
+    if (source !== 'all' && source !== src) continue;
+    const query: Record<string, unknown> = {};
+    if (opts.type) query.processType = opts.type;
+    if (hasDate) query.eventDateTime = dateClause;
+    const docs = await db.collection<BusinessProcessEvent>(coll)
+      .find(query).sort({ eventDateTime: -1 }).limit(AUDIT_FETCH_CAP + 1).toArray();
+    if (docs.length > AUDIT_FETCH_CAP) capped = true;
+    for (const d of docs.slice(0, AUDIT_FETCH_CAP)) {
+      rows.push({
+        id: d.businessProcessEventInstanceReference,
+        source: src,
+        eventDateTime: d.eventDateTime,
+        type: d.processType,
+        action: d.processAction,
+        outcome: d.processOutcome,
+        entityType: d.entityType,
+        entityId: d.entityId,
+        performedByRole: d.performedByRole,
+        bianServiceDomain: d.bianServiceDomain,
+        summary: d.eventSummary,
+      });
+    }
+  }
+
+  // Integration events (inbound/outbound test, dispatch, callback)
+  if (source === 'all' || source === 'integration') {
+    const query: Record<string, unknown> = {};
+    if (opts.type) query.integrationEventType = opts.type;
+    if (hasDate) query.recordCreatedDateTime = dateClause;
+    const docs = await db.collection<IntegrationEvent>(INTEGRATION_EVENTS_COLLECTION)
+      .find(query).sort({ recordCreatedDateTime: -1 }).limit(AUDIT_FETCH_CAP + 1).toArray();
+    if (docs.length > AUDIT_FETCH_CAP) capped = true;
+    for (const d of docs.slice(0, AUDIT_FETCH_CAP)) {
+      const meta = (d.integrationEventMeta ?? {}) as Record<string, unknown>;
+      rows.push({
+        id: d.integrationEventInstanceReference,
+        source: 'integration',
+        eventDateTime: d.recordCreatedDateTime,
+        type: d.integrationEventType,
+        action: d.integrationEventTriggeredBy,
+        outcome: d.integrationEventStatus,
+        entityType: 'integration',
+        entityId: d.externalProviderArrangementInstanceReference,
+        performedByRole: null,
+        bianServiceDomain: d.bianServiceDomain,
+        context: typeof meta.direction === 'string' ? `${meta.direction}${meta.test ? ' test' : ''}` : undefined,
+        summary: {
+          payload: d.integrationEventPayloadSnapshot,
+          payloadHash: d.integrationEventPayloadHash,
+          responseCode: d.integrationEventResponseCode,
+          latencyMs: d.integrationEventLatencyMs,
+          error: d.integrationEventErrorMessage,
+          ...meta,
+        },
+      });
+    }
+  }
+
+  // In-memory narrowing (outcome, free-text), merge-sort, paginate
+  let merged = rows;
+  if (opts.outcome) merged = merged.filter((r) => r.outcome === opts.outcome);
+  if (opts.q) {
+    const q = opts.q.toLowerCase();
+    merged = merged.filter((r) =>
+      r.action.toLowerCase().includes(q) ||
+      (r.entityId ?? '').toLowerCase().includes(q) ||
+      r.type.toLowerCase().includes(q));
+  }
+  merged.sort((a, b) => new Date(b.eventDateTime).getTime() - new Date(a.eventDateTime).getTime());
+  const total = merged.length;
+  const events = merged.slice((page - 1) * limit, page * limit);
+  return { events, total, page, limit, capped };
 }
 
 export async function listComplianceEvents(

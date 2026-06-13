@@ -47,6 +47,38 @@ async function nextCaseRef(db: Db): Promise<string> {
   return `FD-${year}-${String(seq).padStart(6, '0')}`;
 }
 
+// MongoDB duplicate-key error code. We only treat a collision on the case-reference
+// business-key index as recoverable; anything else propagates.
+const MONGO_DUPLICATE_KEY = 11000;
+function isCaseRefDuplicate(e: unknown): boolean {
+  const err = e as { code?: number; keyPattern?: Record<string, unknown> } | null;
+  return err?.code === MONGO_DUPLICATE_KEY && !!err?.keyPattern?.fraudDiagnosisCaseReference;
+}
+
+// Self-healing: advance the sequence counter to at least the highest numeric suffix
+// currently present in the collection. The seeded counter ($setOnInsert seq:1000) can
+// drift BELOW existing references when the counter document was created by a runtime
+// $inc (seq starting at 1) before the seed ran, or when the DB predates ADR-024. That
+// makes nextCaseRef hand out references that already exist (E11000 on insert). Calling
+// this on a collision realigns the counter so the very next allocation is unique, with
+// no DB reset required. Uses a $max pipeline update so we never lower an advanced counter.
+async function reconcileCaseRefCounter(db: Db): Promise<void> {
+  const docs = await db
+    .collection(FRAUD_DIAGNOSIS_COLLECTION)
+    .find({}, { projection: { _id: 0, fraudDiagnosisCaseReference: 1 } })
+    .toArray();
+  let max = 1000;
+  for (const d of docs as Array<{ fraudDiagnosisCaseReference?: string }>) {
+    const m = /(\d+)\s*$/.exec(d.fraudDiagnosisCaseReference ?? '');
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  await db.collection<{ _id: string; seq: number }>(COUNTERS_COLLECTION).updateOne(
+    { _id: CASE_REF_SEQUENCE },
+    [{ $set: { seq: { $max: [{ $ifNull: ['$seq', 0] }, max] } } }],
+    { upsert: true },
+  );
+}
+
 export async function createFraudCase(
   db: Db,
   txnId: string,
@@ -60,7 +92,7 @@ export async function createFraudCase(
 
   const fraudCase: Omit<FraudDiagnosisControlRecord, never> = {
     fraudDiagnosisInstanceReference: caseId,
-    fraudDiagnosisCaseReference: await nextCaseRef(db),
+    fraudDiagnosisCaseReference: '', // assigned per-attempt below (self-healing against counter drift)
     cardTransactionInstanceReference: txnId,
     customerAgreementInstanceReference: customerRef,
     transactionSnapshot,
@@ -88,7 +120,27 @@ export async function createFraudCase(
     schemaVersion: 1,
   };
 
-  await db.collection(FRAUD_DIAGNOSIS_COLLECTION).insertOne(fraudCase as object);
+  // Allocate the human-readable reference and insert, retrying if the counter has
+  // drifted behind existing references. On the first collision we realign the counter
+  // (reconcile) so the next attempt is guaranteed unique. A payment must never fail
+  // because of a stale demo counter.
+  let inserted = false;
+  for (let attempt = 0; attempt < 5 && !inserted; attempt++) {
+    fraudCase.fraudDiagnosisCaseReference = await nextCaseRef(db);
+    try {
+      await db.collection(FRAUD_DIAGNOSIS_COLLECTION).insertOne(fraudCase as object);
+      inserted = true;
+    } catch (e) {
+      if (isCaseRefDuplicate(e)) {
+        await reconcileCaseRefCounter(db);
+        continue;
+      }
+      throw e;
+    }
+  }
+  if (!inserted) {
+    throw new Error('Could not allocate a unique fraudDiagnosisCaseReference after reconciling the counter.');
+  }
   await db.collection(FRAUD_DIAGNOSIS_EVENTS_COLLECTION).insertOne(openEvent as object);
 
   void dispatchIntegration(db, 'fraud_detection', 'fraud.createCase', {

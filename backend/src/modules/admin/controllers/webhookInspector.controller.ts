@@ -11,6 +11,8 @@ export interface WebhookEntry {
   body: unknown;
   timestamp: string;
   ip: string;
+  // The response this endpoint sent back to the caller (what the webhook emitter received).
+  response: { status: number; body: unknown };
 }
 
 const MAX_BUFFER = 200;
@@ -49,8 +51,11 @@ export async function webhookInspectorController(fastify: FastifyInstance) {
       description: 'Public endpoint that accepts any HTTP method and records the request in the in-memory buffer for inspection in the admin panel.',
     },
     handler: async (request, reply) => {
+      const id = uuidv4();
+      const responseStatus = 200;
+      const responseBody = { received: true, id };
       const entry: WebhookEntry = {
-        id: uuidv4(),
+        id,
         method: request.method,
         path: request.url,
         query: (request.query as Record<string, string>) ?? {},
@@ -58,11 +63,12 @@ export async function webhookInspectorController(fastify: FastifyInstance) {
         body: request.body ?? null,
         timestamp: new Date().toISOString(),
         ip: request.ip,
+        response: { status: responseStatus, body: responseBody },
       };
       if (buffer.length >= MAX_BUFFER) buffer.shift();
       buffer.push(entry);
       broadcast('request', JSON.stringify(entry));
-      return reply.status(200).send({ received: true, id: entry.id });
+      return reply.status(responseStatus).send(responseBody);
     },
   });
 
@@ -79,18 +85,42 @@ export async function webhookInspectorController(fastify: FastifyInstance) {
       return reply.status(401).send({ error: 'Unauthorized' });
     }
     reply.hijack();
-    reply.raw.writeHead(200, {
+    const raw = reply.raw;
+    raw.writeHead(200, {
       'Content-Type': 'text/event-stream; charset=utf-8',
-      'Cache-Control': 'no-cache',
+      // no-transform stops intermediaries from buffering/altering the stream.
+      'Cache-Control': 'no-cache, no-transform',
       'Connection': 'keep-alive',
+      // Disable proxy response buffering (nginx and similar) so events are not
+      // held back waiting for a byte threshold.
+      'X-Accel-Buffering': 'no',
       'Access-Control-Allow-Origin': process.env.CORS_ORIGIN ?? 'http://localhost:3000',
     });
-    reply.raw.flushHeaders();
+    // Disable Nagle's algorithm: send each small SSE frame immediately instead of
+    // coalescing it. Without this, a lone event can sit in the TCP/socket buffer
+    // until the next write — the reason new requests only appeared after a manual
+    // reconnect (which replays the whole buffer at once).
+    raw.socket?.setNoDelay(true);
+    raw.flushHeaders();
+    // Initial padding comment pushes the response past the client/intermediary
+    // initial read-buffer threshold, so the very first real events flush promptly.
+    raw.write(`: connected${' '.repeat(2048)}\n\n`);
+
     for (const entry of buffer) {
-      reply.raw.write(`event: request\ndata: ${JSON.stringify({ text: JSON.stringify(entry) })}\n\n`);
+      raw.write(`event: request\ndata: ${JSON.stringify({ text: JSON.stringify(entry) })}\n\n`);
     }
-    clients.add(reply.raw);
-    reply.raw.on('close', () => clients.delete(reply.raw));
+    clients.add(raw);
+
+    // Heartbeat keeps the connection warm through idle periods and flushes the
+    // pipe periodically (parity with the /admin/logs stream, which writes on a
+    // timer). Comment frames (": ...") are ignored by SSE parsers.
+    const heartbeat = setInterval(() => {
+      try { raw.write(`: ping\n\n`); } catch { /* socket gone; cleanup runs on close */ }
+    }, 15000);
+
+    const cleanup = () => { clearInterval(heartbeat); clients.delete(raw); };
+    raw.on('close', cleanup);
+    request.raw.on('close', cleanup);
   });
 
   // DELETE /webhook/requests — clear buffer, admin only

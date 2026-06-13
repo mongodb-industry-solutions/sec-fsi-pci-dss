@@ -16,6 +16,7 @@ import {
 } from './integrationRegistry.service';
 import { applyMappings } from './fieldMapping.service';
 import { resolveProviderFromGroup } from './integrationRoutingGroup.service';
+import { sanitizeDeep } from './businessProcessEvent.service';
 
 export interface DispatchResult {
   provider: 'internal' | 'external';
@@ -229,6 +230,7 @@ export async function logEvent(
     integrationEventType: opts.type,
     integrationEventStatus: opts.status,
     integrationEventPayloadHash: opts.payload ? hashPayload(opts.payload) : undefined,
+    integrationEventPayloadSnapshot: opts.payload ? (sanitizeDeep(opts.payload) as Record<string, unknown>) : undefined,
     integrationEventResponseCode: opts.responseCode,
     integrationEventLatencyMs: opts.latencyMs,
     integrationEventErrorMessage: opts.error,
@@ -321,6 +323,111 @@ export async function testMapping(
     appliedRules: rules.length,
     errors,
   };
+}
+
+// Resolve a possibly-relative URL to absolute, against this server's own base, so an
+// internal PSP override (e.g. /api/v1/webhooks/{id}/callback) can be reached over loopback.
+function toAbsoluteUrl(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  const base = process.env.SELF_BASE_URL ?? `http://127.0.0.1:${process.env.PORT ?? 3001}`;
+  return base.replace(/\/$/, '') + (url.startsWith('/') ? url : `/${url}`);
+}
+
+export interface RunTestResult {
+  direction: 'outbound' | 'inbound';
+  executed: boolean;
+  status: IntegrationEvent['integrationEventStatus'];
+  latencyMs: number;
+  responseCode?: number;
+  responseBody?: unknown;
+  transformed: Record<string, unknown>;
+  appliedRules: number;
+  targetUrl?: string;
+  error?: string;
+}
+
+// Read a response body for the test result, parsing JSON when possible and truncating
+// large text so the audit/preview stays readable. Best-effort; never throws.
+async function readResponseBody(res: Response): Promise<unknown> {
+  try {
+    const text = await res.text();
+    if (!text) return undefined;
+    try { return JSON.parse(text); } catch { return text.length > 4000 ? `${text.slice(0, 4000)}…` : text; }
+  } catch { return undefined; }
+}
+
+// "Run Test" — a REAL execution (distinct from test-mapping/Validate Params which only
+// transforms). Outbound: applies outbound mapping and POSTs to the override URL or the
+// configured endpoint, recording an integrationEvent. Inbound: applies inbound mapping and
+// records a callback event, mirroring real reception. Results surface in the events stream.
+export async function runIntegrationTest(
+  db: Db,
+  id: string,
+  direction: 'outbound' | 'inbound',
+  payload: Record<string, unknown>,
+  overrideUrl?: string
+): Promise<RunTestResult> {
+  const { getIntegration } = await import('./integrationRegistry.service');
+  const provider = await getIntegration(db, id);
+  if (!provider) throw Object.assign(new Error('Integration not found'), { code: 404 });
+
+  const rules = direction === 'outbound'
+    ? (provider.fieldMappingConfig?.outbound ?? [])
+    : (provider.fieldMappingConfig?.inbound ?? []);
+  let transformed = payload;
+  try { transformed = applyMappings(payload, rules); } catch { /* keep original on mapping error */ }
+
+  if (direction === 'inbound') {
+    await logEvent(db, {
+      arrangementId: id,
+      type: 'callback',
+      status: 'received',
+      triggeredBy: 'manager.run-test.inbound',
+      payload: transformed,
+      latencyMs: 0,
+      meta: { test: true, direction: 'inbound' },
+    });
+    return { direction, executed: true, status: 'received', latencyMs: 0, transformed, appliedRules: rules.length };
+  }
+
+  // outbound — real HTTP dispatch to the override URL or the configured endpoint
+  const rawTarget = overrideUrl?.trim() || provider.externalProviderApiEndpoint;
+  if (!rawTarget) {
+    return { direction, executed: false, status: 'error', latencyMs: 0, transformed, appliedRules: rules.length, error: 'No endpoint configured and no override URL provided.' };
+  }
+  const targetUrl = toAbsoluteUrl(rawTarget);
+  const start = Date.now();
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), provider.externalProviderTimeoutMs ?? 5000);
+    const res = await fetch(targetUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Integration-Test': 'true', ...buildAuthHeaders(provider) },
+      body: JSON.stringify(transformed),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    const latencyMs = Date.now() - start;
+    const status = res.ok ? 'received' : 'error';
+    const responseBody = await readResponseBody(res);
+    await logEvent(db, {
+      arrangementId: id, type: 'test', status, triggeredBy: 'manager.run-test.outbound',
+      payload: transformed, responseCode: res.status, latencyMs,
+      meta: { test: true, direction: 'outbound', targetUrl, override: !!overrideUrl, responseBody },
+    });
+    await updateHealthStatus(db, id, res.ok ? 'ok' : 'degraded');
+    return { direction, executed: true, status, latencyMs, responseCode: res.status, responseBody, transformed, appliedRules: rules.length, targetUrl };
+  } catch (err) {
+    const latencyMs = Date.now() - start;
+    const isTimeout = (err as Error).name === 'AbortError';
+    await logEvent(db, {
+      arrangementId: id, type: 'test', status: isTimeout ? 'timeout' : 'error', triggeredBy: 'manager.run-test.outbound',
+      payload: transformed, latencyMs, error: (err as Error).message,
+      meta: { test: true, direction: 'outbound', targetUrl, override: !!overrideUrl },
+    });
+    await updateHealthStatus(db, id, 'unreachable');
+    return { direction, executed: true, status: isTimeout ? 'timeout' : 'error', latencyMs, transformed, appliedRules: rules.length, targetUrl, error: (err as Error).message };
+  }
 }
 
 export async function getIntegrationEvents(

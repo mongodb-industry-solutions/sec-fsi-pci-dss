@@ -8,6 +8,7 @@ import {
   addMemberToGroup,
   removeMemberFromGroup,
   getDefaultGroupForType,
+  deleteRoutingGroup,
 } from '../services/integrationRoutingGroup.service';
 
 const E = { type: 'object', properties: { error: { type: 'string' } } };
@@ -161,6 +162,28 @@ export async function integrationRoutingGroupController(fastify: FastifyInstance
       const group = await getDefaultGroupForType(fastify.db, type as never);
       if (!group) return reply.status(404).send({ error: 'No default group for this type' });
       return { group };
+    },
+  });
+
+  // ── DELETE /integration-groups/:id ────────────────────────────────────────
+  fastify.delete('/:id', {
+    schema: {
+      tags: ['integrations'],
+      summary: 'Delete a routing group (SD-193). Detaches members; default group is protected.',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      response: { 200: { type: 'object', additionalProperties: true }, 403: E, 404: E, 409: E },
+    },
+    handler: async (request, reply) => {
+      if (!isAuthorized(request as unknown as DemoRequest))
+        return reply.status(403).send({ error: 'Forbidden' });
+      const { id } = request.params as { id: string };
+      const result = await deleteRoutingGroup(fastify.db, id);
+      if (!result.ok && result.reason === 'not_found')
+        return reply.status(404).send({ error: 'Routing group not found' });
+      if (!result.ok && result.reason === 'is_default')
+        return reply.status(409).send({ error: 'The default routing group cannot be deleted.' });
+      return { deleted: true };
     },
   });
 

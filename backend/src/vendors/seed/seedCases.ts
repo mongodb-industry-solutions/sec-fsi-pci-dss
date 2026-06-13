@@ -23,12 +23,24 @@ export async function seedCases(db: Db) {
   }
   console.log(`  fraudDiagnosisCase: ${records.length} upserted`);
 
-  // Initialize the case-reference sequence above the seeded references
-  // (FD-YYYY-000001..000020) so runtime-created cases start at 001001 and never
-  // collide. $setOnInsert: only set on first seed; never resets an advanced counter.
+  // Initialize / reconcile the case-reference sequence so runtime-created cases never
+  // collide with an existing reference. The counter must sit at least at 1000 (above the
+  // seeded FD-YYYY-000001..000020 band) AND above the highest numeric suffix actually
+  // present, in case the counter document drifted below the data (e.g. created by a
+  // runtime $inc starting at 1, or a pre-ADR-024 DB). A $max pipeline update only ever
+  // raises the counter, never lowers an already-advanced one.
+  const existing = await db
+    .collection('fraudDiagnosisCase')
+    .find({}, { projection: { _id: 0, fraudDiagnosisCaseReference: 1 } })
+    .toArray();
+  let maxSeq = 1000;
+  for (const r of existing as Array<{ fraudDiagnosisCaseReference?: string }>) {
+    const m = /(\d+)\s*$/.exec(r.fraudDiagnosisCaseReference ?? '');
+    if (m) maxSeq = Math.max(maxSeq, parseInt(m[1], 10));
+  }
   await db.collection<{ _id: string; seq: number }>('counters').updateOne(
     { _id: 'fraudDiagnosisCaseReference' },
-    { $setOnInsert: { seq: 1000 } },
+    [{ $set: { seq: { $max: [{ $ifNull: ['$seq', 0] }, maxSeq] } } }],
     { upsert: true }
   );
 }

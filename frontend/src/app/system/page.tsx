@@ -7,6 +7,7 @@ import {
   PlusCircle, Store, ClipboardCheck, ShieldAlert, ScanLine, UserCheck,
   Building2, AlertTriangle, Plug, Zap, KeyRound, LayoutGrid,
   CheckCircle2, AlertCircle, Clock, WifiOff, Wrench, ShieldCheck,
+  Network, Activity,
   type LucideIcon,
 } from 'lucide-react';
 import { api, AuthUser, AuthDomain } from '../../lib/api';
@@ -83,6 +84,7 @@ const ROLE_CARDS: Record<string, DashboardCard[]> = {
     { label: 'Transactions', description: 'Full transaction audit view — all fields visible for review, no modifications permitted.',     icon: CreditCard,       href: '/system/transactions',  bianSd: 'SD-27', pciDss: 'Req 10.2.1' },
     { label: 'Users',        description: 'Customer and staff account compliance review (authentication records, roles).',               icon: Users,            href: '/system/users',         bianSd: 'SD-91', pciDss: 'Req 8.2' },
     { label: 'Audit Log',      description: 'System-wide, append-only security event log across all cases (who did what, when).',          icon: BarChart3,  href: '/system/audit',     bianSd: 'SD-16', pciDss: 'Req 10' },
+    { label: 'Audit Events',   description: 'Unified audit trail across business, compliance and integration events. Inspect each payload for analysis or replay.', icon: Activity, href: '/system/audit-events', bianSd: 'SD-193', pciDss: 'Req 10.2' },
     { label: 'Data Integrity', description: 'Verify control-record integrity: no duplicate case references, links resolve, counts reconcile.', icon: ShieldCheck, href: '/system/integrity', bianSd: 'SD-83', pciDss: 'Req 10' },
     { label: 'Merchant',       description: 'Merchant compliance, KYB and lifecycle audit trail across the whole portfolio.',             icon: Store,      href: '/system/merchant',  bianSd: 'SD-89', pciDss: 'Req 12.8' },
   ],
@@ -414,6 +416,30 @@ function ManagerIntegrationHub({ debugMode }: { debugMode: boolean }) {
             <p className="font-semibold text-gray-900 text-sm">Integration Registry</p>
             <p className="text-xs text-gray-500 mt-0.5">Manage all external provider arrangements</p>
             {debugMode && <p className="mt-2 text-[10px] font-mono text-gray-400">SD-193 · Req 12.8</p>}
+          </Link>
+
+          {/* Routing Groups card */}
+          <Link href="/system/admin/routing-groups" className="group block bg-white rounded-xl border p-5 hover:border-[#001E2B]/30 hover:shadow-md transition-all">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-slate-200 transition-colors">
+                <Network size={20} className="text-slate-600" />
+              </div>
+            </div>
+            <p className="font-semibold text-gray-900 text-sm">Routing Groups</p>
+            <p className="text-xs text-gray-500 mt-0.5">Provider routing strategies and members</p>
+            {debugMode && <p className="mt-2 text-[10px] font-mono text-gray-400">SD-193 · routing portfolio</p>}
+          </Link>
+
+          {/* Audit Events card */}
+          <Link href="/system/audit-events" className="group block bg-white rounded-xl border p-5 hover:border-[#001E2B]/30 hover:shadow-md transition-all">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-slate-200 transition-colors">
+                <Activity size={20} className="text-slate-600" />
+              </div>
+            </div>
+            <p className="font-semibold text-gray-900 text-sm">Audit Events</p>
+            <p className="text-xs text-gray-500 mt-0.5">Unified business, compliance and integration audit trail</p>
+            {debugMode && <p className="mt-2 text-[10px] font-mono text-gray-400">ADR-025 · Req 10.2 / 10.7</p>}
           </Link>
         </div>
       )}

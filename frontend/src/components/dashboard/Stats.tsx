@@ -35,7 +35,7 @@ export function MonthlyBars({ title, data, color = 'bg-[#00ED64]' }: {
           {data.slice(-12).map((d) => (
             <div key={`${d.year}-${d.month}`} className="flex-1 flex flex-col items-center gap-1 min-w-0">
               <span className="text-xs text-gray-500">{d.count}</span>
-              <div className={`w-full ${color} rounded-t`} style={{ height: `${Math.max(4, (d.count / max) * 120)}px` }} title={`${d.count}`} />
+              <div className={`w-full ${color} rounded-t ring-1 ring-inset ring-black/20`} style={{ height: `${Math.max(4, (d.count / max) * 120)}px` }} title={`${d.count}`} />
               <span className="text-[10px] text-gray-400 whitespace-nowrap">{MONTHS[d.month - 1]} {String(d.year).slice(2)}</span>
             </div>
           ))}
@@ -62,7 +62,7 @@ export function BreakdownBars({ title, items, total }: {
           {items.map((it) => (
             <div key={it.label} className="flex items-center gap-2">
               <span className="w-28 text-xs text-gray-500 capitalize shrink-0 truncate">{it.label}</span>
-              <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+              <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden ring-1 ring-black/10">
                 <div className={`h-2 ${it.colorClass}`} style={{ width: `${(it.value / denom) * 100}%` }} />
               </div>
               <span className="w-8 text-xs text-gray-600 text-right">{it.value}</span>

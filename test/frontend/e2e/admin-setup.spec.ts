@@ -4,19 +4,19 @@
  * Auth difference vs /system routes:
  *   - /system uses a `demo_token` COOKIE  → injectable via context.addCookies()
  *   - /admin/panel uses `admin_token` in sessionStorage → must inject via
- *     page.addInitScript() BEFORE navigation (sessionStorage is wiped on nav otherwise)
+ *     page.addInitScript() BEFORE navigation (the layout's auth guard reads it on mount)
  *
- * SSE stub:
- *   POST /api/v1/admin/run returns a text/event-stream body.
- *   readSSE() splits on "\n\n" and parses each frame.
- *   route.fulfill({ body: sseBody(...) }) sends the full body at once, which
- *   the reader processes as a single chunk — works correctly because the reader
- *   returns done:true on the next read, ending the loop.
- *
- * TestSummary only appears when:
- *   1. lastCommand is in TEST_COMMANDS (test | test:unit | test:integration | test:e2e)
- *   2. running === false (stream finished)
- *   3. commandStatus is non-null (set from the "done" event text)
+ * Result contract (ADR-026):
+ *   POST /api/v1/admin/run returns a text/event-stream body. Test commands emit a
+ *   dedicated `summary` frame carrying the normalized TestSummary object directly
+ *   (NOT wrapped in {text}); the frontend renders it without parsing log text.
+ *   Frame format consumed by readSSE (frontend/src/lib/adminHelpers.ts):
+ *     event: <type>\n
+ *     data: <json>\n
+ *     \n
+ *   For log/error/start/done the json is {"text": "..."}; for summary it is the
+ *   TestSummary object. The TestSummary panel renders once `done` arrives and a
+ *   summary frame was received.
  */
 import { test, expect } from '@playwright/test';
 
@@ -27,36 +27,49 @@ async function loginAsAdmin(page: import('@playwright/test').Page) {
   await page.addInitScript((t) => sessionStorage.setItem('admin_token', t), ADMIN_TOKEN);
 }
 
-/**
- * Build a static SSE response body.
- * Each entry becomes: `event: <type>\ndata: {"text":"<text>"}\n\n`
- * readSSE() expects this exact format (see frontend/src/lib/adminHelpers.ts).
- */
-function sseBody(entries: Array<{ type: string; text: string }>): string {
-  return entries
-    .map((e) => `event: ${e.type}\ndata: ${JSON.stringify({ text: e.text })}\n\n`)
+type Frame =
+  | { type: 'start' | 'log' | 'error' | 'done'; text: string }
+  | { type: 'summary'; summary: Record<string, unknown> };
+
+/** Build a static SSE response body in the exact format readSSE expects. */
+function sseBody(frames: Frame[]): string {
+  return frames
+    .map((f) =>
+      f.type === 'summary'
+        ? `event: summary\ndata: ${JSON.stringify(f.summary)}\n\n`
+        : `event: ${f.type}\ndata: ${JSON.stringify({ text: f.text })}\n\n`,
+    )
     .join('');
 }
 
-/** Passing vitest-style output — matches parseTestResults() patterns. */
+/** Vitest run that passes: logs + a structured summary + done(code 0). */
 const SSE_UNIT_PASS = sseBody([
   { type: 'start', text: 'npm run test:unit' },
-  { type: 'log',   text: ' PASS  test/unit/foo.test.ts' },
-  { type: 'log',   text: 'Test Files  1 passed (1)' },
-  { type: 'log',   text: 'Tests  3 passed (3)' },
-  { type: 'log',   text: 'Duration  1.23s' },
-  { type: 'done',  text: 'Command exited with code 0' },
+  { type: 'log',   text: 'RUN  v4.1.0' },
+  { type: 'summary', summary: {
+    tool: 'vitest', total: 3, passed: 3, failed: 0, skipped: 0, durationMs: 1230, failures: [],
+  } },
+  { type: 'done',  text: 'Process exited with code 0' },
 ]);
 
-/** Failing vitest-style output — parseTestResults() extracts failure list. */
+/** Vitest run that fails: a failure entry with a reason + done(code 1). */
 const SSE_UNIT_FAIL = sseBody([
   { type: 'start', text: 'npm run test:unit' },
-  { type: 'log',   text: ' FAIL  test/unit/bar.test.ts > suite > it should work' },
-  { type: 'log',   text: 'AssertionError: expected 1 to equal 2' },
-  { type: 'log',   text: 'Test Files  1 failed | 0 passed (1)' },
-  { type: 'log',   text: 'Tests  1 failed | 2 passed (3)' },
-  { type: 'log',   text: 'Duration  0.98s' },
-  { type: 'done',  text: 'Command exited with code 1' },
+  { type: 'log',   text: 'RUN  v4.1.0' },
+  { type: 'summary', summary: {
+    tool: 'vitest', total: 3, passed: 2, failed: 1, skipped: 0, durationMs: 980,
+    failures: [{ title: 'test/backend/unit/bar.test.ts > suite > it should work', reason: 'AssertionError: expected 1 to equal 2' }],
+  } },
+  { type: 'done',  text: 'Process exited with code 1' },
+]);
+
+/** Playwright run that passes, to assert the tool badge reflects the strategy. */
+const SSE_E2E_PASS = sseBody([
+  { type: 'start', text: 'npm run test:e2e' },
+  { type: 'summary', summary: {
+    tool: 'playwright', total: 5, passed: 5, failed: 0, skipped: 0, durationMs: 8400, failures: [],
+  } },
+  { type: 'done',  text: 'Process exited with code 0' },
 ]);
 
 test.describe('Admin Panel: Setup Page', () => {
@@ -82,9 +95,9 @@ test.describe('Admin Panel: Setup Page', () => {
     await guest.close();
   });
 
-  // ── Test commands → TestSummary ──────────────────────────────────────────────
+  // ── Test commands → TestSummary from the structured summary event ─────────────
 
-  test('Unit Tests: passing run shows TestSummary with "All passed"', async ({ page }) => {
+  test('Unit Tests: passing run shows TestSummary with "All passed" and vitest badge', async ({ page }) => {
     await page.route('**/api/v1/admin/run', (route) =>
       route.fulfill({ status: 200, contentType: 'text/event-stream', body: SSE_UNIT_PASS }),
     );
@@ -92,14 +105,13 @@ test.describe('Admin Panel: Setup Page', () => {
     await page.goto('/admin/panel/setup');
     await page.locator('button:has-text("Unit Tests")').first().click();
 
-    // TestSummary is only rendered once the stream ends and commandStatus is set
     await expect(page.locator('text=Test Results').first()).toBeVisible({ timeout: 8_000 });
     await expect(page.locator('text=All passed').first()).toBeVisible();
-    // Log panel shows the raw vitest output
-    await expect(page.locator('text=PASS').first()).toBeVisible();
+    // Tool badge comes straight from summary.tool
+    await expect(page.locator('text=vitest').first()).toBeVisible();
   });
 
-  test('Unit Tests: failing run shows failure count and failure entry', async ({ page }) => {
+  test('Unit Tests: failing run shows failure count, title and reason', async ({ page }) => {
     await page.route('**/api/v1/admin/run', (route) =>
       route.fulfill({ status: 200, contentType: 'text/event-stream', body: SSE_UNIT_FAIL }),
     );
@@ -108,26 +120,26 @@ test.describe('Admin Panel: Setup Page', () => {
     await page.locator('button:has-text("Unit Tests")').first().click();
 
     await expect(page.locator('text=Test Results').first()).toBeVisible({ timeout: 8_000 });
-    // Status badge shows "N failed"
-    await expect(page.locator('text=/\\d+ failed/').first()).toBeVisible();
-    // Failure list entry includes the test file name
+    await expect(page.locator('text=/1 failed/').first()).toBeVisible();
     await expect(page.locator('text=/bar.test.ts/').first()).toBeVisible();
+    await expect(page.locator('text=/AssertionError/').first()).toBeVisible();
   });
 
-  test('Unit Tests: failure reason (AssertionError) appears under the failure title', async ({ page }) => {
+  test('E2E Tests: summary reflects the playwright tool badge', async ({ page }) => {
     await page.route('**/api/v1/admin/run', (route) =>
-      route.fulfill({ status: 200, contentType: 'text/event-stream', body: SSE_UNIT_FAIL }),
+      route.fulfill({ status: 200, contentType: 'text/event-stream', body: SSE_E2E_PASS }),
     );
 
     await page.goto('/admin/panel/setup');
-    await page.locator('button:has-text("Unit Tests")').first().click();
+    await page.locator('button:has-text("E2E Tests")').first().click();
 
-    await expect(page.locator('text=/AssertionError/').first()).toBeVisible({ timeout: 8_000 });
+    await expect(page.locator('text=Test Results').first()).toBeVisible({ timeout: 8_000 });
+    await expect(page.locator('text=playwright').first()).toBeVisible();
   });
 
-  // ── Non-test commands → NO TestSummary ──────────────────────────────────────
+  // ── Non-test commands → NO summary event → NO TestSummary panel ──────────────
 
-  test('Setup command does NOT render TestSummary (not a TEST_COMMANDS entry)', async ({ page }) => {
+  test('Setup command does NOT render TestSummary (no summary event emitted)', async ({ page }) => {
     await page.route('**/api/v1/admin/run', (route) =>
       route.fulfill({
         status: 200,
@@ -135,7 +147,7 @@ test.describe('Admin Panel: Setup Page', () => {
         body: sseBody([
           { type: 'start', text: 'npm run setup:check' },
           { type: 'log',   text: 'All checks passed' },
-          { type: 'done',  text: 'Command exited with code 0' },
+          { type: 'done',  text: 'Process exited with code 0' },
         ]),
       }),
     );

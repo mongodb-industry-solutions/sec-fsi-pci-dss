@@ -8,7 +8,7 @@ import {
   User, PlusCircle, Store, ClipboardCheck,
   ChevronLeft, ChevronRight, Settings2, Plug,
   ShieldAlert, ScanLine, UserCheck, Building2, AlertTriangle,
-  Zap, KeyRound, ShieldCheck, Activity,
+  Zap, KeyRound, ShieldCheck, Activity, Network,
   HelpCircle,
   type LucideIcon,
 } from 'lucide-react';
@@ -42,6 +42,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'Transactions',   path: '/system/transactions',  icon: CreditCard },
     { label: 'Users',          path: '/system/users',         icon: Users },
     { label: 'Audit Log',      path: '/system/audit',         icon: BarChart3 },
+    { label: 'Audit Events',   path: '/system/audit-events',  icon: Activity },
     { label: 'Data Integrity', path: '/system/integrity',     icon: ShieldCheck },
     { label: 'Merchant',       path: '/system/merchant',      icon: Store },
     { label: 'My Profile',     path: '/system/profile',       icon: User },
@@ -60,6 +61,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
   manager: [
     { label: 'Hub',             path: '/system',                          icon: Settings2,    exact: true },
     { label: 'Registry',        path: '/system/admin/integrations',       icon: Plug,         exact: true },
+    { label: 'Routing Groups',  path: '/system/admin/routing-groups',     icon: Network },
     { label: 'Fraud Detection', path: '/system/admin/fraud-detection',    icon: ShieldAlert },
     { label: 'HRP / Sanctions', path: '/system/admin/hrp',                icon: ScanLine },
     { label: 'KYC / Identity',  path: '/system/admin/kyc',                icon: UserCheck },
@@ -68,7 +70,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'Credit Bureau',   path: '/system/admin/credit-bureau',      icon: CreditCard },
     { label: 'Card Auth',       path: '/system/admin/card-authorization', icon: Zap },
     { label: 'Card Issuer',     path: '/system/admin/card-issuer',        icon: KeyRound },
-    { label: 'Process Events',  path: '/system/admin/events',             icon: Activity },
+    { label: 'Audit Events',    path: '/system/audit-events',             icon: Activity },
     { label: '+ Register',      path: '/system/admin/integrations/new',   icon: PlusCircle },
   ],
 };

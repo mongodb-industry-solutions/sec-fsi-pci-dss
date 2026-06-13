@@ -5,8 +5,12 @@ async function apiFetch<T>(
   options?: RequestInit,
   token?: string
 ): Promise<T> {
+  // Only advertise a JSON body when one is actually sent. A bodyless request (DELETE,
+  // GET) that still carries `Content-Type: application/json` makes Fastify's JSON parser
+  // reject it with FST_ERR_CTP_EMPTY_JSON_BODY ("Body cannot be empty…"). This surfaced
+  // when leaving a routing group (DELETE with no body).
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(options?.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
@@ -709,6 +713,11 @@ export const api = {
       apiFetch<{ original: Record<string, unknown>; transformed: Record<string, unknown>; appliedRules: number; errors: string[] }>(
         `/api/v1/integrations/providers/${id}/test-mapping`, { method: 'POST', body: JSON.stringify(body) }, token
       ),
+    runTest: (id: string, body: { direction: 'outbound' | 'inbound'; payload: Record<string, unknown>; overrideUrl?: string }, token: string) =>
+      apiFetch<{
+        direction: 'outbound' | 'inbound'; executed: boolean; status: string; latencyMs: number;
+        responseCode?: number; responseBody?: unknown; transformed: Record<string, unknown>; appliedRules: number; targetUrl?: string; error?: string;
+      }>(`/api/v1/integrations/providers/${id}/run-test`, { method: 'POST', body: JSON.stringify(body) }, token),
     delete: (id: string, token: string) =>
       apiFetch<{ deleted: boolean }>(
         `/api/v1/integrations/providers/${id}`, { method: 'DELETE' }, token
@@ -729,6 +738,10 @@ export const api = {
       apiFetch<{ group: Record<string, unknown> }>(
         `/api/v1/integrations/groups/${id}`, { method: 'PATCH', body: JSON.stringify(body) }, token
       ),
+    deleteGroup: (id: string, token: string) =>
+      apiFetch<{ deleted: boolean }>(
+        `/api/v1/integrations/groups/${id}`, { method: 'DELETE' }, token
+      ),
     addMember: (groupId: string, body: { providerId: string; priority?: number; weight?: number }, token: string) =>
       apiFetch<{ group: Record<string, unknown> }>(
         `/api/v1/integrations/groups/${groupId}/members`, { method: 'POST', body: JSON.stringify(body) }, token
@@ -746,6 +759,14 @@ export const api = {
   },
 
   processEvents: {
+    // Unified audit stream: business + compliance + integration events.
+    audit: (token: string, params?: { source?: string; type?: string; outcome?: string; q?: string; from?: string; to?: string; page?: number; limit?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString() : '';
+      return apiFetch<{
+        events: Array<{ id: string; source: string; eventDateTime: string; type: string; action: string; outcome: string; entityType?: string; entityId?: string; performedByRole?: string | null; bianServiceDomain?: string; context?: string; summary?: Record<string, unknown> }>;
+        total: number; page: number; limit: number; capped: boolean;
+      }>(`/api/v1/events/audit${qs}`, {}, token);
+    },
     list: (token: string, params?: { processType?: string; entityType?: string; from?: string; to?: string; page?: number; limit?: number }) => {
       const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : '';
       return apiFetch<{ events: Record<string, unknown>[]; total: number; page: number; limit: number }>(

@@ -3,6 +3,8 @@ import type { DemoRequest } from '../../../shared/models/identity.model';
 import {
   listProcessEvents,
   listComplianceEvents,
+  listAuditEvents,
+  type AuditSource,
 } from '../services/businessProcessEvent.service';
 import type { BusinessProcessType, ComplianceProcessType, BusinessEntityType } from '../models/externalProviderArrangement.model';
 
@@ -13,6 +15,50 @@ function isAuditRole(request: DemoRequest): boolean {
 }
 
 export async function processEventController(fastify: FastifyInstance) {
+  // ── GET /events/audit ───────────────────────────────────────────────────────
+  // Unified audit view: business + compliance + integration events merged into one
+  // normalized stream. Filters: source, type, outcome, q, date range. Auditor/manager.
+  fastify.get('/audit', {
+    schema: {
+      tags: ['events'],
+      summary: 'Unified audit event stream (business + compliance + integration)',
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          source:  { type: 'string', enum: ['all', 'business', 'compliance', 'integration'] },
+          type:    { type: 'string' },
+          outcome: { type: 'string' },
+          q:       { type: 'string' },
+          from:    { type: 'string', format: 'date-time' },
+          to:      { type: 'string', format: 'date-time' },
+          page:    { type: 'integer', minimum: 1, default: 1 },
+          limit:   { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+        },
+      },
+      response: {
+        200: { type: 'object', additionalProperties: true },
+        403: E,
+      },
+    },
+    handler: async (request, reply) => {
+      if (!isAuditRole(request as unknown as DemoRequest))
+        return reply.status(403).send({ error: 'Forbidden: security_auditor or manager role required' });
+      const q = request.query as Record<string, string>;
+      const result = await listAuditEvents(fastify.db, {
+        source:  (q.source as AuditSource | 'all' | undefined) ?? 'all',
+        type:    q.type || undefined,
+        outcome: q.outcome || undefined,
+        q:       q.q || undefined,
+        from:    q.from ? new Date(q.from) : undefined,
+        to:      q.to   ? new Date(q.to)   : undefined,
+        page:    q.page  ? parseInt(q.page,  10) : 1,
+        limit:   q.limit ? parseInt(q.limit, 10) : 20,
+      });
+      return reply.send(result);
+    },
+  });
+
   // ── GET /events/process ────────────────────────────────────────────────────
   fastify.get('/process', {
     schema: {

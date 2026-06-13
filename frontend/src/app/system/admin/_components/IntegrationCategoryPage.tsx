@@ -12,6 +12,7 @@ import { getToken } from '../../../../lib/auth';
 import { useDebugMode } from '../../../../lib/debugMode';
 import { Pagination } from '../../../../components/Pagination';
 import { CATEGORY_CONTRACTS, CATEGORY_TRIGGER_EVENTS } from './categoryContracts';
+import { useConfirm, useNotify } from '../../../../components/ui/ConfirmProvider';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -390,6 +391,8 @@ function SystemEventsSection({ type }: { type: string }) {
 
 export function IntegrationCategoryPage({ meta }: { meta: CategoryMeta }) {
   const token = getToken() ?? '';
+  const confirm = useConfirm();
+  const notify = useNotify();
   const { debugMode } = useDebugMode();
 
   const [allRows, setAllRows] = useState<Integration[]>([]);
@@ -443,13 +446,19 @@ export function IntegrationCategoryPage({ meta }: { meta: CategoryMeta }) {
   }
 
   async function handleDelete(id: string, name: string) {
-    if (!confirm(`Delete "${name}"? This action cannot be undone.`)) return;
+    const ok = await confirm({
+      title: `Delete "${name}"?`,
+      message: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setDeleting(id);
     try {
       await api.integrations.delete(id, token);
       load();
     } catch (err) {
-      alert((err as Error).message ?? 'Failed to delete provider.');
+      notify((err as Error).message ?? 'Failed to delete provider.', 'error');
     } finally { setDeleting(null); }
   }
 

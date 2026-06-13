@@ -1880,3 +1880,79 @@ The `eventSummary` field in every event applies the CHD blocklist from ADR-014 a
 - (−) `integrationEvents` migration requires drop + recreate (timeseries cannot be created on an existing collection); existing event logs are lost — acceptable since the demo uses seeded data.
 - (−) Adding real HTTP calls for internal providers adds latency (~5–10 ms loopback); mitigated by fire-and-forget logging and async callback handling.
 - (−) Unique index removed from `integrationEvents.integrationEventInstanceReference` — dedup enforcement moves to the application layer (UUID generation guarantees uniqueness in practice).
+
+---
+
+## ADR-026 — Test-runner Strategy: per-tool native reporters over generic log parsing
+
+**Status:** Accepted (2026-06-13)
+
+**Context**
+
+The admin panel's Setup page (`/admin/panel/setup`) runs the project's npm scripts via `POST /admin/run`, which spawns the process and streams stdout/stderr to the browser as Server-Sent Events. To show a pass/fail summary above the raw log, the frontend (`parseTestResults`) scraped the streamed text with regexes tuned to **vitest**'s output format (`Test Files … passed`, `Tests … passed`, `Duration …`, `FAIL …`).
+
+Each test type uses a different tool: **vitest** for `test:unit` and `test:integration`, **Playwright** for `test:e2e`. Playwright's terminal output does not match the vitest regexes, so running E2E tests through the panel produced no structured summary (the counts and failure list stayed empty) even though the logs streamed correctly. Text-scraping is also brittle across tool version bumps — a format change silently breaks the parser.
+
+**Decision**
+
+Introduce a **Strategy pattern** keyed by command id, owned by the backend, where each strategy runs its tool with that tool's **native machine-readable reporter** and parses the resulting JSON into one normalized contract. The frontend stops parsing text entirely.
+
+### D1 — `TestRunStrategy` + normalized `NormalizedTestSummary`
+
+`backend/src/modules/admin/services/testRunners.ts` defines:
+
+```ts
+interface NormalizedTestSummary {
+  tool: 'vitest' | 'playwright';
+  total: number; passed: number; failed: number; skipped: number;
+  durationMs: number;
+  failures: Array<{ title: string; reason?: string }>;
+}
+
+interface TestRunStrategy {
+  tool: 'vitest' | 'playwright';
+  npmArgs: string[];                 // includes the reporter flags that write JSON
+  env?: Record<string, string>;      // e.g. PLAYWRIGHT_JSON_OUTPUT_NAME
+  outputFile: string;                // absolute path to the JSON results file
+  parse(raw: string): NormalizedTestSummary;
+}
+```
+
+`resolveTestStrategy(command, projectRoot)` maps:
+
+| command | tool | invocation | output |
+|---|---|---|---|
+| `test:unit` | vitest | `… -- --reporter=default --reporter=json --outputFile=test-results/unit.json` | `unit.json` |
+| `test:integration` | vitest | same, `integration.json` | `integration.json` |
+| `test:e2e` | Playwright | `… -- --reporter=line,json` + env `PLAYWRIGHT_JSON_OUTPUT_NAME` | `e2e.json` |
+| everything else (`setup`, `seed`, `type-check`, and the `test` aggregate) | — (null) | unchanged log streaming | none |
+
+The `default`/`line` reporter keeps streaming human-readable output to the console; the `json` reporter writes the structured file in parallel. The `test` aggregate (which chains all three tools sequentially) returns `null` — it streams logs only, with no merged summary.
+
+### D2 — New SSE `summary` event
+
+`spawnSSE` gains an optional `summarize()` hook called once on process close. Its non-null return is emitted as a dedicated SSE frame:
+
+```
+event: summary
+data: <NormalizedTestSummary as JSON>   // NOT wrapped in {text}, unlike log/error/done frames
+```
+
+The controller reads `strategy.outputFile`, calls `strategy.parse()`, and emits the summary just before the `done` frame. A missing/unparseable file degrades gracefully to log-only (no summary). The results dir is created and any stale file removed before the run.
+
+### D3 — Frontend becomes a renderer
+
+`readSSE` gains an optional `onSummary` callback; the `summary` frame is parsed as the structured object and routed there, all other frames feed the log console as before. The Setup page stores the summary in state and renders the `TestSummary` panel from it. `parseTestResults`/`parseCount` and the `TEST_COMMANDS` text heuristic are deleted.
+
+**Consequences**
+
+- (+) E2E (Playwright) runs now produce a correct summary; no tool's output format is special-cased in the UI.
+- (+) Robust to tool version changes — counts come from the tools' own JSON, not regex on human output.
+- (+) Adding a new test type (load, contract, etc.) is one new strategy in `testRunners.ts`; the controller, SSE contract, and UI are untouched.
+- (+) Clear separation: backend owns "how to get structured results from each tool", frontend owns rendering.
+- (−) Per-tool JSON shapes must be mapped in `parse()` (vitest follows the Jest schema; Playwright exposes `stats` + nested `suites`); a future major version of either tool may require updating that mapping — but the blast radius is one function.
+- (−) Writes a JSON file under `test-results/` per run (already git-ignored); negligible.
+
+**PCI DSS / scope note**
+
+`/admin/run` is operator tooling (ADR-011 context), not a business API — the SSE `summary` event is documented here rather than in `technical-spec.md §6` (business API contracts), which is unchanged.

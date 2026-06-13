@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { API_BASE_URL } from '../../../../lib/constants';
-import { getAdminToken, readSSE, LogEntry, downloadText } from '../../../../lib/adminHelpers';
+import { getAdminToken, readSSE, LogEntry, TestSummary as TestSummaryData, downloadText } from '../../../../lib/adminHelpers';
 import { Download, Copy, CheckCheck, CheckCircle2, XCircle } from 'lucide-react';
 
 const SETUP_LOGS_KEY = 'admin_setup_logs';
@@ -46,15 +46,13 @@ function formatElapsed(ms: number): string {
   return `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, '0')}s`;
 }
 
-const TEST_COMMANDS = new Set(['test', 'test:unit', 'test:integration', 'test:e2e']);
-
-interface TestCount { passed: number; failed: number; total: number; }
-interface TestFailure { title: string; reason?: string; }
-interface TestSummaryData {
-  files?: TestCount;
-  tests?: TestCount;
-  duration?: string;
-  failures: TestFailure[];
+/** Formats a duration in ms as `820ms`, `1.2s`, or `2m 05s`. */
+function formatDuration(ms: number): string {
+  if (!ms) return '—';
+  if (ms < 1000) return `${ms}ms`;
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(1)}s`;
+  return `${Math.floor(s / 60)}m ${String(Math.round(s % 60)).padStart(2, '0')}s`;
 }
 
 /** Determines the CSS color class for a single log line.
@@ -79,58 +77,6 @@ function logLineClass(e: LogEntry): string {
   return 'text-gray-300';
 }
 
-/** Pulls a `N failed | M passed (T)` style count out of a vitest summary line. */
-function parseCount(line: string): TestCount {
-  const failed = /(\d+)\s+failed/.exec(line);
-  const passed = /(\d+)\s+passed/.exec(line);
-  const total  = /\((\d+)\)/.exec(line);
-  const f = failed ? Number(failed[1]) : 0;
-  const p = passed ? Number(passed[1]) : 0;
-  return { failed: f, passed: p, total: total ? Number(total[1]) : f + p };
-}
-
-/**
- * Parses streamed (ANSI-stripped) vitest output into headline stats and a list of
- * failures with their reasons, so the UI can surface them without scrolling the log.
- */
-function parseTestResults(logs: LogEntry[]): TestSummaryData {
-  const lines = logs.map((l) => l.text);
-  const summary: TestSummaryData = { failures: [] };
-  const seen = new Set<string>();
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (/Test Files/.test(line) && /(passed|failed)/.test(line)) {
-      summary.files = parseCount(line);
-    } else if (/\bTests\b/.test(line) && /(passed|failed)/.test(line)) {
-      summary.tests = parseCount(line);
-    }
-
-    const dur = /Duration\s+([\d.]+\s*m?s)/.exec(line);
-    if (dur) summary.duration = dur[1].replace(/\s+/g, '');
-
-    // " FAIL  test/path.test.ts > suite > name"  (uppercase FAIL is vitest's failure marker)
-    const fail = /(?:^|\s)FAIL\s+(.+)$/.exec(line);
-    if (fail) {
-      const title = fail[1].replace(/\s*\[\s*.+\s*\]\s*$/, '').trim();
-      if (!seen.has(title)) {
-        seen.add(title);
-        let reason: string | undefined;
-        for (let j = i + 1; j < Math.min(i + 8, lines.length); j++) {
-          if (/(?:[A-Z][a-zA-Z]*Error|Error):\s*\S/.test(lines[j])) {
-            reason = lines[j].trim();
-            break;
-          }
-        }
-        summary.failures.push({ title, reason });
-      }
-    }
-  }
-
-  return summary;
-}
-
 export default function SetupPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [running, setRunning] = useState(false);
@@ -141,8 +87,8 @@ export default function SetupPage() {
   const [pendingConfirm, setPendingConfirm] = useState<CommandDef | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState<number>(() => Date.now());
-  // The command that produced the current output (activeCommand is cleared on finish).
-  const [lastCommand, setLastCommand] = useState<string | null>(null);
+  // Structured test results from the SSE `summary` event (test commands only).
+  const [summary, setSummary] = useState<TestSummaryData | null>(null);
 
   // Tick a live clock while a command runs so the elapsed time updates.
   useEffect(() => {
@@ -178,8 +124,8 @@ export default function SetupPage() {
     if (running || !token) return;
     setRunning(true);
     setActiveCommand(commandId);
-    setLastCommand(commandId);
     setCommandStatus(null);
+    setSummary(null);
     setLogs([]);
     setStartedAt(Date.now());
     setNow(Date.now());
@@ -195,13 +141,17 @@ export default function SetupPage() {
         setCommandStatus('failure');
         return;
       }
-      await readSSE(res, (type, text) => {
-        if (type === 'done') {
-          const match = /code\s+(\d+)/i.exec(text);
-          setCommandStatus(match?.[1] === '0' ? 'success' : 'failure');
-        }
-        setLogs((prev) => [...prev, { type: type as LogEntry['type'], text }]);
-      });
+      await readSSE(
+        res,
+        (type, text) => {
+          if (type === 'done') {
+            const match = /code\s+(\d+)/i.exec(text);
+            setCommandStatus(match?.[1] === '0' ? 'success' : 'failure');
+          }
+          setLogs((prev) => [...prev, { type: type as LogEntry['type'], text }]);
+        },
+        (s) => setSummary(s),
+      );
     } finally {
       setNow(Date.now()); // freeze elapsed at the final value
       setRunning(false);
@@ -227,9 +177,9 @@ export default function SetupPage() {
   const currentStep =
     [...logs].reverse().find((e) => e.type !== 'done' && e.text.trim())?.text ?? 'Starting…';
 
-  // For finished test runs, surface parsed pass/fail stats above the raw log.
-  const isTest = !!lastCommand && TEST_COMMANDS.has(lastCommand);
-  const testSummary = isTest && !running && commandStatus ? parseTestResults(logs) : null;
+  // The summary panel shows once the run finishes and a structured summary arrived
+  // (only test commands emit one — see ADR-026).
+  const testSummary = !running && summary ? summary : null;
 
   return (
     <>
@@ -474,9 +424,9 @@ function TestSummary({ summary, status }: {
   summary: TestSummaryData;
   status: null | 'success' | 'failure';
 }) {
-  const { tests, files, duration, failures } = summary;
-  const ok = status === 'success';
-  const failedCount = tests?.failed ?? failures.length;
+  const { tool, total, passed, failed, skipped, durationMs, failures } = summary;
+  // Trust the structured count; fall back to the process exit status if absent.
+  const ok = failed === 0 && status !== 'failure';
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex-shrink-0">
@@ -486,28 +436,22 @@ function TestSummary({ summary, status }: {
             ? <CheckCircle2 size={18} className="text-[#00ED64]" />
             : <XCircle size={18} className="text-red-500" />}
           <h3 className="text-sm font-semibold text-white">Test Results</h3>
+          <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500 border border-gray-700 rounded px-1.5 py-0.5">
+            {tool}
+          </span>
         </div>
         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
           ok ? 'bg-[#00ED64]/15 text-[#00ED64]' : 'bg-red-500/15 text-red-400'
         }`}>
-          {ok ? 'All passed' : `${failedCount} failed`}
+          {ok ? 'All passed' : `${failed} failed`}
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <StatTile
-          label="Tests"
-          value={tests?.total ?? 0}
-          sub={`${tests?.passed ?? 0} passed · ${tests?.failed ?? 0} failed`}
-          tone={tests?.failed ? 'fail' : 'pass'}
-        />
-        <StatTile
-          label="Files"
-          value={files?.total ?? 0}
-          sub={`${files?.passed ?? 0} passed · ${files?.failed ?? 0} failed`}
-          tone={files?.failed ? 'fail' : 'pass'}
-        />
-        <StatTile label="Duration" value={duration ?? '—'} sub="wall clock" tone="neutral" />
+      <div className="grid grid-cols-4 gap-2">
+        <StatTile label="Tests"    value={total}   sub={`${skipped} skipped`}          tone="neutral" />
+        <StatTile label="Passed"   value={passed}  sub="of total"                       tone="pass" />
+        <StatTile label="Failed"   value={failed}  sub={failed ? 'see below' : 'none'}  tone={failed ? 'fail' : 'pass'} />
+        <StatTile label="Duration" value={formatDuration(durationMs)} sub="wall clock" tone="neutral" />
       </div>
 
       {failures.length > 0 && (

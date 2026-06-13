@@ -183,6 +183,8 @@ type UpdateablePatch = Partial<Pick<
   | 'externalProviderTimeoutMs'
   | 'externalProviderRetryPolicy'
   | 'externalProviderArrangementStatus'
+  | 'externalProviderCallbackEnabled'
+  | 'externalProviderCallbackPath'
   | 'categoryConfig'
   | 'authConfig'
   | 'fieldMappingConfig'

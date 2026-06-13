@@ -3,9 +3,11 @@ import React, { useState, useEffect } from 'react';
 import {
   Download, Check, CheckSquare, ChevronDown, ChevronUp,
   ExternalLink, Shield, Database, Lock, Eye, FileText,
-  AlertTriangle, CheckCircle2,
+  AlertTriangle, CheckCircle2, Users, Search, KeyRound, ScrollText, Ban,
 } from 'lucide-react';
 import { SectionHeader } from '../../../components/SectionHeader';
+import { getToken, decodeToken } from '../../../lib/auth';
+import { ROLE_LABELS } from '../../../lib/constants';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -262,6 +264,132 @@ const MONGODB_MAPPING = [
     docs: 'https://www.mongodb.com/products/platform/trust/pci-dss' },
 ];
 
+// ─── Role responsibilities (screen-only; not exported to the PDF) ───────────────
+// Explains what the logged-in role is accountable for, what data it may touch, the
+// PCI DSS requirements that scope it, and its hard limits. Aligned with the demo's
+// RBAC and the PCI alignment shown in the Overview/Architecture tabs.
+
+interface RoleGuide {
+  icon: React.ElementType;
+  tagline: string;
+  responsibilities: string[];
+  dataAccess: string[];
+  restrictions: string[];
+  pci: string[];   // requirement chips, e.g. "Req 3", "Req 10"
+}
+
+const ROLE_GUIDE: Record<string, RoleGuide> = {
+  customer: {
+    icon: Users,
+    tagline: 'Initiate your own payments and review your own transaction history — nothing else.',
+    responsibilities: [
+      'Initiate card payments through the checkout flow.',
+      'Review your own transaction history and payment status.',
+      'If you own a merchant, manage that merchant account, its API keys, and webhooks.',
+    ],
+    dataAccess: [
+      'Only your own transactions and (if applicable) your own merchant record.',
+      'Card numbers are always shown masked (****-****-****-1234); full PAN is never exposed.',
+    ],
+    restrictions: [
+      'No visibility into other customers, fraud cases, or audit logs.',
+      'Cannot decrypt any cardholder data.',
+    ],
+    pci: ['Req 3', 'Req 7'],
+  },
+  level1_analyst: {
+    icon: Search,
+    tagline: 'First-line fraud triage: review queued cases and search by encrypted card reference.',
+    responsibilities: [
+      'Review the fraud case queue and triage incoming cases.',
+      'Search transactions by encrypted card reference (QE equality search).',
+      'Add investigation notes and escalate cases to L2 when deeper access is required.',
+    ],
+    dataAccess: [
+      'Fraud cases and their linked transactions.',
+      'Searches run against encrypted fields — the database never sees plaintext PAN; the PAN stays masked in the UI.',
+    ],
+    restrictions: [
+      'Cannot decrypt the full PAN or sensitive customer profile fields.',
+      'Cannot resolve a case as confirmed fraud without escalation; no admin or Integration Hub access.',
+    ],
+    pci: ['Req 3', 'Req 7', 'Req 10'],
+  },
+  level2_investigator: {
+    icon: KeyRound,
+    tagline: 'Deep investigation with authorized decryption of sensitive fields for assigned cases.',
+    responsibilities: [
+      'Conduct full investigation on escalated cases.',
+      'Access decrypted customer profile and full PAN for cases under investigation.',
+      'Resolve and close cases, documenting the outcome and rationale.',
+    ],
+    dataAccess: [
+      'Authorized decryption of QE-protected fields (full PAN, customer profile) for assigned cases.',
+      'Full transaction detail and the complete case activity log.',
+    ],
+    restrictions: [
+      'Every field-level decryption is logged and auditable.',
+      'Elevated access is scoped to assigned cases — not a blanket grant.',
+    ],
+    pci: ['Req 3', 'Req 7', 'Req 8', 'Req 10'],
+  },
+  security_auditor: {
+    icon: ScrollText,
+    tagline: 'Read-only compliance oversight: review logs and verify control effectiveness.',
+    responsibilities: [
+      'Review audit logs and business/compliance process event logs.',
+      'Produce compliance reports and evidence for assessments.',
+      'Verify that access controls and logging are operating as designed.',
+    ],
+    dataAccess: [
+      'System-wide audit and process event logs; aggregate fraud statistics.',
+      'No PAN decryption — oversight does not require cardholder data.',
+    ],
+    restrictions: [
+      'Strictly read-only: cannot modify cases, transactions, or configuration.',
+    ],
+    pci: ['Req 10', 'Req 12'],
+  },
+  merchant_officer: {
+    icon: CheckSquare,
+    tagline: 'Merchant onboarding and KYB review across the merchant portfolio.',
+    responsibilities: [
+      'Work the merchant onboarding review queue.',
+      'Perform KYB checks and approve or reject merchant agreements.',
+      'Maintain the merchant registry and document review decisions.',
+    ],
+    dataAccess: [
+      'Merchant agreements, KYB data, and the full merchant portfolio.',
+      'No cardholder PAN — the merchant lifecycle does not require it.',
+    ],
+    restrictions: [
+      'No fraud case or audit log access; no access to cardholder data.',
+    ],
+    pci: ['Req 7', 'Req 12'],
+  },
+  manager: {
+    icon: Database,
+    tagline: 'Integration Hub: manage external providers, routing, and credentials.',
+    responsibilities: [
+      'Configure external provider integrations (fraud, AML, KYC, card auth, …).',
+      'Manage routing groups, field mapping, and per-provider authentication config.',
+      'Monitor integration and process event logs for dispatched calls.',
+    ],
+    dataAccess: [
+      'The integration registry and provider configuration.',
+      'Provider API keys are shown once at creation and stored only as a bcrypt hash — never retrievable afterward.',
+    ],
+    restrictions: [
+      'No cardholder PAN decryption.',
+      'Provider secrets cannot be read back after creation; only rotated or revoked.',
+    ],
+    pci: ['Req 8', 'Req 10', 'Req 12'],
+  },
+};
+
+// Display order for the "other roles" reference grid.
+const ROLE_ORDER = ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor', 'merchant_officer', 'manager'];
+
 // goal number → left-border accent color class
 const GOAL_COLORS: Record<string, { border: string; text: string; bg: string }> = {
   '1': { border: 'border-l-sky-500',     text: 'text-sky-400',     bg: 'bg-sky-500/10' },
@@ -279,10 +407,17 @@ const GOAL_LABELS: Record<string, string> = {
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export default function HelpPage() {
-  type Tab = 'overview' | 'checklist' | 'mongodb';
+  type Tab = 'overview' | 'roles' | 'checklist' | 'mongodb';
   const [tab, setTab]           = useState<Tab>('checklist');
   const [checked, setChecked]   = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [role, setRole]         = useState<string>('');
+
+  // Resolve the logged-in role from the demo JWT (client-side; cookie-based).
+  useEffect(() => {
+    const t = getToken();
+    if (t) setRole(decodeToken(t)?.role ?? '');
+  }, []);
 
   useEffect(() => {
     try {
@@ -454,6 +589,7 @@ export default function HelpPage() {
         <div className="screen-only flex border-b border-gray-300 mb-6 gap-1">
           {([
             { id: 'overview',  label: 'Demo Overview',    icon: Eye },
+            { id: 'roles',     label: 'Your Role',        icon: Users },
             { id: 'checklist', label: 'PCI DSS v4.0.1 Checklist',     icon: CheckSquare },
             { id: 'mongodb',   label: 'Architecture Proposal', icon: Database },
           ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
@@ -583,6 +719,131 @@ export default function HelpPage() {
               ))}
             </div>
           </div>
+        </div>
+
+        {/* ══ YOUR ROLE (screen-only; excluded from the PDF export) ═════════ */}
+        <div className={`space-y-4 screen-only ${tab !== 'roles' ? 'hidden' : ''}`}>
+          {(() => {
+            const guide = ROLE_GUIDE[role];
+            const roleLabel = ROLE_LABELS[role] ?? (role || 'Unknown role');
+
+            return (
+              <>
+                {/* Intro */}
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                  <p className="text-[11px] font-semibold text-[#00ED64] uppercase tracking-widest mb-2">Your access in this demo</p>
+                  <h2 className="text-base font-semibold text-white mb-3">What your role can do, see, and is accountable for</h2>
+                  <p className="text-gray-400 text-sm leading-relaxed">
+                    Access in this platform follows PCI DSS <span className="text-gray-200 font-medium">least-privilege, need-to-know</span> (Req 7):
+                    every role is granted the minimum data and actions required for its job. This page explains the responsibilities of the role
+                    you are signed in as, and how they map to the PCI DSS requirements detailed in the Checklist tab.
+                  </p>
+                </div>
+
+                {/* Logged-in role detail */}
+                {guide ? (
+                  <div className="bg-gray-900 border border-[#00ED64]/30 rounded-xl overflow-hidden">
+                    {/* Header */}
+                    <div className="flex items-start gap-4 p-5 border-b border-gray-800 bg-[#00ED64]/[0.04]">
+                      <div className="w-11 h-11 rounded-lg bg-[#00ED64]/10 border border-[#00ED64]/20 flex items-center justify-center shrink-0 mt-0.5">
+                        {React.createElement(guide.icon, { size: 20, className: 'text-[#00ED64]' })}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-semibold text-[#00ED64] uppercase tracking-widest mb-0.5">You are signed in as</p>
+                        <h2 className="text-lg font-bold text-white leading-tight">{roleLabel}</h2>
+                        <p className="text-gray-300 text-sm leading-relaxed mt-1.5">{guide.tagline}</p>
+                      </div>
+                    </div>
+
+                    {/* Responsibilities */}
+                    <div className="px-5 py-4">
+                      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-3">As {roleLabel}, you are responsible for</p>
+                      <ul className="space-y-2.5">
+                        {guide.responsibilities.map(r => (
+                          <li key={r} className="flex items-start gap-2.5">
+                            <CheckCircle2 size={15} className="text-[#00ED64] shrink-0 mt-0.5" />
+                            <span className="text-gray-300 text-sm leading-snug">{r}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Data access + restrictions */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-800 border-t border-gray-800">
+                      <div className="bg-gray-900 p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Eye size={14} className="text-sky-400 shrink-0" />
+                          <p className="text-sm font-semibold text-white">Data you can access</p>
+                        </div>
+                        <ul className="space-y-2">
+                          {guide.dataAccess.map(d => (
+                            <li key={d} className="flex items-start gap-2.5">
+                              <span className="text-sky-400/70 shrink-0 text-sm leading-5">›</span>
+                              <span className="text-gray-400 text-sm leading-snug">{d}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="bg-gray-900 p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Ban size={14} className="text-amber-400 shrink-0" />
+                          <p className="text-sm font-semibold text-white">Out of scope for you</p>
+                        </div>
+                        <ul className="space-y-2">
+                          {guide.restrictions.map(r => (
+                            <li key={r} className="flex items-start gap-2.5">
+                              <span className="text-amber-500/70 shrink-0 text-sm leading-5">›</span>
+                              <span className="text-gray-400 text-sm leading-snug">{r}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    {/* PCI mapping */}
+                    <div className="px-5 py-4 border-t border-gray-800">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Lock size={13} className="text-[#00ED64] shrink-0" />
+                        <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest">Scoped by PCI DSS</span>
+                        {guide.pci.map(p => (
+                          <span key={p} className="text-[11px] text-[#00ED64]/80 border border-[#00ED64]/20 bg-[#00ED64]/[0.05] px-2.5 py-0.5 rounded-full">{p}</span>
+                        ))}
+                      </div>
+                      <p className="text-gray-600 text-xs mt-2">See the <span className="text-gray-400">PCI DSS v4.0.1 Checklist</span> tab for the full text of each requirement.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 flex items-start gap-3">
+                    <AlertTriangle size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-gray-400 text-sm leading-relaxed">
+                      No specific role guidance is available for <span className="text-gray-200 font-medium">{roleLabel}</span>.
+                      The roles defined in this demo are listed below.
+                    </p>
+                  </div>
+                )}
+
+                {/* Other roles reference */}
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-4">Other roles in this demo</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {ROLE_ORDER.filter(r => r !== role).map(r => {
+                      const g = ROLE_GUIDE[r];
+                      if (!g) return null;
+                      return (
+                        <div key={r} className="bg-gray-800/40 border border-gray-700/50 rounded-lg p-3.5">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            {React.createElement(g.icon, { size: 14, className: 'text-gray-400 shrink-0' })}
+                            <p className="text-xs font-semibold text-gray-200">{ROLE_LABELS[r] ?? r}</p>
+                          </div>
+                          <p className="text-gray-500 text-xs leading-snug">{g.tagline}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            );
+          })()}
         </div>
 
         {/* ══ PCI CHECKLIST ═════════════════════════════════════════════════ */}

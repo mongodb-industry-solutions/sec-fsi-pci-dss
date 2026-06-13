@@ -1,11 +1,13 @@
 'use client';
 import { useState } from 'react';
-import { FlaskConical } from 'lucide-react';
+import { FlaskConical, Play, Info } from 'lucide-react';
 import { useIntegration } from '../_context';
 import type { MappingRule, FieldMappingConfig } from '../_context';
 import { FieldMappingMatrix, SaveBtn, Card, StatusToggle, FieldLabel } from '../_shared';
 import { api } from '../../../../../../lib/api';
 import { getOutboundSample } from '../_samples';
+import { useNotify } from '../../../../../../components/ui/ConfirmProvider';
+import { classifyEndpoint } from '../_endpoint';
 
 // ── Category settings ─────────────────────────────────────────────────────────
 
@@ -60,6 +62,7 @@ function CategorySettings({
 
 export default function OutboundPage() {
   const { integration, reload, token } = useIntegration();
+  const notify = useNotify();
 
   if (!integration) return null;
 
@@ -99,14 +102,21 @@ export default function OutboundPage() {
   const [testError, setTestError]               = useState('');
   const [testing, setTesting]                   = useState(false);
 
+  // Run Test (real execution) state — separate from Validate Params (dry-run mapping above)
+  const [overrideUrl, setOverrideUrl] = useState('');
+  const [running, setRunning]         = useState(false);
+  const [runResult, setRunResult]     = useState<{ status: string; latencyMs: number; responseCode?: number; responseBody?: unknown; targetUrl?: string; transformed: Record<string, unknown>; error?: string } | null>(null);
+  const effectiveTarget = overrideUrl.trim() || endpoint;
+  const endpointInfo = classifyEndpoint(effectiveTarget);
+
   async function toggleStatus() {
     setTogglingStatus(true);
     try {
       await api.integrations.update(id, {
         externalProviderArrangementStatus: isActive ? 'inactive' : 'active',
       }, token);
-      reload();
-    } catch (err) { alert((err as Error).message); }
+      reload(true);
+    } catch (err) { notify((err as Error).message, 'error'); }
     finally { setTogglingStatus(false); }
   }
 
@@ -132,7 +142,7 @@ export default function OutboundPage() {
       }, token);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-      reload();
+      reload(true); // silent: refresh context in place, no full-page remount
     } finally { setSaving(false); }
   }
 
@@ -151,6 +161,25 @@ export default function OutboundPage() {
       setTestResult(r);
     } catch (err) { setTestError((err as Error).message); }
     finally { setTesting(false); }
+  }
+
+  async function handleRunTest() {
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(testPayload) as Record<string, unknown>;
+      setTestPayloadError('');
+    } catch (e) {
+      setTestPayloadError((e as Error).message);
+      return;
+    }
+    if (!endpointInfo.valid) { notify('Enter a valid URL (https://… or an internal /path).', 'error'); return; }
+    setRunning(true); setTestError(''); setRunResult(null);
+    try {
+      const r = await api.integrations.runTest(id, { direction: 'outbound', payload: parsed, overrideUrl: overrideUrl.trim() || undefined }, token);
+      setRunResult(r);
+      notify(`Run test ${r.status}${r.responseCode ? ` (HTTP ${r.responseCode})` : ''}. See the Events tab.`, r.status === 'received' ? 'success' : 'error');
+    } catch (err) { setTestError((err as Error).message); }
+    finally { setRunning(false); }
   }
 
   const endpointPlaceholder = isInternal
@@ -384,22 +413,48 @@ export default function OutboundPage() {
       {/* ── Outbound test ──────────────────────────────────────────────────── */}
       <Card
         title="Test outbound request"
-        subtitle="Apply the current field mapping rules to a sample payload and preview what would be sent to the configured endpoint. No actual HTTP request is made.">
+        subtitle="Validate Params previews the field mapping without calling anything. Run Test performs a real HTTP dispatch and records an event in the Events tab.">
         <div className="space-y-4">
 
-          {/* Target URL banner */}
-          <div className="flex items-center gap-2 rounded-lg border bg-gray-50 px-3 py-2.5 text-xs">
-            <span className="font-medium text-gray-500 shrink-0">Target</span>
-            {endpoint
-              ? <code className="flex-1 font-mono text-gray-800 break-all">{endpoint}</code>
-              : <span className="flex-1 italic text-gray-400">No endpoint configured; set the URL in the Endpoint section above.</span>}
+          {!isActive && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+              <Info size={13} className="mt-0.5 shrink-0 text-amber-600" />
+              <p>This integration is <strong>inactive</strong>. Activate it in the Outbound status section above to validate or run a test.</p>
+            </div>
+          )}
+
+          {/* Test target URL (override) */}
+          <div>
+            <FieldLabel
+              label="Test target URL (optional override)"
+              hint="Leave blank to use the configured endpoint. Enter a URL here to run a one-off test against a different target without changing the saved configuration." />
+            <input
+              value={overrideUrl}
+              onChange={e => setOverrideUrl(e.target.value)}
+              placeholder={endpoint || 'https://api.provider.com/v1/score'}
+              className={`w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 ${endpointInfo.valid ? 'border-gray-300 focus:ring-violet-400' : 'border-red-400 bg-red-50'}`} />
+            {!endpointInfo.valid && (
+              <p className="mt-1 text-xs text-red-600">Enter an absolute URL (https://…) or an internal path starting with /.</p>
+            )}
+            {!effectiveTarget && (
+              <p className="mt-1 text-xs text-gray-400">No endpoint configured; set the URL in the Endpoint section above or enter an override.</p>
+            )}
+            {endpointInfo.isInternal && endpointInfo.note && (
+              <div className="mt-2 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                <Info size={13} className="mt-0.5 shrink-0" />
+                <div>
+                  <p>{endpointInfo.note}</p>
+                  {endpointInfo.resolved && <p className="mt-0.5 font-mono break-all">{endpointInfo.resolved}</p>}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Payload editor */}
           <div>
             <FieldLabel
               label="Request payload"
-              hint="JSON body that will be transformed by the outbound field mapping rules above. Edit it to test different scenarios." />
+              hint="JSON body transformed by the outbound field mapping rules above. Edit it to test different scenarios." />
             <textarea
               value={testPayload}
               onChange={e => { setTestPayload(e.target.value); setTestPayloadError(''); }}
@@ -411,20 +466,32 @@ export default function OutboundPage() {
             )}
           </div>
 
-          <button
-            onClick={handleTestMapping}
-            disabled={testing || !!testPayloadError}
-            className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-violet-300 text-violet-700 hover:bg-violet-50 disabled:opacity-40 transition-colors font-medium">
-            <FlaskConical size={12} className={testing ? 'animate-spin' : ''} />
-            {testing ? 'Running…' : 'Run test'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={handleTestMapping}
+              disabled={testing || !!testPayloadError || !isActive}
+              title={!isActive ? 'Activate the integration to test it' : undefined}
+              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-violet-300 text-violet-700 hover:bg-violet-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium">
+              <FlaskConical size={12} className={testing ? 'animate-spin' : ''} />
+              {testing ? 'Validating…' : 'Validate Params'}
+            </button>
+            <button
+              onClick={handleRunTest}
+              disabled={running || !!testPayloadError || !endpointInfo.valid || !effectiveTarget || !isActive}
+              title={!isActive ? 'Activate the integration to run a test' : !effectiveTarget ? 'Configure an endpoint or enter an override URL' : undefined}
+              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] hover:bg-[#00ED64] hover:text-[#001E2B] disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold">
+              <Play size={12} />
+              {running ? 'Running…' : 'Run Test'}
+            </button>
+          </div>
 
           {testError && <p className="text-xs text-red-600">⚠ {testError}</p>}
 
+          {/* Validate Params result */}
           {testResult && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-gray-600">
-                {testResult.appliedRules} mapping rule{testResult.appliedRules !== 1 ? 's' : ''} applied
+                Validate Params: {testResult.appliedRules} mapping rule{testResult.appliedRules !== 1 ? 's' : ''} applied
               </p>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <div>
@@ -432,8 +499,32 @@ export default function OutboundPage() {
                   <pre className="bg-gray-50 border rounded-lg p-3 text-xs font-mono overflow-auto max-h-52">{JSON.stringify(testResult.original, null, 2)}</pre>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Transformed payload (sent to endpoint)</p>
+                  <p className="text-xs text-gray-500 mb-1">Transformed payload (would be sent)</p>
                   <pre className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs font-mono overflow-auto max-h-52">{JSON.stringify(testResult.transformed, null, 2)}</pre>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Run Test result */}
+          {runResult && (
+            <div className="space-y-2 border-t pt-3">
+              <div className="flex items-center gap-2 flex-wrap text-xs">
+                <span className="font-medium text-gray-600">Run Test result:</span>
+                <span className={`px-2 py-0.5 rounded-full font-medium ${runResult.status === 'received' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{runResult.status}</span>
+                {runResult.responseCode !== undefined && <span className="text-gray-500">HTTP {runResult.responseCode}</span>}
+                <span className="text-gray-400">{runResult.latencyMs} ms</span>
+                {runResult.targetUrl && <code className="font-mono text-gray-500 break-all">→ {runResult.targetUrl}</code>}
+              </div>
+              {runResult.error && <p className="text-xs text-red-600">⚠ {runResult.error}</p>}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Payload sent</p>
+                  <pre className="bg-gray-50 border rounded-lg p-3 text-xs font-mono overflow-auto max-h-52">{JSON.stringify(runResult.transformed, null, 2)}</pre>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Response received</p>
+                  <pre className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs font-mono overflow-auto max-h-52">{runResult.responseBody !== undefined ? (typeof runResult.responseBody === 'string' ? runResult.responseBody : JSON.stringify(runResult.responseBody, null, 2)) : (runResult.error ? 'No response (request failed).' : 'No response body.')}</pre>
                 </div>
               </div>
             </div>

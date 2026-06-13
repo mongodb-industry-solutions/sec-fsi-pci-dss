@@ -99,7 +99,9 @@ interface CtxValue {
   integration: Integration | null;
   loading: boolean;
   loadError: string | null;
-  reload: () => void;
+  /** reload(true) refreshes the integration in-place without toggling the loading state,
+   *  so the page does NOT unmount/remount (no full-page "refresh" flicker, no local state loss). */
+  reload: (silent?: boolean) => void;
   token: string;
 }
 
@@ -114,16 +116,17 @@ export function IntegrationProvider({ children }: { children: React.ReactNode })
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const reload = useCallback(() => {
-    setLoading(true);
+  const reload = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
     setLoadError(null);
     api.integrations.get(id, token)
       .then(d => setIntegration(d.integration as unknown as Integration))
       .catch((err: unknown) => {
         const msg = (err as Error)?.message ?? 'Failed to load';
-        setLoadError(msg.toLowerCase().includes('not found') ? 'Integration not found.' : msg);
+        // On a silent refresh, keep the current view rather than swapping to an error screen.
+        if (!silent) setLoadError(msg.toLowerCase().includes('not found') ? 'Integration not found.' : msg);
       })
-      .finally(() => setLoading(false));
+      .finally(() => { if (!silent) setLoading(false); });
   }, [id, token]);
 
   useEffect(() => { reload(); }, [reload]);

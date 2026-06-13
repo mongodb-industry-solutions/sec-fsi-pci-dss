@@ -10,6 +10,7 @@ import { RedirectionPaymentFlow } from '../../../components/simulator/Redirectio
 import { PaymentLinkFlow } from '../../../components/simulator/PaymentLinkFlow';
 import type { PaymentMethodId, SimulatorScenario } from '../../../types/simulator';
 import simulatorConfig from '../../../config/simulator.json';
+import { variedAmount, variedDescription } from '../../../lib/simVary';
 
 type Step = 1 | 2 | 3;
 
@@ -19,6 +20,7 @@ interface FormData {
   email: string;
   phone: string;
   amount: string;
+  description: string;
   merchantName: string;
   merchantCategoryCode: string;
 }
@@ -35,6 +37,7 @@ const DEFAULTS: FormData = {
   email: 'luis.fernandez@back.es',
   phone: '+44 7700 900123',
   amount: '850.00',
+  description: '',
   merchantName: 'TechGadgets Ltd.',
   merchantCategoryCode: '5734',
 };
@@ -295,6 +298,7 @@ export default function PaymentPage() {
   const [returning, setReturning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const [varyNote, setVaryNote] = useState<string | null>(null);
   const cardTokenRef = useRef<string>(generateToken());
 
   // Read sim_method + sim_scenario from sessionStorage on mount
@@ -314,6 +318,7 @@ export default function PaymentPage() {
           email: found.prefill.email,
           phone: found.prefill.phone,
           amount: String(found.prefill.amount),
+          description: '',
           merchantName: found.prefill.merchantName,
           merchantCategoryCode: found.prefill.merchantCategoryCode,
         });
@@ -401,6 +406,17 @@ export default function PaymentPage() {
     setForm((f) => ({ ...f, merchantName: name, merchantCategoryCode: mcc }));
   }
 
+  // One-click variation of the payment options (amount + description) for repeated demo
+  // runs. The persona and merchant stay fixed; only what is being paid varies, so each
+  // run is a distinguishable variation of the same predefined use case.
+  function handleVary() {
+    const amount = variedAmount(form.amount);
+    const description = variedDescription(form.merchantName, form.description);
+    setForm((f) => ({ ...f, amount, description }));
+    setValidationErrors({});
+    setVaryNote(`Distinct values generated. Find this transaction by amount $${amount} or descriptor “${description}”.`);
+  }
+
   function handleNext() {
     const errors = validateStep1(form, maskedCard);
     if (Object.keys(errors).length > 0) {
@@ -426,7 +442,7 @@ export default function PaymentPage() {
         cardTransactionChannel: 'online',
         cardTransactionMaskedPanDisplay: maskedCard || '****-****-****-1234',
         cardTransactionType: 'purchase',
-        cardTransactionDescription: form.merchantName.toUpperCase().slice(0, 22),
+        cardTransactionDescription: (form.description.trim() || form.merchantName.toUpperCase()).slice(0, 22),
         // Acquiring-side link: the API-card flow charges the simulator merchant,
         // so the payment also surfaces in that merchant's received-payments view.
         merchantAgreementInstanceReference: simulatorConfig.merchantId,
@@ -483,6 +499,7 @@ export default function PaymentPage() {
     setReturning(false);
     setError(null);
     setValidationErrors({});
+    setVaryNote(null);
     cardTokenRef.current = generateToken();
     router.push('/simulator');
   }
@@ -535,6 +552,25 @@ export default function PaymentPage() {
                 <strong>MongoDB Queryable Encryption</strong> before leaving the browser in Step 2.
               </p>
             </StepExplainer>
+          </div>
+
+          {/* Edit / vary values before paying */}
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-xs text-blue-800">
+                This scenario fixes the persona and merchant. You can still adjust the payment
+                options below (amount, description) before paying, or use <strong>Vary values</strong>
+                {' '}to generate a distinct variation so repeated runs are easy to tell apart.
+              </p>
+              <button
+                type="button"
+                onClick={handleVary}
+                className="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors"
+              >
+                🎲 Vary values
+              </button>
+            </div>
+            {varyNote && <p className="text-xs text-blue-700 font-medium">{varyNote}</p>}
           </div>
 
           {/* Card number */}
@@ -628,6 +664,22 @@ export default function PaymentPage() {
               {validationErrors.amount && (
                 <p className="text-xs text-red-600 mt-0.5">{validationErrors.amount}</p>
               )}
+            </div>
+
+            {/* Description / statement descriptor */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+                <Tooltip text="Statement descriptor stored in cardTransactionDescription (max 22 chars). Optional; defaults to the merchant name. Vary it to make repeated runs distinguishable." />
+              </label>
+              <input
+                type="text"
+                value={form.description}
+                maxLength={22}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder={form.merchantName.toUpperCase().slice(0, 22)}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              />
             </div>
 
             {/* Merchant Name */}

@@ -12,6 +12,7 @@ import {
 import {
   testIntegration,
   testMapping,
+  runIntegrationTest,
   getIntegrationEvents,
 } from '../services/integrationDispatch.service';
 
@@ -150,6 +151,8 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
           externalProviderTimeoutMs:         { type: 'number', minimum: 100, maximum: 30000 },
           externalProviderRetryPolicy:       { type: 'object' },
           externalProviderArrangementStatus: { type: 'string', enum: ['active','inactive','test'] },
+          externalProviderCallbackEnabled:   { type: 'boolean' },
+          externalProviderCallbackPath:      { type: 'string' },
           categoryConfig:                    { type: 'object' },
           authConfig:                        { type: 'object' },
           fieldMappingConfig:                { type: 'object' },
@@ -174,6 +177,8 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
       if (body.externalProviderTimeoutMs !== undefined)         patch.externalProviderTimeoutMs     = body.externalProviderTimeoutMs as number;
       if (body.externalProviderRetryPolicy !== undefined)       patch.externalProviderRetryPolicy   = body.externalProviderRetryPolicy as never;
       if (body.externalProviderArrangementStatus !== undefined) patch.externalProviderArrangementStatus = body.externalProviderArrangementStatus as never;
+      if (body.externalProviderCallbackEnabled !== undefined)   patch.externalProviderCallbackEnabled = body.externalProviderCallbackEnabled as boolean;
+      if (body.externalProviderCallbackPath !== undefined)      patch.externalProviderCallbackPath  = body.externalProviderCallbackPath as string;
       if (body.categoryConfig !== undefined)                    patch.categoryConfig  = body.categoryConfig as never;
       if (body.authConfig !== undefined)                        patch.authConfig      = body.authConfig as never;
       if (body.fieldMappingConfig !== undefined)                patch.fieldMappingConfig = body.fieldMappingConfig as never;
@@ -263,6 +268,40 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
       const { direction, payload } = request.body as { direction: 'outbound' | 'inbound'; payload: Record<string, unknown> };
       try {
         return await testMapping(fastify.db, id, direction, payload);
+      } catch (err) {
+        if ((err as { code?: number }).code === 404) return reply.status(404).send({ error: 'Integration not found' });
+        throw err;
+      }
+    },
+  });
+
+  // ── POST /integrations/:id/run-test ────────────────────────────────────────
+  // Real execution (vs test-mapping which only transforms). Records an integrationEvent.
+  fastify.post('/:id/run-test', {
+    schema: {
+      tags: ['integrations'],
+      summary: 'Run a real inbound/outbound test (records an event)',
+      description: 'Outbound: POSTs the mapped payload to the override URL or configured endpoint. Inbound: applies inbound mapping and records a callback event. Manager only.',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      body: {
+        type: 'object',
+        required: ['direction', 'payload'],
+        properties: {
+          direction:   { type: 'string', enum: ['outbound', 'inbound'] },
+          payload:     { type: 'object' },
+          overrideUrl: { type: 'string' },
+        },
+      },
+      response: { 200: { type: 'object', additionalProperties: true }, 403: E, 404: E },
+    },
+    handler: async (request, reply) => {
+      if (!isAuthorized(request as unknown as DemoRequest))
+        return reply.status(403).send({ error: 'Forbidden' });
+      const { id } = request.params as { id: string };
+      const { direction, payload, overrideUrl } = request.body as { direction: 'outbound' | 'inbound'; payload: Record<string, unknown>; overrideUrl?: string };
+      try {
+        return await runIntegrationTest(fastify.db, id, direction, payload, overrideUrl);
       } catch (err) {
         if ((err as { code?: number }).code === 404) return reply.status(404).send({ error: 'Integration not found' });
         throw err;

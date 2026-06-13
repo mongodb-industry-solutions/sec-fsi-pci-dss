@@ -17,6 +17,9 @@ interface WebhookEntry {
   body: unknown;
   timestamp: string;
   ip: string;
+  // The response the hook sent back to the caller. Optional for backward
+  // compatibility with entries persisted before this field existed.
+  response?: { status: number; body: unknown };
 }
 
 const METHOD_COLORS: Record<string, string> = {
@@ -48,7 +51,7 @@ export default function WebhookPage() {
   });
   const [connected, setConnected] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'headers' | 'body'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'headers' | 'body' | 'response'>('overview');
   const [filterMethod, setFilterMethod] = useState('');
   const [searchText, setSearchText] = useState('');
   const [page, setPage] = useState(1);
@@ -283,7 +286,7 @@ export default function WebhookPage() {
                   <div className="border-t border-gray-800">
                     {/* Tabs */}
                     <div className="flex gap-0 border-b border-gray-800 px-4">
-                      {(['overview', 'headers', 'body'] as const).map((tab) => (
+                      {(['overview', 'headers', 'body', 'response'] as const).map((tab) => (
                         <button
                           key={tab}
                           onClick={() => setActiveTab(tab)}
@@ -339,6 +342,33 @@ export default function WebhookPage() {
                         expandedEntry.body
                           ? <pre className="whitespace-pre-wrap break-all">{bodyText(expandedEntry.body)}</pre>
                           : <span className="text-gray-600 italic">No body</span>
+                      )}
+
+                      {activeTab === 'response' && (
+                        expandedEntry.response ? (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-500">Status</span>
+                              <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded border ${
+                                expandedEntry.response.status < 300
+                                  ? 'bg-green-900/60 text-green-300 border-green-700'
+                                  : expandedEntry.response.status < 500
+                                    ? 'bg-yellow-900/60 text-yellow-300 border-yellow-700'
+                                    : 'bg-red-900/60 text-red-300 border-red-700'
+                              }`}>
+                                {expandedEntry.response.status}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="text-gray-500 mb-1">Body sent to caller</p>
+                              {expandedEntry.response.body
+                                ? <pre className="whitespace-pre-wrap break-all text-gray-200">{bodyText(expandedEntry.response.body)}</pre>
+                                : <span className="text-gray-600 italic">No body</span>}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-600 italic">Response not recorded for this request.</span>
+                        )
                       )}
                     </div>
                   </div>

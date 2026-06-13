@@ -54,7 +54,7 @@ export default function OverviewPage() {
     try {
       const r = await api.integrations.test(id, token);
       setTestMsg({ ok: r.status === 'ok', text: r.status === 'ok' ? `Connection OK; ${r.latencyMs}ms` : `Test failed: ${r.status}` });
-      reload();
+      reload(true); // silent: refresh health badge in place, no full-page remount
     } catch (err) {
       setTestMsg({ ok: false, text: (err as Error).message });
     } finally { setTesting(false); }

@@ -1,11 +1,13 @@
 'use client';
 import { useState } from 'react';
-import { Copy, Check, Shield, ShieldOff, FlaskConical, AlertTriangle } from 'lucide-react';
+import { Copy, Check, Shield, ShieldOff, FlaskConical, Play, Info } from 'lucide-react';
 import { useIntegration } from '../_context';
 import type { MappingRule, HmacConfig, FieldMappingConfig } from '../_context';
 import { FieldMappingMatrix, SaveBtn, Card, StatusToggle, FieldLabel } from '../_shared';
 import { api } from '../../../../../../lib/api';
 import { getInboundSample } from '../_samples';
+import { useNotify, useConfirm } from '../../../../../../components/ui/ConfirmProvider';
+import { classifyEndpoint } from '../_endpoint';
 
 // ── Copy helper ───────────────────────────────────────────────────────────────
 
@@ -27,6 +29,8 @@ function CopyBtn({ text }: { text: string }) {
 
 export default function InboundPage() {
   const { integration, reload, token } = useIntegration();
+  const notify = useNotify();
+  const confirm = useConfirm();
 
   if (!integration) return null;
 
@@ -45,8 +49,8 @@ export default function InboundPage() {
     try {
       await api.integrations.update(id, { externalProviderCallbackEnabled: !callbackEnabled }, token);
       setCallbackEnabled(v => !v);
-      reload();
-    } catch (err) { alert((err as Error).message); }
+      reload(true); // silent: persist + refresh context without remounting the page
+    } catch (err) { notify((err as Error).message, 'error'); }
     finally { setTogglingCallback(false); }
   }
 
@@ -76,26 +80,54 @@ export default function InboundPage() {
   const [inboundTestError, setInboundTestError]     = useState('');
   const [inboundTesting, setInboundTesting]         = useState(false);
 
-  async function handleSimulateInbound() {
-    let parsed: Record<string, unknown>;
+  // Run Test (real reception) state — separate from Validate Params (dry-run mapping)
+  const [overrideUrl, setOverrideUrl] = useState('');
+  const [running, setRunning]         = useState(false);
+  const [runResult, setRunResult]     = useState<{ status: string; latencyMs: number; transformed: Record<string, unknown>; error?: string } | null>(null);
+  const effectiveTarget = overrideUrl.trim() || webhookUrl;
+  const endpointInfo = classifyEndpoint(effectiveTarget);
+
+  function parseSample(): Record<string, unknown> | null {
     try {
-      parsed = JSON.parse(inboundSample) as Record<string, unknown>;
+      const p = JSON.parse(inboundSample) as Record<string, unknown>;
       setInboundSampleError('');
+      return p;
     } catch (e) {
       setInboundSampleError((e as Error).message);
-      return;
+      return null;
     }
-    const providerName = integration?.externalProviderArrangementName ?? 'this provider';
-    const confirmed = window.confirm(
-      `This will simulate an inbound webhook call from "${providerName}" arriving at:\n\n${webhookUrl}\n\nLeafyBank will process the payload through the inbound field mapping rules. No actual HTTP request is made to or from the provider.\n\nContinue?`
-    );
-    if (!confirmed) return;
+  }
+
+  // Validate Params — dry-run: applies the inbound mapping only, no execution.
+  async function handleValidateInbound() {
+    const parsed = parseSample();
+    if (!parsed) return;
     setInboundTesting(true); setInboundTestError(''); setInboundTestResult(null);
     try {
       const r = await api.integrations.testMapping(id, { direction: 'inbound', payload: parsed }, token);
       setInboundTestResult(r);
     } catch (err) { setInboundTestError((err as Error).message); }
     finally { setInboundTesting(false); }
+  }
+
+  // Run Test — real reception: processes the payload and records a callback event.
+  async function handleRunInbound() {
+    const parsed = parseSample();
+    if (!parsed) return;
+    const providerName = integration?.externalProviderArrangementName ?? 'this provider';
+    const ok = await confirm({
+      title: 'Run inbound test?',
+      message: `Simulates a real webhook reception from "${providerName}" at ${effectiveTarget}. The payload is processed through the inbound mapping and a callback event is recorded in the Events tab.`,
+      confirmLabel: 'Run test',
+    });
+    if (!ok) return;
+    setRunning(true); setInboundTestError(''); setRunResult(null);
+    try {
+      const r = await api.integrations.runTest(id, { direction: 'inbound', payload: parsed, overrideUrl: overrideUrl.trim() || undefined }, token);
+      setRunResult(r);
+      notify(`Inbound run test ${r.status}. See the Events tab.`, r.status === 'received' ? 'success' : 'error');
+    } catch (err) { setInboundTestError((err as Error).message); }
+    finally { setRunning(false); }
   }
 
   async function handleSave() {
@@ -120,7 +152,7 @@ export default function InboundPage() {
       }, token);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-      reload();
+      reload(true); // silent: refresh context in place, no full-page remount
     } finally { setSaving(false); }
   }
 
@@ -297,31 +329,48 @@ export default function InboundPage() {
 
       <SaveBtn saving={saving} saved={saved} onClick={handleSave} />
 
-      {/* ── Simulate inbound data ──────────────────────────────────────────── */}
+      {/* ── Test inbound reception ─────────────────────────────────────────── */}
       <Card
-        title="Simulate inbound data reception"
-        subtitle="Preview how LeafyBank processes an incoming webhook payload; applies the inbound field mapping rules and shows the result. A confirmation is required before running.">
+        title="Test inbound reception"
+        subtitle="Validate Params previews the inbound field mapping without executing. Run Test performs a real reception and records a callback event in the Events tab.">
         <div className="space-y-4">
 
-          {/* Callback URL banner */}
-          <div className="flex items-center gap-2 rounded-lg border bg-gray-50 px-3 py-2.5 text-xs">
-            <span className="font-medium text-gray-500 shrink-0">Receives at</span>
-            <code className="flex-1 font-mono text-gray-800 break-all">{webhookUrl}</code>
-          </div>
+          {!callbackEnabled && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+              <Info size={13} className="mt-0.5 shrink-0 text-amber-600" />
+              <p>Inbound reception is <strong>disabled</strong>. Enable it in the Inbound status section above to validate or run a test.</p>
+            </div>
+          )}
 
-          {/* Dry-run notice */}
-          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-            <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-600" />
-            <p className="text-xs text-amber-800">
-              You will be asked to confirm before the test runs. This is a dry-run; field mapping rules are applied but no data is written to production systems.
-            </p>
+          {/* Test target URL (override) */}
+          <div>
+            <FieldLabel
+              label="Receiving URL (optional override)"
+              hint="Defaults to this integration's callback URL. You can point the test at a different path without changing the saved configuration." />
+            <input
+              value={overrideUrl}
+              onChange={e => setOverrideUrl(e.target.value)}
+              placeholder={webhookUrl}
+              className={`w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 ${endpointInfo.valid ? 'border-gray-300 focus:ring-amber-400' : 'border-red-400 bg-red-50'}`} />
+            {!endpointInfo.valid && (
+              <p className="mt-1 text-xs text-red-600">Enter an absolute URL (https://…) or an internal path starting with /.</p>
+            )}
+            {endpointInfo.isInternal && endpointInfo.note && (
+              <div className="mt-2 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                <Info size={13} className="mt-0.5 shrink-0" />
+                <div>
+                  <p>{endpointInfo.note}</p>
+                  {endpointInfo.resolved && <p className="mt-0.5 font-mono break-all">{endpointInfo.resolved}</p>}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Payload editor */}
           <div>
             <FieldLabel
               label="Incoming payload"
-              hint="Simulated JSON body that an external provider would POST to the callback URL. Edit it to test different scenarios, then run to see how LeafyBank would process it." />
+              hint="Simulated JSON body that an external provider would POST to the callback URL. Edit it to test different scenarios." />
             <textarea
               value={inboundSample}
               onChange={e => { setInboundSample(e.target.value); setInboundSampleError(''); }}
@@ -333,20 +382,32 @@ export default function InboundPage() {
             )}
           </div>
 
-          <button
-            onClick={handleSimulateInbound}
-            disabled={inboundTesting || !!inboundSampleError}
-            className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-amber-400 text-amber-700 hover:bg-amber-50 disabled:opacity-40 transition-colors font-medium">
-            <FlaskConical size={12} className={inboundTesting ? 'animate-spin' : ''} />
-            {inboundTesting ? 'Processing…' : 'Simulate reception'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={handleValidateInbound}
+              disabled={inboundTesting || !!inboundSampleError || !callbackEnabled}
+              title={!callbackEnabled ? 'Enable inbound reception to test it' : undefined}
+              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-amber-400 text-amber-700 hover:bg-amber-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium">
+              <FlaskConical size={12} className={inboundTesting ? 'animate-spin' : ''} />
+              {inboundTesting ? 'Validating…' : 'Validate Params'}
+            </button>
+            <button
+              onClick={handleRunInbound}
+              disabled={running || !!inboundSampleError || !endpointInfo.valid || !callbackEnabled}
+              title={!callbackEnabled ? 'Enable inbound reception to run a test' : undefined}
+              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] hover:bg-[#00ED64] hover:text-[#001E2B] disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold">
+              <Play size={12} />
+              {running ? 'Running…' : 'Run Test'}
+            </button>
+          </div>
 
           {inboundTestError && <p className="text-xs text-red-600">⚠ {inboundTestError}</p>}
 
+          {/* Validate Params result */}
           {inboundTestResult && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-gray-600">
-                {inboundTestResult.appliedRules} mapping rule{inboundTestResult.appliedRules !== 1 ? 's' : ''} applied
+                Validate Params: {inboundTestResult.appliedRules} mapping rule{inboundTestResult.appliedRules !== 1 ? 's' : ''} applied
               </p>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <div>
@@ -357,6 +418,22 @@ export default function InboundPage() {
                   <p className="text-xs text-gray-500 mb-1">Processed by LeafyBank (after mapping)</p>
                   <pre className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs font-mono overflow-auto max-h-52">{JSON.stringify(inboundTestResult.transformed, null, 2)}</pre>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Run Test result */}
+          {runResult && (
+            <div className="space-y-2 border-t pt-3">
+              <div className="flex items-center gap-2 flex-wrap text-xs">
+                <span className="font-medium text-gray-600">Run Test result:</span>
+                <span className={`px-2 py-0.5 rounded-full font-medium ${runResult.status === 'received' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{runResult.status}</span>
+                <span className="text-gray-400">{runResult.latencyMs} ms</span>
+              </div>
+              {runResult.error && <p className="text-xs text-red-600">⚠ {runResult.error}</p>}
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Processed payload (recorded as a callback event)</p>
+                <pre className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs font-mono overflow-auto max-h-52">{JSON.stringify(runResult.transformed, null, 2)}</pre>
               </div>
             </div>
           )}

@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import { spawn, execSync } from 'child_process';
 import * as path from 'path';
 import { logBuffer, appendLog, writeCount } from '../../../shared/logBuffer';
+import { resolveTestStrategy, NormalizedTestSummary } from '../services/testRunners';
 
 // __dirname = backend/src/modules/admin/controllers/ (tsx dev mode)
 // 5 levels up -> project root
@@ -219,34 +220,51 @@ function spawnSSE(
   args: string[],
   cwd: string,
   label: string,
+  opts: {
+    env?: NodeJS.ProcessEnv;
+    /** Called once on process close; a non-null return is emitted as a `summary` event. */
+    summarize?: () => NormalizedTestSummary | null;
+  } = {},
 ): Promise<void> {
-  const sendEvent = (type: string, data: string) => {
-    raw.write(`event: ${type}\ndata: ${JSON.stringify({ text: data })}\n\n`);
-    appendLog(`[${label}] ${data}`);
+  const sendText = (type: string, text: string) => {
+    raw.write(`event: ${type}\ndata: ${JSON.stringify({ text })}\n\n`);
+    appendLog(`[${label}] ${text}`);
+  };
+  // The summary frame carries the structured object directly (not wrapped in {text}).
+  const sendSummary = (summary: NormalizedTestSummary) => {
+    raw.write(`event: summary\ndata: ${JSON.stringify(summary)}\n\n`);
   };
 
-  sendEvent('start', `> ${command} ${args.join(' ')}  (cwd: ${cwd})`);
+  sendText('start', `> ${command} ${args.join(' ')}  (cwd: ${cwd})`);
 
   const child = spawn(command, args, {
     cwd,
     shell: true,
-    env: { ...process.env },
+    env: { ...process.env, ...(opts.env ?? {}) },
   });
 
   return new Promise((resolve) => {
     child.stdout.on('data', (chunk: Buffer) => {
-      chunk.toString().split('\n').filter(Boolean).forEach((l) => sendEvent('log', l));
+      chunk.toString().split('\n').filter(Boolean).forEach((l) => sendText('log', l));
     });
     child.stderr.on('data', (chunk: Buffer) => {
-      chunk.toString().split('\n').filter(Boolean).forEach((l) => sendEvent('error', l));
+      chunk.toString().split('\n').filter(Boolean).forEach((l) => sendText('error', l));
     });
     child.on('close', (code) => {
-      sendEvent('done', `Process exited with code ${code ?? 0}`);
+      if (opts.summarize) {
+        try {
+          const summary = opts.summarize();
+          if (summary) sendSummary(summary);
+        } catch (err) {
+          sendText('error', `Could not parse test results: ${(err as Error).message}`);
+        }
+      }
+      sendText('done', `Process exited with code ${code ?? 0}`);
       (raw as import('http').ServerResponse).end?.();
       resolve();
     });
     child.on('error', (err) => {
-      sendEvent('error', `Failed to start: ${err.message}`);
+      sendText('error', `Failed to start: ${err.message}`);
       (raw as import('http').ServerResponse).end?.();
       resolve();
     });
@@ -351,8 +369,29 @@ export async function adminController(fastify: FastifyInstance) {
     const args = ALLOWED_NPM_COMMANDS[command];
     if (!args) return reply.status(400).send({ error: 'Unknown command' });
 
+    // Single-tool test commands run with their tool's native JSON reporter so the
+    // result summary is parsed from structured output, not scraped from log text.
+    const strategy = resolveTestStrategy(command, PROJECT_ROOT);
+
     beginSSE(reply);
-    await spawnSSE(reply.raw, 'npm', args, PROJECT_ROOT, `npm:${command}`);
+
+    if (strategy) {
+      fs.mkdirSync(path.dirname(strategy.outputFile), { recursive: true });
+      // Drop a stale results file so a crash before write can't surface an old summary.
+      try { fs.rmSync(strategy.outputFile, { force: true }); } catch { /* none to remove */ }
+      await spawnSSE(reply.raw, 'npm', strategy.npmArgs, PROJECT_ROOT, `npm:${command}`, {
+        env: strategy.env,
+        summarize: () => {
+          try {
+            return strategy.parse(fs.readFileSync(strategy.outputFile, 'utf-8'));
+          } catch {
+            return null; // no file (tool crashed before writing) → log-only, no summary
+          }
+        },
+      });
+    } else {
+      await spawnSSE(reply.raw, 'npm', args, PROJECT_ROOT, `npm:${command}`);
+    }
   });
 
   // POST /admin/exec

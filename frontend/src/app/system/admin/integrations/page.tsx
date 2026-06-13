@@ -10,6 +10,7 @@ import { getToken } from '../../../../lib/auth';
 import { useDebugMode } from '../../../../lib/debugMode';
 import { ROLE_LABELS } from '../../../../lib/constants';
 import { Pagination } from '../../../../components/Pagination';
+import { useNotify } from '../../../../components/ui/ConfirmProvider';
 
 interface Integration {
   externalProviderArrangementInstanceReference: string;
@@ -62,6 +63,7 @@ export default function IntegrationsListPage() {
   const [testing, setTesting]   = useState<string | null>(null);
   const [testResult, setTestResult] = useState<Record<string, { status: string; latencyMs: number }>>({});
   const { debugMode } = useDebugMode();
+  const notify = useNotify();
 
   // Filters
   const [nameInput, setNameInput]   = useState('');
@@ -149,7 +151,7 @@ export default function IntegrationsListPage() {
       await api.integrations.suspend(id, token);
       load(typeFilter, statusFilter);
     } catch (err) {
-      alert((err as Error).message);
+      notify((err as Error).message, 'error');
     }
   }
 
