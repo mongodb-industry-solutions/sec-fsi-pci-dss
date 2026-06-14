@@ -80,8 +80,8 @@ export function RedirectionPaymentFlow({ scenario }: Props) {
         amount,
         currency: prefill.currency,
         description: description.trim() || prefill.description,
-        returnUrl: `${origin}/simulator/payment/callback?status=success&session={session_id}&txn={txn_id}&case={case_id}`,
-        cancelUrl: `${origin}/simulator/payment/callback?status=cancelled&session={session_id}`,
+        returnUrl: `${origin}/simulator/payment/callback?result={result}&session={session_id}&txn={txn_id}&case={case_id}&token={card_token}&code={response_code}&reason={reason}`,
+        cancelUrl: `${origin}/simulator/payment/callback?result=cancelled&session={session_id}`,
         merchantReference: `SIM-${scenario.id.toUpperCase()}-${Date.now()}`,
       });
       const sid = result.checkoutSessionInstanceReference;

@@ -10,8 +10,63 @@ import {
 } from '../models/checkoutSession.model';
 import { createTransaction } from '../../transactions/services/cardTransaction.service';
 import { authorizeCard, linkAuthToTransaction } from './cardAuthorization.service';
+import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
 
 const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+// Human-readable decline reasons keyed by the PSP/issuer response code (BIAN SD-15).
+const DECLINE_REASONS: Record<string, string> = {
+  '0190': 'Authorization declined by the issuer',
+  '0540': 'Card deactivated or removed by the cardholder',
+};
+
+// Send the merchant payment callback through the Integration Hub OUTBOUND mechanism (ADR-010/025):
+// the PSP notifies the merchant of the payment outcome. Carries the surrogate card token + the
+// approval/decline result and reason — NEVER the PAN or CVV (PCI DSS Req 3; logEvent also applies
+// the CHD blocklist). Fired on BOTH approval and decline. The `generic` provider (Merchant Payment
+// Notifications) defines the inbound/outbound channel; if none is active the dispatch is a graceful
+// no-op and the browser return-URL still carries the result.
+async function dispatchMerchantCallback(
+  db: Db,
+  session: CheckoutSessionRecord,
+  outcome: {
+    result: 'approved' | 'declined';
+    cardToken: string;
+    maskedPan: string;
+    responseCode: string;
+    authorizationCode?: string;
+    declineReason?: string;
+    cardTransactionInstanceReference?: string;
+  },
+): Promise<void> {
+  try {
+    await dispatchIntegration(
+      db,
+      'generic',
+      'gateway.checkout.callback',
+      {
+        event: outcome.result === 'approved' ? 'payment.completed' : 'payment.declined',
+        result: outcome.result,
+        cardToken: outcome.cardToken,                 // surrogate, NOT CHD
+        maskedPan: outcome.maskedPan,                 // display-safe last 4
+        responseCode: outcome.responseCode,
+        ...(outcome.authorizationCode ? { authorizationCode: outcome.authorizationCode } : {}),
+        ...(outcome.declineReason ? { declineReason: outcome.declineReason } : {}),
+        amount: session.checkoutSessionAmount,
+        currency: session.checkoutSessionCurrency,
+        merchantReference: session.checkoutSessionMerchantReference,
+        merchantAgreementInstanceReference: session.merchantAgreementInstanceReference,
+        checkoutSessionInstanceReference: session.checkoutSessionInstanceReference,
+        ...(outcome.cardTransactionInstanceReference ? { cardTransactionInstanceReference: outcome.cardTransactionInstanceReference } : {}),
+      },
+      {
+        entityType: 'transaction',
+        entityId: outcome.cardTransactionInstanceReference ?? session.checkoutSessionInstanceReference,
+        processType: 'payment_processing',
+      },
+    );
+  } catch { /* callback delivery never blocks the payment outcome */ }
+}
 
 export interface CreateCheckoutSessionInput {
   merchantAgreementInstanceReference: string;
@@ -129,7 +184,7 @@ export interface ProcessCheckoutPaymentInput {
 export async function processCheckoutPayment(
   db: Db,
   input: ProcessCheckoutPaymentInput
-): Promise<{ result: ProcessPaymentResult; cardTransactionInstanceReference?: string; fraudDiagnosisInstanceReference?: string; redirectUrl?: string }> {
+): Promise<{ result: ProcessPaymentResult; cardTransactionInstanceReference?: string; fraudDiagnosisInstanceReference?: string; redirectUrl?: string; responseCode?: string; declineReason?: string }> {
   const session = await db
     .collection<CheckoutSessionRecord>(CHECKOUT_SESSION_COLLECTION)
     .findOne({ checkoutSessionInstanceReference: input.sessionId } as Partial<CheckoutSessionRecord>);
@@ -163,7 +218,22 @@ export async function processCheckoutPayment(
   });
 
   if (authResult.result === 'declined') {
-    return { result: 'declined' };
+    // Notify the merchant of the decline via the integration callback (token + reason, no CHD),
+    // and still return a redirect so the buyer/merchant return page is reached.
+    const declineReason = DECLINE_REASONS[authResult.responseCode] ?? 'Authorization declined';
+    await dispatchMerchantCallback(db, session, {
+      result: 'declined',
+      cardToken: input.cardToken,
+      maskedPan,
+      responseCode: authResult.responseCode,
+      declineReason,
+    });
+    const redirectUrl = substitutePlaceholders(session.checkoutSessionReturnUrl, {
+      session_id: input.sessionId, txn_id: '', case_id: '',
+      card_token: input.cardToken, result: 'declined', response_code: authResult.responseCode,
+      auth_code: '', reason: declineReason,
+    });
+    return { result: 'declined', redirectUrl, responseCode: authResult.responseCode, declineReason };
   }
 
   // Create the underlying card transaction
@@ -211,10 +281,26 @@ export async function processCheckoutPayment(
     }
   );
 
+  // Notify the merchant of the successful payment via the integration callback: surrogate token +
+  // authorization confirmation (no CHD). Mirrors the decline callback so the merchant always hears back.
+  await dispatchMerchantCallback(db, session, {
+    result: 'approved',
+    cardToken: input.cardToken,
+    maskedPan,
+    responseCode: authResult.responseCode,
+    authorizationCode: authResult.authCode,
+    cardTransactionInstanceReference: txResult.cardTransactionInstanceReference,
+  });
+
   const redirectUrl = substitutePlaceholders(session.checkoutSessionReturnUrl, {
     session_id: input.sessionId,
     txn_id: txResult.cardTransactionInstanceReference,
     case_id: txResult.fraudDiagnosisInstanceReference ?? '',
+    card_token: input.cardToken,
+    result: 'approved',
+    response_code: authResult.responseCode,
+    auth_code: authResult.authCode ?? '',
+    reason: '',
   });
 
   return {

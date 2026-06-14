@@ -413,5 +413,47 @@
     "recordCreatedDateTime": "2026-06-11T09:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-11T09:00:00.000Z",
     "schemaVersion": 2
+  },
+  {
+    "externalProviderArrangementInstanceReference": "int-merchant-callback-001",
+    "externalProviderArrangementName": "Merchant Payment Notifications",
+    "externalProviderArrangementType": "generic",
+    "externalProviderArrangementStatus": "active",
+    "externalProviderIsInternal": true,
+    "externalProviderCallbackEnabled": true,
+    "externalProviderTriggerEvents": [
+      "gateway.checkout.callback",
+      "payment_link.callback"
+    ],
+    "externalProviderMode": "async",
+    "externalProviderTimeoutMs": 1000,
+    "externalProviderRetryPolicy": {
+      "maxAttempts": 3,
+      "backoffMs": 500
+    },
+    "externalProviderHealthStatus": "ok",
+    "externalProviderLastHealthCheckAt": "2026-06-11T09:00:00.000Z",
+    "fieldMappingConfig": {
+      "outbound": [
+        { "sourcePath": "cardToken", "targetPath": "card_token" },
+        { "sourcePath": "result", "targetPath": "status" },
+        { "sourcePath": "responseCode", "targetPath": "response_code" },
+        { "sourcePath": "declineReason", "targetPath": "decline_reason" }
+      ],
+      "inbound": [
+        { "sourcePath": "acknowledged", "targetPath": "merchantAcknowledged" }
+      ],
+      "schemaVersion": 1
+    },
+    "routingPriority": 999,
+    "bianServiceDomain": "Payment Order",
+    "bianControlRecordType": "PaymentOrderProcedure",
+    "pciDssRequirements": [
+      "Req 3.4",
+      "Req 10.2.1"
+    ],
+    "recordCreatedDateTime": "2026-06-11T09:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-11T09:00:00.000Z",
+    "schemaVersion": 2
   }
 ]

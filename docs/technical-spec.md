@@ -2307,6 +2307,23 @@ runSeed().then(() => process.exit(0)).catch(err => { console.error(err); process
 
 ## 8. Ch-04 Payment Integration: Redirect Checkout + Payment Links
 
+### 8.0 Merchant payment callback (PSP → merchant, ADR-010/025)
+After a hosted-checkout payment is processed, the PSP notifies the merchant of the outcome through
+the **Integration Hub OUTBOUND mechanism** (`dispatchIntegration`, type `generic` — the seeded
+"Merchant Payment Notifications" provider, which defines the inbound webhook + outbound field
+mapping). The callback fires on **both** outcomes:
+- **Approved** → `payment.completed` with `cardToken` (surrogate, not CHD), `maskedPan`,
+  `responseCode`, `authorizationCode`, amount/currency, references.
+- **Declined** → `payment.declined` with `cardToken`, `responseCode` (e.g. `0540` = card
+  deactivated/removed) and a human `declineReason`. The decline path also returns a `redirectUrl`
+  and the real `code`/reason (no longer hard-coded `0190`).
+
+PCI DSS Req 3: the callback carries only the surrogate token + masked PAN — never the PAN/CVV
+(`logEvent` also applies the CHD blocklist). The browser return URL receives the same outcome via
+`{result}`, `{card_token}`, `{response_code}`, `{reason}` placeholders. The integration event is
+auditable in the events stream (Req 10). Saving the card is the merchant's decision on receiving
+this callback — not a checkbox in the PSP-hosted payment UI.
+
 ### 8.1 New TypeScript Models
 
 #### `CheckoutSessionRecord` (SD-64 — `checkoutSessionLog`)
