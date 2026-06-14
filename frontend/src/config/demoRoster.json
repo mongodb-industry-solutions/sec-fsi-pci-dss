@@ -1,0 +1,6 @@
+{
+  "_comment": "Declarative criteria for the curated demo roster. The actual users live in MongoDB (seeded). Both the /system login picker (debug mode) and the /simulator call GET /api/v1/auth/users with these filters, so they always draw from the SAME deterministic set. No emails or ids are hardcoded here — only filter criteria. Change a user's customerAuthenticationDemoFeatured flag in the DB and both surfaces update together.",
+  "login": { "featured": true },
+  "simulatorPersonas": { "featured": true, "role": ["customer"] },
+  "simulatorMerchants": { "featured": true, "isMerchant": true }
+}

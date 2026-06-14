@@ -11,6 +11,7 @@ import {
 } from '../models/paymentLink.model';
 import { createTransaction } from '../../transactions/services/cardTransaction.service';
 import { authorizeCard, linkAuthToTransaction } from './cardAuthorization.service';
+import { sendMerchantPaymentCallback, DECLINE_REASONS } from './checkout.service';
 
 // 8-char alphanumeric code (URL-safe, no ambiguous chars O/0 I/l)
 const CODE_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -171,6 +172,21 @@ export async function processLinkPayment(
   });
 
   if (authResult.result === 'declined') {
+    // Notify the merchant of the decline via its own webhook + the integration audit event.
+    await sendMerchantPaymentCallback(db, {
+      merchantAgreementInstanceReference: link.merchantAgreementInstanceReference,
+      amount: link.paymentLinkAmount,
+      currency: link.paymentLinkCurrency,
+      merchantReference: link.paymentLinkCode,
+      contextRef: link.paymentLinkInstanceReference,
+      contextType: 'payment_link',
+      triggeredBy: 'payment_link.callback',
+      result: 'declined',
+      cardToken: input.cardToken,
+      maskedPan,
+      responseCode: authResult.responseCode,
+      declineReason: DECLINE_REASONS[authResult.responseCode] ?? 'Authorization declined',
+    });
     return { result: 'declined' };
   }
 
@@ -198,6 +214,23 @@ export async function processLinkPayment(
 
   // Link auth record to the transaction
   await linkAuthToTransaction(db, authResult.recordId, txResult.cardTransactionInstanceReference);
+
+  // Notify the merchant of the successful payment (per-merchant webhook + integration audit event).
+  await sendMerchantPaymentCallback(db, {
+    merchantAgreementInstanceReference: link.merchantAgreementInstanceReference,
+    amount: link.paymentLinkAmount,
+    currency: link.paymentLinkCurrency,
+    merchantReference: link.paymentLinkCode,
+    contextRef: link.paymentLinkInstanceReference,
+    contextType: 'payment_link',
+    triggeredBy: 'payment_link.callback',
+    result: 'approved',
+    cardToken: input.cardToken,
+    maskedPan,
+    responseCode: authResult.responseCode,
+    authorizationCode: authResult.authCode,
+    cardTransactionInstanceReference: txResult.cardTransactionInstanceReference,
+  });
 
   // Determine new status for single_use links
   const newStatus: PaymentLinkStatus =

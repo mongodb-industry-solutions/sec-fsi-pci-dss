@@ -2307,11 +2307,16 @@ runSeed().then(() => process.exit(0)).catch(err => { console.error(err); process
 
 ## 8. Ch-04 Payment Integration: Redirect Checkout + Payment Links
 
-### 8.0 Merchant payment callback (PSP → merchant, ADR-010/025)
-After a hosted-checkout payment is processed, the PSP notifies the merchant of the outcome through
-the **Integration Hub OUTBOUND mechanism** (`dispatchIntegration`, type `generic` — the seeded
-"Merchant Payment Notifications" provider, which defines the inbound webhook + outbound field
-mapping). The callback fires on **both** outcomes:
+### 8.0 Merchant payment callback (PSP → merchant, ADR-010/025/028)
+After a payment is processed (hosted checkout **or** payment link), the PSP notifies the merchant via
+`sendMerchantPaymentCallback`, on **both** approval and decline, through TWO channels:
+1. **The merchant's own webhook** (per-merchant): `deliverWebhook` POSTs the HMAC-signed event to the
+   merchant's `merchantWebhookEndpoint` using `merchantWebhookSecret`. Each merchant has a **distinct**
+   endpoint (seeded), so the correct merchant is notified per its configuration (ADR-028).
+2. **The Integration Hub** OUTBOUND event (`dispatchIntegration`, type `generic` — the seeded
+   "Merchant Payment Notifications" provider) as the auditable inbound/outbound record.
+
+The event carries on **both** outcomes:
 - **Approved** → `payment.completed` with `cardToken` (surrogate, not CHD), `maskedPan`,
   `responseCode`, `authorizationCode`, amount/currency, references.
 - **Declined** → `payment.declined` with `cardToken`, `responseCode` (e.g. `0540` = card
@@ -2582,8 +2587,12 @@ Error codes: 404 merchant not found, 410 link expired/deactivated/completed.
 | `GET` | `/merchants/:id/events` | JWT | owner, `merchant_officer`, `security_auditor` | Merchant lifecycle **audit trail** (BIAN SD-89, PCI DSS Req 10): append-only `merchantAgreementEvents` log of `submitted` / `approved` / `rejected` / `updated` actions with actor and timestamp. Operational metadata only — no cardholder data. |
 | `GET` | `/merchants` | JWT | `merchant_officer`, `security_auditor` | List all merchant applications (officer review queue) |
 | `PATCH` | `/merchants/:id/review` | JWT | `merchant_officer`, `security_auditor` | Approve or reject application (BIAN Action: Control). Transitions status to `agreed` or `rejected`. Writes `merchantAgreementKybCheck` BQ:Step. |
-| `POST` | `/merchants/:id/keys` | JWT | `customer` | Generate new API key (plaintext returned once) |
+| `POST` | `/merchants/:id/keys` | JWT | `customer` | Generate new API key (plaintext returned once; `keyOrigin: 'generated'`) |
+| `POST` | `/merchants/:id/keys/import` | JWT | `customer` | Register an EXISTING key from the merchant's own system. Hashed server-side (bcrypt), plaintext never stored/returned; only the prefix is shown. `keyOrigin: 'imported'`. 400 if too short, 409 if already registered |
+| `PATCH` | `/merchants/:id/keys/:keyId` | JWT | `customer` | Rename (relabel) a key — `{ label }`; empty label clears it. Label is never a secret |
 | `DELETE` | `/merchants/:id/keys/:keyId` | JWT | `customer` | Revoke API key |
+
+`MerchantApiKeyRecord` adds `keyOrigin?: 'generated' | 'imported'` (display only; absent = generated). Both generate and import store only the bcrypt hash + display prefix (PCI DSS Req 3).
 
 **POST `/merchants` request (BIAN Action: Initiate):**
 ```json

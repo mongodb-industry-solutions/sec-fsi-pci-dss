@@ -10,11 +10,13 @@ import { variedAmountNum, variedDescription } from '../../lib/simVary';
 
 interface Props {
   scenario: SimulatorScenario;
+  // The merchant (payee) selected on the landing page; defaults to the configured demo merchant.
+  merchantId?: string;
 }
 
 type FlowState = 'idle' | 'creating' | 'link_ready' | 'iframe_open' | 'complete' | 'error';
 
-export function PaymentLinkFlow({ scenario }: Props) {
+export function PaymentLinkFlow({ scenario, merchantId }: Props) {
   const router = useRouter();
   const [flowState, setFlowState] = useState<FlowState>('idle');
   const [linkCode, setLinkCode] = useState<string | null>(null);
@@ -83,7 +85,7 @@ export function PaymentLinkFlow({ scenario }: Props) {
     setErrorMsg(null);
     try {
       const result = await api.simulator.createPaymentLink({
-        merchantId: simulatorConfig.merchantId,
+        merchantId: merchantId ?? simulatorConfig.merchantId,
         amount,
         currency: prefill.currency,
         description: description.trim() || prefill.description,

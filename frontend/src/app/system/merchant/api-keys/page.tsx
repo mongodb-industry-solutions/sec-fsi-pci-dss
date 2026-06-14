@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Copy, Check, Key, ShieldCheck, Trash2, Search } from 'lucide-react';
+import { Copy, Check, Key, ShieldCheck, Trash2, Search, Plus, Pencil, X, Download } from 'lucide-react';
 import { SectionHeader } from '../../../../components/SectionHeader';
 import { Pagination } from '../../../../components/Pagination';
 import { useRequireActiveMerchant } from '../../../../lib/merchantContext';
@@ -11,6 +11,7 @@ type KeyMeta = {
   keyPrefix: string;
   keyLabel: string | null;
   keyStatus: 'active' | 'revoked';
+  keyOrigin?: 'generated' | 'imported';
   keyCreatedDateTime: string;
   keyLastUsedDateTime: string | null;
 };
@@ -25,6 +26,15 @@ export default function ApiKeysSectionPage() {
   const [result, setResult] = useState<{ merchantApiKey: string; keyId: string; keyPrefix: string; keyLabel?: string | null } | null>(null);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Import an existing key (from the merchant's own system)
+  const [importValue, setImportValue] = useState('');
+  const [importLabel, setImportLabel] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Inline label editing
+  const [editingKeyId, setEditingKeyId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState('');
+  const [savingLabel, setSavingLabel] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'revoked'>('all');
   const [page, setPage] = useState(1);
@@ -54,6 +64,29 @@ export default function ApiKeysSectionPage() {
 
   async function revoke(keyId: string) {
     try { await api.merchants.revokeKey(merchantId, keyId, token); loadKeys(); } catch {}
+  }
+
+  async function importExisting() {
+    if (!importValue.trim()) return;
+    setImporting(true); setImportMsg(null);
+    try {
+      const r = await api.merchants.importKey(merchantId, importValue.trim(), token, importLabel.trim() || undefined);
+      setImportMsg({ ok: true, text: `Imported key ${r.keyPrefix}… (${r.keyLabel ?? 'unlabeled'}).` });
+      setImportValue(''); setImportLabel('');
+      loadKeys();
+    } catch (e) {
+      setImportMsg({ ok: false, text: e instanceof Error ? e.message : 'Failed to import key.' });
+    }
+    setImporting(false);
+  }
+
+  function startEdit(k: KeyMeta) { setEditingKeyId(k.keyId); setEditLabel(k.keyLabel ?? ''); }
+  function cancelEdit() { setEditingKeyId(null); setEditLabel(''); }
+  async function saveLabel(keyId: string) {
+    setSavingLabel(true);
+    try { await api.merchants.updateKeyLabel(merchantId, keyId, editLabel.trim(), token); setEditingKeyId(null); loadKeys(); }
+    catch {}
+    setSavingLabel(false);
   }
 
   const activeCount = keys.filter((k) => k.keyStatus === 'active').length;
@@ -118,6 +151,44 @@ export default function ApiKeysSectionPage() {
         )}
       </div>
 
+      {/* Import an existing key (from the merchant's own system) */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+        <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5"><Download size={14} /> Add an existing key</h2>
+        <p className="text-xs text-gray-500">
+          Register a key your own system already issued. It is hashed on the server (bcrypt) and never
+          stored in plaintext — only its prefix is shown afterwards. Marked as <span className="font-medium">imported</span>.
+        </p>
+        <div className="space-y-2">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">API key</label>
+            <input
+              value={importValue}
+              onChange={(e) => setImportValue(e.target.value)}
+              placeholder="Paste the full API key from your system"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
+            />
+          </div>
+          <div className="flex gap-2 items-end flex-wrap">
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-xs text-gray-500 mb-1">Label (optional)</label>
+              <input
+                value={importLabel}
+                onChange={(e) => setImportLabel(e.target.value)}
+                placeholder="e.g. Merchant ERP key, Legacy gateway"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
+              />
+            </div>
+            <button onClick={importExisting} disabled={importing || !importValue.trim()}
+              className="flex items-center gap-2 border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 text-sm">
+              <Plus size={15} />{importing ? 'Importing...' : 'Import key'}
+            </button>
+          </div>
+        </div>
+        {importMsg && (
+          <p className={`text-xs ${importMsg.ok ? 'text-green-700' : 'text-red-600'}`}>{importMsg.text}</p>
+        )}
+      </div>
+
       {/* Existing keys */}
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
@@ -158,20 +229,53 @@ export default function ApiKeysSectionPage() {
             {paginated.map((k) => (
               <li key={k.keyId} className="px-5 py-3 flex items-center gap-3">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-gray-800 text-sm">{k.keyLabel || 'Unlabeled key'}</span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${k.keyStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>{k.keyStatus}</span>
-                  </div>
+                  {editingKeyId === k.keyId ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <input
+                        autoFocus
+                        value={editLabel}
+                        onChange={(e) => setEditLabel(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') saveLabel(k.keyId); if (e.key === 'Escape') cancelEdit(); }}
+                        maxLength={80}
+                        placeholder="Label (empty to clear)"
+                        className="flex-1 min-w-[160px] border border-gray-300 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
+                      />
+                      <button onClick={() => saveLabel(k.keyId)} disabled={savingLabel}
+                        className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-[#001E2B] text-[#00ED64] disabled:opacity-50">
+                        <Check size={13} /> {savingLabel ? 'Saving…' : 'Save'}
+                      </button>
+                      <button onClick={cancelEdit} disabled={savingLabel}
+                        className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border text-gray-600 hover:bg-gray-50">
+                        <X size={13} /> Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-gray-800 text-sm">{k.keyLabel || 'Unlabeled key'}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${k.keyStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>{k.keyStatus}</span>
+                      {k.keyOrigin === 'imported' && (
+                        <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-blue-50 text-blue-700 border border-blue-200">imported</span>
+                      )}
+                    </div>
+                  )}
                   <div className="text-xs text-gray-400 mt-0.5 font-mono">
                     {k.keyPrefix}… · created {new Date(k.keyCreatedDateTime).toLocaleDateString()}
                     {k.keyLastUsedDateTime ? ` · last used ${new Date(k.keyLastUsedDateTime).toLocaleDateString()}` : ''}
                   </div>
                 </div>
-                {k.keyStatus === 'active' && (
-                  <button onClick={() => revoke(k.keyId)} title="Revoke key"
-                    className="shrink-0 inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
-                    <Trash2 size={13} /> Revoke
-                  </button>
+                {editingKeyId !== k.keyId && (
+                  <div className="shrink-0 flex items-center gap-1.5">
+                    <button onClick={() => startEdit(k)} title="Rename / relabel"
+                      className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+                      <Pencil size={13} /> Rename
+                    </button>
+                    {k.keyStatus === 'active' && (
+                      <button onClick={() => revoke(k.keyId)} title="Revoke key"
+                        className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
+                        <Trash2 size={13} /> Revoke
+                      </button>
+                    )}
+                  </div>
                 )}
               </li>
             ))}

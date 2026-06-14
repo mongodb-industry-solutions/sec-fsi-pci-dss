@@ -118,20 +118,20 @@ Password for all demo users: \`demo-password\``,
     schema: {
       tags: ['auth'],
       summary: 'List demo users (local domain)',
-      description: `Returns active pre-seeded demo user accounts for the local authentication domain.
-Intended for the UI to display one-click login shortcuts; passwords are **never** returned.
-Data is read directly from the seed file to avoid QE-decryption overhead on this helper endpoint.
+      description: `Returns active pre-seeded demo user accounts (DB-backed) for the local domain.
+Intended for the UI to display one-click login shortcuts; passwords are **never** returned. This is
+the single, non-hardcoded roster shared by the debug-mode login picker and the simulator.
 
-Pass \`?featured=true\` to return only the curated demo roster surfaced in the
-debug-mode user picker (application mode) and used by the simulator.`,
+Filters (combinable): \`featured=true\` (curated roster), \`role=customer,merchant_officer\`
+(comma list), \`q=\` (name/email substring), \`isMerchant=true\` (only customers who own a merchant).
+Results are returned in a deterministic order.`,
       querystring: {
         type: 'object',
         properties: {
-          featured: {
-            type: 'string',
-            enum: ['true', 'false'],
-            description: 'When "true", returns only users flagged customerAuthenticationDemoFeatured.',
-          },
+          featured: { type: 'string', enum: ['true', 'false'], description: 'When "true", only users flagged customerAuthenticationDemoFeatured.' },
+          role: { type: 'string', description: 'Comma-separated role filter, e.g. "customer,merchant_officer".' },
+          q: { type: 'string', description: 'Case-insensitive substring match on name or email.' },
+          isMerchant: { type: 'string', enum: ['true', 'false'], description: 'When "true", only customers who own a merchant.' },
         },
       },
       response: {
@@ -141,7 +141,7 @@ debug-mode user picker (application mode) and used by the simulator.`,
           properties: {
             users: {
               type: 'array',
-              description: 'All active demo accounts for the local domain.',
+              description: 'Active demo accounts matching the filters, in deterministic order.',
               items: {
                 type: 'object',
                 properties: {
@@ -152,13 +152,17 @@ debug-mode user picker (application mode) and used by the simulator.`,
                     enum: ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor', 'merchant_officer', 'manager'],
                     description: 'Role that will be encoded in the JWT on login.',
                   },
-                  featured: {
-                    type: 'boolean',
-                    description: 'True if this user is part of the curated demo roster.',
-                  },
+                  featured: { type: 'boolean', description: 'True if part of the curated demo roster.' },
+                  partyRef: { type: 'string', description: 'partyInstanceReference (SD-13).' },
                   merchant: {
-                    type: 'string',
-                    description: 'Merchant name when this user owns a merchant (customer who is also a merchant owner).',
+                    type: 'object',
+                    nullable: true,
+                    description: 'Present when this customer owns a merchant (customer + merchant).',
+                    properties: {
+                      id: { type: 'string', description: 'merchantAgreementInstanceReference.' },
+                      name: { type: 'string', description: 'Merchant display name.' },
+                      mcc: { type: 'string', nullable: true, description: 'Merchant Category Code (ISO 18245).' },
+                    },
                   },
                 },
               },
@@ -168,8 +172,13 @@ debug-mode user picker (application mode) and used by the simulator.`,
       },
     },
   }, async (request, reply) => {
-    const { featured } = request.query as { featured?: string };
-    const users = await getDemoUsers(fastify.db, { featured: featured === 'true' });
+    const { featured, role, q, isMerchant } = request.query as { featured?: string; role?: string; q?: string; isMerchant?: string };
+    const users = await getDemoUsers(fastify.db, {
+      featured: featured === 'true',
+      ...(role ? { role: role.split(',').map((r) => r.trim()).filter(Boolean) } : {}),
+      ...(q ? { q } : {}),
+      ...(isMerchant === 'true' ? { isMerchant: true } : {}),
+    });
     return reply.send({ users });
   });
 

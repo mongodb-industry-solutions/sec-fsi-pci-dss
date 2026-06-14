@@ -50,6 +50,10 @@ export interface SimulatorConfig {
 export interface SimulatorState {
   method: PaymentMethodId | null;
   scenarioId: string | null;
+  // The merchant (payee) chosen for this run — a real merchant owned by a featured customer.
+  merchantId: string | null;
+  merchantName: string | null;
+  merchantMcc: string | null;
   step: number;
   checkoutSessionId: string | null;
   paymentLinkCode: string | null;

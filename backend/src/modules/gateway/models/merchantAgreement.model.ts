@@ -10,6 +10,9 @@ export interface MerchantApiKeyRecord {
   keyCreatedDateTime: Date;
   keyLastUsedDateTime?: Date;
   keyLabel?: string;        // Human label to identify/differentiate keys (never a secret)
+  // 'generated' = minted by the PSP; 'imported' = supplied by the merchant's own system. Display
+  // only (helps recognise which keys originate elsewhere). Absent on legacy records = generated.
+  keyOrigin?: 'generated' | 'imported';
 }
 
 export interface MerchantAgreementControlRecord {

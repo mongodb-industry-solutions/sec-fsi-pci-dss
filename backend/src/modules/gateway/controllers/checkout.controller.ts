@@ -9,7 +9,6 @@ import {
   cancelCheckoutSession,
 } from '../services/checkout.service';
 import { getMerchantById } from '../services/merchant.service';
-import { deliverWebhook } from '../services/webhook.service';
 
 const SESSION_STATUS_ENUM = ['pending', 'completed', 'expired', 'cancelled'];
 
@@ -221,35 +220,8 @@ export async function checkoutController(fastify: FastifyInstance) {
       redirectUrl: redirectUrl ?? null,
     });
 
-    // Fire webhook asynchronously (non-blocking)
-    if (result === 'ok') {
-      const session = await getCheckoutSession(fastify.db, id);
-      if (session) {
-        const merchant = await getMerchantById(fastify.db, (session as unknown as Record<string, unknown>).merchantAgreementInstanceReference as string ?? '');
-        const merchantDoc = merchant as Record<string, unknown> | null;
-        if (merchantDoc?.merchantWebhookEndpoint && merchantDoc?.merchantWebhookSecret) {
-          const maskedPan = `****-****-****-${body.cardToken.slice(-4).padStart(4, '0')}`;
-          deliverWebhook(
-            merchantDoc.merchantWebhookEndpoint as string,
-            {
-              event: 'checkout.completed',
-              timestamp: new Date().toISOString(),
-              data: {
-                checkoutSessionInstanceReference: id,
-                cardTransactionInstanceReference,
-                fraudDiagnosisInstanceReference: fraudDiagnosisInstanceReference ?? null,
-                fraudCaseCreated: !!fraudDiagnosisInstanceReference,
-                cardToken: body.cardToken,
-                maskedPan,
-                amount: session.checkoutSessionAmount,
-                currency: session.checkoutSessionCurrency,
-              },
-            },
-            merchantDoc.merchantWebhookSecret as string
-          ).catch(() => {});
-        }
-      }
-    }
+    // The merchant payment callback (per-merchant webhook + integration audit event) is fired inside
+    // processCheckoutPayment for BOTH success and decline — see dispatchMerchantCallback.
 
     return reply.send({
       success: true,

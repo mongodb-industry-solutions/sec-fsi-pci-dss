@@ -352,6 +352,7 @@ export async function generateApiKey(
     keyHashBcrypt,
     keyStatus: 'active',
     keyCreatedDateTime: now,
+    keyOrigin: 'generated',
     ...(label?.trim() && { keyLabel: label.trim() }),
   };
 
@@ -366,6 +367,69 @@ export async function generateApiKey(
     keyLabel: newKey.keyLabel,
     merchantApiKey: plaintext, // Returned ONCE - never stored in plaintext
   };
+}
+
+/**
+ * Import an EXISTING API key supplied by the merchant's own system. PCI DSS Req 3: only the bcrypt
+ * hash + a display prefix are stored — the plaintext is hashed and discarded, never persisted and
+ * never returned (the merchant already holds it). Returns metadata, or 'invalid' if too short, or
+ * 'duplicate' if that exact key is already registered (active) for the merchant.
+ */
+export async function importApiKey(
+  db: Db,
+  merchantId: string,
+  plaintext: string,
+  label?: string,
+): Promise<{ keyId: string; keyPrefix: string; keyLabel?: string; keyStatus: 'active'; keyOrigin: 'imported' } | null | 'invalid' | 'duplicate'> {
+  const merchant = await db
+    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
+    .findOne({ merchantAgreementInstanceReference: merchantId } as Partial<MerchantAgreementControlRecord>);
+  if (!merchant) return null;
+
+  const trimmed = plaintext.trim();
+  if (trimmed.length < 12) return 'invalid';
+
+  // Reject re-importing a key already on file (compare against active keys' hashes).
+  const active = (merchant.merchantApiKeys ?? []).filter((k) => k.keyStatus === 'active');
+  for (const k of active) {
+    if (await bcryptCompare(trimmed, k.keyHashBcrypt)) return 'duplicate';
+  }
+
+  const now = new Date();
+  const newKey: MerchantApiKeyRecord = {
+    keyId: uuidv4(),
+    keyPrefix: trimmed.slice(0, 12),
+    keyHashBcrypt: await bcryptHash(trimmed, BCRYPT_ROUNDS),
+    keyStatus: 'active',
+    keyCreatedDateTime: now,
+    keyOrigin: 'imported',
+    ...(label?.trim() && { keyLabel: label.trim() }),
+  };
+
+  await db.collection(MERCHANT_AGREEMENT_COLLECTION).updateOne(
+    { merchantAgreementInstanceReference: merchantId },
+    { $push: { merchantApiKeys: newKey }, $set: { recordUpdatedDateTime: now } } as object
+  );
+
+  return { keyId: newKey.keyId, keyPrefix: newKey.keyPrefix, keyLabel: newKey.keyLabel, keyStatus: 'active', keyOrigin: 'imported' };
+}
+
+/** Update (or clear) the human label of an API key. Label is never a secret. */
+export async function updateApiKeyLabel(
+  db: Db,
+  merchantId: string,
+  keyId: string,
+  label: string,
+): Promise<'ok' | 'not_found'> {
+  const trimmed = label.trim();
+  const update = trimmed
+    ? { $set: { 'merchantApiKeys.$.keyLabel': trimmed, recordUpdatedDateTime: new Date() } }
+    : { $unset: { 'merchantApiKeys.$.keyLabel': '' }, $set: { recordUpdatedDateTime: new Date() } };
+  const result = await db.collection(MERCHANT_AGREEMENT_COLLECTION).updateOne(
+    { merchantAgreementInstanceReference: merchantId, 'merchantApiKeys.keyId': keyId } as object,
+    update as object,
+  );
+  return result.matchedCount > 0 ? 'ok' : 'not_found';
 }
 
 /**
@@ -385,6 +449,7 @@ export async function getMerchantApiKeys(db: Db, merchantId: string) {
     keyPrefix: k.keyPrefix,
     keyLabel: k.keyLabel ?? null,
     keyStatus: k.keyStatus,
+    keyOrigin: k.keyOrigin ?? 'generated',
     keyCreatedDateTime: k.keyCreatedDateTime,
     keyLastUsedDateTime: k.keyLastUsedDateTime ?? null,
   }));

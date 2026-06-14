@@ -1993,3 +1993,42 @@ PCI DSS Req 3 (only masked PAN + irreversible token; no PAN/CVV), Req 7 (per-cus
 **Trade-offs.** Slight denormalisation (masked PAN/network on both entities) for read performance; the
 deterministic token is the dedup key, so a tokenisation-key change would re-issue tokens (acceptable —
 the registry rebuilds from arrangements via `rebuildCardRegistry`).
+
+## ADR-028 — Shared demo roster (DB-backed, filterable) + simulator merchant selection + per-merchant callback
+
+**Context.** Three coupled needs: (a) the `/system` login picker (debug mode) and the `/simulator`
+must offer the **same** users without hardcoding; (b) the simulator must let the operator choose the
+**merchant (payee)** so payments are attributable and reviewable; (c) the PSP must notify the
+**correct merchant** of the payment outcome per its own configuration. There is **no `merchant`
+role** — a "merchant" is a `customer` who owns a merchant via `merchant.merchantOwnerPartyReference`
+(e.g. luis.fernandez → Espresso Works, amara.okafor → Okafor Digital Services).
+
+**Decision.**
+1. **Single DB-backed, filterable roster.** `getDemoUsers(db, filter)` queries the
+   `customerAuthentication` collection (not the seed file), resolves the owned merchant as
+   `{ id, name, mcc }` via `merchantOwnerPartyReference`, and returns a **deterministic order**
+   (role rank → name → email). Filters: `featured`, `role[]`, `q`, `isMerchant`. Exposed on
+   `GET /api/v1/auth/users` and `/system/users`.
+2. **Declarative criteria, not hardcoded users.** `frontend/src/config/demoRoster.json` holds the
+   filter criteria (`login`, `simulatorPersonas`, `simulatorMerchants`). Login and simulator call the
+   same endpoint with these criteria, so they draw from the **same set** (simulator sets are subsets
+   of the login roster). The old frontend `customers ≤ 4` cap is removed — the `featured` flag is the
+   curation. The seeder guarantees the featured roster exists in the DB.
+3. **Simulator merchant step.** After persona selection, a 3rd step selects the merchant (from
+   `simulatorMerchants` → ≥2 deterministic real merchants). The chosen `merchantId` is propagated
+   through all flows (api-card, redirect checkout, payment link). The transaction-value editing step
+   is preserved; merchant selection is inserted, not replacing it.
+4. **Per-merchant callback.** `sendMerchantPaymentCallback` (shared by checkout + payment-link) fires
+   on **both** approval and decline: (i) the merchant's **own** webhook (`merchantWebhookEndpoint`
+   signed with `merchantWebhookSecret`, distinct per merchant) and (ii) an Integration-Hub `generic`
+   event for audit. Seed gives each merchant a distinct webhook URL pointing at the webhook inspector.
+   PCI DSS Req 3: surrogate token + masked PAN only (no PAN/CVV).
+
+**Traceability.** Everything done in the simulator is reviewable in the system under the chosen
+merchant: received payments (`/system/merchant/[id]`), webhook deliveries (webhook inspector),
+integration audit events (`/system/admin/events`), fraud case (`/system/investigation`), and the
+auto-registered card-on-file (`/system/cards`).
+
+**Trade-offs.** `getDemoUsers` now hits the DB (one find + one merchant find) instead of a file read —
+negligible for the roster size and removes file/DB drift. Merchant webhook delivery is loopback to the
+inspector in local/demo; in production it targets the merchant's real endpoint.

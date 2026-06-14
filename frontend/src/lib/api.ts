@@ -37,8 +37,29 @@ export interface AuthUser {
   name: string;
   role: string;
   featured?: boolean;
-  /** Merchant name when this user owns a merchant (customer who is also a merchant owner). */
-  merchant?: string;
+  partyRef?: string;
+  /** Present when this customer owns a merchant (customer who is also a merchant owner). */
+  merchant?: { id: string; name: string; mcc?: string };
+}
+
+/** Declarative filters for the shared demo roster (see config/demoRoster.json). */
+export interface DemoUserFilters {
+  featured?: boolean;
+  role?: string[];
+  q?: string;
+  isMerchant?: boolean;
+}
+
+// Build the demo-roster querystring. Accepts a legacy boolean (= { featured }) or a filters object.
+function demoRosterQuery(arg?: boolean | DemoUserFilters): string {
+  const f: DemoUserFilters = typeof arg === 'boolean' ? { featured: arg } : (arg ?? {});
+  const qs = new URLSearchParams();
+  if (f.featured) qs.set('featured', 'true');
+  if (f.role?.length) qs.set('role', f.role.join(','));
+  if (f.q) qs.set('q', f.q);
+  if (f.isMerchant) qs.set('isMerchant', 'true');
+  const s = qs.toString();
+  return s ? `?${s}` : '';
 }
 
 export interface AuthDomain {
@@ -250,8 +271,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(body),
       }),
-    users: (featured?: boolean) =>
-      apiFetch<{ users: AuthUser[] }>(`/api/v1/auth/users${featured ? '?featured=true' : ''}`),
+    users: (filters?: boolean | DemoUserFilters) =>
+      apiFetch<{ users: AuthUser[] }>(`/api/v1/auth/users${demoRosterQuery(filters)}`),
     domains: () =>
       apiFetch<{ domains: AuthDomain[] }>('/api/v1/auth/domains'),
     updateMe: (
@@ -566,8 +587,8 @@ export const api = {
   },
 
   system: {
-    users: (featured?: boolean) =>
-      apiFetch<{ users: AuthUser[] }>(`/api/v1/system/users${featured ? '?featured=true' : ''}`),
+    users: (filters?: boolean | DemoUserFilters) =>
+      apiFetch<{ users: AuthUser[] }>(`/api/v1/system/users${demoRosterQuery(filters)}`),
     rawDocument: (collection: string, id: string, token: string) =>
       apiFetch<RawDocumentResponse>(
         `/api/v1/system/raw/${collection}/${id}`, {}, token
@@ -685,6 +706,7 @@ export const api = {
           keyPrefix: string;
           keyLabel: string | null;
           keyStatus: 'active' | 'revoked';
+          keyOrigin?: 'generated' | 'imported';
           keyCreatedDateTime: string;
           keyLastUsedDateTime: string | null;
         }>;
@@ -692,6 +714,16 @@ export const api = {
     generateKey: (merchantId: string, token: string, label?: string) =>
       apiFetch<{ keyId: string; keyPrefix: string; keyLabel?: string | null; merchantApiKey: string }>(
         `/api/v1/merchants/${merchantId}/keys`, { method: 'POST', body: JSON.stringify({ label }) }, token
+      ),
+    // Register an existing key from the merchant's own system (hashed server-side; never stored plain).
+    importKey: (merchantId: string, apiKey: string, token: string, label?: string) =>
+      apiFetch<{ keyId: string; keyPrefix: string; keyLabel?: string | null; keyStatus: 'active'; keyOrigin: 'imported' }>(
+        `/api/v1/merchants/${merchantId}/keys/import`, { method: 'POST', body: JSON.stringify({ apiKey, label }) }, token
+      ),
+    // Rename (relabel) a key to identify it more easily. Empty label clears it.
+    updateKeyLabel: (merchantId: string, keyId: string, label: string, token: string) =>
+      apiFetch<{ keyId: string; keyLabel: string | null }>(
+        `/api/v1/merchants/${merchantId}/keys/${keyId}`, { method: 'PATCH', body: JSON.stringify({ label }) }, token
       ),
     revokeKey: (merchantId: string, keyId: string, token: string) =>
       apiFetch<{ revoked: boolean; keyId: string }>(

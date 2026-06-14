@@ -66,14 +66,18 @@ export async function demoController(fastify: FastifyInstance) {
     schema: {
       tags: ['system'],
       summary: 'List demo users for quick login',
-      description: `Returns active pre-seeded demo user accounts for the local authentication domain.
-**Public  -  no JWT required.** Intended for the login UI to populate the user selector. Passwords are never returned.
+      description: `Returns active pre-seeded demo user accounts (DB-backed) for the local domain.
+**Public  -  no JWT required.** The single, non-hardcoded roster shared by the login picker and the simulator.
 
-Pass \`?featured=true\` to return only the curated demo roster (debug-mode picker + simulator).`,
+Filters (combinable): \`featured=true\`, \`role=customer,merchant_officer\` (comma list), \`q=\`
+(name/email substring), \`isMerchant=true\` (only customers who own a merchant). Deterministic order.`,
       querystring: {
         type: 'object',
         properties: {
           featured: { type: 'string', enum: ['true', 'false'], description: 'When "true", only customerAuthenticationDemoFeatured users.' },
+          role: { type: 'string', description: 'Comma-separated role filter.' },
+          q: { type: 'string', description: 'Case-insensitive substring on name or email.' },
+          isMerchant: { type: 'string', enum: ['true', 'false'], description: 'When "true", only customers who own a merchant.' },
         },
       },
       response: {
@@ -83,7 +87,7 @@ Pass \`?featured=true\` to return only the curated demo roster (debug-mode picke
           properties: {
             users: {
               type: 'array',
-              description: 'Active demo accounts for the local domain.',
+              description: 'Active demo accounts matching the filters, in deterministic order.',
               items: {
                 type: 'object',
                 properties: {
@@ -94,9 +98,17 @@ Pass \`?featured=true\` to return only the curated demo roster (debug-mode picke
                     enum: ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor', 'merchant_officer', 'manager'],
                     description: 'Role encoded in the JWT on login.',
                   },
+                  featured: { type: 'boolean', description: 'True if part of the curated demo roster.' },
+                  partyRef: { type: 'string', description: 'partyInstanceReference (SD-13).' },
                   merchant: {
-                    type: 'string',
-                    description: 'Merchant name when this user owns a merchant (customer who is also a merchant owner).',
+                    type: 'object',
+                    nullable: true,
+                    description: 'Present when this customer owns a merchant (customer + merchant).',
+                    properties: {
+                      id: { type: 'string', description: 'merchantAgreementInstanceReference.' },
+                      name: { type: 'string', description: 'Merchant display name.' },
+                      mcc: { type: 'string', nullable: true, description: 'Merchant Category Code (ISO 18245).' },
+                    },
                   },
                 },
               },
@@ -109,8 +121,13 @@ Pass \`?featured=true\` to return only the curated demo roster (debug-mode picke
   }, async (request, reply) => {
     try {
       const db = (fastify as FastifyInstance & { db?: Db }).db as Db;
-      const { featured } = request.query as { featured?: string };
-      const users = await getDemoUsers(db, { featured: featured === 'true' });
+      const { featured, role, q, isMerchant } = request.query as { featured?: string; role?: string; q?: string; isMerchant?: string };
+      const users = await getDemoUsers(db, {
+        featured: featured === 'true',
+        ...(role ? { role: role.split(',').map((r) => r.trim()).filter(Boolean) } : {}),
+        ...(q ? { q } : {}),
+        ...(isMerchant === 'true' ? { isMerchant: true } : {}),
+      });
       return reply.send({ users });
     } catch (err) {
       fastify.log.error(err);

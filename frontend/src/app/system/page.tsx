@@ -13,6 +13,7 @@ import {
 import { api, AuthUser, AuthDomain } from '../../lib/api';
 import { getToken, setToken, clearToken, decodeToken, isTokenExpired } from '../../lib/auth';
 import { DEMO_PASSWORD, ROLE_LABELS } from '../../lib/constants';
+import demoRoster from '../../config/demoRoster.json';
 import { Tooltip } from '../../components/Tooltip';
 import { useDebugMode } from '../../lib/debugMode';
 import { UserMenu } from '../../components/UserMenu';
@@ -119,19 +120,20 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
   const [submitting, setSubmitting]         = useState(false);
   const [error, setError]                   = useState<string | null>(null);
 
-  const displayUsers = useMemo(() => {
-    const sorted = [...users].sort((a, b) => (ROLE_ORDER[a.role] ?? 99) - (ROLE_ORDER[b.role] ?? 99));
-    let n = 0;
-    return sorted.filter((u) => (u.role === 'customer' ? ++n <= 4 : true));
-  }, [users]);
+  // The API already returns the curated roster (config/demoRoster.json criteria) in a deterministic
+  // order shared with the simulator. We only group by role for display; no hardcoded user cap.
+  const displayUsers = useMemo(
+    () => [...users].sort((a, b) => (ROLE_ORDER[a.role] ?? 99) - (ROLE_ORDER[b.role] ?? 99)),
+    [users],
+  );
 
   useEffect(() => {
     setSelectedEmail(''); setPassword(''); setSubmitting(false); setError(null);
   }, []);
 
   useEffect(() => {
-    api.system.users(true).then((r) => setUsers(r.users)).catch(() =>
-      api.auth.users(true).then((r) => setUsers(r.users)).catch(() => {}));
+    api.system.users(demoRoster.login).then((r) => setUsers(r.users)).catch(() =>
+      api.auth.users(demoRoster.login).then((r) => setUsers(r.users)).catch(() => {}));
     api.auth.domains()
       .then((r) => { setDomains(r.domains); if (r.domains.length > 0) setSelectedDomain(r.domains[0].name); })
       .catch(() => setDomains([{ name: 'local', displayName: 'Local (Demo Users)', type: 'local', flowType: 'client_credentials' }]));
@@ -231,7 +233,7 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
                       <option value="">Select a user…</option>
                       {displayUsers.map((u) => (
                         <option key={u.email} value={u.email}>
-                          {u.name} ({ROLE_LABELS[u.role] ?? u.role}{u.merchant ? ` · 🏬 ${u.merchant}` : ''})
+                          {u.name} ({ROLE_LABELS[u.role] ?? u.role}{u.merchant ? ` · 🏬 ${u.merchant.name}` : ''})
                         </option>
                       ))}
                     </select>

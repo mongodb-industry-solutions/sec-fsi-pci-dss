@@ -283,6 +283,8 @@ export default function PaymentPage() {
   const router = useRouter();
   const [simMethod, setSimMethod] = useState<PaymentMethodId | null>(null);
   const [simScenario, setSimScenario] = useState<SimulatorScenario | null>(null);
+  // The merchant (payee) chosen on the landing page — drives attribution + per-merchant callback.
+  const [merchantId, setMerchantId] = useState<string>(simulatorConfig.merchantId);
   const [methodReady, setMethodReady] = useState(false);
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<FormData>(DEFAULTS);
@@ -310,11 +312,19 @@ export default function PaymentPage() {
     const scenarioId = sessionStorage.getItem('sim_scenario');
     setSimMethod(method);
 
+    // Merchant (payee) chosen on the landing page. Overrides the scenario's merchant prefill so the
+    // payment is attributed to the selected merchant and its webhook callback is the one notified.
+    const selMerchantId = sessionStorage.getItem('sim_merchant_id') ?? simulatorConfig.merchantId;
+    const selMerchantName = sessionStorage.getItem('sim_merchant_name') ?? simulatorConfig.merchantName;
+    const selMerchantMcc = sessionStorage.getItem('sim_merchant_mcc') ?? undefined;
+    setMerchantId(selMerchantId);
+
     if (scenarioId) {
       const found = (simulatorConfig.scenarios as SimulatorScenario[]).find(s => s.id === scenarioId) ?? null;
       setSimScenario(found);
       if (found && method === 'api-card') {
-        // Pre-fill form from scenario
+        // Pre-fill from scenario (payer) + the selected merchant (payee). Both remain editable on
+        // the form so the operator can still vary values for more dynamic demos.
         setForm({
           cardholderName: found.prefill.cardholderName,
           expiry: '12/28',
@@ -322,8 +332,8 @@ export default function PaymentPage() {
           phone: found.prefill.phone,
           amount: String(found.prefill.amount),
           description: '',
-          merchantName: found.prefill.merchantName,
-          merchantCategoryCode: found.prefill.merchantCategoryCode,
+          merchantName: selMerchantName,
+          merchantCategoryCode: selMerchantMcc ?? found.prefill.merchantCategoryCode,
         });
       }
     }
@@ -390,6 +400,7 @@ export default function PaymentPage() {
     return (
       <RedirectionPaymentFlow
         scenario={scenario}
+        merchantId={merchantId}
       />
     );
   }
@@ -399,6 +410,7 @@ export default function PaymentPage() {
     return (
       <PaymentLinkFlow
         scenario={scenario}
+        merchantId={merchantId}
       />
     );
   }
@@ -449,9 +461,9 @@ export default function PaymentPage() {
         cardTransactionMaskedPanDisplay: maskedCard || '****-****-****-1234',
         cardTransactionType: 'purchase',
         cardTransactionDescription: (form.description.trim() || form.merchantName.toUpperCase()).slice(0, 22),
-        // Acquiring-side link: the API-card flow charges the simulator merchant,
-        // so the payment also surfaces in that merchant's received-payments view.
-        merchantAgreementInstanceReference: simulatorConfig.merchantId,
+        // Acquiring-side link: the payment is charged to the MERCHANT selected on the landing page,
+        // so it surfaces in that merchant's received-payments view and its webhook callback fires.
+        merchantAgreementInstanceReference: merchantId,
         gatewayPayload: { source: 'simulator', timestamp: new Date().toISOString() },
       });
 

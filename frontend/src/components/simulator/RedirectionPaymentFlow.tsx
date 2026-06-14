@@ -10,11 +10,13 @@ import { variedAmountNum, variedDescription } from '../../lib/simVary';
 
 interface Props {
   scenario: SimulatorScenario;
+  // The merchant (payee) selected on the landing page; defaults to the configured demo merchant.
+  merchantId?: string;
 }
 
 type FlowState = 'idle' | 'creating' | 'ready' | 'waiting' | 'complete' | 'error';
 
-export function RedirectionPaymentFlow({ scenario }: Props) {
+export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
   const router = useRouter();
   const [flowState, setFlowState] = useState<FlowState>('idle');
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -76,7 +78,7 @@ export function RedirectionPaymentFlow({ scenario }: Props) {
     try {
       const origin = window.location.origin;
       const result = await api.simulator.createCheckoutSession({
-        merchantId: simulatorConfig.merchantId,
+        merchantId: merchantId ?? simulatorConfig.merchantId,
         amount,
         currency: prefill.currency,
         description: description.trim() || prefill.description,

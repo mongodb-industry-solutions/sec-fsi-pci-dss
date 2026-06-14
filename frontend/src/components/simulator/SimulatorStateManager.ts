@@ -3,6 +3,9 @@ import type { PaymentMethodId, SimulatorState } from '../../types/simulator';
 const KEYS = {
   METHOD: 'sim_method',
   SCENARIO: 'sim_scenario',
+  MERCHANT_ID: 'sim_merchant_id',
+  MERCHANT_NAME: 'sim_merchant_name',
+  MERCHANT_MCC: 'sim_merchant_mcc',
   STEP: 'sim_step',
   CHECKOUT_SESSION: 'sim_checkout_session',
   PAYMENT_LINK: 'sim_payment_link',
@@ -29,6 +32,9 @@ export const SimulatorStateManager = {
     return {
       method: (safeGet(KEYS.METHOD) as PaymentMethodId) ?? null,
       scenarioId: safeGet(KEYS.SCENARIO),
+      merchantId: safeGet(KEYS.MERCHANT_ID),
+      merchantName: safeGet(KEYS.MERCHANT_NAME),
+      merchantMcc: safeGet(KEYS.MERCHANT_MCC),
       step: parseInt(safeGet(KEYS.STEP) ?? '0', 10),
       checkoutSessionId: safeGet(KEYS.CHECKOUT_SESSION),
       paymentLinkCode: safeGet(KEYS.PAYMENT_LINK),
@@ -41,6 +47,13 @@ export const SimulatorStateManager = {
 
   setScenario(scenarioId: string): void {
     safeSet(KEYS.SCENARIO, scenarioId);
+  },
+
+  // The merchant (payee) chosen for this run — a real merchant owned by a featured customer.
+  setMerchant(id: string, name: string, mcc?: string): void {
+    safeSet(KEYS.MERCHANT_ID, id);
+    safeSet(KEYS.MERCHANT_NAME, name);
+    if (mcc) safeSet(KEYS.MERCHANT_MCC, mcc);
   },
 
   setStep(step: number): void {
