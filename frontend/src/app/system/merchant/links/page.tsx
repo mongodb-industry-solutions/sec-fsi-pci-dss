@@ -87,7 +87,7 @@ export default function LinksSectionPage() {
   const paginated = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   return (
-    <div className="w-full px-5 sm:px-8 py-6 space-y-5 max-w-2xl">
+    <div className="w-full px-5 sm:px-8 py-6 space-y-5">
       <SectionHeader
         icon={Link2}
         title="Payment Links"

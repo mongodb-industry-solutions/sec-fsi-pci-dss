@@ -11,7 +11,7 @@ import {
 } from '../models/paymentLink.model';
 import { createTransaction } from '../../transactions/services/cardTransaction.service';
 import { authorizeCard, linkAuthToTransaction } from './cardAuthorization.service';
-import { sendMerchantPaymentCallback, DECLINE_REASONS } from './checkout.service';
+import { sendMerchantPaymentCallback, DECLINE_REASONS } from './merchantCallback.service';
 
 // 8-char alphanumeric code (URL-safe, no ambiguous chars O/0 I/l)
 const CODE_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -215,22 +215,8 @@ export async function processLinkPayment(
   // Link auth record to the transaction
   await linkAuthToTransaction(db, authResult.recordId, txResult.cardTransactionInstanceReference);
 
-  // Notify the merchant of the successful payment (per-merchant webhook + integration audit event).
-  await sendMerchantPaymentCallback(db, {
-    merchantAgreementInstanceReference: link.merchantAgreementInstanceReference,
-    amount: link.paymentLinkAmount,
-    currency: link.paymentLinkCurrency,
-    merchantReference: link.paymentLinkCode,
-    contextRef: link.paymentLinkInstanceReference,
-    contextType: 'payment_link',
-    triggeredBy: 'payment_link.callback',
-    result: 'approved',
-    cardToken: input.cardToken,
-    maskedPan,
-    responseCode: authResult.responseCode,
-    authorizationCode: authResult.authCode,
-    cardTransactionInstanceReference: txResult.cardTransactionInstanceReference,
-  });
+  // The APPROVED merchant callback is fired centrally inside createTransaction (covers all flows).
+  // The decline callback (above) is handled here because a decline never reaches createTransaction.
 
   // Determine new status for single_use links
   const newStatus: PaymentLinkStatus =

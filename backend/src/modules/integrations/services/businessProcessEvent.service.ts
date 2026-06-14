@@ -176,6 +176,9 @@ export async function listAuditEvents(
     entityType?: string;
     outcome?: string;
     q?: string;
+    // Deep "related reference" match across entityId + event summary/payload — used by the auditor to
+    // find EVERY event for a given transaction id / case id / merchant / customer / card token.
+    ref?: string;
     minScore?: number;
     from?: Date;
     to?: Date;
@@ -234,6 +237,9 @@ export async function listAuditEvents(
     if (docs.length > AUDIT_FETCH_CAP) capped = true;
     for (const d of docs.slice(0, AUDIT_FETCH_CAP)) {
       const meta = (d.integrationEventMeta ?? {}) as Record<string, unknown>;
+      // Use the business context (e.g. the transaction this callback belongs to) for entity linking
+      // and search, so an integration event is findable by its transaction/case id — not only by the
+      // provider id. The provider arrangement id is retained in the summary.
       rows.push({
         id: d.integrationEventInstanceReference,
         source: 'integration',
@@ -241,17 +247,20 @@ export async function listAuditEvents(
         type: d.integrationEventType,
         action: d.integrationEventTriggeredBy,
         outcome: d.integrationEventStatus,
-        entityType: 'integration',
-        entityId: d.externalProviderArrangementInstanceReference,
+        entityType: d.businessContext?.entityType ?? 'integration',
+        entityId: d.businessContext?.entityId ?? d.externalProviderArrangementInstanceReference,
         performedByRole: null,
         bianServiceDomain: d.bianServiceDomain,
         context: typeof meta.direction === 'string' ? `${meta.direction}${meta.test ? ' test' : ''}` : undefined,
         summary: {
+          providerArrangementId: d.externalProviderArrangementInstanceReference,
           payload: d.integrationEventPayloadSnapshot,
           payloadHash: d.integrationEventPayloadHash,
           responseCode: d.integrationEventResponseCode,
           latencyMs: d.integrationEventLatencyMs,
           error: d.integrationEventErrorMessage,
+          request: d.integrationEventRequest,
+          response: d.integrationEventResponse,
           ...meta,
         },
       });
@@ -274,6 +283,15 @@ export async function listAuditEvents(
       r.action.toLowerCase().includes(q) ||
       (r.entityId ?? '').toLowerCase().includes(q) ||
       r.type.toLowerCase().includes(q));
+  }
+  // Deep "related reference" match: entityId OR any value in the event summary/payload (so a txn id,
+  // case id, merchant id, customer/account ref or card token finds EVERY related event).
+  if (opts.ref) {
+    const ref = opts.ref.toLowerCase().trim();
+    merged = merged.filter((r) => {
+      if ((r.entityId ?? '').toLowerCase().includes(ref)) return true;
+      try { return JSON.stringify(r.summary ?? {}).toLowerCase().includes(ref); } catch { return false; }
+    });
   }
   merged.sort((a, b) => new Date(b.eventDateTime).getTime() - new Date(a.eventDateTime).getTime());
   const total = merged.length;

@@ -14,6 +14,7 @@ import {
   MerchantApiKeyRecord,
 } from '../models/merchantAgreement.model';
 import { emitComplianceEvent } from '../../integrations/services/businessProcessEvent.service';
+import { deliverWebhook } from './webhook.service';
 
 const BCRYPT_ROUNDS = 10;
 const API_KEY_PREFIX = 'lbpk_live_';
@@ -319,15 +320,91 @@ export async function updateMerchant(
 }
 
 export async function registerWebhook(db: Db, merchantId: string, url: string) {
-  const result = await db.collection(MERCHANT_AGREEMENT_COLLECTION).findOneAndUpdate(
-    { merchantAgreementInstanceReference: merchantId },
-    { $set: { merchantWebhookEndpoint: url, recordUpdatedDateTime: new Date() } },
-    { returnDocument: 'after', projection: { merchantWebhookEndpoint: 1, merchantAgreementInstanceReference: 1 } }
+  const existing = await db.collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION).findOne(
+    { merchantAgreementInstanceReference: merchantId } as Partial<MerchantAgreementControlRecord>,
+    { projection: { merchantWebhookSecret: 1 } },
   );
-  if (!result) return null;
+  if (!existing) return null;
+
+  // A webhook needs a signing secret to be USABLE — without it the PSP cannot HMAC-sign the callback
+  // and treats the endpoint as not configured. Saving the URL therefore guarantees a secret exists
+  // (generated once, kept thereafter). The secret is the webhook's authentication (X-Webhook-Signature).
+  const secret = (existing as { merchantWebhookSecret?: string }).merchantWebhookSecret || `whsec_${randomBytes(24).toString('hex')}`;
+  await db.collection(MERCHANT_AGREEMENT_COLLECTION).updateOne(
+    { merchantAgreementInstanceReference: merchantId },
+    { $set: { merchantWebhookEndpoint: url, merchantWebhookSecret: secret, recordUpdatedDateTime: new Date() } },
+  );
   return {
     merchantAgreementInstanceReference: merchantId,
     merchantWebhookEndpoint: url,
+    merchantWebhookSecret: secret, // returned so the merchant can verify signatures
+  };
+}
+
+/**
+ * Send a SIMULATED `payment.completed` webhook to the merchant's configured endpoint so they can
+ * verify their integration WITHOUT running a full payment. Returns the exact payload sent plus the
+ * delivery outcome (status, attempts, the merchant's response, or an error). HMAC-signed like a real
+ * event; sample (clearly `test: true`) data only — no real CHD.
+ */
+// The default representative payload (same SHAPE as a real `payment.completed` callback). Exposed so
+// the UI can show/pre-fill it for editing before sending the test.
+export function buildSampleWebhookPayload(merchantId: string): Record<string, unknown> {
+  return {
+    event: 'payment.completed',
+    result: 'approved',
+    test: true,
+    cardToken: 'tok_test000000000000',
+    maskedPan: '****-****-****-4242',
+    responseCode: '0000',
+    authorizationCode: 'TEST01',
+    amount: 49.99,
+    currency: 'USD',
+    merchantReference: 'TEST-ORDER-0001',
+    merchantAgreementInstanceReference: merchantId,
+    transactionId: '00000000-0000-4000-8000-000000000000',
+    cardTransactionInstanceReference: '00000000-0000-4000-8000-000000000000',
+  };
+}
+
+export async function sendTestWebhook(
+  db: Db,
+  merchantId: string,
+  opts?: { payload?: Record<string, unknown>; extraHeaders?: Record<string, string> },
+): Promise<
+  | { configured: false }
+  | { configured: true; endpoint: string; payload: Record<string, unknown>; requestHeaders: Record<string, string>; signature: string; delivered: boolean; statusCode?: number; attempts: number; response?: unknown; error?: string }
+  | null
+> {
+  const m = await db.collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION).findOne(
+    { merchantAgreementInstanceReference: merchantId } as Partial<MerchantAgreementControlRecord>,
+    { projection: { merchantWebhookEndpoint: 1, merchantWebhookSecret: 1, merchantName: 1 } },
+  );
+  if (!m) return null;
+  const endpoint = (m as { merchantWebhookEndpoint?: string }).merchantWebhookEndpoint;
+  const secret = (m as { merchantWebhookSecret?: string }).merchantWebhookSecret;
+  if (!endpoint || !secret) return { configured: false };
+
+  // Use the (optionally edited) payload from the caller, else the default sample.
+  const payload = opts?.payload ?? buildSampleWebhookPayload(merchantId);
+
+  const r = await deliverWebhook(
+    endpoint,
+    { event: String(payload.event ?? 'payment.completed'), timestamp: new Date().toISOString(), data: payload },
+    secret,
+    { extraHeaders: opts?.extraHeaders },
+  );
+  return {
+    configured: true,
+    endpoint,
+    payload,
+    requestHeaders: r.request.headers,
+    signature: r.request.headers['X-Webhook-Signature'] ?? '',
+    delivered: r.delivered,
+    statusCode: r.statusCode,
+    attempts: r.attempts,
+    response: r.response,
+    error: r.error,
   };
 }
 

@@ -68,6 +68,9 @@ export async function processFdsCallback(
     triggeredBy: 'external.fds.callback',
     payload: mapped as unknown as Record<string, unknown>,
     latencyMs: 0,
+    // Inbound capture (PCI DSS Req 10.7): method + received body. Raw request headers are also
+    // recorded by the webhook inspector that receives the call.
+    request: { method: 'POST', body: mapped },
   });
 
   if (mapped.caseId) {
@@ -99,6 +102,9 @@ export async function processAmlCallback(
     triggeredBy: 'external.aml.callback',
     payload: mapped as unknown as Record<string, unknown>,
     latencyMs: 0,
+    // Inbound capture (PCI DSS Req 10.7): method + received body. Raw request headers are also
+    // recorded by the webhook inspector that receives the call.
+    request: { method: 'POST', body: mapped },
   });
 }
 
@@ -116,6 +122,9 @@ export async function processKycCallback(
     triggeredBy: 'external.kyc.callback',
     payload: mapped as unknown as Record<string, unknown>,
     latencyMs: 0,
+    // Inbound capture (PCI DSS Req 10.7): method + received body. Raw request headers are also
+    // recorded by the webhook inspector that receives the call.
+    request: { method: 'POST', body: mapped },
   });
 
   await db.collection('customerAgreementProcedure').updateOne(
@@ -145,6 +154,9 @@ export async function processKybCallback(
     triggeredBy: 'external.kyb.callback',
     payload: mapped as unknown as Record<string, unknown>,
     latencyMs: 0,
+    // Inbound capture (PCI DSS Req 10.7): method + received body. Raw request headers are also
+    // recorded by the webhook inspector that receives the call.
+    request: { method: 'POST', body: mapped },
   });
 
   await db.collection('merchantAgreementProcedure').updateOne(
@@ -174,6 +186,9 @@ export async function processHrpCallback(
     triggeredBy: 'external.hrp.callback',
     payload: mapped as unknown as Record<string, unknown>,
     latencyMs: 0,
+    // Inbound capture (PCI DSS Req 10.7): method + received body. Raw request headers are also
+    // recorded by the webhook inspector that receives the call.
+    request: { method: 'POST', body: mapped },
   });
 }
 
@@ -191,6 +206,9 @@ export async function processCardAuthorizationCallback(
     triggeredBy: 'external.card_authorization.callback',
     payload: mapped as unknown as Record<string, unknown>,
     latencyMs: 0,
+    // Inbound capture (PCI DSS Req 10.7): method + received body. Raw request headers are also
+    // recorded by the webhook inspector that receives the call.
+    request: { method: 'POST', body: mapped },
   });
 }
 
@@ -208,6 +226,9 @@ export async function processCardIssuerCallback(
     triggeredBy: 'external.card_issuer.callback',
     payload: mapped as unknown as Record<string, unknown>,
     latencyMs: 0,
+    // Inbound capture (PCI DSS Req 10.7): method + received body. Raw request headers are also
+    // recorded by the webhook inspector that receives the call.
+    request: { method: 'POST', body: mapped },
   });
 }
 
@@ -225,5 +246,8 @@ export async function processGenericCallback(
     triggeredBy: 'external.generic.callback',
     payload: mapped,
     latencyMs: 0,
+    // Inbound capture (PCI DSS Req 10.7): method + received body. Raw request headers are also
+    // recorded by the webhook inspector that receives the call.
+    request: { method: 'POST', body: mapped },
   });
 }

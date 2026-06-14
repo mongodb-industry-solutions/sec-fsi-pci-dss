@@ -10,95 +10,9 @@ import {
 } from '../models/checkoutSession.model';
 import { createTransaction } from '../../transactions/services/cardTransaction.service';
 import { authorizeCard, linkAuthToTransaction } from './cardAuthorization.service';
-import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
-import { deliverWebhook } from './webhook.service';
-import { MERCHANT_AGREEMENT_COLLECTION, MerchantAgreementControlRecord } from '../models/merchantAgreement.model';
+import { sendMerchantPaymentCallback, DECLINE_REASONS } from './merchantCallback.service';
 
 const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
-
-// Human-readable decline reasons keyed by the PSP/issuer response code (BIAN SD-15).
-export const DECLINE_REASONS: Record<string, string> = {
-  '0190': 'Authorization declined by the issuer',
-  '0540': 'Card deactivated or removed by the cardholder',
-};
-
-// Notify the merchant of the payment outcome. TWO complementary channels, fired on BOTH approval
-// and decline (PCI DSS Req 3: surrogate token + masked PAN only, NEVER PAN/CVV):
-//   1. The merchant's OWN webhook (per-merchant config): `deliverWebhook` POSTs the HMAC-signed event
-//      to `merchantWebhookEndpoint` using `merchantWebhookSecret`. This is the real callback — each
-//      merchant has a distinct endpoint, so the correct merchant is notified per its configuration.
-//   2. The Integration Hub OUTBOUND event (`generic` provider) as the auditable inbound/outbound
-//      record (ADR-010/025); `logEvent` also applies the CHD blocklist.
-export interface MerchantPaymentCallbackInput {
-  merchantAgreementInstanceReference: string;
-  amount: number;
-  currency: string;
-  merchantReference: string;
-  // The originating context (checkout session or payment link) reference, for correlation.
-  contextRef: string;
-  contextType: 'checkout_session' | 'payment_link';
-  triggeredBy: string;
-  result: 'approved' | 'declined';
-  cardToken: string;
-  maskedPan: string;
-  responseCode: string;
-  authorizationCode?: string;
-  declineReason?: string;
-  cardTransactionInstanceReference?: string;
-}
-
-/**
- * Notify the merchant of the payment outcome — shared by the checkout (redirect) and payment-link
- * flows. TWO complementary channels, fired on BOTH approval and decline (PCI DSS Req 3: surrogate
- * token + masked PAN only, NEVER PAN/CVV):
- *   1. The merchant's OWN webhook (per-merchant config): `deliverWebhook` POSTs the HMAC-signed event
- *      to `merchantWebhookEndpoint` using `merchantWebhookSecret`. Each merchant has a distinct
- *      endpoint, so the correct merchant is notified per its configuration.
- *   2. The Integration Hub OUTBOUND event (`generic` provider) as the auditable inbound/outbound
- *      record (ADR-010/025); `logEvent` also applies the CHD blocklist.
- */
-export async function sendMerchantPaymentCallback(db: Db, o: MerchantPaymentCallbackInput): Promise<void> {
-  const payload: Record<string, unknown> = {
-    event: o.result === 'approved' ? 'payment.completed' : 'payment.declined',
-    result: o.result,
-    cardToken: o.cardToken,                 // surrogate, NOT CHD
-    maskedPan: o.maskedPan,                 // display-safe last 4
-    responseCode: o.responseCode,
-    ...(o.authorizationCode ? { authorizationCode: o.authorizationCode } : {}),
-    ...(o.declineReason ? { declineReason: o.declineReason } : {}),
-    amount: o.amount,
-    currency: o.currency,
-    merchantReference: o.merchantReference,
-    merchantAgreementInstanceReference: o.merchantAgreementInstanceReference,
-    [`${o.contextType === 'payment_link' ? 'paymentLinkInstanceReference' : 'checkoutSessionInstanceReference'}`]: o.contextRef,
-    ...(o.cardTransactionInstanceReference ? { cardTransactionInstanceReference: o.cardTransactionInstanceReference } : {}),
-  };
-
-  // 1) Per-merchant webhook delivery (the real callback to the correct merchant's endpoint).
-  try {
-    const merchant = await db
-      .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
-      .findOne(
-        { merchantAgreementInstanceReference: o.merchantAgreementInstanceReference } as Partial<MerchantAgreementControlRecord>,
-        { projection: { merchantWebhookEndpoint: 1, merchantWebhookSecret: 1 } },
-      );
-    const endpoint = (merchant as { merchantWebhookEndpoint?: string } | null)?.merchantWebhookEndpoint;
-    const secret = (merchant as { merchantWebhookSecret?: string } | null)?.merchantWebhookSecret;
-    if (endpoint && secret) {
-      void deliverWebhook(endpoint, { event: payload.event as string, timestamp: new Date().toISOString(), data: payload }, secret)
-        .catch(() => { /* delivery failures are retried inside deliverWebhook; never block payment */ });
-    }
-  } catch { /* merchant lookup failure never blocks the payment outcome */ }
-
-  // 2) Integration Hub audit event (inbound/outbound mechanism).
-  try {
-    await dispatchIntegration(db, 'generic', o.triggeredBy, payload, {
-      entityType: 'transaction',
-      entityId: o.cardTransactionInstanceReference ?? o.contextRef,
-      processType: 'payment_processing',
-    });
-  } catch { /* audit dispatch never blocks the payment outcome */ }
-}
 
 export interface CreateCheckoutSessionInput {
   merchantAgreementInstanceReference: string;
@@ -320,23 +234,9 @@ export async function processCheckoutPayment(
     }
   );
 
-  // Notify the merchant of the successful payment via the integration callback: surrogate token +
-  // authorization confirmation (no CHD). Mirrors the decline callback so the merchant always hears back.
-  await sendMerchantPaymentCallback(db, {
-    merchantAgreementInstanceReference: session.merchantAgreementInstanceReference,
-    amount: session.checkoutSessionAmount,
-    currency: session.checkoutSessionCurrency,
-    merchantReference: session.checkoutSessionMerchantReference,
-    contextRef: session.checkoutSessionInstanceReference,
-    contextType: 'checkout_session',
-    triggeredBy: 'gateway.checkout.callback',
-    result: 'approved',
-    cardToken: input.cardToken,
-    maskedPan,
-    responseCode: authResult.responseCode,
-    authorizationCode: authResult.authCode,
-    cardTransactionInstanceReference: txResult.cardTransactionInstanceReference,
-  });
+  // The APPROVED merchant callback is fired centrally inside createTransaction (covers all flows).
+  // Here we only build the redirect; the decline callback (above) is handled per-flow because a
+  // decline never reaches createTransaction.
 
   const redirectUrl = substitutePlaceholders(session.checkoutSessionReturnUrl, {
     session_id: input.sessionId,

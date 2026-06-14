@@ -730,11 +730,26 @@ export const api = {
         `/api/v1/merchants/${merchantId}/keys/${keyId}`, { method: 'DELETE' }, token
       ),
     registerWebhook: (merchantId: string, webhookEndpoint: string, token: string) =>
-      apiFetch<{ merchantAgreementInstanceReference: string; merchantWebhookEndpoint: string }>(
+      apiFetch<{ merchantAgreementInstanceReference: string; merchantWebhookEndpoint: string; merchantWebhookSecret?: string }>(
         `/api/v1/merchants/${merchantId}/webhooks`,
         { method: 'POST', body: JSON.stringify({ webhookEndpoint }) },
         token
       ),
+    // Send a simulated payment.completed webhook so the merchant can test their endpoint. Optional
+    // edited payload + an optional auth header (paste the auth scheme/key the endpoint expects).
+    testWebhook: (merchantId: string, token: string, body?: { payload?: Record<string, unknown>; authHeader?: { name: string; value: string } }) =>
+      apiFetch<{
+        configured: boolean;
+        endpoint?: string;
+        payload?: Record<string, unknown>;
+        requestHeaders?: Record<string, string>;
+        signature?: string;
+        delivered?: boolean;
+        statusCode?: number;
+        attempts?: number;
+        response?: unknown;
+        error?: string;
+      }>(`/api/v1/merchants/${merchantId}/webhooks/test`, { method: 'POST', body: JSON.stringify(body ?? {}) }, token),
   },
 
   checkout: {
@@ -923,7 +938,7 @@ export const api = {
 
   processEvents: {
     // Unified audit stream: business + compliance + integration events.
-    audit: (token: string, params?: { source?: string; type?: string; entityType?: string; outcome?: string; q?: string; minScore?: number; from?: string; to?: string; page?: number; limit?: number }) => {
+    audit: (token: string, params?: { source?: string; type?: string; entityType?: string; outcome?: string; q?: string; ref?: string; minScore?: number; from?: string; to?: string; page?: number; limit?: number }) => {
       const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString() : '';
       return apiFetch<{
         events: Array<{ id: string; source: string; eventDateTime: string; type: string; action: string; outcome: string; entityType?: string; entityId?: string; performedByRole?: string | null; bianServiceDomain?: string; context?: string; summary?: Record<string, unknown> }>;

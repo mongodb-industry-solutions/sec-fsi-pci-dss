@@ -74,6 +74,7 @@ export default function AuditEventsPage() {
   const [entityType, setEntityType] = useState('');
   const [outcome, setOutcome] = useState('');
   const [q, setQ] = useState('');
+  const [ref, setRef] = useState('');
   const [minScore, setMinScore] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -94,7 +95,7 @@ export default function AuditEventsPage() {
     try {
       const res = await api.processEvents.audit(token, {
         source, type: typeInput || undefined, entityType: entityType || undefined,
-        outcome: outcome || undefined, q: q || undefined,
+        outcome: outcome || undefined, q: q || undefined, ref: ref || undefined,
         minScore: minScore ? parseInt(minScore, 10) : undefined,
         from: from ? new Date(from).toISOString() : undefined,
         to: to ? new Date(to).toISOString() : undefined,
@@ -105,7 +106,7 @@ export default function AuditEventsPage() {
       setCapped(res.capped);
     } catch { setEvents([]); setTotal(0); }
     finally { setLoading(false); }
-  }, [token, source, typeInput, entityType, outcome, q, minScore, from, to, page, pageSize]);
+  }, [token, source, typeInput, entityType, outcome, q, ref, minScore, from, to, page, pageSize]);
 
   useEffect(() => { if (authorized) load(); }, [authorized, load]);
 
@@ -144,6 +145,15 @@ export default function AuditEventsPage() {
             <input value={q} onChange={(e) => { setQ(e.target.value); resetToFirst(); }}
               placeholder="Action, type or entity id…"
               className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
+          </div>
+        </div>
+        <div className="lg:col-span-2">
+          <label className="block text-xs text-gray-500 mb-1">Related reference (txn · case · merchant · customer · card token)</label>
+          <div className="relative">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input value={ref} onChange={(e) => { setRef(e.target.value); resetToFirst(); }}
+              placeholder="Paste a transaction id, case id, merchant id, account ref or card token…"
+              className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
           </div>
         </div>
         <div>
@@ -190,8 +200,8 @@ export default function AuditEventsPage() {
             className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm" />
         </div>
         <div className="flex items-end gap-2">
-          {(q || typeInput || entityType || outcome || minScore || from || to) && (
-            <button onClick={() => { setQ(''); setTypeInput(''); setEntityType(''); setOutcome(''); setMinScore(''); setFrom(''); setTo(''); resetToFirst(); }}
+          {(q || ref || typeInput || entityType || outcome || minScore || from || to) && (
+            <button onClick={() => { setQ(''); setRef(''); setTypeInput(''); setEntityType(''); setOutcome(''); setMinScore(''); setFrom(''); setTo(''); resetToFirst(); }}
               className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">Clear</button>
           )}
           <button onClick={load} className="text-xs px-3 py-1.5 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors inline-flex items-center gap-1">

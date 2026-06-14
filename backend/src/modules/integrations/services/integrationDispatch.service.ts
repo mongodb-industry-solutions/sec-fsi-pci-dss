@@ -131,11 +131,13 @@ async function dispatchExternal(
 
   const fieldMappingApplied = mappedPayload !== payload;
 
+  // Declared outside try so the catch branch can include the request in its audit capture.
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...buildAuthHeaders(provider),
+  };
+
   try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...buildAuthHeaders(provider),
-    };
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), provider.externalProviderTimeoutMs);
@@ -151,6 +153,11 @@ async function dispatchExternal(
     const latencyMs = Date.now() - start;
     const status = res.ok ? 'received' : 'error';
 
+    // Capture the response body + headers (best-effort) so the audit can show exactly what came back.
+    let responseBody: unknown;
+    try { const text = await res.text(); try { responseBody = JSON.parse(text); } catch { responseBody = text; } } catch { /* no body */ }
+    const responseHeaders = Object.fromEntries(res.headers.entries());
+
     await logEvent(db, {
       arrangementId,
       type: 'dispatch',
@@ -161,6 +168,8 @@ async function dispatchExternal(
       latencyMs,
       meta: { fieldMappingApplied },
       businessContext,
+      request: { method: 'POST', url: provider.externalProviderApiEndpoint, headers, body: mappedPayload },
+      response: { status: res.status, headers: responseHeaders, body: responseBody },
     });
 
     await updateHealthStatus(db, arrangementId, res.ok ? 'ok' : 'degraded');
@@ -181,6 +190,7 @@ async function dispatchExternal(
       error: (err as Error).message,
       meta: { fieldMappingApplied },
       businessContext,
+      request: { method: 'POST', url: provider.externalProviderApiEndpoint, headers, body: mappedPayload },
     });
 
     await updateHealthStatus(db, arrangementId, 'unreachable');
@@ -222,6 +232,8 @@ export async function logEvent(
     error?: string;
     meta?: Record<string, unknown>;
     businessContext?: BusinessContextRef;
+    request?: { method: string; url?: string; headers?: Record<string, string>; body?: unknown };
+    response?: { status?: number; headers?: Record<string, string>; body?: unknown };
   }
 ): Promise<void> {
   const event: IntegrationEvent = {
@@ -236,6 +248,9 @@ export async function logEvent(
     integrationEventErrorMessage: opts.error,
     integrationEventTriggeredBy: opts.triggeredBy,
     integrationEventMeta: opts.meta,
+    // Sanitized request/response capture (auth/CHD redacted) — PCI DSS Req 10.7.
+    ...(opts.request ? { integrationEventRequest: sanitizeDeep(opts.request) as IntegrationEvent['integrationEventRequest'] } : {}),
+    ...(opts.response ? { integrationEventResponse: sanitizeDeep(opts.response) as IntegrationEvent['integrationEventResponse'] } : {}),
     businessContext: opts.businessContext,
     bianServiceDomain: 'External Provider Arrangements',
     bianControlRecordType: 'ExternalProviderArrangementActionLog',

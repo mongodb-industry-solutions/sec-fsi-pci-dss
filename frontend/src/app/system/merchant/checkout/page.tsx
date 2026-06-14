@@ -38,7 +38,7 @@ export default function CheckoutSectionPage() {
   }
 
   return (
-    <div className="w-full px-5 sm:px-8 py-6 space-y-5 max-w-2xl">
+    <div className="w-full px-5 sm:px-8 py-6 space-y-5">
       <SectionHeader
         icon={ShoppingCart}
         title="Checkout Session"

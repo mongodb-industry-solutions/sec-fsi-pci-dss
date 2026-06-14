@@ -466,6 +466,10 @@ export interface IntegrationEvent {
   integrationEventErrorMessage?: string;
   integrationEventTriggeredBy: string;
   integrationEventMeta?: Record<string, unknown>;
+  // Full request/response capture for outbound dispatch and inbound callbacks (PCI DSS Req 10.7 —
+  // reconstruct what happened). Sanitized: auth/CHD values are redacted before storage.
+  integrationEventRequest?: { method: string; url?: string; headers?: Record<string, string>; body?: unknown };
+  integrationEventResponse?: { status?: number; headers?: Record<string, string>; body?: unknown };
   businessContext?: BusinessContextRef;
   bianServiceDomain: string;
   bianControlRecordType: string;

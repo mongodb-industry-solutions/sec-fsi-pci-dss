@@ -3,9 +3,27 @@
 
 import { FastifyInstance } from 'fastify';
 import type { JwtDemoPayload } from '../../../shared/models/identity.model';
-import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, generateApiKey, importApiKey, updateApiKeyLabel, revokeApiKey, reviewMerchantApplication, getMerchantEvents, getMerchantApiKeys } from '../services/merchant.service';
+import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, sendTestWebhook, generateApiKey, importApiKey, updateApiKeyLabel, revokeApiKey, reviewMerchantApplication, getMerchantEvents, getMerchantApiKeys } from '../services/merchant.service';
 import { getMerchantTransactions, getMerchantStats } from '../../transactions/services/cardTransaction.service';
 import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
+
+// Authorization verdict for API-key MUTATIONS (generate/import/revoke/relabel): the merchant
+// **owner** (JWT partyRef matches merchantOwnerPartyReference) or a `merchant_officer`. The
+// `security_auditor` may view keys (read-only) but never mutate credentials.
+async function checkKeyMutationAccess(
+  fastify: FastifyInstance,
+  merchantId: string,
+  user?: JwtDemoPayload,
+): Promise<{ ok: true } | { status: 403 | 404; error: string }> {
+  const merchant = await getMerchantById(fastify.db, merchantId) as Record<string, unknown> | null;
+  if (!merchant) return { status: 404, error: 'Merchant not found' };
+  const isOwner = !!user?.partyRef && merchant.merchantOwnerPartyReference === user.partyRef;
+  const isOfficer = user?.role === 'merchant_officer';
+  if (!isOwner && !isOfficer) {
+    return { status: 403, error: 'Access denied: only the merchant owner or a merchant officer can manage API keys.' };
+  }
+  return { ok: true };
+}
 
 export async function merchantController(fastify: FastifyInstance) {
 
@@ -580,6 +598,7 @@ Delivery includes up to 3 retry attempts with exponential backoff.`,
           properties: {
             merchantAgreementInstanceReference: { type: 'string' },
             merchantWebhookEndpoint: { type: 'string' },
+            merchantWebhookSecret: { type: 'string', description: 'HMAC signing secret — verify the X-Webhook-Signature header with it. Generated on first save.' },
           },
         },
         400: { $ref: 'Error#' },
@@ -593,6 +612,53 @@ Delivery includes up to 3 retry attempts with exponential backoff.`,
     if (!webhookEndpoint) return reply.status(400).send({ error: 'webhookEndpoint is required' });
     const result = await registerWebhook(fastify.db, id, webhookEndpoint);
     if (!result) return reply.status(404).send({ error: 'Merchant not found' });
+    return reply.send(result);
+  });
+
+  // POST /api/v1/merchants/:id/webhooks/test — send a SIMULATED payment.completed webhook so the
+  // merchant can verify their endpoint without running a full payment. Owner / merchant_officer.
+  fastify.post('/:id/webhooks/test', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Send a test webhook to the merchant endpoint (SD-89)',
+      description: `Delivers a representative (clearly \`test: true\`) \`payment.completed\` event to the
+merchant's configured \`merchantWebhookEndpoint\`, HMAC-signed exactly like a real callback. Returns the
+payload sent + the delivery outcome (status, attempts, the merchant's response). No real CHD is included.`,
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      body: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          payload: { type: 'object', additionalProperties: true, description: 'Optional edited payload to send instead of the default sample.' },
+          authHeader: {
+            type: 'object',
+            description: 'Optional auth header to add (e.g. the scheme the merchant configured — paste an API key value here to test it).',
+            properties: { name: { type: 'string' }, value: { type: 'string' } },
+          },
+        },
+      },
+      response: {
+        200: { type: 'object', additionalProperties: true, description: 'Delivery result + the payload + signed headers that were sent.' },
+        400: { description: 'No webhook endpoint configured.', $ref: 'Error#' },
+        401: { $ref: 'Error#' },
+        403: { description: 'Not the merchant owner or a merchant officer.', $ref: 'Error#' },
+        404: { description: 'Merchant not found.', $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtDemoPayload }).user);
+    if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
+    const body = (request.body ?? {}) as { payload?: Record<string, unknown>; authHeader?: { name?: string; value?: string } };
+    const extraHeaders = body.authHeader?.name && body.authHeader?.value
+      ? { [body.authHeader.name]: body.authHeader.value }
+      : undefined;
+    const result = await sendTestWebhook(fastify.db, id, { payload: body.payload, extraHeaders });
+    if (result === null) return reply.status(404).send({ error: 'Merchant not found' });
+    if (result.configured === false) {
+      return reply.status(400).send({ error: 'No webhook endpoint configured. Save a webhook URL first.' });
+    }
     return reply.send(result);
   });
 
@@ -671,11 +737,14 @@ Delivery includes up to 3 retry attempts with exponential backoff.`,
           },
         },
         401: { $ref: 'Error#' },
+        403: { description: 'Not the merchant owner or a merchant officer.', $ref: 'Error#' },
         404: { $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
+    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtDemoPayload }).user);
+    if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
     const { label } = (request.body ?? {}) as { label?: string };
     const result = await generateApiKey(fastify.db, id, label);
     if (!result) return reply.status(404).send({ error: 'Merchant not found' });
@@ -699,11 +768,14 @@ Delivery includes up to 3 retry attempts with exponential backoff.`,
           properties: { revoked: { type: 'boolean' }, keyId: { type: 'string' } },
         },
         401: { $ref: 'Error#' },
+        403: { description: 'Not the merchant owner or a merchant officer.', $ref: 'Error#' },
         404: { $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
     const { id, keyId } = request.params as { id: string; keyId: string };
+    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtDemoPayload }).user);
+    if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
     const result = await revokeApiKey(fastify.db, id, keyId);
     if (result === 'not_found') return reply.status(404).send({ error: 'Merchant or key not found' });
     return reply.send({ revoked: true, keyId });
@@ -740,12 +812,15 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
         },
         400: { description: 'Key too short / invalid.', $ref: 'Error#' },
         401: { $ref: 'Error#' },
+        403: { description: 'Not the merchant owner or a merchant officer.', $ref: 'Error#' },
         404: { description: 'Merchant not found.', $ref: 'Error#' },
         409: { description: 'Key already registered for this merchant.', $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
+    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtDemoPayload }).user);
+    if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
     const { apiKey, label } = (request.body ?? {}) as { apiKey?: string; label?: string };
     if (!apiKey) return reply.status(400).send({ error: 'apiKey is required' });
     const result = await importApiKey(fastify.db, id, apiKey, label);
@@ -775,11 +850,14 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
       response: {
         200: { type: 'object', properties: { keyId: { type: 'string' }, keyLabel: { type: 'string', nullable: true } } },
         401: { $ref: 'Error#' },
+        403: { description: 'Not the merchant owner or a merchant officer.', $ref: 'Error#' },
         404: { description: 'Merchant or key not found.', $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
     const { id, keyId } = request.params as { id: string; keyId: string };
+    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtDemoPayload }).user);
+    if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
     const { label } = (request.body ?? {}) as { label?: string };
     const result = await updateApiKeyLabel(fastify.db, id, keyId, label ?? '');
     if (result === 'not_found') return reply.status(404).send({ error: 'Merchant or key not found' });

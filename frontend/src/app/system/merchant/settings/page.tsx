@@ -54,7 +54,7 @@ export default function SettingsSectionPage() {
     n === undefined ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
 
   return (
-    <div className="w-full px-5 sm:px-8 py-6 space-y-5 max-w-2xl">
+    <div className="w-full px-5 sm:px-8 py-6 space-y-5">
       <SectionHeader
         icon={SettingsIcon}
         title="Settings"

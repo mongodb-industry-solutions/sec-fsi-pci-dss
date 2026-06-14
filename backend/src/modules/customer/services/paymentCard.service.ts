@@ -67,12 +67,13 @@ export async function createCard(db: Db, input: CreateCardInput) {
 // card (deterministic token) for the same customer is never duplicated; a different customer using
 // the same card gets their own arrangement row and is added to the shared registry. Used by the
 // payment auto-registration path.
-export async function upsertCardByToken(db: Db, input: CreateCardInput): Promise<{ paymentCardInstanceReference: string }> {
+export async function upsertCardByToken(db: Db, input: CreateCardInput): Promise<{ paymentCardInstanceReference: string; created: boolean }> {
   const now = new Date();
   const existing = await db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION)
     .findOne({ paymentCardReference: input.cardToken, customerAgreementInstanceReference: input.customerAgreementInstanceReference });
 
   let cardId: string;
+  let created = false;
   if (existing) {
     // Only refresh fields we actually have; never wipe an existing expiry/network with blanks.
     const set: Record<string, unknown> = { paymentCardMaskedPanDisplay: input.paymentCardMaskedPanDisplay, recordUpdatedDateTime: now };
@@ -86,10 +87,11 @@ export async function upsertCardByToken(db: Db, input: CreateCardInput): Promise
   } else {
     const result = await createCard(db, input);
     cardId = result.paymentCardInstanceReference;
+    created = true;
   }
 
   await syncCardRegistry(db, input.cardToken);
-  return { paymentCardInstanceReference: cardId };
+  return { paymentCardInstanceReference: cardId, created };
 }
 
 // Soft-delete (PCI DSS Req 10: never lose the audit history). The card is marked `revoked`

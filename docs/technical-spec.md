@@ -2316,6 +2316,31 @@ After a payment is processed (hosted checkout **or** payment link), the PSP noti
 2. **The Integration Hub** OUTBOUND event (`dispatchIntegration`, type `generic` — the seeded
    "Merchant Payment Notifications" provider) as the auditable inbound/outbound record.
 
+**Single chokepoint (ADR-028/PM-4).** The **approved** callback is fired inside `createTransaction`,
+so it covers EVERY merchant-attributed payment — app/api-card, hosted checkout and payment link — not
+just the gateway flows. A third effect is added: a unified-audit **businessProcessEvent**
+`payment.callback` (entityType=transaction) so the outcome is visible/searchable in `/system/audit-events`
+for manager/auditor (previously only `transaction.authorized` appeared). The webhook payload always
+includes the **transactionId**. Declines fire the callback per-flow (a decline never reaches
+`createTransaction`).
+
+**Webhook test + lifecycle events (PM-5).** `POST /merchants/:id/webhooks/test` (owner/officer) delivers
+a simulated `payment.completed` (HMAC-signed, `test:true`) to the merchant's endpoint so they can verify
+their integration without a payment — returns the payload + delivery outcome (status, attempts, response).
+The `payment.callback` audit event now records the actual webhook **method/headers/body + the merchant's
+response** (delivered/statusCode/attempts), not just `webhookConfigured`. Each payment also emits a
+`payment.card.validation` (card_issuer integrator) before charging, and a `card.registered` (new) or
+`card.matched` (existing) compliance event — full card lifecycle behind a transaction for the auditor.
+(If `webhookConfigured` is false, the merchant has no endpoint in the DB — set it in
+`/system/merchant/webhooks` or re-seed.)
+
+**Auditable search + capture (PM-4).** `/events/audit` adds a `ref` deep-match filter (entityId +
+event summary/payload) so the auditor finds EVERY event for a transaction id, case id, merchant,
+customer/account ref or card token; integration events use their `businessContext` for entity linking.
+Integration events now persist `integrationEventRequest` {method,url,headers,body} and
+`integrationEventResponse` {status,headers,body} (sanitized) for outbound dispatch and inbound
+callbacks (PCI DSS Req 10.7).
+
 The event carries on **both** outcomes:
 - **Approved** → `payment.completed` with `cardToken` (surrogate, not CHD), `maskedPan`,
   `responseCode`, `authorizationCode`, amount/currency, references.

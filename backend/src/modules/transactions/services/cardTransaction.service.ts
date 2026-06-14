@@ -9,8 +9,10 @@ import { canReadSensitive } from '../../../vendors/middleware/rbac';
 import { createFraudCase } from '../../fraud/services/fraudDiagnosis.service';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
-import { emitProcessEvent } from '../../integrations/services/businessProcessEvent.service';
+import { emitProcessEvent, emitComplianceEvent } from '../../integrations/services/businessProcessEvent.service';
+import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
 import { getCardByToken, upsertCardByToken } from '../../customer/services/paymentCard.service';
+import { sendMerchantPaymentCallback } from '../../gateway/services/merchantCallback.service';
 
 export interface CreateTransactionInput {
   cardToken: string;
@@ -104,6 +106,17 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
     throw new CardNotActiveError(onFile.paymentCardStatus);
   }
 
+  // SD-15 / card_issuer: confirm the card with the issuer before charging it. Routed through the
+  // Integration Hub (card_issuer integrator) so the validation is an auditable inbound/outbound
+  // event tied to this transaction. CVV/PIN are validated upstream and never reach here (no SAD).
+  try {
+    await dispatchIntegration(db, 'card_issuer', 'payment.card.validation', {
+      cardToken: input.cardToken,
+      maskedPan: input.cardTransactionMaskedPanDisplay,
+      ...(input.paymentCardNetwork ? { network: input.paymentCardNetwork } : {}),
+    }, { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' });
+  } catch { /* validation logging never blocks the payment */ }
+
   // Normalize the account reference to the customer's canonical business key
   // (ACC-xxx) so seeded and simulator-created transactions share one convention.
   // Falls back to the raw input (e.g. email) if the customer can't be resolved.
@@ -146,13 +159,34 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
   // the details later. upsertCardByToken is idempotent, so re-using a saved card is a safe no-op.
   if (resolved.uuid) {
     try {
-      await upsertCardByToken(db, {
+      const upsert = await upsertCardByToken(db, {
         customerAgreementInstanceReference: resolved.uuid,
         cardToken: input.cardToken,
         paymentCardMaskedPanDisplay: input.cardTransactionMaskedPanDisplay,
         paymentCardIsPreferred: false,
         ...(input.paymentCardExpirationDate ? { paymentCardExpirationDate: input.paymentCardExpirationDate } : {}),
         ...(input.paymentCardNetwork ? { paymentCardNetwork: input.paymentCardNetwork } : {}),
+      });
+      // Audit the card-on-file outcome (SD-88, PCI DSS Req 10): registered if new, matched if it
+      // already existed — so an auditor sees the full card lifecycle behind a transaction.
+      emitComplianceEvent(db, {
+        entityType: 'card',
+        entityId: upsert.paymentCardInstanceReference,
+        processType: 'card_management',
+        processAction: upsert.created ? 'card.registered' : 'card.matched',
+        processOutcome: 'approved',
+        performedByPartyReference: null,
+        performedByRole: null,
+        eventSummary: {
+          via: 'payment',
+          created: upsert.created,
+          cardToken: input.cardToken,
+          maskedPan: input.cardTransactionMaskedPanDisplay,
+          customerAgreementInstanceReference: resolved.uuid,
+          cardTransactionInstanceReference: txnId,
+        },
+        bianServiceDomain: 'Payment Card',
+        bianControlRecordType: 'PaymentCardManagement',
       });
     } catch { /* never block the payment on card-on-file save */ }
   }
@@ -191,11 +225,44 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
       channel: input.cardTransactionChannel,
       merchantName: input.cardTransactionMerchantName,
       fraudCaseCreated: create,
+      // Searchable references for the unified audit (manager/auditor): find every event for a given
+      // transaction / card / merchant / customer / case.
+      cardTransactionInstanceReference: txnId,
+      cardToken: input.cardToken,
+      ...(input.merchantAgreementInstanceReference ? { merchantAgreementInstanceReference: input.merchantAgreementInstanceReference } : {}),
+      accountReference: canonicalAccountRef,
+      ...(resolved.uuid ? { customerAgreementInstanceReference: resolved.uuid } : {}),
+      ...(fraudCaseRef ? { fraudDiagnosisInstanceReference: fraudCaseRef } : {}),
     },
     bianServiceDomain: 'Card Transaction',
     bianControlRecordType: 'CardTransactionRecord',
     processMeta: { ruleIds: reasons },
   });
+
+  // Merchant payment callback (PSP → merchant) for EVERY payment attributed to a merchant — the
+  // single chokepoint that covers app/api-card, hosted checkout and payment link. Fires the
+  // merchant's own webhook (with the transaction id) + the unified-audit `payment.callback` event +
+  // the integration audit event. Declines are handled per-flow (they never reach here).
+  if (input.merchantAgreementInstanceReference) {
+    try {
+      await sendMerchantPaymentCallback(db, {
+        merchantAgreementInstanceReference: input.merchantAgreementInstanceReference,
+        amount: input.amount,
+        currency: input.currency,
+        merchantReference: ((input.gatewayPayload as { merchantReference?: string; paymentReference?: string } | undefined)?.merchantReference)
+          ?? ((input.gatewayPayload as { paymentReference?: string } | undefined)?.paymentReference)
+          ?? txnId,
+        contextRef: txnId,
+        contextType: 'transaction',
+        triggeredBy: 'payment.callback',
+        result: 'approved',
+        cardToken: input.cardToken,
+        maskedPan: input.cardTransactionMaskedPanDisplay,
+        responseCode: '0000',
+        cardTransactionInstanceReference: txnId,
+      });
+    } catch { /* callback never blocks the payment outcome */ }
+  }
 
   return {
     cardTransactionInstanceReference: txnId,
