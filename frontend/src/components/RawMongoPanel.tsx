@@ -63,6 +63,10 @@ function key(s: RawPanelSection): string {
   return s.kind === 'mongo' ? `mongo:${s.collection}` : `static:${s.label}`;
 }
 
+// Fallback for sections added after mount (sections prop can grow once the page's
+// async data resolves; the useState initializer only ran for the initial set).
+const EMPTY_SECTION_STATE: SectionState = { expanded: false, doc: null, loading: false, error: null };
+
 function defaultExpanded(s: RawPanelSection): boolean {
   // Static sections start collapsed (data is shown on demand);
   // Mongo sections also start collapsed (loaded lazily).
@@ -85,7 +89,7 @@ export function RawMongoPanel({
 
   async function toggle(section: RawPanelSection) {
     const k = key(section);
-    const current = state[k];
+    const current = state[k] ?? EMPTY_SECTION_STATE;
 
     if (current.expanded) {
       setState(p => ({ ...p, [k]: { ...p[k], expanded: false } }));
@@ -137,7 +141,7 @@ export function RawMongoPanel({
       {/* Accordion */}
       {sections.map(section => {
         const k = key(section);
-        const s = state[k];
+        const s = state[k] ?? EMPTY_SECTION_STATE;
         const data = section.kind === 'static' ? section.data : s.doc;
 
         return (

@@ -7,6 +7,16 @@ import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPar
 import { getMerchantTransactions, getMerchantStats } from '../../transactions/services/cardTransaction.service';
 import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
 
+// Roles allowed to READ a merchant's business detail (profile, payments, analytics, audit trail).
+// PSP staff: `merchant_officer` and `security_auditor`. Fraud-investigation roles
+// (`level1_analyst`, `level2_investigator`) need this in the context of a case (SD-89 Merchant
+// Relations is referenced from SD-83 Fraud Diagnosis) — PCI DSS Req 7 still excludes the
+// administrative `manager` role, which has no business need-to-know. Credential routes (API keys)
+// keep the stricter officer/auditor/owner set and are NOT widened here.
+const MERCHANT_DETAIL_READ_ROLES = new Set([
+  'merchant_officer', 'security_auditor', 'level1_analyst', 'level2_investigator',
+]);
+
 // Authorization verdict for API-key MUTATIONS (generate/import/revoke/relabel): the merchant
 // **owner** (JWT partyRef matches merchantOwnerPartyReference) or a `merchant_officer`. The
 // `security_auditor` may view keys (read-only) but never mutate credentials.
@@ -349,9 +359,9 @@ Used by customers to detect their onboarding state: no application / under_revie
 
     const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
     const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
-    const isStaff = user?.role === 'merchant_officer' || user?.role === 'security_auditor';
+    const isStaff = MERCHANT_DETAIL_READ_ROLES.has(user?.role ?? '');
     if (!isOwner && !isStaff) {
-      return reply.status(403).send({ error: 'Access denied: only the merchant owner, a merchant officer, or a security auditor can view received payments.' });
+      return reply.status(403).send({ error: 'Access denied: only the merchant owner, PSP staff, or a fraud investigator can view received payments.' });
     }
 
     const result = await getMerchantTransactions(fastify.db, id, Number(page), Number(limit), { status, search });
@@ -392,9 +402,9 @@ Used by customers to detect their onboarding state: no application / under_revie
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
     const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
     const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
-    const isStaff = user?.role === 'merchant_officer' || user?.role === 'security_auditor';
+    const isStaff = MERCHANT_DETAIL_READ_ROLES.has(user?.role ?? '');
     if (!isOwner && !isStaff) {
-      return reply.status(403).send({ error: 'Access denied: only the merchant owner, a merchant officer, or a security auditor can view merchant analytics.' });
+      return reply.status(403).send({ error: 'Access denied: only the merchant owner, PSP staff, or a fraud investigator can view merchant analytics.' });
     }
     const stats = await getMerchantStats(fastify.db, id);
     return reply.send(stats);
@@ -442,9 +452,9 @@ Used by customers to detect their onboarding state: no application / under_revie
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
     const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
     const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
-    const isStaff = user?.role === 'merchant_officer' || user?.role === 'security_auditor';
+    const isStaff = MERCHANT_DETAIL_READ_ROLES.has(user?.role ?? '');
     if (!isOwner && !isStaff) {
-      return reply.status(403).send({ error: 'Access denied: only the merchant owner, a merchant officer, or a security auditor can view the audit trail.' });
+      return reply.status(403).send({ error: 'Access denied: only the merchant owner, PSP staff, or a fraud investigator can view the audit trail.' });
     }
     const events = await getMerchantEvents(fastify.db, id);
     return reply.send({ events });

@@ -2937,7 +2937,7 @@ and makes `paymentCardNetwork` / `paymentCardExpirationDate` optional (external 
   card twice). **`paymentCardRegistry`** (new, plaintext, token unique) = the physical card, with
   `cardHolderAgreementReferences[]` + `cardHolderCount`. The card is stored once; the registry counts
   distinct holders. `syncCardRegistry` recomputes on register/auto-register/revoke; crossing
-  `SHARED_CARD_HOLDER_THRESHOLD` (3) emits `card.shared_threshold_exceeded`.
+  `SHARED_CARD_HOLDER_THRESHOLD` (3) emits `card.shared.threshold.exceeded`.
 - **Dedup.** POST → `registerCardForCustomer` (re-adding returns the existing arrangement with
   `reused:true`; a removed card reactivates). Auto-register → `upsertCardByToken`, scoped by
   `(customer, token)`.

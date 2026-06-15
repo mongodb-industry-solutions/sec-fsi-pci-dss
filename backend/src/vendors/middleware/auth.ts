@@ -83,6 +83,16 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   // not break public-route matching.
   const path = url.split('?')[0];
 
+  // Routes that opt out of JWT via `config: { skipAuth: true }` validate their own
+  // caller identity in-handler. The internal capability-module engines (ADR-029:
+  // /api/v1/modules/<cap>/score|screen) use the X-Integration-Source header instead
+  // of a Bearer token — the EDA dispatcher calls them server-to-server, not as a user.
+  const routeConfig = (request.routeOptions?.config ?? {}) as { skipAuth?: boolean };
+  if (routeConfig.skipAuth) {
+    attachRbacContext(request);
+    return;
+  }
+
   if (PUBLIC_EXACT.has(path)) {
     attachRbacContext(request);
     return;

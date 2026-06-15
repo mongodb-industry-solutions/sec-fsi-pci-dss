@@ -334,7 +334,7 @@
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
       "checkout.pay",
-      "payment_link.pay"
+      "payment.link.pay"
     ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 200,
@@ -423,7 +423,7 @@
     "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
       "gateway.checkout.callback",
-      "payment_link.callback"
+      "payment.link.callback"
     ],
     "externalProviderMode": "async",
     "externalProviderTimeoutMs": 1000,

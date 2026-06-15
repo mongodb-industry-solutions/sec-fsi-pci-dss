@@ -166,7 +166,7 @@ export async function syncCardRegistry(db: Db, token: string): Promise<{ cardHol
       entityType: 'card',
       entityId: token,
       processType: 'card_management',
-      processAction: 'card.shared_threshold_exceeded',
+      processAction: 'card.shared.threshold.exceeded',
       processOutcome: 'escalated',
       performedByPartyReference: null,
       performedByRole: null,

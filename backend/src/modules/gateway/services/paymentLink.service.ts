@@ -180,7 +180,7 @@ export async function processLinkPayment(
       merchantReference: link.paymentLinkCode,
       contextRef: link.paymentLinkInstanceReference,
       contextType: 'payment_link',
-      triggeredBy: 'payment_link.callback',
+      triggeredBy: 'payment.link.callback',
       result: 'declined',
       cardToken: input.cardToken,
       maskedPan,

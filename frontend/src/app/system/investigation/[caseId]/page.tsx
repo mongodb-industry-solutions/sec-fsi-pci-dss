@@ -383,14 +383,14 @@ export default function DemoCaseDetailPage() {
               <div className="flex items-center gap-2 mb-3">
                 <ShieldAlert size={15} className="text-[#001E2B]" />
                 <h2 className="font-semibold text-sm">Fraud Detection (SDF)</h2>
-                <span className="ml-auto text-xs text-gray-400">{enrichment.sdf.scorePending ? 'score pending' : `score ${enrichment.sdf.score}/100`}</span>
+                <span className="ml-auto text-xs text-gray-400">{enrichment.sdf?.scorePending ? 'score pending' : `score ${enrichment.sdf?.score ?? '—'}/100`}</span>
               </div>
-              {enrichment.sdf.conclusion && <p className="text-sm text-gray-700 mb-2">{enrichment.sdf.conclusion}</p>}
-              {enrichment.sdf.events.length === 0 ? (
+              {enrichment.sdf?.conclusion && <p className="text-sm text-gray-700 mb-2">{enrichment.sdf.conclusion}</p>}
+              {(enrichment.sdf?.events?.length ?? 0) === 0 ? (
                 <p className="text-xs text-gray-400">No detection events recorded yet.</p>
               ) : (
                 <ul className="space-y-1.5">
-                  {enrichment.sdf.events.map((ev, i) => (
+                  {(enrichment.sdf?.events ?? []).map((ev, i) => (
                     <li key={i} className="text-xs flex items-start gap-2">
                       <span className={`mt-0.5 px-1.5 py-0.5 rounded-full font-medium ${ev.outcome === 'rejected' || ev.outcome === 'failed' ? 'bg-red-100 text-red-700' : ev.outcome === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>{ev.outcome}</span>
                       <div className="min-w-0">

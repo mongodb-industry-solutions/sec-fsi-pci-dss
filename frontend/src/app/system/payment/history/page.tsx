@@ -72,11 +72,17 @@ export default function TransactionHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  // Standard list controls (search + status filter), same pattern as the rest of the system.
+  const [qInput, setQInput] = useState('');
+  const [q, setQ] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   function handleLimitChange(newLimit: number) {
     setPageSize(newLimit);
     setPage(1);
   }
+  function applySearch() { setPage(1); setQ(qInput.trim()); }
+  function clearSearch() { setQInput(''); setQ(''); setPage(1); }
   const { debugMode } = useDebugMode();
 
   useEffect(() => {
@@ -123,8 +129,22 @@ export default function TransactionHistoryPage() {
     load();
   }, []);
 
-  const totalPages = Math.max(1, Math.ceil(allTxns.length / pageSize));
-  const paginated = allTxns.slice((page - 1) * pageSize, page * pageSize);
+  // Status options are derived from the data (effective status = case status when escalated).
+  const statusKeys = Array.from(new Set(allTxns.map((t) => t.caseStatus ?? t.status)));
+  const ql = q.toLowerCase();
+  const filtered = allTxns.filter((t) => {
+    if (statusFilter && (t.caseStatus ?? t.status) !== statusFilter) return false;
+    if (!ql) return true;
+    return (
+      t.merchant?.toLowerCase().includes(ql) ||
+      t.maskedPan?.toLowerCase().includes(ql) ||
+      (t.paymentReference ?? '').toLowerCase().includes(ql) ||
+      (t.caseRef ?? '').toLowerCase().includes(ql) ||
+      String(t.amount).includes(ql)
+    );
+  });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -155,6 +175,42 @@ export default function TransactionHistoryPage() {
           </div>
         ) : (
           <>
+            {/* Search + status filter — standard pattern (input + Search + Clear), same as the rest of the system */}
+            <div className="flex flex-col sm:flex-row gap-2 mb-5">
+              <input
+                type="text"
+                value={qInput}
+                onChange={(e) => setQInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') applySearch(); }}
+                placeholder="Search by merchant, card or reference…"
+                className="flex-1 border rounded-lg px-3 py-2 text-sm"
+              />
+              <select
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                className="border rounded-lg px-3 py-2 text-sm bg-white"
+              >
+                <option value="">All statuses</option>
+                {statusKeys.map((k) => (
+                  <option key={k} value={k}>{STATUS_DISPLAY[k]?.label ?? k.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
+              <button onClick={applySearch} className="px-4 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold">
+                Search
+              </button>
+              {(q || qInput || statusFilter) && (
+                <button onClick={() => { clearSearch(); setStatusFilter(''); }} className="px-3 py-2 rounded-lg border text-sm text-gray-500 hover:bg-gray-50 transition-colors">
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {filtered.length === 0 ? (
+              <div className="bg-white rounded-xl border p-6 text-center text-gray-500">
+                No transactions match your filters.
+              </div>
+            ) : (
+            <>
             <div className="space-y-3 mb-5">
               {paginated.map((txn) => {
                 const { label, color } = displayStatus(txn);
@@ -217,13 +273,15 @@ export default function TransactionHistoryPage() {
             <Pagination
               page={page}
               totalPages={totalPages}
-              total={allTxns.length}
+              total={filtered.length}
               limit={pageSize}
               onPageChange={setPage}
               onLimitChange={handleLimitChange}
               limitOptions={[5, 10, 20, 50]}
               noun="transactions"
             />
+            </>
+            )}
           </>
         )}
       </main>

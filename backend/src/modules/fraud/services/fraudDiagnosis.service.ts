@@ -146,7 +146,7 @@ export async function createFraudCase(
   }
   await db.collection(FRAUD_DIAGNOSIS_EVENTS_COLLECTION).insertOne(openEvent as object);
 
-  void dispatchProvider(db, 'fraud_detection', 'fraud.createCase', {
+  void dispatchProvider(db, 'fraud_detection', 'fraud.create.case', {
     fraudDiagnosisInstanceReference: caseId,
     cardTransactionInstanceReference: txnId,
     customerAgreementInstanceReference: customerRef,
@@ -160,7 +160,7 @@ export async function createFraudCase(
     entityType: 'fraud_case',
     entityId: caseId,
     processType: 'fraud_evaluation',
-    processAction: 'fraud_case.opened',
+    processAction: 'fraud.case.opened',
     processOutcome: 'pending',
     performedByPartyReference: null,
     performedByRole: null,

@@ -795,7 +795,7 @@ Returns an empty \`hrpcFlags\` array when the account is not in any HRPC categor
       return (riskOrder[lvl] ?? 0) > riskOrder[acc] ? (lvl as 'low' | 'medium' | 'high') : acc;
     }, 'none');
 
-    void dispatchProvider(fastify.db, 'hrp_sanctions', 'fraud.hrpcCheck', {
+    void dispatchProvider(fastify.db, 'hrp_sanctions', 'fraud.hrpc.check', {
       accountRef,
       hrpcMatch: flags.length > 0,
       highestRiskLevel,

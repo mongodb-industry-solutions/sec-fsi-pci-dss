@@ -184,7 +184,7 @@ export const CATEGORY_TRIGGER_EVENTS: Record<string, TriggerEvent[]> = {
   ],
   hrp_sanctions: [
     { event: 'customer.onboarding.initiated', description: 'New customer onboarding process started' },
-    { event: 'transaction.high_risk',         description: 'Transaction scored as high-risk by FDS' },
+    { event: 'transaction.high.risk',         description: 'Transaction scored as high-risk by FDS' },
     { event: 'periodic.rescan',               description: 'Periodic rescreening triggered by scheduled batch job' },
   ],
   kyc_identity: [
@@ -213,7 +213,7 @@ export const CATEGORY_TRIGGER_EVENTS: Record<string, TriggerEvent[]> = {
   ],
   card_authorization: [
     { event: 'checkout.pay',       description: 'Checkout session pay action triggered by cardholder' },
-    { event: 'payment_link.pay',   description: 'Payment link pay action triggered by cardholder' },
+    { event: 'payment.link.pay',   description: 'Payment link pay action triggered by cardholder' },
   ],
   card_issuer: [
     { event: 'checkout.cvv.validation',   description: 'CVV2/CVC2 validation check triggered during checkout' },

@@ -100,7 +100,10 @@ export default function StaffMerchantDetailPage() {
       setMerchant(m);
       // Authorization: staff (officer/auditor) or the merchant's own owner.
       const partyRef = decodeToken(token)?.partyRef;
-      const isStaff = role === 'merchant_officer' || role === 'security_auditor';
+      // PSP staff + fraud investigators (L1/L2) may view a merchant; investigators reach it from a
+      // case (SD-89 referenced by SD-83). The administrative `manager` role is excluded (PCI Req 7).
+      const isStaff = role === 'merchant_officer' || role === 'security_auditor'
+        || role === 'level1_analyst' || role === 'level2_investigator';
       const isOwner = !!partyRef && (m as Record<string, unknown>).merchantOwnerPartyReference === partyRef;
       if (!isStaff && !isOwner) { setDenied(true); setLoading(false); return; }
 
