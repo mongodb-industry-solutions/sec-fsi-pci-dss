@@ -264,7 +264,75 @@ export interface TransactionNotesResponse {
   notes: NoteEntry[];
 }
 
+// ADR-030: data-driven RBAC/ACL
+export type AclPermissionMap = Record<string, string[]>;
+export interface EffectivePermissions {
+  role: string;
+  label: string;
+  description: string | null;
+  scope: 'own' | 'all';
+  isBuiltin: boolean;
+  bianServiceDomain: string | null;
+  permissions: AclPermissionMap;
+  catalog: { resources: string[]; actions: string[] };
+}
+export interface ManagedUserDTO {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  domain: string;
+  status: 'active' | 'suspended';
+  featured?: boolean;
+}
+export interface RoleRecordDTO {
+  roleName: string;
+  roleLabel: string;
+  roleDescription?: string;
+  rolePermissions: AclPermissionMap;
+  roleScope: 'own' | 'all';
+  roleIsBuiltin: boolean;
+  bianServiceDomain: string;
+  bianControlRecordType: string;
+  recordCreatedDateTime?: string;
+  recordUpdatedDateTime?: string;
+}
+
 export const api = {
+  acl: {
+    effective: (token: string) =>
+      apiFetch<EffectivePermissions>('/api/v1/acl/effective', {}, token),
+  },
+
+  roles: {
+    list: (token: string) =>
+      apiFetch<{ roles: RoleRecordDTO[]; catalog: { resources: string[]; actions: string[] } }>('/api/v1/roles', {}, token),
+    get: (roleName: string, token: string) =>
+      apiFetch<RoleRecordDTO>(`/api/v1/roles/${encodeURIComponent(roleName)}`, {}, token),
+    create: (body: Partial<RoleRecordDTO> & { roleName: string; roleLabel: string }, token: string) =>
+      apiFetch<RoleRecordDTO>('/api/v1/roles', { method: 'POST', body: JSON.stringify(body) }, token),
+    update: (roleName: string, body: Partial<RoleRecordDTO>, token: string) =>
+      apiFetch<RoleRecordDTO>(`/api/v1/roles/${encodeURIComponent(roleName)}`, { method: 'PUT', body: JSON.stringify(body) }, token),
+    remove: (roleName: string, token: string) =>
+      apiFetch<{ deleted: boolean; roleName: string }>(`/api/v1/roles/${encodeURIComponent(roleName)}`, { method: 'DELETE' }, token),
+  },
+
+  users: {
+    list: (token: string, params?: { domain?: string; q?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.domain) qs.set('domain', params.domain);
+      if (params?.q) qs.set('q', params.q);
+      const s = qs.toString();
+      return apiFetch<{ users: ManagedUserDTO[] }>(`/api/v1/users${s ? `?${s}` : ''}`, {}, token);
+    },
+    create: (body: { email: string; name: string; role: string; domain?: string; password?: string; status?: 'active' | 'suspended' }, token: string) =>
+      apiFetch<ManagedUserDTO>('/api/v1/users', { method: 'POST', body: JSON.stringify(body) }, token),
+    update: (id: string, body: { name?: string; role?: string; status?: 'active' | 'suspended'; password?: string }, token: string) =>
+      apiFetch<ManagedUserDTO>(`/api/v1/users/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }, token),
+    remove: (id: string, token: string) =>
+      apiFetch<{ deleted: boolean; id: string }>(`/api/v1/users/${encodeURIComponent(id)}`, { method: 'DELETE' }, token),
+  },
+
   auth: {
     login: (body: { email: string; password: string; domain: string }) =>
       apiFetch<LoginResponse>('/api/v1/auth/login', {

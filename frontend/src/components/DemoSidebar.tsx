@@ -7,9 +7,8 @@ import {
   BriefcaseMedical, CreditCard, Users, BarChart3, ClipboardList,
   User, PlusCircle, Store, ClipboardCheck,
   ChevronLeft, ChevronRight, Settings2, Plug,
-  ShieldAlert, ScanLine, UserCheck, Building2, AlertTriangle,
-  Zap, KeyRound, ShieldCheck, Activity, Network,
-  HelpCircle,
+  KeyRound, ShieldCheck, Activity, Network,
+  HelpCircle, LayoutGrid, Lock,
   type LucideIcon,
 } from 'lucide-react';
 import { getToken, decodeToken } from '../lib/auth';
@@ -55,19 +54,13 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'All Merchants',path: '/system/merchant',        icon: Store, exact: true },
   ],
   manager: [
-    { label: 'Hub',             path: '/system',                          icon: Settings2,    exact: true },
-    { label: 'Registry',        path: '/system/admin/integrations',       icon: Plug,         exact: true },
-    { label: 'Routing Groups',  path: '/system/admin/routing-groups',     icon: Network },
-    { label: 'Fraud Detection', path: '/system/admin/fraud-detection',    icon: ShieldAlert },
-    { label: 'HRP / Sanctions', path: '/system/admin/hrp',                icon: ScanLine },
-    { label: 'KYC / Identity',  path: '/system/admin/kyc',                icon: UserCheck },
-    { label: 'KYB / Business',  path: '/system/admin/kyb',                icon: Building2 },
-    { label: 'AML Monitoring',  path: '/system/admin/aml',                icon: AlertTriangle },
-    { label: 'Credit Bureau',   path: '/system/admin/credit-bureau',      icon: CreditCard },
-    { label: 'Card Auth',       path: '/system/admin/card-authorization', icon: Zap },
-    { label: 'Card Issuer',     path: '/system/admin/card-issuer',        icon: KeyRound },
-    { label: 'Audit Events',    path: '/system/audit-events',             icon: Activity },
-    { label: '+ Register',      path: '/system/admin/integrations/new',   icon: PlusCircle },
+    { label: 'Hub',           path: '/system',                       icon: Settings2,  exact: true },
+    { label: 'Providers',     path: '/system/admin/providers',       icon: Plug },
+    { label: 'Groups',        path: '/system/admin/providers/groups', icon: Network },
+    { label: 'Modules',       path: '/system/admin/modules',         icon: LayoutGrid },
+    { label: 'Auth Domains',  path: '/system/admin/modules/domains', icon: KeyRound },
+    { label: 'Roles & Access', path: '/system/admin/roles',          icon: Lock },
+    { label: 'Audit Events',  path: '/system/audit-events',          icon: Activity },
   ],
 };
 

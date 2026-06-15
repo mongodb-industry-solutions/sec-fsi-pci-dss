@@ -7,6 +7,7 @@ import { getToken, decodeToken } from '../../../lib/auth';
 import { Pagination } from '../../../components/Pagination';
 import { Mail, Type, Search, X, Lock, CreditCard } from 'lucide-react';
 import { SectionHeader } from '../../../components/SectionHeader';
+import { RequirePermission } from '../../../components/RequirePermission';
 
 interface Transaction {
   cardTransactionInstanceReference?: string;
@@ -137,6 +138,7 @@ export default function TransactionsPage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
+    <RequirePermission resource="transactions" action="view">
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <SectionHeader
         icon={CreditCard}
@@ -318,5 +320,6 @@ export default function TransactionsPage() {
         </>
       )}
     </div>
+    </RequirePermission>
   );
 }

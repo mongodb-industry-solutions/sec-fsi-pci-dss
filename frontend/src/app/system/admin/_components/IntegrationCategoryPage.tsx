@@ -6,11 +6,13 @@ import {
   RefreshCw, Trash2, Search, X, Filter, Pencil, Eye,
   ShieldAlert, ScanLine, UserCheck, Building2, AlertTriangle, CreditCard, Puzzle,
   GitBranch, ArrowRight, Zap, ChevronDown, KeyRound,
+  type LucideIcon,
 } from 'lucide-react';
 import { api } from '../../../../lib/api';
 import { getToken } from '../../../../lib/auth';
 import { useDebugMode } from '../../../../lib/debugMode';
 import { Pagination } from '../../../../components/Pagination';
+import { SectionHeader } from '../../../../components/SectionHeader';
 import { CATEGORY_CONTRACTS, CATEGORY_TRIGGER_EVENTS } from './categoryContracts';
 import { useConfirm, useNotify } from '../../../../components/ui/ConfirmProvider';
 
@@ -58,7 +60,7 @@ export interface CategoryMeta {
   bianSd: string;
 }
 
-const ICON_BY_TYPE: Record<string, React.ElementType> = {
+const ICON_BY_TYPE: Record<string, LucideIcon> = {
   fraud_detection:   ShieldAlert,
   hrp_sanctions:     ScanLine,
   kyc_identity:      UserCheck,
@@ -466,28 +468,22 @@ export function IntegrationCategoryPage({ meta }: { meta: CategoryMeta }) {
 
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className="p-2.5 bg-slate-100 rounded-xl mt-0.5">
-            <Icon size={20} className="text-slate-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{meta.label}</h1>
-            <p className="text-sm text-gray-500 mt-0.5">{meta.description}</p>
-            {debugMode && (
-              <p className="text-xs text-gray-400 font-mono mt-0.5">{meta.bianSd} · SD-193 · PCI DSS Req 12.8.1</p>
-            )}
-          </div>
-        </div>
-        <Link
-          href={`/system/admin/integrations/new?type=${meta.type}`}
-          className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
-        >
-          <Plus size={14} />
-          Register Provider
-        </Link>
-      </div>
+      {/* Header — shared SectionHeader (icon + title + subtitle), consistent across /system */}
+      <SectionHeader
+        icon={Icon}
+        title={meta.label}
+        description={meta.description}
+        debugInfo={`${meta.bianSd} · SD-193 · PCI DSS Req 12.8.1`}
+        actions={
+          <Link
+            href={`/system/admin/integrations/new?type=${meta.type}`}
+            className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
+          >
+            <Plus size={14} />
+            Register Provider
+          </Link>
+        }
+      />
 
       {/* ── Group Configuration ─────────────────────────────────────────── */}
       <GroupConfigSection type={meta.type} token={token} />

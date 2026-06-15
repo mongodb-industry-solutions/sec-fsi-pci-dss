@@ -11,13 +11,17 @@ export const VALID_DEMO_ROLES: ReadonlySet<UserRole> = new Set([
 ]);
 
 export function extractDemoRole(request: FastifyRequest): UserRole {
+  // The x-demo-role header is UNTRUSTED (simulator convenience, no token) — restrict it to builtins.
   const header = request.headers['x-demo-role'] as string | undefined;
   if (header && VALID_DEMO_ROLES.has(header as UserRole)) {
     return header as UserRole;
   }
+  // A JWT role is signed by us at login from the stored user record, so it is TRUSTED — return it
+  // as-is even when it is a custom role (ADR-030). Authorization is enforced by the ACL (`can()`),
+  // not by this union, so custom roles resolve correctly without widening the type everywhere.
   const user = (request as FastifyRequest & { user?: JwtDemoPayload }).user;
-  if (user?.role && VALID_DEMO_ROLES.has(user.role)) {
-    return user.role;
+  if (user?.role) {
+    return user.role as UserRole;
   }
   return 'level1_analyst';
 }

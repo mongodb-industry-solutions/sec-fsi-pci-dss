@@ -9,6 +9,8 @@ import { useDebugMode } from '../../../../lib/debugMode';
 import { RawMongoPanel } from '../../../../components/RawMongoPanel';
 import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
 import { useResource } from '../../../../lib/useResource';
+import { useEffectivePermissions } from '../../../../lib/permissions';
+import { AccessDenied } from '../../../../components/AccessDenied';
 import { storeEscalationToken, readEscalationToken } from '../../../../lib/escalation';
 import { Eye, EyeOff, UserCheck, Store, ChevronRight } from 'lucide-react';
 
@@ -72,6 +74,8 @@ export default function TransactionDetailPage() {
   const [partyMerchant, setPartyMerchant] = useState<Record<string, unknown> | null>(null);
   // Breadcrumb context: a transaction opened from a case reflects that path.
   const [fromCase, setFromCase] = useState<{ caseId: string; caseRef?: string } | null>(null);
+  const { loading: permLoading, can: canPerm } = useEffectivePermissions();
+  const canViewTxn = canPerm('transactions', 'view');
 
   useEffect(() => {
     const t = getToken() ?? '';
@@ -157,6 +161,10 @@ export default function TransactionDetailPage() {
       .then((r) => setCardHolders(r.cardHolderCount))
       .catch(() => setCardHolders(null));
   }, [token, txn?.paymentCardReference]);
+
+  // ADR-030: gate the whole detail view on transactions:view (manager/merchant_officer → AccessDenied).
+  if (permLoading) return <div className="w-full px-5 sm:px-8 lg:px-12 py-6 text-gray-400">Checking access…</div>;
+  if (!canViewTxn) return <AccessDenied resource="transactions" action="view" />;
 
   if (loading) return <div className="w-full px-5 sm:px-8 lg:px-12 py-6 text-gray-400">Loading transaction...</div>;
   if (notFound || !txn) return (

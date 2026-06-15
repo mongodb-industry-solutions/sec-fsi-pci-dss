@@ -4,6 +4,7 @@ import { existsSync } from 'fs';
 import { execSync } from 'child_process';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
 import { seedParties } from './seedParties';
+import { seedRoles } from './seedRoles';
 import { seedUsers } from './seedUsers';
 import { seedMerchants } from './seedMerchants';
 import { seedAuthDomains } from './seedAuthDomains';
@@ -70,6 +71,9 @@ export async function runSeed() {
   try {
     console.log('Seeding party (SD-13)...');
     await seedParties(db);
+
+    console.log('Seeding role (ADR-030 RBAC builtin matrix)...');
+    await seedRoles(db);
 
     console.log('Seeding customerAuthenticationAssessment (SD-91)...');
     await seedUsers(db);

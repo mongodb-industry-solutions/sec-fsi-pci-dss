@@ -1,12 +1,13 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { KeyRound, Plus, Pencil, Trash2, Check, X } from 'lucide-react';
+import { KeyRound, Plus, Pencil, Trash2, Check, X, Users } from 'lucide-react';
 import { SectionHeader } from '../../../../../components/SectionHeader';
 import { Breadcrumb } from '../../../../../components/Breadcrumb';
 import { Pagination } from '../../../../../components/Pagination';
 import { api } from '../../../../../lib/api';
 import { getToken } from '../../../../../lib/auth';
 import { useNotify } from '../../../../../components/ui/ConfirmProvider';
+import { DomainAccessPanel } from './DomainAccessPanel';
 
 type Row = Record<string, unknown>;
 const PAGE_SIZE = 10;
@@ -40,6 +41,7 @@ export default function AuthDomainsPage() {
   const [form, setForm] = useState<FormState | null>(null); // null = form hidden
   const [saving, setSaving] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null); // ADR-030: access panel
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -213,6 +215,11 @@ export default function AuthDomainsPage() {
                         </>
                       ) : (
                         <>
+                          <button onClick={() => setExpandedId(expandedId === id ? null : id)}
+                            title={String(r.partyAuthenticationDomainType) === 'local' ? 'Manage users' : 'Manage role mappings'}
+                            className={`flex items-center gap-1 text-xs ${expandedId === id ? 'text-[#001E2B] font-medium' : 'text-gray-500 hover:text-[#001E2B]'}`}>
+                            <Users size={14} /> Access
+                          </button>
                           <button onClick={() => startEdit(r)} className="text-gray-500 hover:text-[#001E2B]"><Pencil size={14} /></button>
                           <button onClick={() => setConfirmingId(id)} className="text-gray-500 hover:text-red-600"><Trash2 size={14} /></button>
                         </>
@@ -222,6 +229,24 @@ export default function AuthDomainsPage() {
                 </tr>
               );
             })}
+            {/* ADR-030: expanded access panel for the selected domain */}
+            {!loading && expandedId && (() => {
+              const r = rows.find((x) => String(x.partyAuthenticationDomainInstanceReference) === expandedId);
+              if (!r) return null;
+              return (
+                <tr key={`${expandedId}-access`}>
+                  <td colSpan={5} className="p-0">
+                    <DomainAccessPanel
+                      domainId={expandedId}
+                      domainName={String(r.partyAuthenticationDomainName)}
+                      domainType={String(r.partyAuthenticationDomainType ?? 'local')}
+                      initialMappings={(r.partyAuthenticationDomainRoleMappings as { externalClaimOrGroup: string; roleName: string }[]) ?? []}
+                      token={token}
+                    />
+                  </td>
+                </tr>
+              );
+            })()}
           </tbody>
         </table>
       </div>

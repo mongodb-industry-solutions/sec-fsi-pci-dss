@@ -896,6 +896,32 @@ void db.collection(BUSINESS_PROCESS_EVENTS_COLLECTION).insertOne(event).catch(()
 
 ---
 
+### 1.15 RBAC/ACL — data-driven permission model (ADR-030, SD-16)
+
+Authorization is **data-driven, default-deny** (PCI DSS Req 7). The permission **catalog** (resource × action) is static code (`backend/src/shared/models/acl.model.ts`, mirrored in `frontend/src/config/acl.ts`); the role→permission **assignment** is data in the **`role`** collection (CRUD by the `manager`).
+
+**Resources** (→ BIAN SD): `transactions`(SD-254) · `customers`(SD-53) · `cards`(SD-88) · `fraudCases`(SD-83) · `merchants`(SD-89) · `providers`(SD-193) · `modules`(ADR-029) · `authDomains`(SD-16) · `roles` · `auditEvents`(ADR-025) · `consents`.
+**Actions** (PCI levels): `view` · `viewSensitive` (CHD/PII — Req 3/7, bound to the escalation flow) · `manage` · `investigate`. Scope `own` for `customer`.
+
+**`role` collection** — `{ roleName (PK, unique), roleLabel, roleDescription, rolePermissions: {[resource]: action[]}, roleScope: 'own'|'all', roleIsBuiltin, bianServiceDomain, bianControlRecordType, recordCreated/UpdatedDateTime }`. Builtin roles are editable (permissions) but not deletable; custom roles support any subset, including full-manage.
+
+**Builtin role matrix (seed):**
+
+| Role | transactions | customers | cards | fraudCases | merchants | providers | modules | authDomains | roles | auditEvents | consents |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| **customer** (own) | view | — | view·manage | — | view | — | — | — | — | — | view |
+| **level1_analyst** | view | view | view | view·investigate | view | — | — | — | — | view | — |
+| **level2_investigator** | view·**viewSensitive** | view·**viewSensitive** | view·**viewSensitive** | view·investigate | view | — | — | — | — | view | — |
+| **security_auditor** | view·viewSensitive | view·viewSensitive | view·viewSensitive | view·viewSensitive | view | view | view | — | — | view | — |
+| **merchant_officer** | — | — | — | — | view·manage | — | — | — | — | view | — |
+| **manager** | **—** | **—** | **—** | **—** | — | view·manage | view·manage | view·manage | view·manage | view | — |
+
+> The `manager` (SD-193 platform admin) has **no** access to business/cardholder data — separation of duties (PCI Req 7). `can('manager','transactions','view') === false` ⇒ **403 backend** (`requirePermission` preHandler) + **`<AccessDenied>` frontend** (`<RequirePermission>`), with the role's responsibilities rendered from the live ACL.
+
+**Enforcement & API:** `requirePermission(resource, action)` (Fastify preHandler, default-deny, cached role load + builtin fallback). `GET /api/v1/acl/effective` returns the caller's resolved permissions (frontend `can()` — permissions never live in the JWT). Roles CRUD: `GET/POST /api/v1/roles`, `GET/PUT/DELETE /api/v1/roles/:roleName` (`roles:manage`; builtin not deletable). Users (local): `GET/POST /api/v1/users`, `PUT/DELETE /api/v1/users/:id` (`authDomains:manage`). Remote role mappings: `partyAuthenticationDomainRoleMappings` on `authenticationDomain` (claim/group → role).
+
+---
+
 ## 2. QE encryptedFieldsMaps
 
 All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `keyId` values are per-field BSON Binary UUIDs resolved at runtime from the provisioned DEKs via `provisionDEKs.ts`.

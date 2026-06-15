@@ -1,13 +1,20 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Network, Plus, Trash2, Users, Search, Star } from 'lucide-react';
+import Link from 'next/link';
+import { Network, Plus, Trash2, Users, Search, Star, ChevronDown, ChevronRight, Power } from 'lucide-react';
 import { api } from '../../../../../lib/api';
 import { getToken, decodeToken } from '../../../../../lib/auth';
 import { SectionHeader } from '../../../../../components/SectionHeader';
 import { Pagination } from '../../../../../components/Pagination';
 import { useConfirm, useNotify } from '../../../../../components/ui/ConfirmProvider';
-import { useDebugMode } from '../../../../../lib/debugMode';
+import { byProviderType } from '../../../../../config/capabilities';
+
+// Map a routing group's provider type to its capability admin page (clicking a group card opens it).
+function capabilityHref(providerType: string): string | null {
+  const cap = byProviderType(providerType)?.capability;
+  return cap && cap !== 'generic' ? `/system/admin/providers/${cap}` : null;
+}
 
 interface Member {
   externalProviderArrangementInstanceReference: string;
@@ -50,7 +57,6 @@ export default function RoutingGroupsPage() {
   const router = useRouter();
   const confirm = useConfirm();
   const notify = useNotify();
-  const { debugMode } = useDebugMode();
   const [token, setToken] = useState('');
   const [authorized, setAuthorized] = useState<boolean | null>(null);
 
@@ -69,6 +75,7 @@ export default function RoutingGroupsPage() {
   const [typeFilter, setTypeFilter] = useState('');
   const [page, setPage] = useState(1);
   const [busy, setBusy] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null); // custom-group member/strategy editor
 
   useEffect(() => {
     const t = getToken() ?? '';
@@ -182,10 +189,10 @@ export default function RoutingGroupsPage() {
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <SectionHeader
         icon={Network}
-        title="Routing Groups"
-        description="Create and manage provider routing groups and their members."
-        info="Routing groups decide which external provider handles each request per integration type, with strategies such as primary/fallback or round robin. The default group is the fallback target and cannot be deleted."
-        debugInfo="BIAN SD-193 ExternalProviderArrangementPortfolio · routing strategy + members · manager only"
+        title="Groups"
+        description="Provider categories. Built-in groups can be activated/deactivated; add custom groups for advanced routing."
+        info="Each built-in group is a provider category (e.g. Fraud Detection). Open one to manage its providers. Built-in groups cannot be deleted — only deactivated. Custom groups add routing across multiple providers (strategy + members)."
+        debugInfo="BIAN SD-193 ExternalProviderArrangementPortfolio · built-in deactivate-only · custom = routing strategy + members · manager only"
       />
 
       {/* Create */}
@@ -238,88 +245,122 @@ export default function RoutingGroupsPage() {
           No routing groups{search || typeFilter ? ' match the current filters.' : ' yet. Create one above.'}
         </div>
       ) : (
-        <div className="space-y-3">
-          {paginated.map((g) => {
-            const available = providers.filter(
-              (p) => p.externalProviderArrangementType === g.routingGroupProviderType &&
-                !g.routingGroupMembers.some((m) => m.externalProviderArrangementInstanceReference === p.externalProviderArrangementInstanceReference)
-            );
-            const isBusy = busy === g.routingGroupInstanceReference;
-            return (
-              <div key={g.routingGroupInstanceReference} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-3 flex-wrap">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-gray-800 text-sm">{g.routingGroupName}</span>
-                      {g.isDefaultGroup && (
-                        <span className="inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 font-medium"><Star size={10} /> Default</span>
-                      )}
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${g.routingGroupStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>{g.routingGroupStatus}</span>
-                    </div>
-                    <span className="text-xs text-gray-400">{TYPE_LABEL[g.routingGroupProviderType] ?? g.routingGroupProviderType}</span>
-                  </div>
-                  <div className="flex items-center gap-2 ml-auto flex-wrap">
-                    <select value={g.routingGroupStrategy} disabled={isBusy} onChange={(e) => handleStrategy(g, e.target.value)}
-                      className="border border-gray-300 rounded-lg px-2 py-1 text-xs bg-white">
-                      {STRATEGIES.map((s) => <option key={s} value={s}>{STRATEGY_LABEL[s]}</option>)}
-                    </select>
-                    <button onClick={() => handleStatus(g)} disabled={isBusy}
-                      className="text-xs px-2.5 py-1 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50">
-                      {g.routingGroupStatus === 'active' ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button onClick={() => handleDelete(g)} disabled={isBusy || g.isDefaultGroup}
-                      title={g.isDefaultGroup ? 'The default group cannot be deleted' : 'Delete group'}
-                      className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed">
-                      <Trash2 size={12} /> Delete
-                    </button>
-                  </div>
-                </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {paginated.map((g) => {
+              const available = providers.filter(
+                (p) => p.externalProviderArrangementType === g.routingGroupProviderType &&
+                  !g.routingGroupMembers.some((m) => m.externalProviderArrangementInstanceReference === p.externalProviderArrangementInstanceReference)
+              );
+              const isBusy = busy === g.routingGroupInstanceReference;
+              const builtin = !!g.isDefaultGroup;
+              const href = capabilityHref(g.routingGroupProviderType);
+              const expanded = expandedId === g.routingGroupInstanceReference;
+              const active = g.routingGroupStatus === 'active';
+              const typeLabel = TYPE_LABEL[g.routingGroupProviderType] ?? g.routingGroupProviderType;
 
-                {/* Members */}
-                <div className="px-5 py-3 space-y-2">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500"><Users size={12} /> Members ({g.routingGroupMembers.length})</div>
-                  {g.routingGroupMembers.length === 0 ? (
-                    <p className="text-xs text-gray-400">No members yet.</p>
+              return (
+                <div key={g.routingGroupInstanceReference} className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col">
+                  {/* Header — built-in cards navigate to the capability's provider page */}
+                  {builtin && href ? (
+                    <Link href={href} className="group block">
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-slate-200 transition-colors"><Network size={20} className="text-slate-600" /></div>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>{g.routingGroupStatus}</span>
+                      </div>
+                      <p className="font-semibold text-gray-900 text-sm group-hover:text-[#001E2B] transition-colors">{typeLabel}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{g.routingGroupName}</p>
+                    </Link>
                   ) : (
-                    <ul className="divide-y divide-gray-50">
-                      {[...g.routingGroupMembers].sort((a, b) => (a.memberPriority ?? 999) - (b.memberPriority ?? 999)).map((m) => (
-                        <li key={m.externalProviderArrangementInstanceReference} className="flex items-center gap-2 py-1.5">
-                          <span className="text-sm text-gray-700 truncate">{m.externalProviderArrangementName ?? providerName(m.externalProviderArrangementInstanceReference)}</span>
-                          {m.memberRole && <span className="text-[11px] bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">{m.memberRole}</span>}
-                          {debugMode && <span className="text-[10px] font-mono text-gray-400">prio {m.memberPriority ?? '—'}</span>}
-                          <button onClick={() => handleRemoveMember(g, m.externalProviderArrangementInstanceReference)} disabled={isBusy}
-                            className="ml-auto text-xs text-red-600 hover:underline disabled:opacity-50">Remove</button>
-                        </li>
-                      ))}
-                    </ul>
+                    <div>
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="p-2 bg-slate-100 rounded-lg"><Network size={20} className="text-slate-600" /></div>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>{g.routingGroupStatus}</span>
+                      </div>
+                      <p className="font-semibold text-gray-900 text-sm">{g.routingGroupName}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{typeLabel}</p>
+                    </div>
                   )}
-                  {available.length > 0 && (
-                    <div className="pt-1">
-                      <select defaultValue="" disabled={isBusy}
-                        onChange={(e) => { handleAddMember(g, e.target.value); e.currentTarget.value = ''; }}
-                        className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white">
-                        <option value="" disabled>+ Add a {TYPE_LABEL[g.routingGroupProviderType]} provider…</option>
-                        {available.map((p) => (
-                          <option key={p.externalProviderArrangementInstanceReference} value={p.externalProviderArrangementInstanceReference}>
-                            {p.externalProviderArrangementName}
-                          </option>
-                        ))}
-                      </select>
+
+                  <div className="mt-3 flex items-center gap-2 flex-wrap">
+                    {builtin
+                      ? <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium border border-blue-200"><Star size={9} /> Built-in</span>
+                      : <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-medium border border-purple-200">Custom</span>}
+                    <span className="text-[11px] text-gray-400 flex items-center gap-1"><Users size={11} /> {g.routingGroupMembers.length} member{g.routingGroupMembers.length !== 1 ? 's' : ''}</span>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2 flex-wrap">
+                    <button onClick={() => handleStatus(g)} disabled={isBusy}
+                      className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                      <Power size={12} /> {active ? 'Deactivate' : 'Activate'}
+                    </button>
+                    {builtin && href && (
+                      <Link href={href} className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border border-[#001E2B]/30 text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors">
+                        Open <ChevronRight size={12} />
+                      </Link>
+                    )}
+                    {!builtin && (
+                      <>
+                        <button onClick={() => setExpandedId(expanded ? null : g.routingGroupInstanceReference)}
+                          className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">
+                          {expanded ? 'Hide' : 'Manage'} <ChevronDown size={12} className={expanded ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                        </button>
+                        <button onClick={() => handleDelete(g)} disabled={isBusy}
+                          className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-40">
+                          <Trash2 size={12} /> Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Custom-group routing management (strategy + members) — built-ins are deactivate-only */}
+                  {!builtin && expanded && (
+                    <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
+                      <div>
+                        <label className="block text-[11px] text-gray-500 mb-1">Routing strategy</label>
+                        <select value={g.routingGroupStrategy} disabled={isBusy} onChange={(e) => handleStrategy(g, e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-2 py-1 text-xs bg-white">
+                          {STRATEGIES.map((s) => <option key={s} value={s}>{STRATEGY_LABEL[s]}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500"><Users size={12} /> Members</div>
+                      {g.routingGroupMembers.length === 0 ? (
+                        <p className="text-xs text-gray-400">No members yet.</p>
+                      ) : (
+                        <ul className="divide-y divide-gray-50">
+                          {[...g.routingGroupMembers].sort((a, b) => (a.memberPriority ?? 999) - (b.memberPriority ?? 999)).map((m) => (
+                            <li key={m.externalProviderArrangementInstanceReference} className="flex items-center gap-2 py-1.5">
+                              <span className="text-xs text-gray-700 truncate">{m.externalProviderArrangementName ?? providerName(m.externalProviderArrangementInstanceReference)}</span>
+                              {m.memberRole && <span className="text-[10px] bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">{m.memberRole}</span>}
+                              <button onClick={() => handleRemoveMember(g, m.externalProviderArrangementInstanceReference)} disabled={isBusy}
+                                className="ml-auto text-xs text-red-600 hover:underline disabled:opacity-50">Remove</button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {available.length > 0 && (
+                        <select defaultValue="" disabled={isBusy}
+                          onChange={(e) => { handleAddMember(g, e.target.value); e.currentTarget.value = ''; }}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs bg-white">
+                          <option value="" disabled>+ Add a {typeLabel} provider…</option>
+                          {available.map((p) => (
+                            <option key={p.externalProviderArrangementInstanceReference} value={p.externalProviderArrangementInstanceReference}>
+                              {p.externalProviderArrangementName}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   )}
                 </div>
-              </div>
-            );
-          })}
-          <Pagination
-            page={safePage}
-            totalPages={totalPages}
-            total={filtered.length}
-            limit={PAGE_SIZE}
-            onPageChange={setPage}
-            noun="groups"
-          />
-        </div>
+              );
+            })}
+          </div>
+          <div className="mt-4">
+            <Pagination page={safePage} totalPages={totalPages} total={filtered.length} limit={PAGE_SIZE} onPageChange={setPage} noun="groups" />
+          </div>
+        </>
       )}
     </div>
   );

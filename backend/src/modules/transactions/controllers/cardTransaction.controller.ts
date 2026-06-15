@@ -10,6 +10,7 @@ import {
 } from '../services/cardTransaction.service';
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
 import { getCaseNotes } from '../../fraud/services/fraudDiagnosis.service';
+import { requirePermission } from '../../../vendors/middleware/acl';
 
 export async function cardTransactionController(fastify: FastifyInstance) {
   fastify.get('/merchants', {
@@ -197,6 +198,7 @@ the Merchant Name selector. No authentication required (public, simulator mode).
   });
 
   fastify.get('/', {
+    preHandler: requirePermission('transactions', 'view'),
     schema: {
       tags: ['transactions'],
       summary: 'List transactions by card token',
@@ -261,6 +263,7 @@ token is a PAN surrogate and is NOT Cardholder Data under PCI DSS v4.0.`,
   });
 
   fastify.get('/:id', {
+    preHandler: requirePermission('transactions', 'view'),
     schema: {
       tags: ['transactions'],
       summary: 'Get a transaction by ID',
@@ -330,6 +333,7 @@ role to retrieve.`,
 
   // GET /api/v1/transactions/:id/notes  -  customer-safe: returns customer-visible notes list
   fastify.get('/:id/notes', {
+    preHandler: requirePermission('transactions', 'view'),
     schema: {
       tags: ['transactions'],
       summary: 'Get customer-visible notes for a transaction (list)',
@@ -417,6 +421,7 @@ Retracted notes are excluded from the list.`,
 
   // GET /api/v1/transactions/all   -  paginated transaction list for analyst / auditor roles
   fastify.get('/all', {
+    preHandler: requirePermission('transactions', 'view'),
     schema: {
       tags: ['transactions'],
       summary: 'List all transactions (paginated)',

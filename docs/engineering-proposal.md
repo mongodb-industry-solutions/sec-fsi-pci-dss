@@ -1626,3 +1626,25 @@ ADR-004 established the dual-mode frontend. In practice the Simulator had drifte
 - (+) Removed dead/duplicated resources: `users.json`, the hard-coded password map, fictional investigation constants, `simulatorHistory.ts`, and the legacy `*Sensitive.json` export files.
 - (−) The Simulator now depends on the auth and fraud endpoints behaving correctly; an RBAC bug surfaces in the Simulator (intended — it is now an honest test surface).
 - (−) Customer-facing case status in Application-mode transaction **history list** is not shown (customers are blocked from `/fraud`); customer-visible case notes remain available on the detail page via the dedicated customer-safe notes endpoint. A customer-safe case-status projection on `/transactions/all` is a possible follow-up.
+
+---
+
+## ADR-030 — Data-Driven RBAC/ACL + Role & User Administration by Domain
+
+**Status:** Accepted (2026-06-15). Implemented v8.1 (Phases A–C). Aligns **PCI DSS Req 7** (RBAC, least privilege, default-deny, documented matrix, separation of duties) and **BIAN SD-16** (Party Authentication).
+
+**Context.** Authorization was hard-coded across ~13 files (`auth.ts` prefix/role sets, per-controller role checks). This made the policy impossible to review as a whole (Req 7 wants a documented matrix) and impossible to change without code edits. The trigger: the `manager` (SD-193 integration admin) could reach business/cardholder data (`/system/transactions/:id`), violating separation of duties.
+
+**Decision.**
+1. **Static catalog, data assignment (E1).** The permission catalog (resource × action) lives in code (`acl.model.ts` back / `config/acl.ts` front) — it mirrors the real enforcement points, so no permission exists without a guard. Role→permission assignment is data in a new **`role`** collection (CRUD by the manager). The matrix in code doubles as the seed and the runtime fallback, so the DB can never diverge from what enforcement expects.
+2. **Global roles & actions (E2).** Roles/actions are global across authentication domains. Per domain only the *binding* differs: **local** = user CRUD + role assignment; **remote (OIDC/SAML)** = claim/group → role mapping (`partyAuthenticationDomainRoleMappings`).
+3. **Builtin vs custom (E3).** Six builtin roles (matrix in `technical-spec §1.15`) — permissions editable, not deletable. Custom roles: full CRUD, any subset incl. full-manage.
+4. **Enforcement.** `requirePermission(resource, action)` — a Fastify preHandler, default-deny, with a cached role load (TTL + invalidation on edit) and builtin fallback so it never fails open. `viewSensitive` additionally requires the existing escalation flow (`canReadSensitive`). `GET /api/v1/acl/effective` exposes the caller's resolved permissions so the frontend `can()`/`<RequirePermission>` work without putting permissions in the JWT (changes apply without re-login). `extractDemoRole` trusts the signed token's role (so custom roles resolve through the ACL) while the untrusted `x-demo-role` header stays restricted to builtins.
+5. **UI.** `/system/admin/roles` (matrix editor, builtin-protected) + per-domain access panels under Auth Domains (users for local, role mapping for remote) + a reusable `<AccessDenied>` whose body lists the role's responsibilities **derived from the live ACL** (not hard-coded).
+
+**Consequences.**
+- (+) Req 7 evidence is a single documented, queryable matrix; the manager is provably excluded from CHD (`can('manager','transactions',*) === false` → 403 + AccessDenied).
+- (+) New roles/permissions need no code change; enforcement is one reusable guard.
+- (+) Default-deny is surfaced to the user (AccessDenied) instead of a blank/erroring page.
+- (−) A new collection (`role`) + seed + cache to maintain. Mitigated by code-as-source-of-truth seed/fallback.
+- (−) `requirePermission` adds one cached DB read per guarded route (30s TTL); negligible.

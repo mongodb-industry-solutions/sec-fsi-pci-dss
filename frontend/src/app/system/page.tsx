@@ -6,8 +6,8 @@ import {
   BriefcaseMedical, CreditCard, Users, BarChart3, ClipboardList, User,
   PlusCircle, Store, ClipboardCheck, ShieldAlert, ScanLine, UserCheck,
   Building2, AlertTriangle, Plug, Zap, KeyRound, LayoutGrid,
-  CheckCircle2, AlertCircle, Clock, WifiOff, Wrench, ShieldCheck,
-  Network, Activity,
+  CheckCircle2, AlertCircle, Clock, WifiOff, ShieldCheck,
+  Activity,
   type LucideIcon,
 } from 'lucide-react';
 import { api, AuthUser, AuthDomain } from '../../lib/api';
@@ -315,14 +315,14 @@ interface Integration {
 }
 
 const TYPE_META: Record<string, { label: string; icon: LucideIcon; description: string; bianSd: string; href: string }> = {
-  fraud_detection:    { label: 'Fraud Detection',    icon: ShieldAlert,   description: 'Real-time transaction scoring and fraud signals',       bianSd: 'SD-63',  href: '/system/admin/fraud-detection' },
-  hrp_sanctions:      { label: 'HRP / Sanctions',    icon: ScanLine,      description: 'High-risk person and sanctions list screening',         bianSd: 'SD-13',  href: '/system/admin/hrp' },
-  kyc_identity:       { label: 'KYC / Identity',     icon: UserCheck,     description: 'Customer identity verification (KYC)',                  bianSd: 'SD-53',  href: '/system/admin/kyc' },
-  kyb_business:       { label: 'KYB / Business',     icon: Building2,     description: 'Merchant business entity verification (KYB)',           bianSd: 'SD-89',  href: '/system/admin/kyb' },
-  aml_monitoring:     { label: 'AML Monitoring',     icon: AlertTriangle, description: 'Anti-money laundering pattern analysis',                bianSd: 'SD-99',  href: '/system/admin/aml' },
-  credit_bureau:      { label: 'Credit Bureau',      icon: CreditCard,    description: 'Credit scoring and bureau checks',                      bianSd: 'SD-83',  href: '/system/admin/credit-bureau' },
-  card_authorization: { label: 'Card Authorization', icon: Zap,           description: 'Card transaction authorization via payment networks',   bianSd: 'SD-15',  href: '/system/admin/card-authorization' },
-  card_issuer:        { label: 'Card Issuer',        icon: KeyRound,      description: 'CVV and PIN validation from card-issuing processors',   bianSd: 'SD-88',  href: '/system/admin/card-issuer' },
+  fraud_detection:    { label: 'Fraud Detection',    icon: ShieldAlert,   description: 'Real-time transaction scoring and fraud signals',       bianSd: 'SD-63',  href: '/system/admin/providers/fds' },
+  hrp_sanctions:      { label: 'HRP / Sanctions',    icon: ScanLine,      description: 'High-risk person and sanctions list screening',         bianSd: 'SD-13',  href: '/system/admin/providers/hrp' },
+  kyc_identity:       { label: 'KYC / Identity',     icon: UserCheck,     description: 'Customer identity verification (KYC)',                  bianSd: 'SD-53',  href: '/system/admin/providers/kyc' },
+  kyb_business:       { label: 'KYB / Business',     icon: Building2,     description: 'Merchant business entity verification (KYB)',           bianSd: 'SD-89',  href: '/system/admin/providers/kyb' },
+  aml_monitoring:     { label: 'AML Monitoring',     icon: AlertTriangle, description: 'Anti-money laundering pattern analysis',                bianSd: 'SD-99',  href: '/system/admin/providers/aml' },
+  credit_bureau:      { label: 'Credit Bureau',      icon: CreditCard,    description: 'Credit scoring and bureau checks',                      bianSd: 'SD-83',  href: '/system/admin/providers/credit-bureau' },
+  card_authorization: { label: 'Card Authorization', icon: Zap,           description: 'Card transaction authorization via payment networks',   bianSd: 'SD-15',  href: '/system/admin/providers/card-authorization' },
+  card_issuer:        { label: 'Card Issuer',        icon: KeyRound,      description: 'CVV and PIN validation from card-issuing processors',   bianSd: 'SD-88',  href: '/system/admin/providers/card-issuer' },
 };
 
 function HealthBadge({ status }: { status?: string }) {
@@ -348,20 +348,47 @@ function ManagerIntegrationHub({ debugMode }: { debugMode: boolean }) {
     integrations.map(i => [i.externalProviderArrangementType, i])
   );
 
+  // Three primary admin sections (BIAN SD-193). Audit Events sits under /system; Modules and
+  // Providers under /system/admin. These replace the old per-type/registry/routing card sprawl.
+  const MAIN_CARDS: { label: string; description: string; icon: LucideIcon; href: string; debug: string }[] = [
+    { label: 'Audit Events', description: 'Unified business, compliance and integration audit trail.', icon: Activity,   href: '/system/audit-events',     debug: 'ADR-025 · Req 10.2 / 10.7' },
+    { label: 'Modules',      description: 'Internal capability engines (scoring, screening) and their config.', icon: LayoutGrid, href: '/system/admin/modules',    debug: 'ADR-029 · internal modules' },
+    { label: 'Providers',    description: 'External provider arrangements — register, route and monitor.', icon: Plug,       href: '/system/admin/providers',  debug: 'SD-193 · Req 12.8' },
+  ];
+
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">Integration Hub</h2>
-          <p className="text-sm text-gray-500 mt-0.5">BIAN SD-193 External Provider Arrangements · PCI DSS Req 12.8</p>
-        </div>
-        <Link
-          href="/system/admin/integrations"
-          className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
-        >
-          <Wrench size={14} />
-          Manage Integrations
-        </Link>
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-gray-900">Integration Hub</h2>
+        <p className="text-sm text-gray-500 mt-0.5">BIAN SD-193 External Provider Arrangements · PCI DSS Req 12.8</p>
+      </div>
+
+      {/* Primary sections */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {MAIN_CARDS.map((card) => {
+          const Icon = card.icon;
+          return (
+            <Link key={card.href} href={card.href} className="group block bg-white rounded-xl border p-5 hover:border-[#001E2B]/30 hover:shadow-md transition-all">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-slate-200 transition-colors">
+                  <Icon size={20} className="text-slate-600" />
+                </div>
+                {card.href === '/system/admin/providers' && (
+                  <span className="text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded font-mono">{integrations.length} registered</span>
+                )}
+              </div>
+              <p className="font-semibold text-gray-900 text-sm">{card.label}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{card.description}</p>
+              {debugMode && <p className="mt-2 text-[10px] font-mono text-gray-400">{card.debug}</p>}
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Groups — provider categories. Clicking a card opens that category's provider list. */}
+      <div className="mt-8 mb-3">
+        <h3 className="text-sm font-semibold text-gray-700">Groups</h3>
+        <p className="text-xs text-gray-500 mt-0.5">Provider categories — the built-in capability groups. Open one to manage its providers.</p>
       </div>
 
       {loading ? (
@@ -409,45 +436,6 @@ function ManagerIntegrationHub({ debugMode }: { debugMode: boolean }) {
               </Link>
             );
           })}
-
-          {/* Integration Registry card */}
-          <Link href="/system/admin/integrations" className="group block bg-white rounded-xl border p-5 hover:border-[#001E2B]/30 hover:shadow-md transition-all">
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-slate-200 transition-colors">
-                <Plug size={20} className="text-slate-600" />
-              </div>
-              <span className="text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded font-mono">
-                {integrations.length} registered
-              </span>
-            </div>
-            <p className="font-semibold text-gray-900 text-sm">Integration Registry</p>
-            <p className="text-xs text-gray-500 mt-0.5">Manage all external provider arrangements</p>
-            {debugMode && <p className="mt-2 text-[10px] font-mono text-gray-400">SD-193 · Req 12.8</p>}
-          </Link>
-
-          {/* Routing Groups card */}
-          <Link href="/system/admin/routing-groups" className="group block bg-white rounded-xl border p-5 hover:border-[#001E2B]/30 hover:shadow-md transition-all">
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-slate-200 transition-colors">
-                <Network size={20} className="text-slate-600" />
-              </div>
-            </div>
-            <p className="font-semibold text-gray-900 text-sm">Routing Groups</p>
-            <p className="text-xs text-gray-500 mt-0.5">Provider routing strategies and members</p>
-            {debugMode && <p className="mt-2 text-[10px] font-mono text-gray-400">SD-193 · routing portfolio</p>}
-          </Link>
-
-          {/* Audit Events card */}
-          <Link href="/system/audit-events" className="group block bg-white rounded-xl border p-5 hover:border-[#001E2B]/30 hover:shadow-md transition-all">
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-slate-200 transition-colors">
-                <Activity size={20} className="text-slate-600" />
-              </div>
-            </div>
-            <p className="font-semibold text-gray-900 text-sm">Audit Events</p>
-            <p className="text-xs text-gray-500 mt-0.5">Unified business, compliance and integration audit trail</p>
-            {debugMode && <p className="mt-2 text-[10px] font-mono text-gray-400">ADR-025 · Req 10.2 / 10.7</p>}
-          </Link>
         </div>
       )}
 

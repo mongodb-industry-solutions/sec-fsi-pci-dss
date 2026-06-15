@@ -182,6 +182,12 @@ export async function createIndexes(client: MongoClient) {
     { key: { partyAuthenticationDomainEnabled: 1 } },
   ]);
 
+  // ADR-030: RBAC role definitions (data-driven ACL)
+  await ensureIndexes(db, 'role', [
+    { key: { roleName: 1 }, unique: true },
+    { key: { roleIsBuiltin: 1 } },
+  ]);
+
   // SD-60: Customer Credit Rating State
   await ensureIndexes(db, 'customerCreditRatingState', [
     { key: { customerCreditRatingInstanceReference: 1 }, unique: true },

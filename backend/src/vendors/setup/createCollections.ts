@@ -76,6 +76,18 @@ export async function createCollections(
     console.log('  skip:    authenticationDomain (already exists)');
   }
 
+  // ADR-030 / SD-16: RBAC role definitions  -  plaintext, no QE (permission matrix, no CHD)
+  if (!existingNames.has('role') || reset) {
+    if (existingNames.has('role') && reset) {
+      await db.collection('role').drop();
+      console.log('  dropped: role');
+    }
+    await db.createCollection('role');
+    console.log('  created: role');
+  } else {
+    console.log('  skip:    role (already exists)');
+  }
+
   // SD-16: Party Authentication Assessment  -  plaintext, identity verification stubs
   if (!existingNames.has('partyAuthenticationAssessment') || reset) {
     if (existingNames.has('partyAuthenticationAssessment') && reset) {
