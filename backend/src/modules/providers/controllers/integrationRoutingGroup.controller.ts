@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import type { DemoRequest } from '../../../shared/models/identity.model';
+import type { AuthenticatedRequest } from '../../../shared/models/identity.model';
 import {
   createRoutingGroup,
   getRoutingGroup,
@@ -13,8 +13,8 @@ import {
 
 const E = { type: 'object', properties: { error: { type: 'string' } } };
 
-function isAuthorized(request: DemoRequest): boolean {
-  return request.demoRole === 'manager';
+function isAuthorized(request: AuthenticatedRequest): boolean {
+  return request.userRole === 'manager';
 }
 
 export async function integrationRoutingGroupController(fastify: FastifyInstance) {
@@ -31,7 +31,7 @@ export async function integrationRoutingGroupController(fastify: FastifyInstance
       response: { 200: { type: 'object', additionalProperties: true }, 403: E },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
       const { type } = request.query as { type?: string };
       const groups = await listRoutingGroups(fastify.db, { type: type as never });
@@ -57,7 +57,7 @@ export async function integrationRoutingGroupController(fastify: FastifyInstance
       response: { 201: { type: 'object', additionalProperties: true }, 403: E },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
       const body = request.body as { name: string; providerType: string; strategy: string };
       const group = await createRoutingGroup(fastify.db, {
@@ -78,7 +78,7 @@ export async function integrationRoutingGroupController(fastify: FastifyInstance
       response: { 200: { type: 'object', additionalProperties: true }, 403: E, 404: E },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
       const { id } = request.params as { id: string };
       const group = await getRoutingGroup(fastify.db, id);
@@ -104,7 +104,7 @@ export async function integrationRoutingGroupController(fastify: FastifyInstance
       response: { 200: { type: 'object', additionalProperties: true }, 403: E, 404: E },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
       const { id } = request.params as { id: string };
       const body = request.body as Record<string, string>;
@@ -136,7 +136,7 @@ export async function integrationRoutingGroupController(fastify: FastifyInstance
       response: { 200: { type: 'object', additionalProperties: true }, 403: E, 404: E },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
       const { id } = request.params as { id: string };
       const body = request.body as { providerId: string; priority?: number; weight?: number };
@@ -156,7 +156,7 @@ export async function integrationRoutingGroupController(fastify: FastifyInstance
       response: { 200: { type: 'object', additionalProperties: true }, 403: E, 404: E },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
       const { type } = request.params as { type: string };
       const group = await getDefaultGroupForType(fastify.db, type as never);
@@ -175,7 +175,7 @@ export async function integrationRoutingGroupController(fastify: FastifyInstance
       response: { 200: { type: 'object', additionalProperties: true }, 403: E, 404: E, 409: E },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
       const { id } = request.params as { id: string };
       const result = await deleteRoutingGroup(fastify.db, id);
@@ -200,7 +200,7 @@ export async function integrationRoutingGroupController(fastify: FastifyInstance
       response: { 200: { type: 'object', additionalProperties: true }, 403: E, 404: E },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
       const { id, pid } = request.params as { id: string; pid: string };
       const group = await removeMemberFromGroup(fastify.db, id, pid);

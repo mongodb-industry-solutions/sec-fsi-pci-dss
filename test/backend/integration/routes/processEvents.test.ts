@@ -11,7 +11,7 @@
  *   FR-v7-03.3  level1_analyst is denied → 403
  *   FR-v7-03.4  unauthenticated request → 401
  *   FR-v7-03.5  manager can list complianceProcessEvents → 200
- *   FR-v7-03.6  x-demo-role override with valid JWT sets effective role
+ *   FR-v7-03.6  x-user-role override with valid JWT sets effective role
  *   FR-v7-03.7  pagination params (page, limit) are respected
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -84,11 +84,11 @@ describe('ADR-025: /api/v1/events routes — RBAC', () => {
     expect(typeof res.body.limit).toBe('number');
   });
 
-  skip('FR-v7-03.2: GET /events/process returns 200 for manager role (x-demo-role override)', async () => {
+  skip('FR-v7-03.2: GET /events/process returns 200 for manager role (x-user-role override)', async () => {
     const res = await supertest(app.server)
       .get('/api/v1/events/process')
       .set('Authorization', `Bearer ${analystToken}`)
-      .set('x-demo-role', 'manager');
+      .set('x-user-role', 'manager');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.events)).toBe(true);
   });
@@ -115,7 +115,7 @@ describe('ADR-025: /api/v1/events routes — RBAC', () => {
     const res = await supertest(app.server)
       .get('/api/v1/events/compliance')
       .set('Authorization', `Bearer ${analystToken}`)
-      .set('x-demo-role', 'manager');
+      .set('x-user-role', 'manager');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.events)).toBe(true);
   });

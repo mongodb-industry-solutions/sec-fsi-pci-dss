@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { registerCardForCustomer, getCardsByCustomer, getCardById, getCardHolderCount, getCardRegistryByToken, updateCardMetadata, setCardActivation, revokeCard, getOwnAgreementId } from '../services/paymentCard.service';
 import type { PaymentCardManagementControlRecord } from '../models/paymentCard.model';
-import type { JwtDemoPayload } from '../../../shared/models/identity.model';
+import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { emitComplianceEvent } from '../../providers/services/businessProcessEvent.service';
 
 const STAFF_READ_ROLES = ['level1_analyst', 'level2_investigator', 'security_auditor'];
@@ -124,7 +124,7 @@ and must NOT be repeated in the request body.
     }
 
     // Ownership: a customer may only register a card on their own agreement.
-    const user = (request as { user?: JwtDemoPayload }).user;
+    const user = (request as { user?: JwtUserPayload }).user;
     const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
     if (!ownId || ownId !== customerId) {
       return reply.status(403).send({ error: 'You can only register a card on your own account.' });
@@ -232,7 +232,7 @@ in this list response; it requires Level 2 access and a separate request.`,
   }, async (request, reply) => {
     const { customerId } = request.params as { customerId: string };
     // Owner (the customer themselves) or staff (read-only, for investigation).
-    const user = (request as { user?: JwtDemoPayload }).user;
+    const user = (request as { user?: JwtUserPayload }).user;
     const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
     const isOwner = !!ownId && ownId === customerId;
     const isStaff = STAFF_READ_ROLES.includes(user?.role ?? '');
@@ -272,7 +272,7 @@ shared-card / money-mule indicator. Restricted to fraud analyst / investigator /
       },
     },
   }, async (request, reply) => {
-    const user = (request as { user?: JwtDemoPayload }).user;
+    const user = (request as { user?: JwtUserPayload }).user;
     if (!STAFF_READ_ROLES.includes(user?.role ?? '')) {
       return reply.status(403).send({ error: 'Shared-card oversight is restricted to investigation roles.' });
     }
@@ -334,7 +334,7 @@ audited (Req 10).`,
     },
   }, async (request, reply) => {
     const { customerId, cardId } = request.params as { customerId: string; cardId: string };
-    const user = (request as { user?: JwtDemoPayload }).user;
+    const user = (request as { user?: JwtUserPayload }).user;
     const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
     if (!ownId || ownId !== customerId) {
       return reply.status(403).send({ error: 'You can only view your own saved cards.' });
@@ -418,7 +418,7 @@ treated purely as a recognizable nickname/memo.`,
       return reply.status(400).send({ error: 'Provide paymentCardAlias and/or paymentCardCustomerNote' });
     }
 
-    const user = (request as { user?: JwtDemoPayload }).user;
+    const user = (request as { user?: JwtUserPayload }).user;
     const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
     if (!ownId || ownId !== customerId) {
       return reply.status(403).send({ error: 'You can only edit your own saved cards.' });
@@ -494,7 +494,7 @@ audit event (Req 10).`,
     const { customerId, cardId } = request.params as { customerId: string; cardId: string };
     const { active } = request.body as { active: boolean };
 
-    const user = (request as { user?: JwtDemoPayload }).user;
+    const user = (request as { user?: JwtUserPayload }).user;
     const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
     if (!ownId || ownId !== customerId) {
       return reply.status(403).send({ error: 'You can only change the status of your own saved cards.' });
@@ -546,7 +546,7 @@ audit event (\`card.removed\`) is emitted. CVV/PIN are never involved.`,
     },
   }, async (request, reply) => {
     const { customerId, cardId } = request.params as { customerId: string; cardId: string };
-    const user = (request as { user?: JwtDemoPayload }).user;
+    const user = (request as { user?: JwtUserPayload }).user;
     const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
     if (!ownId || ownId !== customerId) {
       return reply.status(403).send({ error: 'You can only remove cards from your own account.' });

@@ -2,7 +2,7 @@
 // Routes mounted at /merchants → /api/v1/merchants
 
 import { FastifyInstance } from 'fastify';
-import type { JwtDemoPayload } from '../../../shared/models/identity.model';
+import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, sendTestWebhook, generateApiKey, importApiKey, updateApiKeyLabel, revokeApiKey, reviewMerchantApplication, getMerchantEvents, getMerchantApiKeys } from '../services/merchant.service';
 import { getMerchantTransactions, getMerchantStats } from '../../transactions/services/cardTransaction.service';
 import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
@@ -23,7 +23,7 @@ const MERCHANT_DETAIL_READ_ROLES = new Set([
 async function checkKeyMutationAccess(
   fastify: FastifyInstance,
   merchantId: string,
-  user?: JwtDemoPayload,
+  user?: JwtUserPayload,
 ): Promise<{ ok: true } | { status: 403 | 404; error: string }> {
   const merchant = await getMerchantById(fastify.db, merchantId) as Record<string, unknown> | null;
   if (!merchant) return { status: 404, error: 'Merchant not found' };
@@ -89,7 +89,7 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
       },
     },
   }, async (request, reply) => {
-    const user = (request as { user?: JwtDemoPayload }).user;
+    const user = (request as { user?: JwtUserPayload }).user;
     // Ch-05: customers cannot list all merchants; they can only see their own via GET /:id
     if (user?.role === 'customer') {
       return reply.status(403).send({ error: 'Access denied: use GET /merchants/:id to view your own merchant.' });
@@ -143,7 +143,7 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
       },
     },
   }, async (request, reply) => {
-    const user = (request as { user?: JwtDemoPayload }).user;
+    const user = (request as { user?: JwtUserPayload }).user;
     const body = request.body as Parameters<typeof createMerchant>[1];
     if (!body.merchantName || !body.merchantCategoryCode) {
       return reply.status(400).send({ error: 'merchantName and merchantCategoryCode are required' });
@@ -243,7 +243,7 @@ Used by customers to detect their onboarding state: no application / under_revie
       },
     },
   }, async (request, reply) => {
-    const user = (request as { user?: JwtDemoPayload }).user;
+    const user = (request as { user?: JwtUserPayload }).user;
     const partyRef = user?.partyRef;
     if (!partyRef) return reply.send({ found: false, merchant: null });
     const merchant = await getMerchantByOwnerPartyRef(fastify.db, partyRef);
@@ -352,7 +352,7 @@ Used by customers to detect their onboarding state: no application / under_revie
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { page = 1, limit = 20, status, search } = request.query as { page?: number; limit?: number; status?: string; search?: string };
-    const user = (request as { user?: JwtDemoPayload }).user;
+    const user = (request as { user?: JwtUserPayload }).user;
 
     const merchant = await getMerchantById(fastify.db, id);
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
@@ -397,7 +397,7 @@ Used by customers to detect their onboarding state: no application / under_revie
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const user = (request as { user?: JwtDemoPayload }).user;
+    const user = (request as { user?: JwtUserPayload }).user;
     const merchant = await getMerchantById(fastify.db, id);
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
     const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
@@ -447,7 +447,7 @@ Used by customers to detect their onboarding state: no application / under_revie
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const user = (request as { user?: JwtDemoPayload }).user;
+    const user = (request as { user?: JwtUserPayload }).user;
     const merchant = await getMerchantById(fastify.db, id);
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
     const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
@@ -499,7 +499,7 @@ The reviewing officer's partyRef is recorded for audit trail.
       },
     },
   }, async (request, reply) => {
-    const user = (request as { user?: JwtDemoPayload }).user;
+    const user = (request as { user?: JwtUserPayload }).user;
     const role = user?.role;
 
     // RBAC: only merchant_officer and security_auditor can review applications
@@ -559,7 +559,7 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
       },
     },
   }, async (request, reply) => {
-    const user = (request as { user?: JwtDemoPayload }).user;
+    const user = (request as { user?: JwtUserPayload }).user;
     const { id } = request.params as { id: string };
     const patch = request.body as Record<string, unknown>;
     const isStaff = user?.role === 'merchant_officer' || user?.role === 'security_auditor';
@@ -658,7 +658,7 @@ payload sent + the delivery outcome (status, attempts, the merchant's response).
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtDemoPayload }).user);
+    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtUserPayload }).user);
     if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
     const body = (request.body ?? {}) as { payload?: Record<string, unknown>; authHeader?: { name?: string; value?: string } };
     const extraHeaders = body.authHeader?.name && body.authHeader?.value
@@ -709,7 +709,7 @@ payload sent + the delivery outcome (status, attempts, the merchant's response).
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const user = (request as { user?: JwtDemoPayload }).user;
+    const user = (request as { user?: JwtUserPayload }).user;
     const merchant = await getMerchantById(fastify.db, id);
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
     const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
@@ -753,7 +753,7 @@ payload sent + the delivery outcome (status, attempts, the merchant's response).
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtDemoPayload }).user);
+    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtUserPayload }).user);
     if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
     const { label } = (request.body ?? {}) as { label?: string };
     const result = await generateApiKey(fastify.db, id, label);
@@ -784,7 +784,7 @@ payload sent + the delivery outcome (status, attempts, the merchant's response).
     },
   }, async (request, reply) => {
     const { id, keyId } = request.params as { id: string; keyId: string };
-    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtDemoPayload }).user);
+    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtUserPayload }).user);
     if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
     const result = await revokeApiKey(fastify.db, id, keyId);
     if (result === 'not_found') return reply.status(404).send({ error: 'Merchant or key not found' });
@@ -829,7 +829,7 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtDemoPayload }).user);
+    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtUserPayload }).user);
     if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
     const { apiKey, label } = (request.body ?? {}) as { apiKey?: string; label?: string };
     if (!apiKey) return reply.status(400).send({ error: 'apiKey is required' });
@@ -866,7 +866,7 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
     },
   }, async (request, reply) => {
     const { id, keyId } = request.params as { id: string; keyId: string };
-    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtDemoPayload }).user);
+    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtUserPayload }).user);
     if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
     const { label } = (request.body ?? {}) as { label?: string };
     const result = await updateApiKeyLabel(fastify.db, id, keyId, label ?? '');

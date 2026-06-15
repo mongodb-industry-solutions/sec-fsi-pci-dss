@@ -5,13 +5,13 @@ import { getTransactionById } from '../../transactions/services/cardTransaction.
 import { generateToken } from '../../../vendors/security/escalationTokens';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
-import type { DemoRequest, JwtDemoPayload } from '../../../shared/models/identity.model';
+import type { AuthenticatedRequest, JwtUserPayload } from '../../../shared/models/identity.model';
 import type { AnalystRole } from '../models/fraudDiagnosis.model';
 
 // Resolve the acting user (unique id + name) from the JWT for individual audit accountability
 // (PCI DSS Req 10.2.1). partyRef is the stable BIAN Party reference; sub is the auth fallback.
 function actorOf(request: unknown): { ref?: string; name?: string } {
-  const u = (request as { user?: JwtDemoPayload }).user;
+  const u = (request as { user?: JwtUserPayload }).user;
   return { ref: u?.partyRef ?? u?.sub, name: u?.name };
 }
 import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
@@ -193,8 +193,8 @@ without creating a duplicate.
     // Separation of duties (PCI DSS Req 7; BIAN SD-83): opening (initiating) a fraud case is
     // an analyst control action. The security auditor is read-only oversight and must not
     // initiate cases. manager/merchant_officer/customer are already blocked from /fraud.
-    const { demoRole } = request as unknown as DemoRequest;
-    if (demoRole === 'security_auditor') {
+    const { userRole } = request as unknown as AuthenticatedRequest;
+    if (userRole === 'security_auditor') {
       return reply.status(403).send({ error: 'Access denied: the auditor role is read-only and cannot open investigation cases (separation of duties, PCI DSS Req 7).' });
     }
     const { transactionId, reason } = request.body as { transactionId: string; reason?: string };
@@ -472,12 +472,12 @@ Req 7 (least privilege) and Req 10 (audit of sensitive access).`,
       },
     },
   }, async (request, reply) => {
-    const { demoRole, escalationToken } = request as unknown as DemoRequest;
-    if (!ENRICHMENT_ROLES.includes(demoRole)) {
+    const { userRole, escalationToken } = request as unknown as AuthenticatedRequest;
+    if (!ENRICHMENT_ROLES.includes(userRole)) {
       return reply.status(403).send({ error: 'Access denied: investigation enrichment requires an analyst or auditor role.' });
     }
     const { id } = request.params as { id: string };
-    const result = await getCaseEnrichment(fastify.db, id, demoRole, escalationToken, actorOf(request));
+    const result = await getCaseEnrichment(fastify.db, id, userRole, escalationToken, actorOf(request));
     if (!result) return reply.status(404).send({ error: 'Fraud case not found' });
     return reply.send(result);
   });
@@ -539,9 +539,9 @@ Req 7 (least privilege) and Req 10 (audit of sensitive access).`,
 
     // Role-based validation: L1 cannot close/resolve an escalated case
     if (body.fraudDiagnosisCaseStatus) {
-      const { demoRole } = request as unknown as DemoRequest;
+      const { userRole } = request as unknown as AuthenticatedRequest;
       const TERMINAL_STATUSES = ['resolved_cleared', 'resolved_fraud', 'closed'];
-      if (demoRole === 'level1_analyst' && TERMINAL_STATUSES.includes(body.fraudDiagnosisCaseStatus)) {
+      if (userRole === 'level1_analyst' && TERMINAL_STATUSES.includes(body.fraudDiagnosisCaseStatus)) {
         const currentCase = await getCaseById(fastify.db, id);
         if (!currentCase) return reply.status(404).send({ error: 'Fraud case not found' });
         if (currentCase.fraudDiagnosisCaseStatus === 'escalated') {
@@ -573,7 +573,7 @@ Req 7 (least privilege) and Req 10 (audit of sensitive access).`,
     const result = await updateCase(fastify.db, id, patch);
     if (!result) return reply.status(404).send({ error: 'Fraud case not found' });
 
-    const { demoRole: callerRole } = request as unknown as DemoRequest;
+    const { userRole: callerRole } = request as unknown as AuthenticatedRequest;
 
     // Write audit event for status changes and note additions
     const actionType = body.fraudDiagnosisCaseStatus === 'resolved_cleared' || body.fraudDiagnosisCaseStatus === 'resolved_fraud' || body.fraudDiagnosisCaseStatus === 'closed'
@@ -1055,16 +1055,16 @@ Errors are corrected via \`DELETE /fraud/:id/notes/:noteId\` (retraction), which
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { noteText, visibility } = request.body as { noteText: string; visibility: 'internal' | 'customer' };
-    const { demoRole } = request as unknown as DemoRequest;
+    const { userRole } = request as unknown as AuthenticatedRequest;
 
-    if (demoRole === 'customer' || demoRole === 'security_auditor') {
+    if (userRole === 'customer' || userRole === 'security_auditor') {
       return reply.status(403).send({ error: 'Only L1 and L2 analysts may add notes' });
     }
 
     const fraudCase = await getCaseById(fastify.db, id);
     if (!fraudCase) return reply.status(404).send({ error: 'Fraud case not found' });
 
-    const result = await addCaseNote(fastify.db, id, noteText, visibility, demoRole as import('../../../shared/models/identity.model').AnalystRole, actorOf(request));
+    const result = await addCaseNote(fastify.db, id, noteText, visibility, userRole as import('../../../shared/models/identity.model').AnalystRole, actorOf(request));
     return reply.status(201).send({ noteId: result.noteId, actionDateTime: result.actionDateTime });
   });
 
@@ -1106,13 +1106,13 @@ Retracted notes are hidden from the customer but remain visible in the internal 
   }, async (request, reply) => {
     const { id, noteId } = request.params as { id: string; noteId: string };
     const { retractionReason } = (request.body as { retractionReason?: string }) ?? {};
-    const { demoRole } = request as unknown as DemoRequest;
+    const { userRole } = request as unknown as AuthenticatedRequest;
 
-    if (demoRole === 'customer' || demoRole === 'security_auditor') {
+    if (userRole === 'customer' || userRole === 'security_auditor') {
       return reply.status(403).send({ error: 'Only L1 and L2 analysts may retract notes' });
     }
 
-    const outcome = await retractCaseNote(fastify.db, id, noteId, retractionReason, demoRole as import('../../../shared/models/identity.model').AnalystRole, actorOf(request));
+    const outcome = await retractCaseNote(fastify.db, id, noteId, retractionReason, userRole as import('../../../shared/models/identity.model').AnalystRole, actorOf(request));
     if (outcome === 'not_found')        return reply.status(404).send({ error: 'Note not found for this case' });
     if (outcome === 'wrong_role')       return reply.status(403).send({ error: 'Only the author role may retract this note' });
     if (outcome === 'already_retracted') return reply.status(409).send({ error: 'Note has already been retracted' });

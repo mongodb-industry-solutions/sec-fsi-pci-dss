@@ -2,7 +2,7 @@
   {
     "roleName": "customer",
     "roleLabel": "Customer",
-    "roleDescription": "Account holder — own transactions, own stored cards and own consents only.",
+    "roleDescription": "Account holder, own transactions, own stored cards and own consents only.",
     "roleScope": "own",
     "roleIsBuiltin": true,
     "bianServiceDomain": "Customer Agreement",

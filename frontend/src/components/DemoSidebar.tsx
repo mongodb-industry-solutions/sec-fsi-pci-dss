@@ -19,6 +19,7 @@ interface NavItem {
   path: string;
   icon: LucideIcon;
   exact?: boolean;
+  tooltip?: string;
 }
 
 const NAV_BY_ROLE: Record<string, NavItem[]> = {
@@ -58,7 +59,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'Providers',     path: '/system/admin/providers',       icon: Plug },
     { label: 'Groups',        path: '/system/admin/providers/groups', icon: Network },
     { label: 'Modules',       path: '/system/admin/modules',         icon: LayoutGrid },
-    { label: 'Auth Domains',  path: '/system/admin/modules/domains', icon: KeyRound },
+    { label: 'Domains',       path: '/system/admin/modules/domains', icon: KeyRound, tooltip: 'Authentication & authorization domains — local users and remote IdP (OIDC/SAML) role mappings' },
     { label: 'Roles & Access', path: '/system/admin/roles',          icon: Lock },
     { label: 'Audit Events',  path: '/system/audit-events',          icon: Activity },
   ],
@@ -81,17 +82,26 @@ function useRole() {
   return role;
 }
 
-function useActiveItem() {
+// Only ONE item is active: the most specific (longest path) that matches the current route.
+// This keeps siblings independent — e.g. /system/admin/providers/groups lights "Groups" only
+// (not "Providers"), and /system/admin/modules/domains lights "Domains" only (not "Modules").
+function useActiveItem(items: NavItem[]) {
   const pathname = usePathname();
-  return (item: NavItem) =>
-    item.exact ? pathname === item.path : pathname === item.path || pathname.startsWith(item.path + '/');
+  let best: NavItem | null = null;
+  for (const item of items) {
+    const matches = item.exact
+      ? pathname === item.path
+      : pathname === item.path || pathname.startsWith(item.path + '/');
+    if (matches && (!best || item.path.length > best.path.length)) best = item;
+  }
+  return (item: NavItem) => best !== null && best.path === item.path;
 }
 
 /** Desktop/tablet sidebar (hidden below md breakpoint) */
 export function DemoSidebar() {
   const role    = useRole();
   const items   = NAV_BY_ROLE[role] ?? [];
-  const isActive = useActiveItem();
+  const isActive = useActiveItem([...items, ...ACCOUNT_ITEMS]);
   const [collapsed, setCollapsed] = useState(true);
 
   return (
@@ -123,7 +133,7 @@ export function DemoSidebar() {
             <Link
               key={item.path}
               href={item.path}
-              title={item.label}
+              title={item.tooltip ?? item.label}
               className={`flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium transition-colors ${
                 active
                   ? 'bg-[#00ED64]/10 text-[#00ED64] border-r-2 border-[#00ED64]'
@@ -146,7 +156,7 @@ export function DemoSidebar() {
             <Link
               key={item.path}
               href={item.path}
-              title={item.label}
+              title={item.tooltip ?? item.label}
               className={`flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium transition-colors ${
                 active
                   ? 'bg-[#00ED64]/10 text-[#00ED64] border-r-2 border-[#00ED64]'
@@ -188,10 +198,10 @@ export function DemoSidebar() {
 /** Mobile bottom tab bar (visible below md breakpoint only) */
 export function MobileBottomNav() {
   const role     = useRole();
-  const isActive = useActiveItem();
   // Append the account-level Profile link (pulled out of the per-role lists for
   // the desktop sidebar) so it stays reachable on mobile.
   const items    = role ? [...(NAV_BY_ROLE[role] ?? []), ACCOUNT_ITEMS[0]] : [];
+  const isActive = useActiveItem(items);
 
   if (items.length === 0) return null;
 

@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import type { DemoRequest } from '../../../shared/models/identity.model';
+import type { AuthenticatedRequest } from '../../../shared/models/identity.model';
 import {
   createIntegration,
   getIntegration,
@@ -18,8 +18,8 @@ import {
 
 const E = { type: 'object', properties: { error: { type: 'string' } } };
 
-function isAuthorized(request: DemoRequest): boolean {
-  return request.demoRole === 'manager';
+function isAuthorized(request: AuthenticatedRequest): boolean {
+  return request.userRole === 'manager';
 }
 
 export async function integrationRegistryController(fastify: FastifyInstance) {
@@ -42,7 +42,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
       },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden: manager or system_admin role required' });
 
       const { type, status } = request.query as { type?: string; status?: string };
@@ -84,7 +84,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
       },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden: manager or system_admin role required' });
 
       try {
@@ -125,7 +125,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
       response: { 200: { type: 'object', additionalProperties: true }, 403: E, 404: E },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
 
       const { id } = request.params as { id: string };
@@ -164,7 +164,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
       response: { 200: { type: 'object', additionalProperties: true }, 403: E, 404: E, 422: E },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
 
       const { id } = request.params as { id: string };
@@ -206,7 +206,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
       response: { 200: { type: 'object', additionalProperties: true }, 400: E, 403: E, 404: E },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
 
       const { id } = request.params as { id: string };
@@ -230,7 +230,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
       response: { 200: { type: 'object', properties: { status: { type: 'string' }, latencyMs: { type: 'number' } } }, 403: E, 404: E },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
 
       const { id } = request.params as { id: string };
@@ -261,7 +261,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
       response: { 200: { type: 'object', additionalProperties: true }, 403: E, 404: E },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
 
       const { id } = request.params as { id: string };
@@ -296,7 +296,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
       response: { 200: { type: 'object', additionalProperties: true }, 403: E, 404: E },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
       const { id } = request.params as { id: string };
       const { direction, payload, overrideUrl } = request.body as { direction: 'outbound' | 'inbound'; payload: Record<string, unknown>; overrideUrl?: string };
@@ -318,7 +318,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
       response: { 200: { type: 'object', additionalProperties: true }, 400: E, 403: E, 404: E },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
 
       const { id } = request.params as { id: string };
@@ -346,7 +346,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
       },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
 
       const { id } = request.params as { id: string };
@@ -377,7 +377,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
       response: { 200: { type: 'object', additionalProperties: true }, 403: E },
     },
     handler: async (request, reply) => {
-      if (!isAuthorized(request as unknown as DemoRequest))
+      if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
 
       const { id } = request.params as { id: string };

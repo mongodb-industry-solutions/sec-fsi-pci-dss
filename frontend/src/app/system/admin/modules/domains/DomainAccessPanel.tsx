@@ -1,10 +1,21 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Trash2, Users, GitBranch } from 'lucide-react';
+import { Plus, Trash2, Users, GitBranch, Search } from 'lucide-react';
 import { api, type ManagedUserDTO, type RoleRecordDTO } from '../../../../../lib/api';
 import { useConfirm, useNotify } from '../../../../../components/ui/ConfirmProvider';
+import { Pagination } from '../../../../../components/Pagination';
 
 type RoleMapping = { externalClaimOrGroup: string; roleName: string };
+
+const USERS_PAGE_SIZE = 8;
+
+// PII minimization (PCI DSS Req 7 / data minimization): the admin browse-list identifies accounts
+// by name + role; the full QE-encrypted email is not needed here, so it is masked in the list.
+function maskEmail(email: string): string {
+  const [local, domain] = (email ?? '').split('@');
+  if (!domain) return '•••';
+  return `${local.slice(0, 1)}${'•'.repeat(Math.max(2, local.length - 1))}@${domain}`;
+}
 
 // ADR-030 / §13.5: per-domain access management. Local domains → user CRUD + role assignment.
 // Remote (OIDC/SAML) domains → claim/group → role mapping only (no user CRUD; users come from the IdP).
@@ -30,6 +41,10 @@ export function DomainAccessPanel({
   const [loadingUsers, setLoadingUsers] = useState(isLocal);
   const [newUser, setNewUser] = useState({ email: '', name: '', role: 'level1_analyst', password: '' });
   const [busy, setBusy] = useState<string | null>(null);
+  // Standard list controls (search + role filter + pagination)
+  const [userQuery, setUserQuery] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('');
+  const [userPage, setUserPage] = useState(1);
 
   const loadUsers = useCallback(async () => {
     if (!isLocal) return;
@@ -87,20 +102,49 @@ export function DomainAccessPanel({
     finally { setSavingMap(false); }
   }
 
+  // Standard filter + search + pagination over the loaded users (PII-minimized list).
+  const filteredUsers = users.filter((u) => {
+    if (userRoleFilter && u.role !== userRoleFilter) return false;
+    const q = userQuery.trim().toLowerCase();
+    if (!q) return true;
+    return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.role.toLowerCase().includes(q);
+  });
+  const userTotalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PAGE_SIZE));
+  const userSafePage = Math.min(userPage, userTotalPages);
+  const pagedUsers = filteredUsers.slice((userSafePage - 1) * USERS_PAGE_SIZE, userSafePage * USERS_PAGE_SIZE);
+
   if (isLocal) {
     return (
       <div className="bg-gray-50 border-t border-gray-100 px-5 py-4 space-y-3">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-600"><Users size={13} /> Users in this domain</div>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-600"><Users size={13} /> Users in this domain</div>
+          <span className="text-[10px] text-gray-400">Identity records (SD-91) · email masked · no cardholder data</span>
+        </div>
+
+        {/* Search + role filter — standard pattern */}
+        <div className="flex flex-wrap gap-2">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input value={userQuery} onChange={(e) => { setUserQuery(e.target.value); setUserPage(1); }}
+              placeholder="Search by name, email or role…" className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-1.5 text-sm bg-white" />
+          </div>
+          <select value={userRoleFilter} onChange={(e) => { setUserRoleFilter(e.target.value); setUserPage(1); }}
+            className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm bg-white">
+            <option value="">All roles</option>
+            {roleOptions.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+
         {loadingUsers ? (
           <p className="text-xs text-gray-400">Loading users…</p>
         ) : (
           <div className="space-y-1.5">
-            {users.length === 0 && <p className="text-xs text-gray-400">No users yet.</p>}
-            {users.map((u) => (
+            {filteredUsers.length === 0 && <p className="text-xs text-gray-400">{users.length === 0 ? 'No users yet.' : 'No users match the filters.'}</p>}
+            {pagedUsers.map((u) => (
               <div key={u.id} className="flex items-center gap-2 flex-wrap bg-white border rounded-lg px-3 py-2">
                 <div className="min-w-0">
                   <span className="text-sm font-medium text-gray-800">{u.name}</span>
-                  <span className="text-xs text-gray-400 ml-2">{u.email}</span>
+                  <span className="text-xs text-gray-400 ml-2 font-mono" title="Email masked (PII minimization)">{maskEmail(u.email)}</span>
                 </div>
                 <div className="flex items-center gap-2 ml-auto">
                   <select value={u.role} disabled={busy === u.id} onChange={(e) => changeRole(u, e.target.value)}
@@ -118,6 +162,9 @@ export function DomainAccessPanel({
                 </div>
               </div>
             ))}
+            {filteredUsers.length > 0 && (
+              <Pagination page={userSafePage} totalPages={userTotalPages} total={filteredUsers.length} limit={USERS_PAGE_SIZE} onPageChange={setUserPage} noun="users" />
+            )}
           </div>
         )}
         {/* Add user */}

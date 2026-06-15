@@ -12,9 +12,9 @@ import type { FastifyInstance } from 'fastify';
 const SKIP = !process.env.TEST_MONGODB_URI;
 const skip = SKIP ? it.skip : it;
 
-// A JWT signed for manager (bypasses auth middleware in test mode via x-demo-role header)
-const SYSTEM_ADMIN_HEADERS = { 'x-demo-role': 'manager' };
-const ANALYST_HEADERS      = { 'x-demo-role': 'level1_analyst' };
+// A JWT signed for manager (bypasses auth middleware in test mode via x-user-role header)
+const SYSTEM_ADMIN_HEADERS = { 'x-user-role': 'manager' };
+const ANALYST_HEADERS      = { 'x-user-role': 'level1_analyst' };
 
 describe('FR-v6 Integration Hub routes', () => {
   let app: FastifyInstance;

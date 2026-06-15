@@ -85,7 +85,7 @@ describe('requirePermission guard', () => {
       status(c: number) { this.statusCode = c; return this; },
       send(b: unknown) { this.body = b; return this; },
     };
-    const request = { server: { db: mockDb(null) }, demoRole: role } as never;
+    const request = { server: { db: mockDb(null) }, userRole: role } as never;
     return { request, reply };
   }
 

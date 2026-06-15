@@ -1,13 +1,13 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { KeyRound, Plus, Pencil, Trash2, Check, X, Users } from 'lucide-react';
+import Link from 'next/link';
+import { KeyRound, Plus, Pencil, Trash2, Check, X, ChevronRight } from 'lucide-react';
 import { SectionHeader } from '../../../../../components/SectionHeader';
 import { Breadcrumb } from '../../../../../components/Breadcrumb';
 import { Pagination } from '../../../../../components/Pagination';
 import { api } from '../../../../../lib/api';
 import { getToken } from '../../../../../lib/auth';
 import { useNotify } from '../../../../../components/ui/ConfirmProvider';
-import { DomainAccessPanel } from './DomainAccessPanel';
 
 type Row = Record<string, unknown>;
 const PAGE_SIZE = 10;
@@ -41,7 +41,7 @@ export default function AuthDomainsPage() {
   const [form, setForm] = useState<FormState | null>(null); // null = form hidden
   const [saving, setSaving] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null); // ADR-030: access panel
+  const [typeFilter, setTypeFilter] = useState(''); // standard list filter
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -102,6 +102,9 @@ export default function AuthDomainsPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  // Type filter is applied client-side over the current page (domain set is small); search +
+  // pagination remain server-side via the API.
+  const shown = typeFilter ? rows.filter((r) => String(r.partyAuthenticationDomainType) === typeFilter) : rows;
 
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
@@ -118,25 +121,33 @@ export default function AuthDomainsPage() {
         }
       />
 
-      {/* Search — standard pattern (input + Search + Clear), same as the rest of the system */}
-      <div className="flex gap-2">
+      {/* Search + type filter — standard pattern (input + filter + Search + Clear) */}
+      <div className="flex flex-wrap gap-2">
         <input
           type="text"
           value={qInput}
           onChange={(e) => setQInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { setPage(1); setQ(qInput.trim()); } }}
-          placeholder="Search by name or type…"
-          className="flex-1 border rounded-lg px-3 py-2 text-sm"
+          placeholder="Search by name or display…"
+          className="flex-1 min-w-[200px] border rounded-lg px-3 py-2 text-sm"
         />
+        <select
+          value={typeFilter}
+          onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
+          className="border rounded-lg px-3 py-2 text-sm bg-white"
+        >
+          <option value="">All types</option>
+          {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
         <button
           onClick={() => { setPage(1); setQ(qInput.trim()); }}
           className="px-4 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold"
         >
           Search
         </button>
-        {(q || qInput) && (
+        {(q || qInput || typeFilter) && (
           <button
-            onClick={() => { setQInput(''); setQ(''); setPage(1); }}
+            onClick={() => { setQInput(''); setQ(''); setTypeFilter(''); setPage(1); }}
             className="px-3 py-2 rounded-lg border text-sm text-gray-500 hover:bg-gray-50 transition-colors"
           >
             Clear
@@ -196,13 +207,16 @@ export default function AuthDomainsPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">Loading…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">No authentication domains.</td></tr>
-            ) : rows.map((r) => {
+            ) : shown.length === 0 ? (
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">No authentication domains{typeFilter ? ` of type "${typeFilter}"` : ''}.</td></tr>
+            ) : shown.map((r) => {
               const id = String(r.partyAuthenticationDomainInstanceReference);
+              const detailHref = `/system/admin/modules/domains/${id}`;
               return (
-                <tr key={id} className="border-t border-gray-100">
-                  <td className="px-4 py-2 font-mono text-xs">{String(r.partyAuthenticationDomainName)}</td>
+                <tr key={id} className="border-t border-gray-100 hover:bg-gray-50/50">
+                  <td className="px-4 py-2 font-mono text-xs">
+                    <Link href={detailHref} className="text-[#001E2B] hover:underline">{String(r.partyAuthenticationDomainName)}</Link>
+                  </td>
                   <td className="px-4 py-2">{String(r.partyAuthenticationDomainDisplayName ?? '')}</td>
                   <td className="px-4 py-2">{String(r.partyAuthenticationDomainType ?? '')}</td>
                   <td className="px-4 py-2">{r.partyAuthenticationDomainEnabled ? 'Yes' : 'No'}</td>
@@ -215,13 +229,13 @@ export default function AuthDomainsPage() {
                         </>
                       ) : (
                         <>
-                          <button onClick={() => setExpandedId(expandedId === id ? null : id)}
-                            title={String(r.partyAuthenticationDomainType) === 'local' ? 'Manage users' : 'Manage role mappings'}
-                            className={`flex items-center gap-1 text-xs ${expandedId === id ? 'text-[#001E2B] font-medium' : 'text-gray-500 hover:text-[#001E2B]'}`}>
-                            <Users size={14} /> Access
-                          </button>
-                          <button onClick={() => startEdit(r)} className="text-gray-500 hover:text-[#001E2B]"><Pencil size={14} /></button>
-                          <button onClick={() => setConfirmingId(id)} className="text-gray-500 hover:text-red-600"><Trash2 size={14} /></button>
+                          <Link href={detailHref}
+                            title={String(r.partyAuthenticationDomainType) === 'local' ? 'Manage users & access' : 'Manage role mappings & access'}
+                            className="inline-flex items-center gap-1 text-xs text-[#001E2B] hover:underline">
+                            Manage <ChevronRight size={13} />
+                          </Link>
+                          <button onClick={() => startEdit(r)} title="Quick edit" className="text-gray-500 hover:text-[#001E2B]"><Pencil size={14} /></button>
+                          <button onClick={() => setConfirmingId(id)} title="Delete" className="text-gray-500 hover:text-red-600"><Trash2 size={14} /></button>
                         </>
                       )}
                     </div>
@@ -229,24 +243,6 @@ export default function AuthDomainsPage() {
                 </tr>
               );
             })}
-            {/* ADR-030: expanded access panel for the selected domain */}
-            {!loading && expandedId && (() => {
-              const r = rows.find((x) => String(x.partyAuthenticationDomainInstanceReference) === expandedId);
-              if (!r) return null;
-              return (
-                <tr key={`${expandedId}-access`}>
-                  <td colSpan={5} className="p-0">
-                    <DomainAccessPanel
-                      domainId={expandedId}
-                      domainName={String(r.partyAuthenticationDomainName)}
-                      domainType={String(r.partyAuthenticationDomainType ?? 'local')}
-                      initialMappings={(r.partyAuthenticationDomainRoleMappings as { externalClaimOrGroup: string; roleName: string }[]) ?? []}
-                      token={token}
-                    />
-                  </td>
-                </tr>
-              );
-            })()}
           </tbody>
         </table>
       </div>

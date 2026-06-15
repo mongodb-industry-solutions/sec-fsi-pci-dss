@@ -16,7 +16,7 @@ export type AnalystRole =
   | 'merchant_officer'  // Ch-05: can view fraud cases linked to their merchants
   | 'ai_agent';
 
-export interface JwtDemoPayload {
+export interface JwtUserPayload {
   sub: string;
   email: string;
   role: UserRole;
@@ -27,7 +27,7 @@ export interface JwtDemoPayload {
   exp: number;
 }
 
-export interface DemoRequest extends FastifyRequest {
-  demoRole: UserRole;
+export interface AuthenticatedRequest extends FastifyRequest {
+  userRole: UserRole;
   escalationToken?: string;
 }

@@ -32,7 +32,7 @@ export type Action = (typeof ACTIONS)[number];
 export type RolePermissions = Partial<Record<Resource, Action[]>>;
 
 export interface RoleRecord {
-  roleName: string;                 // PK (unique). Matches JwtDemoPayload.role.
+  roleName: string;                 // PK (unique). Matches JwtUserPayload.role.
   roleLabel: string;
   roleDescription?: string;
   rolePermissions: RolePermissions; // { [resource]: action[] } — default-deny: absent ⇒ no access

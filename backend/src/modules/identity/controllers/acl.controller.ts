@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { loadRole } from '../../../vendors/middleware/acl';
 import { RESOURCES, ACTIONS } from '../../../shared/models/acl.model';
-import type { DemoRequest } from '../../../shared/models/identity.model';
+import type { AuthenticatedRequest } from '../../../shared/models/identity.model';
 
 // ADR-030: expose the current user's EFFECTIVE permissions so the frontend can gate UI without
 // embedding permissions in the JWT (changes take effect without re-login). PCI DSS Req 7.
@@ -16,7 +16,7 @@ export async function aclController(fastify: FastifyInstance) {
       security: [{ bearerAuth: [] }],
     },
   }, async (request) => {
-    const role = (request as unknown as DemoRequest).demoRole;
+    const role = (request as unknown as AuthenticatedRequest).userRole;
     const rec = await loadRole(fastify.db, role);
     return {
       role,

@@ -1,7 +1,7 @@
 import { FastifyRequest } from 'fastify';
-import type { JwtDemoPayload, UserRole, DemoRequest } from '../../shared/models/identity.model';
+import type { JwtUserPayload, UserRole, AuthenticatedRequest } from '../../shared/models/identity.model';
 
-export const VALID_DEMO_ROLES: ReadonlySet<UserRole> = new Set([
+export const VALID_USER_ROLES: ReadonlySet<UserRole> = new Set([
   'customer',
   'level1_analyst',
   'level2_investigator',
@@ -10,16 +10,16 @@ export const VALID_DEMO_ROLES: ReadonlySet<UserRole> = new Set([
   'manager',             // Ch-07: SD-193 Integration Hub administrator
 ]);
 
-export function extractDemoRole(request: FastifyRequest): UserRole {
-  // The x-demo-role header is UNTRUSTED (simulator convenience, no token) — restrict it to builtins.
-  const header = request.headers['x-demo-role'] as string | undefined;
-  if (header && VALID_DEMO_ROLES.has(header as UserRole)) {
+export function extractUserRole(request: FastifyRequest): UserRole {
+  // The x-user-role header is UNTRUSTED (simulator convenience, no token) — restrict it to builtins.
+  const header = request.headers['x-user-role'] as string | undefined;
+  if (header && VALID_USER_ROLES.has(header as UserRole)) {
     return header as UserRole;
   }
   // A JWT role is signed by us at login from the stored user record, so it is TRUSTED — return it
   // as-is even when it is a custom role (ADR-030). Authorization is enforced by the ACL (`can()`),
   // not by this union, so custom roles resolve correctly without widening the type everywhere.
-  const user = (request as FastifyRequest & { user?: JwtDemoPayload }).user;
+  const user = (request as FastifyRequest & { user?: JwtUserPayload }).user;
   if (user?.role) {
     return user.role as UserRole;
   }
@@ -43,7 +43,7 @@ export function canReadSensitive(role: UserRole, hasValidToken: boolean): boolea
 }
 
 export function attachRbacContext(request: FastifyRequest): void {
-  const demoReq = request as unknown as DemoRequest;
-  demoReq.demoRole = extractDemoRole(request);
+  const demoReq = request as unknown as AuthenticatedRequest;
+  demoReq.userRole = extractUserRole(request);
   demoReq.escalationToken = request.headers['x-escalation-token'] as string | undefined;
 }

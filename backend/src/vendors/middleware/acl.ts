@@ -4,7 +4,7 @@ import {
   ROLE_COLLECTION, RoleRecord, RolePermissions, Resource, Action,
   BUILTIN_ROLES, hasPermission,
 } from '../../shared/models/acl.model';
-import type { DemoRequest } from '../../shared/models/identity.model';
+import type { AuthenticatedRequest } from '../../shared/models/identity.model';
 import { canReadSensitive } from './rbac';
 
 // ── Role-permission cache ─────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ function serverDb(request: FastifyRequest): Db {
 }
 
 function roleOf(request: FastifyRequest): string | undefined {
-  return (request as unknown as DemoRequest).demoRole
+  return (request as unknown as AuthenticatedRequest).userRole
     ?? (request as FastifyRequest & { user?: { role?: string } }).user?.role;
 }
 
@@ -86,7 +86,7 @@ export function requirePermission(resource: Resource, action: Action) {
       });
     }
     if (action === 'viewSensitive') {
-      const escToken = (request as unknown as DemoRequest).escalationToken;
+      const escToken = (request as unknown as AuthenticatedRequest).escalationToken;
       if (role && !canReadSensitive(role as never, !!escToken)) {
         return reply.status(403).send({
           error: 'Access denied: sensitive access requires an active escalation token.',

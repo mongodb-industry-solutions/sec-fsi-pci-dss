@@ -6,11 +6,11 @@
  * Spins up a real Fastify app against a seeded test Atlas cluster.
  *
  * Acceptance criteria:
- * FR-v2-13.1  Missing X-Demo-Role defaults to level1_analyst
+ * FR-v2-13.1  Missing X-User-Role defaults to level1_analyst
  * FR-v2-13.2  L1 gets customer data without sensitive block
  * FR-v2-13.3  L2 without escalation token → 403
  * FR-v2-13.3  L2 with valid escalation token → 200 with sensitive block
- * NFR-v2-02   Forged X-Demo-Role: level2_investigator without token → 403
+ * NFR-v2-02   Forged X-User-Role: level2_investigator without token → 403
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import supertest from 'supertest';
@@ -54,7 +54,7 @@ describe('FR-v2-13: RBAC API Layer', () => {
     await app.close();
   });
 
-  skip('FR-v2-13.1: missing X-Demo-Role defaults to level1_analyst (no sensitive block)', async () => {
+  skip('FR-v2-13.1: missing X-User-Role defaults to level1_analyst (no sensitive block)', async () => {
     const res = await supertest(app.server)
       .get(`/api/v1/customer-agreements?email=${encodeURIComponent(TEST_EMAIL)}`)
       .set('Authorization', `Bearer ${l1Token}`);
@@ -66,7 +66,7 @@ describe('FR-v2-13: RBAC API Layer', () => {
     const res = await supertest(app.server)
       .get(`/api/v1/customer-agreements?email=${encodeURIComponent(TEST_EMAIL)}`)
       .set('Authorization', `Bearer ${l1Token}`)
-      .set('X-Demo-Role', 'level1_analyst');
+      .set('X-User-Role', 'level1_analyst');
     expect(res.status).toBe(200);
     expect(res.body.customerName).toBeTruthy();
     expect(res.body.sensitive).toBeUndefined();
@@ -76,17 +76,17 @@ describe('FR-v2-13: RBAC API Layer', () => {
     const res = await supertest(app.server)
       .get(`/api/v1/customer-agreements?email=${encodeURIComponent(TEST_EMAIL)}`)
       .set('Authorization', `Bearer ${l2Token}`)
-      .set('X-Demo-Role', 'level2_investigator');
+      .set('X-User-Role', 'level2_investigator');
     expect(res.status).toBe(403);
     expect(res.body.error).toMatch(/escalation token/i);
   });
 
-  skip('NFR-v2-02: forged X-Demo-Role level2_investigator without token → 403', async () => {
+  skip('NFR-v2-02: forged X-User-Role level2_investigator without token → 403', async () => {
     // L1 user's JWT, but header claims L2 - must still be blocked without token
     const res = await supertest(app.server)
       .get(`/api/v1/customer-agreements?email=${encodeURIComponent(TEST_EMAIL)}`)
       .set('Authorization', `Bearer ${l1Token}`)
-      .set('X-Demo-Role', 'level2_investigator');
+      .set('X-User-Role', 'level2_investigator');
     expect(res.status).toBe(403);
   });
 
@@ -95,7 +95,7 @@ describe('FR-v2-13: RBAC API Layer', () => {
     const res = await supertest(app.server)
       .get(`/api/v1/customer-agreements?email=${encodeURIComponent(TEST_EMAIL)}`)
       .set('Authorization', `Bearer ${l2Token}`)
-      .set('X-Demo-Role', 'level2_investigator')
+      .set('X-User-Role', 'level2_investigator')
       .set('X-Escalation-Token', escalationToken);
     expect(res.status).toBe(200);
     expect(res.body.sensitive).toBeDefined();

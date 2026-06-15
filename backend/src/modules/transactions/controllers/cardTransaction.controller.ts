@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import type { DemoRequest } from '../../../shared/models/identity.model';
+import type { AuthenticatedRequest } from '../../../shared/models/identity.model';
 import {
   createTransaction,
   getTransactionById,
@@ -325,8 +325,8 @@ role to retrieve.`,
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { demoRole, escalationToken } = request as unknown as DemoRequest;
-    const txn = await getTransactionById(fastify.db, id, demoRole as Parameters<typeof getTransactionById>[2], escalationToken);
+    const { userRole, escalationToken } = request as unknown as AuthenticatedRequest;
+    const txn = await getTransactionById(fastify.db, id, userRole as Parameters<typeof getTransactionById>[2], escalationToken);
     if (!txn) return reply.status(404).send({ error: 'Transaction not found' });
     return reply.send(txn);
   });
@@ -478,9 +478,9 @@ Not accessible to the \`customer\` role (enforced by RBAC middleware).`,
     };
     // Privacy: a customer may only list their OWN transactions. Ignore any email
     // they pass and scope to the email in their JWT.
-    const { demoRole } = request as unknown as DemoRequest;
+    const { userRole } = request as unknown as AuthenticatedRequest;
     const jwtEmail = (request as unknown as { user?: { email?: string } }).user?.email;
-    const effectiveEmail = demoRole === 'customer' ? jwtEmail : email;
+    const effectiveEmail = userRole === 'customer' ? jwtEmail : email;
     const result = await getAllTransactions(
       fastify.db,
       { status, merchant, cardToken, email: effectiveEmail },

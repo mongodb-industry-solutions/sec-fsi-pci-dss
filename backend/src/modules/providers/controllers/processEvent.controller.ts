@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import type { DemoRequest } from '../../../shared/models/identity.model';
+import type { AuthenticatedRequest } from '../../../shared/models/identity.model';
 import {
   listProcessEvents,
   listComplianceEvents,
@@ -10,8 +10,8 @@ import type { BusinessProcessType, ComplianceProcessType, BusinessEntityType } f
 
 const E = { type: 'object', properties: { error: { type: 'string' } } };
 
-function isAuditRole(request: DemoRequest): boolean {
-  return request.demoRole === 'security_auditor' || request.demoRole === 'manager';
+function isAuditRole(request: AuthenticatedRequest): boolean {
+  return request.userRole === 'security_auditor' || request.userRole === 'manager';
 }
 
 export async function processEventController(fastify: FastifyInstance) {
@@ -45,7 +45,7 @@ export async function processEventController(fastify: FastifyInstance) {
       },
     },
     handler: async (request, reply) => {
-      if (!isAuditRole(request as unknown as DemoRequest))
+      if (!isAuditRole(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden: security_auditor or manager role required' });
       const q = request.query as Record<string, string>;
       const result = await listAuditEvents(fastify.db, {
@@ -89,7 +89,7 @@ export async function processEventController(fastify: FastifyInstance) {
       },
     },
     handler: async (request, reply) => {
-      if (!isAuditRole(request as unknown as DemoRequest))
+      if (!isAuditRole(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden: security_auditor or manager role required' });
 
       const q = request.query as Record<string, string>;
@@ -132,7 +132,7 @@ export async function processEventController(fastify: FastifyInstance) {
       },
     },
     handler: async (request, reply) => {
-      if (!isAuditRole(request as unknown as DemoRequest))
+      if (!isAuditRole(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden: security_auditor or manager role required' });
 
       const { entityType, entityId } = request.params;
@@ -171,7 +171,7 @@ export async function processEventController(fastify: FastifyInstance) {
       },
     },
     handler: async (request, reply) => {
-      if (!isAuditRole(request as unknown as DemoRequest))
+      if (!isAuditRole(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden: security_auditor or manager role required' });
 
       const q = request.query as Record<string, string>;
@@ -214,7 +214,7 @@ export async function processEventController(fastify: FastifyInstance) {
       },
     },
     handler: async (request, reply) => {
-      if (!isAuditRole(request as unknown as DemoRequest))
+      if (!isAuditRole(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden: security_auditor or manager role required' });
 
       const { entityType, entityId } = request.params;

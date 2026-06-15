@@ -147,6 +147,6 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     return reply.status(403).send({ error: 'Access denied: investigation is restricted to fraud analyst and auditor roles' });
   }
 
-  // Always populate demoRole and escalationToken after auth resolves
+  // Always populate userRole and escalationToken after auth resolves
   attachRbacContext(request);
 }
