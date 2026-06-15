@@ -8,9 +8,12 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // suppressHydrationWarning: browser extensions (e.g. LanguageTool injects
+  // `data-lt-installed` on <html>/<body>) mutate the DOM before React hydrates,
+  // which otherwise triggers a spurious attribute-mismatch warning.
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <UIProvider>{children}</UIProvider>
       </body>
     </html>
