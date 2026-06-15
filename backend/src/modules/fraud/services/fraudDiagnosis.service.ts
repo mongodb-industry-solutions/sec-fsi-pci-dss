@@ -9,8 +9,8 @@ import {
 } from '../models/fraudDiagnosis.model';
 import { RiskSeverity } from '../../../shared/models/risk.model';
 import { TransactionSnapshot } from '../../../shared/models/transaction.model';
-import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
-import { emitProcessEvent } from '../../integrations/services/businessProcessEvent.service';
+import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
+import { emitProcessEvent } from '../../providers/services/businessProcessEvent.service';
 import { CARD_TRANSACTION_COLLECTION } from '../../transactions/models/cardTransaction.model';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 
@@ -146,7 +146,7 @@ export async function createFraudCase(
   }
   await db.collection(FRAUD_DIAGNOSIS_EVENTS_COLLECTION).insertOne(openEvent as object);
 
-  void dispatchIntegration(db, 'fraud_detection', 'fraud.createCase', {
+  void dispatchProvider(db, 'fraud_detection', 'fraud.createCase', {
     fraudDiagnosisInstanceReference: caseId,
     cardTransactionInstanceReference: txnId,
     customerAgreementInstanceReference: customerRef,

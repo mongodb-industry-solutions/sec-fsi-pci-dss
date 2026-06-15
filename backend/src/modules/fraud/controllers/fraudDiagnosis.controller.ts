@@ -14,7 +14,7 @@ function actorOf(request: unknown): { ref?: string; name?: string } {
   const u = (request as { user?: JwtDemoPayload }).user;
   return { ref: u?.partyRef ?? u?.sub, name: u?.name };
 }
-import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
+import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
 import { getCaseEnrichment } from '../services/caseEnrichment.service';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
@@ -795,7 +795,7 @@ Returns an empty \`hrpcFlags\` array when the account is not in any HRPC categor
       return (riskOrder[lvl] ?? 0) > riskOrder[acc] ? (lvl as 'low' | 'medium' | 'high') : acc;
     }, 'none');
 
-    void dispatchIntegration(fastify.db, 'hrp_sanctions', 'fraud.hrpcCheck', {
+    void dispatchProvider(fastify.db, 'hrp_sanctions', 'fraud.hrpcCheck', {
       accountRef,
       hrpcMatch: flags.length > 0,
       highestRiskLevel,

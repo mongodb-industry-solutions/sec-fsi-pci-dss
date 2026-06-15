@@ -139,24 +139,7 @@ Before any payment flow starts, the presenter selects **which integration patter
 
 **Config source:** `frontend/src/config/simulator-methods.json` — controls which methods and scenarios are visible. Setting `enabled: false` hides a method; `comingSoon: true` shows a disabled card.
 
-**Step 3 — Select Merchant (payee) (ADR-028).** After the customer scenario, the presenter picks the
-**merchant** that receives the payment. The list comes from the **shared demo roster** — real merchants
-owned by featured customers (e.g. Espresso Works ← luis.fernandez, Okafor Digital Services ← amara.okafor),
-fetched via `GET /api/v1/auth/users` with the `simulatorMerchants` criteria from
-`frontend/src/config/demoRoster.json`. These are the **same users** shown in the `/system` debug login —
-nothing is hardcoded; both surfaces query the DB with declarative criteria, so they always match. The
-chosen merchant drives payment attribution **and** the per-merchant webhook callback. The transaction-value
-editing step (Step 1) is unchanged — merchant selection is an added step, not a replacement.
-
-**State persistence:** Selections are stored in `sessionStorage` (`sim_method`, `sim_scenario`,
-`sim_merchant_id`/`sim_merchant_name`/`sim_merchant_mcc`) and survive navigation within the simulator.
-Cleared on "Restart Simulation."
-
-**Review-in-system checklist (everything is traceable under the chosen merchant):**
-1. Payment → `/system/merchant/[id]` *Received payments* (acquiring view), and `/system/transactions` (staff).
-2. Merchant callback → **webhook inspector** (`/admin/panel/webhook`): the HMAC-signed `payment.completed`/`payment.declined` event with card token + result/reason. Plus the audit event in `/system/admin/events`.
-3. Fraud case (if triggered) → `/system/investigation`.
-4. Card-on-file (auto-registered by deterministic token) → `/system/cards` for the payer.
+**State persistence:** Selections are stored in `sessionStorage` (`sim_method`, `sim_scenario`) and survive navigation within the simulator. Cleared on "Restart Simulation."
 
 **Payment methods:**
 

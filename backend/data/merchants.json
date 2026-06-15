@@ -8,9 +8,7 @@
     "merchantAgreementStatus": "active",
     "merchantOwnerPartyReference": "b0000001-0000-4000-8000-000000000001",
     "merchantTier": "standard",
-    "merchantAllowedCurrencies": [
-      "USD"
-    ],
+    "merchantAllowedCurrencies": ["USD"],
     "merchantTransactionLimitAmount": 10000,
     "merchantSettlementSchedule": "T+2",
     "merchantAverageTransactionAmount": 28.5,
@@ -31,9 +29,7 @@
     "bianControlRecordType": "MerchantAgreementProcedure",
     "recordCreatedDateTime": "2026-05-14T09:00:00.000Z",
     "recordUpdatedDateTime": "2026-05-15T10:30:00.000Z",
-    "schemaVersion": 2,
-    "merchantWebhookEndpoint": "http://localhost:3001/api/v1/admin/webhook/hook?merchant=m0000001-0000-4000-8000-000000000001",
-    "merchantWebhookSecret": "whsec_demo_m0000001"
+    "schemaVersion": 2
   },
   {
     "merchantAgreementInstanceReference": "m0000002-0000-4000-8000-000000000002",
@@ -44,10 +40,7 @@
     "merchantAgreementStatus": "active",
     "merchantOwnerPartyReference": "b0000058-0000-4000-8000-000000000058",
     "merchantTier": "standard",
-    "merchantAllowedCurrencies": [
-      "USD",
-      "EUR"
-    ],
+    "merchantAllowedCurrencies": ["USD", "EUR"],
     "merchantTransactionLimitAmount": 5000,
     "merchantSettlementSchedule": "T+2",
     "merchantAverageTransactionAmount": 0,
@@ -68,9 +61,7 @@
     "bianControlRecordType": "MerchantAgreementProcedure",
     "recordCreatedDateTime": "2026-06-08T11:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T09:00:00.000Z",
-    "schemaVersion": 2,
-    "merchantWebhookEndpoint": "http://localhost:3001/api/v1/admin/webhook/hook?merchant=m0000002-0000-4000-8000-000000000002",
-    "merchantWebhookSecret": "whsec_demo_m0000002"
+    "schemaVersion": 2
   },
   {
     "merchantAgreementInstanceReference": "m0000003-0000-4000-8000-000000000003",
@@ -79,15 +70,12 @@
     "merchantCategoryCode": "7371",
     "merchantCountryCode": "DE",
     "merchantAgreementStatus": "active",
-    "merchantOwnerPartyReference": "b0000059-0000-4000-8000-000000000059",
+    "merchantOwnerPartyReference": "b0000057-0000-4000-8000-000000000057",
     "merchantTier": "standard",
-    "merchantAllowedCurrencies": [
-      "EUR",
-      "USD"
-    ],
+    "merchantAllowedCurrencies": ["EUR", "USD"],
     "merchantTransactionLimitAmount": 8000,
     "merchantSettlementSchedule": "T+2",
-    "merchantAverageTransactionAmount": 350,
+    "merchantAverageTransactionAmount": 350.0,
     "merchantTransactionCount30d": 28,
     "merchantRiskCategory": "low",
     "merchantApiKeys": [],
@@ -105,8 +93,6 @@
     "bianControlRecordType": "MerchantAgreementProcedure",
     "recordCreatedDateTime": "2026-05-19T08:00:00.000Z",
     "recordUpdatedDateTime": "2026-05-20T14:15:00.000Z",
-    "schemaVersion": 2,
-    "merchantWebhookEndpoint": "http://localhost:3001/api/v1/admin/webhook/hook?merchant=m0000003-0000-4000-8000-000000000003",
-    "merchantWebhookSecret": "whsec_demo_m0000003"
+    "schemaVersion": 2
   }
 ]

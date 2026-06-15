@@ -9,8 +9,8 @@ import { canReadSensitive } from '../../../vendors/middleware/rbac';
 import { createFraudCase } from '../../fraud/services/fraudDiagnosis.service';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
-import { emitProcessEvent, emitComplianceEvent } from '../../integrations/services/businessProcessEvent.service';
-import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
+import { emitProcessEvent, emitComplianceEvent } from '../../providers/services/businessProcessEvent.service';
+import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
 import { getCardByToken, upsertCardByToken } from '../../customer/services/paymentCard.service';
 import { sendMerchantPaymentCallback } from '../../gateway/services/merchantCallback.service';
 
@@ -110,7 +110,7 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
   // Integration Hub (card_issuer integrator) so the validation is an auditable inbound/outbound
   // event tied to this transaction. CVV/PIN are validated upstream and never reach here (no SAD).
   try {
-    await dispatchIntegration(db, 'card_issuer', 'payment.card.validation', {
+    await dispatchProvider(db, 'card_issuer', 'payment.card.validation', {
       cardToken: input.cardToken,
       maskedPan: input.cardTransactionMaskedPanDisplay,
       ...(input.paymentCardNetwork ? { network: input.paymentCardNetwork } : {}),

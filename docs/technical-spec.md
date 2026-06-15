@@ -523,14 +523,16 @@ export interface CustomerCreditRatingStateControlRecord {
 
 ---
 
-### 1.13 SD-193 — `integrationRegistry` (ExternalProviderArrangement)
+### 1.13 SD-193 — `externalProviderArrangement` (ExternalProviderArrangement)
 
 > **Schema v2** — Updated 2026-06-11. Adds `generic` type, enhanced config sub-documents, multi-provider routing, and default routing groups.
+> **dev.v7 Fase 2 (2026-06-14)** — Collections renamed to pure BIAN SD-193 control-record names; added `capabilityModuleConfiguration` (internal Module engine config, ADR-029). Constant identifiers keep `INTEGRATION_*` until the module rename (Fase 3).
 
 ```typescript
-export const INTEGRATION_REGISTRY_COLLECTION       = 'integrationRegistry';
-export const INTEGRATION_EVENTS_COLLECTION         = 'integrationEvents';
-export const INTEGRATION_ROUTING_GROUPS_COLLECTION = 'integrationRoutingGroups';
+export const INTEGRATION_REGISTRY_COLLECTION       = 'externalProviderArrangement';
+export const INTEGRATION_EVENTS_COLLECTION         = 'externalProviderArrangementActionLog';
+export const INTEGRATION_ROUTING_GROUPS_COLLECTION = 'externalProviderArrangementPortfolio';
+export const CAPABILITY_MODULE_CONFIGURATION_COLLECTION = 'capabilityModuleConfiguration';
 
 export type IntegrationProviderType =
   | 'fraud_detection'

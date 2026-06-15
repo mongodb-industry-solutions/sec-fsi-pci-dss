@@ -101,9 +101,12 @@ Obtain a token via \`POST /api/v1/auth/login\`.
         { name: 'transactions', description: 'module:transactions · SD-254 Card Transaction. /api/v1/transactions. QE:equality on account reference. Auto-triggers fraud case.' },
         { name: 'fraud',        description: 'module:fraud · SD-83 Fraud Diagnosis. /api/v1/fraud. Investigation lifecycle: open > under_review > escalated > resolved > closed.' },
         { name: 'merchants',    description: 'module:psp-platform · SD-89 Merchant Relations. /api/v1/merchants. Merchant onboarding, configuration, and webhook registration. Prototype (v5 roadmap).' },
-        { name: 'gateway',      description: 'module:psp-platform · SD-64 Payment Order · SD-65 Payment Execution · SD-57 Card Token. /api/v1/gateway/payments · /api/v1/gateway/tokens. Prototype (v5 roadmap).' },
+        { name: 'gateway',          description: 'module:psp-platform · SD-64 Payment Order · SD-65 Payment Execution · SD-57 Card Token. /api/v1/gateway/payments · /api/v1/gateway/tokens. Prototype (v5 roadmap).' },
+        { name: 'payment:checkout', description: 'module:psp-platform · SD-64 · Redirect checkout sessions. /api/v1/gateway/checkout. Hosted-payment-page flow for merchants.' },
+        { name: 'payment:links',    description: 'module:psp-platform · SD-64 · Payment links. /api/v1/gateway/pay. Shareable pay-by-link flow for merchants.' },
         { name: 'system',       description: 'module:system · /api/v1/system. Health check (public) + raw document viewer (non-production, JWT required).' },
         { name: 'admin',        description: 'module:admin · /api/v1/admin. Administration panel: setup commands, terminal, log streaming, system info. Login via POST /admin/login.' },
+        { name: 'providers',    description: 'module:providers · SD-193 External Provider Arrangements (ADR-029). /api/v1/providers. Vendors (external integrations), routing groups, and inbound callbacks (/providers/callback/<capability>/:id).' },
       ],
     },
   });

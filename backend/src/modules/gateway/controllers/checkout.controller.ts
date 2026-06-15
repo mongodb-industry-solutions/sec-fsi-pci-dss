@@ -9,6 +9,7 @@ import {
   cancelCheckoutSession,
 } from '../services/checkout.service';
 import { getMerchantById } from '../services/merchant.service';
+import { deliverWebhook } from '../services/webhook.service';
 
 const SESSION_STATUS_ENUM = ['pending', 'completed', 'expired', 'cancelled'];
 
@@ -168,15 +169,7 @@ export async function checkoutController(fastify: FastifyInstance) {
             redirectUrl: { type: 'string', description: 'Buyer should be redirected to this URL.' },
           },
         },
-        402: {
-          description: 'Card authorization declined. The merchant callback (integration outbound) carries the token + decline reason; the buyer is redirected to `redirectUrl`.',
-          type: 'object',
-          properties: {
-            error: { type: 'string', description: 'Human-readable decline reason.' },
-            code: { type: 'string', description: 'PSP/issuer response code (e.g. 0190, 0540 = card deactivated).' },
-            redirectUrl: { type: 'string', nullable: true, description: 'Return URL carrying result=declined + card_token + reason.' },
-          },
-        },
+        402: { description: 'Card authorization declined.', $ref: 'Error#' },
         404: { $ref: 'Error#' },
         409: { description: 'Session already completed.', $ref: 'Error#' },
         410: { description: 'Session expired or cancelled.', $ref: 'Error#' },
@@ -194,7 +187,7 @@ export async function checkoutController(fastify: FastifyInstance) {
       cardAuthOutcome?: 'approved' | 'declined' | 'challenge';
     };
 
-    const { result, cardTransactionInstanceReference, fraudDiagnosisInstanceReference, redirectUrl, responseCode, declineReason } = await processCheckoutPayment(
+    const { result, cardTransactionInstanceReference, fraudDiagnosisInstanceReference, redirectUrl } = await processCheckoutPayment(
       fastify.db,
       {
         sessionId: id,
@@ -211,17 +204,37 @@ export async function checkoutController(fastify: FastifyInstance) {
     if (result === 'not_found') return reply.status(404).send({ error: 'Checkout session not found' });
     if (result === 'expired' || result === 'cancelled') return reply.status(410).send({ error: `Session ${result}` });
     if (result === 'already_completed') return reply.status(409).send({ error: 'Session already completed' });
-    // Decline: the merchant callback (integration outbound) already fired inside the service with the
-    // token + decline reason. Return the real response code + reason + redirect so the buyer's return
-    // page is reached on failure too.
-    if (result === 'declined') return reply.status(402).send({
-      error: declineReason ?? 'Card authorization declined',
-      code: responseCode ?? '0190',
-      redirectUrl: redirectUrl ?? null,
-    });
+    if (result === 'declined') return reply.status(402).send({ error: 'Card authorization declined', code: '0190' });
 
-    // The merchant payment callback (per-merchant webhook + integration audit event) is fired inside
-    // processCheckoutPayment for BOTH success and decline — see dispatchMerchantCallback.
+    // Fire webhook asynchronously (non-blocking)
+    if (result === 'ok') {
+      const session = await getCheckoutSession(fastify.db, id);
+      if (session) {
+        const merchant = await getMerchantById(fastify.db, (session as unknown as Record<string, unknown>).merchantAgreementInstanceReference as string ?? '');
+        const merchantDoc = merchant as Record<string, unknown> | null;
+        if (merchantDoc?.merchantWebhookEndpoint && merchantDoc?.merchantWebhookSecret) {
+          const maskedPan = `****-****-****-${body.cardToken.slice(-4).padStart(4, '0')}`;
+          deliverWebhook(
+            merchantDoc.merchantWebhookEndpoint as string,
+            {
+              event: 'checkout.completed',
+              timestamp: new Date().toISOString(),
+              data: {
+                checkoutSessionInstanceReference: id,
+                cardTransactionInstanceReference,
+                fraudDiagnosisInstanceReference: fraudDiagnosisInstanceReference ?? null,
+                fraudCaseCreated: !!fraudDiagnosisInstanceReference,
+                cardToken: body.cardToken,
+                maskedPan,
+                amount: session.checkoutSessionAmount,
+                currency: session.checkoutSessionCurrency,
+              },
+            },
+            merchantDoc.merchantWebhookSecret as string
+          ).catch(() => {});
+        }
+      }
+    }
 
     return reply.send({
       success: true,

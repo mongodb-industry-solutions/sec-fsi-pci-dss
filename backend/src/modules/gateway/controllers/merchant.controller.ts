@@ -5,7 +5,7 @@ import { FastifyInstance } from 'fastify';
 import type { JwtDemoPayload } from '../../../shared/models/identity.model';
 import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, sendTestWebhook, generateApiKey, importApiKey, updateApiKeyLabel, revokeApiKey, reviewMerchantApplication, getMerchantEvents, getMerchantApiKeys } from '../services/merchant.service';
 import { getMerchantTransactions, getMerchantStats } from '../../transactions/services/cardTransaction.service';
-import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
+import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
 
 // Authorization verdict for API-key MUTATIONS (generate/import/revoke/relabel): the merchant
 // **owner** (JWT partyRef matches merchantOwnerPartyReference) or a `merchant_officer`. The
@@ -144,7 +144,7 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
     }
     const result = await createMerchant(fastify.db, body);
 
-    void dispatchIntegration(fastify.db, 'kyb_business', 'merchant.onboard', {
+    void dispatchProvider(fastify.db, 'kyb_business', 'merchant.onboard', {
       merchantAgreementInstanceReference: result.merchantAgreementInstanceReference,
       merchantName: body.merchantName,
       merchantCategoryCode: body.merchantCategoryCode,

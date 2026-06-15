@@ -11,8 +11,8 @@ import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { canReadSensitive } from '../../../vendors/middleware/rbac';
 import { validateToken } from '../../../vendors/security/escalationTokens';
 import { appendAuditEvent } from '../../fraud/services/fraudDiagnosis.service';
-import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
-import { emitComplianceEvent } from '../../integrations/services/businessProcessEvent.service';
+import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
+import { emitComplianceEvent } from '../../providers/services/businessProcessEvent.service';
 
 /**
  * Build the API response from a unified customerAgreementProcedure document.
@@ -229,7 +229,7 @@ export async function updateSelfProfile(
   }
 
   if (matched) {
-    void dispatchIntegration(db, 'kyc_identity', 'auth.updateProfile', {
+    void dispatchProvider(db, 'kyc_identity', 'auth.updateProfile', {
       partyInstanceReference: party.partyInstanceReference,
       fieldsUpdated: Object.keys({ ...partyPatch, ...agreementPatch }).filter(k => k !== 'recordUpdatedDateTime'),
     }, { entityType: 'customer', entityId: party.partyInstanceReference, processType: 'kyc_verification' })

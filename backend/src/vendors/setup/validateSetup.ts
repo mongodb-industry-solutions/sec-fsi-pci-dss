@@ -24,6 +24,11 @@ const EXPECTED_COLLECTIONS = [
   'customerCreditRatingState',
   'consentAgreement',
   'consentAccessLog',
+  // SD-193 External Provider Arrangements (dev.v7 Fase 2 — BIAN-pure rename + new module config)
+  'externalProviderArrangement',
+  'externalProviderArrangementActionLog',
+  'externalProviderArrangementPortfolio',
+  'capabilityModuleConfiguration',
 ];
 
 // Unique index (primary ref field) per collection - representative index check
@@ -40,6 +45,10 @@ const EXPECTED_UNIQUE_INDEXES: Record<string, string> = {
   customerCreditRatingState:        'customerCreditRatingInstanceReference',
   consentAgreement:                 'consentAgreementInstanceReference',
   consentAccessLog:                 'consentAccessLogInstanceReference',
+  externalProviderArrangement:          'externalProviderArrangementInstanceReference',
+  externalProviderArrangementPortfolio: 'routingGroupInstanceReference',
+  capabilityModuleConfiguration:        'capabilityModuleInstanceReference',
+  // externalProviderArrangementActionLog is timeseries — no unique index (checked by presence only)
 };
 
 // -- Result tracking ----------------------------------------------------------
@@ -138,7 +147,7 @@ function checkEnvVars(): boolean {
   // -- 1.1 Core (required) ----------------------------------------------------
   console.log('   1.1 Core (required)');
 
-  for (const v of ['MONGODB_URI', 'MONGODB_DB_NAME', 'KMS_PROVIDER', 'JWT_SECRET']) {
+  for (const v of ['MONGODB_URI', 'MONGODB_DB_NAME', 'KMS_PROVIDER']) {
     process.env[v]
       ? check('pass', v, v === 'MONGODB_DB_NAME' ? process.env[v] : undefined)
       : check('fail', v, 'not set - required');
@@ -150,8 +159,12 @@ function checkEnvVars(): boolean {
     check('warn', 'MONGODB_URI format', 'does not start with mongodb:// or mongodb+srv://');
   }
 
-  // Semantic: JWT_SECRET must not be the demo default
-  if (process.env.JWT_SECRET === 'demo-local-secret-change-in-production') {
+  // JWT_SECRET is optional for local/demo: the app falls back to a built-in demo default
+  // (auth, escalation tokens, admin). Warn (not fail) when unset or when it equals that default —
+  // a strong secret is required only before any non-local deployment.
+  if (!process.env.JWT_SECRET) {
+    check('warn', 'JWT_SECRET', 'not set - app uses the built-in demo default; set a strong secret before any non-local deployment');
+  } else if (process.env.JWT_SECRET === 'demo-local-secret-change-in-production') {
     check('warn', 'JWT_SECRET', 'using the hardcoded demo default - change before any non-local deployment');
   }
 

@@ -13,7 +13,7 @@ import {
   KybCheckStatus,
   MerchantApiKeyRecord,
 } from '../models/merchantAgreement.model';
-import { emitComplianceEvent } from '../../integrations/services/businessProcessEvent.service';
+import { emitComplianceEvent } from '../../providers/services/businessProcessEvent.service';
 import { deliverWebhook } from './webhook.service';
 
 const BCRYPT_ROUNDS = 10;

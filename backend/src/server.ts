@@ -18,7 +18,16 @@ import { fraudModule }        from './modules/fraud';
 import { gatewayModule }      from './modules/gateway';
 import { systemModule }       from './modules/system';
 import { adminModule }        from './modules/admin';
-import { integrationsModule } from './modules/integrations';
+import { providersModule } from './modules/providers';
+import { fdsModule }       from './modules/fds';
+import { hrpModule }       from './modules/hrp';
+import { amlModule }       from './modules/aml';
+import { kycModule }       from './modules/kyc';
+import { kybModule }       from './modules/kyb';
+import { creditBureauModule }      from './modules/credit-bureau';
+import { cardAuthorizationModule } from './modules/card-authorization';
+import { cardIssuerModule }        from './modules/card-issuer';
+import { domainModule }       from './modules/domain';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
@@ -139,7 +148,18 @@ export async function buildApp(): Promise<FastifyInstance> {
   // /api/v1/system/raw returns 403 in production (enforced inside the controller)
   await fastify.register(systemModule,       { prefix: '/api/v1' });
   await fastify.register(adminModule,        { prefix: '/api/v1' });
-  await fastify.register(integrationsModule, { prefix: '/api/v1' });
+  await fastify.register(providersModule, { prefix: '/api/v1' });
+  // Capability modules (internal engines, ADR-029) — each declares its own static routes.
+  await fastify.register(fdsModule,          { prefix: '/api/v1' });
+  await fastify.register(hrpModule,          { prefix: '/api/v1' });
+  await fastify.register(amlModule,          { prefix: '/api/v1' });
+  await fastify.register(kycModule,          { prefix: '/api/v1' });
+  await fastify.register(kybModule,          { prefix: '/api/v1' });
+  await fastify.register(creditBureauModule, { prefix: '/api/v1' });
+  await fastify.register(cardAuthorizationModule, { prefix: '/api/v1' });
+  await fastify.register(cardIssuerModule,   { prefix: '/api/v1' });
+  // Internal Module without a Provider counterpart (ADR-029).
+  await fastify.register(domainModule,  { prefix: '/api/v1' });
 
   return fastify;
 }

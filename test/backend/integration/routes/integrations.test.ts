@@ -1,6 +1,6 @@
 /**
  * Integration tests: /api/v1/integrations routes (FR-v6-03, FR-v6-05, FR-v6-06)
- * Source: backend/src/modules/integrations/controllers/integrationRegistry.controller.ts
+ * Source: backend/src/modules/providers/controllers/integrationRegistry.controller.ts
  *
  * Requires TEST_MONGODB_URI — skips gracefully when not set.
  */

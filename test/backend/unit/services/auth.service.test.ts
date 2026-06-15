@@ -24,6 +24,26 @@ function makeDb(user: Record<string, unknown> | null) {
   } as any;
 }
 
+// getDemoUsers is DB-backed (not file-based): it queries customerAuthentication with a status/
+// featured/role filter, then merchantAgreement for owners. This mock applies the status+featured
+// filter to a seed and returns no merchants (the `merchantOwnerPartyReference` query → []).
+function makeDemoDb(records: Record<string, unknown>[]) {
+  return {
+    collection: vi.fn(() => ({
+      find: vi.fn((query: Record<string, unknown> = {}) => ({
+        toArray: vi.fn().mockResolvedValue(
+          'merchantOwnerPartyReference' in query
+            ? []
+            : records.filter((r) =>
+                (!query.customerAuthenticationAccountStatus || r.customerAuthenticationAccountStatus === query.customerAuthenticationAccountStatus) &&
+                (query.customerAuthenticationDemoFeatured === undefined || r.customerAuthenticationDemoFeatured === query.customerAuthenticationDemoFeatured),
+              ),
+        ),
+      })),
+    })),
+  } as any;
+}
+
 beforeAll(() => {
   process.env.JWT_SECRET = 'test-secret-key';
   process.env.JWT_EXPIRES_IN = '1h';
@@ -118,8 +138,7 @@ describe('getDemoUsers', () => {
   });
 
   it('returns only active users, projected to name/email/role - no hash', async () => {
-    h.readFileSync.mockReturnValue(JSON.stringify(seed));
-    const users = await getDemoUsers({} as any);
+    const users = await getDemoUsers(makeDemoDb(seed));
     expect(users).toHaveLength(2); // disabled user excluded
     const sarah = users.find((u) => u.email === 'sarah.chen@back.es')!;
     expect(sarah.name).toBe('Sarah Chen');
@@ -128,8 +147,7 @@ describe('getDemoUsers', () => {
   });
 
   it('featured=true returns only the curated featured roster', async () => {
-    h.readFileSync.mockReturnValue(JSON.stringify(seed));
-    const users = await getDemoUsers({} as any, { featured: true });
+    const users = await getDemoUsers(makeDemoDb(seed), { featured: true });
     expect(users).toHaveLength(1);
     expect(users[0].email).toBe('sarah.chen@back.es');
     expect(users[0].featured).toBe(true);

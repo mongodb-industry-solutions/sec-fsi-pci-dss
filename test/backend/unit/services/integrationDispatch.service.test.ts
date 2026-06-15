@@ -17,32 +17,35 @@ const h = vi.hoisted(() => {
     ok: true,
     status: 200,
     json: vi.fn().mockResolvedValue({ status: 'ok' }),
+    // dispatchExternal reads the body via res.text() then JSON.parse, and captures res.headers.entries().
+    text: vi.fn().mockResolvedValue('{"status":"ok"}'),
+    headers: { entries: () => [] as [string, string][] },
   });
 
   return { insertOne, findOne, updateOne, collection, fetchMock };
 });
 
-vi.mock('../../../../backend/src/modules/integrations/services/integrationRegistry.service', () => ({
+vi.mock('../../../../backend/src/modules/providers/services/integrationRegistry.service', () => ({
   getActiveProviderForType: h.findOne,
   updateHealthStatus: vi.fn().mockResolvedValue(undefined),
   hashPayload: vi.fn().mockReturnValue('hash-abc'),
 }));
 
-vi.mock('../../../../backend/src/modules/integrations/services/fieldMapping.service', () => ({
+vi.mock('../../../../backend/src/modules/providers/services/fieldMapping.service', () => ({
   applyMappings: vi.fn((p: unknown) => p),
 }));
 
-vi.mock('../../../../backend/src/modules/integrations/services/integrationRoutingGroup.service', () => ({
+vi.mock('../../../../backend/src/modules/providers/services/integrationRoutingGroup.service', () => ({
   resolveProviderFromGroup: vi.fn().mockResolvedValue(null),
 }));
 
 // Stub the global fetch
 vi.stubGlobal('fetch', h.fetchMock);
 
-import { dispatchIntegration } from '../../../../backend/src/modules/integrations/services/integrationDispatch.service';
+import { dispatchProvider } from '../../../../backend/src/modules/providers/services/integrationDispatch.service';
 
 function makeDb() {
-  return { collection: h.collection } as unknown as Parameters<typeof dispatchIntegration>[0];
+  return { collection: h.collection } as unknown as Parameters<typeof dispatchProvider>[0];
 }
 
 function makeProvider(overrides: Record<string, unknown> = {}) {
@@ -68,6 +71,8 @@ beforeEach(() => {
     ok: true,
     status: 200,
     json: vi.fn().mockResolvedValue({ status: 'ok' }),
+    text: vi.fn().mockResolvedValue('{"status":"ok"}'),
+    headers: { entries: () => [] as [string, string][] },
   });
 });
 
@@ -76,12 +81,12 @@ beforeEach(() => {
 describe('endpoint-first dispatch logic (ADR-025 D3)', () => {
   it('calls fetch when provider has externalProviderApiEndpoint (even if internal)', async () => {
     h.findOne.mockResolvedValueOnce(
-      makeProvider({ externalProviderApiEndpoint: 'http://localhost:3001/api/v1/internal/fds/score' })
+      makeProvider({ externalProviderApiEndpoint: 'http://localhost:3001/api/v1/modules/fds/score' })
     );
-    const result = await dispatchIntegration(makeDb(), 'fraud_detection', 'test', { amount: 100 });
+    const result = await dispatchProvider(makeDb(), 'fraud_detection', 'test', { amount: 100 });
     expect(h.fetchMock).toHaveBeenCalledTimes(1);
     expect(h.fetchMock).toHaveBeenCalledWith(
-      'http://localhost:3001/api/v1/internal/fds/score',
+      'http://localhost:3001/api/v1/modules/fds/score',
       expect.objectContaining({ method: 'POST' })
     );
     expect(result.provider).toBe('external');
@@ -92,7 +97,7 @@ describe('endpoint-first dispatch logic (ADR-025 D3)', () => {
     h.findOne.mockResolvedValueOnce(
       makeProvider({ externalProviderIsInternal: true }) // no externalProviderApiEndpoint
     );
-    const result = await dispatchIntegration(makeDb(), 'fraud_detection', 'test', { amount: 100 });
+    const result = await dispatchProvider(makeDb(), 'fraud_detection', 'test', { amount: 100 });
     expect(h.fetchMock).not.toHaveBeenCalled();
     expect(result.provider).toBe('internal');
     expect(result.status).toBe('sent');
@@ -105,13 +110,13 @@ describe('endpoint-first dispatch logic (ADR-025 D3)', () => {
         externalProviderApiEndpoint: 'https://api.refinitiv.com/fds/score',
       })
     );
-    await dispatchIntegration(makeDb(), 'fraud_detection', 'test', { amount: 500 });
+    await dispatchProvider(makeDb(), 'fraud_detection', 'test', { amount: 500 });
     expect(h.fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('returns error status when no active provider found', async () => {
     h.findOne.mockResolvedValueOnce(null);
-    const result = await dispatchIntegration(makeDb(), 'fraud_detection', 'test', {});
+    const result = await dispatchProvider(makeDb(), 'fraud_detection', 'test', {});
     expect(result.status).toBe('error');
     expect(result.error).toMatch(/no active provider/i);
     expect(h.fetchMock).not.toHaveBeenCalled();
@@ -126,7 +131,7 @@ describe('businessContext persisted in integrationEvents', () => {
       makeProvider({ externalProviderIsInternal: true }) // no endpoint → logAndReturn
     );
     const ctx = { entityType: 'transaction' as const, entityId: 'txn-abc', processType: 'payment_processing' as const };
-    await dispatchIntegration(makeDb(), 'fraud_detection', 'test', { amount: 50 }, ctx);
+    await dispatchProvider(makeDb(), 'fraud_detection', 'test', { amount: 50 }, ctx);
 
     // insertOne is called to log the integrationEvent
     expect(h.insertOne).toHaveBeenCalled();
@@ -136,7 +141,7 @@ describe('businessContext persisted in integrationEvents', () => {
 
   it('logs integrationEvent without businessContext when not passed', async () => {
     h.findOne.mockResolvedValueOnce(makeProvider({ externalProviderIsInternal: true }));
-    await dispatchIntegration(makeDb(), 'fraud_detection', 'test', { amount: 50 });
+    await dispatchProvider(makeDb(), 'fraud_detection', 'test', { amount: 50 });
     const doc = h.insertOne.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(doc.businessContext).toBeUndefined();
   });
@@ -147,13 +152,13 @@ describe('businessContext persisted in integrationEvents', () => {
 describe('timeout handling', () => {
   it('returns timeout status when fetch throws AbortError', async () => {
     h.findOne.mockResolvedValueOnce(
-      makeProvider({ externalProviderApiEndpoint: 'http://localhost:3001/api/v1/internal/fds/score' })
+      makeProvider({ externalProviderApiEndpoint: 'http://localhost:3001/api/v1/modules/fds/score' })
     );
     const abortErr = new Error('aborted');
     abortErr.name = 'AbortError';
     h.fetchMock.mockRejectedValueOnce(abortErr);
 
-    const result = await dispatchIntegration(makeDb(), 'fraud_detection', 'test', {});
+    const result = await dispatchProvider(makeDb(), 'fraud_detection', 'test', {});
     expect(result.status).toBe('timeout');
   });
 });

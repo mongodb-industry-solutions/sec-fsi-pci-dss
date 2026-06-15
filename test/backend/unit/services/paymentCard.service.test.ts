@@ -12,6 +12,7 @@ function makeDb(overrides?: { findResults?: unknown[] }) {
       insertOne: insertOneMock,
       find: vi.fn().mockReturnValue({
         project: vi.fn().mockReturnThis(),
+        sort: vi.fn().mockReturnThis(),
         toArray: vi.fn().mockResolvedValue(overrides?.findResults ?? []),
       }),
     }),

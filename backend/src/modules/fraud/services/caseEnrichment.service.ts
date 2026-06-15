@@ -5,7 +5,7 @@ import { getTransactionById } from '../../transactions/services/cardTransaction.
 import { CARD_TRANSACTION_COLLECTION } from '../../transactions/models/cardTransaction.model';
 import { getByInstanceReference } from '../../customer/services/customerAgreement.service';
 import { getMerchantById } from '../../gateway/services/merchant.service';
-import { listProcessEvents } from '../../integrations/services/businessProcessEvent.service';
+import { listProcessEvents } from '../../providers/services/businessProcessEvent.service';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
 

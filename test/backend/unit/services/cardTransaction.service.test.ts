@@ -31,8 +31,32 @@ vi.mock('../../../../backend/src/vendors/security/escalationTokens', () => ({
 vi.mock('../../../../backend/src/modules/fraud/services/fraudDiagnosis.service', () => ({
   createFraudCase: h.createFraudCase,
 }));
+// createTransaction now also: validates the card-on-file, dispatches card_issuer validation, emits
+// process/compliance events, upserts the card registry, and fires the merchant callback. Mock these
+// so the test exercises the transaction + fraud-trigger logic in isolation.
+vi.mock('../../../../backend/src/modules/customer/services/paymentCard.service', () => ({
+  getCardByToken: vi.fn().mockResolvedValue(null),       // no card-on-file → passes through
+  upsertCardByToken: vi.fn().mockResolvedValue({ paymentCardInstanceReference: 'card-x', created: false }),
+}));
+vi.mock('../../../../backend/src/modules/providers/services/integrationDispatch.service', () => ({
+  dispatchProvider: vi.fn().mockResolvedValue({ provider: 'internal', status: 'received' }),
+}));
+vi.mock('../../../../backend/src/modules/providers/services/businessProcessEvent.service', () => ({
+  emitProcessEvent: vi.fn().mockResolvedValue(undefined),
+  emitComplianceEvent: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('../../../../backend/src/modules/gateway/services/merchantCallback.service', () => ({
+  sendMerchantPaymentCallback: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { createTransaction, getTransactionById, getTransactionsByCardToken } from '../../../../backend/src/modules/transactions/services/cardTransaction.service';
+
+// createTransaction uses the passed db only for resolveCustomerAgreement (a local helper that does
+// findOne on the customer/party collections); everything else is mocked. A findOne→null db makes
+// it fall back to the raw account reference, which is all these tests need.
+function txDb() {
+  return { collection: vi.fn(() => ({ findOne: vi.fn().mockResolvedValue(null) })) } as any;
+}
 
 // Local mock DB used only by getTransactionsByCardToken (which queries the passed db directly).
 function makeDb(overrides?: { findResults?: unknown[] }) {
@@ -70,61 +94,61 @@ const baseInput = {
 
 describe('createTransaction', () => {
   it('inserts one transaction document through the QE write client', async () => {
-    await createTransaction({} as any, baseInput);
+    await createTransaction(txDb(), baseInput);
     expect(h.insertOne).toHaveBeenCalledTimes(1);
   });
 
   it('returns UUID-format transaction reference', async () => {
-    const result = await createTransaction({} as any, baseInput);
+    const result = await createTransaction(txDb(), baseInput);
     expect(result.cardTransactionInstanceReference).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
     );
   });
 
   it('returns cardTransactionStatus = authorized', async () => {
-    const result = await createTransaction({} as any, baseInput);
+    const result = await createTransaction(txDb(), baseInput);
     expect(result.cardTransactionStatus).toBe('authorized');
   });
 
   it('fraudCaseCreated is false for amount ≤ threshold + safe MCC', async () => {
-    const result = await createTransaction({} as any, { ...baseInput, amount: 100, cardTransactionMerchantCategoryCode: '5411' });
+    const result = await createTransaction(txDb(), { ...baseInput, amount: 100, cardTransactionMerchantCategoryCode: '5411' });
     expect(result.fraudCaseCreated).toBe(false);
     expect(result.fraudDiagnosisInstanceReference).toBeUndefined();
     expect(h.createFraudCase).not.toHaveBeenCalled();
   });
 
   it('fraudCaseCreated is false when amount equals threshold exactly', async () => {
-    const result = await createTransaction({} as any, { ...baseInput, amount: 500, cardTransactionMerchantCategoryCode: '5411' });
+    const result = await createTransaction(txDb(), { ...baseInput, amount: 500, cardTransactionMerchantCategoryCode: '5411' });
     expect(result.fraudCaseCreated).toBe(false);
   });
 
   it('fraudCaseCreated is true when amount > threshold', async () => {
-    const result = await createTransaction({} as any, { ...baseInput, amount: 850, cardTransactionMerchantCategoryCode: '5411' });
+    const result = await createTransaction(txDb(), { ...baseInput, amount: 850, cardTransactionMerchantCategoryCode: '5411' });
     expect(result.fraudCaseCreated).toBe(true);
     expect(result.fraudDiagnosisInstanceReference).toBeTruthy();
     expect(h.createFraudCase).toHaveBeenCalledTimes(1);
   });
 
   it('fraudCaseCreated is true when MCC is in RISK_MCC_LIST (below threshold)', async () => {
-    const result = await createTransaction({} as any, { ...baseInput, amount: 50, cardTransactionMerchantCategoryCode: '7995' });
+    const result = await createTransaction(txDb(), { ...baseInput, amount: 50, cardTransactionMerchantCategoryCode: '7995' });
     expect(result.fraudCaseCreated).toBe(true);
   });
 
   it('respects custom FRAUD_AMOUNT_THRESHOLD env var', async () => {
     process.env.FRAUD_AMOUNT_THRESHOLD = '1000';
-    const result = await createTransaction({} as any, { ...baseInput, amount: 850, cardTransactionMerchantCategoryCode: '5411' });
+    const result = await createTransaction(txDb(), { ...baseInput, amount: 850, cardTransactionMerchantCategoryCode: '5411' });
     expect(result.fraudCaseCreated).toBe(false);
   });
 
   it('respects custom RISK_MCC_LIST env var', async () => {
     process.env.RISK_MCC_LIST = '1234';
-    const result = await createTransaction({} as any, { ...baseInput, amount: 50, cardTransactionMerchantCategoryCode: '7995' });
+    const result = await createTransaction(txDb(), { ...baseInput, amount: 50, cardTransactionMerchantCategoryCode: '7995' });
     expect(result.fraudCaseCreated).toBe(false);
   });
 
   // U-01: cardTransactionDescription accepted and function returns successfully (BIAN SD-254)
   it('U-01: accepts cardTransactionDescription and returns authorized status', async () => {
-    const result = await createTransaction({} as any, { ...baseInput, cardTransactionDescription: 'AMAZON.COM*ELECTRONI' });
+    const result = await createTransaction(txDb(), { ...baseInput, cardTransactionDescription: 'AMAZON.COM*ELECTRONI' });
     expect(result.cardTransactionStatus).toBe('authorized');
     expect(result.cardTransactionInstanceReference).toBeTruthy();
   });
@@ -133,14 +157,14 @@ describe('createTransaction', () => {
   it('U-02: accepts all valid cardTransactionType values', async () => {
     const types = ['purchase', 'cash_advance', 'balance_transfer', 'refund', 'fee', 'adjustment'] as const;
     for (const txType of types) {
-      const result = await createTransaction({} as any, { ...baseInput, cardTransactionType: txType });
+      const result = await createTransaction(txDb(), { ...baseInput, cardTransactionType: txType });
       expect(result.cardTransactionStatus).toBe('authorized');
     }
   });
 
   // U-03: optional cardTransactionNarrative accepted when provided
   it('U-03: accepts optional cardTransactionNarrative when provided', async () => {
-    const result = await createTransaction({} as any, {
+    const result = await createTransaction(txDb(), {
       ...baseInput,
       cardTransactionNarrative: 'PURCHASE at Safe Store - ref AB12CD34',
     });
@@ -151,7 +175,7 @@ describe('createTransaction', () => {
   it('U-04: completes successfully when cardTransactionNarrative is absent', async () => {
     const inputWithoutNarrative = { ...baseInput };
     expect('cardTransactionNarrative' in inputWithoutNarrative).toBe(false);
-    const result = await createTransaction({} as any, inputWithoutNarrative);
+    const result = await createTransaction(txDb(), inputWithoutNarrative);
     expect(result.cardTransactionStatus).toBe('authorized');
   });
 });

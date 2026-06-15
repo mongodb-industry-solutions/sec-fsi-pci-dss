@@ -13,8 +13,8 @@
 import { Db } from 'mongodb';
 import { deliverWebhook, type WebhookDeliveryResult } from './webhook.service';
 import { MERCHANT_AGREEMENT_COLLECTION, MerchantAgreementControlRecord } from '../models/merchantAgreement.model';
-import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
-import { emitProcessEvent } from '../../integrations/services/businessProcessEvent.service';
+import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
+import { emitProcessEvent } from '../../providers/services/businessProcessEvent.service';
 
 // Human-readable decline reasons keyed by the PSP/issuer response code (BIAN SD-15).
 export const DECLINE_REASONS: Record<string, string> = {
@@ -121,7 +121,7 @@ export async function sendMerchantPaymentCallback(db: Db, o: MerchantPaymentCall
 
   // 3) Integration Hub audit event (inbound/outbound mechanism).
   try {
-    await dispatchIntegration(db, 'generic', o.triggeredBy, payload, {
+    await dispatchProvider(db, 'generic', o.triggeredBy, payload, {
       entityType: 'transaction',
       entityId: transactionId ?? o.contextRef,
       processType: 'payment_processing',

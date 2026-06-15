@@ -4,10 +4,15 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 
-// dispatchIntegration is a fire-and-forget side effect (outbound webhook). Stub it so
+// dispatchProvider is a fire-and-forget side effect (outbound webhook). Stub it so
 // case creation is tested in isolation and no real dispatch is attempted.
-vi.mock('../../../../backend/src/modules/integrations/services/integrationDispatch.service', () => ({
-  dispatchIntegration: vi.fn().mockResolvedValue(undefined),
+vi.mock('../../../../backend/src/modules/providers/services/integrationDispatch.service', () => ({
+  dispatchProvider: vi.fn().mockResolvedValue(undefined),
+}));
+// emitProcessEvent is a fire-and-forget audit write (businessProcessEvent collection). Stub it so the
+// shared insertOne spy counts only the case + opening-event writes this test asserts on.
+vi.mock('../../../../backend/src/modules/providers/services/businessProcessEvent.service', () => ({
+  emitProcessEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { createFraudCase, getCases, getCaseById } from '../../../../backend/src/modules/fraud/services/fraudDiagnosis.service';
@@ -35,6 +40,8 @@ function makeDb(overrides?: { findResults?: unknown[]; total?: number; findOneRe
       }),
       findOne: vi.fn().mockResolvedValue(overrides?.findOneResult ?? null),
       countDocuments: vi.fn().mockResolvedValue(overrides?.total ?? docs.length),
+      // ADR-024: restart-safe case reference uses an atomic counter (findOneAndUpdate).
+      findOneAndUpdate: vi.fn().mockResolvedValue({ _id: 'caseRefSeq', seq: 1 }),
     }),
     _insertOne: insertOneMock,
   } as any;

@@ -66,11 +66,14 @@ describe('getByEmail', () => {
     expect(result!.customerName).toBe('John Doe');
   });
 
-  it('includes party-sourced PII (email/phone/accountRef) in the response', async () => {
+  it('restricts contact PII for L1 but exposes the account reference (PCI DSS Req 7 least-privilege)', async () => {
+    // Contact PII (email/phone) is now gated to L2 investigator / security auditor (need-to-know).
+    // The default L1 analyst triages on non-identifying attributes; the account reference is not PII-gated.
     h.getDbForRole.mockResolvedValue(makeRoleDb(party, agreement));
-    const result = await getByEmail({} as any, 'customer@example.com');
-    expect(result!.customerEmailAddress).toBe('customer@example.com');
-    expect(result!.customerMobilePhoneNumber).toBe('+1-555-0001');
+    const result = await getByEmail({} as any, 'customer@example.com'); // default role = level1_analyst
+    expect(result!.customerEmailAddress).toBeUndefined();
+    expect(result!.customerMobilePhoneNumber).toBeUndefined();
+    expect(result!.contactPiiRestricted).toBe(true);
     expect(result!.customerAgreementReference).toBe('ACC-REF-001');
   });
 

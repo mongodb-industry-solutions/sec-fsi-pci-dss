@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { registerCardForCustomer, getCardsByCustomer, getCardById, getCardHolderCount, getCardRegistryByToken, updateCardMetadata, setCardActivation, revokeCard, getOwnAgreementId } from '../services/paymentCard.service';
 import type { PaymentCardManagementControlRecord } from '../models/paymentCard.model';
 import type { JwtDemoPayload } from '../../../shared/models/identity.model';
-import { emitComplianceEvent } from '../../integrations/services/businessProcessEvent.service';
+import { emitComplianceEvent } from '../../providers/services/businessProcessEvent.service';
 
 const STAFF_READ_ROLES = ['level1_analyst', 'level2_investigator', 'security_auditor'];
 

@@ -207,14 +207,27 @@ export async function createCollections(
     console.log('  skip:    merchantAgreementEvents (already exists)');
   }
 
-  // SD-193: Integration Events  -  timeseries, TTL 90 days (ADR-025: migration from standard)
+  // SD-193: External Provider Arrangement Action Log  -  timeseries, TTL 90 days (ADR-025).
   // Timeseries collections cannot be converted; drop + recreate always on reset.
-  if (!existingNames.has('integrationEvents') || reset) {
-    if (existingNames.has('integrationEvents') && reset) {
-      await db.collection('integrationEvents').drop();
-      console.log('  dropped: integrationEvents (timeseries migration)');
+  // Renamed from legacy 'integrationEvents'.)
+  if (existingNames.has('integrationEvents')) {
+    await db.collection('integrationEvents').drop().catch(() => {});
+    console.log('  dropped: integrationEvents (legacy → externalProviderArrangementActionLog)');
+  }
+  // Drop legacy non-timeseries collections renamed to BIAN names (data is re-seeded
+  // into the new names from JSON). Makes setup on an OLD database migrate cleanly without orphans.
+  for (const legacy of ['integrationRegistry', 'integrationRoutingGroups']) {
+    if (existingNames.has(legacy)) {
+      await db.collection(legacy).drop().catch(() => {});
+      console.log(`  dropped: ${legacy} (legacy → BIAN-renamed)`);
     }
-    await db.createCollection('integrationEvents', {
+  }
+  if (!existingNames.has('externalProviderArrangementActionLog') || reset) {
+    if (existingNames.has('externalProviderArrangementActionLog') && reset) {
+      await db.collection('externalProviderArrangementActionLog').drop();
+      console.log('  dropped: externalProviderArrangementActionLog (timeseries migration)');
+    }
+    await db.createCollection('externalProviderArrangementActionLog', {
       timeseries: {
         timeField: 'recordCreatedDateTime',
         metaField: 'externalProviderArrangementInstanceReference',
@@ -222,9 +235,9 @@ export async function createCollections(
       },
       expireAfterSeconds: 7776000, // 90 days
     });
-    console.log('  created: integrationEvents (timeseries, TTL 90d)');
+    console.log('  created: externalProviderArrangementActionLog (timeseries, TTL 90d)');
   } else {
-    console.log('  skip:    integrationEvents (already exists)');
+    console.log('  skip:    externalProviderArrangementActionLog (already exists)');
   }
 
   // ADR-025: Business Process Events  -  timeseries, TTL 90 days (transactional processes)

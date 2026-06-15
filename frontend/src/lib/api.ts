@@ -863,77 +863,102 @@ export const api = {
   integrations: {
     list: (token: string, params?: { type?: string; status?: string }) => {
       const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([,v]) => v) as [string,string][]).toString() : '';
-      return apiFetch<{ integrations: Record<string, unknown>[] }>(`/api/v1/integrations/providers${qs}`, {}, token);
+      return apiFetch<{ integrations: Record<string, unknown>[] }>(`/api/v1/providers/vendors${qs}`, {}, token);
     },
     get: (id: string, token: string) =>
-      apiFetch<{ integration: Record<string, unknown> }>(`/api/v1/integrations/providers/${id}`, {}, token),
+      apiFetch<{ integration: Record<string, unknown> }>(`/api/v1/providers/vendors/${id}`, {}, token),
     create: (body: Record<string, unknown>, token: string) =>
       apiFetch<{ integration: Record<string, unknown>; apiKey?: string }>(
-        '/api/v1/integrations/providers', { method: 'POST', body: JSON.stringify(body) }, token
+        '/api/v1/providers/vendors', { method: 'POST', body: JSON.stringify(body) }, token
       ),
     update: (id: string, body: Record<string, unknown>, token: string) =>
       apiFetch<{ integration: Record<string, unknown> }>(
-        `/api/v1/integrations/providers/${id}`, { method: 'PATCH', body: JSON.stringify(body) }, token
+        `/api/v1/providers/vendors/${id}`, { method: 'PATCH', body: JSON.stringify(body) }, token
       ),
     rotateKey: (id: string, token: string) =>
       apiFetch<{ integration: Record<string, unknown>; apiKey: string }>(
-        `/api/v1/integrations/providers/${id}/rotate-key`, { method: 'POST' }, token
+        `/api/v1/providers/vendors/${id}/rotate-key`, { method: 'POST' }, token
       ),
     test: (id: string, token: string) =>
-      apiFetch<{ status: string; latencyMs: number }>(`/api/v1/integrations/providers/${id}/test`, { method: 'POST' }, token),
+      apiFetch<{ status: string; latencyMs: number }>(`/api/v1/providers/vendors/${id}/test`, { method: 'POST' }, token),
     suspend: (id: string, token: string) =>
-      apiFetch<{ integration: Record<string, unknown> }>(`/api/v1/integrations/providers/${id}/suspend`, { method: 'POST' }, token),
+      apiFetch<{ integration: Record<string, unknown> }>(`/api/v1/providers/vendors/${id}/suspend`, { method: 'POST' }, token),
     events: (id: string, token: string, page = 1, limit = 20) =>
       apiFetch<{ events: Record<string, unknown>[]; total: number; page: number }>(
-        `/api/v1/integrations/providers/${id}/events?page=${page}&limit=${limit}`, {}, token
+        `/api/v1/providers/vendors/${id}/events?page=${page}&limit=${limit}`, {}, token
       ),
     testMapping: (id: string, body: { direction: 'outbound' | 'inbound'; payload: Record<string, unknown> }, token: string) =>
       apiFetch<{ original: Record<string, unknown>; transformed: Record<string, unknown>; appliedRules: number; errors: string[] }>(
-        `/api/v1/integrations/providers/${id}/test-mapping`, { method: 'POST', body: JSON.stringify(body) }, token
+        `/api/v1/providers/vendors/${id}/test-mapping`, { method: 'POST', body: JSON.stringify(body) }, token
       ),
     runTest: (id: string, body: { direction: 'outbound' | 'inbound'; payload: Record<string, unknown>; overrideUrl?: string }, token: string) =>
       apiFetch<{
         direction: 'outbound' | 'inbound'; executed: boolean; status: string; latencyMs: number;
         responseCode?: number; responseBody?: unknown; transformed: Record<string, unknown>; appliedRules: number; targetUrl?: string; error?: string;
-      }>(`/api/v1/integrations/providers/${id}/run-test`, { method: 'POST', body: JSON.stringify(body) }, token),
+      }>(`/api/v1/providers/vendors/${id}/run-test`, { method: 'POST', body: JSON.stringify(body) }, token),
     delete: (id: string, token: string) =>
       apiFetch<{ deleted: boolean }>(
-        `/api/v1/integrations/providers/${id}`, { method: 'DELETE' }, token
+        `/api/v1/providers/vendors/${id}`, { method: 'DELETE' }, token
       ),
   },
   integrationGroups: {
     list: (token: string, params?: { type?: string }) => {
       const qs = params?.type ? `?type=${params.type}` : '';
-      return apiFetch<{ groups: Record<string, unknown>[] }>(`/api/v1/integrations/groups${qs}`, {}, token);
+      return apiFetch<{ groups: Record<string, unknown>[] }>(`/api/v1/providers/groups${qs}`, {}, token);
     },
     get: (id: string, token: string) =>
-      apiFetch<{ group: Record<string, unknown> }>(`/api/v1/integrations/groups/${id}`, {}, token),
+      apiFetch<{ group: Record<string, unknown> }>(`/api/v1/providers/groups/${id}`, {}, token),
     create: (body: { name: string; providerType: string; strategy: string }, token: string) =>
       apiFetch<{ group: Record<string, unknown> }>(
-        '/api/v1/integrations/groups', { method: 'POST', body: JSON.stringify(body) }, token
+        '/api/v1/providers/groups', { method: 'POST', body: JSON.stringify(body) }, token
       ),
     update: (id: string, body: Record<string, unknown>, token: string) =>
       apiFetch<{ group: Record<string, unknown> }>(
-        `/api/v1/integrations/groups/${id}`, { method: 'PATCH', body: JSON.stringify(body) }, token
+        `/api/v1/providers/groups/${id}`, { method: 'PATCH', body: JSON.stringify(body) }, token
       ),
     deleteGroup: (id: string, token: string) =>
       apiFetch<{ deleted: boolean }>(
-        `/api/v1/integrations/groups/${id}`, { method: 'DELETE' }, token
+        `/api/v1/providers/groups/${id}`, { method: 'DELETE' }, token
       ),
     addMember: (groupId: string, body: { providerId: string; priority?: number; weight?: number }, token: string) =>
       apiFetch<{ group: Record<string, unknown> }>(
-        `/api/v1/integrations/groups/${groupId}/members`, { method: 'POST', body: JSON.stringify(body) }, token
+        `/api/v1/providers/groups/${groupId}/members`, { method: 'POST', body: JSON.stringify(body) }, token
       ),
     removeMember: (groupId: string, providerId: string, token: string) =>
       apiFetch<{ group: Record<string, unknown> }>(
-        `/api/v1/integrations/groups/${groupId}/members/${providerId}`, { method: 'DELETE' }, token
+        `/api/v1/providers/groups/${groupId}/members/${providerId}`, { method: 'DELETE' }, token
       ),
     getDefault: (type: string, token: string) =>
-      apiFetch<{ group: Record<string, unknown> }>(`/api/v1/integrations/groups/default/${type}`, {}, token),
+      apiFetch<{ group: Record<string, unknown> }>(`/api/v1/providers/groups/default/${type}`, {}, token),
     updateStrategy: (groupId: string, strategy: string, token: string) =>
       apiFetch<{ group: Record<string, unknown> }>(
-        `/api/v1/integrations/groups/${groupId}`, { method: 'PATCH', body: JSON.stringify({ routingGroupStrategy: strategy }) }, token
+        `/api/v1/providers/groups/${groupId}`, { method: 'PATCH', body: JSON.stringify({ routingGroupStrategy: strategy }) }, token
       ),
+  },
+
+  // Internal Modules (ADR-029): engine config + Auth Domains full CRUD.
+  modules: {
+    getConfig: (capability: string, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/modules/${capability}/config`, {}, token),
+    updateConfig: (capability: string, moduleConfig: Record<string, unknown>, token: string) =>
+      apiFetch<Record<string, unknown>>(
+        `/api/v1/modules/${capability}/config`, { method: 'PUT', body: JSON.stringify({ moduleConfig }) }, token
+      ),
+    domains: {
+      list: (token: string, params?: { q?: string; page?: number; limit?: number }) => {
+        const entries = Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)] as [string, string]);
+        const qs = entries.length ? '?' + new URLSearchParams(entries).toString() : '';
+        return apiFetch<{ items: Record<string, unknown>[]; total: number; page: number; limit: number }>(`/api/v1/modules/domains${qs}`, {}, token);
+      },
+      get: (id: string, token: string) =>
+        apiFetch<Record<string, unknown>>(`/api/v1/modules/domains/${id}`, {}, token),
+      create: (body: Record<string, unknown>, token: string) =>
+        apiFetch<Record<string, unknown>>('/api/v1/modules/domains', { method: 'POST', body: JSON.stringify(body) }, token),
+      update: (id: string, body: Record<string, unknown>, token: string) =>
+        apiFetch<Record<string, unknown>>(`/api/v1/modules/domains/${id}`, { method: 'PUT', body: JSON.stringify(body) }, token),
+      remove: (id: string, token: string) =>
+        apiFetch<{ deleted: boolean }>(`/api/v1/modules/domains/${id}`, { method: 'DELETE' }, token),
+    },
   },
 
   processEvents: {

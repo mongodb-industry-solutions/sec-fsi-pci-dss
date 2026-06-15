@@ -233,14 +233,15 @@ export async function createIndexes(client: MongoClient) {
     { key: { paymentLinkExpiresAt: 1 }, expireAfterSeconds: 0, sparse: true },
   ]);
 
-  // SD-193: Integration Registry (Ch-07)
+  // SD-193: External Provider Arrangement (Ch-07) — registry of providers/vendors
+  // (dev.v7 Fase 2: renamed from legacy 'integrationRegistry').
   // Drop the old unique (type+endpoint) index if it still exists — replaced with non-unique
   // to support multi-provider configurations (ADR-010).
-  await db.collection('integrationRegistry')
+  await db.collection('externalProviderArrangement')
     .dropIndex('externalProviderArrangementType_1_externalProviderApiEndpoint_1')
     .catch(() => { /* index may not exist — safe to ignore */ });
 
-  await ensureIndexes(db, 'integrationRegistry', [
+  await ensureIndexes(db, 'externalProviderArrangement', [
     { key: { externalProviderArrangementInstanceReference: 1 }, unique: true },
     { key: { externalProviderArrangementType: 1, externalProviderArrangementStatus: 1 } },
     { key: { externalProviderIsInternal: 1 } },
@@ -249,20 +250,30 @@ export async function createIndexes(client: MongoClient) {
     { key: { routingPriority: 1, externalProviderArrangementType: 1 } },
   ]);
 
-  // SD-193: Integration Routing Groups (Ch-07)
-  await ensureIndexes(db, 'integrationRoutingGroups', [
+  // SD-193: External Provider Arrangement Portfolio (Ch-07) — routing groups
+  // (dev.v7 Fase 2: renamed from legacy 'integrationRoutingGroups').
+  await ensureIndexes(db, 'externalProviderArrangementPortfolio', [
     { key: { routingGroupInstanceReference: 1 }, unique: true },
     { key: { routingGroupProviderType: 1, routingGroupStatus: 1 } },
     { key: { isDefaultGroup: 1 }, sparse: true },
   ]);
 
-  // SD-193: Integration Events — timeseries (ADR-025)
+  // SD-193: External Provider Arrangement Action Log — timeseries (ADR-025)
+  // (dev.v7 Fase 2: renamed from legacy 'integrationEvents').
   // TTL is managed by the timeseries collection definition; no manual TTL index needed.
-  await ensureIndexes(db, 'integrationEvents', [
+  await ensureIndexes(db, 'externalProviderArrangementActionLog', [
     { key: { externalProviderArrangementInstanceReference: 1, recordCreatedDateTime: -1 } },
     { key: { integrationEventType: 1, recordCreatedDateTime: -1 } },
     { key: { 'businessContext.entityType': 1, 'businessContext.entityId': 1, recordCreatedDateTime: -1 }, sparse: true },
   ]).catch(() => { /* timeseries collection may not exist on the very first run */ });
+
+  // dev.v7 Fase 2: capabilityModuleConfiguration — internal Module engine config (ADR-029).
+  // Implicitly created here via createIndex; documents seeded in Fase 4.
+  await ensureIndexes(db, 'capabilityModuleConfiguration', [
+    { key: { capabilityModuleInstanceReference: 1 }, unique: true },
+    { key: { capability: 1 }, unique: true },
+    { key: { moduleDomain: 1 } },
+  ]);
 
   // ADR-025: Business Process Events — timeseries
   await ensureIndexes(db, 'businessProcessEvent', [

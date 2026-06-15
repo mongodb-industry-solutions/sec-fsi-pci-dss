@@ -17,7 +17,7 @@ vi.mock('uuid', () => ({ v4: () => 'test-uuid-1234' }));
 import {
   emitProcessEvent,
   emitComplianceEvent,
-} from '../../../../backend/src/modules/integrations/services/businessProcessEvent.service';
+} from '../../../../backend/src/modules/providers/services/businessProcessEvent.service';
 
 function makeDb() {
   return { collection: h.collection } as unknown as Parameters<typeof emitProcessEvent>[0];

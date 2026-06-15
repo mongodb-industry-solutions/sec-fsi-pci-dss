@@ -10,7 +10,7 @@ import {
   SHARED_CARD_HOLDER_THRESHOLD,
 } from '../models/paymentCardRegistry.model';
 import { CUSTOMER_AGREEMENT_COLLECTION, CustomerAgreementControlRecord } from '../models/customerAgreement.model';
-import { emitComplianceEvent } from '../../integrations/services/businessProcessEvent.service';
+import { emitComplianceEvent } from '../../providers/services/businessProcessEvent.service';
 
 // Resolve the customerAgreement owned by a Party (SD-13). Used to enforce that a customer can
 // only manage THEIR OWN cards (PCI DSS Req 7 least privilege): the path :customerId must equal
@@ -276,8 +276,14 @@ export async function getCardIntegrity(db: Db) {
 
 // Rebuild the entire registry from the live arrangements (seed-time / maintenance).
 export async function rebuildCardRegistry(db: Db): Promise<number> {
-  const tokens = await db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION).distinct('paymentCardReference');
-  for (const token of tokens) await syncCardRegistry(db, token as string);
+  // QE-encrypted collections do NOT support the `distinct` command (the driver attaches
+  // `distinct.encryptionInformation`, which the server / crypt_shared rejects). Use an aggregation
+  // `$group` on the (non-encrypted) surrogate token instead — supported on QE collections.
+  const grouped = await db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION)
+    .aggregate([{ $group: { _id: '$paymentCardReference' } }])
+    .toArray();
+  const tokens = grouped.map((g) => g._id as string).filter(Boolean);
+  for (const token of tokens) await syncCardRegistry(db, token);
   return tokens.length;
 }
 

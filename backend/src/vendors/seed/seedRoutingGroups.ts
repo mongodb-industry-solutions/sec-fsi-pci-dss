@@ -1,11 +1,11 @@
 import { Db } from 'mongodb';
 import {
-  INTEGRATION_REGISTRY_COLLECTION,
-  INTEGRATION_ROUTING_GROUPS_COLLECTION,
+  EXTERNAL_PROVIDER_ARRANGEMENT_COLLECTION,
+  EXTERNAL_PROVIDER_ARRANGEMENT_PORTFOLIO_COLLECTION,
   IntegrationProviderType,
   IntegrationRoutingGroup,
   ExternalProviderArrangement,
-} from '../../modules/integrations/models/externalProviderArrangement.model';
+} from '../../modules/providers/models/externalProviderArrangement.model';
 
 interface DefaultGroupDef {
   id: string;
@@ -82,8 +82,8 @@ const DEFAULT_GROUP_DEFS: DefaultGroupDef[] = [
 ];
 
 export async function seedRoutingGroups(db: Db): Promise<void> {
-  const groupsCol = db.collection<IntegrationRoutingGroup>(INTEGRATION_ROUTING_GROUPS_COLLECTION);
-  const providersCol = db.collection<ExternalProviderArrangement>(INTEGRATION_REGISTRY_COLLECTION);
+  const groupsCol = db.collection<IntegrationRoutingGroup>(EXTERNAL_PROVIDER_ARRANGEMENT_PORTFOLIO_COLLECTION);
+  const providersCol = db.collection<ExternalProviderArrangement>(EXTERNAL_PROVIDER_ARRANGEMENT_COLLECTION);
   const now = new Date();
 
   for (const def of DEFAULT_GROUP_DEFS) {

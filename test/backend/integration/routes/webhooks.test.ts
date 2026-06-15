@@ -1,6 +1,6 @@
 /**
  * Integration tests: /webhooks/* callback routes (FR-v6-09, FR-v6-10)
- * Source: backend/src/modules/integrations/controllers/integrationWebhook.controller.ts
+ * Source: backend/src/modules/providers/controllers/integrationWebhook.controller.ts
  *
  * Requires TEST_MONGODB_URI — skips gracefully when not set.
  * HMAC tests validate the verifyHmacSignature utility directly (unit-level).
@@ -12,7 +12,7 @@ import { buildApp } from '../../../../backend/src/server';
 import type { FastifyInstance } from 'fastify';
 import {
   verifyHmacSignature,
-} from '../../../../backend/src/modules/integrations/services/integrationCallback.service';
+} from '../../../../backend/src/modules/providers/services/integrationCallback.service';
 
 // ── HMAC utility unit tests (no DB, no server required) ─────────────────────
 

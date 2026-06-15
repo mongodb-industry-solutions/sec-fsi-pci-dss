@@ -9,9 +9,9 @@ import {
   CardAuthorizationRecord,
   CardAuthorizationResult,
 } from '../models/cardAuthorization.model';
-import { getActiveProviderForType } from '../../integrations/services/integrationRegistry.service';
-import { dispatchIntegration } from '../../integrations/services/integrationDispatch.service';
-import { CardAuthorizationConfig } from '../../integrations/models/externalProviderArrangement.model';
+import { getActiveProviderForType } from '../../providers/services/integrationRegistry.service';
+import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
+import { CardAuthorizationConfig } from '../../providers/models/externalProviderArrangement.model';
 import { getCardByToken } from '../../customer/services/paymentCard.service';
 
 const RESPONSE_CODE_APPROVED = '0000';
@@ -94,7 +94,7 @@ export async function authorizeCard(
   if (provider && !provider.externalProviderIsInternal) {
     // Real external provider — delegate via Integration Hub
     providerRef = provider.externalProviderArrangementInstanceReference;
-    const dispatchResult = await dispatchIntegration(db, 'card_authorization', req.checkoutSessionInstanceReference, {
+    const dispatchResult = await dispatchProvider(db, 'card_authorization', req.checkoutSessionInstanceReference, {
       cardToken: req.cardToken,
       amount: req.amount,
       currency: req.currency,
