@@ -48,7 +48,7 @@ function formatElapsed(ms: number): string {
 
 /** Formats a duration in ms as `820ms`, `1.2s`, or `2m 05s`. */
 function formatDuration(ms: number): string {
-  if (!ms) return '—';
+  if (!ms) return '-';
   if (ms < 1000) return `${ms}ms`;
   const s = ms / 1000;
   if (s < 60) return `${s.toFixed(1)}s`;
@@ -178,7 +178,7 @@ export default function SetupPage() {
     [...logs].reverse().find((e) => e.type !== 'done' && e.text.trim())?.text ?? 'Starting…';
 
   // The summary panel shows once the run finishes and a structured summary arrived
-  // (only test commands emit one — see ADR-026).
+  // (only test commands emit one; see ADR-026).
   const testSummary = !running && summary ? summary : null;
 
   return (

@@ -128,7 +128,7 @@ export default function DemoCaseDetailPage() {
   }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-resume escalation: an L2 who has already accepted this case re-derives a fresh
-  // stateless token on load (idempotent on the backend — no audit-trail noise), so sensitive
+  // stateless token on load (idempotent on the backend; no audit-trail noise), so sensitive
   // fields stay accessible across reloads and into linked entity pages without re-clicking.
   useEffect(() => {
     if (role !== 'level2_investigator' || !fraudCase || !token || escalationToken) return;
@@ -370,7 +370,7 @@ export default function DemoCaseDetailPage() {
                   <span className="text-gray-500">Merchant:</span>
                   <span className="font-medium truncate">{enrichment.operation.merchantName}</span>
                   <span className="text-gray-500">MCC:</span>
-                  <span className="font-mono text-xs">{enrichment.operation.merchantCategoryCode ?? '—'}</span>
+                  <span className="font-mono text-xs">{enrichment.operation.merchantCategoryCode ?? '-'}</span>
                   <span className="text-gray-500">Card:</span>
                   <span className="font-mono text-xs">{enrichment.operation.maskedPan}</span>
                   {enrichment.operation.description && (<><span className="text-gray-500">Descriptor:</span><span className="truncate">{enrichment.operation.description}</span></>)}
@@ -378,12 +378,12 @@ export default function DemoCaseDetailPage() {
               </div>
             )}
 
-            {/* SDF — detection signal + history */}
+            {/* SDF; detection signal + history */}
             <div className="bg-white rounded-xl border p-5">
               <div className="flex items-center gap-2 mb-3">
                 <ShieldAlert size={15} className="text-[#001E2B]" />
                 <h2 className="font-semibold text-sm">Fraud Detection (SDF)</h2>
-                <span className="ml-auto text-xs text-gray-400">{enrichment.sdf?.scorePending ? 'score pending' : `score ${enrichment.sdf?.score ?? '—'}/100`}</span>
+                <span className="ml-auto text-xs text-gray-400">{enrichment.sdf?.scorePending ? 'score pending' : `score ${enrichment.sdf?.score ?? '-'}/100`}</span>
               </div>
               {enrichment.sdf?.conclusion && <p className="text-sm text-gray-700 mb-2">{enrichment.sdf.conclusion}</p>}
               {(enrichment.sdf?.events?.length ?? 0) === 0 ? (
@@ -404,7 +404,7 @@ export default function DemoCaseDetailPage() {
               {debugMode && <p className="mt-3 text-[10px] font-mono text-gray-400">SD-83 · processType fraud_evaluation · asOf {new Date(enrichment.asOf).toLocaleTimeString()}</p>}
             </div>
 
-            {/* Merchant — acquired (KYB record) or external (descriptor only, no KYB) */}
+            {/* Merchant; acquired (KYB record) or external (descriptor only, no KYB) */}
             <div className="bg-white rounded-xl border p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Store size={15} className="text-[#001E2B]" />
@@ -425,17 +425,17 @@ export default function DemoCaseDetailPage() {
                   <span className="text-gray-500">KYB check:</span>
                   <span className="capitalize">{(enrichment.kyb.kybCheck as { merchantAgreementKybCheckStatus?: string } | null)?.merchantAgreementKybCheckStatus ?? 'n/a'}</span>
                   <span className="text-gray-500">Risk:</span>
-                  <span className="capitalize">{enrichment.kyb.riskCategory ?? '—'}{enrichment.kyb.tier ? ` · ${enrichment.kyb.tier}` : ''}</span>
+                  <span className="capitalize">{enrichment.kyb.riskCategory ?? '-'}{enrichment.kyb.tier ? ` · ${enrichment.kyb.tier}` : ''}</span>
                   <span className="text-gray-500">Country / MCC:</span>
-                  <span className="font-mono text-xs">{enrichment.kyb.countryCode ?? '—'} / {enrichment.kyb.categoryCode ?? '—'}</span>
+                  <span className="font-mono text-xs">{enrichment.kyb.countryCode ?? '-'} / {enrichment.kyb.categoryCode ?? '-'}</span>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
                     <span className="text-gray-500">Descriptor:</span>
-                    <span className="font-medium truncate">{enrichment.operation?.merchantName ?? '—'}</span>
+                    <span className="font-medium truncate">{enrichment.operation?.merchantName ?? '-'}</span>
                     <span className="text-gray-500">MCC:</span>
-                    <span className="font-mono text-xs">{enrichment.operation?.merchantCategoryCode ?? '—'}</span>
+                    <span className="font-mono text-xs">{enrichment.operation?.merchantCategoryCode ?? '-'}</span>
                   </div>
                   <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
                     External merchant: not acquired by this PSP, so there is no KYB record. Only the card-network
@@ -445,7 +445,7 @@ export default function DemoCaseDetailPage() {
               )}
             </div>
 
-            {/* KYC — single, unified customer card (summary + contact + sensitive, role-gated) */}
+            {/* KYC; single, unified customer card (summary + contact + sensitive, role-gated) */}
             {enrichment.kyc && (
               <div className="bg-white rounded-xl border p-5">
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -461,13 +461,13 @@ export default function DemoCaseDetailPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
                   <span className="text-gray-500">Name:</span>
-                  <span className="font-medium truncate">{enrichment.kyc.name ?? '—'}</span>
+                  <span className="font-medium truncate">{enrichment.kyc.name ?? '-'}</span>
                   <span className="text-gray-500">Segment:</span>
-                  <span className="capitalize">{enrichment.kyc.segment ?? '—'}</span>
+                  <span className="capitalize">{enrichment.kyc.segment ?? '-'}</span>
                   <span className="text-gray-500">Status:</span>
-                  <span className="capitalize">{enrichment.kyc.status ?? '—'}</span>
+                  <span className="capitalize">{enrichment.kyc.status ?? '-'}</span>
                   <span className="text-gray-500">Enrolled:</span>
-                  <span>{enrichment.kyc.enrollmentDate ? new Date(enrichment.kyc.enrollmentDate).toLocaleDateString() : '—'}</span>
+                  <span>{enrichment.kyc.enrollmentDate ? new Date(enrichment.kyc.enrollmentDate).toLocaleDateString() : '-'}</span>
                   <span className="text-gray-500">KYC check:</span>
                   <span className="capitalize">{(enrichment.kyc.kycCheck as { customerAgreementKycCheckStatus?: string } | null)?.customerAgreementKycCheckStatus ?? 'n/a'}</span>
                   {enrichment.kyc.email && (<><span className="text-gray-500">Email:</span><span className="font-mono text-xs truncate">{enrichment.kyc.email}</span></>)}

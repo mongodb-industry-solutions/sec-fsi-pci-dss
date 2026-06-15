@@ -2,12 +2,12 @@
 import type { ReactNode } from 'react';
 
 // Lightweight, dependency-free stat primitives shared by role dashboards and the
-// merchant overview. SVG/CSS only — no charting library.
+// merchant overview. SVG/CSS only; no charting library.
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-/** "12 cases" / "1 case" — naive singularisation when count is 1. */
+/** "12 cases" / "1 case"; naive singularisation when count is 1. */
 function countLabel(count: number, noun: string): string {
   const n = count === 1 && noun.endsWith('s') ? noun.slice(0, -1) : noun;
   return `${count} ${n}`;

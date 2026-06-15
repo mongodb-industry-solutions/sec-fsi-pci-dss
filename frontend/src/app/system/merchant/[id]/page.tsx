@@ -53,7 +53,7 @@ function InfoRow({ label, value }: { label: string; value?: string | number }) {
   return (
     <div className="flex justify-between gap-3 py-1.5 text-sm">
       <span className="text-gray-500">{label}</span>
-      <span className="text-gray-900 font-medium text-right">{value ?? '—'}</span>
+      <span className="text-gray-900 font-medium text-right">{value ?? '-'}</span>
     </div>
   );
 }
@@ -228,14 +228,14 @@ export default function StaffMerchantDetailPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h2 className="font-semibold text-gray-800 text-sm mb-2">Merchant details</h2>
           <div className="divide-y divide-gray-50">
-            <InfoRow label="Legal entity" value={String(m.merchantLegalEntityReference ?? '—')} />
-            <InfoRow label="MCC" value={String(m.merchantCategoryCode ?? '—')} />
-            <InfoRow label="Country" value={String(m.merchantCountryCode ?? '—')} />
-            <InfoRow label="Tier" value={String(m.merchantTier ?? '—')} />
-            <InfoRow label="Allowed currencies" value={currencies ?? '—'} />
+            <InfoRow label="Legal entity" value={String(m.merchantLegalEntityReference ?? '-')} />
+            <InfoRow label="MCC" value={String(m.merchantCategoryCode ?? '-')} />
+            <InfoRow label="Country" value={String(m.merchantCountryCode ?? '-')} />
+            <InfoRow label="Tier" value={String(m.merchantTier ?? '-')} />
+            <InfoRow label="Allowed currencies" value={currencies ?? '-'} />
             <InfoRow label="Transaction limit" value={m.merchantTransactionLimitAmount as number | undefined} />
-            <InfoRow label="Settlement" value={String(m.merchantSettlementSchedule ?? '—')} />
-            <InfoRow label="Risk category" value={String(m.merchantRiskCategory ?? '—')} />
+            <InfoRow label="Settlement" value={String(m.merchantSettlementSchedule ?? '-')} />
+            <InfoRow label="Risk category" value={String(m.merchantRiskCategory ?? '-')} />
           </div>
         </div>
 
@@ -244,9 +244,9 @@ export default function StaffMerchantDetailPage() {
           <h2 className="font-semibold text-gray-800 text-sm mb-2 flex items-center gap-1.5"><ShieldCheck size={14} className="text-teal-600" /> KYB check (SD-89)</h2>
           {kyb ? (
             <div className="divide-y divide-gray-50">
-              <InfoRow label="Status" value={String(kyb.merchantAgreementKybCheckStatus ?? '—')} />
-              <InfoRow label="Reference" value={String(kyb.merchantAgreementKybCheckReference ?? '—')} />
-              <InfoRow label="Completed" value={kyb.merchantAgreementKybCheckCompletedDate ? new Date(String(kyb.merchantAgreementKybCheckCompletedDate)).toLocaleDateString() : '—'} />
+              <InfoRow label="Status" value={String(kyb.merchantAgreementKybCheckStatus ?? '-')} />
+              <InfoRow label="Reference" value={String(kyb.merchantAgreementKybCheckReference ?? '-')} />
+              <InfoRow label="Completed" value={kyb.merchantAgreementKybCheckCompletedDate ? new Date(String(kyb.merchantAgreementKybCheckCompletedDate)).toLocaleDateString() : '-'} />
               {kyb.merchantAgreementKybCheckNotes != null && (
                 <div className="py-1.5 text-sm"><span className="text-gray-500">Notes</span><p className="text-gray-700 mt-0.5">{String(kyb.merchantAgreementKybCheckNotes)}</p></div>
               )}
@@ -255,7 +255,7 @@ export default function StaffMerchantDetailPage() {
         </div>
       </div>
 
-      {/* Acquiring analytics (reuses /:id/stats — officer/auditor authorized; no payer PII) */}
+      {/* Acquiring analytics (reuses /:id/stats; officer/auditor authorized; no payer PII) */}
       <div className="space-y-4">
         <h2 className="text-sm font-semibold text-gray-700">Activity <span className="text-xs font-normal text-gray-400">· aggregates only, no payer PII (PCI DSS Req 3/7)</span></h2>
         {!stats ? (
@@ -264,7 +264,7 @@ export default function StaffMerchantDetailPage() {
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <StatCard icon={<Receipt size={14} />} label="Operations" value={String(stats.count)} sub="payments received" />
-              <StatCard icon={<TrendingUp size={14} />} label="Gross volume" value={topCurrency ? fmt(topCurrency.amount, topCurrency.currency) : '—'} sub={stats.byCurrency.length > 1 ? `+${stats.byCurrency.length - 1} currencies` : undefined} />
+              <StatCard icon={<TrendingUp size={14} />} label="Gross volume" value={topCurrency ? fmt(topCurrency.amount, topCurrency.currency) : '-'} sub={stats.byCurrency.length > 1 ? `+${stats.byCurrency.length - 1} currencies` : undefined} />
               <StatCard icon={<CreditCard size={14} />} label="Avg ticket" value={topCurrency ? fmt(stats.avgAmount, topCurrency.currency) : stats.avgAmount.toFixed(2)} />
               <StatCard icon={<CalendarDays size={14} />} label="This month" value={String(thisMonth?.count ?? 0)} sub="operations" />
             </div>
@@ -292,7 +292,7 @@ export default function StaffMerchantDetailPage() {
         )}
       </div>
 
-      {/* Payments Received — full acquiring list with drill-in (and case oversight for auditor) */}
+      {/* Payments Received; full acquiring list with drill-in (and case oversight for auditor) */}
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="flex items-center justify-between gap-2 px-5 py-3 border-b border-gray-100 flex-wrap">
           <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5">
@@ -348,7 +348,7 @@ export default function StaffMerchantDetailPage() {
                     <tr key={s.cardTransactionInstanceReference} className="hover:bg-gray-50">
                       <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{new Date(s.cardTransactionDateTime).toLocaleDateString()}</td>
                       <td className="px-4 py-2.5 font-mono text-xs text-gray-700">{s.cardTransactionMaskedPanDisplay}</td>
-                      <td className="px-4 py-2.5 text-gray-600 hidden sm:table-cell truncate max-w-[220px]">{s.cardTransactionDescription ?? '—'}</td>
+                      <td className="px-4 py-2.5 text-gray-600 hidden sm:table-cell truncate max-w-[220px]">{s.cardTransactionDescription ?? '-'}</td>
                       <td className="px-4 py-2.5">
                         <span className={`inline-block w-2 h-2 rounded-full mr-1.5 align-middle ${SALE_STATUS(s.cardTransactionStatus)}`} />
                         <span className="capitalize text-xs text-gray-600">{s.cardTransactionStatus}</span>
@@ -407,7 +407,7 @@ export default function StaffMerchantDetailPage() {
                 <span className="absolute -left-[5px] w-2.5 h-2.5 rounded-full bg-[#00ED64] border border-white" />
                 <p className="text-sm font-medium text-gray-800">{row.label}</p>
                 <p className="text-xs text-gray-400">
-                  {row.date ? new Date(row.date).toLocaleString() : '—'}{row.role ? ` · ${row.role.replace(/_/g, ' ')}` : ''}
+                  {row.date ? new Date(row.date).toLocaleString() : '-'}{row.role ? ` · ${row.role.replace(/_/g, ' ')}` : ''}
                 </p>
               </li>
             ))}

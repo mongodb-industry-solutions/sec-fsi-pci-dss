@@ -1,4 +1,4 @@
-// Canonical capability registry (ADR-029) — frontend mirror of the backend registry.
+// Canonical capability registry (ADR-029); frontend mirror of the backend registry.
 // Single source of truth for capability labels, admin folders and grouping, replacing the ~11
 // scattered hardcoded TYPE_LABEL / TYPE_OPTIONS / PROVIDER_TYPES / CATEGORY_* lists.
 //
@@ -69,7 +69,7 @@ export const CAPABILITIES: Record<CapabilityKey, CapabilityDescriptor> = {
   },
   'card-authorization': {
     capability: 'card-authorization', providerType: 'card_authorization', label: 'Card Authorization',
-    description: 'Card authorization request/response (no CVV passed — PCI DSS Req 3.3).',
+    description: 'Card authorization request/response (no CVV passed; PCI DSS Req 3.3).',
     callbackSegment: 'card/authorization', frontendFolder: 'card-authorization', moduleDomain: 'gateway', hasModule: true,
     bianServiceDomain: 'SD-15 Card Authorization',
   },
@@ -81,7 +81,7 @@ export const CAPABILITIES: Record<CapabilityKey, CapabilityDescriptor> = {
   },
   generic: {
     capability: 'generic', providerType: 'generic', label: 'Merchant Notifications',
-    description: 'Generic outbound notifications (e.g. merchant payment callbacks). Passthrough — no internal Module.',
+    description: 'Generic outbound notifications (e.g. merchant payment callbacks). Passthrough; no internal Module.',
     callbackSegment: 'generic', frontendFolder: 'generic', moduleDomain: null, hasModule: false,
     bianServiceDomain: 'SD-193 External Provider Arrangements',
   },

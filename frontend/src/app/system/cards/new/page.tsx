@@ -13,7 +13,7 @@ import { detectNetwork, tokenizeCard } from '../../../../lib/cardTokenize';
 
 // Register a new card-on-file (BIAN SD-88). The PAN, expiry and CVV are entered here, validated and
 // tokenized IN THE BROWSER: only the masked PAN + surrogate token + expiry + network are sent to
-// the server. The CVV (SAD) is validated and discarded — never transmitted or stored (PCI DSS Req 3).
+// the server. The CVV (SAD) is validated and discarded; never transmitted or stored (PCI DSS Req 3).
 export default function NewCardPage() {
   const router = useRouter();
   const notify = useNotify();
@@ -106,7 +106,7 @@ export default function NewCardPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border p-5 space-y-4">
-          {/* Card number — the network is detected automatically from the number */}
+          {/* Card number; the network is detected automatically from the number */}
           <div>
             <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1.5">
               Card number
@@ -124,11 +124,11 @@ export default function NewCardPage() {
             </div>
           </div>
 
-          {/* Network — auto-filled from the card number, read-only */}
+          {/* Network; auto-filled from the card number, read-only */}
           <div>
             <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1.5">
               Network
-              <Tooltip text="The card scheme (Visa, Mastercard, Amex, Elo). Detected automatically from the card number — you cannot edit it." />
+              <Tooltip text="The card scheme (Visa, Mastercard, Amex, Elo). Detected automatically from the card number; you cannot edit it." />
             </label>
             <input value={network ?? ''} readOnly
               placeholder="Detected from the card number"
@@ -150,7 +150,7 @@ export default function NewCardPage() {
             <div>
               <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1.5">
                 Security code
-                <Tooltip text="The 3-digit code on the back of the card (4 digits on the front for Amex). Used only to validate the card right now — it is never stored or sent to our servers (PCI DSS prohibits storing it)." />
+                <Tooltip text="The 3-digit code on the back of the card (4 digits on the front for Amex). Used only to validate the card right now; it is never stored or sent to our servers (PCI DSS prohibits storing it)." />
               </label>
               <input value={cvv} onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))} inputMode="numeric"
                 placeholder={network === 'AMEX' ? '4 digits' : '3 digits'}
@@ -163,7 +163,7 @@ export default function NewCardPage() {
             <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1.5">
               Nickname
               <span className="text-gray-400 text-xs font-normal">(optional)</span>
-              <Tooltip text="A label to help you recognize this card later, e.g. 'Personal' or 'Travel'. Display only — never enter the card number or security code here." />
+              <Tooltip text="A label to help you recognize this card later, e.g. 'Personal' or 'Travel'. Display only; never enter the card number or security code here." />
             </label>
             <input value={alias} onChange={(e) => setAlias(e.target.value.slice(0, 40))} maxLength={40}
               placeholder="e.g. Personal, Travel, Work"

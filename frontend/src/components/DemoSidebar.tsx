@@ -59,7 +59,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'Providers',     path: '/system/admin/providers',       icon: Plug },
     { label: 'Groups',        path: '/system/admin/providers/groups', icon: Network },
     { label: 'Modules',       path: '/system/admin/modules',         icon: LayoutGrid },
-    { label: 'Domains',       path: '/system/admin/modules/domains', icon: KeyRound, tooltip: 'Authentication & authorization domains — local users and remote IdP (OIDC/SAML) role mappings' },
+    { label: 'Domains',       path: '/system/admin/modules/domains', icon: KeyRound, tooltip: 'Authentication & authorization domains; local users and remote IdP (OIDC/SAML) role mappings' },
     { label: 'Roles & Access', path: '/system/admin/roles',          icon: Lock },
     { label: 'Audit Events',  path: '/system/audit-events',          icon: Activity },
   ],
@@ -83,7 +83,7 @@ function useRole() {
 }
 
 // Only ONE item is active: the most specific (longest path) that matches the current route.
-// This keeps siblings independent — e.g. /system/admin/providers/groups lights "Groups" only
+// This keeps siblings independent; e.g. /system/admin/providers/groups lights "Groups" only
 // (not "Providers"), and /system/admin/modules/domains lights "Domains" only (not "Modules").
 function useActiveItem(items: NavItem[]) {
   const pathname = usePathname();

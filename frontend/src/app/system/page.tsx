@@ -71,7 +71,7 @@ const ROLE_CARDS: Record<string, DashboardCard[]> = {
   level1_analyst: [
     { label: 'Cases',        description: 'Fraud investigation cases. Search by case reference (FD-…), email, phone or card token, and escalate to L2.', icon: BriefcaseMedical, href: '/system/investigation', bianSd: 'SD-63', pciDss: 'Req 10.4' },
     { label: 'Transactions', description: 'Search all card transactions. Sensitive gateway data stays encrypted (QE:none) at the L1 access level.',     icon: CreditCard,       href: '/system/transactions',  bianSd: 'SD-27', pciDss: 'Req 10.2' },
-    { label: 'Users',        description: 'Look up a customer by encrypted email, phone or account reference (QE equality — no plaintext leaves the app).', icon: Users,          href: '/system/users',         bianSd: 'SD-53', pciDss: 'Req 12.3' },
+    { label: 'Users',        description: 'Look up a customer by encrypted email, phone or account reference (QE equality; no plaintext leaves the app).', icon: Users,          href: '/system/users',         bianSd: 'SD-53', pciDss: 'Req 12.3' },
     { label: 'Merchant',     description: 'Browse merchants and open one for its KYB status and received-payment activity.',              icon: Store,            href: '/system/merchant',      bianSd: 'SD-89', pciDss: 'Req 12.8' },
   ],
   level2_investigator: [
@@ -82,7 +82,7 @@ const ROLE_CARDS: Record<string, DashboardCard[]> = {
   ],
   security_auditor: [
     { label: 'Cases',        description: 'Read-only view of every fraud case and its complete, append-only audit trail.',               icon: BriefcaseMedical, href: '/system/investigation', bianSd: 'SD-63', pciDss: 'Req 10.4' },
-    { label: 'Transactions', description: 'Full transaction audit view — all fields visible for review, no modifications permitted.',     icon: CreditCard,       href: '/system/transactions',  bianSd: 'SD-27', pciDss: 'Req 10.2.1' },
+    { label: 'Transactions', description: 'Full transaction audit view; all fields visible for review, no modifications permitted.',     icon: CreditCard,       href: '/system/transactions',  bianSd: 'SD-27', pciDss: 'Req 10.2.1' },
     { label: 'Users',        description: 'Customer and staff account compliance review (authentication records, roles).',               icon: Users,            href: '/system/users',         bianSd: 'SD-91', pciDss: 'Req 8.2' },
     { label: 'Audit Log',      description: 'System-wide, append-only security event log across all cases (who did what, when).',          icon: BarChart3,  href: '/system/audit',     bianSd: 'SD-16', pciDss: 'Req 10' },
     { label: 'Audit Events',   description: 'Unified audit trail across business, compliance and integration events. Inspect each payload for analysis or replay.', icon: Activity, href: '/system/audit-events', bianSd: 'SD-193', pciDss: 'Req 10.2' },
@@ -90,7 +90,7 @@ const ROLE_CARDS: Record<string, DashboardCard[]> = {
     { label: 'Merchant',       description: 'Merchant compliance, KYB and lifecycle audit trail across the whole portfolio.',             icon: Store,      href: '/system/merchant',  bianSd: 'SD-89', pciDss: 'Req 12.8' },
   ],
   merchant_officer: [
-    { label: 'Review Queue', description: 'Approve or reject pending merchant applications — the KYB decision (BIAN Control action).',    icon: ClipboardCheck, href: '/system/merchant/review', bianSd: 'SD-89', pciDss: 'Req 12.8' },
+    { label: 'Review Queue', description: 'Approve or reject pending merchant applications; the KYB decision (BIAN Control action).',    icon: ClipboardCheck, href: '/system/merchant/review', bianSd: 'SD-89', pciDss: 'Req 12.8' },
     { label: 'All Merchants',description: 'Full merchant portfolio. Open any merchant for its KYB, activity and lifecycle audit trail.',   icon: Store,          href: '/system/merchant',        bianSd: 'SD-89', pciDss: 'Req 12.8' },
     { label: 'My Profile',   description: 'Manage your officer profile and contact details.',                                            icon: User,           href: '/system/profile',         bianSd: 'SD-53', pciDss: 'Req 8' },
   ],
@@ -324,13 +324,13 @@ function ManagerIntegrationHub({ debugMode }: { debugMode: boolean }) {
       .catch(() => {});
   }, []);
 
-  // Primary admin sections (BIAN SD-193) — each is an independent area. Audit Events sits under
+  // Primary admin sections (BIAN SD-193); each is an independent area. Audit Events sits under
   // /system; Modules, Providers and Groups under /system/admin.
   const MAIN_CARDS: { label: string; description: string; icon: LucideIcon; href: string; debug: string }[] = [
     { label: 'Audit Events', description: 'Unified business, compliance and integration audit trail.', icon: Activity,   href: '/system/audit-events',           debug: 'ADR-025 · Req 10.2 / 10.7' },
     { label: 'Modules',      description: 'Internal capability engines (scoring, screening) and their config.', icon: LayoutGrid, href: '/system/admin/modules',          debug: 'ADR-029 · internal modules' },
-    { label: 'Providers',    description: 'External provider arrangements — register, route and monitor.', icon: Plug,       href: '/system/admin/providers',        debug: 'SD-193 · Req 12.8' },
-    { label: 'Groups',       description: 'Provider categories and routing groups — activate built-ins or add custom groups.', icon: Network,    href: '/system/admin/providers/groups', debug: 'SD-193 · routing portfolio' },
+    { label: 'Providers',    description: 'External provider arrangements; register, route and monitor.', icon: Plug,       href: '/system/admin/providers',        debug: 'SD-193 · Req 12.8' },
+    { label: 'Groups',       description: 'Provider categories and routing groups; activate built-ins or add custom groups.', icon: Network,    href: '/system/admin/providers/groups', debug: 'SD-193 · routing portfolio' },
   ];
 
   return (
@@ -431,7 +431,7 @@ function RoleDashboard({ user, onSignOut }: { user: DecodedUser; onSignOut: () =
             </div>
           )}
 
-          {/* Role-relevant analytics (BIAN-aligned; aggregates only — no cardholder PII) */}
+          {/* Role-relevant analytics (BIAN-aligned; aggregates only; no cardholder PII) */}
           <div className="mt-8">
             <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
               Insights

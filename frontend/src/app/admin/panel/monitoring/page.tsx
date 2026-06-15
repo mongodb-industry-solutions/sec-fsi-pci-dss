@@ -799,7 +799,7 @@ export default function MonitoringPage() {
       {paused && (
         <div className="flex items-center gap-2 px-3 py-2 bg-yellow-900/15 border border-yellow-700/30 rounded-lg text-xs text-yellow-500">
           <PauseCircle size={13} className="flex-shrink-0" />
-          Monitoring is paused — polling is suspended for all services.
+          Monitoring is paused; polling is suspended for all services.
           <button
             onClick={togglePaused}
             className="ml-auto underline underline-offset-2 hover:no-underline transition-all"

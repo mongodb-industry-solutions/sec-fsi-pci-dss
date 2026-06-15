@@ -283,7 +283,7 @@ export default function PaymentPage() {
   const router = useRouter();
   const [simMethod, setSimMethod] = useState<PaymentMethodId | null>(null);
   const [simScenario, setSimScenario] = useState<SimulatorScenario | null>(null);
-  // The merchant (payee) chosen on the landing page — drives attribution + per-merchant callback.
+  // The merchant (payee) chosen on the landing page; drives attribution + per-merchant callback.
   const [merchantId, setMerchantId] = useState<string>(simulatorConfig.merchantId);
   const [methodReady, setMethodReady] = useState(false);
   const [step, setStep] = useState<Step>(1);

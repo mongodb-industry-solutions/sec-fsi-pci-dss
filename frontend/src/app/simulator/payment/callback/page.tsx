@@ -7,7 +7,7 @@ function CallbackInner() {
   const params = useSearchParams();
 
   // The PSP callback carries the outcome (result), the surrogate card token, the response code and
-  // (on failure) the decline reason — never the PAN/CVV. `result` is the new field; fall back to the
+  // (on failure) the decline reason; never the PAN/CVV. `result` is the new field; fall back to the
   // legacy `status` param. Map to the status the simulator parent already understands.
   const result = params.get('result') ?? params.get('status') ?? 'approved';
   const approved = result === 'approved' || result === 'success' || result === 'paid';

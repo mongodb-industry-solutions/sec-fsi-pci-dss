@@ -39,9 +39,9 @@ function statusClass(status?: string): string {
 }
 
 function fmtDate(iso?: string): string {
-  if (!iso) return '—';
+  if (!iso) return '-';
   const d = new Date(iso);
-  return isNaN(d.getTime()) ? '—' : d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return isNaN(d.getTime()) ? '-' : d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 export default function CardDetailPage() {
@@ -145,7 +145,7 @@ export default function CardDetailPage() {
     if (deactivating) {
       const ok = await confirm({
         title: 'Deactivate this card?',
-        message: 'While deactivated, any payment with this card will be declined by the PSP — even though the card itself remains valid. You can reactivate it at any time.',
+        message: 'While deactivated, any payment with this card will be declined by the PSP; even though the card itself remains valid. You can reactivate it at any time.',
         confirmLabel: 'Deactivate',
         tone: 'danger',
       });
@@ -244,9 +244,9 @@ export default function CardDetailPage() {
               <DetailRow label="Network" value={card.paymentCardNetwork} />
               <DetailRow label="Masked number" value={card.paymentCardMaskedPanDisplay} mono />
               <DetailRow label="Expires" value={card.paymentCardExpirationDate} mono
-                hint={debugMode ? 'QE:none — owner-visible' : undefined} />
+                hint={debugMode ? 'QE:none; owner-visible' : undefined} />
               <DetailRow label="Card token" value={card.paymentCardReference} mono
-                hint={debugMode ? 'PAN surrogate — not CHD' : undefined} />
+                hint={debugMode ? 'PAN surrogate; not CHD' : undefined} />
               <DetailRow label="Status" value={card.paymentCardStatus} />
               {card.paymentCardMandateStatus && (
                 <DetailRow label="Recurring mandate" value={card.paymentCardMandateStatus} />
@@ -263,7 +263,7 @@ export default function CardDetailPage() {
             )}
           </div>
 
-          {/* Editable metadata — the ONLY mutable attributes of a saved card */}
+          {/* Editable metadata; the ONLY mutable attributes of a saved card */}
           <div className="bg-white rounded-xl border p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -321,7 +321,7 @@ export default function CardDetailPage() {
             )}
           </div>
 
-          {/* Activation toggle — only for customer-toggleable states (active ↔ suspended) */}
+          {/* Activation toggle; only for customer-toggleable states (active ↔ suspended) */}
           {(card.paymentCardStatus === 'active' || card.paymentCardStatus === 'suspended') && (
             <div className="bg-white rounded-xl border p-5 flex items-center justify-between gap-3 flex-wrap">
               <div>
@@ -370,7 +370,7 @@ function DetailRow({ label, value, mono, hint }: { label: string; value?: string
       <span className="text-gray-500 shrink-0">{label}</span>
       <span className="flex items-center gap-2 min-w-0">
         {hint && <span className="text-xs text-gray-300 font-mono hidden sm:inline">{hint}</span>}
-        <span className={`text-gray-800 text-right truncate ${mono ? 'font-mono' : ''}`}>{value ?? '—'}</span>
+        <span className={`text-gray-800 text-right truncate ${mono ? 'font-mono' : ''}`}>{value ?? '-'}</span>
       </span>
     </div>
   );

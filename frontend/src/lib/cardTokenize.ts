@@ -3,7 +3,7 @@
 // In this PSP demo the browser is the tokenization boundary: the full PAN and the CVV are
 // validated here and NEVER leave the browser. Only the derived masked PAN and a surrogate token
 // are sent to the server. The CVV (sensitive authentication data, SAD) is used for validation
-// and then discarded — it is never transmitted or stored at any layer (PCI DSS Req 3.2).
+// and then discarded; it is never transmitted or stored at any layer (PCI DSS Req 3.2).
 
 export type CardNetwork = 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
 
@@ -17,7 +17,7 @@ export function detectNetwork(panDigits: string): CardNetwork | null {
   return null;
 }
 
-// Luhn checksum — rejects typos and obviously invalid numbers.
+// Luhn checksum; rejects typos and obviously invalid numbers.
 export function luhnValid(panDigits: string): boolean {
   if (!/^\d{12,19}$/.test(panDigits)) return false;
   let sum = 0;
@@ -54,7 +54,7 @@ export interface TokenizeResult { token: string; maskedPan: string; network: Car
 
 // Demo tokenization key. In production the token comes from a PCI-compliant tokenization vault/HSM;
 // here we derive it deterministically with a keyed HMAC so the SAME card number always yields the
-// SAME token. PCI DSS: the token must not be reversible to the PAN — a *keyed* HMAC (not a bare hash
+// SAME token. PCI DSS: the token must not be reversible to the PAN; a *keyed* HMAC (not a bare hash
 // of the low-entropy PAN) is the accepted construction. NOTE: a browser cannot truly hold a secret,
 // so this key is a stand-in; a real deployment performs this server-side / in the vault.
 const TOKEN_KEY = process.env.NEXT_PUBLIC_CARD_TOKEN_KEY || 'demo-psp-tokenization-key-v1';
@@ -89,6 +89,6 @@ export async function tokenizeCard({ pan, expiry, cvv }: TokenizeInput): Promise
     maskedPan: `****-****-****-${last4}`,
     network,
     expiry: expiry.trim(),
-    // cvv intentionally NOT returned — discarded after validation (PCI DSS: SAD never stored).
+    // cvv intentionally NOT returned; discarded after validation (PCI DSS: SAD never stored).
   };
 }

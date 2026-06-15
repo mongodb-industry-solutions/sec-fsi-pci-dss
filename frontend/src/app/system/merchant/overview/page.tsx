@@ -91,7 +91,7 @@ export default function OverviewSectionPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard icon={<Receipt size={14} />} label="Operations" value={String(stats.count)} sub="payments received" />
             <StatCard icon={<TrendingUp size={14} />} label="Gross volume"
-              value={topCurrency ? fmt(topCurrency.amount, topCurrency.currency) : '—'}
+              value={topCurrency ? fmt(topCurrency.amount, topCurrency.currency) : '-'}
               sub={stats.byCurrency.length > 1 ? `+${stats.byCurrency.length - 1} other currencies` : (topCurrency ? `${topCurrency.currency}` : undefined)} />
             <StatCard icon={<CreditCard size={14} />} label="Avg ticket"
               value={topCurrency ? fmt(stats.avgAmount, topCurrency.currency) : stats.avgAmount.toFixed(2)} sub="across all currencies" />

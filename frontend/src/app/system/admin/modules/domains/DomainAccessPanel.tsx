@@ -121,7 +121,7 @@ export function DomainAccessPanel({
           <span className="text-[10px] text-gray-400">Identity records (SD-91) · email masked · no cardholder data</span>
         </div>
 
-        {/* Search + role filter — standard pattern */}
+        {/* Search + role filter; standard pattern */}
         <div className="flex flex-wrap gap-2">
           <div className="relative flex-1 min-w-[180px]">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />

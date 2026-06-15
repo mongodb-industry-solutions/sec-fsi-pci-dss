@@ -90,7 +90,7 @@ export default function CustomerDetailPage() {
   const Field = ({ label, value }: { label: string; value?: unknown }) => (
     <>
       <span className="text-gray-500">{label}</span>
-      <span className="font-medium text-gray-900 text-right truncate">{value != null && value !== '' ? String(value) : '—'}</span>
+      <span className="font-medium text-gray-900 text-right truncate">{value != null && value !== '' ? String(value) : '-'}</span>
     </>
   );
 
@@ -142,7 +142,7 @@ export default function CustomerDetailPage() {
         </div>
       </div>
 
-      {/* Sensitive PII — auditor always; L2 only with a valid escalation token */}
+      {/* Sensitive PII; auditor always; L2 only with a valid escalation token */}
       <div className="bg-white rounded-xl border p-5">
         <div className="flex items-center gap-2 mb-3">
           <Lock size={14} className="text-gray-400" />

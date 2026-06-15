@@ -3,11 +3,13 @@ import React, { useState, useEffect } from 'react';
 import {
   Download, Check, CheckSquare, ChevronDown, ChevronUp,
   ExternalLink, Shield, Database, Lock, Eye, FileText,
-  AlertTriangle, CheckCircle2, Users, Search, KeyRound, ScrollText, Ban,
+  AlertTriangle, CheckCircle2, Users, Ban, ChevronRight,
 } from 'lucide-react';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { ROLE_LABELS } from '../../../lib/constants';
+import Link from 'next/link';
+import { ROLE_GUIDE, ROLE_ORDER } from '../../../config/roleGuide';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -264,131 +266,6 @@ const MONGODB_MAPPING = [
     docs: 'https://www.mongodb.com/products/platform/trust/pci-dss' },
 ];
 
-// ─── Role responsibilities (screen-only; not exported to the PDF) ───────────────
-// Explains what the logged-in role is accountable for, what data it may touch, the
-// PCI DSS requirements that scope it, and its hard limits. Aligned with the demo's
-// RBAC and the PCI alignment shown in the Overview/Architecture tabs.
-
-interface RoleGuide {
-  icon: React.ElementType;
-  tagline: string;
-  responsibilities: string[];
-  dataAccess: string[];
-  restrictions: string[];
-  pci: string[];   // requirement chips, e.g. "Req 3", "Req 10"
-}
-
-const ROLE_GUIDE: Record<string, RoleGuide> = {
-  customer: {
-    icon: Users,
-    tagline: 'Initiate your own payments and review your own transaction history — nothing else.',
-    responsibilities: [
-      'Initiate card payments through the checkout flow.',
-      'Review your own transaction history and payment status.',
-      'If you own a merchant, manage that merchant account, its API keys, and webhooks.',
-    ],
-    dataAccess: [
-      'Only your own transactions and (if applicable) your own merchant record.',
-      'Card numbers are always shown masked (****-****-****-1234); full PAN is never exposed.',
-    ],
-    restrictions: [
-      'No visibility into other customers, fraud cases, or audit logs.',
-      'Cannot decrypt any cardholder data.',
-    ],
-    pci: ['Req 3', 'Req 7'],
-  },
-  level1_analyst: {
-    icon: Search,
-    tagline: 'First-line fraud triage: review queued cases and search by encrypted card reference.',
-    responsibilities: [
-      'Review the fraud case queue and triage incoming cases.',
-      'Search transactions by encrypted card reference (QE equality search).',
-      'Add investigation notes and escalate cases to L2 when deeper access is required.',
-    ],
-    dataAccess: [
-      'Fraud cases and their linked transactions.',
-      'Searches run against encrypted fields — the database never sees plaintext PAN; the PAN stays masked in the UI.',
-    ],
-    restrictions: [
-      'Cannot decrypt the full PAN or sensitive customer profile fields.',
-      'Cannot resolve a case as confirmed fraud without escalation; no admin or Integration Hub access.',
-    ],
-    pci: ['Req 3', 'Req 7', 'Req 10'],
-  },
-  level2_investigator: {
-    icon: KeyRound,
-    tagline: 'Deep investigation with authorized decryption of sensitive fields for assigned cases.',
-    responsibilities: [
-      'Conduct full investigation on escalated cases.',
-      'Access decrypted customer profile and full PAN for cases under investigation.',
-      'Resolve and close cases, documenting the outcome and rationale.',
-    ],
-    dataAccess: [
-      'Authorized decryption of QE-protected fields (full PAN, customer profile) for assigned cases.',
-      'Full transaction detail and the complete case activity log.',
-    ],
-    restrictions: [
-      'Every field-level decryption is logged and auditable.',
-      'Elevated access is scoped to assigned cases — not a blanket grant.',
-    ],
-    pci: ['Req 3', 'Req 7', 'Req 8', 'Req 10'],
-  },
-  security_auditor: {
-    icon: ScrollText,
-    tagline: 'Read-only compliance oversight: review logs and verify control effectiveness.',
-    responsibilities: [
-      'Review audit logs and business/compliance process event logs.',
-      'Produce compliance reports and evidence for assessments.',
-      'Verify that access controls and logging are operating as designed.',
-    ],
-    dataAccess: [
-      'System-wide audit and process event logs; aggregate fraud statistics.',
-      'No PAN decryption — oversight does not require cardholder data.',
-    ],
-    restrictions: [
-      'Strictly read-only: cannot modify cases, transactions, or configuration.',
-    ],
-    pci: ['Req 10', 'Req 12'],
-  },
-  merchant_officer: {
-    icon: CheckSquare,
-    tagline: 'Merchant onboarding and KYB review across the merchant portfolio.',
-    responsibilities: [
-      'Work the merchant onboarding review queue.',
-      'Perform KYB checks and approve or reject merchant agreements.',
-      'Maintain the merchant registry and document review decisions.',
-    ],
-    dataAccess: [
-      'Merchant agreements, KYB data, and the full merchant portfolio.',
-      'No cardholder PAN — the merchant lifecycle does not require it.',
-    ],
-    restrictions: [
-      'No fraud case or audit log access; no access to cardholder data.',
-    ],
-    pci: ['Req 7', 'Req 12'],
-  },
-  manager: {
-    icon: Database,
-    tagline: 'Integration Hub: manage external providers, routing, and credentials.',
-    responsibilities: [
-      'Configure external provider integrations (fraud, AML, KYC, card auth, …).',
-      'Manage routing groups, field mapping, and per-provider authentication config.',
-      'Monitor integration and process event logs for dispatched calls.',
-    ],
-    dataAccess: [
-      'The integration registry and provider configuration.',
-      'Provider API keys are shown once at creation and stored only as a bcrypt hash — never retrievable afterward.',
-    ],
-    restrictions: [
-      'No cardholder PAN decryption.',
-      'Provider secrets cannot be read back after creation; only rotated or revoked.',
-    ],
-    pci: ['Req 8', 'Req 10', 'Req 12'],
-  },
-};
-
-// Display order for the "other roles" reference grid.
-const ROLE_ORDER = ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor', 'merchant_officer', 'manager'];
 
 // goal number → left-border accent color class
 const GOAL_COLORS: Record<string, { border: string; text: string; bg: string }> = {
@@ -406,9 +283,20 @@ const GOAL_LABELS: Record<string, string> = {
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
-export default function HelpPage() {
-  type Tab = 'overview' | 'roles' | 'checklist' | 'mongodb';
-  const [tab, setTab]           = useState<Tab>('checklist');
+export type Tab = 'overview' | 'roles' | 'checklist' | 'mongodb';
+
+// Each tab is its own route (own URL) for direct navigation/linking.
+const TAB_HREF: Record<Tab, string> = {
+  overview: '/system/help',
+  roles: '/system/help/roles',
+  checklist: '/system/help/checklist',
+  mongodb: '/system/help/mongodb',
+};
+
+// Shared content for all help tabs. The full document (overview + checklist + architecture) is
+// always in the DOM so the "Export PDF" (window.print) produces the combined compliance document;
+// `tab` only controls which section is visible on screen.
+export function HelpContent({ tab }: { tab: Tab }) {
   const [checked, setChecked]   = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [role, setRole]         = useState<string>('');
@@ -593,9 +481,9 @@ export default function HelpPage() {
             { id: 'checklist', label: 'PCI DSS v4.0.1 Checklist',     icon: CheckSquare },
             { id: 'mongodb',   label: 'Architecture Proposal', icon: Database },
           ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
-            <button
+            <Link
               key={id}
-              onClick={() => setTab(id)}
+              href={TAB_HREF[id]}
               className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-[15px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
                 tab === id
                   ? 'border-[#001E2B] text-[#001E2B]'
@@ -603,7 +491,7 @@ export default function HelpPage() {
               }`}
             >
               <Icon size={15} className={tab === id ? 'text-[#001E2B]' : 'text-gray-400'} /> {label}
-            </button>
+            </Link>
           ))}
         </div>
 
@@ -619,17 +507,27 @@ export default function HelpPage() {
           {/* About card */}
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
             <p className="text-[11px] font-semibold text-[#00ED64] uppercase tracking-widest mb-2">About this demo</p>
-            <h2 className="text-base font-semibold text-white mb-3">FSI PSP on MongoDB Atlas</h2>
+            <h2 className="text-base font-semibold text-white mb-3">A PCI DSS-aligned Payment Service Provider on MongoDB Atlas</h2>
             <p className="text-gray-400 text-sm leading-relaxed mb-3">
-              This demo shows how a <span className="text-gray-200 font-medium">digital bank or card issuer</span> can use{' '}
-              <span className="text-[#00ED64] font-medium">MongoDB Atlas</span> to run a PCI DSS-aligned payment fraud
-              investigation workflow; enabling analysts to search and query encrypted sensitive cardholder data
-              without that data ever being exposed to the database server.
+              This is a <span className="text-gray-200 font-medium">Payment Service Provider (PSP)</span>: the platform a
+              digital bank or card issuer uses to authorize card payments, detect fraud, and investigate cases. It runs the
+              full payment lifecycle on <span className="text-[#00ED64] font-medium">MongoDB Atlas</span>, from checkout and
+              authorization, through automated transaction scoring, to multi-tier analyst investigation and resolution.
+            </p>
+            <p className="text-gray-400 text-sm leading-relaxed mb-3">
+              The goal is to show that Atlas can support a regulated payments workload end to end.{' '}
+              <span className="text-gray-200 font-medium">Queryable Encryption</span> lets analysts search sensitive
+              cardholder data (card reference, PAN) by exact match while the database server never sees the plaintext;
+              <span className="text-gray-200 font-medium"> role-scoped clients and RBAC</span> control what each role may
+              decrypt; and <span className="text-gray-200 font-medium">append-only audit events</span> record every
+              sensitive access for review.
             </p>
             <p className="text-gray-400 text-sm leading-relaxed">
-              The system demonstrates the full lifecycle of a fraud case, from automated transaction scoring through
-              multi-tier analyst investigation to resolution, while keeping sensitive fields encrypted at rest using{' '}
-              <span className="text-gray-200 font-medium">MongoDB Queryable Encryption (QE)</span>.
+              The data model follows <span className="text-gray-200 font-medium">BIAN</span> service domains (Card
+              Transaction SD-254, Fraud Diagnosis SD-83, Customer Agreement SD-53, External Provider Arrangements SD-193),
+              and the security controls map to <span className="text-gray-200 font-medium">PCI DSS v4.0.1</span> (Req 3
+              encryption, Req 7/8 access control, Req 10 logging). BIAN gives an industry-standard structure; PCI DSS gives
+              the control objectives.
             </p>
           </div>
 
@@ -687,7 +585,7 @@ export default function HelpPage() {
                 { role: 'L1 Analyst',       desc: 'View fraud cases; search transactions by encrypted card ref.' },
                 { role: 'L2 Investigator',  desc: 'Full PAN access; encrypted field decryption; case escalation.' },
                 { role: 'Security Auditor', desc: 'Read-only audit log access; compliance reports.' },
-                { role: 'Customer',         desc: 'Own transaction history and payment initiation only.' },
+                { role: 'Customer',         desc: 'Own transaction history and payment initiation. May optionally also be a merchant (dual-role) after KYB.' },
                 { role: 'Merchant Officer', desc: 'Merchant onboarding review queue and merchant registry.' },
                 { role: 'Manager',          desc: 'Integration Hub; external provider management.' },
               ].map(p => (
@@ -699,17 +597,18 @@ export default function HelpPage() {
             </div>
           </div>
 
-          {/* PCI alignment */}
+          {/* Standards alignment (PCI DSS + BIAN) */}
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <div className="flex items-center gap-2 mb-4">
               <FileText size={15} className="text-[#00ED64] shrink-0" />
-              <p className="text-sm font-semibold text-white">PCI DSS Alignment Demonstrated</p>
+              <p className="text-sm font-semibold text-white">Standards alignment demonstrated (PCI DSS + BIAN)</p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {[
                 { req: 'Req 3',    title: 'Stored Data Protection', desc: 'PAN encrypted via Queryable Encryption; CVV never stored after auth.' },
-                { req: 'Req 7, 8', title: 'Access Control and Auth', desc: 'Role-based access with JWT; each role gets minimum required data access.' },
+                { req: 'Req 7, 8', title: 'Access Control and Auth', desc: 'Data-driven RBAC (ADR-030); each role gets the minimum data access.' },
                 { req: 'Req 10',   title: 'Audit Logging',           desc: 'Every case action logged with user, timestamp, and action type.' },
+                { req: 'BIAN',     title: 'Service Domain Model',    desc: 'SD-254, SD-83, SD-53, SD-193; standard banking data structure.' },
               ].map(a => (
                 <div key={a.req} className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-3.5">
                   <p className="text-[#00ED64] text-xs font-bold mb-1">{a.req}</p>
@@ -830,13 +729,15 @@ export default function HelpPage() {
                       const g = ROLE_GUIDE[r];
                       if (!g) return null;
                       return (
-                        <div key={r} className="bg-gray-800/40 border border-gray-700/50 rounded-lg p-3.5">
+                        <Link key={r} href={`/system/help/roles/${r}`}
+                          className="group bg-gray-800/40 border border-gray-700/50 rounded-lg p-3.5 hover:border-[#00ED64]/40 hover:bg-gray-800/70 transition-colors">
                           <div className="flex items-center gap-2 mb-1.5">
-                            {React.createElement(g.icon, { size: 14, className: 'text-gray-400 shrink-0' })}
+                            {React.createElement(g.icon, { size: 14, className: 'text-gray-400 shrink-0 group-hover:text-[#00ED64]' })}
                             <p className="text-xs font-semibold text-gray-200">{ROLE_LABELS[r] ?? r}</p>
+                            <ChevronRight size={12} className="ml-auto text-gray-600 group-hover:text-[#00ED64]" />
                           </div>
                           <p className="text-gray-500 text-xs leading-snug">{g.tagline}</p>
-                        </div>
+                        </Link>
                       );
                     })}
                   </div>
@@ -1225,4 +1126,9 @@ export default function HelpPage() {
       </div>
     </>
   );
+}
+
+// /system/help → Demo Overview tab (each tab is its own route; see ./roles, ./checklist, ./mongodb).
+export default function HelpPage() {
+  return <HelpContent tab="overview" />;
 }

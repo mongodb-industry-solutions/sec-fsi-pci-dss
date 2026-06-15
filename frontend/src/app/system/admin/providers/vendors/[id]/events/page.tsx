@@ -119,10 +119,10 @@ export default function EventsPage() {
                     <td className="px-4 py-2.5 font-mono text-gray-700 text-xs">{e.integrationEventType}</td>
                     <td className="px-4 py-2.5"><StatusBadge status={e.integrationEventStatus} /></td>
                     <td className="px-4 py-2.5 text-right font-mono text-gray-500 text-xs">
-                      {e.integrationEventLatencyMs != null ? `${e.integrationEventLatencyMs}ms` : '—'}
+                      {e.integrationEventLatencyMs != null ? `${e.integrationEventLatencyMs}ms` : '-'}
                     </td>
                     <td className="px-4 py-2.5 text-red-500 text-xs hidden sm:table-cell truncate max-w-[200px]">
-                      {e.integrationEventErrorMessage || '—'}
+                      {e.integrationEventErrorMessage || '-'}
                     </td>
                     <td className="px-4 py-2.5 text-right text-gray-400 text-xs whitespace-nowrap">
                       {new Date(e.recordCreatedDateTime).toLocaleString()}
@@ -135,7 +135,7 @@ export default function EventsPage() {
                           <div><dt className="text-gray-500">Event ID</dt><dd className="font-mono text-gray-700 break-all">{eId}</dd></div>
                           <div><dt className="text-gray-500">Type</dt><dd className="font-mono text-gray-700">{e.integrationEventType}</dd></div>
                           <div><dt className="text-gray-500">Status</dt><dd><StatusBadge status={e.integrationEventStatus} /></dd></div>
-                          <div><dt className="text-gray-500">Latency</dt><dd className="font-mono">{e.integrationEventLatencyMs != null ? `${e.integrationEventLatencyMs}ms` : '—'}</dd></div>
+                          <div><dt className="text-gray-500">Latency</dt><dd className="font-mono">{e.integrationEventLatencyMs != null ? `${e.integrationEventLatencyMs}ms` : '-'}</dd></div>
                           {e.integrationEventErrorMessage && (
                             <div className="col-span-full">
                               <dt className="text-gray-500 mb-0.5">Error message</dt>

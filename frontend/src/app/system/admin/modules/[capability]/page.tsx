@@ -61,7 +61,7 @@ export default function ModuleConfigPage() {
       <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Modules', href: '/system/admin/modules' }, { label: descriptor?.label ?? capability }]} />
       <SectionHeader
         icon={Boxes}
-        title={`${descriptor?.label ?? capability} — Internal Module`}
+        title={`${descriptor?.label ?? capability}; Internal Module`}
         description={descriptor?.description ?? 'Internal engine configuration.'}
         debugInfo={`capability=${capability}${descriptor ? ` · ${descriptor.bianServiceDomain}` : ''}`}
       />

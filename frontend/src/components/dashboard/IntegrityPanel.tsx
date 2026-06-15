@@ -104,7 +104,7 @@ export function IntegrityPanel({ token }: { token: string }) {
         </div>
       )}
 
-      {/* Cards duplicated by error — same masked card under multiple tokens for one customer */}
+      {/* Cards duplicated by error; same masked card under multiple tokens for one customer */}
       {d.cards && d.cards.tokenizationDuplicates.length > 0 && (
         <div className="bg-white rounded-xl border border-amber-200 overflow-hidden">
           <div className="bg-amber-50 border-b border-amber-200 px-5 py-3 flex items-center gap-3">
@@ -113,7 +113,7 @@ export function IntegrityPanel({ token }: { token: string }) {
             </span>
             <div className="min-w-0">
               <h2 className="font-semibold text-amber-900 text-sm">Cards duplicated by error</h2>
-              <p className="text-xs text-amber-700">Same card (masked PAN + network) stored under multiple tokens for one customer — inconsistent tokenization.</p>
+              <p className="text-xs text-amber-700">Same card (masked PAN + network) stored under multiple tokens for one customer; inconsistent tokenization.</p>
             </div>
             <span className="ml-auto text-xs font-semibold bg-amber-600 text-white rounded-full px-2.5 py-1 shrink-0">{d.cards.tokenizationDuplicateCount}</span>
           </div>
@@ -163,7 +163,7 @@ export function IntegrityPanel({ token }: { token: string }) {
         </div>
       )}
 
-      {/* Orphaned customer references — dedicated, interactive review card */}
+      {/* Orphaned customer references; dedicated, interactive review card */}
       {d.orphanCustomerReferences && d.orphanCustomerReferences.length > 0 && (
         <div className="bg-white rounded-xl border border-amber-200 overflow-hidden">
           <div className="bg-amber-50 border-b border-amber-200 px-5 py-3 flex items-center gap-3">

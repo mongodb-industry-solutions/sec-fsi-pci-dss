@@ -127,7 +127,7 @@ export default function WebhooksSectionPage() {
         )}
       </div>
 
-      {/* Test webhook — editable payload + optional auth header, no real payment needed */}
+      {/* Test webhook; editable payload + optional auth header, no real payment needed */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
         <div>
           <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5"><Send size={14} /> Test your endpoint</h2>
@@ -187,7 +187,7 @@ export default function WebhooksSectionPage() {
             </div>
             {testResult.error && <p className="text-xs text-red-600">{testResult.error}</p>}
             <div>
-              <p className="text-xs text-gray-500 mb-1">Request — POST {String(testResult.endpoint ?? '')}</p>
+              <p className="text-xs text-gray-500 mb-1">Request; POST {String(testResult.endpoint ?? '')}</p>
               <JsonView data={{ headers: testResult.requestHeaders, body: testResult.payload }} maxHeight="14rem" collapsed={3} />
             </div>
             {testResult.response !== undefined && testResult.response !== null && (

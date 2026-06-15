@@ -477,7 +477,7 @@ export const api = {
         {},
         token
       ),
-    // Edit the alias/note — the only mutable attributes of a saved card. Owner-only; audited.
+    // Edit the alias/note; the only mutable attributes of a saved card. Owner-only; audited.
     updateCard: (
       customerId: string,
       cardId: string,
@@ -538,7 +538,7 @@ export const api = {
         bySeverity: Array<{ severity: string; count: number }>;
         byMonth: Array<{ year: number; month: number; count: number }>;
       }>('/api/v1/fraud/stats', {}, token),
-    // Auditor data-integrity oversight (PCI DSS Req 10) — no PII.
+    // Auditor data-integrity oversight (PCI DSS Req 10); no PII.
     integrity: (token: string) =>
       apiFetch<{
         totalCases: number;
@@ -558,7 +558,7 @@ export const api = {
           healthy: boolean;
         };
       }>('/api/v1/fraud/integrity', {}, token),
-    // Shared-card registry lookup (FDS/AML) — investigation roles. Token from a transaction.
+    // Shared-card registry lookup (FDS/AML); investigation roles. Token from a transaction.
     cardRegistry: (cardToken: string, token: string) =>
       apiFetch<{
         paymentCardReference: string;
@@ -766,7 +766,7 @@ export const api = {
       apiFetch<{ merchantAgreementInstanceReference: string; merchantName: string; merchantAgreementStatus: string; merchantApiKey: string }>(
         '/api/v1/merchants', { method: 'POST', body: JSON.stringify(body) }, token
       ),
-    // API key metadata (no secret/hash) — id, prefix, label, status, dates.
+    // API key metadata (no secret/hash); id, prefix, label, status, dates.
     listKeys: (merchantId: string, token: string) =>
       apiFetch<{
         keys: Array<{

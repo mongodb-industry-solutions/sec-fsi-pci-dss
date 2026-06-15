@@ -104,7 +104,7 @@ export default function OutboundPage() {
   const [testError, setTestError]               = useState('');
   const [testing, setTesting]                   = useState(false);
 
-  // Run Test (real execution) state — separate from Validate Params (dry-run mapping above)
+  // Run Test (real execution) state; separate from Validate Params (dry-run mapping above)
   const [overrideUrl, setOverrideUrl] = useState('');
   const [running, setRunning]         = useState(false);
   const [runResult, setRunResult]     = useState<{ status: string; latencyMs: number; responseCode?: number; responseBody?: unknown; targetUrl?: string; transformed: Record<string, unknown>; error?: string } | null>(null);

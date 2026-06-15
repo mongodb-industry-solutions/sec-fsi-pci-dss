@@ -137,7 +137,7 @@ export function FieldMappingMatrix({ rules, setRules, sourceLabel, targetLabel, 
                   {r.location}
                 </span>
               </td>
-              <td className="px-3 py-2 font-mono text-gray-800">{r.sourceField || <em className="text-gray-400">—</em>}</td>
+              <td className="px-3 py-2 font-mono text-gray-800">{r.sourceField || <em className="text-gray-400">-</em>}</td>
               <td className="px-3 py-2 font-mono text-gray-500">{r.targetField || <em className="text-gray-400">same as source</em>}</td>
               <td className="px-3 py-2 text-center text-green-600">{r.required ? '✓' : ''}</td>
             </tr>

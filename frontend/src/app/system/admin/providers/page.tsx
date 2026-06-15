@@ -162,7 +162,7 @@ export default function IntegrationsListPage() {
       <SectionHeader
         icon={Plug}
         title="Providers"
-        description="External provider vendors — BIAN SD-193 External Provider Arrangements."
+        description="External provider vendors; BIAN SD-193 External Provider Arrangements."
         debugInfo="SD-193 · ExternalProviderArrangement · PCI DSS Req 12.8.1"
         actions={
           <Link

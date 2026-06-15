@@ -109,7 +109,7 @@ function RoleBadge({ role, priority }: { role?: string; priority?: number }) {
     return <span className="text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">Fallback</span>;
   if (role === 'peer')
     return <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-medium">Peer</span>;
-  return <span className="text-xs text-gray-400">—</span>;
+  return <span className="text-xs text-gray-400">-</span>;
 }
 
 const PAGE_SIZE = 10;
@@ -468,7 +468,7 @@ export function IntegrationCategoryPage({ meta }: { meta: CategoryMeta }) {
 
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
-      {/* Header — shared SectionHeader (icon + title + subtitle), consistent across /system */}
+      {/* Header; shared SectionHeader (icon + title + subtitle), consistent across /system */}
       <SectionHeader
         icon={Icon}
         title={meta.label}

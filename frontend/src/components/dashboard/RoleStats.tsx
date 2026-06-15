@@ -87,9 +87,9 @@ function CustomerStats({ token }: { token: string }) {
     <div className="space-y-4">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={<Receipt size={14} />} label="My payments" value={String(rows.length)} sub="total" />
-        <StatCard icon={<TrendingUp size={14} />} label="Total spent" value={topCur ? fmt(topCur[1], topCur[0]) : '—'} sub={byCurrency.size > 1 ? `+${byCurrency.size - 1} currencies` : undefined} />
+        <StatCard icon={<TrendingUp size={14} />} label="Total spent" value={topCur ? fmt(topCur[1], topCur[0]) : '-'} sub={byCurrency.size > 1 ? `+${byCurrency.size - 1} currencies` : undefined} />
         <StatCard icon={<CalendarDays size={14} />} label="This month" value={String(thisMonth?.count ?? 0)} sub="payments" />
-        <StatCard icon={<CheckCircle2 size={14} />} label="Last payment" value={rows[0] ? new Date(rows[0].cardTransactionDateTime).toLocaleDateString() : '—'} />
+        <StatCard icon={<CheckCircle2 size={14} />} label="Last payment" value={rows[0] ? new Date(rows[0].cardTransactionDateTime).toLocaleDateString() : '-'} />
       </div>
       <MonthlyBars title="Payments by month" data={months} />
       <BreakdownBars title="By status" total={rows.length} items={statuses.map((x) => ({ ...x, colorClass: color(STATUS_COLOR, x.label) }))} />

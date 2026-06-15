@@ -134,7 +134,7 @@ export default function TransactionDetailPage() {
   async function approveAndReveal() {
     // Approve the escalation on the linked case to obtain a sensitive-access token. Setting the
     // token flips the resource key, so the cached transaction transparently refetches with the
-    // sensitive (QE:none) fields decrypted — no manual re-fetch needed.
+    // sensitive (QE:none) fields decrypted; no manual re-fetch needed.
     if (!linkedCase) return;
     setApproving(true);
     try {
@@ -345,7 +345,7 @@ export default function TransactionDetailPage() {
         </div>
       </div>
 
-      {/* Parties — customer (KYC) + merchant (KYB), role-gated, to continue the investigation */}
+      {/* Parties; customer (KYC) + merchant (KYB), role-gated, to continue the investigation */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Customer (KYC) */}
         <div className="bg-white rounded-xl border p-5">
@@ -364,9 +364,9 @@ export default function TransactionDetailPage() {
           ) : (
             <>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-                <span className="text-gray-500">Name</span><span className="font-medium truncate">{String(partyCustomer.customerName ?? '—')}</span>
-                <span className="text-gray-500">Segment</span><span className="capitalize">{String(partyCustomer.customerSegment ?? '—')}</span>
-                <span className="text-gray-500">Status</span><span className="capitalize">{String(partyCustomer.customerAgreementStatus ?? '—')}</span>
+                <span className="text-gray-500">Name</span><span className="font-medium truncate">{String(partyCustomer.customerName ?? '-')}</span>
+                <span className="text-gray-500">Segment</span><span className="capitalize">{String(partyCustomer.customerSegment ?? '-')}</span>
+                <span className="text-gray-500">Status</span><span className="capitalize">{String(partyCustomer.customerAgreementStatus ?? '-')}</span>
                 <span className="text-gray-500">KYC check</span><span className="capitalize">{String((partyCustomer.customerAgreementKycCheck as { customerAgreementKycCheckStatus?: string } | null)?.customerAgreementKycCheckStatus ?? 'n/a')}</span>
               </div>
               {custSensitive ? (
@@ -400,7 +400,7 @@ export default function TransactionDetailPage() {
             <div className="space-y-2">
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
                 <span className="text-gray-500">Descriptor</span><span className="font-medium truncate">{txn.cardTransactionMerchantName}</span>
-                <span className="text-gray-500">MCC</span><span className="font-mono text-xs">{txn.cardTransactionMerchantCategoryCode ?? '—'}</span>
+                <span className="text-gray-500">MCC</span><span className="font-mono text-xs">{txn.cardTransactionMerchantCategoryCode ?? '-'}</span>
               </div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
                 External merchant: not acquired by this PSP, so there is no KYB record. Only the card-network descriptor (name + MCC) is available. Expected for issuer-side transactions.
@@ -411,10 +411,10 @@ export default function TransactionDetailPage() {
           ) : (
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
               <span className="text-gray-500">Name</span><span className="font-medium truncate">{String(partyMerchant.merchantName ?? txn.cardTransactionMerchantName)}</span>
-              <span className="text-gray-500">Status</span><span className="capitalize">{String(partyMerchant.merchantAgreementStatus ?? '—')}</span>
+              <span className="text-gray-500">Status</span><span className="capitalize">{String(partyMerchant.merchantAgreementStatus ?? '-')}</span>
               <span className="text-gray-500">KYB check</span><span className="capitalize">{String((partyMerchant.merchantAgreementKybCheck as { merchantAgreementKybCheckStatus?: string } | null)?.merchantAgreementKybCheckStatus ?? 'n/a')}</span>
-              <span className="text-gray-500">Risk</span><span className="capitalize">{String(partyMerchant.merchantRiskCategory ?? '—')}{partyMerchant.merchantTier ? ` · ${String(partyMerchant.merchantTier)}` : ''}</span>
-              <span className="text-gray-500">Country / MCC</span><span className="font-mono text-xs">{String(partyMerchant.merchantCountryCode ?? '—')} / {String(partyMerchant.merchantCategoryCode ?? '—')}</span>
+              <span className="text-gray-500">Risk</span><span className="capitalize">{String(partyMerchant.merchantRiskCategory ?? '-')}{partyMerchant.merchantTier ? ` · ${String(partyMerchant.merchantTier)}` : ''}</span>
+              <span className="text-gray-500">Country / MCC</span><span className="font-mono text-xs">{String(partyMerchant.merchantCountryCode ?? '-')} / {String(partyMerchant.merchantCategoryCode ?? '-')}</span>
             </div>
           )}
         </div>
@@ -481,7 +481,7 @@ export default function TransactionDetailPage() {
         )}
       </div>
 
-      {/* PCI DSS note for Auditor — debug/educational annotation only */}
+      {/* PCI DSS note for Auditor; debug/educational annotation only */}
       {isAuditor && debugMode && (
         <div className="bg-[#001E2B]/5 border border-[#001E2B]/20 rounded-xl p-4 text-sm text-gray-600">
           <strong className="text-[#001E2B]">Security Auditor (read-only):</strong> All fields visible for audit review.

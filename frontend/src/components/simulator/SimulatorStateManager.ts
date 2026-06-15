@@ -49,7 +49,7 @@ export const SimulatorStateManager = {
     safeSet(KEYS.SCENARIO, scenarioId);
   },
 
-  // The merchant (payee) chosen for this run — a real merchant owned by a featured customer.
+  // The merchant (payee) chosen for this run; a real merchant owned by a featured customer.
   setMerchant(id: string, name: string, mcc?: string): void {
     safeSet(KEYS.MERCHANT_ID, id);
     safeSet(KEYS.MERCHANT_NAME, name);

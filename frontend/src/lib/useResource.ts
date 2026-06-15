@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 // Lightweight stale-while-revalidate client cache. Investigation pages fetch in useEffect and
 // blank to a "Loading…" state on every mount, so breadcrumb back-navigation (to pages already
 // visited) flashes. This module-level cache lets a revisit render instantly from cache and
-// revalidate in the background — no extra dependency (no SWR/react-query). Cache is per-tab
+// revalidate in the background; no extra dependency (no SWR/react-query). Cache is per-tab
 // (in-memory) and keyed by a caller-supplied string (include role/token-scope in the key when
 // the response is role-dependent, so two roles never share an entry).
 

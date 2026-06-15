@@ -35,7 +35,7 @@ export default function ModulesIndexPage() {
             <KeyRound size={18} className="text-[#001E2B]" />
             <div>
               <p className="font-semibold text-gray-800 text-sm">Auth Domains</p>
-              <p className="text-xs text-gray-500">Authentication-domain registry — full CRUD (BIAN SD-16)</p>
+              <p className="text-xs text-gray-500">Authentication-domain registry; full CRUD (BIAN SD-16)</p>
             </div>
           </div>
           <ChevronRight size={16} className="text-gray-400" />

@@ -92,7 +92,7 @@ export default function TransactionDetailPage() {
   const [events, setEvents] = useState<ActionEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  // The owner's saved-card id matching this transaction's token — lets us link to the card detail.
+  // The owner's saved-card id matching this transaction's token; lets us link to the card detail.
   const [matchedCardId, setMatchedCardId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -209,7 +209,7 @@ export default function TransactionDetailPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm border-t pt-4">
-          {/* Card info — links to the saved card detail when it's one of the customer's cards */}
+          {/* Card info; links to the saved card detail when it's one of the customer's cards */}
           <span className="text-gray-500">Card (masked)</span>
           {matchedCardId ? (
             <Link href={`/system/cards/${matchedCardId}?from=history&txnId=${txnId}`} className="font-mono text-[#001E2B] hover:underline inline-flex items-center gap-1 w-fit">

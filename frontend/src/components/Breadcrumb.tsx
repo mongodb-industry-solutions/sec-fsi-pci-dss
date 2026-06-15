@@ -8,7 +8,7 @@ export interface Crumb {
 }
 
 // Reusable navigation breadcrumb for investigation flows. It only renders labels and links
-// to routes the caller can already open — it never carries or displays sensitive data, so it
+// to routes the caller can already open; it never carries or displays sensitive data, so it
 // is safe across roles (PCI DSS: navigation context only). The first item shows a home icon.
 export function Breadcrumb({ items }: { items: Crumb[] }) {
   if (!items.length) return null;

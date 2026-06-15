@@ -41,7 +41,7 @@ function mccNote(mcc: string): string {
 
 const genToken = () => `tok_${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 10)}`;
 
-// Static fallback — shown only if the API call fails (network error, not yet seeded)
+// Static fallback; shown only if the API call fails (network error, not yet seeded)
 const MERCHANT_FALLBACK: MerchantOption[] = [
   { id: '', label: 'TechGadgets Ltd.',  mcc: '5734', risk: 'low' },
   { id: '', label: 'Casino Royale',     mcc: '7995', risk: 'high' },
@@ -337,7 +337,7 @@ export default function DemoPaymentPage() {
                 <div className="flex items-center justify-between">
                   <h2 className="flex items-center gap-1.5 font-semibold text-gray-800">
                     Card
-                    <Tooltip text="The card to charge. Pick one of your saved cards, search for another, or enter a new card — new cards are tokenized in your browser and saved to your wallet after payment." />
+                    <Tooltip text="The card to charge. Pick one of your saved cards, search for another, or enter a new card; new cards are tokenized in your browser and saved to your wallet after payment." />
                   </h2>
                   <Link href="/system/cards" className="text-xs text-[#001E2B] hover:underline">Manage cards</Link>
                 </div>
@@ -477,7 +477,7 @@ export default function DemoPaymentPage() {
                   <Tooltip text="The business you are paying (BIAN SD-89). Pick one of the first four, search for another, or type a name and MCC manually. Some categories (e.g. gambling) are higher risk and influence fraud scoring." />
                 </h2>
 
-                {/* Preset grid — first 4 active merchants from SD-89 */}
+                {/* Preset grid; first 4 active merchants from SD-89 */}
                 {merchantsLoading ? (
                   <div className="grid grid-cols-2 gap-2">
                     {[0, 1, 2, 3].map(i => (
@@ -549,7 +549,7 @@ export default function DemoPaymentPage() {
                     className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#001E2B]/30" />
                   <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
                     MCC code
-                    <Tooltip text="ISO 18245 Merchant Category Code — a 4-digit code identifying the merchant's business type (e.g. 5411 grocery, 7995 gambling). Drives risk scoring." />
+                    <Tooltip text="ISO 18245 Merchant Category Code; a 4-digit code identifying the merchant's business type (e.g. 5411 grocery, 7995 gambling). Drives risk scoring." />
                   </label>
                   <input value={mcc} onChange={(e) => setMcc(e.target.value)}
                     placeholder="MCC code"

@@ -175,7 +175,7 @@ export default function TransactionHistoryPage() {
           </div>
         ) : (
           <>
-            {/* Search + status filter — standard pattern (input + Search + Clear), same as the rest of the system */}
+            {/* Search + status filter; standard pattern (input + Search + Clear), same as the rest of the system */}
             <div className="flex flex-col sm:flex-row gap-2 mb-5">
               <input
                 type="text"

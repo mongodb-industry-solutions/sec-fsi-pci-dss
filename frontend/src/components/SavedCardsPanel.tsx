@@ -7,7 +7,7 @@ import { useDebugMode } from '../lib/debugMode';
 import { Pagination } from './Pagination';
 
 // Customer-managed stored cards (BIAN SD-88): searchable / filterable / paginated list. Only the
-// masked PAN, network, status, alias and registration date are shown here — the full PAN and CVV
+// masked PAN, network, status, alias and registration date are shown here; the full PAN and CVV
 // are never stored. Ownership is enforced by the backend. Clicking a row opens the card detail.
 interface CardRow {
   paymentCardInstanceReference: string;
@@ -33,9 +33,9 @@ function statusClass(status: string): string {
 }
 
 function fmtDate(iso?: string): string {
-  if (!iso) return '—';
+  if (!iso) return '-';
   const d = new Date(iso);
-  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return isNaN(d.getTime()) ? '-' : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 export function SavedCardsPanel({ agreementId, token }: { agreementId: string | null; token: string }) {
@@ -61,7 +61,7 @@ export function SavedCardsPanel({ agreementId, token }: { agreementId: string | 
 
   useEffect(() => { loadCards(); }, [loadCards]);
 
-  // Client-side filtering — a customer has only a handful of cards, so the full list is returned
+  // Client-side filtering; a customer has only a handful of cards, so the full list is returned
   // once and filtered/paginated in the browser (no extra round-trips).
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

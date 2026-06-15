@@ -6,7 +6,7 @@
 // We persist it in sessionStorage keyed by caseId so an L2 who has approved keeps sensitive
 // access while the token is valid and across the case → customer/transaction navigation. The
 // token is still validated server-side on every request (expiry enforced there); if it is
-// missing or expired the backend simply returns no sensitive data — no fail-open. sessionStorage
+// missing or expired the backend simply returns no sensitive data; no fail-open. sessionStorage
 // is per-tab and cleared on tab close, appropriate for a short-lived capability token.
 
 const keyFor = (caseId: string) => `esc:${caseId}`;

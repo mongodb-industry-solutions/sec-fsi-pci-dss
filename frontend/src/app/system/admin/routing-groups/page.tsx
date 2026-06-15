@@ -194,7 +194,7 @@ export default function RoutingGroupsPage() {
         <div className="flex flex-wrap gap-2 items-end">
           <div className="flex-1 min-w-[180px]">
             <label className="block text-xs text-gray-500 mb-1">Name</label>
-            <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Fraud — primary + fallback"
+            <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Fraud; primary + fallback"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
           </div>
           <div>
@@ -286,7 +286,7 @@ export default function RoutingGroupsPage() {
                         <li key={m.externalProviderArrangementInstanceReference} className="flex items-center gap-2 py-1.5">
                           <span className="text-sm text-gray-700 truncate">{m.externalProviderArrangementName ?? providerName(m.externalProviderArrangementInstanceReference)}</span>
                           {m.memberRole && <span className="text-[11px] bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">{m.memberRole}</span>}
-                          {debugMode && <span className="text-[10px] font-mono text-gray-400">prio {m.memberPriority ?? '—'}</span>}
+                          {debugMode && <span className="text-[10px] font-mono text-gray-400">prio {m.memberPriority ?? '-'}</span>}
                           <button onClick={() => handleRemoveMember(g, m.externalProviderArrangementInstanceReference)} disabled={isBusy}
                             className="ml-auto text-xs text-red-600 hover:underline disabled:opacity-50">Remove</button>
                         </li>

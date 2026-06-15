@@ -156,7 +156,7 @@ export default function ApiKeysSectionPage() {
         <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5"><Download size={14} /> Add an existing key</h2>
         <p className="text-xs text-gray-500">
           Register a key your own system already issued. It is hashed on the server (bcrypt) and never
-          stored in plaintext — only its prefix is shown afterwards. Marked as <span className="font-medium">imported</span>.
+          stored in plaintext; only its prefix is shown afterwards. Marked as <span className="font-medium">imported</span>.
         </p>
         <div className="space-y-2">
           <div>

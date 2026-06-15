@@ -36,7 +36,7 @@ function toRenderable(data: unknown): object | null {
     try {
       const parsed = JSON.parse(data);
       if (parsed && typeof parsed === 'object') return parsed as object;
-    } catch { /* not JSON — render as text below */ }
+    } catch { /* not JSON; render as text below */ }
   }
   return null;
 }

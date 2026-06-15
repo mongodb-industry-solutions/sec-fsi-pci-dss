@@ -124,7 +124,7 @@ export default function SimulatorCaseDetailPage() {
 
   async function toggleRaw() {
     if (!showRaw && !rawDoc && fraudCase?.cardTransactionInstanceReference) {
-      // Real ciphertext from Atlas. L1 client cannot decrypt QE:none — that's the point.
+      // Real ciphertext from Atlas. L1 client cannot decrypt QE:none; that's the point.
       try {
         const doc = await api.system.rawDocument(
           'cardTransactionLog',
@@ -449,7 +449,7 @@ function Field({ label, value, type, locked }: { label: string; value?: string; 
       <EncryptionBadge label={label} type={type} />
       {locked
         ? <span className="text-gray-400 text-xs italic">🔒 locked, requires L2 escalation</span>
-        : <span className="text-green-700 font-mono text-xs">{value ?? '—'}</span>}
+        : <span className="text-green-700 font-mono text-xs">{value ?? '-'}</span>}
     </div>
   );
 }

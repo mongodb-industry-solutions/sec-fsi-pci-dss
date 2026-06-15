@@ -7,7 +7,7 @@ import { RESOURCE_LABELS, ACTION_LABELS, RESOURCE_BIAN } from '../config/acl';
 
 // ADR-030: reusable "access not authorized" screen. Renders inside the /system layout (header +
 // sidebar provided by layout.tsx). The role's responsibilities are derived from the live ACL
-// (GET /acl/effective) — never hardcoded — so they always match the actual permission matrix.
+// (GET /acl/effective); never hardcoded; so they always match the actual permission matrix.
 // PCI DSS Req 7 (least privilege, default-deny is shown to the user, not silently failing).
 export function AccessDenied({ resource, action = 'view' }: { resource?: string; action?: string }) {
   const { perms } = useEffectivePermissions();
@@ -33,7 +33,7 @@ export function AccessDenied({ resource, action = 'view' }: { resource?: string;
           <div className="min-w-0 text-sm text-gray-700 leading-relaxed">
             <p>
               You are signed in as <span className="font-semibold">{perms?.label ?? perms?.role ?? 'your role'}</span>
-              {perms?.description ? <> — {perms.description}</> : null}
+              {perms?.description ? <>; {perms.description}</> : null}
             </p>
             <p className="mt-2">
               This area is restricted under the platform&apos;s role-based access control (separation of duties).

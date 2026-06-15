@@ -84,7 +84,7 @@ export default function InboundPage() {
   const [inboundTestError, setInboundTestError]     = useState('');
   const [inboundTesting, setInboundTesting]         = useState(false);
 
-  // Run Test (real reception) state — separate from Validate Params (dry-run mapping)
+  // Run Test (real reception) state; separate from Validate Params (dry-run mapping)
   const [overrideUrl, setOverrideUrl] = useState('');
   const [running, setRunning]         = useState(false);
   const [runResult, setRunResult]     = useState<{ status: string; latencyMs: number; transformed: Record<string, unknown>; error?: string } | null>(null);
@@ -102,7 +102,7 @@ export default function InboundPage() {
     }
   }
 
-  // Validate Params — dry-run: applies the inbound mapping only, no execution.
+  // Validate Params; dry-run: applies the inbound mapping only, no execution.
   async function handleValidateInbound() {
     const parsed = parseSample();
     if (!parsed) return;
@@ -114,7 +114,7 @@ export default function InboundPage() {
     finally { setInboundTesting(false); }
   }
 
-  // Run Test — real reception: processes the payload and records a callback event.
+  // Run Test; real reception: processes the payload and records a callback event.
   async function handleRunInbound() {
     const parsed = parseSample();
     if (!parsed) return;

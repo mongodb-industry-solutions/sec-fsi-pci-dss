@@ -115,7 +115,7 @@ function DomainDetail() {
         }
       />
 
-      {/* Details — read-only summary or inline editor (main fields) */}
+      {/* Details; read-only summary or inline editor (main fields) */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-sm text-gray-800">Domain details</h2>
@@ -134,7 +134,7 @@ function DomainDetail() {
             <div>
               <label className="block text-xs text-gray-500 mb-1">Slug (login identifier)</label>
               <input value={name} disabled className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono bg-gray-50 text-gray-400" />
-              <p className="text-[10px] text-gray-400 mt-0.5">Immutable — used in the JWT domain claim.</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">Immutable; used in the JWT domain claim.</p>
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Display name</label>
@@ -178,7 +178,7 @@ function DomainDetail() {
         )}
       </div>
 
-      {/* Access management — users (local) or role mappings (remote) */}
+      {/* Access management; users (local) or role mappings (remote) */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
           <Shield size={15} className="text-[#001E2B]" />

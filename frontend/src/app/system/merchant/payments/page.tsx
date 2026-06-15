@@ -137,7 +137,7 @@ export default function PaymentsSectionPage() {
                 <tr key={s.cardTransactionInstanceReference} className="hover:bg-gray-50">
                   <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{new Date(s.cardTransactionDateTime).toLocaleDateString()}</td>
                   <td className="px-4 py-2.5 font-mono text-xs text-gray-700">{s.cardTransactionMaskedPanDisplay}</td>
-                  <td className="px-4 py-2.5 text-gray-600 hidden sm:table-cell truncate max-w-[220px]">{s.cardTransactionDescription ?? '—'}</td>
+                  <td className="px-4 py-2.5 text-gray-600 hidden sm:table-cell truncate max-w-[220px]">{s.cardTransactionDescription ?? '-'}</td>
                   <td className="px-4 py-2.5">
                     <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${statusClass(s.cardTransactionStatus)}`}>{s.cardTransactionStatus}</span>
                   </td>

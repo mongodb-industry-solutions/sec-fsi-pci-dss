@@ -112,7 +112,7 @@ export default function AuthDomainsPage() {
       <SectionHeader
         icon={KeyRound}
         title="Auth Domains"
-        description="Authentication-domain registry — internal module (full CRUD). Domains drive the login UI."
+        description="Authentication-domain registry; internal module (full CRUD). Domains drive the login UI."
         debugInfo="BIAN SD-16 · collection authenticationDomain · /api/v1/modules/domains"
         actions={
           <button onClick={startCreate} className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium">
@@ -121,7 +121,7 @@ export default function AuthDomainsPage() {
         }
       />
 
-      {/* Search + type filter — standard pattern (input + filter + Search + Clear) */}
+      {/* Search + type filter; standard pattern (input + filter + Search + Clear) */}
       <div className="flex flex-wrap gap-2">
         <input
           type="text"
