@@ -56,9 +56,13 @@ async function mongodbPlugin(fastify: FastifyInstance) {
     const { initEventBus, getEventBus } = await import('../vendors/eventbus');
     await initEventBus(db).start();
 
-    // dev.v8 F3: register the event-driven payment-authorization saga on the bus.
+    // dev.v8 F3/F4: register the event-driven payment-authorization saga (issuer + FDS + sanctions gate).
     const { PaymentAuthorizationSaga } = await import('../modules/transactions/services/paymentAuthorization.saga');
     new PaymentAuthorizationSaga(db, getEventBus()).register();
+
+    // dev.v8 F5: post-authorization process (AML monitoring + investigation-case enrichment).
+    const { PostAuthorizationProcess } = await import('../modules/transactions/services/postAuthorization.process');
+    new PostAuthorizationProcess(db, getEventBus()).register();
 
     fastify.addHook('onClose', async () => {
       const { closeQEClient } = await import('../vendors/encryption/qeClient');
