@@ -146,12 +146,16 @@ export default function SimulatorCaseDetailPage() {
   const isResolved = !!fraudCase && ['resolved_cleared', 'resolved_fraud', 'closed'].includes(fraudCase.caseStatus);
   const movedPastEscalate = isEscalated || l2HasAccepted || isResolved;
 
+  // Resolution requires an explicit decision (confirmed fraud / cleared): Next cannot skip it until
+  // the case is resolved, otherwise the customer outcome would have nothing to show.
+  const nextBlocked = currentStep === 'l2-resolve' && !isResolved;
+
   // "Next" performs the required action of the current step before advancing, so the flow stays
   // consistent: on L1-escalate it escalates (same as the Escalate button); on L2-review it approves
   // the escalation (same as the Approve button), then moves to resolution. If the action is already
-  // done, Next just advances. Resolution still requires an explicit fraud/cleared choice.
+  // done, Next just advances. Resolution must be decided with the fraud/cleared buttons first.
   async function handleNext() {
-    if (busy) return;
+    if (busy || nextBlocked) return;
     if (currentStep === 'l1-escalate' && !movedPastEscalate) {
       await handleEscalate();   // advances to l2-review on success
       return;
@@ -167,6 +171,7 @@ export default function SimulatorCaseDetailPage() {
   const nextLabel =
     currentStep === 'l1-escalate' && !movedPastEscalate ? 'Escalate & Continue'
     : currentStep === 'l2-review' && isEscalated && !l2HasAccepted ? 'Approve & Continue'
+    : nextBlocked ? 'Decide to continue'
     : 'Next Step';
 
   if (loading) return <div className="text-center py-12 text-gray-400">Loading case…</div>;
@@ -273,7 +278,8 @@ export default function SimulatorCaseDetailPage() {
           Previous Step
         </button>
         <span className="text-xs text-gray-400 self-center">Step {stepIndex + 1} of {STEPS.length}</span>
-        <button onClick={handleNext} disabled={stepIndex === STEPS.length - 1 || busy}
+        <button onClick={handleNext} disabled={stepIndex === STEPS.length - 1 || busy || nextBlocked}
+          title={nextBlocked ? 'Resolve the case (confirmed fraud or cleared) before continuing' : undefined}
           className="px-4 py-2 rounded-lg border border-[#001E2B] bg-[#001E2B] text-[#00ED64] text-sm font-medium disabled:opacity-30 hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors">
           {busy ? 'Working…' : nextLabel}
         </button>
