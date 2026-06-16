@@ -1673,3 +1673,22 @@ ADR-004 established the dual-mode frontend. In practice the Simulator had drifte
 - (+) Immutable answers (no edit after submit) give a defensible investigation record.
 - (+) Live (SSE) L2 updates + a derived notification feed reuse the existing case/events/RBAC architecture; no parallel system, no extra collection for notifications.
 - (−) One new collection (`fraudDiagnosisCustomerQuestion`) to maintain. The SSE bus is single-process (demo); a multi-instance deployment would back it with Redis pub/sub or MongoDB change streams.
+
+## ADR-032 — Event-Driven Architecture: EventBus vendor, correlated event store, two-phase async payment authorization
+
+**Status:** Accepted (2026-06-16). Implemented dev.v8 (F1-F5). Aligns **PCI DSS Req 3.2** (no SAD), **Req 10** (traceable audit) and **BIAN SD-254 / SD-88 / SD-63 / SD-13 / SD-99**.
+
+**Context.** Event handling was scattered: a per-case in-process `EventEmitter` (`caseEventBus`) plus direct writes to three event collections (`businessProcessEvent`, `complianceProcessEvent`, `externalProviderArrangementActionLog`). Following the real-PSP model, a card payment must wait for the issuer's decision (and other real-time risk checks) from providers with asynchronous flows, while the client waits for the outcome — and an investigation must be able to follow the whole journey across subsystems, not chase scattered logs.
+
+**Decision.**
+1. **EventBus vendor (port/adapter), one instance for ALL events** (`backend/src/vendors/eventbus`). The system depends only on the `EventBus` port (`publish`/`subscribe`); the default `EventBusInProcess` adapter uses Node `EventEmitter` (name-indexed exact dispatch + `eventType\0correlationId` composite keys for journey-scoped subscriptions + a small wildcard list). Migrating to Kafka/RabbitMQ swaps only the adapter in `initEventBus` — no publisher/consumer changes. The former `caseEventBus` signals run on the same bus, marked `transient` (delivered, not persisted).
+2. **`DomainEvent` envelope + correlated event store** (`domainEvent` collection). Every event carries `eventId` (idempotency), `eventType` (dotted, module-prefixed), `correlationId` (= the journey, the `cardTransactionInstanceReference` for a payment), `causationId`, `businessProcess`, `partitionKey` (Kafka-ready). CHD is stripped on publish (`sanitizeDeep`, single CHD blocklist owned by the vendor). The legacy `emitProcessEvent`/`emitComplianceEvent`/`logEvent` also mirror to the store with correlation. `GET /api/v1/events/trail/:correlationId` returns the ordered journey.
+3. **Two-phase async payment authorization.** `POST /transactions` creates the transaction `pending` and returns `202`; the client subscribes to `GET /api/v1/transactions/:id/stream` (SSE, public by txn UUID, no CHD) for the outcome. **Phase 1 (gate):** `card-issuer` + `fds` + `hrp` (sanctions) run in parallel, out-of-band; each funnels a `*.completed` verdict onto the bus and `PaymentAuthorizationSaga` aggregates them — any hard decline → `payment.declined` (short-circuit), all approve → `payment.authorized`. CHD (PAN/CVV/expiry) goes straight to the issuer via dispatch, never on the bus. **Phase 2 (post-auth, async):** `PostAuthorizationProcess` runs AML monitoring (never blocks the authorized payment) and enriches the fraud case from the correlated trail (`fraudDiagnosisCase.subsystemSignals`).
+4. **Backward compatibility.** `createTransaction` is kept as a synchronous wrapper (initiate + await the terminal event) so the gateway (checkout / payment-link) is unchanged.
+
+**Consequences.**
+- (+) One coherent event mechanism; a broker migration is an adapter swap.
+- (+) Full journey traceability by `correlationId` (Req 10) feeds the investigation directly.
+- (+) Realistic PSP flow: client waits via SSE; issuer/sanctions/fraud gate in real time; AML/investigation are post-auth.
+- (+) No CHD on the bus or in the event store (Req 3.2).
+- (−) Saga/Phase-2 aggregation state is in-memory (matches the in-process bus); a multi-instance deployment persists it alongside the broker migration. Event-store retention is not yet a TTL (regular collection for the unique `eventId` index); to be revisited.

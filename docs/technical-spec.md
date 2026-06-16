@@ -3010,3 +3010,18 @@ list-filter realism.
   of alias/note; remove (soft-delete with confirm). Technical labels (QE/token) only in debug mode.
 
 *Added 2026-06-13; detail/edit/seed/payment-integration extension same day (doc + code together per repo rules).*
+
+---
+
+## 11. Event-Driven Architecture (dev.v8)
+
+**EventBus vendor** (`backend/src/vendors/eventbus`). One bus for all events behind the `EventBus` port (`publish`/`subscribe`); default adapter `EventBusInProcess` (Node `EventEmitter`). Swap to Kafka/RabbitMQ = change the adapter in `initEventBus` only. `DomainEvent` envelope: `eventId` (idempotency), `eventType` (dotted, module-prefixed), `occurredAt`, `correlationId` (the journey; = `cardTransactionInstanceReference` for a payment), `causationId`, `businessProcess`, `partitionKey`, `source`, `actor?`, `bian?`, `payload` (CHD stripped on publish), `schemaVersion`, `transient?` (delivered, not persisted).
+
+**Collection `domainEvent`** (regular, not time-series — carries a unique `eventId` index). Indexes: `{eventId} unique`, `{correlationId, occurredAt}`, `{businessProcess, occurredAt}`, `{eventType, occurredAt}`, `{partitionKey, occurredAt}`. Created in `createCollections`/`createIndexes`; validated in `validateSetup`. Every business/compliance/integration emit also mirrors here (correlated). Read the journey with `GET /api/v1/events/trail/:correlationId` (auditor/manager).
+
+**Async payment authorization.** `POST /api/v1/transactions` returns `202 { cardTransactionInstanceReference, cardTransactionStatus: 'pending' }`. The client subscribes to `GET /api/v1/transactions/:id/stream` (SSE, public by txn UUID, `skipAuth`, no PII/CHD, race-safe) for the terminal `authorized`/`declined`. Transient `cardVerification { cardNumber, cvv, expiry }` on create is forwarded to the issuer only and never stored or logged.
+- **Phase 1 gate** (parallel, out-of-band): `card-issuer` + `fds` + `hrp` (sanctions). Each publishes its `*.completed` verdict; `PaymentAuthorizationSaga` aggregates, any hard decline gives `payment.declined`, all approve gives `payment.authorized`.
+- **Phase 2** (post-auth, async): `PostAuthorizationProcess` runs AML monitoring and enriches the case from the correlated trail into a new schemaless field `fraudDiagnosisCase.subsystemSignals { issuer, fds, sanctions, aml }`.
+- `createTransaction` remains a synchronous wrapper (initiate + await terminal) so the gateway (checkout / payment-link) is unchanged. See ADR-032.
+
+*Added 2026-06-16 (dev.v8; doc + code together per repo rules).*

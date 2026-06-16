@@ -1132,6 +1132,11 @@ export const api = {
         total: number; page: number; limit: number; capped: boolean;
       }>(`/api/v1/events/audit${qs}`, {}, token);
     },
+    // dev.v8: correlated journey — every DomainEvent for one business-process instance, in order.
+    trail: (correlationId: string, token: string) =>
+      apiFetch<{ correlationId: string; count: number; events: Array<{ eventId: string; eventType: string; occurredAt: string; correlationId: string; causationId?: string; businessProcess: string; source: string; payload: Record<string, unknown>; bian?: { serviceDomain: string; controlRecord: string } }> }>(
+        `/api/v1/events/trail/${encodeURIComponent(correlationId)}`, {}, token,
+      ),
     list: (token: string, params?: { processType?: string; entityType?: string; from?: string; to?: string; page?: number; limit?: number }) => {
       const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : '';
       return apiFetch<{ events: Record<string, unknown>[]; total: number; page: number; limit: number }>(
