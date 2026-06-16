@@ -4,7 +4,7 @@
  * delivery, idempotency by eventId, and the correlated trail.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { InProcessEventBus } from '../../../../backend/src/vendors/eventbus/InProcessEventBus';
+import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
 import type { EventStore } from '../../../../backend/src/vendors/eventbus/EventStore';
 import { makeEvent } from '../../../../backend/src/vendors/eventbus';
 import type { DomainEvent } from '../../../../backend/src/vendors/eventbus/types';
@@ -22,8 +22,8 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe('EventBus vendor (in-process adapter)', () => {
   let store: FakeStore;
-  let bus: InProcessEventBus;
-  beforeEach(() => { store = new FakeStore(); bus = new InProcessEventBus(store); });
+  let bus: EventBusInProcess;
+  beforeEach(() => { store = new FakeStore(); bus = new EventBusInProcess(store); });
 
   it('persists every published event to the store', async () => {
     await bus.publish(makeEvent({ eventType: 'payment.authorized', correlationId: 'txn-1', businessProcess: 'card_payment', payload: { amount: 100 } }));

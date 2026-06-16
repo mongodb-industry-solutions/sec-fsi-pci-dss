@@ -17,7 +17,7 @@ function actorOf(request: unknown): { ref?: string; name?: string } {
 import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
 import { getCaseEnrichment } from '../services/caseEnrichment.service';
 import { createQuestion, listQuestionsByCase } from '../services/customerQuestion.service';
-import { subscribeCaseEvents } from '../../../vendors/events/caseEventBus';
+import { subscribeCaseEvents } from '../../../vendors/eventbus';
 import { createNotification } from '../../notifications/notifications.service';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';

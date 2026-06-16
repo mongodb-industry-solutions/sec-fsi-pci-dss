@@ -13,34 +13,10 @@ import {
   ProcessEventMeta,
 } from '../models/externalProviderArrangement.model';
 
-// CHD blocklist — these keys must never appear in eventSummary (PCI DSS Req 3.2 / ADR-014)
-const CHD_BLOCKLIST = new Set([
-  'pan', 'cardNumber', 'cvv', 'cvv2', 'cvc', 'cvc2',
-  'expiryDate', 'cardExpiry', 'expiry', 'cardholderName',
-  'trackData', 'track1', 'track2', 'track3', 'pinBlock',
-  'fullCardNumber', 'primaryAccountNumber',
-]);
-
-function sanitizeSummary(raw: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(raw).filter(([k]) => !CHD_BLOCKLIST.has(k))
-  );
-}
-
-// Recursive CHD scrub for payload snapshots stored in the audit trail. Strips blocklisted
-// keys at ANY depth (payloads can be nested, e.g. card.cvv) so the stored snapshot is safe
-// to display (PCI DSS Req 3.2) while preserving the rest of the data for analysis/replay.
-export function sanitizeDeep(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sanitizeDeep);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .filter(([k]) => !CHD_BLOCKLIST.has(k))
-        .map(([k, v]) => [k, sanitizeDeep(v)])
-    );
-  }
-  return value;
-}
+// CHD scrubbing is owned by the eventbus vendor (single source of truth, PCI DSS Req 3.2 / ADR-014).
+// Re-exported here so existing importers keep working unchanged.
+import { sanitizeSummary, sanitizeDeep } from '../../../vendors/eventbus/sanitize';
+export { sanitizeDeep };
 
 interface EmitProcessEventOpts {
   entityType: BusinessEntityType;

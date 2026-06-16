@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   NOTIFICATION_COLLECTION, NotificationRecord, NotificationDTO, NotificationType, toNotificationDTO,
 } from './notification.model';
-import { publishPartyNotification } from '../../vendors/events/caseEventBus';
+import { publishPartyNotification } from '../../vendors/eventbus';
 
 const col = (db: Db) => db.collection<NotificationRecord>(NOTIFICATION_COLLECTION);
 

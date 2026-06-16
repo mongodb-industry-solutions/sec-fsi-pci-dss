@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { listForParty, unreadCount, markRead, markAllRead } from '../notifications.service';
-import { subscribePartyNotifications } from '../../../vendors/events/caseEventBus';
+import { subscribePartyNotifications } from '../../../vendors/eventbus';
 
 function partyOf(request: unknown): string {
   return (request as { user?: { partyRef?: string } }).user?.partyRef ?? '';

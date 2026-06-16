@@ -1,9 +1,7 @@
-// Event-Driven Architecture core types (dev.v8). The DomainEvent envelope is the STABLE contract
-// every publisher/consumer depends on; the transport (this in-process bus, or a future Kafka /
-// RabbitMQ adapter) can change without touching it. No CHD ever travels in payload (sanitized on
-// publish) — PCI DSS Req 3.2 / Req 10.
+// DomainEvent: the stable contract every publisher/consumer depends on; the transport adapter can
+// change (in-process now, Kafka/Rabbit later) without touching it. Payload carries no CHD.
 
-// TYPE of business process an event belongs to. Used to GROUP events for audit/investigation.
+// Process class an event belongs to, used to group events for audit/investigation.
 export type BusinessProcess =
   | 'card_payment'
   | 'fraud_investigation'

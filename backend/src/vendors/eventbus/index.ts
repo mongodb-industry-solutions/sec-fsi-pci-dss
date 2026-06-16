@@ -1,9 +1,8 @@
-// EventBus vendor entry point. The app initializes one bus at startup (initEventBus) and the rest of
-// the system depends only on getEventBus() -> the EventBus port. Swapping the adapter (Kafka/Rabbit)
-// happens HERE only; no consumer changes (dev.v8 D1).
+// EventBus vendor entry point. App calls initEventBus at startup; everything else uses getEventBus().
+// Swapping the adapter (Kafka/Rabbit) happens here only.
 import { Db } from 'mongodb';
 import { EventBus } from './EventBus';
-import { InProcessEventBus } from './InProcessEventBus';
+import { EventBusInProcess } from './EventBusInProcess';
 import { MongoEventStore, EventStore } from './EventStore';
 import { v4 as uuidv4 } from 'uuid';
 import { DomainEvent, BusinessProcess } from './types';
@@ -11,7 +10,7 @@ import { DomainEvent, BusinessProcess } from './types';
 let instance: EventBus | null = null;
 
 export function initEventBus(db: Db, store?: EventStore): EventBus {
-  instance = new InProcessEventBus(store ?? new MongoEventStore(db));
+  instance = new EventBusInProcess(store ?? new MongoEventStore(db));
   return instance;
 }
 
@@ -20,11 +19,9 @@ export function getEventBus(): EventBus {
   return instance;
 }
 
-// Test/advanced seam: inject a specific bus implementation.
 export function setEventBus(bus: EventBus): void { instance = bus; }
 
-// Helper to build a well-formed DomainEvent with sane defaults (partitionKey defaults to
-// correlationId; eventId/occurredAt auto-filled). Keeps publishers terse and consistent.
+// Builds a DomainEvent with defaults (eventId/occurredAt auto-filled; partitionKey = correlationId).
 export function makeEvent<T>(input: {
   eventType: string;
   correlationId: string;
@@ -54,5 +51,6 @@ export function makeEvent<T>(input: {
 
 export * from './types';
 export * from './EventBus';
+export * from './signals';
 export { MongoEventStore, DOMAIN_EVENT_COLLECTION } from './EventStore';
 export type { EventStore } from './EventStore';
