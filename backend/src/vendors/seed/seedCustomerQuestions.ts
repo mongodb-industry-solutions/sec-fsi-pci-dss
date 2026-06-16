@@ -25,8 +25,9 @@ export async function seedCustomerQuestions(db: Db) {
     .findOne<{ partyInstanceReference?: string }>({ customerAgreementInstanceReference: fraudCase.customerAgreementInstanceReference });
 
   const now = new Date();
+  const questionId = uuidv4();
   await col.insertOne({
-    customerQuestionInstanceReference: uuidv4(),
+    customerQuestionInstanceReference: questionId,
     fraudDiagnosisInstanceReference: fraudCase.fraudDiagnosisInstanceReference,
     fraudDiagnosisCaseReference: fraudCase.fraudDiagnosisCaseReference,
     cardTransactionInstanceReference: fraudCase.cardTransactionInstanceReference,
@@ -46,5 +47,19 @@ export async function seedCustomerQuestions(db: Db) {
     recordUpdatedDateTime: now,
     schemaVersion: 1,
   });
-  console.log('  customerQuestions: 1 demo question seeded');
+
+  // Deliver the matching (unread) notification so the bell + page show it out of the box.
+  await createNotification(db, {
+    recipientPartyReference: agreement?.partyInstanceReference ?? '',
+    notificationType: 'fraud_question',
+    title: 'A security question needs your response',
+    detail: 'Did you perform this operation?',
+    href: `/system/payment/history/${fraudCase.cardTransactionInstanceReference}`,
+    relatedReference: questionId,
+    transactionId: fraudCase.cardTransactionInstanceReference,
+    caseReference: fraudCase.fraudDiagnosisCaseReference,
+    actionable: true,
+  });
+
+  console.log('  customerQuestions: 1 demo question + notification seeded');
 }

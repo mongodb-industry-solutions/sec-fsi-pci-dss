@@ -1,91 +1,96 @@
 import { Db } from 'mongodb';
-import { listPendingForParty } from '../fraud/services/customerQuestion.service';
-import { CUSTOMER_AGREEMENT_COLLECTION } from '../customer/models/customerAgreement.model';
-import { FRAUD_DIAGNOSIS_COLLECTION } from '../fraud/models/fraudDiagnosis.model';
+import { v4 as uuidv4 } from 'uuid';
+import {
+  NOTIFICATION_COLLECTION, NotificationRecord, NotificationDTO, NotificationType, toNotificationDTO,
+} from './notification.model';
+import { publishPartyNotification } from '../../vendors/events/caseEventBus';
 
-export type NotificationType = 'fraud_question' | 'transaction_status';
+const col = (db: Db) => db.collection<NotificationRecord>(NOTIFICATION_COLLECTION);
 
-export interface NotificationItem {
-  type: NotificationType;
-  id: string;
-  transactionId: string;
-  caseReference: string;
+export interface CreateNotificationInput {
+  recipientPartyReference: string;
+  notificationType: NotificationType;
   title: string;
   detail: string;
   href: string;
-  createdAt: string;
-  actionable: boolean; // true = needs the customer to act (drives the unread badge count)
+  relatedReference?: string;
+  transactionId?: string;
+  caseReference?: string;
+  actionable?: boolean;
 }
 
-function toIso(v: unknown): string {
-  if (v instanceof Date) return v.toISOString();
-  if (typeof v === 'string') return v;
-  return new Date().toISOString();
-}
-
-// Derived notifications for a customer (by party). No stored notification collection: the feed is
-// computed from authoritative records (pending questions + resolved cases), so it cannot drift and
-// carries no CHD (PCI DSS Req 3/7). Scoped strictly to the caller's own party (Req 7).
-export async function getNotificationsForParty(db: Db, partyRef: string): Promise<NotificationItem[]> {
-  if (!partyRef) return [];
-  const items: NotificationItem[] = [];
-
-  // 1) Pending security questions; actionable.
-  const pending = await listPendingForParty(db, partyRef);
-  for (const q of pending) {
-    items.push({
-      type: 'fraud_question',
-      id: q.questionId,
-      transactionId: q.transactionId,
-      caseReference: q.caseReference,
-      title: 'A security question needs your response',
-      detail: q.questionText,
-      href: `/system/payment/history/${q.transactionId}`,
-      createdAt: q.askedDateTime,
-      actionable: true,
+// Create a notification (no-op without a recipient). Fires the per-party SSE signal so the bell
+// updates live. De-dupes by (party, type, relatedReference) so re-runs / retries don't pile up.
+export async function createNotification(db: Db, input: CreateNotificationInput): Promise<void> {
+  if (!input.recipientPartyReference) return;
+  if (input.relatedReference) {
+    const existing = await col(db).findOne({
+      recipientPartyReference: input.recipientPartyReference,
+      notificationType: input.notificationType,
+      relatedReference: input.relatedReference,
     });
+    if (existing) return;
   }
+  const record: NotificationRecord = {
+    notificationInstanceReference: uuidv4(),
+    recipientPartyReference: input.recipientPartyReference,
+    notificationType: input.notificationType,
+    title: input.title,
+    detail: input.detail,
+    href: input.href,
+    relatedReference: input.relatedReference,
+    transactionId: input.transactionId,
+    caseReference: input.caseReference,
+    actionable: input.actionable ?? false,
+    notificationStatus: 'unread',
+    // Auxiliary alert read-model (not a core control record): BIAN Customer Case Management.
+    bianServiceDomain: 'Customer Case Management',
+    bianControlRecordType: 'CustomerNotification',
+    recordCreatedDateTime: new Date(),
+    schemaVersion: 1,
+  };
+  await col(db).insertOne(record);
+  publishPartyNotification(input.recipientPartyReference);
+}
 
-  // 2) Resolved-case status updates; informational; link to the related transaction.
-  const agreements = await db.collection(CUSTOMER_AGREEMENT_COLLECTION)
-    .find<{ customerAgreementInstanceReference: string }>({ partyInstanceReference: partyRef })
-    .toArray();
-  const agreementRefs = agreements.map((a) => a.customerAgreementInstanceReference).filter(Boolean);
-  if (agreementRefs.length) {
-    const cases = await db.collection(FRAUD_DIAGNOSIS_COLLECTION)
-      .find<{
-        fraudDiagnosisInstanceReference: string;
-        fraudDiagnosisCaseReference: string;
-        cardTransactionInstanceReference: string;
-        fraudDiagnosisCaseStatus: string;
-        fraudDiagnosisResolutionRecord?: { resolutionOutcome?: string; resolutionDateTime?: unknown };
-        recordUpdatedDateTime?: unknown;
-        recordCreatedDateTime?: unknown;
-      }>({
-        customerAgreementInstanceReference: { $in: agreementRefs },
-        fraudDiagnosisCaseStatus: { $in: ['resolved_cleared', 'resolved_fraud'] },
-      })
-      .toArray();
-    for (const c of cases) {
-      const cleared = c.fraudDiagnosisCaseStatus === 'resolved_cleared'
-        || c.fraudDiagnosisResolutionRecord?.resolutionOutcome === 'cleared';
-      items.push({
-        type: 'transaction_status',
-        id: `status-${c.fraudDiagnosisInstanceReference}`,
-        transactionId: c.cardTransactionInstanceReference,
-        caseReference: c.fraudDiagnosisCaseReference,
-        title: cleared ? 'A transaction review was completed' : 'A transaction was confirmed as fraud',
-        detail: cleared
-          ? 'Your transaction was reviewed and confirmed as legitimate. No action is needed.'
-          : 'An unauthorized transaction was confirmed. A refund has been initiated and your card secured.',
-        href: `/system/payment/history/${c.cardTransactionInstanceReference}`,
-        createdAt: toIso(c.fraudDiagnosisResolutionRecord?.resolutionDateTime ?? c.recordUpdatedDateTime ?? c.recordCreatedDateTime),
-        actionable: false,
-      });
-    }
-  }
+export async function listForParty(db: Db, partyRef: string): Promise<NotificationDTO[]> {
+  if (!partyRef) return [];
+  const rows = await col(db).find({ recipientPartyReference: partyRef }).sort({ recordCreatedDateTime: -1 }).limit(200).toArray();
+  return rows.map(toNotificationDTO);
+}
 
-  // Newest first.
-  items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  return items;
+export async function unreadCount(db: Db, partyRef: string): Promise<number> {
+  if (!partyRef) return 0;
+  return col(db).countDocuments({ recipientPartyReference: partyRef, notificationStatus: 'unread' });
+}
+
+// Mark one notification read (ownership-scoped by party, PCI DSS Req 7). Returns false if not found.
+export async function markRead(db: Db, id: string, partyRef: string): Promise<boolean> {
+  const res = await col(db).updateOne(
+    { notificationInstanceReference: id, recipientPartyReference: partyRef, notificationStatus: 'unread' },
+    { $set: { notificationStatus: 'read', readDateTime: new Date() } },
+  );
+  if (res.matchedCount > 0) publishPartyNotification(partyRef);
+  // matchedCount 0 may mean already-read (idempotent) or not owned; report success if it exists for the party.
+  return res.matchedCount > 0 || !!(await col(db).findOne({ notificationInstanceReference: id, recipientPartyReference: partyRef }));
+}
+
+export async function markAllRead(db: Db, partyRef: string): Promise<number> {
+  if (!partyRef) return 0;
+  const res = await col(db).updateMany(
+    { recipientPartyReference: partyRef, notificationStatus: 'unread' },
+    { $set: { notificationStatus: 'read', readDateTime: new Date() } },
+  );
+  if (res.modifiedCount > 0) publishPartyNotification(partyRef);
+  return res.modifiedCount;
+}
+
+// Mark the notification tied to a related entity read (e.g. when the customer answers the question).
+export async function markReadByRelated(db: Db, partyRef: string | undefined, relatedReference: string): Promise<void> {
+  if (!partyRef) return;
+  const res = await col(db).updateMany(
+    { recipientPartyReference: partyRef, relatedReference, notificationStatus: 'unread' },
+    { $set: { notificationStatus: 'read', readDateTime: new Date() } },
+  );
+  if (res.modifiedCount > 0) publishPartyNotification(partyRef);
 }

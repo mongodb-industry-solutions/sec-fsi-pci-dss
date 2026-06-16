@@ -170,6 +170,14 @@ export async function createIndexes(client: MongoClient) {
     { key: { partyInstanceReference: 1, questionStatus: 1 } },
   ]);
 
+  // ADR-031: Notifications (per-party, read/unread)
+  await ensureIndexes(db, 'notification', [
+    { key: { notificationInstanceReference: 1 }, unique: true },
+    { key: { recipientPartyReference: 1, recordCreatedDateTime: -1 } },
+    { key: { recipientPartyReference: 1, notificationStatus: 1 } },
+    { key: { recipientPartyReference: 1, notificationType: 1, relatedReference: 1 } },
+  ]);
+
   // SD-91: Customer Authentication Assessment
   await ensureIndexes(db, 'customerAuthenticationAssessment', [
     { key: { customerAuthenticationInstanceReference: 1 }, unique: true },

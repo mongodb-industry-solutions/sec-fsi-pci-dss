@@ -281,15 +281,17 @@ export interface CustomerQuestion {
 }
 
 export interface NotificationItem {
-  type: 'fraud_question' | 'transaction_status' | string;
   id: string;
-  transactionId: string;
-  caseReference: string;
+  type: 'fraud_question' | 'transaction_status' | string;
   title: string;
   detail: string;
   href: string;
-  createdAt: string;
+  transactionId: string | null;
+  caseReference: string | null;
+  status: 'unread' | 'read';
   actionable: boolean;
+  createdAt: string;
+  readAt: string | null;
 }
 
 // ADR-030: data-driven RBAC/ACL
@@ -398,9 +400,13 @@ export const api = {
   },
 
   notifications: {
-    // ADR-031: pending actionable items for the current user (e.g. unanswered security questions).
+    // ADR-031: the user's notifications (read + unread); `count` = unread.
     list: (token: string) =>
       apiFetch<{ count: number; items: NotificationItem[] }>('/api/v1/notifications', {}, token),
+    markRead: (id: string, token: string) =>
+      apiFetch<{ ok: boolean }>(`/api/v1/notifications/${encodeURIComponent(id)}/read`, { method: 'POST', body: JSON.stringify({}) }, token),
+    markAllRead: (token: string) =>
+      apiFetch<{ updated: number }>('/api/v1/notifications/read-all', { method: 'POST', body: JSON.stringify({}) }, token),
   },
 
   transactions: {

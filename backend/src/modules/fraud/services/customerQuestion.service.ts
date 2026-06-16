@@ -6,7 +6,8 @@ import {
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import { getCaseById, appendAuditEvent } from './fraudDiagnosis.service';
 import { emitProcessEvent } from '../../providers/services/businessProcessEvent.service';
-import { publishCaseEvent, publishPartyNotification } from '../../../vendors/events/caseEventBus';
+import { publishCaseEvent } from '../../../vendors/events/caseEventBus';
+import { createNotification, markReadByRelated } from '../../notifications/notifications.service';
 import type { AnalystRole } from '../../../shared/models/identity.model';
 
 const col = (db: Db) => db.collection<CustomerQuestionRecord>(CUSTOMER_QUESTION_COLLECTION);
@@ -69,7 +70,18 @@ export async function createQuestion(
     bianServiceDomain: 'Fraud Diagnosis', bianControlRecordType: 'FraudDiagnosisCase',
   });
   publishCaseEvent({ caseId, kind: 'question.created', questionId: record.customerQuestionInstanceReference, transactionId: record.cardTransactionInstanceReference, at: now.toISOString() });
-  publishPartyNotification(record.partyInstanceReference); // new pending item for the customer
+  // Deliver a persisted, unread notification to the customer (also fires the live party signal).
+  await createNotification(db, {
+    recipientPartyReference: record.partyInstanceReference,
+    notificationType: 'fraud_question',
+    title: 'A security question needs your response',
+    detail: text,
+    href: `/system/payment/history/${record.cardTransactionInstanceReference}`,
+    relatedReference: record.customerQuestionInstanceReference,
+    transactionId: record.cardTransactionInstanceReference,
+    caseReference: record.fraudDiagnosisCaseReference,
+    actionable: true,
+  });
 
   return { ok: true, question: toCustomerQuestionDTO(record) };
 }
@@ -155,7 +167,8 @@ export async function submitResponse(
     bianServiceDomain: 'Fraud Diagnosis', bianControlRecordType: 'FraudDiagnosisCase',
   });
   publishCaseEvent({ caseId: q.fraudDiagnosisInstanceReference, kind: 'question.answered', questionId, transactionId: q.cardTransactionInstanceReference, at: now.toISOString() });
-  publishPartyNotification(q.partyInstanceReference); // a pending item was cleared
+  // Answering implies the customer handled it: mark its notification read (clears the badge).
+  await markReadByRelated(db, q.partyInstanceReference, questionId);
 
   const updated = await col(db).findOne({ customerQuestionInstanceReference: questionId });
   return { ok: true, question: toCustomerQuestionDTO(updated!) };

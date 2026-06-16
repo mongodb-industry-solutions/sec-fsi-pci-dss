@@ -18,6 +18,7 @@ import { dispatchProvider } from '../../providers/services/integrationDispatch.s
 import { getCaseEnrichment } from '../services/caseEnrichment.service';
 import { createQuestion, listQuestionsByCase } from '../services/customerQuestion.service';
 import { subscribeCaseEvents } from '../../../vendors/events/caseEventBus';
+import { createNotification } from '../../notifications/notifications.service';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
 const ENRICHMENT_ROLES = ['level1_analyst', 'level2_investigator', 'security_auditor'];
@@ -594,6 +595,29 @@ Req 7 (least privilege) and Req 10 (audit of sensitive access).`,
         resolutionOutcome: body.resolutionOutcome,
         ...(body.fraudDiagnosisCaseStatus === 'under_review' && { action: 'escalation_cancelled' }),
       }, actorOf(request));
+    }
+
+    // Notify the customer when their case is resolved (ADR-031 transaction-status notification).
+    if (body.fraudDiagnosisCaseStatus === 'resolved_cleared' || body.fraudDiagnosisCaseStatus === 'resolved_fraud') {
+      const fc = await getCaseById(fastify.db, id);
+      if (fc) {
+        const agreement = await fastify.db.collection(CUSTOMER_AGREEMENT_COLLECTION)
+          .findOne<{ partyInstanceReference?: string }>({ customerAgreementInstanceReference: fc.customerAgreementInstanceReference });
+        const cleared = body.fraudDiagnosisCaseStatus === 'resolved_cleared';
+        await createNotification(fastify.db, {
+          recipientPartyReference: agreement?.partyInstanceReference ?? '',
+          notificationType: 'transaction_status',
+          title: cleared ? 'A transaction review was completed' : 'A transaction was confirmed as fraud',
+          detail: cleared
+            ? 'Your transaction was reviewed and confirmed as legitimate. No action is needed.'
+            : 'An unauthorized transaction was confirmed. A refund has been initiated and your card secured.',
+          href: `/system/payment/history/${fc.cardTransactionInstanceReference}`,
+          relatedReference: `status-${fc.fraudDiagnosisInstanceReference}`,
+          transactionId: fc.cardTransactionInstanceReference,
+          caseReference: fc.fraudDiagnosisCaseReference,
+          actionable: false,
+        });
+      }
     }
 
     const updated = result as unknown as { fraudDiagnosisInstanceReference: string; fraudDiagnosisCaseStatus: string; recordUpdatedDateTime: Date };
@@ -1232,11 +1256,17 @@ page; the answer is immutable once submitted (PCI DSS Req 10 traceability).`,
 
     reply.hijack();
     const res = reply.raw;
+    // hijack() bypasses Fastify's CORS hook, so echo the CORS headers here or the browser blocks the
+    // cross-origin stream (origin allow-listed by the cors plugin).
+    const origin = (request.headers.origin as string | undefined) ?? process.env.CORS_ORIGIN ?? 'http://localhost:3000';
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Credentials': 'true',
+      Vary: 'Origin',
     });
     res.write('event: ready\ndata: {}\n\n');
 

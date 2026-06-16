@@ -146,6 +146,17 @@ export async function createCollections(
     console.log('  skip:    fraudDiagnosisCustomerQuestion (already exists)');
   }
 
+  // ADR-031: Notifications  -  plaintext (no CHD), per-party with read/unread state
+  if (!existingNames.has('notification') || reset) {
+    if (existingNames.has('notification') && reset) {
+      await db.collection('notification').drop();
+    }
+    await db.createCollection('notification');
+    console.log('  created: notification');
+  } else {
+    console.log('  skip:    notification (already exists)');
+  }
+
   // SD-60: Customer Credit Rating State  -  plaintext, classification metadata, no PII
   if (!existingNames.has('customerCreditRatingState') || reset) {
     if (existingNames.has('customerCreditRatingState') && reset) {

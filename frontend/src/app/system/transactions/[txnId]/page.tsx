@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '../../../../lib/api';
@@ -41,16 +41,20 @@ function RevealField({ label, value, type }: { label: string; value: string; typ
   const masked = type === 'qe-equality'
     ? value.slice(0, 3) + '●●●●●●●●' + value.slice(-3)
     : '●●●●●●●●●●●●';
+  // Renders as two grid cells (label, value) so protected fields line up with the regular
+  // label/value rows in the surrounding `grid grid-cols-2`.
   return (
-    <div className="flex items-center gap-2">
+    <>
       <EncryptionBadge label={label} type={type} />
-      <span className={`text-xs font-mono transition-colors ${shown ? 'text-gray-900' : 'text-gray-400 select-none'}`}>
-        {shown ? value : masked}
-      </span>
-      <button onClick={() => setShown(v => !v)} className="text-gray-400 hover:text-[#001E2B] transition-colors" title={shown ? 'Hide' : 'Reveal'}>
-        {shown ? <EyeOff size={13} /> : <Eye size={13} />}
-      </button>
-    </div>
+      <div className="flex items-center gap-2 min-w-0">
+        <span className={`text-xs font-mono truncate transition-colors ${shown ? 'text-gray-900' : 'text-gray-400 select-none'}`}>
+          {shown ? value : masked}
+        </span>
+        <button onClick={() => setShown(v => !v)} className="text-gray-400 hover:text-[#001E2B] transition-colors shrink-0" title={shown ? 'Hide' : 'Reveal'}>
+          {shown ? <EyeOff size={13} /> : <Eye size={13} />}
+        </button>
+      </div>
+    </>
   );
 }
 
@@ -277,18 +281,20 @@ export default function TransactionDetailPage() {
             {debugMode && (
               <p className="text-xs font-semibold text-blue-700 uppercase mb-2">QE:equality  -  searchable while encrypted</p>
             )}
-            {txn.cardTransactionAccountReference ? (
-              <RevealField
-                label="Account Reference"
-                value={txn.cardTransactionAccountReference}
-                type="qe-equality"
-              />
-            ) : (
-              <div className="flex items-center gap-2">
-                <EncryptionBadge label="Account Reference" type="qe-equality" />
-                <span className="text-gray-400 text-xs italic">Not available at this access level</span>
-              </div>
-            )}
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm items-center">
+              {txn.cardTransactionAccountReference ? (
+                <RevealField
+                  label="Account Reference"
+                  value={txn.cardTransactionAccountReference}
+                  type="qe-equality"
+                />
+              ) : (
+                <>
+                  <EncryptionBadge label="Account Reference" type="qe-equality" />
+                  <span className="text-gray-400 text-xs italic">Not available at this access level</span>
+                </>
+              )}
+            </div>
           </div>
 
           {/* QE:none - debug only: explains system architecture (DEK-sensitive, L2 escalation) */}
@@ -329,14 +335,14 @@ export default function TransactionDetailPage() {
                   )}
                 </div>
               ) : (
-                <div className="space-y-1.5">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm items-center">
                   {['Raw Gateway Payload', 'Processor Metadata'].map(f => (
-                    <div key={f} className="flex items-center gap-2">
+                    <Fragment key={f}>
                       <EncryptionBadge label={f} type="qe-none" />
                       <span className="text-gray-400 text-xs italic">
                         {isL2 && !escalationToken ? 'Click "Approve escalation" above' : 'Requires Level 2 escalation approval'}
                       </span>
-                    </div>
+                    </Fragment>
                   ))}
                 </div>
               )}

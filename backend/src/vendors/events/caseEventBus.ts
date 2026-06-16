@@ -33,7 +33,7 @@ export function subscribeCaseEvents(caseId: string, listener: (event: CaseStream
 
 // Per-party notification signal: fired when the party's notification set changes (a question is
 // raised to them, or one they had pending is answered). Carries no payload (the client refetches the
-// scoped list) — keeps CHD/PII out of the stream entirely (PCI DSS Req 3/7).
+// scoped list), keeps CHD/PII out of the stream entirely (PCI DSS Req 3/7).
 export function publishPartyNotification(partyRef: string | undefined): void {
   if (partyRef) bus.emit(partyChannel(partyRef), { at: new Date().toISOString() });
 }

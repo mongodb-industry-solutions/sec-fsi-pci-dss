@@ -25,6 +25,21 @@ export function NotificationBell() {
   useEffect(() => { load(); }, [load]);
   useNotificationsStream(token, load); // live refresh on change
 
+  function readOne(n: NotificationItem) {
+    if (n.status === 'unread') {
+      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, status: 'read' } : x)));
+      setCount((c) => Math.max(0, c - 1));
+      api.notifications.markRead(n.id, token).catch(() => { /* ignore */ });
+    }
+    setOpen(false);
+  }
+
+  function readAll() {
+    setItems((prev) => prev.map((x) => ({ ...x, status: 'read' })));
+    setCount(0);
+    api.notifications.markAllRead(token).catch(() => { /* ignore */ });
+  }
+
   useEffect(() => {
     function onDown(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setOpen(false); }
@@ -57,7 +72,9 @@ export function NotificationBell() {
         <div role="menu" className="absolute right-0 top-full mt-2 w-80 max-w-[90vw] rounded-xl border border-white/10 bg-[#0d2a38] shadow-2xl shadow-black/40 overflow-hidden z-50">
           <div className="px-4 py-3 flex items-center justify-between border-b border-white/8">
             <p className="text-white text-sm font-semibold">Notifications</p>
-            {count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#00ED64]/15 text-[#00ED64] font-medium border border-[#00ED64]/30">{count} pending</span>}
+            {count > 0
+              ? <button onClick={readAll} className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#00ED64]/15 text-[#00ED64] font-medium border border-[#00ED64]/30 hover:bg-[#00ED64]/25 transition-colors">Mark all read</button>
+              : <span className="text-[10px] text-gray-500">No new</span>}
           </div>
 
           {top5.length === 0 ? (
@@ -66,11 +83,11 @@ export function NotificationBell() {
             <ul className="max-h-80 overflow-y-auto divide-y divide-white/5">
               {top5.map((n) => (
                 <li key={n.id}>
-                  <Link href={n.href} role="menuitem" onClick={() => setOpen(false)}
-                    className="block px-4 py-2.5 hover:bg-white/8 transition-colors">
+                  <Link href={n.href} role="menuitem" onClick={() => readOne(n)}
+                    className={`block px-4 py-2.5 hover:bg-white/8 transition-colors ${n.status === 'read' ? 'opacity-60' : ''}`}>
                     <div className="flex items-center gap-2">
-                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${n.actionable ? 'bg-[#00ED64]' : 'bg-gray-500'}`} />
-                      <p className="text-sm font-medium text-gray-100 truncate">{n.title}</p>
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${n.status === 'unread' ? (n.actionable ? 'bg-[#00ED64]' : 'bg-sky-400') : 'bg-gray-600'}`} />
+                      <p className={`text-sm truncate ${n.status === 'unread' ? 'font-semibold text-gray-100' : 'font-medium text-gray-300'}`}>{n.title}</p>
                     </div>
                     <p className="text-xs text-gray-400 truncate mt-0.5 pl-3.5">{n.detail}</p>
                   </Link>
