@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   BriefcaseMedical, CreditCard, Users, BarChart3, ClipboardList,
   User, PlusCircle, Store, ClipboardCheck,
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { getToken, decodeToken } from '../lib/auth';
 import { api } from '../lib/api';
+import { useNotificationsChanged, useNotificationsStream } from '../lib/useNotificationsStream';
 import { CarouselNav } from './CarouselNav';
 
 interface NavItem {
@@ -100,14 +101,21 @@ function useActiveItem(items: NavItem[]) {
 }
 
 // ADR-031: live count of pending notifications (customer questions to answer) for the badge.
+// Refreshes on the same signals as the top-bar bell: the same-tab "changed" event (instant when an
+// item is read elsewhere) and the SSE stream (new notifications / cross-tab changes).
 function useNotifCount(role: string): number {
   const [count, setCount] = useState(0);
-  useEffect(() => {
-    if (role !== 'customer') { setCount(0); return; }
-    const t = getToken() ?? '';
-    if (!t) return;
-    api.notifications.list(t).then((r) => setCount(r.count)).catch(() => setCount(0));
-  }, [role]);
+  const [token, setToken] = useState('');
+  useEffect(() => { setToken(getToken() ?? ''); }, []);
+
+  const reload = useCallback(() => {
+    if (role !== 'customer' || !token) { setCount(0); return; }
+    api.notifications.list(token).then((r) => setCount(r.count)).catch(() => setCount(0));
+  }, [role, token]);
+
+  useEffect(() => { reload(); }, [reload]);
+  useNotificationsChanged(reload);                                  // instant same-tab refresh on read
+  useNotificationsStream(role === 'customer' ? token : '', reload); // live refresh (SSE)
   return count;
 }
 
