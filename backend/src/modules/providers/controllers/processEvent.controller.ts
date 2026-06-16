@@ -7,6 +7,7 @@ import {
   type AuditSource,
 } from '../services/businessProcessEvent.service';
 import type { BusinessProcessType, ComplianceProcessType, BusinessEntityType } from '../models/externalProviderArrangement.model';
+import { MongoEventStore } from '../../../vendors/eventbus';
 
 const E = { type: 'object', properties: { error: { type: 'string' } } };
 
@@ -62,6 +63,27 @@ export async function processEventController(fastify: FastifyInstance) {
         limit:      q.limit ? parseInt(q.limit, 10) : 20,
       });
       return reply.send(result);
+    },
+  });
+
+  // ── GET /events/trail/:correlationId ────────────────────────────────────────
+  // dev.v8: the correlated journey. Every DomainEvent for one business-process instance
+  // (e.g. a payment) in time order, so an investigator/auditor follows the whole story
+  // (issuer + FDS + sanctions + AML + authorization) without cross-referencing logs.
+  fastify.get('/trail/:correlationId', {
+    schema: {
+      tags: ['events'],
+      summary: 'Correlated event trail for one journey (dev.v8 EDA)',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['correlationId'], properties: { correlationId: { type: 'string' } } },
+      response: { 200: { type: 'object', additionalProperties: true }, 403: E },
+    },
+    handler: async (request, reply) => {
+      if (!isAuditRole(request as unknown as AuthenticatedRequest))
+        return reply.status(403).send({ error: 'Forbidden: security_auditor or manager role required' });
+      const { correlationId } = request.params as { correlationId: string };
+      const events = await new MongoEventStore(fastify.db).trail(correlationId);
+      return reply.send({ correlationId, count: events.length, events });
     },
   });
 
