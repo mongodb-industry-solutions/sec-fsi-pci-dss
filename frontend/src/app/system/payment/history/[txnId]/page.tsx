@@ -7,6 +7,7 @@ import { getToken, decodeToken } from '../../../../../lib/auth';
 import { useDebugMode } from '../../../../../lib/debugMode';
 import { Eye, EyeOff } from 'lucide-react';
 import { RawMongoPanel } from '../../../../../components/RawMongoPanel';
+import { CustomerQuestionsPanel } from '../../../../../components/CustomerQuestionsPanel';
 
 interface StoredTransaction {
   txnId: string;
@@ -374,6 +375,9 @@ export default function TransactionDetailPage() {
           )}
         </div>
       )}
+
+      {/* Customer questions from L1/L2 (ADR-031) — answer Yes/No/Other, immutable once submitted. */}
+      {token && <CustomerQuestionsPanel txnId={txnId} token={token} />}
 
       {/* Resolution outcome */}
       {fraudCase?.fraudDiagnosisResolutionRecord && (

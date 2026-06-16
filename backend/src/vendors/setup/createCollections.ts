@@ -135,6 +135,17 @@ export async function createCollections(
     console.log('  skip:    fraudDiagnosisCaseEvents (already exists)');
   }
 
+  // SD-83: Customer Questions  -  plaintext (no CHD), investigator questions + immutable responses
+  if (!existingNames.has('fraudDiagnosisCustomerQuestion') || reset) {
+    if (existingNames.has('fraudDiagnosisCustomerQuestion') && reset) {
+      await db.collection('fraudDiagnosisCustomerQuestion').drop();
+    }
+    await db.createCollection('fraudDiagnosisCustomerQuestion');
+    console.log('  created: fraudDiagnosisCustomerQuestion');
+  } else {
+    console.log('  skip:    fraudDiagnosisCustomerQuestion (already exists)');
+  }
+
   // SD-60: Customer Credit Rating State  -  plaintext, classification metadata, no PII
   if (!existingNames.has('customerCreditRatingState') || reset) {
     if (existingNames.has('customerCreditRatingState') && reset) {

@@ -129,6 +129,8 @@ export type ActionType =
   | 'escalated'
   | 'ai_review'
   | 'resolved'
-  | 'closed';
+  | 'closed'
+  | 'question_created'    // SD-83: investigator posed a question to the customer
+  | 'question_answered';  // SD-83: customer submitted an (immutable) response
 
 export type ResolutionOutcome = 'cleared' | 'confirmed_fraud' | 'referred';

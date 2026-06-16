@@ -6,6 +6,7 @@ import { api, FraudCase, ActionEvent, HrpcCheckResponse, CaseEnrichment } from '
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { RawMongoPanel } from '../../../../components/RawMongoPanel';
 import { CaseNotesPanel } from '../../../../components/CaseNotesPanel';
+import { CaseQuestionsPanel } from '../../../../components/CaseQuestionsPanel';
 import { SEVERITY_COLORS, STATUS_COLORS, ROLE_LABELS, formatRiskIndicator } from '../../../../lib/constants';
 import { useDebugMode } from '../../../../lib/debugMode';
 import { Breadcrumb } from '../../../../components/Breadcrumb';
@@ -501,6 +502,9 @@ export default function DemoCaseDetailPage() {
 
         {/* -- Notes -- */}
         {token && <CaseNotesPanel caseId={caseId} token={token} role={role} onActivity={() => reload(token)} />}
+
+        {/* -- Customer questions (ADR-031) -- */}
+        {token && <CaseQuestionsPanel caseId={caseId} token={token} role={role} onActivity={() => reload(token)} />}
 
         {fraudCase.fraudDiagnosisResolutionRecord && (
           <div className={`rounded-xl border p-4 text-sm ${fraudCase.fraudDiagnosisResolutionRecord.resolutionOutcome === 'confirmed_fraud' ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>

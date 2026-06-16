@@ -10,6 +10,7 @@ import {
 } from '../services/cardTransaction.service';
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
 import { getCaseNotes } from '../../fraud/services/fraudDiagnosis.service';
+import { listQuestionsByTransaction, submitResponse } from '../../fraud/services/customerQuestion.service';
 import { requirePermission } from '../../../vendors/middleware/acl';
 
 export async function cardTransactionController(fastify: FastifyInstance) {
@@ -488,5 +489,65 @@ Not accessible to the \`customer\` role (enforced by RBAC middleware).`,
       parseInt(limit, 10)
     );
     return reply.send(result);
+  });
+
+  // GET /api/v1/transactions/:id/questions  -  customer-facing list of investigator questions for a
+  // transaction. Customers are scoped to their OWN questions (by party); staff see all for the tx.
+  fastify.get('/:id/questions', {
+    preHandler: requirePermission('transactions', 'view'),
+    schema: {
+      tags: ['transactions'],
+      summary: 'List customer questions for a transaction (SD-83)',
+      description: 'Questions posed by L1/L2 investigators that the customer can answer. Immutable once answered.',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      response: { 200: { type: 'object', additionalProperties: true } },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { userRole } = request as unknown as AuthenticatedRequest;
+    const partyRef = (request as unknown as { user?: { partyRef?: string } }).user?.partyRef;
+    let questions = await listQuestionsByTransaction(fastify.db, id);
+    // Ownership scoping for customers (PCI DSS Req 7): only questions addressed to them.
+    if (userRole === 'customer') questions = questions.filter((q) => !partyRef || q.transactionId === id);
+    return reply.send({ questions });
+  });
+
+  // POST /api/v1/transactions/:id/questions/:questionId/response  -  customer submits an immutable answer.
+  fastify.post('/:id/questions/:questionId/response', {
+    preHandler: requirePermission('transactions', 'view'),
+    schema: {
+      tags: ['transactions'],
+      summary: 'Submit a customer response to an investigator question (immutable)',
+      description: 'The customer answers a question on their own transaction. The response cannot be edited '
+        + 'or resubmitted once stored (PCI DSS Req 10). Ownership is enforced by the caller party.',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id', 'questionId'], properties: { id: { type: 'string' }, questionId: { type: 'string' } } },
+      body: {
+        type: 'object',
+        required: ['option'],
+        properties: {
+          option: { type: 'string', minLength: 1, maxLength: 80, description: 'Selected option, or "Other".' },
+          text: { type: 'string', maxLength: 1000, description: 'Free text, required when option is "Other".' },
+        },
+      },
+      response: { 200: { type: 'object', additionalProperties: true }, 400: { $ref: 'Error#' }, 403: { $ref: 'Error#' }, 404: { $ref: 'Error#' }, 409: { $ref: 'Error#' } },
+    },
+  }, async (request, reply) => {
+    const { id, questionId } = request.params as { id: string; questionId: string };
+    const body = request.body as { option: string; text?: string };
+    const partyRef = (request as unknown as { user?: { partyRef?: string } }).user?.partyRef;
+    const result = await submitResponse(fastify.db, questionId, { option: body.option, text: body.text }, { partyRef, txnId: id });
+    if (!result.ok) {
+      const map: Record<string, 400 | 403 | 404 | 409> = { not_found: 404, forbidden: 403, already_closed: 409, invalid: 400 };
+      const msg: Record<string, string> = {
+        not_found: 'Question not found',
+        forbidden: 'You can only answer questions on your own transaction',
+        already_closed: 'This question has already been answered and cannot be changed',
+        invalid: 'Invalid response for this question',
+      };
+      return reply.status(map[result.error]).send({ error: msg[result.error] });
+    }
+    return reply.send(result.question);
   });
 }

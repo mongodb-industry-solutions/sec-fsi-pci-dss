@@ -16,6 +16,7 @@ function actorOf(request: unknown): { ref?: string; name?: string } {
 }
 import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
 import { getCaseEnrichment } from '../services/caseEnrichment.service';
+import { createQuestion, listQuestionsByCase } from '../services/customerQuestion.service';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
 const ENRICHMENT_ROLES = ['level1_analyst', 'level2_investigator', 'security_auditor'];
@@ -1172,5 +1173,59 @@ Retracted notes are hidden from the customer but remain visible in the internal 
 
     const notes = await getCaseNotes(fastify.db, id, visibility);
     return reply.send({ notes });
+  });
+
+  // POST /api/v1/fraud/:id/questions  -  L1/L2 pose a structured question to the customer (SD-83).
+  fastify.post('/:id/questions', {
+    schema: {
+      tags: ['fraud'],
+      summary: 'Create a customer question on a fraud case (SD-83)',
+      description: `Investigator (L1/L2) poses a structured question to the customer with predefined
+selectable responses and an optional free-text "Other". The customer answers it on their transaction
+page; the answer is immutable once submitted (PCI DSS Req 10 traceability).`,
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      body: {
+        type: 'object',
+        required: ['questionText', 'options'],
+        properties: {
+          questionText: { type: 'string', minLength: 1, maxLength: 500 },
+          options: { type: 'array', items: { type: 'string', minLength: 1, maxLength: 80 }, minItems: 1, maxItems: 10 },
+          allowOther: { type: 'boolean', default: false },
+        },
+      },
+      response: { 201: { type: 'object', additionalProperties: true }, 400: { $ref: 'Error#' }, 403: { $ref: 'Error#' }, 404: { $ref: 'Error#' } },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { userRole } = request as unknown as AuthenticatedRequest;
+    if (userRole !== 'level1_analyst' && userRole !== 'level2_investigator') {
+      return reply.status(403).send({ error: 'Only L1 and L2 investigators may pose customer questions' });
+    }
+    const body = request.body as { questionText: string; options: string[]; allowOther?: boolean };
+    const actor = actorOf(request);
+    const result = await createQuestion(fastify.db, id, {
+      questionText: body.questionText, options: body.options, allowOther: !!body.allowOther,
+    }, { ref: actor.ref, name: actor.name, role: userRole as AnalystRole });
+    if (!result.ok) {
+      return reply.status(result.error === 'case_not_found' ? 404 : 400)
+        .send({ error: result.error === 'case_not_found' ? 'Fraud case not found' : 'A question text and at least one option are required' });
+    }
+    return reply.status(201).send(result.question);
+  });
+
+  // GET /api/v1/fraud/:id/questions  -  investigation roles list a case's questions + responses.
+  fastify.get('/:id/questions', {
+    schema: {
+      tags: ['fraud'],
+      summary: 'List customer questions for a fraud case (SD-83)',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      response: { 200: { type: 'object', additionalProperties: true } },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const questions = await listQuestionsByCase(fastify.db, id);
+    return reply.send({ questions });
   });
 }

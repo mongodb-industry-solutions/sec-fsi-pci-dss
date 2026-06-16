@@ -28,6 +28,7 @@ import { creditBureauModule }      from './modules/credit-bureau';
 import { cardAuthorizationModule } from './modules/card-authorization';
 import { cardIssuerModule }        from './modules/card-issuer';
 import { domainModule }       from './modules/domain';
+import { notificationsModule } from './modules/notifications';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
@@ -160,6 +161,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(cardIssuerModule,   { prefix: '/api/v1' });
   // Internal Module without a Provider counterpart (ADR-029).
   await fastify.register(domainModule,  { prefix: '/api/v1' });
+  // Customer notifications (pending fraud-investigation questions to answer).
+  await fastify.register(notificationsModule, { prefix: '/api/v1' });
 
   return fastify;
 }

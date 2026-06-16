@@ -8,10 +8,11 @@ import {
   User, PlusCircle, Store, ClipboardCheck,
   ChevronLeft, ChevronRight, Settings2, Plug,
   KeyRound, ShieldCheck, Activity, Network,
-  HelpCircle, LayoutGrid, Lock,
+  HelpCircle, LayoutGrid, Lock, Bell,
   type LucideIcon,
 } from 'lucide-react';
 import { getToken, decodeToken } from '../lib/auth';
+import { api } from '../lib/api';
 import { CarouselNav } from './CarouselNav';
 
 interface NavItem {
@@ -48,6 +49,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'Transactions',    path: '/system/payment/history', icon: ClipboardList },
     { label: 'New Payment',     path: '/system/payment',         icon: PlusCircle, exact: true },
     { label: 'Payment Methods', path: '/system/cards',           icon: CreditCard },
+    { label: 'Notifications',   path: '/system/notifications',   icon: Bell },
     { label: 'Merchant',        path: '/system/merchant',        icon: Store },
   ],
   merchant_officer: [
@@ -97,11 +99,24 @@ function useActiveItem(items: NavItem[]) {
   return (item: NavItem) => best !== null && best.path === item.path;
 }
 
+// ADR-031: live count of pending notifications (customer questions to answer) for the badge.
+function useNotifCount(role: string): number {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (role !== 'customer') { setCount(0); return; }
+    const t = getToken() ?? '';
+    if (!t) return;
+    api.notifications.list(t).then((r) => setCount(r.count)).catch(() => setCount(0));
+  }, [role]);
+  return count;
+}
+
 /** Desktop/tablet sidebar (hidden below md breakpoint) */
 export function DemoSidebar() {
   const role    = useRole();
   const items   = NAV_BY_ROLE[role] ?? [];
   const isActive = useActiveItem([...items, ...ACCOUNT_ITEMS]);
+  const notifCount = useNotifCount(role);
   const [collapsed, setCollapsed] = useState(true);
 
   return (
@@ -134,7 +149,7 @@ export function DemoSidebar() {
               key={item.path}
               href={item.path}
               title={item.tooltip ?? item.label}
-              className={`flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium transition-colors ${
+              className={`relative flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium transition-colors ${
                 active
                   ? 'bg-[#00ED64]/10 text-[#00ED64] border-r-2 border-[#00ED64]'
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -142,6 +157,11 @@ export function DemoSidebar() {
             >
               <Icon size={16} className="shrink-0" />
               {!collapsed && <span className="truncate">{item.label}</span>}
+              {item.path === '/system/notifications' && notifCount > 0 && (
+                <span className={`${collapsed ? 'absolute top-1.5 right-1.5 w-2 h-2 p-0' : 'ml-auto min-w-[18px] h-[18px] px-1'} rounded-full bg-[#00ED64] text-[#001E2B] text-[10px] font-bold flex items-center justify-center`}>
+                  {collapsed ? '' : notifCount}
+                </span>
+              )}
             </Link>
           );
         })}

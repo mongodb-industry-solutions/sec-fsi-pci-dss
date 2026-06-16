@@ -14,7 +14,8 @@ export type AnalystRole =
   | 'level2_investigator'
   | 'security_auditor'
   | 'merchant_officer'  // Ch-05: can view fraud cases linked to their merchants
-  | 'ai_agent';
+  | 'ai_agent'
+  | 'customer';         // SD-83: the subject answering an investigator's question (customer response)
 
 export interface JwtUserPayload {
   sub: string;

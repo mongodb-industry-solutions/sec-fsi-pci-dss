@@ -922,6 +922,23 @@ Authorization is **data-driven, default-deny** (PCI DSS Req 7). The permission *
 
 ---
 
+### 1.16 Customer Questions (ADR-031, SD-83)
+
+Structured investigator→customer questions on a fraud case, answered by the customer on the related transaction; **immutable once answered** (PCI DSS Req 10).
+
+**Collection `fraudDiagnosisCustomerQuestion`** (plaintext, no CHD) — `{ customerQuestionInstanceReference (PK), fraudDiagnosisInstanceReference, fraudDiagnosisCaseReference, cardTransactionInstanceReference, customerAgreementInstanceReference, partyInstanceReference, questionText, questionOptions[], allowOther, questionStatus('pending'|'closed'), askedBy{InstanceReference,Name,Role}, askedDateTime, responseOption?, responseText?, respondedByInstanceReference?, respondedDateTime?, bianServiceDomain, bianControlRecordType, recordCreated/UpdatedDateTime, schemaVersion }`. Indexes: unique `customerQuestionInstanceReference`; `cardTransactionInstanceReference`; `{fraudDiagnosisInstanceReference, askedDateTime}`; `{partyInstanceReference, questionStatus}`.
+
+**API:**
+- `POST /api/v1/fraud/:id/questions` (L1/L2) — body `{ questionText, options[], allowOther }`; creates a pending question on the case.
+- `GET /api/v1/fraud/:id/questions` (investigation roles) — list questions + responses.
+- `GET /api/v1/transactions/:id/questions` (`transactions:view`; customers scoped to own party) — customer-facing list.
+- `POST /api/v1/transactions/:id/questions/:questionId/response` — customer answers `{ option, text? }`; atomic pending→closed (immutable; 409 if already closed; 403 if not the owner; 400 if the option is not valid / "Other" without text).
+- `GET /api/v1/notifications` — the caller's pending questions (drives the menu badge).
+
+**Events (Req 10):** create/answer emit `businessProcessEvent` (`fraud.question.created` / `fraud.question.answered`) and append `fraudDiagnosisCaseEvents` (`question_created` / `question_answered`). No CHD is ever stored in the question or response.
+
+---
+
 ## 2. QE encryptedFieldsMaps
 
 All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `keyId` values are per-field BSON Binary UUIDs resolved at runtime from the provisioned DEKs via `provisionDEKs.ts`.

@@ -1648,3 +1648,24 @@ ADR-004 established the dual-mode frontend. In practice the Simulator had drifte
 - (+) Default-deny is surfaced to the user (AccessDenied) instead of a blank/erroring page.
 - (−) A new collection (`role`) + seed + cache to maintain. Mitigated by code-as-source-of-truth seed/fallback.
 - (−) `requirePermission` adds one cached DB read per guarded route (30s TTL); negligible.
+
+---
+
+## ADR-031 — Customer Questions and Responses on Fraud Cases
+
+**Status:** Accepted (2026-06-15). Implemented v8.2. Aligns **BIAN SD-83** (Fraud Diagnosis) and **PCI DSS Req 10** (immutable, traceable audit of investigation interactions).
+
+**Context.** During an investigation, L1/L2 agents need a structured way to ask the customer a question (e.g. "Did you perform this operation?") and capture the answer as part of the case record, rather than free-form notes. The customer must be able to respond from their own transaction view, be notified of pending questions, and the answer must be tamper-evident.
+
+**Decision.**
+1. **New collection `fraudDiagnosisCustomerQuestion`** (plaintext, no CHD) linked to the case (`fraudDiagnosisInstanceReference`), the transaction (customer entry point) and the owning party (ownership checks). A question carries `questionText`, predefined `questionOptions[]`, an `allowOther` flag, `questionStatus` (`pending`/`closed`), and an immutable response (`responseOption`, optional `responseText`).
+2. **Investigator API** (L1/L2, fraud-case scope): `POST /api/v1/fraud/:id/questions`, `GET /api/v1/fraud/:id/questions`. The options list is fully customizable per question.
+3. **Customer API** (on the transaction, `transactions:view`): `GET /api/v1/transactions/:id/questions` (scoped to the caller's own party) and `POST /api/v1/transactions/:id/questions/:questionId/response`. The answer is written with an **atomic pending→closed transition** — it cannot be edited or resubmitted (immutability, Req 10). Ownership is enforced by the caller's party (Req 7).
+4. **Notifications**: `GET /api/v1/notifications` returns the caller's pending questions; a "Notifications" entry + count badge appears in the customer menu and links to the relevant transaction.
+5. **Event tracking**: create and answer each emit a `businessProcessEvent` (`fraud.question.created` / `fraud.question.answered`) for the unified audit feed, and append a `fraudDiagnosisCaseEvents` entry (`question_created` / `question_answered`) so the case timeline shows the full interaction.
+
+**Consequences.**
+- (+) Structured, auditable customer interaction; every question and response is timestamped and attributed (Req 10).
+- (+) Immutable answers (no edit after submit) give a defensible investigation record.
+- (+) Reuses the existing case/events/RBAC/notes architecture; no parallel system.
+- (−) One new collection + a small notifications surface to maintain.

@@ -12,6 +12,7 @@ import { seedCustomers } from './seedCustomers';
 import { seedCards } from './seedCards';
 import { seedTransactions } from './seedTransactions';
 import { seedCases } from './seedCases';
+import { seedCustomerQuestions } from './seedCustomerQuestions';
 import { seedCreditRatings } from './seedCreditRatings';
 import { seedIntegrations } from './seedIntegrations';
 import { seedCapabilityModules } from './seedCapabilityModules';
@@ -92,6 +93,9 @@ export async function runSeed() {
 
     console.log('Seeding fraudDiagnosisCase...');
     await seedCases(db);
+
+    console.log('Seeding fraudDiagnosisCustomerQuestion (ADR-031 demo question)...');
+    await seedCustomerQuestions(db);
 
     console.log('Seeding customerCreditRatingState...');
     await seedCreditRatings(db);

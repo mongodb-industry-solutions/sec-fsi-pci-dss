@@ -264,6 +264,33 @@ export interface TransactionNotesResponse {
   notes: NoteEntry[];
 }
 
+// ADR-031: customer questions raised by L1/L2 investigators (SD-83), answered by the customer.
+export interface CustomerQuestion {
+  questionId: string;
+  caseReference: string;
+  transactionId: string;
+  questionText: string;
+  options: string[];
+  allowOther: boolean;
+  status: 'pending' | 'closed';
+  askedByRole: string;
+  askedDateTime: string;
+  responseOption: string | null;
+  responseText: string | null;
+  respondedDateTime: string | null;
+}
+
+export interface NotificationItem {
+  type: string;
+  id: string;
+  transactionId: string;
+  caseReference: string;
+  title: string;
+  detail: string;
+  href: string;
+  createdAt: string;
+}
+
 // ADR-030: data-driven RBAC/ACL
 export type AclPermissionMap = Record<string, string[]>;
 export interface EffectivePermissions {
@@ -369,6 +396,12 @@ export const api = {
       }>('/api/v1/auth/me', {}, token),
   },
 
+  notifications: {
+    // ADR-031: pending actionable items for the current user (e.g. unanswered security questions).
+    list: (token: string) =>
+      apiFetch<{ count: number; items: NotificationItem[] }>('/api/v1/notifications', {}, token),
+  },
+
   transactions: {
     create: (body: object, token?: string) =>
       apiFetch<CardTransactionCreateResponse>('/api/v1/transactions', {
@@ -409,6 +442,15 @@ export const api = {
       ),
     getNotes: (txnId: string, token: string) =>
       apiFetch<TransactionNotesResponse>(`/api/v1/transactions/${txnId}/notes`, {}, token),
+    // ADR-031: customer questions on a transaction + immutable answer submission.
+    getQuestions: (txnId: string, token: string) =>
+      apiFetch<{ questions: CustomerQuestion[] }>(`/api/v1/transactions/${txnId}/questions`, {}, token),
+    answerQuestion: (txnId: string, questionId: string, body: { option: string; text?: string }, token: string) =>
+      apiFetch<CustomerQuestion>(
+        `/api/v1/transactions/${txnId}/questions/${questionId}/response`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token,
+      ),
     listAll: (
       params: { status?: string; merchant?: string; cardToken?: string; email?: string; page?: number; limit?: number },
       token: string
@@ -600,6 +642,11 @@ export const api = {
       ),
     getNotes: (caseId: string, token: string) =>
       apiFetch<CaseNotesResponse>(`/api/v1/fraud/${caseId}/notes`, {}, token),
+    // ADR-031: investigator-posed customer questions on a case.
+    getQuestions: (caseId: string, token: string) =>
+      apiFetch<{ questions: CustomerQuestion[] }>(`/api/v1/fraud/${caseId}/questions`, {}, token),
+    createQuestion: (caseId: string, body: { questionText: string; options: string[]; allowOther: boolean }, token: string) =>
+      apiFetch<CustomerQuestion>(`/api/v1/fraud/${caseId}/questions`, { method: 'POST', body: JSON.stringify(body) }, token),
     addNote: (
       caseId: string,
       body: { noteText: string; visibility: 'internal' | 'customer' },

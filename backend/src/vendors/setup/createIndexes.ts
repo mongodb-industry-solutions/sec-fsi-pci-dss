@@ -162,6 +162,14 @@ export async function createIndexes(client: MongoClient) {
     { key: { fraudDiagnosisInstanceReference: 1, actionDateTime: -1 } },
   ]);
 
+  // SD-83: Customer Questions (ADR-031)
+  await ensureIndexes(db, 'fraudDiagnosisCustomerQuestion', [
+    { key: { customerQuestionInstanceReference: 1 }, unique: true },
+    { key: { cardTransactionInstanceReference: 1 } },
+    { key: { fraudDiagnosisInstanceReference: 1, askedDateTime: -1 } },
+    { key: { partyInstanceReference: 1, questionStatus: 1 } },
+  ]);
+
   // SD-91: Customer Authentication Assessment
   await ensureIndexes(db, 'customerAuthenticationAssessment', [
     { key: { customerAuthenticationInstanceReference: 1 }, unique: true },
