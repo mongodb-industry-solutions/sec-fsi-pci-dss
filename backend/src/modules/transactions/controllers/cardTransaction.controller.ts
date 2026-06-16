@@ -1,13 +1,12 @@
 import { FastifyInstance } from 'fastify';
 import type { AuthenticatedRequest } from '../../../shared/models/identity.model';
 import {
-  createTransaction,
+  initiateTransaction,
   getTransactionById,
   getTransactionsByCardToken,
   getDistinctMerchants,
   getAllTransactions,
   CardNotActiveError,
-  CardIssuerDeclinedError,
 } from '../services/cardTransaction.service';
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
 import { CARD_TRANSACTION_COLLECTION } from '../models/cardTransaction.model';
@@ -148,33 +147,25 @@ the Merchant Name selector. No authentication required (public, simulator mode).
         },
       },
       response: {
-        201: {
-          description: 'Transaction recorded successfully.',
+        202: {
+          description: 'Transaction accepted and PENDING. Authorization runs asynchronously (issuer + risk); '
+            + 'subscribe to GET /api/v1/transactions/:id/stream (SSE) for the authorized / declined outcome.',
           type: 'object',
           properties: {
             cardTransactionInstanceReference: {
               type: 'string',
-              description: 'UUID of the created `cardTransaction` document. Use this to fetch the transaction with GET /:id.',
+              description: 'UUID of the created `cardTransaction`. Use it for the SSE stream and to fetch the transaction.',
             },
             cardTransactionStatus: {
               type: 'string',
-              enum: ['authorized', 'declined', 'pending', 'settled', 'disputed'],
-              description: 'Initial transaction status (always `authorized` on successful creation).',
-            },
-            fraudCaseCreated: {
-              type: 'boolean',
-              description: 'True when the amount or MCC triggered automatic fraud case creation.',
-            },
-            fraudDiagnosisInstanceReference: {
-              type: 'string',
-              description: 'UUID of the auto-created `fraudDiagnosisCase`. Present only when `fraudCaseCreated` is true.',
+              enum: ['pending'],
+              description: 'Always `pending`; the terminal status arrives over the SSE stream.',
             },
           },
         },
         400: { description: 'Required fields missing or invalid.', $ref: 'Error#' },
         401: { description: 'Missing or invalid Bearer token.', $ref: 'Error#' },
-        402: { description: 'Card issuer declined the card after analysis — payment not authorized.', $ref: 'Error#' },
-        422: { description: 'Card-on-file is deactivated or removed — PSP declined.', $ref: 'Error#' },
+        422: { description: 'Card-on-file is deactivated or removed - PSP declined.', $ref: 'Error#' },
         500: { description: 'Unexpected server error.', $ref: 'Error#' },
       },
     },
@@ -203,16 +194,16 @@ the Merchant Name selector. No authentication required (public, simulator mode).
     }
 
     try {
-      const result = await createTransaction(fastify.db, body);
-      return reply.status(201).send(result);
+      // dev.v8 F3: async authorization. Create the transaction PENDING and return immediately; the
+      // client opens GET /:id/stream (SSE) to receive the issuer decision (authorized / declined).
+      const result = await initiateTransaction(fastify.db, body);
+      return reply.status(202).send({
+        cardTransactionInstanceReference: result.cardTransactionInstanceReference,
+        cardTransactionStatus: result.cardTransactionStatus,
+      });
     } catch (err) {
       if (err instanceof CardNotActiveError) {
         return reply.status(422).send({ error: 'This card has been deactivated. Reactivate it to make payments, or use a different card.' });
-      }
-      if (err instanceof CardIssuerDeclinedError) {
-        // The card issuer is authoritative: it analysed the card and declined, so the payment is
-        // not authorized. The reason is surfaced for the audit; the customer sees a safe message.
-        return reply.status(402).send({ error: `The card issuer declined this card (${err.responseCode}). The payment was not authorized.` });
       }
       throw err;
     }

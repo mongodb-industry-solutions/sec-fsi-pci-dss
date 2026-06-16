@@ -4,6 +4,7 @@ import { EXTERNAL_PROVIDER_ARRANGEMENT_COLLECTION, ExternalProviderArrangement }
 import { logEvent } from './integrationDispatch.service';
 import { applyMappings } from './fieldMapping.service';
 import { createNotification } from '../../notifications/notifications.service';
+import { getEventBus, makeEvent } from '../../../vendors/eventbus';
 
 export function verifyHmacSignature(
   secret: string,
@@ -246,7 +247,7 @@ export async function processCardAuthorizationCallback(
 export async function processCardIssuerCallback(
   db: Db,
   provider: ExternalProviderArrangement,
-  body: { responseCode: string; cvvValidationResult?: string; pinValidationResult?: string }
+  body: { responseCode: string; cvvValidationResult?: string; pinValidationResult?: string; cardTransactionInstanceReference?: string; transactionId?: string; actionConfirmed?: boolean }
 ): Promise<void> {
   const mapped = applyInboundMapping(provider, body as unknown as Record<string, unknown>) as typeof body;
 
@@ -261,6 +262,21 @@ export async function processCardIssuerCallback(
     // recorded by the webhook inspector that receives the call.
     request: { method: 'POST', body: mapped },
   });
+
+  // dev.v8 F3: a real ASYNC issuer posts its decision here. Funnel it into the same event the saga
+  // consumes (cardissuer.validation.completed), so external and internal issuers drive one flow.
+  const txnId = mapped.cardTransactionInstanceReference ?? mapped.transactionId;
+  if (txnId) {
+    const approved = mapped.actionConfirmed ?? (mapped.responseCode === '00' || mapped.responseCode === '0000');
+    void getEventBus().publish(makeEvent({
+      eventType: 'cardissuer.validation.completed',
+      correlationId: txnId,
+      businessProcess: 'card_payment',
+      source: 'callback.card-issuer',
+      payload: { transactionId: txnId, approved, responseCode: mapped.responseCode },
+      bian: { serviceDomain: 'SD-88 Payment Card', controlRecord: 'PaymentCardValidation' },
+    }));
+  }
 }
 
 export async function processGenericCallback(

@@ -2,7 +2,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '../../../lib/api';
+import { api, awaitPaymentOutcome } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { useDebugMode } from '../../../lib/debugMode';
 import { FraudAlert } from '../../../components/FraudAlert';
@@ -286,9 +286,15 @@ export default function DemoPaymentPage() {
         gatewayPayload: { source: 'app-mode', paymentReference: paymentReference || undefined },
       }, token);
 
+      // dev.v8 F3: the payment is PENDING; wait for the issuer's async decision over SSE.
       const txnId = res.cardTransactionInstanceReference;
+      const outcome = await awaitPaymentOutcome(txnId);
+      if (outcome.status === 'declined') {
+        setError(`The card issuer declined this payment${outcome.declineReason ? ` (${outcome.declineReason.replace(/_/g, ' ')})` : ''}. No charge was made.`);
+        return;
+      }
       // Persisted server-side; history reads from the real API (no local mirror).
-      setResult({ txnId, fraudCaseCreated: res.fraudCaseCreated, caseId: res.fraudDiagnosisInstanceReference, maskedPan: maskedCard });
+      setResult({ txnId, fraudCaseCreated: !!outcome.fraudCaseCreated, caseId: outcome.caseId ?? undefined, maskedPan: maskedCard });
       setStep(3);
     } catch (err) {
       setError((err as Error).message);

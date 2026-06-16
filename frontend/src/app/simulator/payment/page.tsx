@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '../../../lib/api';
+import { api, awaitPaymentOutcome } from '../../../lib/api';
 import { FraudAlert } from '../../../components/FraudAlert';
 import { EncryptionBadge } from '../../../components/EncryptionBadge';
 import { Tooltip } from '../../../components/Tooltip';
@@ -406,15 +406,23 @@ export default function PaymentPage() {
         // so it surfaces in that merchant's received-payments view and its webhook callback fires.
         merchantAgreementInstanceReference: merchantId,
         gatewayPayload: { source: 'simulator', timestamp: new Date().toISOString() },
+        // Transient verification values sent to the card issuer for authorization (never stored/logged).
+        cardVerification: { ...(rawCard ? { cardNumber: rawCard } : {}), ...(form.expiry ? { expiry: form.expiry } : {}) },
       });
 
+      // dev.v8 F3: the payment is PENDING; wait for the issuer's async decision over SSE.
+      const txnId = res.cardTransactionInstanceReference;
+      const outcome = await awaitPaymentOutcome(txnId);
+      if (outcome.status === 'declined') {
+        setError(`The card issuer declined this payment${outcome.declineReason ? ` (${outcome.declineReason.replace(/_/g, ' ')})` : ''}. No charge was made.`);
+        return;
+      }
+
       const newResult = {
-        txnId: res.cardTransactionInstanceReference,
-        fraudCaseCreated: res.fraudCaseCreated,
-        caseId: res.fraudDiagnosisInstanceReference,
-        caseRef: res.fraudDiagnosisInstanceReference
-          ? `FD-SIM-${res.fraudDiagnosisInstanceReference.slice(-6).toUpperCase()}`
-          : undefined,
+        txnId,
+        fraudCaseCreated: !!outcome.fraudCaseCreated,
+        caseId: outcome.caseId ?? undefined,
+        caseRef: outcome.caseId ? `FD-SIM-${outcome.caseId.slice(-6).toUpperCase()}` : undefined,
         cardToken: cardTokenRef.current,
       };
       try {

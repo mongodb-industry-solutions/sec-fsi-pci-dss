@@ -77,11 +77,51 @@ export interface Merchant {
   mcc: string;
 }
 
+// dev.v8 F3: create now returns PENDING; the authorized/declined outcome arrives over SSE.
 export interface CardTransactionCreateResponse {
   cardTransactionInstanceReference: string;
-  cardTransactionStatus: string;
-  fraudCaseCreated: boolean;
-  fraudDiagnosisInstanceReference?: string;
+  cardTransactionStatus: string; // 'pending'
+}
+
+// Terminal authorization outcome delivered by GET /transactions/:id/stream (SSE).
+export interface PaymentOutcome {
+  status: 'authorized' | 'declined';
+  fraudCaseCreated?: boolean;
+  caseId?: string | null;
+  declineReason?: string | null;
+  declineCode?: string | null;
+}
+
+// Opens the public per-transaction SSE stream and resolves with the first terminal outcome. The
+// backend emits immediately if the outcome already landed, so this is race-safe. Public (no token).
+export function awaitPaymentOutcome(txnId: string, signal?: AbortSignal): Promise<PaymentOutcome> {
+  return new Promise<PaymentOutcome>((resolve, reject) => {
+    fetch(`${API_BASE_URL}/api/v1/transactions/${encodeURIComponent(txnId)}/stream`, { signal })
+      .then(async (res) => {
+        if (!res.body) { reject(new Error('No stream')); return; }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) { reject(new Error('Stream closed before outcome')); return; }
+          buffer += decoder.decode(value, { stream: true });
+          const frames = buffer.split('\n\n');
+          buffer = frames.pop() ?? '';
+          for (const frame of frames) {
+            const dataLine = frame.split('\n').find((l) => l.startsWith('data:'));
+            if (!dataLine) continue;
+            const json = dataLine.slice(5).trim();
+            if (!json || json === '{}') continue;
+            try {
+              const d = JSON.parse(json) as PaymentOutcome;
+              if (d.status) { await reader.cancel(); resolve(d); return; }
+            } catch { /* ignore non-JSON keepalives */ }
+          }
+        }
+      })
+      .catch(reject);
+  });
 }
 
 export interface FraudCaseListResponse {
