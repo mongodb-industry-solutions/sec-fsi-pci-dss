@@ -186,7 +186,8 @@ export async function initiateTransaction(
     correlationId: txnId,
     businessProcess: 'card_payment',
     source: 'psp.core',
-    payload: { amount: input.amount, currency: input.currency, merchantName: input.cardTransactionMerchantName, maskedPan: input.cardTransactionMaskedPanDisplay, channel: input.cardTransactionChannel },
+    // Phase-1 gates the saga must aggregate before authorizing (dev.v8 F4).
+    payload: { amount: input.amount, currency: input.currency, merchantName: input.cardTransactionMerchantName, maskedPan: input.cardTransactionMaskedPanDisplay, channel: input.cardTransactionChannel, gatesExpected: ['cardissuer', 'fds', 'sanctions'] },
     bian: { serviceDomain: 'SD-254 Card Transaction', controlRecord: 'CardTransactionRecord' },
   }));
 
@@ -206,11 +207,48 @@ export async function initiateTransaction(
     }, { correlationId: txnId });
   });
 
-  // Issuer authorization, out-of-band. CHD (PAN/CVV/expiry) goes directly to the issuer via dispatch,
-  // never onto the bus. The result is funneled to `cardissuer.validation.completed`.
+  // Phase-1 gates run out-of-band, in parallel; each funnels its verdict onto the bus and the saga
+  // aggregates them. CHD (PAN/CVV/expiry) goes directly to the issuer via dispatch, never on the bus.
   void authorizeWithIssuer(db, txnId, input, onFile?.paymentCardNetwork);
+  void scoreFraudGate(db, txnId, input);
+  void screenSanctionsGate(db, txnId, input);
 
   return { cardTransactionInstanceReference: txnId, cardTransactionStatus: 'pending', settled };
+}
+
+// FDS gating: real-time fraud score. Fail-open (only an explicit block declines).
+async function scoreFraudGate(db: Db, txnId: string, input: CreateTransactionInput): Promise<void> {
+  let approved = true;
+  let reason: string | undefined;
+  try {
+    const r = await dispatchProvider(db, 'fraud_detection', 'fraud.scoring.requested', {
+      cardTransactionInstanceReference: txnId, amount: input.amount, currency: input.currency,
+      merchantName: input.cardTransactionMerchantName, merchantCategoryCode: input.cardTransactionMerchantCategoryCode,
+    }, { entityType: 'transaction', entityId: txnId, processType: 'fraud_evaluation' });
+    const b = r.responseBody as { recommendation?: string } | undefined;
+    if (b?.recommendation === 'block' || b?.recommendation === 'decline') { approved = false; reason = 'fraud_block'; }
+  } catch { /* fail-open */ }
+  void getEventBus().publish(makeEvent({
+    eventType: 'fraud.scoring.completed', correlationId: txnId, businessProcess: 'card_payment', source: 'callback.fds',
+    payload: { transactionId: txnId, approved, reason }, bian: { serviceDomain: 'SD-63 Fraud Evaluation', controlRecord: 'FraudEvaluationAssessment' },
+  }));
+}
+
+// Sanctions/HRP gating: regulatory hard stop on a match. Fail-open on transport error.
+async function screenSanctionsGate(db: Db, txnId: string, input: CreateTransactionInput): Promise<void> {
+  let approved = true;
+  let reason: string | undefined;
+  try {
+    const r = await dispatchProvider(db, 'hrp_sanctions', 'sanctions.screening.requested', {
+      cardTransactionInstanceReference: txnId, accountReference: input.accountReference, merchantName: input.cardTransactionMerchantName,
+    }, { entityType: 'transaction', entityId: txnId, processType: 'aml_screening' });
+    const b = r.responseBody as { hrpcMatch?: boolean; match?: boolean } | undefined;
+    if (b && (b.hrpcMatch ?? b.match)) { approved = false; reason = 'sanctions_match'; }
+  } catch { /* fail-open */ }
+  void getEventBus().publish(makeEvent({
+    eventType: 'sanctions.screening.completed', correlationId: txnId, businessProcess: 'card_payment', source: 'callback.hrp',
+    payload: { transactionId: txnId, approved, reason }, bian: { serviceDomain: 'SD-13 Party Reference', controlRecord: 'PartyReferenceDataDirectoryEntry' },
+  }));
 }
 
 async function authorizeWithIssuer(db: Db, txnId: string, input: CreateTransactionInput, onFileNetwork?: string): Promise<void> {
