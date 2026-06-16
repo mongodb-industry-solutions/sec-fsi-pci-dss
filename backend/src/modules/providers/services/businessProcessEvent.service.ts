@@ -17,6 +17,44 @@ import {
 // Re-exported here so existing importers keep working unchanged.
 import { sanitizeSummary, sanitizeDeep } from '../../../vendors/eventbus/sanitize';
 export { sanitizeDeep };
+import { getEventBus, makeEvent, type BusinessProcess } from '../../../vendors/eventbus';
+
+// Maps the per-event processType to the EDA business-process class used to group a journey (dev.v8).
+export const PROCESS_TO_BUSINESS: Record<string, BusinessProcess> = {
+  payment_processing: 'card_payment',
+  card_authorization: 'card_payment',
+  fraud_evaluation: 'fraud_investigation',
+  aml_screening: 'fraud_investigation',
+  kyc_verification: 'customer_onboarding',
+  kyb_verification: 'merchant_onboarding',
+  merchant_onboarding: 'merchant_onboarding',
+  customer_onboarding: 'customer_onboarding',
+  card_management: 'card_management',
+};
+
+// Mirror an event onto the unified, correlated event store (dev.v8 F2): a journey (correlationId)
+// becomes traceable end-to-end. Best-effort; if the bus is not initialized (unit tests / degraded
+// mode) it is a silent no-op. CHD is stripped on publish. Shared by the emitters and the dispatcher.
+export function mirrorEventToBus(input: {
+  eventType: string; correlationId: string; businessProcess: BusinessProcess; source: string;
+  payload: Record<string, unknown>;
+  actor?: { partyRef?: string | null; role?: string | null };
+  bian?: { serviceDomain: string; controlRecord: string };
+}): void {
+  try { void getEventBus().publish(makeEvent(input)); } catch { /* bus not initialized */ }
+}
+
+function mirrorToBus(opts: EmitProcessEventOpts | EmitComplianceEventOpts): void {
+  mirrorEventToBus({
+    eventType: opts.processAction,
+    correlationId: opts.entityId,
+    businessProcess: PROCESS_TO_BUSINESS[opts.processType] ?? 'system',
+    source: 'psp.core',
+    payload: { ...opts.eventSummary, outcome: opts.processOutcome, entityType: opts.entityType },
+    actor: { partyRef: opts.performedByPartyReference, role: opts.performedByRole },
+    bian: { serviceDomain: opts.bianServiceDomain, controlRecord: opts.bianControlRecordType },
+  });
+}
 
 interface EmitProcessEventOpts {
   entityType: BusinessEntityType;
@@ -66,6 +104,7 @@ export function emitProcessEvent(db: Db, opts: EmitProcessEventOpts): void {
   try {
     void db.collection<BusinessProcessEvent>(BUSINESS_PROCESS_EVENTS_COLLECTION).insertOne(event).catch(() => {});
   } catch { /* fire-and-forget: swallow synchronous errors (e.g. test mocks) */ }
+  mirrorToBus(opts);
 }
 
 export function emitComplianceEvent(db: Db, opts: EmitComplianceEventOpts): void {
@@ -87,6 +126,7 @@ export function emitComplianceEvent(db: Db, opts: EmitComplianceEventOpts): void
   try {
     void db.collection<BusinessProcessEvent>(COMPLIANCE_PROCESS_EVENTS_COLLECTION).insertOne(event).catch(() => {});
   } catch { /* fire-and-forget: swallow synchronous errors (e.g. test mocks) */ }
+  mirrorToBus(opts);
 }
 
 export async function listProcessEvents(

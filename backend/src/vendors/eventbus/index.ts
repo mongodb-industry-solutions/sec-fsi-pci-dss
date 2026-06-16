@@ -32,6 +32,7 @@ export function makeEvent<T>(input: {
   partitionKey?: string;
   actor?: DomainEvent['actor'];
   bian?: DomainEvent['bian'];
+  transient?: boolean;
 }): DomainEvent<T> {
   return {
     eventId: uuidv4(),
@@ -46,6 +47,7 @@ export function makeEvent<T>(input: {
     bian: input.bian,
     payload: input.payload,
     schemaVersion: 1,
+    ...(input.transient ? { transient: true } : {}),
   };
 }
 

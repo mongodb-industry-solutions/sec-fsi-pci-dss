@@ -36,4 +36,6 @@ export interface DomainEvent<T = Record<string, unknown>> {
   payload: T;
   /** Envelope schema version. */
   schemaVersion: number;
+  /** Ephemeral signal (e.g. SSE wake-up): delivered to subscribers but not persisted. */
+  transient?: boolean;
 }

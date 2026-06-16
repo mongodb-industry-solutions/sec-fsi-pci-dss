@@ -29,7 +29,7 @@ export class EventBusInProcess implements EventBus {
 
   async publish<T>(event: DomainEvent<T>): Promise<void> {
     const safe: DomainEvent = { ...event, payload: sanitizeDeep(event.payload) as Record<string, unknown> };
-    if (this.store) await this.store.append(safe); // CHD already stripped (PCI Req 3.2 / 10)
+    if (this.store && !safe.transient) await this.store.append(safe); // transient = SSE signal, not persisted
     this.emitter.emit(safe.eventType, safe);
     this.emitter.emit(safe.eventType + SEP + safe.correlationId, safe);
     for (const w of this.wildcards) {

@@ -80,6 +80,15 @@ describe('EventBus vendor (in-process adapter)', () => {
     expect(trail.map(e => e.eventType)).toEqual(['a', 'b']);
   });
 
+  it('delivers transient events but does not persist them', async () => {
+    const hit: string[] = [];
+    bus.subscribe('party.notification', (e) => { hit.push(e.eventType); });
+    await bus.publish(makeEvent({ eventType: 'party.notification', correlationId: 'p', businessProcess: 'system', payload: {}, transient: true }));
+    await flush();
+    expect(hit).toEqual(['party.notification']); // delivered
+    expect(store.events).toHaveLength(0);        // not persisted
+  });
+
   it('isolates a throwing handler from the rest', async () => {
     const hit: string[] = [];
     bus.subscribe('*', () => { throw new Error('boom'); });
