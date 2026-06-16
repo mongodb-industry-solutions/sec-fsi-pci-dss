@@ -6,6 +6,7 @@ import { api, type NotificationItem } from '../../../lib/api';
 import { getToken } from '../../../lib/auth';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { Pagination } from '../../../components/Pagination';
+import { emitNotificationsChanged, useNotificationsChanged } from '../../../lib/useNotificationsStream';
 
 const PAGE_SIZE = 10;
 
@@ -37,6 +38,7 @@ export default function NotificationsPage() {
     api.notifications.list(token).then((r) => setItems(r.items)).catch(() => setItems([])).finally(() => setLoading(false));
   }, [token]);
   useEffect(() => { load(); }, [load]);
+  useNotificationsChanged(load); // refresh if the bell (or another view) marks items read
 
   const unread = items.filter((n) => n.status === 'unread').length;
 
@@ -44,11 +46,17 @@ export default function NotificationsPage() {
     if (n.status !== 'unread') return;
     setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, status: 'read' } : x)));
     api.notifications.markRead(n.id, token).catch(() => { /* ignore */ });
+    emitNotificationsChanged(); // decrement the top-bar bell counter immediately
   }
   function readAll() {
     setItems((prev) => prev.map((x) => ({ ...x, status: 'read' })));
     api.notifications.markAllRead(token).catch(() => { /* ignore */ });
+    emitNotificationsChanged();
   }
+
+  // One-click filter to a case or transaction: clicking the reference on a notification narrows the
+  // list to every notification associated with it (the search already matches case ref + txn id).
+  function filterByRef(ref: string) { setQ(ref); setPage(1); }
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -136,10 +144,31 @@ export default function NotificationsPage() {
                       {n.actionable && isUnread && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#00ED64]/15 text-[#007a4d] font-medium">Action needed</span>}
                     </div>
                     <p className={`text-sm mt-0.5 ${isUnread ? 'text-gray-600' : 'text-gray-500'}`}>{n.detail}</p>
-                    <p className="text-[11px] text-gray-400 mt-1 font-mono">
-                      {n.caseReference ? `${n.caseReference} · ` : ''}{new Date(n.createdAt).toLocaleString()}
-                      {!isUnread && ' · read'}
-                    </p>
+                    <div className="flex items-center gap-2 flex-wrap text-[11px] text-gray-400 mt-1 font-mono">
+                      {/* Clickable references: filter the list to this case / transaction */}
+                      {n.caseReference && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); filterByRef(n.caseReference as string); }}
+                          className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 hover:bg-[#00ED64]/20 hover:text-[#007a4d] transition-colors"
+                          title="Filter to this case"
+                        >
+                          {n.caseReference}
+                        </button>
+                      )}
+                      {n.transactionId && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); filterByRef(n.transactionId as string); }}
+                          className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 hover:bg-[#00ED64]/20 hover:text-[#007a4d] transition-colors"
+                          title="Filter to this transaction"
+                        >
+                          txn {n.transactionId.slice(0, 8)}…
+                        </button>
+                      )}
+                      <span>{new Date(n.createdAt).toLocaleString()}</span>
+                      {!isUnread && <span>· read</span>}
+                    </div>
                   </div>
                   <ChevronRight size={16} className="text-gray-300 group-hover:text-[#001E2B] mt-1 shrink-0" />
                 </Link>

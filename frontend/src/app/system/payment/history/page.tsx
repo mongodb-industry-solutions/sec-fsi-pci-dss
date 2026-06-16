@@ -49,22 +49,33 @@ interface TransactionWithCase extends StoredTransaction {
   resolutionOutcome?: string | null;
 }
 
-const STATUS_DISPLAY: Record<string, { label: string; color: string }> = {
-  authorized:       { label: 'Authorized',                      color: 'bg-green-100 text-green-800' },
-  settled:          { label: 'Settled',                         color: 'bg-green-100 text-green-800' },
-  under_review:     { label: 'Under review',                    color: 'bg-amber-100 text-amber-800' },
-  open:             { label: 'Under review',                    color: 'bg-amber-100 text-amber-800' },
-  escalated:        { label: 'In investigation',                color: 'bg-orange-100 text-orange-800' },
-  resolved_cleared: { label: 'Cleared',                         color: 'bg-green-100 text-green-800' },
-  resolved_fraud:   { label: 'Fraud confirmed - refund issued', color: 'bg-red-100 text-red-800' },
-  closed:           { label: 'Closed',                          color: 'bg-gray-100 text-gray-700' },
-  declined:         { label: 'Declined',                        color: 'bg-red-100 text-red-800' },
+// Payment authorization status (did the payment go through). This is SEPARATE from the fraud/risk
+// status below: a payment can be Authorized and still be flagged or confirmed as fraud.
+const PAYMENT_STATUS: Record<string, { label: string; color: string }> = {
+  authorized: { label: 'Authorized', color: 'bg-green-100 text-green-800' },
+  settled:    { label: 'Settled',    color: 'bg-green-100 text-green-800' },
+  pending:    { label: 'Pending',    color: 'bg-amber-100 text-amber-800' },
+  declined:   { label: 'Declined',   color: 'bg-red-100 text-red-800' },
 };
 
+// Fraud / risk status (BIAN SD-83). Only present when the transaction triggered a fraud case.
+// Worded so it is unambiguous what the tag refers to (the security review, not the payment).
+const FRAUD_STATUS: Record<string, { label: string; color: string; icon: string }> = {
+  open:             { label: 'Flagged for review',  color: 'bg-amber-100 text-amber-800',  icon: '⚠' },
+  under_review:     { label: 'Flagged for review',  color: 'bg-amber-100 text-amber-800',  icon: '⚠' },
+  escalated:        { label: 'Under investigation', color: 'bg-orange-100 text-orange-800', icon: '🔍' },
+  resolved_fraud:   { label: 'Confirmed fraud',     color: 'bg-red-100 text-red-800',      icon: '🛑' },
+  resolved_cleared: { label: 'Cleared, legitimate', color: 'bg-green-100 text-green-800',   icon: '✓' },
+  closed:           { label: 'Case closed',         color: 'bg-gray-100 text-gray-700',    icon: '•' },
+};
 
-function displayStatus(txn: TransactionWithCase) {
-  const key = txn.caseStatus ?? txn.status;
-  return STATUS_DISPLAY[key] ?? { label: key.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700' };
+function paymentStatus(txn: TransactionWithCase) {
+  return PAYMENT_STATUS[txn.status] ?? { label: txn.status.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700' };
+}
+
+function fraudStatus(txn: TransactionWithCase) {
+  if (!txn.fraudCaseCreated || !txn.caseStatus) return null;
+  return FRAUD_STATUS[txn.caseStatus] ?? { label: txn.caseStatus.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700', icon: '⚠' };
 }
 
 export default function TransactionHistoryPage() {
@@ -76,6 +87,9 @@ export default function TransactionHistoryPage() {
   const [qInput, setQInput] = useState('');
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  // Fraud/risk filter, separate from the payment-status filter. '' = any, 'none' = no fraud case,
+  // 'any' = has a fraud case, or a specific case status.
+  const [fraudFilter, setFraudFilter] = useState('');
 
   function handleLimitChange(newLimit: number) {
     setPageSize(newLimit);
@@ -105,6 +119,10 @@ export default function TransactionHistoryPage() {
             cardTransactionMerchantCategoryCode?: string;
             cardTransactionChannel?: string;
             cardTransactionMaskedPanDisplay: string;
+            fraudCaseCreated?: boolean;
+            fraudDiagnosisCaseStatus?: string | null;
+            fraudDiagnosisCaseReference?: string | null;
+            fraudDiagnosisResolutionOutcome?: string | null;
           };
           return {
             txnId:               row.cardTransactionInstanceReference,
@@ -116,7 +134,10 @@ export default function TransactionHistoryPage() {
             cardTransactionType: row.cardTransactionType,
             maskedPan:           row.cardTransactionMaskedPanDisplay,
             status:              row.cardTransactionStatus,
-            fraudCaseCreated:    false,
+            fraudCaseCreated:    !!row.fraudCaseCreated,
+            caseStatus:          row.fraudDiagnosisCaseStatus ?? undefined,
+            caseRef:             row.fraudDiagnosisCaseReference ?? undefined,
+            resolutionOutcome:   row.fraudDiagnosisResolutionOutcome ?? undefined,
             createdAt:           row.cardTransactionDateTime,
           };
         });
@@ -129,17 +150,23 @@ export default function TransactionHistoryPage() {
     load();
   }, []);
 
-  // Status options are derived from the data (effective status = case status when escalated).
-  const statusKeys = Array.from(new Set(allTxns.map((t) => t.caseStatus ?? t.status)));
+  // Payment-status options from the data (authorized / settled / declined …).
+  const statusKeys = Array.from(new Set(allTxns.map((t) => t.status)));
+  // Fraud-status options from the transactions that actually have a fraud case.
+  const fraudKeys = Array.from(new Set(allTxns.filter((t) => t.fraudCaseCreated && t.caseStatus).map((t) => t.caseStatus as string)));
   const ql = q.toLowerCase();
   const filtered = allTxns.filter((t) => {
-    if (statusFilter && (t.caseStatus ?? t.status) !== statusFilter) return false;
+    if (statusFilter && t.status !== statusFilter) return false;
+    if (fraudFilter === 'none' && t.fraudCaseCreated) return false;
+    if (fraudFilter === 'any' && !t.fraudCaseCreated) return false;
+    if (fraudFilter && fraudFilter !== 'none' && fraudFilter !== 'any' && t.caseStatus !== fraudFilter) return false;
     if (!ql) return true;
     return (
       t.merchant?.toLowerCase().includes(ql) ||
       t.maskedPan?.toLowerCase().includes(ql) ||
       (t.paymentReference ?? '').toLowerCase().includes(ql) ||
       (t.caseRef ?? '').toLowerCase().includes(ql) ||
+      t.txnId.toLowerCase().includes(ql) ||
       String(t.amount).includes(ql)
     );
   });
@@ -175,31 +202,45 @@ export default function TransactionHistoryPage() {
           </div>
         ) : (
           <>
-            {/* Search + status filter; standard pattern (input + Search + Clear), same as the rest of the system */}
+            {/* Search + two distinct filters: payment status and fraud/risk status. Standard pattern. */}
             <div className="flex flex-col sm:flex-row gap-2 mb-5">
               <input
                 type="text"
                 value={qInput}
                 onChange={(e) => setQInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') applySearch(); }}
-                placeholder="Search by merchant, card or reference…"
+                placeholder="Search by merchant, card, reference or transaction id…"
                 className="flex-1 border rounded-lg px-3 py-2 text-sm"
               />
               <select
                 value={statusFilter}
                 onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
                 className="border rounded-lg px-3 py-2 text-sm bg-white"
+                title="Payment authorization status"
               >
-                <option value="">All statuses</option>
+                <option value="">All payment statuses</option>
                 {statusKeys.map((k) => (
-                  <option key={k} value={k}>{STATUS_DISPLAY[k]?.label ?? k.replace(/_/g, ' ')}</option>
+                  <option key={k} value={k}>{PAYMENT_STATUS[k]?.label ?? k.replace(/_/g, ' ')}</option>
                 ))}
+              </select>
+              <select
+                value={fraudFilter}
+                onChange={(e) => { setFraudFilter(e.target.value); setPage(1); }}
+                className="border rounded-lg px-3 py-2 text-sm bg-white"
+                title="Fraud / risk status"
+              >
+                <option value="">All fraud statuses</option>
+                <option value="any">Flagged as fraud (any)</option>
+                {fraudKeys.map((k) => (
+                  <option key={k} value={k}>{FRAUD_STATUS[k]?.label ?? k.replace(/_/g, ' ')}</option>
+                ))}
+                <option value="none">No fraud case</option>
               </select>
               <button onClick={applySearch} className="px-4 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold">
                 Search
               </button>
-              {(q || qInput || statusFilter) && (
-                <button onClick={() => { clearSearch(); setStatusFilter(''); }} className="px-3 py-2 rounded-lg border text-sm text-gray-500 hover:bg-gray-50 transition-colors">
+              {(q || qInput || statusFilter || fraudFilter) && (
+                <button onClick={() => { clearSearch(); setStatusFilter(''); setFraudFilter(''); }} className="px-3 py-2 rounded-lg border text-sm text-gray-500 hover:bg-gray-50 transition-colors">
                   Clear
                 </button>
               )}
@@ -213,7 +254,8 @@ export default function TransactionHistoryPage() {
             <>
             <div className="space-y-3 mb-5">
               {paginated.map((txn) => {
-                const { label, color } = displayStatus(txn);
+                const pay = paymentStatus(txn);
+                const fraud = fraudStatus(txn);
                 return (
                   <Link
                     key={txn.txnId}
@@ -243,7 +285,12 @@ export default function TransactionHistoryPage() {
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-xs px-2 py-0.5 rounded font-medium ${color}`}>{label}</span>
+                      {/* Payment authorization status */}
+                      <span className={`text-xs px-2 py-0.5 rounded font-medium ${pay.color}`} title="Payment authorization status">💳 {pay.label}</span>
+                      {/* Fraud / risk status, only when a fraud case exists; clearly distinct from the payment status */}
+                      {fraud && (
+                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${fraud.color}`} title="Fraud / risk review status">{fraud.icon} {fraud.label}</span>
+                      )}
                       {txn.cardTransactionType && (
                         <span className={`text-xs px-2 py-0.5 rounded font-medium ${TYPE_COLORS[txn.cardTransactionType] ?? 'bg-gray-100 text-gray-600'}`}>
                           {TYPE_LABELS[txn.cardTransactionType] ?? txn.cardTransactionType.replace(/_/g, ' ')}

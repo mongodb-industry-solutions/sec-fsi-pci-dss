@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api, Merchant } from '../../../lib/api';
+import { api } from '../../../lib/api';
 import { FraudAlert } from '../../../components/FraudAlert';
 import { EncryptionBadge } from '../../../components/EncryptionBadge';
 import { Tooltip } from '../../../components/Tooltip';
@@ -46,9 +46,6 @@ const DEFAULTS: FormData = {
 // Preset amount options for quick selection
 const AMOUNT_PRESETS = simulatorConfig.amountPresets;
 
-// Fallback merchant list when DB is unavailable
-const FALLBACK_MERCHANTS: Merchant[] = simulatorConfig.fallbackMerchants;
-
 function maskCardNumber(raw: string): string {
   const digits = raw.replace(/\D/g, '').slice(0, 16);
   const last4 = digits.slice(-4).padStart(4, '*');
@@ -64,67 +61,6 @@ function simulateCipher(seed: string): string {
     c.charCodeAt(0).toString(16).padStart(2, '0')
   );
   return `\\x${bytes.slice(0, 4).join('\\x')}...`;
-}
-
-// -- Merchant combobox --------------------------------------------------------
-function MerchantCombobox({
-  value,
-  mcc,
-  merchants,
-  onChange,
-}: {
-  value: string;
-  mcc: string;
-  merchants: Merchant[];
-  onChange: (name: string, mcc: string) => void;
-}) {
-  const [custom, setCustom] = useState(false);
-
-  function handleSelect(e: React.ChangeEvent<HTMLSelectElement>) {
-    if (e.target.value === '__custom__') {
-      setCustom(true);
-      onChange(value, mcc);
-    } else {
-      const m = merchants.find((x) => x.name === e.target.value);
-      if (m) onChange(m.name, m.mcc);
-    }
-  }
-
-  if (custom) {
-    return (
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value, mcc)}
-          className="flex-1 border rounded-lg px-3 py-2 text-sm"
-          placeholder="Merchant name"
-        />
-        <button
-          type="button"
-          onClick={() => setCustom(false)}
-          className="text-xs text-blue-600 underline whitespace-nowrap"
-        >
-          Use list
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <select
-      value={value}
-      onChange={handleSelect}
-      className="w-full border rounded-lg px-3 py-2 text-sm"
-    >
-      {merchants.map((m, idx) => (
-        <option key={`${m.name}-${m.mcc}-${idx}`} value={m.name}>
-          {m.name} (MCC {m.mcc})
-        </option>
-      ))}
-      <option value="__custom__">✏ Enter custom merchant…</option>
-    </select>
-  );
 }
 
 // -- Amount selector ----------------------------------------------------------
@@ -188,14 +124,23 @@ function AmountSelector({ value, onChange }: { value: string; onChange: (v: stri
 }
 
 // -- Card selector ------------------------------------------------------------─
+// Proposes a list of cards (the customer's cards on file when a scenario is loaded, or the
+// generic test cards otherwise) and always allows entering a different card number by hand.
 function CardSelector({
   maskedCard,
   onCardChange,
+  cards,
+  customerName,
+  defaultNumber,
 }: {
   maskedCard: string;
   onCardChange: (raw: string) => void;
+  cards: { label: string; number: string }[];
+  customerName?: string;
+  defaultNumber?: string;
 }) {
   const [custom, setCustom] = useState(false);
+  const presetValue = defaultNumber && cards.some((c) => c.number === defaultNumber) ? defaultNumber : '';
 
   function handlePreset(e: React.ChangeEvent<HTMLSelectElement>) {
     if (e.target.value === '__custom__') {
@@ -237,14 +182,16 @@ function CardSelector({
     <div className="space-y-1">
       <select
         onChange={handlePreset}
-        defaultValue=""
+        defaultValue={presetValue}
         className="w-full border rounded-lg px-3 py-2 text-sm bg-white"
       >
-        <option value="" disabled>Select a test card or enter custom…</option>
-        {TEST_CARDS.map((c) => (
+        <option value="" disabled>
+          {customerName ? `Select a card on file for ${customerName}…` : 'Select a test card or enter custom…'}
+        </option>
+        {cards.map((c) => (
           <option key={c.number} value={c.number}>{c.label}</option>
         ))}
-        <option value="__custom__">✏ Enter custom card number…</option>
+        <option value="__custom__">✏ Enter a different card number…</option>
       </select>
       {maskedCard && (
         <div className="font-mono text-gray-700 bg-gray-50 rounded px-3 py-2 flex items-center gap-2 text-sm">
@@ -252,7 +199,9 @@ function CardSelector({
         </div>
       )}
       <p className="text-xs text-gray-500">
-        Masked immediately. Raw PAN never stored. Leave blank to use the pre-filled demo card.
+        {customerName
+          ? 'Pick one of the customer’s cards on file, or enter a different one. Masked immediately; raw PAN never stored.'
+          : 'Masked immediately. Raw PAN never stored. Leave blank to use the pre-filled demo card.'}
       </p>
     </div>
   );
@@ -291,7 +240,6 @@ export default function PaymentPage() {
   const [maskedCard, setMaskedCard] = useState<string>(maskCardNumber(DEMO_CARD_NUMBER));
   // Raw PAN digits kept only to derive the deterministic token at submit time (never sent).
   const [rawCard, setRawCard] = useState<string>(DEMO_CARD_NUMBER.replace(/\D/g, ''));
-  const [merchants, setMerchants] = useState<Merchant[]>(FALLBACK_MERCHANTS);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{
     txnId: string;
@@ -323,8 +271,8 @@ export default function PaymentPage() {
       const found = (simulatorConfig.scenarios as SimulatorScenario[]).find(s => s.id === scenarioId) ?? null;
       setSimScenario(found);
       if (found && method === 'api-card') {
-        // Pre-fill from scenario (payer) + the selected merchant (payee). Both remain editable on
-        // the form so the operator can still vary values for more dynamic demos.
+        // Pre-fill from scenario (payer) + the selected merchant (payee). The merchant is fixed
+        // (chosen on the landing page); the other values stay editable so the operator can vary them.
         setForm({
           cardholderName: found.prefill.cardholderName,
           expiry: '12/28',
@@ -335,7 +283,16 @@ export default function PaymentPage() {
           merchantName: selMerchantName,
           merchantCategoryCode: selMerchantMcc ?? found.prefill.merchantCategoryCode,
         });
+        // Pre-select the customer's primary card on file so the masked display reflects their card.
+        const primary = found.savedCards?.[0]?.number ?? found.prefill.cardHint;
+        if (primary) {
+          setRawCard(primary.replace(/\D/g, ''));
+          setMaskedCard(maskCardNumber(primary));
+        }
       }
+    } else if (method === 'api-card') {
+      // No scenario: still reflect the merchant fixed on the landing page.
+      setForm((f) => ({ ...f, merchantName: selMerchantName, merchantCategoryCode: selMerchantMcc ?? f.merchantCategoryCode }));
     }
 
     if (!method) {
@@ -366,23 +323,6 @@ export default function PaymentPage() {
     } catch {
       sessionStorage.removeItem('sim_payment_step3');
     }
-
-    api.transactions.merchants()
-      .then((res) => {
-        if (res.merchants.length > 0) {
-          setMerchants(res.merchants);
-          if (!simScenario) {
-            const defaultMerchant = res.merchants.find((m) => m.name === DEFAULTS.merchantName)
-              ?? res.merchants[0];
-            setForm((f) => ({
-              ...f,
-              merchantName: defaultMerchant.name,
-              merchantCategoryCode: defaultMerchant.mcc,
-            }));
-          }
-        }
-      })
-      .catch(() => {/* keep fallback list */});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [simMethod, methodReady]);
 
@@ -417,19 +357,20 @@ export default function PaymentPage() {
 
   // ── API Card flow (default) ───────────────────────────────────────────────
 
-  function handleMerchantChange(name: string, mcc: string) {
-    setForm((f) => ({ ...f, merchantName: name, merchantCategoryCode: mcc }));
-  }
+  // Cards proposed in the selector: the customer's cards on file when a scenario is loaded,
+  // otherwise the generic demo test cards. A different card can always be entered by hand.
+  const customerCards = simScenario?.savedCards?.length
+    ? simScenario.savedCards.map((c) => ({ label: `${c.alias} ${maskCardNumber(c.number)}`, number: c.number }))
+    : TEST_CARDS;
 
-  // One-click variation of the payment options (amount + description) for repeated demo
-  // runs. The persona and merchant stay fixed; only what is being paid varies, so each
-  // run is a distinguishable variation of the same predefined use case.
+  // One-click variation of the payment amount for repeated demo runs. The persona, merchant and
+  // descriptor stay fixed; only the amount varies, so each run is easy to tell apart in history.
   function handleVary() {
     const amount = variedAmount(form.amount);
     const description = variedDescription(form.merchantName, form.description);
     setForm((f) => ({ ...f, amount, description }));
     setValidationErrors({});
-    setVaryNote(`Distinct values generated. Find this transaction by amount $${amount} or descriptor “${description}”.`);
+    setVaryNote(`New amount generated. Find this transaction by amount $${amount}.`);
   }
 
   function handleNext() {
@@ -594,13 +535,16 @@ export default function PaymentPage() {
 
           {/* Card number */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
               Card Number
               <Tooltip text="Select a test card or enter a custom PAN. The raw PAN is masked immediately on input and is never stored in component state or sent to the server. A secure token is generated instead." />
             </label>
             <CardSelector
               maskedCard={maskedCard}
               onCardChange={(raw) => { setRawCard(raw); setMaskedCard(maskCardNumber(raw)); }}
+              cards={customerCards}
+              customerName={simScenario?.persona}
+              defaultNumber={rawCard}
             />
             {validationErrors.cardNumber && (
               <p className="text-xs text-red-600 mt-0.5">{validationErrors.cardNumber}</p>
@@ -609,7 +553,7 @@ export default function PaymentPage() {
 
           {/* Cardholder name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
               Cardholder Name
               <Tooltip text="Name as it appears on the card. Stored as plaintext, not classified as Cardholder Data under PCI DSS v4.0 when stored without a PAN." />
             </label>
@@ -623,7 +567,7 @@ export default function PaymentPage() {
 
           {/* Expiry */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
               Expiry Date
               <Tooltip text="Card expiration date (MM/YY). Stored in the paymentCard collection with QE:none encryption: protected at rest, not searchable." />
             </label>
@@ -641,7 +585,7 @@ export default function PaymentPage() {
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
                 Email Address
                 <Tooltip text="Customer email address (QE:equality field). Encrypted with Queryable Encryption before being sent to Atlas. MongoDB stores only ciphertext and can still perform exact-match queries without seeing the plaintext." />
               </label>
@@ -658,7 +602,7 @@ export default function PaymentPage() {
 
             {/* Phone */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
                 Mobile Phone
                 <Tooltip text="Customer mobile number (QE:equality field). Encrypted at origin with Queryable Encryption. L1 Analysts can search by phone without Atlas seeing the plaintext number." />
               </label>
@@ -675,7 +619,7 @@ export default function PaymentPage() {
 
             {/* Amount */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
                 Amount (USD)
                 <Tooltip text={`Transaction amount. Stored as plaintext in cardTransactionAmount. Amounts above $${simulatorConfig.fraudAmountThreshold} automatically trigger fraud case creation (configurable via FRAUD_AMOUNT_THRESHOLD env var). Selecting $850 will trigger a fraud alert.`} />
               </label>
@@ -687,7 +631,7 @@ export default function PaymentPage() {
 
             {/* Description / statement descriptor */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
                 Description
                 <Tooltip text="Statement descriptor stored in cardTransactionDescription (max 22 chars). Optional; defaults to the merchant name. Vary it to make repeated runs distinguishable." />
               </label>
@@ -701,26 +645,22 @@ export default function PaymentPage() {
               />
             </div>
 
-            {/* Merchant Name */}
+            {/* Merchant Name (read-only; the payee is fixed on the landing page) */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
                 Merchant Name
-                <Tooltip text="Name of the business processing the payment. Stored as plaintext in cardTransactionMerchantName. Selecting a merchant also sets its ISO 18245 MCC code. Certain MCC codes (5812 restaurants, 6011 ATM, 7995 gambling) are high-risk and trigger fraud cases." />
+                <Tooltip text="The business receiving the payment (the payee), fixed when you chose the merchant on the previous screen. Stored as plaintext in cardTransactionMerchantName. Its ISO 18245 MCC drives fraud risk: codes such as 5812 (restaurants), 6011 (ATM) and 7995 (gambling) are high-risk." />
               </label>
-              <MerchantCombobox
-                value={form.merchantName}
-                mcc={form.merchantCategoryCode}
-                merchants={merchants}
-                onChange={handleMerchantChange}
-              />
-              {validationErrors.merchantName && (
-                <p className="text-xs text-red-600 mt-0.5">{validationErrors.merchantName}</p>
-              )}
+              <div className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700 flex items-center justify-between gap-2">
+                <span className="truncate">{form.merchantName}</span>
+                <span className="text-[10px] uppercase tracking-wide text-gray-400 shrink-0">Preset</span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Chosen on the previous screen; the payment is attributed to this merchant.</p>
             </div>
 
             {/* MCC (read-only display) */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
                 Merchant Category Code (MCC)
                 <Tooltip text="ISO 18245 four-digit code classifying the merchant's business type. Set automatically when you select a merchant. High-risk codes (5812, 6011, 7995) trigger automatic fraud case creation regardless of transaction amount." />
               </label>

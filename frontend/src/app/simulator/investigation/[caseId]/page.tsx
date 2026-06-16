@@ -83,7 +83,7 @@ export default function SimulatorCaseDetailPage() {
     });
   }
 
-  function handleApprove() {
+  function handleApprove(advance = false) {
     return run(async () => {
       const l2 = await getSimTokenForRole('level2_investigator');
       setL2Token(l2);
@@ -99,6 +99,8 @@ export default function SimulatorCaseDetailPage() {
           .then(setRawDoc).catch(() => null);
       }
       setMsg('Escalation approved. Escalation token issued, sensitive fields unlocked.');
+      // When triggered from the "Next" button, advance to the resolution step after approving.
+      if (advance) setCurrentStep('l2-resolve');
     });
   }
 
@@ -142,6 +144,30 @@ export default function SimulatorCaseDetailPage() {
   const isEscalated = fraudCase?.caseStatus === 'escalated';
   const l2HasAccepted = !!fraudCase?.escalationAcceptedAt;
   const isResolved = !!fraudCase && ['resolved_cleared', 'resolved_fraud', 'closed'].includes(fraudCase.caseStatus);
+  const movedPastEscalate = isEscalated || l2HasAccepted || isResolved;
+
+  // "Next" performs the required action of the current step before advancing, so the flow stays
+  // consistent: on L1-escalate it escalates (same as the Escalate button); on L2-review it approves
+  // the escalation (same as the Approve button), then moves to resolution. If the action is already
+  // done, Next just advances. Resolution still requires an explicit fraud/cleared choice.
+  async function handleNext() {
+    if (busy) return;
+    if (currentStep === 'l1-escalate' && !movedPastEscalate) {
+      await handleEscalate();   // advances to l2-review on success
+      return;
+    }
+    if (currentStep === 'l2-review' && isEscalated && !l2HasAccepted) {
+      await handleApprove(true); // approves, then advances to l2-resolve
+      return;
+    }
+    if (stepIndex < STEPS.length - 1) setCurrentStep(STEPS[stepIndex + 1].id);
+  }
+
+  // Label the Next button to reflect the action it will perform on the current step.
+  const nextLabel =
+    currentStep === 'l1-escalate' && !movedPastEscalate ? 'Escalate & Continue'
+    : currentStep === 'l2-review' && isEscalated && !l2HasAccepted ? 'Approve & Continue'
+    : 'Next Step';
 
   if (loading) return <div className="text-center py-12 text-gray-400">Loading case…</div>;
   if (!fraudCase) return <div className="text-center py-12 text-gray-500">Case not found.</div>;
@@ -229,7 +255,7 @@ export default function SimulatorCaseDetailPage() {
           l2HasAccepted={l2HasAccepted}
           isEscalated={isEscalated}
           busy={busy}
-          onApprove={handleApprove}
+          onApprove={() => handleApprove(false)}
           showRaw={showRaw}
           rawDoc={rawDoc}
           onToggleRaw={toggleRaw}
@@ -247,9 +273,9 @@ export default function SimulatorCaseDetailPage() {
           Previous Step
         </button>
         <span className="text-xs text-gray-400 self-center">Step {stepIndex + 1} of {STEPS.length}</span>
-        <button onClick={() => stepIndex < STEPS.length - 1 && setCurrentStep(STEPS[stepIndex + 1].id)} disabled={stepIndex === STEPS.length - 1}
+        <button onClick={handleNext} disabled={stepIndex === STEPS.length - 1 || busy}
           className="px-4 py-2 rounded-lg border border-[#001E2B] bg-[#001E2B] text-[#00ED64] text-sm font-medium disabled:opacity-30 hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors">
-          Next Step
+          {busy ? 'Working…' : nextLabel}
         </button>
       </div>
     </div>

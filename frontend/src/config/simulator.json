@@ -67,6 +67,10 @@
       "persona": "Luis Fernandez",
       "expectedOutcome": "fraud",
       "outcomeLabel": "🚨 Fraud case auto-created",
+      "savedCards": [
+        { "alias": "Personal Visa", "number": "4242424242424242" },
+        { "alias": "Business Visa", "number": "2223000048400010" }
+      ],
       "prefill": {
         "cardholderName": "Luis Fernandez",
         "email": "luis.fernandez@back.es",
@@ -88,6 +92,10 @@
       "persona": "Julia Santos",
       "expectedOutcome": "legit",
       "outcomeLabel": "✅ Payment approved",
+      "savedCards": [
+        { "alias": "Personal Mastercard", "number": "5555555555551212" },
+        { "alias": "Prepaid Mastercard", "number": "5200828282828210" }
+      ],
       "prefill": {
         "cardholderName": "Julia Santos",
         "email": "julia.santos@back.es",
@@ -109,6 +117,10 @@
       "persona": "Amara Okafor",
       "expectedOutcome": "borderline",
       "outcomeLabel": "⚠️ Manual review triggered",
+      "savedCards": [
+        { "alias": "Personal Visa", "number": "4111111111111234" },
+        { "alias": "Amex Gold", "number": "378282246310005" }
+      ],
       "prefill": {
         "cardholderName": "Amara Okafor",
         "email": "amara.okafor@back.es",

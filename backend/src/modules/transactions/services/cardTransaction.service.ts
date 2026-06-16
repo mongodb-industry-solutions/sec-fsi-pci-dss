@@ -7,6 +7,7 @@ import {
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { canReadSensitive } from '../../../vendors/middleware/rbac';
 import { createFraudCase } from '../../fraud/services/fraudDiagnosis.service';
+import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
 import { emitProcessEvent, emitComplianceEvent } from '../../providers/services/businessProcessEvent.service';
@@ -407,6 +408,33 @@ export async function getAllTransactions(
       .toArray(),
     readDb.collection(CARD_TRANSACTION_COLLECTION).countDocuments(query),
   ]);
+
+  // Enrich each row with its linked fraud case (BIAN SD-83). The fraud/risk status is a SEPARATE
+  // concept from the payment authorization status (cardTransactionStatus): a payment can be
+  // "authorized" yet still flagged or confirmed fraud. The list surfaces both so they are not
+  // conflated. Fraud-case fields are plaintext (not CHD), so the unencrypted client reads them.
+  const txnIds = results.map((r) => r.cardTransactionInstanceReference);
+  if (txnIds.length > 0) {
+    const cases = await db
+      .collection(FRAUD_DIAGNOSIS_COLLECTION)
+      .find(
+        { cardTransactionInstanceReference: { $in: txnIds } },
+        { projection: { _id: 0, cardTransactionInstanceReference: 1, fraudDiagnosisCaseStatus: 1, fraudDiagnosisCaseReference: 1, fraudDiagnosisCaseSeverity: 1, 'fraudDiagnosisResolutionRecord.resolutionOutcome': 1 } },
+      )
+      .toArray();
+    const byTxn = new Map(cases.map((c) => [c.cardTransactionInstanceReference as string, c]));
+    for (const r of results as Record<string, unknown>[]) {
+      const c = byTxn.get(r.cardTransactionInstanceReference as string);
+      r.fraudCaseCreated = !!c;
+      if (c) {
+        r.fraudDiagnosisCaseStatus = c.fraudDiagnosisCaseStatus ?? null;
+        r.fraudDiagnosisCaseReference = c.fraudDiagnosisCaseReference ?? null;
+        r.fraudDiagnosisCaseSeverity = c.fraudDiagnosisCaseSeverity ?? null;
+        r.fraudDiagnosisResolutionOutcome =
+          (c.fraudDiagnosisResolutionRecord as { resolutionOutcome?: string } | undefined)?.resolutionOutcome ?? null;
+      }
+    }
+  }
 
   return { results, total, page, limit };
 }

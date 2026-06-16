@@ -16,6 +16,8 @@ export interface SimulatorScenario {
   persona: string;
   expectedOutcome: 'fraud' | 'legit' | 'borderline';
   outcomeLabel: string;
+  /** Cards this customer already has on file; proposed in the API card-payment selector. */
+  savedCards?: { alias: string; number: string }[];
   prefill: {
     cardholderName: string;
     email: string;

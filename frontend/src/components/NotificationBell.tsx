@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Bell } from 'lucide-react';
 import { api, type NotificationItem } from '../lib/api';
 import { getToken } from '../lib/auth';
-import { useNotificationsStream } from '../lib/useNotificationsStream';
+import { useNotificationsStream, useNotificationsChanged, emitNotificationsChanged } from '../lib/useNotificationsStream';
 
 // ADR-031: top-bar notifications. Dark dropdown matching the adjacent user menu. Shows an unread
 // (actionable) count badge; lists the latest 5 with a one-line (truncated) message and a "View all"
@@ -23,13 +23,15 @@ export function NotificationBell() {
     api.notifications.list(token).then((r) => { setItems(r.items); setCount(r.count); }).catch(() => { /* ignore */ });
   }, [token]);
   useEffect(() => { load(); }, [load]);
-  useNotificationsStream(token, load); // live refresh on change
+  useNotificationsStream(token, load);   // live refresh on change (SSE)
+  useNotificationsChanged(load);         // instant same-tab refresh when the page marks items read
 
   function readOne(n: NotificationItem) {
     if (n.status === 'unread') {
       setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, status: 'read' } : x)));
       setCount((c) => Math.max(0, c - 1));
       api.notifications.markRead(n.id, token).catch(() => { /* ignore */ });
+      emitNotificationsChanged(); // keep the notifications page in sync if it is open
     }
     setOpen(false);
   }
@@ -38,6 +40,7 @@ export function NotificationBell() {
     setItems((prev) => prev.map((x) => ({ ...x, status: 'read' })));
     setCount(0);
     api.notifications.markAllRead(token).catch(() => { /* ignore */ });
+    emitNotificationsChanged();
   }
 
   useEffect(() => {
