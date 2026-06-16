@@ -476,7 +476,7 @@ export function IntegrationCategoryPage({ meta }: { meta: CategoryMeta }) {
         debugInfo={`${meta.bianSd} · SD-193 · PCI DSS Req 12.8.1`}
         actions={
           <Link
-            href={`/system/admin/integrations/new?type=${meta.type}`}
+            href={`/system/admin/providers/vendors/new?type=${meta.type}`}
             className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
           >
             <Plus size={14} />
@@ -551,7 +551,7 @@ export function IntegrationCategoryPage({ meta }: { meta: CategoryMeta }) {
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
             No providers found{hasFilters ? ' matching current filters.' : '. '}
             {!hasFilters && (
-              <Link href={`/system/admin/integrations/new?type=${meta.type}`} className="underline font-medium">Register one now.</Link>
+              <Link href={`/system/admin/providers/vendors/new?type=${meta.type}`} className="underline font-medium">Register one now.</Link>
             )}
           </div>
         ) : (
@@ -647,7 +647,7 @@ export function IntegrationCategoryPage({ meta }: { meta: CategoryMeta }) {
                               <span className="hidden sm:inline">Test</span>
                             </button>
                             <Link
-                              href={`/system/admin/integrations/${id}`}
+                              href={`/system/admin/providers/vendors/${id}`}
                               className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded border transition-colors ${
                                 i.externalProviderIsInternal
                                   ? 'border-gray-200 hover:border-gray-400 text-gray-500 hover:text-gray-700'

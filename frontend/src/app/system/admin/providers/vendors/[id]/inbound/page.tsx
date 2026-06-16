@@ -11,6 +11,7 @@ import { classifyEndpoint } from '../_endpoint';
 import { JsonView } from '../../../../../../../components/json/JsonView';
 import { JsonEditor } from '../../../../../../../components/json/JsonEditor';
 import { byProviderType } from '../../../../../../../config/capabilities';
+import { API_BASE_URL } from '../../../../../../../lib/constants';
 
 // ── Copy helper ───────────────────────────────────────────────────────────────
 
@@ -40,9 +41,12 @@ export default function InboundPage() {
   const id  = integration.externalProviderArrangementInstanceReference;
   const fmc = integration.fieldMappingConfig ?? {};
 
-  // Inbound callback route (ADR-029): /api/v1/providers/callback/<capability-segment>/<vendorId>
+  // Inbound callback route (ADR-029): /api/v1/providers/callback/<capability-segment>/<vendorId>.
+  // The external provider needs the ABSOLUTE URL (scheme + host), not just the path, so it can POST
+  // to the right destination; the path alone is ambiguous outside our own origin.
   const callbackSegment = byProviderType(String(integration.externalProviderArrangementType))?.callbackSegment ?? 'generic';
-  const webhookUrl   = `/api/v1/providers/callback/${callbackSegment}/${id}`;
+  const webhookPath  = `/api/v1/providers/callback/${callbackSegment}/${id}`;
+  const webhookUrl   = `${API_BASE_URL}${webhookPath}`;
 
   // ── Immediate toggle ──────────────────────────────────────────────────────
   const [callbackEnabled, setCallbackEnabled]   = useState(integration.externalProviderCallbackEnabled ?? false);
@@ -165,12 +169,20 @@ export default function InboundPage() {
   return (
     <div className="space-y-5">
 
+      {/* For a synchronous provider the inbound callback is NOT part of the decision path; make that
+          explicit so a disabled callback is not mistaken for a broken approval. */}
+      {integration.externalProviderMode === 'sync' && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+          <strong>Synchronous provider.</strong> This integration returns its result in the immediate response to each request, and the PSP enforces that decision inline; for the card issuer, a decline blocks the payment before it is authorized. The inbound callback below is an optional asynchronous channel, so leaving it disabled does not affect the synchronous approve/decline decision.
+        </div>
+      )}
+
       {/* ── Inbound status ─────────────────────────────────────────────────── */}
       <Card title="Inbound status">
         <p className="text-sm text-gray-600 leading-relaxed mb-4">
           {isInternal
             ? 'The inbound section configures how this integration receives response data from the backend API. When the API finishes processing a request, it can deliver results asynchronously to the callback endpoint defined here.'
-            : 'The inbound section configures how this integration receives data from the external provider. Providers use the callback URL to send event notifications, async results, or status updates back to LeafyBank.'}
+            : 'The inbound section configures how this integration receives data from the external provider. Providers use the callback URL to send event notifications, async results, or status updates back to the PSP.'}
         </p>
         <StatusToggle
           enabled={callbackEnabled}
@@ -197,7 +209,7 @@ export default function InboundPage() {
           <div>
             <FieldLabel
               label="Callback URL (read-only)"
-              hint="This URL is derived from the integration ID. To customise the path, update externalProviderCallbackPath in the registry." />
+              hint="Full absolute URL (scheme + host + path) to register in the provider's webhook settings; the provider posts inbound responses here. Derived from the integration ID. To customise the path, update externalProviderCallbackPath in the registry." />
             <div className="flex items-center gap-2 bg-gray-50 border rounded-lg px-3 py-2">
               <code className="flex-1 text-sm font-mono text-gray-800 break-all">{webhookUrl}</code>
               <CopyBtn text={webhookUrl} />
@@ -222,12 +234,12 @@ export default function InboundPage() {
       {/* ── Field mapping ──────────────────────────────────────────────────── */}
       <Card
         title="Expected field mapping"
-        subtitle="Maps incoming field names to LeafyBank's internal names. Leave the target blank to use the source name unchanged. Use dot notation for nested values: payload.transaction.amount">
+        subtitle="Maps incoming field names to the PSP's internal names. Leave the target blank to use the source name unchanged. Use dot notation for nested values: payload.transaction.amount">
         <FieldMappingMatrix
           rules={inboundRules}
           setRules={setInboundRules}
           sourceLabel="Sender field"
-          targetLabel="LeafyBank maps to" />
+          targetLabel="the PSP maps to" />
       </Card>
 
       {/* ── Security ───────────────────────────────────────────────────────── */}
@@ -270,7 +282,7 @@ export default function InboundPage() {
               <div>
                 <FieldLabel
                   label="Signature prefix"
-                  hint="Text that the sender prepends to the signature value in the header (e.g. 'sha256='). LeafyBank strips this before comparing. Leave blank if the header contains the raw signature." />
+                  hint="Text that the sender prepends to the signature value in the header (e.g. 'sha256='). The PSP strips this before comparing. Leave blank if the header contains the raw signature." />
                 <input value={sigPrefix} onChange={e => setSigPrefix(e.target.value)}
                   placeholder="sha256="
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono" />
@@ -416,7 +428,7 @@ export default function InboundPage() {
                   <JsonView data={inboundTestResult.original} maxHeight="13rem" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Processed by LeafyBank (after mapping)</p>
+                  <p className="text-xs text-gray-500 mb-1">Processed by the PSP (after mapping)</p>
                   <JsonView data={inboundTestResult.transformed} maxHeight="13rem" />
                 </div>
               </div>

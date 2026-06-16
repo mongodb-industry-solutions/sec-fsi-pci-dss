@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, RefreshCw, Search, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
+import { Activity, RefreshCw, Search, ChevronDown, ChevronRight, ExternalLink, Download } from 'lucide-react';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { Pagination } from '../../../components/Pagination';
 import { api } from '../../../lib/api';
@@ -50,7 +50,7 @@ function entityHref(entityType?: string, entityId?: string | null): string | nul
     case 'fraud_case':  return `/system/investigation/${entityId}`;
     case 'transaction': return `/system/transactions/${entityId}`;
     case 'merchant':    return `/system/merchant/${entityId}`;
-    case 'integration': return `/system/admin/integrations/${entityId}`;
+    case 'integration': return `/system/admin/providers/vendors/${entityId}`;
     default:            return null;
   }
 }
@@ -67,6 +67,7 @@ export default function AuditEventsPage() {
   const [total, setTotal] = useState(0);
   const [capped, setCapped] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const [source, setSource] = useState('all');
@@ -110,6 +111,65 @@ export default function AuditEventsPage() {
 
   useEffect(() => { if (authorized) load(); }, [authorized, load]);
 
+  // Export the events matching the CURRENTLY APPLIED filters as a JSON file, so a reviewer can work
+  // from a bounded, scoped extract instead of the whole stream. Walks the paginated API (100/page,
+  // capped at 5000) and writes each event with its category (source) and all observable fields.
+  const downloadJson = useCallback(async () => {
+    if (!token) return;
+    setDownloading(true);
+    try {
+      const filters = {
+        source, type: typeInput || undefined, entityType: entityType || undefined,
+        outcome: outcome || undefined, q: q || undefined, ref: ref || undefined,
+        minScore: minScore ? parseInt(minScore, 10) : undefined,
+        from: from ? new Date(from).toISOString() : undefined,
+        to: to ? new Date(to).toISOString() : undefined,
+      };
+      const MAX = 5000, PER = 100;
+      const collected: AuditRow[] = [];
+      let pageN = 1;
+      let grandTotal = 0;
+      for (;;) {
+        const res = await api.processEvents.audit(token, { ...filters, page: pageN, limit: PER });
+        grandTotal = res.total;
+        collected.push(...(res.events as AuditRow[]));
+        if (collected.length >= res.total || res.events.length < PER || collected.length >= MAX) break;
+        pageN += 1;
+      }
+      const payload = {
+        generatedAt: new Date().toISOString(),
+        filtersApplied: Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== undefined && v !== '' && v !== 'all')),
+        totalMatching: grandTotal,
+        exported: collected.length,
+        truncated: collected.length < grandTotal,
+        events: collected.map((e) => ({
+          event: e.action,
+          category: e.source,
+          type: e.type,
+          outcome: e.outcome,
+          eventDateTime: e.eventDateTime,
+          entityType: e.entityType ?? null,
+          entityId: e.entityId ?? null,
+          performedByRole: e.performedByRole ?? null,
+          bianServiceDomain: e.bianServiceDomain ?? null,
+          context: e.context ?? null,
+          summary: e.summary ?? null,
+          id: e.id,
+        })),
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-events-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch { /* surfaced via the empty download; non-blocking */ }
+    finally { setDownloading(false); }
+  }, [token, source, typeInput, entityType, outcome, q, ref, minScore, from, to]);
+
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   function resetToFirst() { setPage(1); }
 
@@ -123,6 +183,13 @@ export default function AuditEventsPage() {
         description="Unified, searchable audit trail across the whole platform."
         info="Combines business process events, compliance events, and integration (inbound/outbound test) events into one stream. Filter by source, event type, outcome, date range, or free text."
         debugInfo="ADR-025 · businessProcessEvent + complianceProcessEvent + integrationEvents · PCI DSS Req 10.2 / 10.3 / 10.7"
+        actions={
+          <button onClick={downloadJson} disabled={downloading || loading}
+            className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium disabled:opacity-50"
+            title="Download the events matching the current filters as JSON">
+            <Download size={14} />{downloading ? 'Preparing…' : 'Download JSON'}
+          </button>
+        }
       />
 
       {/* Source segmented control */}

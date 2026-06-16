@@ -34,6 +34,50 @@ describe('capability module engines (ADR-029)', () => {
     expect(verifyKyb({}).sanctionsMatch).toBe(false);
     expect(scoreCreditBureau({}).creditScore).toBeGreaterThan(0);
     expect(authorizeCard({}).authorizationStatus).toBe('approved');
-    expect(validateCardIssuer({}).actionConfirmed).toBe(true);
+  });
+
+  describe('card issuer validation (configurable simulator)', () => {
+    it('approves a well-formed Visa with the configured valid CVV', () => {
+      const r = validateCardIssuer({ cardNumber: '4242424242424242', cvv: '123' });
+      expect(r.actionConfirmed).toBe(true);
+      expect(r.responseCode).toBe('00');
+      expect(r.network).toBe('VISA');
+      expect(r.cvvValidationResult).toBe('match');
+    });
+    it('declines a wrong CVV', () => {
+      const r = validateCardIssuer({ cardNumber: '4242424242424242', cvv: '999' });
+      expect(r.actionConfirmed).toBe(false);
+      expect(r.responseCode).toBe('82');
+      expect(r.cvvValidationResult).toBe('no_match');
+    });
+    it('declines a number that fails the Luhn check', () => {
+      const r = validateCardIssuer({ cardNumber: '4242424242424241' });
+      expect(r.actionConfirmed).toBe(false);
+      expect(r.responseCode).toBe('14');
+    });
+    it('declines an unsupported network', () => {
+      const r = validateCardIssuer({ cardNumber: '9999999999999999' });
+      expect(r.actionConfirmed).toBe(false);
+      expect(r.responseCode).toBe('12');
+    });
+    it('tokenized path (masked PAN + network, no CVV) approves a supported network', () => {
+      const r = validateCardIssuer({ maskedPan: '****-****-****-4242', network: 'VISA' });
+      expect(r.actionConfirmed).toBe(true);
+      expect(r.cvvValidationResult).toBe('not_provided');
+    });
+    it('tokenized path with NO network hint does NOT false-decline (network not assessable)', () => {
+      // Regression: a masked PAN alone hides the BIN, so the network cannot be assessed. The issuer
+      // must not reject the card here (it was validated at entry), otherwise legit payments break.
+      const r = validateCardIssuer({ maskedPan: '****-****-****-1212' });
+      expect(r.actionConfirmed).toBe(true);
+      expect(r.responseCode).toBe('00');
+      expect(r.network).toBeNull();
+    });
+    it('never echoes the PAN or CVV in the response', () => {
+      const r = validateCardIssuer({ cardNumber: '4242424242424242', cvv: '123' }) as Record<string, unknown>;
+      const serialized = JSON.stringify(r);
+      expect(serialized).not.toContain('4242424242424242');
+      expect(serialized).not.toContain('123');
+    });
   });
 });

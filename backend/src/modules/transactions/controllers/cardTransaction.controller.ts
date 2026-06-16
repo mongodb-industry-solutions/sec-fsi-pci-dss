@@ -7,6 +7,7 @@ import {
   getDistinctMerchants,
   getAllTransactions,
   CardNotActiveError,
+  CardIssuerDeclinedError,
 } from '../services/cardTransaction.service';
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
 import { getCaseNotes } from '../../fraud/services/fraudDiagnosis.service';
@@ -132,6 +133,16 @@ the Merchant Name selector. No authentication required (public, simulator mode).
             description: 'Raw JSON response from the PSP authorization flow. Stored as QE:none in the `cardTransactionSensitive` collection; requires DEK-sensitive key (Level 2 Investigator role) to read.',
             additionalProperties: true,
           },
+          cardVerification: {
+            type: 'object',
+            description: 'Transient card verification values (PAN, CVV, expiry) forwarded to the card issuer for authorization ONLY, mirroring a real authorization request. NEVER stored on the transaction and stripped from every audit log (PCI DSS Req 3.2 / Req 10.7).',
+            additionalProperties: false,
+            properties: {
+              cardNumber: { type: 'string', description: 'Full PAN. Used only to authorize; never persisted.' },
+              cvv: { type: 'string', description: 'Card verification value. Validated in-memory; never persisted (PCI DSS Req 3.2).' },
+              expiry: { type: 'string', description: 'Expiry MM/YY. Used to check the card is not expired; never persisted.' },
+            },
+          },
         },
       },
       response: {
@@ -160,6 +171,7 @@ the Merchant Name selector. No authentication required (public, simulator mode).
         },
         400: { description: 'Required fields missing or invalid.', $ref: 'Error#' },
         401: { description: 'Missing or invalid Bearer token.', $ref: 'Error#' },
+        402: { description: 'Card issuer declined the card after analysis — payment not authorized.', $ref: 'Error#' },
         422: { description: 'Card-on-file is deactivated or removed — PSP declined.', $ref: 'Error#' },
         500: { description: 'Unexpected server error.', $ref: 'Error#' },
       },
@@ -181,6 +193,7 @@ the Merchant Name selector. No authentication required (public, simulator mode).
       paymentCardExpirationDate?: string;
       paymentCardNetwork?: 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
       gatewayPayload: object;
+      cardVerification?: { cardNumber?: string; cvv?: string; expiry?: string };
     };
 
     if (!body.cardToken || !body.accountReference || body.amount == null) {
@@ -193,6 +206,11 @@ the Merchant Name selector. No authentication required (public, simulator mode).
     } catch (err) {
       if (err instanceof CardNotActiveError) {
         return reply.status(422).send({ error: 'This card has been deactivated. Reactivate it to make payments, or use a different card.' });
+      }
+      if (err instanceof CardIssuerDeclinedError) {
+        // The card issuer is authoritative: it analysed the card and declined, so the payment is
+        // not authorized. The reason is surfaced for the audit; the customer sees a safe message.
+        return reply.status(402).send({ error: `The card issuer declined this card (${err.responseCode}). The payment was not authorized.` });
       }
       throw err;
     }

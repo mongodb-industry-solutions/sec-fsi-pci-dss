@@ -32,6 +32,8 @@ const EXPECTED_COLLECTIONS = [
   'externalProviderArrangementActionLog',
   'externalProviderArrangementPortfolio',
   'capabilityModuleConfiguration',
+  // dev.v8: unified Event Store (EDA backbone)
+  'domainEvent',
 ];
 
 // Unique index (primary ref field) per collection - representative index check
@@ -45,6 +47,7 @@ const EXPECTED_UNIQUE_INDEXES: Record<string, string> = {
   fraudDiagnosisCase:               'fraudDiagnosisInstanceReference',
   fraudDiagnosisCustomerQuestion:   'customerQuestionInstanceReference',
   notification:                     'notificationInstanceReference',
+  domainEvent:                      'eventId',
   partyAuthenticationAssessment:    'partyAuthenticationInstanceReference',
   authenticationDomain:             'partyAuthenticationDomainInstanceReference',
   role:                             'roleName',

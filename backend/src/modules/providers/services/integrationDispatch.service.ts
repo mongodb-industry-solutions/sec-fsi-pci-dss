@@ -25,6 +25,10 @@ export interface DispatchResult {
   latencyMs: number;
   responseCode?: number;
   error?: string;
+  // Parsed body the provider/module returned. Lets the caller act on the provider's DECISION (e.g.
+  // a card issuer that approves/declines), not just on transport success. Undefined for stub
+  // providers with no endpoint, or when the call errored/timed out before a body was read.
+  responseBody?: unknown;
 }
 
 export async function dispatchProvider(
@@ -84,7 +88,7 @@ export async function dispatchProvider(
 
 function buildAuthHeaders(provider: ExternalProviderArrangement): Record<string, string> {
   if (!provider.authConfig) {
-    return { 'X-Integration-Source': 'leafybank-demo' };
+    return { 'X-Integration-Source': 'psp-demo' };
   }
 
   const { scheme, bearer, apiKey } = provider.authConfig;
@@ -96,7 +100,7 @@ function buildAuthHeaders(provider: ExternalProviderArrangement): Record<string,
     const prefix = bearer.tokenPrefix ?? 'Bearer';
     return {
       [headerName]: `${prefix} [demo-key-placeholder]`,
-      'X-Integration-Source': 'leafybank-demo',
+      'X-Integration-Source': 'psp-demo',
     };
   }
 
@@ -106,12 +110,12 @@ function buildAuthHeaders(provider: ExternalProviderArrangement): Record<string,
       const prefix = apiKey.keyPrefix ?? '';
       return {
         [headerName]: `${prefix}[demo-key-placeholder]`,
-        'X-Integration-Source': 'leafybank-demo',
+        'X-Integration-Source': 'psp-demo',
       };
     }
   }
 
-  return { 'X-Integration-Source': 'leafybank-demo' };
+  return { 'X-Integration-Source': 'psp-demo' };
 }
 
 async function dispatchExternal(
@@ -140,7 +144,12 @@ async function dispatchExternal(
   try {
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), provider.externalProviderTimeoutMs);
+    // Internal providers dispatch via an HTTP loopback to our own API (ADR-025 endpoint-first). That
+    // round-trip is more than a local function call, so enforce a sane minimum timeout to avoid
+    // spurious AbortError timeouts on a busy event loop; external providers keep their configured value.
+    const configuredTimeout = provider.externalProviderTimeoutMs ?? 5000;
+    const effectiveTimeout = provider.externalProviderIsInternal ? Math.max(configuredTimeout, 1500) : configuredTimeout;
+    const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
 
     const res = await fetch(provider.externalProviderApiEndpoint!, {
       method: 'POST',
@@ -174,7 +183,7 @@ async function dispatchExternal(
 
     await updateHealthStatus(db, arrangementId, res.ok ? 'ok' : 'degraded');
 
-    return { provider: 'external', arrangementId, status, latencyMs, responseCode: res.status };
+    return { provider: 'external', arrangementId, status, latencyMs, responseCode: res.status, responseBody };
   } catch (err) {
     const latencyMs = Date.now() - start;
     const isTimeout = (err as Error).name === 'AbortError';
@@ -286,7 +295,7 @@ export async function testIntegration(
     const res = await fetch(provider.externalProviderApiEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Integration-Test': 'true' },
-      body: JSON.stringify({ test: true, source: 'leafybank-demo' }),
+      body: JSON.stringify({ test: true, source: 'psp-demo' }),
       signal: controller.signal,
     });
     clearTimeout(timeout);

@@ -5,6 +5,8 @@ import { useIntegration, TYPE_LABEL } from '../_context';
 import { Card } from '../_shared';
 import { api } from '../../../../../../../lib/api';
 import { useDebugMode } from '../../../../../../../lib/debugMode';
+import { byProviderType } from '../../../../../../../config/capabilities';
+import { API_BASE_URL } from '../../../../../../../lib/constants';
 
 // ── Type descriptions ────────────────────────────────────────────────────────
 
@@ -62,6 +64,11 @@ export default function OverviewPage() {
 
   const triggerEvents = integration.externalProviderTriggerEvents ?? [];
 
+  // Inbound callback endpoint, shown as a full absolute URL (scheme + host + path). External
+  // providers must register this exact URL; the path alone is ambiguous outside our origin.
+  const callbackSegment = byProviderType(String(integration.externalProviderArrangementType))?.callbackSegment ?? 'generic';
+  const callbackUrl = `${API_BASE_URL}/api/v1/providers/callback/${callbackSegment}/${id}`;
+
   return (
     <div className="space-y-5">
       {/* Purpose */}
@@ -96,7 +103,7 @@ export default function OverviewPage() {
               <dt className="text-xs text-gray-500">Provider type</dt>
               <dd className="text-sm text-gray-700 mt-0.5">
                 {integration.externalProviderIsInternal
-                  ? <span>Built-in <span className="text-gray-400">(LeafyBank internal module)</span></span>
+                  ? <span>Built-in <span className="text-gray-400">(internal module)</span></span>
                   : 'External (third-party API)'}
               </dd>
             </div>
@@ -112,6 +119,14 @@ export default function OverviewPage() {
                 <dd className="text-sm font-mono text-gray-700 mt-0.5 break-all">{integration.externalProviderApiEndpoint}</dd>
               </div>
             )}
+            <div>
+              <dt className="text-xs text-gray-500">Inbound callback endpoint</dt>
+              <dd className="text-sm font-mono text-gray-700 mt-0.5 break-all">{callbackUrl}</dd>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                Full URL to register with the provider for inbound responses
+                {integration.externalProviderCallbackEnabled ? '' : ' (currently disabled in the Inbound tab)'}.
+              </p>
+            </div>
             {integration.externalProviderApiKeyPrefix && (
               <div>
                 <dt className="text-xs text-gray-500">API key (prefix)</dt>
@@ -150,7 +165,7 @@ export default function OverviewPage() {
       {/* Trigger events */}
       <Card
         title="System events linked to this integration"
-        subtitle="These are the internal LeafyBank events that can activate or be processed by this integration provider.">
+        subtitle="Internal system events that activate this provider. When one of these fires, the PSP dispatches a request to this provider and records the round-trip in the Events tab.">
         {triggerEvents.length === 0 ? (
           <p className="text-sm text-gray-400 italic">No trigger events configured.</p>
         ) : (

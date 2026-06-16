@@ -1,6 +1,6 @@
 // Realistic sample payloads per integration type.
-// Outbound: what LeafyBank sends to the provider API.
-// Inbound:  what an external provider posts to LeafyBank's webhook.
+// Outbound: what the PSP sends to the provider API.
+// Inbound:  what an external provider posts to the PSP's webhook.
 
 export const OUTBOUND_SAMPLES: Record<string, Record<string, unknown>> = {
   hrp_sanctions: {
@@ -28,7 +28,7 @@ export const OUTBOUND_SAMPLES: Record<string, Record<string, unknown>> = {
       destinationBankBic: 'ADCBAEAA',
       destinationAccountIban: 'AE070331234567890123456',
     },
-    requestedBy: 'leafybank-payment-processor',
+    requestedBy: 'psp-payment-processor',
     correlationId: 'corr-20260611-98734',
     callbackUrl: '/api/v1/webhooks/int-internal-hrp-001/callback',
   },
@@ -59,7 +59,7 @@ export const OUTBOUND_SAMPLES: Record<string, Record<string, unknown>> = {
       last30DaysSpendEur: 3217.40,
       previousDeclines30Days: 0,
     },
-    requestedBy: 'leafybank-card-authorization',
+    requestedBy: 'psp-card-authorization',
     correlationId: 'corr-20260611-45123',
   },
 
@@ -87,7 +87,7 @@ export const OUTBOUND_SAMPLES: Record<string, Record<string, unknown>> = {
       { type: 'PROOF_OF_ADDRESS', issueDate: '2026-03-15', issuer: 'CFE' },
     ],
     biometric: { faceMatchRequired: true, livenessCheckRequired: true },
-    requestedBy: 'leafybank-onboarding-service',
+    requestedBy: 'psp-onboarding-service',
     correlationId: 'corr-20260611-10234',
   },
 
@@ -114,7 +114,7 @@ export const OUTBOUND_SAMPLES: Record<string, Record<string, unknown>> = {
       { firstName: 'Ana', lastName: 'Restrepo', ownershipPercent: 55, isPep: false },
       { firstName: 'Jorge', lastName: 'Molina', ownershipPercent: 45, isPep: false },
     ],
-    requestedBy: 'leafybank-commercial-onboarding',
+    requestedBy: 'psp-commercial-onboarding',
     correlationId: 'corr-20260611-30891',
   },
 
@@ -141,7 +141,7 @@ export const OUTBOUND_SAMPLES: Record<string, Record<string, unknown>> = {
     triggeredAlerts: [
       { alertCode: 'STR-001', description: 'Structuring pattern detected; 6 deposits just below €10,000', severity: 'HIGH' },
     ],
-    requestedBy: 'leafybank-aml-engine',
+    requestedBy: 'psp-aml-engine',
     correlationId: 'corr-20260611-67231',
   },
 
@@ -164,7 +164,7 @@ export const OUTBOUND_SAMPLES: Record<string, Record<string, unknown>> = {
       termMonths: 60,
       purpose: 'HOME_IMPROVEMENT',
     },
-    requestedBy: 'leafybank-lending-engine',
+    requestedBy: 'psp-lending-engine',
     correlationId: 'corr-20260611-22108',
     consentReference: 'CONSENT-20260611-DMS-001',
   },
@@ -173,7 +173,7 @@ export const OUTBOUND_SAMPLES: Record<string, Record<string, unknown>> = {
     requestId: 'req-20260611-001',
     timestamp: '2026-06-11T08:00:00.000Z',
     payload: { key: 'value', nested: { field: 'example' } },
-    requestedBy: 'leafybank-service',
+    requestedBy: 'psp-service',
     correlationId: 'corr-20260611-001',
   },
 };

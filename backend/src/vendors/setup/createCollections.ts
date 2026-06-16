@@ -311,4 +311,17 @@ export async function createCollections(
   } else {
     console.log('  skip:    complianceProcessEvent (already exists)');
   }
+
+  // dev.v8: unified Event Store (EDA backbone). Regular collection (NOT timeseries) so it can carry
+  // a UNIQUE index on eventId for idempotency. Holds every DomainEvent, correlated by correlationId.
+  if (!existingNames.has('domainEvent') || reset) {
+    if (existingNames.has('domainEvent') && reset) {
+      await db.collection('domainEvent').drop();
+      console.log('  dropped: domainEvent');
+    }
+    await db.createCollection('domainEvent');
+    console.log('  created: domainEvent (event store)');
+  } else {
+    console.log('  skip:    domainEvent (already exists)');
+  }
 }

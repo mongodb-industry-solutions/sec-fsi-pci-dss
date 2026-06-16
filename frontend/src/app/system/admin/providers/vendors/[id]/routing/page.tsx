@@ -121,12 +121,12 @@ export default function RoutingPage() {
         <div className="text-sm text-gray-700 space-y-3 leading-relaxed">
           <p>
             A <strong>routing group</strong> lets you register multiple providers for the same integration type
-            and define exactly how LeafyBank distributes requests between them.
+            and define exactly how the PSP distributes requests between them.
           </p>
           <p>
             For example: you have a built-in fraud detection engine and an external scoring API.
             By adding both to a group with the <em>Primary / Fallback</em> strategy,
-            LeafyBank will send all traffic to the external API and automatically fall back to the internal engine
+            the PSP will send all traffic to the external API and automatically fall back to the internal engine
             if the external one is unavailable.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">

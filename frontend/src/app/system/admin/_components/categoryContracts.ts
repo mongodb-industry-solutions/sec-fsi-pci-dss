@@ -1,6 +1,6 @@
 // Category data contracts and trigger events for each IntegrationProviderType.
 // These are canonical definitions; not fetched from the API. They describe the
-// protocol between LeafyBank and any provider of that type.
+// protocol between the PSP and any provider of that type.
 
 export interface ContractField {
   name: string;

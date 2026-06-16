@@ -18,7 +18,7 @@ export async function checkoutController(fastify: FastifyInstance) {
   // POST /api/v1/checkout/sessions
   fastify.post('/sessions', {
     schema: {
-      tags: ['checkout'],
+      tags: ['payment:checkout'],
       summary: 'Create a checkout session (Redirect Checkout)',
       description: `Creates a \`checkoutSession\` (BIAN SD-64) and returns a hosted payment page URL.
 
@@ -98,7 +98,7 @@ export async function checkoutController(fastify: FastifyInstance) {
   // GET /api/v1/checkout/sessions/:id
   fastify.get('/sessions/:id', {
     schema: {
-      tags: ['checkout'],
+      tags: ['payment:checkout'],
       summary: 'Get checkout session (public status check)',
       description: 'Returns payment page display data and current session status. Used by the hosted payment page on load and by the merchant to verify payment after redirect.',
       params: {
@@ -134,7 +134,7 @@ export async function checkoutController(fastify: FastifyInstance) {
   // POST /api/v1/checkout/sessions/:id/pay
   fastify.post('/sessions/:id/pay', {
     schema: {
-      tags: ['checkout'],
+      tags: ['payment:checkout'],
       summary: 'Process payment for a checkout session (public)',
       description: `Called by the hosted payment page after the buyer submits the card form.
 
@@ -247,7 +247,7 @@ export async function checkoutController(fastify: FastifyInstance) {
   // DELETE /api/v1/checkout/sessions/:id
   fastify.delete('/sessions/:id', {
     schema: {
-      tags: ['checkout'],
+      tags: ['payment:checkout'],
       summary: 'Cancel a checkout session',
       security: [{ bearerAuth: [] }],
       params: {

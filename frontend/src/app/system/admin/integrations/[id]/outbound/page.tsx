@@ -195,8 +195,8 @@ export default function OutboundPage() {
       <Card title="Outbound status">
         <p className="text-sm text-gray-600 leading-relaxed mb-4">
           {isInternal
-            ? 'The outbound section configures the API endpoint that LeafyBank calls when this built-in integration is triggered. Even built-in providers follow the API-first approach and call a backend endpoint with the specified fields.'
-            : 'The outbound section configures where and how LeafyBank sends data when this integration is triggered; endpoint, authentication, field mapping, and transport settings.'}
+            ? 'The outbound section configures the API endpoint that the PSP calls when this built-in integration is triggered. Even built-in providers follow the API-first approach and call a backend endpoint with the specified fields.'
+            : 'The outbound section configures where and how the PSP sends data when this integration is triggered; endpoint, authentication, field mapping, and transport settings.'}
         </p>
         <StatusToggle
           enabled={isActive}
@@ -228,7 +228,7 @@ export default function OutboundPage() {
               label="URL"
               hint={isInternal
                 ? 'Backend API path this integration POSTs to when triggered. Use a relative path (e.g. /api/v1/hrp/screen) or a full URL for cross-service calls.'
-                : 'Full URL of the external API endpoint. LeafyBank will send requests here when the integration is triggered.'} />
+                : 'Full URL of the external API endpoint. The PSP will send requests here when the integration is triggered.'} />
             <input value={endpoint} onChange={e => setEndpoint(e.target.value)}
               placeholder={endpointPlaceholder}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono" />
@@ -249,7 +249,7 @@ export default function OutboundPage() {
             <div>
               <FieldLabel
                 label="Mode"
-                hint="Synchronous: LeafyBank waits for the response before continuing the transaction flow. Asynchronous: the call is dispatched in the background and the result arrives via the inbound callback." />
+                hint="Synchronous: the PSP waits for the response before continuing the transaction flow. Asynchronous: the call is dispatched in the background and the result arrives via the inbound callback." />
               <select value={mode} onChange={e => setMode(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
                 <option value="sync">Synchronous</option>
@@ -259,7 +259,7 @@ export default function OutboundPage() {
             <div>
               <FieldLabel
                 label="Timeout (ms)"
-                hint="Maximum time in milliseconds LeafyBank will wait for the endpoint to respond. Requests that exceed this are cancelled and retried according to the retry policy." />
+                hint="Maximum time in milliseconds the PSP will wait for the endpoint to respond. Requests that exceed this are cancelled and retried according to the retry policy." />
               <input type="number" value={timeoutMs} onChange={e => setTimeoutMs(parseInt(e.target.value))}
                 min={100} max={30000}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
@@ -287,7 +287,7 @@ export default function OutboundPage() {
       {/* ── Authentication ─────────────────────────────────────────────────── */}
       <Card
         title="Authentication"
-        subtitle="Credentials LeafyBank sends to prove its identity when calling the endpoint.">
+        subtitle="Credentials the PSP sends to prove its identity when calling the endpoint.">
         <div className="space-y-4">
           <div>
             <FieldLabel
@@ -360,7 +360,7 @@ export default function OutboundPage() {
               <div>
                 <FieldLabel
                   label="Signature header"
-                  hint="HTTP header in which LeafyBank sends the computed signature. The receiving endpoint will read this header to verify the request." />
+                  hint="HTTP header in which the PSP sends the computed signature. The receiving endpoint will read this header to verify the request." />
                 <input value={hmacHeader} onChange={e => setHmacHeader(e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono" />
               </div>
@@ -386,7 +386,7 @@ export default function OutboundPage() {
 
           {scheme === 'oauth2_cc' && (
             <p className="text-xs text-gray-400 border-t pt-3">
-              OAuth2 client credentials; token endpoint and client secret are managed by the LeafyBank vault. Contact the platform team to configure credentials.
+              OAuth2 client credentials; token endpoint and client secret are managed by the PSP vault. Contact the platform team to configure credentials.
             </p>
           )}
         </div>
@@ -395,11 +395,11 @@ export default function OutboundPage() {
       {/* ── Field mapping ──────────────────────────────────────────────────── */}
       <Card
         title="Field mapping"
-        subtitle="Maps LeafyBank's internal field names to the names the endpoint expects. Leave the target blank to send the field with its original name. Use dot notation for nested fields: payload.transaction.amount">
+        subtitle="Maps the PSP's internal field names to the names the endpoint expects. Leave the target blank to send the field with its original name. Use dot notation for nested fields: payload.transaction.amount">
         <FieldMappingMatrix
           rules={outboundRules}
           setRules={setOutboundRules}
-          sourceLabel="LeafyBank field"
+          sourceLabel="the PSP field"
           targetLabel="Endpoint expects" />
       </Card>
 
@@ -494,7 +494,7 @@ export default function OutboundPage() {
               </p>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Original payload (LeafyBank internal)</p>
+                  <p className="text-xs text-gray-500 mb-1">Original payload (the PSP internal)</p>
                   <JsonView data={testResult.original} maxHeight="13rem" />
                 </div>
                 <div>

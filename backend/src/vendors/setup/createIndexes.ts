@@ -178,6 +178,16 @@ export async function createIndexes(client: MongoClient) {
     { key: { recipientPartyReference: 1, notificationType: 1, relatedReference: 1 } },
   ]);
 
+  // dev.v8: Event Store (EDA). Unique eventId = idempotency; the rest power correlated trails,
+  // per-business-process grouping and type/time queries for audit and investigation.
+  await ensureIndexes(db, 'domainEvent', [
+    { key: { eventId: 1 }, unique: true },
+    { key: { correlationId: 1, occurredAt: 1 } },
+    { key: { businessProcess: 1, occurredAt: -1 } },
+    { key: { eventType: 1, occurredAt: -1 } },
+    { key: { partitionKey: 1, occurredAt: 1 } },
+  ]);
+
   // SD-91: Customer Authentication Assessment
   await ensureIndexes(db, 'customerAuthenticationAssessment', [
     { key: { customerAuthenticationInstanceReference: 1 }, unique: true },

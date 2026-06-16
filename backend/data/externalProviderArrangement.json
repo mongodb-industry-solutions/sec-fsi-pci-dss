@@ -370,12 +370,12 @@
   },
   {
     "externalProviderArrangementInstanceReference": "int-internal-card-issuer-001",
-    "externalProviderArrangementName": "Card Issuer CVV/PIN Validation Stub",
+    "externalProviderArrangementName": "Card Issuer CVV/PIN Validation",
     "externalProviderArrangementType": "card_issuer",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
     "externalProviderApiEndpoint": "http://localhost:3001/api/v1/modules/card-issuer/score",
-    "externalProviderInternalHandler": "cardIssuer.cvvPinStub",
+    "externalProviderInternalHandler": "cardIssuer.cvv.validation",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
       "checkout.cvv.validation",
@@ -383,7 +383,7 @@
       "card.activation.cvv"
     ],
     "externalProviderMode": "sync",
-    "externalProviderTimeoutMs": 150,
+    "externalProviderTimeoutMs": 3000,
     "externalProviderRetryPolicy": {
       "maxAttempts": 1,
       "backoffMs": 0

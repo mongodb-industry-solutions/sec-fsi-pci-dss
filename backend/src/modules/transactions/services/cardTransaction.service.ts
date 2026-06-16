@@ -34,6 +34,10 @@ export interface CreateTransactionInput {
   paymentCardExpirationDate?: string;
   paymentCardNetwork?: 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
   gatewayPayload: object;
+  // Transient card verification values forwarded to the card issuer for authorization ONLY, as a real
+  // authorization request would carry. NEVER persisted on the transaction and stripped from every
+  // audit log (PCI DSS Req 3.2 / Req 10.7). Used in-memory for the issuer decision, then discarded.
+  cardVerification?: { cardNumber?: string; cvv?: string; expiry?: string };
 }
 
 // Thrown when a payment is attempted with a card-on-file the customer has deactivated (suspended)
@@ -42,6 +46,17 @@ export class CardNotActiveError extends Error {
   constructor(public readonly status: string) {
     super(`Card is ${status}: the PSP declined this operation`);
     this.name = 'CardNotActiveError';
+  }
+}
+
+// The card issuer (internal module or an external issuer integration) declined the card after
+// analysis. The issuer is AUTHORITATIVE: when it declines, the PSP does not authorize the payment.
+// This is the security gate that an external issuer would enforce in a real deployment (BIAN SD-15 /
+// SD-88). Carries the issuer's response code + reason for the audit and the customer-facing message.
+export class CardIssuerDeclinedError extends Error {
+  constructor(public readonly responseCode: string, public readonly reason: string) {
+    super(`Card issuer declined the card (${responseCode}): ${reason}`);
+    this.name = 'CardIssuerDeclinedError';
   }
 }
 
@@ -107,16 +122,31 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
     throw new CardNotActiveError(onFile.paymentCardStatus);
   }
 
-  // SD-15 / card_issuer: confirm the card with the issuer before charging it. Routed through the
-  // Integration Hub (card_issuer integrator) so the validation is an auditable inbound/outbound
-  // event tied to this transaction. CVV/PIN are validated upstream and never reach here (no SAD).
+  // SD-15 / card_issuer: confirm the card with the issuer BEFORE charging it. Routed through the
+  // Integration Hub (card_issuer integrator) so the validation is an auditable inbound/outbound event
+  // tied to this transaction. The issuer is authoritative: if it DECLINES, the PSP does not authorize.
+  // The network is taken from the card-on-file so the issuer can assess it (the masked PAN hides the
+  // BIN); CVV/PIN are validated upstream and never reach here (no SAD stored).
+  // Fire one of the issuer's DECLARED trigger events (checkout.cvv.validation) so the audited event
+  // matches what the provider advertises it handles, instead of an ad-hoc name.
+  const issuerNetwork = input.paymentCardNetwork ?? onFile?.paymentCardNetwork;
+  let issuerResult: Awaited<ReturnType<typeof dispatchProvider>> | null = null;
   try {
-    await dispatchProvider(db, 'card_issuer', 'payment.card.validation', {
+    issuerResult = await dispatchProvider(db, 'card_issuer', 'checkout.cvv.validation', {
       cardToken: input.cardToken,
       maskedPan: input.cardTransactionMaskedPanDisplay,
-      ...(input.paymentCardNetwork ? { network: input.paymentCardNetwork } : {}),
+      // Correlation id so the issuer module logs its validation against this transaction (PCI Req 10).
+      cardTransactionInstanceReference: txnId,
+      ...(issuerNetwork ? { network: issuerNetwork } : {}),
     }, { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' });
-  } catch { /* validation logging never blocks the payment */ }
+  } catch { /* a transport failure is non-fatal; only an explicit issuer DECLINE blocks the payment */ }
+
+  // Enforce the issuer's decision. Only an explicit decline blocks (fail-safe against transport
+  // hiccups); the validation event is already recorded above for the audit trail.
+  const issuerDecision = issuerResult?.responseBody as { actionConfirmed?: boolean; responseCode?: string; decisionReason?: string } | undefined;
+  if (issuerDecision && issuerDecision.actionConfirmed === false) {
+    throw new CardIssuerDeclinedError(issuerDecision.responseCode ?? 'declined', issuerDecision.decisionReason ?? 'card_issuer_declined');
+  }
 
   // Normalize the account reference to the customer's canonical business key
   // (ACC-xxx) so seeded and simulator-created transactions share one convention.

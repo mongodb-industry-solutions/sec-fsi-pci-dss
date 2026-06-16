@@ -168,7 +168,7 @@ export default function InboundPage() {
         <p className="text-sm text-gray-600 leading-relaxed mb-4">
           {isInternal
             ? 'The inbound section configures how this integration receives response data from the backend API. When the API finishes processing a request, it can deliver results asynchronously to the callback endpoint defined here.'
-            : 'The inbound section configures how this integration receives data from the external provider. Providers use the callback URL to send event notifications, async results, or status updates back to LeafyBank.'}
+            : 'The inbound section configures how this integration receives data from the external provider. Providers use the callback URL to send event notifications, async results, or status updates back to the PSP.'}
         </p>
         <StatusToggle
           enabled={callbackEnabled}
@@ -220,12 +220,12 @@ export default function InboundPage() {
       {/* ── Field mapping ──────────────────────────────────────────────────── */}
       <Card
         title="Expected field mapping"
-        subtitle="Maps incoming field names to LeafyBank's internal names. Leave the target blank to use the source name unchanged. Use dot notation for nested values: payload.transaction.amount">
+        subtitle="Maps incoming field names to the PSP's internal names. Leave the target blank to use the source name unchanged. Use dot notation for nested values: payload.transaction.amount">
         <FieldMappingMatrix
           rules={inboundRules}
           setRules={setInboundRules}
           sourceLabel="Sender field"
-          targetLabel="LeafyBank maps to" />
+          targetLabel="the PSP maps to" />
       </Card>
 
       {/* ── Security ───────────────────────────────────────────────────────── */}
@@ -268,7 +268,7 @@ export default function InboundPage() {
               <div>
                 <FieldLabel
                   label="Signature prefix"
-                  hint="Text that the sender prepends to the signature value in the header (e.g. 'sha256='). LeafyBank strips this before comparing. Leave blank if the header contains the raw signature." />
+                  hint="Text that the sender prepends to the signature value in the header (e.g. 'sha256='). The PSP strips this before comparing. Leave blank if the header contains the raw signature." />
                 <input value={sigPrefix} onChange={e => setSigPrefix(e.target.value)}
                   placeholder="sha256="
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono" />
@@ -414,7 +414,7 @@ export default function InboundPage() {
                   <JsonView data={inboundTestResult.original} maxHeight="13rem" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Processed by LeafyBank (after mapping)</p>
+                  <p className="text-xs text-gray-500 mb-1">Processed by the PSP (after mapping)</p>
                   <JsonView data={inboundTestResult.transformed} maxHeight="13rem" />
                 </div>
               </div>

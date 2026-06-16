@@ -96,7 +96,7 @@ export default function OverviewPage() {
               <dt className="text-xs text-gray-500">Provider type</dt>
               <dd className="text-sm text-gray-700 mt-0.5">
                 {integration.externalProviderIsInternal
-                  ? <span>Built-in <span className="text-gray-400">(LeafyBank internal module)</span></span>
+                  ? <span>Built-in <span className="text-gray-400">(the PSP internal module)</span></span>
                   : 'External (third-party API)'}
               </dd>
             </div>
@@ -150,7 +150,7 @@ export default function OverviewPage() {
       {/* Trigger events */}
       <Card
         title="System events linked to this integration"
-        subtitle="These are the internal LeafyBank events that can activate or be processed by this integration provider.">
+        subtitle="These are the internal the PSP events that can activate or be processed by this integration provider.">
         {triggerEvents.length === 0 ? (
           <p className="text-sm text-gray-400 italic">No trigger events configured.</p>
         ) : (

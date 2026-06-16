@@ -64,7 +64,7 @@ export default function AdminDashboardPage() {
             <p className="text-sm text-gray-500 mt-0.5">BIAN SD-193 External Provider Arrangements · PCI DSS Req 12.8</p>
           </div>
           <Link
-            href="/system/admin/integrations"
+            href="/system/admin/providers"
             className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
           >
             <Wrench size={14} />

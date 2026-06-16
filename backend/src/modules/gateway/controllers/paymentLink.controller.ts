@@ -20,7 +20,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
   // POST /api/v1/payment-links
   fastify.post('/', {
     schema: {
-      tags: ['payment/links'],
+      tags: ['payment:links'],
       summary: 'Create a payment link',
       description: `Creates a shareable payment link. The returned \`paymentUrl\` (/pay/{code}) can be shared via email, QR code, or embedded in a web page.
 
@@ -102,7 +102,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
   // GET /api/v1/payment-links
   fastify.get('/', {
     schema: {
-      tags: ['payment/links'],
+      tags: ['payment:links'],
       summary: 'List payment links',
       security: [{ bearerAuth: [] }],
       querystring: {
@@ -154,7 +154,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
   // GET /api/v1/payment-links/:code  (public - no auth)
   fastify.get('/:code', {
     schema: {
-      tags: ['payment/links'],
+      tags: ['payment:links'],
       summary: 'Resolve a payment link by code (public)',
       description: 'Returns payment display data for the payment page. Never exposes internal merchant IDs or hashes.',
       params: {
@@ -189,7 +189,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
   // POST /api/v1/payment-links/:code/pay  (public)
   fastify.post('/:code/pay', {
     schema: {
-      tags: ['payment/links'],
+      tags: ['payment:links'],
       summary: 'Process payment via payment link (public)',
       description: 'Called by the payment link page after buyer submits card form. Card data is tokenized client-side before this call.',
       params: {
@@ -286,7 +286,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
   // PATCH /api/v1/payment-links/:id
   fastify.patch('/:id', {
     schema: {
-      tags: ['payment/links'],
+      tags: ['payment:links'],
       summary: 'Update or deactivate a payment link',
       security: [{ bearerAuth: [] }],
       params: {

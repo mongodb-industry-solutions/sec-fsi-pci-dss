@@ -109,9 +109,18 @@
     "capability": "card-issuer",
     "moduleDomain": "gateway",
     "capabilityModuleStatus": "active",
-    "moduleConfig": { "cvvValidationEnabled": true, "pinValidationEnabled": true, "cardNetworks": ["visa", "mastercard"] },
+    "moduleConfig": {
+      "validCvv": "123",
+      "enforceLuhn": true,
+      "networks": [
+        { "name": "VISA", "prefixes": ["4"], "lengths": [13, 16, 19], "cvvLength": 3, "enabled": true },
+        { "name": "MASTERCARD", "prefixes": ["51-55", "2221-2720"], "lengths": [16], "cvvLength": 3, "enabled": true },
+        { "name": "AMEX", "prefixes": ["34", "37"], "lengths": [15], "cvvLength": 4, "enabled": true },
+        { "name": "DISCOVER", "prefixes": ["6011", "644-649", "65"], "lengths": [16, 19], "cvvLength": 3, "enabled": true }
+      ]
+    },
     "moduleCallbackEndpoints": [
-      { "event": "card-issuer.validated", "path": "/api/v1/providers/callback/card/issuer/int-internal-card-issuer-001" }
+      { "event": "card.issuer.validation.approved", "path": "/api/v1/providers/callback/card/issuer/int-internal-card-issuer-001" }
     ],
     "bianServiceDomain": "SD-88 Payment Card",
     "bianControlRecordType": "PaymentCardManagement",
