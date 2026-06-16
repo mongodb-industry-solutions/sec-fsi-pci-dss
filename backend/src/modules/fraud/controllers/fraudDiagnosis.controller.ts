@@ -276,14 +276,14 @@ without creating a duplicate.
     });
   });
 
-  // GET /api/v1/fraud/stats — investigation analytics for L1/L2/auditor dashboards.
+  // GET /api/v1/fraud/stats; investigation analytics for L1/L2/auditor dashboards.
   // Registered before /:id so "stats" is not matched as a case id.
-  // Aggregates over case metadata only — no cardholder PII (PCI DSS Req 3/7).
+  // Aggregates over case metadata only; no cardholder PII (PCI DSS Req 3/7).
   fastify.get('/stats', {
     schema: {
       tags: ['fraud'],
       summary: 'Fraud investigation analytics',
-      description: 'Aggregated case counts by status, severity, and month for the investigation dashboards. No PII — fraud cases carry only operational metadata.',
+      description: 'Aggregated case counts by status, severity, and month for the investigation dashboards. No PII; fraud cases carry only operational metadata.',
       response: {
         200: {
           type: 'object',
@@ -306,13 +306,13 @@ without creating a duplicate.
     return reply.send(stats);
   });
 
-  // GET /api/v1/fraud/integrity — Security Auditor data-integrity oversight (PCI DSS Req 10).
+  // GET /api/v1/fraud/integrity; Security Auditor data-integrity oversight (PCI DSS Req 10).
   // Registered before /:id. Auditor-only: verifies control-record integrity (no PII).
   fastify.get('/integrity', {
     schema: {
       tags: ['fraud'],
       summary: 'Fraud case data-integrity check (auditor, Req 10)',
-      description: 'Read-only integrity oversight for the Security Auditor: duplicate case references, orphaned transaction/customer references, case totals, and payment-card duplication checks (duplicate arrangements, inconsistent tokenization, registry drift). Aggregates + masked PAN only — no CHD/PII.',
+      description: 'Read-only integrity oversight for the Security Auditor: duplicate case references, orphaned transaction/customer references, case totals, and payment-card duplication checks (duplicate arrangements, inconsistent tokenization, registry drift). Aggregates + masked PAN only; no CHD/PII.',
       security: [{ bearerAuth: [] }],
       response: {
         200: {
@@ -597,22 +597,26 @@ Req 7 (least privilege) and Req 10 (audit of sensitive access).`,
       }, actorOf(request));
     }
 
-    // Notify the customer when their case is resolved (ADR-031 transaction-status notification).
-    if (body.fraudDiagnosisCaseStatus === 'resolved_cleared' || body.fraudDiagnosisCaseStatus === 'resolved_fraud') {
+    // Notify the customer on important case status changes (ADR-031 transaction-status notification):
+    // escalated (specialist review) and resolved (cleared / confirmed fraud).
+    const newStatus = body.fraudDiagnosisCaseStatus;
+    if (newStatus === 'escalated' || newStatus === 'resolved_cleared' || newStatus === 'resolved_fraud') {
       const fc = await getCaseById(fastify.db, id);
       if (fc) {
         const agreement = await fastify.db.collection(CUSTOMER_AGREEMENT_COLLECTION)
           .findOne<{ partyInstanceReference?: string }>({ customerAgreementInstanceReference: fc.customerAgreementInstanceReference });
-        const cleared = body.fraudDiagnosisCaseStatus === 'resolved_cleared';
+        const copy = newStatus === 'escalated'
+          ? { title: 'Your case is being reviewed by a specialist', detail: 'A specialist investigator is now reviewing your transaction. We will update you with the outcome.', rel: `status-escalated-${fc.fraudDiagnosisInstanceReference}` }
+          : newStatus === 'resolved_cleared'
+          ? { title: 'A transaction review was completed', detail: 'Your transaction was reviewed and confirmed as legitimate. No action is needed.', rel: `status-${fc.fraudDiagnosisInstanceReference}` }
+          : { title: 'A transaction was confirmed as fraud', detail: 'An unauthorized transaction was confirmed. A refund has been initiated and your card secured.', rel: `status-${fc.fraudDiagnosisInstanceReference}` };
         await createNotification(fastify.db, {
           recipientPartyReference: agreement?.partyInstanceReference ?? '',
           notificationType: 'transaction_status',
-          title: cleared ? 'A transaction review was completed' : 'A transaction was confirmed as fraud',
-          detail: cleared
-            ? 'Your transaction was reviewed and confirmed as legitimate. No action is needed.'
-            : 'An unauthorized transaction was confirmed. A refund has been initiated and your card secured.',
+          title: copy.title,
+          detail: copy.detail,
           href: `/system/payment/history/${fc.cardTransactionInstanceReference}`,
-          relatedReference: `status-${fc.fraudDiagnosisInstanceReference}`,
+          relatedReference: copy.rel,
           transactionId: fc.cardTransactionInstanceReference,
           caseReference: fc.fraudDiagnosisCaseReference,
           actionable: false,
@@ -956,7 +960,7 @@ Token TTL: 4 hours. Use \`POST /fraud/:id/escalate/approve\` again to renew.`,
 
     // Idempotent resume: the first approval records the acceptance and audits it (PCI Req 10).
     // Subsequent calls (e.g. the L2 reloading the case to re-derive a fresh stateless token)
-    // only re-issue the token — no duplicate acceptance timestamp, no audit-trail noise.
+    // only re-issue the token; no duplicate acceptance timestamp, no audit-trail noise.
     const alreadyAccepted = !!fraudCase.fraudDiagnosisEscalationAcceptedAt;
     const approvedAt = alreadyAccepted ? new Date(fraudCase.fraudDiagnosisEscalationAcceptedAt as unknown as string) : now;
     if (!alreadyAccepted) {
@@ -1091,6 +1095,23 @@ Errors are corrected via \`DELETE /fraud/:id/notes/:noteId\` (retraction), which
     if (!fraudCase) return reply.status(404).send({ error: 'Fraud case not found' });
 
     const result = await addCaseNote(fastify.db, id, noteText, visibility, userRole as import('../../../shared/models/identity.model').AnalystRole, actorOf(request));
+
+    // Notify the customer when the message is visible to them (ADR-031).
+    if (visibility === 'customer') {
+      const agreement = await fastify.db.collection(CUSTOMER_AGREEMENT_COLLECTION)
+        .findOne<{ partyInstanceReference?: string }>({ customerAgreementInstanceReference: fraudCase.customerAgreementInstanceReference });
+      await createNotification(fastify.db, {
+        recipientPartyReference: agreement?.partyInstanceReference ?? '',
+        notificationType: 'security_message',
+        title: 'New message from the security team',
+        detail: noteText,
+        href: `/system/payment/history/${fraudCase.cardTransactionInstanceReference}`,
+        relatedReference: `note-${result.noteId}`,
+        transactionId: fraudCase.cardTransactionInstanceReference,
+        caseReference: fraudCase.fraudDiagnosisCaseReference,
+        actionable: false,
+      });
+    }
     return reply.status(201).send({ noteId: result.noteId, actionDateTime: result.actionDateTime });
   });
 
@@ -1242,7 +1263,7 @@ page; the answer is immutable once submitted (PCI DSS Req 10 traceability).`,
   // GET /api/v1/fraud/:id/stream  -  Server-Sent Events for live case updates (e.g. a customer
   // answering a question). Investigation roles only; a valid JWT is required (no anonymous stream).
   // Consumed via fetch + ReadableStream on the client so the normal Bearer header is used (no token
-  // in the URL — PCI DSS Req 4/10). No CHD is streamed, only event kinds + opaque references.
+  // in the URL; PCI DSS Req 4/10). No CHD is streamed, only event kinds + opaque references.
   fastify.get('/:id/stream', {
     schema: { tags: ['fraud'], summary: 'Live case event stream (SSE)', security: [{ bearerAuth: [] }] },
   }, async (request, reply) => {

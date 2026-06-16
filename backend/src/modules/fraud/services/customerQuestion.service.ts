@@ -167,8 +167,20 @@ export async function submitResponse(
     bianServiceDomain: 'Fraud Diagnosis', bianControlRecordType: 'FraudDiagnosisCase',
   });
   publishCaseEvent({ caseId: q.fraudDiagnosisInstanceReference, kind: 'question.answered', questionId, transactionId: q.cardTransactionInstanceReference, at: now.toISOString() });
-  // Answering implies the customer handled it: mark its notification read (clears the badge).
+  // Answering implies the customer handled it: mark its notification read (clears their badge).
   await markReadByRelated(db, q.partyInstanceReference, questionId);
+  // Notify the investigator who asked, so they can jump straight to the case (href = the case).
+  await createNotification(db, {
+    recipientPartyReference: q.askedByInstanceReference,
+    notificationType: 'question_response',
+    title: 'A customer answered your question',
+    detail: `Response to "${q.questionText}": ${option}${isOther && text ? ` (${text})` : ''}`,
+    href: `/system/investigation/${q.fraudDiagnosisInstanceReference}`,
+    relatedReference: `answer-${questionId}`,
+    transactionId: q.cardTransactionInstanceReference,
+    caseReference: q.fraudDiagnosisCaseReference,
+    actionable: false,
+  });
 
   const updated = await col(db).findOne({ customerQuestionInstanceReference: questionId });
   return { ok: true, question: toCustomerQuestionDTO(updated!) };

@@ -47,19 +47,7 @@ export async function seedCustomerQuestions(db: Db) {
     recordUpdatedDateTime: now,
     schemaVersion: 1,
   });
+  void agreement; // party is resolved + stored on the question; notifications are seeded separately.
 
-  // Deliver the matching (unread) notification so the bell + page show it out of the box.
-  await createNotification(db, {
-    recipientPartyReference: agreement?.partyInstanceReference ?? '',
-    notificationType: 'fraud_question',
-    title: 'A security question needs your response',
-    detail: 'Did you perform this operation?',
-    href: `/system/payment/history/${fraudCase.cardTransactionInstanceReference}`,
-    relatedReference: questionId,
-    transactionId: fraudCase.cardTransactionInstanceReference,
-    caseReference: fraudCase.fraudDiagnosisCaseReference,
-    actionable: true,
-  });
-
-  console.log('  customerQuestions: 1 demo question + notification seeded');
+  console.log('  customerQuestions: 1 demo question seeded');
 }

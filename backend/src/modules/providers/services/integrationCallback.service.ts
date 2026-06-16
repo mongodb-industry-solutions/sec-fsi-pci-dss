@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { EXTERNAL_PROVIDER_ARRANGEMENT_COLLECTION, ExternalProviderArrangement } from '../models/externalProviderArrangement.model';
 import { logEvent } from './integrationDispatch.service';
 import { applyMappings } from './fieldMapping.service';
+import { createNotification } from '../../notifications/notifications.service';
 
 export function verifyHmacSignature(
   secret: string,
@@ -138,6 +139,21 @@ export async function processKycCallback(
       },
     }
   );
+
+  // Notify the customer when KYC is approved (ADR-031 account-status notification).
+  if (mapped.status === 'verified') {
+    const agreement = await db.collection('customerAgreementProcedure')
+      .findOne<{ partyInstanceReference?: string }>({ customerAgreementInstanceReference: mapped.agreementRef });
+    await createNotification(db, {
+      recipientPartyReference: agreement?.partyInstanceReference ?? '',
+      notificationType: 'kyc_status',
+      title: 'Your identity verification (KYC) was approved',
+      detail: 'Your identity check is complete and verified. Your account is fully enabled.',
+      href: '/system/profile',
+      relatedReference: `kyc-${mapped.agreementRef}`,
+      actionable: false,
+    }).catch(() => { /* non-blocking */ });
+  }
 }
 
 export async function processKybCallback(
@@ -170,6 +186,21 @@ export async function processKybCallback(
       },
     }
   );
+
+  // Notify the merchant owner when KYB is approved (ADR-031 account-status notification).
+  if (mapped.status === 'verified') {
+    const merchant = await db.collection('merchantAgreementProcedure')
+      .findOne<{ merchantOwnerPartyReference?: string; merchantName?: string }>({ merchantAgreementInstanceReference: mapped.merchantRef });
+    await createNotification(db, {
+      recipientPartyReference: merchant?.merchantOwnerPartyReference ?? '',
+      notificationType: 'kyb_status',
+      title: 'Your business verification (KYB) was approved',
+      detail: `Your merchant${merchant?.merchantName ? ` "${merchant.merchantName}"` : ''} passed KYB verification and can now accept payments.`,
+      href: `/system/merchant/${mapped.merchantRef}`,
+      relatedReference: `kyb-${mapped.merchantRef}`,
+      actionable: false,
+    }).catch(() => { /* non-blocking */ });
+  }
 }
 
 export async function processHrpCallback(

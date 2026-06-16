@@ -15,6 +15,7 @@ import {
 } from '../models/merchantAgreement.model';
 import { emitComplianceEvent } from '../../providers/services/businessProcessEvent.service';
 import { deliverWebhook } from './webhook.service';
+import { createNotification } from '../../notifications/notifications.service';
 
 const BCRYPT_ROUNDS = 10;
 const API_KEY_PREFIX = 'lbpk_live_';
@@ -60,7 +61,7 @@ export async function getMerchants(
   return { results, total };
 }
 
-// Ch-05: dual-role lookup — customer finds their own merchant by partyRef (SD-13 FK)
+// Ch-05: dual-role lookup; customer finds their own merchant by partyRef (SD-13 FK)
 export async function getMerchantPicker(
   db: Db,
   filters: { q?: string; limit?: number }
@@ -112,7 +113,7 @@ export async function getMerchantById(db: Db, id: string) {
 
 // ── Merchant lifecycle audit trail (BIAN SD-89, PCI DSS Req 10) ─────────────────
 // Append-only event log of merchant relationship actions (submitted, approved,
-// rejected, KYB, config updates). No cardholder data — operational metadata only.
+// rejected, KYB, config updates). No cardholder data; operational metadata only.
 export const MERCHANT_EVENTS_COLLECTION = 'merchantAgreementEvents';
 
 export interface MerchantAgreementEvent {
@@ -180,9 +181,9 @@ export async function createMerchant(db: Db, input: CreateMerchantInput) {
     merchantLegalEntityReference: input.merchantLegalEntityReference,
     merchantCategoryCode: input.merchantCategoryCode,
     merchantCountryCode: input.merchantCountryCode,
-    merchantAgreementStatus: 'under_review',   // Ch-05: starts at under_review — officer must approve
+    merchantAgreementStatus: 'under_review',   // Ch-05: starts at under_review; officer must approve
     ...(input.merchantOwnerPartyReference && { merchantOwnerPartyReference: input.merchantOwnerPartyReference }),
-    // Ch-06: BQ:Step — KYB initiated at application time (BIAN SD-89 BQ:Step)
+    // Ch-06: BQ:Step; KYB initiated at application time (BIAN SD-89 BQ:Step)
     merchantAgreementKybCheck: {
       merchantAgreementKybCheckStatus: 'initiated' as KybCheckStatus,
     } satisfies MerchantAgreementKybCheck,
@@ -233,7 +234,7 @@ export async function createMerchant(db: Db, input: CreateMerchantInput) {
   };
 }
 
-// Ch-05: BIAN Action Term: Control — merchant_officer approves or rejects an application
+// Ch-05: BIAN Action Term: Control; merchant_officer approves or rejects an application
 export async function reviewMerchantApplication(
   db: Db,
   merchantId: string,
@@ -262,7 +263,7 @@ export async function reviewMerchantApplication(
         merchantReviewNote: reviewNote ?? '',
         merchantReviewedByPartyReference: reviewerPartyRef,
         merchantReviewedDateTime: now,
-        // Ch-06: BQ:Step — formal KYB check record (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
+        // Ch-06: BQ:Step; formal KYB check record (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
         merchantAgreementKybCheck: {
           merchantAgreementKybCheckStatus: kybStatus,
           merchantAgreementKybCheckCompletedDate: now,
@@ -292,6 +293,19 @@ export async function reviewMerchantApplication(
     bianServiceDomain: 'Merchant Relations',
     bianControlRecordType: 'MerchantAgreementProcedure',
   });
+
+  // Notify the merchant owner when KYB is approved (ADR-031 account-status notification).
+  if (action === 'approve' && merchant.merchantOwnerPartyReference) {
+    await createNotification(db, {
+      recipientPartyReference: merchant.merchantOwnerPartyReference,
+      notificationType: 'kyb_status',
+      title: 'Your business verification (KYB) was approved',
+      detail: `Your merchant${merchant.merchantName ? ` "${merchant.merchantName}"` : ''} passed KYB verification and can now accept payments.`,
+      href: `/system/merchant/${merchantId}`,
+      relatedReference: `kyb-${merchantId}`,
+      actionable: false,
+    }).catch(() => { /* non-blocking */ });
+  }
 
   return 'ok';
 }
@@ -326,7 +340,7 @@ export async function registerWebhook(db: Db, merchantId: string, url: string) {
   );
   if (!existing) return null;
 
-  // A webhook needs a signing secret to be USABLE — without it the PSP cannot HMAC-sign the callback
+  // A webhook needs a signing secret to be USABLE; without it the PSP cannot HMAC-sign the callback
   // and treats the endpoint as not configured. Saving the URL therefore guarantees a secret exists
   // (generated once, kept thereafter). The secret is the webhook's authentication (X-Webhook-Signature).
   const secret = (existing as { merchantWebhookSecret?: string }).merchantWebhookSecret || `whsec_${randomBytes(24).toString('hex')}`;
@@ -345,7 +359,7 @@ export async function registerWebhook(db: Db, merchantId: string, url: string) {
  * Send a SIMULATED `payment.completed` webhook to the merchant's configured endpoint so they can
  * verify their integration WITHOUT running a full payment. Returns the exact payload sent plus the
  * delivery outcome (status, attempts, the merchant's response, or an error). HMAC-signed like a real
- * event; sample (clearly `test: true`) data only — no real CHD.
+ * event; sample (clearly `test: true`) data only; no real CHD.
  */
 // The default representative payload (same SHAPE as a real `payment.completed` callback). Exposed so
 // the UI can show/pre-fill it for editing before sending the test.
@@ -448,7 +462,7 @@ export async function generateApiKey(
 
 /**
  * Import an EXISTING API key supplied by the merchant's own system. PCI DSS Req 3: only the bcrypt
- * hash + a display prefix are stored — the plaintext is hashed and discarded, never persisted and
+ * hash + a display prefix are stored; the plaintext is hashed and discarded, never persisted and
  * never returned (the merchant already holds it). Returns metadata, or 'invalid' if too short, or
  * 'duplicate' if that exact key is already registered (active) for the merchant.
  */

@@ -13,6 +13,7 @@ import { dispatchProvider } from '../../providers/services/integrationDispatch.s
 import { emitProcessEvent } from '../../providers/services/businessProcessEvent.service';
 import { CARD_TRANSACTION_COLLECTION } from '../../transactions/models/cardTransaction.model';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
+import { createNotification } from '../../notifications/notifications.service';
 
 // -- BIAN SD-83: Note entry - resolved view of a note_added event enriched with retraction info
 export interface NoteEntry {
@@ -63,7 +64,7 @@ function isCaseRefDuplicate(e: unknown): boolean {
 // this on a collision realigns the counter so the very next allocation is unique, with
 // no DB reset required. Uses the $max UPDATE OPERATOR (not an aggregation pipeline): the
 // QE/CSFLE-enabled client rejects pipeline updates (analyze_query, code 31146), and $max
-// only ever raises the counter — never lowers an already-advanced one.
+// only ever raises the counter; never lowers an already-advanced one.
 async function reconcileCaseRefCounter(db: Db): Promise<void> {
   const docs = await db
     .collection(FRAUD_DIAGNOSIS_COLLECTION)
@@ -174,6 +175,21 @@ export async function createFraudCase(
     bianControlRecordType: 'FraudDiagnosisCase',
   });
 
+  // Notify the customer that their transaction is under review (flagged). Non-blocking.
+  const agreement = await db.collection(CUSTOMER_AGREEMENT_COLLECTION)
+    .findOne<{ partyInstanceReference?: string }>({ customerAgreementInstanceReference: customerRef });
+  await createNotification(db, {
+    recipientPartyReference: agreement?.partyInstanceReference ?? '',
+    notificationType: 'transaction_status',
+    title: 'Your transaction is under security review',
+    detail: 'We flagged a recent transaction for a routine security review. We will let you know the outcome.',
+    href: `/system/payment/history/${txnId}`,
+    relatedReference: `status-flagged-${caseId}`,
+    transactionId: txnId,
+    caseReference: fraudCase.fraudDiagnosisCaseReference,
+    actionable: false,
+  }).catch(() => { /* notification must never block case creation */ });
+
   return { fraudDiagnosisInstanceReference: caseId };
 }
 
@@ -212,7 +228,7 @@ export async function getCaseById(db: Db, id: string) {
 
 /**
  * Fraud investigation analytics for L1 / L2 / auditor dashboards.
- * Aggregation over operational case metadata only — fraudDiagnosisCase carries no
+ * Aggregation over operational case metadata only; fraudDiagnosisCase carries no
  * cardholder PII (PCI DSS Req 3/7). `$toDate` tolerates Date or ISO-string dates.
  */
 export async function getFraudStats(db: Db) {
@@ -250,9 +266,9 @@ export async function getFraudStats(db: Db) {
 
 /**
  * Data-integrity oversight for the Security Auditor (PCI DSS Req 10): verifies the
- * Fraud Diagnosis control records are well-formed. Aggregates only — no PII.
+ * Fraud Diagnosis control records are well-formed. Aggregates only; no PII.
  *  - duplicateReferences: case references appearing on more than one case (must be 0;
- *    enforced by the unique index after a clean re-seed — see ADR-024).
+ *    enforced by the unique index after a clean re-seed; see ADR-024).
  *  - orphan references: cases whose linked transaction / customer no longer resolve.
  */
 export async function getFraudIntegrity(db: Db) {

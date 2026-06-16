@@ -3,7 +3,14 @@
 // short title/detail and opaque references (PCI DSS Req 3); scoped to a recipient party (Req 7).
 export const NOTIFICATION_COLLECTION = 'notification';
 
-export type NotificationType = 'fraud_question' | 'transaction_status';
+// The type doubles as the UI category (Question / Message / Transaction / KYC / KYB / Response).
+export type NotificationType =
+  | 'fraud_question'      // customer: an investigator asked a question (actionable)
+  | 'security_message'    // customer: a customer-visible note from the security team
+  | 'transaction_status'  // customer: a transaction/case status change (flagged, escalated, resolved)
+  | 'kyc_status'          // customer: KYC verification approved
+  | 'kyb_status'          // merchant owner: KYB verification approved
+  | 'question_response';  // staff: the customer answered the analyst's question
 export type NotificationStatus = 'unread' | 'read';
 
 export interface NotificationRecord {
