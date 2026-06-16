@@ -6,7 +6,7 @@ import { useNotify } from './ui/ConfirmProvider';
 
 // ADR-031: L1/L2 panel to pose structured questions to the customer on a fraud case (SD-83) and
 // see their (immutable) responses. The customer answers on their transaction page.
-export function CaseQuestionsPanel({ caseId, token, role, onActivity }: { caseId: string; token: string; role: string; onActivity?: () => void }) {
+export function CaseQuestionsPanel({ caseId, token, role, onActivity, refreshSignal }: { caseId: string; token: string; role: string; onActivity?: () => void; refreshSignal?: number }) {
   const notify = useNotify();
   const canWrite = role === 'level1_analyst' || role === 'level2_investigator';
   const [questions, setQuestions] = useState<CustomerQuestion[]>([]);
@@ -23,7 +23,8 @@ export function CaseQuestionsPanel({ caseId, token, role, onActivity }: { caseId
     catch { setQuestions([]); }
     finally { setLoading(false); }
   }, [caseId, token]);
-  useEffect(() => { load(); }, [load]);
+  // Reload on mount and whenever the live stream signals a change (SSE).
+  useEffect(() => { load(); }, [load, refreshSignal]);
 
   function setOpt(i: number, v: string) { setOptions((o) => o.map((x, j) => (j === i ? v : x))); }
   function addOpt() { setOptions((o) => [...o, '']); }

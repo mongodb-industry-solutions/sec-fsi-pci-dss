@@ -298,19 +298,11 @@ export default function TransactionDetailPage() {
           <span className="text-gray-500">Transaction ID</span>
           <span className="font-mono text-xs text-gray-500 truncate">{txn.txnId}</span>
         </div>
-
-        {debugMode && (
-          <div className="mt-4 border-t pt-3 bg-[#001E2B]/3 rounded-b-lg text-xs font-mono text-gray-500 space-y-0.5">
-            <p className="font-semibold text-[#001E2B] mb-1">Debug</p>
-            <p>txnId: {txn.txnId}</p>
-            {txn.caseId && <p>caseId: {txn.caseId}</p>}
-          </div>
-        )}
       </div>
 
       {/* Notes and messages from the security team */}
       {caseNotes?.caseFound && (
-        <div className="bg-white rounded-xl border p-5 space-y-3">
+        <div className="bg-white rounded-xl border p-5 space-y-3 mb-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-gray-800">Security Review</h2>
             {caseNotes.fraudDiagnosisCaseReference && (
@@ -376,7 +368,7 @@ export default function TransactionDetailPage() {
         </div>
       )}
 
-      {/* Customer questions from L1/L2 (ADR-031) — answer Yes/No/Other, immutable once submitted. */}
+      {/* Customer questions from L1/L2 (ADR-031); answer Yes/No/Other, immutable once submitted. */}
       {token && <CustomerQuestionsPanel txnId={txnId} token={token} />}
 
       {/* Resolution outcome */}
@@ -440,6 +432,26 @@ export default function TransactionDetailPage() {
           token={token}
           title="Debug - Raw data"
           sections={[
+            {
+              kind: 'static',
+              label: 'PCI DSS / BIAN - what is stored',
+              labelColor: 'text-[#00ED64]',
+              description: 'This transaction stores no cardholder data; sensitive fields are encrypted at rest',
+              data: {
+                storedEncryptedAtRest: {
+                  cardTransactionAccountReference: 'QE:equality (searchable, ciphertext only in Atlas)',
+                  rawGatewayPayload: 'QE:none (encrypted, requires escalation to read)',
+                  processorMetadata: 'QE:none (encrypted)',
+                },
+                storedInClear_nonSensitive: {
+                  maskedPanDisplay: '****-****-****-XXXX (PCI-permitted)',
+                  cardToken: 'surrogate token (not the PAN, not CHD)',
+                  amount: true, merchantName: true, status: true,
+                },
+                neverStored: ['full PAN', 'CVV / CVV2', 'PIN', 'magnetic track data'],
+                alignment: { bian: 'SD-254 Card Transaction', pciDss: ['Req 3 (no PAN/CVV at rest)', 'Req 10 (auditable)'] },
+              },
+            },
             {
               kind: 'static',
               label: 'localStorage - stored transaction',

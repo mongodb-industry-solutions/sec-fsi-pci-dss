@@ -7,6 +7,7 @@ import { getToken, decodeToken } from '../../../../lib/auth';
 import { RawMongoPanel } from '../../../../components/RawMongoPanel';
 import { CaseNotesPanel } from '../../../../components/CaseNotesPanel';
 import { CaseQuestionsPanel } from '../../../../components/CaseQuestionsPanel';
+import { useCaseStream } from '../../../../lib/useCaseStream';
 import { SEVERITY_COLORS, STATUS_COLORS, ROLE_LABELS, formatRiskIndicator } from '../../../../lib/constants';
 import { useDebugMode } from '../../../../lib/debugMode';
 import { Breadcrumb } from '../../../../components/Breadcrumb';
@@ -76,6 +77,10 @@ export default function DemoCaseDetailPage() {
   const [actionBusy, setActionBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [escalationToken, setEscalationToken] = useState<string | null>(null);
+  const [liveSignal, setLiveSignal] = useState(0);
+
+  // ADR-031: live updates via SSE — when the customer answers a question, refresh the case + panel.
+  useCaseStream(caseId, token, () => { if (token) reload(token); setLiveSignal((s) => s + 1); });
 
   async function reload(resolvedToken: string) {
     const [caseData, eventsData] = await Promise.all([
@@ -504,7 +509,7 @@ export default function DemoCaseDetailPage() {
         {token && <CaseNotesPanel caseId={caseId} token={token} role={role} onActivity={() => reload(token)} />}
 
         {/* -- Customer questions (ADR-031) -- */}
-        {token && <CaseQuestionsPanel caseId={caseId} token={token} role={role} onActivity={() => reload(token)} />}
+        {token && <CaseQuestionsPanel caseId={caseId} token={token} role={role} onActivity={() => reload(token)} refreshSignal={liveSignal} />}
 
         {fraudCase.fraudDiagnosisResolutionRecord && (
           <div className={`rounded-xl border p-4 text-sm ${fraudCase.fraudDiagnosisResolutionRecord.resolutionOutcome === 'confirmed_fraud' ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>

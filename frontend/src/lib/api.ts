@@ -281,7 +281,7 @@ export interface CustomerQuestion {
 }
 
 export interface NotificationItem {
-  type: string;
+  type: 'fraud_question' | 'transaction_status' | string;
   id: string;
   transactionId: string;
   caseReference: string;
@@ -289,6 +289,7 @@ export interface NotificationItem {
   detail: string;
   href: string;
   createdAt: string;
+  actionable: boolean;
 }
 
 // ADR-030: data-driven RBAC/ACL

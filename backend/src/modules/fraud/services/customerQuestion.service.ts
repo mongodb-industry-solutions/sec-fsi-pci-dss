@@ -6,6 +6,7 @@ import {
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import { getCaseById, appendAuditEvent } from './fraudDiagnosis.service';
 import { emitProcessEvent } from '../../providers/services/businessProcessEvent.service';
+import { publishCaseEvent, publishPartyNotification } from '../../../vendors/events/caseEventBus';
 import type { AnalystRole } from '../../../shared/models/identity.model';
 
 const col = (db: Db) => db.collection<CustomerQuestionRecord>(CUSTOMER_QUESTION_COLLECTION);
@@ -67,6 +68,8 @@ export async function createQuestion(
     eventSummary: { questionId: record.customerQuestionInstanceReference, transactionId: record.cardTransactionInstanceReference, options },
     bianServiceDomain: 'Fraud Diagnosis', bianControlRecordType: 'FraudDiagnosisCase',
   });
+  publishCaseEvent({ caseId, kind: 'question.created', questionId: record.customerQuestionInstanceReference, transactionId: record.cardTransactionInstanceReference, at: now.toISOString() });
+  publishPartyNotification(record.partyInstanceReference); // new pending item for the customer
 
   return { ok: true, question: toCustomerQuestionDTO(record) };
 }
@@ -82,7 +85,7 @@ export async function listQuestionsByTransaction(db: Db, txnId: string): Promise
   return rows.map(toCustomerQuestionDTO);
 }
 
-// Pending questions addressed to a specific customer (by owning party) — drives notifications.
+// Pending questions addressed to a specific customer (by owning party); drives notifications.
 export async function listPendingForParty(db: Db, partyRef: string): Promise<CustomerQuestionDTO[]> {
   if (!partyRef) return [];
   const rows = await col(db)
@@ -151,6 +154,8 @@ export async function submitResponse(
     eventSummary: { questionId, transactionId: q.cardTransactionInstanceReference, responseOption: option, hasFreeText: isOther },
     bianServiceDomain: 'Fraud Diagnosis', bianControlRecordType: 'FraudDiagnosisCase',
   });
+  publishCaseEvent({ caseId: q.fraudDiagnosisInstanceReference, kind: 'question.answered', questionId, transactionId: q.cardTransactionInstanceReference, at: now.toISOString() });
+  publishPartyNotification(q.partyInstanceReference); // a pending item was cleared
 
   const updated = await col(db).findOne({ customerQuestionInstanceReference: questionId });
   return { ok: true, question: toCustomerQuestionDTO(updated!) };

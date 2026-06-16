@@ -5,6 +5,7 @@ import { getToken, decodeToken, isTokenExpired } from '../../lib/auth';
 import { DebugModeProvider } from '../../lib/debugMode';
 import { DemoSidebar, MobileBottomNav } from '../../components/DemoSidebar';
 import { UserMenu } from '../../components/UserMenu';
+import { NotificationBell } from '../../components/NotificationBell';
 import Link from 'next/link';
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
@@ -54,6 +55,7 @@ function DemoShell({ children }: { children: React.ReactNode }) {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
+          {user && <NotificationBell />}
           {user && <UserMenu user={user} />}
         </div>
       </header>

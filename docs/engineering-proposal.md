@@ -1664,8 +1664,12 @@ ADR-004 established the dual-mode frontend. In practice the Simulator had drifte
 4. **Notifications**: `GET /api/v1/notifications` returns the caller's pending questions; a "Notifications" entry + count badge appears in the customer menu and links to the relevant transaction.
 5. **Event tracking**: create and answer each emit a `businessProcessEvent` (`fraud.question.created` / `fraud.question.answered`) for the unified audit feed, and append a `fraudDiagnosisCaseEvents` entry (`question_created` / `question_answered`) so the case timeline shows the full interaction.
 
+**Live updates & notifications (v8.3).**
+6. **SSE**: `GET /api/v1/fraud/:id/stream` streams case events (`question.created`/`question.answered`) to the investigation view so L1/L2 see a customer's answer without a manual refresh. An in-process event bus (`caseEventBus`) publishes on create/answer; the client consumes via `fetch` + `ReadableStream` (Bearer header, no token in the URL — Req 4). Investigation roles only; a valid JWT is required (no anonymous stream). No CHD is streamed (Req 3).
+7. **Notifications** are **derived** (no stored collection) from authoritative records per party: pending questions (actionable) + resolved cases (informational). Surfaced via a top-bar bell (latest 5 + count badge + "View all") and a full `/system/notifications` page with search/type-filter/pagination. `GET /api/v1/notifications` is scoped to the caller's own party (Req 7).
+
 **Consequences.**
 - (+) Structured, auditable customer interaction; every question and response is timestamped and attributed (Req 10).
 - (+) Immutable answers (no edit after submit) give a defensible investigation record.
-- (+) Reuses the existing case/events/RBAC/notes architecture; no parallel system.
-- (−) One new collection + a small notifications surface to maintain.
+- (+) Live (SSE) L2 updates + a derived notification feed reuse the existing case/events/RBAC architecture; no parallel system, no extra collection for notifications.
+- (−) One new collection (`fraudDiagnosisCustomerQuestion`) to maintain. The SSE bus is single-process (demo); a multi-instance deployment would back it with Redis pub/sub or MongoDB change streams.

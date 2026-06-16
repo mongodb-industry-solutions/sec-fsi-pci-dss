@@ -17,6 +17,7 @@ function actorOf(request: unknown): { ref?: string; name?: string } {
 import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
 import { getCaseEnrichment } from '../services/caseEnrichment.service';
 import { createQuestion, listQuestionsByCase } from '../services/customerQuestion.service';
+import { subscribeCaseEvents } from '../../../vendors/events/caseEventBus';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
 const ENRICHMENT_ROLES = ['level1_analyst', 'level2_investigator', 'security_auditor'];
@@ -1212,6 +1213,43 @@ page; the answer is immutable once submitted (PCI DSS Req 10 traceability).`,
         .send({ error: result.error === 'case_not_found' ? 'Fraud case not found' : 'A question text and at least one option are required' });
     }
     return reply.status(201).send(result.question);
+  });
+
+  // GET /api/v1/fraud/:id/stream  -  Server-Sent Events for live case updates (e.g. a customer
+  // answering a question). Investigation roles only; a valid JWT is required (no anonymous stream).
+  // Consumed via fetch + ReadableStream on the client so the normal Bearer header is used (no token
+  // in the URL — PCI DSS Req 4/10). No CHD is streamed, only event kinds + opaque references.
+  fastify.get('/:id/stream', {
+    schema: { tags: ['fraud'], summary: 'Live case event stream (SSE)', security: [{ bearerAuth: [] }] },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { userRole } = request as unknown as AuthenticatedRequest;
+    const authed = (request as unknown as { user?: unknown }).user;
+    if (!authed) return reply.status(401).send({ error: 'Authentication required' });
+    if (!ENRICHMENT_ROLES.includes(userRole)) {
+      return reply.status(403).send({ error: 'Access denied: live case stream is restricted to investigation roles' });
+    }
+
+    reply.hijack();
+    const res = reply.raw;
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.write('event: ready\ndata: {}\n\n');
+
+    const unsubscribe = subscribeCaseEvents(id, (event) => {
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    });
+    const keepAlive = setInterval(() => res.write(': ping\n\n'), 25000);
+
+    request.raw.on('close', () => {
+      clearInterval(keepAlive);
+      unsubscribe();
+      res.end();
+    });
   });
 
   // GET /api/v1/fraud/:id/questions  -  investigation roles list a case's questions + responses.

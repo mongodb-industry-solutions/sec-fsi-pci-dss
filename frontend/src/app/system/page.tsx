@@ -16,6 +16,7 @@ import demoRoster from '../../config/demoRoster.json';
 import { Tooltip } from '../../components/Tooltip';
 import { useDebugMode } from '../../lib/debugMode';
 import { UserMenu } from '../../components/UserMenu';
+import { NotificationBell } from '../../components/NotificationBell';
 import { DemoSidebar, MobileBottomNav } from '../../components/DemoSidebar';
 import { RoleStats } from '../../components/dashboard/RoleStats';
 import { SectionHeader } from '../../components/SectionHeader';
@@ -389,7 +390,10 @@ function RoleDashboard({ user, onSignOut }: { user: DecodedUser; onSignOut: () =
           <span className="text-base">🏦</span>
           <span>PSP</span>
         </Link>
-        <UserMenu user={user} onSignOut={onSignOut} />
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          <UserMenu user={user} onSignOut={onSignOut} />
+        </div>
       </header>
 
       {/* Sidebar + Content */}

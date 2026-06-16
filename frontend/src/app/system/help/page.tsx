@@ -577,23 +577,25 @@ export function HelpContent({ tab }: { tab: Tab }) {
             </div>
           </div>
 
-          {/* Personas */}
+          {/* Personas; each links to its full role description (same as the Your Role tab). */}
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-4">Demo Personas and Roles</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {[
-                { role: 'L1 Analyst',       desc: 'View fraud cases; search transactions by encrypted card ref.' },
-                { role: 'L2 Investigator',  desc: 'Full PAN access; encrypted field decryption; case escalation.' },
-                { role: 'Security Auditor', desc: 'Read-only audit log access; compliance reports.' },
-                { role: 'Customer',         desc: 'Own transaction history and payment initiation. May optionally also be a merchant (dual-role) after KYB.' },
-                { role: 'Merchant Officer', desc: 'Merchant onboarding review queue and merchant registry.' },
-                { role: 'Manager',          desc: 'Integration Hub; external provider management.' },
-              ].map(p => (
-                <div key={p.role} className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-3">
-                  <p className="text-xs font-semibold text-gray-200 mb-1">{p.role}</p>
-                  <p className="text-gray-500 text-xs leading-snug">{p.desc}</p>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {ROLE_ORDER.map((r) => {
+                const g = ROLE_GUIDE[r];
+                if (!g) return null;
+                return (
+                  <Link key={r} href={`/system/help/roles/${r}`}
+                    className="group bg-gray-800/40 border border-gray-700/50 rounded-lg p-3 hover:border-[#00ED64]/40 hover:bg-gray-800/70 transition-colors">
+                    <div className="flex items-center gap-2 mb-1">
+                      {React.createElement(g.icon, { size: 14, className: 'text-gray-400 shrink-0 group-hover:text-[#00ED64]' })}
+                      <p className="text-xs font-semibold text-gray-200">{ROLE_LABELS[r] ?? r}</p>
+                      <ChevronRight size={12} className="ml-auto text-gray-600 group-hover:text-[#00ED64]" />
+                    </div>
+                    <p className="text-gray-500 text-xs leading-snug">{g.tagline}</p>
+                  </Link>
+                );
+              })}
             </div>
           </div>
 
