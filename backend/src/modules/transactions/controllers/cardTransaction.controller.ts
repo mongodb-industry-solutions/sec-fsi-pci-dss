@@ -10,6 +10,8 @@ import {
   CardIssuerDeclinedError,
 } from '../services/cardTransaction.service';
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
+import { CARD_TRANSACTION_COLLECTION } from '../models/cardTransaction.model';
+import { getEventBus } from '../../../vendors/eventbus';
 import { getCaseNotes } from '../../fraud/services/fraudDiagnosis.service';
 import { listQuestionsByTransaction, submitResponse } from '../../fraud/services/customerQuestion.service';
 import { requirePermission } from '../../../vendors/middleware/acl';
@@ -214,6 +216,52 @@ the Merchant Name selector. No authentication required (public, simulator mode).
       }
       throw err;
     }
+  });
+
+  // dev.v8 F3: live authorization outcome (SSE). Public by txn id (UUID); emits only the terminal
+  // authorized/declined status, no PII/CHD. The client opens this right after initiating a payment to
+  // wait for the async issuer decision. On connect it first checks the stored status (race-safe: the
+  // outcome may already have landed), otherwise it subscribes to the bus for this journey.
+  fastify.get('/:id/stream', {
+    schema: {
+      tags: ['transactions'],
+      summary: 'Live payment authorization outcome (SSE)',
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+    },
+    config: { skipAuth: true },
+  }, async (request, reply) => {
+    const txnId = (request.params as { id: string }).id;
+    reply.hijack();
+    const res = reply.raw;
+    const origin = (request.headers.origin as string | undefined) ?? process.env.CORS_ORIGIN ?? 'http://localhost:3000';
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no', 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Credentials': 'true', Vary: 'Origin',
+    });
+    res.write('event: ready\ndata: {}\n\n');
+
+    const emit = (status: string, extra: Record<string, unknown> = {}) => res.write(`data: ${JSON.stringify({ status, ...extra })}\n\n`);
+
+    // If the outcome already landed before this connection, emit it now and close.
+    try {
+      const txn = await fastify.db.collection<{ cardTransactionStatus?: string }>(CARD_TRANSACTION_COLLECTION)
+        .findOne({ cardTransactionInstanceReference: txnId }, { projection: { _id: 0, cardTransactionStatus: 1 } });
+      if (txn && txn.cardTransactionStatus && txn.cardTransactionStatus !== 'pending') {
+        emit(txn.cardTransactionStatus);
+        return res.end();
+      }
+    } catch { /* fall through to live subscription */ }
+
+    const sub = getEventBus().subscribe(['payment.authorized', 'payment.declined'], (e) => {
+      const p = e.payload as { fraudCaseCreated?: boolean; fraudDiagnosisInstanceReference?: string; decisionReason?: string; responseCode?: string };
+      emit(e.eventType === 'payment.authorized' ? 'authorized' : 'declined', {
+        fraudCaseCreated: !!p.fraudCaseCreated, caseId: p.fraudDiagnosisInstanceReference ?? null,
+        declineReason: p.decisionReason ?? null, declineCode: p.responseCode ?? null,
+      });
+    }, { correlationId: txnId });
+
+    const keepAlive = setInterval(() => res.write(': ping\n\n'), 25000);
+    request.raw.on('close', () => { clearInterval(keepAlive); sub.unsubscribe(); res.end(); });
   });
 
   fastify.get('/', {

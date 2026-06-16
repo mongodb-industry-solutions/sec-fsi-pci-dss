@@ -11,10 +11,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const h = vi.hoisted(() => {
   const insertOne = vi.fn().mockResolvedValue({ insertedId: 'mock-id' });
   const findOne = vi.fn().mockResolvedValue(null);
-  const qeDb = { collection: vi.fn(() => ({ insertOne, findOne })) };
+  const updateOne = vi.fn().mockResolvedValue({ matchedCount: 1 });
+  const qeDb = { collection: vi.fn(() => ({ insertOne, findOne, updateOne })) };
   return {
     insertOne,
     findOne,
+    updateOne,
     qeDb,
     getDbForRole: vi.fn().mockResolvedValue(qeDb),
     validateToken: vi.fn().mockReturnValue({ valid: false }),
@@ -50,6 +52,9 @@ vi.mock('../../../../backend/src/modules/gateway/services/merchantCallback.servi
 }));
 
 import { createTransaction, getTransactionById, getTransactionsByCardToken } from '../../../../backend/src/modules/transactions/services/cardTransaction.service';
+import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
+import { setEventBus, getEventBus } from '../../../../backend/src/vendors/eventbus';
+import { PaymentAuthorizationSaga } from '../../../../backend/src/modules/transactions/services/paymentAuthorization.saga';
 
 // createTransaction uses the passed db only for resolveCustomerAgreement (a local helper that does
 // findOne on the customer/party collections); everything else is mocked. A findOne→null db makes
@@ -72,10 +77,16 @@ function makeDb(overrides?: { findResults?: unknown[] }) {
 beforeEach(() => {
   h.insertOne.mockClear();
   h.findOne.mockReset().mockResolvedValue(null);
+  h.updateOne.mockClear();
   h.createFraudCase.mockClear();
   h.getDbForRole.mockClear();
   process.env.FRAUD_AMOUNT_THRESHOLD = '500';
   process.env.RISK_MCC_LIST = '5812,6011,7995';
+  // dev.v8 F3: authorization is event-driven. A fresh in-process bus + the saga drive it; the issuer
+  // dispatch is mocked (no decline) so the journey reaches `authorized`, and createTransaction (the
+  // sync wrapper) resolves to the final outcome.
+  setEventBus(new EventBusInProcess());
+  new PaymentAuthorizationSaga(txDb(), getEventBus()).register();
 });
 
 const baseInput = {

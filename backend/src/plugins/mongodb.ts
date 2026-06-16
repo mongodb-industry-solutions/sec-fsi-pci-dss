@@ -53,8 +53,12 @@ async function mongodbPlugin(fastify: FastifyInstance) {
     // dev.v8: initialize the EventBus vendor (in-process adapter + Mongo event store) now that the
     // DB is live. The rest of the system depends only on getEventBus(); swapping to a broker adapter
     // is a one-line change here. Initialized but inert until publishers/subscribers are wired (F2+).
-    const { initEventBus } = await import('../vendors/eventbus');
+    const { initEventBus, getEventBus } = await import('../vendors/eventbus');
     await initEventBus(db).start();
+
+    // dev.v8 F3: register the event-driven payment-authorization saga on the bus.
+    const { PaymentAuthorizationSaga } = await import('../modules/transactions/services/paymentAuthorization.saga');
+    new PaymentAuthorizationSaga(db, getEventBus()).register();
 
     fastify.addHook('onClose', async () => {
       const { closeQEClient } = await import('../vendors/encryption/qeClient');

@@ -14,6 +14,7 @@ import { emitProcessEvent, emitComplianceEvent } from '../../providers/services/
 import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
 import { getCardByToken, upsertCardByToken } from '../../customer/services/paymentCard.service';
 import { sendMerchantPaymentCallback } from '../../gateway/services/merchantCallback.service';
+import { getEventBus, makeEvent } from '../../../vendors/eventbus';
 
 export interface CreateTransactionInput {
   cardToken: string;
@@ -106,51 +107,46 @@ export async function resolveCustomerAgreement(db: Db, accountReference: string)
   }
 }
 
-export async function createTransaction(db: Db, input: CreateTransactionInput) {
+// Outcome of an authorization journey (resolved when the saga reaches a terminal payment event).
+export interface AuthorizationOutcome {
+  cardTransactionInstanceReference: string;
+  cardTransactionStatus: 'authorized' | 'declined';
+  fraudCaseCreated: boolean;
+  fraudDiagnosisInstanceReference?: string;
+  declineReason?: string;
+  declineCode?: string;
+}
+
+// Non-CHD context needed to finish an authorized payment, kept transiently between initiate and the
+// event-driven completion (in-process; a broker deployment would carry this in the saga state).
+interface PendingContext {
+  input: CreateTransactionInput; // cardVerification stripped before storing
+  canonicalAccountRef: string;
+  resolvedUuid?: string;
+}
+const pendingContext = new Map<string, PendingContext>();
+
+// EDA entry point (dev.v8 F3). Creates the transaction PENDING and drives authorization through the
+// event bus: it publishes `payment.authorization.requested`, runs the issuer check out-of-band (CHD
+// goes straight to the issuer, never on the bus) and emits `cardissuer.validation.completed`. The
+// PaymentAuthorizationSaga reacts and reaches `payment.authorized` / `payment.declined`. Returns the
+// txn id immediately + a `settled` promise (server-side callers await it; the API can return pending
+// and let the client wait via SSE on the same terminal events).
+export async function initiateTransaction(
+  db: Db,
+  input: CreateTransactionInput,
+): Promise<{ cardTransactionInstanceReference: string; cardTransactionStatus: 'pending'; settled: Promise<AuthorizationOutcome> }> {
   const txnId = uuidv4();
   const now = new Date();
-
-  // v2: sensitive gateway fields (QE:none, DEK-sensitive tier) are written inline.
-  // Use the Level 2 QE client so the driver encrypts them with the correct DEKs.
   const txWriteDb = await getDbForRole('security_auditor', false);
 
-  // PSP-level control (BIAN SD-15): if this token belongs to a card-on-file the customer has
-  // DEACTIVATED (suspended) or REMOVED (revoked), the PSP rejects the operation regardless of
-  // what the issuer would say. New/unsaved tokens have no card-on-file and pass through.
+  // PSP-level control (BIAN SD-15): a deactivated/removed card-on-file is rejected up front,
+  // regardless of the issuer (new/unsaved tokens pass through).
   const onFile = await getCardByToken(db, input.cardToken);
   if (onFile && onFile.paymentCardStatus !== 'active') {
     throw new CardNotActiveError(onFile.paymentCardStatus);
   }
 
-  // SD-15 / card_issuer: confirm the card with the issuer BEFORE charging it. Routed through the
-  // Integration Hub (card_issuer integrator) so the validation is an auditable inbound/outbound event
-  // tied to this transaction. The issuer is authoritative: if it DECLINES, the PSP does not authorize.
-  // The network is taken from the card-on-file so the issuer can assess it (the masked PAN hides the
-  // BIN); CVV/PIN are validated upstream and never reach here (no SAD stored).
-  // Fire one of the issuer's DECLARED trigger events (checkout.cvv.validation) so the audited event
-  // matches what the provider advertises it handles, instead of an ad-hoc name.
-  const issuerNetwork = input.paymentCardNetwork ?? onFile?.paymentCardNetwork;
-  let issuerResult: Awaited<ReturnType<typeof dispatchProvider>> | null = null;
-  try {
-    issuerResult = await dispatchProvider(db, 'card_issuer', 'checkout.cvv.validation', {
-      cardToken: input.cardToken,
-      maskedPan: input.cardTransactionMaskedPanDisplay,
-      // Correlation id so the issuer module logs its validation against this transaction (PCI Req 10).
-      cardTransactionInstanceReference: txnId,
-      ...(issuerNetwork ? { network: issuerNetwork } : {}),
-    }, { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' });
-  } catch { /* a transport failure is non-fatal; only an explicit issuer DECLINE blocks the payment */ }
-
-  // Enforce the issuer's decision. Only an explicit decline blocks (fail-safe against transport
-  // hiccups); the validation event is already recorded above for the audit trail.
-  const issuerDecision = issuerResult?.responseBody as { actionConfirmed?: boolean; responseCode?: string; decisionReason?: string } | undefined;
-  if (issuerDecision && issuerDecision.actionConfirmed === false) {
-    throw new CardIssuerDeclinedError(issuerDecision.responseCode ?? 'declined', issuerDecision.decisionReason ?? 'card_issuer_declined');
-  }
-
-  // Normalize the account reference to the customer's canonical business key
-  // (ACC-xxx) so seeded and simulator-created transactions share one convention.
-  // Falls back to the raw input (e.g. email) if the customer can't be resolved.
   const resolved = await resolveCustomerAgreement(db, input.accountReference);
   const canonicalAccountRef = resolved.reference ?? input.accountReference;
 
@@ -158,12 +154,11 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
     cardTransactionInstanceReference: txnId,
     paymentCardReference: input.cardToken,
     cardTransactionAccountReference: canonicalAccountRef,
-    // QE:none fields - encrypted by L2 QE client on write
     rawGatewayPayload: input.gatewayPayload,
     processorTransactionMetadata: { processedAt: now.toISOString() },
     cardTransactionAmount: { amount: input.amount, currency: input.currency },
     cardTransactionDateTime: now,
-    cardTransactionStatus: 'authorized',
+    cardTransactionStatus: 'pending',
     cardTransactionType: input.cardTransactionType as CardTransactionLogControlRecord['cardTransactionType'],
     cardTransactionChannel: input.cardTransactionChannel as CardTransactionLogControlRecord['cardTransactionChannel'],
     cardTransactionInitiationType: 'customerInitiated',
@@ -179,52 +174,119 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
     recordUpdatedDateTime: now,
     schemaVersion: 3,
   };
-
   await txWriteDb.collection(CARD_TRANSACTION_COLLECTION).insertOne(txn as object);
 
-  // Card-on-file auto-registration (SD-88): EVERY payment that resolves to a customer saves the
-  // card to their wallet — regardless of channel or origin (app, hosted checkout, payment link,
-  // simulator, or any external system integrating with the PSP). There is no "save card" opt-in:
-  // using a card to pay IS the registration. Expiry/network are stored when the source reports
-  // them; otherwise the card is still registered (masked PAN + token) and the customer can complete
-  // the details later. upsertCardByToken is idempotent, so re-using a saved card is a safe no-op.
-  if (resolved.uuid) {
+  // Stash the non-CHD context the completion step needs (strip the verification values).
+  const safeInput: CreateTransactionInput = { ...input, cardVerification: undefined };
+  pendingContext.set(txnId, { input: safeInput, canonicalAccountRef, resolvedUuid: resolved.uuid });
+
+  const bus = getEventBus();
+  void bus.publish(makeEvent({
+    eventType: 'payment.authorization.requested',
+    correlationId: txnId,
+    businessProcess: 'card_payment',
+    source: 'psp.core',
+    payload: { amount: input.amount, currency: input.currency, merchantName: input.cardTransactionMerchantName, maskedPan: input.cardTransactionMaskedPanDisplay, channel: input.cardTransactionChannel },
+    bian: { serviceDomain: 'SD-254 Card Transaction', controlRecord: 'CardTransactionRecord' },
+  }));
+
+  // Resolves when the saga reaches a terminal payment event for this journey.
+  const settled = new Promise<AuthorizationOutcome>((resolve) => {
+    const sub = bus.subscribe(['payment.authorized', 'payment.declined'], (e) => {
+      sub.unsubscribe();
+      const p = e.payload as { fraudCaseCreated?: boolean; fraudDiagnosisInstanceReference?: string; decisionReason?: string; responseCode?: string };
+      resolve({
+        cardTransactionInstanceReference: txnId,
+        cardTransactionStatus: e.eventType === 'payment.authorized' ? 'authorized' : 'declined',
+        fraudCaseCreated: !!p.fraudCaseCreated,
+        fraudDiagnosisInstanceReference: p.fraudDiagnosisInstanceReference,
+        declineReason: p.decisionReason,
+        declineCode: p.responseCode,
+      });
+    }, { correlationId: txnId });
+  });
+
+  // Issuer authorization, out-of-band. CHD (PAN/CVV/expiry) goes directly to the issuer via dispatch,
+  // never onto the bus. The result is funneled to `cardissuer.validation.completed`.
+  void authorizeWithIssuer(db, txnId, input, onFile?.paymentCardNetwork);
+
+  return { cardTransactionInstanceReference: txnId, cardTransactionStatus: 'pending', settled };
+}
+
+async function authorizeWithIssuer(db: Db, txnId: string, input: CreateTransactionInput, onFileNetwork?: string): Promise<void> {
+  const issuerNetwork = input.paymentCardNetwork ?? onFileNetwork;
+  let decision: { actionConfirmed?: boolean; responseCode?: string; decisionReason?: string } | undefined;
+  try {
+    const r = await dispatchProvider(db, 'card_issuer', 'checkout.cvv.validation', {
+      cardToken: input.cardToken,
+      maskedPan: input.cardTransactionMaskedPanDisplay,
+      cardTransactionInstanceReference: txnId,
+      ...(issuerNetwork ? { network: issuerNetwork } : {}),
+      ...(input.cardVerification?.cardNumber ? { cardNumber: input.cardVerification.cardNumber } : {}),
+      ...(input.cardVerification?.cvv ? { cvv: input.cardVerification.cvv } : {}),
+      ...(input.cardVerification?.expiry ? { expiry: input.cardVerification.expiry } : {}),
+    }, { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' });
+    decision = r.responseBody as typeof decision;
+  } catch { /* transport failure: fail-safe to approve; only an explicit decline blocks */ }
+
+  publishIssuerValidationCompleted(txnId, {
+    approved: decision?.actionConfirmed !== false,
+    responseCode: decision?.responseCode,
+    decisionReason: decision?.decisionReason,
+  });
+}
+
+// Emit the issuer outcome onto the bus. Also called by the inbound callback for a real async issuer
+// (processCardIssuerCallback), so internal and external issuers funnel into the same event.
+export function publishIssuerValidationCompleted(txnId: string, decision: { approved: boolean; responseCode?: string; decisionReason?: string }): void {
+  void getEventBus().publish(makeEvent({
+    eventType: 'cardissuer.validation.completed',
+    correlationId: txnId,
+    businessProcess: 'card_payment',
+    source: 'callback.card-issuer',
+    payload: { transactionId: txnId, ...decision },
+    bian: { serviceDomain: 'SD-88 Payment Card', controlRecord: 'PaymentCardValidation' },
+  }));
+}
+
+// Finish an APPROVED payment: card-on-file, fraud case, audit event, merchant callback, status flip.
+// Idempotent on the pending context (a second call is a no-op). Returns the fraud-case outcome.
+export async function completeAuthorized(db: Db, txnId: string): Promise<{ fraudCaseCreated: boolean; fraudDiagnosisInstanceReference?: string }> {
+  const ctx = pendingContext.get(txnId);
+  if (!ctx) return { fraudCaseCreated: false };
+  pendingContext.delete(txnId);
+  const { input, canonicalAccountRef, resolvedUuid } = ctx;
+  const now = new Date();
+  const txWriteDb = await getDbForRole('security_auditor', false);
+
+  await txWriteDb.collection(CARD_TRANSACTION_COLLECTION).updateOne(
+    { cardTransactionInstanceReference: txnId },
+    { $set: { cardTransactionStatus: 'authorized', recordUpdatedDateTime: now } },
+  );
+
+  // Card-on-file auto-registration (SD-88): using a card to pay IS the registration. Idempotent.
+  if (resolvedUuid) {
     try {
       const upsert = await upsertCardByToken(db, {
-        customerAgreementInstanceReference: resolved.uuid,
+        customerAgreementInstanceReference: resolvedUuid,
         cardToken: input.cardToken,
         paymentCardMaskedPanDisplay: input.cardTransactionMaskedPanDisplay,
         paymentCardIsPreferred: false,
         ...(input.paymentCardExpirationDate ? { paymentCardExpirationDate: input.paymentCardExpirationDate } : {}),
         ...(input.paymentCardNetwork ? { paymentCardNetwork: input.paymentCardNetwork } : {}),
       });
-      // Audit the card-on-file outcome (SD-88, PCI DSS Req 10): registered if new, matched if it
-      // already existed — so an auditor sees the full card lifecycle behind a transaction.
       emitComplianceEvent(db, {
-        entityType: 'card',
-        entityId: upsert.paymentCardInstanceReference,
-        processType: 'card_management',
-        processAction: upsert.created ? 'card.registered' : 'card.matched',
-        processOutcome: 'approved',
-        performedByPartyReference: null,
-        performedByRole: null,
-        eventSummary: {
-          via: 'payment',
-          created: upsert.created,
-          cardToken: input.cardToken,
-          maskedPan: input.cardTransactionMaskedPanDisplay,
-          customerAgreementInstanceReference: resolved.uuid,
-          cardTransactionInstanceReference: txnId,
-        },
-        bianServiceDomain: 'Payment Card',
-        bianControlRecordType: 'PaymentCardManagement',
+        entityType: 'card', entityId: upsert.paymentCardInstanceReference, processType: 'card_management',
+        processAction: upsert.created ? 'card.registered' : 'card.matched', processOutcome: 'approved',
+        performedByPartyReference: null, performedByRole: null,
+        eventSummary: { via: 'payment', created: upsert.created, cardToken: input.cardToken, maskedPan: input.cardTransactionMaskedPanDisplay, customerAgreementInstanceReference: resolvedUuid, cardTransactionInstanceReference: txnId },
+        bianServiceDomain: 'Payment Card', bianControlRecordType: 'PaymentCardManagement',
       });
-    } catch { /* never block the payment on card-on-file save */ }
+    } catch { /* never block on card-on-file save */ }
   }
 
   const { create, reasons } = shouldCreateFraudCase(input.amount, input.cardTransactionMerchantCategoryCode);
   let fraudCaseRef: string | undefined;
-
   if (create) {
     const severity = deriveSeverity(input.amount, reasons);
     const snapshot = {
@@ -234,72 +296,74 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
       cardTransactionStatus: 'authorized' as const,
       cardTransactionMaskedPanDisplay: input.cardTransactionMaskedPanDisplay,
     };
-
-    // Reuse the agreement resolved above for the fraud-case customer linkage.
-    const customerAgreementUuid = resolved.uuid ?? input.accountReference;
-
-    const fraudCase = await createFraudCase(db, txnId, customerAgreementUuid, reasons, severity, snapshot);
+    const fraudCase = await createFraudCase(db, txnId, resolvedUuid ?? input.accountReference, reasons, severity, snapshot);
     fraudCaseRef = fraudCase.fraudDiagnosisInstanceReference;
   }
 
   emitProcessEvent(db, {
-    entityType: 'transaction',
-    entityId: txnId,
-    processType: 'payment_processing',
-    processAction: 'transaction.authorized',
-    processOutcome: 'approved',
-    performedByPartyReference: null,
-    performedByRole: null,
+    entityType: 'transaction', entityId: txnId, processType: 'payment_processing',
+    processAction: 'transaction.authorized', processOutcome: 'approved',
+    performedByPartyReference: null, performedByRole: null,
     eventSummary: {
-      amount: input.amount,
-      currency: input.currency,
-      channel: input.cardTransactionChannel,
-      merchantName: input.cardTransactionMerchantName,
-      fraudCaseCreated: create,
-      // Searchable references for the unified audit (manager/auditor): find every event for a given
-      // transaction / card / merchant / customer / case.
-      cardTransactionInstanceReference: txnId,
-      cardToken: input.cardToken,
+      amount: input.amount, currency: input.currency, channel: input.cardTransactionChannel,
+      merchantName: input.cardTransactionMerchantName, fraudCaseCreated: create,
+      cardTransactionInstanceReference: txnId, cardToken: input.cardToken,
       ...(input.merchantAgreementInstanceReference ? { merchantAgreementInstanceReference: input.merchantAgreementInstanceReference } : {}),
       accountReference: canonicalAccountRef,
-      ...(resolved.uuid ? { customerAgreementInstanceReference: resolved.uuid } : {}),
+      ...(resolvedUuid ? { customerAgreementInstanceReference: resolvedUuid } : {}),
       ...(fraudCaseRef ? { fraudDiagnosisInstanceReference: fraudCaseRef } : {}),
     },
-    bianServiceDomain: 'Card Transaction',
-    bianControlRecordType: 'CardTransactionRecord',
-    processMeta: { ruleIds: reasons },
+    bianServiceDomain: 'Card Transaction', bianControlRecordType: 'CardTransactionRecord', processMeta: { ruleIds: reasons },
   });
 
-  // Merchant payment callback (PSP → merchant) for EVERY payment attributed to a merchant — the
-  // single chokepoint that covers app/api-card, hosted checkout and payment link. Fires the
-  // merchant's own webhook (with the transaction id) + the unified-audit `payment.callback` event +
-  // the integration audit event. Declines are handled per-flow (they never reach here).
   if (input.merchantAgreementInstanceReference) {
     try {
       await sendMerchantPaymentCallback(db, {
         merchantAgreementInstanceReference: input.merchantAgreementInstanceReference,
-        amount: input.amount,
-        currency: input.currency,
+        amount: input.amount, currency: input.currency,
         merchantReference: ((input.gatewayPayload as { merchantReference?: string; paymentReference?: string } | undefined)?.merchantReference)
-          ?? ((input.gatewayPayload as { paymentReference?: string } | undefined)?.paymentReference)
-          ?? txnId,
-        contextRef: txnId,
-        contextType: 'transaction',
-        triggeredBy: 'payment.callback',
-        result: 'approved',
-        cardToken: input.cardToken,
-        maskedPan: input.cardTransactionMaskedPanDisplay,
-        responseCode: '0000',
-        cardTransactionInstanceReference: txnId,
+          ?? ((input.gatewayPayload as { paymentReference?: string } | undefined)?.paymentReference) ?? txnId,
+        contextRef: txnId, contextType: 'transaction', triggeredBy: 'payment.callback', result: 'approved',
+        cardToken: input.cardToken, maskedPan: input.cardTransactionMaskedPanDisplay, responseCode: '0000', cardTransactionInstanceReference: txnId,
       });
-    } catch { /* callback never blocks the payment outcome */ }
+    } catch { /* callback never blocks the outcome */ }
   }
 
+  return { fraudCaseCreated: create, fraudDiagnosisInstanceReference: fraudCaseRef };
+}
+
+// Finish a DECLINED payment: flip status, drop the pending context, audit the decline.
+export async function declineTransaction(db: Db, txnId: string, reason: string, code: string): Promise<void> {
+  pendingContext.delete(txnId);
+  const txWriteDb = await getDbForRole('security_auditor', false);
+  await txWriteDb.collection(CARD_TRANSACTION_COLLECTION).updateOne(
+    { cardTransactionInstanceReference: txnId },
+    { $set: { cardTransactionStatus: 'declined', recordUpdatedDateTime: new Date() } },
+  );
+  emitProcessEvent(db, {
+    entityType: 'transaction', entityId: txnId, processType: 'payment_processing',
+    processAction: 'transaction.declined', processOutcome: 'rejected',
+    performedByPartyReference: null, performedByRole: null,
+    eventSummary: { cardTransactionInstanceReference: txnId, decisionReason: reason, responseCode: code },
+    bianServiceDomain: 'Card Transaction', bianControlRecordType: 'CardTransactionRecord',
+  });
+}
+
+// Backward-compatible synchronous entry point: drives the EDA flow and resolves to the final outcome,
+// preserving the previous behavior (returns the authorized result, or throws on an issuer decline).
+// Used by the gateway (checkout / payment-link) and the current API path; the client async + SSE flow
+// uses initiateTransaction directly.
+export async function createTransaction(db: Db, input: CreateTransactionInput) {
+  const { settled } = await initiateTransaction(db, input);
+  const o = await settled;
+  if (o.cardTransactionStatus === 'declined') {
+    throw new CardIssuerDeclinedError(o.declineCode ?? 'declined', o.declineReason ?? 'card_issuer_declined');
+  }
   return {
-    cardTransactionInstanceReference: txnId,
-    cardTransactionStatus: 'authorized',
-    fraudCaseCreated: create,
-    ...(fraudCaseRef && { fraudDiagnosisInstanceReference: fraudCaseRef }),
+    cardTransactionInstanceReference: o.cardTransactionInstanceReference,
+    cardTransactionStatus: 'authorized' as const,
+    fraudCaseCreated: o.fraudCaseCreated,
+    ...(o.fraudDiagnosisInstanceReference && { fraudDiagnosisInstanceReference: o.fraudDiagnosisInstanceReference }),
   };
 }
 
