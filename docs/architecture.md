@@ -44,17 +44,29 @@ To ensure flexibility and scalability, the PSP system adopts a **Hexagonal Archi
    - A **Provider** is equivalent to a **Port** in the Hexagonal Architecture. It defines the **inbound** and **outbound** behaviors for specific events it handles.  
    - Providers interact directly with external systems or modules for event processing.  
 
-4. **Provider Event Configurations:**  
-   - **Outbound Configuration:**  
+4. **Provider Event Configurations (configured per event, per vendor):**  
+   The configuration scope is layered — getting this wrong breaks the model:
+   - A **Provider Group** (category) routes to **one or more Vendors** (connectors).
+   - A **Vendor** (External Provider) carries its **vendor-global** config, managed once at vendor level: **Overview**
+     (identity, status, vendor-level metadata), **Routing** (how the group picks among its vendors:
+     default + fallback / strategy), and the list of **Events** it handles. **There is no vendor base
+     URL.**
+   - **Each event a vendor handles has its OWN Outbound and Inbound configuration**, including **its
+     own URLs**: the outbound endpoint the PSP calls and the inbound callback URL the vendor calls
+     back. A vendor handling three events has three independent outbound/inbound configs. URLs,
+     mapping, auth, retries and timeout are **never** vendor-global — they are **always per event**.
+     (See §7.7: each event's wire contract.)
+
+   - **Outbound Configuration (per event):**  
      - Defines how outgoing attributes are mapped between the PSP system and external systems. For example:
        - If the PSP emits an event with a field `cvv`, but the external system expects `cvvData`, mapping ensures compatibility by transforming `cvv` into `cvvData`.  
        - Similar mapping applies to headers (e.g., transforming `authorization` into `X-Authorization`).  
-     - Providers must configure security features like API Keys, HTTP action methods (POST, GET, etc.), retries, timeout settings, etc.  
+     - Each event configures security features like API Keys, HTTP action methods (POST, GET, etc.), retries, timeout settings, etc.  
      - Provider-specific configurations (e.g., security and data formats) must align with their category.  
 
-   - **Inbound Configuration:**  
-     - Defines how responses from external systems to specific events are processed via inbound callbacks.  
-     - Mapping of inbound attributes ensures the system properly interprets external data.  
+   - **Inbound Configuration (per event):**  
+     - Defines how responses from external systems to that event are processed via inbound callbacks.  
+     - Mapping of inbound attributes (body **and** header) ensures the system properly interprets external data.  
      - Security measures (e.g., authenticity checks, anti-spoofing techniques) must verify that the response comes from legitimate external systems.
 
 5. **External Systems/Adapters:**  
@@ -142,8 +154,10 @@ described as the real, code-backed sequence of `DomainEvent`s on the Event Bus.
   `businessProcess` (the journey class), `source` (emitting component), `actor`, `bian`, `payload`,
   `schemaVersion`, optional `transient`.
 - **`correlationId` = the journey.** For a payment it is the `cardTransactionInstanceReference`
-  (`txnId`); the investigation case reuses the same id so payment and investigation are one trail.
-  For onboarding/card-management it is the entity reference (party / card / merchant).
+  (`txnId`); post-auth AML (Phase 2) shares it. The investigation **case** has its own
+  `correlationId = caseRef` and cross-links to the transaction (`payload.transactionId`), so the two
+  trails are linkable but distinct (see §5.2 / §6.2). For onboarding/card-management it is the entity
+  reference (party / card / merchant).
 - **`businessProcess`** is the *class* used to group events:
   `card_payment | fraud_investigation | card_management | customer_onboarding |
   merchant_onboarding | provider_integration | system`.
@@ -163,8 +177,9 @@ described as the real, code-backed sequence of `DomainEvent`s on the Event Bus.
   a journey is therefore reconstructable from the store.
 - **Persistence layers** (do not confuse them):
   1. `domainEvent` — the Event Bus store, the canonical correlated journey (queried by `correlationId`).
-  2. `businessProcessEvent` / `complianceProcessEvent` — the audit ledger; every audit emit is also
-     **mirrored** onto the bus (`mirrorEventToBus`, `eventType = processAction`).
+  2. `businessProcessEvent` / `complianceProcessEvent` — the audit ledger; a **durable projection**
+     written by a bus subscriber from the domain events. It never originates events. (Legacy code
+     writes the ledger and mirrors to the bus; the migration flips this to publish-then-project — §9.2.)
   3. `externalProviderArrangementActionLog` — the outbound/inbound HTTP I/O with providers
      (`triggeredBy`), the request side of each `.requested`.
 - **PCI DSS:** cardholder data stays fully event-driven. Raw CHD keys (`cardNumber`/`cvv`/`expiry`)
@@ -172,9 +187,10 @@ described as the real, code-backed sequence of `DomainEvent`s on the Event Bus.
   Issuer, the CHD travels as a single **application-encrypted** envelope field (`chd`,
   opaque ciphertext) on the validation event. Every bus backend persists in-flight messages (Kafka
   log, RabbitMQ queue, in-process Mongo) — so the carrier event **is** persisted, but only
-  **temporarily and encrypted**: the field is ciphertext at rest (Req 3.4) and is **purged once the
-  journey completes** (short/bounded retention), so SAD/CVV is not kept after authorization (Req 3.2);
-  the permanent correlated trail and audit ledger keep only the CHD-free projection. The Card Issuer
+  **temporarily and encrypted**: the field is ciphertext at rest (Req 3.4) and is **purged (`$unset`)
+  once the journey completes** (short/bounded retention), leaving the permanent trail record CHD-free,
+  so SAD/CVV is not kept after authorization (Req 3.2); the audit ledger and action log never carry
+  CHD at all. §8 specifies the store and purge mechanism. The Card Issuer
   **provider group is the consumer**: it reads the event, decrypts the CHD just-in-time, and dispatches
   it to the external provider per the outbound config over TLS (§7.7). Control logs are CHD-free
   (Req 10.7). See §7 intro and §7.7.
@@ -195,8 +211,8 @@ sequenceDiagram
   API->>Bus: card.payment.authorization.requested (gatesExpected:[card.issuer,fds,hrp])
   Bus->>Saga: begin(journey)
   par Phase-1 gates (parallel, out-of-band)
-    Bus->>Iss: card.issuer.validation.requested
-    Iss->>Iss: dispatch (CHD, HTTP body only)
+    Bus->>Iss: card.issuer.validation.requested {chd encrypted}
+    Iss->>Iss: decrypt chd, POST to vendor over TLS
     Iss-->>Bus: card.issuer.validation.completed {outcome,responseCode}
   and
     Bus->>FDS: fds.scoring.requested
@@ -218,13 +234,13 @@ sequenceDiagram
 | 2b-done | `fds.scoring.completed` | `callback.fds` | card_payment | yes | Saga gate `fds` |
 | 2c-req | `hrp.screening.requested` | `psp.core` | card_payment | yes | triggers HRP/sanctions dispatch |
 | 2c-done | `hrp.screening.completed` | `callback.hrp` | card_payment | yes | Saga gate `hrp` |
-| 3 | `card.payment.authorization.completed` | `saga.payment-authorization` | card_payment | yes (+ audit mirror) | resolves SSE; `{outcome}` drives merchant `payment.callback`; triggers Phase 2 |
+| 3 | `card.payment.authorization.completed` | `saga.payment-authorization` | card_payment | yes (+ audit projection) | resolves SSE; `{outcome}` drives merchant `payment.callback`; triggers Phase 2 |
 
 - **One start, one end.** `card.payment.authorization.requested` opens the journey;
   `card.payment.authorization.completed` closes it, emitted once **all** gate `*.completed` events are
   in. Its payload carries `outcome: authorized | declined` (+ `responseCode`, `decisionReason`) — no
   separate `payment.authorized` / `payment.declined`, no `transaction.authorized` / `.declined`. The
-  closing event is mirrored to the audit ledger, so the compliance record is preserved.
+  closing event is also projected to the audit ledger, so the compliance record is preserved.
 - Each gate is a `*.requested -> *.completed` pair; the `*.completed` payload carries the per-gate
   `outcome` (no separate approved/declined event names). The HTTP dispatch to the provider is logged
   in `externalProviderArrangementActionLog` (the wire side of each `*.requested`).
@@ -246,10 +262,10 @@ AML monitoring.
 |---|---|---|---|---|---|
 | 1 | `aml.monitoring.requested` | `psp.core` | txnId | on `card.payment.authorization.completed` (authorized) | yes |
 | 2 | `aml.monitoring.completed` | `callback.aml` | txnId | AML provider verdict returned (`outcome` in payload) | yes |
-| 3 | `fraud.case.opened` | `psp.core` | caseRef | open a case if required and not already open | yes (audit+mirror) |
-| 4 | `fraud.case.enriched` | `psp.core` | caseRef | attach correlated subsystem signals to the open case | yes (audit+mirror) |
-| 5 | `fraud.question.created` -> `fraud.question.answered` | `psp.core` | caseRef | investigator <-> customer Q&A | yes (audit+mirror) |
-| 6 | `fraud.case.updated` | `psp.core` | caseRef | any case status/field change (incl. resolution) | yes (audit+mirror) |
+| 3 | `fraud.case.opened` | `psp.core` | caseRef | open a case if required and not already open | yes (+ audit projection) |
+| 4 | `fraud.case.enriched` | `psp.core` | caseRef | attach correlated subsystem signals to the open case | yes (+ audit projection) |
+| 5 | `fraud.question.created` -> `fraud.question.answered` | `psp.core` | caseRef | investigator <-> customer Q&A | yes (+ audit projection) |
+| 6 | `fraud.case.updated` | `psp.core` | caseRef | any case status/field change (incl. resolution) | yes (+ audit projection) |
 
 - **One bus, no duplicate signal names.** The case view's live SSE subscribes to these **canonical
   persisted** events by `caseRef` — there are no separate transient `question.*` / `case.updated`
@@ -262,7 +278,7 @@ AML monitoring.
 
 #### **5.3 `card_management`**
 
-`correlationId = card token / customer agreement reference`. All audit+mirror, all persisted.
+`correlationId = card token / customer agreement reference`. All projected to the audit ledger, all persisted.
 
 | eventType | trigger |
 |---|---|
@@ -320,39 +336,13 @@ The case view's live updates are **not** transient signals — they ride the can
 
 ---
 
-### **6. Event Standardization — Resolved Standard + Migration Map**
+### **6. Event Standardization — Locked Rules & Decisions**
 
-The standard in 5.0 is **agreed**. Renaming an `eventType` is a breaking contract change (subscribers
-+ the `domainEvent` store), so this section is the single migration map to apply in one pass.
+The standard in §5.0 is **agreed and permanent**. This chapter states the invariants every
+implementation must hold plus the resolved cross-cutting decisions. (The one-time rename of the
+current code to these names is the *temporary* migration map in §9.)
 
-#### **6.1 Rename map (current -> standard)**
-
-| Current `eventType` | Standard | Notes |
-|---|---|---|
-| `payment.authorization.requested` | `card.payment.authorization.requested` | process opening event |
-| `payment.authorized` + `payment.declined` | `card.payment.authorization.completed` | one closing event; `payload.outcome` = authorized \| declined |
-| `transaction.authorized` / `transaction.declined` | *(removed)* | folded into the closing event; still mirrored to the audit ledger |
-| `cardissuer.validation.completed` | `card.issuer.validation.completed` | dotted; verdict in payload |
-| *(none — was only an action-log dispatch)* | `card.issuer.validation.requested` | new bus event; replaces the `checkout.cvv.validation` trigger name |
-| `fraud.scoring.completed` | `fds.scoring.completed` | provider-prefixed |
-| *(action-log `fraud.scoring.requested`)* | `fds.scoring.requested` | now a bus event too |
-| `sanctions.screening.completed` | `hrp.screening.completed` | provider-prefixed (`hrp`, action = screening) |
-| *(action-log `sanctions.screening.requested`)* | `hrp.screening.requested` | now a bus event too |
-| `aml.monitoring.completed` | `aml.monitoring.completed` | unchanged (already conformant) |
-| *(action-log `aml.monitoring.requested`)* | `aml.monitoring.requested` | now a bus event too |
-| `fraud.investigation.case.enriched` | `fraud.case.enriched` | shorter, consistent `fraud.case.*` prefix |
-| `question.created` / `question.answered` (transient signal) | *(removed)* | unified into the canonical `fraud.question.created` / `fraud.question.answered` |
-| `case.updated` (transient signal) | `fraud.case.updated` | now a canonical persisted event that also drives the case SSE |
-| `kyc.profile.updated` | `profile.validation.completed` | folded into the KYC process closing event |
-| *(none)* | `profile.validation.requested` / `kyc.validation.requested` / `kyc.validation.completed` | new KYC opening + provider pair on the bus (`external.kyc.callback` is the wire side) |
-| `merchant.submitted` | `merchant.validation.requested` | KYB process opening event |
-| *(none)* | `kyb.validation.requested` / `kyb.validation.completed` / `merchant.validation.completed` | new KYB provider pair + process closing (`external.kyb.callback` is the wire side) |
-
-The compliance-ledger verdicts `card.issuer.validation.approved|declined` collapse into the single
-`card.issuer.validation.completed` with the verdict in payload. The case view's SSE now subscribes to
-the canonical `fraud.*` events (by `caseRef`) instead of separate transient signals.
-
-#### **6.2 Rules locked by this standard**
+#### **6.1 Rules locked by this standard**
 
 1. **One opening + one closing event per business process.** The closing `*.completed` fires only
    when every dependent provider `*.completed` has arrived; `payload.outcome` carries the result.
@@ -365,7 +355,7 @@ the canonical `fraud.*` events (by `caseRef`) instead of separate transient sign
    `*.completed`; audit ledger, action log and SSE are projections/subscribers, never parallel
    channels. No service calls another directly for these flows.
 
-#### **6.3 Resolved: `businessProcess` across one `correlationId`**
+#### **6.2 Resolved: `businessProcess` across one `correlationId`**
 
 **Decision:** post-auth `aml.monitoring.*` and case enrichment keep `businessProcess:
 fraud_investigation`, even though they share the payment's `correlationId`. Rationale: post-auth *is*
@@ -657,11 +647,11 @@ interface FraudCaseOpened {
  */
 interface FraudCaseEnriched {
   transactionId: string;
-  subsystemSignals: {
-    issuer:    { approved: boolean; responseCode: string | null } | null;
-    fds:       { approved: boolean; reason: string | null } | null;
-    sanctions: { approved: boolean; reason: string | null } | null;
-    aml:       { alert: boolean; severity: string | null } | null;
+  subsystemSignals: {                         // derived: each gate's outcome collapsed per subsystem
+    issuer: { approved: boolean; responseCode: string | null } | null;
+    fds:    { approved: boolean; reason: string | null } | null;
+    hrp:    { approved: boolean; reason: string | null } | null;   // HRP/sanctions verdict
+    aml:    { alert: boolean; severity: string | null } | null;
   };
 }
 
@@ -881,8 +871,10 @@ Card Issuer below is the worked example. The adapter is the bus<->vendor transla
 
 For the Card Issuer the adapter consumes `card.issuer.validation.requested`, decrypts `chd`, and sends
 the plaintext CHD over TLS; `clientReference` lets the async callback map back to the journey.
-Attribute mapping (per provider config) renames fields to whatever the vendor expects outbound, and
-back to ours inbound.
+Attribute mapping is configured **per event, per vendor** (§2): each event a vendor handles has its
+own outbound/inbound mapping, endpoint, auth, retries and timeout — renaming fields to whatever that
+vendor expects outbound, and back to ours inbound. Vendor-global config (overview, routing, events)
+is set once at vendor level.
 
 ```ts
 /**
@@ -1028,16 +1020,17 @@ type AmlMonitoringInbound = WireCorrelation & AmlMonitoringCompleted;
   `externalProviderArrangementActionLog` with the CHD stripped (pre-mapping payload; PCI Req 3.2/10.7).
 
 **Callback correlation (wire -> bus bridge).** The vendor has no `correlationId`, so the Provider
-Group must reconstruct it when the async callback lands. The callback endpoint is a **static URL per
-provider** (configured once, as vendors expect — never per business-process instance):
+Group must reconstruct it when the async callback lands. The inbound callback URL is **per event, per
+vendor** (configured in that event's inbound config, §2) — and **static** (one URL per event+vendor,
+configured once; never per business-process instance):
 
 ```
-POST /api/v1/providers/{group}/callback/{providerId}     // static; {providerId} is fixed per connector
+POST /api/v1/providers/{group}/{vendorId}/{event}/callback   // static per event+vendor; not per instance
 ```
 
 Correlation travels in the callback **message**, not the URL. To maximize vendor support, the
 reference (`clientReference = correlationId`) can be carried either in the **body** or in a **header**,
-on both legs — the per-provider attribute mapping declares where:
+on both legs — that event's inbound attribute mapping declares where:
 
 - **Outbound:** the adapter stamps `clientReference` into the request body field and/or header the
   vendor echoes (e.g. body `metadata.ref` / `merchantReference`, or header `X-Client-Reference`).
@@ -1183,3 +1176,103 @@ Principles:
   reference-led; the adapter assembles the vendor-facing signal set just-in-time (resolving QE records
   + decrypting `chd`) and reconstructs only the verdict + non-sensitive metadata back onto the bus.
 
+---
+
+### **8. Event store (`domainEvent`) — collection design**
+
+The in-process Event Bus persists events to the MongoDB collection `domainEvent`. **It MUST be a
+normal collection, NOT a time series collection.** Two of the reasons are hard blockers, not
+preferences:
+
+1. **Idempotent append requires a UNIQUE index on `eventId`.** Publish is at-least-once; the store
+   dedupes on `eventId` (duplicate-key 11000 = already processed). **Time series collections do not
+   support unique indexes** — the idempotency guarantee would be lost. *(blocker)*
+2. **The `chd` purge requires a field-level update.** The encrypted `chd` on
+   `card.issuer.validation.requested` is removed with `$unset` when the journey completes. **Time
+   series collections are insert-optimized and do not support `$unset` of a measurement field** — the
+   field could not be purged in place. *(blocker)*
+3. **The primary access pattern is by `correlationId`, not by time window.** The journey trail and
+   `byProcess` queries hit secondary indexes on `correlationId` / `businessProcess` / `eventType`;
+   time-series bucketing optimizes time-range scans, which is not how this store is read.
+4. **Flexible secondary indexes.** A normal collection indexes any field freely; time-series indexing
+   is constrained around the time/meta fields.
+
+Time series *would* give better compression, write throughput, and a native `expireAfterSeconds` TTL
+— attractive under high load — but the unique-index and field-update blockers make it unusable for
+this store. (A separate, strictly append-only, immutable audit *stream* could be time series; the
+`domainEvent` bus store cannot, because it needs both idempotency and the `chd` purge.)
+
+**Indexes (normal collection):**
+
+| Index | Purpose |
+|---|---|
+| `{ eventId: 1 }` **unique** | idempotent append / dedupe |
+| `{ correlationId: 1, occurredAt: 1 }` | ordered journey trail (the main read) |
+| `{ businessProcess: 1, occurredAt: -1 }` | `byProcess` queries |
+| `{ eventType: 1, occurredAt: -1 }` | by event type |
+| `{ partitionKey: 1 }` | partition affinity / future broker parity |
+
+**`chd` retention (the concrete realization of "temporary + encrypted", §5.0 / §7.8):**
+
+- The encrypted `chd` rides on the `card.issuer.validation.requested` document, encrypted (§7.8) — the
+  only event that ever carries it.
+- When the journey reaches its terminal `card.payment.authorization.completed`, the saga (or a purge
+  hook) `$unset`s `chd` from that document. The event record persists for the trail; the CHD is gone.
+- A periodic **safety sweep** `$unset`s `chd` from any `card.issuer.validation.requested` older than a
+  short bound (e.g. 15 min) that never reached a terminal event (abandoned journeys), so SAD/CVV is
+  never retained past authorization (Req 3.2). This is a field sweep, **not** a document TTL — a
+  document TTL would delete the trail record, which must be kept.
+- The audit ledger and `externalProviderArrangementActionLog` never hold `chd` at all.
+
+This keeps the event store immutable in practice except for the single, documented, security-driven
+`chd` purge — and that exception is itself the reason a normal collection is required.
+
+---
+
+### **9. Migration map (TEMPORARY — remove once applied)**
+
+> This chapter is **temporary**. It maps the *current code's* event names to the standard (§5-§8) for
+> a one-pass rename, plus the structural flips the migration must do. **§5-§8 are the contract;** this
+> is only how to get the existing code there. Delete this chapter once the migration has shipped.
+
+Renaming an `eventType` is a breaking change (subscribers + the `domainEvent` store), so apply the
+whole map in a single pass.
+
+#### **9.1 Rename map (current -> standard)**
+
+| Current `eventType` | Standard | Notes |
+|---|---|---|
+| `payment.authorization.requested` | `card.payment.authorization.requested` | process opening event |
+| `payment.authorized` + `payment.declined` | `card.payment.authorization.completed` | one closing event; `payload.outcome` = authorized \| declined |
+| `transaction.authorized` / `transaction.declined` | *(removed)* | folded into the closing event; still recorded in the audit ledger (projection) |
+| `cardissuer.validation.completed` | `card.issuer.validation.completed` | dotted; verdict in payload |
+| *(none — was only an action-log dispatch)* | `card.issuer.validation.requested` | new bus event; replaces the `checkout.cvv.validation` trigger name |
+| `fraud.scoring.completed` | `fds.scoring.completed` | provider-prefixed |
+| *(action-log `fraud.scoring.requested`)* | `fds.scoring.requested` | now a bus event too |
+| `sanctions.screening.completed` | `hrp.screening.completed` | provider-prefixed (`hrp`, action = screening) |
+| *(action-log `sanctions.screening.requested`)* | `hrp.screening.requested` | now a bus event too |
+| `aml.monitoring.completed` | `aml.monitoring.completed` | unchanged (already conformant) |
+| *(action-log `aml.monitoring.requested`)* | `aml.monitoring.requested` | now a bus event too |
+| `fraud.investigation.case.enriched` | `fraud.case.enriched` | shorter, consistent `fraud.case.*` prefix |
+| `question.created` / `question.answered` (transient signal) | *(removed)* | unified into the canonical `fraud.question.created` / `fraud.question.answered` |
+| `case.updated` (transient signal) | `fraud.case.updated` | now a canonical persisted event that also drives the case SSE |
+| `kyc.profile.updated` | `profile.validation.completed` | folded into the KYC process closing event |
+| *(none)* | `profile.validation.requested` / `kyc.validation.requested` / `kyc.validation.completed` | new KYC opening + provider pair on the bus (`external.kyc.callback` is the wire side) |
+| `merchant.submitted` | `merchant.validation.requested` | KYB process opening event |
+| *(none)* | `kyb.validation.requested` / `kyb.validation.completed` / `merchant.validation.completed` | new KYB provider pair + process closing (`external.kyb.callback` is the wire side) |
+
+The compliance-ledger verdicts `card.issuer.validation.approved|declined` collapse into the single
+`card.issuer.validation.completed` with the verdict in payload. The case view's SSE now subscribes to
+the canonical `fraud.*` events (by `caseRef`) instead of separate transient signals.
+
+#### **9.2 Structural flips (beyond renames)**
+
+- **Audit ledger -> projection.** Legacy code writes the ledger and *mirrors* to the bus
+  (`mirrorEventToBus`). Flip to **publish-then-project**: business logic publishes the domain event;
+  a bus subscriber writes `businessProcessEvent` / `complianceProcessEvent` (§5.0, §6.1 rule 5).
+- **Per-gate `*.requested` onto the bus.** FDS / HRP / issuer / AML currently only log their request
+  in the action log; emit each `*.requested` on the bus as the causation parent of its `*.completed`.
+- **`chd` carrier + purge.** Stop stripping CHD on publish for the issuer validation event; instead
+  carry the encrypted `chd` (§7.8) and add the `$unset` purge + safety sweep (§8).
+- **`domainEvent` store/indexes.** Ensure it is a normal collection with the §8 indexes (unique
+  `eventId`, correlation/process/type/partition).
