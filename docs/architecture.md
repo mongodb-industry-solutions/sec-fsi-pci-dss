@@ -74,21 +74,53 @@ To ensure flexibility and scalability, the PSP system adopts a **Hexagonal Archi
    - These systems must process requests and provide responses via the defined callback endpoints.
 
 6. **Modules:**  
-   - **Build-in Modules:**  
-     - Internal implementations that provide basic functionality for providers without creating system dependencies.  
-     - Modules act as adapters and should be configured via providers.  
-     - Example: A "build-in card validator" module that supports CVV validation but can be easily replaced by external card issuer providers.  
+   - **Built-in Provider Modules:**  
+     Internal implementations of provider categories that ship with the PSP system. They are **not considered part of the PSP core** — they are replaceable subsystems that can be substituted by external vendors at any time. Despite being implemented internally, each built-in provider is treated architecturally as an independent external system.
+
+     The following built-in providers ship with the system:
+
+     | Module | Category | Role |
+     |---|---|---|
+     | `card-issuer` | Card Issuer | Default card validation (CVV, PIN, authorization) |
+     | `fds` | Fraud Detection System | Internal rule-based fraud scoring |
+     | `hrp` | Human Resource Processes | Internal sanctions and PEP screening |
+     | `aml` | Anti-Money Laundering | Internal transaction monitoring |
+     | `kyc` | Know Your Customer | Internal identity verification for customers |
+     | `kyb` | Know Your Business | Internal business verification for merchants |
+     | `credit-bureau` | Credit Bureau | Internal credit scoring and assessment |
+     | `card-authorization` | Card Authorization | Internal card authorization processing |
+
+     **Admin panel labeling:** The administration route `/system/admin/modules` lists **all configurable modules** in the system — both PSP core modules (e.g., `domain`, `gateway`, `identity`) and built-in provider modules (e.g., `fds`, `card-issuer`). Because both types appear in the same list, every entry must display a **module type label** (e.g., `Core` or `Built-in Provider`) so operators can tell at a glance whether they are configuring a core system behavior or a replaceable provider adapter.
+
+   - **Implementation contract (mandatory):**  
+     Built-in providers **must strictly implement the same architectural interfaces and definitions** established for external vendors. The integration mechanism is identical — event-driven dispatch via the Event Bus, the same inbound/outbound attribute mapping contracts (§7.7), the same authentication and callback URL configuration, retries, and timeouts. There is **no shortcut path**: no built-in implementation may hardcode behavior, bypass the EDA + Hexagonal boundary, or couple directly to the PSP core. Violating this contract defeats the substitutability guarantee and pollutes the architectural baseline.
 
    - **Configuration & Response Handling:**  
      - Modules must implement the inbound/outbound requirements of the provider for specific events.  
-     - Callback URLs and configurations for modules are dynamic and should support easy replacement by external systems.
+     - Callback URLs and configurations for modules are dynamic and must support easy replacement by external systems.
 
-#### **Directory Structure:**  
-- All **Provider Groups** must reside in:  
-  `backend/src/modules`.  
-- All **Build-in Modules** (vendors/internal adapters) must reside in:  
-  `backend/src/vendors`.  
-This distinction cleanly separates the **PSP core** from replaceable subsystems.
+#### **Directory Structure:**
+
+| Directory | Purpose |
+|---|---|
+| `backend/src/modules/` | PSP core — business domains and process orchestration |
+| `backend/src/providers/` | Built-in provider modules — replaceable adapters (see §2.6) |
+| `backend/src/shared/` | Shared business resources reused by both `modules/` and `providers/` |
+| `backend/src/vendors/` | System-level libraries with no business logic (event bus, encryption, middleware, seed, setup) |
+
+**Shared resources (`backend/src/shared/`).** Any business type, interface, utility, or constant needed by more than one module or provider must live in `shared/` — never duplicated across consumers. Both `modules/` and `providers/` import from `shared/`; neither imports from the other. `vendors/` is imported by all layers but never imports from `modules/`, `providers/`, or `shared/`.
+
+**Internal structure convention.** Every directory under `modules/`, `providers/`, and `shared/` follows the same standard layout. Only the subdirectories actually required by that unit are created — do not invent new names:
+
+```
+<unit>/
+  controllers/   # request handling (only if the unit exposes HTTP endpoints)
+  services/      # business logic
+  models/        # TypeScript interfaces and types
+  config/        # configuration constants and maps
+```
+
+**File-per-class rule.** Each service, controller, and config must be its own file. For models, use one file per class unless the interfaces are small *and* belong to the same family (e.g., a group of related request/response shapes with little content); in that case they may be co-located in a single file. The deciding criterion is semantics and readability — never convenience. No duplication across units: if a type is used in more than one place it belongs in `shared/models/`.
 
 ---
 
@@ -1276,3 +1308,20 @@ the canonical `fraud.*` events (by `caseRef`) instead of separate transient sign
   carry the encrypted `chd` (§7.8) and add the `$unset` purge + safety sweep (§8).
 - **`domainEvent` store/indexes.** Ensure it is a normal collection with the §8 indexes (unique
   `eventId`, correlation/process/type/partition).
+
+#### **9.3 Built-in provider module relocation (TEMPORARY)**
+
+**Current state (layout debt).** The eight built-in provider modules listed in §2.6 currently reside in `backend/src/modules/` instead of `backend/src/vendors/`. This is a layout inconsistency — those directories contain built-in adapter implementations, not PSP core logic, and must live under `vendors/` per the directory contract (§2, Directory Structure).
+
+| Current path | Target path | Category |
+|---|---|---|
+| `backend/src/modules/card-issuer/` | `backend/src/providers/card-issuer/` | Card Issuer |
+| `backend/src/modules/fds/` | `backend/src/providers/fds/` | Fraud Detection System |
+| `backend/src/modules/hrp/` | `backend/src/providers/hrp/` | Human Resource Processes |
+| `backend/src/modules/aml/` | `backend/src/providers/aml/` | Anti-Money Laundering |
+| `backend/src/modules/kyc/` | `backend/src/providers/kyc/` | Know Your Customer |
+| `backend/src/modules/kyb/` | `backend/src/providers/kyb/` | Know Your Business |
+| `backend/src/modules/credit-bureau/` | `backend/src/providers/credit-bureau/` | Credit Bureau |
+| `backend/src/modules/card-authorization/` | `backend/src/providers/card-authorization/` | Card Authorization |
+
+The migration must: move each directory to `backend/src/providers/`, update all import paths, and verify that no remaining reference in `backend/src/modules/` points to these adapters. Once complete, `backend/src/modules/` will contain only the PSP core modules: `gateway`, `fraud`, `customer`, `identity`, `transactions`, `admin`, `system`, `providers`, `domain`, and `notifications`. `backend/src/vendors/` remains unchanged — it holds infrastructure with no business model involvement (event bus, encryption, middleware, seed, setup). Delete this section once the relocation has shipped.
