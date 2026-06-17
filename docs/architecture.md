@@ -124,6 +124,19 @@ described as the real, code-backed sequence of `DomainEvent`s on the Event Bus.
 
 #### **5.0 Event model and conventions**
 
+- **Single Event Bus, by design (non-negotiable).** Every event in this section is published on and
+  consumed through the one `EventBus` port — there is no parallel event channel and no service calls
+  another service directly for these flows. Concretely:
+  - **Provider calls are bus-driven:** a `*.requested` event is what triggers the outbound dispatch;
+    the inbound callback re-enters the system by publishing the matching `*.completed`. Services do
+    not invoke each other; they react to events.
+  - **The other stores are projections, not channels:** `businessProcessEvent` /
+    `complianceProcessEvent` (audit ledger) and `externalProviderArrangementActionLog` (HTTP wire
+    log) are written off the bus flow; they never originate or relay domain events.
+  - **SSE rides bus subscriptions:** live UI updates (case view, notifications) are bus subscribers,
+    not a separate push mechanism.
+  - **Transport is swappable:** because everything goes through the `EventBus` port, moving from the
+    in-process adapter to Kafka/RabbitMQ changes only the adapter, not any publisher or consumer.
 - **Envelope (`DomainEvent`)** — `eventId` (uuid, idempotency key), `eventType` (dotted name),
   `occurredAt`, `correlationId` (the journey instance), `causationId` (cause -> effect),
   `businessProcess` (the journey class), `source` (emitting component), `actor`, `bian`, `payload`,
@@ -339,6 +352,10 @@ the canonical `fraud.*` events (by `caseRef`) instead of separate transient sign
 3. **Every provider call is a `*.requested -> *.completed` pair on the bus** (the HTTP dispatch is
    the wire side, logged in the action log). This closes the trail gap (request->response pairs).
 4. **`causationId` is mandatory** along the chain (see 5.0) so a journey graph is fully traceable.
+5. **Single Event Bus, by design** (see 5.0): every event is published/consumed through the one
+   `EventBus` port; provider dispatch is triggered by `*.requested` events and re-enters via
+   `*.completed`; audit ledger, action log and SSE are projections/subscribers, never parallel
+   channels. No service calls another directly for these flows.
 
 #### **6.3 Resolved: `businessProcess` across one `correlationId`**
 
