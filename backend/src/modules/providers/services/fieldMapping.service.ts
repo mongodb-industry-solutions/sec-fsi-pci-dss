@@ -1,27 +1,43 @@
 import { FieldMapping, FieldTransform } from '../models/externalProviderArrangement.model';
 
-// PCI DSS blocklist — these field names must never be remapped or injected
-const PCI_BLOCKED_FIELDS = new Set([
+// Cardholder data. Mappable ONLY for a card issuer / card authorization connector, which legitimately
+// receives the PAN/CVV/expiry to authorize (e.g. rename cardNumber -> card_value). Blocked for every
+// other integration type so CHD can never be remapped into a fraud/AML/marketing connector.
+const CHD_FIELDS = new Set([
   'pan', 'primaryaccountnumber', 'cardnumber', 'cvv', 'cvc', 'cvv2', 'cvc2',
-  'expirydate', 'cardexpirydate', 'cardholdername', 'cardholderName',
-  'externalproviderApiKeyHash', 'externalproviderApiKeyHash',
-  'externalProviderApiKeyHash', 'externalProviderCallbackSecretHash',
+  'expirydate', 'cardexpirydate', 'expiry', 'cardholdername',
 ]);
 
-function isBlockedField(path: string): boolean {
+// Secrets — never mappable, for any provider.
+const SECRET_FIELDS = new Set([
+  'externalproviderapikeyhash', 'externalprovidercallbacksecrethash',
+]);
+
+function blockedReason(path: string, allowCardData: boolean): string | null {
   const lower = path.toLowerCase().replace(/\./g, '');
-  return PCI_BLOCKED_FIELDS.has(lower) || PCI_BLOCKED_FIELDS.has(path);
+  if (SECRET_FIELDS.has(lower)) return 'a protected secret';
+  if (!allowCardData && CHD_FIELDS.has(lower)) return 'a PCI DSS-protected cardholder-data field';
+  return null;
 }
 
-export function validateMappingRules(rules: FieldMapping[]): string[] {
+// `allowCardData` = true for card-issuer / card-authorization providers, so the attribute mapping can
+// convert the PSP's `cardNumber`/`cvv`/`expiry` to whatever the connector expects (e.g. `card_value`).
+export function validateMappingRules(rules: FieldMapping[], opts?: { allowCardData?: boolean }): string[] {
+  const allow = opts?.allowCardData ?? false;
   const errors: string[] = [];
   for (const rule of rules) {
-    if (isBlockedField(rule.sourcePath))
-      errors.push(`sourcePath "${rule.sourcePath}" is a PCI DSS-protected field and cannot be mapped`);
-    if (isBlockedField(rule.targetPath))
-      errors.push(`targetPath "${rule.targetPath}" is a PCI DSS-protected field and cannot be mapped`);
+    const src = blockedReason(rule.sourcePath, allow);
+    if (src) errors.push(`sourcePath "${rule.sourcePath}" is ${src} and cannot be mapped`);
+    const tgt = blockedReason(rule.targetPath, allow);
+    if (tgt) errors.push(`targetPath "${rule.targetPath}" is ${tgt} and cannot be mapped`);
   }
   return errors;
+}
+
+// The provider types whose connectors authorize the card and therefore may map cardholder data.
+const CARD_DATA_TYPES = new Set(['card_issuer', 'card_authorization']);
+export function mayMapCardData(providerType: string | undefined): boolean {
+  return providerType !== undefined && CARD_DATA_TYPES.has(providerType);
 }
 
 export function getNestedValue(obj: Record<string, unknown>, path: string): unknown {

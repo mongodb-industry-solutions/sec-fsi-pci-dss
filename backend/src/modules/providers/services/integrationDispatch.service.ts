@@ -128,7 +128,10 @@ async function dispatchExternal(
   const start = Date.now();
   const arrangementId = provider.externalProviderArrangementInstanceReference;
 
-  // Apply outbound field mapping before sending
+  // Apply outbound field mapping before sending. The MAPPED payload goes to the connector (it may
+  // rename CHD, e.g. cardNumber -> card_value, for a card issuer). PCI DSS Req 3.2/10.7: we log the
+  // ORIGINAL (pre-mapping) payload, where CHD lives under known keys that sanitizeDeep strips — the
+  // mapped body (with aliased CHD) is NEVER persisted, only transmitted.
   const mappedPayload = provider.fieldMappingConfig?.outbound?.length
     ? applyMappings(payload, provider.fieldMappingConfig.outbound)
     : payload;
@@ -172,12 +175,12 @@ async function dispatchExternal(
       type: 'dispatch',
       status,
       triggeredBy,
-      payload: mappedPayload,
+      payload,
       responseCode: res.status,
       latencyMs,
       meta: { fieldMappingApplied },
       businessContext,
-      request: { method: 'POST', url: provider.externalProviderApiEndpoint, headers, body: mappedPayload },
+      request: { method: 'POST', url: provider.externalProviderApiEndpoint, headers, body: payload },
       response: { status: res.status, headers: responseHeaders, body: responseBody },
     });
 
@@ -194,12 +197,12 @@ async function dispatchExternal(
       type: 'dispatch',
       status,
       triggeredBy,
-      payload: mappedPayload,
+      payload,
       latencyMs,
       error: (err as Error).message,
       meta: { fieldMappingApplied },
       businessContext,
-      request: { method: 'POST', url: provider.externalProviderApiEndpoint, headers, body: mappedPayload },
+      request: { method: 'POST', url: provider.externalProviderApiEndpoint, headers, body: payload },
     });
 
     await updateHealthStatus(db, arrangementId, 'unreachable');

@@ -18,6 +18,7 @@ type Step = 1 | 2 | 3;
 interface FormData {
   cardholderName: string;
   expiry: string;
+  cvv: string;
   email: string;
   phone: string;
   amount: string;
@@ -35,6 +36,7 @@ const TEST_CARDS = simulatorConfig.testCards;
 const DEFAULTS: FormData = {
   cardholderName: 'Luis Fernandez',
   expiry: '12/28',
+  cvv: '',
   email: 'luis.fernandez@back.es',
   phone: '+44 7700 900123',
   amount: '850.00',
@@ -275,7 +277,10 @@ export default function PaymentPage() {
         // (chosen on the landing page); the other values stay editable so the operator can vary them.
         setForm({
           cardholderName: found.prefill.cardholderName,
-          expiry: '12/28',
+          // Expiry is card data: take the scenario's own card expiry (not a blanket constant).
+          expiry: found.prefill.cardExpiry ?? '',
+          // CVV is entered by the user at payment time (never predefined). Placeholder hints the demo value.
+          cvv: '',
           email: found.prefill.email,
           phone: found.prefill.phone,
           amount: String(found.prefill.amount),
@@ -407,7 +412,7 @@ export default function PaymentPage() {
         merchantAgreementInstanceReference: merchantId,
         gatewayPayload: { source: 'simulator', timestamp: new Date().toISOString() },
         // Transient verification values sent to the card issuer for authorization (never stored/logged).
-        cardVerification: { ...(rawCard ? { cardNumber: rawCard } : {}), ...(form.expiry ? { expiry: form.expiry } : {}) },
+        cardVerification: { ...(rawCard ? { cardNumber: rawCard } : {}), ...(form.cvv ? { cvv: form.cvv } : {}), ...(form.expiry ? { expiry: form.expiry } : {}) },
       });
 
       // dev.v8 F3: the payment is PENDING; wait for the issuer's async decision over SSE.
@@ -573,19 +578,35 @@ export default function PaymentPage() {
             />
           </div>
 
-          {/* Expiry */}
-          <div>
-            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-              Expiry Date
-              <Tooltip text="Card expiration date (MM/YY). Stored in the paymentCard collection with QE:none encryption: protected at rest, not searchable." />
-            </label>
-            <input
-              type="text"
-              value={form.expiry}
-              onChange={(e) => setForm((f) => ({ ...f, expiry: e.target.value }))}
-              className="w-full border rounded-lg px-3 py-2 font-mono"
-              placeholder="MM/YY"
-            />
+          {/* Expiry + CVV */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                Expiry Date
+                <Tooltip text="Card expiration date (MM/YY). The card issuer declines an expired card; the value is sent for authorization only and never stored." />
+              </label>
+              <input
+                type="text"
+                value={form.expiry}
+                onChange={(e) => setForm((f) => ({ ...f, expiry: e.target.value }))}
+                className="w-full border rounded-lg px-3 py-2 font-mono"
+                placeholder="MM/YY"
+              />
+            </div>
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                CVV
+                <Tooltip text="Card verification value. Sent to the card issuer for authorization only, never stored or logged (PCI DSS Req 3.2). The demo issuer accepts 123; any other value is declined." />
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={form.cvv}
+                onChange={(e) => setForm((f) => ({ ...f, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                className="w-full border rounded-lg px-3 py-2 font-mono"
+                placeholder="123"
+              />
+            </div>
           </div>
 
           <div className="border-t pt-4 space-y-4">

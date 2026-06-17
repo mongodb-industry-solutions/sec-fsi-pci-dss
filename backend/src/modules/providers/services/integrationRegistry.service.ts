@@ -14,7 +14,7 @@ import {
   IntegrationAuthConfig,
   FieldMappingConfig,
 } from '../models/externalProviderArrangement.model';
-import { validateMappingRules } from './fieldMapping.service';
+import { validateMappingRules, mayMapCardData } from './fieldMapping.service';
 import { getDefaultGroupForType, addMemberToGroup } from './integrationRoutingGroup.service';
 
 const BCRYPT_ROUNDS = 12;
@@ -61,11 +61,13 @@ export async function createIntegration(
 ): Promise<{ integration: IntegrationSummary; apiKey?: string }> {
   const col = db.collection<ExternalProviderArrangement>(EXTERNAL_PROVIDER_ARRANGEMENT_COLLECTION);
 
-  // Validate field mapping rules for PCI DSS blocklist
+  // Validate field mapping rules for PCI DSS blocklist. Card issuer / card authorization connectors
+  // may map cardholder data (they authorize the card); all other types may not.
   if (input.fieldMappingConfig) {
+    const allowCardData = mayMapCardData(input.type);
     const errors = [
-      ...validateMappingRules(input.fieldMappingConfig.outbound),
-      ...validateMappingRules(input.fieldMappingConfig.inbound),
+      ...validateMappingRules(input.fieldMappingConfig.outbound, { allowCardData }),
+      ...validateMappingRules(input.fieldMappingConfig.inbound, { allowCardData }),
     ];
     if (errors.length > 0) {
       throw Object.assign(new Error(errors.join('; ')), { code: 422 });
@@ -198,18 +200,25 @@ export async function updateIntegration(
   id: string,
   patch: UpdateablePatch
 ): Promise<IntegrationSummary | null> {
-  // Validate field mapping rules if being updated
+  const col = db.collection<ExternalProviderArrangement>(EXTERNAL_PROVIDER_ARRANGEMENT_COLLECTION);
+
+  // Validate field mapping rules if being updated. Card-data mapping is allowed only for the card
+  // issuer / card authorization connector (decided by the existing provider's type).
   if (patch.fieldMappingConfig) {
+    const existing = await col.findOne(
+      { externalProviderArrangementInstanceReference: id },
+      { projection: { _id: 0, externalProviderArrangementType: 1 } },
+    );
+    const allowCardData = mayMapCardData(existing?.externalProviderArrangementType);
     const errors = [
-      ...validateMappingRules(patch.fieldMappingConfig.outbound),
-      ...validateMappingRules(patch.fieldMappingConfig.inbound),
+      ...validateMappingRules(patch.fieldMappingConfig.outbound, { allowCardData }),
+      ...validateMappingRules(patch.fieldMappingConfig.inbound, { allowCardData }),
     ];
     if (errors.length > 0) {
       throw Object.assign(new Error(errors.join('; ')), { code: 422 });
     }
   }
 
-  const col = db.collection<ExternalProviderArrangement>(EXTERNAL_PROVIDER_ARRANGEMENT_COLLECTION);
   const result = await col.findOneAndUpdate(
     { externalProviderArrangementInstanceReference: id },
     { $set: { ...patch, recordUpdatedDateTime: new Date() } },
