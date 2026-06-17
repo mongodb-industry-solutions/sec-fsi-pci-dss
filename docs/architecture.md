@@ -167,9 +167,17 @@ described as the real, code-backed sequence of `DomainEvent`s on the Event Bus.
      **mirrored** onto the bus (`mirrorEventToBus`, `eventType = processAction`).
   3. `externalProviderArrangementActionLog` — the outbound/inbound HTTP I/O with providers
      (`triggeredBy`), the request side of each `.requested`.
-- **PCI DSS:** cardholder data (PAN/CVV/expiry) reaches the Card Issuer **only** via the provider
-  dispatch HTTP body. It is **never** placed on the bus or in any of the three stores
-  (`sanitizeDeep` strips it on publish; the pre-mapping payload is what gets logged). Req 3.2 / 10.7.
+- **PCI DSS:** cardholder data stays fully event-driven. Raw CHD keys (`cardNumber`/`cvv`/`expiry`)
+  are never allowed in a payload (`sanitizeDeep` strips them on every publish). To reach the Card
+  Issuer, the CHD travels as a single **application-encrypted** envelope field (`chd`,
+  opaque ciphertext) on the validation event. Every bus backend persists in-flight messages (Kafka
+  log, RabbitMQ queue, in-process Mongo) — so the carrier event **is** persisted, but only
+  **temporarily and encrypted**: the field is ciphertext at rest (Req 3.4) and is **purged once the
+  journey completes** (short/bounded retention), so SAD/CVV is not kept after authorization (Req 3.2);
+  the permanent correlated trail and audit ledger keep only the CHD-free projection. The Card Issuer
+  **provider group is the consumer**: it reads the event, decrypts the CHD just-in-time, and dispatches
+  it to the external provider per the outbound config over TLS (§7.7). Control logs are CHD-free
+  (Req 10.7). See §7 intro and §7.7.
 
 #### **5.1 `card_payment` — async two-phase authorization (core)**
 
@@ -365,8 +373,813 @@ investigation, so the `byProcess` split is meaningful — `byProcess('card_payme
 Phase-1 authorization, `byProcess('fraud_investigation')` returns the post-auth monitoring + case.
 The trail by `correlationId` remains the single end-to-end journey regardless.
 
-> Recommendation: adopt items 1-2 (pure naming, low risk via a one-pass rename + store note), decide
-> 3-4 together (they deliver the "relationship between events" requirement for investigation/audit),
-> and explicitly resolve 5 so `byProcess` reporting is unambiguous. No code changes until these are
-> validated.
+---
+
+### **7. Event Payload Contracts**
+
+The data each event carries between producer and consumer. Conventions:
+
+- **Two distinct interface families. Do not mix them.**
+  1. **Bus interfaces** (§7.0-7.6) — the contract for *how information is managed as events*: the
+     envelope (§7.0) + the event `payload`. **Reference-led, no sensitive data, backend-agnostic** —
+     identical whether the bus is in-process Mongo, Kafka, or RabbitMQ. Naming: `XxxRequested` /
+     `XxxCompleted`.
+  2. **Vendor interfaces** (§7.7) — the contract *with the external vendor*: the outbound/inbound
+     payload of each call, **owned by the specific Provider Group**. The *resolved* data. Naming:
+     the event in camelCase + a direction suffix — `<Event>Outbound` / `<Event>Inbound` (e.g.
+     `CardIssuerValidationOutbound` / `CardIssuerValidationInbound`).
+- **The Provider Group is the only bridge between the two**, in both directions:
+  - **Outbound:** it consumes the bus `*.requested`, **resolves the references** (PII, account,
+    card-on-file) just-in-time from the QE-protected store, decrypts `chd` (the one datum with no DB
+    home), applies the outbound attribute mapping, and builds the vendor request.
+  - **Inbound:** it authenticates the vendor callback, applies the inbound mapping, and
+    **reconstructs** the bus `*.completed` event.
+  - **Resolved sensitive data never returns to the bus** — only the verdict/outcome (+ non-sensitive
+    metadata). QE-protected data therefore never rides the bus at all: the bus carries references, the
+    vendor call carries the resolved data, and the two contracts stay separate by design.
+- **No envelope duplication on the bus.** The bus payload carries domain data only; envelope fields
+  (`correlationId`, `causationId`, `occurredAt`, `source`, ...) are never repeated, because every
+  internal consumer (e.g. the saga subscribes filtered by `correlationId`) already has them. A
+  cross-reference to a *different* id (e.g. a case event pointing at its transaction) **is** included.
+- **Wire correlation (mandatory).** An external provider does not know our envelope, so it cannot use
+  `correlationId`. The provider-group adapter therefore stamps a `clientReference = correlationId`
+  into **every** outbound provider request, and **every** callback MUST echo it. The inbound handler
+  resolves the journey from that echoed reference and republishes the `*.completed` on the bus with
+  the correct `correlationId`. This is what keeps N concurrent async journeys (different
+  customers/merchants) from ever being confused.
+- **`outcome` on every `*.completed`.** A single enum field carries the verdict; details
+  (codes/reasons/scores) are extra optional fields. No separate success/failure events.
+- **CHD on the bus only as an encrypted, temporarily-persisted envelope (issuer validation).** The
+  flow stays fully event-driven: the validation event carries the CHD as a single
+  **application-encrypted** field `chd` (opaque ciphertext — envelope encryption with a
+  managed data key, same KMS family as Queryable Encryption). The **Card Issuer provider group is the
+  consumer**: it reads the event, **decrypts `chd` just-in-time**, and dispatches the
+  plaintext to the external provider per the outbound config over TLS (§7.7). Guarantees:
+  - raw CHD keys (`cardNumber`/`cvv`/`expiry`) are never allowed in any payload — `sanitizeDeep`
+    strips them on publish; CHD only ever rides inside the encrypted `chd`;
+  - every bus backend persists in-flight messages, so the carrier event **is** persisted — but only
+    **temporarily and encrypted**: `chd` is ciphertext at rest (Req 3.4) and is
+    **purged once the journey completes** (short/bounded retention), so SAD/CVV is not retained after
+    authorization (Req 3.2). The permanent correlated trail and audit ledger keep only the CHD-free
+    projection of the event;
+  - PAN is rendered unreadable anywhere it could transit a broker such as a future Kafka topic (Req
+    3.4); control logs are CHD-free (Req 10.7);
+  - only the Card Issuer provider-group adapter holds the key to decrypt, and only momentarily.
+
+#### **7.0 The envelope contract (`DomainEvent`)**
+
+Every event on the bus is a `DomainEvent`: the **envelope** wraps a typed **payload**. The envelope
+fields carry the message metadata (identity, correlation, routing, BIAN); the `payload` carries the
+business data defined in §7.1-7.6. The journey id lives here, in `correlationId` — never inside the
+payload. `payload` is generic so each event binds its §7.x type, e.g.
+`DomainEvent<CardIssuerValidationRequested>`.
+
+```ts
+type BusinessProcess =
+  | 'card_payment' | 'fraud_investigation' | 'card_management'
+  | 'customer_onboarding' | 'merchant_onboarding' | 'provider_integration' | 'system';
+
+interface DomainEvent<T = Record<string, unknown>> {
+  eventId: string;            // uuid v4 — unique per event; idempotency / dedupe key
+  eventType: string;          // dotted name, e.g. "card.issuer.validation.completed"
+  occurredAt: string;         // ISO-8601 timestamp
+  correlationId: string;      // the journey instance id (= transactionId / paymentId / caseRef)
+  causationId?: string;       // eventId that directly caused this one (cause -> effect chain)
+  businessProcess: BusinessProcess;  // the journey class, for grouping/byProcess queries
+  partitionKey?: string;      // ordering/partition key for a broker; defaults to correlationId
+  source: string;             // emitting component, e.g. "psp.core", "saga.payment-authorization"
+  actor?: { partyRef?: string | null; role?: string | null };  // who triggered it, if applicable
+  bian?: { serviceDomain: string; controlRecord: string };     // BIAN mapping for the event
+  payload: T;                 // the typed business data (§7.1-7.6) — NEVER cardholder data
+  schemaVersion: number;      // envelope schema version
+  transient?: boolean;        // delivered to subscribers but not appended to the store (e.g. SSE)
+}
+```
+
+- **`correlationId`** is the single shared id across all events of one instance (the saga/consumers
+  filter and the trail queries by it). **`causationId`** chains cause to effect within that instance.
+- **Broker mapping:** on a real broker the envelope maps to **message headers** and `payload` to the
+  message **value**; `partitionKey` (default `correlationId`) keeps one journey ordered on a partition.
+- **On the wire** to an external provider, the envelope is not visible, so `correlationId` is carried
+  as `clientReference` in the request/callback (§7.7).
+
+#### **7.1 `card_payment`**
+
+```ts
+// correlationId = transactionId for every event in this process.
+
+/**
+ * @process   card_payment
+ * @event     card.payment.authorization.requested
+ * @producer  psp.core
+ * @consumer  PaymentAuthorizationSaga
+ */
+interface CardPaymentAuthorizationRequested {
+  amount: number;
+  currency: string;                         // ISO-4217
+  channel: 'api' | 'checkout' | 'payment_link';
+  merchantName: string;
+  merchantCategoryCode?: string;
+  maskedPan: string;                        // "411111******1111" — masked only
+  cardNetwork?: string;                     // visa | mastercard | amex | ...
+  cardToken?: string;                       // tokenized card-on-file reference
+  accountReference?: string;
+  gatesExpected: Array<'card.issuer' | 'fds' | 'hrp'>;
+}
+
+/**
+ * @process   card_payment
+ * @event     card.issuer.validation.requested
+ * @producer  psp.core
+ * @consumer  Card Issuer provider group
+ * @note      CHD rides ONLY in encrypted chd; persisted temporarily + purged (see §7 intro, §7.7).
+ */
+interface CardIssuerValidationRequested {
+  cardToken: string;                        // tokenized card-on-file reference — NOT the PAN
+  maskedPan: string;
+  cardNetwork?: string;
+  amount: number;
+  currency: string;
+  chd: string;                // application-encrypted CHD envelope (opaque); persisted temporarily, purged after the journey
+}
+
+/**
+ * @process   card_payment
+ * @event     card.issuer.validation.completed
+ * @producer  Card Issuer Provider (callback.card-issuer)
+ * @consumer  PaymentAuthorizationSaga
+ */
+interface CardIssuerValidationCompleted {
+  cardToken: string;                        // which card was validated (token, never the PAN)
+  outcome: 'approved' | 'declined';
+  responseCode?: string;                    // ISO-8583-style: "00", "05", "51"
+  decisionReason?: string;                  // "cvv_mismatch" | "expired_card" | "insufficient_funds"
+  cvvProvided?: boolean;                    // audit signal only — never the CVV value
+  cardNetwork?: string;
+}
+
+/**
+ * @process   card_payment
+ * @event     fds.scoring.requested
+ * @producer  psp.core
+ * @consumer  Fraud Detection (FDS) provider group
+ * @note      Bus contract: reference-led. The FDS adapter assembles the full risk signal set
+ *            (FdsScoringOutbound, §7.7) JIT from these refs + the stored transaction/party/device records.
+ */
+interface FdsScoringRequested {
+  accountReference?: string;                // -> resolve account history / velocity / device-IP
+  cardToken?: string;                       // -> resolve card-on-file (BIN, network, country)
+  amount: number;                           // non-sensitive routing/threshold context
+  currency: string;
+  channel: 'api' | 'checkout' | 'payment_link';
+  merchantName: string;
+  merchantCategoryCode?: string;
+  // correlationId (envelope) identifies the transaction record the adapter resolves the rest from.
+}
+
+/**
+ * @process   card_payment
+ * @event     fds.scoring.completed
+ * @producer  Fraud Detection (FDS) Provider (callback.fds)
+ * @consumer  PaymentAuthorizationSaga
+ */
+interface FdsScoringCompleted {
+  outcome: 'approved' | 'declined';         // declined = block
+  riskScore?: number;                       // 0..100
+  recommendation?: 'approve' | 'review' | 'block';
+  riskFactors?: string[];                   // e.g. ["new_device","geo_mismatch","high_velocity"] — feeds the case
+  reason?: string;
+}
+
+/**
+ * @process   card_payment
+ * @event     hrp.screening.requested
+ * @producer  psp.core
+ * @consumer  HRP / Sanctions provider group
+ * @note      No PII in clear: pass subjectPartyReference; the HRP adapter resolves the identity from the
+ *            QE party store JIT to build HrpScreeningOutbound (§7.7). All parties here are stored, so a
+ *            reference always suffices (external-party envelope is the §7.9 pattern, not a field).
+ */
+interface HrpScreeningRequested {
+  // Who to screen — the adapter resolves the identity JIT from the QE party store via these references.
+  subjectPartyReference?: string;           // the account holder / payer
+  counterpartyReference?: string;           // merchant / beneficiary, if applicable
+  // Screening context (non-PII)
+  accountReference?: string;
+  amount?: number;
+  currency?: string;
+  merchantName?: string;
+  merchantCountry?: string;                 // ISO-3166
+}
+
+/**
+ * @process   card_payment
+ * @event     hrp.screening.completed
+ * @producer  HRP / Sanctions provider group (callback.hrp)
+ * @consumer  PaymentAuthorizationSaga
+ */
+interface HrpScreeningCompleted {
+  outcome: 'approved' | 'declined';         // declined = sanctions/PEP match -> hard stop
+  matchType?: 'sanctions' | 'pep' | 'adverse_media';
+  matchScore?: number;                      // 0..100 confidence of the watchlist match
+  matchedList?: string;                     // e.g. "OFAC SDN" | "EU consolidated" — feeds the case
+  reason?: string;
+}
+
+/**
+ * @process   card_payment
+ * @event     card.payment.authorization.completed
+ * @producer  saga.payment-authorization
+ * @consumer  psp.core (SSE outcome + merchant callback), PostAuthorizationProcess
+ */
+interface CardPaymentAuthorizationCompleted {
+  outcome: 'authorized' | 'declined';
+  responseCode?: string;
+  decisionReason?: string;                  // set on decline, e.g. "sanctions_match"
+  declinedBy?: 'card.issuer' | 'fds' | 'hrp';
+  settledAmount?: { amount: number; currency: string };
+  fraudCaseCreated: boolean;
+  fraudDiagnosisInstanceReference?: string; // the case to enrich in Phase 2
+}
+```
+
+#### **7.2 `fraud_investigation`**
+
+```ts
+// correlationId = transactionId for AML; = caseRef for the case-lifecycle events.
+
+/**
+ * @process   fraud_investigation
+ * @event     aml.monitoring.requested
+ * @producer  psp.core (PostAuthorizationProcess)
+ * @consumer  AML provider group
+ * @note      Bus contract: reference-led. The AML adapter assembles the monitoring signal set
+ *            (AmlMonitoringOutbound, §7.7) JIT from these refs + the stored transaction/account history.
+ */
+interface AmlMonitoringRequested {
+  accountReference?: string;                // -> resolve account 30d volume/velocity, corridors
+  counterpartyReference?: string;           // beneficiary/merchant party, if applicable
+  // correlationId = transactionId -> resolve the transaction record (amount, channel, destination)
+}
+
+/**
+ * @process   fraud_investigation
+ * @event     aml.monitoring.completed
+ * @producer  AML Provider (callback.aml)
+ * @consumer  PostAuthorizationProcess
+ */
+interface AmlMonitoringCompleted {
+  outcome: 'clear' | 'alert';
+  severity?: 'low' | 'medium' | 'high';
+  alertType?: string;                         // "structuring" | "velocity" | ...
+  requiresReview?: boolean;
+}
+
+/**
+ * @process   fraud_investigation
+ * @event     fraud.case.opened
+ * @producer  psp.core
+ * @consumer  Case view (SSE), investigators
+ */
+interface FraudCaseOpened {
+  transactionId: string;                      // cross-link to the payment journey
+  accountReference?: string;
+  reason: string;                             // "fds_review" | "aml_alert" | ...
+  priority?: 'low' | 'medium' | 'high';
+  openedBy?: string;                          // 'system' | partyRef
+}
+
+/**
+ * @process   fraud_investigation
+ * @event     fraud.case.enriched
+ * @producer  psp.core (PostAuthorizationProcess)
+ * @consumer  Case view (SSE), investigators
+ */
+interface FraudCaseEnriched {
+  transactionId: string;
+  subsystemSignals: {
+    issuer:    { approved: boolean; responseCode: string | null } | null;
+    fds:       { approved: boolean; reason: string | null } | null;
+    sanctions: { approved: boolean; reason: string | null } | null;
+    aml:       { alert: boolean; severity: string | null } | null;
+  };
+}
+
+/**
+ * @process   fraud_investigation
+ * @event     fraud.question.created
+ * @producer  psp.core
+ * @consumer  Customer (app/SSE), case view
+ */
+interface FraudQuestionCreated {
+  questionId: string;
+  transactionId?: string;
+  prompt: string;                             // question text shown to the customer
+  channel?: 'app' | 'email' | 'sms';
+}
+
+/**
+ * @process   fraud_investigation
+ * @event     fraud.question.answered
+ * @producer  psp.core
+ * @consumer  Case view (SSE), investigator
+ */
+interface FraudQuestionAnswered {
+  questionId: string;
+  transactionId?: string;
+  answer: string;
+  answeredAt: string;                         // ISO-8601
+}
+
+/**
+ * @process   fraud_investigation
+ * @event     fraud.case.updated
+ * @producer  psp.core
+ * @consumer  Case view (SSE)
+ */
+interface FraudCaseUpdated {
+  transactionId?: string;
+  status: 'open' | 'investigating' | 'escalated_l2' | 'resolved' | 'closed';
+  resolution?: 'confirmed_fraud' | 'cleared' | 'chargeback';
+  updatedBy?: string;                         // analyst partyRef
+  note?: string;
+}
+```
+
+#### **7.3 `card_management`**
+
+```ts
+// correlationId = cardToken (tokenized, never the PAN).
+
+/**
+ * @process   card_management
+ * @event     card.registered, card.accessed, card.updated, card.removed
+ * @producer  psp.core
+ * @consumer  Audit ledger, notifications, risk monitoring
+ */
+interface CardManagementEvent {
+  customerAgreementReference: string;
+  maskedPan: string;
+  cardNetwork?: string;
+  performedByPartyReference?: string;
+}
+
+/**
+ * @process   card_management
+ * @event     card.shared.threshold.exceeded
+ * @producer  psp.core
+ * @consumer  Risk monitoring, case view
+ */
+interface CardSharedThresholdExceeded {
+  maskedPan: string;
+  sharedAcrossPartyCount: number;
+  threshold: number;
+}
+```
+
+#### **7.4 `customer_onboarding` (KYC)**
+
+```ts
+// correlationId = customerReference.
+
+/**
+ * @process   customer_onboarding
+ * @event     profile.validation.requested
+ * @producer  psp.core
+ * @consumer  Customer Onboarding Process
+ */
+interface ProfileValidationRequested {
+  partyName?: string;
+  country?: string;                           // ISO-3166
+  documentType?: string;                      // metadata only — never document images/PII
+}
+
+/**
+ * @process   customer_onboarding
+ * @event     kyc.validation.requested
+ * @producer  psp.core
+ * @consumer  KYC Provider
+ */
+interface KycValidationRequested {
+  partyName?: string;
+  country?: string;
+}
+
+/**
+ * @process   customer_onboarding
+ * @event     kyc.validation.completed
+ * @producer  KYC Provider (callback.kyc)
+ * @consumer  Customer Onboarding Process
+ */
+interface KycValidationCompleted {
+  outcome: 'verified' | 'rejected' | 'review';
+  riskRating?: 'low' | 'medium' | 'high';
+  reason?: string;
+}
+
+/**
+ * @process   customer_onboarding
+ * @event     profile.validation.completed
+ * @producer  psp.core (Customer Onboarding Process)
+ * @consumer  Onboarding UI, notifications
+ */
+interface ProfileValidationCompleted {
+  outcome: 'verified' | 'rejected' | 'review';
+  reason?: string;
+}
+```
+
+#### **7.5 `merchant_onboarding` (KYB)**
+
+```ts
+// correlationId = merchantReference.
+
+/**
+ * @process   merchant_onboarding
+ * @event     merchant.validation.requested
+ * @producer  psp.core
+ * @consumer  Merchant Onboarding Process
+ */
+interface MerchantValidationRequested {
+  legalName?: string;
+  country?: string;
+  category?: string;                          // MCC
+}
+
+/**
+ * @process   merchant_onboarding
+ * @event     kyb.validation.requested
+ * @producer  psp.core
+ * @consumer  KYB Provider
+ */
+interface KybValidationRequested {
+  legalName?: string;
+  country?: string;
+}
+
+/**
+ * @process   merchant_onboarding
+ * @event     kyb.validation.completed
+ * @producer  KYB Provider (callback.kyb)
+ * @consumer  Merchant Onboarding Process
+ */
+interface KybValidationCompleted {
+  outcome: 'verified' | 'rejected' | 'review';
+  riskRating?: 'low' | 'medium' | 'high';
+  reason?: string;
+}
+
+/**
+ * @process   merchant_onboarding
+ * @event     merchant.validation.completed
+ * @producer  psp.core (Merchant Onboarding Process)
+ * @consumer  Onboarding UI, notifications
+ */
+interface MerchantValidationCompleted {
+  outcome: 'verified' | 'rejected' | 'review';
+  reason?: string;
+}
+```
+
+#### **7.6 `system` (transient)**
+
+```ts
+// Ephemeral fan-out (not persisted). correlationId = recipient partyReference.
+
+/**
+ * @process   system
+ * @event     party.notification
+ * @producer  psp.core
+ * @consumer  Frontend SSE (bell + sidebar counter)
+ */
+interface PartyNotification {
+  kind: 'case' | 'transaction' | 'system';
+  title: string;
+  body?: string;
+  refId?: string;                             // caseRef | transactionId the bell links to
+}
+```
+
+#### **7.7 Provider wire contracts (HTTP, outside the bus)**
+
+The wire is what a **Provider Group adapter** sends to its vendor and what the vendor returns on its
+callback — a different contract from the bus payload. This holds for **every** provider group; the
+Card Issuer below is the worked example. The adapter is the bus<->vendor translator:
+
+- **Build (outbound):** consume the bus `*.requested`, **resolve its references** (PII, account,
+  card-on-file) just-in-time from the QE-protected store, decrypt `chd` where present, apply the
+  **outbound** attribute mapping, and assemble the vendor request. The rich/sensitive signal set is
+  assembled here, not carried on the bus.
+- **Reconstruct (inbound):** authenticate the callback, apply the **inbound** mapping, and publish the
+  bus `*.completed` — carrying only the verdict + non-sensitive metadata, never the resolved PII/CHD.
+- **No verdict duplication.** The bus `*.completed` (§7.1/§7.2) is the **single source of truth** for
+  the verdict; each wire callback **reuses** it (`WireCorrelation & Pick<*.completed, ...>`) so no
+  field is defined twice. The adapter translates values where they differ (HRP `match` -> `declined`),
+  adds context-only fields when publishing (e.g. `cardToken`), and restores the envelope. The wire
+  **request**, by contrast, is a different *resolved* shape assembled from the lean bus `*.requested` +
+  the QE store — not a copy of the bus request.
+
+For the Card Issuer the adapter consumes `card.issuer.validation.requested`, decrypts `chd`, and sends
+the plaintext CHD over TLS; `clientReference` lets the async callback map back to the journey.
+Attribute mapping (per provider config) renames fields to whatever the vendor expects outbound, and
+back to ours inbound.
+
+```ts
+/**
+ * @type      outbound + inbound (mixin on every Wire* below)
+ * @producer  Provider Group adapter (stamps outbound) / Vendor (echoes inbound)
+ * @consumer  Provider Group adapter (resolves correlationId inbound)
+ * @note      Universal: present on EVERY outbound request and echoed on EVERY callback.
+ */
+interface WireCorrelation {
+  clientReference: string;                    // = correlationId (e.g. cardTransactionInstanceReference)
+}
+
+/**
+ * @process   card_payment
+ * @event     card.issuer.validation.requested
+ * @type      outbound
+ * @producer  Provider Group: Card Issuer
+ * @consumer  Vendor: Card Issuer
+ * @note      TLS only; logged sanitized; CHD decrypted from `chd` and sent ONLY here, never persisted.
+ */
+interface CardIssuerValidationOutbound extends WireCorrelation {
+  amount: number;
+  currency: string;
+  cardNetwork?: string;
+  cardNumber: string;                         // PAN — plaintext only on this wire
+  cvv: string;
+  expiry: string;                             // MM/YY
+  // Provider-specific names are produced by attribute mapping, e.g. cardNumber -> card_value.
+}
+
+/**
+ * @process   card_payment
+ * @event     card.issuer.validation.completed
+ * @type      inbound
+ * @producer  Vendor: Card Issuer
+ * @consumer  Provider Group: Card Issuer
+ * @note      Reuses the bus verdict; the adapter adds context (cardToken) and restores the envelope.
+ */
+type CardIssuerValidationInbound = WireCorrelation &
+  Pick<CardIssuerValidationCompleted, 'outcome' | 'responseCode' | 'decisionReason'>;
+
+/**
+ * @process   card_payment
+ * @event     fds.scoring.requested
+ * @type      outbound
+ * @producer  Provider Group: FDS
+ * @consumer  Vendor: FDS
+ * @note      Assembled by the adapter from the stored transaction/party/device records — no CHD.
+ */
+interface FdsScoringOutbound extends WireCorrelation {
+  amount: number; currency: string; channel: string;
+  merchantName: string; merchantCategoryCode?: string; merchantCountry?: string;
+  accountAgeDays?: number; isNewPaymentMethod?: boolean;
+  cardBin?: string; cardNetwork?: string; cardCountry?: string;   // non-CHD card context
+  ipAddress?: string; deviceFingerprint?: string; userAgent?: string;   // device/network (PII-class)
+  geoLocation?: { country?: string; city?: string; lat?: number; lon?: number };
+  recentTransactionCount24h?: number; billingShippingMismatch?: boolean;
+  threeDsResult?: 'authenticated' | 'attempted' | 'failed' | 'not_enrolled';
+}
+
+/**
+ * @process   card_payment
+ * @event     fds.scoring.completed
+ * @type      inbound
+ * @producer  Vendor: FDS
+ * @consumer  Provider Group: FDS
+ */
+type FdsScoringInbound = WireCorrelation &
+  Pick<FdsScoringCompleted, 'outcome' | 'riskScore' | 'recommendation' | 'riskFactors'>;
+
+/**
+ * @process   card_payment
+ * @event     hrp.screening.requested
+ * @type      outbound
+ * @producer  Provider Group: HRP / Sanctions
+ * @consumer  Vendor: HRP / Sanctions
+ * @note      Identity resolved from the QE party store via subjectPartyReference (external party: §7.9).
+ */
+interface HrpScreeningOutbound extends WireCorrelation {
+  subject: { fullName: string; dateOfBirth?: string; nationality?: string;
+             country?: string; documentNumber?: string; entityType?: 'individual' | 'business' };
+  counterparty?: { fullName?: string; country?: string };
+  context?: { amount?: number; currency?: string; merchantName?: string };
+}
+
+/**
+ * @process   card_payment
+ * @event     hrp.screening.completed
+ * @type      inbound
+ * @producer  Vendor: HRP / Sanctions
+ * @consumer  Provider Group: HRP / Sanctions
+ * @note      Vendor outcome is clear|match; the adapter maps it to approved|declined on the bus.
+ */
+interface HrpScreeningInbound extends WireCorrelation,
+  Pick<HrpScreeningCompleted, 'matchType' | 'matchScore' | 'matchedList'> {
+  outcome: 'clear' | 'match';
+  matchedName?: string;                       // wire-only watchlist detail
+}
+
+/**
+ * @process   fraud_investigation
+ * @event     aml.monitoring.requested
+ * @type      outbound
+ * @producer  Provider Group: AML
+ * @consumer  Vendor: AML
+ * @note      Monitoring signal set assembled from the transaction + account history.
+ */
+interface AmlMonitoringOutbound extends WireCorrelation {
+  amount: number; currency: string; channel?: string;
+  transactionType?: 'purchase' | 'transfer' | 'withdrawal' | 'refund';
+  originAccountRef?: string;
+  counterparty?: { name?: string; accountRef?: string; country?: string };
+  destinationCountry?: string;
+  account30dVolume?: number; account30dCount?: number;
+  structuringIndicator?: boolean;             // many sub-threshold txns
+  rapidMovementIndicator?: boolean;           // funds in and out quickly
+  highRiskCorridor?: boolean;
+}
+
+/**
+ * @process   fraud_investigation
+ * @event     aml.monitoring.completed
+ * @type      inbound
+ * @producer  Vendor: AML
+ * @consumer  Provider Group: AML
+ * @note      Verdict shape equals the bus completed; only clientReference is added on the wire.
+ */
+type AmlMonitoringInbound = WireCorrelation & AmlMonitoringCompleted;
+```
+
+- The inbound handler reads `clientReference`, looks up the journey, and publishes the matching
+  `*.completed` (§7.1/§7.2) on the bus with the resolved `correlationId`, mapping the wire callback's
+  fields into the lean bus payload — **only the verdict + non-sensitive metadata, never the resolved
+  PII/CHD**.
+- **KYC / KYB** follow the same shape: the adapter resolves the identity / business profile from the
+  QE store and sends a `KycValidationOutbound` / `KybValidationOutbound` (resolved identity + documents metadata);
+  the callback maps to `kyc.validation.completed` / `kyb.validation.completed`.
+- The internal built-in Card Issuer module short-circuits the wire (no real HTTP) but follows the
+  identical contract: it consumes the same bus event, decrypts `chd` in-process, and
+  publishes the same `*.completed` event.
+- The plaintext CHD exists only inside the adapter for the duration of the call; it is never put back
+  on the bus, persisted, or logged. The wire body is logged (sanitized) only in
+  `externalProviderArrangementActionLog` with the CHD stripped (pre-mapping payload; PCI Req 3.2/10.7).
+
+**Callback correlation (wire -> bus bridge).** The vendor has no `correlationId`, so the Provider
+Group must reconstruct it when the async callback lands. The callback endpoint is a **static URL per
+provider** (configured once, as vendors expect — never per business-process instance):
+
+```
+POST /api/v1/providers/{group}/callback/{providerId}     // static; {providerId} is fixed per connector
+```
+
+Correlation travels in the callback **message**, not the URL. To maximize vendor support, the
+reference (`clientReference = correlationId`) can be carried either in the **body** or in a **header**,
+on both legs — the per-provider attribute mapping declares where:
+
+- **Outbound:** the adapter stamps `clientReference` into the request body field and/or header the
+  vendor echoes (e.g. body `metadata.ref` / `merchantReference`, or header `X-Client-Reference`).
+- **Fallback:** if the vendor cannot echo arbitrary data but returns its own id synchronously
+  (`pspReference`), the adapter stores `vendorRef -> correlationId` at dispatch.
+
+At dispatch it records a short-lived **pending-correlation entry**, indexed by the reference (never by
+a URL token):
+
+```ts
+interface PendingCorrelation {
+  ref: string;              // clientReference (= correlationId) or the vendor's own ref from the ACK
+  correlationId: string;    // the journey — restores the envelope correlationId
+  causationId: string;      // eventId of the originating *.requested — restores the cause->effect chain
+  businessProcess: string;  // restores the envelope businessProcess (also derivable from eventType)
+  eventType: string;        // the *.completed to publish, e.g. "card.issuer.validation.completed"
+  expiresAt: string;        // if it lapses with no callback -> the saga times out (fail-open per gate)
+}
+```
+
+**Why the wire has no `businessProcess` / `causationId`.** The wire carries only `clientReference`
+(= `correlationId`); `businessProcess` and `causationId` are **internal envelope fields** the vendor
+has no use for, so they are never sent. The adapter **restores the full envelope** when it
+reconstructs the `*.completed`: `correlationId` from the echoed `clientReference`, and
+`causationId` + `businessProcess` from the `PendingCorrelation` entry recorded at dispatch (the
+`causationId` is the eventId of the `*.requested` that caused the call). The cause->effect chain is
+therefore preserved even though it never crossed the wire.
+
+On callback the Provider Group: (1) **authenticates** it (HMAC signature / anti-spoofing,
+`authConfig.hmacInbound`); (2) reads the reference from the body **or** header per the inbound
+mapping; (3) resolves `correlationId` via the `PendingCorrelation` registry; (4) applies inbound
+attribute mapping to build the `*.completed` payload; (5) **publishes** the `DomainEvent` with the
+**restored envelope** (`correlationId` + `causationId` + `businessProcess` from the pending entry —
+the saga, subscribed by `correlationId`, receives it); (6) clears the entry.
+The internal built-in module follows the same contract in-process (it already holds the
+`correlationId`, so no lookup is needed).
+
+#### **7.8 `chd` field — encryption format and algorithms**
+
+The `chd` field on `card.issuer.validation.requested` is the **only** carrier of cardholder data on
+the bus, and it is always an opaque ciphertext token. Encryption is **envelope encryption** so the
+data key never leaves the KMS in clear, reusing the **same KMS / CMK as Queryable Encryption** (one
+key-management surface for the whole system).
+
+**Cleartext (before encryption).** Minimal CHD JSON, UTF-8, only the fields the issuer needs:
+
+```jsonc
+{ "cardNumber": "4111111111111111", "cvv": "123", "expiry": "12/28" }
+```
+
+**Algorithms.**
+
+| Layer | Algorithm | Parameters |
+|---|---|---|
+| Content encryption (DEK -> ciphertext) | **AES-256-GCM** (AEAD) | 256-bit DEK, **96-bit random IV per message**, 128-bit auth tag |
+| Authenticated data (AAD) | bound to the journey | `AAD = correlationId + "." + eventType` — a token cannot be replayed onto another event/journey |
+| Key wrapping (CMK -> wraps DEK) | **KMS envelope** (AWS KMS / Azure Key Vault / GCP KMS / KMIP) | per-message 256-bit DEK from `GenerateDataKey`; CMK never exported |
+| Serialization | **Opaque compact token** (default) | versioned, dot-joined base64url parts; built with native `node:crypto` (no extra dependency). JWE Compact (RFC 7516, `enc=A256GCM`) is an optional alternative only if external interop is ever needed |
+
+**Confidentiality is the requirement — not just integrity.** The `chd` MUST be a **JWE**
+(encrypted): its content is **unreadable** in any context without the KMS-held key. It MUST NOT be a
+JWS or any signed-but-readable token — signing only proves the data was not modified and would leave
+the CHD visible, which is not acceptable. Consequences:
+
+- `base64url` is an **encoding, not encryption**: decoding the ciphertext segment yields only the
+  AES-256-GCM **encrypted bytes**, never readable CHD. Plaintext is recoverable solely via
+  `KMS.Decrypt`, restricted to the Card Issuer adapter.
+- Only crypto metadata (version + key id) is readable. **No CHD ever appears in the metadata or the
+  AAD** — the AAD is the journey binding (`correlationId.eventType`), not card data.
+- Therefore anyone who inspects the event in the store, broker, or a log sees only opaque ciphertext;
+  AES-256-GCM gives confidentiality **and** integrity (AEAD), but confidentiality is the primary
+  guarantee here.
+
+**Token format (the `chd` string).** Opaque, versioned, dot-joined base64url parts — everything the
+consumer needs to decrypt, and nothing readable but the version and key id:
+
+```
+v1 "." BASE64URL(kid) "." BASE64URL(wrappedDEK) "." BASE64URL(iv) "." BASE64URL(ciphertext) "." BASE64URL(tag)
+```
+
+- `v1` — format version (lets the scheme evolve); `kid` — which CMK wrapped the DEK.
+- The IV (12 bytes), ciphertext, and 16-byte GCM tag are the `node:crypto` `createCipheriv`
+  /`createDecipheriv('aes-256-gcm', ...)` outputs. No JWE library or extra dependency is required.
+
+**Encryption (producer — psp.core, when emitting `card.issuer.validation.requested`).**
+
+```
+1. dek, wrappedDEK = KMS.GenerateDataKey(CMK, AES-256)        // dek in memory only
+2. iv = randomBytes(12)
+3. aad = utf8(correlationId + "." + "card.issuer.validation.requested")
+4. c = createCipheriv('aes-256-gcm', dek, iv).setAAD(aad)
+   ciphertext = c.update(utf8(JSON(cleartext))) + c.final(); tag = c.getAuthTag()
+5. chd = "v1" + "." + b64url(kid,wrappedDEK,iv,ciphertext,tag)
+6. zeroize(dek, cleartext)                                    // wipe plaintext + data key
+```
+
+**Decryption (consumer — Card Issuer provider-group adapter, just-in-time).**
+
+```
+1. v, kid, wrappedDEK, iv, ciphertext, tag = splitToken(chd)
+2. dek = KMS.Decrypt(wrappedDEK)                              // only this adapter has KMS decrypt rights
+3. aad = utf8(correlationId + "." + eventType)
+4. d = createDecipheriv('aes-256-gcm', dek, iv).setAAD(aad).setAuthTag(tag)
+   plaintext = d.update(ciphertext) + d.final()               // d.final() THROWS if tag/AAD invalid
+5. cardData = JSON(plaintext) -> dispatch to provider over TLS (§7.7)
+6. zeroize(dek, plaintext, cardData)                          // wipe right after the call
+```
+
+**Key management and lifecycle.**
+
+- **Authorization to decrypt** is restricted to the Card Issuer provider-group adapter's KMS grant; no
+  other component (saga, stores, audit, FDS/HRP/AML adapters) can decrypt `chd` (PCI Req 3.5/3.6, 7).
+- **CMK rotation** is handled by the KMS; old DEKs stay decryptable via `kid`. A new DEK is generated
+  **per message**, so no DEK is ever reused across cards.
+- **Integrity / anti-replay:** the GCM auth tag detects tampering; the AAD binds the token to its
+  `correlationId` + `eventType`, so a captured `chd` cannot be moved to another journey.
+- **Retention:** the encrypted `chd` is persisted only for the bounded life of the journey (§7 intro)
+  and purged on completion; the CMK/DEK design means even an un-purged copy stays unreadable at rest
+  (Req 3.4). Plaintext and the unwrapped DEK exist only transiently in the adapter and are zeroized.
+
+#### **7.9 Sensitive data classes — CHD vs PII**
+
+Two classes of sensitive data, **different regimes, different handling**. Do not conflate them.
+
+| Class | Examples | Regime | On the bus | Persistence | Who can decrypt |
+|---|---|---|---|---|---|
+| **CHD** | PAN, CVV, expiry | PCI DSS (Req 3.2/3.4) | encrypted `chd` envelope (§7.8); purged after journey | **never** (CVV never; PAN only as unreadable, transient) | Card Issuer adapter **only** |
+| **PII** | full name, DOB, email, phone, address, document no. | GDPR / privacy | **reference-first** — pass a `partyReference`, the adapter resolves identity JIT from the QE party store; encrypted `pii` envelope only if the party is not in our store | **may persist** — already in the party record, encrypted at rest with Queryable Encryption | screening adapters **and** the case/investigation service |
+
+Principles:
+
+- **Minimize.** Send only the fields the screen needs (sanctions/PEP: name, DOB, nationality,
+  country, optional document number) — never the whole profile.
+- **Reference over value.** Prefer `subjectPartyReference` so PII never rides the bus at all; the HRP
+  adapter QE-decrypts the identity just-in-time, screens, and discards it.
+- **Encrypt when unavoidable.** For an external party not in our store, carry identity in the `pii`
+  envelope using the **same crypto scheme as §7.8** — but the decrypt grant includes the
+  case/investigation service (an investigator legitimately sees the name), unlike `chd` which is
+  issuer-only. PII may be retained (it is part of the party record); CVV never is.
+- **At rest**, both classes are protected: CHD never lands in a store; PII fields use Queryable
+  Encryption so they stay searchable while encrypted.
+- **Applies to every provider group** (issuer, FDS, HRP, AML, KYC, KYB): the bus `*.requested` is
+  reference-led; the adapter assembles the vendor-facing signal set just-in-time (resolving QE records
+  + decrypting `chd`) and reconstructs only the verdict + non-sensitive metadata back onto the bus.
 
