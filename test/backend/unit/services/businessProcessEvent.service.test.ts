@@ -1,209 +1,121 @@
 /**
- * Unit tests: businessProcessEvent.service (ADR-025 / F7.1)
- * Covers: routing by processType, CHD sanitization, fire-and-forget robustness.
+ * Unit tests: businessProcessEvent.service (ADR-025 + dev.v8 P6 §9.2 publish-then-project).
+ * The audit ledger is now a PROJECTION: the emit helpers PUBLISH a domain event; the
+ * LedgerProjection bus subscriber writes businessProcessEvent/complianceProcessEvent. Covers routing
+ * by ledgerKind, CHD sanitization (stripped by the bus on publish), and fire-and-forget robustness.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── hoisted mocks ────────────────────────────────────────────────────────────
 const h = vi.hoisted(() => {
   const insertOne = vi.fn().mockResolvedValue({ insertedId: 'mock-id' });
   const collection = vi.fn(() => ({ insertOne }));
   return { insertOne, collection };
 });
-
-// We only mock uuid so we get deterministic IDs in assertions
 vi.mock('uuid', () => ({ v4: () => 'test-uuid-1234' }));
 
 import {
   emitProcessEvent,
   emitComplianceEvent,
+  LedgerProjection,
 } from '../../../../backend/src/modules/providers/services/businessProcessEvent.service';
+import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
+import { setEventBus, getEventBus } from '../../../../backend/src/vendors/eventbus';
 
-function makeDb() {
-  return { collection: h.collection } as unknown as Parameters<typeof emitProcessEvent>[0];
-}
+const mockDb = { collection: h.collection } as never;
+const flush = () => new Promise((r) => setTimeout(r, 0));
 
 beforeEach(() => {
   h.insertOne.mockClear();
   h.collection.mockClear();
+  // Fresh bus + the projection subscriber that writes the ledger from published events.
+  setEventBus(new EventBusInProcess());
+  new LedgerProjection(mockDb, getEventBus()).register();
 });
 
-// ── routing ──────────────────────────────────────────────────────────────────
-
-describe('emitProcessEvent — routing', () => {
-  it('routes payment_processing to businessProcessEvent collection', () => {
-    emitProcessEvent(makeDb(), {
-      entityType: 'transaction',
-      entityId: 'txn-001',
-      processType: 'payment_processing',
-      processAction: 'transaction.authorized',
-      processOutcome: 'approved',
-      performedByPartyReference: null,
-      performedByRole: null,
-      eventSummary: { amount: 100 },
-      bianServiceDomain: 'Card Transaction',
-      bianControlRecordType: 'CardTransactionLog',
+// ── routing (now via the projection subscriber) ───────────────────────────────
+describe('emit* → LedgerProjection routing', () => {
+  it('routes payment_processing (business) to businessProcessEvent collection', async () => {
+    emitProcessEvent(mockDb, {
+      entityType: 'transaction', entityId: 'txn-001', processType: 'payment_processing',
+      processAction: 'transaction.authorized', processOutcome: 'approved',
+      performedByPartyReference: null, performedByRole: null,
+      eventSummary: { amount: 100 }, bianServiceDomain: 'Card Transaction', bianControlRecordType: 'CardTransactionLog',
     });
+    await flush();
     expect(h.collection).toHaveBeenCalledWith('businessProcessEvent');
   });
 
-  it('routes fraud_evaluation to businessProcessEvent collection', () => {
-    emitProcessEvent(makeDb(), {
-      entityType: 'fraud_case',
-      entityId: 'case-001',
-      processType: 'fraud_evaluation',
-      processAction: 'case.created',
-      processOutcome: 'pending',
-      performedByPartyReference: null,
-      performedByRole: null,
-      eventSummary: {},
-      bianServiceDomain: 'Fraud Diagnosis',
-      bianControlRecordType: 'FraudDiagnosisCase',
+  it('routes kyc_verification (compliance) to complianceProcessEvent collection', async () => {
+    emitComplianceEvent(mockDb, {
+      entityType: 'customer', entityId: 'cust-001', processType: 'kyc_verification',
+      processAction: 'profile.validation.completed', processOutcome: 'approved',
+      performedByPartyReference: null, performedByRole: null,
+      eventSummary: {}, bianServiceDomain: 'Customer Agreement', bianControlRecordType: 'CustomerAgreementProcedure',
     });
-    expect(h.collection).toHaveBeenCalledWith('businessProcessEvent');
-  });
-});
-
-describe('emitComplianceEvent — routing', () => {
-  it('routes kyc_verification to complianceProcessEvent collection', () => {
-    emitComplianceEvent(makeDb(), {
-      entityType: 'customer',
-      entityId: 'cust-001',
-      processType: 'kyc_verification',
-      processAction: 'kyc.initiated',
-      processOutcome: 'pending',
-      performedByPartyReference: null,
-      performedByRole: null,
-      eventSummary: {},
-      bianServiceDomain: 'Customer Agreement',
-      bianControlRecordType: 'CustomerAgreementProcedure',
-    });
+    await flush();
     expect(h.collection).toHaveBeenCalledWith('complianceProcessEvent');
   });
 
-  it('routes merchant_onboarding to complianceProcessEvent collection', () => {
-    emitComplianceEvent(makeDb(), {
-      entityType: 'merchant',
-      entityId: 'merch-001',
-      processType: 'merchant_onboarding',
-      processAction: 'merchant.submitted',
-      processOutcome: 'pending',
-      performedByPartyReference: null,
-      performedByRole: null,
-      eventSummary: {},
-      bianServiceDomain: 'Merchant Relations',
-      bianControlRecordType: 'MerchantAgreementProcedure',
+  it('projects a faithful ledger row (action, outcome, entity, bian)', async () => {
+    emitProcessEvent(mockDb, {
+      entityType: 'transaction', entityId: 'txn-007', processType: 'payment_processing',
+      processAction: 'transaction.authorized', processOutcome: 'approved',
+      performedByPartyReference: 'p1', performedByRole: 'system',
+      eventSummary: { amount: 10 }, bianServiceDomain: 'Card Transaction', bianControlRecordType: 'CardTransactionLog',
     });
-    expect(h.collection).toHaveBeenCalledWith('complianceProcessEvent');
+    await flush();
+    const row = h.insertOne.mock.calls[0][0] as Record<string, unknown>;
+    expect(row.processAction).toBe('transaction.authorized');
+    expect(row.processOutcome).toBe('approved');
+    expect(row.entityId).toBe('txn-007');
+    expect(row.entityType).toBe('transaction');
+    expect(row.bianServiceDomain).toBe('Card Transaction');
+    expect((row.eventSummary as Record<string, unknown>).amount).toBe(10);
+    // projection metadata must NOT leak into the ledger eventSummary
+    expect(row.eventSummary).not.toHaveProperty('ledgerKind');
+    expect(row.eventSummary).not.toHaveProperty('processType');
   });
 });
 
-// ── CHD sanitization ─────────────────────────────────────────────────────────
-
+// ── CHD sanitization (stripped by the bus on publish) ──────────────────────────
 describe('CHD blocklist sanitization', () => {
-  it('removes pan from eventSummary', () => {
-    emitProcessEvent(makeDb(), {
-      entityType: 'transaction',
-      entityId: 'txn-002',
-      processType: 'payment_processing',
-      processAction: 'transaction.authorized',
-      processOutcome: 'approved',
-      performedByPartyReference: null,
-      performedByRole: null,
-      eventSummary: { amount: 500, pan: '4111111111111111', currency: 'USD' },
-      bianServiceDomain: 'Card Transaction',
-      bianControlRecordType: 'CardTransactionLog',
+  it('strips pan/cvv/cardNumber/expiryDate/trackData from the projected eventSummary', async () => {
+    emitProcessEvent(mockDb, {
+      entityType: 'transaction', entityId: 'txn-002', processType: 'payment_processing',
+      processAction: 'transaction.authorized', processOutcome: 'approved',
+      performedByPartyReference: null, performedByRole: null,
+      eventSummary: { amount: 500, pan: '4111111111111111', cvv: '123', cvv2: '456', cardNumber: '4111111111111111', expiryDate: '12/26', trackData: 'x', merchant: 'Safe Store' },
+      bianServiceDomain: 'Card Transaction', bianControlRecordType: 'CardTransactionLog',
     });
-    const doc = h.insertOne.mock.calls[0]?.[0] as Record<string, unknown>;
-    const summary = doc.eventSummary as Record<string, unknown>;
-    expect(summary).not.toHaveProperty('pan');
+    await flush();
+    const summary = (h.insertOne.mock.calls[0][0] as Record<string, unknown>).eventSummary as Record<string, unknown>;
+    for (const k of ['pan', 'cvv', 'cvv2', 'cardNumber', 'expiryDate', 'trackData']) expect(summary).not.toHaveProperty(k);
     expect(summary).toHaveProperty('amount', 500);
-    expect(summary).toHaveProperty('currency', 'USD');
-  });
-
-  it('removes cvv, cvv2, cardNumber, expiryDate from eventSummary', () => {
-    emitProcessEvent(makeDb(), {
-      entityType: 'transaction',
-      entityId: 'txn-003',
-      processType: 'payment_processing',
-      processAction: 'transaction.authorized',
-      processOutcome: 'approved',
-      performedByPartyReference: null,
-      performedByRole: null,
-      eventSummary: {
-        amount: 200,
-        cvv: '123',
-        cvv2: '456',
-        cardNumber: '4111111111111111',
-        expiryDate: '12/26',
-        trackData: 'sensitive',
-        merchant: 'Safe Store',
-      },
-      bianServiceDomain: 'Card Transaction',
-      bianControlRecordType: 'CardTransactionLog',
-    });
-    const doc = h.insertOne.mock.calls[0]?.[0] as Record<string, unknown>;
-    const summary = doc.eventSummary as Record<string, unknown>;
-    expect(summary).not.toHaveProperty('cvv');
-    expect(summary).not.toHaveProperty('cvv2');
-    expect(summary).not.toHaveProperty('cardNumber');
-    expect(summary).not.toHaveProperty('expiryDate');
-    expect(summary).not.toHaveProperty('trackData');
     expect(summary).toHaveProperty('merchant', 'Safe Store');
   });
 });
 
-// ── fire-and-forget robustness ────────────────────────────────────────────────
-
+// ── fire-and-forget robustness ─────────────────────────────────────────────────
 describe('fire-and-forget robustness', () => {
-  it('does not throw when db has no collection method (test mock)', () => {
-    expect(() => {
-      emitProcessEvent({} as never, {
-        entityType: 'transaction',
-        entityId: 'txn-004',
-        processType: 'payment_processing',
-        processAction: 'transaction.authorized',
-        processOutcome: 'approved',
-        performedByPartyReference: null,
-        performedByRole: null,
-        eventSummary: {},
-        bianServiceDomain: 'Card Transaction',
-        bianControlRecordType: 'CardTransactionLog',
-      });
-    }).not.toThrow();
+  it('emit* never throws even if the bus throws on publish', () => {
+    setEventBus({ publish: () => { throw new Error('bus down'); }, subscribe: () => ({ unsubscribe() {} }), start: async () => {}, stop: async () => {} } as never);
+    expect(() => emitProcessEvent(mockDb, {
+      entityType: 'transaction', entityId: 'txn-004', processType: 'payment_processing',
+      processAction: 'transaction.authorized', processOutcome: 'approved',
+      performedByPartyReference: null, performedByRole: null,
+      eventSummary: {}, bianServiceDomain: '', bianControlRecordType: '',
+    })).not.toThrow();
   });
 
-  it('does not throw when insertOne rejects', () => {
+  it('the projection swallows a failing ledger insert (no unhandled rejection)', async () => {
     h.insertOne.mockRejectedValueOnce(new Error('DB write error'));
-    expect(() => {
-      emitProcessEvent(makeDb(), {
-        entityType: 'transaction',
-        entityId: 'txn-005',
-        processType: 'payment_processing',
-        processAction: 'transaction.authorized',
-        processOutcome: 'approved',
-        performedByPartyReference: null,
-        performedByRole: null,
-        eventSummary: {},
-        bianServiceDomain: 'Card Transaction',
-        bianControlRecordType: 'CardTransactionLog',
-      });
-    }).not.toThrow();
-  });
-
-  it('insertOne is called exactly once per emit', () => {
-    emitProcessEvent(makeDb(), {
-      entityType: 'transaction',
-      entityId: 'txn-006',
-      processType: 'payment_processing',
-      processAction: 'transaction.authorized',
-      processOutcome: 'approved',
-      performedByPartyReference: null,
-      performedByRole: null,
-      eventSummary: { amount: 10 },
-      bianServiceDomain: 'Card Transaction',
-      bianControlRecordType: 'CardTransactionLog',
+    emitProcessEvent(mockDb, {
+      entityType: 'transaction', entityId: 'txn-005', processType: 'payment_processing',
+      processAction: 'transaction.authorized', processOutcome: 'approved',
+      performedByPartyReference: null, performedByRole: null,
+      eventSummary: {}, bianServiceDomain: '', bianControlRecordType: '',
     });
+    await flush();
     expect(h.insertOne).toHaveBeenCalledTimes(1);
   });
 });

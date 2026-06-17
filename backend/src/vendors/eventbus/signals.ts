@@ -13,9 +13,13 @@ export interface CaseStreamEvent {
   at: string;
 }
 
+// The case stream rides the canonical persisted fraud.* events (§5.2 / §9.1): the SSE `kind` maps to
+// the standard eventType — `fraud.question.created|answered`, `fraud.case.updated`.
+const CASE_STREAM_EVENT_TYPES = ['fraud.question.created', 'fraud.question.answered', 'fraud.case.updated'];
+
 export function publishCaseEvent(event: CaseStreamEvent): void {
   void bus()?.publish(makeEvent({
-    eventType: `case.${event.kind}`,
+    eventType: `fraud.${event.kind}`,
     correlationId: event.caseId,
     businessProcess: 'fraud_investigation',
     source: 'signal.case',
@@ -27,9 +31,9 @@ export function publishCaseEvent(event: CaseStreamEvent): void {
 export function subscribeCaseEvents(caseId: string, listener: (event: CaseStreamEvent) => void): () => void {
   const b = bus();
   if (!b) return () => {};
-  const sub = b.subscribe('case.*', (e) => {
+  const sub = b.subscribe(CASE_STREAM_EVENT_TYPES, (e) => {
     const p = e.payload as { questionId?: string; transactionId?: string };
-    listener({ caseId, kind: e.eventType.slice('case.'.length) as CaseStreamEvent['kind'], questionId: p.questionId, transactionId: p.transactionId, at: e.occurredAt });
+    listener({ caseId, kind: e.eventType.slice('fraud.'.length) as CaseStreamEvent['kind'], questionId: p.questionId, transactionId: p.transactionId, at: e.occurredAt });
   }, { correlationId: caseId });
   return () => sub.unsubscribe();
 }

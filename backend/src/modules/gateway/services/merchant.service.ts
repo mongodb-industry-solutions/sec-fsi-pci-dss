@@ -206,7 +206,7 @@ export async function createMerchant(db: Db, input: CreateMerchantInput) {
 
   await db.collection(MERCHANT_AGREEMENT_COLLECTION).insertOne(merchant as object);
 
-  await appendMerchantEvent(db, id, 'merchant.submitted', {
+  await appendMerchantEvent(db, id, 'merchant.validation.requested', {
     performedByPartyReference: input.merchantOwnerPartyReference,
     performedByRole: 'customer',
     details: { merchantAgreementStatus: 'under_review', kyb: 'initiated' },
@@ -216,7 +216,7 @@ export async function createMerchant(db: Db, input: CreateMerchantInput) {
     entityType: 'merchant',
     entityId: id,
     processType: 'merchant_onboarding',
-    processAction: 'merchant.submitted',
+    processAction: 'merchant.validation.requested',
     processOutcome: 'pending',
     performedByPartyReference: input.merchantOwnerPartyReference ?? null,
     performedByRole: 'customer',

@@ -9,24 +9,27 @@ import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.mo
 // (it never blocks the payment), and the investigation case is ENRICHED from the correlated subsystem
 // signals (issuer + FDS + sanctions + AML) so an investigator sees the full picture in one place.
 
+// §7.2 FraudCaseEnriched.subsystemSignals: one collapsed verdict per subsystem (hrp = sanctions gate).
 export interface SubsystemSignals {
   issuer: { approved: boolean; responseCode: string | null } | null;
   fds: { approved: boolean; reason: string | null } | null;
-  sanctions: { approved: boolean; reason: string | null } | null;
+  hrp: { approved: boolean; reason: string | null } | null;
   aml: { alert: boolean; severity: string | null } | null;
 }
 
-// Pure: collapse a journey's event trail into the latest verdict per subsystem.
+// Pure: collapse a journey's event trail into the latest verdict per subsystem. A gate verdict travels
+// as `outcome` ('approved'|'declined') with the legacy `approved` boolean accepted as a fallback.
 export function extractSubsystemSignals(events: DomainEvent[]): SubsystemSignals {
   const latest = (type: string) => [...events].reverse().find((e) => e.eventType === type)?.payload as Record<string, unknown> | undefined;
-  const issuer = latest('cardissuer.validation.completed');
-  const fds = latest('fraud.scoring.completed');
-  const sanctions = latest('sanctions.screening.completed');
+  const ok = (p: Record<string, unknown>) => (p.outcome ? p.outcome !== 'declined' : p.approved !== false);
+  const issuer = latest('card.issuer.validation.completed');
+  const fds = latest('fds.scoring.completed');
+  const hrp = latest('hrp.screening.completed');
   const aml = latest('aml.monitoring.completed');
   return {
-    issuer: issuer ? { approved: issuer.approved !== false, responseCode: (issuer.responseCode as string) ?? null } : null,
-    fds: fds ? { approved: fds.approved !== false, reason: (fds.reason as string) ?? null } : null,
-    sanctions: sanctions ? { approved: sanctions.approved !== false, reason: (sanctions.reason as string) ?? null } : null,
+    issuer: issuer ? { approved: ok(issuer), responseCode: (issuer.responseCode as string) ?? null } : null,
+    fds: fds ? { approved: ok(fds), reason: (fds.reason as string) ?? null } : null,
+    hrp: hrp ? { approved: ok(hrp), reason: (hrp.reason as string) ?? null } : null,
     aml: aml ? { alert: !!aml.alert, severity: (aml.severity as string) ?? null } : null,
   };
 }
@@ -38,21 +41,28 @@ export class PostAuthorizationProcess {
   }
 
   register(): void {
-    this.bus.subscribe('payment.authorized', (e) => this.onAuthorized(e));
+    this.bus.subscribe('card.payment.authorization.completed', (e) => this.onAuthorized(e));
     this.bus.subscribe('aml.monitoring.completed', (e) => this.onAmlCompleted(e));
   }
 
   private async onAuthorized(e: DomainEvent): Promise<void> {
+    const p = e.payload as { outcome?: 'authorized' | 'declined'; fraudCaseCreated?: boolean; fraudDiagnosisInstanceReference?: string };
+    if (p.outcome === 'declined') return; // post-auth only runs for an authorized payment (§5.2)
     const txnId = e.correlationId;
-    const p = e.payload as { fraudCaseCreated?: boolean; fraudDiagnosisInstanceReference?: string };
-    await this.runAmlMonitoring(txnId);
+    await this.runAmlMonitoring(txnId, e.eventId);
     if (p.fraudCaseCreated && p.fraudDiagnosisInstanceReference) {
       await this.enrichCase(txnId, p.fraudDiagnosisInstanceReference);
     }
   }
 
   // AML transaction monitoring, post-auth. May raise an alert; never blocks the (already done) payment.
-  private async runAmlMonitoring(txnId: string): Promise<void> {
+  // Emits the reference-led aml.monitoring.requested (§7.2) then aml.monitoring.completed (causation).
+  private async runAmlMonitoring(txnId: string, causationParent?: string): Promise<void> {
+    const requested = makeEvent({
+      eventType: 'aml.monitoring.requested', correlationId: txnId, businessProcess: 'fraud_investigation', source: 'psp.core', causationId: causationParent,
+      payload: {}, bian: { serviceDomain: 'SD-99 AML', controlRecord: 'SuspiciousActivityAnalysisAssessment' },
+    });
+    void this.bus.publish(requested);
     let alert = false;
     let severity: string | undefined;
     try {
@@ -69,8 +79,8 @@ export class PostAuthorizationProcess {
     } catch { /* AML failure never affects the authorized payment */ }
 
     void this.bus.publish(makeEvent({
-      eventType: 'aml.monitoring.completed', correlationId: txnId, businessProcess: 'fraud_investigation', source: 'callback.aml',
-      payload: { transactionId: txnId, alert, severity }, bian: { serviceDomain: 'SD-99 AML', controlRecord: 'SuspiciousActivityAnalysisAssessment' },
+      eventType: 'aml.monitoring.completed', correlationId: txnId, businessProcess: 'fraud_investigation', source: 'callback.aml', causationId: requested.eventId,
+      payload: { transactionId: txnId, outcome: alert ? 'alert' : 'clear', alert, severity }, bian: { serviceDomain: 'SD-99 AML', controlRecord: 'SuspiciousActivityAnalysisAssessment' },
     }));
   }
 
@@ -83,7 +93,7 @@ export class PostAuthorizationProcess {
     );
     emitProcessEvent(this.db, {
       entityType: 'fraud_case', entityId: caseRef, processType: 'fraud_evaluation',
-      processAction: 'fraud.investigation.case.enriched', processOutcome: 'pending',
+      processAction: 'fraud.case.enriched', processOutcome: 'pending',
       performedByPartyReference: null, performedByRole: null,
       eventSummary: { cardTransactionInstanceReference: txnId, signals },
       bianServiceDomain: 'SD-83 Fraud Diagnosis', bianControlRecordType: 'FraudDiagnosisCase',

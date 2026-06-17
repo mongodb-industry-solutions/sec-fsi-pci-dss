@@ -178,7 +178,7 @@ export const CATEGORY_CONTRACTS: Record<string, CategoryContract> = {
 
 export const CATEGORY_TRIGGER_EVENTS: Record<string, TriggerEvent[]> = {
   fraud_detection: [
-    { event: 'transaction.authorized',  description: 'Transaction authorized by the PSP' },
+    { event: 'card.payment.authorization.completed', description: 'Payment authorization completed by the PSP (outcome in payload)' },
     { event: 'transaction.flagged',     description: 'Transaction flagged by an internal rule engine' },
     { event: 'fraud.case.opened',       description: 'Fraud investigation case opened manually by analyst' },
   ],
@@ -199,7 +199,7 @@ export const CATEGORY_TRIGGER_EVENTS: Record<string, TriggerEvent[]> = {
   ],
   aml_monitoring: [
     { event: 'customer.onboarding.initiated', description: 'New customer onboarding process started' },
-    { event: 'transaction.authorized',        description: 'Transaction authorized and subject to AML check' },
+    { event: 'card.payment.authorization.completed', description: 'Payment authorized and subject to AML check' },
     { event: 'periodic.aml.rescan',           description: 'Periodic AML screening batch job triggered' },
     { event: 'sar.threshold.exceeded',        description: 'Aggregate transaction amount crossed SAR reporting threshold' },
   ],

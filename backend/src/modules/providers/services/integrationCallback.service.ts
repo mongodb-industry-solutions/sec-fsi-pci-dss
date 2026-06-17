@@ -5,6 +5,7 @@ import { logEvent } from './integrationDispatch.service';
 import { applyMappings } from './fieldMapping.service';
 import { createNotification } from '../../notifications/notifications.service';
 import { getEventBus, makeEvent } from '../../../vendors/eventbus';
+import { resolvePendingCorrelation, clearPendingCorrelation } from './pendingCorrelation.service';
 
 export function verifyHmacSignature(
   secret: string,
@@ -264,18 +265,23 @@ export async function processCardIssuerCallback(
   });
 
   // dev.v8 F3: a real ASYNC issuer posts its decision here. Funnel it into the same event the saga
-  // consumes (cardissuer.validation.completed), so external and internal issuers drive one flow.
+  // consumes (card.issuer.validation.completed), so external and internal issuers drive one flow.
   const txnId = mapped.cardTransactionInstanceReference ?? mapped.transactionId;
   if (txnId) {
     const approved = mapped.actionConfirmed ?? (mapped.responseCode === '00' || mapped.responseCode === '0000');
+    // §7.7: restore the full envelope (causationId + businessProcess) from the pending-correlation
+    // entry recorded at dispatch; fall back to defaults if the entry has lapsed/was swept.
+    const pending = resolvePendingCorrelation(txnId);
     void getEventBus().publish(makeEvent({
-      eventType: 'cardissuer.validation.completed',
+      eventType: 'card.issuer.validation.completed',
       correlationId: txnId,
       businessProcess: 'card_payment',
       source: 'callback.card-issuer',
-      payload: { transactionId: txnId, approved, responseCode: mapped.responseCode },
+      ...(pending?.causationId ? { causationId: pending.causationId } : {}),
+      payload: { transactionId: txnId, outcome: approved ? 'approved' : 'declined', approved, responseCode: mapped.responseCode },
       bian: { serviceDomain: 'SD-88 Payment Card', controlRecord: 'PaymentCardValidation' },
     }));
+    clearPendingCorrelation(txnId);
   }
 }
 

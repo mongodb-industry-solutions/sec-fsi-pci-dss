@@ -14,7 +14,7 @@ export type BusinessProcess =
 export interface DomainEvent<T = Record<string, unknown>> {
   /** uuid v4 — idempotency key (a consumer/store may dedupe on this). */
   eventId: string;
-  /** Dotted, module/domain-prefixed, e.g. 'payment.authorization.requested'. */
+  /** Dotted, module/domain-prefixed, e.g. 'card.payment.authorization.requested'. */
   eventType: string;
   /** ISO-8601 timestamp. */
   occurredAt: string;

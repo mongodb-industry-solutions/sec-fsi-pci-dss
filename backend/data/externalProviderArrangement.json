@@ -378,7 +378,7 @@
     "externalProviderInternalHandler": "cardIssuer.cvv.validation",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
-      "checkout.cvv.validation",
+      "card.issuer.validation.requested",
       "payment.pin.verification",
       "card.activation.cvv"
     ],

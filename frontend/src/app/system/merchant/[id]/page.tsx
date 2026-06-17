@@ -29,7 +29,7 @@ const SALE_STATUS = (s: string) =>
   s === 'authorized' || s === 'settled' ? 'bg-green-500' : s === 'disputed' ? 'bg-red-500' : s === 'declined' ? 'bg-gray-400' : 'bg-amber-500';
 
 const EVENT_LABEL: Record<string, string> = {
-  'merchant.submitted': 'Application submitted',
+  'merchant.validation.requested': 'Application submitted',
   'merchant.approved': 'Approved · KYB verified',
   'merchant.rejected': 'Application rejected',
   'merchant.updated': 'Configuration updated',

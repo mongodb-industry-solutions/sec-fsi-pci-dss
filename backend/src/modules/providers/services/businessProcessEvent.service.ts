@@ -15,9 +15,9 @@ import {
 
 // CHD scrubbing is owned by the eventbus vendor (single source of truth, PCI DSS Req 3.2 / ADR-014).
 // Re-exported here so existing importers keep working unchanged.
-import { sanitizeSummary, sanitizeDeep } from '../../../vendors/eventbus/sanitize';
+import { sanitizeDeep } from '../../../vendors/eventbus/sanitize';
 export { sanitizeDeep };
-import { getEventBus, makeEvent, type BusinessProcess } from '../../../vendors/eventbus';
+import { getEventBus, makeEvent, type BusinessProcess, type EventBus, type DomainEvent } from '../../../vendors/eventbus';
 
 // Maps the per-event processType to the EDA business-process class used to group a journey (dev.v8).
 export const PROCESS_TO_BUSINESS: Record<string, BusinessProcess> = {
@@ -44,16 +44,64 @@ export function mirrorEventToBus(input: {
   try { void getEventBus().publish(makeEvent(input)); } catch { /* bus not initialized */ }
 }
 
-function mirrorToBus(opts: EmitProcessEventOpts | EmitComplianceEventOpts): void {
+// §9.2: publish-then-project. Publishes a ledger-bearing domain event; the LedgerProjection subscriber
+// writes the durable ledger row. `ledgerKind` selects business vs compliance; processType + processMeta
+// ride the payload so the projector can reconstruct the row. CHD is stripped by the bus on publish.
+function publishLedgerEvent(opts: EmitProcessEventOpts | EmitComplianceEventOpts, ledgerKind: 'business' | 'compliance'): void {
   mirrorEventToBus({
     eventType: opts.processAction,
     correlationId: opts.entityId,
     businessProcess: PROCESS_TO_BUSINESS[opts.processType] ?? 'system',
     source: 'psp.core',
-    payload: { ...opts.eventSummary, outcome: opts.processOutcome, entityType: opts.entityType },
+    payload: {
+      ...opts.eventSummary,
+      outcome: opts.processOutcome,
+      entityType: opts.entityType,
+      processType: opts.processType,
+      ledgerKind,
+      ...(opts.processMeta ? { processMeta: opts.processMeta } : {}),
+    },
     actor: { partyRef: opts.performedByPartyReference, role: opts.performedByRole },
     bian: { serviceDomain: opts.bianServiceDomain, controlRecord: opts.bianControlRecordType },
   });
+}
+
+// Payload keys that carry projection metadata (not part of the ledger eventSummary).
+const LEDGER_META_KEYS = new Set(['outcome', 'entityType', 'processType', 'ledgerKind', 'processMeta']);
+
+// §5.0 / §9.2: the durable audit ledger is a PROJECTION written by this single bus subscriber from the
+// published domain events — it never originates events. Business logic only publishes (via emit*).
+export class LedgerProjection {
+  constructor(private readonly db: Db, private readonly bus: EventBus) {}
+
+  register(): void {
+    this.bus.subscribe('*', (e) => this.project(e));
+  }
+
+  private async project(e: DomainEvent): Promise<void> {
+    const p = (e.payload ?? {}) as Record<string, unknown>;
+    const kind = p.ledgerKind;
+    if (kind !== 'business' && kind !== 'compliance') return; // only emit*-originated ledger events
+    const collection = kind === 'business' ? BUSINESS_PROCESS_EVENTS_COLLECTION : COMPLIANCE_PROCESS_EVENTS_COLLECTION;
+    const eventSummary: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(p)) if (!LEDGER_META_KEYS.has(k)) eventSummary[k] = v;
+    const row: BusinessProcessEvent = {
+      eventDateTime: new Date(e.occurredAt),
+      processType: p.processType as BusinessProcessType,
+      businessProcessEventInstanceReference: uuidv4(),
+      entityType: p.entityType as BusinessEntityType,
+      entityId: e.correlationId,
+      processAction: e.eventType,
+      processOutcome: p.outcome as ProcessEventOutcome,
+      performedByPartyReference: e.actor?.partyRef ?? null,
+      performedByRole: e.actor?.role ?? null,
+      eventSummary,
+      bianServiceDomain: e.bian?.serviceDomain ?? '',
+      bianControlRecordType: e.bian?.controlRecord ?? '',
+      processMeta: p.processMeta as ProcessEventMeta | undefined,
+    };
+    try { await this.db.collection<BusinessProcessEvent>(collection).insertOne(row); } catch { /* fire-and-forget */ }
+  }
 }
 
 interface EmitProcessEventOpts {
@@ -84,49 +132,16 @@ interface EmitComplianceEventOpts {
   processMeta?: ProcessEventMeta;
 }
 
-// Fire-and-forget — never blocks request path (PCI DSS Req 10.2.1)
-export function emitProcessEvent(db: Db, opts: EmitProcessEventOpts): void {
-  const event: BusinessProcessEvent = {
-    eventDateTime: new Date(),
-    processType: opts.processType,
-    businessProcessEventInstanceReference: uuidv4(),
-    entityType: opts.entityType,
-    entityId: opts.entityId,
-    processAction: opts.processAction,
-    processOutcome: opts.processOutcome,
-    performedByPartyReference: opts.performedByPartyReference,
-    performedByRole: opts.performedByRole,
-    eventSummary: sanitizeSummary(opts.eventSummary),
-    bianServiceDomain: opts.bianServiceDomain,
-    bianControlRecordType: opts.bianControlRecordType,
-    processMeta: opts.processMeta,
-  };
-  try {
-    void db.collection<BusinessProcessEvent>(BUSINESS_PROCESS_EVENTS_COLLECTION).insertOne(event).catch(() => {});
-  } catch { /* fire-and-forget: swallow synchronous errors (e.g. test mocks) */ }
-  mirrorToBus(opts);
+// §9.2 flip — publish-then-project. Business logic publishes the domain event; the LedgerProjection
+// bus subscriber writes the businessProcessEvent/complianceProcessEvent ledger. No direct write here
+// (the legacy write-then-mirror double-write is gone). Fire-and-forget; never blocks (PCI Req 10.2.1).
+// `_db` is retained for call-site compatibility but unused — the projection owns the DB write.
+export function emitProcessEvent(_db: Db, opts: EmitProcessEventOpts): void {
+  publishLedgerEvent(opts, 'business');
 }
 
-export function emitComplianceEvent(db: Db, opts: EmitComplianceEventOpts): void {
-  const event: BusinessProcessEvent = {
-    eventDateTime: new Date(),
-    processType: opts.processType,
-    businessProcessEventInstanceReference: uuidv4(),
-    entityType: opts.entityType,
-    entityId: opts.entityId,
-    processAction: opts.processAction,
-    processOutcome: opts.processOutcome,
-    performedByPartyReference: opts.performedByPartyReference,
-    performedByRole: opts.performedByRole,
-    eventSummary: sanitizeSummary(opts.eventSummary),
-    bianServiceDomain: opts.bianServiceDomain,
-    bianControlRecordType: opts.bianControlRecordType,
-    processMeta: opts.processMeta,
-  };
-  try {
-    void db.collection<BusinessProcessEvent>(COMPLIANCE_PROCESS_EVENTS_COLLECTION).insertOne(event).catch(() => {});
-  } catch { /* fire-and-forget: swallow synchronous errors (e.g. test mocks) */ }
-  mirrorToBus(opts);
+export function emitComplianceEvent(_db: Db, opts: EmitComplianceEventOpts): void {
+  publishLedgerEvent(opts, 'compliance');
 }
 
 export async function listProcessEvents(

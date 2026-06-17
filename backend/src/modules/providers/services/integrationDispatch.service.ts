@@ -16,7 +16,7 @@ import {
 } from './integrationRegistry.service';
 import { applyMappings } from './fieldMapping.service';
 import { resolveProviderFromGroup } from './integrationRoutingGroup.service';
-import { sanitizeDeep, mirrorEventToBus, PROCESS_TO_BUSINESS } from './businessProcessEvent.service';
+import { sanitizeDeep } from './businessProcessEvent.service';
 
 export interface DispatchResult {
   provider: 'internal' | 'external';
@@ -271,16 +271,9 @@ export async function logEvent(
 
   void db.collection<IntegrationEvent>(EXTERNAL_PROVIDER_ARRANGEMENT_ACTION_LOG_COLLECTION).insertOne(event).catch(() => {});
 
-  // dev.v8 F2: mirror onto the correlated event store so the integration call is part of the journey
-  // (correlationId = the transaction/case it served). Payload is sanitized again on publish.
-  mirrorEventToBus({
-    eventType: opts.triggeredBy,
-    correlationId: opts.businessContext?.entityId ?? opts.arrangementId,
-    businessProcess: PROCESS_TO_BUSINESS[opts.businessContext?.processType ?? ''] ?? 'provider_integration',
-    source: 'integration.dispatch',
-    payload: { ...(opts.payload ?? {}), status: opts.status, responseCode: opts.responseCode, latencyMs: opts.latencyMs, error: opts.error, providerArrangementId: opts.arrangementId },
-    bian: { serviceDomain: 'External Provider Arrangements', controlRecord: 'ExternalProviderArrangementActionLog' },
-  });
+  // §5.0: the action log is the HTTP wire I/O record only — it NEVER originates or relays domain
+  // events. (Removed the legacy mirror-to-bus: per-gate *.requested/*.completed are published by the
+  // provider groups directly, §9.2/P5, so the journey trail is fed from the bus, not from this log.)
 }
 
 export async function testIntegration(

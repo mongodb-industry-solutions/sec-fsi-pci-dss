@@ -9,9 +9,23 @@ import { DomainEvent, BusinessProcess } from './types';
 
 let instance: EventBus | null = null;
 
+// §3.1: the bus engine is chosen by configuration (Strategy pattern) — switching engines needs no
+// publisher/consumer code change, only this selection + the adapter. `in-process` is implemented;
+// broker engines (kafka/rabbitmq) implement the SAME EventBus port and plug in here when wired.
+export type EventBusEngine = 'in-process' | 'kafka' | 'rabbitmq';
+
+export function resolveEventBusEngine(): EventBusEngine {
+  return (process.env.EVENT_BUS_ENGINE ?? 'in-process') as EventBusEngine;
+}
+
 export function initEventBus(db: Db, store?: EventStore): EventBus {
-  instance = new EventBusInProcess(store ?? new MongoEventStore(db));
-  return instance;
+  const engine = resolveEventBusEngine();
+  if (engine === 'in-process') {
+    instance = new EventBusInProcess(store ?? new MongoEventStore(db));
+    return instance;
+  }
+  // Broker adapters (KafkaEventBus / RabbitEventBus) implement the same port; not wired in the demo.
+  throw new Error(`EVENT_BUS_ENGINE='${engine}' is not wired yet; set EVENT_BUS_ENGINE=in-process`);
 }
 
 export function getEventBus(): EventBus {

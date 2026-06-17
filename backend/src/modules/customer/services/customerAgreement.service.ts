@@ -239,7 +239,7 @@ export async function updateSelfProfile(
       entityType: 'customer',
       entityId: party.partyInstanceReference,
       processType: 'kyc_verification',
-      processAction: 'kyc.profile.updated',
+      processAction: 'profile.validation.completed',
       processOutcome: 'approved',
       performedByPartyReference: party.partyInstanceReference,
       performedByRole: 'customer',

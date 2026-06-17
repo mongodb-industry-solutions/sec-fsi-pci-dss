@@ -1,0 +1,211 @@
+// Internal Card Issuer engine (built-in CVV/PIN + card-format validation; used when no external
+// issuer vendor). It behaves as a configurable simulator: the validation rules (a fixed valid CVV,
+// per-network number-format checks, and the set of supported card networks) are data-driven and
+// stored in the capability module config, so new networks/rules can be added without code changes.
+//
+// PCI DSS Req 3.2: NO sensitive authentication data is stored. The CVV is only compared in memory
+// against the configured value; neither the PAN nor the CVV is ever returned or logged.
+import { CardIssuerInboundPayload } from '../../../modules/providers/models/externalProviderArrangement.model';
+
+// ── Configurable rules ────────────────────────────────────────────────────────
+
+export interface CardNetworkRule {
+  /** Display name, e.g. "VISA". */
+  name: string;
+  /** Accepted IIN/BIN prefixes. Each entry is an exact start ("4", "34") or an inclusive numeric
+   *  range over the leading digits ("51-55", "2221-2720"). */
+  prefixes: string[];
+  /** Accepted total card-number lengths (digits). */
+  lengths: number[];
+  /** Expected CVV length for this network (Visa/MC = 3, Amex = 4). */
+  cvvLength: number;
+  /** Disabled networks are treated as unsupported (declined) without removing the rule. */
+  enabled: boolean;
+}
+
+export interface CardIssuerSimulatorConfig {
+  /** The single CVV the simulator accepts. A fixed demo value, never a real card secret. */
+  validCvv: string;
+  /** When true, full card numbers must pass the Luhn checksum. */
+  enforceLuhn: boolean;
+  /** Supported card networks. Extend this list to add a new network. */
+  networks: CardNetworkRule[];
+}
+
+// Built-in defaults. The admin can override any of these via the module config; missing keys fall
+// back here, so the simulator always has a working rule set.
+export const DEFAULT_CARD_ISSUER_CONFIG: CardIssuerSimulatorConfig = {
+  validCvv: '123',
+  enforceLuhn: true,
+  networks: [
+    { name: 'VISA',       prefixes: ['4'],                     lengths: [13, 16, 19], cvvLength: 3, enabled: true },
+    { name: 'MASTERCARD', prefixes: ['51-55', '2221-2720'],    lengths: [16],         cvvLength: 3, enabled: true },
+    { name: 'AMEX',       prefixes: ['34', '37'],              lengths: [15],         cvvLength: 4, enabled: true },
+    { name: 'DISCOVER',   prefixes: ['6011', '644-649', '65'], lengths: [16, 19],     cvvLength: 3, enabled: true },
+  ],
+};
+
+// Merge stored overrides over the defaults. `networks`, when provided, replaces the default list
+// wholesale (so an operator can curate the exact supported set).
+export function resolveCardIssuerConfig(moduleConfig: Record<string, unknown> | undefined | null): CardIssuerSimulatorConfig {
+  const c = (moduleConfig ?? {}) as Partial<CardIssuerSimulatorConfig>;
+  return {
+    validCvv: typeof c.validCvv === 'string' && c.validCvv.length ? c.validCvv : DEFAULT_CARD_ISSUER_CONFIG.validCvv,
+    enforceLuhn: typeof c.enforceLuhn === 'boolean' ? c.enforceLuhn : DEFAULT_CARD_ISSUER_CONFIG.enforceLuhn,
+    networks: Array.isArray(c.networks) && c.networks.length ? c.networks : DEFAULT_CARD_ISSUER_CONFIG.networks,
+  };
+}
+
+// ── Validation primitives ───────────────────────────────────────────────────
+
+function digitsOnly(v: unknown): string {
+  return typeof v === 'string' || typeof v === 'number' ? String(v).replace(/\D/g, '') : '';
+}
+
+function luhnValid(num: string): boolean {
+  if (!num) return false;
+  let sum = 0;
+  let alt = false;
+  for (let i = num.length - 1; i >= 0; i--) {
+    let d = num.charCodeAt(i) - 48;
+    if (d < 0 || d > 9) return false;
+    if (alt) { d *= 2; if (d > 9) d -= 9; }
+    sum += d;
+    alt = !alt;
+  }
+  return sum % 10 === 0;
+}
+
+// Does the card number start with this prefix rule? Rule is an exact start ("4") or an inclusive
+// numeric range over the leading digits ("51-55", "2221-2720").
+function prefixMatches(num: string, rule: string): boolean {
+  const range = rule.split('-');
+  if (range.length === 2) {
+    const [lo, hi] = range;
+    const width = lo.length;
+    const head = num.slice(0, width);
+    if (head.length < width) return false;
+    const n = Number(head);
+    return n >= Number(lo) && n <= Number(hi);
+  }
+  return num.startsWith(rule);
+}
+
+function detectNetwork(num: string, networks: CardNetworkRule[]): CardNetworkRule | undefined {
+  return networks.find((nw) => nw.prefixes.some((p) => prefixMatches(num, p)));
+}
+
+function networkByName(name: string, networks: CardNetworkRule[]): CardNetworkRule | undefined {
+  const n = name.trim().toUpperCase();
+  return networks.find((nw) => nw.name.toUpperCase() === n);
+}
+
+// True when the expiry (MM/YY or MM/YYYY) is in the past (the card is expired at end of that month).
+// Returns false for unparseable input so malformed values are not treated as expired.
+function isExpired(expiry: string): boolean {
+  const m = expiry.trim().match(/^(\d{1,2})\s*\/\s*(\d{2}|\d{4})$/);
+  if (!m) return false;
+  const month = parseInt(m[1], 10);
+  if (month < 1 || month > 12) return false;
+  const year = m[2].length === 2 ? 2000 + parseInt(m[2], 10) : parseInt(m[2], 10);
+  const now = new Date();
+  // Card is valid through the LAST day of the expiry month; expired once the next month starts.
+  const firstOfNextMonth = new Date(year, month, 1);
+  return firstOfNextMonth <= now;
+}
+
+// ── Validation result ──────────────────────────────────────────────────────
+
+export interface CardValidationResult {
+  approved: boolean;
+  /** ISO-8583-style response code: 00 approved, 14 invalid number, 82 invalid CVV, 12 unsupported. */
+  responseCode: string;
+  network: string | null;
+  cvvValidationResult: 'match' | 'no_match' | 'not_provided';
+  decisionReason: string;
+  /** Last 4 digits only, for safe display/logging. Never the full PAN. */
+  last4: string | null;
+}
+
+// Reads the (possibly tokenized) request and applies the configured rules. When a full card number
+// is present (direct simulator test) it runs network detection, Luhn and length checks; when only a
+// masked PAN + network are present (the tokenized payment path) it validates the network is
+// supported and the CVV when supplied. The PAN/CVV are used only transiently and never persisted.
+export function validateCard(input: Record<string, unknown>, config: CardIssuerSimulatorConfig): CardValidationResult {
+  const fullPan = digitsOnly(input.cardNumber ?? input.pan ?? input.primaryAccountNumber ?? input.fullCardNumber);
+  const maskedPan = typeof input.maskedPan === 'string' ? input.maskedPan
+    : typeof input.cardTransactionMaskedPanDisplay === 'string' ? input.cardTransactionMaskedPanDisplay : '';
+  const cvvRaw = input.cvv ?? input.cvv2 ?? input.cvc ?? input.cvc2;
+  const cvv = cvvRaw === undefined || cvvRaw === null ? '' : String(cvvRaw);
+  const networkHint = typeof input.network === 'string' ? input.network
+    : typeof input.cardNetwork === 'string' ? input.cardNetwork : '';
+  const expiryRaw = input.expiry ?? input.cardExpiry ?? input.expiryDate;
+  const expiry = typeof expiryRaw === 'string' ? expiryRaw : '';
+
+  const last4 = (fullPan || maskedPan).replace(/\D/g, '').slice(-4) || null;
+
+  // The network is only ASSESSABLE when we have a full PAN (we can read the BIN) or an explicit
+  // network hint. In a tokenized payment that carries neither, the network was already validated at
+  // card-entry time, so we must NOT re-decline it here, that would wrongly reject legitimate cards.
+  const assessable = !!fullPan || !!networkHint;
+  const rule = fullPan ? detectNetwork(fullPan, config.networks) : (networkHint ? networkByName(networkHint, config.networks) : undefined);
+  const network = rule?.name ?? (networkHint || null);
+
+  if (assessable && (!rule || !rule.enabled)) {
+    return { approved: false, responseCode: '12', network, cvvValidationResult: 'not_provided', decisionReason: 'unsupported_or_disabled_network', last4 };
+  }
+
+  // Expiry check (when supplied): an expired card is declined (ISO-8583 response code 54). A
+  // malformed value is ignored rather than declined, to stay lenient on input formatting.
+  if (expiry && isExpired(expiry)) {
+    return { approved: false, responseCode: '54', network, cvvValidationResult: 'not_provided', decisionReason: 'expired_card', last4 };
+  }
+
+  // Full-PAN checks (only possible when the PAN is present; the tokenized path has a masked PAN only).
+  if (fullPan) {
+    if (config.enforceLuhn && !luhnValid(fullPan)) {
+      return { approved: false, responseCode: '14', network, cvvValidationResult: 'not_provided', decisionReason: 'failed_luhn_check', last4 };
+    }
+    if (rule && !rule.lengths.includes(fullPan.length)) {
+      return { approved: false, responseCode: '14', network, cvvValidationResult: 'not_provided', decisionReason: 'invalid_length_for_network', last4 };
+    }
+  }
+
+  // CVV check (only when a CVV is supplied; the tokenized path does not send one). The length is only
+  // enforced when we know the network (and therefore its expected CVV length).
+  let cvvValidationResult: CardValidationResult['cvvValidationResult'] = 'not_provided';
+  if (cvv) {
+    const lengthOk = rule ? cvv.length === rule.cvvLength : true;
+    const ok = cvv === config.validCvv && lengthOk;
+    cvvValidationResult = ok ? 'match' : 'no_match';
+    if (!ok) {
+      return { approved: false, responseCode: '82', network, cvvValidationResult, decisionReason: 'invalid_cvv', last4 };
+    }
+  }
+
+  return { approved: true, responseCode: '00', network, cvvValidationResult, decisionReason: 'approved', last4 };
+}
+
+// Issuer inbound payload shape, enriched with the validation outcome (responseCode /
+// cvvValidationResult / network) used by the callback flow.
+export type CardIssuerValidationResponse = CardIssuerInboundPayload & {
+  responseCode: string;
+  cvvValidationResult: string;
+  network: string | null;
+  decisionReason: string;
+};
+
+export function validateCardIssuer(
+  input: Record<string, unknown>,
+  config: CardIssuerSimulatorConfig = DEFAULT_CARD_ISSUER_CONFIG,
+): CardIssuerValidationResponse {
+  const r = validateCard(input, config);
+  return {
+    cardStatus: 'active',
+    actionConfirmed: r.approved,
+    responseCode: r.responseCode,
+    cvvValidationResult: r.cvvValidationResult,
+    network: r.network,
+    decisionReason: r.decisionReason,
+  };
+}

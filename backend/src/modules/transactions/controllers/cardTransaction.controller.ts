@@ -243,9 +243,9 @@ the Merchant Name selector. No authentication required (public, simulator mode).
       }
     } catch { /* fall through to live subscription */ }
 
-    const sub = getEventBus().subscribe(['payment.authorized', 'payment.declined'], (e) => {
-      const p = e.payload as { fraudCaseCreated?: boolean; fraudDiagnosisInstanceReference?: string; decisionReason?: string; responseCode?: string };
-      emit(e.eventType === 'payment.authorized' ? 'authorized' : 'declined', {
+    const sub = getEventBus().subscribe('card.payment.authorization.completed', (e) => {
+      const p = e.payload as { outcome?: 'authorized' | 'declined'; fraudCaseCreated?: boolean; fraudDiagnosisInstanceReference?: string; decisionReason?: string; responseCode?: string };
+      emit(p.outcome === 'declined' ? 'declined' : 'authorized', {
         fraudCaseCreated: !!p.fraudCaseCreated, caseId: p.fraudDiagnosisInstanceReference ?? null,
         declineReason: p.decisionReason ?? null, declineCode: p.responseCode ?? null,
       });
