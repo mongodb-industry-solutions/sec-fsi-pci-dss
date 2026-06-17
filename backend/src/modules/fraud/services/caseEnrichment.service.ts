@@ -1,11 +1,11 @@
 import { Db } from 'mongodb';
 import type { UserRole } from '../../../shared/models/identity.model';
 import { getCaseById } from './fraudDiagnosis.service';
-import { getTransactionById } from '../../transactions/services/cardTransaction.service';
-import { CARD_TRANSACTION_COLLECTION } from '../../transactions/models/cardTransaction.model';
+import { getTransactionById } from '../../transaction/services/cardTransaction.service';
+import { CARD_TRANSACTION_COLLECTION } from '../../transaction/models/cardTransaction.model';
 import { getByInstanceReference } from '../../customer/services/customerAgreement.service';
 import { getMerchantById } from '../../gateway/services/merchant.service';
-import { listProcessEvents } from '../../providers/services/businessProcessEvent.service';
+import { listProcessEvents } from '../../provider/services/businessProcessEvent.service';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
 

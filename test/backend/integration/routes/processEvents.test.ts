@@ -1,6 +1,6 @@
 /**
  * Integration tests: /api/v1/events routes RBAC (ADR-025 / F7.3)
- * Source: backend/src/modules/providers/controllers/processEvent.controller.ts
+ * Source: backend/src/modules/provider/controllers/processEvent.controller.ts
  *
  * Requires TEST_MONGODB_URI env var — skips gracefully when not set.
  * Spins up a real Fastify app against a seeded test Atlas cluster.

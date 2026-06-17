@@ -10,11 +10,11 @@ vi.mock('../../../../backend/src/modules/fraud/services/fraudDiagnosis.service',
   getCaseById: vi.fn(),
   appendAuditEvent: vi.fn(async () => {}),
 }));
-vi.mock('../../../../backend/src/modules/providers/services/businessProcessEvent.service', () => ({
+vi.mock('../../../../backend/src/modules/provider/services/businessProcessEvent.service', () => ({
   emitProcessEvent: vi.fn(() => {}),
 }));
 // Notifications are delivered as a side effect; isolate them from the question-service unit tests.
-vi.mock('../../../../backend/src/modules/notifications/notifications.service', () => ({
+vi.mock('../../../../backend/src/modules/notification/notifications.service', () => ({
   createNotification: vi.fn(async () => {}),
   markReadByRelated: vi.fn(async () => {}),
 }));

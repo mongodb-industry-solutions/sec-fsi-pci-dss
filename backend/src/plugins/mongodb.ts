@@ -59,26 +59,26 @@ async function mongodbPlugin(fastify: FastifyInstance) {
     // dev.v8 P6 (§9.2): the audit ledger is a PROJECTION. Register the bus subscriber that writes
     // businessProcessEvent/complianceProcessEvent from published domain events BEFORE any publisher,
     // so no ledger event is missed.
-    const { LedgerProjection } = await import('../modules/providers/services/businessProcessEvent.service');
+    const { LedgerProjection } = await import('../modules/provider/services/businessProcessEvent.service');
     new LedgerProjection(db, getEventBus()).register();
 
     // dev.v8 F3/F4: register the event-driven payment-authorization saga (issuer + FDS + sanctions gate).
-    const { PaymentAuthorizationSaga } = await import('../modules/transactions/services/paymentAuthorization.saga');
+    const { PaymentAuthorizationSaga } = await import('../modules/transaction/services/paymentAuthorization.saga');
     new PaymentAuthorizationSaga(db, getEventBus()).register();
 
     // dev.v8 F5: post-authorization process (AML monitoring + investigation-case enrichment).
-    const { PostAuthorizationProcess } = await import('../modules/transactions/services/postAuthorization.process');
+    const { PostAuthorizationProcess } = await import('../modules/transaction/services/postAuthorization.process');
     new PostAuthorizationProcess(db, getEventBus()).register();
 
     // dev.v8 P5 (§7.7): periodic sweep of lapsed pending-correlation entries (abandoned async
     // callbacks). In-memory registry; the sweep keeps it bounded.
-    const { sweepExpiredCorrelations } = await import('../modules/providers/services/pendingCorrelation.service');
+    const { sweepExpiredCorrelations } = await import('../modules/provider/services/pendingCorrelation.service');
     const sweepTimer = setInterval(() => sweepExpiredCorrelations(), 5 * 60 * 1000);
     sweepTimer.unref();
 
     // dev.v8 P7 (§8): purge the encrypted `chd` carrier when a payment journey closes, plus a periodic
     // safety sweep for abandoned journeys so SAD/CVV is never retained after authorization (PCI Req 3.2).
-    const { ChdRetention, sweepAbandonedChd } = await import('../modules/transactions/services/chdRetention.service');
+    const { ChdRetention, sweepAbandonedChd } = await import('../modules/transaction/services/chdRetention.service');
     new ChdRetention(db, getEventBus()).register();
     const chdSweepTimer = setInterval(() => { void sweepAbandonedChd(db); }, 5 * 60 * 1000);
     chdSweepTimer.unref();

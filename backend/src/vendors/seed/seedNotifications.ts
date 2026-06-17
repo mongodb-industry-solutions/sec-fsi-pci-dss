@@ -1,5 +1,5 @@
 import { Db } from 'mongodb';
-import { createNotification } from '../../modules/notifications/notifications.service';
+import { createNotification } from '../../modules/notification/notifications.service';
 import { CUSTOMER_QUESTION_COLLECTION, CustomerQuestionRecord } from '../../modules/fraud/models/customerQuestion.model';
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../modules/fraud/models/fraudDiagnosis.model';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../modules/customer/models/customerAgreement.model';

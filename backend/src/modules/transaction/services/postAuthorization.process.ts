@@ -1,7 +1,7 @@
 import { Db } from 'mongodb';
 import { EventBus, DomainEvent, makeEvent, MongoEventStore } from '../../../vendors/eventbus';
-import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
-import { emitProcessEvent } from '../../providers/services/businessProcessEvent.service';
+import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
+import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
 import { CARD_TRANSACTION_COLLECTION } from '../models/cardTransaction.model';
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
 

@@ -17,7 +17,7 @@ import {
   emitProcessEvent,
   emitComplianceEvent,
   LedgerProjection,
-} from '../../../../backend/src/modules/providers/services/businessProcessEvent.service';
+} from '../../../../backend/src/modules/provider/services/businessProcessEvent.service';
 import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
 import { setEventBus, getEventBus } from '../../../../backend/src/vendors/eventbus';
 

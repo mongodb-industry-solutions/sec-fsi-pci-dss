@@ -1,6 +1,6 @@
 /**
  * Unit tests: cardTransaction.service (FR-v1-03)
- * Source: backend/src/modules/transactions/services/cardTransaction.service.ts
+ * Source: backend/src/modules/transaction/services/cardTransaction.service.ts
  *
  * createTransaction now writes through a role-aware QE client (getDbForRole) and
  * delegates fraud-case creation to fraudDiagnosis.service. Both are mocked so the
@@ -40,10 +40,10 @@ vi.mock('../../../../backend/src/modules/customer/services/paymentCard.service',
   getCardByToken: vi.fn().mockResolvedValue(null),       // no card-on-file → passes through
   upsertCardByToken: vi.fn().mockResolvedValue({ paymentCardInstanceReference: 'card-x', created: false }),
 }));
-vi.mock('../../../../backend/src/modules/providers/services/integrationDispatch.service', () => ({
+vi.mock('../../../../backend/src/modules/provider/services/integrationDispatch.service', () => ({
   dispatchProvider: vi.fn().mockResolvedValue({ provider: 'internal', status: 'received' }),
 }));
-vi.mock('../../../../backend/src/modules/providers/services/businessProcessEvent.service', () => ({
+vi.mock('../../../../backend/src/modules/provider/services/businessProcessEvent.service', () => ({
   emitProcessEvent: vi.fn().mockResolvedValue(undefined),
   emitComplianceEvent: vi.fn().mockResolvedValue(undefined),
 }));
@@ -51,10 +51,10 @@ vi.mock('../../../../backend/src/modules/gateway/services/merchantCallback.servi
   sendMerchantPaymentCallback: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { createTransaction, getTransactionById, getTransactionsByCardToken } from '../../../../backend/src/modules/transactions/services/cardTransaction.service';
+import { createTransaction, getTransactionById, getTransactionsByCardToken } from '../../../../backend/src/modules/transaction/services/cardTransaction.service';
 import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
 import { setEventBus, getEventBus } from '../../../../backend/src/vendors/eventbus';
-import { PaymentAuthorizationSaga } from '../../../../backend/src/modules/transactions/services/paymentAuthorization.saga';
+import { PaymentAuthorizationSaga } from '../../../../backend/src/modules/transaction/services/paymentAuthorization.saga';
 
 // createTransaction uses the passed db only for resolveCustomerAgreement (a local helper that does
 // findOne on the customer/party collections); everything else is mocked. A findOne→null db makes

@@ -5,7 +5,7 @@ import {
   EXTERNAL_PROVIDER_ARRANGEMENT_COLLECTION,
   EXTERNAL_PROVIDER_ARRANGEMENT_ACTION_LOG_COLLECTION,
   ExternalProviderArrangement,
-} from '../../modules/providers/models/externalProviderArrangement.model';
+} from '../../modules/provider/models/externalProviderArrangement.model';
 import { seedRoutingGroups } from './seedRoutingGroups';
 
 const DATA_DIR: string = process.env.SEED_DATA_DIR ?? join(process.cwd(), 'data');

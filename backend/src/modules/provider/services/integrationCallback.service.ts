@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { EXTERNAL_PROVIDER_ARRANGEMENT_COLLECTION, ExternalProviderArrangement } from '../models/externalProviderArrangement.model';
 import { logEvent } from './integrationDispatch.service';
 import { applyMappings } from './fieldMapping.service';
-import { createNotification } from '../../notifications/notifications.service';
+import { createNotification } from '../../notification/notifications.service';
 import { getEventBus, makeEvent } from '../../../vendors/eventbus';
 import { resolvePendingCorrelation, clearPendingCorrelation } from './pendingCorrelation.service';
 

@@ -10,7 +10,7 @@ import {
   SHARED_CARD_HOLDER_THRESHOLD,
 } from '../models/paymentCardRegistry.model';
 import { CUSTOMER_AGREEMENT_COLLECTION, CustomerAgreementControlRecord } from '../models/customerAgreement.model';
-import { emitComplianceEvent } from '../../providers/services/businessProcessEvent.service';
+import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 
 // Resolve the customerAgreement owned by a Party (SD-13). Used to enforce that a customer can
 // only manage THEIR OWN cards (PCI DSS Req 7 least privilege): the path :customerId must equal

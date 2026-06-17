@@ -11,8 +11,8 @@ import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { canReadSensitive } from '../../../vendors/middleware/rbac';
 import { validateToken } from '../../../vendors/security/escalationTokens';
 import { appendAuditEvent } from '../../fraud/services/fraudDiagnosis.service';
-import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
-import { emitComplianceEvent } from '../../providers/services/businessProcessEvent.service';
+import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
+import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 
 /**
  * Build the API response from a unified customerAgreementProcedure document.

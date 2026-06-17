@@ -9,7 +9,7 @@ import {
   PaymentLinkStatus,
   PaymentLinkUsageType,
 } from '../models/paymentLink.model';
-import { createTransaction } from '../../transactions/services/cardTransaction.service';
+import { createTransaction } from '../../transaction/services/cardTransaction.service';
 import { authorizeCard, linkAuthToTransaction } from './cardAuthorization.service';
 import { sendMerchantPaymentCallback, DECLINE_REASONS } from './merchantCallback.service';
 

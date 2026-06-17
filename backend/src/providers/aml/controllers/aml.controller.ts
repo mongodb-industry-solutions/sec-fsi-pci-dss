@@ -4,7 +4,7 @@ import { screenAml } from '../services/aml.service';
 import {
   getCapabilityModuleConfig,
   upsertCapabilityModuleConfig,
-} from '../../../modules/providers/services/capabilityModuleConfig.service';
+} from '../../../modules/provider/services/capabilityModuleConfig.service';
 
 export async function amlController(fastify: FastifyInstance) {
   const CAP = 'aml';

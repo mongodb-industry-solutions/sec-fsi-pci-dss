@@ -9,9 +9,9 @@ import {
   CardAuthorizationRecord,
   CardAuthorizationResult,
 } from '../models/cardAuthorization.model';
-import { getActiveProviderForType } from '../../providers/services/integrationRegistry.service';
-import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
-import { CardAuthorizationConfig } from '../../providers/models/externalProviderArrangement.model';
+import { getActiveProviderForType } from '../../provider/services/integrationRegistry.service';
+import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
+import { CardAuthorizationConfig } from '../../provider/models/externalProviderArrangement.model';
 import { getCardByToken } from '../../customer/services/paymentCard.service';
 
 const RESPONSE_CODE_APPROVED = '0000';

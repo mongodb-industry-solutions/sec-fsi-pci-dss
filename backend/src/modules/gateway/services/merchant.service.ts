@@ -13,9 +13,9 @@ import {
   KybCheckStatus,
   MerchantApiKeyRecord,
 } from '../models/merchantAgreement.model';
-import { emitComplianceEvent } from '../../providers/services/businessProcessEvent.service';
+import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import { deliverWebhook } from './webhook.service';
-import { createNotification } from '../../notifications/notifications.service';
+import { createNotification } from '../../notification/notifications.service';
 
 const BCRYPT_ROUNDS = 10;
 const API_KEY_PREFIX = 'lbpk_live_';

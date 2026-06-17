@@ -4,7 +4,7 @@ import { verifyKyb } from '../services/kyb.service';
 import {
   getCapabilityModuleConfig,
   upsertCapabilityModuleConfig,
-} from '../../../modules/providers/services/capabilityModuleConfig.service';
+} from '../../../modules/provider/services/capabilityModuleConfig.service';
 
 export async function kybController(fastify: FastifyInstance) {
   const CAP = 'kyb';

@@ -4,8 +4,8 @@ import { validateCardIssuer, resolveCardIssuerConfig } from '../services/cardIss
 import {
   getCapabilityModuleConfig,
   upsertCapabilityModuleConfig,
-} from '../../../modules/providers/services/capabilityModuleConfig.service';
-import { emitComplianceEvent } from '../../../modules/providers/services/businessProcessEvent.service';
+} from '../../../modules/provider/services/capabilityModuleConfig.service';
+import { emitComplianceEvent } from '../../../modules/provider/services/businessProcessEvent.service';
 
 export async function cardIssuerController(fastify: FastifyInstance) {
   const CAP = 'card-issuer';

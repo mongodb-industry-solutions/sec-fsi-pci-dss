@@ -6,7 +6,7 @@ import { screenHrp, HrpConfig } from '../services/hrp.service';
 import {
   getCapabilityModuleConfig,
   upsertCapabilityModuleConfig,
-} from '../../../modules/providers/services/capabilityModuleConfig.service';
+} from '../../../modules/provider/services/capabilityModuleConfig.service';
 
 export async function hrpController(fastify: FastifyInstance) {
   const CAP = 'hrp';

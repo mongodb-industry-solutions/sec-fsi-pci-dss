@@ -25,24 +25,24 @@ const h = vi.hoisted(() => {
   return { insertOne, findOne, updateOne, collection, fetchMock };
 });
 
-vi.mock('../../../../backend/src/modules/providers/services/integrationRegistry.service', () => ({
+vi.mock('../../../../backend/src/modules/provider/services/integrationRegistry.service', () => ({
   getActiveProviderForType: h.findOne,
   updateHealthStatus: vi.fn().mockResolvedValue(undefined),
   hashPayload: vi.fn().mockReturnValue('hash-abc'),
 }));
 
-vi.mock('../../../../backend/src/modules/providers/services/fieldMapping.service', () => ({
+vi.mock('../../../../backend/src/modules/provider/services/fieldMapping.service', () => ({
   applyMappings: vi.fn((p: unknown) => p),
 }));
 
-vi.mock('../../../../backend/src/modules/providers/services/integrationRoutingGroup.service', () => ({
+vi.mock('../../../../backend/src/modules/provider/services/integrationRoutingGroup.service', () => ({
   resolveProviderFromGroup: vi.fn().mockResolvedValue(null),
 }));
 
 // Stub the global fetch
 vi.stubGlobal('fetch', h.fetchMock);
 
-import { dispatchProvider } from '../../../../backend/src/modules/providers/services/integrationDispatch.service';
+import { dispatchProvider } from '../../../../backend/src/modules/provider/services/integrationDispatch.service';
 
 function makeDb() {
   return { collection: h.collection } as unknown as Parameters<typeof dispatchProvider>[0];

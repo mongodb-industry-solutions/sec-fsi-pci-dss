@@ -9,11 +9,11 @@ import {
 } from '../models/fraudDiagnosis.model';
 import { RiskSeverity } from '../../../shared/models/risk.model';
 import { TransactionSnapshot } from '../../../shared/models/transaction.model';
-import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
-import { emitProcessEvent } from '../../providers/services/businessProcessEvent.service';
-import { CARD_TRANSACTION_COLLECTION } from '../../transactions/models/cardTransaction.model';
+import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
+import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
+import { CARD_TRANSACTION_COLLECTION } from '../../transaction/models/cardTransaction.model';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
-import { createNotification } from '../../notifications/notifications.service';
+import { createNotification } from '../../notification/notifications.service';
 
 // -- BIAN SD-83: Note entry - resolved view of a note_added event enriched with retraction info
 export interface NoteEntry {

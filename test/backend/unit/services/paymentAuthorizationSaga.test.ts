@@ -10,7 +10,7 @@ const h = vi.hoisted(() => ({
   completeAuthorized: vi.fn(async () => ({ fraudCaseCreated: false })),
   declineTransaction: vi.fn(async () => {}),
 }));
-vi.mock('../../../../backend/src/modules/transactions/services/cardTransaction.service', () => ({
+vi.mock('../../../../backend/src/modules/transaction/services/cardTransaction.service', () => ({
   completeAuthorized: h.completeAuthorized,
   declineTransaction: h.declineTransaction,
 }));
@@ -18,7 +18,7 @@ vi.mock('../../../../backend/src/modules/transactions/services/cardTransaction.s
 import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
 import { makeEvent } from '../../../../backend/src/vendors/eventbus';
 import type { Db } from 'mongodb';
-import { PaymentAuthorizationSaga } from '../../../../backend/src/modules/transactions/services/paymentAuthorization.saga';
+import { PaymentAuthorizationSaga } from '../../../../backend/src/modules/transaction/services/paymentAuthorization.saga';
 
 const flush = () => new Promise((r) => setTimeout(r, 15));
 const gate = (eventType: string, correlationId: string, approved: boolean, reason?: string) =>

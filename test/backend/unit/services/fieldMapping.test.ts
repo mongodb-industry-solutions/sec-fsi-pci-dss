@@ -4,7 +4,7 @@
  * Secrets are never mappable.
  */
 import { describe, it, expect } from 'vitest';
-import { validateMappingRules, mayMapCardData } from '../../../../backend/src/modules/providers/services/fieldMapping.service';
+import { validateMappingRules, mayMapCardData } from '../../../../backend/src/modules/provider/services/fieldMapping.service';
 
 const rule = (sourcePath: string, targetPath: string) => ({ sourcePath, targetPath });
 

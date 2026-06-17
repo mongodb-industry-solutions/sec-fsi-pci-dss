@@ -4,7 +4,7 @@ import { authorizeCard } from '../services/cardAuthorization.service';
 import {
   getCapabilityModuleConfig,
   upsertCapabilityModuleConfig,
-} from '../../../modules/providers/services/capabilityModuleConfig.service';
+} from '../../../modules/provider/services/capabilityModuleConfig.service';
 
 export async function cardAuthorizationController(fastify: FastifyInstance) {
   const CAP = 'card-authorization';

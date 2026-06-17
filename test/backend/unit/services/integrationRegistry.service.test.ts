@@ -1,6 +1,6 @@
 /**
  * Unit tests: integrationRegistry.service (FR-v6-03, FR-v6-05, FR-v6-07)
- * Source: backend/src/modules/providers/services/integrationRegistry.service.ts
+ * Source: backend/src/modules/provider/services/integrationRegistry.service.ts
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
@@ -9,8 +9,8 @@ import {
   suspendIntegration,
   verifyApiKey,
   stripSecrets,
-} from '../../../../backend/src/modules/providers/services/integrationRegistry.service';
-import type { ExternalProviderArrangement } from '../../../../backend/src/modules/providers/models/externalProviderArrangement.model';
+} from '../../../../backend/src/modules/provider/services/integrationRegistry.service';
+import type { ExternalProviderArrangement } from '../../../../backend/src/modules/provider/models/externalProviderArrangement.model';
 
 // ── Minimal DB mock ──────────────────────────────────────────────────────────
 

@@ -4,7 +4,7 @@
  * delete (the trail record is kept, CHD-free). Pure: a mock db captures the updateMany filter/update.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { purgeChd, sweepAbandonedChd, ChdRetention } from '../../../../backend/src/modules/transactions/services/chdRetention.service';
+import { purgeChd, sweepAbandonedChd, ChdRetention } from '../../../../backend/src/modules/transaction/services/chdRetention.service';
 import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
 import { makeEvent } from '../../../../backend/src/vendors/eventbus';
 

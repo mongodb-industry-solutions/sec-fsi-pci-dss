@@ -6,12 +6,12 @@ import { describe, it, expect, vi } from 'vitest';
 
 // dispatchProvider is a fire-and-forget side effect (outbound webhook). Stub it so
 // case creation is tested in isolation and no real dispatch is attempted.
-vi.mock('../../../../backend/src/modules/providers/services/integrationDispatch.service', () => ({
+vi.mock('../../../../backend/src/modules/provider/services/integrationDispatch.service', () => ({
   dispatchProvider: vi.fn().mockResolvedValue(undefined),
 }));
 // emitProcessEvent is a fire-and-forget audit write (businessProcessEvent collection). Stub it so the
 // shared insertOne spy counts only the case + opening-event writes this test asserts on.
-vi.mock('../../../../backend/src/modules/providers/services/businessProcessEvent.service', () => ({
+vi.mock('../../../../backend/src/modules/provider/services/businessProcessEvent.service', () => ({
   emitProcessEvent: vi.fn().mockResolvedValue(undefined),
 }));
 

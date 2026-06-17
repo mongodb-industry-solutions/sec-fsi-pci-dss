@@ -19,16 +19,16 @@ vi.mock('../../../../backend/src/modules/fraud/services/fraudDiagnosis.service',
 vi.mock('../../../../backend/src/modules/customer/services/paymentCard.service', () => ({
   getCardByToken: vi.fn().mockResolvedValue(null), upsertCardByToken: vi.fn().mockResolvedValue({ paymentCardInstanceReference: 'c', created: false }),
 }));
-vi.mock('../../../../backend/src/modules/providers/services/integrationDispatch.service', () => ({ dispatchProvider: h.dispatchProvider }));
-vi.mock('../../../../backend/src/modules/providers/services/businessProcessEvent.service', () => ({ emitProcessEvent: vi.fn(), emitComplianceEvent: vi.fn() }));
+vi.mock('../../../../backend/src/modules/provider/services/integrationDispatch.service', () => ({ dispatchProvider: h.dispatchProvider }));
+vi.mock('../../../../backend/src/modules/provider/services/businessProcessEvent.service', () => ({ emitProcessEvent: vi.fn(), emitComplianceEvent: vi.fn() }));
 vi.mock('../../../../backend/src/modules/gateway/services/merchantCallback.service', () => ({ sendMerchantPaymentCallback: vi.fn().mockResolvedValue(undefined) }));
 
-import { createTransaction } from '../../../../backend/src/modules/transactions/services/cardTransaction.service';
+import { createTransaction } from '../../../../backend/src/modules/transaction/services/cardTransaction.service';
 import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
 import type { EventStore } from '../../../../backend/src/vendors/eventbus/EventStore';
 import { setEventBus, getEventBus } from '../../../../backend/src/vendors/eventbus';
 import type { DomainEvent } from '../../../../backend/src/vendors/eventbus/types';
-import { PaymentAuthorizationSaga } from '../../../../backend/src/modules/transactions/services/paymentAuthorization.saga';
+import { PaymentAuthorizationSaga } from '../../../../backend/src/modules/transaction/services/paymentAuthorization.saga';
 import { EnvelopeChdCrypto, LocalKmsKeyProvider, setChdCrypto } from '../../../../backend/src/vendors/encryption/chdCrypto';
 
 class FakeStore implements EventStore {

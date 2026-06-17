@@ -4,7 +4,7 @@ import { readFileSync } from 'fs';
 import {
   CAPABILITY_MODULE_CONFIGURATION_COLLECTION,
   CapabilityModuleConfiguration,
-} from '../../modules/providers/models/capabilityModuleConfiguration.model';
+} from '../../modules/provider/models/capabilityModuleConfiguration.model';
 
 const DATA_DIR: string = process.env.SEED_DATA_DIR ?? join(process.cwd(), 'data');
 

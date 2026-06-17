@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, appendAuditEvent, createFraudCase, addCaseNote, retractCaseNote, getCaseNotes, getFraudStats, getFraudIntegrity } from '../services/fraudDiagnosis.service';
 import { getCardIntegrity } from '../../customer/services/paymentCard.service';
-import { getTransactionById } from '../../transactions/services/cardTransaction.service';
+import { getTransactionById } from '../../transaction/services/cardTransaction.service';
 import { generateToken } from '../../../vendors/security/escalationTokens';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
@@ -14,11 +14,11 @@ function actorOf(request: unknown): { ref?: string; name?: string } {
   const u = (request as { user?: JwtUserPayload }).user;
   return { ref: u?.partyRef ?? u?.sub, name: u?.name };
 }
-import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
+import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { getCaseEnrichment } from '../services/caseEnrichment.service';
 import { createQuestion, listQuestionsByCase } from '../services/customerQuestion.service';
 import { subscribeCaseEvents } from '../../../vendors/eventbus';
-import { createNotification } from '../../notifications/notifications.service';
+import { createNotification } from '../../notification/notifications.service';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
 const ENRICHMENT_ROLES = ['level1_analyst', 'level2_investigator', 'security_auditor'];

@@ -5,7 +5,7 @@
 //
 // PCI DSS Req 3.2: NO sensitive authentication data is stored. The CVV is only compared in memory
 // against the configured value; neither the PAN nor the CVV is ever returned or logged.
-import { CardIssuerInboundPayload } from '../../../modules/providers/models/externalProviderArrangement.model';
+import { CardIssuerInboundPayload } from '../../../modules/provider/models/externalProviderArrangement.model';
 
 // ── Configurable rules ────────────────────────────────────────────────────────
 

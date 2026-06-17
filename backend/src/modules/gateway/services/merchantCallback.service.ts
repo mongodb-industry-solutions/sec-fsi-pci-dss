@@ -13,8 +13,8 @@
 import { Db } from 'mongodb';
 import { deliverWebhook, type WebhookDeliveryResult } from './webhook.service';
 import { MERCHANT_AGREEMENT_COLLECTION, MerchantAgreementControlRecord } from '../models/merchantAgreement.model';
-import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
-import { emitProcessEvent } from '../../providers/services/businessProcessEvent.service';
+import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
+import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
 
 // Human-readable decline reasons keyed by the PSP/issuer response code (BIAN SD-15).
 export const DECLINE_REASONS: Record<string, string> = {

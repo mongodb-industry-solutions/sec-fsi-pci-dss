@@ -13,12 +13,12 @@ import { authMiddleware } from './vendors/middleware/auth';
 import { appendLog }          from './shared/logBuffer';
 import { identityModule }     from './modules/identity';
 import { customerModule }     from './modules/customer';
-import { transactionsModule } from './modules/transactions';
+import { transactionsModule } from './modules/transaction';
 import { fraudModule }        from './modules/fraud';
 import { gatewayModule }      from './modules/gateway';
 import { systemModule }       from './modules/system';
 import { adminModule }        from './modules/admin';
-import { providersModule } from './modules/providers';
+import { providersModule } from './modules/provider';
 import { fdsModule }       from './providers/fds';
 import { hrpModule }       from './providers/hrp';
 import { amlModule }       from './providers/aml';
@@ -28,7 +28,7 @@ import { creditBureauModule }      from './providers/credit-bureau';
 import { cardAuthorizationModule } from './providers/card-authorization';
 import { cardIssuerModule }        from './providers/card-issuer';
 import { domainModule }       from './modules/domain';
-import { notificationsModule } from './modules/notifications';
+import { notificationsModule } from './modules/notification';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({

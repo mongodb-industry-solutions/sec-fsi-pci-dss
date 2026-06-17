@@ -1,7 +1,7 @@
 // Internal FDS (Fraud Detection) engine — the built-in scorer used when no external fraud vendor
 // is active (internal-first, ADR-010/029). Pure function; thresholds overridable from the Module
 // config (capabilityModuleConfiguration.moduleConfig). Distinct from Fraud Diagnosis (SD-83).
-import { FdsInboundPayload } from '../../../modules/providers/models/externalProviderArrangement.model';
+import { FdsInboundPayload } from '../../../modules/provider/models/externalProviderArrangement.model';
 
 export interface FdsThresholds {
   reviewAmount: number; // amount above which the transaction is flagged for review

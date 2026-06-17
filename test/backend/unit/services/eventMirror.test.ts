@@ -7,7 +7,7 @@ import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/Even
 import { setEventBus } from '../../../../backend/src/vendors/eventbus';
 import type { EventStore } from '../../../../backend/src/vendors/eventbus/EventStore';
 import type { DomainEvent } from '../../../../backend/src/vendors/eventbus/types';
-import { emitProcessEvent } from '../../../../backend/src/modules/providers/services/businessProcessEvent.service';
+import { emitProcessEvent } from '../../../../backend/src/modules/provider/services/businessProcessEvent.service';
 
 class FakeStore implements EventStore {
   events: DomainEvent[] = [];

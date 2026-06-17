@@ -3,7 +3,7 @@
  * the latest verdict per subsystem (issuer + FDS + HRP/sanctions + AML) for case enrichment. Pure.
  */
 import { describe, it, expect } from 'vitest';
-import { extractSubsystemSignals } from '../../../../backend/src/modules/transactions/services/postAuthorization.process';
+import { extractSubsystemSignals } from '../../../../backend/src/modules/transaction/services/postAuthorization.process';
 import { makeEvent } from '../../../../backend/src/vendors/eventbus';
 
 const ev = (eventType: string, payload: Record<string, unknown>) =>

@@ -4,8 +4,8 @@
 import { FastifyInstance } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, sendTestWebhook, generateApiKey, importApiKey, updateApiKeyLabel, revokeApiKey, reviewMerchantApplication, getMerchantEvents, getMerchantApiKeys } from '../services/merchant.service';
-import { getMerchantTransactions, getMerchantStats } from '../../transactions/services/cardTransaction.service';
-import { dispatchProvider } from '../../providers/services/integrationDispatch.service';
+import { getMerchantTransactions, getMerchantStats } from '../../transaction/services/cardTransaction.service';
+import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 
 // Roles allowed to READ a merchant's business detail (profile, payments, analytics, audit trail).
 // PSP staff: `merchant_officer` and `security_auditor`. Fraud-investigation roles

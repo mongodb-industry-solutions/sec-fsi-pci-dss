@@ -5,9 +5,9 @@ import {
 } from '../models/customerQuestion.model';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import { getCaseById, appendAuditEvent } from './fraudDiagnosis.service';
-import { emitProcessEvent } from '../../providers/services/businessProcessEvent.service';
+import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
 import { publishCaseEvent } from '../../../vendors/eventbus';
-import { createNotification, markReadByRelated } from '../../notifications/notifications.service';
+import { createNotification, markReadByRelated } from '../../notification/notifications.service';
 import type { AnalystRole } from '../../../shared/models/identity.model';
 
 const col = (db: Db) => db.collection<CustomerQuestionRecord>(CUSTOMER_QUESTION_COLLECTION);

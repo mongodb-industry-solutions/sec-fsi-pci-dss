@@ -5,7 +5,7 @@ import {
   IntegrationProviderType,
   IntegrationRoutingGroup,
   ExternalProviderArrangement,
-} from '../../modules/providers/models/externalProviderArrangement.model';
+} from '../../modules/provider/models/externalProviderArrangement.model';
 
 interface DefaultGroupDef {
   id: string;

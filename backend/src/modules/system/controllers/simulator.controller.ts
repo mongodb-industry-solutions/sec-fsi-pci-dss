@@ -5,8 +5,8 @@ import { FastifyInstance } from 'fastify';
 import { createCheckoutSession } from '../../gateway/services/checkout.service';
 import { createPaymentLink } from '../../gateway/services/paymentLink.service';
 import { getMerchantById } from '../../gateway/services/merchant.service';
-import { CARD_TRANSACTION_COLLECTION } from '../../transactions/models/cardTransaction.model';
-import { resolveCustomerAgreement } from '../../transactions/services/cardTransaction.service';
+import { CARD_TRANSACTION_COLLECTION } from '../../transaction/models/cardTransaction.model';
+import { resolveCustomerAgreement } from '../../transaction/services/cardTransaction.service';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 
 export async function simulatorController(fastify: FastifyInstance) {

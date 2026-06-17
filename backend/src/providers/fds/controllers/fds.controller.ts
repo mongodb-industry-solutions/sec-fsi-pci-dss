@@ -6,7 +6,7 @@ import { scoreFds, FdsThresholds } from '../services/fds.service';
 import {
   getCapabilityModuleConfig,
   upsertCapabilityModuleConfig,
-} from '../../../modules/providers/services/capabilityModuleConfig.service';
+} from '../../../modules/provider/services/capabilityModuleConfig.service';
 
 export async function fdsController(fastify: FastifyInstance) {
   const CAP = 'fds';
