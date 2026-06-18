@@ -5,6 +5,7 @@ import { api, awaitPaymentOutcome } from '../../../lib/api';
 import { FraudAlert } from '../../../components/FraudAlert';
 import { EncryptionBadge } from '../../../components/EncryptionBadge';
 import { Tooltip } from '../../../components/Tooltip';
+import { Eye, EyeOff } from 'lucide-react';
 import { StepExplainer } from '../../../components/StepExplainer';
 import { RedirectionPaymentFlow } from '../../../components/simulator/RedirectionPaymentFlow';
 import { PaymentLinkFlow } from '../../../components/simulator/PaymentLinkFlow';
@@ -239,6 +240,7 @@ export default function PaymentPage() {
   const [methodReady, setMethodReady] = useState(false);
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<FormData>(DEFAULTS);
+  const [showCvv, setShowCvv] = useState(false);
   const [maskedCard, setMaskedCard] = useState<string>(maskCardNumber(DEMO_CARD_NUMBER));
   // Raw PAN digits kept only to derive the deterministic token at submit time (never sent).
   const [rawCard, setRawCard] = useState<string>(DEMO_CARD_NUMBER.replace(/\D/g, ''));
@@ -598,14 +600,25 @@ export default function PaymentPage() {
                 CVV
                 <Tooltip text="Card verification value. Sent to the card issuer for authorization only, never stored or logged (PCI DSS Req 3.2). The demo issuer accepts 123; any other value is declined." />
               </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={form.cvv}
-                onChange={(e) => setForm((f) => ({ ...f, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
-                className="w-full border rounded-lg px-3 py-2 font-mono"
-                placeholder="123"
-              />
+              <div className="relative">
+                <input
+                  type={showCvv ? 'text' : 'password'}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={form.cvv}
+                  onChange={(e) => setForm((f) => ({ ...f, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                  className="w-full border rounded-lg pl-3 pr-9 py-2 font-mono"
+                  placeholder="123"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCvv((s) => !s)}
+                  aria-label={showCvv ? 'Hide CVV' : 'Show CVV'}
+                  className="absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400 hover:text-gray-700"
+                >
+                  {showCvv ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
             </div>
           </div>
 

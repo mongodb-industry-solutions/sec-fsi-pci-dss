@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { api } from '../../../../lib/api';
 import { deriveCardToken } from '../../../../lib/cardTokenize';
-import { Lock, CreditCard, CheckCircle, XCircle } from 'lucide-react';
+import { Lock, CreditCard, CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react';
 
 type LinkData = Awaited<ReturnType<typeof api.paymentLinks.resolve>>;
 type PageState = 'loading' | 'ready' | 'paying' | 'success' | 'declined' | 'unavailable' | 'error';
@@ -29,6 +29,7 @@ function PaymentLinkPageInner() {
   const [customerEmail, setCustomerEmail] = useState('');
   const [cvv, setCvv] = useState('');
   const [cvvTouched, setCvvTouched] = useState(false);
+  const [showCvv, setShowCvv] = useState(false);
   const cvvValid = /^\d{3,4}$/.test(cvv);
 
   const applyPrefillParams = useCallback((sp: ReturnType<typeof useSearchParams>) => {
@@ -290,22 +291,33 @@ function PaymentLinkPageInner() {
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">CVV</label>
-                  <input
-                    required
-                    type="text"
-                    inputMode="numeric"
-                    value={cvv}
-                    onChange={(e) => { setCvv(e.target.value.replace(/\D/g, '').slice(0, 4)); }}
-                    onBlur={() => setCvvTouched(true)}
-                    placeholder="•••"
-                    maxLength={4}
-                    aria-invalid={cvvTouched && !cvvValid}
-                    className={`w-full border rounded-lg px-3 py-2 text-sm text-center font-mono focus:outline-none focus:ring-2 ${
-                      cvvTouched && !cvvValid
-                        ? 'border-red-300 focus:ring-red-200 focus:border-red-400'
-                        : 'border-gray-300 focus:ring-[#00ED64]/40 focus:border-[#00ED64]'
-                    }`}
-                  />
+                  <div className="relative">
+                    <input
+                      required
+                      type={showCvv ? 'text' : 'password'}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      value={cvv}
+                      onChange={(e) => { setCvv(e.target.value.replace(/\D/g, '').slice(0, 4)); }}
+                      onBlur={() => setCvvTouched(true)}
+                      placeholder="•••"
+                      maxLength={4}
+                      aria-invalid={cvvTouched && !cvvValid}
+                      className={`w-full border rounded-lg pl-3 pr-9 py-2 text-sm text-center font-mono focus:outline-none focus:ring-2 ${
+                        cvvTouched && !cvvValid
+                          ? 'border-red-300 focus:ring-red-200 focus:border-red-400'
+                          : 'border-gray-300 focus:ring-[#00ED64]/40 focus:border-[#00ED64]'
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCvv((s) => !s)}
+                      aria-label={showCvv ? 'Hide CVV' : 'Show CVV'}
+                      className="absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400 hover:text-gray-700"
+                    >
+                      {showCvv ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
                   {cvvTouched && !cvvValid ? (
                     <p className="text-xs text-red-600 mt-0.5">Enter the 3 or 4 digit code.</p>
                   ) : (

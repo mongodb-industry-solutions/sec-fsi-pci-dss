@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { HelpCircle, CheckCircle2, Send } from 'lucide-react';
 import { api, type CustomerQuestion } from '../lib/api';
 import { useNotify } from './ui/ConfirmProvider';
+import { useNotificationsStream } from '../lib/useNotificationsStream';
 
 // ADR-031: customer-facing question/response section, shown on a transaction below the security
 // notes. Questions are posed by L1/L2 investigators (SD-83); the customer picks a predefined option
@@ -22,6 +23,8 @@ export function CustomerQuestionsPanel({ txnId, token, onAnswered }: { txnId: st
     finally { setLoading(false); }
   }, [txnId, token]);
   useEffect(() => { load(); }, [load]);
+  // Live: a newly-posed question (or an answered one) appears without a manual refresh.
+  useNotificationsStream(token, load);
 
   function setDraft(qid: string, patch: Partial<{ option: string; text: string }>) {
     setDrafts((d) => {

@@ -26,20 +26,21 @@ export function NotificationBell() {
   useNotificationsStream(token, load);   // live refresh on change (SSE)
   useNotificationsChanged(load);         // instant same-tab refresh when the page marks items read
 
-  function readOne(n: NotificationItem) {
-    if (n.status === 'unread') {
-      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, status: 'read' } : x)));
-      setCount((c) => Math.max(0, c - 1));
-      api.notifications.markRead(n.id, token).catch(() => { /* ignore */ });
-      emitNotificationsChanged(); // keep the notifications page in sync if it is open
-    }
+  async function readOne(n: NotificationItem) {
     setOpen(false);
+    if (n.status !== 'unread') return;
+    setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, status: 'read' } : x)));
+    setCount((c) => Math.max(0, c - 1));
+    // Await the write BEFORE signalling, so the sidebar/page refetch the post-write count (not the
+    // stale one) and both badges decrement in lock-step.
+    await api.notifications.markRead(n.id, token).catch(() => { /* ignore */ });
+    emitNotificationsChanged();
   }
 
-  function readAll() {
+  async function readAll() {
     setItems((prev) => prev.map((x) => ({ ...x, status: 'read' })));
     setCount(0);
-    api.notifications.markAllRead(token).catch(() => { /* ignore */ });
+    await api.notifications.markAllRead(token).catch(() => { /* ignore */ });
     emitNotificationsChanged();
   }
 

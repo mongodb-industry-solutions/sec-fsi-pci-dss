@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, FraudCase, ActionEvent, TransactionNotesResponse } from '../../../../../lib/api';
@@ -8,6 +8,7 @@ import { useDebugMode } from '../../../../../lib/debugMode';
 import { Eye, EyeOff } from 'lucide-react';
 import { RawMongoPanel } from '../../../../../components/RawMongoPanel';
 import { CustomerQuestionsPanel } from '../../../../../components/CustomerQuestionsPanel';
+import { useNotificationsStream } from '../../../../../lib/useNotificationsStream';
 
 interface StoredTransaction {
   txnId: string;
@@ -96,49 +97,54 @@ export default function TransactionDetailPage() {
   // The owner's saved-card id matching this transaction's token; lets us link to the card detail.
   const [matchedCardId, setMatchedCardId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const load = async () => {
-      const t = getToken() ?? '';
-      const u = t ? decodeToken(t) : null;
-      setUser(u);
-      setToken(t);
+  // `showLoading` is only true for the initial mount; live refreshes (a new note / answered question
+  // arriving over the notifications stream) refetch in the background without flashing the skeleton.
+  const loadData = useCallback(async (showLoading: boolean) => {
+    const t = getToken() ?? '';
+    const u = t ? decodeToken(t) : null;
+    setUser(u);
+    setToken(t);
+    if (showLoading) setLoading(true);
 
-      // Real source of truth: fetch the transaction from the API.
-      const data = await api.transactions.getById(txnId, t).catch(() => null);
-      if (!data) { setNotFound(true); setLoading(false); return; }
+    // Real source of truth: fetch the transaction from the API.
+    const data = await api.transactions.getById(txnId, t).catch(() => null);
+    if (!data) { if (showLoading) { setNotFound(true); setLoading(false); } return; }
 
-      setTxn({
-        txnId:          data.cardTransactionInstanceReference,
-        cardToken:      data.paymentCardReference ?? null,
-        amount:         data.cardTransactionAmount?.amount ?? 0,
-        currency:       data.cardTransactionAmount?.currency ?? 'USD',
-        merchant:       data.cardTransactionMerchantName,
-        mcc:            data.cardTransactionMerchantCategoryCode ?? '',
-        channel:        data.cardTransactionChannel ?? '',
-        initiationType: data.cardTransactionInitiationType ?? null,
-        maskedPan:      data.cardTransactionMaskedPanDisplay,
-        status:         data.cardTransactionStatus,
-        fraudCaseCreated: false,
-        createdAt:      data.cardTransactionDateTime,
-      });
-      setApiTxn({
-        paymentCardReference:                data.paymentCardReference,
-        cardTransactionMerchantCategoryCode: data.cardTransactionMerchantCategoryCode,
-        cardTransactionChannel:              data.cardTransactionChannel,
-        cardTransactionInitiationType:       data.cardTransactionInitiationType,
-        cardTransactionType:                 data.cardTransactionType,
-        cardTransactionDescription:          data.cardTransactionDescription,
-        cardTransactionNarrative:            data.cardTransactionNarrative,
-      });
+    setTxn({
+      txnId:          data.cardTransactionInstanceReference,
+      cardToken:      data.paymentCardReference ?? null,
+      amount:         data.cardTransactionAmount?.amount ?? 0,
+      currency:       data.cardTransactionAmount?.currency ?? 'USD',
+      merchant:       data.cardTransactionMerchantName,
+      mcc:            data.cardTransactionMerchantCategoryCode ?? '',
+      channel:        data.cardTransactionChannel ?? '',
+      initiationType: data.cardTransactionInitiationType ?? null,
+      maskedPan:      data.cardTransactionMaskedPanDisplay,
+      status:         data.cardTransactionStatus,
+      fraudCaseCreated: false,
+      createdAt:      data.cardTransactionDateTime,
+    });
+    setApiTxn({
+      paymentCardReference:                data.paymentCardReference,
+      cardTransactionMerchantCategoryCode: data.cardTransactionMerchantCategoryCode,
+      cardTransactionChannel:              data.cardTransactionChannel,
+      cardTransactionInitiationType:       data.cardTransactionInitiationType,
+      cardTransactionType:                 data.cardTransactionType,
+      cardTransactionDescription:          data.cardTransactionDescription,
+      cardTransactionNarrative:            data.cardTransactionNarrative,
+    });
 
-      // Customer-visible case notes via the dedicated customer-safe endpoint
-      // (the /fraud endpoints themselves are not accessible to the customer role).
-      api.transactions.getNotes(txnId, t).then(setCaseNotes).catch(() => null);
+    // Customer-visible case notes via the dedicated customer-safe endpoint
+    // (the /fraud endpoints themselves are not accessible to the customer role).
+    api.transactions.getNotes(txnId, t).then(setCaseNotes).catch(() => null);
 
-      setLoading(false);
-    };
-    load();
+    if (showLoading) setLoading(false);
   }, [txnId]);
+
+  useEffect(() => { loadData(true); }, [loadData]);
+  // Live: a new customer-visible note (or a status change) appears without a manual refresh.
+  const refresh = useCallback(() => { void loadData(false); }, [loadData]);
+  useNotificationsStream(token, refresh);
 
   // Resolve the owner's saved card matching this transaction's token, so the card data can link
   // to its detail page. Customer-only; a removed (revoked) card simply won't match (no link).
@@ -369,7 +375,7 @@ export default function TransactionDetailPage() {
       )}
 
       {/* Customer questions from L1/L2 (ADR-031); answer Yes/No/Other, immutable once submitted. */}
-      {token && <CustomerQuestionsPanel txnId={txnId} token={token} />}
+      {token && <CustomerQuestionsPanel txnId={txnId} token={token} onAnswered={refresh} />}
 
       {/* Resolution outcome */}
       {fraudCase?.fraudDiagnosisResolutionRecord && (

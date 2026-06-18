@@ -42,15 +42,17 @@ export default function NotificationsPage() {
 
   const unread = items.filter((n) => n.status === 'unread').length;
 
-  function readOne(n: NotificationItem) {
+  async function readOne(n: NotificationItem) {
     if (n.status !== 'unread') return;
     setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, status: 'read' } : x)));
-    api.notifications.markRead(n.id, token).catch(() => { /* ignore */ });
-    emitNotificationsChanged(); // decrement the top-bar bell counter immediately
+    // Await the write BEFORE signalling so the bell + sidebar badges refetch the post-write count and
+    // both decrement together (they show the same data and must stay synchronized).
+    await api.notifications.markRead(n.id, token).catch(() => { /* ignore */ });
+    emitNotificationsChanged();
   }
-  function readAll() {
+  async function readAll() {
     setItems((prev) => prev.map((x) => ({ ...x, status: 'read' })));
-    api.notifications.markAllRead(token).catch(() => { /* ignore */ });
+    await api.notifications.markAllRead(token).catch(() => { /* ignore */ });
     emitNotificationsChanged();
   }
 

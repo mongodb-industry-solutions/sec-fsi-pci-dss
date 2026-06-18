@@ -14,6 +14,7 @@ import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/b
 import { getChdCrypto } from '../../../vendors/encryption/chdCrypto';
 import { getCardByToken, upsertCardByToken } from '../../customer/services/paymentCard.service';
 import { sendMerchantPaymentCallback } from '../../gateway/services/merchantCallback.service';
+import { createNotification } from '../../notification/notifications.service';
 import { getEventBus, makeEvent } from '../../../vendors/eventbus';
 
 export interface CreateTransactionInput {
@@ -390,8 +391,10 @@ export async function completeAuthorized(db: Db, txnId: string, fdsVerdict?: Fds
   return { fraudCaseCreated: create, fraudDiagnosisInstanceReference: fraudCaseRef };
 }
 
-// Finish a DECLINED payment: flip status, drop the pending context, audit the decline.
+// Finish a DECLINED payment: flip status, drop the pending context, audit the decline, and tell the
+// customer (a declined payment is relevant to them). Capture the context BEFORE dropping it.
 export async function declineTransaction(db: Db, txnId: string, reason: string, code: string): Promise<void> {
+  const ctx = pendingContext.get(txnId);
   pendingContext.delete(txnId);
   const txWriteDb = await getDbForRole('security_auditor', false);
   await txWriteDb.collection(CARD_TRANSACTION_COLLECTION).updateOne(
@@ -405,6 +408,26 @@ export async function declineTransaction(db: Db, txnId: string, reason: string, 
     eventSummary: { cardTransactionInstanceReference: txnId, decisionReason: reason, responseCode: code },
     bianServiceDomain: 'Card Transaction', bianControlRecordType: 'CardTransactionRecord',
   });
+
+  // Notify the customer that their payment was declined (non-blocking; no raw card data).
+  if (ctx?.resolvedUuid) {
+    try {
+      const agreement = await db.collection(CUSTOMER_AGREEMENT_COLLECTION)
+        .findOne<{ partyInstanceReference?: string }>({ customerAgreementInstanceReference: ctx.resolvedUuid });
+      const amount = ctx.input.amount;
+      const currency = ctx.input.currency;
+      await createNotification(db, {
+        recipientPartyReference: agreement?.partyInstanceReference ?? '',
+        notificationType: 'transaction_status',
+        title: 'Payment declined',
+        detail: `Your payment of ${amount} ${currency} to ${ctx.input.cardTransactionMerchantName} was declined.`,
+        href: `/system/payment/history/${txnId}`,
+        relatedReference: `declined-${txnId}`,
+        transactionId: txnId,
+        actionable: false,
+      });
+    } catch { /* notification must never affect the decline outcome */ }
+  }
 }
 
 // Backward-compatible synchronous entry point: drives the EDA flow and resolves to the final outcome,
