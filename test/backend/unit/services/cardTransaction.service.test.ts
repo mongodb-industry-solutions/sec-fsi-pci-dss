@@ -56,6 +56,7 @@ import { dispatchProvider } from '../../../../backend/src/modules/provider/servi
 import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
 import { setEventBus, getEventBus } from '../../../../backend/src/vendors/eventbus';
 import { PaymentAuthorizationSaga } from '../../../../backend/src/modules/transaction/services/paymentAuthorization.saga';
+import { ProviderGroups } from '../../../../backend/src/providers/_groups/providerGroups';
 
 // createTransaction uses the passed db only for resolveCustomerAgreement (a local helper that does
 // findOne on the customer/party collections); everything else is mocked. A findOne→null db makes
@@ -87,6 +88,7 @@ beforeEach(() => {
   // dispatch is mocked (no decline) so the journey reaches `authorized`, and createTransaction (the
   // sync wrapper) resolves to the final outcome.
   setEventBus(new EventBusInProcess());
+  new ProviderGroups(txDb(), getEventBus()).register();
   new PaymentAuthorizationSaga(txDb(), getEventBus()).register();
 });
 

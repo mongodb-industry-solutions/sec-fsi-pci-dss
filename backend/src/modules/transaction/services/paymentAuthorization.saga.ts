@@ -16,7 +16,7 @@ const GATE_EVENT: Record<string, string> = {
 };
 const DEFAULT_GATES = ['card.issuer', 'fds', 'hrp'];
 
-interface GateVerdict { approved: boolean; responseCode?: string; reason?: string }
+interface GateVerdict { approved: boolean; responseCode?: string; reason?: string; riskScore?: number; recommendation?: 'approve' | 'review' | 'decline'; fraudFlag?: boolean; rulesFired?: string[] }
 interface JourneyState { expected: Set<string>; verdicts: Map<string, GateVerdict>; decided: boolean }
 
 export class PaymentAuthorizationSaga {
@@ -47,9 +47,9 @@ export class PaymentAuthorizationSaga {
 
     // Gate verdict travels in the *.completed payload. Accept the §7 `outcome` enum
     // ('approved'|'declined') and the legacy `approved` boolean for forward/back compatibility.
-    const p = e.payload as { outcome?: 'approved' | 'declined'; approved?: boolean; responseCode?: string; decisionReason?: string; reason?: string };
+    const p = e.payload as { outcome?: 'approved' | 'declined'; approved?: boolean; responseCode?: string; decisionReason?: string; reason?: string; riskScore?: number; recommendation?: 'approve' | 'review' | 'decline'; fraudFlag?: boolean; rulesFired?: string[] };
     const approved = p.outcome ? p.outcome !== 'declined' : p.approved !== false;
-    st.verdicts.set(gate, { approved, responseCode: p.responseCode, reason: p.decisionReason ?? p.reason });
+    st.verdicts.set(gate, { approved, responseCode: p.responseCode, reason: p.decisionReason ?? p.reason, riskScore: p.riskScore, recommendation: p.recommendation, fraudFlag: p.fraudFlag, rulesFired: p.rulesFired });
 
     const declinedEntry = [...st.verdicts.entries()].find(([, v]) => !v.approved);
     const allIn = [...st.expected].every((g) => st!.verdicts.has(g));
@@ -71,7 +71,12 @@ export class PaymentAuthorizationSaga {
         payload: { outcome: 'declined', decisionReason: verdict.reason, responseCode: verdict.responseCode, declinedBy, fraudCaseCreated: false }, bian,
       }));
     } else {
-      const outcome = await completeAuthorized(this.db, txnId);
+      // Hand the FDS gate verdict to completion so the fraud case is congruent with the gate result.
+      const fdsV = st.verdicts.get('fds');
+      const fdsVerdict = fdsV?.recommendation
+        ? { riskScore: fdsV.riskScore ?? 0, recommendation: fdsV.recommendation, fraudFlag: !!fdsV.fraudFlag, rulesFired: fdsV.rulesFired ?? [] }
+        : undefined;
+      const outcome = await completeAuthorized(this.db, txnId, fdsVerdict);
       void this.bus.publish(makeEvent({
         eventType: 'card.payment.authorization.completed', correlationId: txnId, businessProcess: 'card_payment',
         causationId: e.eventId, source: 'saga.payment-authorization',

@@ -7,7 +7,7 @@
     "externalProviderIsInternal": true,
     "externalProviderApiEndpoint": "/api/v1/modules/fds/score",
     "externalProviderInternalHandler": "fraudDiagnosis.internalFraudScoring",
-    "externalProviderCallbackEnabled": false,
+    "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
       "fds.scoring.requested",
       "fraud.create.case"
@@ -56,7 +56,7 @@
     "externalProviderIsInternal": true,
     "externalProviderApiEndpoint": "/api/v1/modules/hrp/screen",
     "externalProviderInternalHandler": "fraudDiagnosis.hrpcCheck",
-    "externalProviderCallbackEnabled": false,
+    "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
       "hrp.screening.requested",
       "fraud.hrpc.check"
@@ -110,7 +110,7 @@
     "externalProviderIsInternal": true,
     "externalProviderApiEndpoint": "/api/v1/modules/aml/score",
     "externalProviderInternalHandler": "fraudDiagnosis.amlPatternCheck",
-    "externalProviderCallbackEnabled": false,
+    "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
       "aml.monitoring.requested"
     ],
@@ -170,7 +170,7 @@
     "externalProviderIsInternal": true,
     "externalProviderApiEndpoint": "/api/v1/modules/kyc/score",
     "externalProviderInternalHandler": "customerAgreement.internalKycCheck",
-    "externalProviderCallbackEnabled": false,
+    "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
       "kyc.validation.requested"
     ],
@@ -223,7 +223,7 @@
     "externalProviderIsInternal": true,
     "externalProviderApiEndpoint": "/api/v1/modules/kyb/score",
     "externalProviderInternalHandler": "merchantRelations.internalKybCheck",
-    "externalProviderCallbackEnabled": false,
+    "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
       "kyb.validation.requested"
     ],
@@ -277,7 +277,7 @@
     "externalProviderIsInternal": true,
     "externalProviderApiEndpoint": "/api/v1/modules/credit-bureau/score",
     "externalProviderInternalHandler": "customerCredit.internalCreditAssessment",
-    "externalProviderCallbackEnabled": false,
+    "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
       "credit.assessment.requested"
     ],
@@ -328,7 +328,7 @@
     "externalProviderIsInternal": true,
     "externalProviderApiEndpoint": "/api/v1/modules/card-authorization/score",
     "externalProviderInternalHandler": "cardAuthorization.stubAdapter",
-    "externalProviderCallbackEnabled": false,
+    "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
       "card.authorization.requested"
     ],
@@ -372,7 +372,7 @@
     "externalProviderIsInternal": true,
     "externalProviderApiEndpoint": "/api/v1/modules/card-issuer/score",
     "externalProviderInternalHandler": "cardIssuer.internalCvvValidation",
-    "externalProviderCallbackEnabled": false,
+    "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
       "card.issuer.validation.requested"
     ],

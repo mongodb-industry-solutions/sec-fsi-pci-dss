@@ -48,7 +48,8 @@ describe('PaymentAuthorizationSaga (Phase-1 gate aggregation)', () => {
     await bus.publish(gate('hrp.screening.completed', 't1', true));
     await flush();
     expect(seen).toEqual(['authorized']);
-    expect(h.completeAuthorized).toHaveBeenCalledWith({}, 't1');
+    // The FDS gate verdict is handed to completion; these gates carry no verdict, so it is undefined.
+    expect(h.completeAuthorized).toHaveBeenCalledWith({}, 't1', undefined);
     expect(h.declineTransaction).not.toHaveBeenCalled();
   });
 

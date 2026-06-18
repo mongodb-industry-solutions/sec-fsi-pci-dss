@@ -29,6 +29,7 @@ import type { EventStore } from '../../../../backend/src/vendors/eventbus/EventS
 import { setEventBus, getEventBus } from '../../../../backend/src/vendors/eventbus';
 import type { DomainEvent } from '../../../../backend/src/vendors/eventbus/types';
 import { PaymentAuthorizationSaga } from '../../../../backend/src/modules/transaction/services/paymentAuthorization.saga';
+import { ProviderGroups } from '../../../../backend/src/providers/_groups/providerGroups';
 import { EnvelopeChdCrypto, LocalKmsKeyProvider, setChdCrypto } from '../../../../backend/src/vendors/encryption/chdCrypto';
 
 class FakeStore implements EventStore {
@@ -55,6 +56,7 @@ describe('P7 — encrypted CHD carrier (§7.8)', () => {
     setChdCrypto(crypto);
     store = new FakeStore();
     setEventBus(new EventBusInProcess(store));
+    new ProviderGroups(txDb(), getEventBus()).register();
     new PaymentAuthorizationSaga(txDb(), getEventBus()).register();
   });
 

@@ -11,8 +11,6 @@ import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.mo
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
 import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
-import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
-import { recordPendingCorrelation } from '../../provider/services/pendingCorrelation.service';
 import { getChdCrypto } from '../../../vendors/encryption/chdCrypto';
 import { getCardByToken, upsertCardByToken } from '../../customer/services/paymentCard.service';
 import { sendMerchantPaymentCallback } from '../../gateway/services/merchantCallback.service';
@@ -138,11 +136,11 @@ interface PendingContext {
   input: CreateTransactionInput; // cardVerification stripped before storing
   canonicalAccountRef: string;
   resolvedUuid?: string;
-  // P13.3 (D2): the FDS gate stashes its verdict here so completeAuthorized derives the fraud case
-  // from it (score/severity/indicators), instead of an amount-count heuristic. In-memory, matching
-  // the in-process saga aggregation (a broker deployment would carry this in the saga state).
-  fdsVerdict?: { riskScore: number; recommendation: 'approve' | 'review' | 'decline'; fraudFlag: boolean; rulesFired: string[] };
 }
+
+// The FDS verdict the saga aggregates from fds.scoring.completed and hands to completeAuthorized, so
+// the fraud case is congruent with the gate result (score/severity/indicators come from the verdict).
+export interface FdsVerdict { riskScore: number; recommendation: 'approve' | 'review' | 'decline'; fraudFlag: boolean; rulesFired: string[] }
 const pendingContext = new Map<string, PendingContext>();
 
 // EDA entry point (dev.v8 F3). Creates the transaction PENDING and drives authorization through the
@@ -231,90 +229,24 @@ export async function initiateTransaction(
     }, { correlationId: txnId });
   });
 
-  // Phase-1 gates run out-of-band, in parallel; each emits its own *.requested -> *.completed pair on
-  // the bus (§6.1 rule 3) with the causation chain (§5.0). CHD (PAN/CVV/expiry) goes directly to the
-  // issuer via dispatch, never on the bus.
-  void authorizeWithIssuer(db, txnId, input, gateCausationId, onFile?.paymentCardNetwork);
-  void scoreFraudGate(db, txnId, input, gateCausationId);
-  void screenSanctionsGate(db, txnId, input, gateCausationId);
+  // Phase-1 gates run out-of-band: the orchestrator only PUBLISHES each gate's *.requested. The
+  // Provider Group reactors perform the actual provider call and publish the matching *.completed;
+  // the saga aggregates the verdicts. Card data rides only the encrypted `chd` carrier on the issuer
+  // request — plaintext never touches the bus.
+  void emitGateRequests(txnId, input, gateCausationId, onFile?.paymentCardNetwork);
 
   return { cardTransactionInstanceReference: txnId, cardTransactionStatus: 'pending', settled };
 }
 
-// FDS gating: real-time fraud score. Fail-open (only an explicit block declines). Emits the
-// reference-led fds.scoring.requested (§7.1) then its fds.scoring.completed (causation chain, §5.0).
-async function scoreFraudGate(db: Db, txnId: string, input: CreateTransactionInput, causationParent?: string): Promise<void> {
-  const requested = makeEvent({
-    eventType: 'fds.scoring.requested', correlationId: txnId, businessProcess: 'card_payment', source: 'psp.core', causationId: causationParent,
-    payload: { accountReference: input.accountReference, cardToken: input.cardToken, amount: input.amount, currency: input.currency, channel: input.cardTransactionChannel, merchantName: input.cardTransactionMerchantName, merchantCategoryCode: input.cardTransactionMerchantCategoryCode },
-    bian: { serviceDomain: 'SD-63 Fraud Evaluation', controlRecord: 'FraudEvaluationAssessment' },
-  });
-  void getEventBus().publish(requested);
-  let approved = true;
-  let reason: string | undefined;
-  let verdict: { riskScore?: number; recommendation?: string; fraudFlag?: boolean; rulesFired?: string[] } | undefined;
-  try {
-    const r = await dispatchProvider(db, 'fraud_detection', 'fds.scoring.requested', {
-      cardTransactionInstanceReference: txnId, amount: input.amount, currency: input.currency,
-      merchantName: input.cardTransactionMerchantName, merchantCategoryCode: input.cardTransactionMerchantCategoryCode,
-    }, { entityType: 'transaction', entityId: txnId, processType: 'fraud_evaluation' });
-    verdict = r.responseBody as typeof verdict;
-    if (verdict?.recommendation === 'block' || verdict?.recommendation === 'decline') { approved = false; reason = 'fraud_block'; }
-    // Stash the verdict so completeAuthorized derives the fraud case from it (P13.3 / D2).
-    const ctx = pendingContext.get(txnId);
-    if (ctx && verdict) {
-      ctx.fdsVerdict = {
-        riskScore: verdict.riskScore ?? 0,
-        recommendation: (verdict.recommendation as 'approve' | 'review' | 'decline') ?? 'approve',
-        fraudFlag: !!verdict.fraudFlag,
-        rulesFired: verdict.rulesFired ?? [],
-      };
-    }
-  } catch { /* fail-open */ }
-  void getEventBus().publish(makeEvent({
-    eventType: 'fds.scoring.completed', correlationId: txnId, businessProcess: 'card_payment', source: 'callback.fds', causationId: requested.eventId,
-    // The verdict (riskScore + rulesFired) rides the completed event so the audit trail and SSE are
-    // congruent with the fraud case the saga will open (P13.4).
-    payload: { transactionId: txnId, outcome: approved ? 'approved' : 'declined', approved, reason, riskScore: verdict?.riskScore, recommendation: verdict?.recommendation, rulesFired: verdict?.rulesFired },
-    bian: { serviceDomain: 'SD-63 Fraud Evaluation', controlRecord: 'FraudEvaluationAssessment' },
-  }));
-}
-
-// Sanctions/HRP gating: regulatory hard stop on a match. Fail-open on transport error. Emits the
-// reference-led hrp.screening.requested (§7.1) then its hrp.screening.completed (causation chain).
-async function screenSanctionsGate(db: Db, txnId: string, input: CreateTransactionInput, causationParent?: string): Promise<void> {
-  const requested = makeEvent({
-    eventType: 'hrp.screening.requested', correlationId: txnId, businessProcess: 'card_payment', source: 'psp.core', causationId: causationParent,
-    payload: { subjectPartyReference: input.accountReference, accountReference: input.accountReference, amount: input.amount, currency: input.currency, merchantName: input.cardTransactionMerchantName },
-    bian: { serviceDomain: 'SD-13 Party Reference', controlRecord: 'PartyReferenceDataDirectoryEntry' },
-  });
-  void getEventBus().publish(requested);
-  let approved = true;
-  let reason: string | undefined;
-  try {
-    const r = await dispatchProvider(db, 'hrp_sanctions', 'hrp.screening.requested', {
-      cardTransactionInstanceReference: txnId, accountReference: input.accountReference, merchantName: input.cardTransactionMerchantName,
-    }, { entityType: 'transaction', entityId: txnId, processType: 'aml_screening' });
-    const b = r.responseBody as { hrpcMatch?: boolean; match?: boolean } | undefined;
-    if (b && (b.hrpcMatch ?? b.match)) { approved = false; reason = 'sanctions_match'; }
-  } catch { /* fail-open */ }
-  void getEventBus().publish(makeEvent({
-    eventType: 'hrp.screening.completed', correlationId: txnId, businessProcess: 'card_payment', source: 'callback.hrp', causationId: requested.eventId,
-    payload: { transactionId: txnId, outcome: approved ? 'approved' : 'declined', approved, reason }, bian: { serviceDomain: 'SD-13 Party Reference', controlRecord: 'PartyReferenceDataDirectoryEntry' },
-  }));
-}
-
-// Card-issuer gating (§7.8). CHD rides the bus ONLY as the encrypted `chd` envelope on
-// card.issuer.validation.requested (temporarily-persisted, purged on completion). The issuer
-// adapter decrypts it just-in-time for the wire; plaintext never returns to the bus, is never logged.
+// Publish the three Phase-1 gate requests for a journey. The orchestrator only emits requests; the
+// Provider Group reactors perform the provider calls and publish the completions. Card verification
+// values are encrypted into the opaque `chd` carrier here, so plaintext never touches the bus.
 const CHD_AAD_EVENT = 'card.issuer.validation.requested';
-async function authorizeWithIssuer(db: Db, txnId: string, input: CreateTransactionInput, causationParent?: string, onFileNetwork?: string): Promise<void> {
+async function emitGateRequests(txnId: string, input: CreateTransactionInput, causationParent: string, onFileNetwork?: string): Promise<void> {
+  const bus = getEventBus();
   const issuerNetwork = input.paymentCardNetwork ?? onFileNetwork;
   const cv = input.cardVerification;
 
-  // Build the encrypted CHD carrier when ANY raw verification value is present (§7.8). The tokenized
-  // payment path carries only a CVV (no PAN/expiry) — it is still protected as the opaque `chd` token.
-  // The plaintext keys never ride the bus — only the opaque `chd` token does.
   let chd: string | undefined;
   if (cv?.cvv || cv?.cardNumber) {
     try {
@@ -325,50 +257,21 @@ async function authorizeWithIssuer(db: Db, txnId: string, input: CreateTransacti
     } catch { /* crypto unavailable (no master key) — proceed reference-led, no CHD on the wire */ }
   }
 
-  const requested = makeEvent({
+  void bus.publish(makeEvent({
     eventType: 'card.issuer.validation.requested', correlationId: txnId, businessProcess: 'card_payment', source: 'psp.core', causationId: causationParent,
-    payload: { cardToken: input.cardToken, maskedPan: input.cardTransactionMaskedPanDisplay, amount: input.amount, currency: input.currency, ...(issuerNetwork ? { cardNetwork: issuerNetwork } : {}), ...(chd ? { chd } : {}) },
+    payload: { cardToken: input.cardToken, maskedPan: input.cardTransactionMaskedPanDisplay, amount: input.amount, currency: input.currency, ...(issuerNetwork ? { cardNetwork: issuerNetwork } : {}), ...(chd ? { chd } : {}), ...(input.requireCardVerification ? { cvvExpected: true } : {}) },
     bian: { serviceDomain: 'SD-88 Payment Card', controlRecord: 'PaymentCardValidation' },
-  });
-  void getEventBus().publish(requested);
-  // §7.7 wire->bus bridge: record the journey envelope so a real ASYNC issuer callback can restore
-  // correlationId + causationId + businessProcess (the sync built-in path completes inline below).
-  recordPendingCorrelation({
-    ref: txnId, correlationId: txnId, causationId: requested.eventId,
-    businessProcess: 'card_payment', eventType: 'card.issuer.validation.completed',
-  });
-
-  // Decrypt `chd` just-in-time for the wire (§7.8). Plaintext exists only here; it is never
-  // re-published, persisted, or logged (the action log sanitizes the dispatch snapshot).
-  let cardData: { cardNumber?: string; cvv?: string; expiry?: string } = {};
-  if (chd) {
-    try { cardData = await getChdCrypto().decrypt(chd, { correlationId: txnId, eventType: CHD_AAD_EVENT }); }
-    catch { /* tamper/AAD mismatch — send no CHD on the wire (issuer fail-safe) */ }
-  } else if (cv) {
-    cardData = { cardNumber: cv.cardNumber, cvv: cv.cvv, expiry: cv.expiry };
-  }
-
-  let decision: { actionConfirmed?: boolean; responseCode?: string; decisionReason?: string } | undefined;
-  try {
-    const r = await dispatchProvider(db, 'card_issuer', 'card.issuer.validation.requested', {
-      cardToken: input.cardToken,
-      maskedPan: input.cardTransactionMaskedPanDisplay,
-      cardTransactionInstanceReference: txnId,
-      ...(issuerNetwork ? { network: issuerNetwork } : {}),
-      ...(cardData.cardNumber ? { cardNumber: cardData.cardNumber } : {}),
-      ...(cardData.cvv ? { cvv: cardData.cvv } : {}),
-      ...(cardData.expiry ? { expiry: cardData.expiry } : {}),
-      // D1: tell the issuer a CVV was expected on this channel, so a missing CVV declines (82).
-      ...(input.requireCardVerification ? { cvvExpected: true } : {}),
-    }, { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' });
-    decision = r.responseBody as typeof decision;
-  } catch { /* transport failure: fail-safe to approve; only an explicit decline blocks */ }
-
-  publishIssuerValidationCompleted(txnId, {
-    approved: decision?.actionConfirmed !== false,
-    responseCode: decision?.responseCode,
-    decisionReason: decision?.decisionReason,
-  }, requested.eventId);
+  }));
+  void bus.publish(makeEvent({
+    eventType: 'fds.scoring.requested', correlationId: txnId, businessProcess: 'card_payment', source: 'psp.core', causationId: causationParent,
+    payload: { accountReference: input.accountReference, cardToken: input.cardToken, amount: input.amount, currency: input.currency, channel: input.cardTransactionChannel, merchantName: input.cardTransactionMerchantName, merchantCategoryCode: input.cardTransactionMerchantCategoryCode },
+    bian: { serviceDomain: 'SD-63 Fraud Evaluation', controlRecord: 'FraudEvaluationAssessment' },
+  }));
+  void bus.publish(makeEvent({
+    eventType: 'hrp.screening.requested', correlationId: txnId, businessProcess: 'card_payment', source: 'psp.core', causationId: causationParent,
+    payload: { subjectPartyReference: input.accountReference, accountReference: input.accountReference, amount: input.amount, currency: input.currency, merchantName: input.cardTransactionMerchantName },
+    bian: { serviceDomain: 'SD-13 Party Reference', controlRecord: 'PartyReferenceDataDirectoryEntry' },
+  }));
 }
 
 // Emit the issuer outcome onto the bus. Also called by the inbound callback for a real async issuer
@@ -388,7 +291,7 @@ export function publishIssuerValidationCompleted(txnId: string, decision: { appr
 
 // Finish an APPROVED payment: card-on-file, fraud case, audit event, merchant callback, status flip.
 // Idempotent on the pending context (a second call is a no-op). Returns the fraud-case outcome.
-export async function completeAuthorized(db: Db, txnId: string): Promise<{ fraudCaseCreated: boolean; fraudDiagnosisInstanceReference?: string }> {
+export async function completeAuthorized(db: Db, txnId: string, fdsVerdict?: FdsVerdict): Promise<{ fraudCaseCreated: boolean; fraudDiagnosisInstanceReference?: string }> {
   const ctx = pendingContext.get(txnId);
   if (!ctx) return { fraudCaseCreated: false };
   pendingContext.delete(txnId);
@@ -422,11 +325,11 @@ export async function completeAuthorized(db: Db, txnId: string): Promise<{ fraud
     } catch { /* never block on card-on-file save */ }
   }
 
-  // P13.3 (D2): the FDS verdict drives the fraud case when present — the case score/severity/indicators
-  // are the FDS verdict, so the case is congruent with the fds.scoring.completed gate result. When no
-  // verdict is available (FDS unreachable / fail-open), fall back to the PSP amount+MCC rule, which
-  // shares the same amount threshold as the FDS engine (D3: FRAUD_AMOUNT_THRESHOLD === FDS reviewAmount).
-  const fds = ctx.fdsVerdict;
+  // The FDS verdict (handed in by the saga) drives the fraud case when present — the case
+  // score/severity/indicators are the FDS verdict, so the case is congruent with the
+  // fds.scoring.completed gate result. When no verdict is available (FDS unreachable / fail-open),
+  // fall back to the PSP amount+MCC rule, which shares the FDS amount threshold (FRAUD_AMOUNT_THRESHOLD).
+  const fds = fdsVerdict;
   let create: boolean;
   let reasons: string[];
   let severity: 'low' | 'medium' | 'high' | 'critical';
