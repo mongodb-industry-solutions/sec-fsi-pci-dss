@@ -229,7 +229,7 @@ export async function updateSelfProfile(
   }
 
   if (matched) {
-    void dispatchProvider(db, 'kyc_identity', 'auth.update.profile', {
+    void dispatchProvider(db, 'kyc_identity', 'kyc.validation.requested', {
       partyInstanceReference: party.partyInstanceReference,
       fieldsUpdated: Object.keys({ ...partyPatch, ...agreementPatch }).filter(k => k !== 'recordUpdatedDateTime'),
     }, { entityType: 'customer', entityId: party.partyInstanceReference, processType: 'kyc_verification' })

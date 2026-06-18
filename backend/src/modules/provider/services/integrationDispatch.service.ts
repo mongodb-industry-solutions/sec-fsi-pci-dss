@@ -150,6 +150,10 @@ async function dispatchExternal(
     ...buildAuthHeaders(wire.auth),
   };
 
+  // Resolve a host-less internal path (seeded config) to an absolute URL via PSP_BASE_URL; absolute
+  // external URLs pass through unchanged.
+  const targetUrl = resolveServiceUrl(wire.url ?? '');
+
   try {
 
     const controller = new AbortController();
@@ -160,7 +164,7 @@ async function dispatchExternal(
     const effectiveTimeout = provider.externalProviderIsInternal ? Math.max(configuredTimeout, 1500) : configuredTimeout;
     const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
 
-    const res = await fetch(wire.url!, {
+    const res = await fetch(targetUrl, {
       method: wire.httpMethod,
       headers,
       body: JSON.stringify(mappedPayload),
@@ -186,7 +190,7 @@ async function dispatchExternal(
       latencyMs,
       meta: { fieldMappingApplied },
       businessContext,
-      request: { method: wire.httpMethod, url: wire.url, headers, body: payload },
+      request: { method: wire.httpMethod, url: targetUrl, headers, body: payload },
       response: { status: res.status, headers: responseHeaders, body: responseBody },
     });
 
@@ -208,7 +212,7 @@ async function dispatchExternal(
       error: (err as Error).message,
       meta: { fieldMappingApplied },
       businessContext,
-      request: { method: wire.httpMethod, url: wire.url, headers, body: payload },
+      request: { method: wire.httpMethod, url: targetUrl, headers, body: payload },
     });
 
     await updateHealthStatus(db, arrangementId, 'unreachable');
@@ -362,12 +366,15 @@ export async function testMapping(
   };
 }
 
-// Resolve a possibly-relative URL to absolute, against this server's own base, so an
-// internal PSP override (e.g. /api/v1/webhooks/{id}/callback) can be reached over loopback.
-function toAbsoluteUrl(url: string): string {
+// Resolve an internal PSP path (e.g. /api/v1/modules/fds/score) to an absolute URL using PSP_BASE_URL
+// (default http://127.0.0.1:3001). Seeded configs MUST be host-less paths so they work unchanged across
+// environments/deployments; only this resolver knows the runtime host. Absolute URLs (real external
+// providers) are returned untouched.
+export function resolveServiceUrl(url: string): string {
   if (/^https?:\/\//i.test(url)) return url;
-  const base = process.env.SELF_BASE_URL ?? `http://127.0.0.1:${process.env.PORT ?? 3001}`;
-  return base.replace(/\/$/, '') + (url.startsWith('/') ? url : `/${url}`);
+  const raw = process.env.PSP_BASE_URL ?? '127.0.0.1:3001';
+  const base = (/^https?:\/\//i.test(raw) ? raw : `http://${raw}`).replace(/\/$/, '');
+  return base + (url.startsWith('/') ? url : `/${url}`);
 }
 
 export interface RunTestResult {
@@ -432,7 +439,7 @@ export async function runIntegrationTest(
   if (!rawTarget) {
     return { direction, executed: false, status: 'error', latencyMs: 0, transformed, appliedRules: rules.length, error: 'No endpoint configured and no override URL provided.' };
   }
-  const targetUrl = toAbsoluteUrl(rawTarget);
+  const targetUrl = resolveServiceUrl(rawTarget);
   const start = Date.now();
   try {
     const controller = new AbortController();

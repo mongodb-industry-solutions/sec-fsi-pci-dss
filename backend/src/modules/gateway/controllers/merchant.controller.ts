@@ -154,7 +154,7 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
     }
     const result = await createMerchant(fastify.db, body);
 
-    void dispatchProvider(fastify.db, 'kyb_business', 'merchant.onboard', {
+    void dispatchProvider(fastify.db, 'kyb_business', 'kyb.validation.requested', {
       merchantAgreementInstanceReference: result.merchantAgreementInstanceReference,
       merchantName: body.merchantName,
       merchantCategoryCode: body.merchantCategoryCode,

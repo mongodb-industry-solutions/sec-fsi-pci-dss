@@ -94,13 +94,13 @@ export async function authorizeCard(
   if (provider && !provider.externalProviderIsInternal) {
     // Real external provider — delegate via Integration Hub
     providerRef = provider.externalProviderArrangementInstanceReference;
-    const dispatchResult = await dispatchProvider(db, 'card_authorization', req.checkoutSessionInstanceReference, {
+    const dispatchResult = await dispatchProvider(db, 'card_authorization', 'card.authorization.requested', {
       cardToken: req.cardToken,
       amount: req.amount,
       currency: req.currency,
       mcc: req.mcc,
       merchantCode: req.merchantCode,
-    });
+    }, { entityType: 'transaction', entityId: req.checkoutSessionInstanceReference, processType: 'card_authorization' });
     // Real provider response interpretation (simplified)
     result = dispatchResult.status === 'received' && dispatchResult.responseCode === 200 ? 'approved' : 'declined';
     responseCode = result === 'approved' ? RESPONSE_CODE_APPROVED : RESPONSE_CODE_DECLINED;

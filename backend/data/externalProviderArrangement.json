@@ -5,11 +5,12 @@
     "externalProviderArrangementType": "fraud_detection",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
-    "externalProviderApiEndpoint": "http://localhost:3001/api/v1/modules/fds/score",
+    "externalProviderApiEndpoint": "/api/v1/modules/fds/score",
     "externalProviderInternalHandler": "fraudDiagnosis.internalFraudScoring",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
-      "transaction.authorized"
+      "fds.scoring.requested",
+      "fraud.create.case"
     ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 500,
@@ -53,12 +54,12 @@
     "externalProviderArrangementType": "hrp_sanctions",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
-    "externalProviderApiEndpoint": "http://localhost:3001/api/v1/modules/hrp/screen",
+    "externalProviderApiEndpoint": "/api/v1/modules/hrp/screen",
     "externalProviderInternalHandler": "fraudDiagnosis.hrpcCheck",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
-      "case.created",
-      "merchant.application.submitted"
+      "hrp.screening.requested",
+      "fraud.hrpc.check"
     ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 500,
@@ -107,12 +108,11 @@
     "externalProviderArrangementType": "aml_monitoring",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
-    "externalProviderApiEndpoint": "http://localhost:3001/api/v1/modules/aml/score",
+    "externalProviderApiEndpoint": "/api/v1/modules/aml/score",
     "externalProviderInternalHandler": "fraudDiagnosis.amlPatternCheck",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
-      "transaction.batch.processed",
-      "case.escalated"
+      "aml.monitoring.requested"
     ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 2000,
@@ -168,12 +168,11 @@
     "externalProviderArrangementType": "kyc_identity",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
-    "externalProviderApiEndpoint": "http://localhost:3001/api/v1/modules/kyc/score",
+    "externalProviderApiEndpoint": "/api/v1/modules/kyc/score",
     "externalProviderInternalHandler": "customerAgreement.internalKycCheck",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
-      "customer.onboarding.initiated",
-      "kyc.renewal.due"
+      "kyc.validation.requested"
     ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 1000,
@@ -222,12 +221,11 @@
     "externalProviderArrangementType": "kyb_business",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
-    "externalProviderApiEndpoint": "http://localhost:3001/api/v1/modules/kyb/score",
+    "externalProviderApiEndpoint": "/api/v1/modules/kyb/score",
     "externalProviderInternalHandler": "merchantRelations.internalKybCheck",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
-      "merchant.application.submitted",
-      "kyb.renewal.due"
+      "kyb.validation.requested"
     ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 1000,
@@ -277,12 +275,11 @@
     "externalProviderArrangementType": "credit_bureau",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
-    "externalProviderApiEndpoint": "http://localhost:3001/api/v1/modules/credit-bureau/score",
+    "externalProviderApiEndpoint": "/api/v1/modules/credit-bureau/score",
     "externalProviderInternalHandler": "customerCredit.internalCreditAssessment",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
-      "loan.application.submitted",
-      "credit.review.requested"
+      "credit.assessment.requested"
     ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 1500,
@@ -329,12 +326,11 @@
     "externalProviderArrangementType": "card_authorization",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
-    "externalProviderApiEndpoint": "http://localhost:3001/api/v1/modules/card-authorization/score",
+    "externalProviderApiEndpoint": "/api/v1/modules/card-authorization/score",
     "externalProviderInternalHandler": "cardAuthorization.stubAdapter",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
-      "checkout.pay",
-      "payment.link.pay"
+      "card.authorization.requested"
     ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 200,
@@ -370,17 +366,15 @@
   },
   {
     "externalProviderArrangementInstanceReference": "int-internal-card-issuer-001",
-    "externalProviderArrangementName": "Card Issuer CVV/PIN Validation",
+    "externalProviderArrangementName": "Card Issuer",
     "externalProviderArrangementType": "card_issuer",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
-    "externalProviderApiEndpoint": "http://localhost:3001/api/v1/modules/card-issuer/score",
-    "externalProviderInternalHandler": "cardIssuer.cvv.validation",
+    "externalProviderApiEndpoint": "/api/v1/modules/card-issuer/score",
+    "externalProviderInternalHandler": "cardIssuer.internalCvvValidation",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
-      "card.issuer.validation.requested",
-      "payment.pin.verification",
-      "card.activation.cvv"
+      "card.issuer.validation.requested"
     ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 3000,
@@ -422,8 +416,7 @@
     "externalProviderIsInternal": true,
     "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
-      "gateway.checkout.callback",
-      "payment.link.callback"
+      "payment.callback"
     ],
     "externalProviderMode": "async",
     "externalProviderTimeoutMs": 1000,
