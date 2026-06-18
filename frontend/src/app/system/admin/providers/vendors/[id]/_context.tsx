@@ -46,6 +46,36 @@ export interface FieldMappingConfig {
   schemaVersion?: number;
 }
 
+// §2.4: a field mapping as stored per event (sourcePath -> targetPath).
+export interface EventFieldMapping {
+  sourcePath: string;
+  targetPath: string;
+  required?: boolean;
+}
+
+// §2.4: per-event wire config — each event a vendor handles has its OWN outbound + inbound config
+// (its own URL, mapping, auth, retries, timeout, callback). There is NO vendor base URL.
+export interface ProviderEventOutboundConfig {
+  url?: string;
+  httpMethod?: string;
+  mapping?: EventFieldMapping[];
+  auth?: AuthConfig;
+  retryPolicy?: { maxAttempts: number; backoffMs: number };
+  timeoutMs?: number;
+}
+export interface ProviderEventInboundConfig {
+  callbackUrl?: string;
+  mapping?: EventFieldMapping[];
+  auth?: AuthConfig;
+  referenceLocation?: 'body' | 'header';
+  referenceField?: string;
+}
+export interface ProviderEventConfig {
+  event: string;
+  outbound: ProviderEventOutboundConfig;
+  inbound: ProviderEventInboundConfig;
+}
+
 export interface Integration {
   externalProviderArrangementInstanceReference: string;
   externalProviderArrangementName: string;
@@ -63,6 +93,7 @@ export interface Integration {
   externalProviderRetryPolicy?: { maxAttempts: number; backoffMs: number };
   externalProviderTimeoutMs?: number;
   externalProviderTriggerEvents?: string[];
+  externalProviderEvents?: ProviderEventConfig[];
   categoryConfig?: Record<string, unknown>;
   authConfig?: AuthConfig;
   fieldMappingConfig?: FieldMappingConfig;

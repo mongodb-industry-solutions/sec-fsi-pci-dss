@@ -239,6 +239,31 @@ export interface RetryPolicy {
   backoffMs: number;
 }
 
+// ── Per-event wire configuration (§2.4 / §7.7) ────────────────────────────────
+// Each event a vendor handles has its OWN outbound + inbound config, including its own URLs. URLs,
+// mapping, auth, retries and timeout are NEVER vendor-global — always per event. There is no vendor
+// base URL. The inbound callback is per event+vendor (§7.7).
+export interface ProviderEventOutboundConfig {
+  url?: string;                          // outbound endpoint the PSP calls for THIS event
+  httpMethod?: 'POST' | 'GET' | 'PUT' | 'PATCH' | 'DELETE';
+  mapping?: FieldMapping[];              // outbound attribute mapping for this event
+  auth?: IntegrationAuthConfig;          // per-event auth (e.g. API key / bearer / hmacOutbound)
+  retryPolicy?: RetryPolicy;
+  timeoutMs?: number;
+}
+export interface ProviderEventInboundConfig {
+  callbackUrl?: string;                  // inbound callback URL the vendor calls for THIS event (§7.7)
+  mapping?: FieldMapping[];              // inbound attribute mapping for this event
+  auth?: IntegrationAuthConfig;          // per-event inbound auth (e.g. hmacInbound, anti-spoofing)
+  referenceLocation?: 'body' | 'header'; // where clientReference (= correlationId) travels (§7.7)
+  referenceField?: string;               // body path or header name carrying the reference
+}
+export interface ProviderEventConfig {
+  event: string;                         // bus event handled, e.g. 'card.issuer.validation.requested'
+  outbound: ProviderEventOutboundConfig;
+  inbound: ProviderEventInboundConfig;
+}
+
 export interface ExternalProviderArrangement {
   externalProviderArrangementInstanceReference: string;
   externalProviderArrangementName: string;
@@ -258,6 +283,13 @@ export interface ExternalProviderArrangement {
   externalProviderCallbackSecretHash?: string; // bcrypt — never returned
 
   externalProviderTriggerEvents: string[];
+  // §2.4: per-event wire config — the AUTHORITATIVE source for url/method/mapping/auth/retries/timeout
+  // and the inbound callback. The seeder populates it for every vendor (deriveEventConfigs), the
+  // dispatcher (resolveEventOutbound) and the callback handlers (resolveEventInbound) read it, and the
+  // admin Outbound/Inbound tabs edit it. The vendor-global fields below are a DEPRECATED migration
+  // fallback only (no vendor base URL per §2.4); they are never the source of truth when per-event
+  // config is present (always, post-seed) and exist solely as a safety net for legacy/partial data.
+  externalProviderEvents?: ProviderEventConfig[];
   externalProviderMode: IntegrationMode;
 
   externalProviderTimeoutMs: number;

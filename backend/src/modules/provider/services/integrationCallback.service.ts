@@ -6,6 +6,11 @@ import { applyMappings } from './fieldMapping.service';
 import { createNotification } from '../../notification/notifications.service';
 import { getEventBus, makeEvent } from '../../../vendors/eventbus';
 import { resolvePendingCorrelation, clearPendingCorrelation } from './pendingCorrelation.service';
+import { resolveEventInbound } from './providerEventConfig.service';
+
+// Uniform shape for the per-event callback dispatcher (§7.7). `body: never` keeps each specific
+// handler assignable into a Record while the controller passes `request.body as never`.
+export type CallbackHandler = (db: Db, provider: ExternalProviderArrangement, body: never, event?: string) => Promise<void>;
 
 export function verifyHmacSignature(
   secret: string,
@@ -47,12 +52,15 @@ export async function validateCallback(
   return { valid, provider: valid ? provider : undefined, errorCode: valid ? undefined : 401 };
 }
 
-// Apply inbound field mapping rules to a callback body
+// Apply inbound field mapping to a callback body. §2.4: mapping is per event — when `event` is given
+// the per-event inbound mapping is used (falling back to vendor-global via the resolver); the legacy
+// (event-less) callback routes keep using the vendor-global mapping directly.
 function applyInboundMapping(
   provider: ExternalProviderArrangement,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  event?: string,
 ): Record<string, unknown> {
-  const rules = provider.fieldMappingConfig?.inbound;
+  const rules = event ? resolveEventInbound(provider, event).mapping : provider.fieldMappingConfig?.inbound;
   if (!rules || rules.length === 0) return body;
   return applyMappings(body, rules);
 }
@@ -60,9 +68,10 @@ function applyInboundMapping(
 export async function processFdsCallback(
   db: Db,
   provider: ExternalProviderArrangement,
-  body: { fraudScore: number; recommendation: string; caseId?: string; metadata?: Record<string, unknown> }
+  body: { fraudScore: number; recommendation: string; caseId?: string; metadata?: Record<string, unknown> },
+  event?: string,
 ): Promise<void> {
-  const mapped = applyInboundMapping(provider, body as unknown as Record<string, unknown>) as typeof body;
+  const mapped = applyInboundMapping(provider, body as unknown as Record<string, unknown>, event) as typeof body;
 
   await logEvent(db, {
     arrangementId: provider.externalProviderArrangementInstanceReference,
@@ -94,9 +103,10 @@ export async function processFdsCallback(
 export async function processAmlCallback(
   db: Db,
   provider: ExternalProviderArrangement,
-  body: { alertType: string; severity: string; entities: string[]; caseId?: string }
+  body: { alertType: string; severity: string; entities: string[]; caseId?: string },
+  event?: string,
 ): Promise<void> {
-  const mapped = applyInboundMapping(provider, body as unknown as Record<string, unknown>) as typeof body;
+  const mapped = applyInboundMapping(provider, body as unknown as Record<string, unknown>, event) as typeof body;
 
   await logEvent(db, {
     arrangementId: provider.externalProviderArrangementInstanceReference,
@@ -114,9 +124,10 @@ export async function processAmlCallback(
 export async function processKycCallback(
   db: Db,
   provider: ExternalProviderArrangement,
-  body: { status: 'verified' | 'rejected' | 'expired'; agreementRef: string; reference?: string }
+  body: { status: 'verified' | 'rejected' | 'expired'; agreementRef: string; reference?: string },
+  event?: string,
 ): Promise<void> {
-  const mapped = applyInboundMapping(provider, body as unknown as Record<string, unknown>) as typeof body;
+  const mapped = applyInboundMapping(provider, body as unknown as Record<string, unknown>, event) as typeof body;
 
   await logEvent(db, {
     arrangementId: provider.externalProviderArrangementInstanceReference,
@@ -161,9 +172,10 @@ export async function processKycCallback(
 export async function processKybCallback(
   db: Db,
   provider: ExternalProviderArrangement,
-  body: { status: 'verified' | 'rejected' | 'expired'; merchantRef: string; reference?: string }
+  body: { status: 'verified' | 'rejected' | 'expired'; merchantRef: string; reference?: string },
+  event?: string,
 ): Promise<void> {
-  const mapped = applyInboundMapping(provider, body as unknown as Record<string, unknown>) as typeof body;
+  const mapped = applyInboundMapping(provider, body as unknown as Record<string, unknown>, event) as typeof body;
 
   await logEvent(db, {
     arrangementId: provider.externalProviderArrangementInstanceReference,
@@ -208,9 +220,10 @@ export async function processKybCallback(
 export async function processHrpCallback(
   db: Db,
   provider: ExternalProviderArrangement,
-  body: { hrpcMatch: boolean; flags: string[]; accountRef: string }
+  body: { hrpcMatch: boolean; flags: string[]; accountRef: string },
+  event?: string,
 ): Promise<void> {
-  const mapped = applyInboundMapping(provider, body as unknown as Record<string, unknown>) as typeof body;
+  const mapped = applyInboundMapping(provider, body as unknown as Record<string, unknown>, event) as typeof body;
 
   await logEvent(db, {
     arrangementId: provider.externalProviderArrangementInstanceReference,
@@ -228,9 +241,10 @@ export async function processHrpCallback(
 export async function processCardAuthorizationCallback(
   db: Db,
   provider: ExternalProviderArrangement,
-  body: { authorizationResult: string; cardTransactionInstanceReference?: string; responseCode: string }
+  body: { authorizationResult: string; cardTransactionInstanceReference?: string; responseCode: string },
+  event?: string,
 ): Promise<void> {
-  const mapped = applyInboundMapping(provider, body as unknown as Record<string, unknown>) as typeof body;
+  const mapped = applyInboundMapping(provider, body as unknown as Record<string, unknown>, event) as typeof body;
 
   await logEvent(db, {
     arrangementId: provider.externalProviderArrangementInstanceReference,
@@ -248,9 +262,10 @@ export async function processCardAuthorizationCallback(
 export async function processCardIssuerCallback(
   db: Db,
   provider: ExternalProviderArrangement,
-  body: { responseCode: string; cvvValidationResult?: string; pinValidationResult?: string; cardTransactionInstanceReference?: string; transactionId?: string; actionConfirmed?: boolean }
+  body: { responseCode: string; cvvValidationResult?: string; pinValidationResult?: string; cardTransactionInstanceReference?: string; transactionId?: string; actionConfirmed?: boolean },
+  event?: string,
 ): Promise<void> {
-  const mapped = applyInboundMapping(provider, body as unknown as Record<string, unknown>) as typeof body;
+  const mapped = applyInboundMapping(provider, body as unknown as Record<string, unknown>, event) as typeof body;
 
   await logEvent(db, {
     arrangementId: provider.externalProviderArrangementInstanceReference,
@@ -288,9 +303,10 @@ export async function processCardIssuerCallback(
 export async function processGenericCallback(
   db: Db,
   provider: ExternalProviderArrangement,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  event?: string,
 ): Promise<void> {
-  const mapped = applyInboundMapping(provider, body);
+  const mapped = applyInboundMapping(provider, body, event);
 
   await logEvent(db, {
     arrangementId: provider.externalProviderArrangementInstanceReference,

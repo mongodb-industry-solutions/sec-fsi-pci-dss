@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { RefreshCw, CheckCircle2, AlertCircle, WifiOff, Clock } from 'lucide-react';
-import { useIntegration, TYPE_LABEL } from '../_context';
+import { RefreshCw, CheckCircle2, AlertCircle, WifiOff, Clock, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { useIntegration, TYPE_LABEL, type ProviderEventConfig } from '../_context';
 import { Card } from '../_shared';
 import { api } from '../../../../../../../lib/api';
 import { useDebugMode } from '../../../../../../../lib/debugMode';
@@ -62,12 +62,16 @@ export default function OverviewPage() {
     } finally { setTesting(false); }
   }
 
-  const triggerEvents = integration.externalProviderTriggerEvents ?? [];
+  // §2.4: configuration is PER EVENT. Show each event the vendor handles with its own outbound URL and
+  // inbound callback URL. Fall back to the (legacy) trigger list when per-event config is absent.
+  const events: ProviderEventConfig[] = integration.externalProviderEvents?.length
+    ? integration.externalProviderEvents
+    : (integration.externalProviderTriggerEvents ?? []).map((e) => ({ event: e, outbound: {}, inbound: {} }));
 
-  // Inbound callback endpoint, shown as a full absolute URL (scheme + host + path). External
-  // providers must register this exact URL; the path alone is ambiguous outside our origin.
-  const callbackSegment = byProviderType(String(integration.externalProviderArrangementType))?.callbackSegment ?? 'generic';
-  const callbackUrl = `${API_BASE_URL}/api/v1/providers/callback/${callbackSegment}/${id}`;
+  // §7.7 per-event+vendor callback URL: /api/v1/providers/{group}/{vendorId}/{event}/callback.
+  const group = byProviderType(String(integration.externalProviderArrangementType))?.capability ?? 'generic';
+  const callbackFor = (ev: ProviderEventConfig) =>
+    ev.inbound?.callbackUrl || `${API_BASE_URL}/api/v1/providers/${group}/${id}/${encodeURIComponent(ev.event)}/callback`;
 
   return (
     <div className="space-y-5">
@@ -91,7 +95,8 @@ export default function OverviewPage() {
         </div>
       </Card>
 
-      {/* Provider info */}
+      {/* Vendor-global info — §2.4: identity, status, metadata only. NO vendor base URL / callback /
+          auth here: those are configured PER EVENT (see below + the Outbound / Inbound tabs). */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <Card title="Provider">
           <dl className="space-y-3">
@@ -113,26 +118,13 @@ export default function OverviewPage() {
                 <dd className="text-sm font-mono text-gray-700 mt-0.5">{integration.externalProviderInternalHandler}</dd>
               </div>
             )}
-            {integration.externalProviderApiEndpoint && (
-              <div>
-                <dt className="text-xs text-gray-500">Outbound endpoint</dt>
-                <dd className="text-sm font-mono text-gray-700 mt-0.5 break-all">{integration.externalProviderApiEndpoint}</dd>
-              </div>
-            )}
             <div>
-              <dt className="text-xs text-gray-500">Inbound callback endpoint</dt>
-              <dd className="text-sm font-mono text-gray-700 mt-0.5 break-all">{callbackUrl}</dd>
-              <p className="text-[11px] text-gray-400 mt-0.5">
-                Full URL to register with the provider for inbound responses
-                {integration.externalProviderCallbackEnabled ? '' : ' (currently disabled in the Inbound tab)'}.
-              </p>
+              <dt className="text-xs text-gray-500">Configuration scope</dt>
+              <dd className="text-sm text-gray-700 mt-0.5">
+                Per event (§2.4) — endpoints, mapping, auth, retries and timeout are set per event below.
+                <span className="text-gray-400"> There is no vendor base URL.</span>
+              </dd>
             </div>
-            {integration.externalProviderApiKeyPrefix && (
-              <div>
-                <dt className="text-xs text-gray-500">API key (prefix)</dt>
-                <dd className="text-sm font-mono text-gray-500 mt-0.5">{integration.externalProviderApiKeyPrefix}…</dd>
-              </div>
-            )}
             <div>
               <dt className="text-xs text-gray-500">Registered</dt>
               <dd className="text-sm text-gray-700 mt-0.5">{new Date(integration.recordCreatedDateTime).toLocaleString()}</dd>
@@ -162,19 +154,36 @@ export default function OverviewPage() {
         </Card>
       </div>
 
-      {/* Trigger events */}
+      {/* Per-event configuration (§2.4 / §7.7): each event has its OWN outbound + inbound config. */}
       <Card
-        title="System events linked to this integration"
-        subtitle="Internal system events that activate this provider. When one of these fires, the PSP dispatches a request to this provider and records the round-trip in the Events tab.">
-        {triggerEvents.length === 0 ? (
-          <p className="text-sm text-gray-400 italic">No trigger events configured.</p>
+        title="Events & per-event configuration"
+        subtitle="Each event this vendor handles carries its own outbound endpoint and inbound callback URL, plus its own mapping, auth, retries and timeout. Edit them in the Outbound / Inbound tabs.">
+        {events.length === 0 ? (
+          <p className="text-sm text-gray-400 italic">No events configured.</p>
         ) : (
-          <div className="flex flex-wrap gap-2">
-            {triggerEvents.map(ev => (
-              <span key={ev}
-                className="text-xs px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-medium font-mono">
-                {ev}
-              </span>
+          <div className="space-y-3">
+            {events.map((ev) => (
+              <div key={ev.event} className="rounded-lg border border-gray-200 p-3">
+                <p className="font-mono text-xs font-semibold text-indigo-700">{ev.event}</p>
+                <dl className="mt-2 grid grid-cols-1 gap-2 text-xs">
+                  <div className="flex items-start gap-1.5">
+                    <ArrowUpRight size={13} className="mt-0.5 shrink-0 text-gray-400" />
+                    <div className="min-w-0">
+                      <dt className="text-gray-500">Outbound endpoint</dt>
+                      <dd className="font-mono text-gray-700 break-all">{ev.outbound?.url ?? <span className="italic text-gray-400">not set</span>}</dd>
+                      {!!ev.outbound?.mapping?.length && <dd className="text-gray-400">{ev.outbound.mapping.length} mapping rule(s)</dd>}
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-1.5">
+                    <ArrowDownLeft size={13} className="mt-0.5 shrink-0 text-gray-400" />
+                    <div className="min-w-0">
+                      <dt className="text-gray-500">Inbound callback URL</dt>
+                      <dd className="font-mono text-gray-700 break-all">{callbackFor(ev)}</dd>
+                      {!!ev.inbound?.mapping?.length && <dd className="text-gray-400">{ev.inbound.mapping.length} mapping rule(s)</dd>}
+                    </div>
+                  </div>
+                </dl>
+              </div>
             ))}
           </div>
         )}

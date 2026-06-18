@@ -1,8 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Copy, Check, Shield, ShieldOff, FlaskConical, Play, Info } from 'lucide-react';
 import { useIntegration } from '../_context';
-import type { MappingRule, HmacConfig, FieldMappingConfig } from '../_context';
+import type { MappingRule, HmacConfig, FieldMappingConfig, ProviderEventConfig, EventFieldMapping } from '../_context';
 import { FieldMappingMatrix, SaveBtn, Card, StatusToggle, FieldLabel } from '../_shared';
 import { api } from '../../../../../../../lib/api';
 import { getInboundSample } from '../_samples';
@@ -41,12 +41,18 @@ export default function InboundPage() {
   const id  = integration.externalProviderArrangementInstanceReference;
   const fmc = integration.fieldMappingConfig ?? {};
 
-  // Inbound callback route (ADR-029): /api/v1/providers/callback/<capability-segment>/<vendorId>.
-  // The external provider needs the ABSOLUTE URL (scheme + host), not just the path, so it can POST
-  // to the right destination; the path alone is ambiguous outside our own origin.
-  const callbackSegment = byProviderType(String(integration.externalProviderArrangementType))?.callbackSegment ?? 'generic';
-  const webhookPath  = `/api/v1/providers/callback/${callbackSegment}/${id}`;
-  const webhookUrl   = `${API_BASE_URL}${webhookPath}`;
+  // §2.4: inbound config is PER EVENT. Pick the event to configure; its callback URL + mapping + auth
+  // load into the form and Save persists them to that event.
+  const events = integration.externalProviderEvents ?? [];
+  const eventNames = events.length ? events.map((e) => e.event) : (integration.externalProviderTriggerEvents ?? []);
+  const [selectedEvent, setSelectedEvent] = useState(eventNames[0] ?? '');
+  const selectedInbound = events.find((e) => e.event === selectedEvent)?.inbound;
+
+  // §7.7 per-event+vendor callback URL: /api/v1/providers/{group}/{vendorId}/{event}/callback. The
+  // provider needs the ABSOLUTE URL (scheme + host) to POST inbound responses for this event.
+  const group = byProviderType(String(integration.externalProviderArrangementType))?.capability ?? 'generic';
+  const webhookUrl = selectedInbound?.callbackUrl
+    || `${API_BASE_URL}/api/v1/providers/${group}/${id}/${encodeURIComponent(selectedEvent || 'event')}/callback`;
 
   // ── Immediate toggle ──────────────────────────────────────────────────────
   const [callbackEnabled, setCallbackEnabled]   = useState(integration.externalProviderCallbackEnabled ?? false);
@@ -81,6 +87,21 @@ export default function InboundPage() {
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved]   = useState(false);
+
+  // Load the selected event's inbound config (mapping + HMAC) into the form (§2.4 per-event).
+  useEffect(() => {
+    const inb = events.find((e) => e.event === selectedEvent)?.inbound;
+    if (!inb) return; // legacy vendor without per-event config — keep vendor-global values
+    setInboundRules((inb.mapping ?? []).map((m) => ({ location: 'body', sourceField: m.sourcePath, targetField: m.targetPath, required: !!m.required })));
+    const hmac = inb.auth?.hmacInbound;
+    setSecEnabled(!!hmac?.algorithm);
+    if (hmac?.algorithm) setAlgorithm(hmac.algorithm);
+    if (hmac?.signatureHeaderName) setSigHeader(hmac.signatureHeaderName);
+    if (hmac?.signaturePrefix) setSigPrefix(hmac.signaturePrefix);
+    if (hmac?.payloadFormat) setPayloadFormat(hmac.payloadFormat);
+    if (hmac?.replayWindowSeconds != null) setReplayWindow(hmac.replayWindowSeconds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEvent]);
 
   const [inboundSample, setInboundSample]           = useState(() => getInboundSample(integration.externalProviderArrangementType));
   const [inboundSampleError, setInboundSampleError] = useState('');
@@ -153,10 +174,29 @@ export default function InboundPage() {
         ipAllowlist: ipAllowlist.split(',').map(s => s.trim()).filter(Boolean),
       },
     };
+    // §2.4: persist the selected event's per-event inbound config (its own mapping + auth + callback).
+    const eventMapping: EventFieldMapping[] = inboundRules.map((r) => ({ sourcePath: r.sourceField, targetPath: r.targetField, required: r.required }));
+    const updatedEvents: ProviderEventConfig[] = selectedEvent
+      ? (() => {
+          const existing = events.find((e) => e.event === selectedEvent);
+          const entry: ProviderEventConfig = {
+            event: selectedEvent,
+            outbound: existing?.outbound ?? {},
+            inbound: {
+              ...(selectedInbound?.callbackUrl ? { callbackUrl: selectedInbound.callbackUrl } : {}),
+              mapping: eventMapping,
+              ...(hmacInbound ? { auth: { hmacInbound } } : {}),
+            },
+          };
+          const rest = events.filter((e) => e.event !== selectedEvent);
+          return [...rest, entry].sort((a, b) => a.event.localeCompare(b.event));
+        })()
+      : events;
     try {
       await api.integrations.update(id, {
         authConfig: { ...(integration?.authConfig ?? {}), hmacInbound },
         fieldMappingConfig: newFmc,
+        ...(updatedEvents.length ? { externalProviderEvents: updatedEvents } : {}),
       }, token);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -168,6 +208,20 @@ export default function InboundPage() {
 
   return (
     <div className="space-y-5">
+
+      {/* ── Per-event selector (§2.4) ──────────────────────────────────────── */}
+      {eventNames.length > 0 && (
+        <Card
+          title="Event being configured"
+          subtitle="Each event this vendor handles has its own inbound configuration (callback URL, mapping, signature verification). Pick the event to edit; Save persists this event's inbound config.">
+          <select
+            value={selectedEvent}
+            onChange={(e) => setSelectedEvent(e.target.value)}
+            className="w-full sm:w-96 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono">
+            {eventNames.map((ev) => <option key={ev} value={ev}>{ev}</option>)}
+          </select>
+        </Card>
+      )}
 
       {/* For a synchronous provider the inbound callback is NOT part of the decision path; make that
           explicit so a disabled callback is not mistaken for a broken approval. */}

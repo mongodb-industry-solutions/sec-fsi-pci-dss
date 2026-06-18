@@ -181,6 +181,7 @@ type UpdateablePatch = Partial<Pick<
   ExternalProviderArrangement,
   | 'externalProviderApiEndpoint'
   | 'externalProviderTriggerEvents'
+  | 'externalProviderEvents'
   | 'externalProviderMode'
   | 'externalProviderTimeoutMs'
   | 'externalProviderRetryPolicy'

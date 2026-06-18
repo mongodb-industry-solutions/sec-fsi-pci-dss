@@ -8,6 +8,7 @@ import {
   IntegrationRoutingGroup,
   EXTERNAL_PROVIDER_ARRANGEMENT_PORTFOLIO_COLLECTION,
   BusinessContextRef,
+  IntegrationAuthConfig,
 } from '../models/externalProviderArrangement.model';
 import {
   getActiveProviderForType,
@@ -17,6 +18,7 @@ import {
 import { applyMappings } from './fieldMapping.service';
 import { resolveProviderFromGroup } from './integrationRoutingGroup.service';
 import { sanitizeDeep } from './businessProcessEvent.service';
+import { resolveEventOutbound } from './providerEventConfig.service';
 
 export interface DispatchResult {
   provider: 'internal' | 'external';
@@ -86,12 +88,12 @@ export async function dispatchProvider(
   });
 }
 
-function buildAuthHeaders(provider: ExternalProviderArrangement): Record<string, string> {
-  if (!provider.authConfig) {
+function buildAuthHeaders(authConfig?: IntegrationAuthConfig): Record<string, string> {
+  if (!authConfig) {
     return { 'X-Integration-Source': 'psp-demo' };
   }
 
-  const { scheme, bearer, apiKey } = provider.authConfig;
+  const { scheme, bearer, apiKey } = authConfig;
 
   if (scheme === 'bearer' && bearer) {
     // API key is bcrypt-hashed — we can't recover the plaintext in a demo.
@@ -128,12 +130,16 @@ async function dispatchExternal(
   const start = Date.now();
   const arrangementId = provider.externalProviderArrangementInstanceReference;
 
+  // §2.4: resolve the wire config for THIS event (url, method, mapping, auth, timeout) — per-event when
+  // configured, vendor-global as the migration fallback. `triggeredBy` is the bus event name.
+  const wire = resolveEventOutbound(provider, triggeredBy);
+
   // Apply outbound field mapping before sending. The MAPPED payload goes to the connector (it may
   // rename CHD, e.g. cardNumber -> card_value, for a card issuer). PCI DSS Req 3.2/10.7: we log the
   // ORIGINAL (pre-mapping) payload, where CHD lives under known keys that sanitizeDeep strips — the
   // mapped body (with aliased CHD) is NEVER persisted, only transmitted.
-  const mappedPayload = provider.fieldMappingConfig?.outbound?.length
-    ? applyMappings(payload, provider.fieldMappingConfig.outbound)
+  const mappedPayload = wire.mapping.length
+    ? applyMappings(payload, wire.mapping)
     : payload;
 
   const fieldMappingApplied = mappedPayload !== payload;
@@ -141,7 +147,7 @@ async function dispatchExternal(
   // Declared outside try so the catch branch can include the request in its audit capture.
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...buildAuthHeaders(provider),
+    ...buildAuthHeaders(wire.auth),
   };
 
   try {
@@ -150,12 +156,12 @@ async function dispatchExternal(
     // Internal providers dispatch via an HTTP loopback to our own API (ADR-025 endpoint-first). That
     // round-trip is more than a local function call, so enforce a sane minimum timeout to avoid
     // spurious AbortError timeouts on a busy event loop; external providers keep their configured value.
-    const configuredTimeout = provider.externalProviderTimeoutMs ?? 5000;
+    const configuredTimeout = wire.timeoutMs;
     const effectiveTimeout = provider.externalProviderIsInternal ? Math.max(configuredTimeout, 1500) : configuredTimeout;
     const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
 
-    const res = await fetch(provider.externalProviderApiEndpoint!, {
-      method: 'POST',
+    const res = await fetch(wire.url!, {
+      method: wire.httpMethod,
       headers,
       body: JSON.stringify(mappedPayload),
       signal: controller.signal,
@@ -180,7 +186,7 @@ async function dispatchExternal(
       latencyMs,
       meta: { fieldMappingApplied },
       businessContext,
-      request: { method: 'POST', url: provider.externalProviderApiEndpoint, headers, body: payload },
+      request: { method: wire.httpMethod, url: wire.url, headers, body: payload },
       response: { status: res.status, headers: responseHeaders, body: responseBody },
     });
 
@@ -202,7 +208,7 @@ async function dispatchExternal(
       error: (err as Error).message,
       meta: { fieldMappingApplied },
       businessContext,
-      request: { method: 'POST', url: provider.externalProviderApiEndpoint, headers, body: payload },
+      request: { method: wire.httpMethod, url: wire.url, headers, body: payload },
     });
 
     await updateHealthStatus(db, arrangementId, 'unreachable');
@@ -433,7 +439,7 @@ export async function runIntegrationTest(
     const timeout = setTimeout(() => controller.abort(), provider.externalProviderTimeoutMs ?? 5000);
     const res = await fetch(targetUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Integration-Test': 'true', ...buildAuthHeaders(provider) },
+      headers: { 'Content-Type': 'application/json', 'X-Integration-Test': 'true', ...buildAuthHeaders(provider.authConfig) },
       body: JSON.stringify(transformed),
       signal: controller.signal,
     });

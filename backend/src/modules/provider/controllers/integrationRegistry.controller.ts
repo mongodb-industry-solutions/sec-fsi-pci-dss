@@ -147,6 +147,7 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
         properties: {
           externalProviderApiEndpoint:       { type: 'string' },
           externalProviderTriggerEvents:     { type: 'array', items: { type: 'string' } },
+          externalProviderEvents:            { type: 'array', items: { type: 'object', additionalProperties: true } },
           externalProviderMode:              { type: 'string', enum: ['sync','async'] },
           externalProviderTimeoutMs:         { type: 'number', minimum: 100, maximum: 30000 },
           externalProviderRetryPolicy:       { type: 'object' },

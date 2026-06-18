@@ -84,14 +84,15 @@ export async function updateUser(db: Db, id: string, patch: {
     const cur = await col.findOne({ customerAuthenticationInstanceReference: id });
     return cur ? toManaged(cur) : null;
   }
-  const res = await col.findOneAndUpdate(
+  // QE-encrypted collection: findOneAndUpdate with returnDocument:'after' is rejected
+  // ("findAndModify with encryption only supports new: false"). Update, then read back.
+  const upd = await col.updateOne(
     { customerAuthenticationInstanceReference: id },
     { $set: set },
-    { returnDocument: 'after' },
   );
-  const doc = (res as unknown as { value?: CustomerAuthenticationAssessmentRecord })?.value
-    ?? (res as CustomerAuthenticationAssessmentRecord | null);
-  return doc && doc.customerAuthenticationInstanceReference ? toManaged(doc) : null;
+  if (upd.matchedCount === 0) return null;
+  const doc = await col.findOne({ customerAuthenticationInstanceReference: id });
+  return doc ? toManaged(doc) : null;
 }
 
 export async function deleteUser(db: Db, id: string): Promise<boolean> {

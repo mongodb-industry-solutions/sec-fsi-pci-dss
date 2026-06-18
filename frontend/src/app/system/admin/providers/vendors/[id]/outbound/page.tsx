@@ -1,8 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FlaskConical, Play, Info } from 'lucide-react';
 import { useIntegration } from '../_context';
-import type { MappingRule, FieldMappingConfig } from '../_context';
+import type { MappingRule, FieldMappingConfig, ProviderEventConfig, EventFieldMapping } from '../_context';
 import { FieldMappingMatrix, SaveBtn, Card, StatusToggle, FieldLabel } from '../_shared';
 import { api } from '../../../../../../../lib/api';
 import { getOutboundSample } from '../_samples';
@@ -98,6 +98,23 @@ export default function OutboundPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved]   = useState(false);
 
+  // §2.4: outbound config is PER EVENT. Pick the event to configure; its config loads into the form
+  // and Save persists it back to that event (vendor-global is kept as a migration fallback).
+  const events = integration.externalProviderEvents ?? [];
+  const eventNames = events.length ? events.map((e) => e.event) : (integration.externalProviderTriggerEvents ?? []);
+  const [selectedEvent, setSelectedEvent] = useState(eventNames[0] ?? '');
+
+  useEffect(() => {
+    const ev = events.find((e) => e.event === selectedEvent)?.outbound;
+    if (!ev) return; // legacy vendor without per-event config — keep the vendor-global values shown
+    setEndpoint(ev.url ?? '');
+    setHttpMethod(ev.httpMethod ?? 'POST');
+    if (ev.timeoutMs != null) setTimeoutMs(ev.timeoutMs);
+    if (ev.retryPolicy) { setMaxAttempts(ev.retryPolicy.maxAttempts); setBackoffMs(ev.retryPolicy.backoffMs); }
+    setOutboundRules((ev.mapping ?? []).map((m) => ({ location: 'body', sourceField: m.sourcePath, targetField: m.targetPath, required: !!m.required })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEvent]);
+
   const [testPayload, setTestPayload]           = useState(() => getOutboundSample(integration.externalProviderArrangementType));
   const [testPayloadError, setTestPayloadError] = useState('');
   const [testResult, setTestResult]             = useState<{ original: Record<string, unknown>; transformed: Record<string, unknown>; appliedRules: number } | null>(null);
@@ -132,6 +149,22 @@ export default function OutboundPage() {
       ...(scheme === 'hmac'    ? { hmacOutbound: { algorithm: hmacAlgo, signatureHeaderName: hmacHeader, signaturePrefix: hmacPrefix, payloadFormat: hmacFormat } } : {}),
     };
     const newFmc: FieldMappingConfig = { ...fmc, outboundRules, outboundHttpMethod: httpMethod };
+    // §2.4: persist the selected event's per-event outbound config (its own url/method/mapping/auth/
+    // retry/timeout). The vendor-global fields are still written as a migration fallback.
+    const eventMapping: EventFieldMapping[] = outboundRules.map((r) => ({ sourcePath: r.sourceField, targetField: r.targetField, targetPath: r.targetField, required: r.required }))
+      .map(({ sourcePath, targetPath, required }) => ({ sourcePath, targetPath, required }));
+    const updatedEvents: ProviderEventConfig[] = selectedEvent
+      ? (() => {
+          const existing = events.find((e) => e.event === selectedEvent);
+          const entry: ProviderEventConfig = {
+            event: selectedEvent,
+            outbound: { url: endpoint || undefined, httpMethod, mapping: eventMapping, auth: authConfig, retryPolicy: { maxAttempts, backoffMs }, timeoutMs },
+            inbound: existing?.inbound ?? {},
+          };
+          const rest = events.filter((e) => e.event !== selectedEvent);
+          return [...rest, entry].sort((a, b) => a.event.localeCompare(b.event));
+        })()
+      : events;
     try {
       await api.integrations.update(id, {
         externalProviderApiEndpoint:  endpoint || undefined,
@@ -141,6 +174,7 @@ export default function OutboundPage() {
         authConfig,
         fieldMappingConfig:           newFmc,
         categoryConfig,
+        ...(updatedEvents.length ? { externalProviderEvents: updatedEvents } : {}),
       }, token);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -190,6 +224,20 @@ export default function OutboundPage() {
 
   return (
     <div className="space-y-5">
+
+      {/* ── Per-event selector (§2.4) ──────────────────────────────────────── */}
+      {eventNames.length > 0 && (
+        <Card
+          title="Event being configured"
+          subtitle="Each event this vendor handles has its own outbound configuration (URL, mapping, auth, retries, timeout). Pick the event to edit; Save persists this event's outbound config.">
+          <select
+            value={selectedEvent}
+            onChange={(e) => setSelectedEvent(e.target.value)}
+            className="w-full sm:w-96 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono">
+            {eventNames.map((ev) => <option key={ev} value={ev}>{ev}</option>)}
+          </select>
+        </Card>
+      )}
 
       {/* ── Outbound status ────────────────────────────────────────────────── */}
       <Card title="Outbound status">
