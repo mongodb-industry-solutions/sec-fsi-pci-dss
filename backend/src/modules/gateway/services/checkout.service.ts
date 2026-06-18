@@ -125,6 +125,9 @@ export interface ProcessCheckoutPaymentInput {
   customerEmail?: string;
   saveCard?: boolean;
   cardAuthOutcome?: 'approved' | 'declined' | 'challenge';
+  // The CVV the buyer entered on the checkout form. Forwarded to the issuer for verification ONLY
+  // (P13.1); never persisted/logged (PCI DSS Req 3.2). A wrong/missing CVV declines (D1).
+  cardCvv?: string;
 }
 
 export async function processCheckoutPayment(
@@ -208,6 +211,14 @@ export async function processCheckoutPayment(
     ...(input.cardExpiryMonth && input.cardExpiryYear
       ? { paymentCardExpirationDate: `${input.cardExpiryMonth}/${input.cardExpiryYear.slice(-2)}` }
       : {}),
+    // P13.1: forward the entered CVV to the issuer for verification (rides only the encrypted `chd`
+    // envelope, never persisted/logged). requireCardVerification marks this as a CVV-bearing channel
+    // so a missing CVV declines (D1).
+    requireCardVerification: true,
+    cardVerification: {
+      ...(input.cardCvv ? { cvv: input.cardCvv } : {}),
+      ...(input.cardExpiryMonth && input.cardExpiryYear ? { expiry: `${input.cardExpiryMonth}/${input.cardExpiryYear.slice(-2)}` } : {}),
+    },
     gatewayPayload: {
       source: 'checkout_session',
       sessionId: session.checkoutSessionInstanceReference,

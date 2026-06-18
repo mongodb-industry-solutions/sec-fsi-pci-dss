@@ -154,6 +154,7 @@ export async function checkoutController(fastify: FastifyInstance) {
           cardholderName: { type: 'string', minLength: 1, maxLength: 100 },
           cardExpiryMonth: { type: 'string', pattern: '^(0[1-9]|1[0-2])$' },
           cardExpiryYear: { type: 'string', pattern: '^20[2-9][0-9]$' },
+          cardCvv: { type: 'string', pattern: '^[0-9]{3,4}$', description: 'Card verification value. Forwarded to the issuer for verification ONLY; never persisted (PCI DSS Req 3.2). A wrong/missing CVV declines.' },
           cardholderEmail: { type: 'string', format: 'email', description: 'Customer email — used as accountReference to link transaction to customer record.' },
           saveCard: { type: 'boolean', description: 'When true, saves the card token to the customer\'s SD-57 paymentCardManagement record.' },
           cardAuthOutcome: { type: 'string', enum: ['approved', 'declined', 'challenge'], description: 'Simulator-only: drives stub card auth result.' },
@@ -182,6 +183,7 @@ export async function checkoutController(fastify: FastifyInstance) {
       cardholderName: string;
       cardExpiryMonth: string;
       cardExpiryYear: string;
+      cardCvv?: string;
       cardholderEmail?: string;
       saveCard?: boolean;
       cardAuthOutcome?: 'approved' | 'declined' | 'challenge';
@@ -195,6 +197,7 @@ export async function checkoutController(fastify: FastifyInstance) {
         cardholderName: body.cardholderName,
         cardExpiryMonth: body.cardExpiryMonth,
         cardExpiryYear: body.cardExpiryYear,
+        cardCvv: body.cardCvv,
         customerEmail: body.cardholderEmail,
         saveCard: body.saveCard,
         cardAuthOutcome: body.cardAuthOutcome,

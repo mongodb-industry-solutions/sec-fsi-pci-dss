@@ -3,11 +3,13 @@
 // encrypts the content; the DEK is wrapped by a CMK that never leaves the KMS. node:crypto only.
 import { createCipheriv, createDecipheriv, randomBytes, hkdfSync } from 'node:crypto';
 
-// Cleartext CHD shape — the minimal fields the issuer needs (§7.8).
+// Cleartext CHD shape — the minimal fields the issuer needs (§7.8). On the tokenized payment path the
+// PAN/expiry are not present (the card was tokenized client-side); only the CVV is carried, still as
+// the opaque `chd` token. cvv is the always-present verification value; cardNumber/expiry are optional.
 export interface ChdCleartext {
-  cardNumber: string;
+  cardNumber?: string;
   cvv: string;
-  expiry: string;                           // MM/YY
+  expiry?: string;                          // MM/YY
 }
 
 // Journey binding for the AAD — a token cannot be replayed onto another event/journey (§7.8).

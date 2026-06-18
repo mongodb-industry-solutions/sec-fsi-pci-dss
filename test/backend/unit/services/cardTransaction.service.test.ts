@@ -52,6 +52,7 @@ vi.mock('../../../../backend/src/modules/gateway/services/merchantCallback.servi
 }));
 
 import { createTransaction, getTransactionById, getTransactionsByCardToken } from '../../../../backend/src/modules/transaction/services/cardTransaction.service';
+import { dispatchProvider } from '../../../../backend/src/modules/provider/services/integrationDispatch.service';
 import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
 import { setEventBus, getEventBus } from '../../../../backend/src/vendors/eventbus';
 import { PaymentAuthorizationSaga } from '../../../../backend/src/modules/transaction/services/paymentAuthorization.saga';
@@ -155,6 +156,39 @@ describe('createTransaction', () => {
     process.env.RISK_MCC_LIST = '1234';
     const result = await createTransaction(txDb(), { ...baseInput, amount: 50, cardTransactionMerchantCategoryCode: '7995' });
     expect(result.fraudCaseCreated).toBe(false);
+  });
+
+  // P13.3 (D2): when the FDS gate returns a verdict, the fraud case is driven by it — the case score
+  // and risk indicators are the FDS verdict, not the amount-count heuristic.
+  it('opens the fraud case from the FDS verdict (score + rulesFired), not the amount heuristic', async () => {
+    vi.mocked(dispatchProvider).mockImplementation(async (_db: any, group: string) => {
+      if (group === 'fraud_detection') {
+        return { provider: 'internal', status: 'received', responseBody: { riskScore: 75, recommendation: 'review', fraudFlag: true, rulesFired: ['HIGH_VALUE_TXN', 'RISKY_MCC'] } } as any;
+      }
+      return { provider: 'internal', status: 'received' } as any;
+    });
+    // A LOW amount that the PSP amount rule would NOT flag — proving the verdict (not the amount) decides.
+    const result = await createTransaction(txDb(), { ...baseInput, amount: 50, cardTransactionMerchantCategoryCode: '5411' });
+    expect(result.fraudCaseCreated).toBe(true);
+    expect(h.createFraudCase).toHaveBeenCalledTimes(1);
+    const call = h.createFraudCase.mock.calls[0];
+    expect(call[3]).toEqual(['HIGH_VALUE_TXN', 'RISKY_MCC']); // riskIndicators = rulesFired
+    expect(call[4]).toBe('high');                              // severity from score 75
+    expect(call[6]).toBe(75);                                  // fraudScore = FDS riskScore
+    vi.mocked(dispatchProvider).mockResolvedValue({ provider: 'internal', status: 'received' } as any);
+  });
+
+  it('does NOT open a case when the FDS verdict is approve, even above the amount heuristic', async () => {
+    vi.mocked(dispatchProvider).mockImplementation(async (_db: any, group: string) => {
+      if (group === 'fraud_detection') {
+        return { provider: 'internal', status: 'received', responseBody: { riskScore: 10, recommendation: 'approve', fraudFlag: false, rulesFired: [] } } as any;
+      }
+      return { provider: 'internal', status: 'received' } as any;
+    });
+    const result = await createTransaction(txDb(), { ...baseInput, amount: 850, cardTransactionMerchantCategoryCode: '5411' });
+    expect(result.fraudCaseCreated).toBe(false);
+    expect(h.createFraudCase).not.toHaveBeenCalled();
+    vi.mocked(dispatchProvider).mockResolvedValue({ provider: 'internal', status: 'received' } as any);
   });
 
   // U-01: cardTransactionDescription accepted and function returns successfully (BIAN SD-254)

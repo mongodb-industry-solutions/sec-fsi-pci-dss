@@ -87,6 +87,8 @@ function PaymentLinkPageInner() {
         cardholderName,
         cardExpiryMonth: expiryMonth.padStart(2, '0'),
         cardExpiryYear: `20${expiryYear}`,
+        // Forward the entered CVV for issuer verification (never persisted; PCI Req 3.2). A wrong CVV declines.
+        cardCvv: cvv,
         customerEmail: customerEmail || undefined,
       });
       if (result.success) {

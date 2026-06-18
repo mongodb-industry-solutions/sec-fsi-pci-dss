@@ -41,6 +41,10 @@ export interface CreateTransactionInput {
   // authorization request would carry. NEVER persisted on the transaction and stripped from every
   // audit log (PCI DSS Req 3.2 / Req 10.7). Used in-memory for the issuer decision, then discarded.
   cardVerification?: { cardNumber?: string; cvv?: string; expiry?: string };
+  // P13.1 (D1): set by CVV-bearing channels (interactive checkout / payment-link / simulator). When
+  // true and no CVV reached the issuer, the issuer declines (a CVV was expected but missing). Left
+  // unset for card-on-file / recurring tokenized payments, which legitimately carry no CVV.
+  requireCardVerification?: boolean;
 }
 
 // Thrown when a payment is attempted with a card-on-file the customer has deactivated (suspended)
@@ -76,6 +80,15 @@ function deriveSeverity(amount: number, riskIndicators: string[]): 'low' | 'medi
   if (amount > 1000 || riskIndicators.length >= 2) return 'critical';
   if (amount > 500) return 'high';
   if (amount > 200) return 'medium';
+  return 'low';
+}
+
+// P13.3 (D2): when the FDS verdict drives the case, map the FDS riskScore (0–100) to the case severity
+// so the case is congruent with the gate verdict (no more disconnected riskIndicators.length*40).
+function deriveSeverityFromScore(score: number): 'low' | 'medium' | 'high' | 'critical' {
+  if (score >= 80) return 'critical';
+  if (score >= 60) return 'high';
+  if (score >= 40) return 'medium';
   return 'low';
 }
 
@@ -125,6 +138,10 @@ interface PendingContext {
   input: CreateTransactionInput; // cardVerification stripped before storing
   canonicalAccountRef: string;
   resolvedUuid?: string;
+  // P13.3 (D2): the FDS gate stashes its verdict here so completeAuthorized derives the fraud case
+  // from it (score/severity/indicators), instead of an amount-count heuristic. In-memory, matching
+  // the in-process saga aggregation (a broker deployment would carry this in the saga state).
+  fdsVerdict?: { riskScore: number; recommendation: 'approve' | 'review' | 'decline'; fraudFlag: boolean; rulesFired: string[] };
 }
 const pendingContext = new Map<string, PendingContext>();
 
@@ -235,17 +252,31 @@ async function scoreFraudGate(db: Db, txnId: string, input: CreateTransactionInp
   void getEventBus().publish(requested);
   let approved = true;
   let reason: string | undefined;
+  let verdict: { riskScore?: number; recommendation?: string; fraudFlag?: boolean; rulesFired?: string[] } | undefined;
   try {
     const r = await dispatchProvider(db, 'fraud_detection', 'fds.scoring.requested', {
       cardTransactionInstanceReference: txnId, amount: input.amount, currency: input.currency,
       merchantName: input.cardTransactionMerchantName, merchantCategoryCode: input.cardTransactionMerchantCategoryCode,
     }, { entityType: 'transaction', entityId: txnId, processType: 'fraud_evaluation' });
-    const b = r.responseBody as { recommendation?: string } | undefined;
-    if (b?.recommendation === 'block' || b?.recommendation === 'decline') { approved = false; reason = 'fraud_block'; }
+    verdict = r.responseBody as typeof verdict;
+    if (verdict?.recommendation === 'block' || verdict?.recommendation === 'decline') { approved = false; reason = 'fraud_block'; }
+    // Stash the verdict so completeAuthorized derives the fraud case from it (P13.3 / D2).
+    const ctx = pendingContext.get(txnId);
+    if (ctx && verdict) {
+      ctx.fdsVerdict = {
+        riskScore: verdict.riskScore ?? 0,
+        recommendation: (verdict.recommendation as 'approve' | 'review' | 'decline') ?? 'approve',
+        fraudFlag: !!verdict.fraudFlag,
+        rulesFired: verdict.rulesFired ?? [],
+      };
+    }
   } catch { /* fail-open */ }
   void getEventBus().publish(makeEvent({
     eventType: 'fds.scoring.completed', correlationId: txnId, businessProcess: 'card_payment', source: 'callback.fds', causationId: requested.eventId,
-    payload: { transactionId: txnId, outcome: approved ? 'approved' : 'declined', approved, reason }, bian: { serviceDomain: 'SD-63 Fraud Evaluation', controlRecord: 'FraudEvaluationAssessment' },
+    // The verdict (riskScore + rulesFired) rides the completed event so the audit trail and SSE are
+    // congruent with the fraud case the saga will open (P13.4).
+    payload: { transactionId: txnId, outcome: approved ? 'approved' : 'declined', approved, reason, riskScore: verdict?.riskScore, recommendation: verdict?.recommendation, rulesFired: verdict?.rulesFired },
+    bian: { serviceDomain: 'SD-63 Fraud Evaluation', controlRecord: 'FraudEvaluationAssessment' },
   }));
 }
 
@@ -281,13 +312,14 @@ async function authorizeWithIssuer(db: Db, txnId: string, input: CreateTransacti
   const issuerNetwork = input.paymentCardNetwork ?? onFileNetwork;
   const cv = input.cardVerification;
 
-  // Build the encrypted CHD carrier if raw card verification is present (§7.8). The plaintext keys
-  // never ride the bus — only the opaque `chd` token does.
+  // Build the encrypted CHD carrier when ANY raw verification value is present (§7.8). The tokenized
+  // payment path carries only a CVV (no PAN/expiry) — it is still protected as the opaque `chd` token.
+  // The plaintext keys never ride the bus — only the opaque `chd` token does.
   let chd: string | undefined;
-  if (cv?.cardNumber && cv?.cvv && cv?.expiry) {
+  if (cv?.cvv || cv?.cardNumber) {
     try {
       chd = await getChdCrypto().encrypt(
-        { cardNumber: cv.cardNumber, cvv: cv.cvv, expiry: cv.expiry },
+        { ...(cv.cardNumber ? { cardNumber: cv.cardNumber } : {}), cvv: cv.cvv ?? '', ...(cv.expiry ? { expiry: cv.expiry } : {}) },
         { correlationId: txnId, eventType: CHD_AAD_EVENT },
       );
     } catch { /* crypto unavailable (no master key) — proceed reference-led, no CHD on the wire */ }
@@ -326,6 +358,8 @@ async function authorizeWithIssuer(db: Db, txnId: string, input: CreateTransacti
       ...(cardData.cardNumber ? { cardNumber: cardData.cardNumber } : {}),
       ...(cardData.cvv ? { cvv: cardData.cvv } : {}),
       ...(cardData.expiry ? { expiry: cardData.expiry } : {}),
+      // D1: tell the issuer a CVV was expected on this channel, so a missing CVV declines (82).
+      ...(input.requireCardVerification ? { cvvExpected: true } : {}),
     }, { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' });
     decision = r.responseBody as typeof decision;
   } catch { /* transport failure: fail-safe to approve; only an explicit decline blocks */ }
@@ -388,10 +422,28 @@ export async function completeAuthorized(db: Db, txnId: string): Promise<{ fraud
     } catch { /* never block on card-on-file save */ }
   }
 
-  const { create, reasons } = shouldCreateFraudCase(input.amount, input.cardTransactionMerchantCategoryCode);
+  // P13.3 (D2): the FDS verdict drives the fraud case when present — the case score/severity/indicators
+  // are the FDS verdict, so the case is congruent with the fds.scoring.completed gate result. When no
+  // verdict is available (FDS unreachable / fail-open), fall back to the PSP amount+MCC rule, which
+  // shares the same amount threshold as the FDS engine (D3: FRAUD_AMOUNT_THRESHOLD === FDS reviewAmount).
+  const fds = ctx.fdsVerdict;
+  let create: boolean;
+  let reasons: string[];
+  let severity: 'low' | 'medium' | 'high' | 'critical';
+  let score: number | undefined;
+  if (fds) {
+    create = fds.recommendation !== 'approve' || fds.fraudFlag;
+    reasons = fds.rulesFired.length ? fds.rulesFired : create ? ['fds_flagged'] : [];
+    severity = deriveSeverityFromScore(fds.riskScore);
+    score = fds.riskScore;
+  } else {
+    const fallback = shouldCreateFraudCase(input.amount, input.cardTransactionMerchantCategoryCode);
+    create = fallback.create;
+    reasons = fallback.reasons;
+    severity = deriveSeverity(input.amount, reasons);
+  }
   let fraudCaseRef: string | undefined;
   if (create) {
-    const severity = deriveSeverity(input.amount, reasons);
     const snapshot = {
       cardTransactionAmount: { amount: input.amount, currency: input.currency },
       cardTransactionMerchantName: input.cardTransactionMerchantName,
@@ -399,7 +451,7 @@ export async function completeAuthorized(db: Db, txnId: string): Promise<{ fraud
       cardTransactionStatus: 'authorized' as const,
       cardTransactionMaskedPanDisplay: input.cardTransactionMaskedPanDisplay,
     };
-    const fraudCase = await createFraudCase(db, txnId, resolvedUuid ?? input.accountReference, reasons, severity, snapshot);
+    const fraudCase = await createFraudCase(db, txnId, resolvedUuid ?? input.accountReference, reasons, severity, snapshot, score);
     fraudCaseRef = fraudCase.fraudDiagnosisInstanceReference;
   }
 

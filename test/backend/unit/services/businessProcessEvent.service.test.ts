@@ -19,7 +19,7 @@ import {
   LedgerProjection,
 } from '../../../../backend/src/modules/provider/services/businessProcessEvent.service';
 import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
-import { setEventBus, getEventBus } from '../../../../backend/src/vendors/eventbus';
+import { setEventBus, getEventBus, makeEvent } from '../../../../backend/src/vendors/eventbus';
 
 const mockDb = { collection: h.collection } as never;
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -74,6 +74,45 @@ describe('emit* → LedgerProjection routing', () => {
     // projection metadata must NOT leak into the ledger eventSummary
     expect(row.eventSummary).not.toHaveProperty('ledgerKind');
     expect(row.eventSummary).not.toHaveProperty('processType');
+  });
+});
+
+// ── P13.4: canonical §5 milestones project to the business ledger (no ledgerKind) ──────────────
+describe('canonical milestone projection (P13.4)', () => {
+  it('projects a gate *.completed (fds.scoring.completed) to the business ledger', async () => {
+    getEventBus().publish(makeEvent({
+      eventType: 'fds.scoring.completed', correlationId: 'txn-900', businessProcess: 'card_payment', source: 'callback.fds',
+      payload: { transactionId: 'txn-900', outcome: 'approved', approved: true, riskScore: 75, rulesFired: ['HIGH_VALUE_TXN'] },
+      bian: { serviceDomain: 'SD-63 Fraud Evaluation', controlRecord: 'FraudEvaluationAssessment' },
+    }));
+    await flush();
+    expect(h.collection).toHaveBeenCalledWith('businessProcessEvent');
+    const row = h.insertOne.mock.calls[0][0] as Record<string, unknown>;
+    expect(row.processAction).toBe('fds.scoring.completed');
+    expect(row.entityId).toBe('txn-900');
+    expect(row.processType).toBe('fraud_evaluation');
+    expect((row.eventSummary as Record<string, unknown>).riskScore).toBe(75);
+  });
+
+  it('projects the journey closing event (card.payment.authorization.completed)', async () => {
+    getEventBus().publish(makeEvent({
+      eventType: 'card.payment.authorization.completed', correlationId: 'txn-901', businessProcess: 'card_payment', source: 'saga.payment-authorization',
+      payload: { outcome: 'authorized', fraudCaseCreated: false },
+      bian: { serviceDomain: 'SD-254 Card Transaction', controlRecord: 'CardTransactionRecord' },
+    }));
+    await flush();
+    const row = h.insertOne.mock.calls[0][0] as Record<string, unknown>;
+    expect(row.processAction).toBe('card.payment.authorization.completed');
+    expect(row.processOutcome).toBe('authorized');
+  });
+
+  it('does NOT project a non-canonical bus event that carries no ledgerKind', async () => {
+    getEventBus().publish(makeEvent({
+      eventType: 'fds.scoring.requested', correlationId: 'txn-902', businessProcess: 'card_payment', source: 'psp.core',
+      payload: { amount: 100 },
+    }));
+    await flush();
+    expect(h.insertOne).not.toHaveBeenCalled();
   });
 });
 

@@ -67,7 +67,19 @@ function publishLedgerEvent(opts: EmitProcessEventOpts | EmitComplianceEventOpts
 }
 
 // Payload keys that carry projection metadata (not part of the ledger eventSummary).
-const LEDGER_META_KEYS = new Set(['outcome', 'entityType', 'processType', 'ledgerKind', 'processMeta']);
+const LEDGER_META_KEYS = new Set(['outcome', 'entityType', 'processType', 'ledgerKind', 'processMeta', 'chd']);
+
+// P13.4 (§5): canonical choreography milestones are published directly on the bus (not via emit*), so
+// they carry no `ledgerKind`. The projection ALSO writes them to the business ledger so the unified
+// audit view shows the journey open/close and EVERY gate *.completed symmetrically (no more missing
+// fds/hrp completions, no issuer-only asymmetry). The wire detail stays in the integration action-log.
+const CANONICAL_LEDGER_EVENTS: Record<string, { processType: BusinessProcessType; entityType: BusinessEntityType; bian: { serviceDomain: string; controlRecord: string } }> = {
+  'card.payment.authorization.requested': { processType: 'payment_processing', entityType: 'transaction', bian: { serviceDomain: 'SD-254 Card Transaction', controlRecord: 'CardTransactionRecord' } },
+  'card.payment.authorization.completed': { processType: 'payment_processing', entityType: 'transaction', bian: { serviceDomain: 'SD-254 Card Transaction', controlRecord: 'CardTransactionRecord' } },
+  'card.issuer.validation.completed':     { processType: 'payment_processing', entityType: 'transaction', bian: { serviceDomain: 'SD-88 Payment Card', controlRecord: 'PaymentCardValidation' } },
+  'fds.scoring.completed':                { processType: 'fraud_evaluation',   entityType: 'transaction', bian: { serviceDomain: 'SD-63 Fraud Evaluation', controlRecord: 'FraudEvaluationAssessment' } },
+  'hrp.screening.completed':              { processType: 'aml_screening',      entityType: 'transaction', bian: { serviceDomain: 'SD-13 Party Reference', controlRecord: 'PartyReferenceDataDirectoryEntry' } },
+};
 
 // §5.0 / §9.2: the durable audit ledger is a PROJECTION written by this single bus subscriber from the
 // published domain events — it never originates events. Business logic only publishes (via emit*).
@@ -81,26 +93,46 @@ export class LedgerProjection {
   private async project(e: DomainEvent): Promise<void> {
     const p = (e.payload ?? {}) as Record<string, unknown>;
     const kind = p.ledgerKind;
-    if (kind !== 'business' && kind !== 'compliance') return; // only emit*-originated ledger events
-    const collection = kind === 'business' ? BUSINESS_PROCESS_EVENTS_COLLECTION : COMPLIANCE_PROCESS_EVENTS_COLLECTION;
+
+    // emit*-originated ledger events carry an explicit ledgerKind.
+    if (kind === 'business' || kind === 'compliance') {
+      const collection = kind === 'business' ? BUSINESS_PROCESS_EVENTS_COLLECTION : COMPLIANCE_PROCESS_EVENTS_COLLECTION;
+      const row = this.buildRow(e, p, p.processType as BusinessProcessType, p.entityType as BusinessEntityType, e.correlationId,
+        e.bian?.serviceDomain ?? '', e.bian?.controlRecord ?? '');
+      try { await this.db.collection<BusinessProcessEvent>(collection).insertOne(row); } catch { /* fire-and-forget */ }
+      return;
+    }
+
+    // P13.4: canonical §5 milestone (no ledgerKind) → project to the business ledger so the audit view
+    // shows the whole journey symmetrically. `transient` aggregation events are still ignored.
+    const milestone = CANONICAL_LEDGER_EVENTS[e.eventType];
+    if (!milestone || e.transient) return;
+    const row = this.buildRow(e, p, milestone.processType, milestone.entityType, e.correlationId,
+      e.bian?.serviceDomain ?? milestone.bian.serviceDomain, e.bian?.controlRecord ?? milestone.bian.controlRecord);
+    try { await this.db.collection<BusinessProcessEvent>(BUSINESS_PROCESS_EVENTS_COLLECTION).insertOne(row); } catch { /* fire-and-forget */ }
+  }
+
+  private buildRow(
+    e: DomainEvent, p: Record<string, unknown>, processType: BusinessProcessType, entityType: BusinessEntityType,
+    entityId: string, bianServiceDomain: string, bianControlRecordType: string,
+  ): BusinessProcessEvent {
     const eventSummary: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(p)) if (!LEDGER_META_KEYS.has(k)) eventSummary[k] = v;
-    const row: BusinessProcessEvent = {
+    return {
       eventDateTime: new Date(e.occurredAt),
-      processType: p.processType as BusinessProcessType,
+      processType,
       businessProcessEventInstanceReference: uuidv4(),
-      entityType: p.entityType as BusinessEntityType,
-      entityId: e.correlationId,
+      entityType,
+      entityId,
       processAction: e.eventType,
-      processOutcome: p.outcome as ProcessEventOutcome,
+      processOutcome: (p.outcome as ProcessEventOutcome) ?? 'pending',
       performedByPartyReference: e.actor?.partyRef ?? null,
       performedByRole: e.actor?.role ?? null,
       eventSummary,
-      bianServiceDomain: e.bian?.serviceDomain ?? '',
-      bianControlRecordType: e.bian?.controlRecord ?? '',
+      bianServiceDomain,
+      bianControlRecordType,
       processMeta: p.processMeta as ProcessEventMeta | undefined,
     };
-    try { await this.db.collection<BusinessProcessEvent>(collection).insertOne(row); } catch { /* fire-and-forget */ }
   }
 }
 

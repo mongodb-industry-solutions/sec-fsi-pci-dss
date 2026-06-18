@@ -4,7 +4,19 @@
     "capability": "fds",
     "moduleDomain": "fraud",
     "capabilityModuleStatus": "active",
-    "moduleConfig": { "thresholds": { "reviewAmount": 1000 }, "scoreScaleMax": 100 },
+    "moduleConfig": {
+      "amount": { "reviewAmount": 500 },
+      "riskyMcc": ["5812", "6011", "7995"],
+      "velocity": { "window24hMax": 5 },
+      "bands": { "reviewAtOrAbove": 50, "declineAtOrAbove": 120 },
+      "rules": [
+        { "id": "HIGH_VALUE_TXN", "label": "Amount over 500", "when": { "field": "amount", "op": "gt", "value": 500 }, "score": 60, "action": "review" },
+        { "id": "ELEVATED_VALUE_TXN", "label": "Amount over 250", "when": { "field": "amount", "op": "gt", "value": 250 }, "score": 40 },
+        { "id": "RISKY_MCC", "label": "Merchant category on the risky list", "when": { "field": "merchantCategoryCode", "op": "in", "value": ["5812", "6011", "7995"] }, "score": 35, "action": "review" },
+        { "id": "VELOCITY_24H", "label": "More than 5 transactions in 24h", "when": { "field": "recentTransactionCount24h", "op": "gt", "value": 5 }, "score": 30, "action": "review" }
+      ],
+      "scoreScaleMax": 100
+    },
     "moduleCallbackEndpoints": [
       { "event": "fds.scored", "path": "/api/v1/providers/callback/fds/int-internal-fds-001" }
     ],

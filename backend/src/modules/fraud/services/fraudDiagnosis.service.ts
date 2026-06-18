@@ -88,10 +88,17 @@ export async function createFraudCase(
   customerRef: string,
   riskIndicators: string[],
   severity: RiskSeverity,
-  transactionSnapshot: TransactionSnapshot
+  transactionSnapshot: TransactionSnapshot,
+  // P13.3 (D2): the authoritative fraud score from the FDS verdict. When provided, it IS the case
+  // score (congruent with fds.scoring.completed). When omitted (manual/legacy), fall back to the
+  // indicator-count heuristic so existing callers keep working.
+  fraudScore?: number,
 ) {
   const caseId = uuidv4();
   const now = new Date();
+  const resolvedScore = typeof fraudScore === 'number'
+    ? Math.min(100, Math.round(fraudScore))
+    : Math.min(100, riskIndicators.length * 40);
 
   const fraudCase: Omit<FraudDiagnosisControlRecord, never> = {
     fraudDiagnosisInstanceReference: caseId,
@@ -104,7 +111,7 @@ export async function createFraudCase(
     fraudDiagnosisRequestDateTime: now,
     fraudDiagnosisAssessment: {
       riskIndicators,
-      fraudDiagnosisScore: Math.min(100, riskIndicators.length * 40),
+      fraudDiagnosisScore: resolvedScore,
     },
     bianServiceDomain: 'Fraud Diagnosis',
     bianControlRecordType: 'FraudDiagnosis',

@@ -205,6 +205,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
           cardholderName: { type: 'string', minLength: 1, maxLength: 100 },
           cardExpiryMonth: { type: 'string', pattern: '^(0[1-9]|1[0-2])$' },
           cardExpiryYear: { type: 'string', pattern: '^20[2-9][0-9]$' },
+          cardCvv: { type: 'string', pattern: '^[0-9]{3,4}$', description: 'Card verification value. Forwarded to the issuer for verification ONLY; never persisted (PCI DSS Req 3.2). A wrong/missing CVV declines.' },
           customerEmail: { type: 'string', format: 'email', description: 'Optional: link payment to customer record.' },
         },
       },
@@ -229,6 +230,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
       cardholderName: string;
       cardExpiryMonth: string;
       cardExpiryYear: string;
+      cardCvv?: string;
       customerEmail?: string;
       cardAuthOutcome?: 'approved' | 'declined' | 'challenge';
     };
@@ -239,6 +241,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
       cardholderName: body.cardholderName,
       cardExpiryMonth: body.cardExpiryMonth,
       cardExpiryYear: body.cardExpiryYear,
+      cardCvv: body.cardCvv,
       customerEmail: body.customerEmail,
       cardAuthOutcome: body.cardAuthOutcome,
     });

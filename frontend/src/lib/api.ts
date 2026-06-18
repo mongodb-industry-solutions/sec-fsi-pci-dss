@@ -939,7 +939,7 @@ export const api = {
         checkoutSessionReturnUrl: string;
         checkoutSessionCancelUrl: string;
       }>(`/api/v1/checkout/sessions/${sessionId}`),
-    pay: (sessionId: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth: string; cardExpiryYear: string; cardholderEmail?: string; saveCard?: boolean }) =>
+    pay: (sessionId: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth: string; cardExpiryYear: string; cardCvv?: string; cardholderEmail?: string; saveCard?: boolean }) =>
       apiFetch<{ success: boolean; cardTransactionInstanceReference: string; redirectUrl: string }>(
         `/api/v1/checkout/sessions/${sessionId}/pay`, { method: 'POST', body: JSON.stringify(body) }
       ),
@@ -981,7 +981,7 @@ export const api = {
         paymentLinkStatus: string;
         paymentLinkExpiresAt?: string;
       }>(`/api/v1/payment/links/${code}`),
-    pay: (code: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth: string; cardExpiryYear: string; customerEmail?: string }) =>
+    pay: (code: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth: string; cardExpiryYear: string; cardCvv?: string; customerEmail?: string }) =>
       apiFetch<{ success: boolean; cardTransactionInstanceReference: string; fraudDiagnosisInstanceReference?: string | null }>(
         `/api/v1/payment/links/${code}/pay`, { method: 'POST', body: JSON.stringify(body) }
       ),

@@ -171,6 +171,15 @@ export function validateCard(input: Record<string, unknown>, config: CardIssuerS
     }
   }
 
+  // D1 (P13.1): on a CVV-bearing channel (interactive checkout / payment-link / simulator), the PSP
+  // sets `cvvExpected`. A missing CVV there is a decline (82) — the card-present-style verification
+  // was required but absent. Card-on-file / recurring tokenized payments do not set the flag, so they
+  // keep approving without a CVV.
+  const cvvExpected = input.cvvExpected === true || input.cvvExpected === 'true';
+  if (cvvExpected && !cvv) {
+    return { approved: false, responseCode: '82', network, cvvValidationResult: 'not_provided', decisionReason: 'cvv_required', last4 };
+  }
+
   // CVV check (only when a CVV is supplied; the tokenized path does not send one). The length is only
   // enforced when we know the network (and therefore its expected CVV length).
   let cvvValidationResult: CardValidationResult['cvvValidationResult'] = 'not_provided';

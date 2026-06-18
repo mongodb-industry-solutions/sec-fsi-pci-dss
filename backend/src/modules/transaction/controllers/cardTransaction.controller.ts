@@ -196,7 +196,12 @@ the Merchant Name selector. No authentication required (public, simulator mode).
     try {
       // dev.v8 F3: async authorization. Create the transaction PENDING and return immediately; the
       // client opens GET /:id/stream (SSE) to receive the issuer decision (authorized / declined).
-      const result = await initiateTransaction(fastify.db, body);
+      // P13.1 (D1): supplying cardVerification marks this as a CVV-bearing channel, so a wrong or
+      // missing CVV declines at the issuer.
+      const result = await initiateTransaction(fastify.db, {
+        ...body,
+        ...(body.cardVerification ? { requireCardVerification: true } : {}),
+      });
       return reply.status(202).send({
         cardTransactionInstanceReference: result.cardTransactionInstanceReference,
         cardTransactionStatus: result.cardTransactionStatus,

@@ -65,6 +65,17 @@ describe('capability module engines (ADR-029)', () => {
       expect(r.actionConfirmed).toBe(true);
       expect(r.cvvValidationResult).toBe('not_provided');
     });
+    it('D1 (P13.1): declines when a CVV was expected on the channel but none was supplied', () => {
+      const r = validateCardIssuer({ maskedPan: '****-****-****-4242', network: 'VISA', cvvExpected: true });
+      expect(r.actionConfirmed).toBe(false);
+      expect(r.responseCode).toBe('82');
+      expect(r.decisionReason).toBe('cvv_required');
+    });
+    it('D1 (P13.1): a correct CVV on a CVV-bearing channel still approves', () => {
+      const r = validateCardIssuer({ cardNumber: '4242424242424242', cvv: '123', cvvExpected: true });
+      expect(r.actionConfirmed).toBe(true);
+      expect(r.cvvValidationResult).toBe('match');
+    });
     it('tokenized path with NO network hint does NOT false-decline (network not assessable)', () => {
       // Regression: a masked PAN alone hides the BIN, so the network cannot be assessed. The issuer
       // must not reject the card here (it was validated at entry), otherwise legit payments break.

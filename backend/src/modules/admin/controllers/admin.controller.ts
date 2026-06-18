@@ -40,8 +40,8 @@ function isMongoUri(key: string, value: string): boolean {
 
 /**
  * Replaces the password in a MongoDB URI with *** while keeping the rest
- * (scheme, username, host, port, database, options) visible.
- * e.g.  mongodb+srv://admin:s3cr3t@cluster.net/db  →  mongodb+srv://admin:***@cluster.net/db
+ * (scheme, username, host, port, database, options) visible. Only the credential
+ * segment between the username colon and the @ is masked.
  */
 function maskMongoUri(uri: string): string {
   return uri.replace(

@@ -135,6 +135,9 @@ export interface ProcessLinkPaymentInput {
   cardExpiryYear: string;
   customerEmail?: string;
   cardAuthOutcome?: 'approved' | 'declined' | 'challenge';
+  // The CVV the buyer entered on the payment-link page. Forwarded to the issuer for verification ONLY
+  // (P13.1); never persisted/logged (PCI DSS Req 3.2). A wrong/missing CVV declines (D1).
+  cardCvv?: string;
 }
 
 export async function processLinkPayment(
@@ -203,6 +206,13 @@ export async function processLinkPayment(
     cardTransactionDescription: link.paymentLinkDescription.slice(0, 22),
     cardTransactionNarrative: `Payment link ${link.paymentLinkCode}`,
     merchantAgreementInstanceReference: link.merchantAgreementInstanceReference,
+    // P13.1: forward the entered CVV to the issuer for verification (rides only the encrypted `chd`
+    // envelope, never persisted/logged). requireCardVerification marks this as a CVV-bearing channel.
+    requireCardVerification: true,
+    cardVerification: {
+      ...(input.cardCvv ? { cvv: input.cardCvv } : {}),
+      ...(input.cardExpiryMonth && input.cardExpiryYear ? { expiry: `${input.cardExpiryMonth}/${input.cardExpiryYear.slice(-2)}` } : {}),
+    },
     gatewayPayload: {
       source: 'payment_link',
       linkCode: link.paymentLinkCode,
