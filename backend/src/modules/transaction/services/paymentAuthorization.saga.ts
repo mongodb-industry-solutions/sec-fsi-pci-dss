@@ -40,6 +40,11 @@ export class PaymentAuthorizationSaga {
 
   private async onGate(gate: string, e: DomainEvent): Promise<void> {
     const txnId = e.correlationId;
+    // Only the authoritative gate verdict drives the saga. Audit-ledger projections (emit*/compliance
+    // events) can share a gate's eventType (e.g. the card-issuer module's own compliance event is also
+    // `card.issuer.validation.completed`) but carry a `ledgerKind` and use a ledger outcome ('rejected')
+    // — ignore them so they never masquerade as a gate approval.
+    if ((e.payload as { ledgerKind?: string }).ledgerKind) return;
     // Fallback if the gate result beats the `requested` event (in-process race): assume the default set.
     let st = this.journeys.get(txnId);
     if (!st) { st = { expected: new Set(DEFAULT_GATES), verdicts: new Map(), decided: false }; this.journeys.set(txnId, st); }

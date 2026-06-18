@@ -165,9 +165,12 @@ export async function checkoutController(fastify: FastifyInstance) {
           type: 'object',
           properties: {
             success: { type: 'boolean' },
-            cardTransactionInstanceReference: { type: 'string' },
+            declined: { type: 'boolean', description: 'True when the payment was declined (a normal outcome, not an error).' },
+            cardTransactionInstanceReference: { type: 'string', nullable: true },
             fraudDiagnosisInstanceReference: { type: 'string', nullable: true },
-            redirectUrl: { type: 'string', description: 'Buyer should be redirected to this URL.' },
+            responseCode: { type: 'string', description: 'Issuer response code on a decline (e.g. 82).' },
+            declineReason: { type: 'string', description: 'Human-readable decline reason.' },
+            redirectUrl: { type: 'string', nullable: true, description: 'Buyer should be redirected to this URL.' },
           },
         },
         402: { description: 'Card authorization declined.', $ref: 'Error#' },
@@ -189,7 +192,7 @@ export async function checkoutController(fastify: FastifyInstance) {
       cardAuthOutcome?: 'approved' | 'declined' | 'challenge';
     };
 
-    const { result, cardTransactionInstanceReference, fraudDiagnosisInstanceReference, redirectUrl } = await processCheckoutPayment(
+    const { result, cardTransactionInstanceReference, fraudDiagnosisInstanceReference, redirectUrl, responseCode, declineReason } = await processCheckoutPayment(
       fastify.db,
       {
         sessionId: id,
@@ -207,7 +210,18 @@ export async function checkoutController(fastify: FastifyInstance) {
     if (result === 'not_found') return reply.status(404).send({ error: 'Checkout session not found' });
     if (result === 'expired' || result === 'cancelled') return reply.status(410).send({ error: `Session ${result}` });
     if (result === 'already_completed') return reply.status(409).send({ error: 'Session already completed' });
-    if (result === 'declined') return reply.status(402).send({ error: 'Card authorization declined', code: '0190' });
+    // A declined payment is a normal outcome (not an error): return 200 with success:false + the
+    // redirect so the buyer is shown "payment declined" and returned to the merchant.
+    if (result === 'declined') {
+      return reply.status(200).send({
+        success: false,
+        declined: true,
+        cardTransactionInstanceReference: cardTransactionInstanceReference ?? null,
+        responseCode: responseCode ?? '0190',
+        declineReason: declineReason ?? 'Card declined',
+        redirectUrl: redirectUrl ?? null,
+      });
+    }
 
     // Fire webhook asynchronously (non-blocking)
     if (result === 'ok') {

@@ -8,7 +8,7 @@ import {
   CheckoutSessionRecord,
   CheckoutSessionStatus,
 } from '../models/checkoutSession.model';
-import { createTransaction } from '../../transaction/services/cardTransaction.service';
+import { createTransaction, CardIssuerDeclinedError } from '../../transaction/services/cardTransaction.service';
 import { authorizeCard, linkAuthToTransaction } from './cardAuthorization.service';
 import { sendMerchantPaymentCallback, DECLINE_REASONS } from './merchantCallback.service';
 
@@ -192,41 +192,71 @@ export async function processCheckoutPayment(
     return { result: 'declined', redirectUrl, responseCode: authResult.responseCode, declineReason };
   }
 
-  // Create the underlying card transaction
-  const txResult = await createTransaction(db, {
-    cardToken: input.cardToken,
-    accountReference: input.customerEmail ?? input.cardToken,
-    amount: session.checkoutSessionAmount,
-    currency: session.checkoutSessionCurrency,
-    cardTransactionMerchantName: session.merchantName,
-    cardTransactionMerchantCategoryCode: mcc,
-    cardTransactionChannel: 'online',
-    cardTransactionMaskedPanDisplay: maskedPan,
-    cardTransactionType: 'purchase',
-    cardTransactionDescription: session.checkoutSessionDescription.slice(0, 22),
-    cardTransactionNarrative: `Checkout session ${session.checkoutSessionMerchantReference}`,
-    merchantAgreementInstanceReference: session.merchantAgreementInstanceReference,
-    // Pass the expiry through so the card-on-file (auto-registered in createTransaction) carries
-    // it. The card is saved for the payer regardless of any "save card" choice (SD-88).
-    ...(input.cardExpiryMonth && input.cardExpiryYear
-      ? { paymentCardExpirationDate: `${input.cardExpiryMonth}/${input.cardExpiryYear.slice(-2)}` }
-      : {}),
-    // P13.1: forward the entered CVV to the issuer for verification (rides only the encrypted `chd`
-    // envelope, never persisted/logged). requireCardVerification marks this as a CVV-bearing channel
-    // so a missing CVV declines (D1).
-    requireCardVerification: true,
-    cardVerification: {
-      ...(input.cardCvv ? { cvv: input.cardCvv } : {}),
-      ...(input.cardExpiryMonth && input.cardExpiryYear ? { expiry: `${input.cardExpiryMonth}/${input.cardExpiryYear.slice(-2)}` } : {}),
-    },
-    gatewayPayload: {
-      source: 'checkout_session',
-      sessionId: session.checkoutSessionInstanceReference,
-      merchantReference: session.checkoutSessionMerchantReference,
-      cardAuthorizationInstanceReference: authResult.recordId,
-      cardAuthorizationCode: authResult.authCode,
-    },
-  });
+  // Create the underlying card transaction. An issuer decline (e.g. a wrong CVV) is a normal business
+  // outcome, not a server error: surface it as a declined payment (merchant callback + redirect back
+  // to the merchant), the same as the pre-auth decline above — never a 500.
+  let txResult: Awaited<ReturnType<typeof createTransaction>>;
+  try {
+    txResult = await createTransaction(db, {
+      cardToken: input.cardToken,
+      accountReference: input.customerEmail ?? input.cardToken,
+      amount: session.checkoutSessionAmount,
+      currency: session.checkoutSessionCurrency,
+      cardTransactionMerchantName: session.merchantName,
+      cardTransactionMerchantCategoryCode: mcc,
+      cardTransactionChannel: 'online',
+      cardTransactionMaskedPanDisplay: maskedPan,
+      cardTransactionType: 'purchase',
+      cardTransactionDescription: session.checkoutSessionDescription.slice(0, 22),
+      cardTransactionNarrative: `Checkout session ${session.checkoutSessionMerchantReference}`,
+      merchantAgreementInstanceReference: session.merchantAgreementInstanceReference,
+      // Pass the expiry through so the card-on-file (auto-registered in createTransaction) carries
+      // it. The card is saved for the payer regardless of any "save card" choice (SD-88).
+      ...(input.cardExpiryMonth && input.cardExpiryYear
+        ? { paymentCardExpirationDate: `${input.cardExpiryMonth}/${input.cardExpiryYear.slice(-2)}` }
+        : {}),
+      // P13.1: forward the entered CVV to the issuer for verification (rides only the encrypted `chd`
+      // envelope, never persisted/logged). requireCardVerification marks this as a CVV-bearing channel
+      // so a missing CVV declines (D1).
+      requireCardVerification: true,
+      cardVerification: {
+        ...(input.cardCvv ? { cvv: input.cardCvv } : {}),
+        ...(input.cardExpiryMonth && input.cardExpiryYear ? { expiry: `${input.cardExpiryMonth}/${input.cardExpiryYear.slice(-2)}` } : {}),
+      },
+      gatewayPayload: {
+        source: 'checkout_session',
+        sessionId: session.checkoutSessionInstanceReference,
+        merchantReference: session.checkoutSessionMerchantReference,
+        cardAuthorizationInstanceReference: authResult.recordId,
+        cardAuthorizationCode: authResult.authCode,
+      },
+    });
+  } catch (err) {
+    if (err instanceof CardIssuerDeclinedError) {
+      const declineReason = DECLINE_REASONS[err.responseCode] ?? err.reason ?? 'Authorization declined';
+      await sendMerchantPaymentCallback(db, {
+        merchantAgreementInstanceReference: session.merchantAgreementInstanceReference,
+        amount: session.checkoutSessionAmount,
+        currency: session.checkoutSessionCurrency,
+        merchantReference: session.checkoutSessionMerchantReference,
+        contextRef: session.checkoutSessionInstanceReference,
+        contextType: 'checkout_session',
+        triggeredBy: 'gateway.checkout.callback',
+        result: 'declined',
+        cardToken: input.cardToken,
+        maskedPan,
+        responseCode: err.responseCode,
+        declineReason,
+        ...(err.cardTransactionInstanceReference ? { cardTransactionInstanceReference: err.cardTransactionInstanceReference } : {}),
+      });
+      const redirectUrl = substitutePlaceholders(session.checkoutSessionReturnUrl, {
+        session_id: input.sessionId, txn_id: err.cardTransactionInstanceReference ?? '', case_id: '',
+        card_token: input.cardToken, result: 'declined', response_code: err.responseCode, auth_code: '', reason: declineReason,
+      });
+      return { result: 'declined', redirectUrl, responseCode: err.responseCode, declineReason, cardTransactionInstanceReference: err.cardTransactionInstanceReference };
+    }
+    throw err;
+  }
 
   // Link auth record to the transaction. The card-on-file is auto-registered inside
   // createTransaction for every payment, so no separate opt-in save is needed here.

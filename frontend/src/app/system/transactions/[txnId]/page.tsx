@@ -220,6 +220,8 @@ export default function TransactionDetailPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm border-t pt-4">
+          <span className="text-gray-500">Transaction ID</span>
+          <span className="font-mono text-xs break-all">{txn.cardTransactionInstanceReference ?? txnId}</span>
           {txn.cardTransactionChannel && (
             <>
               <span className="text-gray-500">Channel</span>
@@ -376,12 +378,27 @@ export default function TransactionDetailPage() {
                 <span className="text-gray-500">KYC check</span><span className="capitalize">{String((partyCustomer.customerAgreementKycCheck as { customerAgreementKycCheckStatus?: string } | null)?.customerAgreementKycCheckStatus ?? 'n/a')}</span>
               </div>
               {custSensitive ? (
-                <div className="mt-3 rounded-lg border border-purple-200 bg-purple-50 p-3 text-xs space-y-1">
-                  {custSensitive.customerAgreementResidentialAddress && (
-                    <div><span className="text-gray-500">Address: </span><span className="font-mono">{[custSensitive.customerAgreementResidentialAddress.streetAddress, custSensitive.customerAgreementResidentialAddress.city, custSensitive.customerAgreementResidentialAddress.postalCode, custSensitive.customerAgreementResidentialAddress.countryCode].filter(Boolean).join(', ')}</span></div>
-                  )}
-                  {custSensitive.governmentIdentificationReference && <div><span className="text-gray-500">Gov ID: </span><span className="font-mono">{custSensitive.governmentIdentificationReference}</span></div>}
-                  {custSensitive.customerAgreementRiskNotes && <div><span className="text-gray-500">Risk notes: </span>{custSensitive.customerAgreementRiskNotes}</div>}
+                <div className="mt-3 rounded-lg border border-purple-200 bg-purple-50 p-3">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                    {custSensitive.customerAgreementResidentialAddress && (
+                      <>
+                        <span className="text-gray-500">Address</span>
+                        <span className="font-mono text-xs break-words">{[custSensitive.customerAgreementResidentialAddress.streetAddress, custSensitive.customerAgreementResidentialAddress.city, custSensitive.customerAgreementResidentialAddress.postalCode, custSensitive.customerAgreementResidentialAddress.countryCode].filter(Boolean).join(', ')}</span>
+                      </>
+                    )}
+                    {custSensitive.governmentIdentificationReference && (
+                      <>
+                        <span className="text-gray-500">Gov ID</span>
+                        <span className="font-mono text-xs">{custSensitive.governmentIdentificationReference}</span>
+                      </>
+                    )}
+                    {custSensitive.customerAgreementRiskNotes && (
+                      <>
+                        <span className="text-gray-500">Risk notes</span>
+                        <span>{custSensitive.customerAgreementRiskNotes}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <p className="mt-3 text-xs text-gray-400 italic">Sensitive KYC PII requires {isAuditor ? 'auditor access' : 'L2 escalation'}.</p>

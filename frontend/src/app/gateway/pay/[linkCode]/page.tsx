@@ -6,7 +6,7 @@ import { deriveCardToken } from '../../../../lib/cardTokenize';
 import { Lock, CreditCard, CheckCircle, XCircle } from 'lucide-react';
 
 type LinkData = Awaited<ReturnType<typeof api.paymentLinks.resolve>>;
-type PageState = 'loading' | 'ready' | 'paying' | 'success' | 'unavailable' | 'error';
+type PageState = 'loading' | 'ready' | 'paying' | 'success' | 'declined' | 'unavailable' | 'error';
 
 // Registry of GET prefill params. Add a new field here and wire it in applyPrefillParams.
 const PREFILL_PARAM_NAMES = ['name', 'card', 'expiry', 'email'] as const;
@@ -92,7 +92,7 @@ function PaymentLinkPageInner() {
         customerEmail: customerEmail || undefined,
       });
       if (result.success) {
-        setTxRef(result.cardTransactionInstanceReference);
+        setTxRef(result.cardTransactionInstanceReference ?? '');
         setState('success');
         // Notify parent frame when embedded as iframe in the simulator
         try {
@@ -105,6 +105,13 @@ function PaymentLinkPageInner() {
             window.location.origin
           );
         } catch { /* not in iframe */ }
+      } else if (result.declined) {
+        // A declined payment is a normal outcome: show the reason (the buyer can retry).
+        setError(result.declineReason || 'Your card was declined.');
+        setState('declined');
+      } else {
+        setState('ready');
+        setError('Payment could not be completed. Please try again.');
       }
     } catch (err) {
       setState('ready');
@@ -140,6 +147,20 @@ function PaymentLinkPageInner() {
             </div>
           )}
           <div className="mt-4 text-xs text-gray-400">Powered by MongoDB PSP Platform</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (state === 'declined') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-sm w-full text-center">
+          <XCircle className="mx-auto mb-3 text-red-500" size={48} />
+          <h2 className="text-lg font-semibold text-gray-800 mb-2">Payment Declined</h2>
+          <p className="text-sm text-gray-500 mb-4">{error || 'Your card was declined.'}</p>
+          <button onClick={() => { setError(''); setState('ready'); }}
+            className="text-sm text-[#001E2B] underline hover:no-underline">Try again</button>
         </div>
       </div>
     );

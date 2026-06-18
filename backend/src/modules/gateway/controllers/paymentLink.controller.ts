@@ -214,8 +214,11 @@ export async function paymentLinkController(fastify: FastifyInstance) {
           type: 'object',
           properties: {
             success: { type: 'boolean' },
-            cardTransactionInstanceReference: { type: 'string' },
+            declined: { type: 'boolean', description: 'True when the payment was declined (a normal outcome, not an error).' },
+            cardTransactionInstanceReference: { type: 'string', nullable: true },
             fraudDiagnosisInstanceReference: { type: 'string', nullable: true },
+            responseCode: { type: 'string', description: 'Issuer response code on a decline (e.g. 82).' },
+            declineReason: { type: 'string', description: 'Human-readable decline reason.' },
           },
         },
         404: { $ref: 'Error#' },
@@ -235,7 +238,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
       cardAuthOutcome?: 'approved' | 'declined' | 'challenge';
     };
 
-    const { result, cardTransactionInstanceReference, fraudDiagnosisInstanceReference } = await processLinkPayment(fastify.db, {
+    const { result, cardTransactionInstanceReference, fraudDiagnosisInstanceReference, responseCode, declineReason } = await processLinkPayment(fastify.db, {
       linkCode: code,
       cardToken: body.cardToken,
       cardholderName: body.cardholderName,
@@ -250,7 +253,15 @@ export async function paymentLinkController(fastify: FastifyInstance) {
     if (result === 'expired') return reply.status(410).send({ error: 'Payment link has expired' });
     if (result === 'deactivated') return reply.status(410).send({ error: 'Payment link is no longer active' });
     if (result === 'completed') return reply.status(410).send({ error: 'This payment link has already been used' });
-    if (result === 'declined') return reply.status(402).send({ error: 'Card authorization declined', code: '0190' });
+    // A declined payment is a normal outcome (not an error): 200 with success:false so the pay page
+    // can show "payment declined" with the reason.
+    if (result === 'declined') {
+      return reply.status(200).send({
+        success: false, declined: true,
+        cardTransactionInstanceReference: cardTransactionInstanceReference ?? null,
+        responseCode: responseCode ?? '0190', declineReason: declineReason ?? 'Card declined',
+      });
+    }
 
     // Fire webhook asynchronously
     if (result === 'ok') {

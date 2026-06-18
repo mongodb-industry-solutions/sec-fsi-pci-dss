@@ -9,7 +9,7 @@ import {
   PaymentLinkStatus,
   PaymentLinkUsageType,
 } from '../models/paymentLink.model';
-import { createTransaction } from '../../transaction/services/cardTransaction.service';
+import { createTransaction, CardIssuerDeclinedError } from '../../transaction/services/cardTransaction.service';
 import { authorizeCard, linkAuthToTransaction } from './cardAuthorization.service';
 import { sendMerchantPaymentCallback, DECLINE_REASONS } from './merchantCallback.service';
 
@@ -143,7 +143,7 @@ export interface ProcessLinkPaymentInput {
 export async function processLinkPayment(
   db: Db,
   input: ProcessLinkPaymentInput
-): Promise<{ result: ProcessLinkPaymentResult; cardTransactionInstanceReference?: string; fraudDiagnosisInstanceReference?: string }> {
+): Promise<{ result: ProcessLinkPaymentResult; cardTransactionInstanceReference?: string; fraudDiagnosisInstanceReference?: string; responseCode?: string; declineReason?: string }> {
   const link = await db
     .collection<PaymentLinkRecord>(PAYMENT_LINK_COLLECTION)
     .findOne({ paymentLinkCode: input.linkCode } as Partial<PaymentLinkRecord>);
@@ -193,34 +193,60 @@ export async function processLinkPayment(
     return { result: 'declined' };
   }
 
-  const txResult = await createTransaction(db, {
-    cardToken: input.cardToken,
-    accountReference: input.customerEmail ?? input.cardToken,
-    amount: link.paymentLinkAmount,
-    currency: link.paymentLinkCurrency,
-    cardTransactionMerchantName: link.merchantName,
-    cardTransactionMerchantCategoryCode: '5999',
-    cardTransactionChannel: 'online',
-    cardTransactionMaskedPanDisplay: maskedPan,
-    cardTransactionType: 'purchase',
-    cardTransactionDescription: link.paymentLinkDescription.slice(0, 22),
-    cardTransactionNarrative: `Payment link ${link.paymentLinkCode}`,
-    merchantAgreementInstanceReference: link.merchantAgreementInstanceReference,
-    // P13.1: forward the entered CVV to the issuer for verification (rides only the encrypted `chd`
-    // envelope, never persisted/logged). requireCardVerification marks this as a CVV-bearing channel.
-    requireCardVerification: true,
-    cardVerification: {
-      ...(input.cardCvv ? { cvv: input.cardCvv } : {}),
-      ...(input.cardExpiryMonth && input.cardExpiryYear ? { expiry: `${input.cardExpiryMonth}/${input.cardExpiryYear.slice(-2)}` } : {}),
-    },
-    gatewayPayload: {
-      source: 'payment_link',
-      linkCode: link.paymentLinkCode,
-      linkInstanceReference: link.paymentLinkInstanceReference,
-      cardAuthorizationInstanceReference: authResult.recordId,
-      cardAuthorizationCode: authResult.authCode,
-    },
-  });
+  // An issuer decline (e.g. a wrong CVV) is a normal business outcome, not a server error: notify the
+  // merchant and return a declined result — never a 500.
+  let txResult: Awaited<ReturnType<typeof createTransaction>>;
+  try {
+    txResult = await createTransaction(db, {
+      cardToken: input.cardToken,
+      accountReference: input.customerEmail ?? input.cardToken,
+      amount: link.paymentLinkAmount,
+      currency: link.paymentLinkCurrency,
+      cardTransactionMerchantName: link.merchantName,
+      cardTransactionMerchantCategoryCode: '5999',
+      cardTransactionChannel: 'online',
+      cardTransactionMaskedPanDisplay: maskedPan,
+      cardTransactionType: 'purchase',
+      cardTransactionDescription: link.paymentLinkDescription.slice(0, 22),
+      cardTransactionNarrative: `Payment link ${link.paymentLinkCode}`,
+      merchantAgreementInstanceReference: link.merchantAgreementInstanceReference,
+      // P13.1: forward the entered CVV to the issuer for verification (rides only the encrypted `chd`
+      // envelope, never persisted/logged). requireCardVerification marks this as a CVV-bearing channel.
+      requireCardVerification: true,
+      cardVerification: {
+        ...(input.cardCvv ? { cvv: input.cardCvv } : {}),
+        ...(input.cardExpiryMonth && input.cardExpiryYear ? { expiry: `${input.cardExpiryMonth}/${input.cardExpiryYear.slice(-2)}` } : {}),
+      },
+      gatewayPayload: {
+        source: 'payment_link',
+        linkCode: link.paymentLinkCode,
+        linkInstanceReference: link.paymentLinkInstanceReference,
+        cardAuthorizationInstanceReference: authResult.recordId,
+        cardAuthorizationCode: authResult.authCode,
+      },
+    });
+  } catch (err) {
+    if (err instanceof CardIssuerDeclinedError) {
+      const declineReason = DECLINE_REASONS[err.responseCode] ?? err.reason ?? 'Authorization declined';
+      await sendMerchantPaymentCallback(db, {
+        merchantAgreementInstanceReference: link.merchantAgreementInstanceReference,
+        amount: link.paymentLinkAmount,
+        currency: link.paymentLinkCurrency,
+        merchantReference: link.paymentLinkCode,
+        contextRef: link.paymentLinkInstanceReference,
+        contextType: 'payment_link',
+        triggeredBy: 'payment.link.callback',
+        result: 'declined',
+        cardToken: input.cardToken,
+        maskedPan,
+        responseCode: err.responseCode,
+        declineReason,
+        ...(err.cardTransactionInstanceReference ? { cardTransactionInstanceReference: err.cardTransactionInstanceReference } : {}),
+      });
+      return { result: 'declined', responseCode: err.responseCode, declineReason, cardTransactionInstanceReference: err.cardTransactionInstanceReference };
+    }
+    throw err;
+  }
 
   // Link auth record to the transaction
   await linkAuthToTransaction(db, authResult.recordId, txResult.cardTransactionInstanceReference);

@@ -64,6 +64,21 @@ describe('PaymentAuthorizationSaga (Phase-1 gate aggregation)', () => {
     expect(h.completeAuthorized).not.toHaveBeenCalled();
   });
 
+  it('ignores an audit-ledger projection that shares a gate eventType (compliance issuer event)', async () => {
+    const seen = watch('t4');
+    await bus.publish(makeEvent({ eventType: 'card.payment.authorization.requested', correlationId: 't4', businessProcess: 'card_payment', payload: { gatesExpected: ['card.issuer', 'fds', 'hrp'] } }));
+    // The card-issuer module's own COMPLIANCE event reuses the gate eventType but carries a ledgerKind
+    // and a ledger outcome ('rejected'); it must NOT be read as an issuer approval.
+    await bus.publish(makeEvent({ eventType: 'card.issuer.validation.completed', correlationId: 't4', businessProcess: 'card_payment', payload: { outcome: 'rejected', ledgerKind: 'compliance', response: { approved: false, responseCode: '82' } } }));
+    await bus.publish(gate('fds.scoring.completed', 't4', true));
+    await bus.publish(gate('hrp.screening.completed', 't4', true));
+    // The authoritative (business) issuer verdict declines — the journey must decline, not authorize.
+    await bus.publish(gate('card.issuer.validation.completed', 't4', false, 'invalid_cvv'));
+    await flush();
+    expect(seen).toEqual(['declined']);
+    expect(h.completeAuthorized).not.toHaveBeenCalled();
+  });
+
   it('decides only once', async () => {
     const seen = watch('t3');
     await bus.publish(makeEvent({ eventType: 'card.payment.authorization.requested', correlationId: 't3', businessProcess: 'card_payment', payload: { gatesExpected: ['card.issuer', 'fds', 'hrp'] } }));

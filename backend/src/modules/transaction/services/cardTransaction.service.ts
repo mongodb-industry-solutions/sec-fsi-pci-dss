@@ -59,7 +59,7 @@ export class CardNotActiveError extends Error {
 // This is the security gate that an external issuer would enforce in a real deployment (BIAN SD-15 /
 // SD-88). Carries the issuer's response code + reason for the audit and the customer-facing message.
 export class CardIssuerDeclinedError extends Error {
-  constructor(public readonly responseCode: string, public readonly reason: string) {
+  constructor(public readonly responseCode: string, public readonly reason: string, public readonly cardTransactionInstanceReference?: string) {
     super(`Card issuer declined the card (${responseCode}): ${reason}`);
     this.name = 'CardIssuerDeclinedError';
   }
@@ -415,7 +415,7 @@ export async function createTransaction(db: Db, input: CreateTransactionInput) {
   const { settled } = await initiateTransaction(db, input);
   const o = await settled;
   if (o.cardTransactionStatus === 'declined') {
-    throw new CardIssuerDeclinedError(o.declineCode ?? 'declined', o.declineReason ?? 'card_issuer_declined');
+    throw new CardIssuerDeclinedError(o.declineCode ?? 'declined', o.declineReason ?? 'card_issuer_declined', o.cardTransactionInstanceReference);
   }
   return {
     cardTransactionInstanceReference: o.cardTransactionInstanceReference,

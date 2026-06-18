@@ -940,7 +940,7 @@ export const api = {
         checkoutSessionCancelUrl: string;
       }>(`/api/v1/checkout/sessions/${sessionId}`),
     pay: (sessionId: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth: string; cardExpiryYear: string; cardCvv?: string; cardholderEmail?: string; saveCard?: boolean }) =>
-      apiFetch<{ success: boolean; cardTransactionInstanceReference: string; redirectUrl: string }>(
+      apiFetch<{ success: boolean; declined?: boolean; cardTransactionInstanceReference?: string | null; responseCode?: string; declineReason?: string; redirectUrl?: string | null }>(
         `/api/v1/checkout/sessions/${sessionId}/pay`, { method: 'POST', body: JSON.stringify(body) }
       ),
     cancelSession: (sessionId: string, merchantAgreementInstanceReference: string, token: string) =>
@@ -982,7 +982,7 @@ export const api = {
         paymentLinkExpiresAt?: string;
       }>(`/api/v1/payment/links/${code}`),
     pay: (code: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth: string; cardExpiryYear: string; cardCvv?: string; customerEmail?: string }) =>
-      apiFetch<{ success: boolean; cardTransactionInstanceReference: string; fraudDiagnosisInstanceReference?: string | null }>(
+      apiFetch<{ success: boolean; declined?: boolean; cardTransactionInstanceReference?: string | null; fraudDiagnosisInstanceReference?: string | null; responseCode?: string; declineReason?: string }>(
         `/api/v1/payment/links/${code}/pay`, { method: 'POST', body: JSON.stringify(body) }
       ),
     deactivate: (id: string, merchantAgreementInstanceReference: string, token: string) =>

@@ -6,7 +6,7 @@ import { deriveCardToken } from '../../../../lib/cardTokenize';
 import { Lock, CreditCard, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 type SessionData = Awaited<ReturnType<typeof api.checkout.getSession>>;
-type PageState = 'loading' | 'ready' | 'paying' | 'success' | 'expired' | 'completed' | 'error';
+type PageState = 'loading' | 'ready' | 'paying' | 'success' | 'declined' | 'expired' | 'completed' | 'error';
 
 // ---------------------------------------------------------------------------
 // Registry of supported GET prefill params.
@@ -142,6 +142,16 @@ function CheckoutPageInner() {
         setTimeout(() => {
           if (result.redirectUrl) router.push(result.redirectUrl);
         }, 2000);
+      } else if (result.declined) {
+        // A declined payment is a normal outcome: show the reason and return to the merchant.
+        setError(result.declineReason || 'Your card was declined.');
+        setState('declined');
+        setTimeout(() => {
+          if (result.redirectUrl) router.push(result.redirectUrl);
+        }, 4000);
+      } else {
+        setState('ready');
+        setError('Payment could not be completed. Please try again.');
       }
     } catch (err) {
       setState('ready');
@@ -193,6 +203,19 @@ function CheckoutPageInner() {
           <h2 className="text-lg font-semibold text-gray-800 mb-2">Payment Successful</h2>
           <p className="text-sm text-gray-500 mb-2">Redirecting you back to the merchant...</p>
           <div className="text-xs text-gray-400">Powered by MongoDB PSP</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (state === 'declined') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-sm w-full text-center">
+          <XCircle className="mx-auto mb-3 text-red-500" size={48} />
+          <h2 className="text-lg font-semibold text-gray-800 mb-2">Payment Declined</h2>
+          <p className="text-sm text-gray-500 mb-2">{error || 'Your card was declined.'}</p>
+          <p className="text-xs text-gray-400">Returning you to the merchant...</p>
         </div>
       </div>
     );
