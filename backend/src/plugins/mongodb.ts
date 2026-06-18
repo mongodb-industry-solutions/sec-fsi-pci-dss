@@ -86,6 +86,7 @@ async function mongodbPlugin(fastify: FastifyInstance) {
     fastify.addHook('onClose', async () => {
       clearInterval(sweepTimer);
       clearInterval(chdSweepTimer);
+      await getEventBus().stop().catch(() => {}); // drains/disconnects the broker engine cleanly
       const { closeQEClient } = await import('../vendors/encryption/qeClient');
       await closeQEClient();
     });

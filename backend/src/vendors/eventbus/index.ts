@@ -3,15 +3,16 @@
 import { Db } from 'mongodb';
 import { EventBus } from './EventBus';
 import { EventBusInProcess } from './EventBusInProcess';
+import { EventBusKafka } from './EventBusKafka';
+import { EventBusRabbit } from './EventBusRabbit';
 import { MongoEventStore, EventStore } from './EventStore';
 import { v4 as uuidv4 } from 'uuid';
 import { DomainEvent, BusinessProcess } from './types';
 
 let instance: EventBus | null = null;
 
-// §3.1: the bus engine is chosen by configuration (Strategy pattern) — switching engines needs no
-// publisher/consumer code change, only this selection + the adapter. `in-process` is implemented;
-// broker engines (kafka/rabbitmq) implement the SAME EventBus port and plug in here when wired.
+// The bus engine is chosen by configuration (Strategy pattern): switching engines needs no
+// publisher/consumer code change, only this selection. Every engine implements the same EventBus port.
 export type EventBusEngine = 'in-process' | 'kafka' | 'rabbitmq';
 
 export function resolveEventBusEngine(): EventBusEngine {
@@ -20,12 +21,30 @@ export function resolveEventBusEngine(): EventBusEngine {
 
 export function initEventBus(db: Db, store?: EventStore): EventBus {
   const engine = resolveEventBusEngine();
-  if (engine === 'in-process') {
-    instance = new EventBusInProcess(store ?? new MongoEventStore(db));
+  const eventStore = store ?? new MongoEventStore(db);
+  const topic = `${process.env.EVENT_BUS_TOPIC_PREFIX ?? 'pci.psp'}.domain-events`;
+
+  if (engine === 'kafka') {
+    instance = new EventBusKafka({ brokers: parseList(process.env.KAFKA_BROKERS), clientId: process.env.KAFKA_CLIENT_ID ?? 'pci-psp', ssl: process.env.KAFKA_SSL === 'true', sasl: buildKafkaSasl(), topic }, eventStore);
     return instance;
   }
-  // Broker adapters (KafkaEventBus / RabbitEventBus) implement the same port; not wired in the demo.
-  throw new Error(`EVENT_BUS_ENGINE='${engine}' is not wired yet; set EVENT_BUS_ENGINE=in-process`);
+  if (engine === 'rabbitmq') {
+    instance = new EventBusRabbit({ url: process.env.RABBITMQ_URL ?? 'amqp://localhost', exchange: topic, topic }, eventStore);
+    return instance;
+  }
+  instance = new EventBusInProcess(eventStore);
+  return instance;
+}
+
+function parseList(v?: string): string[] {
+  return (v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+function buildKafkaSasl(): { mechanism: string; username: string; password: string } | undefined {
+  const mechanism = process.env.KAFKA_SASL_MECHANISM;
+  const username = process.env.KAFKA_SASL_USERNAME;
+  const password = process.env.KAFKA_SASL_PASSWORD;
+  return mechanism && username && password ? { mechanism, username, password } : undefined;
 }
 
 export function getEventBus(): EventBus {
