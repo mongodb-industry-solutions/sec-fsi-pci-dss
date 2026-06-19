@@ -812,8 +812,10 @@ export const api = {
         { method: 'PATCH', body: JSON.stringify(patch) },
         token,
       ),
-    // Acquiring-side: payments this merchant received (no payer PII returned).
-    transactions: (merchantId: string, params: { page?: number; limit?: number; status?: string; search?: string }, token: string) => {
+    transactions: (merchantId: string, params: {
+      page?: number; limit?: number; status?: string; search?: string;
+      txnId?: string; cardToken?: string; dateFrom?: string; dateTo?: string;
+    }, token: string) => {
       const qs = new URLSearchParams(
         Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
       ).toString();
@@ -828,12 +830,30 @@ export const api = {
           cardTransactionMerchantName: string;
           cardTransactionMaskedPanDisplay: string;
           cardTransactionDescription?: string;
+          paymentCardReference?: string;
         }>;
         total: number;
         page: number;
         limit: number;
       }>(`/api/v1/merchants/${merchantId}/transactions${qs ? `?${qs}` : ''}`, {}, token);
     },
+    transactionById: (merchantId: string, txnId: string, token: string) =>
+      apiFetch<{
+        cardTransactionInstanceReference: string;
+        cardTransactionAmount: { amount: number; currency: string };
+        cardTransactionDateTime: string;
+        cardTransactionStatus: string;
+        cardTransactionType?: string;
+        cardTransactionChannel?: string;
+        cardTransactionInitiationType?: string;
+        cardTransactionMerchantName: string;
+        cardTransactionMerchantCategoryCode?: string;
+        cardTransactionMaskedPanDisplay: string;
+        cardTransactionDescription?: string;
+        cardTransactionNarrative?: string;
+        paymentCardReference?: string;
+        merchantAgreementInstanceReference?: string;
+      }>(`/api/v1/merchants/${merchantId}/transactions/${txnId}`, {}, token),
     // Acquiring analytics (BIAN Merchant Activity Analysis): totals + breakdowns, no PII.
     stats: (merchantId: string, token: string) =>
       apiFetch<{

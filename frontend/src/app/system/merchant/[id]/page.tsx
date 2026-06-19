@@ -292,11 +292,11 @@ export default function StaffMerchantDetailPage() {
         )}
       </div>
 
-      {/* Payments Received; full acquiring list with drill-in (and case oversight for auditor) */}
+      {/* Transactions; full acquiring list with drill-in (and case oversight for auditor) */}
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="flex items-center justify-between gap-2 px-5 py-3 border-b border-gray-100 flex-wrap">
           <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5">
-            <Receipt size={14} className="text-[#001E2B]" /> Payments Received
+            <Receipt size={14} className="text-[#001E2B]" /> Transactions
             <span className="text-xs font-normal text-gray-400">· masked PAN only, no payer PII (PCI DSS Req 3/7)</span>
           </h2>
           <span className="text-xs text-gray-400">{payTotal} payment{payTotal !== 1 ? 's' : ''}</span>

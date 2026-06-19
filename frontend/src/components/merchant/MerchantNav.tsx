@@ -12,7 +12,7 @@ const ITEMS: NavItem[] = [
   { href: '/system/merchant/overview',  label: 'Overview',          icon: LayoutDashboard },
   { href: '/system/merchant/checkout',  label: 'Checkout Session',  icon: ShoppingCart },
   { href: '/system/merchant/links',     label: 'Payment Links',     icon: Link2 },
-  { href: '/system/merchant/payments',  label: 'Payments Received', icon: Receipt },
+  { href: '/system/merchant/payments',  label: 'Transactions',      icon: Receipt },
   { href: '/system/merchant/api-keys',  label: 'API Keys',          icon: Key },
   { href: '/system/merchant/webhooks',  label: 'Webhook',           icon: Webhook },
   { href: '/system/merchant/settings',  label: 'Settings',          icon: Settings },
