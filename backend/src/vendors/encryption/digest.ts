@@ -1,5 +1,7 @@
 import * as crypto from 'crypto';
 
+// -- HTTP Digest Auth (RFC 7616 MD5) ----------------------------------------─
+
 export function md5(s: string): string {
     return crypto.createHash('md5').update(s).digest('hex');
 }
@@ -32,7 +34,14 @@ export function buildDigestHeader(
     return parts.join(', ');
 }
 
-export function parseWwwAuthenticate(header: string) {
+
+export interface DigestChallenge {
+    realm: string;
+    nonce: string;
+    opaque?: string;
+}
+
+export function parseWwwAuthenticate(header: string): DigestChallenge {
     const extract = (key: string) => header.match(new RegExp(`${key}="([^"]+)"`))?.[1] ?? '';
     return {
         realm: extract('realm'),
