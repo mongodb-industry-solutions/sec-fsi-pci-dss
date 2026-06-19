@@ -1,6 +1,6 @@
 {
   "name": "fsi-psp-platform",
-  "version": "1.0.0",
+  "version": "1.0.8",
   "private": true,
   "scripts": {
     "setup": "npm install && npm install --prefix frontend && npm install --prefix backend",
