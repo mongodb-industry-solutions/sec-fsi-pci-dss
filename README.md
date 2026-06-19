@@ -1,6 +1,8 @@
-# 🏦 FSI PCI DSS Payment Security Demo
+# 🏦 Leafy Pay: FSI PSP + PCI DSS + MongoDB
 
-> A MongoDB IST demo that shows how a digital bank or card issuer can run a complete card payment lifecycle: from checkout to fraud investigation: while keeping sensitive cardholder data encrypted end-to-end.
+![](./frontend/public/app-logo.png)
+
+> A Payment Service Provider (PSP) solution: a PCI DSS-aligned platform used by digital banks or card issuers to authorize card payments, detect fraud, and investigate cases. It runs the full payment lifecycle on MongoDB Atlas, from checkout and authorization, through automated transaction scoring, to multi-tier analyst investigation and resolution.
 
 **Core message:** *🔐 Encrypt everything. 🔍 Query anything. 🔑 Keys are yours.*
 
@@ -8,7 +10,7 @@
 
 ## 🎯 What This Demo Shows
 
-A synthetic digital bank uses **MongoDB Queryable Encryption (QE)** with **AWS KMS** to protect cardholder data. The server stores only ciphertext. Fraud analysts still search encrypted fields by email, phone, and account reference: without server-side decryption. Access is controlled by role. Every action is audited.
+A PSP platform uses **MongoDB Queryable Encryption (QE)** with **AWS KMS** to protect cardholder data. The server stores only ciphertext. Fraud analysts still search encrypted fields by email, phone, and account reference: without server-side decryption. Access is controlled by role. Every action is audited.
 
 This answers the most common FSI prospect question:
 
