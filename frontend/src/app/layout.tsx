@@ -3,7 +3,7 @@ import './globals.css';
 import { UIProvider } from '../components/ui/ConfirmProvider';
 
 export const metadata: Metadata = {
-  title: 'PSP - Platform',
+  title: 'Leafy Pay',
   description: 'MongoDB Queryable Encryption · AWS KMS · PCI DSS Payment Security Demo',
 };
 

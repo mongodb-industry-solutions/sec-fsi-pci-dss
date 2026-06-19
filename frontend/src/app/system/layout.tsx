@@ -18,7 +18,7 @@ function DemoShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<ReturnType<typeof decodeToken>>(null);
 
   useEffect(() => {
-    document.title = 'PSP - Platform';
+    document.title = 'Leafy Pay';
   }, []);
 
   useEffect(() => {
