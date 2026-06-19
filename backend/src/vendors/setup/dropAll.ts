@@ -3,6 +3,7 @@ import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import * as https from 'https';
 import { buildDigestHeader, parseWwwAuthenticate } from '../encryption/digest';
+import { getKmsConfig } from '../encryption/kms';
 
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
 
@@ -105,6 +106,7 @@ async function dropAtlasRolesAndUsers(): Promise<void> {
 }
 
 export async function runDrop(): Promise<void> {
+
   const uri = process.env.MONGODB_URI;
   if (!uri) {
     throw new Error(
@@ -120,7 +122,7 @@ export async function runDrop(): Promise<void> {
     await client.connect();
     console.log(`Connected - dropping database '${dbName}'\n`);
     console.log('WARNING: This operation is irreversible. All data will be lost.\n');
-
+    const kmsConfig = getKmsConfig();
     const db = client.db(dbName);
 
     // 1. Drop entire application database (collections + indexes included)
@@ -143,12 +145,12 @@ export async function runDrop(): Promise<void> {
     console.log('2. Dropping QE key vault database (encryption)...');
     try {
       const dbList2 = await client.db().admin().listDatabases({ nameOnly: true });
-      const kvExists = dbList2.databases.some((d: { name: string }) => d.name === 'encryption');
+      const kvExists = dbList2.databases.some((d: { name: string }) => d.name === kmsConfig.database);
       if (kvExists) {
-        await client.db('encryption').dropDatabase();
-        console.log('  dropped: database \'encryption\'');
+        await client.db(kmsConfig.database).dropDatabase();
+        console.log(`  dropped: database '${kmsConfig.database}'`);
       } else {
-        warn('database \'encryption\' - not found, skipping');
+        warn(`database '${kmsConfig.database}' - not found, skipping`);
       }
     } catch (e) {
       warn(`key vault - drop failed: ${(e as Error).message}, continuing`);

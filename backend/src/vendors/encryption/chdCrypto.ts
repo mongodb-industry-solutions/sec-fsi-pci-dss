@@ -47,14 +47,14 @@ function zeroize(...bufs: Buffer[]): void {
 }
 
 // ── Local KMS provider ────────────────────────────────────────────────────────
-// CMK = the LOCAL_MASTER_KEY_BASE64 (same key-management surface as Queryable Encryption). A 256-bit
+// CMK = the KMS_LOCAL_MASTER_KEY (same key-management surface as Queryable Encryption). A 256-bit
 // key-encryption key (KEK) is derived from it via HKDF-SHA256; DEKs are wrapped with AES-256-GCM.
 export class LocalKmsKeyProvider implements KmsKeyProvider {
   private readonly kek: Buffer;
   readonly kid = 'local';
 
-  constructor(masterKeyBase64 = process.env.LOCAL_MASTER_KEY_BASE64) {
-    if (!masterKeyBase64) throw new Error('LOCAL_MASTER_KEY_BASE64 is required for local CHD crypto');
+  constructor(masterKeyBase64 = process.env.KMS_LOCAL_MASTER_KEY) {
+    if (!masterKeyBase64) throw new Error('KMS_LOCAL_MASTER_KEY is required for local CHD crypto');
     const master = Buffer.from(masterKeyBase64, 'base64');
     // Derive a stable 256-bit KEK (the QE local key is 96 bytes; we need 32 for AES-256).
     this.kek = Buffer.from(hkdfSync('sha256', master, Buffer.alloc(0), Buffer.from('chd-kek'), 32));

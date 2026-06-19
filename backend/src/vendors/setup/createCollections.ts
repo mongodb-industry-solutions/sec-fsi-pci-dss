@@ -1,9 +1,9 @@
 import { MongoClient, ClientEncryption } from 'mongodb';
-import { buildKmsProviders } from '../encryption/kms';
+import { buildKmsProviders, getKmsConfig } from '../encryption/kms';
 import { buildEncryptedFieldsMaps } from '../encryption/encryptedFieldsMaps';
 import { DEKs } from '../encryption/keyVault';
 
-const KEY_VAULT_NAMESPACE = 'encryption.__keyVault';
+const kmsConfig = getKmsConfig();
 
 export async function createCollections(
   client: MongoClient,
@@ -15,7 +15,7 @@ export async function createCollections(
   const maps = buildEncryptedFieldsMaps(deks);
 
   const clientEncryption = new ClientEncryption(client, {
-    keyVaultNamespace: KEY_VAULT_NAMESPACE,
+    keyVaultNamespace: kmsConfig.namespace,
     kmsProviders: buildKmsProviders(),
   });
 

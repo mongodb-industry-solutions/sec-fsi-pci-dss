@@ -1,7 +1,7 @@
 import { MongoClient, ClientEncryption, Binary } from 'mongodb';
-import { buildKmsProviders, buildCmkOptions } from './kms';
+import { buildKmsProviders, buildCmkOptions, getKmsConfig } from './kms';
 
-const KEY_VAULT_NAMESPACE = 'encryption.__keyVault';
+const kmsConfig = getKmsConfig();
 
 /**
  * One DEK per encrypted field.
@@ -36,11 +36,11 @@ export async function provisionDataEncryptionKeys(client: MongoClient): Promise<
   const cmkOptions = buildCmkOptions();
 
   const clientEncryption = new ClientEncryption(client, {
-    keyVaultNamespace: KEY_VAULT_NAMESPACE,
+    keyVaultNamespace: kmsConfig.namespace,
     kmsProviders,
   });
 
-  const keyVaultColl = client.db('encryption').collection('__keyVault');
+  const keyVaultColl = client.db(kmsConfig.database).collection(kmsConfig.collection);
 
   async function getOrCreate(keyName: string): Promise<Binary> {
     const existing = await keyVaultColl.findOne({ keyAltNames: keyName });
@@ -49,7 +49,7 @@ export async function provisionDataEncryptionKeys(client: MongoClient): Promise<
       return existing._id as unknown as Binary;
     }
     const id = await clientEncryption.createDataKey(
-      process.env.KMS_PROVIDER === 'local' ? 'local' : 'aws',
+      kmsConfig.provider,
       { masterKey: cmkOptions?.aws, keyAltNames: [keyName] }
     );
     console.log(`    new:   ${keyName}`);
@@ -57,19 +57,19 @@ export async function provisionDataEncryptionKeys(client: MongoClient): Promise<
   }
 
   // Lookup tier
-  const txAccountRef       = await getOrCreate('DEK-tx-account-ref');
-  const partyEmail         = await getOrCreate('DEK-party-email');
-  const partyPhone         = await getOrCreate('DEK-party-phone');
+  const txAccountRef = await getOrCreate('DEK-tx-account-ref');
+  const partyEmail = await getOrCreate('DEK-party-email');
+  const partyPhone = await getOrCreate('DEK-party-phone');
   const customerAccountRef = await getOrCreate('DEK-customer-account-ref');
-  const authEmail          = await getOrCreate('DEK-auth-email');
+  const authEmail = await getOrCreate('DEK-auth-email');
 
   // Sensitive tier
-  const txRawPayload      = await getOrCreate('DEK-tx-raw-payload');
-  const txProcessorMeta   = await getOrCreate('DEK-tx-processor-meta');
-  const customerAddress   = await getOrCreate('DEK-customer-address');
-  const customerGovId     = await getOrCreate('DEK-customer-gov-id');
+  const txRawPayload = await getOrCreate('DEK-tx-raw-payload');
+  const txProcessorMeta = await getOrCreate('DEK-tx-processor-meta');
+  const customerAddress = await getOrCreate('DEK-customer-address');
+  const customerGovId = await getOrCreate('DEK-customer-gov-id');
   const customerRiskNotes = await getOrCreate('DEK-customer-risk-notes');
-  const cardExpiry        = await getOrCreate('DEK-card-expiry');
+  const cardExpiry = await getOrCreate('DEK-card-expiry');
 
   return {
     txAccountRef, partyEmail, partyPhone, customerAccountRef, authEmail,

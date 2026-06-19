@@ -614,7 +614,7 @@ const cmkOptions = {
 ```typescript
 // backend/src/encryption/kms.ts
 const kmsProviders = process.env.KMS_PROVIDER === 'local'
-  ? { local: { key: Buffer.from(process.env.LOCAL_MASTER_KEY_BASE64!, 'base64') } }
+  ? { local: { key: Buffer.from(process.env.KMS_LOCAL_MASTER_KEY!, 'base64') } }
   : { aws: { accessKeyId: ..., secretAccessKey: ... } };
 ```
 
@@ -771,7 +771,7 @@ AWS_CMK_ARN=arn:aws:kms:us-east-1:<account>:key/<key-id>
 
 # Local KMS (docker-compose development only: overrides AWS when set)
 KMS_PROVIDER=aws               # 'aws' | 'local'
-LOCAL_MASTER_KEY_BASE64=       # 96-byte key, base64 encoded
+KMS_LOCAL_MASTER_KEY=       # 96-byte key, base64 encoded
 
 # API
 API_PORT=3001

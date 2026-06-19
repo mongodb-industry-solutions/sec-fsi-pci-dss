@@ -22,21 +22,19 @@
  */
 
 import { MongoClient, Db } from 'mongodb';
-import { buildKmsProviders } from './kms';
+import { buildKmsProviders, getKmsConfig } from './kms';
 import { buildEncryptedFieldsMaps } from './encryptedFieldsMaps';
 import { provisionDataEncryptionKeys } from './keyVault';
 import { resolveCryptLibOptions } from './cryptLib';
 import { canReadSensitive } from '../middleware/rbac';
 import type { UserRole } from '../../shared/models/identity.model';
 
-const KEY_VAULT_NAMESPACE = 'encryption.__keyVault';
+const kmsConfig = getKmsConfig();
 
 let _l1Client: MongoClient | null = null;
 let _l2Client: MongoClient | null = null;
 
 async function buildQEClient(uri: string, tier: 'level1' | 'level2'): Promise<MongoClient> {
-  // Resolve DEKs using a plain (non-QE) connection first.
-  // Short timeouts so the Fastify plugin fails fast when MongoDB is unreachable.
   const plainClient = new MongoClient(process.env.MONGODB_URI!, {
     serverSelectionTimeoutMS: 8000,
     connectTimeoutMS: 8000,
@@ -53,7 +51,7 @@ async function buildQEClient(uri: string, tier: 'level1' | 'level2'): Promise<Mo
     serverSelectionTimeoutMS: 8000,
     connectTimeoutMS: 8000,
     autoEncryption: {
-      keyVaultNamespace: KEY_VAULT_NAMESPACE,
+      keyVaultNamespace: kmsConfig.namespace,
       kmsProviders: buildKmsProviders(),
       encryptedFieldsMap: {
         [`${dbName}.party`]:                            maps.party,

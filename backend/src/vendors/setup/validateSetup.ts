@@ -4,6 +4,7 @@ import { resolve } from 'path';
 import { existsSync } from 'fs';
 import * as https from 'https';
 import { buildDigestHeader, parseWwwAuthenticate } from '../encryption/digest';
+import { getKmsConfig } from '../encryption/kms';
 
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
 
@@ -152,19 +153,19 @@ function checkEnvVars(): boolean {
   console.log('   1.2 KMS-specific');
 
   if (kms === 'local') {
-    const localKey = process.env.LOCAL_MASTER_KEY_BASE64;
+    const localKey = process.env.KMS_LOCAL_MASTER_KEY;
     localKey
-      ? check('pass', 'LOCAL_MASTER_KEY_BASE64')
-      : check('fail', 'LOCAL_MASTER_KEY_BASE64', 'not set - required for KMS_PROVIDER=local');
+      ? check('pass', 'KMS_LOCAL_MASTER_KEY')
+      : check('fail', 'KMS_LOCAL_MASTER_KEY', 'not set - required for KMS_PROVIDER=local');
 
     if (localKey) {
       try {
         const decoded = Buffer.from(localKey, 'base64');
         decoded.length === 96
-          ? check('pass', 'LOCAL_MASTER_KEY_BASE64 length', '96 bytes ✓')
-          : check('fail', 'LOCAL_MASTER_KEY_BASE64 length', `expected 96 bytes, got ${decoded.length} - regenerate with setup:key`);
+          ? check('pass', 'KMS_LOCAL_MASTER_KEY length', '96 bytes ✓')
+          : check('fail', 'KMS_LOCAL_MASTER_KEY length', `expected 96 bytes, got ${decoded.length} - regenerate with setup:key`);
       } catch {
-        check('fail', 'LOCAL_MASTER_KEY_BASE64', 'invalid base64 encoding');
+        check('fail', 'KMS_LOCAL_MASTER_KEY', 'invalid base64 encoding');
       }
     }
   } else if (kms === 'aws') {
@@ -251,6 +252,7 @@ function checkEnvVars(): boolean {
 
 async function checkMongoDB(client: MongoClient): Promise<void> {
   const dbName = process.env.MONGODB_DB_NAME ?? 'pci_demo';
+  const kmsConfig = getKmsConfig();
 
   // -- Connectivity ------------------------------------------------------------
   console.log('\n2. MongoDB connectivity');
@@ -314,23 +316,23 @@ async function checkMongoDB(client: MongoClient): Promise<void> {
   }
 
   // -- Key vault --------------------------------------------------------------─
-  console.log('\n5. QE key vault (encryption.__keyVault)');
+  console.log(`\n5. QE key vault (${kmsConfig.namespace})`);
 
   try {
-    const kvDb      = client.db('encryption');
-    const kvList    = await kvDb.listCollections({ name: '__keyVault' }).toArray();
+    const kvDb      = client.db(kmsConfig.database);
+    const kvList    = await kvDb.listCollections({ name: kmsConfig.collection }).toArray();
     if (kvList.length === 0) {
-      check('fail', '__keyVault collection', 'not found - run setup:db');
+      check('fail', `${kmsConfig.collection} collection`, 'not found - run setup:db');
       return;
     }
-    check('pass', '__keyVault collection exists');
+    check('pass', `${kmsConfig.collection} collection exists`);
 
-    const dekCount = await kvDb.collection('__keyVault').countDocuments();
+    const dekCount = await kvDb.collection(kmsConfig.collection).countDocuments();
     dekCount > 0
       ? check('pass', `DEKs present - ${dekCount} key(s)`)
       : check('fail', 'DEKs', 'no DEKs found - run setup:db');
 
-    const kvIndexes = await kvDb.collection('__keyVault').listIndexes().toArray();
+    const kvIndexes = await kvDb.collection(kmsConfig.collection).listIndexes().toArray();
     const hasKvIdx  = kvIndexes.some((i) => i.key?.keyAltNames !== undefined);
     hasKvIdx
       ? check('pass', 'keyAltNames unique index present')

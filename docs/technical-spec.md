@@ -1034,8 +1034,8 @@ import { KMSProviders } from 'mongodb';
 
 export function buildKmsProviders(): KMSProviders {
   if (process.env.KMS_PROVIDER === 'local') {
-    const key = process.env.LOCAL_MASTER_KEY_BASE64;
-    if (!key) throw new Error('LOCAL_MASTER_KEY_BASE64 is required when KMS_PROVIDER=local');
+    const key = process.env.KMS_LOCAL_MASTER_KEY;
+    if (!key) throw new Error('KMS_LOCAL_MASTER_KEY is required when KMS_PROVIDER=local');
     return {
       local: { key: Buffer.from(key, 'base64') },
     };
