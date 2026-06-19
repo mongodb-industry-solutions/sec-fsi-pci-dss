@@ -1,0 +1,99 @@
+[
+  {
+    "roleName": "customer",
+    "roleLabel": "Customer",
+    "roleDescription": "Account holder, own transactions, own stored cards and own consents only.",
+    "roleScope": "own",
+    "roleIsBuiltin": true,
+    "bianServiceDomain": "Customer Agreement",
+    "bianControlRecordType": "CustomerAgreement",
+    "rolePermissions": {
+      "transactions": ["view"],
+      "cards": ["view", "manage"],
+      "merchants": ["view"],
+      "consents": ["view"]
+    }
+  },
+  {
+    "roleName": "level1_analyst",
+    "roleLabel": "L1 Fraud Analyst",
+    "roleDescription": "First-line fraud triage: view transactions/customers/cards, investigate cases, escalate to L2.",
+    "roleScope": "all",
+    "roleIsBuiltin": true,
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosisCase",
+    "rolePermissions": {
+      "transactions": ["view"],
+      "customers": ["view"],
+      "cards": ["view"],
+      "merchants": ["view"],
+      "fraudCases": ["view", "investigate"],
+      "auditEvents": ["view"]
+    }
+  },
+  {
+    "roleName": "level2_investigator",
+    "roleLabel": "L2 Investigator",
+    "roleDescription": "Senior investigator: L1 access plus sensitive CHD/PII via an escalation token, and case resolution.",
+    "roleScope": "all",
+    "roleIsBuiltin": true,
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosisCase",
+    "rolePermissions": {
+      "transactions": ["view", "viewSensitive"],
+      "customers": ["view", "viewSensitive"],
+      "cards": ["view", "viewSensitive"],
+      "merchants": ["view"],
+      "fraudCases": ["view", "investigate"],
+      "auditEvents": ["view"]
+    }
+  },
+  {
+    "roleName": "security_auditor",
+    "roleLabel": "Security Auditor",
+    "roleDescription": "Read-only global oversight, including sensitive fields, plus integration/config visibility. No mutations.",
+    "roleScope": "all",
+    "roleIsBuiltin": true,
+    "bianServiceDomain": "Party Authentication",
+    "bianControlRecordType": "PartyAuthenticationAssessment",
+    "rolePermissions": {
+      "transactions": ["view", "viewSensitive"],
+      "customers": ["view", "viewSensitive"],
+      "cards": ["view", "viewSensitive"],
+      "fraudCases": ["view", "viewSensitive"],
+      "merchants": ["view"],
+      "providers": ["view"],
+      "modules": ["view"],
+      "auditEvents": ["view"]
+    }
+  },
+  {
+    "roleName": "merchant_officer",
+    "roleLabel": "Merchant Officer",
+    "roleDescription": "Merchant acquiring: review/approve merchants and manage their configuration (KYB decisions).",
+    "roleScope": "all",
+    "roleIsBuiltin": true,
+    "bianServiceDomain": "Merchant Relations",
+    "bianControlRecordType": "MerchantAgreement",
+    "rolePermissions": {
+      "merchants": ["view", "manage"],
+      "auditEvents": ["view"]
+    }
+  },
+  {
+    "roleName": "manager",
+    "roleLabel": "Integration Manager",
+    "roleDescription": "Platform administrator (SD-193): providers, modules, auth domains and roles. No access to business/cardholder data (SoD, PCI Req 7).",
+    "roleScope": "all",
+    "roleIsBuiltin": true,
+    "bianServiceDomain": "External Provider Arrangements",
+    "bianControlRecordType": "ExternalProviderArrangement",
+    "rolePermissions": {
+      "providers": ["view", "manage"],
+      "modules": ["view", "manage"],
+      "authDomains": ["view", "manage"],
+      "roles": ["view", "manage"],
+      "auditEvents": ["view"]
+    }
+  }
+]

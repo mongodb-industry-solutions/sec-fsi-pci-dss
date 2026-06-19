@@ -1,19 +1,29 @@
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-export const DEMO_USERS_PASSWORDS: Record<string, string> = {
-  'luis.fernandez@leafybank.demo': 'demo-password',
-  'julia.santos@leafybank.demo': 'demo-password',
-  'sarah.chen@leafybank.demo': 'demo-password',
-  'michael.obi@leafybank.demo': 'demo-password',
-  'admin@leafybank.demo': 'demo-password',
-};
+// All seeded demo accounts share the same bcrypt-hashed credential.
+// The plaintext is a fixed demo convention (documented in auth.controller.ts);
+// the seed stores only the hash. Used to auto-fill the login form (debug mode)
+// and by the simulator to obtain a real JWT per role via POST /api/v1/auth/login.
+export const DEMO_PASSWORD = 'demo-password';
 
 export const ROLE_LABELS: Record<string, string> = {
   customer: 'Customer',
   level1_analyst: 'L1 Analyst',
   level2_investigator: 'L2 Investigator',
   security_auditor: 'Security Auditor',
+  merchant_officer: 'Merchant Officer',
+  manager:          'Manager',
+};
+
+export const PERFORMER_LABELS: Record<string, string> = {
+  payment_service: 'System - Automated detection',
+  level1_analyst: 'L1 Analyst',
+  level2_investigator: 'L2 Investigator',
+  security_auditor: 'Security Auditor',
+  ai_agent: 'AI Agent',
+  'rbac-layer': 'System - Access control',
+  system: 'System',
 };
 
 export const SEVERITY_COLORS: Record<string, string> = {

@@ -63,7 +63,7 @@ export function resolveCryptLibOptions(): CryptLibOptions {
       console.log(`[crypt] Using library from MONGODB_CRYPT_SHARED_LIB_PATH: ${envPath}`);
       return { cryptSharedLibPath: envPath, cryptSharedLibRequired: true };
     }
-    console.warn(`[crypt] WARNING: MONGODB_CRYPT_SHARED_LIB_PATH="${envPath}" does not exist — ignoring.`);
+    console.warn(`[crypt] WARNING: MONGODB_CRYPT_SHARED_LIB_PATH="${envPath}" does not exist  -  ignoring.`);
   }
 
   // 2. Default platform locations
@@ -86,10 +86,10 @@ export function resolveCryptLibOptions(): CryptLibOptions {
         console.log(`[crypt] Found library in node_modules: ${libPath}`);
         return { cryptSharedLibPath: libPath, cryptSharedLibRequired: true };
       }
-    } catch { /* package not found — skip */ }
+    } catch { /* package not found  -  skip */ }
   }
 
-  // Not found — warn with download instructions
+  // Not found  -  warn with download instructions
   console.warn(
     '\n[crypt] WARNING: mongo_crypt_v1 shared library not found.\n' +
     '  MongoDB Queryable Encryption requires this library.\n' +

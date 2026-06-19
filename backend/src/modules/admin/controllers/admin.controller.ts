@@ -3,9 +3,10 @@ import * as crypto from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import * as os from 'os';
 import * as fs from 'fs';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import * as path from 'path';
-import { logBuffer, appendLog } from '../../../shared/logBuffer';
+import { logBuffer, appendLog, writeCount } from '../../../shared/logBuffer';
+import { resolveTestStrategy, NormalizedTestSummary } from '../services/testRunners';
 
 // __dirname = backend/src/modules/admin/controllers/ (tsx dev mode)
 // 5 levels up -> project root
@@ -17,8 +18,142 @@ const SENSITIVE_KEY_PATTERNS = [
   /aws_/i, /mongo/i,
 ];
 
+// Non-secret vars that match a sensitive pattern and must be shown in plain text.
+const SAFE_KEYS = new Set([
+  'MONGODB_DB_NAME',
+  'MONGODB_CRYPT_SHARED_LIB_PATH',
+]);
+
 function isSensitiveKey(key: string): boolean {
+  if (SAFE_KEYS.has(key)) return false;
   return SENSITIVE_KEY_PATTERNS.some((r) => r.test(key));
+}
+
+/**
+ * Returns true when the env var is a MongoDB connection string that should
+ * have only its password segment masked, not the entire value.
+ */
+function isMongoUri(key: string, value: string): boolean {
+  return /uri/i.test(key) &&
+    (value.startsWith('mongodb://') || value.startsWith('mongodb+srv://'));
+}
+
+/**
+ * Replaces the password in a MongoDB URI with *** while keeping the rest
+ * (scheme, username, host, port, database, options) visible. Only the credential
+ * segment between the username colon and the @ is masked.
+ */
+function maskMongoUri(uri: string): string {
+  return uri.replace(
+    /^(mongodb(?:\+srv)?:\/\/[^:/?#]*:)([^@]*)(@)/,
+    '$1***$3',
+  );
+}
+
+const ENV_PATH = path.join(PROJECT_ROOT, '.env');
+
+/** Returns the list of keys defined in the .env file (comments and blank lines skipped). */
+function readDotenvKeys(): string[] {
+  try {
+    const keys: string[] = [];
+    for (const line of fs.readFileSync(ENV_PATH, 'utf-8').split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || /^[#;]/.test(trimmed)) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq === -1) continue;
+      const key = trimmed.slice(0, eq).trim();
+      if (/^[A-Z_][A-Z0-9_]*$/i.test(key)) keys.push(key);
+    }
+    return keys;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Writes or updates a single KEY=value line in the .env file.
+ * - Preserves comments, blank lines, and original line-ending style.
+ * - Appends the key if not present.
+ * - Quotes values that contain whitespace, #, =, or backslashes.
+ */
+function updateEnvFile(key: string, value: string): void {
+  let content = '';
+  try { content = fs.readFileSync(ENV_PATH, 'utf-8'); } catch { /* create new */ }
+
+  const eol = content.includes('\r\n') ? '\r\n' : '\n';
+  const lines = content.split(/\r?\n/);
+
+  const needsQuotes = /[ \t"'#\\=]/.test(value) || value === '';
+  const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const formatted = needsQuotes ? `"${escaped}"` : value;
+  const newLine = `${key}=${formatted}`;
+
+  let found = false;
+  const updated = lines.map(line => {
+    if (!line.trim() || /^\s*[#;]/.test(line)) return line;
+    const eqIdx = line.indexOf('=');
+    if (eqIdx !== -1 && line.slice(0, eqIdx).trim() === key) {
+      found = true;
+      return newLine;
+    }
+    return line;
+  });
+
+  if (!found) {
+    while (updated.length && !updated[updated.length - 1].trim()) updated.pop();
+    updated.push(newLine, '');
+  }
+
+  fs.writeFileSync(ENV_PATH, updated.join(eol), 'utf-8');
+}
+
+/** Parses the frontend port from CORS_ORIGIN (defaults to 3000). */
+function getFrontendPort(): number {
+  const origin = process.env.CORS_ORIGIN ?? 'http://localhost:3000';
+  try {
+    const p = new URL(origin).port;
+    return p ? parseInt(p, 10) : 3000;
+  } catch {
+    return 3000;
+  }
+}
+
+/** Cross-platform: kills the process listening on the given TCP port. */
+function killProcessOnPort(port: number): void {
+  try {
+    if (process.platform === 'win32') {
+      const out = execSync(`netstat -ano | findstr ":${port} "`, {
+        encoding: 'utf-8', shell: 'cmd.exe',
+      });
+      for (const line of out.split('\n')) {
+        if (/LISTEN/i.test(line)) {
+          const pid = line.trim().split(/\s+/).pop() ?? '';
+          if (/^\d+$/.test(pid) && pid !== '0') {
+            try { execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' }); } catch {}
+          }
+        }
+      }
+    } else {
+      const pids = execSync(`lsof -ti:${port} -sTCP:LISTEN 2>/dev/null || echo ''`, {
+        encoding: 'utf-8', shell: '/bin/sh',
+      }).trim().split('\n').filter(Boolean);
+      for (const pid of pids) {
+        try { process.kill(parseInt(pid, 10), 'SIGTERM'); } catch {}
+      }
+    }
+  } catch { /* no process on port - nothing to kill */ }
+}
+
+/** Spawns a new frontend dev server from the project root (detached, untracked). */
+function spawnFrontend(): void {
+  const child = spawn('npm', ['run', 'dev:frontend'], {
+    cwd: PROJECT_ROOT,
+    detached: true,
+    stdio: 'ignore',
+    shell: true,
+    env: { ...process.env },
+  });
+  child.unref();
 }
 
 const ALLOWED_NPM_COMMANDS: Record<string, string[]> = {
@@ -30,7 +165,10 @@ const ALLOWED_NPM_COMMANDS: Record<string, string[]> = {
   'test':              ['run', 'test'],
   'test:unit':         ['run', 'test:unit'],
   'test:integration':  ['run', 'test:integration'],
+  'test:e2e':          ['run', 'test:e2e'],
   'type-check':        ['run', 'type-check'],
+  'setup:db:drop':     ['run', 'setup:db:drop'],
+  'setup:check':       ['run', 'setup:check'],
 };
 
 type RateLimitStore = Map<string, { count: number; reset: number }>;
@@ -52,9 +190,9 @@ function makeRateLimiter(maxRequests: number, windowMs: number) {
   };
 }
 
-// Strict: login endpoint — 10 attempts per 15 min (brute-force protection)
+// Strict: login endpoint  -  10 attempts per 15 min (brute-force protection)
 const checkLoginRateLimit = makeRateLimiter(10, 15 * 60 * 1000);
-// Lenient: command/exec/logs/system — 300 requests per 15 min (demo usage)
+// Lenient: command/exec/logs/system  -  300 requests per 15 min (demo usage)
 const checkOpsRateLimit   = makeRateLimiter(300, 15 * 60 * 1000);
 
 function sha256(text: string): string {
@@ -82,34 +220,51 @@ function spawnSSE(
   args: string[],
   cwd: string,
   label: string,
+  opts: {
+    env?: NodeJS.ProcessEnv;
+    /** Called once on process close; a non-null return is emitted as a `summary` event. */
+    summarize?: () => NormalizedTestSummary | null;
+  } = {},
 ): Promise<void> {
-  const sendEvent = (type: string, data: string) => {
-    raw.write(`event: ${type}\ndata: ${JSON.stringify({ text: data })}\n\n`);
-    appendLog(`[${label}] ${data}`);
+  const sendText = (type: string, text: string) => {
+    raw.write(`event: ${type}\ndata: ${JSON.stringify({ text })}\n\n`);
+    appendLog(`[${label}] ${text}`);
+  };
+  // The summary frame carries the structured object directly (not wrapped in {text}).
+  const sendSummary = (summary: NormalizedTestSummary) => {
+    raw.write(`event: summary\ndata: ${JSON.stringify(summary)}\n\n`);
   };
 
-  sendEvent('start', `> ${command} ${args.join(' ')}  (cwd: ${cwd})`);
+  sendText('start', `> ${command} ${args.join(' ')}  (cwd: ${cwd})`);
 
   const child = spawn(command, args, {
     cwd,
     shell: true,
-    env: { ...process.env },
+    env: { ...process.env, ...(opts.env ?? {}) },
   });
 
   return new Promise((resolve) => {
     child.stdout.on('data', (chunk: Buffer) => {
-      chunk.toString().split('\n').filter(Boolean).forEach((l) => sendEvent('log', l));
+      chunk.toString().split('\n').filter(Boolean).forEach((l) => sendText('log', l));
     });
     child.stderr.on('data', (chunk: Buffer) => {
-      chunk.toString().split('\n').filter(Boolean).forEach((l) => sendEvent('error', l));
+      chunk.toString().split('\n').filter(Boolean).forEach((l) => sendText('error', l));
     });
     child.on('close', (code) => {
-      sendEvent('done', `Process exited with code ${code ?? 0}`);
+      if (opts.summarize) {
+        try {
+          const summary = opts.summarize();
+          if (summary) sendSummary(summary);
+        } catch (err) {
+          sendText('error', `Could not parse test results: ${(err as Error).message}`);
+        }
+      }
+      sendText('done', `Process exited with code ${code ?? 0}`);
       (raw as import('http').ServerResponse).end?.();
       resolve();
     });
     child.on('error', (err) => {
-      sendEvent('error', `Failed to start: ${err.message}`);
+      sendText('error', `Failed to start: ${err.message}`);
       (raw as import('http').ServerResponse).end?.();
       resolve();
     });
@@ -154,6 +309,7 @@ export async function adminController(fastify: FastifyInstance) {
         },
         401: { $ref: 'Error#', description: 'Invalid credentials.' },
         429: { $ref: 'Error#', description: 'Too many attempts. Try again later.' },
+        503: { $ref: 'Error#', description: 'Admin credentials not configured (production mode).' },
       },
     },
   }, async (request, reply) => {
@@ -213,8 +369,29 @@ export async function adminController(fastify: FastifyInstance) {
     const args = ALLOWED_NPM_COMMANDS[command];
     if (!args) return reply.status(400).send({ error: 'Unknown command' });
 
+    // Single-tool test commands run with their tool's native JSON reporter so the
+    // result summary is parsed from structured output, not scraped from log text.
+    const strategy = resolveTestStrategy(command, PROJECT_ROOT);
+
     beginSSE(reply);
-    await spawnSSE(reply.raw, 'npm', args, PROJECT_ROOT, `npm:${command}`);
+
+    if (strategy) {
+      fs.mkdirSync(path.dirname(strategy.outputFile), { recursive: true });
+      // Drop a stale results file so a crash before write can't surface an old summary.
+      try { fs.rmSync(strategy.outputFile, { force: true }); } catch { /* none to remove */ }
+      await spawnSSE(reply.raw, 'npm', strategy.npmArgs, PROJECT_ROOT, `npm:${command}`, {
+        env: strategy.env,
+        summarize: () => {
+          try {
+            return strategy.parse(fs.readFileSync(strategy.outputFile, 'utf-8'));
+          } catch {
+            return null; // no file (tool crashed before writing) → log-only, no summary
+          }
+        },
+      });
+    } else {
+      await spawnSSE(reply.raw, 'npm', args, PROJECT_ROOT, `npm:${command}`);
+    }
   });
 
   // POST /admin/exec
@@ -285,17 +462,16 @@ export async function adminController(fastify: FastifyInstance) {
       reply.raw.write(`event: log\ndata: ${JSON.stringify({ text: line })}\n\n`);
     });
 
-    let lastLen = logBuffer.length;
+    let lastWrite = writeCount;
     const interval = setInterval(() => {
       if (!reply.raw.writable) { clearInterval(interval); return; }
-      const cur = logBuffer.length;
-      if (cur > lastLen) {
-        logBuffer.slice(lastLen).forEach((line) => {
+      const cur = writeCount;
+      if (cur > lastWrite) {
+        const newCount = Math.min(cur - lastWrite, logBuffer.length);
+        logBuffer.slice(logBuffer.length - newCount).forEach((line) => {
           reply.raw.write(`event: log\ndata: ${JSON.stringify({ text: line })}\n\n`);
         });
-        lastLen = cur;
-      } else if (cur < lastLen) {
-        lastLen = cur;
+        lastWrite = cur;
       }
     }, 2000);
 
@@ -375,10 +551,135 @@ export async function adminController(fastify: FastifyInstance) {
     const env: Record<string, string> = {};
     for (const [k, v] of Object.entries(process.env)) {
       if (v !== undefined) {
-        env[k] = isSensitiveKey(k) ? '***' : v;
+        if (isMongoUri(k, v)) {
+          env[k] = maskMongoUri(v);
+        } else if (isSensitiveKey(k)) {
+          env[k] = '***';
+        } else {
+          env[k] = v;
+        }
       }
     }
 
-    return reply.send({ os: osInfo, node: nodeInfo, package: pkgInfo, env });
+    const dotenvKeys = readDotenvKeys();
+    return reply.send({ os: osInfo, node: nodeInfo, package: pkgInfo, env, dotenvKeys });
+  });
+
+  // PATCH /admin/env  -  update a single env var in .env and process.env
+  fastify.patch('/env', {
+    schema: {
+      tags: ['admin'],
+      summary: 'Update an environment variable',
+      description: 'Updates a key in the project `.env` file and applies it to `process.env` immediately. Only keys already present in `.env` can be updated. A server restart is required for changes to fully propagate (e.g. reconnecting to a new database URI).',
+      security: [{ adminAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['key', 'value'],
+        properties: {
+          key:   { type: 'string', description: 'Env var name (must exist in .env).' },
+          value: { type: 'string', description: 'New value.' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            updated:        { type: 'boolean' },
+            reloadRequired: { type: 'boolean' },
+          },
+        },
+        400: { $ref: 'Error#' },
+        401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
+        429: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const ip = request.ip ?? 'unknown';
+    const rl = checkOpsRateLimit(ip);
+    if (!rl.allowed) {
+      reply.header('Retry-After', String(rl.retryAfter));
+      return reply.status(429).send({ error: `Too many requests. Retry after ${rl.retryAfter}s.` });
+    }
+    if (!verifyAdminToken(request.headers.authorization)) {
+      return reply.status(401).send({ error: 'Invalid admin token' });
+    }
+
+    const { key, value } = request.body as { key: string; value: string };
+
+    if (!key || !/^[A-Z_][A-Z0-9_]*$/i.test(key)) {
+      return reply.status(400).send({ error: 'Invalid key: must be uppercase letters, digits, and underscores.' });
+    }
+    if (typeof value !== 'string') {
+      return reply.status(400).send({ error: 'Value must be a string.' });
+    }
+    if (value.includes('\n') || value.includes('\r')) {
+      return reply.status(400).send({ error: 'Value must not contain newline characters.' });
+    }
+
+    updateEnvFile(key, value);
+    process.env[key] = value;
+
+    return reply.send({ updated: true, reloadRequired: true });
+  });
+
+  // POST /admin/restart
+  fastify.post('/restart', {
+    schema: {
+      tags: ['admin'],
+      summary: 'Restart backend or frontend server',
+      description: [
+        'backend - calls process.exit(0); tsx watch auto-restarts the backend.',
+        'frontend - kills the process on the configured frontend port (CORS_ORIGIN) and spawns a new dev server.',
+      ].join(' '),
+      security: [{ adminAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['target'],
+        properties: {
+          target: {
+            type: 'string',
+            enum: ['backend', 'frontend'],
+          },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            ok:      { type: 'boolean' },
+            message: { type: 'string' },
+          },
+        },
+        401: { $ref: 'Error#' },
+        429: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const ip = request.ip ?? 'unknown';
+    const rl = checkOpsRateLimit(ip);
+    if (!rl.allowed) {
+      reply.header('Retry-After', String(rl.retryAfter));
+      return reply.status(429).send({ error: `Too many requests. Retry after ${rl.retryAfter}s.` });
+    }
+    if (!verifyAdminToken(request.headers.authorization)) {
+      return reply.status(401).send({ error: 'Invalid admin token' });
+    }
+
+    const { target } = request.body as { target: 'backend' | 'frontend' };
+
+    if (target === 'frontend') {
+      const port = getFrontendPort();
+      killProcessOnPort(port);
+      await new Promise((r) => setTimeout(r, 600));
+      spawnFrontend();
+      appendLog(`[admin] Frontend restart initiated on port ${port}`);
+      return reply.send({ ok: true, message: `Frontend restarting on port ${port}` });
+    }
+
+    // Backend: flush response, then exit so tsx watch can restart
+    appendLog('[admin] Backend restart initiated');
+    await reply.send({ ok: true, message: 'Backend restarting...' });
+    setTimeout(() => process.exit(0), 800);
   });
 }

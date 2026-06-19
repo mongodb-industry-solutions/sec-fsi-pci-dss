@@ -1,0 +1,215 @@
+'use client';
+import { useState } from 'react';
+import { RefreshCw, CheckCircle2, AlertCircle, WifiOff, Clock, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { useIntegration, TYPE_LABEL, type ProviderEventConfig } from '../_context';
+import { Card } from '../_shared';
+import { api } from '../../../../../../../lib/api';
+import { useDebugMode } from '../../../../../../../lib/debugMode';
+import { byProviderType } from '../../../../../../../config/capabilities';
+import { API_BASE_URL } from '../../../../../../../lib/constants';
+
+// ── Type descriptions ────────────────────────────────────────────────────────
+
+const TYPE_PURPOSE: Record<string, string> = {
+  fraud_detection: 'Evaluates transactions and events in real time to detect and score potential fraud using configurable rule engines, ML models, or external scoring APIs. Results inform whether transactions should be blocked, flagged, or allowed.',
+  hrp_sanctions:   'Screens counterparties, beneficiaries, and transaction participants against global sanctions lists and high-risk-person (HRP) databases. Required for regulatory compliance in cross-border and domestic payment flows.',
+  kyc_identity:    'Verifies the identity of individual customers by matching submitted documents and biometric data against authoritative sources. Feeds the customer onboarding and periodic review workflows.',
+  kyb_business:    'Validates the legal existence, beneficial ownership, and compliance standing of business customers. Required before activating commercial accounts or raising transaction limits.',
+  aml_monitoring:  'Continuously monitors transaction patterns for signs of money laundering, structuring, or layering. Generates alerts that feed the case management and SAR filing workflows.',
+  credit_bureau:   'Retrieves credit scores, bureau reports, and risk attributes to support lending, credit-limit decisions, and affordability assessments.',
+  generic:         'General-purpose external integration provider. Handles custom data flows not covered by the standard integration types.',
+};
+
+// ── Health badge ──────────────────────────────────────────────────────────────
+
+function HealthStatus({ status }: { status?: string }) {
+  if (!status || status === 'unknown') return (
+    <span className="flex items-center gap-1.5 text-sm text-gray-400"><Clock size={14} />Unknown; no test run yet</span>
+  );
+  if (status === 'ok') return (
+    <span className="flex items-center gap-1.5 text-sm text-green-700 font-medium"><CheckCircle2 size={14} />Healthy</span>
+  );
+  if (status === 'degraded') return (
+    <span className="flex items-center gap-1.5 text-sm text-amber-700 font-medium"><AlertCircle size={14} />Degraded; elevated response times</span>
+  );
+  if (status === 'unreachable') return (
+    <span className="flex items-center gap-1.5 text-sm text-red-600 font-medium"><WifiOff size={14} />Unreachable; connection failed</span>
+  );
+  return null;
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
+
+export default function OverviewPage() {
+  const { integration, reload, token } = useIntegration();
+  const { debugMode } = useDebugMode();
+  const [testing, setTesting]   = useState(false);
+  const [testMsg, setTestMsg]   = useState<{ ok: boolean; text: string } | null>(null);
+
+  if (!integration) return null;
+
+  const id = integration.externalProviderArrangementInstanceReference;
+
+  async function handleTest() {
+    setTesting(true);
+    setTestMsg(null);
+    try {
+      const r = await api.integrations.test(id, token);
+      setTestMsg({ ok: r.status === 'ok', text: r.status === 'ok' ? `Connection OK; ${r.latencyMs}ms` : `Test failed: ${r.status}` });
+      reload(true); // silent: refresh health badge in place, no full-page remount
+    } catch (err) {
+      setTestMsg({ ok: false, text: (err as Error).message });
+    } finally { setTesting(false); }
+  }
+
+  // §2.4: configuration is PER EVENT. Show each event the vendor handles with its own outbound URL and
+  // inbound callback URL. Fall back to the (legacy) trigger list when per-event config is absent.
+  const events: ProviderEventConfig[] = integration.externalProviderEvents?.length
+    ? integration.externalProviderEvents
+    : (integration.externalProviderTriggerEvents ?? []).map((e) => ({ event: e, outbound: {}, inbound: {} }));
+
+  // §7.7 per-event+vendor callback URL: /api/v1/providers/{group}/{vendorId}/{event}/callback.
+  const group = byProviderType(String(integration.externalProviderArrangementType))?.capability ?? 'generic';
+  const callbackFor = (ev: ProviderEventConfig) =>
+    ev.inbound?.callbackUrl || `${API_BASE_URL}/api/v1/providers/${group}/${id}/${encodeURIComponent(ev.event)}/callback`;
+
+  return (
+    <div className="space-y-5">
+      {/* Purpose */}
+      <Card title="Purpose">
+        <p className="text-sm text-gray-700 leading-relaxed">
+          {TYPE_PURPOSE[integration.externalProviderArrangementType] ?? 'No description available.'}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <span className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-medium border">
+            {TYPE_LABEL[integration.externalProviderArrangementType] ?? integration.externalProviderArrangementType}
+          </span>
+          <span className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-medium border">
+            {integration.bianServiceDomain}
+          </span>
+          <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${
+            integration.externalProviderMode === 'sync' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200'
+          }`}>
+            {integration.externalProviderMode === 'sync' ? 'Synchronous' : 'Asynchronous'}
+          </span>
+        </div>
+      </Card>
+
+      {/* Vendor-global info — §2.4: identity, status, metadata only. NO vendor base URL / callback /
+          auth here: those are configured PER EVENT (see below + the Outbound / Inbound tabs). */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <Card title="Provider">
+          <dl className="space-y-3">
+            <div>
+              <dt className="text-xs text-gray-500">Name</dt>
+              <dd className="text-sm font-medium text-gray-900 mt-0.5">{integration.externalProviderArrangementName}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-gray-500">Provider type</dt>
+              <dd className="text-sm text-gray-700 mt-0.5">
+                {integration.externalProviderIsInternal
+                  ? <span>Built-in <span className="text-gray-400">(internal module)</span></span>
+                  : 'External (third-party API)'}
+              </dd>
+            </div>
+            {integration.externalProviderInternalHandler && (
+              <div>
+                <dt className="text-xs text-gray-500">Internal handler</dt>
+                <dd className="text-sm font-mono text-gray-700 mt-0.5">{integration.externalProviderInternalHandler}</dd>
+              </div>
+            )}
+            <div>
+              <dt className="text-xs text-gray-500">Configuration scope</dt>
+              <dd className="text-sm text-gray-700 mt-0.5">
+                Per event (§2.4) — endpoints, mapping, auth, retries and timeout are set per event below.
+                <span className="text-gray-400"> There is no vendor base URL.</span>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-gray-500">Registered</dt>
+              <dd className="text-sm text-gray-700 mt-0.5">{new Date(integration.recordCreatedDateTime).toLocaleString()}</dd>
+            </div>
+          </dl>
+        </Card>
+
+        <Card title="Health">
+          <div className="space-y-3">
+            <HealthStatus status={integration.externalProviderHealthStatus} />
+            {integration.externalProviderLastHealthCheckAt && (
+              <p className="text-xs text-gray-400">
+                Last checked: {new Date(integration.externalProviderLastHealthCheckAt).toLocaleString()}
+              </p>
+            )}
+            {!integration.externalProviderIsInternal && (
+              <button onClick={handleTest} disabled={testing}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-gray-300 hover:border-gray-500 text-gray-700 disabled:opacity-50 mt-2 transition-colors">
+                <RefreshCw size={11} className={testing ? 'animate-spin' : ''} />
+                {testing ? 'Testing connection…' : 'Test connection now'}
+              </button>
+            )}
+            {testMsg && (
+              <p className={`text-xs font-medium ${testMsg.ok ? 'text-green-700' : 'text-red-600'}`}>{testMsg.text}</p>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* Per-event configuration (§2.4 / §7.7): each event has its OWN outbound + inbound config. */}
+      <Card
+        title="Events & per-event configuration"
+        subtitle="Each event this vendor handles carries its own outbound endpoint and inbound callback URL, plus its own mapping, auth, retries and timeout. Edit them in the Outbound / Inbound tabs.">
+        {events.length === 0 ? (
+          <p className="text-sm text-gray-400 italic">No events configured.</p>
+        ) : (
+          <div className="space-y-3">
+            {events.map((ev) => (
+              <div key={ev.event} className="rounded-lg border border-gray-200 p-3">
+                <p className="font-mono text-xs font-semibold text-indigo-700">{ev.event}</p>
+                <dl className="mt-2 grid grid-cols-1 gap-2 text-xs">
+                  <div className="flex items-start gap-1.5">
+                    <ArrowUpRight size={13} className="mt-0.5 shrink-0 text-gray-400" />
+                    <div className="min-w-0">
+                      <dt className="text-gray-500">Outbound endpoint</dt>
+                      <dd className="font-mono text-gray-700 break-all">{ev.outbound?.url ?? <span className="italic text-gray-400">not set</span>}</dd>
+                      {!!ev.outbound?.mapping?.length && <dd className="text-gray-400">{ev.outbound.mapping.length} mapping rule(s)</dd>}
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-1.5">
+                    <ArrowDownLeft size={13} className="mt-0.5 shrink-0 text-gray-400" />
+                    <div className="min-w-0">
+                      <dt className="text-gray-500">Inbound callback URL</dt>
+                      <dd className="font-mono text-gray-700 break-all">{callbackFor(ev)}</dd>
+                      {!!ev.inbound?.mapping?.length && <dd className="text-gray-400">{ev.inbound.mapping.length} mapping rule(s)</dd>}
+                    </div>
+                  </div>
+                </dl>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* BIAN / PCI (debug only) */}
+      {debugMode && (
+        <Card title="BIAN Mapping & PCI DSS">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <div>
+              <dt className="text-xs text-gray-500">BIAN Service Domain</dt>
+              <dd className="font-mono text-gray-800 mt-0.5">{integration.bianServiceDomain}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-gray-500">Control Record Type</dt>
+              <dd className="text-gray-800 mt-0.5">{integration.bianControlRecordType}</dd>
+            </div>
+            {integration.pciDssRequirements?.length > 0 && (
+              <div className="sm:col-span-2">
+                <dt className="text-xs text-gray-500">PCI DSS Requirements</dt>
+                <dd className="font-mono text-gray-700 mt-0.5 text-xs">{integration.pciDssRequirements.join(', ')}</dd>
+              </div>
+            )}
+          </dl>
+        </Card>
+      )}
+    </div>
+  );
+}

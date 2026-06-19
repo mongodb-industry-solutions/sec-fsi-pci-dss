@@ -1,5 +1,13 @@
 import { FastifyInstance } from 'fastify';
-import { getByEmail, getByPhone, getByAccountRef } from '../services/customerAgreement.service';
+import { getByEmail, getByPhone, getByAccountRef, getByInstanceReference } from '../services/customerAgreement.service';
+import type { AuthenticatedRequest, JwtUserPayload } from '../../../shared/models/identity.model';
+
+// Acting user (unique id + name) from the JWT — recorded in the sensitive-access audit event
+// so the case activity log identifies the individual, not just the role (PCI DSS Req 10.2.1).
+function actorOf(request: unknown): { ref?: string; name?: string } {
+  const u = (request as { user?: JwtUserPayload }).user;
+  return { ref: u?.partyRef ?? u?.sub, name: u?.name };
+}
 
 export async function customerAgreementController(fastify: FastifyInstance) {
   fastify.get('/', {
@@ -107,6 +115,7 @@ caller has the DEK-sensitive key, i.e. \`level2_investigator\` role.`,
         },
         400: { description: 'No search key provided, or multiple keys provided.', $ref: 'Error#' },
         401: { description: 'Missing or invalid Bearer token.', $ref: 'Error#' },
+        403: { description: 'Level 2 access requires a valid X-Escalation-Token header.', $ref: 'Error#' },
         404: { description: 'No customer agreement found matching the search key.', $ref: 'Error#' },
       },
     },
@@ -116,25 +125,87 @@ caller has the DEK-sensitive key, i.e. \`level2_investigator\` role.`,
       phone?: string;
       accountRef?: string;
     };
+    const { userRole, escalationToken } = request as unknown as AuthenticatedRequest;
 
-    if (email) {
-      const result = await getByEmail(fastify.db, email);
-      if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
-      return reply.send(result);
-    }
+    try {
+      if (email) {
+        const result = await getByEmail(fastify.db, email, userRole, escalationToken, actorOf(request));
+        if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
+        return reply.send(result);
+      }
 
-    if (phone) {
-      const result = await getByPhone(fastify.db, phone);
-      if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
-      return reply.send(result);
-    }
+      if (phone) {
+        const result = await getByPhone(fastify.db, phone, userRole, escalationToken, actorOf(request));
+        if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
+        return reply.send(result);
+      }
 
-    if (accountRef) {
-      const result = await getByAccountRef(fastify.db, accountRef);
-      if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
-      return reply.send(result);
+      if (accountRef) {
+        const result = await getByAccountRef(fastify.db, accountRef, userRole, escalationToken, actorOf(request));
+        if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
+        return reply.send(result);
+      }
+    } catch (err) {
+      const e = err as { statusCode?: number; message?: string };
+      if (e.statusCode === 403) {
+        return reply.status(403).send({ error: e.message ?? 'Forbidden' });
+      }
+      throw err;
     }
 
     return reply.status(400).send({ error: 'Provide email, phone, or accountRef query parameter' });
+  });
+
+  // GET /api/v1/customer/by-id/:id
+  // Resolves a customerAgreement by primary UUID  -  used by fraud case detail to auto-load
+  // the customer profile linked to a case without requiring a QE equality search.
+  fastify.get('/by-id/:id', {
+    schema: {
+      tags: ['customer'],
+      summary: 'Get customer agreement by instance reference UUID',
+      description: `Looks up a \`customerAgreement\` by its primary UUID (\`customerAgreementInstanceReference\`).
+
+Used by the fraud case detail view to load the customer profile automatically from
+\`fraudDiagnosisCase.linkedCustomerAgreementReference\` without requiring the analyst
+to perform a manual QE equality search.
+
+**Returned fields:** Non-sensitive plaintext fields only (name, segment, status,
+enrollment date). QE:equality fields (email, phone, account reference) are not returned
+ -  they are stored as ciphertext and require explicit QE search. For sensitive fields
+(address, government ID) a valid escalation token is required (L2 role only).`,
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: { id: { type: 'string', description: '`customerAgreementInstanceReference` UUID.' } },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            customerAgreementInstanceReference: { type: 'string' },
+            customerName: { type: 'string' },
+            customerSegment: { type: 'string' },
+            customerAgreementStatus: { type: 'string' },
+            customerAgreementEnrollmentDate: { type: 'string' },
+          },
+          additionalProperties: true,
+        },
+        401: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { userRole, escalationToken } = request as unknown as AuthenticatedRequest;
+    try {
+      const result = await getByInstanceReference(fastify.db, id, userRole, escalationToken, actorOf(request));
+      if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
+      return reply.send(result);
+    } catch (err) {
+      const e = err as { statusCode?: number; message?: string };
+      if (e.statusCode === 403) return (reply as typeof reply & { status(n: number): typeof reply }).status(403).send({ error: e.message ?? 'Forbidden' });
+      throw err;
+    }
   });
 }

@@ -1,0 +1,30 @@
+{
+  "services": [
+    {
+      "id": "atlas",
+      "name": "Atlas DB",
+      "description": "MongoDB Atlas cluster connectivity and QE key management",
+      "type": "atlas",
+      "url": "/api/v1/system/health",
+      "method": "GET",
+      "enabled": true,
+      "intervalMs": 30000,
+      "timeoutMs": 10000,
+      "expectedStatus": 200,
+      "useApiBase": true
+    },
+    {
+      "id": "api",
+      "name": "API Server",
+      "description": "Backend Fastify API server availability",
+      "type": "api",
+      "url": "/api/v1/system/health",
+      "method": "GET",
+      "enabled": true,
+      "intervalMs": 30000,
+      "timeoutMs": 10000,
+      "expectedStatus": 200,
+      "useApiBase": true
+    }
+  ]
+}

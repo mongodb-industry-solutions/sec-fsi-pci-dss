@@ -1,4 +1,4 @@
-// BIAN SD-64: Payment Order + SD-65: Payment Execution — REST controller
+// BIAN SD-64: Payment Order + SD-65: Payment Execution  -  REST controller
 // Routes mounted at /gateway/payments → /api/v1/gateway/payments
 
 import { FastifyInstance } from 'fastify';
@@ -38,7 +38,7 @@ initiated → confirmed → authorized → captured → settled
 
 **SD-65 routing:** On \`/authorize\`, the Payment Execution service selects a processor and records the routing decision.
 
-**Fraud evaluation:** Authorization triggers \`shared/services/fraudTrigger\` — a \`fraudDiagnosisCase\` is opened automatically if the amount or MCC meets the risk criteria.
+**Fraud evaluation:** Authorization triggers \`shared/services/fraudTrigger\`  -  a \`fraudDiagnosisCase\` is opened automatically if the amount or MCC meets the risk criteria.
 
 **PCI DSS:** No cardholder data is accepted at this endpoint. The payment order references the merchant and customer by UUID; card credentials never pass through the gateway API.
 
@@ -74,7 +74,7 @@ initiated → confirmed → authorized → captured → settled
         },
         400: { $ref: 'Error#' },
         401: { $ref: 'Error#' },
-        409: { description: '(v5-only) Duplicate idempotency key — not yet enforced in this prototype.', $ref: 'Error#' },
+        409: { description: '(v5-only) Duplicate idempotency key  -  not yet enforced in this prototype.', $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {

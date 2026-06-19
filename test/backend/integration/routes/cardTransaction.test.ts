@@ -2,7 +2,7 @@
  * Integration tests: card transaction + fraud diagnosis routes (FR-v1-03, FR-v1-04)
  * Source: backend/src/controllers/cardTransaction.controller.ts
  *
- * Requires TEST_MONGODB_URI — skips gracefully when not set.
+ * Requires TEST_MONGODB_URI - skips gracefully when not set.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import supertest from 'supertest';
@@ -27,7 +27,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
 
     const loginRes = await supertest(app.server)
       .post('/api/v1/auth/login')
-      .send({ email: 'sarah.chen@leafybank.demo', password: 'demo-password', domain: 'local' });
+      .send({ email: 'sarah.chen@back.es', password: 'demo-password', domain: 'local' });
     authToken = loginRes.body.token;
   });
 
@@ -57,6 +57,8 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
         cardTransactionMerchantCategoryCode: '5411',
         cardTransactionChannel: 'online',
         cardTransactionMaskedPanDisplay: '****-****-****-9999',
+        cardTransactionType: 'purchase',
+        cardTransactionDescription: 'SAFE STORE',
         gatewayPayload: {},
       });
     expect(res.status).toBe(201);
@@ -79,6 +81,8 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
         cardTransactionMerchantCategoryCode: '5999',
         cardTransactionChannel: 'online',
         cardTransactionMaskedPanDisplay: '****-****-****-0001',
+        cardTransactionType: 'purchase',
+        cardTransactionDescription: 'HIGH RISK STORE',
         gatewayPayload: {},
       });
     expect(res.status).toBe(201);
@@ -100,13 +104,15 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
         cardTransactionMerchantCategoryCode: '7995',
         cardTransactionChannel: 'online',
         cardTransactionMaskedPanDisplay: '****-****-****-0002',
+        cardTransactionType: 'purchase',
+        cardTransactionDescription: 'CASINO',
         gatewayPayload: {},
       });
     expect(res.status).toBe(201);
     expect(res.body.fraudCaseCreated).toBe(true);
   });
 
-  // FR-v1-03.3: GET by ID — Level 1 response (no QE fields)
+  // FR-v1-03.3: GET by ID - Level 1 response (no QE fields)
   skip('GET /card-transactions/:id does not return QE account reference', async () => {
     const createRes = await supertest(app.server)
       .post('/api/v1/card-transactions')
@@ -120,6 +126,8 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
         cardTransactionMerchantCategoryCode: '5411',
         cardTransactionChannel: 'pos',
         cardTransactionMaskedPanDisplay: '****-****-****-0003',
+        cardTransactionType: 'purchase',
+        cardTransactionDescription: 'TEST STORE',
         gatewayPayload: {},
       });
 
@@ -176,7 +184,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
     expect(res.body.diagnosisActionLog).toBeDefined();
   });
 
-  // FR-v1-04.3: GET /fraud-diagnosis-cases?status= — every result matches the filter
+  // FR-v1-04.3: GET /fraud-diagnosis-cases?status= - every result matches the filter
   skip('GET /fraud-diagnosis-cases?status=open returns only open cases', async () => {
     const res = await supertest(app.server)
       .get('/api/v1/fraud-diagnosis-cases?status=open')
@@ -190,9 +198,9 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
   // FR-v1-04.1: QE equality search by customerEmailAddress
   skip('GET /customer-agreements?email= performs QE equality search', async () => {
     const res = await supertest(app.server)
-      .get('/api/v1/customer-agreements?email=sarah.chen@leafybank.demo')
+      .get('/api/v1/customer-agreements?email=sarah.chen@back.es')
       .set('Authorization', `Bearer ${authToken}`);
-    // 200 if seeded, 404 if not — both are valid in a clean test cluster
+    // 200 if seeded, 404 if not - both are valid in a clean test cluster
     expect([200, 404]).toContain(res.status);
     if (res.status === 200) {
       // QE search predicate fields must not be echoed in the response (spec §technical-spec §2)
@@ -209,5 +217,57 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.results)).toBe(true);
     expect(typeof res.body.count).toBe('number');
+  });
+
+  // I-01: POST with cardTransactionDescription → GET /:id returns description + type (BIAN SD-254)
+  skip('I-01: POST with description fields → GET returns them', async () => {
+    const postRes = await supertest(app.server)
+      .post('/api/v1/card-transactions')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        cardToken: `tok_desc_${Date.now()}`,
+        accountReference: 'ACC-DESC-001',
+        amount: 42,
+        currency: 'USD',
+        cardTransactionMerchantName: 'Coffee Shop',
+        cardTransactionMerchantCategoryCode: '5812',
+        cardTransactionChannel: 'contactless',
+        cardTransactionMaskedPanDisplay: '****-****-****-7777',
+        cardTransactionType: 'purchase',
+        cardTransactionDescription: 'COFFEE SHOP',
+        cardTransactionNarrative: 'PURCHASE at Coffee Shop - ref AA11BB22',
+        gatewayPayload: {},
+      });
+    expect(postRes.status).toBe(201);
+
+    const txnId = postRes.body.cardTransactionInstanceReference;
+    const getRes = await supertest(app.server)
+      .get(`/api/v1/card-transactions/${txnId}`)
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.cardTransactionDescription).toBe('COFFEE SHOP');
+    expect(getRes.body.cardTransactionType).toBe('purchase');
+    expect(getRes.body.cardTransactionNarrative).toBe('PURCHASE at Coffee Shop - ref AA11BB22');
+  });
+
+  // I-02: POST missing cardTransactionDescription → 400
+  skip('I-02: POST missing required cardTransactionDescription → 400', async () => {
+    const res = await supertest(app.server)
+      .post('/api/v1/card-transactions')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        cardToken: `tok_nodesc_${Date.now()}`,
+        accountReference: 'ACC-NODESC-001',
+        amount: 10,
+        currency: 'USD',
+        cardTransactionMerchantName: 'Test Store',
+        cardTransactionMerchantCategoryCode: '5411',
+        cardTransactionChannel: 'online',
+        cardTransactionMaskedPanDisplay: '****-****-****-8888',
+        cardTransactionType: 'purchase',
+        // cardTransactionDescription intentionally omitted
+        gatewayPayload: {},
+      });
+    expect(res.status).toBe(400);
   });
 });

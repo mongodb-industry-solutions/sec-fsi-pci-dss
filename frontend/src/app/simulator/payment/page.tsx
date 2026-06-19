@@ -1,59 +1,53 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api, Merchant } from '../../../lib/api';
+import { api, awaitPaymentOutcome } from '../../../lib/api';
 import { FraudAlert } from '../../../components/FraudAlert';
 import { EncryptionBadge } from '../../../components/EncryptionBadge';
 import { Tooltip } from '../../../components/Tooltip';
+import { Eye, EyeOff } from 'lucide-react';
 import { StepExplainer } from '../../../components/StepExplainer';
+import { RedirectionPaymentFlow } from '../../../components/simulator/RedirectionPaymentFlow';
+import { PaymentLinkFlow } from '../../../components/simulator/PaymentLinkFlow';
+import type { PaymentMethodId, SimulatorScenario } from '../../../types/simulator';
+import simulatorConfig from '../../../config/simulator.json';
+import { variedAmount, variedDescription } from '../../../lib/simVary';
+import { deriveCardToken } from '../../../lib/cardTokenize';
 
 type Step = 1 | 2 | 3;
 
 interface FormData {
   cardholderName: string;
   expiry: string;
+  cvv: string;
   email: string;
   phone: string;
   amount: string;
+  description: string;
   merchantName: string;
   merchantCategoryCode: string;
 }
 
 // Default card number for demo (masked immediately on mount)
-const DEMO_CARD_NUMBER = '4111111111111234';
+const DEMO_CARD_NUMBER = simulatorConfig.defaultCard;
 
 // Test card presets for demo selection
-const TEST_CARDS = [  
-  { label: "Visa Standard (4242-4242-4242-4242)", number: "4242424242424242" },    
-  { label: "Visa Business (2223-0000-4840-0010)", number: "2223000048400010" },    
-  { label: "Mastercard Standard (5555-5555-5555-1212)", number: "5555555555551212" },    
-  { label: "Mastercard Prepaid (5200-8282-8282-8210)", number: "5200828282828210" },    
-  { label: "Amex Gold (3782-8224-6301-0005)", number: "378282246310005" },    
-  { label: "Amex Platinum (3714-4963-5309-8431)", number: "371449635398431" },    
-  { label: "Demo Card (Pre-filled Example)", number: DEMO_CARD_NUMBER },    
-] ;
+const TEST_CARDS = simulatorConfig.testCards;
 
 const DEFAULTS: FormData = {
   cardholderName: 'Luis Fernandez',
   expiry: '12/28',
-  email: 'luis.fernandez@leafybank.demo',
+  cvv: '',
+  email: 'luis.fernandez@back.es',
   phone: '+44 7700 900123',
   amount: '850.00',
+  description: '',
   merchantName: 'TechGadgets Ltd.',
   merchantCategoryCode: '5734',
 };
 
 // Preset amount options for quick selection
-const AMOUNT_PRESETS = ['100.00', '250.00', '500.00', '850.00', '1200.00'];
-
-// Fallback merchant list when DB is unavailable
-const FALLBACK_MERCHANTS: Merchant[] = [
-  { name: 'TechGadgets Ltd.', mcc: '5734' },
-  { name: 'Global Electronics', mcc: '5734' },
-  { name: 'City Restaurant', mcc: '5812' },
-  { name: 'ATM Cash Withdrawal', mcc: '6011' },
-  { name: 'Online Casino', mcc: '7995' },
-];
+const AMOUNT_PRESETS = simulatorConfig.amountPresets;
 
 function maskCardNumber(raw: string): string {
   const digits = raw.replace(/\D/g, '').slice(0, 16);
@@ -72,68 +66,7 @@ function simulateCipher(seed: string): string {
   return `\\x${bytes.slice(0, 4).join('\\x')}...`;
 }
 
-// ── Merchant combobox ────────────────────────────────────────────────────────
-function MerchantCombobox({
-  value,
-  mcc,
-  merchants,
-  onChange,
-}: {
-  value: string;
-  mcc: string;
-  merchants: Merchant[];
-  onChange: (name: string, mcc: string) => void;
-}) {
-  const [custom, setCustom] = useState(false);
-
-  function handleSelect(e: React.ChangeEvent<HTMLSelectElement>) {
-    if (e.target.value === '__custom__') {
-      setCustom(true);
-      onChange(value, mcc);
-    } else {
-      const m = merchants.find((x) => x.name === e.target.value);
-      if (m) onChange(m.name, m.mcc);
-    }
-  }
-
-  if (custom) {
-    return (
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value, mcc)}
-          className="flex-1 border rounded-lg px-3 py-2 text-sm"
-          placeholder="Merchant name"
-        />
-        <button
-          type="button"
-          onClick={() => setCustom(false)}
-          className="text-xs text-blue-600 underline whitespace-nowrap"
-        >
-          Use list
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <select
-      value={value}
-      onChange={handleSelect}
-      className="w-full border rounded-lg px-3 py-2 text-sm"
-    >
-      {merchants.map((m, idx) => (
-        <option key={`${m.name}-${m.mcc}-${idx}`} value={m.name}>
-          {m.name} (MCC {m.mcc})
-        </option>
-      ))}
-      <option value="__custom__">✏ Enter custom merchant…</option>
-    </select>
-  );
-}
-
-// ── Amount selector ──────────────────────────────────────────────────────────
+// -- Amount selector ----------------------------------------------------------
 function AmountSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [custom, setCustom] = useState(!AMOUNT_PRESETS.includes(value));
 
@@ -187,21 +120,30 @@ function AmountSelector({ value, onChange }: { value: string; onChange: (v: stri
         </button>
       </div>
       <p className="text-xs text-amber-700">
-        ⚠ Amounts above $500 trigger automatic fraud case creation.
+        ⚠ Amounts above ${simulatorConfig.fraudAmountThreshold} trigger automatic fraud case creation.
       </p>
     </div>
   );
 }
 
-// ── Card selector ─────────────────────────────────────────────────────────────
+// -- Card selector ------------------------------------------------------------─
+// Proposes a list of cards (the customer's cards on file when a scenario is loaded, or the
+// generic test cards otherwise) and always allows entering a different card number by hand.
 function CardSelector({
   maskedCard,
   onCardChange,
+  cards,
+  customerName,
+  defaultNumber,
 }: {
   maskedCard: string;
   onCardChange: (raw: string) => void;
+  cards: { label: string; number: string }[];
+  customerName?: string;
+  defaultNumber?: string;
 }) {
   const [custom, setCustom] = useState(false);
+  const presetValue = defaultNumber && cards.some((c) => c.number === defaultNumber) ? defaultNumber : '';
 
   function handlePreset(e: React.ChangeEvent<HTMLSelectElement>) {
     if (e.target.value === '__custom__') {
@@ -243,14 +185,16 @@ function CardSelector({
     <div className="space-y-1">
       <select
         onChange={handlePreset}
-        defaultValue=""
+        defaultValue={presetValue}
         className="w-full border rounded-lg px-3 py-2 text-sm bg-white"
       >
-        <option value="" disabled>Select a test card or enter custom…</option>
-        {TEST_CARDS.map((c) => (
+        <option value="" disabled>
+          {customerName ? `Select a card on file for ${customerName}…` : 'Select a test card or enter custom…'}
+        </option>
+        {cards.map((c) => (
           <option key={c.number} value={c.number}>{c.label}</option>
         ))}
-        <option value="__custom__">✏ Enter custom card number…</option>
+        <option value="__custom__">✏ Enter a different card number…</option>
       </select>
       {maskedCard && (
         <div className="font-mono text-gray-700 bg-gray-50 rounded px-3 py-2 flex items-center gap-2 text-sm">
@@ -258,13 +202,15 @@ function CardSelector({
         </div>
       )}
       <p className="text-xs text-gray-500">
-        Masked immediately. Raw PAN never stored. Leave blank to use the pre-filled demo card.
+        {customerName
+          ? 'Pick one of the customer’s cards on file, or enter a different one. Masked immediately; raw PAN never stored.'
+          : 'Masked immediately. Raw PAN never stored. Leave blank to use the pre-filled demo card.'}
       </p>
     </div>
   );
 }
 
-// ── Validation ────────────────────────────────────────────────────────────────
+// -- Validation ----------------------------------------------------------------
 interface ValidationErrors {
   cardNumber?: string;
   email?: string;
@@ -284,13 +230,20 @@ function validateStep1(form: FormData, maskedCard: string): ValidationErrors {
   return errors;
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// -- Main component ------------------------------------------------------------
 export default function PaymentPage() {
   const router = useRouter();
+  const [simMethod, setSimMethod] = useState<PaymentMethodId | null>(null);
+  const [simScenario, setSimScenario] = useState<SimulatorScenario | null>(null);
+  // The merchant (payee) chosen on the landing page; drives attribution + per-merchant callback.
+  const [merchantId, setMerchantId] = useState<string>(simulatorConfig.merchantId);
+  const [methodReady, setMethodReady] = useState(false);
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<FormData>(DEFAULTS);
+  const [showCvv, setShowCvv] = useState(false);
   const [maskedCard, setMaskedCard] = useState<string>(maskCardNumber(DEMO_CARD_NUMBER));
-  const [merchants, setMerchants] = useState<Merchant[]>(FALLBACK_MERCHANTS);
+  // Raw PAN digits kept only to derive the deterministic token at submit time (never sent).
+  const [rawCard, setRawCard] = useState<string>(DEMO_CARD_NUMBER.replace(/\D/g, ''));
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{
     txnId: string;
@@ -302,13 +255,70 @@ export default function PaymentPage() {
   const [returning, setReturning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const [varyNote, setVaryNote] = useState<string | null>(null);
   const cardTokenRef = useRef<string>(generateToken());
 
+  // Read sim_method + sim_scenario from sessionStorage on mount
   useEffect(() => {
+    const method = (sessionStorage.getItem('sim_method') as PaymentMethodId) ?? null;
+    const scenarioId = sessionStorage.getItem('sim_scenario');
+    setSimMethod(method);
+
+    // Merchant (payee) chosen on the landing page. Overrides the scenario's merchant prefill so the
+    // payment is attributed to the selected merchant and its webhook callback is the one notified.
+    const selMerchantId = sessionStorage.getItem('sim_merchant_id') ?? simulatorConfig.merchantId;
+    const selMerchantName = sessionStorage.getItem('sim_merchant_name') ?? simulatorConfig.merchantName;
+    const selMerchantMcc = sessionStorage.getItem('sim_merchant_mcc') ?? undefined;
+    setMerchantId(selMerchantId);
+
+    if (scenarioId) {
+      const found = (simulatorConfig.scenarios as SimulatorScenario[]).find(s => s.id === scenarioId) ?? null;
+      setSimScenario(found);
+      if (found && method === 'api-card') {
+        // Pre-fill from scenario (payer) + the selected merchant (payee). The merchant is fixed
+        // (chosen on the landing page); the other values stay editable so the operator can vary them.
+        setForm({
+          cardholderName: found.prefill.cardholderName,
+          // Expiry is card data: take the scenario's own card expiry (not a blanket constant).
+          expiry: found.prefill.cardExpiry ?? '',
+          // CVV is entered by the user at payment time (never predefined). Placeholder hints the demo value.
+          cvv: '',
+          email: found.prefill.email,
+          phone: found.prefill.phone,
+          amount: String(found.prefill.amount),
+          description: '',
+          merchantName: selMerchantName,
+          merchantCategoryCode: selMerchantMcc ?? found.prefill.merchantCategoryCode,
+        });
+        // Pre-select the customer's primary card on file so the masked display reflects their card.
+        const primary = found.savedCards?.[0]?.number ?? found.prefill.cardHint;
+        if (primary) {
+          setRawCard(primary.replace(/\D/g, ''));
+          setMaskedCard(maskCardNumber(primary));
+        }
+      }
+    } else if (method === 'api-card') {
+      // No scenario: still reflect the merchant fixed on the landing page.
+      setForm((f) => ({ ...f, merchantName: selMerchantName, merchantCategoryCode: selMerchantMcc ?? f.merchantCategoryCode }));
+    }
+
+    if (!method) {
+      // No method selected; guard: redirect to landing
+      router.replace('/simulator');
+      return;
+    }
+    setMethodReady(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Restore step 3 from sessionStorage (existing api-card flow)
+  useEffect(() => {
+    if (simMethod !== 'api-card' || !methodReady) return;
     try {
       const saved = sessionStorage.getItem('sim_payment_step3');
       if (saved) {
-        const { savedResult, savedForm, savedMasked } = JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        const { savedResult, savedForm, savedMasked } = parsed._restore ?? parsed;
         cardTokenRef.current = savedResult.cardToken || cardTokenRef.current;
         setResult(savedResult);
         setForm(savedForm);
@@ -320,26 +330,54 @@ export default function PaymentPage() {
     } catch {
       sessionStorage.removeItem('sim_payment_step3');
     }
-
-    api.transactions.merchants()
-      .then((res) => {
-        if (res.merchants.length > 0) {
-          setMerchants(res.merchants);
-          const defaultMerchant = res.merchants.find((m) => m.name === DEFAULTS.merchantName)
-            ?? res.merchants[0];
-          setForm((f) => ({
-            ...f,
-            merchantName: defaultMerchant.name,
-            merchantCategoryCode: defaultMerchant.mcc,
-          }));
-        }
-      })
-      .catch(() => {/* keep fallback list */});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [simMethod, methodReady]);
 
-  function handleMerchantChange(name: string, mcc: string) {
-    setForm((f) => ({ ...f, merchantName: name, merchantCategoryCode: mcc }));
+  // ── Route to non-api-card flows ──────────────────────────────────────────
+  if (!methodReady) {
+    return (
+      <div className="max-w-xl mx-auto text-center py-16 text-gray-400 text-sm">
+        Loading…
+      </div>
+    );
+  }
+
+  if (simMethod === 'redirection') {
+    const scenario = simScenario ?? (simulatorConfig.scenarios[0] as SimulatorScenario);
+    return (
+      <RedirectionPaymentFlow
+        scenario={scenario}
+        merchantId={merchantId}
+      />
+    );
+  }
+
+  if (simMethod === 'payment-link') {
+    const scenario = simScenario ?? (simulatorConfig.scenarios[0] as SimulatorScenario);
+    return (
+      <PaymentLinkFlow
+        scenario={scenario}
+        merchantId={merchantId}
+      />
+    );
+  }
+
+  // ── API Card flow (default) ───────────────────────────────────────────────
+
+  // Cards proposed in the selector: the customer's cards on file when a scenario is loaded,
+  // otherwise the generic demo test cards. A different card can always be entered by hand.
+  const customerCards = simScenario?.savedCards?.length
+    ? simScenario.savedCards.map((c) => ({ label: `${c.alias} ${maskCardNumber(c.number)}`, number: c.number }))
+    : TEST_CARDS;
+
+  // One-click variation of the payment amount for repeated demo runs. The persona, merchant and
+  // descriptor stay fixed; only the amount varies, so each run is easy to tell apart in history.
+  function handleVary() {
+    const amount = variedAmount(form.amount);
+    const description = variedDescription(form.merchantName, form.description);
+    setForm((f) => ({ ...f, amount, description }));
+    setValidationErrors({});
+    setVaryNote(`New amount generated. Find this transaction by amount $${amount}.`);
   }
 
   function handleNext() {
@@ -357,36 +395,60 @@ export default function PaymentPage() {
     setSubmitting(true);
     setError(null);
     try {
+      // Deterministic token from the entered card number: paying again with the same card reuses
+      // the same token, so the card-on-file is never duplicated (dedups in the registry).
+      if (rawCard) cardTokenRef.current = await deriveCardToken(rawCard);
       const res = await api.transactions.create({
         cardToken: cardTokenRef.current,
-        accountReference: `ACC-${Date.now().toString(36).toUpperCase()}`,
+        accountReference: form.email,
         amount: parseFloat(form.amount),
-        currency: 'USD',
+        currency: simulatorConfig.defaultCurrency,
         cardTransactionMerchantName: form.merchantName,
         cardTransactionMerchantCategoryCode: form.merchantCategoryCode,
         cardTransactionChannel: 'online',
         cardTransactionMaskedPanDisplay: maskedCard || '****-****-****-1234',
+        cardTransactionType: 'purchase',
+        cardTransactionDescription: (form.description.trim() || form.merchantName.toUpperCase()).slice(0, 22),
+        // Acquiring-side link: the payment is charged to the MERCHANT selected on the landing page,
+        // so it surfaces in that merchant's received-payments view and its webhook callback fires.
+        merchantAgreementInstanceReference: merchantId,
         gatewayPayload: { source: 'simulator', timestamp: new Date().toISOString() },
+        // Transient verification values sent to the card issuer for authorization (never stored/logged).
+        cardVerification: { ...(rawCard ? { cardNumber: rawCard } : {}), ...(form.cvv ? { cvv: form.cvv } : {}), ...(form.expiry ? { expiry: form.expiry } : {}) },
       });
 
+      // dev.v8 F3: the payment is PENDING; wait for the issuer's async decision over SSE.
+      const txnId = res.cardTransactionInstanceReference;
+      const outcome = await awaitPaymentOutcome(txnId);
+      if (outcome.status === 'declined') {
+        setError(`The card issuer declined this payment${outcome.declineReason ? ` (${outcome.declineReason.replace(/_/g, ' ')})` : ''}. No charge was made.`);
+        return;
+      }
+
       const newResult = {
-        txnId: res.cardTransactionInstanceReference,
-        fraudCaseCreated: res.fraudCaseCreated,
-        caseId: res.fraudDiagnosisInstanceReference,
-        caseRef: res.fraudDiagnosisInstanceReference
-          ? `FD-SIM-${res.fraudDiagnosisInstanceReference.slice(-6).toUpperCase()}`
-          : undefined,
+        txnId,
+        fraudCaseCreated: !!outcome.fraudCaseCreated,
+        caseId: outcome.caseId ?? undefined,
+        caseRef: outcome.caseId ? `FD-SIM-${outcome.caseId.slice(-6).toUpperCase()}` : undefined,
         cardToken: cardTokenRef.current,
       };
       try {
         sessionStorage.setItem('sim_payment_step3', JSON.stringify({
-          savedResult: newResult,
-          savedForm: form,
-          savedMasked: maskedCard,
+          cardTransactionInstanceReference: newResult.txnId,
+          caseId: newResult.caseId ?? null,
+          email: form.email,
+          amount: parseFloat(form.amount),
+          currency: simulatorConfig.defaultCurrency,
+          merchantName: form.merchantName,
+          method: 'api-card',
+          customerName: simScenario?.persona ?? form.cardholderName,
+          _restore: { savedResult: newResult, savedForm: form, savedMasked: maskedCard },
         }));
       } catch { /* ignore storage errors */ }
       setResult(newResult);
       setStep(3);
+      // Transaction is persisted server-side; application-mode history reads it
+      // from the real API (GET /api/v1/transactions/all), no local mirror needed.
     } catch (err) {
       const msg = (err as Error).message ?? '';
       if (msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('fetch')) {
@@ -401,17 +463,23 @@ export default function PaymentPage() {
 
   function handleReset() {
     try { sessionStorage.removeItem('sim_payment_step3'); } catch { /* ignore */ }
+    sessionStorage.removeItem('sim_method');
+    sessionStorage.removeItem('sim_scenario');
+    sessionStorage.removeItem('sim_step');
     setStep(1);
     setForm(DEFAULTS);
     setMaskedCard(maskCardNumber(DEMO_CARD_NUMBER));
+    setRawCard(DEMO_CARD_NUMBER.replace(/\D/g, ''));
     setResult(null);
     setReturning(false);
     setError(null);
     setValidationErrors({});
+    setVaryNote(null);
     cardTokenRef.current = generateToken();
+    router.push('/simulator');
   }
 
-  // ── Step indicator ──────────────────────────────────────────────────────────
+  // -- Step indicator ----------------------------------------------------------
   const stepLabels = ['Card Details', 'Review & Encrypt', 'Confirmation'];
 
   return (
@@ -439,7 +507,7 @@ export default function PaymentPage() {
         </span>
       </div>
 
-      {/* ── STEP 1: Card Details ───────────────────────────────────────────── */}
+      {/* -- STEP 1: Card Details --------------------------------------------─ */}
       {step === 1 && (
         <div className="bg-white rounded-xl border p-6 space-y-4">
           <div className="flex items-center justify-between">
@@ -461,15 +529,37 @@ export default function PaymentPage() {
             </StepExplainer>
           </div>
 
+          {/* Edit / vary values before paying */}
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-xs text-blue-800">
+                This scenario fixes the persona and merchant. You can still adjust the payment
+                options below (amount, description) before paying, or use <strong>Vary values</strong>
+                {' '}to generate a distinct variation so repeated runs are easy to tell apart.
+              </p>
+              <button
+                type="button"
+                onClick={handleVary}
+                className="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors"
+              >
+                🎲 Vary values
+              </button>
+            </div>
+            {varyNote && <p className="text-xs text-blue-700 font-medium">{varyNote}</p>}
+          </div>
+
           {/* Card number */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
               Card Number
               <Tooltip text="Select a test card or enter a custom PAN. The raw PAN is masked immediately on input and is never stored in component state or sent to the server. A secure token is generated instead." />
             </label>
             <CardSelector
               maskedCard={maskedCard}
-              onCardChange={(raw) => setMaskedCard(maskCardNumber(raw))}
+              onCardChange={(raw) => { setRawCard(raw); setMaskedCard(maskCardNumber(raw)); }}
+              cards={customerCards}
+              customerName={simScenario?.persona}
+              defaultNumber={rawCard}
             />
             {validationErrors.cardNumber && (
               <p className="text-xs text-red-600 mt-0.5">{validationErrors.cardNumber}</p>
@@ -478,7 +568,7 @@ export default function PaymentPage() {
 
           {/* Cardholder name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
               Cardholder Name
               <Tooltip text="Name as it appears on the card. Stored as plaintext, not classified as Cardholder Data under PCI DSS v4.0 when stored without a PAN." />
             </label>
@@ -490,19 +580,46 @@ export default function PaymentPage() {
             />
           </div>
 
-          {/* Expiry */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Expiry Date
-              <Tooltip text="Card expiration date (MM/YY). Stored in the paymentCard collection with QE:none encryption: protected at rest, not searchable." />
-            </label>
-            <input
-              type="text"
-              value={form.expiry}
-              onChange={(e) => setForm((f) => ({ ...f, expiry: e.target.value }))}
-              className="w-full border rounded-lg px-3 py-2 font-mono"
-              placeholder="MM/YY"
-            />
+          {/* Expiry + CVV */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                Expiry Date
+                <Tooltip text="Card expiration date (MM/YY). The card issuer declines an expired card; the value is sent for authorization only and never stored." />
+              </label>
+              <input
+                type="text"
+                value={form.expiry}
+                onChange={(e) => setForm((f) => ({ ...f, expiry: e.target.value }))}
+                className="w-full border rounded-lg px-3 py-2 font-mono"
+                placeholder="MM/YY"
+              />
+            </div>
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                CVV
+                <Tooltip text="Card verification value. Sent to the card issuer for authorization only, never stored or logged (PCI DSS Req 3.2). The demo issuer accepts 123; any other value is declined." />
+              </label>
+              <div className="relative">
+                <input
+                  type={showCvv ? 'text' : 'password'}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={form.cvv}
+                  onChange={(e) => setForm((f) => ({ ...f, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                  className="w-full border rounded-lg pl-3 pr-9 py-2 font-mono"
+                  placeholder="123"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCvv((s) => !s)}
+                  aria-label={showCvv ? 'Hide CVV' : 'Show CVV'}
+                  className="absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400 hover:text-gray-700"
+                >
+                  {showCvv ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="border-t pt-4 space-y-4">
@@ -510,7 +627,7 @@ export default function PaymentPage() {
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
                 Email Address
                 <Tooltip text="Customer email address (QE:equality field). Encrypted with Queryable Encryption before being sent to Atlas. MongoDB stores only ciphertext and can still perform exact-match queries without seeing the plaintext." />
               </label>
@@ -527,7 +644,7 @@ export default function PaymentPage() {
 
             {/* Phone */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
                 Mobile Phone
                 <Tooltip text="Customer mobile number (QE:equality field). Encrypted at origin with Queryable Encryption. L1 Analysts can search by phone without Atlas seeing the plaintext number." />
               </label>
@@ -544,9 +661,9 @@ export default function PaymentPage() {
 
             {/* Amount */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
                 Amount (USD)
-                <Tooltip text="Transaction amount. Stored as plaintext in cardTransactionAmount. Amounts above $500 automatically trigger fraud case creation (configurable via FRAUD_AMOUNT_THRESHOLD env var). Selecting $850 will trigger a fraud alert." />
+                <Tooltip text={`Transaction amount. Stored as plaintext in cardTransactionAmount. Amounts above $${simulatorConfig.fraudAmountThreshold} automatically trigger fraud case creation (configurable via FRAUD_AMOUNT_THRESHOLD env var). Selecting $850 will trigger a fraud alert.`} />
               </label>
               <AmountSelector value={form.amount} onChange={(v) => { setForm((f) => ({ ...f, amount: v })); setValidationErrors((v2) => ({ ...v2, amount: undefined })); }} />
               {validationErrors.amount && (
@@ -554,26 +671,38 @@ export default function PaymentPage() {
               )}
             </div>
 
-            {/* Merchant Name */}
+            {/* Description / statement descriptor */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Merchant Name
-                <Tooltip text="Name of the business processing the payment. Stored as plaintext in cardTransactionMerchantName. Selecting a merchant also sets its ISO 18245 MCC code. Certain MCC codes (5812 restaurants, 6011 ATM, 7995 gambling) are high-risk and trigger fraud cases." />
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                Description
+                <Tooltip text="Statement descriptor stored in cardTransactionDescription (max 22 chars). Optional; defaults to the merchant name. Vary it to make repeated runs distinguishable." />
               </label>
-              <MerchantCombobox
-                value={form.merchantName}
-                mcc={form.merchantCategoryCode}
-                merchants={merchants}
-                onChange={handleMerchantChange}
+              <input
+                type="text"
+                value={form.description}
+                maxLength={22}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder={form.merchantName.toUpperCase().slice(0, 22)}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
               />
-              {validationErrors.merchantName && (
-                <p className="text-xs text-red-600 mt-0.5">{validationErrors.merchantName}</p>
-              )}
+            </div>
+
+            {/* Merchant Name (read-only; the payee is fixed on the landing page) */}
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                Merchant Name
+                <Tooltip text="The business receiving the payment (the payee), fixed when you chose the merchant on the previous screen. Stored as plaintext in cardTransactionMerchantName. Its ISO 18245 MCC drives fraud risk: codes such as 5812 (restaurants), 6011 (ATM) and 7995 (gambling) are high-risk." />
+              </label>
+              <div className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700 flex items-center justify-between gap-2">
+                <span className="truncate">{form.merchantName}</span>
+                <span className="text-[10px] uppercase tracking-wide text-gray-400 shrink-0">Preset</span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Chosen on the previous screen; the payment is attributed to this merchant.</p>
             </div>
 
             {/* MCC (read-only display) */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
                 Merchant Category Code (MCC)
                 <Tooltip text="ISO 18245 four-digit code classifying the merchant's business type. Set automatically when you select a merchant. High-risk codes (5812, 6011, 7995) trigger automatic fraud case creation regardless of transaction amount." />
               </label>
@@ -605,10 +734,13 @@ export default function PaymentPage() {
           >
             Next: Review & Encrypt →
           </button>
+          <button onClick={handleReset} className="w-full text-xs text-gray-400 hover:text-gray-600 transition-colors py-1">
+            ← Cancel and change scenario
+          </button>
         </div>
       )}
 
-      {/* ── STEP 2: Review (Encryption Explainer) ─────────────────────────── */}
+      {/* -- STEP 2: Review (Encryption Explainer) --------------------------─ */}
       {step === 2 && (
         <div className="bg-white rounded-xl border p-6 space-y-4">
           <div className="flex items-center justify-between">
@@ -743,7 +875,7 @@ export default function PaymentPage() {
         </div>
       )}
 
-      {/* ── STEP 3: Confirmation + Fraud Alert ────────────────────────────── */}
+      {/* -- STEP 3: Confirmation + Fraud Alert ------------------------------ */}
       {step === 3 && result && (
         <div className="bg-white rounded-xl border p-6 space-y-4">
           {returning && (
@@ -765,8 +897,8 @@ export default function PaymentPage() {
                 as opaque ciphertext; no plaintext PII ever reaches the database server.
               </p>
               <p>
-                If the amount exceeded <strong>$500</strong> or the MCC is high-risk, a
-                <strong> FraudDiagnosisCase</strong> (BIAN SD-105) was automatically opened and you
+                If the amount exceeded <strong>${simulatorConfig.fraudAmountThreshold}</strong> or the MCC is high-risk, a
+                <strong> FraudDiagnosisCase</strong> (BIAN SD-83) was automatically opened and you
                 will be redirected to the Investigation Dashboard.
               </p>
               <p>

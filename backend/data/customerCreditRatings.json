@@ -1,0 +1,120 @@
+[
+  {
+    "customerCreditRatingInstanceReference": "hrpc-001",
+    "customerAgreementReference": "ACC-003",
+    "customerCreditRatingClassificationFlags": [
+      {
+        "customerCreditRatingClassificationCategory": "suspicious_transaction_patterns",
+        "customerCreditRatingClassificationLevel": "high",
+        "customerCreditRatingClassificationLabel": "Suspicious Transaction Patterns",
+        "customerCreditRatingClassificationDescription": "Multiple high-value card transactions at high-risk MCC merchants (7995 - Gambling, 5813 - Drinking Establishments) detected over 90 days. Velocity exceeds peer-group baseline by 340%.",
+        "customerCreditRatingClassificationDetectedDateTime": "2026-03-15",
+        "customerCreditRatingClassificationSource": "internal_transaction_monitoring",
+        "customerCreditRatingReviewRequiredIndicator": true
+      }
+    ],
+    "bianServiceDomain": "CustomerCreditRating",
+    "bianControlRecordType": "CustomerCreditRatingState",
+    "recordCreatedDateTime": "2026-03-15T09:00:00Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00Z",
+    "schemaVersion": 1
+  },
+  {
+    "customerCreditRatingInstanceReference": "hrpc-002",
+    "customerAgreementReference": "ACC-007",
+    "customerCreditRatingClassificationFlags": [
+      {
+        "customerCreditRatingClassificationCategory": "high_risk_jurisdiction",
+        "customerCreditRatingClassificationLevel": "medium",
+        "customerCreditRatingClassificationLabel": "High-Risk Jurisdiction Link",
+        "customerCreditRatingClassificationDescription": "Transaction counterparty linked to a jurisdiction on the FATF elevated-risk list. Cross-border transfer activity increased 80% since last review.",
+        "customerCreditRatingClassificationDetectedDateTime": "2026-04-10",
+        "customerCreditRatingClassificationSource": "correspondent_screening",
+        "customerCreditRatingReviewRequiredIndicator": true
+      }
+    ],
+    "bianServiceDomain": "CustomerCreditRating",
+    "bianControlRecordType": "CustomerCreditRatingState",
+    "recordCreatedDateTime": "2026-04-10T11:30:00Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00Z",
+    "schemaVersion": 1
+  },
+  {
+    "customerCreditRatingInstanceReference": "hrpc-003",
+    "customerAgreementReference": "ACC-012",
+    "customerCreditRatingClassificationFlags": [
+      {
+        "customerCreditRatingClassificationCategory": "pep",
+        "customerCreditRatingClassificationLevel": "high",
+        "customerCreditRatingClassificationLabel": "Politically Exposed Person",
+        "customerCreditRatingClassificationDescription": "Customer holds a senior government role in a regional public authority. Source-of-funds and source-of-wealth review is required under EDD policy.",
+        "customerCreditRatingClassificationDetectedDateTime": "2025-11-20",
+        "customerCreditRatingClassificationSource": "kyc_periodic_review",
+        "customerCreditRatingReviewRequiredIndicator": true
+      },
+      {
+        "customerCreditRatingClassificationCategory": "hnwi",
+        "customerCreditRatingClassificationLevel": "medium",
+        "customerCreditRatingClassificationLabel": "High Net Worth Individual",
+        "customerCreditRatingClassificationDescription": "Account profile qualifies for HNWI classification based on portfolio value and transaction volumes. Complex cross-border structures noted.",
+        "customerCreditRatingClassificationDetectedDateTime": "2025-11-20",
+        "customerCreditRatingClassificationSource": "kyc_periodic_review",
+        "customerCreditRatingReviewRequiredIndicator": false
+      }
+    ],
+    "bianServiceDomain": "CustomerCreditRating",
+    "bianControlRecordType": "CustomerCreditRatingState",
+    "recordCreatedDateTime": "2025-11-20T08:00:00Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00Z",
+    "schemaVersion": 1
+  },
+  {
+    "customerCreditRatingInstanceReference": "hrpc-004",
+    "customerAgreementReference": "ACC-019",
+    "customerCreditRatingClassificationFlags": [
+      {
+        "customerCreditRatingClassificationCategory": "financial_fraud_history",
+        "customerCreditRatingClassificationLevel": "high",
+        "customerCreditRatingClassificationLabel": "Prior Fraud History",
+        "customerCreditRatingClassificationDescription": "Prior confirmed chargeback fraud in 2024 involving card-not-present transactions. Case FD-2024-000291 closed as confirmed_fraud. Enhanced monitoring active.",
+        "customerCreditRatingClassificationDetectedDateTime": "2024-08-05",
+        "customerCreditRatingClassificationSource": "internal_case_history",
+        "customerCreditRatingReviewRequiredIndicator": true
+      }
+    ],
+    "bianServiceDomain": "CustomerCreditRating",
+    "bianControlRecordType": "CustomerCreditRatingState",
+    "recordCreatedDateTime": "2024-08-05T16:00:00Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00Z",
+    "schemaVersion": 1
+  },
+  {
+    "customerCreditRatingInstanceReference": "hrpc-005",
+    "customerAgreementReference": "ACC-025",
+    "customerCreditRatingClassificationFlags": [
+      {
+        "customerCreditRatingClassificationCategory": "ubo",
+        "customerCreditRatingClassificationLevel": "medium",
+        "customerCreditRatingClassificationLabel": "Complex UBO Structure",
+        "customerCreditRatingClassificationDescription": "Account linked to a legal entity with opaque beneficial ownership structure. UBO verification is incomplete pending additional documentation.",
+        "customerCreditRatingClassificationDetectedDateTime": "2026-01-30",
+        "customerCreditRatingClassificationSource": "aml_due_diligence",
+        "customerCreditRatingReviewRequiredIndicator": true
+      },
+      {
+        "customerCreditRatingClassificationCategory": "suspicious_transaction_patterns",
+        "customerCreditRatingClassificationLevel": "medium",
+        "customerCreditRatingClassificationLabel": "Suspicious Transaction Patterns",
+        "customerCreditRatingClassificationDescription": "Rapid fund movement pattern between multiple accounts suggests possible layering. Three linked accounts identified in network analysis.",
+        "customerCreditRatingClassificationDetectedDateTime": "2026-02-14",
+        "customerCreditRatingClassificationSource": "transaction_monitoring",
+        "customerCreditRatingReviewRequiredIndicator": true
+      }
+    ],
+    "bianServiceDomain": "CustomerCreditRating",
+    "bianControlRecordType": "CustomerCreditRatingState",
+    "recordCreatedDateTime": "2026-01-30T10:00:00Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00Z",
+    "schemaVersion": 1
+  }
+]

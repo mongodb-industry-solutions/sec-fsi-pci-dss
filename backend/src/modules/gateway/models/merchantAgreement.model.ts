@@ -1,6 +1,19 @@
 // BIAN SD-89: Merchant Relations Control Record
 
-export const MERCHANT_AGREEMENT_COLLECTION = 'merchantAgreement';
+export const MERCHANT_AGREEMENT_COLLECTION = 'merchantAgreementProcedure';
+
+export interface MerchantApiKeyRecord {
+  keyId: string;            // UUID
+  keyPrefix: string;        // First 8 chars for display: "lbpk_liv..."
+  keyHashBcrypt: string;    // bcrypt(fullPlaintextKey, 12) - plaintext never stored
+  keyStatus: 'active' | 'revoked';
+  keyCreatedDateTime: Date;
+  keyLastUsedDateTime?: Date;
+  keyLabel?: string;        // Human label to identify/differentiate keys (never a secret)
+  // 'generated' = minted by the PSP; 'imported' = supplied by the merchant's own system. Display
+  // only (helps recognise which keys originate elsewhere). Absent on legacy records = generated.
+  keyOrigin?: 'generated' | 'imported';
+}
 
 export interface MerchantAgreementControlRecord {
   // Identifiers
@@ -12,10 +25,22 @@ export interface MerchantAgreementControlRecord {
   merchantAgreementStatus: MerchantAgreementStatus;
   merchantTier: 'standard' | 'enterprise';
 
+  // D-21: Party owner link — BIAN-canonical cross-domain reference via SD-13 Party.
+  merchantOwnerPartyReference?: string;             // FK → party.partyInstanceReference (SD-13)
+
+  // Ch-05: Review metadata (top-level — kept for backward compat). Populated by merchant_officer.
+  merchantReviewNote?: string;
+  merchantReviewedByPartyReference?: string;        // FK → party.partyInstanceReference of reviewing officer
+  merchantReviewedDateTime?: Date;
+
+  // Ch-06: BQ:Step — KYB business verification (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
+  merchantAgreementKybCheck?: MerchantAgreementKybCheck;
+
   // Gateway configuration
   merchantAllowedCurrencies: string[];              // ISO 4217 codes
   merchantTransactionLimitAmount: number;           // Per-transaction limit (base currency)
-  merchantWebhookEndpoint?: string;                 // Notification URL
+  merchantWebhookEndpoint?: string;                 // Notification URL for payment events
+  merchantWebhookSecret?: string;                   // HMAC-SHA256 signing secret for webhook delivery
   merchantSettlementSchedule: SettlementSchedule;
 
   // Risk profile (derived, updated on settlement)
@@ -23,17 +48,38 @@ export interface MerchantAgreementControlRecord {
   merchantTransactionCount30d: number;
   merchantRiskCategory: MerchantRiskCategory;
 
-  // QE:none — API key hash (not CHD, but operationally sensitive)
-  merchantApiKeyHash: string;
+  // API key management (replaces single merchantApiKeyHash)
+  merchantApiKeys: MerchantApiKeyRecord[];
 
   // BIAN metadata
-  bianServiceDomain: 'MerchantRelations';
-  bianControlRecordType: 'MerchantAgreement';
+  bianServiceDomain: 'Merchant Relations';
+  bianControlRecordType: 'MerchantAgreementProcedure';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
   schemaVersion: number;
 }
 
-export type MerchantAgreementStatus = 'active' | 'suspended' | 'closed';
+// Ch-05: Full BIAN SD-89 Agreement lifecycle.
+// Initiate (customer) → Control (merchant_officer approve/reject) → Update (amend) → Terminate (close)
+export type MerchantAgreementStatus =
+  | 'initiated'       // Application submitted; not yet in review
+  | 'under_review'    // merchant_officer performing KYB check
+  | 'agreed'          // KYB passed; officer approved (Control: approve)
+  | 'active'          // T&C accepted; API keys usable; payments enabled
+  | 'amended'         // Terms updated (Update)
+  | 'suspended'       // Fraud hold or compliance flag
+  | 'rejected'        // KYB failed or policy issue (Control: reject)
+  | 'closed';         // Agreement terminated (Terminate)
+// BQ:Step — KYB business verification (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
+export type KybCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
+
+export interface MerchantAgreementKybCheck {
+  merchantAgreementKybCheckStatus: KybCheckStatus;
+  merchantAgreementKybCheckCompletedDate?: Date;
+  merchantAgreementKybCheckReference?: string;       // trade register / AML screening reference
+  merchantAgreementKybCheckNotes?: string;
+  merchantAgreementKybCheckPerformedByPartyReference?: string;  // FK → party (reviewing officer)
+}
+
 export type MerchantRiskCategory = 'low' | 'medium' | 'high';
 export type SettlementSchedule = 'T+1' | 'T+2' | 'T+3';

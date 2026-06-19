@@ -1,4 +1,4 @@
-// BIAN SD-57: Card Etoken — Token Vault — prototype stub service
+// BIAN SD-57: Card Etoken  -  Token Vault  -  prototype stub service
 // Full implementation (QE:none for networkToken, DB persistence) scheduled for v5.
 
 import { v4 as uuidv4 } from 'uuid';

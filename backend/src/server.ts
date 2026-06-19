@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import { resolve } from 'path';
 
 // Load .env from project root (two levels up from backend/src/).
-// Works regardless of CWD — whether called via `npm run dev` from backend/
+// Works regardless of CWD  -  whether called via `npm run dev` from backend/
 // or via `npm run dev:backend` from the workspace root.
 dotenv.config({ path: resolve(__dirname, '../../.env') });
 import Fastify, { FastifyInstance } from 'fastify';
@@ -13,15 +13,27 @@ import { authMiddleware } from './vendors/middleware/auth';
 import { appendLog }          from './shared/logBuffer';
 import { identityModule }     from './modules/identity';
 import { customerModule }     from './modules/customer';
-import { transactionsModule } from './modules/transactions';
+import { transactionsModule } from './modules/transaction';
 import { fraudModule }        from './modules/fraud';
 import { gatewayModule }      from './modules/gateway';
 import { systemModule }       from './modules/system';
 import { adminModule }        from './modules/admin';
+import { providersModule } from './modules/provider';
+import { fdsModule }       from './providers/fds';
+import { hrpModule }       from './providers/hrp';
+import { amlModule }       from './providers/aml';
+import { kycModule }       from './providers/kyc';
+import { kybModule }       from './providers/kyb';
+import { creditBureauModule }      from './providers/credit-bureau';
+import { cardAuthorizationModule } from './providers/card-authorization';
+import { cardIssuerModule }        from './providers/card-issuer';
+import { domainModule }       from './modules/domain';
+import { notificationsModule } from './modules/notification';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
     logger: true,
+    pluginTimeout: 60000,
     ajv: {
       customOptions: {
         // Allow OpenAPI keywords that are not part of JSON Schema draft-07.
@@ -52,11 +64,11 @@ export async function buildApp(): Promise<FastifyInstance> {
   fastify.addHook('preHandler', authMiddleware);
 
   // DB availability guard: return 503 for all /api/* routes when the DB is down.
-  // Excludes /api/v1/system/health so it can report degraded status even when Atlas is unreachable.
+  // Excludes health endpoints so they can report degraded status even when Atlas is unreachable.
   // This runs after auth so unauthenticated requests still get 401, not 503.
   fastify.addHook('preHandler', async (_request, reply) => {
     const url = _request.url;
-    const isHealthCheck = url.startsWith('/api/v1/system/health');
+    const isHealthCheck = url === '/health' || url.startsWith('/api/v1/system/health');
     const isAdminRoute = url.startsWith('/api/v1/admin');
     if (fastify.dbError !== null && url.startsWith('/api/') && !isHealthCheck && !isAdminRoute) {
       return reply.status(503).send({
@@ -83,7 +95,51 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
   }, async (_request, reply) => reply.redirect('/doc'));
 
-  // API routes — each module registers its own routes internally
+  // Public /health alias — compatibility for infra probes that expect this standard path
+  fastify.get('/health', {
+    schema: {
+      tags: ['system'],
+      summary: 'Health check (standard alias)',
+      description: 'Alias for `/api/v1/system/health`. **Public — no JWT required.** Intended for load balancers, k8s liveness probes, and monitoring systems that expect `/health`.',
+      response: {
+        200: {
+          description: 'Healthy: Atlas reachable',
+          type: 'object',
+          properties: {
+            status:      { type: 'string', enum: ['ok'] },
+            atlas:       { type: 'string', enum: ['connected'] },
+            kmsProvider: { type: 'string', enum: ['aws', 'local'] },
+            timestamp:   { type: 'string', format: 'date-time' },
+          },
+        },
+        503: {
+          description: 'Degraded: Atlas unreachable',
+          type: 'object',
+          properties: {
+            status:    { type: 'string', enum: ['error'] },
+            atlas:     { type: 'string', enum: ['disconnected'] },
+            error:     { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' },
+          },
+        },
+      },
+    },
+  }, async (_request, reply) => {
+    const timestamp = new Date().toISOString();
+    const f = fastify as FastifyInstance & { dbError?: string | null; db?: { command: (cmd: object) => Promise<unknown> } };
+    if (f.dbError) {
+      return reply.status(503).send({ status: 'error', atlas: 'disconnected', error: f.dbError, timestamp });
+    }
+    try {
+      await f.db?.command({ ping: 1 });
+      return reply.send({ status: 'ok', atlas: 'connected', kmsProvider: process.env.KMS_PROVIDER ?? 'aws', timestamp });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : 'ping failed';
+      return reply.status(503).send({ status: 'error', atlas: 'disconnected', error: reason, timestamp });
+    }
+  });
+
+  // API routes  -  each module registers its own routes internally
   await fastify.register(identityModule,     { prefix: '/api/v1' });
   await fastify.register(customerModule,     { prefix: '/api/v1' });
   await fastify.register(transactionsModule, { prefix: '/api/v1' });
@@ -93,6 +149,20 @@ export async function buildApp(): Promise<FastifyInstance> {
   // /api/v1/system/raw returns 403 in production (enforced inside the controller)
   await fastify.register(systemModule,       { prefix: '/api/v1' });
   await fastify.register(adminModule,        { prefix: '/api/v1' });
+  await fastify.register(providersModule, { prefix: '/api/v1' });
+  // Capability modules (internal engines, ADR-029) — each declares its own static routes.
+  await fastify.register(fdsModule,          { prefix: '/api/v1' });
+  await fastify.register(hrpModule,          { prefix: '/api/v1' });
+  await fastify.register(amlModule,          { prefix: '/api/v1' });
+  await fastify.register(kycModule,          { prefix: '/api/v1' });
+  await fastify.register(kybModule,          { prefix: '/api/v1' });
+  await fastify.register(creditBureauModule, { prefix: '/api/v1' });
+  await fastify.register(cardAuthorizationModule, { prefix: '/api/v1' });
+  await fastify.register(cardIssuerModule,   { prefix: '/api/v1' });
+  // Internal Module without a Provider counterpart (ADR-029).
+  await fastify.register(domainModule,  { prefix: '/api/v1' });
+  // Customer notifications (pending fraud-investigation questions to answer).
+  await fastify.register(notificationsModule, { prefix: '/api/v1' });
 
   return fastify;
 }

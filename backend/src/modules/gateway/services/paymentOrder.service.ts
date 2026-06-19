@@ -1,4 +1,4 @@
-// BIAN SD-64: Payment Order + SD-65: Payment Execution — prototype stub service
+// BIAN SD-64: Payment Order + SD-65: Payment Execution  -  prototype stub service
 // Full implementation (DB persistence, idempotency, routing engine) scheduled for v5.
 
 import { v4 as uuidv4 } from 'uuid';
@@ -46,7 +46,7 @@ export async function authorizePaymentOrder(id: string) {
   return {
     paymentOrderInstanceReference: id,
     paymentOrderStatus: 'authorized' as PaymentOrderStatus,
-    linkedCardTransactionReference: uuidv4(),
+    cardTransactionInstanceReference: uuidv4(),
     routingDecision: {
       processor: 'simulated_processor_v1',
       routedAt: new Date().toISOString(),

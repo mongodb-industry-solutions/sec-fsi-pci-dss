@@ -1,98 +1,143 @@
 /**
  * Unit tests: customerAgreement.service (FR-v1-04)
- * Source: backend/src/services/customerAgreement.service.ts
+ * Source: backend/src/modules/customer/services/customerAgreement.service.ts
  *
- * Key invariant: QE equality-search fields (email, phone, accountRef) are used only
- * as predicates and must NEVER appear in the response (ADR-003 + PCI DSS data minimisation).
+ * The service now resolves a role-aware QE client (getDbForRole) and joins the PII-
+ * bearing `party` record (SD-13) with the `customerAgreementProcedure` record. The
+ * QE client and escalation-token validator are mocked so the join + response shaping
+ * are tested in isolation. Sensitive fields (address/govId/riskNotes) only appear when
+ * the underlying field is decrypted (L2 client); for the L1 default they are omitted.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { getByEmail, getByPhone, getByAccountRef } from '../../../../backend/src/services/customerAgreement.service';
 
-const mockAgreement = {
-  customerAgreementInstanceReference: 'ca-001',
-  // QE equality fields — search predicates, stripped from response
-  customerEmailAddress: 'customer@example.com',
-  customerMobilePhoneNumber: '+1-555-0001',
-  customerAgreementReference: 'ACC-REF-001',
-  // Safe fields returned to caller
-  customerName: 'John Doe',
-  customerAgreementType: 'personal',
-  bianServiceDomain: 'CustomerAgreement',
-  recordCreatedDateTime: new Date(),
-  recordUpdatedDateTime: new Date(),
+const h = vi.hoisted(() => ({
+  getDbForRole: vi.fn(),
+  validateToken: vi.fn().mockReturnValue({ valid: false }),
+}));
+
+vi.mock('../../../../backend/src/vendors/encryption/roleClients', () => ({
+  getDbForRole: h.getDbForRole,
+}));
+vi.mock('../../../../backend/src/vendors/security/escalationTokens', () => ({
+  validateToken: h.validateToken,
+}));
+
+import { getByEmail, getByPhone, getByAccountRef } from '../../../../backend/src/modules/customer/services/customerAgreement.service';
+import { CUSTOMER_AGREEMENT_COLLECTION } from '../../../../backend/src/modules/customer/models/customerAgreement.model';
+import { PARTY_COLLECTION } from '../../../../backend/src/modules/identity/models/party.model';
+
+const party = {
+  partyInstanceReference: 'party-001',
+  partyName: 'John Doe',
+  partyEmailAddress: 'customer@example.com',
+  partyMobilePhoneNumber: '+1-555-0001',
 };
 
-function makeDb(doc: typeof mockAgreement | null) {
-  return {
-    collection: vi.fn().mockReturnValue({
-      findOne: vi.fn().mockResolvedValue(doc),
-    }),
-  } as any;
+const agreement = {
+  customerAgreementInstanceReference: 'ca-001',
+  partyInstanceReference: 'party-001',
+  customerAgreementReference: 'ACC-REF-001',
+  customerSegment: 'retail',
+  customerAgreementStatus: 'active',
+  bianServiceDomain: 'CustomerAgreement',
+  bianControlRecordType: 'CustomerAgreementProcedure',
+  // no customerAgreementResidentialAddress → isSensitiveDecrypted() is false → no sensitive block
+};
+
+/** Mock role-aware Db that returns `party` / `agreement` per collection name. */
+function makeRoleDb(partyDoc: typeof party | null, agreementDoc: typeof agreement | null) {
+  const partyFindOne = vi.fn().mockResolvedValue(partyDoc);
+  const agreementFindOne = vi.fn().mockResolvedValue(agreementDoc);
+  const db: any = {
+    partyFindOne,
+    agreementFindOne,
+    collection: vi.fn((name: string) => ({
+      findOne: name === PARTY_COLLECTION ? partyFindOne : agreementFindOne,
+    })),
+  };
+  return db;
 }
 
 describe('getByEmail', () => {
-  it('returns document with safe fields when found', async () => {
-    const result = await getByEmail(makeDb(mockAgreement), 'customer@example.com');
+  it('returns the joined safe fields when found', async () => {
+    h.getDbForRole.mockResolvedValue(makeRoleDb(party, agreement));
+    const result = await getByEmail({} as any, 'customer@example.com');
     expect(result).not.toBeNull();
     expect(result!.customerName).toBe('John Doe');
   });
 
-  it('strips QE predicate fields from response', async () => {
-    const result = await getByEmail(makeDb(mockAgreement), 'customer@example.com');
-    expect((result as Record<string, unknown>).customerEmailAddress).toBeUndefined();
-    expect((result as Record<string, unknown>).customerMobilePhoneNumber).toBeUndefined();
-    expect((result as Record<string, unknown>).customerAgreementReference).toBeUndefined();
+  it('restricts contact PII for L1 but exposes the account reference (PCI DSS Req 7 least-privilege)', async () => {
+    // Contact PII (email/phone) is now gated to L2 investigator / security auditor (need-to-know).
+    // The default L1 analyst triages on non-identifying attributes; the account reference is not PII-gated.
+    h.getDbForRole.mockResolvedValue(makeRoleDb(party, agreement));
+    const result = await getByEmail({} as any, 'customer@example.com'); // default role = level1_analyst
+    expect(result!.customerEmailAddress).toBeUndefined();
+    expect(result!.customerMobilePhoneNumber).toBeUndefined();
+    expect(result!.contactPiiRestricted).toBe(true);
+    expect(result!.customerAgreementReference).toBe('ACC-REF-001');
   });
 
-  it('queries by customerEmailAddress', async () => {
-    const db = makeDb(mockAgreement);
-    await getByEmail(db, 'customer@example.com');
-    expect(db.collection().findOne).toHaveBeenCalledWith(
-      expect.objectContaining({ customerEmailAddress: 'customer@example.com' })
+  it('omits the sensitive block for the L1 client (encrypted address not decrypted)', async () => {
+    h.getDbForRole.mockResolvedValue(makeRoleDb(party, agreement));
+    const result = await getByEmail({} as any, 'customer@example.com');
+    expect((result as Record<string, unknown>).sensitive).toBeUndefined();
+  });
+
+  it('queries party by partyEmailAddress', async () => {
+    const db = makeRoleDb(party, agreement);
+    h.getDbForRole.mockResolvedValue(db);
+    await getByEmail({} as any, 'customer@example.com');
+    expect(db.partyFindOne).toHaveBeenCalledWith(
+      expect.objectContaining({ partyEmailAddress: 'customer@example.com' })
     );
   });
 
-  it('returns null when not found', async () => {
-    expect(await getByEmail(makeDb(null), 'unknown@example.com')).toBeNull();
+  it('returns null when the party is not found', async () => {
+    h.getDbForRole.mockResolvedValue(makeRoleDb(null, null));
+    expect(await getByEmail({} as any, 'unknown@example.com')).toBeNull();
   });
 });
 
 describe('getByPhone', () => {
-  it('returns document with safe fields when found', async () => {
-    const result = await getByPhone(makeDb(mockAgreement), '+1-555-0001');
+  it('returns the joined safe fields when found', async () => {
+    h.getDbForRole.mockResolvedValue(makeRoleDb(party, agreement));
+    const result = await getByPhone({} as any, '+1-555-0001');
     expect(result!.customerName).toBe('John Doe');
-    expect((result as Record<string, unknown>).customerMobilePhoneNumber).toBeUndefined();
   });
 
-  it('queries by customerMobilePhoneNumber', async () => {
-    const db = makeDb(mockAgreement);
-    await getByPhone(db, '+1-555-0001');
-    expect(db.collection().findOne).toHaveBeenCalledWith(
-      expect.objectContaining({ customerMobilePhoneNumber: '+1-555-0001' })
+  it('queries party by partyMobilePhoneNumber', async () => {
+    const db = makeRoleDb(party, agreement);
+    h.getDbForRole.mockResolvedValue(db);
+    await getByPhone({} as any, '+1-555-0001');
+    expect(db.partyFindOne).toHaveBeenCalledWith(
+      expect.objectContaining({ partyMobilePhoneNumber: '+1-555-0001' })
     );
   });
 
   it('returns null when not found', async () => {
-    expect(await getByPhone(makeDb(null), '+0-000-0000')).toBeNull();
+    h.getDbForRole.mockResolvedValue(makeRoleDb(null, null));
+    expect(await getByPhone({} as any, '+0-000-0000')).toBeNull();
   });
 });
 
 describe('getByAccountRef', () => {
-  it('returns document with safe fields when found', async () => {
-    const result = await getByAccountRef(makeDb(mockAgreement), 'ACC-REF-001');
+  it('returns the joined safe fields when found', async () => {
+    h.getDbForRole.mockResolvedValue(makeRoleDb(party, agreement));
+    const result = await getByAccountRef({} as any, 'ACC-REF-001');
     expect(result!.customerName).toBe('John Doe');
-    expect((result as Record<string, unknown>).customerAgreementReference).toBeUndefined();
   });
 
-  it('queries by customerAgreementReference', async () => {
-    const db = makeDb(mockAgreement);
-    await getByAccountRef(db, 'ACC-REF-001');
-    expect(db.collection().findOne).toHaveBeenCalledWith(
+  it('queries the agreement by customerAgreementReference', async () => {
+    const db = makeRoleDb(party, agreement);
+    h.getDbForRole.mockResolvedValue(db);
+    await getByAccountRef({} as any, 'ACC-REF-001');
+    expect(db.agreementFindOne).toHaveBeenCalledWith(
       expect.objectContaining({ customerAgreementReference: 'ACC-REF-001' })
     );
   });
 
   it('returns null when not found', async () => {
-    expect(await getByAccountRef(makeDb(null), 'UNKNOWN')).toBeNull();
+    h.getDbForRole.mockResolvedValue(makeRoleDb(null, null));
+    expect(await getByAccountRef({} as any, 'UNKNOWN')).toBeNull();
   });
 });

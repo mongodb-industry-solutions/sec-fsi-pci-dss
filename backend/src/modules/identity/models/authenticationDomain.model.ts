@@ -15,7 +15,7 @@ export interface AuthenticationDomainRecord {
   partyAuthenticationDomainDisplayName: string;
   /** Protocol used by this domain */
   partyAuthenticationDomainType: AuthDomainType;
-  /** OAuth/SSO flow — client_credentials shows username+password; others show a redirect button */
+  /** OAuth/SSO flow  -  client_credentials shows username+password; others show a redirect button */
   partyAuthenticationDomainFlowType?: AuthDomainFlowType;
   /** Only enabled domains are surfaced to the UI */
   partyAuthenticationDomainEnabled: boolean;
@@ -23,6 +23,12 @@ export interface AuthenticationDomainRecord {
   partyAuthenticationDomainAlertMessage?: string;
   /** Provider-specific configuration (tenant, client ID, scopes, etc.) */
   partyAuthenticationDomainConfiguration: Record<string, unknown>;
+  /**
+   * ADR-030: for remote (OIDC/SAML) domains, maps an external IdP claim/group to a local role
+   * (E4, plan §13.3). Local domains manage users directly instead. Roles are global (`role`
+   * collection). Ignored for `type: 'local'`.
+   */
+  partyAuthenticationDomainRoleMappings?: Array<{ externalClaimOrGroup: string; roleName: string }>;
   bianServiceDomain: 'PartyAuthentication';
   bianControlRecordType: 'AuthenticationDomain';
   recordCreatedDateTime: Date;

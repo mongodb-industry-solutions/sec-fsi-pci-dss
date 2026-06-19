@@ -1,13 +1,15 @@
-import { FastifyInstance } from 'fastify';
-import { loginUser, getDemoUsers, getEnabledDomains } from '../services/auth.service';
+import { FastifyInstance, FastifyRequest } from 'fastify';
+import { loginUser, getDemoUsers, getEnabledDomains, updateAuthProfile, JwtPayload } from '../services/auth.service';
+import { getSelfProfile, updateSelfProfile } from '../../customer/services/customerAgreement.service';
+import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
 
 export async function authController(fastify: FastifyInstance) {
   fastify.post('/login', {
     schema: {
       tags: ['auth'],
       summary: 'Login: obtain a Bearer JWT',
-      description: `Authenticates a demo user against the \`partyAuthentication\` collection
-(BIAN SD-16) and returns a signed JWT valid for 24 hours.
+      description: `Authenticates a demo user against the \`customerAuthenticationAssessment\` collection
+(BIAN SD-91) and returns a signed JWT valid for 24 hours.
 
 The JWT payload contains the \`sub\` (user UUID), \`email\`, \`role\`, \`name\`, and
 \`domain\` claims. Send it on every subsequent request as:
@@ -23,10 +25,10 @@ Atlas stores only ciphertext and never sees the plaintext address.
 
 | Email | Role |
 |---|---|
-| \`luis.fernandez@leafybank.demo\` | customer |
-| \`sarah.chen@leafybank.demo\` | level1_analyst |
-| \`michael.obi@leafybank.demo\` | level2_investigator |
-| \`admin@leafybank.demo\` | security_auditor |
+| \`luis.fernandez@back.es\` | customer |
+| \`sarah.chen@back.es\` | level1_analyst |
+| \`michael.obi@back.es\` | level2_investigator |
+| \`diego.sans@back.es\` | security_auditor |
 
 Password for all demo users: \`demo-password\``,
       body: {
@@ -63,9 +65,9 @@ Password for all demo users: \`demo-password\``,
               type: 'object',
               description: 'Authenticated user summary.',
               properties: {
-                partyAuthenticationInstanceReference: {
+                customerAuthenticationInstanceReference: {
                   type: 'string',
-                  description: 'Primary key UUID of the partyAuthentication document (BIAN SD-16 Control Record identifier).',
+                  description: 'Primary key UUID of the customerAuthenticationAssessment document (BIAN SD-91 Control Record identifier).',
                 },
                 name: { type: 'string', description: 'Display name.' },
                 email: { type: 'string', format: 'email', description: 'Login email address.' },
@@ -99,7 +101,7 @@ Password for all demo users: \`demo-password\``,
       return reply.status(200).send({
         token,
         user: {
-          partyAuthenticationInstanceReference: user.sub,
+          customerAuthenticationInstanceReference: user.sub,
           name: user.name,
           email: user.email,
           role: user.role,
@@ -116,9 +118,22 @@ Password for all demo users: \`demo-password\``,
     schema: {
       tags: ['auth'],
       summary: 'List demo users (local domain)',
-      description: `Returns all active pre-seeded demo user accounts for the local authentication domain.
-Intended for the UI to display one-click login shortcuts; passwords are **never** returned.
-Data is read directly from the seed file to avoid QE-decryption overhead on this helper endpoint.`,
+      description: `Returns active pre-seeded demo user accounts (DB-backed) for the local domain.
+Intended for the UI to display one-click login shortcuts; passwords are **never** returned. This is
+the single, non-hardcoded roster shared by the debug-mode login picker and the simulator.
+
+Filters (combinable): \`featured=true\` (curated roster), \`role=customer,merchant_officer\`
+(comma list), \`q=\` (name/email substring), \`isMerchant=true\` (only customers who own a merchant).
+Results are returned in a deterministic order.`,
+      querystring: {
+        type: 'object',
+        properties: {
+          featured: { type: 'string', enum: ['true', 'false'], description: 'When "true", only users flagged customerAuthenticationDemoFeatured.' },
+          role: { type: 'string', description: 'Comma-separated role filter, e.g. "customer,merchant_officer".' },
+          q: { type: 'string', description: 'Case-insensitive substring match on name or email.' },
+          isMerchant: { type: 'string', enum: ['true', 'false'], description: 'When "true", only customers who own a merchant.' },
+        },
+      },
       response: {
         200: {
           description: 'List of available demo users.',
@@ -126,7 +141,7 @@ Data is read directly from the seed file to avoid QE-decryption overhead on this
           properties: {
             users: {
               type: 'array',
-              description: 'All active demo accounts for the local domain.',
+              description: 'Active demo accounts matching the filters, in deterministic order.',
               items: {
                 type: 'object',
                 properties: {
@@ -134,8 +149,20 @@ Data is read directly from the seed file to avoid QE-decryption overhead on this
                   name: { type: 'string', description: 'Display name.' },
                   role: {
                     type: 'string',
-                    enum: ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor'],
+                    enum: ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor', 'merchant_officer', 'manager'],
                     description: 'Role that will be encoded in the JWT on login.',
+                  },
+                  featured: { type: 'boolean', description: 'True if part of the curated demo roster.' },
+                  partyRef: { type: 'string', description: 'partyInstanceReference (SD-13).' },
+                  merchant: {
+                    type: 'object',
+                    nullable: true,
+                    description: 'Present when this customer owns a merchant (customer + merchant).',
+                    properties: {
+                      id: { type: 'string', description: 'merchantAgreementInstanceReference.' },
+                      name: { type: 'string', description: 'Merchant display name.' },
+                      mcc: { type: 'string', nullable: true, description: 'Merchant Category Code (ISO 18245).' },
+                    },
                   },
                 },
               },
@@ -144,8 +171,14 @@ Data is read directly from the seed file to avoid QE-decryption overhead on this
         },
       },
     },
-  }, async (_request, reply) => {
-    const users = await getDemoUsers(fastify.db);
+  }, async (request, reply) => {
+    const { featured, role, q, isMerchant } = request.query as { featured?: string; role?: string; q?: string; isMerchant?: string };
+    const users = await getDemoUsers(fastify.db, {
+      featured: featured === 'true',
+      ...(role ? { role: role.split(',').map((r) => r.trim()).filter(Boolean) } : {}),
+      ...(q ? { q } : {}),
+      ...(isMerchant === 'true' ? { isMerchant: true } : {}),
+    });
     return reply.send({ users });
   });
 
@@ -185,5 +218,140 @@ The UI uses this to populate the domain selector on the login screen.`,
       const e = err as { message: string };
       return reply.status(503).send({ error: e.message });
     }
+  });
+
+  // GET /api/v1/auth/me  -  returns the authenticated user's full profile.
+  // For customer role: returns JWT claims + full customerAgreement record including
+  // QE:equality fields (email, phone, accountRef) and sensitive fields if linked.
+  // For analyst / auditor roles: returns JWT claims only (no customerAgreement).
+  fastify.get('/me', {
+    schema: {
+      tags: ['auth'],
+      summary: 'Get authenticated user profile',
+      description: `Returns the full profile of the currently authenticated user.
+
+**Customer role:** Includes JWT claims and the linked \`customerAgreement\` record.
+All QE:equality fields (email, phone, account reference) are returned in plaintext
+since the user is requesting their own data. Sensitive fields (address, govt ID)
+are included if found.
+
+**Analyst / Auditor roles:** Returns JWT claims only. These users do not have
+a \`customerAgreement\` record.`,
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            sub:    { type: 'string' },
+            email:  { type: 'string' },
+            name:   { type: 'string' },
+            role:   { type: 'string' },
+            domain: { type: 'string' },
+            agreement: { type: 'object', nullable: true, additionalProperties: true },
+          },
+        },
+        401: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const user = (request as FastifyRequest & { user?: JwtPayload }).user;
+    if (!user?.email) return reply.status(401).send({ error: 'Unauthenticated' });
+
+    let agreement: Record<string, unknown> | null = null;
+    let partyInstanceReference: string | undefined;
+
+    if (user.role === 'customer') {
+      agreement = await getSelfProfile(fastify.db, user.email).catch(() => null);
+      partyInstanceReference = agreement?.partyInstanceReference as string | undefined;
+    } else {
+      // For non-customer roles, look up partyInstanceReference from the auth record
+      // so the debug panel can show the party document for any role.
+      const authRec = await fastify.db
+        .collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
+        .findOne({ customerAuthenticationInstanceReference: user.sub } as Partial<CustomerAuthenticationAssessmentRecord>);
+      partyInstanceReference = authRec?.partyInstanceReference;
+    }
+
+    return reply.send({
+      sub:                   user.sub,
+      email:                 user.email,
+      name:                  user.name,
+      role:                  user.role,
+      domain:                user.domain,
+      partyInstanceReference,
+      agreement,
+    });
+  });
+
+  // PATCH /api/v1/auth/me  -  update own profile (customer only)
+  fastify.patch('/me', {
+    schema: {
+      tags: ['auth'],
+      summary: 'Update authenticated user profile',
+      description: `Updates editable fields on the \`customerAgreement\` record for the
+authenticated customer.
+
+**Editable fields:** \`customerName\`, \`customerMobilePhoneNumber\`, \`customerAgreementPreferredLanguage\`.
+
+**Not editable:** \`customerEmailAddress\` (login identity), \`customerAgreementReference\` (account key).
+
+**QE note:** \`customerMobilePhoneNumber\` is a QE:equality field. The QE client
+automatically re-encrypts the new value before writing it to Atlas.`,
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        properties: {
+          customerName:                       { type: 'string', description: 'Updated display name.' },
+          customerMobilePhoneNumber:          { type: 'string', description: 'Updated phone (QE:equality - re-encrypted automatically).' },
+          customerAgreementPreferredLanguage: { type: 'string', description: 'ISO 639-1 language code (e.g. "en").' },
+          customerAgreementResidentialAddress: {
+            type: 'object',
+            description: 'Updated address (QE:none - stored in customerAgreementSensitive).',
+            properties: {
+              streetAddress: { type: 'string' },
+              city:          { type: 'string' },
+              postalCode:    { type: 'string' },
+              countryCode:   { type: 'string', description: 'ISO 3166-1 alpha-2 (e.g. "US").' },
+            },
+          },
+        },
+      },
+      response: {
+        200: { type: 'object', properties: { updated: { type: 'boolean' } } },
+        400: { $ref: 'Error#' },
+        401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const user = (request as FastifyRequest & { user?: JwtPayload }).user;
+    if (!user?.email) return reply.status(401).send({ error: 'Unauthenticated' });
+
+    const body = request.body as {
+      customerName?: string;
+      customerMobilePhoneNumber?: string;
+      customerAgreementPreferredLanguage?: string;
+      customerAgreementResidentialAddress?: {
+        streetAddress: string;
+        city: string;
+        postalCode: string;
+        countryCode: string;
+      };
+    };
+
+    if (!body || Object.keys(body).length === 0) {
+      return reply.status(400).send({ error: 'No fields provided for update' });
+    }
+
+    let updated: boolean;
+    if (user.role === 'customer') {
+      updated = await updateSelfProfile(fastify.db, user.email, body);
+    } else {
+      // Non-customer roles (analyst / auditor): only display name is editable
+      updated = body.customerName?.trim()
+        ? await updateAuthProfile(fastify.db, user.sub, body.customerName.trim())
+        : false;
+    }
+    return reply.send({ updated });
   });
 }

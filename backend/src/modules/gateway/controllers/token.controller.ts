@@ -1,4 +1,4 @@
-// BIAN SD-57: Card Etoken — Token Vault — REST controller
+// BIAN SD-57: Card Etoken  -  Token Vault  -  REST controller
 // Routes mounted at /gateway/tokens → /api/v1/gateway/tokens
 
 import { FastifyInstance } from 'fastify';
@@ -14,7 +14,7 @@ export async function tokenController(fastify: FastifyInstance) {
       description: `Creates a \`tokenVault\` entry (BIAN SD-57) that assigns a \`tokenVaultCardToken\`
 (format \`tok_<uuid>\`) to a payment card. The token is a card surrogate; it is NOT CHD under PCI DSS v4.0.
 
-**Network tokens:** If the card scheme provides a network token (\`tokenVaultNetworkToken\`), it is stored as QE:none — encrypted at rest, never returned in any response.
+**Network tokens:** If the card scheme provides a network token (\`tokenVaultNetworkToken\`), it is stored as QE:none  -  encrypted at rest, never returned in any response.
 
 **PCI DSS:** This endpoint does NOT accept the real PAN. The client generates the token (or the card scheme provides it); the vault stores the association. Full PAN is never stored.
 

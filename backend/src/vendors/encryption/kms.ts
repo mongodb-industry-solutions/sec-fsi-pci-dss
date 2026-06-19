@@ -1,9 +1,13 @@
 import { KMSProviders } from 'mongodb';
+import * as dotenv from 'dotenv';
+import { resolve } from 'path';
+
+dotenv.config({ path: resolve(__dirname, '../../../../.env') });
 
 export function buildKmsProviders(): KMSProviders {
   if (process.env.KMS_PROVIDER === 'local') {
-    const key = process.env.LOCAL_MASTER_KEY_BASE64;
-    if (!key) throw new Error('LOCAL_MASTER_KEY_BASE64 is required when KMS_PROVIDER=local');
+    const key = process.env.KMS_LOCAL_MASTER_KEY;
+    if (!key) throw new Error('KMS_LOCAL_MASTER_KEY is required when KMS_PROVIDER=local');
     return { local: { key: Buffer.from(key, 'base64') } };
   }
 
@@ -30,4 +34,18 @@ export function buildCmkOptions() {
   }
 
   return { aws: { key: AWS_CMK_ARN, region: AWS_REGION } };
+}
+
+export function getKmsConfig(): { collection: string; database: string; namespace: string; uri: string; provider: 'local' | 'aws'; } {
+  const uri = process.env.KMS_KEY_VAULT_URI ?? process.env.MONGODB_URI ?? (() => { throw new Error('MONGODB_URI is not set.'); })();
+  const database = process.env.KMS_KEY_VAULT_DATABASE ?? 'encryption';
+  const collection = process.env.KMS_KEY_VAULT_COLLECTION ?? '__keyVault';
+  const provider = process.env.KMS_PROVIDER === 'local' ? 'local' : 'aws';
+  return {
+    uri,
+    provider,
+    database,
+    collection,
+    namespace: `${database}.${collection}`,
+  };
 }

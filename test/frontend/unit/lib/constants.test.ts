@@ -4,32 +4,23 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  DEMO_USERS_PASSWORDS,
+  DEMO_PASSWORD,
   ROLE_LABELS,
   SEVERITY_COLORS,
   STATUS_COLORS,
   formatRiskIndicator,
 } from '../../../../frontend/src/lib/constants';
 
-const EXPECTED_USERS = [
-  'luis.fernandez@leafybank.demo',
-  'julia.santos@leafybank.demo',
-  'sarah.chen@leafybank.demo',
-  'michael.obi@leafybank.demo',
-  'admin@leafybank.demo',
-];
-
-describe('DEMO_USERS_PASSWORDS', () => {
-  it('contains exactly the 5 demo users from the spec', () => {
-    for (const email of EXPECTED_USERS) {
-      expect(DEMO_USERS_PASSWORDS[email]).toBe('demo-password');
-    }
+// All seeded demo accounts now share one bcrypt-hashed credential exposed via the
+// single DEMO_PASSWORD constant (the per-user DEMO_USERS_PASSWORDS map was removed).
+describe('DEMO_PASSWORD', () => {
+  it('is the fixed demo-password convention', () => {
+    expect(DEMO_PASSWORD).toBe('demo-password');
   });
 
-  it('all passwords are demo-password', () => {
-    for (const password of Object.values(DEMO_USERS_PASSWORDS)) {
-      expect(password).toBe('demo-password');
-    }
+  it('is a non-empty string', () => {
+    expect(typeof DEMO_PASSWORD).toBe('string');
+    expect(DEMO_PASSWORD.length).toBeGreaterThan(0);
   });
 });
 
