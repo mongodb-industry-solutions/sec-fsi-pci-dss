@@ -476,7 +476,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
         {/* Tabs */}
         <div className="screen-only flex border-b border-gray-300 mb-6 gap-1">
           {([
-            { id: 'overview',  label: 'Demo Overview',    icon: Eye },
+            { id: 'overview',  label: 'Overview',    icon: Eye },
             { id: 'roles',     label: 'Your Role',        icon: Users },
             { id: 'checklist', label: 'PCI DSS v4.0.1 Checklist',     icon: CheckSquare },
             { id: 'mongodb',   label: 'Architecture Proposal', icon: Database },
