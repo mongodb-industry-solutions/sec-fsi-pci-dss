@@ -2,59 +2,15 @@ import { MongoClient } from 'mongodb';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import * as https from 'https';
-import * as crypto from 'crypto';
+import { buildDigestHeader, parseWwwAuthenticate } from '../encryption/digest';
 
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
 
-const ATLAS_API_BASE    = 'cloud.mongodb.com';
-const ATLAS_API_PATH    = '/api/atlas/v2';
-
+const ATLAS_API_BASE = 'cloud.mongodb.com';
+const ATLAS_API_PATH = '/api/atlas/v2';
 
 function warn(msg: string) {
   console.log(`  [WARN] ${msg}`);
-}
-
-// -- HTTP Digest Auth (RFC 7616 MD5) - same algorithm as createAtlasRoles ----─
-
-function md5(s: string): string {
-  return crypto.createHash('md5').update(s).digest('hex');
-}
-
-function buildDigestHeader(
-  publicKey: string,
-  privateKey: string,
-  method: string,
-  path: string,
-  realm: string,
-  nonce: string,
-  opaque?: string,
-): string {
-  const ha1      = md5(`${publicKey}:${realm}:${privateKey}`);
-  const ha2      = md5(`${method}:${path}`);
-  const cnonce   = crypto.randomBytes(8).toString('hex');
-  const nc       = '00000001';
-  const response = md5(`${ha1}:${nonce}:${nc}:${cnonce}:auth:${ha2}`);
-  const parts = [
-    `Digest username="${publicKey}"`,
-    `realm="${realm}"`,
-    `nonce="${nonce}"`,
-    `uri="${path}"`,
-    `cnonce="${cnonce}"`,
-    `nc=${nc}`,
-    `qop=auth`,
-    `response="${response}"`,
-  ];
-  if (opaque) parts.push(`opaque="${opaque}"`);
-  return parts.join(', ');
-}
-
-function parseWwwAuthenticate(header: string): { realm: string; nonce: string; opaque?: string } {
-  const extract = (key: string) => header.match(new RegExp(`${key}="([^"]+)"`))?.[1] ?? '';
-  return {
-    realm:  extract('realm'),
-    nonce:  extract('nonce'),
-    opaque: header.match(/opaque="([^"]+)"/)?.[1],
-  };
 }
 
 function httpsDeleteRequest(
@@ -96,9 +52,9 @@ async function atlasDelete(
     if (probe.status === 404) { warn(`${label} - not found in Atlas, skipping`); return; }
     if (probe.status !== 401) { warn(`${label} - unexpected HTTP ${probe.status} on probe, skipping`); return; }
 
-    const challenge   = parseWwwAuthenticate(probe.wwwAuthenticate ?? '');
-    const authHeader  = buildDigestHeader(publicKey, privateKey, 'DELETE', path, challenge.realm, challenge.nonce, challenge.opaque);
-    const res         = await httpsDeleteRequest(path, authHeader);
+    const challenge = parseWwwAuthenticate(probe.wwwAuthenticate ?? '');
+    const authHeader = buildDigestHeader(publicKey, privateKey, 'DELETE', path, challenge.realm, challenge.nonce, challenge.opaque);
+    const res = await httpsDeleteRequest(path, authHeader);
 
     if (res.status === 200 || res.status === 204) {
       console.log(`  deleted: ${label}`);
@@ -113,9 +69,9 @@ async function atlasDelete(
 }
 
 async function dropAtlasRolesAndUsers(): Promise<void> {
-  const publicKey  = process.env.ATLAS_PUBLIC_KEY;
+  const publicKey = process.env.ATLAS_PUBLIC_KEY;
   const privateKey = process.env.ATLAS_PRIVATE_KEY;
-  const projectId  = process.env.ATLAS_PROJECT_ID;
+  const projectId = process.env.ATLAS_PROJECT_ID;
 
   if (!publicKey || !privateKey || !projectId) {
     warn('ATLAS_PUBLIC_KEY / ATLAS_PRIVATE_KEY / ATLAS_PROJECT_ID not set - skipping Atlas cleanup.');
@@ -171,7 +127,7 @@ export async function runDrop(): Promise<void> {
     console.log(`1. Dropping database '${dbName}'...`);
     try {
       const dbList = await client.db().admin().listDatabases({ nameOnly: true });
-      const exists  = dbList.databases.some((d: { name: string }) => d.name === dbName);
+      const exists = dbList.databases.some((d: { name: string }) => d.name === dbName);
       if (exists) {
         await db.dropDatabase();
         console.log(`  dropped: database '${dbName}'`);
