@@ -48,9 +48,9 @@ function DemoShell({ children }: { children: React.ReactNode }) {
           href={roleHome}
           className="flex items-center gap-2 text-[#00ED64] font-bold text-sm whitespace-nowrap hover:text-[#00ED64]/80 transition-colors"
         >
-          <span className="text-base">🏦</span>
-          <span className="hidden xs:inline">PSP</span>
-          <span className="xs:hidden">PSP</span>
+          <span className="text-base"><img src="/app-icon.png" alt="Leafy Pay Icon" className="w-9 h-9 mx-auto" /> </span>
+          <span className="text-[#FFFFFF] hidden xs:inline">Leafy</span><span className="hidden xs:inline">Pay</span>
+          <span className="text-[#FFFFFF] xs:hidden">Leafy</span><span className="xs:hidden">Pay</span>
         </Link>
 
         {/* Right side */}

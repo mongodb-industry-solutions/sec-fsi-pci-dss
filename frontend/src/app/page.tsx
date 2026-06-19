@@ -7,14 +7,13 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#001E2B] text-white flex flex-col items-center justify-center p-6">
       <div className="max-w-3xl w-full text-center">
-        <div className="text-6xl mb-4">🏦</div>
-        <h1 className="text-3xl font-bold mb-2">PSP Platform (FSI - PCI DSS Demo)</h1>
+        <div className="text-6xl mb-4"><div className="text-4xl mb-2"> <img src="/app-icon.png" alt="Leafy Pay Icon" className="w-24 h-24 mx-auto" /> </div></div>
+        <h1 className="text-3xl font-bold mb-2">Leafy <span className="text-[#00ED64]">Pay</span> <span className="text-gray-400 font-medium text-md">(PSP - PCI DSS)</span></h1>
         <p className="text-[#00ED64] text-lg mb-8 font-medium">
           MongoDB Queryable Encryption · AWS KMS
         </p>
         <p className="text-gray-400 mb-12 max-w-xl mx-auto">
-          Demonstrates how MongoDB supports a PCI DSS-aligned payment investigation workflow
-          for digital banks, enabling rapid sensitive data queries while ensuring robust
+          Demonstrates how MongoDB supports a PCI DSS-aligned payment investigation workflow for Payment Service Providers (PSPs), enabling efficient sensitive data queries while ensuring robust
           encryption and security controls.
         </p>
 
