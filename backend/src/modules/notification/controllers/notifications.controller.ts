@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { listForParty, unreadCount, markRead, markAllRead } from '../notifications.service';
 import { subscribePartyNotifications } from '../../../vendors/eventbus';
+import { beginSSE } from '../../../shared/sse';
 
 function partyOf(request: unknown): string {
   return (request as { user?: { partyRef?: string } }).user?.partyRef ?? '';
@@ -55,19 +56,7 @@ export async function notificationsController(fastify: FastifyInstance) {
     const partyRef = (request as unknown as { user?: { partyRef?: string } }).user?.partyRef;
     if (!partyRef) return reply.status(401).send({ error: 'Authentication required' });
 
-    reply.hijack();
-    const res = reply.raw;
-    // hijack() bypasses Fastify's CORS hook; echo CORS headers or the browser blocks the stream.
-    const origin = (request.headers.origin as string | undefined) ?? process.env.CORS_ORIGIN ?? 'http://localhost:3000';
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-      'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Credentials': 'true',
-      Vary: 'Origin',
-    });
+    const res = beginSSE(reply, request);
     res.write('event: ready\ndata: {}\n\n');
 
     const unsubscribe = subscribePartyNotifications(partyRef, () => res.write('data: {"changed":true}\n\n'));

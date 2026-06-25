@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import { spawn, execSync } from 'child_process';
 import * as path from 'path';
 import { logBuffer, appendLog, writeCount } from '../../../shared/logBuffer';
+import { beginSSE } from '../../../shared/sse';
 import { resolveTestStrategy, NormalizedTestSummary } from '../services/testRunners';
 
 // __dirname = backend/src/modules/admin/controllers/ (tsx dev mode)
@@ -271,16 +272,6 @@ function spawnSSE(
   });
 }
 
-function beginSSE(reply: import('fastify').FastifyReply) {
-  reply.hijack();
-  reply.raw.writeHead(200, {
-    'Content-Type': 'text/event-stream; charset=utf-8',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': process.env.CORS_ORIGIN ?? 'http://localhost:3000',
-  });
-  reply.raw.flushHeaders();
-}
 
 export async function adminController(fastify: FastifyInstance) {
 
@@ -373,7 +364,7 @@ export async function adminController(fastify: FastifyInstance) {
     // result summary is parsed from structured output, not scraped from log text.
     const strategy = resolveTestStrategy(command, PROJECT_ROOT);
 
-    beginSSE(reply);
+    beginSSE(reply, request);
 
     if (strategy) {
       fs.mkdirSync(path.dirname(strategy.outputFile), { recursive: true });
@@ -433,7 +424,7 @@ export async function adminController(fastify: FastifyInstance) {
     }
     const workDir = requestedCwd;
 
-    beginSSE(reply);
+    beginSSE(reply, request);
     await spawnSSE(reply.raw, command, [], workDir, `exec`);
   });
 
@@ -456,7 +447,7 @@ export async function adminController(fastify: FastifyInstance) {
       return reply.status(401).send({ error: 'Invalid admin token' });
     }
 
-    beginSSE(reply);
+    beginSSE(reply, request);
 
     [...logBuffer].forEach((line) => {
       reply.raw.write(`event: log\ndata: ${JSON.stringify({ text: line })}\n\n`);

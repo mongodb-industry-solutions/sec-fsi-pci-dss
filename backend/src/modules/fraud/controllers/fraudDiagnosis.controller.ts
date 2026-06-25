@@ -18,6 +18,7 @@ import { dispatchProvider } from '../../provider/services/integrationDispatch.se
 import { getCaseEnrichment } from '../services/caseEnrichment.service';
 import { createQuestion, listQuestionsByCase } from '../services/customerQuestion.service';
 import { subscribeCaseEvents } from '../../../vendors/eventbus';
+import { beginSSE } from '../../../shared/sse';
 import { createNotification } from '../../notification/notifications.service';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
@@ -1275,20 +1276,7 @@ page; the answer is immutable once submitted (PCI DSS Req 10 traceability).`,
       return reply.status(403).send({ error: 'Access denied: live case stream is restricted to investigation roles' });
     }
 
-    reply.hijack();
-    const res = reply.raw;
-    // hijack() bypasses Fastify's CORS hook, so echo the CORS headers here or the browser blocks the
-    // cross-origin stream (origin allow-listed by the cors plugin).
-    const origin = (request.headers.origin as string | undefined) ?? process.env.CORS_ORIGIN ?? 'http://localhost:3000';
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-      'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Credentials': 'true',
-      Vary: 'Origin',
-    });
+    const res = beginSSE(reply, request);
     res.write('event: ready\ndata: {}\n\n');
 
     const unsubscribe = subscribeCaseEvents(id, (event) => {

@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { v4 as uuidv4 } from 'uuid';
 import * as jwt from 'jsonwebtoken';
+import { beginSSE } from '../../../shared/sse';
 
 export interface WebhookEntry {
   id: string;
@@ -84,18 +85,7 @@ export async function webhookInspectorController(fastify: FastifyInstance) {
     if (!authorized(request.headers.authorization)) {
       return reply.status(401).send({ error: 'Unauthorized' });
     }
-    reply.hijack();
-    const raw = reply.raw;
-    raw.writeHead(200, {
-      'Content-Type': 'text/event-stream; charset=utf-8',
-      // no-transform stops intermediaries from buffering/altering the stream.
-      'Cache-Control': 'no-cache, no-transform',
-      'Connection': 'keep-alive',
-      // Disable proxy response buffering (nginx and similar) so events are not
-      // held back waiting for a byte threshold.
-      'X-Accel-Buffering': 'no',
-      'Access-Control-Allow-Origin': process.env.CORS_ORIGIN ?? 'http://localhost:3000',
-    });
+    const raw = beginSSE(reply, request);
     // Disable Nagle's algorithm: send each small SSE frame immediately instead of
     // coalescing it. Without this, a lone event can sit in the TCP/socket buffer
     // until the next write — the reason new requests only appeared after a manual
