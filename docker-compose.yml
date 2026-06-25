@@ -1,5 +1,3 @@
-version: '3.9'
-
 # ── PSP Platform FSI PCI DSS Demo ───────────────────────────────────────────────
 # Usage:
 #   docker compose up --build          # build + start both services
@@ -27,14 +25,15 @@ services:
       # Use development to enable /api/v1/system/raw (ciphertext demo step); set production to block it.
       NODE_ENV: ${NODE_ENV:-development}
       SEED_DATA_DIR: /app/data
-      # CORS: allow the frontend container origin
-      CORS_ORIGIN: http://localhost:3000
+      # CORS: allow the frontend from common localhost variants
+      CORS_ORIGIN: "http://localhost:3000,http://127.0.0.1:3000"
+      MONGODB_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
     # Mount the QE shared library if MONGODB_CRYPT_SHARED_LIB_PATH points to a host path.
     # Uncomment and adjust if the library is stored outside the container:
     # volumes:
     #   - ${MONGODB_CRYPT_SHARED_LIB_PATH}:${MONGODB_CRYPT_SHARED_LIB_PATH}:ro
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/v1/system/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
       interval: 10s
       timeout: 5s
       retries: 6
