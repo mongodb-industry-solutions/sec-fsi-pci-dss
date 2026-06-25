@@ -71,8 +71,8 @@ Obtain a token via \`POST /api/v1/auth/login\`.
       },
       servers: [
         {
-          url: 'http://localhost:3001',
-          description: 'Local development',
+          url: '/',
+          description: 'Current server (relative)',
         },
       ],
       components: {
@@ -125,7 +125,8 @@ Obtain a token via \`POST /api/v1/auth/login\`.
       preHandler: (_request, _reply, done) => done(),
     },
     staticCSP: true,
-    transformStaticCSP: (header) => header,
+    transformStaticCSP: (header) =>
+      `${header}; connect-src 'self' http://localhost:3001 http://127.0.0.1:3001`,
     transformSpecification: (spec) => spec,
     transformSpecificationClone: true,
   });

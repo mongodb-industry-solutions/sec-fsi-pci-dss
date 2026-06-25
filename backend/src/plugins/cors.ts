@@ -7,7 +7,15 @@ function buildOrigin(): string | string[] | boolean {
 
   if (!env || env === '*') return true;
 
-  const origins = env.split(',').map((o) => o.trim());
+  const origins = env.split(',').map((o) => o.trim()).filter(Boolean);
+
+  // Always allow requests from the API's own origin (Swagger UI is co-hosted)
+  const port = process.env.PORT || '3001';
+  const self = [`http://localhost:${port}`, `http://127.0.0.1:${port}`];
+  for (const s of self) {
+    if (!origins.includes(s)) origins.push(s);
+  }
+
   if (origins.length === 1) return origins[0];
   return origins;
 }
