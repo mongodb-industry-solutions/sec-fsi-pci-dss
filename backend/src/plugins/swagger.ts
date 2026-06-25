@@ -10,12 +10,12 @@ export const swaggerPlugin = fp(async function (fastify: FastifyInstance) {
     openapi: {
       openapi: '3.0.0',
       info: {
-        title: 'FSI PSP Platform API',
+        title: 'Leafy Pay (PSP Platform API)',
         version: '1.0.0',
         description: `
 ## Overview
 
-REST API for the **FSI PSP Platform Demo**. It demonstrates how
+REST API for the **Leafy Pay** (PSP Platform Demo). It demonstrates how
 [MongoDB Queryable Encryption (QE)](https://www.mongodb.com/docs/manual/core/queryable-encryption/)
 enables a PCI DSS-aligned fraud investigation workflow for digital banks and card issuers:
 encrypted sensitive fields are searchable client-side without the plaintext ever reaching

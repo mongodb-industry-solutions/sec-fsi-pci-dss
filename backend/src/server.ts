@@ -95,47 +95,43 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
   }, async (_request, reply) => reply.redirect('/doc'));
 
-  // Public /health alias — compatibility for infra probes that expect this standard path
+  // Public /health alias, infra probes (k8s, Docker, LBs) expect this path.
+  // Lightweight: no detail param, just connectivity. Redirects to the canonical endpoint internally.
   fastify.get('/health', {
     schema: {
       tags: ['system'],
       summary: 'Health check (standard alias)',
-      description: 'Alias for `/api/v1/system/health`. **Public — no JWT required.** Intended for load balancers, k8s liveness probes, and monitoring systems that expect `/health`.',
+      description: 'Lightweight alias for `/api/v1/system/health` (no `detail`). **Public — no JWT required.** Returns IETF health+json with only the `mongodb:connectivity` check.',
       response: {
-        200: {
-          description: 'Healthy: Atlas reachable',
-          type: 'object',
-          properties: {
-            status:      { type: 'string', enum: ['ok'] },
-            atlas:       { type: 'string', enum: ['connected'] },
-            kmsProvider: { type: 'string', enum: ['aws', 'local'] },
-            timestamp:   { type: 'string', format: 'date-time' },
-          },
-        },
-        503: {
-          description: 'Degraded: Atlas unreachable',
-          type: 'object',
-          properties: {
-            status:    { type: 'string', enum: ['error'] },
-            atlas:     { type: 'string', enum: ['disconnected'] },
-            error:     { type: 'string' },
-            timestamp: { type: 'string', format: 'date-time' },
-          },
-        },
+        200: { type: 'object', additionalProperties: true, description: 'Healthy (status=pass)' },
+        503: { type: 'object', additionalProperties: true, description: 'Degraded (status=fail)' },
       },
     },
   }, async (_request, reply) => {
-    const timestamp = new Date().toISOString();
-    const f = fastify as FastifyInstance & { dbError?: string | null; db?: { command: (cmd: object) => Promise<unknown> } };
-    if (f.dbError) {
-      return reply.status(503).send({ status: 'error', atlas: 'disconnected', error: f.dbError, timestamp });
+    const now = new Date().toISOString();
+    reply.header('Content-Type', 'application/health+json; charset=utf-8');
+    if (fastify.dbError) {
+      return reply.status(503).send({
+        status: 'fail',
+        version: undefined,
+        serviceId: 'fsi-pci-dss-backend',
+        checks: { 'mongodb:connectivity': [{ status: 'fail', componentType: 'datastore', output: fastify.dbError, time: now }] },
+      });
     }
     try {
-      await f.db?.command({ ping: 1 });
-      return reply.send({ status: 'ok', atlas: 'connected', kmsProvider: process.env.KMS_PROVIDER ?? 'aws', timestamp });
+      const t0 = Date.now();
+      await fastify.db.command({ ping: 1 });
+      return reply.send({
+        status: 'pass',
+        serviceId: 'fsi-pci-dss-backend',
+        checks: { 'mongodb:connectivity': [{ status: 'pass', componentType: 'datastore', observedValue: Date.now() - t0, observedUnit: 'ms', time: now }] },
+      });
     } catch (err) {
-      const reason = err instanceof Error ? err.message : 'ping failed';
-      return reply.status(503).send({ status: 'error', atlas: 'disconnected', error: reason, timestamp });
+      return reply.status(503).send({
+        status: 'fail',
+        serviceId: 'fsi-pci-dss-backend',
+        checks: { 'mongodb:connectivity': [{ status: 'fail', componentType: 'datastore', output: err instanceof Error ? err.message : 'ping failed', time: now }] },
+      });
     }
   });
 

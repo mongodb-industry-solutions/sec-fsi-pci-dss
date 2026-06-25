@@ -757,7 +757,10 @@ export const api = {
       ),
   },
 
-  health: () => apiFetch<{ status: string; atlas: string; kmsProvider: string; timestamp: string }>('/api/v1/system/health'),
+  health: (detail?: 'server' | 'db' | 'all') =>
+    apiFetch<{ status: string; version?: string; serviceId?: string; checks?: Record<string, unknown[]> }>(
+      `/api/v1/system/health${detail ? `?detail=${detail}` : ''}`
+    ),
 
   merchants: {
     picker: (params: { q?: string; limit?: number }, token: string) => {
