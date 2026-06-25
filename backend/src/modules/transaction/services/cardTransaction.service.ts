@@ -67,8 +67,8 @@ export class CardIssuerDeclinedError extends Error {
 }
 
 function shouldCreateFraudCase(amount: number, mcc: string): { create: boolean; reasons: string[] } {
-  const threshold = parseInt(process.env.FRAUD_AMOUNT_THRESHOLD ?? '500', 10);
-  const riskMccList = (process.env.RISK_MCC_LIST ?? '5812,6011,7995').split(',').map((m) => m.trim());
+  const threshold = parseInt(process.env.PSP_FRAUD_AMOUNT_THRESHOLD ?? '500', 10);
+  const riskMccList = (process.env.PSP_RISK_MCC_LIST ?? '5812,6011,7995').split(',').map((m) => m.trim());
   const reasons: string[] = [];
   if (amount > threshold) reasons.push('amount_threshold');
   if (riskMccList.includes(mcc)) reasons.push('high_risk_mcc');
@@ -329,7 +329,7 @@ export async function completeAuthorized(db: Db, txnId: string, fdsVerdict?: Fds
   // The FDS verdict (handed in by the saga) drives the fraud case when present — the case
   // score/severity/indicators are the FDS verdict, so the case is congruent with the
   // fds.scoring.completed gate result. When no verdict is available (FDS unreachable / fail-open),
-  // fall back to the PSP amount+MCC rule, which shares the FDS amount threshold (FRAUD_AMOUNT_THRESHOLD).
+  // fall back to the PSP amount+MCC rule, which shares the FDS amount threshold (PSP_FRAUD_AMOUNT_THRESHOLD).
   const fds = fdsVerdict;
   let create: boolean;
   let reasons: string[];

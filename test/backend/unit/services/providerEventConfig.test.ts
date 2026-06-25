@@ -97,20 +97,20 @@ describe('deriveEventConfigs (P11d seed migration)', () => {
   it('builds one per-event config per trigger event from the vendor-global template', () => {
     const vendor = { ...base,
       externalProviderTriggerEvents: ['a.requested', 'b.requested'],
-      externalProviderApiEndpoint: 'http://localhost:3001/api/v1/modules/x/score',
+      externalProviderApiEndpoint: 'http://localhost:8081/api/v1/modules/x/score',
       externalProviderTimeoutMs: 1500,
       externalProviderRetryPolicy: { maxAttempts: 1, backoffMs: 0 },
       fieldMappingConfig: { outbound: [{ sourcePath: 'a', targetPath: 'b' }], inbound: [], schemaVersion: 1 },
     } as ExternalProviderArrangement;
     const events = deriveEventConfigs(vendor);
     expect(events.map((e) => e.event)).toEqual(['a.requested', 'b.requested']);
-    expect(events[0].outbound.url).toBe('http://localhost:3001/api/v1/modules/x/score');
+    expect(events[0].outbound.url).toBe('http://localhost:8081/api/v1/modules/x/score');
     expect(events[0].outbound.timeoutMs).toBe(1500);
     expect(events[0].outbound.mapping).toHaveLength(1);
     // a resolver over the derived doc returns the per-event values
     const resolved = resolveEventOutbound({ ...vendor, externalProviderEvents: events } as ExternalProviderArrangement, 'a.requested');
     expect(resolved.perEvent).toBe(true);
-    expect(resolved.url).toBe('http://localhost:3001/api/v1/modules/x/score');
+    expect(resolved.url).toBe('http://localhost:8081/api/v1/modules/x/score');
   });
 
   it('is idempotent — returns existing per-event config unchanged', () => {

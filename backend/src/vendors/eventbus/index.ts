@@ -16,13 +16,13 @@ let instance: EventBus | null = null;
 export type EventBusEngine = 'in-process' | 'kafka' | 'rabbitmq';
 
 export function resolveEventBusEngine(): EventBusEngine {
-  return (process.env.EVENT_BUS_ENGINE ?? 'in-process') as EventBusEngine;
+  return (process.env.PSP_EVENT_BUS_ENGINE ?? 'in-process') as EventBusEngine;
 }
 
 export function initEventBus(db: Db, store?: EventStore): EventBus {
   const engine = resolveEventBusEngine();
   const eventStore = store ?? new MongoEventStore(db);
-  const topic = `${process.env.EVENT_BUS_TOPIC_PREFIX ?? 'pci.psp'}.domain-events`;
+  const topic = `${process.env.PSP_EVENT_BUS_TOPIC_PREFIX ?? 'pci.psp'}.domain-events`;
 
   if (engine === 'kafka') {
     instance = new EventBusKafka({ brokers: parseList(process.env.KAFKA_BROKERS), clientId: process.env.KAFKA_CLIENT_ID ?? 'pci-psp', ssl: process.env.KAFKA_SSL === 'true', sasl: buildKafkaSasl(), topic }, eventStore);

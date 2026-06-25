@@ -9,7 +9,7 @@ import {
 import { deriveEventConfigs } from '../../modules/provider/services/providerEventConfig.service';
 import { seedRoutingGroups } from './seedRoutingGroups';
 
-const DATA_DIR: string = process.env.SEED_DATA_DIR ?? join(process.cwd(), 'data');
+const DATA_DIR: string = process.env.PSP_SEED_DATA_DIR ?? join(process.cwd(), 'data');
 
 export async function seedIntegrations(db: Db): Promise<void> {
   const raw = readFileSync(join(DATA_DIR, 'externalProviderArrangement.json'), 'utf8');

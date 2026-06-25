@@ -2104,9 +2104,12 @@ ATLAS_DB_USER_LEVEL2=pci_l2
 ATLAS_DB_USER_LEVEL2_PASSWORD=
 
 # ── Backend (Fastify) ─────────────────────────────────────────────
-PORT=3001
+# PORT: defaults to 8081 in source; Dockerfile sets 8080 for K8s
+PORT=8081
 NODE_ENV=development
 JWT_SECRET=                     # 32-char random string
+PSP_URL_FRONTEND=http://localhost:8080
+PSP_CORS_ORIGIN=http://localhost:8080
 
 # ── Fraud detection ────────────────────────────────────────────────
 FRAUD_AMOUNT_THRESHOLD=500
@@ -2780,7 +2783,7 @@ All 50 records include `customerAgreementKycCheck` with BIAN BQ:Step sub-documen
 
 | Concern | Implementation |
 |---|---|
-| SAQ A scope | Card data entered only on `{FRONTEND_URL}/checkout/` and `{FRONTEND_URL}/pay/` — merchant domain never handles CHD |
+| SAQ A scope | Card data entered only on `{PSP_URL_FRONTEND}/checkout/` and `{PSP_URL_FRONTEND}/pay/` — merchant domain never handles CHD |
 | Card tokenization | Frontend generates `tok_<random>` surrogate; raw PAN never sent to backend API |
 | API key storage | bcrypt hash only (`bcryptjs`, 10 rounds); plaintext returned once at generation, never stored |
 | Webhook integrity | `X-Webhook-Signature: sha256=<hmac>` signed with per-merchant secret; constant-time comparison |
@@ -2818,13 +2821,13 @@ Debug Mode is a demo-only UX toggle that switches from the business narrative to
 
 ---
 
-### 8.7 FRONTEND_URL Environment Variable
+### 8.7 PSP_URL_FRONTEND Environment Variable
 
-The `FRONTEND_URL` env var is used to construct hosted page URLs:
-- `paymentPageUrl = ${FRONTEND_URL}/checkout/{sessionId}`
-- `paymentUrl = ${FRONTEND_URL}/pay/{linkCode}`
+The `PSP_URL_FRONTEND` env var is used to construct hosted page URLs:
+- `paymentPageUrl = ${PSP_URL_FRONTEND}/checkout/{sessionId}`
+- `paymentUrl = ${PSP_URL_FRONTEND}/pay/{linkCode}`
 
-Defaults to `http://localhost:3000` when not set.
+Defaults to `http://localhost:8080` when not set.
 
 ---
 

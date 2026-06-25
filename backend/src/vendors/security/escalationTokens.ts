@@ -1,7 +1,7 @@
 import * as jwt from 'jsonwebtoken';
 
 const DEFAULT_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
-const JWT_SECRET = process.env.JWT_SECRET ?? 'demo-local-secret-change-in-production';
+const JWT_SECRET = process.env.PSP_JWT_SECRET ?? 'demo-local-secret-change-in-production';
 
 export interface EscalationTokenEntry {
   caseId: string;

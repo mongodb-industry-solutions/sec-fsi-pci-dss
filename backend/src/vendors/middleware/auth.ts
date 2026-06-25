@@ -2,7 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import * as jwt from 'jsonwebtoken';
 import { attachRbacContext } from './rbac';
 
-const JWT_SECRET = process.env.JWT_SECRET ?? 'demo-local-secret-change-in-production';
+const JWT_SECRET = process.env.PSP_JWT_SECRET ?? 'demo-local-secret-change-in-production';
 
 // Exact URL matches that bypass JWT auth
 const PUBLIC_EXACT: Set<string> = new Set([

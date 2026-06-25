@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import supertest from 'supertest';
-import { buildApp } from '../../../../backend/src/server';
+import { buildApp } from '../../../../backend/bin/server';
 import type { FastifyInstance } from 'fastify';
 
 const SKIP = !process.env.TEST_MONGODB_URI;
@@ -20,8 +20,8 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
     if (SKIP) return;
     process.env.MONGODB_URI = process.env.TEST_MONGODB_URI!;
     process.env.MONGODB_DB_NAME = process.env.TEST_MONGODB_DB_NAME ?? 'pci_dss_test';
-    process.env.FRAUD_AMOUNT_THRESHOLD = '500';
-    process.env.RISK_MCC_LIST = '5812,6011,7995';
+    process.env.PSP_FRAUD_AMOUNT_THRESHOLD = '500';
+    process.env.PSP_RISK_MCC_LIST = '5812,6011,7995';
     app = await buildApp();
     await app.ready();
 
@@ -91,7 +91,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
   });
 
   // FR-v1-03.4: Fraud case auto-created for high-risk MCC
-  skip('POST /card-transactions with MCC in RISK_MCC_LIST creates fraud case', async () => {
+  skip('POST /card-transactions with MCC in PSP_RISK_MCC_LIST creates fraud case', async () => {
     const res = await supertest(app.server)
       .post('/api/v1/card-transactions')
       .set('Authorization', `Bearer ${authToken}`)

@@ -1,14 +1,14 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { ServerResponse } from 'http';
 
-const allowedOrigins: string[] = (process.env.CORS_ORIGIN ?? 'http://localhost:3000')
+const allowedOrigins: string[] = (process.env.PSP_CORS_ORIGIN ?? 'http://localhost:8080')
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
 
 /**
  * Resolves the Access-Control-Allow-Origin value for a hijacked SSE response.
- * Validates the incoming Origin header against the configured CORS_ORIGIN list.
+ * Validates the incoming Origin header against the configured PSP_CORS_ORIGIN list.
  * Falls back to the first allowed origin when no match is found.
  */
 export function resolveSSEOrigin(requestOrigin: string | undefined): string {

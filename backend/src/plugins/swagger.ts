@@ -125,8 +125,10 @@ Obtain a token via \`POST /api/v1/auth/login\`.
       preHandler: (_request, _reply, done) => done(),
     },
     staticCSP: true,
-    transformStaticCSP: (header) =>
-      `${header}; connect-src 'self' http://localhost:3001 http://127.0.0.1:3001`,
+    transformStaticCSP: (header) => {
+      const port = process.env.PORT || '8081';
+      return `${header}; connect-src 'self' http://localhost:${port} http://127.0.0.1:${port}`;
+    },
     transformSpecification: (spec) => spec,
     transformSpecificationClone: true,
   });

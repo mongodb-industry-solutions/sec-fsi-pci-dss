@@ -67,7 +67,7 @@ export async function simulatorController(fastify: FastifyInstance) {
     };
 
     const { merchantId, merchant } = await getSimulatorMerchant(body.merchantId);
-    const baseUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+    const baseUrl = process.env.PSP_URL_FRONTEND ?? 'http://localhost:8080';
 
     const result = await createCheckoutSession(fastify.db, {
       merchantAgreementInstanceReference: merchantId,
@@ -129,7 +129,7 @@ export async function simulatorController(fastify: FastifyInstance) {
     };
 
     const { merchantId, merchant } = await getSimulatorMerchant(body.merchantId);
-    const baseUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+    const baseUrl = process.env.PSP_URL_FRONTEND ?? 'http://localhost:8080';
 
     const result = await createPaymentLink(fastify.db, {
       merchantAgreementInstanceReference: merchantId,

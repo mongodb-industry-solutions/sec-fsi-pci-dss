@@ -6,7 +6,7 @@ import {
   CapabilityModuleConfiguration,
 } from '../../modules/provider/models/capabilityModuleConfiguration.model';
 
-const DATA_DIR: string = process.env.SEED_DATA_DIR ?? join(process.cwd(), 'data');
+const DATA_DIR: string = process.env.PSP_SEED_DATA_DIR ?? join(process.cwd(), 'data');
 
 // Seeds the internal Module configs (ADR-029, plan §3.5). Together with the internal linking
 // vendors in externalProviderArrangement.json (re-pointed to /modules/<cap>/...), this wires the

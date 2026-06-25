@@ -1,7 +1,8 @@
 import { FastifyInstance } from 'fastify';
 import { v4 as uuidv4 } from 'uuid';
 import * as jwt from 'jsonwebtoken';
-import { beginSSE } from '../../../shared/sse';
+import { beginSSE } from '../../../shared/services/sse';
+import { jwtSecret } from '../../../vendors/encryption/digest';
 
 export interface WebhookEntry {
   id: string;
@@ -25,10 +26,6 @@ function broadcast(event: string, text: string) {
   for (const client of [...clients]) {
     try { client.write(frame); } catch { clients.delete(client); }
   }
-}
-
-function jwtSecret() {
-  return process.env.JWT_SECRET ?? 'demo-local-secret-change-in-production';
 }
 
 function authorized(authHeader: string | undefined): boolean {

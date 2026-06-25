@@ -18,7 +18,7 @@ import { dispatchProvider } from '../../provider/services/integrationDispatch.se
 import { getCaseEnrichment } from '../services/caseEnrichment.service';
 import { createQuestion, listQuestionsByCase } from '../services/customerQuestion.service';
 import { subscribeCaseEvents } from '../../../vendors/eventbus';
-import { beginSSE } from '../../../shared/sse';
+import { beginSSE } from '../../../shared/services/sse';
 import { createNotification } from '../../notification/notifications.service';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';

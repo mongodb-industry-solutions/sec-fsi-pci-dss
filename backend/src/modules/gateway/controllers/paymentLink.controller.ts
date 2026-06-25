@@ -81,7 +81,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
       return reply.status(404).send({ error: 'Merchant not found' });
     }
 
-    const baseUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+    const baseUrl = process.env.PSP_URL_FRONTEND ?? 'http://localhost:8080';
 
     const result = await createPaymentLink(fastify.db, {
       merchantAgreementInstanceReference: body.merchantAgreementInstanceReference,

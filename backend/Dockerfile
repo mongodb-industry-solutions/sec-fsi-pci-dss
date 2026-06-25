@@ -21,6 +21,7 @@ RUN ARCH=$(dpkg --print-architecture) && \
     rm -rf crypt.tgz lib
 
 ENV MONGODB_CRYPT_SHARED_LIB_PATH=/usr/local/lib/mongo_crypt_v1.so
+ENV PORT=8080
 
 # Install dependencies first (layer cached unless package.json changes)
 COPY package*.json ./
@@ -42,10 +43,10 @@ RUN if [ ! -f data/parties.json ]; then \
 # Compile TypeScript
 RUN npm run build
 
-EXPOSE 3001
+EXPOSE 8080
 
 # ts-node retained for: npm run seed / npm run setup:db inside the container
 ENV NODE_ENV=production
-ENV SEED_DATA_DIR=/app/data
+ENV PSP_SEED_DATA_DIR=/app/data
 
-CMD ["node", "dist/src/server.js"]
+CMD ["node", "dist/bin/server.js"]

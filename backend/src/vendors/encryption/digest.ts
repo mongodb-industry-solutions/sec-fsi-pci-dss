@@ -49,3 +49,11 @@ export function parseWwwAuthenticate(header: string): DigestChallenge {
         opaque: header.match(/opaque="([^"]+)"/)?.[1]
     };
 }
+
+export function sha256(text: string): string {
+    return crypto.createHash('sha256').update(text).digest('hex');
+}
+
+export function jwtSecret(): string {
+    return process.env.PSP_JWT_SECRET ?? 'demo-local-secret-change-in-production';
+}
