@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-import * as crypto from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import * as os from 'os';
 import * as fs from 'fs';
