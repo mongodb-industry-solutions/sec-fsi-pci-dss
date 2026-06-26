@@ -56,7 +56,7 @@ import { dispatchProvider } from '../../../../backend/src/modules/provider/servi
 import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
 import { setEventBus, getEventBus } from '../../../../backend/src/vendors/eventbus';
 import { PaymentAuthorizationSaga } from '../../../../backend/src/modules/transaction/services/paymentAuthorization.saga';
-import { ProviderGroups } from '../../../../backend/src/providers/_groups/providerGroups';
+import { ProviderGroups } from '../../../../backend/src/providers/groups/providerGroups';
 
 // createTransaction uses the passed db only for resolveCustomerAgreement (a local helper that does
 // findOne on the customer/party collections); everything else is mocked. A findOne→null db makes

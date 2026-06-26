@@ -64,7 +64,7 @@ async function mongodbPlugin(fastify: FastifyInstance) {
 
     // Provider Group reactors: subscribe to each payment gate's *.requested and perform the actual
     // provider call, publishing *.completed. Registered before any publisher so no request is missed.
-    const { ProviderGroups } = await import('../providers/_groups/providerGroups');
+    const { ProviderGroups } = await import('../providers/groups/providerGroups');
     new ProviderGroups(db, getEventBus()).register();
 
     // dev.v8 F3/F4: register the event-driven payment-authorization saga (issuer + FDS + sanctions gate).

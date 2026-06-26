@@ -2127,17 +2127,17 @@ Seed files live in `backend/data/`. The seed script (`backend/bin/seed.ts`) read
 
 | File | Collection (BIAN SD) | Documents | Generator |
 |---|---|---|---|
-| `backend/data/parties.json` | `party` (SD-13) | 53 (50 customers + 3 employees) | `bin/generate.ts` |
-| `backend/data/customerAuthentications.json` | `customerAuthenticationAssessment` (SD-91) | 5 | `bin/generate.ts` |
+| `backend/data/parties.json` | `party` (SD-13) | 53 (50 customers + 3 employees) | `bin/seed-generate.ts` |
+| `backend/data/customerAuthentications.json` | `customerAuthenticationAssessment` (SD-91) | 5 | `bin/seed-generate.ts` |
 | `backend/data/authDomains.json` | `authenticationDomain` (SD-16) | 3 | manual |
-| `backend/data/customerAgreements.json` | `customerAgreementProcedure` (SD-53) | 50 | `bin/generate.ts` — includes inline QE:none fields (v2) |
-| `backend/data/paymentCards.json` | `paymentCardManagement` (SD-88) | 50 | `bin/generate.ts` |
-| `backend/data/cardTransactions.json` | `cardTransactionLog` (SD-254) | 200 | `bin/generate.ts` — includes inline QE:none fields (v2) |
-| `backend/data/fraudCases.json` | `fraudDiagnosisCase` (SD-83) | 20 | `bin/generate.ts` |
-| `backend/data/fraudCaseEvents.json` | `fraudDiagnosisCaseEvents` (SD-83) | 20 | `bin/generate.ts` |
+| `backend/data/customerAgreements.json` | `customerAgreementProcedure` (SD-53) | 50 | `bin/seed-generate.ts` — includes inline QE:none fields (v2) |
+| `backend/data/paymentCards.json` | `paymentCardManagement` (SD-88) | 50 | `bin/seed-generate.ts` |
+| `backend/data/cardTransactions.json` | `cardTransactionLog` (SD-254) | 200 | `bin/seed-generate.ts` — includes inline QE:none fields (v2) |
+| `backend/data/fraudCases.json` | `fraudDiagnosisCase` (SD-83) | 20 | `bin/seed-generate.ts` |
+| `backend/data/fraudCaseEvents.json` | `fraudDiagnosisCaseEvents` (SD-83) | 20 | `bin/seed-generate.ts` |
 | `backend/data/customerCreditRatings.json` | `customerCreditRatingState` (SD-60) | 5 | manual (HRPC profiles) |
 
-**Regenerating synthetic data:** Run `npm run setup:data --prefix backend` (executes `bin/generate.ts`). This overwrites all files marked `bin/generate.ts` above. Manual files (`authDomains.json`, `customerCreditRatings.json`) are never overwritten by the generator.
+**Regenerating synthetic data:** Run `npm run setup:data --prefix backend` (executes `bin/seed-generate.ts`). This overwrites all files marked `bin/seed-generate.ts` above. Manual files (`authDomains.json`, `customerCreditRatings.json`) are never overwritten by the generator.
 
 ### Demo users (`data/customerAuthentications.json`)
 
@@ -2191,7 +2191,7 @@ backend/
 ├── bin/
 │   ├── setup.ts                    # thin wrapper → src/vendors/setup/runSetup()
 │   ├── seed.ts                     # thin wrapper → src/vendors/seed/runSeed()
-│   └── generate.ts                 # synthetic data generator → writes backend/data/*.json
+│   └── seed-generate.ts            # synthetic data generator → writes backend/data/*.json
 │
 ├── data/                           # JSON seed files (consumed by bin/seed.ts only)
 │   ├── parties.json                # generated → party (SD-13): 53 party records
@@ -3002,7 +3002,7 @@ Lifecycle actions emit a **compliance** event (`complianceProcessEvent`) with
 
 ### 10.4 Seed data
 `backend/data/paymentCards.json` provides 3–4 cards per real `customerAgreement` (generator:
-`backend/bin/generateCards.mjs`): valid future expiry (`MM/YY`), masked PAN, surrogate token,
+`backend/bin/seed-generate-cards.mjs`): valid future expiry (`MM/YY`), masked PAN, surrogate token,
 unique alias per customer, one preferred card each, with a few non-active (expired/blocked) for
 list-filter realism.
 

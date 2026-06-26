@@ -11,7 +11,7 @@ import { classifyEndpoint } from '../_endpoint';
 import { JsonView } from '../../../../../../../components/json/JsonView';
 import { JsonEditor } from '../../../../../../../components/json/JsonEditor';
 import { byProviderType } from '../../../../../../../config/capabilities';
-import { API_BASE_URL } from '../../../../../../../lib/constants';
+import { BACKEND_PUBLIC_URL } from '../../../../../../../lib/constants';
 
 // ── Copy helper ───────────────────────────────────────────────────────────────
 
@@ -52,7 +52,7 @@ export default function InboundPage() {
   // provider needs the ABSOLUTE URL (scheme + host) to POST inbound responses for this event.
   const group = byProviderType(String(integration.externalProviderArrangementType))?.capability ?? 'generic';
   const webhookUrl = selectedInbound?.callbackUrl
-    || `${API_BASE_URL}/api/v1/providers/${group}/${id}/${encodeURIComponent(selectedEvent || 'event')}/callback`;
+    || `${BACKEND_PUBLIC_URL}/api/v1/providers/${group}/${id}/${encodeURIComponent(selectedEvent || 'event')}/callback`;
 
   // ── Immediate toggle ──────────────────────────────────────────────────────
   const [callbackEnabled, setCallbackEnabled]   = useState(integration.externalProviderCallbackEnabled ?? false);

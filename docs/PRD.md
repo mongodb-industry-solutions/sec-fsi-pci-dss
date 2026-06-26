@@ -783,7 +783,7 @@ JWT_SECRET=                        # HS256 signing secret (min 32 chars)
 JWT_EXPIRES_IN=24h
 
 # Next.js (browser → backend)
-NEXT_PUBLIC_PSP_URL_BACKEND=http://localhost:8081
+NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC=http://localhost:8081
 ```
 
 ### 8.5 Docker Compose
@@ -809,7 +809,7 @@ services:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_PSP_URL_BACKEND: http://localhost:8081
+        NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC: http://localhost:8081
     ports:
       - "8080:8080"
     env_file: .env

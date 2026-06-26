@@ -30,7 +30,7 @@ import type { EventStore } from '../../../../backend/src/vendors/eventbus/EventS
 import { setEventBus, getEventBus } from '../../../../backend/src/vendors/eventbus';
 import type { DomainEvent } from '../../../../backend/src/vendors/eventbus/types';
 import { PaymentAuthorizationSaga } from '../../../../backend/src/modules/transaction/services/paymentAuthorization.saga';
-import { ProviderGroups } from '../../../../backend/src/providers/_groups/providerGroups';
+import { ProviderGroups } from '../../../../backend/src/providers/groups/providerGroups';
 import {
   recordPendingCorrelation, resolvePendingCorrelation, clearPendingCorrelation,
   sweepExpiredCorrelations, pendingCorrelationSize,

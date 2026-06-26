@@ -40,7 +40,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_PSP_URL_BACKEND: ${NEXT_PUBLIC_PSP_URL_BACKEND:-http://localhost:8081}
+        NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC: ${NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC:-http://localhost:8081}
     ports:
       - "8080:8080"
     env_file:

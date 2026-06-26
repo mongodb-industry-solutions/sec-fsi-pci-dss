@@ -1,7 +1,7 @@
 {
   "name": "fsi-psp-leafy-pay",
   "description": "Leafy Pay is a PCI DSS-aligned Payment Service Provider (PSP) platform designed to provide digital banks and card issuers with secure and efficient payment processing capabilities, built on MongoDB.",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "private": true,
   "scripts": {
     "setup": "npm install && npm install --prefix frontend && npm install --prefix backend",
@@ -27,7 +27,7 @@
     "test:watch": "vitest watch",
     "deploy": "npm run deploy:kube",
     "deploy:docker": "docker compose up --build",
-    "deploy:kube": "tsx backend/bin/kube.ts",
+    "deploy:kube": "tsx tools/kube.ts",
     "type-check": "tsc --noEmit --project backend/tsconfig.json && tsc --noEmit --project frontend/tsconfig.json"
   },
   "devDependencies": {

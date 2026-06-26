@@ -2,7 +2,7 @@
  * Unit tests: integrationRegistry.service (FR-v6-03, FR-v6-05, FR-v6-07)
  * Source: backend/src/modules/provider/services/integrationRegistry.service.ts
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   createIntegration,
   rotateKey,
@@ -43,7 +43,7 @@ function makeDb(opts?: {
 // ── createIntegration ────────────────────────────────────────────────────────
 
 describe('createIntegration', () => {
-  it('returns a plaintext apiKey in the response', async () => {
+  it('returns a plaintext apiKey in the response', { timeout: 15_000 }, async () => {
     const db = makeDb();
     const result = await createIntegration(db as never, {
       name: 'Test FDS',

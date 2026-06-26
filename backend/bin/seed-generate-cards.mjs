@@ -1,7 +1,7 @@
 // One-off generator for paymentCards.json seed data (BIAN SD-88).
 // Produces 3-4 cards per REAL customer agreement so the card-on-file list, the payment
 // card picker and the detail view all have realistic data. PCI DSS: only masked PAN +
-// surrogate token + expiry (no PAN, no CVV). Run: node bin/generateCards.mjs
+// surrogate token + expiry (no PAN, no CVV). Run: node bin/seed-generate-cards.mjs
 import { readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';

@@ -1,6 +1,6 @@
 /**
  * Generates synthetic seed data for all BIAN-compliant collections.
- * Run: ts-node bin/generate.ts
+ * Run: ts-node bin/seed-generate.ts
  * Output: backend/data/*.json
  *
  * v2: *Sensitive files removed. Sensitive fields are inline in the main files.

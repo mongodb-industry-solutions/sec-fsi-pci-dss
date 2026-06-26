@@ -10,12 +10,12 @@ function findProjectRoot(): string {
   try {
     return execSync("git rev-parse --show-toplevel", { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
   } catch {
-    let dir = resolve(__dirname, "../..");
+    let dir = resolve(__dirname, "..");
     while (dir !== dirname(dir)) {
       if (existsSync(join(dir, "package.json")) && existsSync(join(dir, "backend"))) return dir;
       dir = dirname(dir);
     }
-    return resolve(__dirname, "../..");
+    return resolve(__dirname, "..");
   }
 }
 
@@ -23,33 +23,32 @@ const PROJECT_ROOT = findProjectRoot();
 const ENV_PATH = join(PROJECT_ROOT, ".env");
 if (existsSync(ENV_PATH)) dotenv.config({ path: ENV_PATH });
 
-// -- Constants --
-const IST_NAMESPACE = "industrysolutions";
-const ECR_REGISTRY = "795250896452.dkr.ecr.us-east-1.amazonaws.com";
-const STAGING_API = "https://api.staging.corp.mongodb.com";
-const PROD_API = "https://api.prod.corp.mongodb.com";
-const HELM_REPO_NAME = "mongodb";
-const HELM_REPO_URL = "https://10gen.github.io/helm-charts";
-const HELM_CHART_VERSION = "4.25.0";
-const DRONE_URL = "https://drone.corp.mongodb.com";
+// -- Constants (override via KUBE_* env vars, defaults match MongoDB IST) --
+const IST_NAMESPACE = process.env.KUBE_NAMESPACE ?? "industrysolutions";
+const ECR_REGISTRY = process.env.KUBE_ECR_REGISTRY ?? "795250896452.dkr.ecr.us-east-1.amazonaws.com";
+const STAGING_API = process.env.KUBE_STAGING_API ?? "https://api.staging.corp.mongodb.com";
+const PROD_API = process.env.KUBE_PROD_API ?? "https://api.prod.corp.mongodb.com";
+const HELM_REPO_NAME = process.env.KUBE_HELM_REPO_NAME ?? "mongodb";
+const HELM_REPO_URL = process.env.KUBE_HELM_REPO_URL ?? "https://10gen.github.io/helm-charts";
+const HELM_CHART_VERSION = process.env.KUBE_HELM_CHART_VERSION ?? "4.25.0";
+const DRONE_URL = process.env.KUBE_DRONE_URL ?? "https://drone.corp.mongodb.com";
 
-const DEMO_NAME = "sec-fsi-pci-dss";
-const RELEASE_BACKEND = `${DEMO_NAME}-backend`;
-const RELEASE_FRONTEND = `${DEMO_NAME}-frontend`;
-const KSEC_SECRET_STAGING = `${DEMO_NAME}-secrets-staging`;
-const KSEC_SECRET_PROD = `${DEMO_NAME}-secrets-prod`;
+const DEMO_NAME = process.env.KUBE_DEMO_NAME ?? "sec-fsi-pci-dss";
+const RELEASE_BACKEND = process.env.KUBE_RELEASE_BACKEND ?? `${DEMO_NAME}-backend`;
+const RELEASE_FRONTEND = process.env.KUBE_RELEASE_FRONTEND ?? `${DEMO_NAME}-frontend`;
+const KSEC_SECRET_STAGING = process.env.KUBE_KSEC_SECRET_STAGING ?? `${DEMO_NAME}-secrets-staging`;
+const KSEC_SECRET_PROD = process.env.KUBE_KSEC_SECRET_PROD ?? `${DEMO_NAME}-secrets-prod`;
 
-const STAGING_HOST_BE = `${RELEASE_BACKEND}.${IST_NAMESPACE}.staging.corp.mongodb.com`;
-const STAGING_HOST_FE = `${RELEASE_FRONTEND}.${IST_NAMESPACE}.staging.corp.mongodb.com`;
-const PROD_HOST_BE = `${RELEASE_BACKEND}.${IST_NAMESPACE}.prod.corp.mongodb.com`;
-const PROD_HOST_FE = `${RELEASE_FRONTEND}.${IST_NAMESPACE}.prod.corp.mongodb.com`;
+const DOMAIN_SUFFIX = process.env.KUBE_DOMAIN_SUFFIX ?? "corp.mongodb.com";
+const STAGING_HOST_BE = process.env.KUBE_STAGING_HOST_BE ?? `${RELEASE_BACKEND}.${IST_NAMESPACE}.staging.${DOMAIN_SUFFIX}`;
+const STAGING_HOST_FE = process.env.KUBE_STAGING_HOST_FE ?? `${RELEASE_FRONTEND}.${IST_NAMESPACE}.staging.${DOMAIN_SUFFIX}`;
+const PROD_HOST_BE = process.env.KUBE_PROD_HOST_BE ?? `${RELEASE_BACKEND}.${IST_NAMESPACE}.prod.${DOMAIN_SUFFIX}`;
+const PROD_HOST_FE = process.env.KUBE_PROD_HOST_FE ?? `${RELEASE_FRONTEND}.${IST_NAMESPACE}.prod.${DOMAIN_SUFFIX}`;
 
 const HOME = homedir();
 const IS_WIN = platform() === "win32";
-const KANOPY_CONFIG_PATH = IS_WIN
-  ? join(HOME, ".kanopy", "config.yaml")
-  : join(HOME, ".kanopy", "config.yaml");
-const KUBE_DIR = join(HOME, ".kube");
+const KANOPY_CONFIG_PATH = join(HOME, process.env.KUBE_KANOPY_CONFIG_DIR ?? ".kanopy", "config.yaml");
+const KUBE_DIR = join(HOME, process.env.KUBE_CONFIG_DIR ?? ".kube");
 
 // -- Helpers --
 const GREEN = "\x1b[32m";
@@ -184,9 +183,9 @@ async function createKanopyConfig() {
     if (overwrite.toLowerCase() !== "y") return;
   }
 
-  const secret = process.env.KANOPY_CLUSTER_SECRET || "";
+  const secret = process.env.KUBE_CLUSTER_SECRET || "";
   if (!secret) {
-    fail("KANOPY_CLUSTER_SECRET is not set. Add it to your .env file.");
+    fail("KUBE_CLUSTER_SECRET is not set. Add it to your .env file.");
     return;
   }
 
@@ -313,7 +312,7 @@ function kubeEnv(): NodeJS.ProcessEnv {
   return { ...process.env, KUBECONFIG: `${join(KUBE_DIR, "config.staging")}${IS_WIN ? ";" : ":"}${join(KUBE_DIR, "config.prod")}` };
 }
 
-const KSEC_EXCLUDE_PREFIXES = ["KANOPY_"];
+const KSEC_EXCLUDE_PREFIXES = ["KUBE_"];
 
 async function createSecrets() {
   console.log("\nCreate ksec secrets for which environment?");
@@ -675,6 +674,50 @@ async function checkEnvVars() {
   spawnSync("kubectl", ["exec", `deployment/${deployment}`, "-n", IST_NAMESPACE, "--", "env"], { shell: true, stdio: "inherit", env: kubeEnv() });
 }
 
+async function getIngress() {
+  spawnSync("kubectl", ["get", "ingress", "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env: kubeEnv() });
+}
+
+async function describeIngress() {
+  const env = kubeEnv();
+  const result = spawnSync("kubectl", ["get", "ingress", "-n", IST_NAMESPACE, "-o", "name"], { shell: true, encoding: "utf-8", env });
+  const names = (result.stdout || "").split(/\r?\n/).filter(Boolean);
+  if (names.length === 0) { warn("No ingress resources found."); return; }
+
+  console.log("\nAvailable ingress resources:");
+  names.forEach((n, i) => console.log(`  ${i + 1}. ${n}`));
+  console.log(`  ${names.length + 1}. All`);
+
+  const input = await ask("Which ingress to describe? ");
+  const idx = parseInt(input, 10) - 1;
+
+  if (input === String(names.length + 1) || input.toLowerCase() === "all") {
+    for (const n of names) {
+      console.log(`\n--- ${n} ---`);
+      spawnSync("kubectl", ["describe", n, "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env });
+    }
+  } else if (idx >= 0 && idx < names.length) {
+    spawnSync("kubectl", ["describe", names[idx], "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env });
+  } else {
+    warn("Invalid selection.");
+  }
+}
+
+async function helmGetValues() {
+  console.log("\n  1. backend\n  2. frontend\n  3. both");
+  const input = await ask("Which release? ");
+  const env = kubeEnv();
+
+  const releases = input === "1" ? [RELEASE_BACKEND]
+    : input === "2" ? [RELEASE_FRONTEND]
+    : [RELEASE_BACKEND, RELEASE_FRONTEND];
+
+  for (const release of releases) {
+    console.log(`\n${CYAN}--- ${release} ---${NC}`);
+    spawnSync("helm", ["get", "values", release, "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env });
+  }
+}
+
 async function testUrls() {
   const env = kubeEnv();
   const ctx = spawnSync("kubectl", ["config", "current-context"], { shell: true, encoding: "utf-8", env }).stdout.trim();
@@ -735,10 +778,6 @@ async function applyApiProxy() {
   const dronePath = join(PROJECT_ROOT, ".drone.yml");
   const nextConfigPath = join(PROJECT_ROOT, "frontend", "next.config.js");
   const dockerfilePath = join(PROJECT_ROOT, "frontend", "Dockerfile");
-  const envPaths = [
-    { label: "staging",    path: join(PROJECT_ROOT, "environments", "staging.yaml") },
-    { label: "production", path: join(PROJECT_ROOT, "environments", "production.yaml") },
-  ];
 
   if (!existsSync(dronePath)) { fail(".drone.yml not found"); return; }
   if (!existsSync(nextConfigPath)) { fail("frontend/next.config.js not found"); return; }
@@ -751,11 +790,9 @@ async function applyApiProxy() {
   console.log(`  1. ${GREEN}frontend/next.config.js${NC}`);
   console.log(`     Add rewrites() proxying /api/* and /health → backend pod\n`);
   console.log(`  2. ${GREEN}frontend/Dockerfile${NC}`);
-  console.log(`     Add PSP_BACKEND_INTERNAL_URL build arg\n`);
-  console.log(`  3. ${GREEN}environments/*.yaml${NC}`);
-  console.log(`     Add env var: PSP_BACKEND_INTERNAL_URL=${BACKEND_SVC_URL}\n`);
-  console.log(`  4. ${GREEN}.drone.yml${NC}`);
-  console.log(`     Clear NEXT_PUBLIC_PSP_URL_BACKEND, add PSP_BACKEND_INTERNAL_URL build arg\n`);
+  console.log(`     Add NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE build arg\n`);
+  console.log(`  3. ${GREEN}.drone.yml${NC}`);
+  console.log(`     Rename build args to _PUBLIC / _PRIVATE\n`);
   console.log(`     Ensure mesh.enabled=true on backend (required by Kanopy ingress)\n`);
 
   const input = await ask("Apply all changes? (y/N): ");
@@ -767,8 +804,8 @@ const nextConfig = {
     allowedDevOrigins: ['127.0.0.1', 'localhost'],
     async rewrites() {
         const backendUrl =
-            process.env.PSP_BACKEND_INTERNAL_URL ||
-            process.env.NEXT_PUBLIC_PSP_URL_BACKEND ||
+            process.env.NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE ||
+            process.env.NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC ||
             'http://localhost:8081';
         return [
             { source: '/api/:path*', destination: \`\${backendUrl}/api/:path*\` },
@@ -781,68 +818,48 @@ module.exports = nextConfig;
   writeFileSync(nextConfigPath, nextConfig, "utf-8");
   ok("frontend/next.config.js updated with API proxy rewrites");
 
-  // 2. Add PSP_BACKEND_INTERNAL_URL ARG/ENV to Dockerfile if missing
+  // 2. Add NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE ARG/ENV to Dockerfile if missing
   if (existsSync(dockerfilePath)) {
     let df = readFileSync(dockerfilePath, "utf-8");
-    if (!df.includes("PSP_BACKEND_INTERNAL_URL")) {
+    if (!df.includes("NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE")) {
       df = df.replace(
-        /^(ENV NEXT_PUBLIC_PSP_URL_BACKEND=\$NEXT_PUBLIC_PSP_URL_BACKEND)$/m,
-        `$1\n\nARG PSP_BACKEND_INTERNAL_URL=http://localhost:8081\nENV PSP_BACKEND_INTERNAL_URL=$PSP_BACKEND_INTERNAL_URL`,
+        /^(ENV NEXT_PUBLIC_PSP_URL_BACKEND[_A-Z]*=\$NEXT_PUBLIC_PSP_URL_BACKEND[_A-Z]*)$/m,
+        `$1\n\nARG NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE\nENV NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=$NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE`,
       );
       writeFileSync(dockerfilePath, df, "utf-8");
-      ok("frontend/Dockerfile: added PSP_BACKEND_INTERNAL_URL ARG/ENV");
+      ok("frontend/Dockerfile: added NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE ARG/ENV");
     } else {
-      console.log(`  ${DIM}[skip]${NC} Dockerfile: PSP_BACKEND_INTERNAL_URL already present`);
+      console.log(`  ${DIM}[skip]${NC} Dockerfile: NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE already present`);
     }
   }
 
-  // 3. Add PSP_BACKEND_INTERNAL_URL to environment yamls
-  for (const env of envPaths) {
-    if (!existsSync(env.path)) { warn(`${env.path} not found, skipping`); continue; }
-    let content = readFileSync(env.path, "utf-8");
-    if (content.includes("PSP_BACKEND_INTERNAL_URL")) {
-      console.log(`  ${DIM}[skip]${NC} ${env.label}: PSP_BACKEND_INTERNAL_URL already present`);
-      continue;
-    }
-    content = content.replace(
-      /^(  PSP_URL_FRONTEND:.*$)/m,
-      `$1\n  PSP_BACKEND_INTERNAL_URL: "${BACKEND_SVC_URL}"`,
-    );
-    writeFileSync(env.path, content, "utf-8");
-    ok(`environments/${env.label}.yaml: added PSP_BACKEND_INTERNAL_URL`);
-  }
-
-  // 4. Update .drone.yml: clear NEXT_PUBLIC_PSP_URL_BACKEND, add PSP_BACKEND_INTERNAL_URL, ensure mesh=true
+  // 3. Update .drone.yml: rename build args, add PRIVATE, ensure mesh=true
   let drone = readFileSync(dronePath, "utf-8");
   let changes = 0;
 
-  // Clear NEXT_PUBLIC_PSP_URL_BACKEND values
-  drone = drone.replace(
-    /(\s+- NEXT_PUBLIC_PSP_URL_BACKEND=)https?:\/\/[^\n\r]+/g,
-    () => { changes++; return "$1"; },
-  );
-  // Fix: the callback returns literal "$1" — use a proper replacement
-  if (changes > 0) {
-    drone = readFileSync(dronePath, "utf-8");
-    drone = drone.replace(
-      /(\s+- NEXT_PUBLIC_PSP_URL_BACKEND=)https?:\/\/[^\n\r]+/g, "$1",
-    );
+  // Rename NEXT_PUBLIC_PSP_URL_BACKEND= to NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC=
+  if (drone.includes("NEXT_PUBLIC_PSP_URL_BACKEND=") && !drone.includes("NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC=")) {
+    drone = drone.replace(/NEXT_PUBLIC_PSP_URL_BACKEND=/g, "NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC=");
+    changes++;
   }
 
-  // Add PSP_BACKEND_INTERNAL_URL build arg if missing
-  if (!drone.includes("PSP_BACKEND_INTERNAL_URL")) {
+  // Add NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE if missing
+  if (!drone.includes("NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE")) {
     drone = drone.replace(
-      /(\s+- NEXT_PUBLIC_PSP_URL_BACKEND=.*)/g,
-      `$1\n        - PSP_BACKEND_INTERNAL_URL=${BACKEND_SVC_URL}`,
+      /(\s+- NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC=.*)/g,
+      `$1\n        - NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=${BACKEND_SVC_URL}`,
     );
     changes++;
   }
 
+  // Remove old PSP_BACKEND_INTERNAL_URL lines
+  drone = drone.replace(/\s+- PSP_BACKEND_INTERNAL_URL=[^\n\r]*/g, "");
+
   // Ensure mesh.enabled=true on backend steps
   const meshFalseRe = /(ingress\.hosts\[0\]=sec-fsi-pci-dss-backend[^\n]*\n\s+- )mesh\.enabled=false/g;
-  drone = drone.replace(meshFalseRe, () => { changes++; return "$1mesh.enabled=true"; });
-  if (changes > 0 && drone.includes("mesh.enabled=false")) {
+  if (meshFalseRe.test(drone)) {
     drone = drone.replace(meshFalseRe, "$1mesh.enabled=true");
+    changes++;
   }
 
   writeFileSync(dronePath, drone, "utf-8");
@@ -900,8 +917,12 @@ const MENU = `
   25. Check env vars in pod
   26. Test staging/prod URLs
   27. Pre-deployment checklist
+  --- Inspect ---
+  28. Get ingress resources
+  29. Describe ingress (detail)
+  30. Helm get values (backend/frontend)
   --- Fix ---
-  28. Fix mesh 302 (Next.js API proxy)
+  31. Fix mesh 302 (Next.js API proxy)
   --- ---
   0.  Exit
 `;
@@ -944,7 +965,10 @@ async function main() {
       case "25": await checkEnvVars(); break;
       case "26": await testUrls(); break;
       case "27": await preDeployChecklist(); break;
-      case "28": await fixMesh302(); break;
+      case "28": await getIngress(); break;
+      case "29": await describeIngress(); break;
+      case "30": await helmGetValues(); break;
+      case "31": await fixMesh302(); break;
       case "0": console.log("\nGoodbye."); rl.close(); process.exit(0);
       default: warn("Invalid option.");
     }

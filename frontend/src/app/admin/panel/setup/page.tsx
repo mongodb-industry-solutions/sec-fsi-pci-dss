@@ -1,8 +1,8 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useSyncExternalStore } from 'react';
 import { API_BASE_URL } from '../../../../lib/constants';
 import { getAdminToken, readSSE, LogEntry, TestSummary as TestSummaryData, downloadText } from '../../../../lib/adminHelpers';
-import { Download, Copy, CheckCheck, CheckCircle2, XCircle } from 'lucide-react';
+import { Download, Copy, CheckCheck, CheckCircle2, XCircle, Square } from 'lucide-react';
 
 const SETUP_LOGS_KEY = 'admin_setup_logs';
 
@@ -39,14 +39,129 @@ const COMMANDS: CommandDef[] = [
   },
 ];
 
-/** Formats elapsed milliseconds as `12s` or `2m 05s`. */
+// ---------------------------------------------------------------------------
+//  Module-level store — persists across tab switches (mount/unmount)
+// ---------------------------------------------------------------------------
+
+interface SetupStore {
+  logs: LogEntry[];
+  running: boolean;
+  activeCommand: string | null;
+  commandStatus: null | 'success' | 'failure';
+  summary: TestSummaryData | null;
+  startedAt: number | null;
+}
+
+let _state: SetupStore = {
+  logs: (() => {
+    if (typeof window === 'undefined') return [];
+    try { return JSON.parse(sessionStorage.getItem(SETUP_LOGS_KEY) ?? '[]'); } catch { return []; }
+  })(),
+  running: false,
+  activeCommand: null,
+  commandStatus: null,
+  summary: null,
+  startedAt: null,
+};
+
+let _controller: AbortController | null = null;
+const _listeners = new Set<() => void>();
+
+function _notify() { _listeners.forEach((fn) => fn()); }
+
+function _update(partial: Partial<SetupStore>) {
+  _state = { ..._state, ...partial };
+  if (partial.logs !== undefined) {
+    if (_state.logs.length === 0) sessionStorage.removeItem(SETUP_LOGS_KEY);
+    else sessionStorage.setItem(SETUP_LOGS_KEY, JSON.stringify(_state.logs));
+  }
+  _notify();
+}
+
+function _pushLog(entry: LogEntry) {
+  _update({ logs: [..._state.logs, entry] });
+}
+
+async function _runCommand(commandId: string) {
+  const token = getAdminToken();
+  if (_state.running || !token) return;
+
+  _controller = new AbortController();
+  _update({
+    running: true,
+    activeCommand: commandId,
+    commandStatus: null,
+    summary: null,
+    logs: [],
+    startedAt: Date.now(),
+  });
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/admin/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ command: commandId }),
+      signal: _controller.signal,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      _update({
+        logs: [{ type: 'error', text: (err as { error?: string }).error ?? 'Request failed' }],
+        commandStatus: 'failure',
+      });
+      return;
+    }
+    await readSSE(
+      res,
+      (type, text) => {
+        if (type === 'done') {
+          const match = /code\s+(\d+)/i.exec(text);
+          _update({ commandStatus: match?.[1] === '0' ? 'success' : 'failure' });
+        }
+        _pushLog({ type: type as LogEntry['type'], text });
+      },
+      (s) => _update({ summary: s }),
+    );
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      _pushLog({ type: 'error', text: 'Stopped by user' });
+      _update({ commandStatus: 'failure' });
+    } else {
+      _pushLog({ type: 'error', text: String(err) });
+      _update({ commandStatus: 'failure' });
+    }
+  } finally {
+    _update({ running: false, activeCommand: null });
+    _controller = null;
+  }
+}
+
+function _stop() {
+  _controller?.abort();
+}
+
+function _clear() {
+  _update({ logs: [], commandStatus: null, summary: null, startedAt: null });
+}
+
+function subscribe(cb: () => void) {
+  _listeners.add(cb);
+  return () => { _listeners.delete(cb); };
+}
+function getSnapshot() { return _state; }
+const serverSnapshot: SetupStore = { logs: [], running: false, activeCommand: null, commandStatus: null, summary: null, startedAt: null };
+function getServerSnapshot() { return serverSnapshot; }
+
+// ---------------------------------------------------------------------------
+//  Helpers
+// ---------------------------------------------------------------------------
+
 function formatElapsed(ms: number): string {
   const total = Math.floor(ms / 1000);
   if (total < 60) return `${total}s`;
   return `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, '0')}s`;
 }
 
-/** Formats a duration in ms as `820ms`, `1.2s`, or `2m 05s`. */
 function formatDuration(ms: number): string {
   if (!ms) return '-';
   if (ms < 1000) return `${ms}ms`;
@@ -55,109 +170,43 @@ function formatDuration(ms: number): string {
   return `${Math.floor(s / 60)}m ${String(Math.round(s % 60)).padStart(2, '0')}s`;
 }
 
-/** Determines the CSS color class for a single log line.
- * Handles both vitest ([FAIL]/[PASS]) and Playwright (× / ✓ / Error:) output formats. */
 function logLineClass(e: LogEntry): string {
   if (e.type === 'error') return 'text-red-400';
   if (e.type === 'start') return 'text-orange-400 font-semibold';
   if (e.type === 'done')  return 'text-green-400 font-semibold';
   const t = e.text;
-  // Vitest markers
   if (t.includes('[FAIL]') || /\bFAILED\b/.test(t))         return 'text-red-400';
   if (t.includes('[WARN]'))                                   return 'text-yellow-400';
   if (t.includes('[PASS]') || /\bPASSED\b/.test(t))         return 'text-green-400';
   if (t.includes('[SKIP]'))                                   return 'text-gray-500';
-  // Playwright: numbered failure lines "  1) [chromium] ›…"
   if (/^\s+\d+\)\s/.test(t))                                 return 'text-red-400';
-  // Playwright: Error / exception type lines
   if (/\b(Error|AssertionError|SecurityError|TimeoutError|TypeError|ReferenceError)[\s:]/.test(t)) return 'text-red-400';
-  // Playwright: × failure marker and ✓ pass marker
   if (/[×✘]/.test(t))                                        return 'text-red-400';
   if (/[✓✔]/.test(t))                                        return 'text-green-400';
   return 'text-gray-300';
 }
 
-export default function SetupPage() {
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [running, setRunning] = useState(false);
-  const [activeCommand, setActiveCommand] = useState<string | null>(null);
-  const [commandStatus, setCommandStatus] = useState<null | 'success' | 'failure'>(null);
-  const logsEndRef = useRef<HTMLDivElement>(null);
-  const [logsLoaded, setLogsLoaded] = useState(false);
-  const [pendingConfirm, setPendingConfirm] = useState<CommandDef | null>(null);
-  const [startedAt, setStartedAt] = useState<number | null>(null);
-  const [now, setNow] = useState<number>(() => Date.now());
-  // Structured test results from the SSE `summary` event (test commands only).
-  const [summary, setSummary] = useState<TestSummaryData | null>(null);
+// ---------------------------------------------------------------------------
+//  Component
+// ---------------------------------------------------------------------------
 
-  // Tick a live clock while a command runs so the elapsed time updates.
+export default function SetupPage() {
+  const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const { logs, running, activeCommand, commandStatus, summary, startedAt } = state;
+
+  const logsEndRef = useRef<HTMLDivElement>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<CommandDef | null>(null);
+  const [now, setNow] = useState<number>(() => Date.now());
+
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(id);
   }, [running]);
 
-  // Restore logs from sessionStorage on mount.
-  // setLogs + setLogsLoaded are batched by React 18 into one render,
-  // so the persist effect below never runs with stale [] before load completes.
-  useEffect(() => {
-    const saved = sessionStorage.getItem(SETUP_LOGS_KEY);
-    if (saved) {
-      try { setLogs(JSON.parse(saved)); } catch { /* ignore corrupt data */ }
-    }
-    setLogsLoaded(true);
-  }, []);
-
-  // Persist logs after load is complete. Remove the key when empty (e.g. after Clear).
-  useEffect(() => {
-    if (!logsLoaded) return;
-    if (logs.length === 0) sessionStorage.removeItem(SETUP_LOGS_KEY);
-    else sessionStorage.setItem(SETUP_LOGS_KEY, JSON.stringify(logs));
-  }, [logs, logsLoaded]);
-
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
-
-  async function runCommand(commandId: string) {
-    const token = getAdminToken();
-    if (running || !token) return;
-    setRunning(true);
-    setActiveCommand(commandId);
-    setCommandStatus(null);
-    setSummary(null);
-    setLogs([]);
-    setStartedAt(Date.now());
-    setNow(Date.now());
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/admin/run`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ command: commandId }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: res.statusText }));
-        setLogs([{ type: 'error', text: (err as { error?: string }).error ?? 'Request failed' }]);
-        setCommandStatus('failure');
-        return;
-      }
-      await readSSE(
-        res,
-        (type, text) => {
-          if (type === 'done') {
-            const match = /code\s+(\d+)/i.exec(text);
-            setCommandStatus(match?.[1] === '0' ? 'success' : 'failure');
-          }
-          setLogs((prev) => [...prev, { type: type as LogEntry['type'], text }]);
-        },
-        (s) => setSummary(s),
-      );
-    } finally {
-      setNow(Date.now()); // freeze elapsed at the final value
-      setRunning(false);
-      setActiveCommand(null);
-    }
-  }
 
   function handleRun(id: string) {
     const cmd = COMMANDS.find((c) => c.id === id);
@@ -165,20 +214,17 @@ export default function SetupPage() {
       setPendingConfirm(cmd);
       return;
     }
-    runCommand(id);
+    _runCommand(id);
   }
 
   const setupCmds  = COMMANDS.filter((c) => c.group === 'setup');
   const testCmds   = COMMANDS.filter((c) => c.group === 'test');
   const dangerCmds = COMMANDS.filter((c) => c.group === 'danger');
 
-  const elapsedMs = startedAt ? Math.max(0, now - startedAt) : 0;
-  // Latest meaningful line drives the "current activity" label.
+  const elapsedMs = startedAt ? Math.max(0, (running ? now : Date.now()) - startedAt) : 0;
   const currentStep =
     [...logs].reverse().find((e) => e.type !== 'done' && e.text.trim())?.text ?? 'Starting…';
 
-  // The summary panel shows once the run finishes and a structured summary arrived
-  // (only test commands emit one; see ADR-026).
   const testSummary = !running && summary ? summary : null;
 
   return (
@@ -204,7 +250,8 @@ export default function SetupPage() {
               running={running}
               elapsedMs={elapsedMs}
               currentStep={currentStep}
-              onClear={() => { setLogs([]); setCommandStatus(null); setStartedAt(null); }}
+              onClear={_clear}
+              onStop={_stop}
               onDownload={() => downloadText(`setup-${activeCommand ?? 'output'}-${Date.now()}.txt`, logs.map((e) => e.text).join('\n'))}
             />
           </div>
@@ -217,7 +264,7 @@ export default function SetupPage() {
           onConfirm={() => {
             const id = pendingConfirm.id;
             setPendingConfirm(null);
-            runCommand(id);
+            _runCommand(id);
           }}
           onCancel={() => setPendingConfirm(null)}
         />
@@ -266,12 +313,13 @@ function CommandGroup({ label, cmds, activeCommand, running, onRun }: {
   );
 }
 
-function LogPanel({ title, logs, endRef, onClear, onDownload, status, running, elapsedMs, currentStep }: {
+function LogPanel({ title, logs, endRef, onClear, onDownload, onStop, status, running, elapsedMs, currentStep }: {
   title: string;
   logs: LogEntry[];
   endRef: React.RefObject<HTMLDivElement | null>;
   onClear: () => void;
   onDownload: () => void;
+  onStop: () => void;
   status: null | 'success' | 'failure';
   running: boolean;
   elapsedMs: number;
@@ -292,6 +340,15 @@ function LogPanel({ title, logs, endRef, onClear, onDownload, status, running, e
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-950">
         <span className="text-xs font-mono text-gray-400 truncate">{title}</span>
         <div className="flex items-center gap-3 ml-2 flex-shrink-0">
+          {running && (
+            <button
+              onClick={onStop}
+              className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
+              title="Stop running command"
+            >
+              <Square size={10} /> Stop
+            </button>
+          )}
           <button
             onClick={handleCopy}
             disabled={logs.length === 0}
@@ -425,7 +482,6 @@ function TestSummary({ summary, status }: {
   status: null | 'success' | 'failure';
 }) {
   const { tool, total, passed, failed, skipped, durationMs, failures } = summary;
-  // Trust the structured count; fall back to the process exit status if absent.
   const ok = failed === 0 && status !== 'failure';
 
   return (
