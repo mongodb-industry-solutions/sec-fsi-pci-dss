@@ -61,7 +61,7 @@ async function _start() {
         if (!line.startsWith('data: ')) continue;
         try {
           const payload = JSON.parse(line.slice(6)) as { text?: string };
-          if (payload.text) _push({ type: 'stdout', text: payload.text });
+          if (payload.text) _push({ type: 'log', text: payload.text });
         } catch { /* skip malformed */ }
       }
     }
