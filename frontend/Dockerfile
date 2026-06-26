@@ -15,6 +15,10 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
+# node:20-alpine ships a built-in `node` user (uid 1000).
+RUN chown -R node:node /app
+USER node
+
 EXPOSE 8080
 ENV NODE_ENV=production
 

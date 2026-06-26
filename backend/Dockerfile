@@ -60,9 +60,15 @@ RUN if [ ! -f backend/data/parties.json ]; then \
 # Compile backend TypeScript
 RUN cd backend && npm run build
 
+# ── Runtime (non-root) ────────────────────────────────────────────
+# node:20-slim ships a built-in `node` user (uid 1000).
+# test-results/ needs write access for vitest JSON reporter.
+RUN mkdir -p /app/test-results && chown -R node:node /app
+
+USER node
+
 EXPOSE 8080
 
-# ts-node retained for: npm run seed / npm run setup:db inside the container
 ENV NODE_ENV=production
 ENV PSP_SEED_DATA_DIR=/app/backend/data
 ENV PSP_PROJECT_ROOT=/app
