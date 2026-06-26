@@ -27,7 +27,7 @@
     "test:watch": "vitest watch",
     "deploy": "npm run deploy:kube",
     "deploy:docker": "docker compose up --build",
-    "deploy:kube": "tsx backend/bin/kube.ts",
+    "deploy:kube": "tsx tools/kube.ts",
     "type-check": "tsc --noEmit --project backend/tsconfig.json && tsc --noEmit --project frontend/tsconfig.json"
   },
   "devDependencies": {
