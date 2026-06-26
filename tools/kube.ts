@@ -33,6 +33,11 @@ const HELM_REPO_URL = process.env.KUBE_HELM_REPO_URL ?? "https://10gen.github.io
 const HELM_CHART_VERSION = process.env.KUBE_HELM_CHART_VERSION ?? "4.25.0";
 const DRONE_URL = process.env.KUBE_DRONE_URL ?? "https://drone.corp.mongodb.com";
 
+// kanopy-oidc creates kubectl contexts without the protocol prefix
+function contextName(apiUrl: string): string {
+  return apiUrl.replace(/^https?:\/\//, "");
+}
+
 const DEMO_NAME = process.env.KUBE_DEMO_NAME ?? "sec-fsi-pci-dss";
 const RELEASE_BACKEND = process.env.KUBE_RELEASE_BACKEND ?? `${DEMO_NAME}-backend`;
 const RELEASE_FRONTEND = process.env.KUBE_RELEASE_FRONTEND ?? `${DEMO_NAME}-frontend`;
@@ -291,7 +296,7 @@ async function switchContext() {
   const target = input === "2" ? PROD_API : STAGING_API;
   const kubeconfig = `${join(KUBE_DIR, "config.staging")}${IS_WIN ? ";" : ":"}${join(KUBE_DIR, "config.prod")}`;
   const env = { ...process.env, KUBECONFIG: kubeconfig };
-  spawnSync("kubectl", ["config", "use-context", target], { shell: true, stdio: "inherit", env });
+  spawnSync("kubectl", ["config", "use-context", contextName(target)], { shell: true, stdio: "inherit", env });
   spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "inherit", env });
   ok(`Switched to ${target} / ${IST_NAMESPACE}`);
 }
@@ -324,7 +329,7 @@ async function createSecrets() {
 
   action(`Switching context to ${apiServer}...`);
   const env = kubeEnv();
-  spawnSync("kubectl", ["config", "use-context", apiServer], { shell: true, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "use-context", contextName(apiServer)], { shell: true, stdio: "pipe", env });
   spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
 
   if (!existsSync(ENV_PATH)) { fail(`.env not found at ${ENV_PATH}`); return; }
@@ -381,7 +386,7 @@ async function manageSecretKeys() {
   const env = kubeEnv();
 
   action(`Switching context to ${apiServer}...`);
-  spawnSync("kubectl", ["config", "use-context", apiServer], { shell: true, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "use-context", contextName(apiServer)], { shell: true, stdio: "pipe", env });
   spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
 
   console.log(`\n  Secret: ${CYAN}${secretName}${NC}\n`);
@@ -497,7 +502,7 @@ async function extractDroneSecrets() {
   const env = kubeEnv();
 
   action("Switching to staging context...");
-  spawnSync("kubectl", ["config", "use-context", STAGING_API], { shell: true, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "use-context", contextName(STAGING_API)], { shell: true, stdio: "pipe", env });
   spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
 
   console.log("\n--- staging_kubernetes_token ---");
@@ -551,7 +556,7 @@ async function configureDroneSecrets() {
   const env = kubeEnv();
   const clusterSecrets: Array<{ name: string; value: string }> = [];
 
-  spawnSync("kubectl", ["config", "use-context", STAGING_API], { shell: true, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "use-context", contextName(STAGING_API)], { shell: true, stdio: "pipe", env });
   spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
 
   const stagingToken = decodeB64(runCapture(`kubectl get secret kanopy-cicd-token -o jsonpath="{.data.token}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`).stdout);
