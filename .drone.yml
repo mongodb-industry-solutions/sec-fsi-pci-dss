@@ -58,7 +58,7 @@ steps:
         - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-backend
         - ingress.enabled=true
         - ingress.hosts[0]=sec-fsi-pci-dss-backend.industrysolutions.staging.corp.mongodb.com
-        - mesh.enabled=true
+        - mesh.enabled=false
       api_server: https://api.staging.corp.mongodb.com
       kubernetes_token:
         from_secret: staging_kubernetes_token
@@ -146,7 +146,7 @@ steps:
         - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-backend
         - ingress.enabled=true
         - ingress.hosts[0]=sec-fsi-pci-dss-backend.industrysolutions.prod.corp.mongodb.com
-        - mesh.enabled=true
+        - mesh.enabled=false
       api_server: https://api.prod.corp.mongodb.com
       kubernetes_token:
         from_secret: prod_kubernetes_token

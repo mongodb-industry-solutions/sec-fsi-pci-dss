@@ -313,6 +313,8 @@ function kubeEnv(): NodeJS.ProcessEnv {
   return { ...process.env, KUBECONFIG: `${join(KUBE_DIR, "config.staging")}${IS_WIN ? ";" : ":"}${join(KUBE_DIR, "config.prod")}` };
 }
 
+const KSEC_EXCLUDE_PREFIXES = ["KANOPY_"];
+
 async function createSecrets() {
   console.log("\nCreate ksec secrets for which environment?");
   console.log("  1. staging (default)\n  2. production");
@@ -326,12 +328,34 @@ async function createSecrets() {
   spawnSync("kubectl", ["config", "use-context", apiServer], { shell: true, stdio: "pipe", env });
   spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
 
-  console.log(`\nPushing .env to secret '${secretName}'...`);
+  if (!existsSync(ENV_PATH)) { fail(`.env not found at ${ENV_PATH}`); return; }
+
+  const filtered = readFileSync(ENV_PATH, "utf-8")
+    .split(/\r?\n/)
+    .filter((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || /^[#;]/.test(trimmed)) return false;
+      const eq = trimmed.indexOf("=");
+      if (eq === -1) return false;
+      const key = trimmed.slice(0, eq).trim();
+      if (!key) return false;
+      return !KSEC_EXCLUDE_PREFIXES.some((p) => key.startsWith(p));
+    })
+    .join("\n");
+
+  const tmpPath = join(PROJECT_ROOT, ".env.ksec.tmp");
+  writeFileSync(tmpPath, filtered, "utf-8");
+
+  const excluded = KSEC_EXCLUDE_PREFIXES.map((p) => `${p}*`).join(", ");
+  console.log(`\nPushing .env to secret '${secretName}' (excluding ${excluded})...`);
   console.log(`  Source: ${ENV_PATH}\n`);
 
-  const cmd = `helm ksec push "${ENV_PATH}" ${secretName}`;
+  const cmd = `helm ksec push "${tmpPath}" ${secretName}`;
   console.log(`${DIM}[cmd]    ${cmd}${NC}`);
   const result = spawnSync(cmd, { shell: true, stdio: "inherit", env });
+
+  try { require("fs").unlinkSync(tmpPath); } catch { /* cleanup best-effort */ }
+
   result.status === 0 ? ok(`Secret '${secretName}' updated from .env`) : fail("Failed to push secret.");
 }
 
@@ -346,6 +370,55 @@ async function getSecret() {
   console.log(`    - ${KSEC_SECRET_PROD} (production)\n`);
   const name = (await ask(`Secret name (default: ${KSEC_SECRET_STAGING}): `)) || KSEC_SECRET_STAGING;
   spawnSync("helm", ["ksec", "get", name], { shell: true, stdio: "inherit", env: kubeEnv() });
+}
+
+async function manageSecretKeys() {
+  console.log(`\n${CYAN}=== Manage ksec secret keys ===${NC}\n`);
+  console.log("  1. staging (default)\n  2. production");
+  const envInput = await ask("Environment: ");
+  const isProd = envInput === "2";
+  const secretName = isProd ? KSEC_SECRET_PROD : KSEC_SECRET_STAGING;
+  const apiServer = isProd ? PROD_API : STAGING_API;
+  const env = kubeEnv();
+
+  action(`Switching context to ${apiServer}...`);
+  spawnSync("kubectl", ["config", "use-context", apiServer], { shell: true, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
+
+  console.log(`\n  Secret: ${CYAN}${secretName}${NC}\n`);
+  console.log("  1. Set/overwrite a key");
+  console.log("  2. Delete a key");
+  console.log("  3. Delete entire secret\n");
+  const opInput = await ask("Operation: ");
+
+  if (opInput === "1") {
+    const key = await ask("Key name: ");
+    if (!key) { warn("Key is required."); return; }
+    const value = await ask("Value: ");
+    if (!value) { warn("Value is required."); return; }
+    const cmd = `helm ksec set ${secretName} ${key}="${value}"`;
+    console.log(`${DIM}[cmd]    ${cmd}${NC}`);
+    const result = spawnSync(cmd, { shell: true, stdio: "inherit", env });
+    result.status === 0 ? ok(`Key '${key}' set in ${secretName}`) : fail("Failed to set key.");
+  } else if (opInput === "2") {
+    const key = await ask("Key to delete: ");
+    if (!key) { warn("Key is required."); return; }
+    const confirm = await ask(`Delete '${key}' from ${secretName}? (y/N): `);
+    if (confirm.toLowerCase() !== "y") { warn("Aborted."); return; }
+    const cmd = `helm ksec unset ${secretName} ${key}`;
+    console.log(`${DIM}[cmd]    ${cmd}${NC}`);
+    const result = spawnSync(cmd, { shell: true, stdio: "inherit", env });
+    result.status === 0 ? ok(`Key '${key}' deleted from ${secretName}`) : fail("Failed to delete key.");
+  } else if (opInput === "3") {
+    const confirm = await ask(`${RED}Delete ENTIRE secret '${secretName}'?${NC} (type secret name to confirm): `);
+    if (confirm !== secretName) { warn("Aborted — name did not match."); return; }
+    const cmd = `helm ksec delete ${secretName}`;
+    console.log(`${DIM}[cmd]    ${cmd}${NC}`);
+    const result = spawnSync(cmd, { shell: true, stdio: ["pipe", "inherit", "inherit"], input: "y\n", env });
+    result.status === 0 ? ok(`Secret '${secretName}' deleted. Use option 10 to recreate from .env.`) : fail("Failed to delete secret.");
+  } else {
+    warn("Invalid option.");
+  }
 }
 
 // ============================================================
@@ -405,13 +478,6 @@ async function resourceUsage() {
 //  5. DRONE CI
 // ============================================================
 
-const DRONE_SECRET_EXCLUDE_PREFIXES = ["KANOPY_", "MONGODB_CRYPT_SHARED_LIB"];
-const DRONE_SECRET_EXCLUDE_KEYS = new Set([
-  "PSP_CORS_ORIGIN",   // differs per env, set in Helm values
-  "PSP_URL_FRONTEND",  // differs per env, set in Helm values
-  "NODE_ENV",          // set by Dockerfile / Helm values
-]);
-
 function getDroneRepo(): string {
   try {
     const remote = execSync("git remote get-url origin", { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
@@ -425,31 +491,6 @@ function decodeB64(raw: string): string {
   const cleaned = raw.replace(/"/g, "").trim();
   if (!cleaned) return "";
   return Buffer.from(cleaned, "base64").toString("utf-8").trim();
-}
-
-function droneSecretAdd(repo: string, name: string, value: string): boolean {
-  const result = spawnSync("drone", ["secret", "add", "--repository", repo, "--name", name, "--data", value], {
-    shell: true, encoding: "utf-8", stdio: "pipe",
-  });
-  return result.status === 0;
-}
-
-function readEnvSecrets(): Array<{ key: string; value: string }> {
-  if (!existsSync(ENV_PATH)) return [];
-  const entries: Array<{ key: string; value: string }> = [];
-  for (const line of readFileSync(ENV_PATH, "utf-8").split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || /^[#;]/.test(trimmed)) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).trim();
-    if (!value) continue;
-    if (DRONE_SECRET_EXCLUDE_KEYS.has(key)) continue;
-    if (DRONE_SECRET_EXCLUDE_PREFIXES.some((p) => key.startsWith(p))) continue;
-    entries.push({ key, value });
-  }
-  return entries;
 }
 
 async function extractDroneSecrets() {
@@ -530,33 +571,25 @@ async function configureDroneSecrets() {
   if (prodToken) clusterSecrets.push({ name: "prod_kubernetes_token", value: prodToken });
   else warn("Could not extract prod_kubernetes_token");
 
-  // ── 2. App secrets from .env (filtered) ──────────────────────
-  const envSecrets = readEnvSecrets();
-
   // ── Summary before push ──────────────────────────────────────
+  // Only CI/CD infra secrets belong in Drone. App secrets reach the pod via ksec
+  // (option 10) and the envSecrets section in environments/*.yaml.
   console.log(`\n${CYAN}Secrets to configure:${NC}\n`);
-  console.log("  Cluster secrets (from kubectl):");
   for (const s of clusterSecrets) {
     console.log(`    ${GREEN}+${NC} ${s.name}  ${DIM}(${s.value.substring(0, 12)}...)${NC}`);
   }
-  console.log(`\n  App secrets (from .env, excluding ${DRONE_SECRET_EXCLUDE_PREFIXES.join(", ")}*):`);
-  for (const s of envSecrets) {
-    const preview = s.value.length > 20 ? `${s.value.substring(0, 20)}...` : s.value;
-    console.log(`    ${GREEN}+${NC} ${s.key}  ${DIM}(${preview})${NC}`);
-  }
 
-  const total = clusterSecrets.length + envSecrets.length;
-  if (total === 0) { warn("No secrets to push."); return; }
+  if (clusterSecrets.length === 0) { warn("No secrets to push."); return; }
 
   console.log("");
-  const confirm = await ask(`Push ${total} secrets to ${repo}? (y/N): `);
+  const confirm = await ask(`Push ${clusterSecrets.length} secrets to ${repo}? (y/N): `);
   if (confirm.toLowerCase() !== "y") { warn("Aborted."); return; }
 
-  // ── 3. Push all ──────────────────────────────────────────────
+  // ── 2. Push ─────────────────────────────────────────────────
   let pushed = 0, failed_count = 0;
   const droneEnv = { ...process.env, DRONE_SERVER: process.env.DRONE_SERVER || DRONE_URL };
 
-  for (const s of [...clusterSecrets, ...envSecrets.map((e) => ({ name: e.key, value: e.value }))]) {
+  for (const s of clusterSecrets) {
     const result = spawnSync("drone", ["secret", "add", "--repository", repo, "--name", s.name, "--data", s.value], {
       shell: true, encoding: "utf-8", stdio: "pipe", env: droneEnv,
     });
@@ -693,6 +726,148 @@ async function preDeployChecklist() {
 }
 
 // ============================================================
+//  8. MESH / CORS FIX
+// ============================================================
+
+const BACKEND_SVC_URL = `http://${RELEASE_BACKEND}-web-app:8080`;
+
+async function applyMeshBypass() {
+  const dronePath = join(PROJECT_ROOT, ".drone.yml");
+  if (!existsSync(dronePath)) { fail(".drone.yml not found"); return; }
+
+  let content = readFileSync(dronePath, "utf-8");
+  const eol = content.includes("\r\n") ? "\r\n" : "\n";
+
+  const patterns = [
+    { label: "deploy-backend-staging",    find: `${STAGING_HOST_BE}${eol}        - mesh.enabled=true`,  replace: `${STAGING_HOST_BE}${eol}        - mesh.enabled=false` },
+    { label: "deploy-backend-production", find: `${PROD_HOST_BE}${eol}        - mesh.enabled=true`,    replace: `${PROD_HOST_BE}${eol}        - mesh.enabled=false` },
+  ];
+
+  let changes = 0;
+  for (const p of patterns) {
+    if (content.includes(p.find)) {
+      content = content.replace(p.find, p.replace);
+      console.log(`  ${GREEN}[change]${NC} ${p.label}: mesh.enabled → false`);
+      changes++;
+    } else {
+      console.log(`  ${DIM}[skip]${NC}   ${p.label}: already disabled or pattern not found`);
+    }
+  }
+
+  if (changes === 0) { ok("No changes needed — mesh is already disabled on backend."); return; }
+
+  console.log(`\n  Frontend deploy steps: unchanged (mesh stays enabled for SSO)\n`);
+  const input = await ask(`Apply ${changes} change(s) to .drone.yml? (y/N): `);
+  if (input.toLowerCase() !== "y") { warn("Aborted."); return; }
+
+  writeFileSync(dronePath, content, "utf-8");
+  ok(`.drone.yml updated (${changes} backend step(s))`);
+  console.log(`\n${CYAN}Next steps:${NC}`);
+  console.log("  1. Commit and push to the staging/main branch");
+  console.log("  2. Drone redeploys with mesh disabled on the backend");
+  console.log("  3. Verify: browser API calls should return 200, not 302");
+}
+
+async function applyApiProxy() {
+  const dronePath = join(PROJECT_ROOT, ".drone.yml");
+  const nextConfigPath = join(PROJECT_ROOT, "frontend", "next.config.js");
+  const envPaths = [
+    { label: "staging",    path: join(PROJECT_ROOT, "environments", "staging.yaml") },
+    { label: "production", path: join(PROJECT_ROOT, "environments", "production.yaml") },
+  ];
+
+  if (!existsSync(dronePath)) { fail(".drone.yml not found"); return; }
+  if (!existsSync(nextConfigPath)) { fail("frontend/next.config.js not found"); return; }
+
+  console.log(`\n${CYAN}Changes to apply:${NC}\n`);
+  console.log(`  1. ${GREEN}frontend/next.config.js${NC}`);
+  console.log(`     Add rewrites() that proxy /api/* and /health to the backend pod`);
+  console.log(`     Backend URL read from PSP_BACKEND_INTERNAL_URL (runtime env)\n`);
+  console.log(`  2. ${GREEN}environments/*.yaml${NC}`);
+  console.log(`     Add env var: PSP_BACKEND_INTERNAL_URL=${BACKEND_SVC_URL}\n`);
+  console.log(`  3. ${GREEN}.drone.yml${NC}`);
+  console.log(`     Clear NEXT_PUBLIC_PSP_URL_BACKEND build arg (use same-origin)\n`);
+
+  const input = await ask("Apply all changes? (y/N): ");
+  if (input.toLowerCase() !== "y") { warn("Aborted."); return; }
+
+  // 1. Update next.config.js
+  const nextConfig = `/** @type {import('next').NextConfig} */
+const nextConfig = {
+    allowedDevOrigins: ['127.0.0.1', 'localhost'],
+    async rewrites() {
+        const backend = process.env.PSP_BACKEND_INTERNAL_URL;
+        if (!backend) return [];
+        return [
+            { source: '/api/:path*', destination: \`\${backend}/api/:path*\` },
+            { source: '/health', destination: \`\${backend}/health\` },
+        ];
+    },
+};
+module.exports = nextConfig;
+`;
+  writeFileSync(nextConfigPath, nextConfig, "utf-8");
+  ok("frontend/next.config.js updated with API proxy rewrites");
+
+  // 2. Add PSP_BACKEND_INTERNAL_URL to environment yamls
+  for (const env of envPaths) {
+    if (!existsSync(env.path)) { warn(`${env.path} not found, skipping`); continue; }
+    let content = readFileSync(env.path, "utf-8");
+    if (content.includes("PSP_BACKEND_INTERNAL_URL")) {
+      console.log(`  ${DIM}[skip]${NC} ${env.label}: PSP_BACKEND_INTERNAL_URL already present`);
+      continue;
+    }
+    content = content.replace(
+      /^(  PSP_URL_FRONTEND:.*$)/m,
+      `$1\n  PSP_BACKEND_INTERNAL_URL: "${BACKEND_SVC_URL}"`,
+    );
+    writeFileSync(env.path, content, "utf-8");
+    ok(`environments/${env.label}.yaml: added PSP_BACKEND_INTERNAL_URL`);
+  }
+
+  // 3. Clear NEXT_PUBLIC_PSP_URL_BACKEND build arg in .drone.yml
+  let drone = readFileSync(dronePath, "utf-8");
+  let droneChanges = 0;
+  const buildArgRe = /^(\s+- NEXT_PUBLIC_PSP_URL_BACKEND=).+$/gm;
+  drone = drone.replace(buildArgRe, () => { droneChanges++; return "$1"; });
+  if (droneChanges > 0) {
+    // The replacement above uses a literal "$1" — fix with a proper approach
+    drone = readFileSync(dronePath, "utf-8");
+    drone = drone.replace(
+      /(\s+- NEXT_PUBLIC_PSP_URL_BACKEND=)https:\/\/[^\n\r]+/g,
+      "$1",
+    );
+    writeFileSync(dronePath, drone, "utf-8");
+    ok(`.drone.yml: cleared NEXT_PUBLIC_PSP_URL_BACKEND build arg (${droneChanges} steps)`);
+  } else {
+    console.log(`  ${DIM}[skip]${NC} .drone.yml: build arg already empty or not found`);
+  }
+
+  console.log(`\n${CYAN}Next steps:${NC}`);
+  console.log("  1. For local dev, set PSP_BACKEND_INTERNAL_URL=http://localhost:8081 in .env");
+  console.log("  2. Commit and push to the staging/main branch");
+  console.log("  3. Drone rebuilds the frontend with same-origin API calls");
+  console.log("  4. Frontend pod proxies /api/* to the backend pod internally");
+}
+
+async function fixMesh302() {
+  console.log(`\n${CYAN}=== Fix Mesh 302 — Backend OIDC Bypass ===${NC}\n`);
+  console.log("  The Kanopy mesh enforces OIDC/SSO on every ingress host.");
+  console.log("  The frontend's mesh session cookie does not apply to the backend");
+  console.log("  domain, so browser API calls get a 302 redirect to DEX login.\n");
+  console.log(`  1. ${GREEN}Disable mesh on backend ingress (recommended)${NC}`);
+  console.log("     Sets mesh.enabled=false for backend in .drone.yml.");
+  console.log("     Safe: the backend has its own JWT auth middleware.\n");
+  console.log("  2. Next.js API proxy");
+  console.log("     Routes all /api/* calls through the frontend server-side.");
+  console.log("     Browser calls same-origin; frontend proxies to backend pod.\n");
+  const input = await ask("Strategy (default: 1): ");
+
+  if (input === "2") { await applyApiProxy(); }
+  else { await applyMeshBypass(); }
+}
+
+// ============================================================
 //  MAIN MENU
 // ============================================================
 
@@ -715,23 +890,26 @@ const MENU = `
   10. Create/update ksec secrets
   11. List ksec secrets
   12. Get ksec secret values
+  13. Manage secret keys (set/delete)
   --- Deployment ---
-  13. Get pods (this demo)
-  14. Get all resources (pods/deploy/svc/ingress)
-  15. View pod logs
-  16. Helm release status
-  17. Rollout restart
-  18. Resource usage (top)
+  14. Get pods (this demo)
+  15. Get all resources (pods/deploy/svc/ingress)
+  16. View pod logs
+  17. Helm release status
+  18. Rollout restart
+  19. Resource usage (top)
   --- Drone CI ---
-  19. Extract Drone secrets (view only)
-  20. Configure Drone secrets (extract + push)
-  21. Show Drone/deployment info
+  20. Extract Drone secrets (view only)
+  21. Configure Drone secrets (extract + push)
+  22. Show Drone/deployment info
   --- Diagnostics ---
-  22. Describe pod
-  23. Exec into pod (shell)
-  24. Check env vars in pod
-  25. Test staging/prod URLs
-  26. Pre-deployment checklist
+  23. Describe pod
+  24. Exec into pod (shell)
+  25. Check env vars in pod
+  26. Test staging/prod URLs
+  27. Pre-deployment checklist
+  --- Fix ---
+  28. Fix mesh 302 (disable mesh / API proxy)
   --- ---
   0.  Exit
 `;
@@ -759,22 +937,24 @@ async function main() {
       case "10": await createSecrets(); break;
       case "11": await listSecrets(); break;
       case "12": await getSecret(); break;
-      case "13": await getPods(); break;
-      case "14": await getAll(); break;
-      case "15": await podLogs(); break;
-      case "16": await helmStatus(); break;
-      case "17": await rolloutRestart(); break;
-      case "18": await resourceUsage(); break;
-      case "19": await extractDroneSecrets(); break;
-      case "20": await configureDroneSecrets(); break;
-      case "21": await showDroneInfo(); break;
-      case "22": await describePod(); break;
-      case "23": await execIntoPod(); break;
-      case "24": await checkEnvVars(); break;
-      case "25": await testUrls(); break;
-      case "26": await preDeployChecklist(); break;
+      case "13": await manageSecretKeys(); break;
+      case "14": await getPods(); break;
+      case "15": await getAll(); break;
+      case "16": await podLogs(); break;
+      case "17": await helmStatus(); break;
+      case "18": await rolloutRestart(); break;
+      case "19": await resourceUsage(); break;
+      case "20": await extractDroneSecrets(); break;
+      case "21": await configureDroneSecrets(); break;
+      case "22": await showDroneInfo(); break;
+      case "23": await describePod(); break;
+      case "24": await execIntoPod(); break;
+      case "25": await checkEnvVars(); break;
+      case "26": await testUrls(); break;
+      case "27": await preDeployChecklist(); break;
+      case "28": await fixMesh302(); break;
       case "0": console.log("\nGoodbye."); rl.close(); process.exit(0);
-      default: warn("Invalid option. Enter 1-26 or 0.");
+      default: warn("Invalid option.");
     }
 
     if (choice !== "0") await pause();
