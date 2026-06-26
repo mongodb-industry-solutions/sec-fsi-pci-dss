@@ -9,7 +9,7 @@ ENV NEXT_PUBLIC_PSP_URL_BACKEND=$NEXT_PUBLIC_PSP_URL_BACKEND
 
 # Install dependencies (layer cached unless package.json changes)
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 # Copy source and build
 COPY . .
