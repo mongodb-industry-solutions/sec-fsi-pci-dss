@@ -1,90 +1,115 @@
 'use client';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useSyncExternalStore } from 'react';
 import { API_BASE_URL } from '../../../../lib/constants';
 import { getAdminToken, LogEntry, downloadText } from '../../../../lib/adminHelpers';
 import { Download, Copy, CheckCheck, Play, Square } from 'lucide-react';
 
+// ---------------------------------------------------------------------------
+//  Module-level stream manager — persists across tab switches (mount/unmount)
+// ---------------------------------------------------------------------------
+
 const LOGS_KEY = 'admin_server_logs';
+const MAX_LOGS = 1000;
+const PERSIST_LIMIT = 500;
+
+let _logs: LogEntry[] = (() => {
+  if (typeof window === 'undefined') return [];
+  try { return JSON.parse(sessionStorage.getItem(LOGS_KEY) ?? '[]'); } catch { return []; }
+})();
+let _streaming = false;
+let _controller: AbortController | null = null;
+const _listeners = new Set<() => void>();
+
+function _notify() { _listeners.forEach((fn) => fn()); }
+
+function _push(entry: LogEntry) {
+  _logs = [..._logs.slice(-(MAX_LOGS - 1)), entry];
+  sessionStorage.setItem(LOGS_KEY, JSON.stringify(_logs.slice(-PERSIST_LIMIT)));
+  _notify();
+}
+
+async function _start() {
+  const token = getAdminToken();
+  if (!token || _streaming) return;
+
+  _controller = new AbortController();
+  _streaming = true;
+  _notify();
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/admin/logs`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: _controller.signal,
+    });
+    if (!res.ok || !res.body) {
+      _push({ type: 'error', text: `HTTP ${res.status}: ${res.statusText}` });
+      _streaming = false; _controller = null; _notify();
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const payload = JSON.parse(line.slice(6)) as { text?: string };
+          if (payload.text) _push({ type: 'stdout', text: payload.text });
+        } catch { /* skip malformed */ }
+      }
+    }
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'AbortError') { /* expected */ }
+    else _push({ type: 'error', text: String(err) });
+  } finally {
+    _streaming = false;
+    _controller = null;
+    _notify();
+  }
+}
+
+function _stop() {
+  _controller?.abort();
+  _controller = null;
+  _streaming = false;
+  _notify();
+}
+
+function _clear() {
+  _logs = [];
+  sessionStorage.removeItem(LOGS_KEY);
+  _notify();
+}
+
+function subscribe(cb: () => void) {
+  _listeners.add(cb);
+  return () => { _listeners.delete(cb); };
+}
+function getLogsSnapshot() { return _logs; }
+function getStreamingSnapshot() { return _streaming; }
+
+// ---------------------------------------------------------------------------
+//  Component — subscribes to the module-level store via useSyncExternalStore
+// ---------------------------------------------------------------------------
 
 export default function LogsPage() {
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [streaming, setStreaming] = useState(false);
+  const logs = useSyncExternalStore(subscribe, getLogsSnapshot, () => []);
+  const streaming = useSyncExternalStore(subscribe, getStreamingSnapshot, () => false);
+
   const [copied, setCopied] = useState(false);
   const [filter, setFilter] = useState('');
   const logsEndRef = useRef<HTMLDivElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    const saved = sessionStorage.getItem(LOGS_KEY);
-    if (saved) {
-      try { setLogs(JSON.parse(saved)); } catch { /* ignore */ }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (logs.length === 0) sessionStorage.removeItem(LOGS_KEY);
-    else sessionStorage.setItem(LOGS_KEY, JSON.stringify(logs.slice(-500)));
-  }, [logs]);
 
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
-
-  const stopStream = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setStreaming(false);
-  }, []);
-
-  const startStream = useCallback(async () => {
-    const token = getAdminToken();
-    if (!token || streaming) return;
-
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setStreaming(true);
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/admin/logs`, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal,
-      });
-      if (!res.ok || !res.body) {
-        setLogs((prev) => [...prev, { type: 'error', text: `HTTP ${res.status}: ${res.statusText}` }]);
-        setStreaming(false);
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split('\n');
-        buf = lines.pop() ?? '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          try {
-            const payload = JSON.parse(line.slice(6)) as { text?: string };
-            if (payload.text) {
-              setLogs((prev) => [...prev.slice(-999), { type: 'stdout', text: payload.text }]);
-            }
-          } catch { /* skip malformed */ }
-        }
-      }
-    } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
-      setLogs((prev) => [...prev, { type: 'error', text: String(err) }]);
-    } finally {
-      setStreaming(false);
-      abortRef.current = null;
-    }
-  }, [streaming]);
-
-  useEffect(() => () => { abortRef.current?.abort(); }, []);
 
   function handleCopy() {
     const text = logs.map((e) => e.text).join('\n');
@@ -119,7 +144,7 @@ export default function LogsPage() {
             className="bg-gray-800 text-xs text-gray-300 px-2 py-1 rounded border border-gray-700 focus:outline-none focus:border-gray-500 w-32"
           />
           <button
-            onClick={streaming ? stopStream : startStream}
+            onClick={streaming ? _stop : _start}
             className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
               streaming
                 ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30'
@@ -145,7 +170,7 @@ export default function LogsPage() {
           >
             <Download size={12} /> Download
           </button>
-          <button onClick={() => setLogs([])} className="text-xs text-gray-600 hover:text-gray-400">Clear</button>
+          <button onClick={_clear} className="text-xs text-gray-600 hover:text-gray-400">Clear</button>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-0.5 [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/70 [&::-webkit-scrollbar-corner]:bg-gray-900">
