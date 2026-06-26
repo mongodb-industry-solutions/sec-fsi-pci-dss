@@ -10,9 +10,10 @@ import { beginSSE } from '../../../shared/services/sse';
 import { resolveTestStrategy, NormalizedTestSummary } from '../services/testRunners';
 import { jwtSecret, sha256 } from '../../../vendors/encryption/digest';
 
-// __dirname = backend/src/modules/admin/controllers/ (tsx dev mode)
-// 5 levels up -> project root
-const PROJECT_ROOT = path.resolve(__dirname, '../../../../../');
+// In Docker (compiled dist/), __dirname gains an extra /dist/ level that breaks
+// the naïve 5-levels-up heuristic. PSP_PROJECT_ROOT overrides cleanly in any env.
+const PROJECT_ROOT: string = process.env.PSP_PROJECT_ROOT
+  || path.resolve(__dirname, '../../../../../');
 
 const SENSITIVE_KEY_PATTERNS = [
   /secret/i, /password/i, /passwd/i, /pass/i, /key/i,

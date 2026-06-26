@@ -1,3 +1,12 @@
+# ── PSP Backend ───────────────────────────────────────────────────
+# Build context: repo root (docker compose sets context: .)
+# Includes test infrastructure (vitest + test/) so the admin panel's
+# /admin/run endpoint can execute unit and integration tests in-container.
+#
+# E2E tests (Playwright) require browser binaries not included here.
+# To enable: RUN npx playwright install --with-deps chromium
+# ──────────────────────────────────────────────────────────────────
+
 FROM node:20-slim
 
 RUN apt-get update && \
@@ -22,31 +31,40 @@ RUN ARCH=$(dpkg --print-architecture) && \
 
 ENV MONGODB_CRYPT_SHARED_LIB_PATH=/usr/local/lib/mongo_crypt_v1.so
 ENV PORT=8080
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
-# Install dependencies first (layer cached unless package.json changes)
-COPY package*.json ./
-RUN npm ci
+# ── Dependencies ──────────────────────────────────────────────────
+# Root package.json provides test scripts and devDependencies (vitest, tsx).
+COPY package.json ./
+RUN npm install --ignore-scripts
 
-# Copy source
-COPY . .
+# Backend package.json — "fsi-pci-dss-demo": "file:.." now resolves to /app/
+COPY backend/package.json backend/
+RUN cd backend && npm install
+
+# ── Source & test infrastructure ──────────────────────────────────
+COPY backend/ backend/
+COPY test/ test/
+COPY vitest.config.ts tsconfig.base.json ./
+COPY frontend/src/ frontend/src/
+COPY frontend/tsconfig.json frontend/
 
 # Generate seed data JSON files if not present in the build context.
-# If data/parties.json already exists (pre-generated locally), this is skipped.
-# ts-node and @faker-js/faker are devDependencies available at build time.
-RUN if [ ! -f data/parties.json ]; then \
+RUN if [ ! -f backend/data/parties.json ]; then \
       echo "Generating seed data..." && \
-      npx ts-node bin/generate.ts; \
+      cd backend && npx ts-node bin/generate.ts; \
     else \
       echo "Seed data already present, skipping generation."; \
     fi
 
-# Compile TypeScript
-RUN npm run build
+# Compile backend TypeScript
+RUN cd backend && npm run build
 
 EXPOSE 8080
 
 # ts-node retained for: npm run seed / npm run setup:db inside the container
 ENV NODE_ENV=production
-ENV PSP_SEED_DATA_DIR=/app/data
+ENV PSP_SEED_DATA_DIR=/app/backend/data
+ENV PSP_PROJECT_ROOT=/app
 
-CMD ["node", "dist/bin/server.js"]
+CMD ["node", "backend/dist/bin/server.js"]
