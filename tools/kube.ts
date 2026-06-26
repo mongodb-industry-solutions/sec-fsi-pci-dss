@@ -10,12 +10,12 @@ function findProjectRoot(): string {
   try {
     return execSync("git rev-parse --show-toplevel", { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
   } catch {
-    let dir = resolve(__dirname, "../..");
+    let dir = resolve(__dirname, "..");
     while (dir !== dirname(dir)) {
       if (existsSync(join(dir, "package.json")) && existsSync(join(dir, "backend"))) return dir;
       dir = dirname(dir);
     }
-    return resolve(__dirname, "../..");
+    return resolve(__dirname, "..");
   }
 }
 
@@ -23,33 +23,32 @@ const PROJECT_ROOT = findProjectRoot();
 const ENV_PATH = join(PROJECT_ROOT, ".env");
 if (existsSync(ENV_PATH)) dotenv.config({ path: ENV_PATH });
 
-// -- Constants --
-const IST_NAMESPACE = "industrysolutions";
-const ECR_REGISTRY = "795250896452.dkr.ecr.us-east-1.amazonaws.com";
-const STAGING_API = "https://api.staging.corp.mongodb.com";
-const PROD_API = "https://api.prod.corp.mongodb.com";
-const HELM_REPO_NAME = "mongodb";
-const HELM_REPO_URL = "https://10gen.github.io/helm-charts";
-const HELM_CHART_VERSION = "4.25.0";
-const DRONE_URL = "https://drone.corp.mongodb.com";
+// -- Constants (override via KUBE_* env vars, defaults match MongoDB IST) --
+const IST_NAMESPACE = process.env.KUBE_NAMESPACE ?? "industrysolutions";
+const ECR_REGISTRY = process.env.KUBE_ECR_REGISTRY ?? "795250896452.dkr.ecr.us-east-1.amazonaws.com";
+const STAGING_API = process.env.KUBE_STAGING_API ?? "https://api.staging.corp.mongodb.com";
+const PROD_API = process.env.KUBE_PROD_API ?? "https://api.prod.corp.mongodb.com";
+const HELM_REPO_NAME = process.env.KUBE_HELM_REPO_NAME ?? "mongodb";
+const HELM_REPO_URL = process.env.KUBE_HELM_REPO_URL ?? "https://10gen.github.io/helm-charts";
+const HELM_CHART_VERSION = process.env.KUBE_HELM_CHART_VERSION ?? "4.25.0";
+const DRONE_URL = process.env.KUBE_DRONE_URL ?? "https://drone.corp.mongodb.com";
 
-const DEMO_NAME = "sec-fsi-pci-dss";
-const RELEASE_BACKEND = `${DEMO_NAME}-backend`;
-const RELEASE_FRONTEND = `${DEMO_NAME}-frontend`;
-const KSEC_SECRET_STAGING = `${DEMO_NAME}-secrets-staging`;
-const KSEC_SECRET_PROD = `${DEMO_NAME}-secrets-prod`;
+const DEMO_NAME = process.env.KUBE_DEMO_NAME ?? "sec-fsi-pci-dss";
+const RELEASE_BACKEND = process.env.KUBE_RELEASE_BACKEND ?? `${DEMO_NAME}-backend`;
+const RELEASE_FRONTEND = process.env.KUBE_RELEASE_FRONTEND ?? `${DEMO_NAME}-frontend`;
+const KSEC_SECRET_STAGING = process.env.KUBE_KSEC_SECRET_STAGING ?? `${DEMO_NAME}-secrets-staging`;
+const KSEC_SECRET_PROD = process.env.KUBE_KSEC_SECRET_PROD ?? `${DEMO_NAME}-secrets-prod`;
 
-const STAGING_HOST_BE = `${RELEASE_BACKEND}.${IST_NAMESPACE}.staging.corp.mongodb.com`;
-const STAGING_HOST_FE = `${RELEASE_FRONTEND}.${IST_NAMESPACE}.staging.corp.mongodb.com`;
-const PROD_HOST_BE = `${RELEASE_BACKEND}.${IST_NAMESPACE}.prod.corp.mongodb.com`;
-const PROD_HOST_FE = `${RELEASE_FRONTEND}.${IST_NAMESPACE}.prod.corp.mongodb.com`;
+const DOMAIN_SUFFIX = process.env.KUBE_DOMAIN_SUFFIX ?? "corp.mongodb.com";
+const STAGING_HOST_BE = process.env.KUBE_STAGING_HOST_BE ?? `${RELEASE_BACKEND}.${IST_NAMESPACE}.staging.${DOMAIN_SUFFIX}`;
+const STAGING_HOST_FE = process.env.KUBE_STAGING_HOST_FE ?? `${RELEASE_FRONTEND}.${IST_NAMESPACE}.staging.${DOMAIN_SUFFIX}`;
+const PROD_HOST_BE = process.env.KUBE_PROD_HOST_BE ?? `${RELEASE_BACKEND}.${IST_NAMESPACE}.prod.${DOMAIN_SUFFIX}`;
+const PROD_HOST_FE = process.env.KUBE_PROD_HOST_FE ?? `${RELEASE_FRONTEND}.${IST_NAMESPACE}.prod.${DOMAIN_SUFFIX}`;
 
 const HOME = homedir();
 const IS_WIN = platform() === "win32";
-const KANOPY_CONFIG_PATH = IS_WIN
-  ? join(HOME, ".kanopy", "config.yaml")
-  : join(HOME, ".kanopy", "config.yaml");
-const KUBE_DIR = join(HOME, ".kube");
+const KANOPY_CONFIG_PATH = join(HOME, process.env.KUBE_KANOPY_CONFIG_DIR ?? ".kanopy", "config.yaml");
+const KUBE_DIR = join(HOME, process.env.KUBE_CONFIG_DIR ?? ".kube");
 
 // -- Helpers --
 const GREEN = "\x1b[32m";
@@ -184,9 +183,9 @@ async function createKanopyConfig() {
     if (overwrite.toLowerCase() !== "y") return;
   }
 
-  const secret = process.env.KANOPY_CLUSTER_SECRET || "";
+  const secret = process.env.KUBE_CLUSTER_SECRET || "";
   if (!secret) {
-    fail("KANOPY_CLUSTER_SECRET is not set. Add it to your .env file.");
+    fail("KUBE_CLUSTER_SECRET is not set. Add it to your .env file.");
     return;
   }
 
@@ -313,7 +312,7 @@ function kubeEnv(): NodeJS.ProcessEnv {
   return { ...process.env, KUBECONFIG: `${join(KUBE_DIR, "config.staging")}${IS_WIN ? ";" : ":"}${join(KUBE_DIR, "config.prod")}` };
 }
 
-const KSEC_EXCLUDE_PREFIXES = ["KANOPY_"];
+const KSEC_EXCLUDE_PREFIXES = ["KUBE_"];
 
 async function createSecrets() {
   console.log("\nCreate ksec secrets for which environment?");
@@ -675,6 +674,50 @@ async function checkEnvVars() {
   spawnSync("kubectl", ["exec", `deployment/${deployment}`, "-n", IST_NAMESPACE, "--", "env"], { shell: true, stdio: "inherit", env: kubeEnv() });
 }
 
+async function getIngress() {
+  spawnSync("kubectl", ["get", "ingress", "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env: kubeEnv() });
+}
+
+async function describeIngress() {
+  const env = kubeEnv();
+  const result = spawnSync("kubectl", ["get", "ingress", "-n", IST_NAMESPACE, "-o", "name"], { shell: true, encoding: "utf-8", env });
+  const names = (result.stdout || "").split(/\r?\n/).filter(Boolean);
+  if (names.length === 0) { warn("No ingress resources found."); return; }
+
+  console.log("\nAvailable ingress resources:");
+  names.forEach((n, i) => console.log(`  ${i + 1}. ${n}`));
+  console.log(`  ${names.length + 1}. All`);
+
+  const input = await ask("Which ingress to describe? ");
+  const idx = parseInt(input, 10) - 1;
+
+  if (input === String(names.length + 1) || input.toLowerCase() === "all") {
+    for (const n of names) {
+      console.log(`\n--- ${n} ---`);
+      spawnSync("kubectl", ["describe", n, "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env });
+    }
+  } else if (idx >= 0 && idx < names.length) {
+    spawnSync("kubectl", ["describe", names[idx], "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env });
+  } else {
+    warn("Invalid selection.");
+  }
+}
+
+async function helmGetValues() {
+  console.log("\n  1. backend\n  2. frontend\n  3. both");
+  const input = await ask("Which release? ");
+  const env = kubeEnv();
+
+  const releases = input === "1" ? [RELEASE_BACKEND]
+    : input === "2" ? [RELEASE_FRONTEND]
+    : [RELEASE_BACKEND, RELEASE_FRONTEND];
+
+  for (const release of releases) {
+    console.log(`\n${CYAN}--- ${release} ---${NC}`);
+    spawnSync("helm", ["get", "values", release, "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env });
+  }
+}
+
 async function testUrls() {
   const env = kubeEnv();
   const ctx = spawnSync("kubectl", ["config", "current-context"], { shell: true, encoding: "utf-8", env }).stdout.trim();
@@ -900,8 +943,12 @@ const MENU = `
   25. Check env vars in pod
   26. Test staging/prod URLs
   27. Pre-deployment checklist
+  --- Inspect ---
+  28. Get ingress resources
+  29. Describe ingress (detail)
+  30. Helm get values (backend/frontend)
   --- Fix ---
-  28. Fix mesh 302 (Next.js API proxy)
+  31. Fix mesh 302 (Next.js API proxy)
   --- ---
   0.  Exit
 `;
@@ -944,7 +991,10 @@ async function main() {
       case "25": await checkEnvVars(); break;
       case "26": await testUrls(); break;
       case "27": await preDeployChecklist(); break;
-      case "28": await fixMesh302(); break;
+      case "28": await getIngress(); break;
+      case "29": await describeIngress(); break;
+      case "30": await helmGetValues(); break;
+      case "31": await fixMesh302(); break;
       case "0": console.log("\nGoodbye."); rl.close(); process.exit(0);
       default: warn("Invalid option.");
     }
