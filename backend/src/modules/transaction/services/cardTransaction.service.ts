@@ -636,9 +636,9 @@ export async function getMerchantTransactions(
   if (filters?.cardToken) query['paymentCardReference'] = filters.cardToken;
   if (filters?.dateFrom || filters?.dateTo) {
     const range: Record<string, Date> = {};
-    if (filters.dateFrom) range['$gte'] = new Date(filters.dateFrom);
-    if (filters.dateTo) range['$lte'] = new Date(filters.dateTo);
-    query['cardTransactionDateTime'] = range;
+    if (filters.dateFrom) { const d = new Date(filters.dateFrom); if (!isNaN(d.getTime())) range['$gte'] = d; }
+    if (filters.dateTo)   { const d = new Date(filters.dateTo);   if (!isNaN(d.getTime())) range['$lte'] = d; }
+    if (Object.keys(range).length) query['cardTransactionDateTime'] = range;
   }
   if (filters?.search) {
     const rx = { $regex: filters.search, $options: 'i' };

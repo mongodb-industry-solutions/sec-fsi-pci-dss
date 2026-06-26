@@ -1,18 +1,22 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { ServerResponse } from 'http';
 
-const allowedOrigins: string[] = (process.env.PSP_CORS_ORIGIN ?? 'http://localhost:8080')
-  .split(',')
-  .map((o) => o.trim())
-  .filter(Boolean);
+const DEFAULT_ORIGINS = ['http://localhost:8080', 'http://127.0.0.1:8080'];
+
+const rawOrigin = (process.env.PSP_CORS_ORIGIN ?? '').trim();
+const isWildcard = rawOrigin === '*';
+const allowedOrigins: string[] = isWildcard
+  ? DEFAULT_ORIGINS
+  : rawOrigin.split(',').map((o) => o.trim()).filter(Boolean);
+if (allowedOrigins.length === 0) allowedOrigins.push(...DEFAULT_ORIGINS);
 
 /**
  * Resolves the Access-Control-Allow-Origin value for a hijacked SSE response.
- * Validates the incoming Origin header against the configured PSP_CORS_ORIGIN list.
- * Falls back to the first allowed origin when no match is found.
+ * When PSP_CORS_ORIGIN='*', reflects the request origin (credentials require a
+ * specific origin, not the literal '*'). Falls back to the first allowed origin.
  */
 export function resolveSSEOrigin(requestOrigin: string | undefined): string {
-  if (requestOrigin && allowedOrigins.includes(requestOrigin)) return requestOrigin;
+  if (requestOrigin && (isWildcard || allowedOrigins.includes(requestOrigin))) return requestOrigin;
   return allowedOrigins[0];
 }
 

@@ -193,6 +193,15 @@ export async function demoController(fastify: FastifyInstance) {
       Object.assign(checks, await dbChecks(fastify.db));
     }
 
+    // Derive overall status from ALL check entries (not just the mongo ping).
+    // IETF precedence: fail > warn > pass. HTTP 503 only for fail.
+    for (const entries of Object.values(checks)) {
+      for (const e of entries) {
+        if (e.status === 'fail') overallStatus = 'fail';
+        else if (e.status === 'warn' && overallStatus === 'pass') overallStatus = 'warn';
+      }
+    }
+
     reply.header('Content-Type', 'application/health+json; charset=utf-8');
     const body = {
       status: overallStatus,
@@ -201,7 +210,7 @@ export async function demoController(fastify: FastifyInstance) {
       description: SERVICE_DESC,
       checks,
     };
-    return reply.status(overallStatus === 'pass' ? 200 : 503).send(body);
+    return reply.status(overallStatus === 'fail' ? 503 : 200).send(body);
   });
 
   // GET /api/v1/system/users
