@@ -334,8 +334,11 @@ async function createSecrets() {
     .split(/\r?\n/)
     .filter((line) => {
       const trimmed = line.trim();
-      if (!trimmed || /^[#;]/.test(trimmed)) return true;
-      const key = trimmed.split("=")[0].trim();
+      if (!trimmed || /^[#;]/.test(trimmed)) return false;
+      const eq = trimmed.indexOf("=");
+      if (eq === -1) return false;
+      const key = trimmed.slice(0, eq).trim();
+      if (!key) return false;
       return !KSEC_EXCLUDE_PREFIXES.some((p) => key.startsWith(p));
     })
     .join("\n");
@@ -367,6 +370,55 @@ async function getSecret() {
   console.log(`    - ${KSEC_SECRET_PROD} (production)\n`);
   const name = (await ask(`Secret name (default: ${KSEC_SECRET_STAGING}): `)) || KSEC_SECRET_STAGING;
   spawnSync("helm", ["ksec", "get", name], { shell: true, stdio: "inherit", env: kubeEnv() });
+}
+
+async function manageSecretKeys() {
+  console.log(`\n${CYAN}=== Manage ksec secret keys ===${NC}\n`);
+  console.log("  1. staging (default)\n  2. production");
+  const envInput = await ask("Environment: ");
+  const isProd = envInput === "2";
+  const secretName = isProd ? KSEC_SECRET_PROD : KSEC_SECRET_STAGING;
+  const apiServer = isProd ? PROD_API : STAGING_API;
+  const env = kubeEnv();
+
+  action(`Switching context to ${apiServer}...`);
+  spawnSync("kubectl", ["config", "use-context", apiServer], { shell: true, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
+
+  console.log(`\n  Secret: ${CYAN}${secretName}${NC}\n`);
+  console.log("  1. Set/overwrite a key");
+  console.log("  2. Delete a key");
+  console.log("  3. Delete entire secret\n");
+  const opInput = await ask("Operation: ");
+
+  if (opInput === "1") {
+    const key = await ask("Key name: ");
+    if (!key) { warn("Key is required."); return; }
+    const value = await ask("Value: ");
+    if (!value) { warn("Value is required."); return; }
+    const cmd = `helm ksec set ${secretName} ${key}="${value}"`;
+    console.log(`${DIM}[cmd]    ${cmd}${NC}`);
+    const result = spawnSync(cmd, { shell: true, stdio: "inherit", env });
+    result.status === 0 ? ok(`Key '${key}' set in ${secretName}`) : fail("Failed to set key.");
+  } else if (opInput === "2") {
+    const key = await ask("Key to delete: ");
+    if (!key) { warn("Key is required."); return; }
+    const confirm = await ask(`Delete '${key}' from ${secretName}? (y/N): `);
+    if (confirm.toLowerCase() !== "y") { warn("Aborted."); return; }
+    const cmd = `helm ksec unset ${secretName} ${key}`;
+    console.log(`${DIM}[cmd]    ${cmd}${NC}`);
+    const result = spawnSync(cmd, { shell: true, stdio: "inherit", env });
+    result.status === 0 ? ok(`Key '${key}' deleted from ${secretName}`) : fail("Failed to delete key.");
+  } else if (opInput === "3") {
+    const confirm = await ask(`${RED}Delete ENTIRE secret '${secretName}'?${NC} (type secret name to confirm): `);
+    if (confirm !== secretName) { warn("Aborted — name did not match."); return; }
+    const cmd = `helm ksec delete ${secretName}`;
+    console.log(`${DIM}[cmd]    ${cmd}${NC}`);
+    const result = spawnSync(cmd, { shell: true, stdio: ["pipe", "inherit", "inherit"], input: "y\n", env });
+    result.status === 0 ? ok(`Secret '${secretName}' deleted. Use option 10 to recreate from .env.`) : fail("Failed to delete secret.");
+  } else {
+    warn("Invalid option.");
+  }
 }
 
 // ============================================================
@@ -838,25 +890,26 @@ const MENU = `
   10. Create/update ksec secrets
   11. List ksec secrets
   12. Get ksec secret values
+  13. Manage secret keys (set/delete)
   --- Deployment ---
-  13. Get pods (this demo)
-  14. Get all resources (pods/deploy/svc/ingress)
-  15. View pod logs
-  16. Helm release status
-  17. Rollout restart
-  18. Resource usage (top)
+  14. Get pods (this demo)
+  15. Get all resources (pods/deploy/svc/ingress)
+  16. View pod logs
+  17. Helm release status
+  18. Rollout restart
+  19. Resource usage (top)
   --- Drone CI ---
-  19. Extract Drone secrets (view only)
-  20. Configure Drone secrets (extract + push)
-  21. Show Drone/deployment info
+  20. Extract Drone secrets (view only)
+  21. Configure Drone secrets (extract + push)
+  22. Show Drone/deployment info
   --- Diagnostics ---
-  22. Describe pod
-  23. Exec into pod (shell)
-  24. Check env vars in pod
-  25. Test staging/prod URLs
-  26. Pre-deployment checklist
+  23. Describe pod
+  24. Exec into pod (shell)
+  25. Check env vars in pod
+  26. Test staging/prod URLs
+  27. Pre-deployment checklist
   --- Fix ---
-  27. Fix mesh 302 (disable mesh / API proxy)
+  28. Fix mesh 302 (disable mesh / API proxy)
   --- ---
   0.  Exit
 `;
@@ -884,23 +937,24 @@ async function main() {
       case "10": await createSecrets(); break;
       case "11": await listSecrets(); break;
       case "12": await getSecret(); break;
-      case "13": await getPods(); break;
-      case "14": await getAll(); break;
-      case "15": await podLogs(); break;
-      case "16": await helmStatus(); break;
-      case "17": await rolloutRestart(); break;
-      case "18": await resourceUsage(); break;
-      case "19": await extractDroneSecrets(); break;
-      case "20": await configureDroneSecrets(); break;
-      case "21": await showDroneInfo(); break;
-      case "22": await describePod(); break;
-      case "23": await execIntoPod(); break;
-      case "24": await checkEnvVars(); break;
-      case "25": await testUrls(); break;
-      case "26": await preDeployChecklist(); break;
-      case "27": await fixMesh302(); break;
+      case "13": await manageSecretKeys(); break;
+      case "14": await getPods(); break;
+      case "15": await getAll(); break;
+      case "16": await podLogs(); break;
+      case "17": await helmStatus(); break;
+      case "18": await rolloutRestart(); break;
+      case "19": await resourceUsage(); break;
+      case "20": await extractDroneSecrets(); break;
+      case "21": await configureDroneSecrets(); break;
+      case "22": await showDroneInfo(); break;
+      case "23": await describePod(); break;
+      case "24": await execIntoPod(); break;
+      case "25": await checkEnvVars(); break;
+      case "26": await testUrls(); break;
+      case "27": await preDeployChecklist(); break;
+      case "28": await fixMesh302(); break;
       case "0": console.log("\nGoodbye."); rl.close(); process.exit(0);
-      default: warn("Invalid option. Enter 1-27 or 0.");
+      default: warn("Invalid option.");
     }
 
     if (choice !== "0") await pause();
