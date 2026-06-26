@@ -776,7 +776,176 @@ async function preDeployChecklist() {
 }
 
 // ============================================================
-//  8. MESH / CORS FIX
+//  8. FULL DEPLOY SETUP (per environment)
+// ============================================================
+
+async function deployEnvSetup() {
+  console.log(`\n${CYAN}=== Full Deploy Setup ===${NC}\n`);
+  console.log("  1. staging");
+  console.log("  2. production");
+  const input = await ask("Target environment: ");
+  const isProd = input === "2";
+  const envLabel = isProd ? "production" : "staging";
+  const apiServer = isProd ? PROD_API : STAGING_API;
+  const secretName = isProd ? KSEC_SECRET_PROD : KSEC_SECRET_STAGING;
+  const configFile = join(KUBE_DIR, `config.${isProd ? "prod" : "staging"}`);
+  const envYaml = join(PROJECT_ROOT, "environments", `${isProd ? "production" : "staging"}.yaml`);
+
+  let passed = 0;
+  let failed = 0;
+  const step = (label: string, ok: boolean) => {
+    if (ok) { console.log(`  ${GREEN}[OK]${NC}   ${label}`); passed++; }
+    else { console.log(`  ${RED}[FAIL]${NC} ${label}`); failed++; }
+  };
+
+  console.log(`\n${CYAN}Target: ${envLabel}${NC}\n`);
+
+  // ── Phase 1: Prerequisites ────────────────────────────────
+  console.log(`${CYAN}── 1. Prerequisites ──${NC}\n`);
+
+  step("kubectl installed", hasCommand("kubectl"));
+  step("helm installed", hasCommand("helm"));
+  step("kanopy-oidc installed", hasCommand("kanopy-oidc"));
+  step("ksec plugin installed", runCapture("helm plugin list").stdout.includes("ksec"));
+
+  if (!hasCommand("kubectl") || !hasCommand("helm") || !hasCommand("kanopy-oidc")) {
+    console.log(`\n  ${YELLOW}Missing prerequisites. Run option 1 (Full setup) first.${NC}`);
+    const fix = await ask("  Run full setup now? (y/N): ");
+    if (fix.toLowerCase() === "y") {
+      await fullSetup();
+    } else {
+      warn("Cannot continue without prerequisites."); return;
+    }
+  }
+
+  // ── Phase 2: Kanopy config ────────────────────────────────
+  console.log(`\n${CYAN}── 2. Kanopy config ──${NC}\n`);
+
+  if (existsSync(KANOPY_CONFIG_PATH)) {
+    step("Kanopy config exists", true);
+  } else {
+    step("Kanopy config exists", false);
+    const fix = await ask("  Create kanopy config now? (y/N): ");
+    if (fix.toLowerCase() === "y") await createKanopyConfig();
+  }
+
+  // ── Phase 3: Kubeconfig + login ───────────────────────────
+  console.log(`\n${CYAN}── 3. Kubeconfig (${envLabel}) ──${NC}\n`);
+
+  if (existsSync(configFile)) {
+    step(`Kubeconfig exists: ${configFile}`, true);
+  } else {
+    step(`Kubeconfig exists: ${configFile}`, false);
+    console.log(`  ${YELLOW}Generating kubeconfig for ${envLabel}...${NC}\n`);
+    const setupCmd = `kanopy-oidc kube setup ${isProd ? "prod" : "staging"}`;
+    try {
+      if (!existsSync(KUBE_DIR)) mkdirSync(KUBE_DIR, { recursive: true });
+      const output = execSync(setupCmd, { encoding: "utf-8", env: { ...process.env, KUBECONFIG: configFile } });
+      writeFileSync(configFile, output, "utf-8");
+      ok(`Kubeconfig saved at ${configFile}`);
+    } catch (e: any) {
+      fail(`Failed: ${e.message}`); return;
+    }
+  }
+
+  // Login
+  action(`Authenticating to ${envLabel}...`);
+  const loginResult = spawnSync("kanopy-oidc", ["kube", "login"], {
+    shell: true, stdio: "inherit", env: { ...process.env, KUBECONFIG: configFile },
+  });
+  step(`Login to ${envLabel}`, loginResult.status === 0);
+  if (loginResult.status !== 0) {
+    warn("Login failed. Check your credentials and retry.");
+    return;
+  }
+
+  // Switch context
+  const env = kubeEnv();
+  spawnSync("kubectl", ["config", "use-context", contextName(apiServer)], { shell: true, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
+
+  // ── Phase 4: Verify cluster access ────────────────────────
+  console.log(`\n${CYAN}── 4. Cluster access ──${NC}\n`);
+
+  const accessResult = spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "--no-headers"], {
+    shell: true, stdio: "pipe", env, encoding: "utf-8",
+  });
+  step(`Access to namespace '${IST_NAMESPACE}'`, accessResult.status === 0);
+  if (accessResult.status !== 0) {
+    fail("Cannot access the cluster. Check VPN, token, or namespace permissions.");
+    return;
+  }
+
+  // ── Phase 5: Secrets ──────────────────────────────────────
+  console.log(`\n${CYAN}── 5. Secrets (${secretName}) ──${NC}\n`);
+
+  const secretCheck = spawnSync("helm", ["ksec", "get", secretName], {
+    shell: true, stdio: "pipe", env, encoding: "utf-8",
+  });
+  const secretExists = secretCheck.status === 0 && (secretCheck.stdout as string).trim().length > 0;
+
+  if (secretExists) {
+    step(`ksec secret '${secretName}' exists`, true);
+    const keys = (secretCheck.stdout as string).trim().split("\n").length;
+    console.log(`  ${DIM}  ${keys} key(s) found${NC}`);
+  } else {
+    step(`ksec secret '${secretName}' exists`, false);
+    const fix = await ask("  Create secrets from .env now? (y/N): ");
+    if (fix.toLowerCase() === "y") {
+      await createSecrets();
+    } else {
+      warn("Secrets are required for deployment.");
+    }
+  }
+
+  // ── Phase 6: Drone CI secrets ─────────────────────────────
+  console.log(`\n${CYAN}── 6. Drone CI secrets ──${NC}\n`);
+
+  const droneTokens = [
+    { name: "staging_kubernetes_token", cfg: "config.staging", secret: CICD_TOKEN_SECRET },
+    { name: "ecr_access_key", cfg: "config.staging", secret: ECR_SECRET_NAME, key: "ecr_access_key" },
+    { name: "ecr_secret_key", cfg: "config.staging", secret: ECR_SECRET_NAME, key: "ecr_secret_key" },
+  ];
+  if (isProd) {
+    droneTokens.push({ name: "prod_kubernetes_token", cfg: "config.prod", secret: CICD_TOKEN_SECRET });
+  }
+
+  for (const t of droneTokens) {
+    const cfgPath = join(KUBE_DIR, t.cfg);
+    if (!existsSync(cfgPath)) {
+      step(`${t.name} extractable`, false);
+      continue;
+    }
+    const jsonpath = t.key ? `{.data.${t.key}}` : "{.data.token}";
+    const raw = runCapture(`kubectl get secret ${t.secret} -o jsonpath="${jsonpath}" --kubeconfig="${cfgPath}"`).stdout;
+    const decoded = decodeB64(raw);
+    step(`${t.name} extractable`, !!decoded);
+  }
+
+  // ── Phase 7: Files ────────────────────────────────────────
+  console.log(`\n${CYAN}── 7. Required files ──${NC}\n`);
+
+  step(".drone.yml", existsSync(join(PROJECT_ROOT, ".drone.yml")));
+  step(`environments/${envLabel}.yaml`, existsSync(envYaml));
+  step("backend/Dockerfile", existsSync(join(PROJECT_ROOT, "backend", "Dockerfile")));
+  step("frontend/Dockerfile", existsSync(join(PROJECT_ROOT, "frontend", "Dockerfile")));
+
+  // ── Summary ───────────────────────────────────────────────
+  const total = passed + failed;
+  const color = failed === 0 ? GREEN : failed <= 2 ? YELLOW : RED;
+  console.log(`\n${CYAN}── Summary ──${NC}\n`);
+  console.log(`  ${color}${passed}/${total} checks passed${NC}`);
+
+  if (failed === 0) {
+    console.log(`\n  ${GREEN}✓ ${envLabel} is ready for deployment.${NC}`);
+    console.log(`  Push to '${isProd ? "main" : "staging"}' branch to trigger Drone pipeline.`);
+  } else {
+    console.log(`\n  ${YELLOW}⚠ ${failed} issue(s) found. Fix them before deploying.${NC}`);
+  }
+}
+
+// ============================================================
+//  9. MESH / CORS FIX
 // ============================================================
 
 const BACKEND_SVC_URL = `http://${RELEASE_BACKEND}-web-app:80`;
@@ -934,6 +1103,8 @@ const MENU = `
   30. Helm get values (backend/frontend)
   --- Fix ---
   31. Fix mesh 302 (Next.js API proxy)
+  --- Deploy ---
+  32. Full deploy setup (staging or prod)
   --- ---
   0.  Exit
 `;
@@ -980,6 +1151,7 @@ async function main() {
       case "29": await describeIngress(); break;
       case "30": await helmGetValues(); break;
       case "31": await fixMesh302(); break;
+      case "32": await deployEnvSetup(); break;
       case "0": console.log("\nGoodbye."); rl.close(); process.exit(0);
       default: warn("Invalid option.");
     }
