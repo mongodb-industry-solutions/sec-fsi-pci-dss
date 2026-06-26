@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { BookOpen, Code2 } from 'lucide-react';
-import { API_BASE_URL } from '../lib/constants';
+import { BACKEND_PUBLIC_URL } from '../lib/constants';
 
 export default function LandingPage() {
   return (
@@ -59,7 +59,7 @@ export default function LandingPage() {
             <BookOpen size={15} /> Wiki
           </a>
           <a
-            href={`${API_BASE_URL}/doc`}
+            href={`${BACKEND_PUBLIC_URL}/doc`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-700 bg-white/5 hover:border-gray-500 hover:bg-white/10 text-gray-300 hover:text-white text-sm font-medium transition-all"

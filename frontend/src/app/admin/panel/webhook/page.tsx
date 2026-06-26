@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { API_BASE_URL } from '../../../../lib/constants';
+import { API_BASE_URL, BACKEND_PUBLIC_URL } from '../../../../lib/constants';
 import { getAdminToken, readSSE, downloadText } from '../../../../lib/adminHelpers';
 import { Pagination } from '../../../../components/Pagination';
 import { JsonView } from '../../../../components/json/JsonView';
@@ -62,7 +62,7 @@ export default function WebhookPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const hookUrl = `${API_BASE_URL}/api/v1/admin/webhook/hook`;
+  const hookUrl = `${BACKEND_PUBLIC_URL}/api/v1/admin/webhook/hook`;
 
   const connect = useCallback(async (token: string) => {
     abortRef.current?.abort();

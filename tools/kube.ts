@@ -778,10 +778,6 @@ async function applyApiProxy() {
   const dronePath = join(PROJECT_ROOT, ".drone.yml");
   const nextConfigPath = join(PROJECT_ROOT, "frontend", "next.config.js");
   const dockerfilePath = join(PROJECT_ROOT, "frontend", "Dockerfile");
-  const envPaths = [
-    { label: "staging",    path: join(PROJECT_ROOT, "environments", "staging.yaml") },
-    { label: "production", path: join(PROJECT_ROOT, "environments", "production.yaml") },
-  ];
 
   if (!existsSync(dronePath)) { fail(".drone.yml not found"); return; }
   if (!existsSync(nextConfigPath)) { fail("frontend/next.config.js not found"); return; }
@@ -794,11 +790,9 @@ async function applyApiProxy() {
   console.log(`  1. ${GREEN}frontend/next.config.js${NC}`);
   console.log(`     Add rewrites() proxying /api/* and /health → backend pod\n`);
   console.log(`  2. ${GREEN}frontend/Dockerfile${NC}`);
-  console.log(`     Add PSP_BACKEND_INTERNAL_URL build arg\n`);
-  console.log(`  3. ${GREEN}environments/*.yaml${NC}`);
-  console.log(`     Add env var: PSP_BACKEND_INTERNAL_URL=${BACKEND_SVC_URL}\n`);
-  console.log(`  4. ${GREEN}.drone.yml${NC}`);
-  console.log(`     Clear NEXT_PUBLIC_PSP_URL_BACKEND, add PSP_BACKEND_INTERNAL_URL build arg\n`);
+  console.log(`     Add NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE build arg\n`);
+  console.log(`  3. ${GREEN}.drone.yml${NC}`);
+  console.log(`     Rename build args to _PUBLIC / _PRIVATE\n`);
   console.log(`     Ensure mesh.enabled=true on backend (required by Kanopy ingress)\n`);
 
   const input = await ask("Apply all changes? (y/N): ");
@@ -810,8 +804,8 @@ const nextConfig = {
     allowedDevOrigins: ['127.0.0.1', 'localhost'],
     async rewrites() {
         const backendUrl =
-            process.env.PSP_BACKEND_INTERNAL_URL ||
-            process.env.NEXT_PUBLIC_PSP_URL_BACKEND ||
+            process.env.NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE ||
+            process.env.NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC ||
             'http://localhost:8081';
         return [
             { source: '/api/:path*', destination: \`\${backendUrl}/api/:path*\` },
@@ -824,68 +818,48 @@ module.exports = nextConfig;
   writeFileSync(nextConfigPath, nextConfig, "utf-8");
   ok("frontend/next.config.js updated with API proxy rewrites");
 
-  // 2. Add PSP_BACKEND_INTERNAL_URL ARG/ENV to Dockerfile if missing
+  // 2. Add NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE ARG/ENV to Dockerfile if missing
   if (existsSync(dockerfilePath)) {
     let df = readFileSync(dockerfilePath, "utf-8");
-    if (!df.includes("PSP_BACKEND_INTERNAL_URL")) {
+    if (!df.includes("NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE")) {
       df = df.replace(
-        /^(ENV NEXT_PUBLIC_PSP_URL_BACKEND=\$NEXT_PUBLIC_PSP_URL_BACKEND)$/m,
-        `$1\n\nARG PSP_BACKEND_INTERNAL_URL=http://localhost:8081\nENV PSP_BACKEND_INTERNAL_URL=$PSP_BACKEND_INTERNAL_URL`,
+        /^(ENV NEXT_PUBLIC_PSP_URL_BACKEND[_A-Z]*=\$NEXT_PUBLIC_PSP_URL_BACKEND[_A-Z]*)$/m,
+        `$1\n\nARG NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE\nENV NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=$NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE`,
       );
       writeFileSync(dockerfilePath, df, "utf-8");
-      ok("frontend/Dockerfile: added PSP_BACKEND_INTERNAL_URL ARG/ENV");
+      ok("frontend/Dockerfile: added NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE ARG/ENV");
     } else {
-      console.log(`  ${DIM}[skip]${NC} Dockerfile: PSP_BACKEND_INTERNAL_URL already present`);
+      console.log(`  ${DIM}[skip]${NC} Dockerfile: NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE already present`);
     }
   }
 
-  // 3. Add PSP_BACKEND_INTERNAL_URL to environment yamls
-  for (const env of envPaths) {
-    if (!existsSync(env.path)) { warn(`${env.path} not found, skipping`); continue; }
-    let content = readFileSync(env.path, "utf-8");
-    if (content.includes("PSP_BACKEND_INTERNAL_URL")) {
-      console.log(`  ${DIM}[skip]${NC} ${env.label}: PSP_BACKEND_INTERNAL_URL already present`);
-      continue;
-    }
-    content = content.replace(
-      /^(  PSP_URL_FRONTEND:.*$)/m,
-      `$1\n  PSP_BACKEND_INTERNAL_URL: "${BACKEND_SVC_URL}"`,
-    );
-    writeFileSync(env.path, content, "utf-8");
-    ok(`environments/${env.label}.yaml: added PSP_BACKEND_INTERNAL_URL`);
-  }
-
-  // 4. Update .drone.yml: clear NEXT_PUBLIC_PSP_URL_BACKEND, add PSP_BACKEND_INTERNAL_URL, ensure mesh=true
+  // 3. Update .drone.yml: rename build args, add PRIVATE, ensure mesh=true
   let drone = readFileSync(dronePath, "utf-8");
   let changes = 0;
 
-  // Clear NEXT_PUBLIC_PSP_URL_BACKEND values
-  drone = drone.replace(
-    /(\s+- NEXT_PUBLIC_PSP_URL_BACKEND=)https?:\/\/[^\n\r]+/g,
-    () => { changes++; return "$1"; },
-  );
-  // Fix: the callback returns literal "$1" — use a proper replacement
-  if (changes > 0) {
-    drone = readFileSync(dronePath, "utf-8");
-    drone = drone.replace(
-      /(\s+- NEXT_PUBLIC_PSP_URL_BACKEND=)https?:\/\/[^\n\r]+/g, "$1",
-    );
+  // Rename NEXT_PUBLIC_PSP_URL_BACKEND= to NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC=
+  if (drone.includes("NEXT_PUBLIC_PSP_URL_BACKEND=") && !drone.includes("NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC=")) {
+    drone = drone.replace(/NEXT_PUBLIC_PSP_URL_BACKEND=/g, "NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC=");
+    changes++;
   }
 
-  // Add PSP_BACKEND_INTERNAL_URL build arg if missing
-  if (!drone.includes("PSP_BACKEND_INTERNAL_URL")) {
+  // Add NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE if missing
+  if (!drone.includes("NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE")) {
     drone = drone.replace(
-      /(\s+- NEXT_PUBLIC_PSP_URL_BACKEND=.*)/g,
-      `$1\n        - PSP_BACKEND_INTERNAL_URL=${BACKEND_SVC_URL}`,
+      /(\s+- NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC=.*)/g,
+      `$1\n        - NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=${BACKEND_SVC_URL}`,
     );
     changes++;
   }
 
+  // Remove old PSP_BACKEND_INTERNAL_URL lines
+  drone = drone.replace(/\s+- PSP_BACKEND_INTERNAL_URL=[^\n\r]*/g, "");
+
   // Ensure mesh.enabled=true on backend steps
   const meshFalseRe = /(ingress\.hosts\[0\]=sec-fsi-pci-dss-backend[^\n]*\n\s+- )mesh\.enabled=false/g;
-  drone = drone.replace(meshFalseRe, () => { changes++; return "$1mesh.enabled=true"; });
-  if (changes > 0 && drone.includes("mesh.enabled=false")) {
+  if (meshFalseRe.test(drone)) {
     drone = drone.replace(meshFalseRe, "$1mesh.enabled=true");
+    changes++;
   }
 
   writeFileSync(dronePath, drone, "utf-8");

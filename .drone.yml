@@ -38,8 +38,8 @@ steps:
         - git-${DRONE_COMMIT_SHA:0:7}
         - latest
       build_args:
-        - NEXT_PUBLIC_PSP_URL_BACKEND=
-        - PSP_BACKEND_INTERNAL_URL=http://sec-fsi-pci-dss-backend-web-app:80
+        - NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC=https://sec-fsi-pci-dss-backend.industrysolutions.staging.corp.mongodb.com
+        - NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=http://sec-fsi-pci-dss-backend-web-app:80
       access_key:
         from_secret: ecr_access_key
       secret_key:
@@ -127,8 +127,8 @@ steps:
         - git-${DRONE_COMMIT_SHA:0:7}
         - latest
       build_args:
-        - NEXT_PUBLIC_PSP_URL_BACKEND=
-        - PSP_BACKEND_INTERNAL_URL=http://sec-fsi-pci-dss-backend-web-app:80
+        - NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC=https://sec-fsi-pci-dss-backend.industrysolutions.prod.corp.mongodb.com
+        - NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=http://sec-fsi-pci-dss-backend-web-app:80
       access_key:
         from_secret: ecr_access_key
       secret_key:

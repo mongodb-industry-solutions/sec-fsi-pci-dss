@@ -6,7 +6,7 @@ import { Card } from '../_shared';
 import { api } from '../../../../../../../lib/api';
 import { useDebugMode } from '../../../../../../../lib/debugMode';
 import { byProviderType } from '../../../../../../../config/capabilities';
-import { API_BASE_URL } from '../../../../../../../lib/constants';
+import { BACKEND_PUBLIC_URL } from '../../../../../../../lib/constants';
 
 // ── Type descriptions ────────────────────────────────────────────────────────
 
@@ -71,7 +71,7 @@ export default function OverviewPage() {
   // §7.7 per-event+vendor callback URL: /api/v1/providers/{group}/{vendorId}/{event}/callback.
   const group = byProviderType(String(integration.externalProviderArrangementType))?.capability ?? 'generic';
   const callbackFor = (ev: ProviderEventConfig) =>
-    ev.inbound?.callbackUrl || `${API_BASE_URL}/api/v1/providers/${group}/${id}/${encodeURIComponent(ev.event)}/callback`;
+    ev.inbound?.callbackUrl || `${BACKEND_PUBLIC_URL}/api/v1/providers/${group}/${id}/${encodeURIComponent(ev.event)}/callback`;
 
   return (
     <div className="space-y-5">

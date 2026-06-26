@@ -1,5 +1,15 @@
+// Full external backend URL for display: webhook hook URLs, API docs, vendor callbacks.
+export const BACKEND_PUBLIC_URL =
+  process.env.NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC || 'http://localhost:8081';
+
+// Base URL the browser uses for fetch / SSE calls.
+// When PRIVATE is defined → proxy mode: browser uses same-origin (''), Next.js
+// rewrites forward to the PRIVATE URL server-side (see next.config.js).
+// When PRIVATE is not defined → direct mode: browser calls PUBLIC URL directly.
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_PSP_URL_BACKEND ?? 'http://localhost:8081';
+  process.env.NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE !== undefined
+    ? ''
+    : BACKEND_PUBLIC_URL;
 
 // All seeded demo accounts share the same bcrypt-hashed credential.
 // The plaintext is a fixed demo convention (documented in auth.controller.ts);

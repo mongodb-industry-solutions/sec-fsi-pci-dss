@@ -5,7 +5,6 @@ env:
   KMS_PROVIDER: local
   PSP_CORS_ORIGIN: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com"
   PSP_URL_FRONTEND: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com"
-  PSP_BACKEND_INTERNAL_URL: "http://sec-fsi-pci-dss-backend-web-app:80"
 
 envSecrets:
   MONGODB_URI: sec-fsi-pci-dss-secrets-prod
