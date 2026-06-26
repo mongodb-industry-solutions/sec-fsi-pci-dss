@@ -12,7 +12,7 @@ function findProjectRoot(): string {
   } catch {
     let dir = resolve(__dirname, "..");
     while (dir !== dirname(dir)) {
-      if (existsSync(join(dir, "package.json")) && existsSync(join(dir, "backend"))) return dir;
+      if (existsSync(join(dir, "package.json"))) return dir;
       dir = dirname(dir);
     }
     return resolve(__dirname, "..");
@@ -54,6 +54,8 @@ const HOME = homedir();
 const IS_WIN = platform() === "win32";
 const KANOPY_CONFIG_PATH = join(HOME, process.env.KUBE_KANOPY_CONFIG_DIR ?? ".kanopy", "config.yaml");
 const KUBE_DIR = join(HOME, process.env.KUBE_CONFIG_DIR ?? ".kube");
+const CICD_TOKEN_SECRET = process.env.KUBE_CICD_TOKEN_SECRET ?? "kanopy-cicd-token";
+const ECR_SECRET_NAME = process.env.KUBE_ECR_SECRET_NAME ?? "ecr";
 
 // -- Helpers --
 const GREEN = "\x1b[32m";
@@ -194,7 +196,7 @@ async function createKanopyConfig() {
     return;
   }
 
-  const content = `domain: corp.mongodb.com
+  const content = `domain: ${DOMAIN_SUFFIX}
 issuer: dex
 login:
   connector: oidc
@@ -506,20 +508,20 @@ async function extractDroneSecrets() {
   spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
 
   console.log("\n--- staging_kubernetes_token ---");
-  const stagingToken = runCapture(`kubectl get secret kanopy-cicd-token -o jsonpath="{.data.token}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`);
+  const stagingToken = runCapture(`kubectl get secret ${CICD_TOKEN_SECRET} -o jsonpath="{.data.token}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`);
   if (stagingToken.stdout) {
     const decoded = decodeB64(stagingToken.stdout);
     console.log(`  Value: ${DIM}${decoded.substring(0, 20)}...${NC}`);
   } else { warn("Could not extract staging token."); }
 
   console.log("\n--- ecr_access_key ---");
-  const ecrAccess = runCapture(`kubectl get secret ecr -o jsonpath="{.data.ecr_access_key}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`);
+  const ecrAccess = runCapture(`kubectl get secret ${ECR_SECRET_NAME} -o jsonpath="{.data.ecr_access_key}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`);
   if (ecrAccess.stdout) {
     console.log(`  Value: ${decodeB64(ecrAccess.stdout)}`);
   } else { warn("Could not extract ECR access key."); }
 
   console.log("\n--- ecr_secret_key ---");
-  const ecrSecret = runCapture(`kubectl get secret ecr -o jsonpath="{.data.ecr_secret_key}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`);
+  const ecrSecret = runCapture(`kubectl get secret ${ECR_SECRET_NAME} -o jsonpath="{.data.ecr_secret_key}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`);
   if (ecrSecret.stdout) {
     const decoded = decodeB64(ecrSecret.stdout);
     console.log(`  Value: ${DIM}${decoded.substring(0, 10)}...${NC}`);
@@ -527,7 +529,7 @@ async function extractDroneSecrets() {
 
   action("Switching to prod context...");
   console.log("\n--- prod_kubernetes_token ---");
-  const prodToken = runCapture(`kubectl get secret kanopy-cicd-token -o jsonpath="{.data.token}" --kubeconfig="${join(KUBE_DIR, "config.prod")}"`);
+  const prodToken = runCapture(`kubectl get secret ${CICD_TOKEN_SECRET} -o jsonpath="{.data.token}" --kubeconfig="${join(KUBE_DIR, "config.prod")}"`);
   if (prodToken.stdout) {
     const decoded = decodeB64(prodToken.stdout);
     console.log(`  Value: ${DIM}${decoded.substring(0, 20)}...${NC}`);
@@ -559,19 +561,19 @@ async function configureDroneSecrets() {
   spawnSync("kubectl", ["config", "use-context", contextName(STAGING_API)], { shell: true, stdio: "pipe", env });
   spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
 
-  const stagingToken = decodeB64(runCapture(`kubectl get secret kanopy-cicd-token -o jsonpath="{.data.token}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`).stdout);
+  const stagingToken = decodeB64(runCapture(`kubectl get secret ${CICD_TOKEN_SECRET} -o jsonpath="{.data.token}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`).stdout);
   if (stagingToken) clusterSecrets.push({ name: "staging_kubernetes_token", value: stagingToken });
   else warn("Could not extract staging_kubernetes_token");
 
-  const ecrAccess = decodeB64(runCapture(`kubectl get secret ecr -o jsonpath="{.data.ecr_access_key}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`).stdout);
+  const ecrAccess = decodeB64(runCapture(`kubectl get secret ${ECR_SECRET_NAME} -o jsonpath="{.data.ecr_access_key}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`).stdout);
   if (ecrAccess) clusterSecrets.push({ name: "ecr_access_key", value: ecrAccess });
   else warn("Could not extract ecr_access_key");
 
-  const ecrSecret = decodeB64(runCapture(`kubectl get secret ecr -o jsonpath="{.data.ecr_secret_key}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`).stdout);
+  const ecrSecret = decodeB64(runCapture(`kubectl get secret ${ECR_SECRET_NAME} -o jsonpath="{.data.ecr_secret_key}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`).stdout);
   if (ecrSecret) clusterSecrets.push({ name: "ecr_secret_key", value: ecrSecret });
   else warn("Could not extract ecr_secret_key");
 
-  const prodToken = decodeB64(runCapture(`kubectl get secret kanopy-cicd-token -o jsonpath="{.data.token}" --kubeconfig="${join(KUBE_DIR, "config.prod")}"`).stdout);
+  const prodToken = decodeB64(runCapture(`kubectl get secret ${CICD_TOKEN_SECRET} -o jsonpath="{.data.token}" --kubeconfig="${join(KUBE_DIR, "config.prod")}"`).stdout);
   if (prodToken) clusterSecrets.push({ name: "prod_kubernetes_token", value: prodToken });
   else warn("Could not extract prod_kubernetes_token");
 
@@ -861,8 +863,12 @@ module.exports = nextConfig;
   drone = drone.replace(/\s+- PSP_BACKEND_INTERNAL_URL=[^\n\r]*/g, "");
 
   // Ensure mesh.enabled=true on backend steps
-  const meshFalseRe = /(ingress\.hosts\[0\]=sec-fsi-pci-dss-backend[^\n]*\n\s+- )mesh\.enabled=false/g;
+  const escapedBackend = RELEASE_BACKEND.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const meshFalseRe = new RegExp(
+    `(ingress\\.hosts\\[0\\]=${escapedBackend}[^\\n]*\\n\\s+- )mesh\\.enabled=false`, "g",
+  );
   if (meshFalseRe.test(drone)) {
+    drone = readFileSync(dronePath, "utf-8"); // re-read since .test() advances lastIndex
     drone = drone.replace(meshFalseRe, "$1mesh.enabled=true");
     changes++;
   }
