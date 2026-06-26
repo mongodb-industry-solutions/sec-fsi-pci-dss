@@ -43,7 +43,9 @@ export default function PaymentsSectionPage() {
   const [status, setStatus] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+  const [txnIdInput, setTxnIdInput] = useState('');
   const [txnId, setTxnId] = useState('');
+  const [cardTokenInput, setCardTokenInput] = useState('');
   const [cardToken, setCardToken] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -83,8 +85,8 @@ export default function PaymentsSectionPage() {
     const sp = new URLSearchParams(window.location.search);
     if (sp.get('status')) setStatus(sp.get('status')!);
     if (sp.get('q')) { setSearchInput(sp.get('q')!); setSearch(sp.get('q')!); }
-    if (sp.get('txnId')) setTxnId(sp.get('txnId')!);
-    if (sp.get('cardToken')) setCardToken(sp.get('cardToken')!);
+    if (sp.get('txnId')) { setTxnIdInput(sp.get('txnId')!); setTxnId(sp.get('txnId')!); }
+    if (sp.get('cardToken')) { setCardTokenInput(sp.get('cardToken')!); setCardToken(sp.get('cardToken')!); }
     if (sp.get('dateFrom')) setDateFrom(sp.get('dateFrom')!);
     if (sp.get('dateTo')) setDateTo(sp.get('dateTo')!);
     setAutoApplied(true);
@@ -92,13 +94,13 @@ export default function PaymentsSectionPage() {
 
   if (!merchant) return null;
 
-  function onSearch(e: React.FormEvent) { e.preventDefault(); setSearch(searchInput.trim()); }
+  function onSearch(e: React.FormEvent) { e.preventDefault(); setSearch(searchInput.trim()); setTxnId(txnIdInput.trim()); setCardToken(cardTokenInput.trim()); }
   function handlePageChange(p: number) { setPage(p); load(p, pageSize); window.scrollTo({ top: 0, behavior: 'smooth' }); }
   function handleLimitChange(l: number) { setPageSize(l); setPage(1); load(1, l); }
   function clearAll() {
     setStatus(''); setSearchInput(''); setSearch('');
-    setTxnId(''); setCardToken(''); setDateFrom(''); setDateTo('');
-    setPage(1);
+    setTxnIdInput(''); setTxnId(''); setCardTokenInput(''); setCardToken('');
+    setDateFrom(''); setDateTo(''); setPage(1);
   }
 
   return (
@@ -152,15 +154,15 @@ export default function PaymentsSectionPage() {
         <div className="flex flex-wrap gap-3 items-end">
           <div className="min-w-[160px]">
             <label className="block text-xs text-gray-500 mb-1">Transaction ID</label>
-            <input value={txnId} onChange={(e) => setTxnId(e.target.value.trim())}
-              onKeyDown={(e) => e.key === 'Enter' && setPage(1)}
+            <input value={txnIdInput} onChange={(e) => setTxnIdInput(e.target.value.trim())}
+              onKeyDown={(e) => { if (e.key === 'Enter') { setTxnId(txnIdInput.trim()); setPage(1); } }}
               placeholder="UUID…"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
           </div>
           <div className="min-w-[160px]">
             <label className="block text-xs text-gray-500 mb-1">Card Token</label>
-            <input value={cardToken} onChange={(e) => setCardToken(e.target.value.trim())}
-              onKeyDown={(e) => e.key === 'Enter' && setPage(1)}
+            <input value={cardTokenInput} onChange={(e) => setCardTokenInput(e.target.value.trim())}
+              onKeyDown={(e) => { if (e.key === 'Enter') { setCardToken(cardTokenInput.trim()); setPage(1); } }}
               placeholder="tok_xxxxxxxx"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
           </div>

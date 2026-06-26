@@ -204,10 +204,16 @@ function ServiceCard({
       statusLabel = 'Pending…';
       statusColor = 'text-gray-400';
     } else if (last.ok) {
-      dotClass = 'bg-green-500';
       const ietfStatus = last.meta?.status as string | undefined;
-      statusLabel = ietfStatus === 'pass' ? 'Healthy' : 'Healthy';
-      statusColor = 'text-green-400';
+      if (ietfStatus === 'warn') {
+        dotClass = 'bg-yellow-500';
+        statusLabel = 'Degraded';
+        statusColor = 'text-yellow-400';
+      } else {
+        dotClass = 'bg-green-500';
+        statusLabel = 'Healthy';
+        statusColor = 'text-green-400';
+      }
     } else {
       dotClass = 'bg-red-500 animate-pulse';
       statusLabel = 'Down';
