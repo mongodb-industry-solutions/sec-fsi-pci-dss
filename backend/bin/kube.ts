@@ -313,6 +313,8 @@ function kubeEnv(): NodeJS.ProcessEnv {
   return { ...process.env, KUBECONFIG: `${join(KUBE_DIR, "config.staging")}${IS_WIN ? ";" : ":"}${join(KUBE_DIR, "config.prod")}` };
 }
 
+const KSEC_EXCLUDE_PREFIXES = ["KANOPY_"];
+
 async function createSecrets() {
   console.log("\nCreate ksec secrets for which environment?");
   console.log("  1. staging (default)\n  2. production");
@@ -326,12 +328,31 @@ async function createSecrets() {
   spawnSync("kubectl", ["config", "use-context", apiServer], { shell: true, stdio: "pipe", env });
   spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
 
-  console.log(`\nPushing .env to secret '${secretName}'...`);
+  if (!existsSync(ENV_PATH)) { fail(`.env not found at ${ENV_PATH}`); return; }
+
+  const filtered = readFileSync(ENV_PATH, "utf-8")
+    .split(/\r?\n/)
+    .filter((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || /^[#;]/.test(trimmed)) return true;
+      const key = trimmed.split("=")[0].trim();
+      return !KSEC_EXCLUDE_PREFIXES.some((p) => key.startsWith(p));
+    })
+    .join("\n");
+
+  const tmpPath = join(PROJECT_ROOT, ".env.ksec.tmp");
+  writeFileSync(tmpPath, filtered, "utf-8");
+
+  const excluded = KSEC_EXCLUDE_PREFIXES.map((p) => `${p}*`).join(", ");
+  console.log(`\nPushing .env to secret '${secretName}' (excluding ${excluded})...`);
   console.log(`  Source: ${ENV_PATH}\n`);
 
-  const cmd = `helm ksec push "${ENV_PATH}" ${secretName}`;
+  const cmd = `helm ksec push "${tmpPath}" ${secretName}`;
   console.log(`${DIM}[cmd]    ${cmd}${NC}`);
   const result = spawnSync(cmd, { shell: true, stdio: "inherit", env });
+
+  try { require("fs").unlinkSync(tmpPath); } catch { /* cleanup best-effort */ }
+
   result.status === 0 ? ok(`Secret '${secretName}' updated from .env`) : fail("Failed to push secret.");
 }
 
@@ -405,13 +426,6 @@ async function resourceUsage() {
 //  5. DRONE CI
 // ============================================================
 
-const DRONE_SECRET_EXCLUDE_PREFIXES = ["KANOPY_", "MONGODB_CRYPT_SHARED_LIB"];
-const DRONE_SECRET_EXCLUDE_KEYS = new Set([
-  "PSP_CORS_ORIGIN",   // differs per env, set in Helm values
-  "PSP_URL_FRONTEND",  // differs per env, set in Helm values
-  "NODE_ENV",          // set by Dockerfile / Helm values
-]);
-
 function getDroneRepo(): string {
   try {
     const remote = execSync("git remote get-url origin", { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
@@ -425,31 +439,6 @@ function decodeB64(raw: string): string {
   const cleaned = raw.replace(/"/g, "").trim();
   if (!cleaned) return "";
   return Buffer.from(cleaned, "base64").toString("utf-8").trim();
-}
-
-function droneSecretAdd(repo: string, name: string, value: string): boolean {
-  const result = spawnSync("drone", ["secret", "add", "--repository", repo, "--name", name, "--data", value], {
-    shell: true, encoding: "utf-8", stdio: "pipe",
-  });
-  return result.status === 0;
-}
-
-function readEnvSecrets(): Array<{ key: string; value: string }> {
-  if (!existsSync(ENV_PATH)) return [];
-  const entries: Array<{ key: string; value: string }> = [];
-  for (const line of readFileSync(ENV_PATH, "utf-8").split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || /^[#;]/.test(trimmed)) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).trim();
-    if (!value) continue;
-    if (DRONE_SECRET_EXCLUDE_KEYS.has(key)) continue;
-    if (DRONE_SECRET_EXCLUDE_PREFIXES.some((p) => key.startsWith(p))) continue;
-    entries.push({ key, value });
-  }
-  return entries;
 }
 
 async function extractDroneSecrets() {
@@ -530,33 +519,25 @@ async function configureDroneSecrets() {
   if (prodToken) clusterSecrets.push({ name: "prod_kubernetes_token", value: prodToken });
   else warn("Could not extract prod_kubernetes_token");
 
-  // ── 2. App secrets from .env (filtered) ──────────────────────
-  const envSecrets = readEnvSecrets();
-
   // ── Summary before push ──────────────────────────────────────
+  // Only CI/CD infra secrets belong in Drone. App secrets reach the pod via ksec
+  // (option 10) and the envSecrets section in environments/*.yaml.
   console.log(`\n${CYAN}Secrets to configure:${NC}\n`);
-  console.log("  Cluster secrets (from kubectl):");
   for (const s of clusterSecrets) {
     console.log(`    ${GREEN}+${NC} ${s.name}  ${DIM}(${s.value.substring(0, 12)}...)${NC}`);
   }
-  console.log(`\n  App secrets (from .env, excluding ${DRONE_SECRET_EXCLUDE_PREFIXES.join(", ")}*):`);
-  for (const s of envSecrets) {
-    const preview = s.value.length > 20 ? `${s.value.substring(0, 20)}...` : s.value;
-    console.log(`    ${GREEN}+${NC} ${s.key}  ${DIM}(${preview})${NC}`);
-  }
 
-  const total = clusterSecrets.length + envSecrets.length;
-  if (total === 0) { warn("No secrets to push."); return; }
+  if (clusterSecrets.length === 0) { warn("No secrets to push."); return; }
 
   console.log("");
-  const confirm = await ask(`Push ${total} secrets to ${repo}? (y/N): `);
+  const confirm = await ask(`Push ${clusterSecrets.length} secrets to ${repo}? (y/N): `);
   if (confirm.toLowerCase() !== "y") { warn("Aborted."); return; }
 
-  // ── 3. Push all ──────────────────────────────────────────────
+  // ── 2. Push ─────────────────────────────────────────────────
   let pushed = 0, failed_count = 0;
   const droneEnv = { ...process.env, DRONE_SERVER: process.env.DRONE_SERVER || DRONE_URL };
 
-  for (const s of [...clusterSecrets, ...envSecrets.map((e) => ({ name: e.key, value: e.value }))]) {
+  for (const s of clusterSecrets) {
     const result = spawnSync("drone", ["secret", "add", "--repository", repo, "--name", s.name, "--data", s.value], {
       shell: true, encoding: "utf-8", stdio: "pipe", env: droneEnv,
     });
