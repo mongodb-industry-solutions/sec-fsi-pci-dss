@@ -7,6 +7,9 @@ WORKDIR /app
 ARG NEXT_PUBLIC_PSP_URL_BACKEND=http://localhost:8081
 ENV NEXT_PUBLIC_PSP_URL_BACKEND=$NEXT_PUBLIC_PSP_URL_BACKEND
 
+ARG PSP_BACKEND_INTERNAL_URL=http://localhost:8081
+ENV PSP_BACKEND_INTERNAL_URL=$PSP_BACKEND_INTERNAL_URL
+
 # Install dependencies (layer cached unless package.json changes)
 COPY package*.json ./
 RUN npm install
