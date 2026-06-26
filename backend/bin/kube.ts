@@ -674,6 +674,148 @@ async function preDeployChecklist() {
 }
 
 // ============================================================
+//  8. MESH / CORS FIX
+// ============================================================
+
+const BACKEND_SVC_URL = `http://${RELEASE_BACKEND}-web-app:8080`;
+
+async function applyMeshBypass() {
+  const dronePath = join(PROJECT_ROOT, ".drone.yml");
+  if (!existsSync(dronePath)) { fail(".drone.yml not found"); return; }
+
+  let content = readFileSync(dronePath, "utf-8");
+  const eol = content.includes("\r\n") ? "\r\n" : "\n";
+
+  const patterns = [
+    { label: "deploy-backend-staging",    find: `${STAGING_HOST_BE}${eol}        - mesh.enabled=true`,  replace: `${STAGING_HOST_BE}${eol}        - mesh.enabled=false` },
+    { label: "deploy-backend-production", find: `${PROD_HOST_BE}${eol}        - mesh.enabled=true`,    replace: `${PROD_HOST_BE}${eol}        - mesh.enabled=false` },
+  ];
+
+  let changes = 0;
+  for (const p of patterns) {
+    if (content.includes(p.find)) {
+      content = content.replace(p.find, p.replace);
+      console.log(`  ${GREEN}[change]${NC} ${p.label}: mesh.enabled → false`);
+      changes++;
+    } else {
+      console.log(`  ${DIM}[skip]${NC}   ${p.label}: already disabled or pattern not found`);
+    }
+  }
+
+  if (changes === 0) { ok("No changes needed — mesh is already disabled on backend."); return; }
+
+  console.log(`\n  Frontend deploy steps: unchanged (mesh stays enabled for SSO)\n`);
+  const input = await ask(`Apply ${changes} change(s) to .drone.yml? (y/N): `);
+  if (input.toLowerCase() !== "y") { warn("Aborted."); return; }
+
+  writeFileSync(dronePath, content, "utf-8");
+  ok(`.drone.yml updated (${changes} backend step(s))`);
+  console.log(`\n${CYAN}Next steps:${NC}`);
+  console.log("  1. Commit and push to the staging/main branch");
+  console.log("  2. Drone redeploys with mesh disabled on the backend");
+  console.log("  3. Verify: browser API calls should return 200, not 302");
+}
+
+async function applyApiProxy() {
+  const dronePath = join(PROJECT_ROOT, ".drone.yml");
+  const nextConfigPath = join(PROJECT_ROOT, "frontend", "next.config.js");
+  const envPaths = [
+    { label: "staging",    path: join(PROJECT_ROOT, "environments", "staging.yaml") },
+    { label: "production", path: join(PROJECT_ROOT, "environments", "production.yaml") },
+  ];
+
+  if (!existsSync(dronePath)) { fail(".drone.yml not found"); return; }
+  if (!existsSync(nextConfigPath)) { fail("frontend/next.config.js not found"); return; }
+
+  console.log(`\n${CYAN}Changes to apply:${NC}\n`);
+  console.log(`  1. ${GREEN}frontend/next.config.js${NC}`);
+  console.log(`     Add rewrites() that proxy /api/* and /health to the backend pod`);
+  console.log(`     Backend URL read from PSP_BACKEND_INTERNAL_URL (runtime env)\n`);
+  console.log(`  2. ${GREEN}environments/*.yaml${NC}`);
+  console.log(`     Add env var: PSP_BACKEND_INTERNAL_URL=${BACKEND_SVC_URL}\n`);
+  console.log(`  3. ${GREEN}.drone.yml${NC}`);
+  console.log(`     Clear NEXT_PUBLIC_PSP_URL_BACKEND build arg (use same-origin)\n`);
+
+  const input = await ask("Apply all changes? (y/N): ");
+  if (input.toLowerCase() !== "y") { warn("Aborted."); return; }
+
+  // 1. Update next.config.js
+  const nextConfig = `/** @type {import('next').NextConfig} */
+const nextConfig = {
+    allowedDevOrigins: ['127.0.0.1', 'localhost'],
+    async rewrites() {
+        const backend = process.env.PSP_BACKEND_INTERNAL_URL;
+        if (!backend) return [];
+        return [
+            { source: '/api/:path*', destination: \`\${backend}/api/:path*\` },
+            { source: '/health', destination: \`\${backend}/health\` },
+        ];
+    },
+};
+module.exports = nextConfig;
+`;
+  writeFileSync(nextConfigPath, nextConfig, "utf-8");
+  ok("frontend/next.config.js updated with API proxy rewrites");
+
+  // 2. Add PSP_BACKEND_INTERNAL_URL to environment yamls
+  for (const env of envPaths) {
+    if (!existsSync(env.path)) { warn(`${env.path} not found, skipping`); continue; }
+    let content = readFileSync(env.path, "utf-8");
+    if (content.includes("PSP_BACKEND_INTERNAL_URL")) {
+      console.log(`  ${DIM}[skip]${NC} ${env.label}: PSP_BACKEND_INTERNAL_URL already present`);
+      continue;
+    }
+    content = content.replace(
+      /^(  PSP_URL_FRONTEND:.*$)/m,
+      `$1\n  PSP_BACKEND_INTERNAL_URL: "${BACKEND_SVC_URL}"`,
+    );
+    writeFileSync(env.path, content, "utf-8");
+    ok(`environments/${env.label}.yaml: added PSP_BACKEND_INTERNAL_URL`);
+  }
+
+  // 3. Clear NEXT_PUBLIC_PSP_URL_BACKEND build arg in .drone.yml
+  let drone = readFileSync(dronePath, "utf-8");
+  let droneChanges = 0;
+  const buildArgRe = /^(\s+- NEXT_PUBLIC_PSP_URL_BACKEND=).+$/gm;
+  drone = drone.replace(buildArgRe, () => { droneChanges++; return "$1"; });
+  if (droneChanges > 0) {
+    // The replacement above uses a literal "$1" — fix with a proper approach
+    drone = readFileSync(dronePath, "utf-8");
+    drone = drone.replace(
+      /(\s+- NEXT_PUBLIC_PSP_URL_BACKEND=)https:\/\/[^\n\r]+/g,
+      "$1",
+    );
+    writeFileSync(dronePath, drone, "utf-8");
+    ok(`.drone.yml: cleared NEXT_PUBLIC_PSP_URL_BACKEND build arg (${droneChanges} steps)`);
+  } else {
+    console.log(`  ${DIM}[skip]${NC} .drone.yml: build arg already empty or not found`);
+  }
+
+  console.log(`\n${CYAN}Next steps:${NC}`);
+  console.log("  1. For local dev, set PSP_BACKEND_INTERNAL_URL=http://localhost:8081 in .env");
+  console.log("  2. Commit and push to the staging/main branch");
+  console.log("  3. Drone rebuilds the frontend with same-origin API calls");
+  console.log("  4. Frontend pod proxies /api/* to the backend pod internally");
+}
+
+async function fixMesh302() {
+  console.log(`\n${CYAN}=== Fix Mesh 302 — Backend OIDC Bypass ===${NC}\n`);
+  console.log("  The Kanopy mesh enforces OIDC/SSO on every ingress host.");
+  console.log("  The frontend's mesh session cookie does not apply to the backend");
+  console.log("  domain, so browser API calls get a 302 redirect to DEX login.\n");
+  console.log(`  1. ${GREEN}Disable mesh on backend ingress (recommended)${NC}`);
+  console.log("     Sets mesh.enabled=false for backend in .drone.yml.");
+  console.log("     Safe: the backend has its own JWT auth middleware.\n");
+  console.log("  2. Next.js API proxy");
+  console.log("     Routes all /api/* calls through the frontend server-side.");
+  console.log("     Browser calls same-origin; frontend proxies to backend pod.\n");
+  const input = await ask("Strategy (default: 1): ");
+
+  if (input === "2") { await applyApiProxy(); }
+  else { await applyMeshBypass(); }
+}
+
+// ============================================================
 //  MAIN MENU
 // ============================================================
 
@@ -713,6 +855,8 @@ const MENU = `
   24. Check env vars in pod
   25. Test staging/prod URLs
   26. Pre-deployment checklist
+  --- Fix ---
+  27. Fix mesh 302 (disable mesh / API proxy)
   --- ---
   0.  Exit
 `;
@@ -754,8 +898,9 @@ async function main() {
       case "24": await checkEnvVars(); break;
       case "25": await testUrls(); break;
       case "26": await preDeployChecklist(); break;
+      case "27": await fixMesh302(); break;
       case "0": console.log("\nGoodbye."); rl.close(); process.exit(0);
-      default: warn("Invalid option. Enter 1-26 or 0.");
+      default: warn("Invalid option. Enter 1-27 or 0.");
     }
 
     if (choice !== "0") await pause();
