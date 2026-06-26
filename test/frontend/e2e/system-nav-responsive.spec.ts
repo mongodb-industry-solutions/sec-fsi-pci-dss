@@ -28,9 +28,9 @@ test.describe('Responsive nav: merchant section strip (light carousel)', () => {
   test('@375px the strip overflows and centers the active item (both chevrons shown)', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 800 });
     await page.goto('/system/merchant/payments');
-    await expect(page.getByRole('heading', { name: 'Payments Received' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: 'Transactions' })).toBeVisible({ timeout: 15000 });
     await page.waitForTimeout(600);
-    // 6 items overflow at 375px; active "Payments Received" auto-centers → both chevrons visible.
+    // 6 items overflow at 375px; active "Transactions" auto-centers → both chevrons visible.
     expect(await opacity(page, 'nav.bg-white button[aria-label="Scroll right"]')).toBeGreaterThan(0.5);
     expect(await opacity(page, 'nav.bg-white button[aria-label="Scroll left"]')).toBeGreaterThan(0.5);
   });
@@ -38,7 +38,7 @@ test.describe('Responsive nav: merchant section strip (light carousel)', () => {
   test('@375px the 4-item customer bottom bar shows NO chevrons (fits)', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 800 });
     await page.goto('/system/merchant/payments');
-    await expect(page.getByRole('heading', { name: 'Payments Received' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: 'Transactions' })).toBeVisible({ timeout: 15000 });
     await page.waitForTimeout(400);
     expect(await opacity(page, 'nav.fixed button[aria-label="Scroll right"]')).toBeLessThan(0.5);
     expect(await opacity(page, 'nav.fixed button[aria-label="Scroll left"]')).toBeLessThan(0.5);
@@ -47,7 +47,7 @@ test.describe('Responsive nav: merchant section strip (light carousel)', () => {
   test('@1280px the vertical sidebar shows and the bottom bar is hidden', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/system/merchant/payments');
-    await expect(page.getByRole('heading', { name: 'Payments Received' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: 'Transactions' })).toBeVisible({ timeout: 15000 });
     await expect(page.locator('nav.bg-white > ul')).toBeVisible();   // desktop vertical list
     await expect(page.locator('nav.fixed')).toBeHidden();             // mobile bottom bar gone
   });

@@ -1,0 +1,48 @@
+# ── Root .dockerignore ─────────────────────────────────────────────
+# Used when the backend builds with context = repo root (. instead of ./backend).
+# Keeps the build context lean: only backend source, test infra, and root configs.
+# Frontend source (frontend/src/) is kept for frontend unit test resolution.
+
+# Dependencies (reinstalled inside the image)
+**/node_modules/
+
+# Build artifacts (rebuilt inside the image)
+backend/dist/
+frontend/.next/
+frontend/out/
+
+# Environment files (injected via env_file / environment in Compose)
+.env
+.env.*
+!.env.example
+
+# Git
+.git/
+.gitignore
+
+# IDE, AI tooling, agent transcripts
+.agents/
+.claude/
+.cursor/
+.vscode/
+agent-transcripts/
+terminals/
+tmp/
+
+# CI/CD config (not needed at runtime)
+.drone.yml
+
+# Documentation and K8s values
+docs/
+environments/
+
+# Test artifacts (not test source files)
+test-results/
+test/.playwright-report/
+test/.verify-carousel/
+coverage/
+
+# Misc
+*.log
+*.tgz
+*.tsbuildinfo

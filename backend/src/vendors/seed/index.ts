@@ -22,7 +22,7 @@ import { seedCapabilityModules } from './seedCapabilityModules';
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
 
 // DATA_DIR resolution  -  compatible with local dev, ts-node, compiled build, and Docker
-const DATA_DIR: string = process.env.SEED_DATA_DIR ?? join(process.cwd(), 'data');
+const DATA_DIR: string = process.env.PSP_SEED_DATA_DIR ?? join(process.cwd(), 'data');
 
 /**
  * Generates JSON seed files if they are missing.

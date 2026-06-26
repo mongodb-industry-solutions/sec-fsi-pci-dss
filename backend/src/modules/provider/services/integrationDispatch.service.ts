@@ -367,12 +367,12 @@ export async function testMapping(
 }
 
 // Resolve an internal PSP path (e.g. /api/v1/modules/fds/score) to an absolute URL using PSP_BASE_URL
-// (default http://127.0.0.1:3001). Seeded configs MUST be host-less paths so they work unchanged across
+// (default http://127.0.0.1:8081). Seeded configs MUST be host-less paths so they work unchanged across
 // environments/deployments; only this resolver knows the runtime host. Absolute URLs (real external
 // providers) are returned untouched.
 export function resolveServiceUrl(url: string): string {
   if (/^https?:\/\//i.test(url)) return url;
-  const raw = process.env.PSP_BASE_URL ?? '127.0.0.1:3001';
+  const raw = process.env.PSP_BASE_URL ?? '127.0.0.1:8081';
   const base = (/^https?:\/\//i.test(raw) ? raw : `http://${raw}`).replace(/\/$/, '');
   return base + (url.startsWith('/') ? url : `/${url}`);
 }

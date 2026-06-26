@@ -56,8 +56,8 @@ export async function loginUser(
     ...(user.partyInstanceReference && { partyRef: user.partyInstanceReference }),
   };
 
-  const secret = process.env.JWT_SECRET ?? 'demo-local-secret-change-in-production';
-  const expiresIn = process.env.JWT_EXPIRES_IN ?? '24h';
+  const secret = process.env.PSP_JWT_SECRET ?? 'demo-local-secret-change-in-production';
+  const expiresIn = process.env.PSP_JWT_EXPIRES_IN ?? '24h';
   const token = jwt.sign(payload, secret, { expiresIn } as jwt.SignOptions);
 
   return {

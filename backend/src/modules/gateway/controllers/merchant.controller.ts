@@ -4,7 +4,7 @@
 import { FastifyInstance } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, sendTestWebhook, generateApiKey, importApiKey, updateApiKeyLabel, revokeApiKey, reviewMerchantApplication, getMerchantEvents, getMerchantApiKeys } from '../services/merchant.service';
-import { getMerchantTransactions, getMerchantStats } from '../../transaction/services/cardTransaction.service';
+import { getMerchantTransactions, getMerchantTransactionById, getMerchantStats } from '../../transaction/services/cardTransaction.service';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 
 // Roles allowed to READ a merchant's business detail (profile, payments, analytics, audit trail).
@@ -312,10 +312,14 @@ Used by customers to detect their onboarding state: no application / under_revie
       querystring: {
         type: 'object',
         properties: {
-          page:   { type: 'integer', minimum: 1, default: 1 },
-          limit:  { type: 'integer', minimum: 1, maximum: 100, default: 20 },
-          status: { type: 'string', enum: ['authorized', 'declined', 'pending', 'settled', 'disputed'], description: 'Filter by transaction status.' },
-          search: { type: 'string', description: 'Case-insensitive match on masked PAN suffix, descriptor or merchant name (no PII).' },
+          page:      { type: 'integer', minimum: 1, default: 1 },
+          limit:     { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+          status:    { type: 'string', enum: ['authorized', 'declined', 'pending', 'settled', 'disputed'], description: 'Filter by transaction status.' },
+          search:    { type: 'string', description: 'Case-insensitive match on masked PAN suffix, descriptor or merchant name (no PII).' },
+          txnId:     { type: 'string', description: 'Exact match on cardTransactionInstanceReference (UUID).' },
+          cardToken: { type: 'string', description: 'Exact match on paymentCardReference (token surrogate, not CHD).' },
+          dateFrom:  { type: 'string', format: 'date-time', description: 'Inclusive lower bound on cardTransactionDateTime (ISO 8601).' },
+          dateTo:    { type: 'string', format: 'date-time', description: 'Inclusive upper bound on cardTransactionDateTime (ISO 8601).' },
         },
       },
       response: {
@@ -336,6 +340,7 @@ Used by customers to detect their onboarding state: no application / under_revie
                   cardTransactionMerchantName:      { type: 'string' },
                   cardTransactionMaskedPanDisplay:  { type: 'string' },
                   cardTransactionDescription:       { type: 'string' },
+                  paymentCardReference:              { type: 'string' },
                 },
               },
             },
@@ -351,7 +356,10 @@ Used by customers to detect their onboarding state: no application / under_revie
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { page = 1, limit = 20, status, search } = request.query as { page?: number; limit?: number; status?: string; search?: string };
+    const { page = 1, limit = 20, status, search, txnId, cardToken, dateFrom, dateTo } = request.query as {
+      page?: number; limit?: number; status?: string; search?: string;
+      txnId?: string; cardToken?: string; dateFrom?: string; dateTo?: string;
+    };
     const user = (request as { user?: JwtUserPayload }).user;
 
     const merchant = await getMerchantById(fastify.db, id);
@@ -364,8 +372,72 @@ Used by customers to detect their onboarding state: no application / under_revie
       return reply.status(403).send({ error: 'Access denied: only the merchant owner, PSP staff, or a fraud investigator can view received payments.' });
     }
 
-    const result = await getMerchantTransactions(fastify.db, id, Number(page), Number(limit), { status, search });
+    const result = await getMerchantTransactions(fastify.db, id, Number(page), Number(limit), { status, search, txnId, cardToken, dateFrom, dateTo });
     return reply.send(result);
+  });
+
+  // GET /api/v1/merchants/:id/transactions/:tid  — Single transaction detail (acquiring-side)
+  // PCI DSS Req 3/7: same data-minimization projection as the list — no payer PII.
+  fastify.get('/:id/transactions/:tid', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Single merchant transaction detail (acquiring view, SD-89)',
+      description: `Returns a single card transaction where this merchant was the payee.
+
+**Authorization:** same as the list endpoint — merchant owner, \`merchant_officer\`, or \`security_auditor\`.
+
+**PCI DSS Req 3 / Req 7 (data minimization):** the payer's PII is **never** included.`,
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['id', 'tid'],
+        properties: {
+          id:  { type: 'string', description: '`merchantAgreementInstanceReference` UUID.' },
+          tid: { type: 'string', description: '`cardTransactionInstanceReference` UUID.' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            cardTransactionInstanceReference: { type: 'string' },
+            cardTransactionAmount:            { $ref: 'MonetaryAmount#' },
+            cardTransactionDateTime:          { type: 'string', format: 'date-time' },
+            cardTransactionStatus:            { type: 'string' },
+            cardTransactionType:              { type: 'string' },
+            cardTransactionChannel:           { type: 'string' },
+            cardTransactionInitiationType:    { type: 'string' },
+            cardTransactionMerchantName:      { type: 'string' },
+            cardTransactionMerchantCategoryCode: { type: 'string' },
+            cardTransactionMaskedPanDisplay:  { type: 'string' },
+            cardTransactionDescription:       { type: 'string' },
+            cardTransactionNarrative:         { type: 'string' },
+            paymentCardReference:             { type: 'string' },
+            merchantAgreementInstanceReference: { type: 'string' },
+          },
+        },
+        401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id, tid } = request.params as { id: string; tid: string };
+    const user = (request as { user?: JwtUserPayload }).user;
+
+    const merchant = await getMerchantById(fastify.db, id);
+    if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
+
+    const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
+    const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
+    const isStaff = MERCHANT_DETAIL_READ_ROLES.has(user?.role ?? '');
+    if (!isOwner && !isStaff) {
+      return reply.status(403).send({ error: 'Access denied' });
+    }
+
+    const txn = await getMerchantTransactionById(fastify.db, id, tid);
+    if (!txn) return reply.status(404).send({ error: 'Transaction not found for this merchant' });
+    return reply.send(txn);
   });
 
   // GET /api/v1/merchants/:id/stats  — Acquiring analytics (BIAN Merchant Activity Analysis)

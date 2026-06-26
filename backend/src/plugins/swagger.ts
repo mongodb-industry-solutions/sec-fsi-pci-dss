@@ -10,12 +10,12 @@ export const swaggerPlugin = fp(async function (fastify: FastifyInstance) {
     openapi: {
       openapi: '3.0.0',
       info: {
-        title: 'FSI PSP Platform API',
+        title: 'Leafy Pay (PSP Platform API)',
         version: '1.0.0',
         description: `
 ## Overview
 
-REST API for the **FSI PSP Platform Demo**. It demonstrates how
+REST API for the **Leafy Pay** (PSP Platform Demo). It demonstrates how
 [MongoDB Queryable Encryption (QE)](https://www.mongodb.com/docs/manual/core/queryable-encryption/)
 enables a PCI DSS-aligned fraud investigation workflow for digital banks and card issuers:
 encrypted sensitive fields are searchable client-side without the plaintext ever reaching
@@ -71,8 +71,8 @@ Obtain a token via \`POST /api/v1/auth/login\`.
       },
       servers: [
         {
-          url: 'http://localhost:3001',
-          description: 'Local development',
+          url: '/',
+          description: 'Current server (relative)',
         },
       ],
       components: {
@@ -125,7 +125,10 @@ Obtain a token via \`POST /api/v1/auth/login\`.
       preHandler: (_request, _reply, done) => done(),
     },
     staticCSP: true,
-    transformStaticCSP: (header) => header,
+    transformStaticCSP: (header) => {
+      const port = process.env.PORT || '8081';
+      return `${header}; connect-src 'self' http://localhost:${port} http://127.0.0.1:${port}`;
+    },
     transformSpecification: (spec) => spec,
     transformSpecificationClone: true,
   });

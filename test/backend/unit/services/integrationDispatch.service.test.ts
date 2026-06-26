@@ -81,12 +81,12 @@ beforeEach(() => {
 describe('endpoint-first dispatch logic (ADR-025 D3)', () => {
   it('calls fetch when provider has externalProviderApiEndpoint (even if internal)', async () => {
     h.findOne.mockResolvedValueOnce(
-      makeProvider({ externalProviderApiEndpoint: 'http://localhost:3001/api/v1/modules/fds/score' })
+      makeProvider({ externalProviderApiEndpoint: 'http://localhost:8081/api/v1/modules/fds/score' })
     );
     const result = await dispatchProvider(makeDb(), 'fraud_detection', 'test', { amount: 100 });
     expect(h.fetchMock).toHaveBeenCalledTimes(1);
     expect(h.fetchMock).toHaveBeenCalledWith(
-      'http://localhost:3001/api/v1/modules/fds/score',
+      'http://localhost:8081/api/v1/modules/fds/score',
       expect.objectContaining({ method: 'POST' })
     );
     expect(result.provider).toBe('external');
@@ -152,7 +152,7 @@ describe('businessContext persisted in integrationEvents', () => {
 describe('timeout handling', () => {
   it('returns timeout status when fetch throws AbortError', async () => {
     h.findOne.mockResolvedValueOnce(
-      makeProvider({ externalProviderApiEndpoint: 'http://localhost:3001/api/v1/modules/fds/score' })
+      makeProvider({ externalProviderApiEndpoint: 'http://localhost:8081/api/v1/modules/fds/score' })
     );
     const abortErr = new Error('aborted');
     abortErr.name = 'AbortError';

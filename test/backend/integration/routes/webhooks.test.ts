@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createHmac } from 'node:crypto';
 import supertest from 'supertest';
-import { buildApp } from '../../../../backend/src/server';
+import { buildApp } from '../../../../backend/bin/server';
 import type { FastifyInstance } from 'fastify';
 import {
   verifyHmacSignature,

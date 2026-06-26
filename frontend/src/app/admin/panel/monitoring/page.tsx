@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { API_BASE_URL } from '../../../../lib/constants';
+import { JsonView } from '../../../../components/json/JsonView';
 import {
   Activity, Plus, PauseCircle, PlayCircle, Trash2,
   RefreshCw, Power, ChevronDown, ChevronUp, RotateCcw,
@@ -17,6 +18,7 @@ interface MonitoringService {
   description: string;
   type: ServiceType;
   url: string;
+  detailUrl?: string;
   method: 'GET' | 'POST';
   enabled: boolean;
   intervalMs: number;
@@ -160,6 +162,14 @@ function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
 
 // ── Service card ───────────────────────────────────────────────────────────
 
+interface DetailData {
+  status: string;
+  version?: string;
+  serviceId?: string;
+  description?: string;
+  checks?: Record<string, Array<{ status: string; componentType: string; observedValue?: unknown; observedUnit?: string; output?: string; time?: string }>>;
+}
+
 function ServiceCard({
   service, history, checking, paused,
   onToggle, onCheckNow, onRemove,
@@ -174,6 +184,8 @@ function ServiceCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [detailData, setDetailData] = useState<DetailData | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const last = history[0];
   const isActive = service.enabled && !paused;
 
@@ -193,9 +205,8 @@ function ServiceCard({
       statusColor = 'text-gray-400';
     } else if (last.ok) {
       dotClass = 'bg-green-500';
-      statusLabel = service.type === 'atlas'
-        ? `Atlas ${(last.meta?.atlas as string) ?? 'connected'}`
-        : 'Healthy';
+      const ietfStatus = last.meta?.status as string | undefined;
+      statusLabel = ietfStatus === 'pass' ? 'Healthy' : 'Healthy';
       statusColor = 'text-green-400';
     } else {
       dotClass = 'bg-red-500 animate-pulse';
@@ -204,10 +215,17 @@ function ServiceCard({
     }
   }
 
-  // Atlas-specific meta fields
-  const atlasField  = last?.meta?.atlas as string | undefined;
-  const kmsField    = last?.meta?.kmsProvider as string | undefined;
-  const statusField = last?.meta?.status as string | undefined;
+  // Fetch detail data on expand (only if detailUrl is configured)
+  useEffect(() => {
+    if (!expanded || !service.detailUrl || detailData) return;
+    const url = service.useApiBase ? `${API_BASE_URL}${service.detailUrl}` : service.detailUrl;
+    setDetailLoading(true);
+    fetch(url)
+      .then((r) => r.json())
+      .then((d) => setDetailData(d as DetailData))
+      .catch(() => {})
+      .finally(() => setDetailLoading(false));
+  }, [expanded, service.detailUrl, service.useApiBase, detailData]);
 
   const upCount   = history.filter(r => r.ok).length;
   const downCount = history.filter(r => !r.ok).length;
@@ -317,63 +335,102 @@ function ServiceCard({
 
       {/* Expanded detail */}
       {expanded && (
-        <div className="border-t border-gray-800 px-4 py-3 space-y-3">
+        <div className="border-t border-gray-800 px-4 py-3 space-y-3 max-h-[28rem] overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/70">
 
-          {/* Config */}
-          <div>
-            <p className="text-[10px] text-gray-600 uppercase tracking-wide font-semibold mb-1.5">Configuration</p>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs font-mono">
-              <dt className="text-gray-500">URL</dt>
-              <dd className="text-gray-300 truncate" title={service.useApiBase ? `${API_BASE_URL}${service.url}` : service.url}>
-                {service.useApiBase ? (
-                  <><span className="text-gray-600">{API_BASE_URL}</span>{service.url}</>
-                ) : service.url}
-              </dd>
-              <dt className="text-gray-500">Method</dt>
-              <dd className="text-gray-300">{service.method}</dd>
-              <dt className="text-gray-500">Expect</dt>
-              <dd className="text-gray-300">HTTP {service.expectedStatus}</dd>
-              <dt className="text-gray-500">Interval</dt>
-              <dd className="text-gray-300">{formatInterval(service.intervalMs)}</dd>
-              <dt className="text-gray-500">Timeout</dt>
-              <dd className="text-gray-300">{service.timeoutMs / 1000}s</dd>
-            </dl>
-          </div>
-
-          {/* Last result */}
-          {last && (
-            <div className="border-t border-gray-800 pt-3">
-              <p className="text-[10px] text-gray-600 uppercase tracking-wide font-semibold mb-1.5">
-                Last check · {new Date(last.timestamp).toLocaleTimeString()}
-              </p>
-              {last.error && (
-                <p className="flex items-start gap-1.5 text-xs text-red-400 font-mono">
-                  <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
-                  {last.error}
+          {/* IETF health checks detail (fetched on-demand) */}
+          {detailLoading && (
+            <p className="text-xs text-gray-500 animate-pulse">Loading detail…</p>
+          )}
+          {detailData && detailData.checks && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] text-gray-600 uppercase tracking-wide font-semibold">
+                  Component checks
                 </p>
-              )}
-              {(statusField || atlasField || kmsField) && (
-                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs font-mono mt-1">
-                  {statusField && (
-                    <>
-                      <dt className="text-gray-500">status</dt>
-                      <dd className={last.ok ? 'text-green-400' : 'text-red-400'}>{statusField}</dd>
-                    </>
-                  )}
-                  {atlasField && (
-                    <>
-                      <dt className="text-gray-500">atlas</dt>
-                      <dd className={atlasField === 'connected' ? 'text-green-400' : 'text-red-400'}>{atlasField}</dd>
-                    </>
-                  )}
-                  {kmsField && (
-                    <>
-                      <dt className="text-gray-500">kmsProvider</dt>
-                      <dd className="text-gray-300">{kmsField}</dd>
-                    </>
-                  )}
-                </dl>
-              )}
+                {detailData.version && (
+                  <span className="text-[10px] text-gray-700 font-mono">v{detailData.version}</span>
+                )}
+                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                  detailData.status === 'pass' ? 'bg-green-900/30 text-green-400' :
+                  detailData.status === 'warn' ? 'bg-yellow-900/30 text-yellow-400' :
+                  'bg-red-900/30 text-red-400'
+                }`}>
+                  {detailData.status}
+                </span>
+                <button
+                  onClick={() => setDetailData(null)}
+                  title="Refresh detail"
+                  className="ml-auto text-gray-700 hover:text-gray-400 transition-colors"
+                >
+                  <RefreshCw size={10} />
+                </button>
+              </div>
+
+              {/* Render each check as a collapsible entry */}
+              {Object.entries(detailData.checks).map(([name, entries]) => (
+                entries.map((entry, i) => (
+                  <div key={`${name}-${i}`} className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`flex-shrink-0 w-2 h-2 rounded-full ${
+                        entry.status === 'pass' ? 'bg-green-500' :
+                        entry.status === 'warn' ? 'bg-yellow-500' : 'bg-red-500'
+                      }`} />
+                      <span className="text-xs font-mono text-gray-400">{name}</span>
+                      {entry.observedUnit && typeof entry.observedValue !== 'object' && (
+                        <span className="text-xs font-mono text-gray-500">
+                          {String(entry.observedValue)} {entry.observedUnit}
+                        </span>
+                      )}
+                      {entry.output && (
+                        <span className="text-xs font-mono text-red-400 truncate">{entry.output}</span>
+                      )}
+                    </div>
+                    {entry.observedValue !== undefined && typeof entry.observedValue === 'object' && (
+                      <JsonView
+                        data={entry.observedValue}
+                        theme="dark"
+                        maxHeight="10rem"
+                        collapsed={1}
+                        hideToolbar
+                        surfaceClassName="bg-gray-950 border-gray-800"
+                      />
+                    )}
+                  </div>
+                ))
+              ))}
+            </div>
+          )}
+
+          {/* Fallback: Config when no detailUrl or no data yet */}
+          {!detailData && !detailLoading && (
+            <div>
+              <p className="text-[10px] text-gray-600 uppercase tracking-wide font-semibold mb-1.5">Configuration</p>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs font-mono">
+                <dt className="text-gray-500">URL</dt>
+                <dd className="text-gray-300 truncate" title={service.useApiBase ? `${API_BASE_URL}${service.url}` : service.url}>
+                  {service.useApiBase ? (
+                    <><span className="text-gray-600">{API_BASE_URL}</span>{service.url}</>
+                  ) : service.url}
+                </dd>
+                <dt className="text-gray-500">Method</dt>
+                <dd className="text-gray-300">{service.method}</dd>
+                <dt className="text-gray-500">Expect</dt>
+                <dd className="text-gray-300">HTTP {service.expectedStatus}</dd>
+                <dt className="text-gray-500">Interval</dt>
+                <dd className="text-gray-300">{formatInterval(service.intervalMs)}</dd>
+                <dt className="text-gray-500">Timeout</dt>
+                <dd className="text-gray-300">{service.timeoutMs / 1000}s</dd>
+              </dl>
+            </div>
+          )}
+
+          {/* Last error */}
+          {last?.error && (
+            <div className="border-t border-gray-800 pt-3">
+              <p className="flex items-start gap-1.5 text-xs text-red-400 font-mono">
+                <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
+                {last.error}
+              </p>
             </div>
           )}
 
@@ -713,7 +770,7 @@ export default function MonitoringPage() {
   }).length;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 h-full overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#00ED64_#111827] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-gray-900 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#00ED64]/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-[#00ED64]/70 pr-1">
 
       {/* Header controls */}
       <div className="flex items-center gap-3 flex-wrap">

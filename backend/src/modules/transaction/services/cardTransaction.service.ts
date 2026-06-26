@@ -67,8 +67,8 @@ export class CardIssuerDeclinedError extends Error {
 }
 
 function shouldCreateFraudCase(amount: number, mcc: string): { create: boolean; reasons: string[] } {
-  const threshold = parseInt(process.env.FRAUD_AMOUNT_THRESHOLD ?? '500', 10);
-  const riskMccList = (process.env.RISK_MCC_LIST ?? '5812,6011,7995').split(',').map((m) => m.trim());
+  const threshold = parseInt(process.env.PSP_FRAUD_AMOUNT_THRESHOLD ?? '500', 10);
+  const riskMccList = (process.env.PSP_RISK_MCC_LIST ?? '5812,6011,7995').split(',').map((m) => m.trim());
   const reasons: string[] = [];
   if (amount > threshold) reasons.push('amount_threshold');
   if (riskMccList.includes(mcc)) reasons.push('high_risk_mcc');
@@ -329,7 +329,7 @@ export async function completeAuthorized(db: Db, txnId: string, fdsVerdict?: Fds
   // The FDS verdict (handed in by the saga) drives the fraud case when present — the case
   // score/severity/indicators are the FDS verdict, so the case is congruent with the
   // fds.scoring.completed gate result. When no verdict is available (FDS unreachable / fail-open),
-  // fall back to the PSP amount+MCC rule, which shares the FDS amount threshold (FRAUD_AMOUNT_THRESHOLD).
+  // fall back to the PSP amount+MCC rule, which shares the FDS amount threshold (PSP_FRAUD_AMOUNT_THRESHOLD).
   const fds = fdsVerdict;
   let create: boolean;
   let reasons: string[];
@@ -628,12 +628,19 @@ export async function getMerchantTransactions(
   merchantId: string,
   page: number,
   limit: number,
-  filters?: { status?: string; search?: string },
+  filters?: { status?: string; search?: string; txnId?: string; cardToken?: string; dateFrom?: string; dateTo?: string },
 ) {
   const query: Record<string, unknown> = { merchantAgreementInstanceReference: merchantId };
   if (filters?.status) query['cardTransactionStatus'] = filters.status;
+  if (filters?.txnId) query['cardTransactionInstanceReference'] = filters.txnId;
+  if (filters?.cardToken) query['paymentCardReference'] = filters.cardToken;
+  if (filters?.dateFrom || filters?.dateTo) {
+    const range: Record<string, Date> = {};
+    if (filters.dateFrom) range['$gte'] = new Date(filters.dateFrom);
+    if (filters.dateTo) range['$lte'] = new Date(filters.dateTo);
+    query['cardTransactionDateTime'] = range;
+  }
   if (filters?.search) {
-    // Plaintext fields only (no PII): masked PAN suffix or descriptor. Case-insensitive.
     const rx = { $regex: filters.search, $options: 'i' };
     query['$or'] = [
       { cardTransactionMaskedPanDisplay: rx },
@@ -652,6 +659,7 @@ export async function getMerchantTransactions(
     cardTransactionMerchantName: 1,
     cardTransactionMaskedPanDisplay: 1,
     cardTransactionDescription: 1,
+    paymentCardReference: 1,
   };
   const skip = (page - 1) * limit;
   const [results, total] = await Promise.all([
@@ -665,6 +673,40 @@ export async function getMerchantTransactions(
     db.collection(CARD_TRANSACTION_COLLECTION).countDocuments(query),
   ]);
   return { results, total, page, limit };
+}
+
+/**
+ * Single transaction for the acquiring-side view (BIAN SD-89).
+ * Same PCI DSS data-minimization projection as getMerchantTransactions — no payer PII.
+ * Returns null if the transaction does not exist or does not belong to this merchant.
+ */
+export async function getMerchantTransactionById(
+  db: Db,
+  merchantId: string,
+  txnId: string,
+) {
+  const projection = {
+    _id: 0,
+    cardTransactionInstanceReference: 1,
+    cardTransactionAmount: 1,
+    cardTransactionDateTime: 1,
+    cardTransactionStatus: 1,
+    cardTransactionType: 1,
+    cardTransactionChannel: 1,
+    cardTransactionInitiationType: 1,
+    cardTransactionMerchantName: 1,
+    cardTransactionMerchantCategoryCode: 1,
+    cardTransactionMaskedPanDisplay: 1,
+    cardTransactionDescription: 1,
+    cardTransactionNarrative: 1,
+    paymentCardReference: 1,
+    merchantAgreementInstanceReference: 1,
+  };
+  return db.collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION)
+    .findOne(
+      { cardTransactionInstanceReference: txnId, merchantAgreementInstanceReference: merchantId },
+      { projection },
+    );
 }
 
 /**

@@ -1,5 +1,5 @@
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+  process.env.NEXT_PUBLIC_PSP_URL_BACKEND ?? 'http://localhost:8081';
 
 // All seeded demo accounts share the same bcrypt-hashed credential.
 // The plaintext is a fixed demo convention (documented in auth.controller.ts);

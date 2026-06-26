@@ -773,18 +773,17 @@ AWS_CMK_ARN=arn:aws:kms:us-east-1:<account>:key/<key-id>
 KMS_PROVIDER=aws               # 'aws' | 'local'
 KMS_LOCAL_MASTER_KEY=       # 96-byte key, base64 encoded
 
-# API
-API_PORT=3001
-API_HOST=0.0.0.0
-CORS_ORIGIN=http://localhost:3000
+# Server
+PORT=8081                          # Dockerfile sets 8080 for K8s; code defaults to 8081 for local dev
+PSP_CORS_ORIGIN=http://localhost:8080
+PSP_URL_FRONTEND=http://localhost:8080
 
 # Authentication (Application Mode)
 JWT_SECRET=                        # HS256 signing secret (min 32 chars)
 JWT_EXPIRES_IN=24h
-AUTH_DOMAIN=local                  # 'local' | 'msentra' (msentra: v2)
 
-# Next.js
-NEXT_PUBLIC_API_URL=http://localhost:3001
+# Next.js (browser → backend)
+NEXT_PUBLIC_PSP_URL_BACKEND=http://localhost:8081
 ```
 
 ### 8.5 Docker Compose
@@ -796,24 +795,27 @@ services:
   backend:
     build: ./backend
     ports:
-      - "3001:3001"
+      - "8081:8080"  # host:container (Dockerfile sets PORT=8080)
     env_file: .env
+    environment:
+      PSP_CORS_ORIGIN: "http://localhost:8080,http://127.0.0.1:8080"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 3
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_PSP_URL_BACKEND: http://localhost:8081
     ports:
-      - "3000:3000"
+      - "8080:8080"
     env_file: .env
     depends_on:
       backend:
         condition: service_healthy
-    environment:
-      NEXT_PUBLIC_API_URL: http://backend:3001
 
 # MongoDB is NOT included: IST demos use Atlas, not a local instance.
 # Uncomment only for fully offline scenarios:

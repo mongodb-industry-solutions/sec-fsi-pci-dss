@@ -1,11 +1,10 @@
-version: '3.9'
-
 # ── PSP Platform FSI PCI DSS Demo ───────────────────────────────────────────────
 # Usage:
-#   docker compose up --build          # build + start both services
-#   docker compose up --build backend  # rebuild backend only
-#   docker compose exec backend npm run setup:db  # provision QE collections
-#   docker compose exec backend npm run seed       # seed demo data
+#   docker compose up --build                       # build + start both services
+#   docker compose up --build backend               # rebuild backend only
+#   docker compose exec backend npm run setup:db    # provision QE collections
+#   docker compose exec backend npm run setup:seed  # seed demo data
+#   docker compose exec backend npm run test:unit   # run unit tests in-container
 #
 # Prerequisites:
 #   1. Copy .env.example to .env and fill in MONGODB_URI, JWT_SECRET, KMS_PROVIDER.
@@ -17,24 +16,20 @@ version: '3.9'
 services:
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
-      - "3001:3001"
+      - "8081:8080"  # host:container — Dockerfile sets PORT=8080; host exposes 8081
     env_file:
       - .env
     environment:
-      # Use development to enable /api/v1/system/raw (ciphertext demo step); set production to block it.
       NODE_ENV: ${NODE_ENV:-development}
-      SEED_DATA_DIR: /app/data
-      # CORS: allow the frontend container origin
-      CORS_ORIGIN: http://localhost:3000
-    # Mount the QE shared library if MONGODB_CRYPT_SHARED_LIB_PATH points to a host path.
-    # Uncomment and adjust if the library is stored outside the container:
-    # volumes:
-    #   - ${MONGODB_CRYPT_SHARED_LIB_PATH}:${MONGODB_CRYPT_SHARED_LIB_PATH}:ro
+      PSP_SEED_DATA_DIR: /app/backend/data
+      PSP_PROJECT_ROOT: /app
+      PSP_CORS_ORIGIN: "http://localhost:8080,http://127.0.0.1:8080"
+      MONGODB_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/v1/system/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 6
@@ -45,11 +40,9 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # NEXT_PUBLIC_* vars are baked into the Next.js bundle at build time.
-        # For local Docker Compose, the browser talks to localhost:3001 directly.
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+        NEXT_PUBLIC_PSP_URL_BACKEND: ${NEXT_PUBLIC_PSP_URL_BACKEND:-http://localhost:8081}
     ports:
-      - "3000:3000"
+      - "8080:8080"
     env_file:
       - .env
     environment:

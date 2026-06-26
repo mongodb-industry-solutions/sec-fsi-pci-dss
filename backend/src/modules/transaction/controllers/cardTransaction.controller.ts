@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import type { AuthenticatedRequest } from '../../../shared/models/identity.model';
+import { beginSSE } from '../../../shared/services/sse';
 import {
   initiateTransaction,
   getTransactionById,
@@ -55,7 +56,7 @@ the Merchant Name selector. No authentication required (public, simulator mode).
 \`cardTransactionSensitive\` document (raw gateway payload, QE:none).
 
 **Auto fraud-case rule:** a \`fraudDiagnosisCase\` is opened automatically when:
-- \`amount\` exceeds the risk threshold (default: 500, configurable via \`FRAUD_AMOUNT_THRESHOLD\`)
+- \`amount\` exceeds the risk threshold (default: 500, configurable via \`PSP_FRAUD_AMOUNT_THRESHOLD\`)
 - OR \`cardTransactionMerchantCategoryCode\` is in the high-risk list: \`5812\` (restaurants), \`6011\` (ATM/cash), \`7995\` (gambling)
 
 **QE fields:**
@@ -227,13 +228,7 @@ the Merchant Name selector. No authentication required (public, simulator mode).
     config: { skipAuth: true },
   }, async (request, reply) => {
     const txnId = (request.params as { id: string }).id;
-    reply.hijack();
-    const res = reply.raw;
-    const origin = (request.headers.origin as string | undefined) ?? process.env.CORS_ORIGIN ?? 'http://localhost:3000';
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no', 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Credentials': 'true', Vary: 'Origin',
-    });
+    const res = beginSSE(reply, request);
     res.write('event: ready\ndata: {}\n\n');
 
     const emit = (status: string, extra: Record<string, unknown> = {}) => res.write(`data: ${JSON.stringify({ status, ...extra })}\n\n`);

@@ -1,0 +1,27 @@
+env:
+  NODE_ENV: staging
+  KMS_PROVIDER: local
+  PSP_CORS_ORIGIN: "https://sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com"
+  PSP_URL_FRONTEND: "https://sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com"
+
+envSecrets:
+  MONGODB_URI: sec-fsi-pci-dss-secrets-staging
+  MONGODB_DB_NAME: sec-fsi-pci-dss-secrets-staging
+  KMS_LOCAL_MASTER_KEY: sec-fsi-pci-dss-secrets-staging
+  KMS_KEY_VAULT_DATABASE: sec-fsi-pci-dss-secrets-staging
+  KMS_KEY_VAULT_COLLECTION: sec-fsi-pci-dss-secrets-staging
+  PSP_ADM_USER: sec-fsi-pci-dss-secrets-staging
+  PSP_ADM_PASS: sec-fsi-pci-dss-secrets-staging
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1024Mi
+
+serviceAccount:
+  enabled: true
+  create: false
+  name: irsa-industrysolutions-staging

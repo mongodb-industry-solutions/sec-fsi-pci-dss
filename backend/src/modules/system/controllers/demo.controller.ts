@@ -1,9 +1,126 @@
 import { FastifyInstance } from 'fastify';
 import { Db } from 'mongodb';
+import * as os from 'os';
+import * as fs from 'fs';
+import * as path from 'path';
 import { getRawClient } from '../../../vendors/encryption/rawClient';
 import { getDemoUsers } from '../../identity/services/auth.service';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
+
+// ── Health check helpers (IETF draft-inadarei-api-health-check) ─────────────
+
+const PKG_VERSION = (() => {
+  try {
+    const pkgPath = path.join(process.cwd(), 'package.json');
+    return JSON.parse(fs.readFileSync(pkgPath, 'utf-8')).version as string;
+  } catch { return '0.0.0'; }
+})();
+
+const SERVICE_ID = 'fsi-pci-dss-backend';
+const SERVICE_DESC = 'Leafy Pay PSP Platform — Backend API';
+
+type CheckStatus = 'pass' | 'fail' | 'warn';
+interface CheckEntry {
+  status: CheckStatus;
+  componentType: string;
+  observedValue?: unknown;
+  observedUnit?: string;
+  time?: string;
+  output?: string;
+}
+
+function serverChecks(): Record<string, CheckEntry[]> {
+  const cryptPath = process.env.MONGODB_CRYPT_SHARED_LIB_PATH ?? '';
+  const cryptExists = cryptPath ? fs.existsSync(cryptPath) : false;
+  const mem = process.memoryUsage();
+  return {
+    'server:uptime': [{
+      status: 'pass',
+      componentType: 'system',
+      observedValue: Math.floor(process.uptime()),
+      observedUnit: 's',
+    }],
+    'server:memory': [{
+      status: 'pass',
+      componentType: 'system',
+      observedValue: { rssBytes: mem.rss, heapUsedBytes: mem.heapUsed, heapTotalBytes: mem.heapTotal },
+    }],
+    'server:node': [{
+      status: 'pass',
+      componentType: 'system',
+      observedValue: { version: process.version, platform: os.platform(), arch: os.arch() },
+    }],
+    'server:env': [{
+      status: 'pass',
+      componentType: 'system',
+      observedValue: process.env.NODE_ENV ?? 'development',
+    }],
+    'server:cryptSharedLib': [{
+      status: cryptPath && cryptExists ? 'pass' : cryptPath ? 'fail' : 'warn',
+      componentType: 'system',
+      observedValue: { path: cryptPath || null, exists: cryptExists },
+      output: !cryptPath ? 'MONGODB_CRYPT_SHARED_LIB_PATH not set' : !cryptExists ? 'File not found' : undefined,
+    }],
+    'server:kmsProvider': [{
+      status: 'pass',
+      componentType: 'system',
+      observedValue: process.env.KMS_PROVIDER ?? 'local',
+    }],
+  };
+}
+
+function resolveMongoType(modules: string[], host: string): 'Atlas' | 'Enterprise Advanced' | 'Community' {
+  const isEnterprise = modules.some((m) => m.toLowerCase() === 'enterprise');
+  if (isEnterprise && host.includes('.mongodb.net')) return 'Atlas';
+  if (isEnterprise) return 'Enterprise Advanced';
+  return 'Community';
+}
+
+async function dbChecks(db: Db): Promise<Record<string, CheckEntry[]>> {
+  const checks: Record<string, CheckEntry[]> = {};
+  try {
+    const buildInfo = await db.admin().command({ buildInfo: 1 }) as { version?: string; modules?: string[] };
+    const host = (process.env.MONGODB_URI ?? '').replace(/^mongodb(\+srv)?:\/\/[^@]*@/, '').split('/')[0].split('?')[0];
+    const mongoType = resolveMongoType(buildInfo.modules ?? [], host);
+    checks['db:server'] = [{
+      status: 'pass',
+      componentType: 'datastore',
+      observedValue: {
+        host,
+        database: process.env.MONGODB_DB_NAME ?? db.databaseName,
+        serverVersion: buildInfo.version ?? 'unknown',
+        type: mongoType,
+        modules: buildInfo.modules ?? [],
+      },
+    }];
+  } catch (err) {
+    checks['db:server'] = [{
+      status: 'fail',
+      componentType: 'datastore',
+      output: err instanceof Error ? err.message : 'buildInfo failed',
+    }];
+  }
+
+  try {
+    const cols = await db.listCollections({}, { nameOnly: false }).toArray();
+    const collSummary = cols
+      .filter((c) => !c.name.startsWith('system.'))
+      .map((c) => ({ name: c.name, type: c.type ?? 'collection' }));
+    checks['db:collections'] = [{
+      status: 'pass',
+      componentType: 'datastore',
+      observedValue: { count: collSummary.length, items: collSummary },
+    }];
+  } catch (err) {
+    checks['db:collections'] = [{
+      status: 'warn',
+      componentType: 'datastore',
+      output: err instanceof Error ? err.message : 'listCollections failed',
+    }];
+  }
+  return checks;
+}
 
 // Mounted at /system → /api/v1/system
 // - GET /api/v1/system/health       public, always available (bypasses DB guard)
@@ -14,51 +131,77 @@ export async function demoController(fastify: FastifyInstance) {
   fastify.get('/health', {
     schema: {
       tags: ['system'],
-      summary: 'API and Atlas health check',
-      description: `Returns the API server status and MongoDB Atlas connectivity.
-**Public  -  no JWT required.** Responds even when Atlas is unreachable; check the \`atlas\` field.`,
-      response: {
-        200: {
-          description: 'Healthy: Atlas reachable',
-          type: 'object',
-          properties: {
-            status:      { type: 'string', enum: ['ok'] },
-            atlas:       { type: 'string', enum: ['connected'] },
-            kmsProvider: { type: 'string', enum: ['aws', 'local'] },
-            timestamp:   { type: 'string', format: 'date-time' },
-          },
-        },
-        503: {
-          description: 'Degraded: Atlas unreachable',
-          type: 'object',
-          properties: {
-            status:    { type: 'string', enum: ['error'] },
-            atlas:     { type: 'string', enum: ['disconnected'] },
-            error:     { type: 'string' },
-            timestamp: { type: 'string', format: 'date-time' },
-          },
+      summary: 'Health check (IETF draft format)',
+      description: `Returns system health following the IETF Health Check Response Format (draft-inadarei-api-health-check).
+**Public — no JWT required.** Use \`?detail=server|db|all\` for extended component checks (heavier; use on-demand only).`,
+      querystring: {
+        type: 'object',
+        properties: {
+          detail: { type: 'string', enum: ['server', 'db', 'all'], description: 'Include extended checks for the given component.' },
         },
       },
+      response: {
+        200: { type: 'object', additionalProperties: true, description: 'Healthy (status=pass)' },
+        503: { type: 'object', additionalProperties: true, description: 'Degraded (status=fail)' },
+      },
     },
-  }, async (_request, reply) => {
-    const timestamp = new Date().toISOString();
+  }, async (request, reply) => {
+    const detail = (request.query as { detail?: string }).detail;
+    const now = new Date().toISOString();
 
-    if ((fastify as FastifyInstance & { dbError?: string | null }).dbError) {
-      return reply.status(503).send({
-        status: 'error',
-        atlas: 'disconnected',
-        error: (fastify as FastifyInstance & { dbError?: string | null }).dbError,
-        timestamp,
-      });
+    const checks: Record<string, CheckEntry[]> = {};
+    let overallStatus: CheckStatus = 'pass';
+
+    // Core connectivity check (always runs — lightweight ping)
+    if (fastify.dbError) {
+      overallStatus = 'fail';
+      checks['mongodb:connectivity'] = [{
+        status: 'fail',
+        componentType: 'datastore',
+        output: fastify.dbError,
+        time: now,
+      }];
+    } else {
+      try {
+        const t0 = Date.now();
+        await fastify.db.command({ ping: 1 });
+        checks['mongodb:connectivity'] = [{
+          status: 'pass',
+          componentType: 'datastore',
+          observedValue: Date.now() - t0,
+          observedUnit: 'ms',
+          time: now,
+        }];
+      } catch (err) {
+        overallStatus = 'fail';
+        checks['mongodb:connectivity'] = [{
+          status: 'fail',
+          componentType: 'datastore',
+          output: err instanceof Error ? err.message : 'ping failed',
+          time: now,
+        }];
+      }
     }
 
-    try {
-      await (fastify as FastifyInstance & { db?: { command: (cmd: object) => Promise<unknown> } }).db?.command({ ping: 1 });
-      return reply.send({ status: 'ok', atlas: 'connected', kmsProvider: process.env.KMS_PROVIDER ?? 'aws', timestamp });
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : 'ping failed';
-      return reply.status(503).send({ status: 'error', atlas: 'disconnected', error: reason, timestamp });
+    // Extended: server details (no DB cost)
+    if (detail === 'server' || detail === 'all') {
+      Object.assign(checks, serverChecks());
     }
+
+    // Extended: database details (moderate cost — buildInfo + listCollections)
+    if ((detail === 'db' || detail === 'all') && !fastify.dbError) {
+      Object.assign(checks, await dbChecks(fastify.db));
+    }
+
+    reply.header('Content-Type', 'application/health+json; charset=utf-8');
+    const body = {
+      status: overallStatus,
+      version: PKG_VERSION,
+      serviceId: SERVICE_ID,
+      description: SERVICE_DESC,
+      checks,
+    };
+    return reply.status(overallStatus === 'pass' ? 200 : 503).send(body);
   });
 
   // GET /api/v1/system/users

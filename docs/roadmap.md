@@ -47,7 +47,7 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 ### Definition of Done
 
 - [ ] `npm run setup && npm run setup:db && npm run setup:seed` completes without errors
-- [ ] `docker compose up` starts both services and the demo is accessible at `http://localhost:3000`
+- [ ] `docker compose up` starts both services and the demo is accessible at `http://localhost:8080`
 - [ ] Payment flow completes and creates a fraud diagnosis case in Atlas
 - [ ] Investigation search returns a result for an encrypted `customerEmailAddress`
 - [ ] Atlas Data Explorer shows ciphertext in QE fields (not plaintext)

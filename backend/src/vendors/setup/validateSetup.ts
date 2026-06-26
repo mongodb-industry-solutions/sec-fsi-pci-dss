@@ -140,13 +140,13 @@ function checkEnvVars(): boolean {
     check('warn', 'MONGODB_URI format', 'does not start with mongodb:// or mongodb+srv://');
   }
 
-  // JWT_SECRET is optional for local/demo: the app falls back to a built-in demo default
+  // PSP_JWT_SECRET is optional for local/demo: the app falls back to a built-in demo default
   // (auth, escalation tokens, admin). Warn (not fail) when unset or when it equals that default —
   // a strong secret is required only before any non-local deployment.
-  if (!process.env.JWT_SECRET) {
-    check('warn', 'JWT_SECRET', 'not set - app uses the built-in demo default; set a strong secret before any non-local deployment');
-  } else if (process.env.JWT_SECRET === 'demo-local-secret-change-in-production') {
-    check('warn', 'JWT_SECRET', 'using the hardcoded demo default - change before any non-local deployment');
+  if (!process.env.PSP_JWT_SECRET) {
+    check('warn', 'PSP_JWT_SECRET', 'not set - app uses the built-in demo default; set a strong secret before any non-local deployment');
+  } else if (process.env.PSP_JWT_SECRET === 'demo-local-secret-change-in-production') {
+    check('warn', 'PSP_JWT_SECRET', 'using the hardcoded demo default - change before any non-local deployment');
   }
 
   // -- 1.2 KMS-specific --------------------------------------------------------
@@ -204,27 +204,27 @@ function checkEnvVars(): boolean {
   // -- 1.5 Application runtime (optional) ------------------------------------
   console.log('   1.5 Application runtime (optional)');
 
-  const apiPort = process.env.API_PORT;
-  if (!apiPort) {
-    check('warn', 'API_PORT', 'not set - defaulting to 3001');
+  const portVal = process.env.PORT;
+  if (!portVal) {
+    check('warn', 'PORT', 'not set - defaulting to 8081');
   } else {
-    const p = parseInt(apiPort, 10);
+    const p = parseInt(portVal, 10);
     (!isNaN(p) && p > 0 && p < 65536)
-      ? check('pass', 'API_PORT', String(p))
-      : check('warn', 'API_PORT', `'${apiPort}' is not a valid port number`);
+      ? check('pass', 'PORT', String(p))
+      : check('warn', 'PORT', `'${portVal}' is not a valid port number`);
   }
 
-  process.env.API_HOST
-    ? check('pass', 'API_HOST', process.env.API_HOST)
-    : check('warn', 'API_HOST', 'not set - defaulting to 0.0.0.0');
+  process.env.HOST
+    ? check('pass', 'HOST', process.env.HOST)
+    : check('warn', 'HOST', 'not set - defaulting to 0.0.0.0');
 
-  process.env.CORS_ORIGIN
-    ? check('pass', 'CORS_ORIGIN', process.env.CORS_ORIGIN)
-    : check('warn', 'CORS_ORIGIN', 'not set - defaulting to http://localhost:3000 (update for non-local deployments)');
+  process.env.PSP_CORS_ORIGIN
+    ? check('pass', 'PSP_CORS_ORIGIN', process.env.PSP_CORS_ORIGIN)
+    : check('warn', 'PSP_CORS_ORIGIN', 'not set - defaulting to http://localhost:8080 (update for non-local deployments)');
 
-  process.env.JWT_EXPIRES_IN
-    ? check('pass', 'JWT_EXPIRES_IN', process.env.JWT_EXPIRES_IN)
-    : check('warn', 'JWT_EXPIRES_IN', 'not set - defaulting to 24h');
+  process.env.PSP_JWT_EXPIRES_IN
+    ? check('pass', 'PSP_JWT_EXPIRES_IN', process.env.PSP_JWT_EXPIRES_IN)
+    : check('warn', 'PSP_JWT_EXPIRES_IN', 'not set - defaulting to 24h');
 
   const nodeEnv = process.env.NODE_ENV;
   if (!nodeEnv) {

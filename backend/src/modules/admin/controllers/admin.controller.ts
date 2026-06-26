@@ -5,12 +5,15 @@ import * as os from 'os';
 import * as fs from 'fs';
 import { spawn, execSync } from 'child_process';
 import * as path from 'path';
-import { logBuffer, appendLog, writeCount } from '../../../shared/logBuffer';
+import { logBuffer, appendLog, writeCount } from '../../../shared/services/logBuffer';
+import { beginSSE } from '../../../shared/services/sse';
 import { resolveTestStrategy, NormalizedTestSummary } from '../services/testRunners';
+import { jwtSecret, sha256 } from '../../../vendors/encryption/digest';
 
-// __dirname = backend/src/modules/admin/controllers/ (tsx dev mode)
-// 5 levels up -> project root
-const PROJECT_ROOT = path.resolve(__dirname, '../../../../../');
+// In Docker (compiled dist/), __dirname gains an extra /dist/ level that breaks
+// the naïve 5-levels-up heuristic. PSP_PROJECT_ROOT overrides cleanly in any env.
+const PROJECT_ROOT: string = process.env.PSP_PROJECT_ROOT
+  || path.resolve(__dirname, '../../../../../');
 
 const SENSITIVE_KEY_PATTERNS = [
   /secret/i, /password/i, /passwd/i, /pass/i, /key/i,
@@ -107,14 +110,14 @@ function updateEnvFile(key: string, value: string): void {
   fs.writeFileSync(ENV_PATH, updated.join(eol), 'utf-8');
 }
 
-/** Parses the frontend port from CORS_ORIGIN (defaults to 3000). */
+/** Parses the frontend port from PSP_CORS_ORIGIN (defaults to 8080). */
 function getFrontendPort(): number {
-  const origin = process.env.CORS_ORIGIN ?? 'http://localhost:3000';
+  const origin = process.env.PSP_CORS_ORIGIN ?? 'http://localhost:8080,http://127.0.0.1:8080';
   try {
-    const p = new URL(origin).port;
-    return p ? parseInt(p, 10) : 3000;
+    const p = new URL(origin.split(',')[0]).port;
+    return p ? parseInt(p, 10) : 8080;
   } catch {
-    return 3000;
+    return 8080;
   }
 }
 
@@ -195,14 +198,6 @@ const checkLoginRateLimit = makeRateLimiter(10, 15 * 60 * 1000);
 // Lenient: command/exec/logs/system  -  300 requests per 15 min (demo usage)
 const checkOpsRateLimit   = makeRateLimiter(300, 15 * 60 * 1000);
 
-function sha256(text: string): string {
-  return crypto.createHash('sha256').update(text).digest('hex');
-}
-
-function jwtSecret(): string {
-  return process.env.JWT_SECRET ?? 'demo-local-secret-change-in-production';
-}
-
 function verifyAdminToken(authHeader: string | undefined): boolean {
   if (!authHeader?.startsWith('Bearer ')) return false;
   const token = authHeader.slice(7);
@@ -271,16 +266,6 @@ function spawnSSE(
   });
 }
 
-function beginSSE(reply: import('fastify').FastifyReply) {
-  reply.hijack();
-  reply.raw.writeHead(200, {
-    'Content-Type': 'text/event-stream; charset=utf-8',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': process.env.CORS_ORIGIN ?? 'http://localhost:3000',
-  });
-  reply.raw.flushHeaders();
-}
 
 export async function adminController(fastify: FastifyInstance) {
 
@@ -295,8 +280,8 @@ export async function adminController(fastify: FastifyInstance) {
         type: 'object',
         required: ['username', 'password'],
         properties: {
-          username: { type: 'string', description: 'Admin username (matches ADM_USER env var).' },
-          password: { type: 'string', description: 'Plaintext password (server computes SHA-256 and compares against ADM_PASS).' },
+          username: { type: 'string', description: 'Admin username (matches PSP_ADM_USER env var).' },
+          password: { type: 'string', description: 'Plaintext password (server computes SHA-256 and compares against PSP_ADM_PASS).' },
         },
       },
       response: {
@@ -321,11 +306,11 @@ export async function adminController(fastify: FastifyInstance) {
     }
 
     const { username, password } = request.body as { username: string; password: string };
-    if (process.env.NODE_ENV === 'production' && (!process.env.ADM_USER || !process.env.ADM_PASS)) {
-      return reply.status(503).send({ error: 'Admin credentials not configured. Set ADM_USER and ADM_PASS environment variables.' });
+    if (process.env.NODE_ENV === 'production' && (!process.env.PSP_ADM_USER || !process.env.PSP_ADM_PASS)) {
+      return reply.status(503).send({ error: 'Admin credentials not configured. Set PSP_ADM_USER and PSP_ADM_PASS environment variables.' });
     }
-    const admUser = process.env.ADM_USER ?? 'admin';
-    const admPass = process.env.ADM_PASS ?? sha256('admin');
+    const admUser = process.env.PSP_ADM_USER ?? 'admin';
+    const admPass = process.env.PSP_ADM_PASS ?? sha256('admin');
 
     if (username !== admUser || sha256(password) !== admPass) {
       return reply.status(401).send({ error: 'Invalid admin credentials' });
@@ -373,7 +358,7 @@ export async function adminController(fastify: FastifyInstance) {
     // result summary is parsed from structured output, not scraped from log text.
     const strategy = resolveTestStrategy(command, PROJECT_ROOT);
 
-    beginSSE(reply);
+    beginSSE(reply, request);
 
     if (strategy) {
       fs.mkdirSync(path.dirname(strategy.outputFile), { recursive: true });
@@ -433,7 +418,7 @@ export async function adminController(fastify: FastifyInstance) {
     }
     const workDir = requestedCwd;
 
-    beginSSE(reply);
+    beginSSE(reply, request);
     await spawnSSE(reply.raw, command, [], workDir, `exec`);
   });
 
@@ -456,7 +441,7 @@ export async function adminController(fastify: FastifyInstance) {
       return reply.status(401).send({ error: 'Invalid admin token' });
     }
 
-    beginSSE(reply);
+    beginSSE(reply, request);
 
     [...logBuffer].forEach((line) => {
       reply.raw.write(`event: log\ndata: ${JSON.stringify({ text: line })}\n\n`);
@@ -630,7 +615,7 @@ export async function adminController(fastify: FastifyInstance) {
       summary: 'Restart backend or frontend server',
       description: [
         'backend - calls process.exit(0); tsx watch auto-restarts the backend.',
-        'frontend - kills the process on the configured frontend port (CORS_ORIGIN) and spawns a new dev server.',
+        'frontend - kills the process on the configured frontend port (PSP_CORS_ORIGIN) and spawns a new dev server.',
       ].join(' '),
       security: [{ adminAuth: [] }],
       body: {

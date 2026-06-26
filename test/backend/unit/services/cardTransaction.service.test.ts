@@ -82,8 +82,8 @@ beforeEach(() => {
   h.updateOne.mockClear();
   h.createFraudCase.mockClear();
   h.getDbForRole.mockClear();
-  process.env.FRAUD_AMOUNT_THRESHOLD = '500';
-  process.env.RISK_MCC_LIST = '5812,6011,7995';
+  process.env.PSP_FRAUD_AMOUNT_THRESHOLD = '500';
+  process.env.PSP_RISK_MCC_LIST = '5812,6011,7995';
   // dev.v8 F3: authorization is event-driven. A fresh in-process bus + the saga drive it; the issuer
   // dispatch is mocked (no decline) so the journey reaches `authorized`, and createTransaction (the
   // sync wrapper) resolves to the final outcome.
@@ -143,19 +143,19 @@ describe('createTransaction', () => {
     expect(h.createFraudCase).toHaveBeenCalledTimes(1);
   });
 
-  it('fraudCaseCreated is true when MCC is in RISK_MCC_LIST (below threshold)', async () => {
+  it('fraudCaseCreated is true when MCC is in PSP_RISK_MCC_LIST (below threshold)', async () => {
     const result = await createTransaction(txDb(), { ...baseInput, amount: 50, cardTransactionMerchantCategoryCode: '7995' });
     expect(result.fraudCaseCreated).toBe(true);
   });
 
-  it('respects custom FRAUD_AMOUNT_THRESHOLD env var', async () => {
-    process.env.FRAUD_AMOUNT_THRESHOLD = '1000';
+  it('respects custom PSP_FRAUD_AMOUNT_THRESHOLD env var', async () => {
+    process.env.PSP_FRAUD_AMOUNT_THRESHOLD = '1000';
     const result = await createTransaction(txDb(), { ...baseInput, amount: 850, cardTransactionMerchantCategoryCode: '5411' });
     expect(result.fraudCaseCreated).toBe(false);
   });
 
-  it('respects custom RISK_MCC_LIST env var', async () => {
-    process.env.RISK_MCC_LIST = '1234';
+  it('respects custom PSP_RISK_MCC_LIST env var', async () => {
+    process.env.PSP_RISK_MCC_LIST = '1234';
     const result = await createTransaction(txDb(), { ...baseInput, amount: 50, cardTransactionMerchantCategoryCode: '7995' });
     expect(result.fraudCaseCreated).toBe(false);
   });

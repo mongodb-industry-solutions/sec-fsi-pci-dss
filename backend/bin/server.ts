@@ -1,34 +1,32 @@
 import dotenv from 'dotenv';
 import { resolve } from 'path';
 
-// Load .env from project root (two levels up from backend/src/).
-// Works regardless of CWD  -  whether called via `npm run dev` from backend/
-// or via `npm run dev:backend` from the workspace root.
+// Load .env from project root (two levels up from backend/bin/).
 dotenv.config({ path: resolve(__dirname, '../../.env') });
 import Fastify, { FastifyInstance } from 'fastify';
-import corsPlugin from './plugins/cors';
-import mongodbPlugin from './plugins/mongodb';
-import { swaggerPlugin } from './plugins/swagger';
-import { authMiddleware } from './vendors/middleware/auth';
-import { appendLog }          from './shared/logBuffer';
-import { identityModule }     from './modules/identity';
-import { customerModule }     from './modules/customer';
-import { transactionsModule } from './modules/transaction';
-import { fraudModule }        from './modules/fraud';
-import { gatewayModule }      from './modules/gateway';
-import { systemModule }       from './modules/system';
-import { adminModule }        from './modules/admin';
-import { providersModule } from './modules/provider';
-import { fdsModule }       from './providers/fds';
-import { hrpModule }       from './providers/hrp';
-import { amlModule }       from './providers/aml';
-import { kycModule }       from './providers/kyc';
-import { kybModule }       from './providers/kyb';
-import { creditBureauModule }      from './providers/credit-bureau';
-import { cardAuthorizationModule } from './providers/card-authorization';
-import { cardIssuerModule }        from './providers/card-issuer';
-import { domainModule }       from './modules/domain';
-import { notificationsModule } from './modules/notification';
+import corsPlugin from '../src/plugins/cors';
+import mongodbPlugin from '../src/plugins/mongodb';
+import { swaggerPlugin } from '../src/plugins/swagger';
+import { authMiddleware } from '../src/vendors/middleware/auth';
+import { appendLog }          from '../src/shared/services/logBuffer';
+import { identityModule }     from '../src/modules/identity';
+import { customerModule }     from '../src/modules/customer';
+import { transactionsModule } from '../src/modules/transaction';
+import { fraudModule }        from '../src/modules/fraud';
+import { gatewayModule }      from '../src/modules/gateway';
+import { systemModule }       from '../src/modules/system';
+import { adminModule }        from '../src/modules/admin';
+import { providersModule } from '../src/modules/provider';
+import { fdsModule }       from '../src/providers/fds';
+import { hrpModule }       from '../src/providers/hrp';
+import { amlModule }       from '../src/providers/aml';
+import { kycModule }       from '../src/providers/kyc';
+import { kybModule }       from '../src/providers/kyb';
+import { creditBureauModule }      from '../src/providers/credit-bureau';
+import { cardAuthorizationModule } from '../src/providers/card-authorization';
+import { cardIssuerModule }        from '../src/providers/card-issuer';
+import { domainModule }       from '../src/modules/domain';
+import { notificationsModule } from '../src/modules/notification';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
@@ -36,9 +34,6 @@ export async function buildApp(): Promise<FastifyInstance> {
     pluginTimeout: 60000,
     ajv: {
       customOptions: {
-        // Allow OpenAPI keywords that are not part of JSON Schema draft-07.
-        // AJV runs in strict mode by default in Fastify 4; without this it
-        // rejects 'example' and other OpenAPI annotations in route schemas.
         keywords: ['example'],
       },
     },
@@ -65,7 +60,6 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // DB availability guard: return 503 for all /api/* routes when the DB is down.
   // Excludes health endpoints so they can report degraded status even when Atlas is unreachable.
-  // This runs after auth so unauthenticated requests still get 401, not 503.
   fastify.addHook('preHandler', async (_request, reply) => {
     const url = _request.url;
     const isHealthCheck = url === '/health' || url.startsWith('/api/v1/system/health');
@@ -95,47 +89,42 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
   }, async (_request, reply) => reply.redirect('/doc'));
 
-  // Public /health alias — compatibility for infra probes that expect this standard path
+  // Public /health alias, infra probes (k8s, Docker, LBs) expect this path.
   fastify.get('/health', {
     schema: {
       tags: ['system'],
       summary: 'Health check (standard alias)',
-      description: 'Alias for `/api/v1/system/health`. **Public — no JWT required.** Intended for load balancers, k8s liveness probes, and monitoring systems that expect `/health`.',
+      description: 'Lightweight alias for `/api/v1/system/health` (no `detail`). **Public — no JWT required.** Returns IETF health+json with only the `mongodb:connectivity` check.',
       response: {
-        200: {
-          description: 'Healthy: Atlas reachable',
-          type: 'object',
-          properties: {
-            status:      { type: 'string', enum: ['ok'] },
-            atlas:       { type: 'string', enum: ['connected'] },
-            kmsProvider: { type: 'string', enum: ['aws', 'local'] },
-            timestamp:   { type: 'string', format: 'date-time' },
-          },
-        },
-        503: {
-          description: 'Degraded: Atlas unreachable',
-          type: 'object',
-          properties: {
-            status:    { type: 'string', enum: ['error'] },
-            atlas:     { type: 'string', enum: ['disconnected'] },
-            error:     { type: 'string' },
-            timestamp: { type: 'string', format: 'date-time' },
-          },
-        },
+        200: { type: 'object', additionalProperties: true, description: 'Healthy (status=pass)' },
+        503: { type: 'object', additionalProperties: true, description: 'Degraded (status=fail)' },
       },
     },
   }, async (_request, reply) => {
-    const timestamp = new Date().toISOString();
-    const f = fastify as FastifyInstance & { dbError?: string | null; db?: { command: (cmd: object) => Promise<unknown> } };
-    if (f.dbError) {
-      return reply.status(503).send({ status: 'error', atlas: 'disconnected', error: f.dbError, timestamp });
+    const now = new Date().toISOString();
+    reply.header('Content-Type', 'application/health+json; charset=utf-8');
+    if (fastify.dbError) {
+      return reply.status(503).send({
+        status: 'fail',
+        version: undefined,
+        serviceId: 'fsi-pci-dss-backend',
+        checks: { 'mongodb:connectivity': [{ status: 'fail', componentType: 'datastore', output: fastify.dbError, time: now }] },
+      });
     }
     try {
-      await f.db?.command({ ping: 1 });
-      return reply.send({ status: 'ok', atlas: 'connected', kmsProvider: process.env.KMS_PROVIDER ?? 'aws', timestamp });
+      const t0 = Date.now();
+      await fastify.db.command({ ping: 1 });
+      return reply.send({
+        status: 'pass',
+        serviceId: 'fsi-pci-dss-backend',
+        checks: { 'mongodb:connectivity': [{ status: 'pass', componentType: 'datastore', observedValue: Date.now() - t0, observedUnit: 'ms', time: now }] },
+      });
     } catch (err) {
-      const reason = err instanceof Error ? err.message : 'ping failed';
-      return reply.status(503).send({ status: 'error', atlas: 'disconnected', error: reason, timestamp });
+      return reply.status(503).send({
+        status: 'fail',
+        serviceId: 'fsi-pci-dss-backend',
+        checks: { 'mongodb:connectivity': [{ status: 'fail', componentType: 'datastore', output: err instanceof Error ? err.message : 'ping failed', time: now }] },
+      });
     }
   });
 
@@ -145,12 +134,10 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(transactionsModule, { prefix: '/api/v1' });
   await fastify.register(fraudModule,        { prefix: '/api/v1' });
   await fastify.register(gatewayModule,      { prefix: '/api/v1' });
-  // system module always registered: /api/v1/system/health is available in all envs
-  // /api/v1/system/raw returns 403 in production (enforced inside the controller)
   await fastify.register(systemModule,       { prefix: '/api/v1' });
   await fastify.register(adminModule,        { prefix: '/api/v1' });
   await fastify.register(providersModule, { prefix: '/api/v1' });
-  // Capability modules (internal engines, ADR-029) — each declares its own static routes.
+  // Capability modules (internal engines, ADR-029)
   await fastify.register(fdsModule,          { prefix: '/api/v1' });
   await fastify.register(hrpModule,          { prefix: '/api/v1' });
   await fastify.register(amlModule,          { prefix: '/api/v1' });
@@ -169,18 +156,19 @@ export async function buildApp(): Promise<FastifyInstance> {
 
 async function start() {
   const app = await buildApp();
-  const port = parseInt(process.env.API_PORT ?? '3001', 10);
-  const host = process.env.API_HOST ?? '0.0.0.0';
+  const port = parseInt(process.env.PORT ?? '8081', 10);
+  const host = process.env.HOST ?? '0.0.0.0';
 
   try {
     await app.listen({ port, host });
+    console.log(`.........................................................................`);
     console.log(`Backend listening on http://${host}:${port}`);
     console.log(`Swagger UI: http://${host}:${port}/doc`);
-
     if (app.dbError !== null) {
       console.warn(`[mongodb] Running in degraded mode: ${app.dbError}`);
       console.warn('[mongodb] API routes will return 503 until the database becomes reachable.');
     }
+    console.log(`.........................................................................`);
   } catch (err) {
     app.log.error(err);
     process.exit(1);

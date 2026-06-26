@@ -14,7 +14,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import supertest from 'supertest';
-import { buildApp } from '../../../../backend/src/server';
+import { buildApp } from '../../../../backend/bin/server';
 import { generateToken, _clearStore } from '../../../../backend/src/vendors/security/escalationTokens';
 import type { FastifyInstance } from 'fastify';
 
