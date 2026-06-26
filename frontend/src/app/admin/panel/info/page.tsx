@@ -9,9 +9,8 @@ interface HealthResult {
   url: string;
   httpStatus: number;
   status?: string;
-  atlas?: string;
-  kmsProvider?: string;
-  timestamp?: string;
+  version?: string;
+  serviceId?: string;
   error?: string;
   responseMs: number;
 }
@@ -289,14 +288,16 @@ export default function InfoPage() {
                 <InfoRow key={k} label={k} value={String(v)} />
               ))}
               {health && (() => {
-                const ok = health.httpStatus === 200 && health.status === 'ok';
-                const degraded = health.httpStatus === 503;
+                const ok = health.httpStatus === 200 && (health.status === 'pass' || health.status === 'ok');
+                const degraded = health.httpStatus === 200 && health.status === 'warn';
                 const colour = ok ? 'text-green-400' : degraded ? 'text-yellow-400' : 'text-red-400';
                 const summary = ok
-                  ? `ok · atlas ${health.atlas} · ${health.responseMs}ms`
-                  : health.error
-                    ? `${health.error} (${health.responseMs}ms)`
-                    : `HTTP ${health.httpStatus} · ${health.responseMs}ms`;
+                  ? `pass · v${health.version ?? '?'} · ${health.responseMs}ms`
+                  : degraded
+                    ? `warn · v${health.version ?? '?'} · ${health.responseMs}ms`
+                    : health.error
+                      ? `${health.error} (${health.responseMs}ms)`
+                      : `HTTP ${health.httpStatus} · ${health.responseMs}ms`;
                 return (
                   <div className="text-xs py-0.5 border-b border-gray-800/60 flex gap-2 items-center group">
                     <span className="min-w-[140px] flex-shrink-0 text-gray-500 font-mono truncate">/api/v1/system/health</span>
