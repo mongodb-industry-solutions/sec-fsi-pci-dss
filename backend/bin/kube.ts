@@ -165,7 +165,15 @@ async function installKsecPlugin() {
   const plugins = runCapture("helm plugin list").stdout;
   if (plugins.includes("ksec")) { ok("ksec plugin installed."); return; }
   action("Installing ksec Helm plugin...");
-  run("helm plugin install https://github.com/kanopy-platform/ksec");
+  const shellEnv = IS_WIN
+    ? { ...process.env, PATH: `C:\\Program Files\\Git\\usr\\bin;${process.env.PATH}` }
+    : process.env;
+  spawnSync("helm", ["plugin", "install", "https://github.com/kanopy-platform/ksec", "--verify=false"], {
+    shell: true, stdio: "inherit", env: shellEnv,
+  });
+  runCapture("helm plugin list").stdout.includes("ksec")
+    ? ok("ksec plugin installed.")
+    : fail("ksec install failed. Try manually: helm plugin install https://github.com/kanopy-platform/ksec --verify=false");
 }
 
 async function createKanopyConfig() {
@@ -305,8 +313,6 @@ function kubeEnv(): NodeJS.ProcessEnv {
   return { ...process.env, KUBECONFIG: `${join(KUBE_DIR, "config.staging")}${IS_WIN ? ";" : ":"}${join(KUBE_DIR, "config.prod")}` };
 }
 
-const KSEC_KEYS = ["MONGODB_URI", "MONGODB_DB_NAME", "KMS_LOCAL_MASTER_KEY", "KMS_KEY_VAULT_DATABASE", "KMS_KEY_VAULT_COLLECTION", "PSP_ADM_USER", "PSP_ADM_PASS"];
-
 async function createSecrets() {
   console.log("\nCreate ksec secrets for which environment?");
   console.log("  1. staging (default)\n  2. production");
@@ -320,47 +326,13 @@ async function createSecrets() {
   spawnSync("kubectl", ["config", "use-context", apiServer], { shell: true, stdio: "pipe", env });
   spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
 
-  console.log("\nLoad values from:");
-  console.log("  1. .env file (default)");
-  console.log("  2. Enter manually");
-  const source = await ask("Choice: ");
+  console.log(`\nPushing .env to secret '${secretName}'...`);
+  console.log(`  Source: ${ENV_PATH}\n`);
 
-  const fields: [string, string][] = [];
-
-  if (source === "2") {
-    console.log(`\nEnter values for secret '${secretName}':`);
-    console.log("(Press Enter to skip a field)\n");
-    for (const key of KSEC_KEYS) {
-      const val = await ask(`  ${key}: `);
-      if (val) fields.push([key, val]);
-    }
-  } else {
-    console.log(`\nLoading from ${ENV_PATH}...\n`);
-    for (const key of KSEC_KEYS) {
-      const val = process.env[key] || "";
-      if (val) {
-        fields.push([key, val]);
-        const display = key.includes("KEY") || key.includes("PASS") || key.includes("URI")
-          ? val.substring(0, 8) + "..."
-          : val;
-        console.log(`  ${GREEN}+${NC} ${key} = ${display}`);
-      } else {
-        console.log(`  ${DIM}-${NC} ${key} (not set, skipping)`);
-      }
-    }
-  }
-
-  if (fields.length === 0) { warn("No values to set. Skipping."); return; }
-
-  console.log(`\n  ${fields.length} fields will be set on '${secretName}'`);
-  const confirm = await ask("  Proceed? (Y/n): ");
-  if (confirm.toLowerCase() === "n") { warn("Cancelled."); return; }
-
-  const args = fields.map(([k, v]) => `${k}="${v}"`).join(" ");
-  const cmd = `helm ksec set ${secretName} ${args}`;
+  const cmd = `helm ksec push "${ENV_PATH}" ${secretName}`;
   console.log(`${DIM}[cmd]    ${cmd}${NC}`);
   const result = spawnSync(cmd, { shell: true, stdio: "inherit", env });
-  result.status === 0 ? ok(`Secret '${secretName}' created/updated.`) : fail("Failed to create secret.");
+  result.status === 0 ? ok(`Secret '${secretName}' updated from .env`) : fail("Failed to push secret.");
 }
 
 async function listSecrets() {
