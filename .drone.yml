@@ -38,7 +38,8 @@ steps:
         - git-${DRONE_COMMIT_SHA:0:7}
         - latest
       build_args:
-        - NEXT_PUBLIC_PSP_URL_BACKEND=https://sec-fsi-pci-dss-backend.industrysolutions.staging.corp.mongodb.com
+        - NEXT_PUBLIC_PSP_URL_BACKEND=
+        - PSP_BACKEND_INTERNAL_URL=http://sec-fsi-pci-dss-backend-web-app:80
       access_key:
         from_secret: ecr_access_key
       secret_key:
@@ -58,7 +59,7 @@ steps:
         - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-backend
         - ingress.enabled=true
         - ingress.hosts[0]=sec-fsi-pci-dss-backend.industrysolutions.staging.corp.mongodb.com
-        - mesh.enabled=false
+        - mesh.enabled=true
       api_server: https://api.staging.corp.mongodb.com
       kubernetes_token:
         from_secret: staging_kubernetes_token
@@ -126,7 +127,8 @@ steps:
         - git-${DRONE_COMMIT_SHA:0:7}
         - latest
       build_args:
-        - NEXT_PUBLIC_PSP_URL_BACKEND=https://sec-fsi-pci-dss-backend.industrysolutions.prod.corp.mongodb.com
+        - NEXT_PUBLIC_PSP_URL_BACKEND=
+        - PSP_BACKEND_INTERNAL_URL=http://sec-fsi-pci-dss-backend-web-app:80
       access_key:
         from_secret: ecr_access_key
       secret_key:
@@ -146,7 +148,7 @@ steps:
         - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-backend
         - ingress.enabled=true
         - ingress.hosts[0]=sec-fsi-pci-dss-backend.industrysolutions.prod.corp.mongodb.com
-        - mesh.enabled=false
+        - mesh.enabled=true
       api_server: https://api.prod.corp.mongodb.com
       kubernetes_token:
         from_secret: prod_kubernetes_token
