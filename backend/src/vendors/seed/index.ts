@@ -47,7 +47,7 @@ function ensureDataFiles() {
   console.log('  Running data generator...\n');
 
   const backendDir = process.cwd();
-  const generateScript = join(backendDir, 'bin', 'generate.ts');
+  const generateScript = join(backendDir, 'bin', 'seed-generate.ts');
 
   try {
     execSync(`npx ts-node "${generateScript}"`, {
