@@ -13,6 +13,7 @@
     "generate:key": "ts-node bin/generate-key.ts",
     "setup:integrity-issues": "ts-node bin/seed-integrity-issues.ts",
     "generate:data": "ts-node data/generate.ts",
+    "kube": "tsx bin/kube.ts",
     "test": "jest --runInBand",
     "test:unit": "jest --runInBand --testPathPattern=unit",
     "test:integration": "jest --runInBand --testPathPattern=integration",
