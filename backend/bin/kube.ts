@@ -405,8 +405,55 @@ async function resourceUsage() {
 //  5. DRONE CI
 // ============================================================
 
+const DRONE_SECRET_EXCLUDE_PREFIXES = ["KANOPY_", "MONGODB_CRYPT_SHARED_LIB"];
+const DRONE_SECRET_EXCLUDE_KEYS = new Set([
+  "PSP_CORS_ORIGIN",   // differs per env, set in Helm values
+  "PSP_URL_FRONTEND",  // differs per env, set in Helm values
+  "NODE_ENV",          // set by Dockerfile / Helm values
+]);
+
+function getDroneRepo(): string {
+  try {
+    const remote = execSync("git remote get-url origin", { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+    const match = remote.match(/[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
+    if (match) return match[1];
+  } catch { /* fallback below */ }
+  return `mongodb-industry-solutions/${DEMO_NAME}`;
+}
+
+function decodeB64(raw: string): string {
+  const cleaned = raw.replace(/"/g, "").trim();
+  if (!cleaned) return "";
+  return Buffer.from(cleaned, "base64").toString("utf-8").trim();
+}
+
+function droneSecretAdd(repo: string, name: string, value: string): boolean {
+  const result = spawnSync("drone", ["secret", "add", "--repository", repo, "--name", name, "--data", value], {
+    shell: true, encoding: "utf-8", stdio: "pipe",
+  });
+  return result.status === 0;
+}
+
+function readEnvSecrets(): Array<{ key: string; value: string }> {
+  if (!existsSync(ENV_PATH)) return [];
+  const entries: Array<{ key: string; value: string }> = [];
+  for (const line of readFileSync(ENV_PATH, "utf-8").split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || /^[#;]/.test(trimmed)) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    const value = trimmed.slice(eq + 1).trim();
+    if (!value) continue;
+    if (DRONE_SECRET_EXCLUDE_KEYS.has(key)) continue;
+    if (DRONE_SECRET_EXCLUDE_PREFIXES.some((p) => key.startsWith(p))) continue;
+    entries.push({ key, value });
+  }
+  return entries;
+}
+
 async function extractDroneSecrets() {
-  console.log(`\n${CYAN}=== Extracting Drone secrets ===${NC}\n`);
+  console.log(`\n${CYAN}=== Extract Drone secrets (view only) ===${NC}\n`);
   const env = kubeEnv();
 
   action("Switching to staging context...");
@@ -416,20 +463,20 @@ async function extractDroneSecrets() {
   console.log("\n--- staging_kubernetes_token ---");
   const stagingToken = runCapture(`kubectl get secret kanopy-cicd-token -o jsonpath="{.data.token}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`);
   if (stagingToken.stdout) {
-    const decoded = Buffer.from(stagingToken.stdout.replace(/"/g, ""), "base64").toString("utf-8");
+    const decoded = decodeB64(stagingToken.stdout);
     console.log(`  Value: ${DIM}${decoded.substring(0, 20)}...${NC}`);
   } else { warn("Could not extract staging token."); }
 
   console.log("\n--- ecr_access_key ---");
   const ecrAccess = runCapture(`kubectl get secret ecr -o jsonpath="{.data.ecr_access_key}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`);
   if (ecrAccess.stdout) {
-    console.log(`  Value: ${Buffer.from(ecrAccess.stdout.replace(/"/g, ""), "base64").toString("utf-8")}`);
+    console.log(`  Value: ${decodeB64(ecrAccess.stdout)}`);
   } else { warn("Could not extract ECR access key."); }
 
   console.log("\n--- ecr_secret_key ---");
   const ecrSecret = runCapture(`kubectl get secret ecr -o jsonpath="{.data.ecr_secret_key}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`);
   if (ecrSecret.stdout) {
-    const decoded = Buffer.from(ecrSecret.stdout.replace(/"/g, ""), "base64").toString("utf-8");
+    const decoded = decodeB64(ecrSecret.stdout);
     console.log(`  Value: ${DIM}${decoded.substring(0, 10)}...${NC}`);
   } else { warn("Could not extract ECR secret key."); }
 
@@ -437,16 +484,109 @@ async function extractDroneSecrets() {
   console.log("\n--- prod_kubernetes_token ---");
   const prodToken = runCapture(`kubectl get secret kanopy-cicd-token -o jsonpath="{.data.token}" --kubeconfig="${join(KUBE_DIR, "config.prod")}"`);
   if (prodToken.stdout) {
-    const decoded = Buffer.from(prodToken.stdout.replace(/"/g, ""), "base64").toString("utf-8");
+    const decoded = decodeB64(prodToken.stdout);
     console.log(`  Value: ${DIM}${decoded.substring(0, 20)}...${NC}`);
   } else { warn("Could not extract prod token."); }
 
-  console.log(`\n${CYAN}Add these 4 secrets in Drone UI:${NC}`);
-  console.log(`  ${DRONE_URL} -> Repo Settings -> Secrets`);
-  console.log("  - staging_kubernetes_token");
-  console.log("  - prod_kubernetes_token");
-  console.log("  - ecr_access_key");
-  console.log("  - ecr_secret_key");
+  console.log(`\n${CYAN}To push these automatically, use option 20 (Configure Drone secrets).${NC}`);
+}
+
+async function configureDroneSecrets() {
+  console.log(`\n${CYAN}=== Configure Drone CI secrets ===${NC}\n`);
+
+  if (!hasCommand("drone")) {
+    fail("drone CLI not found. Install it from: https://docs.drone.io/cli/install/");
+    console.log("  After installing, set DRONE_SERVER and DRONE_TOKEN in your .env or shell:");
+    console.log(`  DRONE_SERVER=${DRONE_URL}`);
+    console.log("  DRONE_TOKEN=<your personal token from Drone UI → User Settings>");
+    return;
+  }
+
+  const repo = getDroneRepo();
+  console.log(`  Drone repo: ${CYAN}${repo}${NC}`);
+  console.log(`  Drone URL:  ${DRONE_URL}\n`);
+
+  // ── 1. Cluster secrets (4 infra tokens) ──────────────────────
+  action("Extracting cluster secrets...\n");
+  const env = kubeEnv();
+  const clusterSecrets: Array<{ name: string; value: string }> = [];
+
+  spawnSync("kubectl", ["config", "use-context", STAGING_API], { shell: true, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
+
+  const stagingToken = decodeB64(runCapture(`kubectl get secret kanopy-cicd-token -o jsonpath="{.data.token}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`).stdout);
+  if (stagingToken) clusterSecrets.push({ name: "staging_kubernetes_token", value: stagingToken });
+  else warn("Could not extract staging_kubernetes_token");
+
+  const ecrAccess = decodeB64(runCapture(`kubectl get secret ecr -o jsonpath="{.data.ecr_access_key}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`).stdout);
+  if (ecrAccess) clusterSecrets.push({ name: "ecr_access_key", value: ecrAccess });
+  else warn("Could not extract ecr_access_key");
+
+  const ecrSecret = decodeB64(runCapture(`kubectl get secret ecr -o jsonpath="{.data.ecr_secret_key}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`).stdout);
+  if (ecrSecret) clusterSecrets.push({ name: "ecr_secret_key", value: ecrSecret });
+  else warn("Could not extract ecr_secret_key");
+
+  const prodToken = decodeB64(runCapture(`kubectl get secret kanopy-cicd-token -o jsonpath="{.data.token}" --kubeconfig="${join(KUBE_DIR, "config.prod")}"`).stdout);
+  if (prodToken) clusterSecrets.push({ name: "prod_kubernetes_token", value: prodToken });
+  else warn("Could not extract prod_kubernetes_token");
+
+  // ── 2. App secrets from .env (filtered) ──────────────────────
+  const envSecrets = readEnvSecrets();
+
+  // ── Summary before push ──────────────────────────────────────
+  console.log(`\n${CYAN}Secrets to configure:${NC}\n`);
+  console.log("  Cluster secrets (from kubectl):");
+  for (const s of clusterSecrets) {
+    console.log(`    ${GREEN}+${NC} ${s.name}  ${DIM}(${s.value.substring(0, 12)}...)${NC}`);
+  }
+  console.log(`\n  App secrets (from .env, excluding ${DRONE_SECRET_EXCLUDE_PREFIXES.join(", ")}*):`);
+  for (const s of envSecrets) {
+    const preview = s.value.length > 20 ? `${s.value.substring(0, 20)}...` : s.value;
+    console.log(`    ${GREEN}+${NC} ${s.key}  ${DIM}(${preview})${NC}`);
+  }
+
+  const total = clusterSecrets.length + envSecrets.length;
+  if (total === 0) { warn("No secrets to push."); return; }
+
+  console.log("");
+  const confirm = await ask(`Push ${total} secrets to ${repo}? (y/N): `);
+  if (confirm.toLowerCase() !== "y") { warn("Aborted."); return; }
+
+  // ── 3. Push all ──────────────────────────────────────────────
+  let pushed = 0, failed_count = 0;
+  const droneEnv = { ...process.env, DRONE_SERVER: process.env.DRONE_SERVER || DRONE_URL };
+
+  for (const s of [...clusterSecrets, ...envSecrets.map((e) => ({ name: e.key, value: e.value }))]) {
+    const result = spawnSync("drone", ["secret", "add", "--repository", repo, "--name", s.name, "--data", s.value], {
+      shell: true, encoding: "utf-8", stdio: "pipe", env: droneEnv,
+    });
+    if (result.status === 0) {
+      console.log(`  ${GREEN}[ok]${NC} ${s.name}`);
+      pushed++;
+    } else {
+      const err = (result.stderr || result.stdout || "").trim();
+      // "update" means the secret exists — try drone secret update instead
+      if (err.includes("exists") || err.includes("update")) {
+        const upd = spawnSync("drone", ["secret", "update", "--repository", repo, "--name", s.name, "--data", s.value], {
+          shell: true, encoding: "utf-8", stdio: "pipe", env: droneEnv,
+        });
+        if (upd.status === 0) {
+          console.log(`  ${GREEN}[ok]${NC} ${s.name} (updated)`);
+          pushed++;
+        } else {
+          console.log(`  ${RED}[fail]${NC} ${s.name}: ${(upd.stderr || upd.stdout || "").trim()}`);
+          failed_count++;
+        }
+      } else {
+        console.log(`  ${RED}[fail]${NC} ${s.name}: ${err}`);
+        failed_count++;
+      }
+    }
+  }
+
+  console.log(`\n  ${pushed} pushed, ${failed_count} failed.`);
+  if (failed_count === 0) ok(`All ${pushed} secrets configured in Drone.`);
+  else warn("Some secrets failed. Check DRONE_TOKEN is set and valid.");
 }
 
 async function showDroneInfo() {
@@ -583,14 +723,15 @@ const MENU = `
   17. Rollout restart
   18. Resource usage (top)
   --- Drone CI ---
-  19. Extract Drone secrets from cluster
-  20. Show Drone/deployment info
+  19. Extract Drone secrets (view only)
+  20. Configure Drone secrets (extract + push)
+  21. Show Drone/deployment info
   --- Diagnostics ---
-  21. Describe pod
-  22. Exec into pod (shell)
-  23. Check env vars in pod
-  24. Test staging/prod URLs
-  25. Pre-deployment checklist
+  22. Describe pod
+  23. Exec into pod (shell)
+  24. Check env vars in pod
+  25. Test staging/prod URLs
+  26. Pre-deployment checklist
   --- ---
   0.  Exit
 `;
@@ -625,14 +766,15 @@ async function main() {
       case "17": await rolloutRestart(); break;
       case "18": await resourceUsage(); break;
       case "19": await extractDroneSecrets(); break;
-      case "20": await showDroneInfo(); break;
-      case "21": await describePod(); break;
-      case "22": await execIntoPod(); break;
-      case "23": await checkEnvVars(); break;
-      case "24": await testUrls(); break;
-      case "25": await preDeployChecklist(); break;
+      case "20": await configureDroneSecrets(); break;
+      case "21": await showDroneInfo(); break;
+      case "22": await describePod(); break;
+      case "23": await execIntoPod(); break;
+      case "24": await checkEnvVars(); break;
+      case "25": await testUrls(); break;
+      case "26": await preDeployChecklist(); break;
       case "0": console.log("\nGoodbye."); rl.close(); process.exit(0);
-      default: warn("Invalid option. Enter 1-25 or 0.");
+      default: warn("Invalid option. Enter 1-26 or 0.");
     }
 
     if (choice !== "0") await pause();
