@@ -45,8 +45,8 @@ function makeDemoDb(records: Record<string, unknown>[]) {
 }
 
 beforeAll(() => {
-  process.env.JWT_SECRET = 'test-secret-key';
-  process.env.JWT_EXPIRES_IN = '1h';
+  process.env.PSP_JWT_SECRET = 'test-secret-key';
+  process.env.PSP_JWT_EXPIRES_IN = '1h';
 });
 
 describe('loginUser', () => {

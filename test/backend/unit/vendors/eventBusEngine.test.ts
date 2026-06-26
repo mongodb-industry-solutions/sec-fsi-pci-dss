@@ -14,7 +14,7 @@ const fakeStore: EventStore = {
 };
 const db = {} as never;
 
-afterEach(() => { delete process.env.EVENT_BUS_ENGINE; });
+afterEach(() => { delete process.env.PSP_EVENT_BUS_ENGINE; });
 
 describe('Event Bus engine selection', () => {
   it('defaults to in-process when EVENT_BUS_ENGINE is unset', () => {
@@ -23,19 +23,19 @@ describe('Event Bus engine selection', () => {
   });
 
   it('honors an explicit in-process engine', () => {
-    process.env.EVENT_BUS_ENGINE = 'in-process';
+    process.env.PSP_EVENT_BUS_ENGINE = 'in-process';
     expect(resolveEventBusEngine()).toBe('in-process');
     expect(() => initEventBus(db, fakeStore)).not.toThrow();
   });
 
   it('builds a broker adapter for kafka (connects lazily on start, not at construction)', () => {
-    process.env.EVENT_BUS_ENGINE = 'kafka';
+    process.env.PSP_EVENT_BUS_ENGINE = 'kafka';
     expect(resolveEventBusEngine()).toBe('kafka');
     expect(initEventBus(db, fakeStore)).toBeInstanceOf(BrokerEventBus);
   });
 
   it('builds a broker adapter for rabbitmq', () => {
-    process.env.EVENT_BUS_ENGINE = 'rabbitmq';
+    process.env.PSP_EVENT_BUS_ENGINE = 'rabbitmq';
     expect(initEventBus(db, fakeStore)).toBeInstanceOf(BrokerEventBus);
   });
 });
