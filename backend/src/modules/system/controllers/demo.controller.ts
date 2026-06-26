@@ -104,13 +104,15 @@ async function dbChecks(db: Db): Promise<Record<string, CheckEntry[]>> {
 
   try {
     const cols = await db.listCollections({}, { nameOnly: false }).toArray();
-    const collSummary = cols
+    const collNames = cols
       .filter((c) => !c.name.startsWith('system.'))
-      .map((c) => ({ name: c.name, type: c.type ?? 'collection' }));
+      .map((c) => c.name)
+      .sort();
     checks['db:collections'] = [{
       status: 'pass',
       componentType: 'datastore',
-      observedValue: { count: collSummary.length, items: collSummary },
+      observedValue: collNames,
+      observedUnit: `${collNames.length} collections`,
     }];
   } catch (err) {
     checks['db:collections'] = [{
