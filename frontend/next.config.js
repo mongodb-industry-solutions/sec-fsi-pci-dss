@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
+const { version: FRONTEND_VERSION } = require('./package.json');
 const nextConfig = {
+    env: {
+        NEXT_PUBLIC_FRONTEND_VERSION: FRONTEND_VERSION,
+    },
     allowedDevOrigins: ['127.0.0.1', 'localhost'],
     async rewrites() {
         const backendUrl =

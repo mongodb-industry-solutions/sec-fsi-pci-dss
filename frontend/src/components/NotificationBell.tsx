@@ -87,7 +87,7 @@ export function NotificationBell() {
             <ul className="max-h-80 overflow-y-auto divide-y divide-white/5">
               {top5.map((n) => (
                 <li key={n.id}>
-                  <Link href={n.href} role="menuitem" onClick={() => readOne(n)}
+                  <Link href={n.href ?? '/system/notifications'} role="menuitem" onClick={() => readOne(n)}
                     className={`block px-4 py-2.5 hover:bg-white/8 transition-colors ${n.status === 'read' ? 'opacity-60' : ''}`}>
                     <div className="flex items-center gap-2">
                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${n.status === 'unread' ? (n.actionable ? 'bg-[#00ED64]' : 'bg-sky-400') : 'bg-gray-600'}`} />
