@@ -4,7 +4,9 @@ import {
   Download, Check, CheckSquare, ChevronDown, ChevronUp,
   ExternalLink, Shield, Database, Lock, Eye, FileText,
   AlertTriangle, CheckCircle2, Users, Ban, ChevronRight,
+  MessageCircle,
 } from 'lucide-react';
+import { QASection } from './_QASection';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { ROLE_LABELS } from '../../../lib/constants';
@@ -283,7 +285,7 @@ const GOAL_LABELS: Record<string, string> = {
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
-export type Tab = 'overview' | 'roles' | 'checklist' | 'mongodb';
+export type Tab = 'overview' | 'roles' | 'checklist' | 'mongodb' | 'qa';
 
 // Each tab is its own route (own URL) for direct navigation/linking.
 const TAB_HREF: Record<Tab, string> = {
@@ -291,6 +293,7 @@ const TAB_HREF: Record<Tab, string> = {
   roles: '/system/help/roles',
   checklist: '/system/help/checklist',
   mongodb: '/system/help/mongodb',
+  qa: '/system/help/qa',
 };
 
 // Shared content for all help tabs. The full document (overview + checklist + architecture) is
@@ -463,10 +466,10 @@ export function HelpContent({ tab }: { tab: Tab }) {
                   onClick={() => window.print()}
                   className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
                 >
-                  <Download size={14} /> Export PDF
+                  <Download size={14} /> Get Compliance Guide
                 </button>
-                <div className="pointer-events-none absolute right-0 top-full mt-2 hidden group-hover:block z-50 bg-gray-900 border border-gray-700 text-gray-300 text-[11px] rounded-lg px-3 py-2 whitespace-nowrap shadow-xl">
-                  In the print dialog, uncheck &ldquo;Headers and footers&rdquo;
+                <div className="pointer-events-none absolute right-0 top-full mt-2 hidden group-hover:block z-50 bg-gray-900 border border-gray-700 text-gray-300 text-[11px] rounded-lg px-3 py-2 shadow-xl w-64">
+                  Downloads the full PCI DSS v4.0.1 Compliance Guide as a PDF (checklist + architecture). In the print dialog, choose &ldquo;Save as PDF&rdquo; and uncheck &ldquo;Headers and footers&rdquo;.
                 </div>
               </div>
             }
@@ -480,6 +483,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
             { id: 'roles',     label: 'Your Role',        icon: Users },
             { id: 'checklist', label: 'PCI DSS v4.0.1 Checklist',     icon: CheckSquare },
             { id: 'mongodb',   label: 'Architecture Proposal', icon: Database },
+            { id: 'qa',        label: 'Q&A',              icon: MessageCircle },
           ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
             <Link
               key={id}
@@ -1125,6 +1129,12 @@ export function HelpContent({ tab }: { tab: Tab }) {
             </a>
           </div>
         </div>
+
+        {/* ══ Q&A ═══════════════════════════════════════════════════════════ */}
+        <div className={`tab-section space-y-4 ${tab !== 'qa' ? 'screen-only hidden' : ''}`}>
+          <QASection />
+        </div>
+
       </div>
     </>
   );
