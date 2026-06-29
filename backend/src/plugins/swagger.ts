@@ -5,7 +5,11 @@ import fastifySwaggerUi from '@fastify/swagger-ui';
 import fastifyStatic from '@fastify/static';
 import { join } from 'path';
 
-const PUBLIC = join(__dirname, '../../public');
+// PSP_PROJECT_ROOT=/app is set in Docker (compiled: dist/plugins → wrong relative path).
+// Local dev: PSP_PROJECT_ROOT is unset, __dirname is src/plugins so ../../public is correct.
+const PUBLIC = process.env.PSP_PROJECT_ROOT
+  ? join(process.env.PSP_PROJECT_ROOT, 'backend/public')
+  : join(__dirname, '../../public');
 
 // fp() removes encapsulation so @fastify/swagger's onRoute hook
 // captures routes registered in the root scope.
