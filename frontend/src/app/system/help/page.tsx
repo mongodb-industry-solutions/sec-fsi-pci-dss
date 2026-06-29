@@ -4,7 +4,10 @@ import {
   Download, Check, CheckSquare, ChevronDown, ChevronUp,
   ExternalLink, Shield, Database, Lock, Eye, FileText,
   AlertTriangle, CheckCircle2, Users, Ban, ChevronRight,
+  MessageCircle, type LucideIcon,
 } from 'lucide-react';
+import { CarouselNav } from '../../../components/CarouselNav';
+import { QASection } from './_QASection';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { ROLE_LABELS } from '../../../lib/constants';
@@ -283,7 +286,7 @@ const GOAL_LABELS: Record<string, string> = {
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
-export type Tab = 'overview' | 'roles' | 'checklist' | 'mongodb';
+export type Tab = 'overview' | 'roles' | 'checklist' | 'mongodb' | 'qa';
 
 // Each tab is its own route (own URL) for direct navigation/linking.
 const TAB_HREF: Record<Tab, string> = {
@@ -291,7 +294,16 @@ const TAB_HREF: Record<Tab, string> = {
   roles: '/system/help/roles',
   checklist: '/system/help/checklist',
   mongodb: '/system/help/mongodb',
+  qa: '/system/help/qa',
 };
+
+const HELP_TABS: Array<{ id: Tab; label: string; icon: LucideIcon }> = [
+  { id: 'overview',  label: 'Overview',                 icon: Eye },
+  { id: 'roles',     label: 'Your Role',                icon: Users },
+  { id: 'checklist', label: 'PCI DSS v4.0.1 Checklist', icon: CheckSquare },
+  { id: 'mongodb',   label: 'Architecture Proposal',    icon: Database },
+  { id: 'qa',        label: 'Q&A',                      icon: MessageCircle },
+];
 
 // Shared content for all help tabs. The full document (overview + checklist + architecture) is
 // always in the DOM so the "Export PDF" (window.print) produces the combined compliance document;
@@ -300,6 +312,9 @@ export function HelpContent({ tab }: { tab: Tab }) {
   const [checked, setChecked]   = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [role, setRole]         = useState<string>('');
+  const [reqMapOpen, setReqMapOpen]       = useState(true);
+  const [refArchOpen, setRefArchOpen]     = useState(true);
+  const [valuePropOpen, setValuePropOpen] = useState(true);
 
   // Resolve the logged-in role from the demo JWT (client-side; cookie-based).
   useEffect(() => {
@@ -463,36 +478,43 @@ export function HelpContent({ tab }: { tab: Tab }) {
                   onClick={() => window.print()}
                   className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
                 >
-                  <Download size={14} /> Export PDF
+                  <Download size={14} /> Get Compliance Guide
                 </button>
-                <div className="pointer-events-none absolute right-0 top-full mt-2 hidden group-hover:block z-50 bg-gray-900 border border-gray-700 text-gray-300 text-[11px] rounded-lg px-3 py-2 whitespace-nowrap shadow-xl">
-                  In the print dialog, uncheck &ldquo;Headers and footers&rdquo;
+                <div className="pointer-events-none absolute right-0 top-full mt-2 hidden group-hover:block z-50 bg-gray-900 border border-gray-700 text-gray-300 text-[11px] rounded-lg px-3 py-2 shadow-xl w-64">
+                  Downloads the full PCI DSS v4.0.1 Compliance Guide as a PDF (checklist + architecture). In the print dialog, choose &ldquo;Save as PDF&rdquo; and uncheck &ldquo;Headers and footers&rdquo;.
                 </div>
               </div>
             }
           />
         </div>
 
-        {/* Tabs */}
-        <div className="screen-only flex border-b border-gray-300 mb-6 gap-1">
-          {([
-            { id: 'overview',  label: 'Overview',    icon: Eye },
-            { id: 'roles',     label: 'Your Role',        icon: Users },
-            { id: 'checklist', label: 'PCI DSS v4.0.1 Checklist',     icon: CheckSquare },
-            { id: 'mongodb',   label: 'Architecture Proposal', icon: Database },
-          ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
-            <Link
-              key={id}
-              href={TAB_HREF[id]}
-              className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-[15px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
-                tab === id
-                  ? 'border-[#001E2B] text-[#001E2B]'
-                  : 'border-transparent text-gray-500 hover:text-[#001E2B]'
-              }`}
-            >
-              <Icon size={15} className={tab === id ? 'text-[#001E2B]' : 'text-gray-400'} /> {label}
-            </Link>
-          ))}
+        {/* Tabs — desktop: bottom-border underline; mobile: carousel */}
+        <div className="screen-only mb-6">
+          {/* Desktop (md+) */}
+          <div className="hidden md:flex border-b border-gray-300 gap-1">
+            {HELP_TABS.map(({ id, label, icon: Icon }) => (
+              <Link
+                key={id}
+                href={TAB_HREF[id]}
+                className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-[15px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
+                  tab === id
+                    ? 'border-[#001E2B] text-[#001E2B]'
+                    : 'border-transparent text-gray-500 hover:text-[#001E2B]'
+                }`}
+              >
+                <Icon size={15} className={tab === id ? 'text-[#001E2B]' : 'text-gray-400'} /> {label}
+              </Link>
+            ))}
+          </div>
+
+          {/* Mobile (< md): scrollable carousel with chevrons */}
+          <div className="md:hidden border-b border-gray-300">
+            <CarouselNav
+              items={HELP_TABS.map(t => ({ href: TAB_HREF[t.id], label: t.label, icon: t.icon }))}
+              isActive={(href) => href === TAB_HREF[tab]}
+              variant="light"
+            />
+          </div>
         </div>
 
         {/* ══ OVERVIEW ══════════════════════════════════════════════════════ */}
@@ -1015,106 +1037,147 @@ export function HelpContent({ tab }: { tab: Tab }) {
             </div>
           </div>
 
-          {/* Feature mapping */}
-          <div>
-            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-3">Feature Mapping by Requirement</p>
-            <div className="space-y-3">
-              {MONGODB_MAPPING.map((m) => (
-                <div key={m.reqs} className="bg-gray-900 border border-gray-800 rounded-xl p-5 p-mdb-card">
-                  <div className="flex items-start gap-3 mb-3">
-                    <span className="text-xs font-bold text-[#00ED64] bg-[#00ED64]/10 border border-[#00ED64]/20 px-2.5 py-1 rounded-lg shrink-0 p-mdb-reqs">
-                      REQ {m.reqs}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-gray-200 font-semibold text-sm leading-snug p-mdb-area">{m.area}</p>
-                      <p className="text-gray-500 text-xs mt-1 leading-relaxed p-mdb-desc">{m.description}</p>
+          {/* Feature mapping — collapsible panel */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setReqMapOpen(v => !v)}
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-800/40 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest">Feature Mapping by Requirement</span>
+                <span className="text-[10px] text-gray-600 border border-gray-700 rounded-full px-2 py-0.5">{MONGODB_MAPPING.length} requirements</span>
+              </div>
+              {reqMapOpen ? <ChevronUp size={14} className="text-gray-500 shrink-0" /> : <ChevronDown size={14} className="text-gray-500 shrink-0" />}
+            </button>
+
+            {reqMapOpen && (
+              <div className="border-t border-gray-800 px-5 pb-5 pt-4 space-y-3">
+                {MONGODB_MAPPING.map((m) => (
+                  <div key={m.reqs} className="bg-gray-800/50 border border-gray-700/60 rounded-xl p-5 p-mdb-card">
+                    <div className="flex items-start gap-3 mb-3">
+                      <span className="text-xs font-bold text-[#00ED64] bg-[#00ED64]/10 border border-[#00ED64]/20 px-2.5 py-1 rounded-lg shrink-0 p-mdb-reqs">
+                        REQ {m.reqs}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-gray-200 font-semibold text-sm leading-snug p-mdb-area">{m.area}</p>
+                        <p className="text-gray-500 text-xs mt-1 leading-relaxed p-mdb-desc">{m.description}</p>
+                      </div>
                     </div>
+                    <div className="flex flex-wrap gap-1.5 mb-3 p-mdb-tags-block">
+                      {m.features.map(f => (
+                        <span key={f} className="text-xs text-gray-400 border border-gray-700 bg-gray-800/60 px-2.5 py-0.5 rounded-full p-mdb-tag">{f}</span>
+                      ))}
+                    </div>
+                    <a href={m.docs} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors p-mdb-link">
+                      <ExternalLink size={10} /> Documentation
+                    </a>
                   </div>
-                  <div className="flex flex-wrap gap-1.5 mb-3 p-mdb-tags-block">
-                    {m.features.map(f => (
-                      <span key={f} className="text-xs text-gray-400 border border-gray-700 bg-gray-800/60 px-2.5 py-0.5 rounded-full p-mdb-tag">{f}</span>
-                    ))}
-                  </div>
-                  <a href={m.docs} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors p-mdb-link">
-                    <ExternalLink size={10} /> Documentation
-                  </a>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Reference architecture */}
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-1">Reference Architecture</p>
-            <p className="text-gray-600 text-xs mb-4">A 5-layer security model using MongoDB Atlas for a PCI DSS-compliant cardholder data environment.</p>
-            <div className="space-y-2">
-              {[
-                { num: '①', label: 'Application Tier',         color: GOAL_COLORS['2'],
-                  items: ['Application-layer encryption; MongoDB driver encrypts PAN before sending to Atlas (CSFLE/QE).', 'No plaintext PAN in application logs or error messages.', 'JWT-based session management with short expiry and MFA enforcement.', 'WAF in front of all public-facing APIs (Req 6.4.2).'] },
-                { num: '②', label: 'Network Tier',              color: GOAL_COLORS['1'],
-                  items: ['Private Endpoints; all Atlas traffic stays on cloud provider backbone, never public internet.', 'IP Access List; only application server IPs whitelisted in Atlas.', 'VPC/VNet peering for multi-region deployments.', 'TLS 1.2/1.3 enforced on all connections; cannot be downgraded.'] },
-                { num: '③', label: 'Data Tier (Atlas)',          color: GOAL_COLORS['3'],
-                  items: ['Queryable Encryption; PAN stored and searched in encrypted form. MongoDB server never sees plaintext.', 'Customer-Managed Keys (CMK); your KMS (AWS/Azure/GCP) encrypts the data encryption keys.', 'RBAC; custom roles grant minimum required privileges per user type.', 'SCRAM-SHA-256 or x.509 authentication for all database users.'] },
-                { num: '④', label: 'Monitoring and Audit Tier', color: GOAL_COLORS['5'],
-                  items: ['Atlas Audit Logging; all authentication, authorization, and CRUD operations logged.', 'Atlas Log Integration to SIEM (Datadog / Splunk / Sumo Logic).', 'Automated alerts for suspicious access patterns and configuration drift.', 'Atlas Security Advisor; continuous compliance posture monitoring.'] },
-                { num: '⑤', label: 'Key Management Tier',       color: GOAL_COLORS['4'],
-                  items: ['AWS KMS / Azure Key Vault / GCP Cloud KMS / KMIP for master key management.', 'Envelope encryption; data keys encrypted by master keys you control exclusively.', 'Key rotation policy; annual minimum, automated rotation recommended.', 'Split knowledge and dual control for key custodians (Req 3.7).'] },
-              ].map(l => (
-                <div key={l.label} className={`rounded-lg border border-gray-700/50 bg-gray-800/30 border-l-4 ${l.color.border} p-4 p-arch-layer`}>
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className={`text-sm font-black ${l.color.text}`}>{l.num}</span>
-                    <p className={`text-sm font-semibold ${l.color.text} p-arch-title`}>{l.label}</p>
+          {/* Reference architecture — collapsible */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setRefArchOpen(v => !v)}
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-800/40 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest">Reference Architecture</span>
+                <span className="text-[10px] text-gray-600 border border-gray-700 rounded-full px-2 py-0.5">5 layers</span>
+              </div>
+              {refArchOpen ? <ChevronUp size={14} className="text-gray-500 shrink-0" /> : <ChevronDown size={14} className="text-gray-500 shrink-0" />}
+            </button>
+
+            {refArchOpen && (
+              <div className="border-t border-gray-800 px-5 pb-5 pt-4 space-y-2">
+                <p className="text-gray-600 text-xs mb-3">A 5-layer security model using MongoDB Atlas for a PCI DSS-compliant cardholder data environment.</p>
+                {[
+                  { num: '①', label: 'Application Tier',         color: GOAL_COLORS['2'],
+                    items: ['Application-layer encryption; MongoDB driver encrypts PAN before sending to Atlas (CSFLE/QE).', 'No plaintext PAN in application logs or error messages.', 'JWT-based session management with short expiry and MFA enforcement.', 'WAF in front of all public-facing APIs (Req 6.4.2).'] },
+                  { num: '②', label: 'Network Tier',              color: GOAL_COLORS['1'],
+                    items: ['Private Endpoints; all Atlas traffic stays on cloud provider backbone, never public internet.', 'IP Access List; only application server IPs whitelisted in Atlas.', 'VPC/VNet peering for multi-region deployments.', 'TLS 1.2/1.3 enforced on all connections; cannot be downgraded.'] },
+                  { num: '③', label: 'Data Tier (Atlas)',          color: GOAL_COLORS['3'],
+                    items: ['Queryable Encryption; PAN stored and searched in encrypted form. MongoDB server never sees plaintext.', 'Customer-Managed Keys (CMK); your KMS (AWS/Azure/GCP) encrypts the data encryption keys.', 'RBAC; custom roles grant minimum required privileges per user type.', 'SCRAM-SHA-256 or x.509 authentication for all database users.'] },
+                  { num: '④', label: 'Monitoring and Audit Tier', color: GOAL_COLORS['5'],
+                    items: ['Atlas Audit Logging; all authentication, authorization, and CRUD operations logged.', 'Atlas Log Integration to SIEM (Datadog / Splunk / Sumo Logic).', 'Automated alerts for suspicious access patterns and configuration drift.', 'Atlas Security Advisor; continuous compliance posture monitoring.'] },
+                  { num: '⑤', label: 'Key Management Tier',       color: GOAL_COLORS['4'],
+                    items: ['AWS KMS / Azure Key Vault / GCP Cloud KMS / KMIP for master key management.', 'Envelope encryption; data keys encrypted by master keys you control exclusively.', 'Key rotation policy; annual minimum, automated rotation recommended.', 'Split knowledge and dual control for key custodians (Req 3.7).'] },
+                ].map(l => (
+                  <div key={l.label} className={`rounded-lg border border-gray-700/50 bg-gray-800/30 border-l-4 ${l.color.border} p-4 p-arch-layer`}>
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className={`text-sm font-black ${l.color.text}`}>{l.num}</span>
+                      <p className={`text-sm font-semibold ${l.color.text} p-arch-title`}>{l.label}</p>
+                    </div>
+                    <ul className="space-y-1 p-arch-items">
+                      {l.items.map(item => (
+                        <li key={item} className="text-gray-500 text-xs flex items-start gap-2 p-arch-item">
+                          <span className="text-[#00ED64]/60 shrink-0">›</span>{item}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul className="space-y-1 p-arch-items">
-                    {l.items.map(item => (
-                      <li key={item} className="text-gray-500 text-xs flex items-start gap-2 p-arch-item">
-                        <span className="text-[#00ED64]/60 shrink-0">›</span>{item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Value proposition */}
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-4">MongoDB Value Proposition for PCI DSS</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-vp-grid">
-              {[
-                { title: 'Queryable Encryption', emoji: '🔐',
-                  desc: 'The only commercially available database solution enabling equality searches on client-side encrypted fields. Zero plaintext PAN exposure to the database server; MongoDB staff included.',
-                  link: 'https://www.mongodb.com/docs/manual/core/queryable-encryption/', linkText: 'QE Docs' },
-                { title: 'Customer-Managed Keys', emoji: '🗝️',
-                  desc: 'Full cryptographic key sovereignty. Your KMS encrypts data keys; MongoDB never has access to your master keys. Satisfies Req 3.6 to 3.7 key management obligations.',
-                  link: 'https://www.mongodb.com/docs/atlas/security-kms-encryption/', linkText: 'CMK Docs' },
-                { title: 'Private Networking', emoji: '🔒',
-                  desc: 'Private Endpoints ensure all CDE traffic stays on cloud-provider backbone. Combined with IP allowlisting, creates a verifiable CDE network boundary satisfying Req 1 and 2.',
-                  link: 'https://www.mongodb.com/docs/atlas/security-private-endpoint/', linkText: 'Private Endpoint Docs' },
-                { title: 'Audit Logging and SIEM', emoji: '📋',
-                  desc: 'Field-level audit logging forwarded to SIEM in real time. Automated daily review satisfies the new Req 10.4.1.1 requirement for automated log review mechanisms.',
-                  link: 'https://www.mongodb.com/docs/atlas/database-auditing/', linkText: 'Audit Docs' },
-                { title: 'RBAC and Identity Federation', emoji: '👥',
-                  desc: 'Granular role-based access at database and collection level. LDAP/AD integration, OIDC/SCIM provisioning, and workforce identity federation satisfy Req 7 and 8.',
-                  link: 'https://www.mongodb.com/docs/atlas/security-add-mongodb-users/', linkText: 'RBAC Docs' },
-                { title: 'PCI Level 1 Validated SP', emoji: '🏆',
-                  desc: 'Annual QSA assessment of the entire Atlas infrastructure. Request MongoDB\'s Attestation of Compliance (AOC) to reference in your own PCI assessment; reducing your compliance scope.',
-                  link: 'https://www.mongodb.com/products/platform/trust/pci-dss', linkText: 'Trust Center' },
-              ].map(v => (
-                <div key={v.title} className="bg-gray-800/40 border border-gray-700/50 rounded-xl p-4 p-vp-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-base leading-none">{v.emoji}</span>
-                    <p className="text-sm font-semibold text-gray-200 p-vp-title">{v.title}</p>
-                  </div>
-                  <p className="text-gray-500 text-xs leading-relaxed mb-3 p-vp-desc">{v.desc}</p>
-                  <a href={v.link} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors">
-                    <ExternalLink size={10} /> {v.linkText}
-                  </a>
+          {/* Value proposition — collapsible */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setValuePropOpen(v => !v)}
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-800/40 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest">MongoDB Value Proposition for PCI DSS</span>
+                <span className="text-[10px] text-gray-600 border border-gray-700 rounded-full px-2 py-0.5">6 capabilities</span>
+              </div>
+              {valuePropOpen ? <ChevronUp size={14} className="text-gray-500 shrink-0" /> : <ChevronDown size={14} className="text-gray-500 shrink-0" />}
+            </button>
+
+            {valuePropOpen && (
+              <div className="border-t border-gray-800 px-5 pb-5 pt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-vp-grid">
+                  {[
+                    { title: 'Queryable Encryption', emoji: '🔐',
+                      desc: 'The only commercially available database solution enabling equality searches on client-side encrypted fields. Zero plaintext PAN exposure to the database server; MongoDB staff included.',
+                      link: 'https://www.mongodb.com/docs/manual/core/queryable-encryption/', linkText: 'QE Docs' },
+                    { title: 'Customer-Managed Keys', emoji: '🗝️',
+                      desc: 'Full cryptographic key sovereignty. Your KMS encrypts data keys; MongoDB never has access to your master keys. Satisfies Req 3.6 to 3.7 key management obligations.',
+                      link: 'https://www.mongodb.com/docs/atlas/security-kms-encryption/', linkText: 'CMK Docs' },
+                    { title: 'Private Networking', emoji: '🔒',
+                      desc: 'Private Endpoints ensure all CDE traffic stays on cloud-provider backbone. Combined with IP allowlisting, creates a verifiable CDE network boundary satisfying Req 1 and 2.',
+                      link: 'https://www.mongodb.com/docs/atlas/security-private-endpoint/', linkText: 'Private Endpoint Docs' },
+                    { title: 'Audit Logging and SIEM', emoji: '📋',
+                      desc: 'Field-level audit logging forwarded to SIEM in real time. Automated daily review satisfies the new Req 10.4.1.1 requirement for automated log review mechanisms.',
+                      link: 'https://www.mongodb.com/docs/atlas/database-auditing/', linkText: 'Audit Docs' },
+                    { title: 'RBAC and Identity Federation', emoji: '👥',
+                      desc: 'Granular role-based access at database and collection level. LDAP/AD integration, OIDC/SCIM provisioning, and workforce identity federation satisfy Req 7 and 8.',
+                      link: 'https://www.mongodb.com/docs/atlas/security-add-mongodb-users/', linkText: 'RBAC Docs' },
+                    { title: 'PCI Level 1 Validated SP', emoji: '🏆',
+                      desc: 'Annual QSA assessment of the entire Atlas infrastructure. Request MongoDB\'s Attestation of Compliance (AOC) to reference in your own PCI assessment; reducing your compliance scope.',
+                      link: 'https://www.mongodb.com/products/platform/trust/pci-dss', linkText: 'Trust Center' },
+                  ].map(v => (
+                    <div key={v.title} className="bg-gray-800/40 border border-gray-700/50 rounded-xl p-4 p-vp-card">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-base leading-none">{v.emoji}</span>
+                        <p className="text-sm font-semibold text-gray-200 p-vp-title">{v.title}</p>
+                      </div>
+                      <p className="text-gray-500 text-xs leading-relaxed mb-3 p-vp-desc">{v.desc}</p>
+                      <a href={v.link} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                        <ExternalLink size={10} /> {v.linkText}
+                      </a>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Footer */}
@@ -1125,6 +1188,12 @@ export function HelpContent({ tab }: { tab: Tab }) {
             </a>
           </div>
         </div>
+
+        {/* ══ Q&A ═══════════════════════════════════════════════════════════ */}
+        <div className={`tab-section space-y-4 ${tab !== 'qa' ? 'screen-only hidden' : ''}`}>
+          <QASection />
+        </div>
+
       </div>
     </>
   );

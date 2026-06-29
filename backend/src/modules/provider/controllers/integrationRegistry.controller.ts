@@ -28,6 +28,9 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
     schema: {
       tags: ['providers'],
       summary: 'List all integration providers (SD-193)',
+      description: 'Returns all registered external providers (SD-193 External Provider Arrangements). '
+        + 'Results can be filtered by `type` (capability, e.g. fraud_detection) and `status` (active | inactive | test). '
+        + 'Requires manager role. Each record includes routing config, mode, and current status.',
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
@@ -120,6 +123,9 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
     schema: {
       tags: ['providers'],
       summary: 'Get integration provider detail',
+      description: 'Returns the full configuration of a single external provider, including endpoint, '
+        + 'authConfig, fieldMappingConfig, routing group, timeout, retry policy, and current status. '
+        + 'The `externalProviderApiKey` field is never returned. Requires manager role.',
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       response: { 200: { type: 'object', additionalProperties: true }, 403: E, 404: E },
@@ -140,6 +146,10 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
     schema: {
       tags: ['providers'],
       summary: 'Update integration provider configuration',
+      description: 'Partially updates a provider\'s configuration. All body fields are optional; '
+        + 'only the fields provided are changed. Changing `externalProviderArrangementStatus` to `inactive` '
+        + 'stops the routing engine from dispatching new events to this provider. '
+        + 'Changing `fieldMappingConfig` takes effect immediately for the next event. Requires manager role.',
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       body: {
@@ -202,6 +212,11 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
   fastify.post('/:id/rotate-key', {
     schema: {
       tags: ['providers'],
+      summary: 'Rotate integration API / webhook signing key',
+      description: 'Generates a new HMAC-SHA256 signing secret for the provider\'s webhook callbacks. '
+        + 'The new key is returned once in the response and stored hashed; it cannot be retrieved again. '
+        + 'The provider must be updated with the new key before rotation to avoid validation failures. '
+        + 'Returns 400 if the provider does not have a key to rotate. Requires manager role.',
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       response: { 200: { type: 'object', additionalProperties: true }, 400: E, 403: E, 404: E },
@@ -226,6 +241,12 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
   fastify.post('/:id/test', {
     schema: {
       tags: ['providers'],
+      summary: 'Test integration provider connectivity',
+      description: 'Sends a lightweight ping request to the provider\'s configured endpoint and '
+        + 'returns the HTTP status and measured round-trip latency. '
+        + 'Does NOT record an integration event or trigger field-mapping. '
+        + 'Use `POST /:id/run-test` to perform a real dispatched test that records an event. '
+        + 'Requires manager role.',
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       response: { 200: { type: 'object', properties: { status: { type: 'string' }, latencyMs: { type: 'number' } } }, 403: E, 404: E },
@@ -314,6 +335,11 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
   fastify.post('/:id/suspend', {
     schema: {
       tags: ['providers'],
+      summary: 'Suspend an integration provider',
+      description: 'Sets the provider\'s status to `inactive`, stopping the routing engine from '
+        + 'dispatching new events to it. Existing in-flight events are unaffected. '
+        + 'To re-activate, use PATCH /:id with `externalProviderArrangementStatus: "active"`. '
+        + 'Returns 400 if the provider is already inactive. Requires manager role.',
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       response: { 200: { type: 'object', additionalProperties: true }, 400: E, 403: E, 404: E },
@@ -366,6 +392,11 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
   fastify.get('/:id/events', {
     schema: {
       tags: ['providers'],
+      summary: 'Get integration event log (paginated)',
+      description: 'Returns the dispatch and callback event history for a provider, in reverse chronological order. '
+        + 'Each event records the request/response payload, mapped fields, HTTP status, latency, and outcome. '
+        + 'Use this to audit provider behavior, debug field-mapping rules, or review callback delivery. '
+        + 'Supports `page` and `limit` query parameters. Requires manager role.',
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       querystring: {

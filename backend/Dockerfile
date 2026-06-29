@@ -42,6 +42,10 @@ RUN npm install --ignore-scripts
 COPY backend/package.json backend/
 RUN cd backend && npm install
 
+# Frontend types for the admin panel type-check command
+COPY frontend/package*.json frontend/
+RUN cd frontend && npm install --ignore-scripts
+
 # ── Source & test infrastructure ──────────────────────────────────
 COPY backend/ backend/
 COPY test/ test/

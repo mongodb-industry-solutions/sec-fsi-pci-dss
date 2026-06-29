@@ -2,10 +2,36 @@ import fp from 'fastify-plugin';
 import { FastifyInstance } from 'fastify';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
+import fastifyStatic from '@fastify/static';
+import { join } from 'path';
+
+const PUBLIC = join(__dirname, '../../public');
 
 // fp() removes encapsulation so @fastify/swagger's onRoute hook
 // captures routes registered in the root scope.
 export const swaggerPlugin = fp(async function (fastify: FastifyInstance) {
+  // Serve backend/public/ at /public/ (auth whitelist includes /public).
+  await fastify.register(fastifyStatic, { root: PUBLIC, prefix: '/public/' });
+
+  // Rewrite the /doc/ HTML response to inject the app favicon in <head>.
+  // Replaces swagger's default icon links before the browser parses them,
+  // so the tab icon updates reliably without any JavaScript dependency.
+  fastify.addHook('onSend', async function (request, reply, payload) {
+    const ct = reply.getHeader('content-type') as string | undefined;
+    if (typeof payload === 'string' && ct?.includes('text/html') && request.url.startsWith('/doc')) {
+      const patched = payload
+        .replace(/<link rel="icon"[^>]*>/g, '')
+        .replace('</head>',
+          '<link rel="icon" type="image/png" sizes="32x32" href="/public/favicon-32x32.png?v=1" />\n' +
+          '<link rel="icon" type="image/png" sizes="16x16" href="/public/favicon-16x16.png?v=1" />\n' +
+          '</head>'
+        );
+      reply.header('content-length', Buffer.byteLength(patched));
+      return patched;
+    }
+    return payload;
+  });
+
   await fastify.register(fastifySwagger, {
     openapi: {
       openapi: '3.0.0',
@@ -119,6 +145,20 @@ Obtain a token via \`POST /api/v1/auth/login\`.
       displayRequestDuration: true,
       filter: true,
       tryItOutEnabled: true,
+    },
+    theme: {
+      title: 'Leafy Pay API',
+      css: [{
+        filename: 'leafy-topbar.css',
+        content: [
+          /* Replace Fastify SVG logo with app icon */
+          '.topbar-wrapper .link img { content: url("/public/app-icon.png"); height: 38px; width: auto; }',
+          /* Hide any leftover "fastify" text node next to the logo */
+          '.topbar-wrapper .link span:not([class]) { display: none; }',
+          /* Append "Leafy Pay" label after the icon */
+          '.topbar-wrapper .link::after { content: "Leafy Pay"; font-size: 1.15rem; font-weight: 700; color: #00ED64; margin-left: 8px; letter-spacing: 0.01em; }',
+        ].join('\n'),
+      }],
     },
     uiHooks: {
       onRequest: (_request, _reply, done) => done(),

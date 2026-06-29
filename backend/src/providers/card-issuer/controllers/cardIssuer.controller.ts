@@ -13,7 +13,31 @@ export async function cardIssuerController(fastify: FastifyInstance) {
   fastify.post('/score', {
     schema: {
       tags: ['modules:card-issuer'],
-      headers: { type: 'object', required: ['x-integration-source'], properties: { 'x-integration-source': { type: 'string' } } },
+      summary: 'Card issuer validation engine invocation (internal loopback)',
+      description: 'Internal card-issuer (bank) validation engine. Called by the integration router (ADR-029) '
+        + 'when no external card-issuer vendor is active. Validates the card format, network, and SAD (CVV check) '
+        + 'without storing any CHD. PCI DSS Req 3.3: CVV is validated and immediately discarded. '
+        + 'Not JWT-authenticated; requires `X-Integration-Source` header.',
+      headers: { type: 'object', required: ['x-integration-source'], properties: { 'x-integration-source': { type: 'string', description: 'Caller identity header.' } } },
+      body: {
+        type: 'object',
+        additionalProperties: true,
+        description: 'Card validation payload. May include maskedPan, network, cvv (validated and immediately discarded — never stored). Forwarded by the integration router.',
+      },
+      response: {
+        200: {
+          type: 'object',
+          description: 'Card issuer validation result.',
+          properties: {
+            actionConfirmed:     { type: 'boolean', description: 'True when the card passed all issuer checks.' },
+            responseCode:        { type: 'string', description: 'ISO 8583-style response code.' },
+            network:             { type: 'string', description: 'Resolved card network (e.g. VISA, MASTERCARD).' },
+            cvvValidationResult: { type: 'string', enum: ['match', 'mismatch', 'not_provided', 'not_supported'], description: 'CVV check outcome.' },
+            decisionReason:      { type: 'string', description: 'Human-readable reason for approval or rejection.' },
+          },
+        },
+        401: { type: 'object', properties: { error: { type: 'string' } }, description: 'Missing X-Integration-Source header.' },
+      },
     },
     config: { skipAuth: true },
   }, async (request, reply) => {
@@ -73,11 +97,30 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     return reply.send(result);
   });
 
-  fastify.get('/config', { schema: { tags: ['modules:card-issuer'] } }, async () => {
+  fastify.get('/config', {
+    schema: {
+      tags: ['modules:card-issuer'],
+      summary: 'Get card-issuer module configuration',
+      description: 'Returns the active card-issuer validation engine configuration (valid CVV rules, supported networks, format checks).',
+      response: {
+        200: { type: 'object', properties: { capability: { type: 'string' }, moduleConfig: { type: 'object', additionalProperties: true } } },
+      },
+    },
+  }, async () => {
     return (await getCapabilityModuleConfig(fastify.db, CAP)) ?? { capability: CAP, moduleConfig: {} };
   });
 
-  fastify.put('/config', { schema: { tags: ['modules:card-issuer'] } }, async (request) => {
+  fastify.put('/config', {
+    schema: {
+      tags: ['modules:card-issuer'],
+      summary: 'Update card-issuer module configuration',
+      description: 'Replaces the card-issuer engine configuration (CVV rules, network support, PAN format). Changes take effect on the next invocation.',
+      body: { type: 'object', properties: { moduleConfig: { type: 'object', additionalProperties: true } } },
+      response: {
+        200: { type: 'object', properties: { capability: { type: 'string' }, moduleConfig: { type: 'object', additionalProperties: true } } },
+      },
+    },
+  }, async (request) => {
     const body = request.body as { moduleConfig?: Record<string, unknown> };
     return upsertCapabilityModuleConfig(fastify.db, CAP, { moduleConfig: body.moduleConfig ?? {} });
   });

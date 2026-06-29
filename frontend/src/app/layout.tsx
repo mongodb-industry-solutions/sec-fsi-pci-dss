@@ -5,6 +5,14 @@ import { UIProvider } from '../components/ui/ConfirmProvider';
 export const metadata: Metadata = {
   title: 'Leafy Pay',
   description: 'MongoDB Queryable Encryption · AWS KMS · PCI DSS Payment Security Demo',
+  icons: {
+    icon: [
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon.ico',       sizes: 'any' },
+    ],
+    shortcut: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

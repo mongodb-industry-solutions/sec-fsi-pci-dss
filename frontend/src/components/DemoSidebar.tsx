@@ -119,6 +119,8 @@ function useNotifCount(role: string): number {
   return count;
 }
 
+const SIDEBAR_KEY = 'lp-sidebar-collapsed';
+
 /** Desktop/tablet sidebar (hidden below md breakpoint) */
 export function DemoSidebar() {
   const role    = useRole();
@@ -126,6 +128,23 @@ export function DemoSidebar() {
   const isActive = useActiveItem([...items, ...ACCOUNT_ITEMS]);
   const notifCount = useNotifCount(role);
   const [collapsed, setCollapsed] = useState(true);
+
+  // Restore persisted preference after mount (SSR-safe).
+  // Defaults to true (collapsed) when no value is saved yet.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SIDEBAR_KEY);
+      if (saved !== null) setCollapsed(saved === 'true');
+    } catch {}
+  }, []);
+
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed(c => {
+      const next = !c;
+      try { localStorage.setItem(SIDEBAR_KEY, String(next)); } catch {}
+      return next;
+    });
+  }, []);
 
   return (
     <aside className={`
@@ -141,7 +160,7 @@ export function DemoSidebar() {
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Menu</p>
           )}
           <button
-            onClick={() => setCollapsed(c => !c)}
+            onClick={toggleCollapsed}
             title={collapsed ? 'Expand menu' : 'Collapse menu'}
             className={`flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 rounded p-0.5 transition-colors ${collapsed ? 'mx-auto' : 'ml-auto'}`}
           >
@@ -200,7 +219,7 @@ export function DemoSidebar() {
 
       <button
         type="button"
-        onClick={() => setCollapsed(c => !c)}
+        onClick={toggleCollapsed}
         title={collapsed ? 'Expand menu' : 'Collapse menu'}
         className="border-t border-white/10 p-3 flex flex-col items-center gap-1.5 w-full hover:bg-white/5 transition-colors"
       >

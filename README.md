@@ -126,16 +126,15 @@ sec-fsi-pci-dss/
 
 ## 🗺️ Roadmap
 
-| Version | Theme | Key Features |
-|---|---|---|
-| 🟢 **v1** | Security Foundation | Payment simulation, JWT auth, dual-mode UI, QE encryption visible, fraud investigation |
-| 🔵 **v2** | Investigation & Control | RBAC, escalation workflow, audit trail, KMS key rotation |
-| 🟠 **v3** | Agentic | AI agent (Magenta) for automated fraud pre-review; draft diagnosis with Accept / Override |
-| 🟣 **v4** | Advanced Capabilities | Save card / recurring payment, range queries, performance visualization, Leafy Bank scaffold |
+| Version | Theme | Status | Key Features |
+|---|---|---|---|
+| 🟢 **v1** | Security Foundation | Complete | Payment simulation, JWT auth, dual-mode UI, QE encryption visible, fraud investigation |
+| 🔵 **v2** | Investigation & Control | In Development | RBAC, escalation workflow, audit trail, HRPC check, profile management |
+| 🟠 **v3** | Integration-ready API Surface | Planned | Recurring payments, webhook events, stable OpenAPI contracts, performance visualization, Leafy Bank scaffold |
+| 🟣 **v4** | Payment Gateway + Integration Refinement | Planned | Modular backend (BIAN SD modules), gateway API, merchant as first-class actor, full payment order lifecycle |
+| 🔴 **v5** | Agentic Integration | Planned | AI agent (Magenta / ThreatSight360) for automated fraud pre-review; draft diagnosis with Accept / Override |
 
-See [docs/roadmap.md](docs/roadmap.md) for the complete FR, NFR, and acceptance criteria per iteration.
-
-
+See [Scope](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki/Scope) for a detailed breakdown of what each iteration implements, what is out of scope, and how this compares to a real payment gateway. For the complete FR, NFR, and acceptance criteria per iteration, see [docs/roadmap.md](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/blob/staging/docs/roadmap.md).
 
 ---
 
