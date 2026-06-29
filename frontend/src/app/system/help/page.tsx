@@ -4,8 +4,9 @@ import {
   Download, Check, CheckSquare, ChevronDown, ChevronUp,
   ExternalLink, Shield, Database, Lock, Eye, FileText,
   AlertTriangle, CheckCircle2, Users, Ban, ChevronRight,
-  MessageCircle,
+  MessageCircle, type LucideIcon,
 } from 'lucide-react';
+import { CarouselNav } from '../../../components/CarouselNav';
 import { QASection } from './_QASection';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { getToken, decodeToken } from '../../../lib/auth';
@@ -296,6 +297,14 @@ const TAB_HREF: Record<Tab, string> = {
   qa: '/system/help/qa',
 };
 
+const HELP_TABS: Array<{ id: Tab; label: string; icon: LucideIcon }> = [
+  { id: 'overview',  label: 'Overview',                 icon: Eye },
+  { id: 'roles',     label: 'Your Role',                icon: Users },
+  { id: 'checklist', label: 'PCI DSS v4.0.1 Checklist', icon: CheckSquare },
+  { id: 'mongodb',   label: 'Architecture Proposal',    icon: Database },
+  { id: 'qa',        label: 'Q&A',                      icon: MessageCircle },
+];
+
 // Shared content for all help tabs. The full document (overview + checklist + architecture) is
 // always in the DOM so the "Export PDF" (window.print) produces the combined compliance document;
 // `tab` only controls which section is visible on screen.
@@ -479,27 +488,33 @@ export function HelpContent({ tab }: { tab: Tab }) {
           />
         </div>
 
-        {/* Tabs */}
-        <div className="screen-only flex border-b border-gray-300 mb-6 gap-1">
-          {([
-            { id: 'overview',  label: 'Overview',    icon: Eye },
-            { id: 'roles',     label: 'Your Role',        icon: Users },
-            { id: 'checklist', label: 'PCI DSS v4.0.1 Checklist',     icon: CheckSquare },
-            { id: 'mongodb',   label: 'Architecture Proposal', icon: Database },
-            { id: 'qa',        label: 'Q&A',              icon: MessageCircle },
-          ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
-            <Link
-              key={id}
-              href={TAB_HREF[id]}
-              className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-[15px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
-                tab === id
-                  ? 'border-[#001E2B] text-[#001E2B]'
-                  : 'border-transparent text-gray-500 hover:text-[#001E2B]'
-              }`}
-            >
-              <Icon size={15} className={tab === id ? 'text-[#001E2B]' : 'text-gray-400'} /> {label}
-            </Link>
-          ))}
+        {/* Tabs — desktop: bottom-border underline; mobile: carousel */}
+        <div className="screen-only mb-6">
+          {/* Desktop (md+) */}
+          <div className="hidden md:flex border-b border-gray-300 gap-1">
+            {HELP_TABS.map(({ id, label, icon: Icon }) => (
+              <Link
+                key={id}
+                href={TAB_HREF[id]}
+                className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-[15px] font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
+                  tab === id
+                    ? 'border-[#001E2B] text-[#001E2B]'
+                    : 'border-transparent text-gray-500 hover:text-[#001E2B]'
+                }`}
+              >
+                <Icon size={15} className={tab === id ? 'text-[#001E2B]' : 'text-gray-400'} /> {label}
+              </Link>
+            ))}
+          </div>
+
+          {/* Mobile (< md): scrollable carousel with chevrons */}
+          <div className="md:hidden border-b border-gray-300">
+            <CarouselNav
+              items={HELP_TABS.map(t => ({ href: TAB_HREF[t.id], label: t.label, icon: t.icon }))}
+              isActive={(href) => href === TAB_HREF[tab]}
+              variant="light"
+            />
+          </div>
         </div>
 
         {/* ══ OVERVIEW ══════════════════════════════════════════════════════ */}
