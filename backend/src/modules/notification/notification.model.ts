@@ -52,7 +52,8 @@ export function toNotificationDTO(n: NotificationRecord): NotificationDTO {
     type: n.notificationType,
     title: n.title,
     detail: n.detail,
-    href: n.href,
+    // Guard against legacy records written before `href` was added to the schema.
+    href: n.href ?? '/system/notifications',
     transactionId: n.transactionId ?? null,
     caseReference: n.caseReference ?? null,
     status: n.notificationStatus,

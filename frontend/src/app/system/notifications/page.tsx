@@ -131,7 +131,7 @@ export default function NotificationsPage() {
               const Icon = meta.icon;
               const isUnread = n.status === 'unread';
               return (
-                <Link key={n.id} href={n.href} onClick={() => readOne(n)}
+                <Link key={n.id} href={n.href ?? '/system/notifications'} onClick={() => readOne(n)}
                   className={`group flex items-start gap-3 rounded-xl border p-4 transition-all hover:shadow-md ${
                     isUnread ? 'bg-white border-[#00ED64]/40' : 'bg-gray-50 border-gray-200'
                   }`}>
