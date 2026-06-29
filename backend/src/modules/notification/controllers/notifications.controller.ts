@@ -16,9 +16,33 @@ export async function notificationsController(fastify: FastifyInstance) {
       tags: ['notifications'],
       summary: 'Notifications for the current user',
       description: 'Returns the signed-in user\'s notifications (unanswered security questions and '
-        + 'resolved transaction reviews). `count` is the number of actionable (unread) items.',
+        + 'resolved transaction reviews). `count` is the number of actionable (unread) items. '
+        + 'Scoped to the caller\'s own partyRef (PCI DSS Req 7); customers never see other parties\' alerts.',
       security: [{ bearerAuth: [] }],
-      response: { 200: { type: 'object', additionalProperties: true } },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            count: { type: 'number', description: 'Number of unread (actionable) notifications.' },
+            items: {
+              type: 'array',
+              description: 'Notification list, newest first.',
+              items: {
+                type: 'object',
+                properties: {
+                  id:            { type: 'string', description: 'Notification ID.' },
+                  type:          { type: 'string', description: 'Notification type (e.g. security_question, transaction_reviewed).' },
+                  read:          { type: 'boolean', description: 'Whether the notification has been marked read.' },
+                  createdAt:     { type: 'string', format: 'date-time' },
+                  transactionId: { type: 'string', description: 'Linked transaction reference, if applicable.' },
+                  message:       { type: 'string', description: 'Human-readable notification message.' },
+                },
+              },
+            },
+          },
+        },
+        401: { type: 'object', properties: { error: { type: 'string' } } },
+      },
     },
   }, async (request) => {
     const partyRef = partyOf(request);
@@ -31,8 +55,18 @@ export async function notificationsController(fastify: FastifyInstance) {
 
   // POST /api/v1/notifications/:id/read  -  mark one notification read (own only).
   fastify.post<{ Params: { id: string } }>('/:id/read', {
-    schema: { tags: ['notifications'], summary: 'Mark a notification read', security: [{ bearerAuth: [] }],
-      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } } },
+    schema: {
+      tags: ['notifications'],
+      summary: 'Mark a notification read',
+      description: 'Marks a single notification as read. Only the notification\'s owner can mark it read (scoped by partyRef). Returns 404 if not found or if the notification belongs to a different party.',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string', description: 'Notification ID to mark read.' } } },
+      response: {
+        200: { type: 'object', properties: { ok: { type: 'boolean', description: 'Always true on success.' } } },
+        401: { type: 'object', properties: { error: { type: 'string' } } },
+        404: { type: 'object', properties: { error: { type: 'string' } }, description: 'Notification not found or belongs to a different party.' },
+      },
+    },
   }, async (request, reply) => {
     const ok = await markRead(fastify.db, request.params.id, partyOf(request));
     if (!ok) return reply.status(404).send({ error: 'Notification not found' });
@@ -41,7 +75,16 @@ export async function notificationsController(fastify: FastifyInstance) {
 
   // POST /api/v1/notifications/read-all  -  mark all of the caller's notifications read.
   fastify.post('/read-all', {
-    schema: { tags: ['notifications'], summary: 'Mark all notifications read', security: [{ bearerAuth: [] }] },
+    schema: {
+      tags: ['notifications'],
+      summary: 'Mark all notifications read',
+      description: 'Marks all unread notifications belonging to the authenticated user as read. Scoped to the caller\'s own partyRef.',
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: { type: 'object', properties: { updated: { type: 'number', description: 'Number of notifications that were marked read.' } } },
+        401: { type: 'object', properties: { error: { type: 'string' } } },
+      },
+    },
   }, async (request) => {
     const updated = await markAllRead(fastify.db, partyOf(request));
     return { updated };
@@ -51,7 +94,14 @@ export async function notificationsController(fastify: FastifyInstance) {
   // question was raised, or one was answered). Carries no data; the client refetches the scoped list.
   // Auth required; scoped to the caller's own party (PCI DSS Req 7). fetch + Bearer header (no URL token).
   fastify.get('/stream', {
-    schema: { tags: ['notifications'], summary: 'Live notifications signal (SSE)', security: [{ bearerAuth: [] }] },
+    schema: {
+      tags: ['notifications'],
+      summary: 'Live notifications signal (SSE)',
+      description: 'Server-Sent Events stream. Sends a `changed` signal whenever the caller\'s notifications change '
+        + '(new security question raised or one answered). The client must refetch `GET /notifications` on receiving the signal. '
+        + 'Carries no notification data itself (only a trigger). Requires Bearer token in the Authorization header — no URL token.',
+      security: [{ bearerAuth: [] }],
+    },
   }, async (request, reply) => {
     const partyRef = (request as unknown as { user?: { partyRef?: string } }).user?.partyRef;
     if (!partyRef) return reply.status(401).send({ error: 'Authentication required' });

@@ -14,7 +14,25 @@ export async function hrpController(fastify: FastifyInstance) {
   fastify.post('/screen', {
     schema: {
       tags: ['modules:hrp'],
-      headers: { type: 'object', required: ['x-integration-source'], properties: { 'x-integration-source': { type: 'string' } } },
+      summary: 'HRP/Sanctions engine invocation (internal loopback)',
+      description: 'Internal High-Risk Person / sanctions / PEP screening engine. Called by the integration router (ADR-029) '
+        + 'when no external HRP or sanctions vendor is active. Checks the individual against OFAC, PEP, and custom lists. '
+        + 'Not JWT-authenticated; requires `X-Integration-Source` header.',
+      headers: { type: 'object', required: ['x-integration-source'], properties: { 'x-integration-source': { type: 'string', description: 'Caller identity header.' } } },
+      body: { type: 'object', additionalProperties: true, description: 'Individual identity payload forwarded by the integration router.' },
+      response: {
+        200: {
+          type: 'object',
+          description: 'HRP screening result.',
+          properties: {
+            sanctionsHit:  { type: 'boolean', description: 'True if the individual matched a sanctions list.' },
+            pepHit:        { type: 'boolean', description: 'True if the individual matched a PEP (Politically Exposed Person) list.' },
+            matchedLists:  { type: 'array', items: { type: 'string' }, description: 'Names of the lists that matched.' },
+            riskRating:    { type: 'string', enum: ['low', 'medium', 'high', 'critical'], description: 'Overall risk rating.' },
+          },
+        },
+        401: { type: 'object', properties: { error: { type: 'string' } }, description: 'Missing X-Integration-Source header.' },
+      },
     },
     config: { skipAuth: true },
   }, async (request, reply) => {
@@ -26,11 +44,30 @@ export async function hrpController(fastify: FastifyInstance) {
     return reply.send(screenHrp(request.body as Record<string, unknown>, config));
   });
 
-  fastify.get('/config', { schema: { tags: ['modules:hrp'] } }, async () => {
+  fastify.get('/config', {
+    schema: {
+      tags: ['modules:hrp'],
+      summary: 'Get HRP module configuration',
+      description: 'Returns the active HRP/sanctions engine configuration (screening list names, thresholds).',
+      response: {
+        200: { type: 'object', properties: { capability: { type: 'string' }, moduleConfig: { type: 'object', additionalProperties: true } } },
+      },
+    },
+  }, async () => {
     return (await getCapabilityModuleConfig(fastify.db, CAP)) ?? { capability: CAP, moduleConfig: {} };
   });
 
-  fastify.put('/config', { schema: { tags: ['modules:hrp'] } }, async (request) => {
+  fastify.put('/config', {
+    schema: {
+      tags: ['modules:hrp'],
+      summary: 'Update HRP module configuration',
+      description: 'Replaces the HRP/sanctions engine configuration (e.g. custom screening list names). Changes take effect on the next invocation.',
+      body: { type: 'object', properties: { moduleConfig: { type: 'object', additionalProperties: true } } },
+      response: {
+        200: { type: 'object', properties: { capability: { type: 'string' }, moduleConfig: { type: 'object', additionalProperties: true } } },
+      },
+    },
+  }, async (request) => {
     const body = request.body as { moduleConfig?: Record<string, unknown> };
     return upsertCapabilityModuleConfig(fastify.db, CAP, { moduleConfig: body.moduleConfig ?? {} });
   });
