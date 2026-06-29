@@ -292,9 +292,9 @@ export default function InfoPage() {
                 const degraded = health.httpStatus === 200 && health.status === 'warn';
                 const colour = ok ? 'text-green-400' : degraded ? 'text-yellow-400' : 'text-red-400';
                 const summary = ok
-                  ? `pass · v${health.version ?? '?'} · ${health.responseMs}ms`
+                  ? `pass · ${health.responseMs}ms`
                   : degraded
-                    ? `warn · v${health.version ?? '?'} · ${health.responseMs}ms`
+                    ? `warn · ${health.responseMs}ms`
                     : health.error
                       ? `${health.error} (${health.responseMs}ms)`
                       : `HTTP ${health.httpStatus} · ${health.responseMs}ms`;
@@ -305,6 +305,15 @@ export default function InfoPage() {
                   </div>
                 );
               })()}
+              {/* Application versions — shown first, most relevant for quick checks */}
+              <InfoRow
+                label="backend version"
+                value={health?.version ? `v${health.version}` : '—'}
+              />
+              <InfoRow
+                label="frontend version"
+                value={`v${process.env.NEXT_PUBLIC_FRONTEND_VERSION ?? '?'}`}
+              />
             </InfoCard>
 
             <InfoCard title="package.json" icon="📦">
