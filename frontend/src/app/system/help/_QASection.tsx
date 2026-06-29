@@ -8,6 +8,7 @@ interface QACategory {
   id: 1 | 2 | 3 | 4;
   label: string;
   emoji: string;
+  emojiOffset?: string;
   color: { badge: string; border: string; text: string; bg: string };
 }
 
@@ -111,7 +112,7 @@ const CATEGORIES: QACategory[] = [
     color: { badge: 'bg-violet-600 border-violet-600 text-white', border: 'border-l-violet-500', text: 'text-violet-400', bg: 'bg-violet-500/10' } },
   { id: 3, emoji: '🏛️', label: 'Atlas Certification Architecture',
     color: { badge: 'bg-emerald-600 border-emerald-600 text-white', border: 'border-l-emerald-500', text: 'text-emerald-400', bg: 'bg-emerald-500/10' } },
-  { id: 4, emoji: '💳', label: 'PAN Storage, Tokenization & BIAN',
+  { id: 4, emoji: '💳', label: 'PAN Storage, Tokenization & BIAN', emojiOffset: '-2px',
     color: { badge: 'bg-amber-600 border-amber-600 text-white', border: 'border-l-amber-500', text: 'text-amber-400', bg: 'bg-amber-500/10' } },
 ];
 
@@ -228,11 +229,12 @@ const QA_DATA: QAItem[] = [
     question: 'Does this solution need to mention magnetic stripe (track) data in the SAD prohibition list?',
     answer: (
       <div>
-        <P>No, for this specific use case. PCI DSS v4.0 defines three categories of SAD that must never be stored after authorization: card verification codes (CVV/CVC2), PINs, and full track data. Track data is only relevant in <Em>Card Present</Em> transactions where a physical card is swiped, tapped, or inserted.</P>
-        <P>This solution simulates an <Em>online checkout (Card Not Present)</Em> transaction where the bank receives a payment token, not a PAN or track data. Track data is never transmitted or received in this flow, so the existing SAD prohibition list (CVV, PIN) is accurate and sufficient.</P>
+        <P>PCI DSS v4.0 defines three categories of SAD that must <Em>never be stored after authorization</Em>: card verification codes (CVV/CVC2), PINs, and full track data. The prohibition is on <Em>storage</Em>, not on transmission: SAD is allowed in transit during the authorization window.</P>
+        <P>This system acts as a PSP intermediary. Sensitive card data received during payment initiation is encrypted immediately and forwarded securely to the card issuer through the external provider integration layer. The card issuer performs authorization on its side and returns an approval or decline. The PSP <Em>never persists</Em> CVV, PIN, or track data at any point in its database; only the tokenized reference and masked PAN are stored.</P>
+        <Callout label="Key PCI DSS Point">The SAD prohibition is satisfied by design: encrypt in transit, forward to issuer, discard. No SAD field ever reaches the storage layer of this system. This is the correct compliance posture for a CNP PSP acting as a secure pass-through.</Callout>
       </div>
     ),
-    tags: ['SAD', 'magnetic stripe', 'track data', 'Card Not Present', 'CVV', 'PIN'],
+    tags: ['SAD', 'magnetic stripe', 'track data', 'Card Not Present', 'CVV', 'PIN', 'card issuer', 'pass-through', 'never stored'],
   },
   {
     id: 11, category: 2,
@@ -604,9 +606,12 @@ export function QASection() {
         return (
           <div key={cat.id}>
             <div className="flex items-center gap-2 mb-2 px-1">
-              <span className="text-base leading-none">{cat.emoji}</span>
-              <p className="text-[11px] font-bold text-gray-100 uppercase tracking-widest">{cat.label}</p>
-              <span className="text-[10px] text-gray-700">{items.length} question{items.length !== 1 ? 's' : ''}</span>
+              <span
+                className="text-xl leading-[0] shrink-0"
+                style={cat.emojiOffset ? { transform: `translateY(${cat.emojiOffset})` } : undefined}
+              >{cat.emoji}</span>
+              <span className="text-[13px] font-bold text-gray-800 uppercase tracking-widest leading-none">{cat.label}</span>
+              <span className="text-[11px] text-gray-500 leading-none">{items.length} question{items.length !== 1 ? 's' : ''}</span>
             </div>
             <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
               {items.map((qa, idx) => {
