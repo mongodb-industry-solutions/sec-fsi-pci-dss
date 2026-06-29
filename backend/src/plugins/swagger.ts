@@ -148,6 +148,17 @@ Obtain a token via \`POST /api/v1/auth/login\`.
     },
     theme: {
       title: 'Leafy Pay API',
+      css: [{
+        filename: 'leafy-topbar.css',
+        content: [
+          /* Replace Fastify SVG logo with app icon */
+          '.topbar-wrapper .link img { content: url("/public/app-icon.png"); height: 38px; width: auto; }',
+          /* Hide any leftover "fastify" text node next to the logo */
+          '.topbar-wrapper .link span:not([class]) { display: none; }',
+          /* Append "Leafy Pay" label after the icon */
+          '.topbar-wrapper .link::after { content: "Leafy Pay"; font-size: 1.15rem; font-weight: 700; color: #00ED64; margin-left: 8px; letter-spacing: 0.01em; }',
+        ].join('\n'),
+      }],
     },
     uiHooks: {
       onRequest: (_request, _reply, done) => done(),
