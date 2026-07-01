@@ -409,6 +409,86 @@
     "schemaVersion": 2
   },
   {
+    "externalProviderArrangementInstanceReference": "int-internal-ais-001",
+    "externalProviderArrangementName": "Internal Account Information Service (AIS)",
+    "externalProviderArrangementType": "account_information",
+    "externalProviderArrangementStatus": "active",
+    "externalProviderIsInternal": true,
+    "externalProviderApiEndpoint": "/api/v1/modules/account-information/validate",
+    "externalProviderInternalHandler": "accountInformation.internalHandler",
+    "externalProviderCallbackEnabled": false,
+    "externalProviderTriggerEvents": [
+      "payout.ais.validation.requested"
+    ],
+    "externalProviderMode": "sync",
+    "externalProviderTimeoutMs": 500,
+    "externalProviderRetryPolicy": {
+      "maxAttempts": 1,
+      "backoffMs": 0
+    },
+    "externalProviderHealthStatus": "ok",
+    "externalProviderLastHealthCheckAt": "2026-07-01T00:00:00.000Z",
+    "categoryConfig": {
+      "alwaysVerifyActive": true,
+      "returnInternalBalance": true,
+      "identityCheckEnabled": true
+    },
+    "fieldMappingConfig": {
+      "outbound": [],
+      "inbound": [],
+      "schemaVersion": 1
+    },
+    "routingPriority": 999,
+    "bianServiceDomain": "SD-36 Open Banking",
+    "bianControlRecordType": "AccountInformationValidation",
+    "pciDssRequirements": ["Req 12.8.1", "Req 10.2.1"],
+    "recordCreatedDateTime": "2026-07-01T00:00:00.000Z",
+    "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z",
+    "schemaVersion": 2
+  },
+  {
+    "externalProviderArrangementInstanceReference": "int-internal-pisp-001",
+    "externalProviderArrangementName": "Internal Payment Initiation Service (PISP)",
+    "externalProviderArrangementType": "payment_initiation",
+    "externalProviderArrangementStatus": "active",
+    "externalProviderIsInternal": true,
+    "externalProviderApiEndpoint": "/api/v1/modules/payment-initiation/transfer",
+    "externalProviderInternalHandler": "paymentInitiation.internalHandler",
+    "externalProviderCallbackEnabled": true,
+    "externalProviderTriggerEvents": [
+      "payout.transfer.requested",
+      "bank.transfer.settled",
+      "bank.transfer.failed"
+    ],
+    "externalProviderMode": "async",
+    "externalProviderTimeoutMs": 10000,
+    "externalProviderRetryPolicy": {
+      "maxAttempts": 1,
+      "backoffMs": 0
+    },
+    "externalProviderHealthStatus": "ok",
+    "externalProviderLastHealthCheckAt": "2026-07-01T00:00:00.000Z",
+    "categoryConfig": {
+      "alwaysSucceed": true,
+      "settlementDelayT0Ms": 0,
+      "settlementDelayT1Ms": 3000,
+      "settlementDelayT2Ms": 6000,
+      "settlementDelayT3Ms": 9000
+    },
+    "fieldMappingConfig": {
+      "outbound": [],
+      "inbound": [],
+      "schemaVersion": 1
+    },
+    "routingPriority": 999,
+    "bianServiceDomain": "SD-65 Payment Execution",
+    "bianControlRecordType": "PaymentExecutionProcedure",
+    "pciDssRequirements": ["Req 12.8.1", "Req 10.2.1"],
+    "recordCreatedDateTime": "2026-07-01T00:00:00.000Z",
+    "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z",
+    "schemaVersion": 2
+  },
+  {
     "externalProviderArrangementInstanceReference": "int-merchant-callback-001",
     "externalProviderArrangementName": "Merchant Payment Notifications",
     "externalProviderArrangementType": "generic",
