@@ -35,8 +35,8 @@
     "payoutAccountCountryCode": "US",
     "payoutAccountPreferredRail": "internal_ledger",
     "payoutAccountBalance": {
-      "pendingAmount": 0,
-      "availableAmount": 0,
+      "pendingAmount": 320.00,
+      "availableAmount": 1540.75,
       "reservedAmount": 0,
       "currency": "USD",
       "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
@@ -61,7 +61,7 @@
     "payoutAccountBalance": {
       "pendingAmount": 0,
       "availableAmount": 9800.00,
-      "reservedAmount": 0,
+      "reservedAmount": 250.00,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
     },
@@ -86,7 +86,7 @@
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
       "pendingAmount": 0,
-      "availableAmount": 0,
+      "availableAmount": 430.20,
       "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
@@ -111,8 +111,8 @@
     "payoutAccountCountryCode": "GB",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 0,
-      "availableAmount": 0,
+      "pendingAmount": 75.00,
+      "availableAmount": 1284.60,
       "reservedAmount": 0,
       "currency": "USD",
       "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
@@ -120,6 +120,108 @@
     "bianServiceDomain": "Payment Initiation",
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2026-06-01T12:00:00.000Z",
+    "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "payoutAccountInstanceReference": "pau00003-0000-4000-8000-000000000003",
+    "partyInstanceReference": "b0000059-0000-4000-8000-000000000059",
+    "payoutAccountType": "bank_account",
+    "payoutAccountStatus": "active",
+    "payoutAccountIsDefault": true,
+    "payoutAccountIban": "DE89370400440532013000",
+    "payoutAccountRoutingNumber": "COBADEFFXXX",
+    "payoutAccountAlias": "Lena Commerzbank",
+    "payoutAccountBankName": "Commerzbank",
+    "payoutAccountCurrency": "EUR",
+    "payoutAccountCountryCode": "DE",
+    "payoutAccountPreferredRail": "sepa",
+    "payoutAccountBalance": {
+      "pendingAmount": 0,
+      "availableAmount": 3210.00,
+      "reservedAmount": 100.00,
+      "currency": "EUR",
+      "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
+    },
+    "bianServiceDomain": "Payment Initiation",
+    "bianControlRecordType": "PayoutAccountArrangement",
+    "recordCreatedDateTime": "2026-06-15T08:00:00.000Z",
+    "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "payoutAccountInstanceReference": "pau00004-0000-4000-8000-000000000004",
+    "partyInstanceReference": "b0000059-0000-4000-8000-000000000059",
+    "payoutAccountType": "wallet",
+    "payoutAccountStatus": "active",
+    "payoutAccountIsDefault": false,
+    "payoutAccountAlias": "Lena PSP wallet",
+    "payoutAccountBankName": "PSP Wallet",
+    "payoutAccountCurrency": "USD",
+    "payoutAccountCountryCode": "DE",
+    "payoutAccountPreferredRail": "internal_wallet",
+    "payoutAccountBalance": {
+      "pendingAmount": 18.50,
+      "availableAmount": 92.00,
+      "reservedAmount": 0,
+      "currency": "USD",
+      "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
+    },
+    "bianServiceDomain": "Payment Initiation",
+    "bianControlRecordType": "PayoutAccountArrangement",
+    "recordCreatedDateTime": "2026-06-20T11:00:00.000Z",
+    "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "payoutAccountInstanceReference": "pau00005-0000-4000-8000-000000000005",
+    "partyInstanceReference": "b0000060-0000-4000-8000-000000000060",
+    "payoutAccountType": "bank_account",
+    "payoutAccountStatus": "active",
+    "payoutAccountIsDefault": true,
+    "payoutAccountIban": "ES8023100001180000012345",
+    "payoutAccountRoutingNumber": "BBVAESMMXXX",
+    "payoutAccountAlias": "Carlos BBVA",
+    "payoutAccountBankName": "BBVA",
+    "payoutAccountCurrency": "EUR",
+    "payoutAccountCountryCode": "ES",
+    "payoutAccountPreferredRail": "sepa",
+    "payoutAccountBalance": {
+      "pendingAmount": 200.00,
+      "availableAmount": 560.80,
+      "reservedAmount": 0,
+      "currency": "EUR",
+      "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
+    },
+    "bianServiceDomain": "Payment Initiation",
+    "bianControlRecordType": "PayoutAccountArrangement",
+    "recordCreatedDateTime": "2026-06-22T15:30:00.000Z",
+    "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "payoutAccountInstanceReference": "pau00006-0000-4000-8000-000000000006",
+    "partyInstanceReference": "b0000060-0000-4000-8000-000000000060",
+    "payoutAccountType": "bank_account",
+    "payoutAccountStatus": "suspended",
+    "payoutAccountIsDefault": false,
+    "payoutAccountIban": "ES7621000418401234567891",
+    "payoutAccountRoutingNumber": "CAIXESBBXXX",
+    "payoutAccountAlias": "Carlos CaixaBank (suspended)",
+    "payoutAccountBankName": "CaixaBank",
+    "payoutAccountCurrency": "EUR",
+    "payoutAccountCountryCode": "ES",
+    "payoutAccountPreferredRail": "sepa",
+    "payoutAccountBalance": {
+      "pendingAmount": 0,
+      "availableAmount": 0,
+      "reservedAmount": 0,
+      "currency": "EUR",
+      "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
+    },
+    "bianServiceDomain": "Payment Initiation",
+    "bianControlRecordType": "PayoutAccountArrangement",
+    "recordCreatedDateTime": "2026-05-01T09:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z",
     "schemaVersion": 1
   }
