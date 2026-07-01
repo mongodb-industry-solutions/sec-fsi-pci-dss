@@ -140,7 +140,7 @@ function MerchantApplicationForm({
   }
 
   return (
-    <div className="w-full px-5 sm:px-8 py-6 space-y-5">
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -360,7 +360,7 @@ function CustomerMerchantList({
   const hasFilters = !!nameFilter || !!statusFilter;
 
   return (
-    <div className="w-full px-5 sm:px-8 py-6 space-y-5">
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <SectionHeader
         icon={Store}
         title="My Merchants"
@@ -530,7 +530,7 @@ function AnalystMerchantView({ token, role }: { token: string; role: string }) {
   const hasFilters = !!nameFilter || !!statusFilter;
 
   return (
-    <div className="w-full px-5 sm:px-8 py-6 space-y-5">
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <SectionHeader
         icon={Store}
         title="Merchant Agreements"
@@ -668,7 +668,7 @@ export default function MerchantPage() {
 
   // Customer: merchant list
   return (
-    <div className="w-full px-5 sm:px-8 py-6 space-y-5">
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <CustomerMerchantList
         token={token}
         onRegister={() => setShowRegister(true)}

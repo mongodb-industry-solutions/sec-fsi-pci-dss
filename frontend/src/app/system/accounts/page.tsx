@@ -265,7 +265,7 @@ function AccountsPageContent() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <SectionHeader
         icon={Landmark}
         title="Payout Accounts"
