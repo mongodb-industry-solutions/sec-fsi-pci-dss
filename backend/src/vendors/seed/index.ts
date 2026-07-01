@@ -18,6 +18,9 @@ import { seedNotifications } from './seedNotifications';
 import { seedCreditRatings } from './seedCreditRatings';
 import { seedIntegrations } from './seedIntegrations';
 import { seedCapabilityModules } from './seedCapabilityModules';
+import { seedPayoutAccounts } from './seedPayoutAccounts';
+import { seedPaymentExecutions } from './seedPaymentExecutions';
+import { seedCounterpartyArrangements } from './seedCounterpartyArrangements';
 
 // Load .env from project root  -  works regardless of CWD (npm --prefix changes CWD to backend/)
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
@@ -107,6 +110,15 @@ export async function runSeed() {
 
     console.log('Seeding merchantAgreementProcedure (SD-89, Ch-05)...');
     await seedMerchants(db);
+
+    console.log('Seeding payoutAccountArrangement (SD-66, v17)...');
+    await seedPayoutAccounts(db);
+
+    console.log('Seeding paymentExecutionProcedure (SD-65, v17)...');
+    await seedPaymentExecutions(db);
+
+    console.log('Seeding counterpartyArrangement (SD-54, v17)...');
+    await seedCounterpartyArrangements(db);
 
     console.log('Seeding externalProviderArrangement (SD-193, Ch-07)...');
     await seedIntegrations(db);

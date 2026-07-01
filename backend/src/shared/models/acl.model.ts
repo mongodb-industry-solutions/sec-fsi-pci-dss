@@ -21,6 +21,7 @@ export const RESOURCES = [
   'roles',         // SD-16 RBAC administration
   'auditEvents',   // ADR-025 / PCI Req 10
   'consents',      // Open Banking consent
+  'accounts',      // SD-66 Payout Account Arrangement (v17)
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
@@ -60,6 +61,7 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       cards: ['view', 'manage'],
       merchants: ['view'],
       consents: ['view'],
+      accounts: ['view', 'manage'],
     },
   },
   {
@@ -113,6 +115,7 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       providers: ['view'],
       modules: ['view'],
       auditEvents: ['view'],
+      accounts: ['view', 'viewSensitive'],
     },
   },
   {
@@ -126,6 +129,7 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
     rolePermissions: {
       merchants: ['view', 'manage'],
       auditEvents: ['view'],
+      accounts: ['view'],
     },
   },
   {

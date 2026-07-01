@@ -36,6 +36,10 @@ const EXPECTED_COLLECTIONS = [
   'capabilityModuleConfiguration',
   // dev.v8: unified Event Store (EDA backbone)
   'domainEvent',
+  // v17: Payout orchestration collections
+  'payoutAccountArrangement',
+  'paymentExecutionProcedure',
+  'counterpartyArrangement',
 ];
 
 // Unique index (primary ref field) per collection - representative index check
@@ -59,6 +63,10 @@ const EXPECTED_UNIQUE_INDEXES: Record<string, string> = {
   externalProviderArrangement:          'externalProviderArrangementInstanceReference',
   externalProviderArrangementPortfolio: 'routingGroupInstanceReference',
   capabilityModuleConfiguration:        'capabilityModuleInstanceReference',
+  // v17: payout orchestration
+  payoutAccountArrangement:             'payoutAccountInstanceReference',
+  paymentExecutionProcedure:            'paymentExecutionInstanceReference',
+  counterpartyArrangement:              'counterpartyArrangementReference',
   // externalProviderArrangementActionLog is timeseries — no unique index (checked by presence only)
 };
 

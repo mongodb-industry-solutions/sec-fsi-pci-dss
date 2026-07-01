@@ -130,6 +130,27 @@ export function buildEncryptedFieldsMaps(deks: DEKs, tier: QETier = 'level2') {
         },
       ],
     },
+
+    // -- SD-66: Payout Account Arrangement -----------------------------------─
+    // IBAN and routing number are PCI DSS Req 3.3 sensitive — QE:none, L2 only.
+    // No QE:equality needed (accounts are looked up by payoutAccountInstanceReference).
+    ...(includeSensitive ? {
+      payoutAccountArrangement: {
+        fields: [
+          {
+            keyId: deks.payoutIban,
+            path: 'payoutAccountIban',
+            bsonType: 'string',
+            // QE:none — non-searchable, retrieval only
+          },
+          {
+            keyId: deks.payoutRouting,
+            path: 'payoutAccountRoutingNumber',
+            bsonType: 'string',
+          },
+        ],
+      },
+    } : {}),
   };
 }
 

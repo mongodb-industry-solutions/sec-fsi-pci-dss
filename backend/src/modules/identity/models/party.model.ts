@@ -5,6 +5,16 @@
 
 export const PARTY_COLLECTION = 'party';
 
+export interface PartyTransferPreferences {
+  // Controls inbound transfer behaviour. Default: auto-accept all.
+  inboundAutoAccept: boolean;
+  // partyInstanceReference or merchantAgreementInstanceReference values to block
+  blockedSenders: string[];
+  // Require manual confirmation for transfers above this amount (0 = no threshold)
+  requireConfirmationAboveAmount?: number;
+  requireConfirmationAboveCurrency?: string; // ISO 4217
+}
+
 export interface PartyControlRecord {
   partyInstanceReference: string;           // PK, UUID
   // QE equality: searched by analysts (email/phone are PII)
@@ -15,6 +25,8 @@ export interface PartyControlRecord {
   partyType: PartyType;
   partyDateOfBirth?: string;                // ISO 8601 date string, QE:none in v2
   partyNationality?: string;                // ISO 3166-1 alpha-2
+  // v17: inbound transfer preferences and sender block list
+  partyTransferPreferences?: PartyTransferPreferences;
   bianServiceDomain: 'Party Data Management';
   bianControlRecordType: 'Party';
   recordCreatedDateTime: Date;

@@ -76,6 +76,10 @@ async function mongodbPlugin(fastify: FastifyInstance) {
     const { PostAuthorizationProcess } = await import('../modules/transaction/services/postAuthorization.process');
     new PostAuthorizationProcess(db, getEventBus()).register();
 
+    // v17: payout orchestration (merchant settlement, SD-65/SD-66/SD-36).
+    const { PayoutOrchestrationProcess } = await import('../modules/gateway/services/payoutOrchestration.process');
+    new PayoutOrchestrationProcess(db, getEventBus()).register();
+
     // dev.v8 P5 (§7.7): periodic sweep of lapsed pending-correlation entries (abandoned async
     // callbacks). In-memory registry; the sweep keeps it bounded.
     const { sweepExpiredCorrelations } = await import('../modules/provider/services/pendingCorrelation.service');

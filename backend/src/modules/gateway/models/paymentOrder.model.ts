@@ -14,6 +14,12 @@ export interface PaymentOrderControlRecord {
   customerAgreementInstanceReference?: string;      // FK → customerAgreement (populated on confirm)
   linkedCardTransactionReference?: string;          // FK → cardTransaction (populated on authorize)
 
+  // v17: Payout orchestration fields (SD-65 / SD-66)
+  paymentOrderBeneficiaryType?: BeneficiaryType;    // 'merchant' | 'user' | 'anonymous'
+  paymentOrderBeneficiaryReference?: string;        // partyRef for user payouts / anonymous target
+  paymentOrderCaptureStrategy: CaptureStrategy;     // default 'immediate'
+  paymentOrderExecutionReference?: string;          // FK → paymentExecutionProcedure (SD-65)
+
   // Payment details
   paymentOrderAmount: { amount: number; currency: string };
   paymentOrderMerchantReference: string;            // Merchant's own order ID
@@ -59,6 +65,9 @@ export interface PaymentOrderControlRecord {
   recordUpdatedDateTime: Date;
   schemaVersion: number;
 }
+
+export type BeneficiaryType = 'merchant' | 'user' | 'anonymous';
+export type CaptureStrategy = 'immediate' | 'manual';
 
 export type PaymentOrderStatus =
   | 'initiated'

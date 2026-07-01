@@ -1363,6 +1363,71 @@ export const api = {
     },
   },
 
+  // SD-66 Payout Account Arrangement + SD-65 Payment Execution (v17)
+  accounts: {
+    list: (partyRef: string, token: string, params?: { status?: string; page?: number; limit?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+      ).toString() : '';
+      return apiFetch<{
+        results: Array<{
+          payoutAccountInstanceReference: string;
+          payoutAccountType: string;
+          payoutAccountStatus: string;
+          payoutAccountCurrency: string;
+          payoutAccountAlias?: string;
+          payoutAccountBankName?: string;
+          payoutAccountIsDefault: boolean;
+          payoutAccountPreferredRail: string;
+          payoutAccountBalance?: { availableAmount: number; pendingAmount: number; reservedAmount: number; currency: string };
+          recordCreatedDateTime: string;
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/accounts/${encodeURIComponent(partyRef)}${qs}`, {}, token);
+    },
+    setDefault: (partyRef: string, accountRef: string, token: string) =>
+      apiFetch<{ payoutAccountInstanceReference: string; payoutAccountIsDefault: boolean }>(
+        `/api/v1/accounts/${encodeURIComponent(partyRef)}/${encodeURIComponent(accountRef)}/default`,
+        { method: 'POST', body: JSON.stringify({}) },
+        token,
+      ),
+    close: (partyRef: string, accountRef: string, token: string) =>
+      apiFetch<{ payoutAccountInstanceReference: string; payoutAccountStatus: string }>(
+        `/api/v1/accounts/${encodeURIComponent(partyRef)}/${encodeURIComponent(accountRef)}`,
+        { method: 'DELETE' },
+        token,
+      ),
+  },
+
+  executions: {
+    list: (token: string, params?: { status?: string; page?: number; limit?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+      ).toString() : '';
+      return apiFetch<{
+        results: Array<{
+          paymentExecutionInstanceReference: string;
+          paymentExecutionStatus: string;
+          grossAmount: number;
+          netAmount: number;
+          currency: string;
+          beneficiaryType: string;
+          resolvedPayoutAccountReference?: string;
+          cardTransactionInstanceReference?: string;
+          paymentExecutionRail?: string;
+          recordCreatedDateTime: string;
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/executions${qs}`, {}, token);
+    },
+    getById: (executionRef: string, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/executions/${encodeURIComponent(executionRef)}`, {}, token),
+  },
+
   processEvents: {
     // Unified audit stream: business + compliance + integration events.
     audit: (token: string, params?: { source?: string; type?: string; entityType?: string; outcome?: string; q?: string; ref?: string; minScore?: number; from?: string; to?: string; page?: number; limit?: number }) => {

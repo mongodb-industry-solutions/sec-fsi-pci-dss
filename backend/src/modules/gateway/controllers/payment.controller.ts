@@ -93,7 +93,7 @@ initiated → confirmed → authorized → captured → settled
       return reply.status(400).send({ error: 'merchantAgreementInstanceReference, paymentOrderMerchantReference, amount, and currency are required' });
     }
 
-    const result = await createPaymentOrder({ ...body, idempotencyKey });
+    const result = await createPaymentOrder(fastify.db, { ...body, idempotencyKey });
     return reply.status(201).send(result);
   });
 
@@ -133,7 +133,7 @@ initiated → confirmed → authorized → captured → settled
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const result = await getPaymentOrder(id);
+    const result = await getPaymentOrder(fastify.db, id);
     if (!result) return reply.status(404).send({ error: 'Payment order not found' });
     return reply.send(result);
   });
@@ -176,7 +176,7 @@ _(v5: state validation and 422 enforcement are not yet implemented in this proto
     if (!customerAgreementInstanceReference) {
       return reply.status(400).send({ error: 'customerAgreementInstanceReference is required' });
     }
-    const result = await confirmPaymentOrder(id, customerAgreementInstanceReference);
+    const result = await confirmPaymentOrder(fastify.db, id, customerAgreementInstanceReference);
     return reply.send(result);
   });
 
@@ -212,7 +212,8 @@ _(v5: state validation and 422 enforcement are not yet implemented in this proto
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const result = await authorizePaymentOrder(id);
+    const result = await authorizePaymentOrder(fastify.db, id);
+    if (!result) return reply.status(422).send({ error: 'Payment order not found or cannot be authorized from current state' });
     return reply.send(result);
   });
 
@@ -242,7 +243,8 @@ _(v5: state validation and 422 enforcement are not yet implemented in this proto
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const result = await capturePaymentOrder(id);
+    const result = await capturePaymentOrder(fastify.db, id);
+    if (!result) return reply.status(422).send({ error: 'Payment order not found or cannot be captured from current state' });
     return reply.send(result);
   });
 
@@ -271,7 +273,8 @@ A voided order cannot be captured or refunded. _(v5: updating the linked \`cardT
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const result = await voidPaymentOrder(id);
+    const result = await voidPaymentOrder(fastify.db, id);
+    if (!result) return reply.status(422).send({ error: 'Payment order not found or cannot be voided from current state' });
     return reply.send(result);
   });
 
@@ -321,7 +324,8 @@ _(v5: state validation, refund amount check, and 422 enforcement are not yet imp
     if (!refundAmount || !refundReason) {
       return reply.status(400).send({ error: 'refundAmount and refundReason are required' });
     }
-    const result = await refundPaymentOrder(id, refundAmount, refundReason);
+    const result = await refundPaymentOrder(fastify.db, id, refundAmount, refundReason);
+    if (!result) return reply.status(422).send({ error: 'Payment order not found or cannot be refunded from current state' });
     return reply.send(result);
   });
 }

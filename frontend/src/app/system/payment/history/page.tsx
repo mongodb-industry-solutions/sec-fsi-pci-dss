@@ -52,10 +52,15 @@ interface TransactionWithCase extends StoredTransaction {
 // Payment authorization status (did the payment go through). This is SEPARATE from the fraud/risk
 // status below: a payment can be Authorized and still be flagged or confirmed as fraud.
 const PAYMENT_STATUS: Record<string, { label: string; color: string }> = {
-  authorized: { label: 'Authorized', color: 'bg-green-100 text-green-800' },
-  settled:    { label: 'Settled',    color: 'bg-green-100 text-green-800' },
-  pending:    { label: 'Pending',    color: 'bg-amber-100 text-amber-800' },
-  declined:   { label: 'Declined',   color: 'bg-red-100 text-red-800' },
+  authorized: { label: 'Authorized',     color: 'bg-green-100 text-green-800' },
+  settled:    { label: '✓ Settled',      color: 'bg-emerald-100 text-emerald-800 font-semibold' },
+  captured:   { label: 'Captured',       color: 'bg-teal-100 text-teal-800' },
+  pending:    { label: 'Pending',        color: 'bg-amber-100 text-amber-800' },
+  declined:   { label: 'Declined',       color: 'bg-red-100 text-red-800' },
+  voided:     { label: 'Voided',         color: 'bg-gray-100 text-gray-500' },
+  refunded:   { label: 'Refunded',       color: 'bg-purple-100 text-purple-700' },
+  failed:     { label: 'Failed',         color: 'bg-red-100 text-red-800' },
+  expired:    { label: 'Expired',        color: 'bg-gray-100 text-gray-500' },
 };
 
 // Fraud / risk status (BIAN SD-83). Only present when the transaction triggered a fraud case.

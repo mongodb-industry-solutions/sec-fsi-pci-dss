@@ -5,6 +5,9 @@ import { DEKs } from '../encryption/keyVault';
 import { config } from '../../config';
 import { MERCHANT_WEBHOOK_LOG_COLLECTION } from '../../modules/gateway/models/merchantWebhookLog.model';
 import { PARTY_AUTH_CONSENT_COLLECTION } from '../../modules/identity/models/partyAuthConsent.model';
+import { PAYOUT_ACCOUNT_COLLECTION } from '../../modules/gateway/models/payoutAccount.model';
+import { PAYMENT_EXECUTION_COLLECTION } from '../../modules/gateway/models/paymentExecution.model';
+import { COUNTERPARTY_COLLECTION } from '../../modules/identity/models/counterpartyArrangement.model';
 
 const kmsConfig = getKmsConfig();
 
@@ -37,7 +40,12 @@ export async function createCollections(
     { name: 'paymentCardManagement',            map: maps.paymentCardManagement },
     // SD-91: Customer Authentication
     { name: 'customerAuthenticationAssessment', map: maps.customerAuthenticationAssessment },
-  ] as const;
+    // SD-66: Payout Account Arrangement (IBAN/routing QE:none, L2 only — PCI DSS Req 3.3)
+    ...(maps.payoutAccountArrangement
+      ? [{ name: PAYOUT_ACCOUNT_COLLECTION, map: maps.payoutAccountArrangement }]
+      : [{ name: PAYOUT_ACCOUNT_COLLECTION, map: { fields: [] } }]
+    ),
+  ];
 
   const existingList = await db.listCollections().toArray();
   const existingNames = new Set(existingList.map((c) => c.name));
@@ -383,5 +391,29 @@ export async function createCollections(
     console.log(`  created: ${MERCHANT_WEBHOOK_LOG_COLLECTION}`);
   } else {
     console.log(`  skip:    ${MERCHANT_WEBHOOK_LOG_COLLECTION} (already exists)`);
+  }
+
+  // SD-65: Payment Execution Procedure — plaintext (lifecycle states + append-only audit log)
+  if (!existingNames.has(PAYMENT_EXECUTION_COLLECTION) || reset) {
+    if (existingNames.has(PAYMENT_EXECUTION_COLLECTION) && reset) {
+      await db.collection(PAYMENT_EXECUTION_COLLECTION).drop();
+      console.log(`  dropped: ${PAYMENT_EXECUTION_COLLECTION}`);
+    }
+    await db.createCollection(PAYMENT_EXECUTION_COLLECTION);
+    console.log(`  created: ${PAYMENT_EXECUTION_COLLECTION} (SD-65 settlement lifecycle)`);
+  } else {
+    console.log(`  skip:    ${PAYMENT_EXECUTION_COLLECTION} (already exists)`);
+  }
+
+  // SD-54: Counterparty Arrangement — plaintext (beneficiary registry, no raw PII stored)
+  if (!existingNames.has(COUNTERPARTY_COLLECTION) || reset) {
+    if (existingNames.has(COUNTERPARTY_COLLECTION) && reset) {
+      await db.collection(COUNTERPARTY_COLLECTION).drop();
+      console.log(`  dropped: ${COUNTERPARTY_COLLECTION}`);
+    }
+    await db.createCollection(COUNTERPARTY_COLLECTION);
+    console.log(`  created: ${COUNTERPARTY_COLLECTION} (SD-54 beneficiary registry)`);
+  } else {
+    console.log(`  skip:    ${COUNTERPARTY_COLLECTION} (already exists)`);
   }
 }

@@ -67,6 +67,10 @@ export interface MerchantAgreementControlRecord {
   // D-21: Party owner link — BIAN-canonical cross-domain reference via SD-13 Party.
   merchantOwnerPartyReference?: string;             // FK → party.partyInstanceReference (SD-13)
 
+  // v17: Default settlement account (SD-66). Used as payout destination for merchant settlements.
+  // Resolution order: merchantDefaultPayoutAccountReference → owner's default payoutAccount → exception
+  merchantDefaultPayoutAccountReference?: string;  // FK → payoutAccountArrangement (SD-66)
+
   // Ch-05: Review metadata (top-level — kept for backward compat). Populated by merchant_officer.
   merchantReviewNote?: string;
   merchantReviewedByPartyReference?: string;        // FK → party.partyInstanceReference of reviewing officer

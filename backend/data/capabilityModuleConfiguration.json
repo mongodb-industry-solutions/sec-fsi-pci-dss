@@ -139,5 +139,39 @@
     "pciDssRequirements": ["Req 3.2", "Req 3.3", "Req 12.8.1"],
     "recordCreatedDateTime": "2026-06-14T00:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-14T00:00:00.000Z"
+  },
+  {
+    "capabilityModuleInstanceReference": "account-information",
+    "capability": "account-information",
+    "moduleDomain": "gateway",
+    "capabilityModuleStatus": "active",
+    "moduleConfig": {
+      "alwaysVerify": true,
+      "allowedStatuses": ["active"]
+    },
+    "moduleCallbackEndpoints": [],
+    "bianServiceDomain": "SD-36 Open Banking AIS",
+    "bianControlRecordType": "AccountInformationValidation",
+    "pciDssRequirements": ["Req 3.3", "Req 7.1", "Req 12.8.1"],
+    "recordCreatedDateTime": "2026-07-01T00:00:00.000Z",
+    "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z"
+  },
+  {
+    "capabilityModuleInstanceReference": "payment-initiation",
+    "capability": "payment-initiation",
+    "moduleDomain": "gateway",
+    "capabilityModuleStatus": "active",
+    "moduleConfig": {
+      "alwaysSucceed": true,
+      "settlementDelayT1Ms": 3000,
+      "settlementDelayT2Ms": 6000,
+      "settlementDelayT3Ms": 9000
+    },
+    "moduleCallbackEndpoints": [],
+    "bianServiceDomain": "SD-66 Payment Initiation",
+    "bianControlRecordType": "PaymentInitiationProcedure",
+    "pciDssRequirements": ["Req 3.3", "Req 10.2.1", "Req 12.8.1"],
+    "recordCreatedDateTime": "2026-07-01T00:00:00.000Z",
+    "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z"
   }
 ]

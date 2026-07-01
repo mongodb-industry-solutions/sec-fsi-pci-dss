@@ -29,8 +29,8 @@ interface StoredTransaction {
 }
 
 const STATUS_DISPLAY: Record<string, { label: string; color: string; icon: string }> = {
-  authorized:       { label: 'Authorized',                      color: 'bg-green-100 text-green-800',  icon: '✓' },
-  settled:          { label: 'Settled',                         color: 'bg-green-100 text-green-800',  icon: '✓' },
+  authorized:       { label: 'Authorized',                      color: 'bg-green-100 text-green-800',         icon: '✓' },
+  settled:          { label: 'Settled (funds disbursed)',        color: 'bg-emerald-100 text-emerald-800 font-semibold', icon: '✓' },
   under_review:     { label: 'Under review',                    color: 'bg-amber-100 text-amber-800',  icon: '●' },
   open:             { label: 'Under review',                    color: 'bg-amber-100 text-amber-800',  icon: '●' },
   escalated:        { label: 'In investigation',                color: 'bg-orange-100 text-orange-800',icon: '●' },

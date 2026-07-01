@@ -29,6 +29,8 @@ export interface DEKs {
   customerGovId: Binary;          // customerAgreementProcedureSensitive.governmentIdentificationReference
   customerRiskNotes: Binary;      // customerAgreementProcedureSensitive.customerAgreementRiskNotes
   cardExpiry: Binary;             // paymentCardManagement.paymentCardExpirationDate
+  payoutIban: Binary;             // payoutAccountArrangement.payoutAccountIban (SD-66)
+  payoutRouting: Binary;          // payoutAccountArrangement.payoutAccountRoutingNumber (SD-66)
 }
 
 export async function provisionDataEncryptionKeys(client: MongoClient): Promise<DEKs> {
@@ -70,9 +72,12 @@ export async function provisionDataEncryptionKeys(client: MongoClient): Promise<
   const customerGovId = await getOrCreate('DEK-customer-gov-id');
   const customerRiskNotes = await getOrCreate('DEK-customer-risk-notes');
   const cardExpiry = await getOrCreate('DEK-card-expiry');
+  const payoutIban = await getOrCreate('DEK-payout-iban');
+  const payoutRouting = await getOrCreate('DEK-payout-routing');
 
   return {
     txAccountRef, partyEmail, partyPhone, customerAccountRef, authEmail,
     txRawPayload, txProcessorMeta, customerAddress, customerGovId, customerRiskNotes, cardExpiry,
+    payoutIban, payoutRouting,
   };
 }

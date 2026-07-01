@@ -3,7 +3,7 @@
 **Project:** FSI PCI DSS Payment Security Demo  
 **PRD reference:** [PRD.md](PRD.md)  
 **Engineering Proposal:** [engineering-proposal.md](engineering-proposal.md)  
-**Last updated:** 2026-06-13
+**Last updated:** 2026-07-01
 
 This document covers the implementation-level detail that the PRD deliberately omits: BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index creation, and environment configuration. Engineers start here.
 
@@ -939,6 +939,161 @@ Structured investigator→customer questions on a fraud case, answered by the cu
 
 ---
 
+### 1.17 PSP Payout Orchestration Models (v17 — SD-54/65/66)
+
+Three new collections added in v17 to support the end-to-end payout pipeline.
+
+---
+
+#### `payoutAccountArrangement` (SD-66 — Payment Initiation)
+
+PSP-internal bank account record for each party. IBAN and routing number are encrypted at rest with `QE:none` (PCI DSS Req 3.3). Balance sub-document is updated atomically via `$inc`.
+
+```typescript
+// backend/src/modules/gateway/models/payoutAccount.model.ts
+export const PAYOUT_ACCOUNT_COLLECTION = 'payoutAccountArrangement';
+
+export type PayoutAccountType   = 'bank_account' | 'wallet' | 'internal_ledger';
+export type PayoutAccountStatus = 'active' | 'pending_validation' | 'suspended' | 'closed';
+export type PayoutRail          = 'sepa' | 'ach' | 'local_bank' | 'internal_wallet' | 'internal_ledger';
+
+export interface PayoutAccountBalance {
+  pendingAmount:   number;   // authorized, awaiting settlement
+  availableAmount: number;   // settled funds available for withdrawal
+  reservedAmount:  number;   // held for disputes / chargebacks
+  currency:        string;   // ISO 4217 — must match payoutAccountCurrency
+  lastUpdatedDateTime: Date;
+}
+
+export interface PayoutAccountArrangement {
+  payoutAccountInstanceReference: string;  // UUID, PK
+  partyInstanceReference:         string;  // FK → party (SD-13)
+
+  payoutAccountType:         PayoutAccountType;
+  payoutAccountStatus:       PayoutAccountStatus;
+  payoutAccountIsDefault:    boolean;  // at most one true per party (partial unique index)
+
+  // QE:none (DEK-payout-iban / DEK-payout-routing) — L1 returns Binary; L2 auto-decrypts
+  payoutAccountIban?:          string;  // IBAN — PCI DSS Req 3.3
+  payoutAccountRoutingNumber?: string;  // BIC / SWIFT / sort code — PCI DSS Req 3.3
+
+  payoutAccountAlias?:          string;  // phone or email alias for lookup
+  payoutAccountBankName?:       string;
+  payoutAccountCurrency:        string;  // ISO 4217
+  payoutAccountCountryCode:     string;  // ISO 3166-1 alpha-2
+  payoutAccountPreferredRail:   PayoutRail;
+
+  payoutAccountBalance: PayoutAccountBalance;  // PSP internal ledger — $inc only
+
+  bianServiceDomain:      'Payment Initiation';
+  bianControlRecordType:  'PayoutAccountArrangement';
+  recordCreatedDateTime:  Date;
+  recordUpdatedDateTime:  Date;
+  schemaVersion:          number;
+}
+```
+
+---
+
+#### `paymentExecutionProcedure` (SD-65 — Payment Execution)
+
+Lifecycle record for each payout. Created after card authorization; tracks the full journey from beneficiary resolution to final settlement. `resolutionLog` is append-only (PCI DSS Req 10).
+
+```typescript
+// backend/src/modules/gateway/models/paymentExecution.model.ts
+export const PAYMENT_EXECUTION_COLLECTION = 'paymentExecutionProcedure';
+
+export type PaymentExecutionStatus =
+  | 'pending'     // created, not yet routed
+  | 'routing'     // beneficiary resolution in progress
+  | 'scheduled'   // destination resolved; waiting for T+N window
+  | 'in_flight'   // funds dispatched to payout rail
+  | 'completed'   // settlement confirmed
+  | 'failed'      // terminal failure
+  | 'exception'   // blocked: no eligible destination; manual review required
+  | 'refunded'    // reversed post-settlement
+  | 'reversed';   // rolled back before settlement
+
+export interface PaymentExecutionResolutionStep {
+  stepName:    string;
+  stepOutcome: 'found' | 'not_found' | 'fallback' | 'failed';
+  stepNote?:   string;
+  stepDateTime: Date;
+}
+
+export interface PaymentExecutionProcedure {
+  paymentExecutionInstanceReference:  string;   // UUID, PK
+  paymentOrderInstanceReference:      string;   // FK → paymentOrderProcedure (SD-64)
+  cardTransactionInstanceReference?:  string;   // FK → cardTransactionLog (SD-254)
+
+  beneficiaryType:               BeneficiaryType;  // 'merchant' | 'user' | 'anonymous'
+  beneficiaryPartyReference?:    string;            // FK → party (SD-13) for user payouts
+  resolvedPayoutAccountReference?: string;          // FK → payoutAccountArrangement (SD-66)
+
+  grossAmount: number;
+  netAmount:   number;
+  feeAmount:   number;
+  currency:    string;  // ISO 4217
+
+  paymentExecutionRail?: PayoutRail;
+  routingNote?:          string;
+
+  paymentExecutionStatus: PaymentExecutionStatus;
+  failureReason?:  string;
+  scheduledAt?:    Date;
+  initiatedAt?:    Date;
+  completedAt?:    Date;
+
+  resolutionLog: PaymentExecutionResolutionStep[];  // append-only, never cleared
+
+  bianServiceDomain:     'Payment Execution';
+  bianControlRecordType: 'PaymentExecutionProcedure';
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+  schemaVersion:         number;
+}
+```
+
+---
+
+#### `counterpartyArrangement` (SD-54 — Counterparty Administration)
+
+Beneficiary registry entry. Raw phone/email is **never stored** — only the resolved `partyInstanceReference` and a masked display hint. The opaque `counterpartyArrangementReference` is the "beneficiary token" shared with merchants for payment initiation.
+
+```typescript
+// backend/src/modules/identity/models/counterpartyArrangement.model.ts
+export const COUNTERPARTY_COLLECTION = 'counterpartyArrangement';
+
+// Max beneficiaries per user — configurable via PSP_BENEFICIARY_MAX_PER_USER (default: 100)
+export const COUNTERPARTY_MAX_PER_USER = config.payout.beneficiaryMaxPerUser;
+
+export type CounterpartyArrangementStatus = 'active' | 'removed';
+export type CounterpartyLookupType        = 'phone' | 'email';
+
+export interface CounterpartyArrangement {
+  counterpartyArrangementReference: string;  // UUID v4 — the opaque beneficiary token
+  ownerPartyReference:              string;  // FK → party: who owns this contact
+  counterpartyPartyReference:       string;  // FK → party: the resolved beneficiary (PSP internal)
+
+  counterpartyLabel:       string;                  // owner-defined or masked hint
+  counterpartyLookupType:  CounterpartyLookupType;
+  counterpartyLookupHint:  string;                  // masked at store: "+34 6** *** 789" / "j***@example.com"
+                                                     // NEVER stores raw phone/email
+
+  counterpartyArrangementStatus: CounterpartyArrangementStatus;
+
+  bianServiceDomain:     'Counterparty Administration';
+  bianControlRecordType: 'CounterpartyArrangement';
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+  schemaVersion:         number;
+}
+```
+
+*Added 2026-07-01 (v17). Code and doc travel together per SDD rule.*
+
+---
+
 ## 2. QE encryptedFieldsMaps
 
 All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `keyId` values are per-field BSON Binary UUIDs resolved at runtime from the provisioned DEKs via `provisionDEKs.ts`.
@@ -958,6 +1113,8 @@ All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `k
 | `deks.txRawPayload` | `DEK-tx-raw-payload` | `cardTransactionLog.rawGatewayPayload` (QE:none, inline v2) |
 | `deks.txProcessorMeta` | `DEK-tx-processor-meta` | `cardTransactionLog.processorTransactionMetadata` (QE:none, inline v2) |
 | `deks.cardExpiry` | `DEK-card-expiry` | `paymentCardManagement.paymentCardExpirationDate` |
+| `deks.payoutIban` | `DEK-payout-iban` | `payoutAccountArrangement.payoutAccountIban` (QE:none, PCI DSS Req 3.3) |
+| `deks.payoutRouting` | `DEK-payout-routing` | `payoutAccountArrangement.payoutAccountRoutingNumber` (QE:none, PCI DSS Req 3.3) |
 
 ```typescript
 // backend/src/vendors/encryption/encryptedFieldsMaps.ts
@@ -1019,6 +1176,19 @@ export function buildEncryptedFieldsMaps(deks: DEKs, tier: QETier = 'level2') {
     },
 
     // fraudDiagnosisCase: no QE (operational metadata only, no PII or CHD)
+
+    // ── payoutAccountArrangement (SD-66) ──────────────────────────────
+    // QE:none only — IBAN and routing number are sensitive at rest (PCI DSS Req 3.3)
+    // but NOT searchable (accounts looked up by payoutAccountInstanceReference, not IBAN).
+    // L1 map omits this block → driver returns Binary. L2 map includes it → auto-decrypts.
+    ...(includeSensitive ? {
+      payoutAccountArrangement: {
+        fields: [
+          { keyId: deks.payoutIban,    path: 'payoutAccountIban',          bsonType: 'string' },
+          { keyId: deks.payoutRouting, path: 'payoutAccountRoutingNumber',  bsonType: 'string' },
+        ],
+      },
+    } : {}),
   };
 }
 ```
@@ -1367,6 +1537,38 @@ await db.createCollection('complianceProcessEvent', {
 
 // merchantAgreementEvents — standard collection (ADR-025: was lazily created, now explicit)
 await db.createCollection('merchantAgreementEvents');
+```
+
+**v17 index additions** (`createIndexes.ts`):
+
+```typescript
+// ── payoutAccountArrangement (SD-66) ────────────────────────────────────────
+await ensureIndexes(db, 'payoutAccountArrangement', [
+  { key: { payoutAccountInstanceReference: 1 }, unique: true },
+  { key: { partyInstanceReference: 1, payoutAccountStatus: 1 } },
+  // Partial unique: only one default per party. Filter avoids false conflicts with non-default.
+  {
+    key:    { partyInstanceReference: 1, payoutAccountIsDefault: 1 },
+    unique: true,
+    partialFilterExpression: { payoutAccountIsDefault: true },
+  },
+]);
+
+// ── paymentExecutionProcedure (SD-65) ───────────────────────────────────────
+await ensureIndexes(db, 'paymentExecutionProcedure', [
+  { key: { paymentExecutionInstanceReference: 1 }, unique: true },
+  { key: { paymentOrderInstanceReference: 1 } },
+  { key: { cardTransactionInstanceReference: 1 } },
+  { key: { paymentExecutionStatus: 1, recordCreatedDateTime: -1 } },
+]);
+
+// ── counterpartyArrangement (SD-54) ─────────────────────────────────────────
+await ensureIndexes(db, 'counterpartyArrangement', [
+  { key: { counterpartyArrangementReference: 1 }, unique: true },
+  { key: { ownerPartyReference: 1, counterpartyArrangementStatus: 1 } },
+  // Unique (owner, counterparty) pair — prevents duplicate beneficiary entries.
+  { key: { ownerPartyReference: 1, counterpartyPartyReference: 1 }, unique: true },
+]);
 ```
 
 ---
@@ -2071,6 +2273,190 @@ All internal stub endpoints follow the same request/response shape (typed per ca
 
 ---
 
+### 6.10 Payout Accounts — `module: accounts` (SD-66 · v17)
+
+> Base path: `/api/v1/accounts`  
+> Auth: Bearer JWT  
+> Scope: customers can only access their own `partyRef`; `security_auditor` / `manager` can view all.
+
+#### `GET /accounts/:partyRef`
+
+Lists payout accounts for a party.
+
+**Query:** `status` (filter), `page` (default 1), `limit` (default 20, max 100)
+
+**Response 200:**
+```json
+{
+  "results": [
+    {
+      "payoutAccountInstanceReference": "acct-uuid",
+      "partyInstanceReference": "party-uuid",
+      "payoutAccountType": "bank_account",
+      "payoutAccountStatus": "active",
+      "payoutAccountIsDefault": true,
+      "payoutAccountAlias": "My Savings",
+      "payoutAccountBankName": "Demo Bank",
+      "payoutAccountCurrency": "EUR",
+      "payoutAccountCountryCode": "ES",
+      "payoutAccountPreferredRail": "sepa",
+      "payoutAccountBalance": {
+        "pendingAmount": 0, "availableAmount": 1250.00, "reservedAmount": 0,
+        "currency": "EUR", "lastUpdatedDateTime": "2026-07-01T10:00:00Z"
+      },
+      "recordCreatedDateTime": "2026-01-15T08:00:00Z"
+    }
+  ],
+  "total": 1, "page": 1, "limit": 20
+}
+```
+
+Note: `payoutAccountIban` and `payoutAccountRoutingNumber` are **never returned to L1 clients** — they remain as BSON Binary ciphertext and are stripped by `safeAccount()`.
+
+#### `POST /accounts/:partyRef`
+
+Registers a new payout account. Requires `accounts:manage`.
+
+**Body:**
+```json
+{
+  "payoutAccountType": "bank_account",
+  "payoutAccountCurrency": "EUR",
+  "payoutAccountCountryCode": "ES",
+  "payoutAccountPreferredRail": "sepa",
+  "payoutAccountAlias": "My Savings",
+  "payoutAccountBankName": "Demo Bank",
+  "payoutAccountIsDefault": true
+}
+```
+
+**Response 201:** Created account document (IBAN/routing stripped).
+
+#### `GET /accounts/:partyRef/:accountRef`
+
+Returns a single payout account. Requires `accounts:view`.
+
+#### `POST /accounts/:partyRef/:accountRef/default`
+
+Sets the account as the party's default. Atomic: clears the prior default. Requires `accounts:manage`.
+
+**Response 200:** `{ "payoutAccountInstanceReference": "...", "payoutAccountIsDefault": true }`
+
+#### `DELETE /accounts/:partyRef/:accountRef`
+
+Closes a payout account (soft delete — status → `'closed'`). Requires `accounts:manage`.
+
+**Response 200:** `{ "payoutAccountInstanceReference": "...", "payoutAccountStatus": "closed" }`
+
+---
+
+### 6.11 Payment Executions — `module: executions` (SD-65 · v17)
+
+> Base path: `/api/v1/executions`  
+> Auth: Bearer JWT  
+> Roles: `level1_analyst`, `level2_investigator`, `security_auditor`, `manager`
+
+#### `GET /executions`
+
+Lists payment execution records with optional filters.
+
+**Query:** `status`, `partyRef`, `from` (ISO date), `to` (ISO date), `page`, `limit`
+
+**Response 200:**
+```json
+{
+  "results": [
+    {
+      "paymentExecutionInstanceReference": "exec-uuid",
+      "paymentOrderInstanceReference": "order-uuid",
+      "cardTransactionInstanceReference": "txn-uuid",
+      "beneficiaryType": "merchant",
+      "resolvedPayoutAccountReference": "acct-uuid",
+      "grossAmount": 99.99, "netAmount": 99.99, "feeAmount": 0,
+      "currency": "EUR",
+      "paymentExecutionRail": "sepa",
+      "paymentExecutionStatus": "completed",
+      "completedAt": "2026-07-01T11:00:00Z",
+      "resolutionLog": [
+        { "stepName": "ais.account.validation", "stepOutcome": "found", "stepDateTime": "..." },
+        { "stepName": "pisp.transfer.initiated", "stepOutcome": "found", "stepDateTime": "..." },
+        { "stepName": "bank.transfer.settled",   "stepOutcome": "found", "stepDateTime": "..." }
+      ]
+    }
+  ],
+  "total": 1, "page": 1, "limit": 20
+}
+```
+
+#### `GET /executions/:executionRef`
+
+Returns a single execution by reference. Includes full `resolutionLog`.
+
+---
+
+### 6.12 Merchant Beneficiary API — SD-54 (Merchant OAuth · v17)
+
+> Base path: `/api/v1/merchant/beneficiaries`  
+> Auth: Merchant Bearer token (`Authorization: Bearer <merchant-oauth-token>`)  
+> Required scope: see per-endpoint table below  
+> All endpoints enforce OAuth `sub` binding: `token.sub` must match the `partyRef` in the path.
+
+| Endpoint | Scope | Description |
+|---|---|---|
+| `POST /:partyRef/lookup` | `write:beneficiaries` | Resolve phone or email → beneficiary token |
+| `GET /:partyRef` | `read:beneficiaries` | List saved beneficiaries for the party |
+| `DELETE /:partyRef/:beneficiaryToken` | `write:beneficiaries` | Remove a beneficiary entry |
+
+#### `POST /merchant/beneficiaries/:partyRef/lookup`
+
+Resolves a phone number or email to a PSP user and returns an opaque beneficiary token. Anti-enumeration: returns `{ found: false }` for any non-success case (no diff between unknown user and other errors).
+
+**Body:**
+```json
+{ "lookupType": "phone", "lookupValue": "+34612345678" }
+```
+
+**Response 200 (found):**
+```json
+{
+  "found": true,
+  "beneficiaryToken": "btoken-uuid",
+  "maskedHint": "+34 6** *** 678",
+  "lookupType": "phone"
+}
+```
+
+**Response 200 (not found / error):** `{ "found": false }`
+
+#### `GET /merchant/beneficiaries/:partyRef`
+
+Lists the calling party's saved beneficiaries. Returns masked hints only — no raw phone/email.
+
+**Response 200:**
+```json
+{
+  "results": [
+    {
+      "counterpartyArrangementReference": "btoken-uuid",
+      "counterpartyLabel": "My Friend",
+      "counterpartyLookupType": "phone",
+      "counterpartyLookupHint": "+34 6** *** 678",
+      "counterpartyArrangementStatus": "active",
+      "recordCreatedDateTime": "2026-07-01T09:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+#### `DELETE /merchant/beneficiaries/:partyRef/:beneficiaryToken`
+
+Marks a beneficiary entry as `'removed'` (soft delete). The resolved counterparty is not affected.
+
+**Response 200:** `{ "removed": true, "counterpartyArrangementReference": "btoken-uuid" }`
+
+---
+
 ## 7. Environment Variables Reference
 
 ```bash
@@ -2115,6 +2501,16 @@ PSP_CORS_ORIGIN=http://localhost:8080
 FRAUD_AMOUNT_THRESHOLD=500
 RISK_MCC_LIST=5812,6011,7995
 ESCALATION_TOKEN_TTL_SECONDS=3600
+
+# ── Payout Orchestration (v17 — PSP_ prefix) ───────────────────────
+# All read via pspEnv('NAME', 'default') helper in backend/src/config.ts
+PSP_BENEFICIARY_MAX_PER_USER=100          # Max beneficiaries per user (SD-54)
+PSP_BENEFICIARY_RATE_LIMIT_RPM=20        # Max lookups/min per merchant+user pair
+PSP_PAYOUT_SETTLEMENT_DELAY_T1_MS=3000  # Simulated T+1 delay in ms (builtin PISP)
+PSP_PAYOUT_SETTLEMENT_DELAY_T2_MS=6000  # Simulated T+2 delay in ms
+PSP_PAYOUT_SETTLEMENT_DELAY_T3_MS=9000  # Simulated T+3 delay in ms
+PSP_PAYMENT_INITIATION_ALWAYS_SUCCEED=true  # Set false to simulate 5% rail failures
+PSP_AIS_ALWAYS_VERIFY=true               # Set false for builtin AIS to return unverified
 ```
 
 ---

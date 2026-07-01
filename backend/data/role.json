@@ -11,7 +11,8 @@
       "transactions": ["view"],
       "cards": ["view", "manage"],
       "merchants": ["view"],
-      "consents": ["view"]
+      "consents": ["view"],
+      "accounts": ["view", "manage"]
     }
   },
   {
@@ -64,7 +65,8 @@
       "merchants": ["view"],
       "providers": ["view"],
       "modules": ["view"],
-      "auditEvents": ["view"]
+      "auditEvents": ["view"],
+      "accounts": ["view", "viewSensitive"]
     }
   },
   {
@@ -77,7 +79,8 @@
     "bianControlRecordType": "MerchantAgreement",
     "rolePermissions": {
       "merchants": ["view", "manage"],
-      "auditEvents": ["view"]
+      "auditEvents": ["view"],
+      "accounts": ["view"]
     }
   },
   {

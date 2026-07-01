@@ -86,4 +86,18 @@ export const config = {
     eventBusTopicPrefix: pspEnv('EVENT_BUS_TOPIC_PREFIX', 'pci.psp')!,
     seedDataDir: pspEnv('SEED_DATA_DIR'),
   },
+
+  payout: {
+    // Builtin payment-initiation module — simulated settlement delays (T+N)
+    settlementDelayT1Ms: parseInt(pspEnv('PAYOUT_SETTLEMENT_DELAY_T1_MS', '3000')!, 10),
+    settlementDelayT2Ms: parseInt(pspEnv('PAYOUT_SETTLEMENT_DELAY_T2_MS', '6000')!, 10),
+    settlementDelayT3Ms: parseInt(pspEnv('PAYOUT_SETTLEMENT_DELAY_T3_MS', '9000')!, 10),
+    // Set to 'false' in staging to simulate 5% random rail failures
+    paymentInitiationAlwaysSucceed: pspEnv('PAYMENT_INITIATION_ALWAYS_SUCCEED', 'true') === 'true',
+    // Builtin account-information module
+    aisAlwaysVerify: pspEnv('AIS_ALWAYS_VERIFY', 'true') === 'true',
+    // SD-54 Counterparty Administration — beneficiary registry limits
+    beneficiaryMaxPerUser: parseInt(pspEnv('BENEFICIARY_MAX_PER_USER', '100')!, 10),
+    beneficiaryRateLimitRpm: parseInt(pspEnv('BENEFICIARY_RATE_LIMIT_RPM', '20')!, 10),
+  },
 } as const;
