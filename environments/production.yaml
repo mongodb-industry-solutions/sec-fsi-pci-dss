@@ -3,6 +3,7 @@ replicaCount: 2
 env:
   NODE_ENV: production
   KMS_PROVIDER: local
+  PSP_OAUTH_KEY_PROVIDER: aws
   PSP_CORS_ORIGIN: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com"
   PSP_URL_FRONTEND: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com"
 
@@ -14,6 +15,7 @@ envSecrets:
   KMS_KEY_VAULT_COLLECTION: sec-fsi-pci-dss-secrets-prod
   PSP_ADM_USER: sec-fsi-pci-dss-secrets-prod
   PSP_ADM_PASS: sec-fsi-pci-dss-secrets-prod
+  PSP_OAUTH_AWS_KEY_ARN: sec-fsi-pci-dss-secrets-prod
 
 resources:
   requests:

@@ -60,6 +60,7 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
           risk: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Filter by risk category.' },
           page: { type: 'integer', minimum: 1, default: 1 },
           limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+          mine: { type: 'boolean', description: 'When true, restrict results to the caller\'s own merchants regardless of role.' },
         },
       },
       response: {
@@ -93,12 +94,10 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
     },
   }, async (request, reply) => {
     const user = (request as { user?: JwtUserPayload }).user;
-    // Ch-05: customers cannot list all merchants; they can only see their own via GET /:id
-    if (user?.role === 'customer') {
-      return reply.status(403).send({ error: 'Access denied: use GET /merchants/:id to view your own merchant.' });
-    }
-    const { status, mcc, name, risk, page, limit } = request.query as { status?: string; mcc?: string; name?: string; risk?: string; page?: number; limit?: number };
-    const result = await getMerchants(fastify.db, { status: status as never, mcc, name, risk, page, limit });
+    const { status, mcc, name, risk, page, limit, mine } = request.query as { status?: string; mcc?: string; name?: string; risk?: string; page?: number; limit?: number; mine?: boolean };
+    // Customers see only their own merchants; mine=true scopes any role to their own records
+    const ownerPartyRef = (user?.role === 'customer' || mine) ? (user?.partyRef ?? undefined) : undefined;
+    const result = await getMerchants(fastify.db, { status: status as never, mcc, name, risk, page, limit, ownerPartyRef });
     return reply.send(result);
   });
 

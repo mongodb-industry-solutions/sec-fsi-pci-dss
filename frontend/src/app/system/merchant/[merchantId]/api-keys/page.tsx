@@ -1,10 +1,10 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { Copy, Check, Key, ShieldCheck, Trash2, Search, Plus, Pencil, X, Download } from 'lucide-react';
-import { SectionHeader } from '../../../../components/SectionHeader';
-import { Pagination } from '../../../../components/Pagination';
-import { useRequireActiveMerchant } from '../../../../lib/merchantContext';
-import { api } from '../../../../lib/api';
+import { SectionHeader } from '../../../../../components/SectionHeader';
+import { Pagination } from '../../../../../components/Pagination';
+import { useRequireActiveMerchant } from '../../../../../lib/merchantContext';
+import { api } from '../../../../../lib/api';
 
 type KeyMeta = {
   keyId: string;
@@ -138,7 +138,7 @@ export default function ApiKeysSectionPage() {
         {result && (
           <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-2">
             <div className="text-sm font-medium text-green-800">
-              New key{result.keyLabel ? ` “${result.keyLabel}”` : ''} created. Copy it now:
+              New key{result.keyLabel ? ` "${result.keyLabel}"` : ''} created. Copy it now:
             </div>
             <div className="flex items-center gap-2">
               <div className="flex-1 font-mono text-xs text-green-700 bg-white border border-green-200 rounded px-2 py-1.5 truncate">{result.merchantApiKey}</div>

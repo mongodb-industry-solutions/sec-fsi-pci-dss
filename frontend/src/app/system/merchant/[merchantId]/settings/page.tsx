@@ -1,10 +1,10 @@
 'use client';
 import { useState } from 'react';
 import { Settings as SettingsIcon, Check, Lock } from 'lucide-react';
-import { SectionHeader } from '../../../../components/SectionHeader';
-import { useRequireActiveMerchant } from '../../../../lib/merchantContext';
-import { useDebugMode } from '../../../../lib/debugMode';
-import { api } from '../../../../lib/api';
+import { SectionHeader } from '../../../../../components/SectionHeader';
+import { useRequireActiveMerchant } from '../../../../../lib/merchantContext';
+import { useDebugMode } from '../../../../../lib/debugMode';
+import { api } from '../../../../../lib/api';
 
 const CURRENCY_OPTIONS = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF'];
 const SETTLEMENT_OPTIONS = ['T+1', 'T+2', 'T+3'];

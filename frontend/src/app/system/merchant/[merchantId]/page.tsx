@@ -30,15 +30,13 @@ const SALE_STATUS = (s: string) =>
 
 const EVENT_LABEL: Record<string, string> = {
   'merchant.validation.requested': 'Application submitted',
-  'merchant.approved': 'Approved · KYB verified',
+  'merchant.approved': 'Approved, KYB verified',
   'merchant.rejected': 'Application rejected',
   'merchant.updated': 'Configuration updated',
 };
 
 type AuditRow = { label: string; date?: string; role?: string };
 
-// Fallback for merchants seeded before the event log existed: reconstruct lifecycle
-// milestones from the authoritative record fields (clearly labelled as derived).
 function recordMilestones(m: Record<string, unknown>, kyb?: Record<string, unknown>): AuditRow[] {
   const rows: AuditRow[] = [];
   if (m.recordCreatedDateTime) rows.push({ label: 'Application submitted', date: String(m.recordCreatedDateTime), role: 'customer' });
@@ -59,7 +57,7 @@ function InfoRow({ label, value }: { label: string; value?: string | number }) {
 }
 
 export default function StaffMerchantDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const { merchantId: id } = useParams<{ merchantId: string }>();
   const router = useRouter();
   const { token, role, state } = useMerchant();
 
@@ -70,7 +68,6 @@ export default function StaffMerchantDetailPage() {
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
 
-  // Full payments list (acquiring view) with filter/search/pagination + drill-in.
   const isAuditor = role === 'security_auditor';
   const [payments, setPayments] = useState<Sale[]>([]);
   const [payTotal, setPayTotal] = useState(0);
@@ -80,9 +77,7 @@ export default function StaffMerchantDetailPage() {
   const [paySearchInput, setPaySearchInput] = useState('');
   const [paySearch, setPaySearch] = useState('');
   const [payLoading, setPayLoading] = useState(false);
-  // For the auditor only: which payments already have a linked fraud case (read-only).
   const [caseMap, setCaseMap] = useState<Record<string, { id: string; ref: string; status: string } | null>>({});
-  // Breadcrumb context: a merchant opened from a transaction or a case reflects that path.
   const [navCtx, setNavCtx] = useState<{ from: string; txnId?: string; caseId?: string; caseRef?: string } | null>(null);
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -98,10 +93,7 @@ export default function StaffMerchantDetailPage() {
     try {
       const m = await api.merchants.getById(id, token);
       setMerchant(m);
-      // Authorization: staff (officer/auditor) or the merchant's own owner.
       const partyRef = decodeToken(token)?.partyRef;
-      // PSP staff + fraud investigators (L1/L2) may view a merchant; investigators reach it from a
-      // case (SD-89 referenced by SD-83). The administrative `manager` role is excluded (PCI Req 7).
       const isStaff = role === 'merchant_officer' || role === 'security_auditor'
         || role === 'level1_analyst' || role === 'level2_investigator';
       const isOwner = !!partyRef && (m as Record<string, unknown>).merchantOwnerPartyReference === partyRef;
@@ -133,8 +125,6 @@ export default function StaffMerchantDetailPage() {
       const list = res.results as Sale[];
       setPayments(list);
       setPayTotal(res.total);
-      // Auditor oversight (read-only): surface any existing investigation case per payment.
-      // Officer/owner are blocked from /fraud, so the lookup runs for the auditor only.
       if (isAuditor && list.length) {
         const entries = await Promise.all(list.map(async (s) => {
           const cases = await api.fraud.list({ transactionId: s.cardTransactionInstanceReference, limit: 1 }, token).catch(() => null);
@@ -151,7 +141,7 @@ export default function StaffMerchantDetailPage() {
 
   useEffect(() => { if (merchant && !denied) loadPayments(); }, [merchant, denied, loadPayments]);
 
-  if (loading) return <div className="px-5 sm:px-8 py-8 text-center text-sm text-gray-400">Loading merchant…</div>;
+  if (loading) return <div className="px-5 sm:px-8 py-8 text-center text-sm text-gray-400">Loading merchant...</div>;
   if (denied) {
     return (
       <div className="px-5 sm:px-8 py-8">
@@ -255,7 +245,7 @@ export default function StaffMerchantDetailPage() {
         </div>
       </div>
 
-      {/* Acquiring analytics (reuses /:id/stats; officer/auditor authorized; no payer PII) */}
+      {/* Acquiring analytics */}
       <div className="space-y-4">
         <h2 className="text-sm font-semibold text-gray-700">Activity <span className="text-xs font-normal text-gray-400">· aggregates only, no payer PII (PCI DSS Req 3/7)</span></h2>
         {!stats ? (
@@ -292,7 +282,7 @@ export default function StaffMerchantDetailPage() {
         )}
       </div>
 
-      {/* Transactions; full acquiring list with drill-in (and case oversight for auditor) */}
+      {/* Transactions */}
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="flex items-center justify-between gap-2 px-5 py-3 border-b border-gray-100 flex-wrap">
           <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5">
@@ -309,12 +299,11 @@ export default function StaffMerchantDetailPage() {
           </div>
         )}
 
-        {/* Filter + search */}
         <div className="flex flex-wrap gap-2 items-center px-5 py-3 border-b border-gray-100 bg-gray-50/60">
           <form onSubmit={(e) => { e.preventDefault(); setPayPage(1); setPaySearch(paySearchInput.trim()); }} className="relative flex-1 min-w-[180px]">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
             <input value={paySearchInput} onChange={(e) => setPaySearchInput(e.target.value)}
-              placeholder="Search masked PAN or descriptor…"
+              placeholder="Search masked PAN or descriptor..."
               className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
           </form>
           <select value={payStatus} onChange={(e) => { setPayStatus(e.target.value); setPayPage(1); }}
@@ -325,7 +314,7 @@ export default function StaffMerchantDetailPage() {
         </div>
 
         {payLoading ? (
-          <div className="px-5 py-8 text-center text-sm text-gray-400">Loading payments…</div>
+          <div className="px-5 py-8 text-center text-sm text-gray-400">Loading payments...</div>
         ) : payments.length === 0 ? (
           <div className="px-5 py-8 text-center text-sm text-gray-400">No payments match the current filters.</div>
         ) : (
@@ -392,7 +381,7 @@ export default function StaffMerchantDetailPage() {
         )}
       </div>
 
-      {/* Audit trail (BIAN SD-89 lifecycle · PCI DSS Req 10) */}
+      {/* Audit trail (BIAN SD-89 lifecycle, PCI DSS Req 10) */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5"><ClipboardCheck size={14} className="text-[#001E2B]" /> Audit trail</h2>

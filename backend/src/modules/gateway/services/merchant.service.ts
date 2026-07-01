@@ -40,13 +40,14 @@ export interface CreateMerchantInput {
 
 export async function getMerchants(
   db: Db,
-  filters: { status?: MerchantAgreementStatus; mcc?: string; name?: string; risk?: string; page?: number; limit?: number }
+  filters: { status?: MerchantAgreementStatus; mcc?: string; name?: string; risk?: string; page?: number; limit?: number; ownerPartyRef?: string }
 ) {
   const query: Record<string, unknown> = {};
   if (filters.status) query.merchantAgreementStatus = filters.status;
   if (filters.mcc) query.merchantCategoryCode = filters.mcc;
   if (filters.name) query.merchantName = { $regex: filters.name, $options: 'i' };
   if (filters.risk) query.merchantRiskCategory = filters.risk;
+  if (filters.ownerPartyRef) query.merchantOwnerPartyReference = filters.ownerPartyRef;
 
   const page = Math.max(1, filters.page ?? 1);
   const limit = Math.min(100, Math.max(1, filters.limit ?? 20));

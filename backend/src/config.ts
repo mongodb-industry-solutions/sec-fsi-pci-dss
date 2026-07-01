@@ -47,7 +47,7 @@ export const config = {
 
   oauth: {
     keyProvider: (pspEnv('OAUTH_KEY_PROVIDER', 'local')!) as 'local' | 'aws',
-    keyStoreDir: pspEnv('OAUTH_KEY_STORE_DIR', './keys/oauth')!,
+    keyStoreDir: pspEnv('OAUTH_KEY_STORE_DIR', './keys')!,
     awsKeyArn: pspEnv('OAUTH_AWS_KEY_ARN'),
     awsRegion: pspEnv('OAUTH_AWS_REGION', 'us-east-1')!,
   },

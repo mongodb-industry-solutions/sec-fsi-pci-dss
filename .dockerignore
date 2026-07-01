@@ -16,6 +16,9 @@ frontend/out/
 .env.*
 !.env.example
 
+# OAuth / RSA private keys (never bake into image; mount via volume or use KMS)
+backend/keys/
+
 # Git
 .git/
 .gitignore

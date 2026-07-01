@@ -52,20 +52,27 @@ export function useMerchant(): MerchantContextValue {
   return ctx;
 }
 
-/** True when the caller is a customer who owns an operational merchant (sections apply). */
+/** True when the merchant is fully operational (features enabled). */
 export function isActiveOwner(ctx: MerchantContextValue): boolean {
   return ctx.role === 'customer' && (ctx.state === 'active' || ctx.state === 'agreed') && !!ctx.merchant;
 }
 
+/** True when a customer owns any merchant and can access its portal (any non-null state). */
+export function isMerchantAccessible(ctx: MerchantContextValue): boolean {
+  return ctx.role === 'customer' && ctx.state !== 'no_merchant' && !!ctx.merchant;
+}
+
 /**
- * Section pages call this: returns the context, and redirects non-owners (or
- * onboarding states) back to /system/merchant once loading resolves.
+ * Section pages call this: returns the context, and redirects only when there is
+ * no merchant at all. Under-review and rejected merchants are allowed through so
+ * customers can track their application status within the portal.
  */
 export function useRequireActiveMerchant(): MerchantContextValue {
   const ctx = useMerchant();
   const router = useRouter();
   useEffect(() => {
-    if (ctx.state !== 'loading' && !isActiveOwner(ctx)) {
+    if (ctx.state === 'loading') return;
+    if (!isMerchantAccessible(ctx)) {
       router.replace('/system/merchant');
     }
   }, [ctx, router]);

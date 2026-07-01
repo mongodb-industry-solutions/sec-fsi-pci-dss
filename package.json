@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "setup": "npm install && npm install --prefix frontend && npm install --prefix backend",
-    "setup:key": "npm run generate:key --prefix backend",
+    "setup:rsa": "npm run generate:key --prefix backend",
     "setup:db": "npm run setup:db --prefix backend",
     "setup:db:drop": "npm run setup:db:drop --prefix backend",
     "setup:check": "npm run setup:check --prefix backend",

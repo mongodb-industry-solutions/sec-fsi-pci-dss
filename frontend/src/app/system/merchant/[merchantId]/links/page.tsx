@@ -1,10 +1,10 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { Copy, Check, ExternalLink, Trash2, Link2, Search } from 'lucide-react';
-import { SectionHeader } from '../../../../components/SectionHeader';
-import { Pagination } from '../../../../components/Pagination';
-import { useRequireActiveMerchant } from '../../../../lib/merchantContext';
-import { api } from '../../../../lib/api';
+import { SectionHeader } from '../../../../../components/SectionHeader';
+import { Pagination } from '../../../../../components/Pagination';
+import { useRequireActiveMerchant } from '../../../../../lib/merchantContext';
+import { api } from '../../../../../lib/api';
 
 interface PaymentLink {
   paymentLinkInstanceReference: string;

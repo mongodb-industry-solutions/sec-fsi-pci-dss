@@ -5,7 +5,7 @@
  * Behaviour depends on PSP_OAUTH_KEY_PROVIDER:
  *
  *   local (default)
- *     - Writes private.pem to PSP_OAUTH_KEY_STORE_DIR (default: ./keys/oauth/)
+ *     - Writes private.pem to PSP_OAUTH_KEY_STORE_DIR (default: ./keys/)
  *     - Registers public key in Atlas partyAuthenticationKey collection
  *     - Safe to re-run: skips if private.pem already exists (use --force to regenerate)
  *
@@ -19,7 +19,6 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
 import { MongoClient } from 'mongodb';
-import { v4 as uuidv4 } from 'uuid';
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
@@ -49,7 +48,7 @@ async function run(): Promise<void> {
 }
 
 async function runLocalProvider(col: any): Promise<void> {
-  const storeDir = path.resolve(process.env.PSP_OAUTH_KEY_STORE_DIR ?? process.env.OAUTH_KEY_STORE_DIR ?? './keys/oauth');
+  const storeDir = path.resolve(process.env.PSP_OAUTH_KEY_STORE_DIR ?? process.env.OAUTH_KEY_STORE_DIR ?? './keys');
   const privateKeyPath = path.join(storeDir, 'private.pem');
 
   if (fs.existsSync(privateKeyPath) && !force) {
@@ -81,13 +80,13 @@ async function runLocalProvider(col: any): Promise<void> {
 
   await upsertPublicKey(col, kid, publicKey as string);
 
-  // Add keys/oauth/ to .gitignore if not already there
+  // Add backend/keys/ to .gitignore if not already there
   const gitignorePath = path.resolve(__dirname, '../../../.gitignore');
   if (fs.existsSync(gitignorePath)) {
     const content = fs.readFileSync(gitignorePath, 'utf8');
-    if (!content.includes('keys/oauth')) {
-      fs.appendFileSync(gitignorePath, '\n# OAuth RSA private key (never commit)\nkeys/oauth/\n');
-      console.log('  Added keys/oauth/ to .gitignore');
+    if (!content.includes('backend/keys/')) {
+      fs.appendFileSync(gitignorePath, '\n# OAuth / RSA private keys (never commit)\nbackend/keys/\n');
+      console.log('  Added backend/keys/ to .gitignore');
     }
   }
 

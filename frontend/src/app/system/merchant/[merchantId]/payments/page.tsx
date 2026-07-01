@@ -2,11 +2,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Search, ShieldCheck, Receipt, X, ChevronRight } from 'lucide-react';
-import { SectionHeader } from '../../../../components/SectionHeader';
-import { useRequireActiveMerchant } from '../../../../lib/merchantContext';
-import { useDebugMode } from '../../../../lib/debugMode';
-import { api } from '../../../../lib/api';
-import { Pagination } from '../../../../components/Pagination';
+import { SectionHeader } from '../../../../../components/SectionHeader';
+import { useRequireActiveMerchant } from '../../../../../lib/merchantContext';
+import { useDebugMode } from '../../../../../lib/debugMode';
+import { api } from '../../../../../lib/api';
+import { Pagination } from '../../../../../components/Pagination';
 
 interface Sale {
   cardTransactionInstanceReference: string;

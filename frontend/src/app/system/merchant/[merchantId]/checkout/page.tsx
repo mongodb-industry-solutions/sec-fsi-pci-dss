@@ -1,9 +1,9 @@
 'use client';
 import { useState } from 'react';
 import { Copy, Check, ExternalLink, ShoppingCart } from 'lucide-react';
-import { SectionHeader } from '../../../../components/SectionHeader';
-import { useRequireActiveMerchant } from '../../../../lib/merchantContext';
-import { api } from '../../../../lib/api';
+import { SectionHeader } from '../../../../../components/SectionHeader';
+import { useRequireActiveMerchant } from '../../../../../lib/merchantContext';
+import { api } from '../../../../../lib/api';
 
 export default function CheckoutSectionPage() {
   const { token, merchant } = useRequireActiveMerchant();

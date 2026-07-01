@@ -3,10 +3,10 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Receipt, ShieldCheck, ArrowLeft, CreditCard, Calendar, Hash, Tag, Radio, FileText, AlertTriangle } from 'lucide-react';
-import { useRequireActiveMerchant } from '../../../../../lib/merchantContext';
-import { useDebugMode } from '../../../../../lib/debugMode';
-import { api, type TransactionNotesResponse } from '../../../../../lib/api';
-import { Breadcrumb, type Crumb } from '../../../../../components/Breadcrumb';
+import { useRequireActiveMerchant } from '../../../../../../lib/merchantContext';
+import { useDebugMode } from '../../../../../../lib/debugMode';
+import { api, type TransactionNotesResponse } from '../../../../../../lib/api';
+import { Breadcrumb, type Crumb } from '../../../../../../components/Breadcrumb';
 
 type MerchantTxnDetail = Awaited<ReturnType<typeof api.merchants.transactionById>>;
 

@@ -5,10 +5,10 @@ import {
   ExternalLink, ChevronDown, KeyRound, Globe, Webhook,
 } from 'lucide-react';
 import Link from 'next/link';
-import { SectionHeader } from '../../../../components/SectionHeader';
-import { useRequireActiveMerchant } from '../../../../lib/merchantContext';
-import { useDebugMode } from '../../../../lib/debugMode';
-import { api, type MerchantOAuthClient, type TypedWebhookConfig } from '../../../../lib/api';
+import { SectionHeader } from '../../../../../components/SectionHeader';
+import { useRequireActiveMerchant } from '../../../../../lib/merchantContext';
+import { useDebugMode } from '../../../../../lib/debugMode';
+import { api, type MerchantOAuthClient, type TypedWebhookConfig } from '../../../../../lib/api';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
