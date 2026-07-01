@@ -1,5 +1,6 @@
 import { MongoClient } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
+import { config } from '../../config';
 
 // Deliberate duplicate plan — each entry creates N additional documents that share
 // the same fraudDiagnosisCaseReference as an existing canonical seed record.
@@ -22,7 +23,7 @@ export async function seedIntegrityIssues(client: MongoClient): Promise<{
   refsAffected: number;
   skippedRefs: string[];
 }> {
-  const dbName = process.env.MONGODB_DB_NAME ?? 'fsi_pci_dss';
+  const dbName = config.mongodb.dbName;
   const db = client.db(dbName);
   const col = db.collection('fraudDiagnosisCase');
 

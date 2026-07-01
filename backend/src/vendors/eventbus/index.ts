@@ -8,6 +8,7 @@ import { EventBusRabbit } from './EventBusRabbit';
 import { MongoEventStore, EventStore } from './EventStore';
 import { v4 as uuidv4 } from 'uuid';
 import { DomainEvent, BusinessProcess } from './types';
+import { config } from '../../config';
 
 let instance: EventBus | null = null;
 
@@ -16,34 +17,30 @@ let instance: EventBus | null = null;
 export type EventBusEngine = 'in-process' | 'kafka' | 'rabbitmq';
 
 export function resolveEventBusEngine(): EventBusEngine {
-  return (process.env.PSP_EVENT_BUS_ENGINE ?? 'in-process') as EventBusEngine;
+  return config.app.eventBusEngine;
 }
 
 export function initEventBus(db: Db, store?: EventStore): EventBus {
   const engine = resolveEventBusEngine();
   const eventStore = store ?? new MongoEventStore(db);
-  const topic = `${process.env.PSP_EVENT_BUS_TOPIC_PREFIX ?? 'pci.psp'}.domain-events`;
+  const topic = `${config.app.eventBusTopicPrefix}.domain-events`;
 
   if (engine === 'kafka') {
-    instance = new EventBusKafka({ brokers: parseList(process.env.KAFKA_BROKERS), clientId: process.env.KAFKA_CLIENT_ID ?? 'pci-psp', ssl: process.env.KAFKA_SSL === 'true', sasl: buildKafkaSasl(), topic }, eventStore);
+    instance = new EventBusKafka({ brokers: config.kafka.brokers, clientId: config.kafka.clientId, ssl: config.kafka.ssl, sasl: buildKafkaSasl(), topic }, eventStore);
     return instance;
   }
   if (engine === 'rabbitmq') {
-    instance = new EventBusRabbit({ url: process.env.RABBITMQ_URL ?? 'amqp://localhost', exchange: topic, topic }, eventStore);
+    instance = new EventBusRabbit({ url: config.rabbitmq.url, exchange: topic, topic }, eventStore);
     return instance;
   }
   instance = new EventBusInProcess(eventStore);
   return instance;
 }
 
-function parseList(v?: string): string[] {
-  return (v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-}
-
 function buildKafkaSasl(): { mechanism: string; username: string; password: string } | undefined {
-  const mechanism = process.env.KAFKA_SASL_MECHANISM;
-  const username = process.env.KAFKA_SASL_USERNAME;
-  const password = process.env.KAFKA_SASL_PASSWORD;
+  const mechanism = config.kafka.saslMechanism;
+  const username = config.kafka.saslUsername;
+  const password = config.kafka.saslPassword;
   return mechanism && username && password ? { mechanism, username, password } : undefined;
 }
 

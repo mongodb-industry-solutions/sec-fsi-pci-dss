@@ -5,12 +5,13 @@ import { provisionDEKs } from './provisionDEKs';
 import { createCollections } from './createCollections';
 import { createIndexes } from './createIndexes';
 import { createAtlasRoles } from './createAtlasRoles';
+import { config } from '../../config';
 
 // Load .env from project root  -  works regardless of CWD (npm --prefix changes CWD to backend/)
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
 
 export async function runSetup(reset = false) {
-  const uri = process.env.MONGODB_URI;
+  const uri = config.mongodb.uri;
   if (!uri) {
     throw new Error(
       'MONGODB_URI is not set.\n' +

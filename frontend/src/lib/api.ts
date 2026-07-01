@@ -72,6 +72,85 @@ export interface AuthDomain {
   alertMessage?: string;
 }
 
+// v16: Typed webhook types (ADR-038)
+export type WebhookEventType =
+  | 'payment.completed'
+  | 'payment.failed'
+  | 'oauth.authorization_granted'
+  | 'oauth.authorization_revoked'
+  | 'user.notification'
+  | 'dispute.opened'
+  | 'kyb.status_changed';
+
+export const WEBHOOK_EVENT_LABELS: Record<WebhookEventType, string> = {
+  'payment.completed': 'Payment Completed',
+  'payment.failed': 'Payment Failed',
+  'oauth.authorization_granted': 'OAuth Authorization Granted',
+  'oauth.authorization_revoked': 'OAuth Authorization Revoked',
+  'user.notification': 'User Notification (delegation)',
+  'dispute.opened': 'Dispute Opened',
+  'kyb.status_changed': 'KYB Status Changed',
+};
+
+export interface TypedWebhookConfig {
+  webhookId: string;
+  webhookEventType: WebhookEventType;
+  webhookUrl: string;
+  webhookSecret: string;           // Masked on GET
+  webhookStatus: 'active' | 'inactive';
+  webhookAttributeMapping?: Record<string, string>;
+  webhookHeaders?: Record<string, string>;
+  webhookApiKeyId?: string;
+  webhookApiKeyTransport?: 'header' | 'body';
+  webhookApiKeyFieldName?: string;
+  webhookCreatedDateTime: string;
+  webhookLastTestedAt?: string;
+  webhookLastDeliveryStatus?: 'success' | 'failed';
+  webhookLastDeliveryError?: string;
+}
+
+export interface TypedWebhookTestResult {
+  delivered: boolean;
+  statusCode?: number;
+  attempts: number;
+  requestHeaders: Record<string, string>;
+  requestBody: unknown;
+  response?: { status: number; headers: Record<string, string>; body: unknown };
+  error?: string;
+  signature: string;
+}
+
+export interface WebhookDeliveryLog {
+  logId: string;
+  merchantAgreementInstanceReference: string;
+  webhookId: string;
+  webhookEventType: WebhookEventType;
+  deliveryType: 'live' | 'test';
+  requestUrl: string;
+  requestHeaders: Record<string, string>;
+  requestBody: unknown;
+  responseStatus?: number;
+  responseHeaders?: Record<string, string>;
+  responseBody?: unknown;
+  delivered: boolean;
+  attempts: number;
+  error?: string;
+  signature: string;
+  deliveredAt: string;
+}
+
+// v16: OAuth consent grants (user-authorized apps)
+export interface ConsentGrant {
+  consentId: string;
+  oauthClientId: string;
+  merchantAgreementInstanceReference: string;
+  merchantName: string;
+  grantedScopes: string[];
+  consentStatus: 'active' | 'revoked';
+  consentGrantedAt: string;
+  lastUsedAt?: string | null;
+}
+
 export interface Merchant {
   name: string;
   mcc: string;
@@ -935,6 +1014,79 @@ export const api = {
         response?: unknown;
         error?: string;
       }>(`/api/v1/merchants/${merchantId}/webhooks/test`, { method: 'POST', body: JSON.stringify(body ?? {}) }, token),
+
+    // v16: Typed webhook registry (ADR-038) — per-event-type webhooks
+    listTypedWebhooks: (merchantId: string, token: string) =>
+      apiFetch<{ webhooks: TypedWebhookConfig[] }>(`/api/v1/merchants/${merchantId}/webhooks/registry`, {}, token),
+    registerTypedWebhook: (merchantId: string, token: string, body: {
+      eventType: WebhookEventType; url: string;
+      attributeMapping?: Record<string, string>; headers?: Record<string, string>;
+      apiKeyId?: string; apiKeyTransport?: 'header' | 'body'; apiKeyFieldName?: string;
+    }) =>
+      apiFetch<{ webhook: TypedWebhookConfig; webhookSecret: string }>(
+        `/api/v1/merchants/${merchantId}/webhooks/registry`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token,
+      ),
+    updateTypedWebhook: (merchantId: string, webhookId: string, token: string, patch: {
+      url?: string; status?: 'active' | 'inactive';
+      attributeMapping?: Record<string, string>; headers?: Record<string, string>;
+      apiKeyId?: string | null; apiKeyTransport?: 'header' | 'body'; apiKeyFieldName?: string;
+    }) =>
+      apiFetch<TypedWebhookConfig>(
+        `/api/v1/merchants/${merchantId}/webhooks/registry/${webhookId}`,
+        { method: 'PATCH', body: JSON.stringify(patch) },
+        token,
+      ),
+    deleteTypedWebhook: (merchantId: string, webhookId: string, token: string) =>
+      apiFetch<{ deleted: boolean; webhookId: string }>(
+        `/api/v1/merchants/${merchantId}/webhooks/registry/${webhookId}`,
+        { method: 'DELETE' },
+        token,
+      ),
+    testTypedWebhook: (merchantId: string, webhookId: string, token: string, payload?: Record<string, unknown>) =>
+      apiFetch<TypedWebhookTestResult>(
+        `/api/v1/merchants/${merchantId}/webhooks/registry/${webhookId}/test`,
+        { method: 'POST', body: JSON.stringify(payload ? { payload } : {}) },
+        token,
+      ),
+    getTestPayload: (merchantId: string, webhookId: string, token: string) =>
+      apiFetch<{ payload: Record<string, unknown> }>(
+        `/api/v1/merchants/${merchantId}/webhooks/registry/${webhookId}/test-payload`,
+        {},
+        token,
+      ),
+    listDeliveryLogs: (
+      merchantId: string,
+      token: string,
+      filter?: { eventType?: WebhookEventType; deliveryType?: 'live' | 'test'; delivered?: boolean },
+      pagination?: { page?: number; limit?: number },
+    ) => {
+      const params = new URLSearchParams();
+      if (filter?.eventType) params.set('eventType', filter.eventType);
+      if (filter?.deliveryType) params.set('deliveryType', filter.deliveryType);
+      if (filter?.delivered !== undefined) params.set('delivered', String(filter.delivered));
+      if (pagination?.page) params.set('page', String(pagination.page));
+      if (pagination?.limit) params.set('limit', String(pagination.limit));
+      const qs = params.toString();
+      return apiFetch<{ logs: WebhookDeliveryLog[]; total: number; page: number; limit: number; totalPages: number }>(
+        `/api/v1/merchants/${merchantId}/webhooks/logs${qs ? '?' + qs : ''}`,
+        {},
+        token,
+      );
+    },
+  },
+
+  // v16: OAuth consent grants (user's authorized apps)
+  consentGrants: {
+    list: (token: string) =>
+      apiFetch<{ grants: ConsentGrant[] }>('/api/v1/auth/grants', {}, token),
+    revoke: (consentId: string, token: string) =>
+      apiFetch<{ revoked: boolean; consentId: string }>(
+        `/api/v1/auth/grants/${consentId}`,
+        { method: 'DELETE' },
+        token,
+      ),
   },
 
   checkout: {

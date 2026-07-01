@@ -5,6 +5,7 @@ import { existsSync } from 'fs';
 import * as https from 'https';
 import { buildBasicAuthHeader } from '../encryption/digest';
 import { getKmsConfig } from '../encryption/kms';
+import { config } from '../../config';
 
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
 
@@ -120,12 +121,12 @@ async function atlasGet(path: string, publicKey: string, privateKey: string): Pr
 function checkEnvVars(): boolean {
   console.log('\n1. Environment variables');
 
-  const kms = process.env.KMS_PROVIDER;
+  const kms = config.kms.provider;
 
   // -- 1.1 Core (required) ----------------------------------------------------
   console.log('   1.1 Core (required)');
 
-  for (const v of ['MONGODB_URI', 'MONGODB_DB_NAME', 'KMS_PROVIDER']) {
+  for (const v of ['MONGODB_URI', 'MONGODB_DB_NAME', 'PSP_KMS_PROVIDER']) {
     process.env[v]
       ? check('pass', v, v === 'MONGODB_DB_NAME' ? process.env[v] : undefined)
       : check('fail', v, 'not set - required');
@@ -150,29 +151,29 @@ function checkEnvVars(): boolean {
   console.log('   1.2 KMS-specific');
 
   if (kms === 'local') {
-    const localKey = process.env.KMS_LOCAL_MASTER_KEY;
+    const localKey = process.env.PSP_KMS_LOCAL_MASTER_KEY;
     localKey
-      ? check('pass', 'KMS_LOCAL_MASTER_KEY')
-      : check('fail', 'KMS_LOCAL_MASTER_KEY', 'not set - required for KMS_PROVIDER=local');
+      ? check('pass', 'PSP_KMS_LOCAL_MASTER_KEY')
+      : check('fail', 'PSP_KMS_LOCAL_MASTER_KEY', 'not set - required for PSP_KMS_PROVIDER=local');
 
     if (localKey) {
       try {
         const decoded = Buffer.from(localKey, 'base64');
         decoded.length === 96
-          ? check('pass', 'KMS_LOCAL_MASTER_KEY length', '96 bytes ✓')
-          : check('fail', 'KMS_LOCAL_MASTER_KEY length', `expected 96 bytes, got ${decoded.length} - regenerate with setup:key`);
+          ? check('pass', 'PSP_KMS_LOCAL_MASTER_KEY length', '96 bytes ✓')
+          : check('fail', 'PSP_KMS_LOCAL_MASTER_KEY length', `expected 96 bytes, got ${decoded.length} - regenerate with setup:key`);
       } catch {
-        check('fail', 'KMS_LOCAL_MASTER_KEY', 'invalid base64 encoding');
+        check('fail', 'PSP_KMS_LOCAL_MASTER_KEY', 'invalid base64 encoding');
       }
     }
   } else if (kms === 'aws') {
     for (const v of ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_CMK_ARN', 'AWS_REGION']) {
       process.env[v]
         ? check('pass', v)
-        : check('fail', v, `not set - required for KMS_PROVIDER=aws`);
+        : check('fail', v, `not set - required for PSP_KMS_PROVIDER=aws`);
     }
   } else if (kms) {
-    check('warn', 'KMS_PROVIDER', `unknown value '${kms}' - expected 'local' or 'aws'`);
+    check('warn', 'PSP_KMS_PROVIDER', `unknown value '${kms}' - expected 'local' or 'aws'`);
   }
 
   // -- 1.3 Role pool URIs (optional) ------------------------------------------
@@ -248,7 +249,7 @@ function checkEnvVars(): boolean {
 }
 
 async function checkMongoDB(client: MongoClient): Promise<void> {
-  const dbName = process.env.MONGODB_DB_NAME ?? 'pci_demo';
+  const dbName = config.mongodb.dbName;
   const kmsConfig = getKmsConfig();
 
   // -- Connectivity ------------------------------------------------------------
@@ -387,7 +388,7 @@ export async function runValidate(): Promise<void> {
     return;
   }
 
-  const uri    = process.env.MONGODB_URI!;
+  const uri    = config.mongodb.uri;
   const client = new MongoClient(uri);
 
   try {

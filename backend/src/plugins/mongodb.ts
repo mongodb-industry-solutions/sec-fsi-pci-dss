@@ -2,6 +2,7 @@ import fp from 'fastify-plugin';
 import { FastifyInstance } from 'fastify';
 import { Db } from 'mongodb';
 import { getQEClient } from '../vendors/encryption/qeClient';
+import { config } from '../config';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -14,7 +15,7 @@ declare module 'fastify' {
 }
 
 function sanitizeUri(uri: string): { server: string; database: string } {
-  const dbName = process.env.MONGODB_DB_NAME ?? 'unknown';
+  const dbName = config.mongodb.dbName ?? 'unknown';
   try {
     // Strip username:password before parsing; never log credentials
     const clean = uri.replace(/^(mongodb(?:\+srv)?:\/\/)([^@]+@)/, '$1');
@@ -35,7 +36,7 @@ async function mongodbPlugin(fastify: FastifyInstance) {
   fastify.decorate('db', null as unknown as Db);
   fastify.decorate('dbError', null as string | null);
 
-  if (!process.env.MONGODB_URI) {
+  if (!config.mongodb.uri) {
     const msg = 'MONGODB_URI is not set; server starting in degraded mode';
     console.error(`[mongodb] ${msg}`);
     fastify.dbError = msg;
@@ -44,7 +45,7 @@ async function mongodbPlugin(fastify: FastifyInstance) {
 
   try {
     const client = await getQEClient();
-    const db = client.db(process.env.MONGODB_DB_NAME!);
+    const db = client.db(config.mongodb.dbName);
 
     // Reassign decorated properties now that we have a live connection
     fastify.db = db;
@@ -96,7 +97,7 @@ async function mongodbPlugin(fastify: FastifyInstance) {
       await closeQEClient();
     });
   } catch (err) {
-    const { server, database } = sanitizeUri(process.env.MONGODB_URI);
+    const { server, database } = sanitizeUri(config.mongodb.uri);
     const reason = err instanceof Error ? err.message : String(err);
 
     console.error(`[mongodb] Connection failed: server=${server} database=${database}. ${reason}`);

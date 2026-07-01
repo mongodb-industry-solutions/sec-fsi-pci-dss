@@ -1692,3 +1692,118 @@ ADR-004 established the dual-mode frontend. In practice the Simulator had drifte
 - (+) Realistic PSP flow: client waits via SSE; issuer/sanctions/fraud gate in real time; AML/investigation are post-auth.
 - (+) No CHD on the bus or in the event store (Req 3.2).
 - (−) Saga/Phase-2 aggregation state is in-memory (matches the in-process bus); a multi-instance deployment persists it alongside the broker migration. Event-store retention is not yet a TTL (regular collection for the unique `eventId` index); to be revisited.
+
+---
+
+## ADR-033 — OIDC Authorization Server Implemented from Scratch (No oidc-provider Library)
+
+**Status:** Accepted (2026-07-01). Implements **v16** (Issue #29). Aligns **BIAN SD-16** (Party Authentication) and **PCI DSS Req 8.6** (system account credential management).
+
+**Context.** External merchants and third-party systems need a standard mechanism to authenticate against the PSP and access merchant-scoped data. The `oidc-provider` npm package is the most complete Node.js OIDC library, but it requires a complex MongoDB adapter and introduces a large external security surface in a PCI DSS demo.
+
+**Decision.** Implement the Authorization Server manually using primitives already in the project: `jsonwebtoken` (RS256 signing), `crypto` (PKCE SHA256, RSA keypair generation), `bcryptjs` (client secrets), `uuid` (code/token IDs). Support three grant types: `authorization_code` + PKCE (S256), `client_credentials`, and `refresh_token`. All flows are defined in RFC 6749, RFC 7636, and OIDC Core 1.0.
+
+**Consequences.**
+- (+) Fully auditable line-by-line; no hidden adapter layers — appropriate for a PCI DSS demonstration.
+- (+) Zero new npm dependencies; no additional CVE surface.
+- (+) All grant types are well-specified; implementation is straightforward.
+- (−) More development time than a library; no automatic spec-compliance guarantees (covered by integration tests instead).
+
+---
+
+## ADR-034 — OIDC Routes Under /api/v1/auth/ Prefix; Discovery at /.well-known/openid-configuration
+
+**Status:** Accepted (2026-07-01). Implements **v16**.
+
+**Context.** OIDC Discovery 1.0 §4 mandates that the discovery document is served at `{issuer}/.well-known/openid-configuration`. All other endpoint paths are advertised inside that document and have no mandated paths in the spec.
+
+**Decision.** Serve `/.well-known/openid-configuration` at root (no `/api/v1` prefix — spec-mandated). All other OIDC/OAuth2 endpoints use the `/api/v1/auth/` prefix for consistency with the existing internal auth controller (`/api/v1/auth/login`). Fastify's plugin system registers the discovery controller at root level separately from the `/api/v1` prefix.
+
+OIDC endpoints:
+- `GET /.well-known/openid-configuration` — discovery document (root, spec-mandated)
+- `GET /api/v1/auth/jwks` — JSON Web Key Set (public keys)
+- `GET /api/v1/auth/authorize` — Authorization Code flow initiation
+- `POST /api/v1/auth/token` — token issuance (all grant types)
+- `GET /api/v1/auth/userinfo` — OIDC userinfo claims
+- `POST /api/v1/auth/revoke` — RFC 7009 token revocation
+- `POST /api/v1/auth/introspect` — RFC 7662 token introspection
+
+**Consequences.**
+- (+) Discovery document at spec-mandated path; all other paths consistent with existing codebase convention.
+- (+) Any OIDC-compliant client can discover all endpoints from the well-known URL.
+- (−) Two registration points in `server.ts` (root + `/api/v1`); mitigated by clear comments.
+
+---
+
+## ADR-035 — RS256 JWT for OAuth Access Tokens; HS256 Retained for Internal PSP Sessions
+
+**Status:** Accepted (2026-07-01). Implements **v16**.
+
+**Context.** The existing internal authentication uses HS256 JWTs (`PSP_JWT_SECRET`). OAuth access tokens must be verifiable by merchants without sharing the PSP's secret — RS256 with a published JWKS endpoint enables this.
+
+**Decision.** Maintain two parallel signing mechanisms:
+1. **Internal PSP sessions** — HS256, `PSP_JWT_SECRET`. Used by `loginUser()` for employee/customer sessions. Unchanged.
+2. **OAuth access tokens + ID tokens** — RS256, RSA-2048 private key. Issued only by the OAuth token endpoint. Verifiable by anyone holding the public key from `/api/v1/auth/jwks`.
+
+The `sub` claim in OAuth tokens is the `customerAuthenticationInstanceReference` (for user-bearing flows) or `clientId` (for `client_credentials` flow). The `iss` claim is the PSP base URL (`PSP_BASE_URL` env var).
+
+**Consequences.**
+- (+) Merchant-verifiable tokens without sharing any PSP secret — standard OAuth architecture.
+- (+) Existing internal authentication is completely unaffected.
+- (−) Two key types to manage; mitigated by the `OAuthKeyProvider` abstraction (ADR-036).
+
+---
+
+## ADR-036 — RSA Private Key Is Never Persisted in MongoDB; Switchable OAuthKeyProvider (local|aws) Mirrors QE KMS_PROVIDER Pattern
+
+**Status:** Accepted (2026-07-01). Implements **v16**. Aligns **PCI DSS Req 3.6** (cryptographic key management).
+
+**Context.** JWT signing requires an RSA private key at runtime. Storing it in MongoDB would mean any client with a valid connection string could extract and forge any JWT — a complete authentication bypass, violating PCI DSS Req 3.6. The project already uses a `KMS_PROVIDER=local|aws` pattern for QE field encryption.
+
+**Decision.** Mirror the existing pattern with `OAUTH_KEY_PROVIDER=local|aws`:
+
+```
+OAUTH_KEY_PROVIDER=local  →  LocalKeyProvider
+  Private key: $OAUTH_KEY_STORE_DIR/private.pem  (chmod 600, never committed)
+  Dev:         auto-generated on first startup (NODE_ENV=development only)
+  Docker:      bind-mount or named volume
+  K8s:         Secret mounted as volume
+
+OAUTH_KEY_PROVIDER=aws  →  AwsKmsKeyProvider
+  Private key: never exported from AWS KMS hardware
+  Signing:     kms.sign() call — key never in application memory
+  Same AWS credentials as QE (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)
+```
+
+Both providers expose a common `OAuthKeyProvider` interface: `sign(data)`, `getPublicKeyJwk()`, `getKid()`. The Atlas `partyAuthenticationKey` collection stores **only the public key PEM** — safe to expose at the JWKS endpoint and used as the key rotation audit log.
+
+`npm run setup:keys` generates/registers the keypair before first run (analogous to `npm run setup:db` for QE).
+
+**Consequences.**
+- (+) Private key never in the database; FIPS 140-2 hardware boundary available via `aws` provider.
+- (+) Same operational pattern as QE — existing runbooks and K8s Secret patterns apply.
+- (+) Public key registry in Atlas enables JWKS multi-key rotation with grace period.
+- (−) One new setup step (`npm run setup:keys`); documented in README and installation guide.
+
+---
+
+## ADR-037 — Merchant Portal API as OAuth-Authenticated Namespace (/api/v1/merchant/portal/)
+
+**Status:** Accepted (2026-07-01). Implements **v16**. Aligns **BIAN SD-89** (Merchant Relations), **PCI DSS Req 7** (least privilege), **Req 8.6** (system account lifecycle).
+
+**Context.** Merchants today access their data through the PSP application UI. To support programmatic integration, merchants need a machine-readable API. Reusing the internal PSP JWT (`role: merchant`) would conflate PSP-internal roles with external system accounts, violating PCI DSS Req 8.6's requirement for separate system account management.
+
+**Decision.** Create a dedicated `/api/v1/merchant/portal/` namespace authenticated by OAuth merchant access tokens (not internal JWTs). A `validateMerchantToken` middleware: (1) verifies RS256 JWT signature, (2) extracts `client_id`, (3) resolves the merchant from `merchantAgreementProcedure`, (4) checks `oauthClientStatus === 'active'`, (5) enforces scope-based access control per endpoint.
+
+All responses are scoped to the authenticated merchant's own records only:
+- `GET /api/v1/merchant/portal/me` — own merchant profile (scope: `read:merchant_profile`)
+- `GET /api/v1/merchant/portal/transactions` — own transaction metadata, NO customer PII (scope: `read:transactions`)
+- `GET /api/v1/merchant/portal/checkout-sessions` — own sessions (scope: `read:orders`)
+- `GET /api/v1/merchant/portal/payment-links` — own links (scope: `read:orders`)
+- `GET /api/v1/merchant/portal/notifications` + SSE (scope: `read:notifications`)
+
+**Consequences.**
+- (+) Merchants access only their own data — Req 7 least privilege enforced at middleware level.
+- (+) OAuth client lifecycle (issue / rotate / revoke) satisfies Req 8.6 system account management.
+- (+) All merchant portal calls emit `businessProcessEvent` via existing EventBus — Req 10 audit.
+- (−) New middleware in the request path; tested independently with expired/revoked/wrong-scope tokens.

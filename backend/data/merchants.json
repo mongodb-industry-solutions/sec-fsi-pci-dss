@@ -15,6 +15,24 @@
     "merchantTransactionCount30d": 142,
     "merchantRiskCategory": "low",
     "merchantApiKeys": [],
+    "merchantWebhooks": [
+      {
+        "webhookId": "wh000001-0000-4000-8000-000000000001",
+        "webhookEventType": "payment.completed",
+        "webhookUrl": "https://hooks.espressoworks.example.com/psp/payment",
+        "webhookSecret": "demo-secret-replace-in-production",
+        "webhookStatus": "active",
+        "webhookHeaders": {
+          "X-Merchant-Id": "m0000001",
+          "X-Environment": "demo"
+        },
+        "webhookAttributeMapping": {
+          "statusCode": "responseCode",
+          "maskedPan": "cardMask"
+        },
+        "webhookCreatedDateTime": "2026-05-15T10:30:00.000Z"
+      }
+    ],
     "merchantReviewNote": "KYB passed, business registered, tax ID verified, no adverse media",
     "merchantReviewedByPartyReference": "b0000056-0000-4000-8000-000000000056",
     "merchantReviewedDateTime": "2026-05-15T10:30:00.000Z",
@@ -47,6 +65,7 @@
     "merchantTransactionCount30d": 0,
     "merchantRiskCategory": "low",
     "merchantApiKeys": [],
+    "merchantWebhooks": [],
     "merchantReviewNote": "KYB passed; US-registered LLC, EIN verified, no adverse media",
     "merchantReviewedByPartyReference": "b0000056-0000-4000-8000-000000000056",
     "merchantReviewedDateTime": "2026-06-10T09:00:00.000Z",
@@ -79,6 +98,7 @@
     "merchantTransactionCount30d": 28,
     "merchantRiskCategory": "low",
     "merchantApiKeys": [],
+    "merchantWebhooks": [],
     "merchantReviewNote": "KYB passed, German trade register verified, VAT ID confirmed",
     "merchantReviewedByPartyReference": "b0000056-0000-4000-8000-000000000056",
     "merchantReviewedDateTime": "2026-05-20T14:15:00.000Z",

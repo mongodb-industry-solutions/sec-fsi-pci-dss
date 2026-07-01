@@ -1,4 +1,7 @@
 import { MongoClient, Db, IndexSpecification, CreateIndexesOptions, IndexDescription, MongoServerError } from 'mongodb';
+import { MERCHANT_WEBHOOK_LOG_COLLECTION } from '../../modules/gateway/models/merchantWebhookLog.model';
+import { PARTY_AUTH_CONSENT_COLLECTION } from '../../modules/identity/models/partyAuthConsent.model';
+import { config } from '../../config';
 
 // ── Self-healing index helpers ────────────────────────────────────────────────
 
@@ -99,7 +102,7 @@ async function ensureIndexes(
 // ── Main index creation ───────────────────────────────────────────────────────
 
 export async function createIndexes(client: MongoClient) {
-  const db = client.db(process.env.MONGODB_DB_NAME!);
+  const db = client.db(config.mongodb.dbName);
 
   // SD-13: Party Data Management
   await ensureIndexes(db, 'party', [
@@ -319,4 +322,48 @@ export async function createIndexes(client: MongoClient) {
     { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
     { key: { processType: 1, eventDateTime: -1 } },
   ]).catch(() => { /* timeseries collection may not exist on the very first run */ });
+
+  // v16 (ADR-036): SD-16 RSA public key registry — unique kid, status filter for JWKS
+  await ensureIndexes(db, 'partyAuthenticationKey', [
+    { key: { keyId: 1 }, unique: true },
+    { key: { keyStatus: 1 } },
+  ]);
+
+  // v16 (ADR-033): SD-16 OAuth authorization codes — unique code, TTL 5min on expiresAt
+  await ensureIndexes(db, 'partyAuthorizationCode', [
+    { key: { code: 1 }, unique: true },
+    { key: { clientId: 1 } },
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
+  ]);
+
+  // v16 (ADR-033): SD-16 Issued OAuth tokens — unique tokenId, TTL on expiresAt, accessTokenJti lookup
+  await ensureIndexes(db, 'partyIssuedToken', [
+    { key: { tokenId: 1 }, unique: true },
+    { key: { accessTokenJti: 1 }, sparse: true },
+    { key: { clientId: 1, tokenType: 1 } },
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
+  ]);
+
+  // v16 (ADR-037): OAuth client lookup on merchantAgreementProcedure
+  await ensureIndex(
+    db,
+    'merchantAgreementProcedure',
+    { 'merchantOAuthClient.oauthClientId': 1 },
+    { sparse: true },
+  );
+
+  // v16 (ADR-038): SD-16 PartyAuthentication, ConsentGrant — unique per-user+client pair, sub lookup, revocation
+  await ensureIndexes(db, PARTY_AUTH_CONSENT_COLLECTION, [
+    { key: { consentId: 1 }, unique: true },
+    { key: { partyAuthenticationInstanceReference: 1, oauthClientId: 1 }, unique: true },
+    { key: { partyAuthenticationInstanceReference: 1, consentStatus: 1 } },
+    { key: { oauthClientId: 1, consentStatus: 1 } },
+  ]);
+
+  // merchantWebhookDeliveryLog indexes (ADR-038)
+  await ensureIndexes(db, MERCHANT_WEBHOOK_LOG_COLLECTION, [
+    { key: { logId: 1 }, unique: true },
+    { key: { merchantAgreementInstanceReference: 1, deliveredAt: -1 } },
+    { key: { merchantAgreementInstanceReference: 1, webhookEventType: 1, deliveredAt: -1 } },
+  ]);
 }

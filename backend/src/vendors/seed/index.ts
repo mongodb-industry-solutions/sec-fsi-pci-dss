@@ -3,6 +3,7 @@ import { resolve, join } from 'path';
 import { existsSync } from 'fs';
 import { execSync } from 'child_process';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
+import { config } from '../../config';
 import { seedParties } from './seedParties';
 import { seedRoles } from './seedRoles';
 import { seedUsers } from './seedUsers';
@@ -22,7 +23,7 @@ import { seedCapabilityModules } from './seedCapabilityModules';
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
 
 // DATA_DIR resolution  -  compatible with local dev, ts-node, compiled build, and Docker
-const DATA_DIR: string = process.env.PSP_SEED_DATA_DIR ?? join(process.cwd(), 'data');
+const DATA_DIR: string = config.app.seedDataDir ?? join(process.cwd(), 'data');
 
 /**
  * Generates JSON seed files if they are missing.
@@ -68,7 +69,7 @@ export async function runSeed() {
   ensureDataFiles();
 
   const client = await getQEClient();
-  const db = client.db(process.env.MONGODB_DB_NAME!);
+  const db = client.db(config.mongodb.dbName);
 
   try {
     console.log('Seeding party (SD-13)...');

@@ -2,6 +2,7 @@
 // data on the bus and is ALWAYS an opaque ciphertext token. Envelope encryption: a per-message DEK
 // encrypts the content; the DEK is wrapped by a CMK that never leaves the KMS. node:crypto only.
 import { createCipheriv, createDecipheriv, randomBytes, hkdfSync } from 'node:crypto';
+import { config } from '../../config';
 
 // Cleartext CHD shape — the minimal fields the issuer needs (§7.8). On the tokenized payment path the
 // PAN/expiry are not present (the card was tokenized client-side); only the CVV is carried, still as
@@ -53,7 +54,7 @@ export class LocalKmsKeyProvider implements KmsKeyProvider {
   private readonly kek: Buffer;
   readonly kid = 'local';
 
-  constructor(masterKeyBase64 = process.env.KMS_LOCAL_MASTER_KEY) {
+  constructor(masterKeyBase64 = config.kms.localMasterKey) {
     if (!masterKeyBase64) throw new Error('KMS_LOCAL_MASTER_KEY is required for local CHD crypto');
     const master = Buffer.from(masterKeyBase64, 'base64');
     // Derive a stable 256-bit KEK (the QE local key is 96 bytes; we need 32 for AES-256).
@@ -123,7 +124,7 @@ export class EnvelopeChdCrypto implements ChdCrypto {
 // Selects the KMS provider by the same KMS_PROVIDER switch used by Queryable Encryption.
 // Local is fully implemented (demo default). External KMS providers plug in here.
 export function buildKmsKeyProvider(): KmsKeyProvider {
-  const provider = process.env.KMS_PROVIDER ?? 'local';
+  const provider = config.kms.provider;
   if (provider === 'local') return new LocalKmsKeyProvider();
   // Door left open: an AWS/Azure/GCP/KMIP KmsKeyProvider implements GenerateDataKey/Decrypt here,
   // reusing the same CMK as Queryable Encryption (§7.8). Not enabled in the demo environment.

@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, ShoppingCart, Link2, Receipt, Key, Webhook, Settings, type LucideIcon,
+  LayoutDashboard, ShoppingCart, Link2, Receipt, Key, Webhook, Settings, Activity, type LucideIcon,
 } from 'lucide-react';
 import { CarouselNav } from '../CarouselNav';
 
@@ -14,7 +14,8 @@ const ITEMS: NavItem[] = [
   { href: '/system/merchant/links',     label: 'Payment Links',     icon: Link2 },
   { href: '/system/merchant/payments',  label: 'Transactions',      icon: Receipt },
   { href: '/system/merchant/api-keys',  label: 'API Keys',          icon: Key },
-  { href: '/system/merchant/webhooks',  label: 'Webhook',           icon: Webhook },
+  { href: '/system/merchant/webhooks',  label: 'Webhooks',          icon: Webhook },
+  { href: '/system/merchant/events',   label: 'Events',            icon: Activity },
   { href: '/system/merchant/settings',  label: 'Settings',          icon: Settings },
 ];
 

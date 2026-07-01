@@ -4,6 +4,7 @@ import { resolve } from 'path';
 import * as https from 'https';
 import { buildBasicAuthHeader } from '../encryption/digest';
 import { getKmsConfig } from '../encryption/kms';
+import { config } from '../../config';
 
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
 
@@ -65,9 +66,9 @@ async function atlasDelete(
 }
 
 async function dropAtlasRolesAndUsers(): Promise<void> {
-  const publicKey = process.env.ATLAS_PUBLIC_KEY;
-  const privateKey = process.env.ATLAS_PRIVATE_KEY;
-  const projectId = process.env.ATLAS_PROJECT_ID;
+  const publicKey = config.atlas.publicKey;
+  const privateKey = config.atlas.privateKey;
+  const projectId = config.atlas.projectId;
 
   if (!publicKey || !privateKey || !projectId) {
     warn('ATLAS_PUBLIC_KEY / ATLAS_PRIVATE_KEY / ATLAS_PROJECT_ID not set - skipping Atlas cleanup.');
@@ -84,8 +85,8 @@ async function dropAtlasRolesAndUsers(): Promise<void> {
   }
 
   const users = [
-    process.env.ATLAS_DB_USER_LEVEL1,
-    process.env.ATLAS_DB_USER_LEVEL2,
+    config.atlas.dbUserLevel1,
+    config.atlas.dbUserLevel2,
   ].filter(Boolean) as string[];
 
   if (users.length === 0) {
@@ -102,7 +103,7 @@ async function dropAtlasRolesAndUsers(): Promise<void> {
 
 export async function runDrop(): Promise<void> {
 
-  const uri = process.env.MONGODB_URI;
+  const uri = config.mongodb.uri;
   if (!uri) {
     throw new Error(
       'MONGODB_URI is not set.\n' +
@@ -110,7 +111,7 @@ export async function runDrop(): Promise<void> {
     );
   }
 
-  const dbName = process.env.MONGODB_DB_NAME ?? 'pci_demo';
+  const dbName = config.mongodb.dbName;
   const client = new MongoClient(uri);
 
   try {

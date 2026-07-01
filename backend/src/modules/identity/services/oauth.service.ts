@@ -1,0 +1,547 @@
+/**
+ * OAuth 2.0 Authorization Server — core business logic (ADR-033, ADR-035)
+ * Supports: authorization_code + PKCE (S256), client_credentials, refresh_token
+ * Token format: RS256 JWT (access + id_token), opaque UUID (refresh)
+ */
+import { Db } from 'mongodb';
+import * as crypto from 'crypto';
+import * as jwt from 'jsonwebtoken';
+import * as bcrypt from 'bcryptjs';
+import { v4 as uuidv4 } from 'uuid';
+import { MERCHANT_AGREEMENT_COLLECTION, MerchantAgreementControlRecord, OAuthGrantType } from '../../gateway/models/merchantAgreement.model';
+import { PARTY_AUTH_CONSENT_COLLECTION, PartyAuthConsentRecord } from '../models/partyAuthConsent.model';
+import { WebhookService } from '../../gateway/services/merchantWebhook.service';
+import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
+import { PARTY_AUTHORIZATION_CODE_COLLECTION, PartyAuthorizationCodeRecord } from '../models/partyAuthorizationCode.model';
+import { PARTY_ISSUED_TOKEN_COLLECTION, PartyIssuedTokenRecord } from '../models/partyIssuedToken.model';
+import { getOAuthKeyProvider } from './oidcKeys.service';
+
+// ── PKCE ──────────────────────────────────────────────────────────────────────
+
+export function verifyCodeChallenge(verifier: string, challenge: string): boolean {
+  const computed = crypto.createHash('sha256').update(verifier).digest('base64url');
+  return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(challenge));
+}
+
+// ── Client Resolution ─────────────────────────────────────────────────────────
+
+export interface OAuthClientInfo {
+  clientId: string;
+  merchantAgreementInstanceReference: string;
+  merchantName: string;
+  redirectUris: string[];
+  grantTypes: OAuthGrantType[];
+  scopes: string[];
+  clientStatus: string;
+  merchantStatus: string;
+  requirePkce: boolean;
+  tokenLifetimeSeconds: number;
+  refreshTokenLifetimeDays: number;
+}
+
+export async function resolveOAuthClient(
+  db: Db,
+  clientId: string,
+  clientSecret?: string,
+): Promise<OAuthClientInfo> {
+  const merchant = await db
+    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
+    .findOne({ 'merchantOAuthClient.oauthClientId': clientId });
+
+  if (!merchant || !merchant.merchantOAuthClient) {
+    throw oauth401('invalid_client', 'Unknown client_id');
+  }
+
+  const cfg = merchant.merchantOAuthClient;
+  if (cfg.oauthClientStatus !== 'active') {
+    throw oauth401('invalid_client', 'Client is not active');
+  }
+  if (merchant.merchantAgreementStatus !== 'active') {
+    throw oauth401('invalid_client', 'Merchant account is not active');
+  }
+
+  if (clientSecret !== undefined) {
+    const valid = await bcrypt.compare(clientSecret, cfg.oauthClientSecretHash);
+    if (!valid) throw oauth401('invalid_client', 'Invalid client_secret');
+  }
+
+  return {
+    clientId: cfg.oauthClientId,
+    merchantAgreementInstanceReference: merchant.merchantAgreementInstanceReference,
+    merchantName: merchant.merchantName,
+    redirectUris: cfg.oauthRedirectUris,
+    grantTypes: cfg.oauthGrantTypes,
+    scopes: cfg.oauthScopes,
+    clientStatus: cfg.oauthClientStatus,
+    merchantStatus: merchant.merchantAgreementStatus,
+    requirePkce: cfg.oauthRequirePkce,
+    tokenLifetimeSeconds: cfg.oauthTokenLifetimeSeconds ?? 3600,
+    refreshTokenLifetimeDays: cfg.oauthRefreshTokenLifetimeDays ?? 30,
+  };
+}
+
+// ── Authorization Initiation ──────────────────────────────────────────────────
+
+export interface AuthorizeParams {
+  clientId: string;
+  redirectUri: string;
+  responseType: string;
+  scope: string;
+  state?: string;
+  codeChallenge?: string;
+  codeChallengeMethod?: string;
+  nonce?: string;
+}
+
+export interface AuthorizeValidated {
+  client: OAuthClientInfo;
+  scopes: string[];
+  redirectUri: string;
+  state?: string;
+  codeChallenge?: string;
+  nonce?: string;
+}
+
+export async function initiateAuthorization(
+  db: Db,
+  params: AuthorizeParams,
+): Promise<AuthorizeValidated> {
+  if (params.responseType !== 'code') {
+    throw oauthError(400, 'unsupported_response_type', 'Only response_type=code is supported');
+  }
+
+  const client = await resolveOAuthClient(db, params.clientId);
+
+  if (!client.redirectUris.includes(params.redirectUri)) {
+    throw oauthError(400, 'invalid_request', 'redirect_uri not registered for this client');
+  }
+
+  const requestedScopes = params.scope.split(' ').filter(Boolean);
+  const allowedScopes = requestedScopes.filter((s) => client.scopes.includes(s));
+  if (!allowedScopes.includes('openid')) {
+    throw oauthError(400, 'invalid_scope', 'scope must include openid');
+  }
+
+  if (client.requirePkce && !params.codeChallenge) {
+    throw oauthError(400, 'invalid_request', 'code_challenge required for this client (PKCE)');
+  }
+  if (params.codeChallenge && params.codeChallengeMethod !== 'S256') {
+    throw oauthError(400, 'invalid_request', 'Only code_challenge_method=S256 is supported');
+  }
+
+  return {
+    client,
+    scopes: allowedScopes,
+    redirectUri: params.redirectUri,
+    state: params.state,
+    codeChallenge: params.codeChallenge,
+    nonce: params.nonce,
+  };
+}
+
+// ── Issue Authorization Code ──────────────────────────────────────────────────
+
+export async function issueAuthorizationCode(
+  db: Db,
+  clientId: string,
+  sub: string,
+  validated: AuthorizeValidated,
+): Promise<{ code: string; state?: string }> {
+  const code = uuidv4();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes
+
+  const record: PartyAuthorizationCodeRecord = {
+    code,
+    clientId,
+    partyAuthenticationInstanceReference: sub,
+    redirectUri: validated.redirectUri,
+    scopes: validated.scopes,
+    ...(validated.codeChallenge && {
+      codeChallenge: validated.codeChallenge,
+      codeChallengeMethod: 'S256',
+    }),
+    state: validated.state,
+    nonce: validated.nonce,
+    expiresAt,
+    bianServiceDomain: 'PartyAuthentication',
+    bianControlRecordType: 'AuthorizationCode',
+    recordCreatedDateTime: now,
+  };
+
+  await db.collection<PartyAuthorizationCodeRecord>(PARTY_AUTHORIZATION_CODE_COLLECTION).insertOne(record);
+  return { code, state: validated.state };
+}
+
+// ── Exchange Authorization Code ───────────────────────────────────────────────
+
+export async function exchangeAuthorizationCode(
+  db: Db,
+  clientId: string,
+  code: string,
+  redirectUri: string,
+  codeVerifier?: string,
+): Promise<TokenResponse> {
+  const col = db.collection<PartyAuthorizationCodeRecord>(PARTY_AUTHORIZATION_CODE_COLLECTION);
+  const record = await col.findOne({ code, clientId });
+
+  if (!record) throw oauth401('invalid_grant', 'Authorization code not found or already used');
+  if (record.usedAt) throw oauth401('invalid_grant', 'Authorization code already used');
+  if (record.expiresAt < new Date()) throw oauth401('invalid_grant', 'Authorization code expired');
+  if (record.redirectUri !== redirectUri) throw oauth401('invalid_grant', 'redirect_uri mismatch');
+
+  if (record.codeChallenge) {
+    if (!codeVerifier) throw oauth401('invalid_grant', 'code_verifier required (PKCE)');
+    if (!verifyCodeChallenge(codeVerifier, record.codeChallenge)) {
+      throw oauth401('invalid_grant', 'code_verifier does not match code_challenge');
+    }
+  }
+
+  await col.updateOne({ code }, { $set: { usedAt: new Date() } });
+
+  const client = await resolveOAuthClient(db, clientId);
+  const tokens = await issueTokens(db, record.partyAuthenticationInstanceReference, clientId, record.scopes, 'authorization_code', {
+    nonce: record.nonce,
+    tokenLifetimeSeconds: client.tokenLifetimeSeconds,
+    refreshTokenLifetimeDays: client.refreshTokenLifetimeDays,
+  });
+
+  // Upsert consent grant record (SD-16). Created on first exchange; lastUsedAt updated on refresh.
+  const consentCol = db.collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION);
+  const existing = await consentCol.findOne({ partyAuthenticationInstanceReference: record.partyAuthenticationInstanceReference, oauthClientId: clientId });
+  const now = new Date();
+  if (existing) {
+    await consentCol.updateOne(
+      { consentId: existing.consentId },
+      { $set: { grantedScopes: record.scopes, consentStatus: 'active', lastUsedAt: now, recordUpdatedDateTime: now } },
+    );
+  } else {
+    const consentId = uuidv4();
+    await consentCol.insertOne({
+      consentId,
+      partyAuthenticationInstanceReference: record.partyAuthenticationInstanceReference,
+      oauthClientId: clientId,
+      merchantAgreementInstanceReference: client.merchantAgreementInstanceReference,
+      merchantName: client.merchantName,
+      grantedScopes: record.scopes,
+      consentStatus: 'active',
+      consentGrantedAt: now,
+      lastUsedAt: now,
+      bianServiceDomain: 'PartyAuthentication',
+      bianBehaviorQualifier: 'ConsentGrant',
+      recordCreatedDateTime: now,
+      recordUpdatedDateTime: now,
+      schemaVersion: 1,
+    });
+    // Fire oauth.authorization_granted webhook for this merchant (non-blocking)
+    new WebhookService(db).dispatch( client.merchantAgreementInstanceReference, 'oauth.authorization_granted', {
+      consentId,
+      clientId,
+      subject: record.partyAuthenticationInstanceReference,
+      scopes: record.scopes,
+      grantedAt: now.toISOString(),
+    }).catch(() => {});
+  }
+
+  return tokens;
+}
+
+// ── Client Credentials ────────────────────────────────────────────────────────
+
+export async function issueClientCredentialsToken(
+  db: Db,
+  clientId: string,
+  requestedScopes: string[],
+): Promise<TokenResponse> {
+  const client = await resolveOAuthClient(db, clientId);
+
+  if (!client.grantTypes.includes('client_credentials')) {
+    throw oauthError(400, 'unauthorized_client', 'client_credentials grant not permitted');
+  }
+
+  const allowedScopes = requestedScopes.length
+    ? requestedScopes.filter((s) => client.scopes.includes(s))
+    : client.scopes;
+
+  return issueTokens(db, clientId, clientId, allowedScopes, 'client_credentials', {
+    tokenLifetimeSeconds: client.tokenLifetimeSeconds,
+    refreshTokenLifetimeDays: client.refreshTokenLifetimeDays,
+    isClientCredentials: true,
+  });
+}
+
+// ── Refresh Token ─────────────────────────────────────────────────────────────
+
+export async function refreshAccessToken(
+  db: Db,
+  clientId: string,
+  refreshTokenId: string,
+): Promise<TokenResponse> {
+  const col = db.collection<PartyIssuedTokenRecord>(PARTY_ISSUED_TOKEN_COLLECTION);
+  const record = await col.findOne({ tokenId: refreshTokenId, tokenType: 'refresh', clientId });
+
+  if (!record) throw oauth401('invalid_grant', 'Refresh token not found');
+  if (record.revokedAt) throw oauth401('invalid_grant', 'Refresh token has been revoked');
+  if (record.expiresAt < new Date()) throw oauth401('invalid_grant', 'Refresh token has expired');
+
+  const client = await resolveOAuthClient(db, clientId);
+  return issueTokens(db, record.sub, clientId, record.scopes, 'refresh_token', {
+    tokenLifetimeSeconds: client.tokenLifetimeSeconds,
+    refreshTokenLifetimeDays: client.refreshTokenLifetimeDays,
+  });
+}
+
+// ── Userinfo ──────────────────────────────────────────────────────────────────
+
+export async function getUserinfo(db: Db, accessToken: string): Promise<Record<string, unknown>> {
+  const payload = await verifyAccessToken(accessToken);
+  const scopes: string[] = Array.isArray(payload.scope) ? payload.scope : (payload.scope as string ?? '').split(' ');
+
+  const user = await db
+    .collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
+    .findOne({ customerAuthenticationInstanceReference: payload.sub });
+
+  if (!user) throw oauth401('invalid_token', 'User not found');
+
+  const claims: Record<string, unknown> = { sub: payload.sub };
+  if (scopes.includes('profile')) {
+    claims.name = user.customerAuthenticationUserName;
+    claims.preferred_username = user.customerAuthenticationEmailAddress;
+  }
+  if (scopes.includes('email')) {
+    claims.email = user.customerAuthenticationEmailAddress;
+  }
+  return claims;
+}
+
+// ── Revoke Token ──────────────────────────────────────────────────────────────
+
+export async function revokeToken(db: Db, token: string): Promise<void> {
+  const col = db.collection<PartyIssuedTokenRecord>(PARTY_ISSUED_TOKEN_COLLECTION);
+  // Try opaque refresh token first, then jti from JWT
+  const byId = await col.findOne({ tokenId: token });
+  if (byId) {
+    await col.updateOne({ tokenId: token }, { $set: { revokedAt: new Date() } });
+    return;
+  }
+  // Try as access token jti
+  try {
+    const payload = await verifyAccessToken(token);
+    await col.updateOne({ tokenId: payload.jti as string }, { $set: { revokedAt: new Date() } });
+  } catch {
+    // RFC 7009: always return 200, no error for unknown tokens
+  }
+}
+
+// ── Internal: Issue Tokens ────────────────────────────────────────────────────
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: 'Bearer';
+  expires_in: number;
+  scope: string;
+  id_token?: string;
+  refresh_token?: string;
+}
+
+interface IssueOptions {
+  nonce?: string;
+  tokenLifetimeSeconds: number;
+  refreshTokenLifetimeDays: number;
+  isClientCredentials?: boolean;
+}
+
+async function issueTokens(
+  db: Db,
+  sub: string,
+  clientId: string,
+  scopes: string[],
+  grantType: OAuthGrantType,
+  opts: IssueOptions,
+): Promise<TokenResponse> {
+  const provider = getOAuthKeyProvider();
+  const kid = provider.getKid();
+  const now = Math.floor(Date.now() / 1000);
+  const exp = now + opts.tokenLifetimeSeconds;
+  const jti = uuidv4();
+  const issuer = process.env.PSP_BASE_URL ?? 'http://localhost:8081';
+
+  const accessPayload = {
+    iss: issuer,
+    sub,
+    aud: clientId,
+    exp,
+    iat: now,
+    jti,
+    scope: scopes.join(' '),
+    token_type: 'Bearer',
+  };
+
+  // RS256 sign using the key provider
+  const headerAndPayload = [
+    Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid })).toString('base64url'),
+    Buffer.from(JSON.stringify(accessPayload)).toString('base64url'),
+  ].join('.');
+
+  const sigBuffer = await provider.sign(Buffer.from(headerAndPayload));
+  const access_token = `${headerAndPayload}.${sigBuffer.toString('base64url')}`;
+
+  // Store access token record for revocation tracking
+  const col = db.collection<PartyIssuedTokenRecord>(PARTY_ISSUED_TOKEN_COLLECTION);
+  await col.insertOne({
+    tokenId: jti,
+    tokenType: 'access',
+    clientId,
+    sub,
+    scopes,
+    grantType,
+    expiresAt: new Date(exp * 1000),
+    bianServiceDomain: 'PartyAuthentication',
+    bianControlRecordType: 'IssuedToken',
+    recordCreatedDateTime: new Date(),
+  });
+
+  const response: TokenResponse = {
+    access_token,
+    token_type: 'Bearer',
+    expires_in: opts.tokenLifetimeSeconds,
+    scope: scopes.join(' '),
+  };
+
+  // ID token — only for user-bearing flows (not client_credentials) with openid scope
+  if (!opts.isClientCredentials && scopes.includes('openid')) {
+    const idPayload: Record<string, unknown> = {
+      iss: issuer,
+      sub,
+      aud: clientId,
+      exp,
+      iat: now,
+      ...(opts.nonce && { nonce: opts.nonce }),
+    };
+    const user = await db
+      .collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
+      .findOne({ customerAuthenticationInstanceReference: sub });
+
+    if (user) {
+      if (scopes.includes('email')) idPayload.email = user.customerAuthenticationEmailAddress;
+      if (scopes.includes('profile')) {
+        idPayload.name = user.customerAuthenticationUserName;
+        idPayload.preferred_username = user.customerAuthenticationEmailAddress;
+      }
+    }
+
+    const idHeaderAndPayload = [
+      Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid })).toString('base64url'),
+      Buffer.from(JSON.stringify(idPayload)).toString('base64url'),
+    ].join('.');
+    const idSig = await provider.sign(Buffer.from(idHeaderAndPayload));
+    response.id_token = `${idHeaderAndPayload}.${idSig.toString('base64url')}`;
+  }
+
+  // Refresh token — not for client_credentials
+  if (!opts.isClientCredentials && grantType !== 'client_credentials') {
+    const refreshId = uuidv4();
+    const refreshExpiry = new Date();
+    refreshExpiry.setDate(refreshExpiry.getDate() + opts.refreshTokenLifetimeDays);
+
+    await col.insertOne({
+      tokenId: refreshId,
+      tokenType: 'refresh',
+      clientId,
+      sub,
+      scopes,
+      grantType,
+      accessTokenJti: jti,
+      expiresAt: refreshExpiry,
+      bianServiceDomain: 'PartyAuthentication',
+      bianControlRecordType: 'IssuedToken',
+      recordCreatedDateTime: new Date(),
+    });
+
+    response.refresh_token = refreshId;
+  }
+
+  return response;
+}
+
+// ── Token Verification ────────────────────────────────────────────────────────
+
+export async function verifyAccessToken(token: string): Promise<jwt.JwtPayload> {
+  const [headerB64] = token.split('.');
+  const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString());
+  const kid = header.kid as string;
+
+  const provider = getOAuthKeyProvider();
+  if (provider.getKid() !== kid) {
+    throw oauth401('invalid_token', `Unknown kid: ${kid}`);
+  }
+
+  const jwk = await provider.getPublicKeyJwk();
+  const pubKey = crypto.createPublicKey({ key: jwk as crypto.JsonWebKey, format: 'jwk' });
+  const pubPem = pubKey.export({ type: 'spki', format: 'pem' }) as string;
+
+  try {
+    return jwt.verify(token, pubPem, { algorithms: ['RS256'] }) as jwt.JwtPayload;
+  } catch (err) {
+    throw oauth401('invalid_token', (err as Error).message);
+  }
+}
+
+// ── Consent Grant Management (SD-16) ─────────────────────────────────────────
+
+export async function listUserConsentGrants(
+  db: Db,
+  sub: string,
+): Promise<PartyAuthConsentRecord[]> {
+  return db
+    .collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION)
+    .find({ partyAuthenticationInstanceReference: sub, consentStatus: 'active' })
+    .sort({ consentGrantedAt: -1 })
+    .toArray();
+}
+
+export async function revokeConsentGrant(
+  db: Db,
+  sub: string,
+  consentId: string,
+  revokedBy: 'user' | 'merchant' | 'psp' = 'user',
+): Promise<void> {
+  const consent = await db
+    .collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION)
+    .findOne({ consentId, partyAuthenticationInstanceReference: sub });
+
+  if (!consent) throw Object.assign(new Error('Consent grant not found'), { statusCode: 404 });
+  if (consent.consentStatus === 'revoked') return;
+
+  const now = new Date();
+  await db.collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION).updateOne(
+    { consentId },
+    { $set: { consentStatus: 'revoked', consentRevokedAt: now, consentRevokedBy: revokedBy, recordUpdatedDateTime: now } },
+  );
+
+  // Revoke all active tokens for this user+client
+  await db.collection<PartyIssuedTokenRecord>(PARTY_ISSUED_TOKEN_COLLECTION).updateMany(
+    { sub, clientId: consent.oauthClientId, revokedAt: { $exists: false } },
+    { $set: { revokedAt: now } },
+  );
+
+  // Fire oauth.authorization_revoked webhook (non-blocking)
+  new WebhookService(db).dispatch( consent.merchantAgreementInstanceReference, 'oauth.authorization_revoked', {
+    consentId,
+    clientId: consent.oauthClientId,
+    subject: sub,
+    scopes: consent.grantedScopes,
+    revokedAt: now.toISOString(),
+    revokedBy,
+  }).catch(() => {});
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function oauth401(error: string, description: string): Error {
+  return Object.assign(new Error(description), { statusCode: 401, oauthError: error });
+}
+
+function oauthError(status: number, error: string, description: string): Error {
+  return Object.assign(new Error(description), { statusCode: status, oauthError: error });
+}

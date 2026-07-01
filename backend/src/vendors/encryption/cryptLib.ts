@@ -1,5 +1,6 @@
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { config } from '../../config';
 
 /**
  * Resolves the path to the MongoDB Automatic Encryption Shared Library
@@ -56,8 +57,8 @@ export interface CryptLibOptions {
 export function resolveCryptLibOptions(): CryptLibOptions {
   const libName = LIB_NAME[process.platform];
 
-  // 1. Explicit env var takes highest priority
-  const envPath = process.env.MONGODB_CRYPT_SHARED_LIB_PATH;
+  // 1. Explicit config value takes highest priority
+  const envPath = config.mongodb.cryptSharedLibPath;
   if (envPath) {
     if (existsSync(envPath)) {
       console.log(`[crypt] Using library from MONGODB_CRYPT_SHARED_LIB_PATH: ${envPath}`);

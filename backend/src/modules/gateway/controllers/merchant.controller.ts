@@ -4,6 +4,9 @@
 import { FastifyInstance } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, sendTestWebhook, generateApiKey, importApiKey, updateApiKeyLabel, revokeApiKey, reviewMerchantApplication, getMerchantEvents, getMerchantApiKeys } from '../services/merchant.service';
+import { issueMerchantOAuthClient, revokeMerchantOAuthClient, rotateMerchantOAuthClientSecret } from '../services/merchantOAuth.service';
+import { WebhookService } from '../services/merchantWebhook.service';
+import type { WebhookEventType } from '../models/merchantAgreement.model';
 import { getMerchantTransactions, getMerchantTransactionById, getMerchantStats } from '../../transaction/services/cardTransaction.service';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 
@@ -913,6 +916,309 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
   });
 
   // PATCH /api/v1/merchants/:id/keys/:keyId — rename (relabel) an API key
+  // ── OAuth 2.0 Client Registration (v16, ADR-037) ──────────────────────────
+
+  fastify.post('/:id/oauth-client', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Issue OAuth 2.0 client credentials (SD-89)',
+      description: 'Registers a new OAuth 2.0 client for the merchant. The generated client_secret is shown exactly once and never stored in plaintext. Requires merchant_officer or system_admin role.',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: { id: { type: 'string' } },
+      },
+      body: {
+        type: 'object',
+        required: ['redirect_uris', 'grant_types', 'scopes'],
+        properties: {
+          redirect_uris: { type: 'array', items: { type: 'string' }, minItems: 1 },
+          grant_types: { type: 'array', items: { type: 'string' }, minItems: 1 },
+          scopes: { type: 'array', items: { type: 'string' }, minItems: 1 },
+          require_pkce: { type: 'boolean', default: true },
+          token_lifetime_seconds: { type: 'number', default: 3600 },
+          refresh_token_lifetime_days: { type: 'number', default: 30 },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const user = (request as any).user as JwtUserPayload | undefined;
+    if (!user?.role || !['merchant_officer', 'system_admin'].includes(user.role)) {
+      return reply.status(403).send({ error: 'merchant_officer or system_admin required' });
+    }
+    const body = request.body as any;
+    try {
+      const result = await issueMerchantOAuthClient(fastify.db, id, body);
+      return reply.status(201).send(result);
+    } catch (err: any) {
+      return reply.status(err.statusCode ?? 400).send({ error: err.message });
+    }
+  });
+
+  fastify.delete('/:id/oauth-client', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Revoke merchant OAuth 2.0 client (SD-89)',
+      description: 'Revokes the merchant OAuth client. All tokens issued to this client immediately become invalid.',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: { id: { type: 'string' } },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const user = (request as any).user as JwtUserPayload | undefined;
+    if (!user?.role || !['merchant_officer', 'system_admin'].includes(user.role)) {
+      return reply.status(403).send({ error: 'merchant_officer or system_admin required' });
+    }
+    try {
+      await revokeMerchantOAuthClient(fastify.db, id);
+      return { revoked: true };
+    } catch (err: any) {
+      return reply.status(err.statusCode ?? 400).send({ error: err.message });
+    }
+  });
+
+  fastify.post('/:id/oauth-client/rotate-secret', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Rotate merchant OAuth client secret (SD-89)',
+      description: 'Generates a new client_secret. The new secret is shown exactly once. The old secret is immediately invalidated.',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: { id: { type: 'string' } },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const user = (request as any).user as JwtUserPayload | undefined;
+    if (!user?.role || !['merchant_officer', 'system_admin'].includes(user.role)) {
+      return reply.status(403).send({ error: 'merchant_officer or system_admin required' });
+    }
+    try {
+      const result = await rotateMerchantOAuthClientSecret(fastify.db, id);
+      return result;
+    } catch (err: any) {
+      return reply.status(err.statusCode ?? 400).send({ error: err.message });
+    }
+  });
+
+  // ── Typed Webhook Registry (ADR-038) ────────────────────────────────────────
+
+  // GET /api/v1/merchants/:id/webhooks/registry — list all typed webhooks
+  fastify.get('/:id/webhooks/registry', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'List typed webhooks (SD-89)',
+      description: 'Returns all per-event-type webhook configurations for a merchant. Secrets are masked.',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtUserPayload }).user);
+    if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
+    try {
+      const webhooks = await new WebhookService(fastify.db).list(id);
+      return { webhooks };
+    } catch (err: any) {
+      return reply.status(err.statusCode ?? 500).send({ error: err.message });
+    }
+  });
+
+  // POST /api/v1/merchants/:id/webhooks/registry — register a typed webhook
+  fastify.post('/:id/webhooks/registry', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Register a typed webhook (SD-89)',
+      description: 'Registers or replaces the webhook for a specific event type. Returns the signing secret once — store it securely.',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      body: {
+        type: 'object',
+        required: ['eventType', 'url'],
+        properties: {
+          eventType: { type: 'string', enum: ['payment.completed', 'payment.failed', 'oauth.authorization_granted', 'oauth.authorization_revoked', 'user.notification', 'dispute.opened', 'kyb.status_changed'] },
+          url: { type: 'string', format: 'uri' },
+          attributeMapping: { type: 'object', additionalProperties: { type: 'string' }, description: 'PSP field → merchant field renaming map.' },
+          headers: { type: 'object', additionalProperties: { type: 'string' }, description: 'Static HTTP headers sent with every delivery.' },
+          apiKeyId: { type: 'string', description: 'keyId of a merchantApiKey to inject on delivery.' },
+          apiKeyTransport: { type: 'string', enum: ['header', 'body'], description: 'Injection channel for the API key.' },
+          apiKeyFieldName: { type: 'string', description: 'Header name or body field name for the API key.' },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtUserPayload }).user);
+    if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
+    const { eventType, url, attributeMapping, headers, apiKeyId, apiKeyTransport, apiKeyFieldName } = request.body as {
+      eventType: WebhookEventType; url: string;
+      attributeMapping?: Record<string, string>; headers?: Record<string, string>;
+      apiKeyId?: string; apiKeyTransport?: 'header' | 'body'; apiKeyFieldName?: string;
+    };
+    try {
+      const result = await new WebhookService(fastify.db).register(id, eventType, url, attributeMapping, headers, { apiKeyId, apiKeyTransport, apiKeyFieldName });
+      return result;
+    } catch (err: any) {
+      return reply.status(err.statusCode ?? 400).send({ error: err.message });
+    }
+  });
+
+  // PATCH /api/v1/merchants/:id/webhooks/registry/:webhookId — update a typed webhook
+  fastify.patch('/:id/webhooks/registry/:webhookId', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Update a typed webhook (SD-89)',
+      description: 'Updates the URL, status, or attribute mapping of a registered typed webhook.',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id', 'webhookId'], properties: { id: { type: 'string' }, webhookId: { type: 'string' } } },
+      body: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', format: 'uri' },
+          status: { type: 'string', enum: ['active', 'inactive'] },
+          attributeMapping: { type: 'object', additionalProperties: { type: 'string' } },
+          headers: { type: 'object', additionalProperties: { type: 'string' } },
+          apiKeyId: { type: ['string', 'null'] },
+          apiKeyTransport: { type: 'string', enum: ['header', 'body'] },
+          apiKeyFieldName: { type: 'string' },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const { id, webhookId } = request.params as { id: string; webhookId: string };
+    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtUserPayload }).user);
+    if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
+    const patch = request.body as {
+      url?: string; status?: 'active' | 'inactive';
+      attributeMapping?: Record<string, string>; headers?: Record<string, string>;
+      apiKeyId?: string | null; apiKeyTransport?: 'header' | 'body'; apiKeyFieldName?: string;
+    };
+    try {
+      const result = await new WebhookService(fastify.db).update(id, webhookId, patch);
+      return result;
+    } catch (err: any) {
+      return reply.status(err.statusCode ?? 400).send({ error: err.message });
+    }
+  });
+
+  // DELETE /api/v1/merchants/:id/webhooks/registry/:webhookId — remove a typed webhook
+  fastify.delete('/:id/webhooks/registry/:webhookId', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Delete a typed webhook (SD-89)',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id', 'webhookId'], properties: { id: { type: 'string' }, webhookId: { type: 'string' } } },
+    },
+  }, async (request, reply) => {
+    const { id, webhookId } = request.params as { id: string; webhookId: string };
+    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtUserPayload }).user);
+    if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
+    try {
+      await new WebhookService(fastify.db).delete(id, webhookId);
+      return { deleted: true, webhookId };
+    } catch (err: any) {
+      return reply.status(err.statusCode ?? 400).send({ error: err.message });
+    }
+  });
+
+  // POST /api/v1/merchants/:id/webhooks/registry/:webhookId/test — test a typed webhook
+  fastify.post('/:id/webhooks/registry/:webhookId/test', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Test a typed webhook (SD-89)',
+      description: 'Sends the well-defined sample payload for the event type to the webhook URL. Captures the request + merchant response. Marked test:true.',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id', 'webhookId'], properties: { id: { type: 'string' }, webhookId: { type: 'string' } } },
+      body: {
+        type: 'object',
+        properties: {
+          payload: { type: 'object', additionalProperties: true, description: 'Optional custom payload to send instead of the default sample.' },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const { id, webhookId } = request.params as { id: string; webhookId: string };
+    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtUserPayload }).user);
+    if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
+    const body = (request.body ?? {}) as { payload?: Record<string, unknown> };
+    try {
+      const result = await new WebhookService(fastify.db).test(id, webhookId, body.payload);
+      return result;
+    } catch (err: any) {
+      return reply.status(err.statusCode ?? 400).send({ error: err.message });
+    }
+  });
+
+  // GET /api/v1/merchants/:id/webhooks/registry/:webhookId/test-payload — get canonical test payload
+  fastify.get('/:id/webhooks/registry/:webhookId/test-payload', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Get canonical test payload for a webhook (SD-89)',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id', 'webhookId'], properties: { id: { type: 'string' }, webhookId: { type: 'string' } } },
+    },
+  }, async (request, reply) => {
+    const { id, webhookId } = request.params as { id: string; webhookId: string };
+    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtUserPayload }).user);
+    if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
+    try {
+      const svc = new WebhookService(fastify.db);
+      const webhooks = await svc.list(id);
+      const cfg = webhooks.find((w) => w.webhookId === webhookId);
+      if (!cfg) return reply.status(404).send({ error: 'Webhook not found' });
+      const payload = WebhookService.buildTestPayload(cfg.webhookEventType, id);
+      return { payload };
+    } catch (err: any) {
+      return reply.status(err.statusCode ?? 400).send({ error: err.message });
+    }
+  });
+
+  // GET /api/v1/merchants/:id/webhooks/logs — list webhook delivery logs (paginated)
+  fastify.get('/:id/webhooks/logs', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'List webhook delivery logs (SD-89)',
+      description: 'Returns paginated webhook delivery attempts for this merchant, newest first.',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      querystring: {
+        type: 'object',
+        properties: {
+          eventType: { type: 'string' },
+          deliveryType: { type: 'string', enum: ['live', 'test'] },
+          delivered: { type: 'boolean' },
+          page: { type: 'integer', minimum: 1, default: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 100, default: 25 },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const access = await checkKeyMutationAccess(fastify, id, (request as { user?: JwtUserPayload }).user);
+    if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
+    const q = request.query as { eventType?: string; deliveryType?: string; delivered?: boolean; page?: number; limit?: number };
+    const page = Math.max(1, q.page ?? 1);
+    const limit = Math.min(100, Math.max(1, q.limit ?? 25));
+    try {
+      const { logs, total } = await new WebhookService(fastify.db).listLogs(
+        id,
+        { eventType: q.eventType as WebhookEventType | undefined, deliveryType: q.deliveryType as 'live' | 'test' | undefined, delivered: q.delivered },
+        { skip: (page - 1) * limit, limit },
+      );
+      return { logs, total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) };
+    } catch (err: any) {
+      return reply.status(err.statusCode ?? 400).send({ error: err.message });
+    }
+  });
+
   fastify.patch('/:id/keys/:keyId', {
     schema: {
       tags: ['merchants'],

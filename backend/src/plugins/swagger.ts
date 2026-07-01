@@ -4,11 +4,12 @@ import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import fastifyStatic from '@fastify/static';
 import { join } from 'path';
+import { config } from '../config';
 
 // PSP_PROJECT_ROOT=/app is set in Docker (compiled: dist/plugins → wrong relative path).
 // Local dev: PSP_PROJECT_ROOT is unset, __dirname is src/plugins so ../../public is correct.
-const PUBLIC = process.env.PSP_PROJECT_ROOT
-  ? join(process.env.PSP_PROJECT_ROOT, 'backend/public')
+const PUBLIC = config.server.projectRoot
+  ? join(config.server.projectRoot, 'backend/public')
   : join(__dirname, '../../public');
 
 // fp() removes encapsulation so @fastify/swagger's onRoute hook
@@ -170,7 +171,7 @@ Obtain a token via \`POST /api/v1/auth/login\`.
     },
     staticCSP: true,
     transformStaticCSP: (header) => {
-      const port = process.env.PORT || '8081';
+      const port = String(config.server.port);
       return `${header}; connect-src 'self' http://localhost:${port} http://127.0.0.1:${port}`;
     },
     transformSpecification: (spec) => spec,
