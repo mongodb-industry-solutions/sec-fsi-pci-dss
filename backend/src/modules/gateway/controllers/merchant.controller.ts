@@ -38,6 +38,24 @@ async function checkKeyMutationAccess(
   return { ok: true };
 }
 
+// Authorization verdict for OAuth client MUTATIONS: the merchant owner, a merchant_officer,
+// or system_admin. Mirrors checkKeyMutationAccess but extends to system_admin since OAuth
+// client registration is a platform-level configuration action (ADR-037).
+async function checkOAuthClientAccess(
+  fastify: FastifyInstance,
+  merchantId: string,
+  user?: JwtUserPayload,
+): Promise<{ ok: true } | { status: 403 | 404; error: string }> {
+  const merchant = await getMerchantById(fastify.db, merchantId) as Record<string, unknown> | null;
+  if (!merchant) return { status: 404, error: 'Merchant not found' };
+  const isOwner = !!user?.partyRef && merchant.merchantOwnerPartyReference === user.partyRef;
+  const isPrivileged = user?.role === 'merchant_officer' || user?.role === 'system_admin';
+  if (!isOwner && !isPrivileged) {
+    return { status: 403, error: 'Access denied: only the merchant owner, a merchant officer, or a system admin can manage OAuth client configuration.' };
+  }
+  return { ok: true };
+}
+
 export async function merchantController(fastify: FastifyInstance) {
 
   // GET /api/v1/merchants
@@ -659,6 +677,75 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
     return reply.send(result);
   });
 
+  // POST /api/v1/merchants/:id/deactivate
+  fastify.post('/:id/deactivate', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Self-deactivate a merchant account (SD-89)',
+      description: `Transitions an \`active\` or \`agreed\` merchant to \`suspended\` status.
+The merchant record is retained for audit (PCI DSS Req 10). No payments, OAuth authentication,
+or new operations are permitted while suspended.
+
+**Roles:** merchant owner (\`customer\`), \`merchant_officer\`, or \`system_admin\`.`,
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      body: {
+        type: 'object',
+        properties: {
+          reason: { type: 'string', description: 'Optional reason for deactivation (recorded for audit).' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            merchantAgreementInstanceReference: { type: 'string' },
+            merchantAgreementStatus: { type: 'string' },
+            merchantDeactivatedDateTime: { type: 'string' },
+          },
+        },
+        403: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+        409: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const user = (request as { user?: JwtUserPayload }).user;
+    const { id } = request.params as { id: string };
+    const { reason } = (request.body ?? {}) as { reason?: string };
+
+    const merchant = await getMerchantById(fastify.db, id) as Record<string, unknown> | null;
+    if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
+
+    const isOwner = !!user?.partyRef && merchant.merchantOwnerPartyReference === user.partyRef;
+    const isPrivileged = user?.role === 'merchant_officer' || user?.role === 'system_admin';
+    if (!isOwner && !isPrivileged) {
+      return reply.status(403).send({ error: 'Access denied: only the merchant owner, a merchant officer, or a system admin can deactivate a merchant.' });
+    }
+
+    const currentStatus = merchant.merchantAgreementStatus as string;
+    if (currentStatus === 'suspended') {
+      return reply.status(409).send({ error: 'Merchant is already suspended.' });
+    }
+    if (currentStatus === 'rejected' || currentStatus === 'closed') {
+      return reply.status(409).send({ error: `Cannot deactivate a merchant in '${currentStatus}' status.` });
+    }
+
+    const now = new Date();
+    await updateMerchant(fastify.db, id, {
+      merchantAgreementStatus: 'suspended',
+      merchantDeactivatedDateTime: now,
+      merchantDeactivatedByPartyRef: user?.partyRef ?? user?.sub ?? 'unknown',
+      merchantDeactivationReason: reason ?? null,
+    } as never);
+
+    return reply.send({
+      merchantAgreementInstanceReference: id,
+      merchantAgreementStatus: 'suspended',
+      merchantDeactivatedDateTime: now.toISOString(),
+    });
+  });
+
   // POST /api/v1/merchants/:id/webhooks
   fastify.post('/:id/webhooks', {
     schema: {
@@ -944,9 +1031,8 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const user = (request as any).user as JwtUserPayload | undefined;
-    if (!user?.role || !['merchant_officer', 'system_admin'].includes(user.role)) {
-      return reply.status(403).send({ error: 'merchant_officer or system_admin required' });
-    }
+    const access = await checkOAuthClientAccess(fastify, id, user);
+    if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
     const body = request.body as any;
     try {
       const result = await issueMerchantOAuthClient(fastify.db, id, body);
@@ -971,9 +1057,8 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const user = (request as any).user as JwtUserPayload | undefined;
-    if (!user?.role || !['merchant_officer', 'system_admin'].includes(user.role)) {
-      return reply.status(403).send({ error: 'merchant_officer or system_admin required' });
-    }
+    const access = await checkOAuthClientAccess(fastify, id, user);
+    if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
     try {
       await revokeMerchantOAuthClient(fastify.db, id);
       return { revoked: true };
@@ -1003,11 +1088,8 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const user = (request as any).user as JwtUserPayload | undefined;
-    const isSystemAdmin = (user as any)?.role === 'system_admin';
-    const access = await checkKeyMutationAccess(fastify, id, user);
-    if (!('ok' in access) && !isSystemAdmin) {
-      return reply.status(access.status).send({ error: access.error });
-    }
+    const access = await checkOAuthClientAccess(fastify, id, user);
+    if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
     const merchant = await getMerchantById(fastify.db, id) as Record<string, unknown> | null;
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
     const oauthClient = merchant.merchantOAuthClient as (Record<string, unknown> & { oauthClientSecretHash?: unknown }) | undefined;
@@ -1055,9 +1137,8 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const user = (request as any).user as JwtUserPayload | undefined;
-    if (!user?.role || !['merchant_officer', 'system_admin'].includes(user.role)) {
-      return reply.status(403).send({ error: 'merchant_officer or system_admin required' });
-    }
+    const access = await checkOAuthClientAccess(fastify, id, user);
+    if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
     const body = request.body as any;
     try {
       const result = await updateMerchantOAuthClient(fastify.db, id, body);
@@ -1082,9 +1163,8 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const user = (request as any).user as JwtUserPayload | undefined;
-    if (!user?.role || !['merchant_officer', 'system_admin'].includes(user.role)) {
-      return reply.status(403).send({ error: 'merchant_officer or system_admin required' });
-    }
+    const access = await checkOAuthClientAccess(fastify, id, user);
+    if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
     try {
       const result = await rotateMerchantOAuthClientSecret(fastify.db, id);
       return result;

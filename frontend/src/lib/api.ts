@@ -910,6 +910,12 @@ export const api = {
         { method: 'PATCH', body: JSON.stringify(patch) },
         token,
       ),
+    deactivate: (id: string, token: string, reason?: string) =>
+      apiFetch<{ merchantAgreementInstanceReference: string; merchantAgreementStatus: string; merchantDeactivatedDateTime: string }>(
+        `/api/v1/merchants/${id}/deactivate`,
+        { method: 'POST', body: JSON.stringify({ reason }) },
+        token,
+      ),
     transactions: (merchantId: string, params: {
       page?: number; limit?: number; status?: string; search?: string;
       txnId?: string; cardToken?: string; dateFrom?: string; dateTo?: string;

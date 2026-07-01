@@ -48,6 +48,23 @@ async function fetchConsentInfo(searchParams: Record<string, string>): Promise<C
 
 export default async function AuthorizePage({ searchParams }: AuthorizePageProps) {
   const params = searchParams ?? {};
+
+  // Validate required OAuth params before hitting the backend.
+  const required = ['client_id', 'redirect_uri', 'response_type', 'scope'] as const;
+  const missing = required.filter((p) => !params[p]);
+  if (missing.length > 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full bg-white rounded-xl shadow p-8 text-center">
+          <div className="text-4xl mb-4">⚠️</div>
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">Invalid Authorization Request</h1>
+          <p className="text-gray-600 text-sm">Missing required parameters: {missing.join(', ')}.</p>
+          <p className="text-gray-400 text-xs mt-2">This page must be reached through an OAuth authorization flow, not navigated to directly.</p>
+        </div>
+      </div>
+    );
+  }
+
   const info = await fetchConsentInfo(params);
 
   if ('error' in info) {

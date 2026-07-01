@@ -434,7 +434,7 @@ function WebhookForm({
               <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5"><Send size={13} /> Test endpoint</p>
               <p className="text-xs text-gray-400 mt-0.5">
                 Edit the payload below and send it to your URL. Marked <code className="font-mono">test:true</code>. Results are persisted in
-                {' '}<Link href="/system/merchant/events" className="underline hover:text-[#001E2B]">Events</Link>.
+                {' '}<Link href={`/system/merchant/${merchantId}/events`} className="underline hover:text-[#001E2B]">Events</Link>.
               </p>
             </div>
             <button
@@ -540,7 +540,7 @@ export default function WebhooksSectionPage() {
           debugInfo="BIAN SD-89 BQ:Notification, ADR-038, PCI DSS Req 12.8, ISO 20022 pacs.002"
         />
         <Link
-          href="/system/merchant/events"
+          href={`/system/merchant/${merchantId}/events`}
           className="flex items-center gap-1.5 text-xs border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors shrink-0 mt-1"
         >
           <Activity size={13} /> Events log

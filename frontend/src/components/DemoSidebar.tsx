@@ -29,13 +29,13 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'Cases',        path: '/system/investigation', icon: BriefcaseMedical },
     { label: 'Transactions', path: '/system/transactions',  icon: CreditCard },
     { label: 'Users',        path: '/system/users',         icon: Users },
-    { label: 'Merchant',     path: '/system/merchant',      icon: Store },
+    { label: 'Merchants',    path: '/system/merchant',      icon: Store },
   ],
   level2_investigator: [
     { label: 'Cases',        path: '/system/investigation', icon: BriefcaseMedical },
     { label: 'Transactions', path: '/system/transactions',  icon: CreditCard },
     { label: 'Users',        path: '/system/users',         icon: Users },
-    { label: 'Merchant',     path: '/system/merchant',      icon: Store },
+    { label: 'Merchants',    path: '/system/merchant',      icon: Store },
   ],
   security_auditor: [
     { label: 'Cases',          path: '/system/investigation', icon: BriefcaseMedical },
@@ -44,7 +44,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'Audit Log',      path: '/system/audit',         icon: BarChart3 },
     { label: 'Audit Events',   path: '/system/audit-events',  icon: Activity },
     { label: 'Data Integrity', path: '/system/integrity',     icon: ShieldCheck },
-    { label: 'Merchant',       path: '/system/merchant',      icon: Store },
+    { label: 'Merchants',      path: '/system/merchant',      icon: Store },
   ],
   customer: [
     { label: 'Transactions',    path: '/system/payment/history', icon: ClipboardList },

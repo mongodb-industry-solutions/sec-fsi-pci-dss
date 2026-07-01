@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Settings as SettingsIcon, Check, Lock } from 'lucide-react';
+import { Settings as SettingsIcon, Check, Lock, AlertTriangle, X } from 'lucide-react';
 import { SectionHeader } from '../../../../../components/SectionHeader';
 import { useRequireActiveMerchant } from '../../../../../lib/merchantContext';
 import { useDebugMode } from '../../../../../lib/debugMode';
@@ -20,6 +20,24 @@ export default function SettingsSectionPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [deactivateReason, setDeactivateReason] = useState('');
+  const [deactivating, setDeactivating] = useState(false);
+  const [deactivateError, setDeactivateError] = useState('');
+
+  async function deactivate() {
+    setDeactivating(true);
+    setDeactivateError('');
+    try {
+      await api.merchants.deactivate(merchantId, token, deactivateReason || undefined);
+      refresh();
+      setShowDeactivateModal(false);
+    } catch (err) {
+      setDeactivateError(err instanceof Error ? err.message : 'Failed to deactivate merchant.');
+    }
+    setDeactivating(false);
+  }
 
   if (!merchant) return null;
 
@@ -160,6 +178,84 @@ export default function SettingsSectionPage() {
           </p>
         )}
       </div>
+
+      {/* Danger zone */}
+      {merchant.merchantAgreementStatus !== 'suspended' && (
+        <div className="bg-white rounded-xl border border-red-200 p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={14} className="text-red-500" />
+            <h2 className="font-semibold text-gray-800 text-sm">Danger zone</h2>
+          </div>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-700">Deactivate this merchant account</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Suspends all payment processing, OAuth authentication, and new operations immediately.
+                The account and all its data are retained for audit compliance (PCI DSS Req 10). You can request reactivation from your merchant officer.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setShowDeactivateModal(true); setDeactivateReason(''); setDeactivateError(''); }}
+              className="shrink-0 border border-red-300 text-red-600 hover:bg-red-50 font-medium px-4 py-2 rounded-lg transition-colors text-sm"
+            >
+              Deactivate
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Deactivate confirmation modal */}
+      {showDeactivateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={18} className="text-red-500 shrink-0" />
+                <h3 className="font-semibold text-gray-900">Deactivate merchant account?</h3>
+              </div>
+              <button type="button" onClick={() => setShowDeactivateModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600">
+              This will immediately suspend <strong>{merchant.merchantName}</strong>.
+              No payments, OAuth logins, or new operations will be permitted.
+              The account data is preserved for audit purposes and can be reactivated by your merchant officer.
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Reason (optional)</label>
+              <textarea
+                value={deactivateReason}
+                onChange={(e) => setDeactivateReason(e.target.value)}
+                placeholder="e.g. Ceasing operations, switching provider..."
+                rows={2}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 resize-none"
+              />
+            </div>
+            {deactivateError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{deactivateError}</p>
+            )}
+            <div className="flex justify-end gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowDeactivateModal(false)}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={deactivate}
+                disabled={deactivating}
+                className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-60"
+              >
+                {deactivating ? 'Deactivating...' : 'Yes, deactivate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

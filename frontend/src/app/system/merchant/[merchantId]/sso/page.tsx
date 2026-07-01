@@ -84,6 +84,67 @@ function UriListEditor({ uris, onChange, placeholder }: { uris: string[]; onChan
   );
 }
 
+// ── Role mapping editor ───────────────────────────────────────────────────────
+
+const PSP_ROLES: { key: string; label: string; description: string }[] = [
+  { key: 'customer',              label: 'Customer',             description: 'End user authenticating via OIDC' },
+  { key: 'merchant_officer',      label: 'Merchant Officer',     description: 'Merchant admin with full portal access' },
+  { key: 'security_auditor',      label: 'Security Auditor',     description: 'Read-only audit access (PCI DSS Req 10)' },
+  { key: 'level1_analyst',        label: 'L1 Analyst',           description: 'First-level fraud analyst' },
+  { key: 'level2_investigator',   label: 'L2 Investigator',      description: 'Senior investigator with case escalation' },
+];
+
+function RoleMappingEditor({
+  mapping,
+  onChange,
+}: {
+  mapping: Record<string, string>;
+  onChange: (v: Record<string, string>) => void;
+}) {
+  return (
+    <div className="border-t border-gray-100 pt-4">
+      <div className="mb-2">
+        <span className="text-xs font-medium text-gray-700">Role mapping</span>
+        <p className="text-[11px] text-gray-400 mt-0.5">
+          Map PSP role identifiers to the role names your system uses. Leave blank to pass the PSP role through unchanged.
+          The mapped value is included in the <span className="font-mono">role</span> claim of issued tokens.
+        </p>
+      </div>
+      <div className="space-y-1">
+        <div className="grid grid-cols-[1fr_20px_1fr] gap-2 mb-1 px-1">
+          <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">PSP role</span>
+          <span />
+          <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Your role name</span>
+        </div>
+        {PSP_ROLES.map(({ key, label, description }) => (
+          <div key={key} className="grid grid-cols-[1fr_20px_1fr] gap-2 items-center group">
+            <div className="border border-gray-200 bg-gray-50 rounded px-2 py-1.5">
+              <span className="text-xs font-mono text-gray-700">{key}</span>
+              <span className="text-[10px] text-gray-400 block leading-tight">{label}</span>
+            </div>
+            <span className="text-gray-300 text-center text-xs select-none">→</span>
+            <input
+              value={mapping[key] ?? ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === '') {
+                  const { [key]: _, ...rest } = mapping;
+                  onChange(rest);
+                } else {
+                  onChange({ ...mapping, [key]: val });
+                }
+              }}
+              placeholder={key}
+              title={description}
+              className="border border-gray-300 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#00ED64]/40 placeholder:text-gray-300"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Create form (shown when no OAuth client exists) ───────────────────────────
 
 function CreateClientForm({ merchantId, token, onCreated }: { merchantId: string; token: string; onCreated: (secret: string) => void }) {
@@ -111,11 +172,7 @@ function CreateClientForm({ merchantId, token, onCreated }: { merchantId: string
       onCreated(r.oauthClientSecret);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
-      if (msg.includes('merchant_officer') || msg.includes('system_admin') || msg.toLowerCase().includes('forbidden') || msg.includes('403')) {
-        setError('You need merchant officer or system admin permissions to enable OAuth integration. Contact your platform administrator.');
-      } else {
-        setError(msg || 'Failed to generate OAuth credentials. Please try again.');
-      }
+      setError(msg || 'Failed to save OAuth configuration. Please try again.');
     }
     setSaving(false);
   }
@@ -184,7 +241,7 @@ function CreateClientForm({ merchantId, token, onCreated }: { merchantId: string
         disabled={saving}
         className="flex items-center gap-2 bg-[#001E2B] hover:bg-[#001E2B]/80 text-[#00ED64] font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-60 text-sm"
       >
-        <KeyRound size={14} /> {saving ? 'Enabling...' : 'Enable OAuth'}
+        <KeyRound size={14} /> {saving ? 'Saving...' : 'Save'}
       </button>
     </form>
   );
@@ -377,7 +434,7 @@ export default function MerchantSSOPage() {
         )}
 
         {!newSecret && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+          <div className="space-y-5">
             <CreateClientForm merchantId={merchantId} token={token} onCreated={(secret) => { setNewSecret(secret); setShowSecret(true); load(); }} />
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <p className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-1.5"><Globe size={14} className="text-gray-400" /> OIDC Endpoints</p>
@@ -397,8 +454,6 @@ export default function MerchantSSOPage() {
 
   const grantedHook = oauthWebhooks.find((w) => w.webhookEventType === 'oauth.authorization_granted');
   const revokedHook = oauthWebhooks.find((w) => w.webhookEventType === 'oauth.authorization_revoked');
-
-  const claimEntries = Object.entries(claimMapping);
 
   return (
     <div className="w-full px-5 sm:px-8 py-6 space-y-5">
@@ -554,63 +609,8 @@ export default function MerchantSSOPage() {
           </div>
         </div>
 
-        {/* Claim / role mapping */}
-        <div className="border-t border-gray-100 pt-4">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <span className="text-xs font-medium text-gray-700">Claim mapping</span>
-              <span className="text-xs text-gray-400 ml-1">(PSP scope or claim value to your role name)</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setClaimMapping({ ...claimMapping, '': '' })}
-              className="flex items-center gap-1 text-xs text-[#001E2B] hover:underline"
-            >
-              <Plus size={11} /> Add
-            </button>
-          </div>
-          {claimEntries.length === 0 ? (
-            <p className="text-xs text-gray-400 italic">No claim mapping defined.</p>
-          ) : (
-            <div className="space-y-1.5">
-              <div className="grid grid-cols-[1fr_1fr_auto] gap-2 mb-1">
-                <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">PSP scope / claim</span>
-                <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Your role name</span>
-                <span />
-              </div>
-              {claimEntries.map(([k, v], i) => (
-                <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
-                  <input
-                    value={k}
-                    onChange={(e) => {
-                      const entries = Object.entries(claimMapping);
-                      const newEntries = entries.map(([ek, ev], j) => j === i ? [e.target.value, ev] : [ek, ev]);
-                      setClaimMapping(Object.fromEntries(newEntries));
-                    }}
-                    placeholder="e.g. read:transactions"
-                    className="border border-gray-300 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#00ED64]/40"
-                  />
-                  <input
-                    value={v}
-                    onChange={(e) => setClaimMapping({ ...claimMapping, [k]: e.target.value })}
-                    placeholder="e.g. analyst"
-                    className="border border-gray-300 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#00ED64]/40"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const { [k]: _, ...rest } = claimMapping;
-                      setClaimMapping(rest);
-                    }}
-                    className="text-red-400 hover:text-red-600"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Role mapping */}
+        <RoleMappingEditor mapping={claimMapping} onChange={setClaimMapping} />
 
         <div className="flex items-center gap-3 pt-1 border-t border-gray-100">
           <button
@@ -629,7 +629,7 @@ export default function MerchantSSOPage() {
           <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5"><Webhook size={14} className="text-gray-400" /> OAuth event callbacks</p>
           <p className="text-xs text-gray-500 mt-0.5">
             PSP posts a signed JSON payload to these URLs when OAuth authorization events occur.
-            Delivery logs in <Link href="/system/merchant/events" className="underline hover:text-[#001E2B]">Events</Link>.
+            Delivery logs in <Link href={`/system/merchant/${merchantId}/events`} className="underline hover:text-[#001E2B]">Events</Link>.
           </p>
         </div>
 

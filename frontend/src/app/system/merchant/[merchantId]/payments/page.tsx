@@ -236,7 +236,7 @@ export default function PaymentsSectionPage() {
                   </td>
                   <td className="px-4 py-2.5">
                     <Link
-                      href={`/system/merchant/payments/${s.cardTransactionInstanceReference}`}
+                      href={`/system/merchant/${merchantId}/payments/${s.cardTransactionInstanceReference}`}
                       className="text-xs text-blue-600 hover:underline whitespace-nowrap flex items-center gap-1"
                     >
                       Details <ChevronRight size={11} className="opacity-0 group-hover:opacity-100 transition-opacity" />

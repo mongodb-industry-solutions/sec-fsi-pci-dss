@@ -73,8 +73,8 @@ export default function MerchantTransactionDetailPage() {
   if (!merchant) return null;
 
   const crumbs: Crumb[] = [
-    { label: 'Merchant', href: '/system/merchant/overview' },
-    { label: 'Transactions', href: '/system/merchant/payments' },
+    { label: 'Merchant', href: `/system/merchant/${merchantId}/overview` },
+    { label: 'Transactions', href: `/system/merchant/${merchantId}/payments` },
     { label: txn?.cardTransactionDescription ?? tid ?? 'Detail' },
   ];
 
@@ -89,7 +89,7 @@ export default function MerchantTransactionDetailPage() {
     <div className="w-full px-5 sm:px-8 py-6 space-y-3">
       <Breadcrumb items={crumbs} />
       <p className="text-gray-500 mt-4">Transaction not found.</p>
-      <Link href="/system/merchant/payments" className="text-blue-600 hover:underline text-sm inline-flex items-center gap-1">
+      <Link href={`/system/merchant/${merchantId}/payments`} className="text-blue-600 hover:underline text-sm inline-flex items-center gap-1">
         <ArrowLeft size={14} /> Back to transactions
       </Link>
     </div>
@@ -106,7 +106,7 @@ export default function MerchantTransactionDetailPage() {
       <Breadcrumb items={crumbs} />
 
       {/* Back link */}
-      <Link href="/system/merchant/payments" className="text-sm text-gray-500 hover:text-[#001E2B] inline-flex items-center gap-1 transition-colors">
+      <Link href={`/system/merchant/${merchantId}/payments`} className="text-sm text-gray-500 hover:text-[#001E2B] inline-flex items-center gap-1 transition-colors">
         <ArrowLeft size={14} /> Back to transactions
       </Link>
 
