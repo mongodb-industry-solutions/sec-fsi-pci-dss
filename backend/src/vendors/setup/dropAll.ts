@@ -2,7 +2,7 @@ import { MongoClient } from 'mongodb';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import * as https from 'https';
-import { buildDigestHeader, parseWwwAuthenticate } from '../encryption/digest';
+import { buildBasicAuthHeader } from '../encryption/digest';
 import { getKmsConfig } from '../encryption/kms';
 
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
@@ -49,12 +49,7 @@ async function atlasDelete(
   label: string,
 ): Promise<void> {
   try {
-    const probe = await httpsDeleteRequest(path);
-    if (probe.status === 404) { warn(`${label} - not found in Atlas, skipping`); return; }
-    if (probe.status !== 401) { warn(`${label} - unexpected HTTP ${probe.status} on probe, skipping`); return; }
-
-    const challenge = parseWwwAuthenticate(probe.wwwAuthenticate ?? '');
-    const authHeader = buildDigestHeader(publicKey, privateKey, 'DELETE', path, challenge.realm, challenge.nonce, challenge.opaque);
+    const authHeader = buildBasicAuthHeader(publicKey, privateKey);
     const res = await httpsDeleteRequest(path, authHeader);
 
     if (res.status === 200 || res.status === 204) {

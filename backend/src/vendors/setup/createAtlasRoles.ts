@@ -25,7 +25,7 @@
  */
 
 import * as https from 'https';
-import { buildDigestHeader, parseWwwAuthenticate } from '../encryption/digest';
+import { buildBasicAuthHeader } from '../encryption/digest';
 
 const ATLAS_API_BASE = 'cloud.mongodb.com';
 const ATLAS_API_PATH_BASE = '/api/atlas/v2';
@@ -95,18 +95,7 @@ async function atlasPost(
   publicKey: string,
   privateKey: string,
 ): Promise<{ status: number; body: unknown }> {
-  // Step 1: unauthenticated probe to obtain Digest challenge
-  const probe = await httpsRequest('POST', path, body);
-  if (probe.status !== 401) {
-    const parsed = JSON.parse(probe.body || '{}');
-    return { status: probe.status, body: parsed };
-  }
-
-  const wwwAuth = (probe.headers['www-authenticate'] as string) ?? '';
-  const challenge = parseWwwAuthenticate(wwwAuth);
-  const authHeader = buildDigestHeader(publicKey, privateKey, 'POST', path, challenge.realm, challenge.nonce, challenge.opaque);
-
-  // Step 2: authenticated request
+  const authHeader = buildBasicAuthHeader(publicKey, privateKey);
   const res = await httpsRequest('POST', path, body, authHeader);
   let parsed: unknown;
   try { parsed = JSON.parse(res.body || '{}'); } catch { parsed = res.body; }
