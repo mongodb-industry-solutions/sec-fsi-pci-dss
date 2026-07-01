@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import { existsSync } from 'fs';
 import * as https from 'https';
-import { buildDigestHeader, parseWwwAuthenticate } from '../encryption/digest';
+import { buildBasicAuthHeader } from '../encryption/digest';
 import { getKmsConfig } from '../encryption/kms';
 
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
@@ -108,10 +108,7 @@ function httpsGet(
 
 async function atlasGet(path: string, publicKey: string, privateKey: string): Promise<number> {
   try {
-    const probe = await httpsGet(path);
-    if (probe.status !== 401) return probe.status;
-    const c = parseWwwAuthenticate(probe.wwwAuthenticate ?? '');
-    const auth = buildDigestHeader(publicKey, privateKey, 'GET', path, c.realm, c.nonce, c.opaque);
+    const auth = buildBasicAuthHeader(publicKey, privateKey);
     return (await httpsGet(path, auth)).status;
   } catch {
     return 0;
