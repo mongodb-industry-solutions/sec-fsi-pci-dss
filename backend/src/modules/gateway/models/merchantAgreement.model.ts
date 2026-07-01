@@ -142,4 +142,6 @@ export interface MerchantOAuthClientConfig {
   oauthTokenLifetimeSeconds: number;              // Default: 3600
   oauthRefreshTokenLifetimeDays: number;          // Default: 30
   oauthRequirePkce: boolean;                      // true for public clients (authorization_code)
+  oauthPostLogoutRedirectUris?: string[];          // allowed post_logout_redirect_uris
+  oauthClaimMapping?: Record<string, string>;      // PSP claim/scope → merchant role name
 }

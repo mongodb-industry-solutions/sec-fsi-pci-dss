@@ -96,6 +96,56 @@ export async function revokeMerchantOAuthClient(
   }
 }
 
+export interface UpdateMerchantOAuthClientInput {
+  redirect_uris?: string[];
+  post_logout_redirect_uris?: string[];
+  grant_types?: OAuthGrantType[];
+  scopes?: string[];
+  require_pkce?: boolean;
+  token_lifetime_seconds?: number;
+  refresh_token_lifetime_days?: number;
+  claim_mapping?: Record<string, string>;
+}
+
+export type MerchantOAuthClientConfigPublic = Omit<MerchantOAuthClientConfig, 'oauthClientSecretHash'>;
+
+export async function updateMerchantOAuthClient(
+  db: Db,
+  merchantId: string,
+  patch: UpdateMerchantOAuthClientInput,
+): Promise<MerchantOAuthClientConfigPublic> {
+  const col = db.collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION);
+  const merchant = await col.findOne({ merchantAgreementInstanceReference: merchantId });
+
+  if (!merchant) {
+    throw Object.assign(new Error('Merchant not found'), { statusCode: 404 });
+  }
+  if (!merchant.merchantOAuthClient) {
+    throw Object.assign(new Error('No OAuth client configured for this merchant — issue one first'), { statusCode: 400 });
+  }
+
+  const existing = merchant.merchantOAuthClient;
+  const updated: MerchantOAuthClientConfig = {
+    ...existing,
+    ...(patch.redirect_uris !== undefined && { oauthRedirectUris: patch.redirect_uris }),
+    ...(patch.post_logout_redirect_uris !== undefined && { oauthPostLogoutRedirectUris: patch.post_logout_redirect_uris }),
+    ...(patch.grant_types !== undefined && { oauthGrantTypes: patch.grant_types }),
+    ...(patch.scopes !== undefined && { oauthScopes: patch.scopes }),
+    ...(patch.require_pkce !== undefined && { oauthRequirePkce: patch.require_pkce }),
+    ...(patch.token_lifetime_seconds !== undefined && { oauthTokenLifetimeSeconds: patch.token_lifetime_seconds }),
+    ...(patch.refresh_token_lifetime_days !== undefined && { oauthRefreshTokenLifetimeDays: patch.refresh_token_lifetime_days }),
+    ...(patch.claim_mapping !== undefined && { oauthClaimMapping: patch.claim_mapping }),
+  };
+
+  await col.updateOne(
+    { merchantAgreementInstanceReference: merchantId },
+    { $set: { merchantOAuthClient: updated, recordUpdatedDateTime: new Date() } },
+  );
+
+  const { oauthClientSecretHash: _omit, ...publicConfig } = updated;
+  return publicConfig;
+}
+
 export async function rotateMerchantOAuthClientSecret(
   db: Db,
   merchantAgreementInstanceReference: string,

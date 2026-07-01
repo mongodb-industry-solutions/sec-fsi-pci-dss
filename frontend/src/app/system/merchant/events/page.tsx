@@ -16,6 +16,7 @@ const ALL_EVENT_TYPES: WebhookEventType[] = [
   'user.notification',
   'dispute.opened',
   'kyb.status_changed',
+  // OAuth event callbacks appear in /system/merchant/sso but remain filterable here
 ];
 
 const LIMIT_OPTIONS = [10, 25, 50];

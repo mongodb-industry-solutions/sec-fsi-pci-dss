@@ -139,6 +139,22 @@ export interface WebhookDeliveryLog {
   deliveredAt: string;
 }
 
+// v16: Merchant OAuth 2.0 client registration (SD-89 BQ:Grant)
+export interface MerchantOAuthClient {
+  oauthClientId: string;
+  oauthClientSecretPrefix: string;          // First 8 chars — plaintext never returned
+  oauthRedirectUris: string[];
+  oauthGrantTypes: ('authorization_code' | 'client_credentials' | 'refresh_token')[];
+  oauthScopes: string[];
+  oauthClientStatus: 'active' | 'suspended' | 'revoked';
+  oauthClientCreatedDateTime: string;
+  oauthTokenLifetimeSeconds: number;
+  oauthRefreshTokenLifetimeDays: number;
+  oauthRequirePkce: boolean;
+  oauthPostLogoutRedirectUris?: string[];
+  oauthClaimMapping?: Record<string, string>;
+}
+
 // v16: OAuth consent grants (user-authorized apps)
 export interface ConsentGrant {
   consentId: string;
@@ -992,6 +1008,49 @@ export const api = {
     revokeKey: (merchantId: string, keyId: string, token: string) =>
       apiFetch<{ revoked: boolean; keyId: string }>(
         `/api/v1/merchants/${merchantId}/keys/${keyId}`, { method: 'DELETE' }, token
+      ),
+    // v16: OAuth 2.0 client management (SD-89 BQ:Grant)
+    getOAuthClient: (merchantId: string, token: string) =>
+      apiFetch<MerchantOAuthClient>(`/api/v1/merchants/${merchantId}/oauth-client`, {}, token),
+    createOAuthClient: (merchantId: string, token: string, body: {
+      redirect_uris: string[];
+      grant_types: string[];
+      scopes: string[];
+      require_pkce?: boolean;
+      token_lifetime_seconds?: number;
+      refresh_token_lifetime_days?: number;
+    }) =>
+      apiFetch<{ client: MerchantOAuthClient; oauthClientSecret: string }>(
+        `/api/v1/merchants/${merchantId}/oauth-client`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token,
+      ),
+    updateOAuthClient: (merchantId: string, token: string, patch: {
+      redirect_uris?: string[];
+      post_logout_redirect_uris?: string[];
+      grant_types?: string[];
+      scopes?: string[];
+      require_pkce?: boolean;
+      token_lifetime_seconds?: number;
+      refresh_token_lifetime_days?: number;
+      claim_mapping?: Record<string, string>;
+    }) =>
+      apiFetch<MerchantOAuthClient>(
+        `/api/v1/merchants/${merchantId}/oauth-client`,
+        { method: 'PATCH', body: JSON.stringify(patch) },
+        token,
+      ),
+    rotateOAuthClientSecret: (merchantId: string, token: string) =>
+      apiFetch<{ oauthClientId: string; oauthClientSecret: string }>(
+        `/api/v1/merchants/${merchantId}/oauth-client/rotate-secret`,
+        { method: 'POST' },
+        token,
+      ),
+    revokeOAuthClient: (merchantId: string, token: string) =>
+      apiFetch<{ revoked: boolean }>(
+        `/api/v1/merchants/${merchantId}/oauth-client`,
+        { method: 'DELETE' },
+        token,
       ),
     registerWebhook: (merchantId: string, webhookEndpoint: string, token: string) =>
       apiFetch<{ merchantAgreementInstanceReference: string; merchantWebhookEndpoint: string; merchantWebhookSecret?: string }>(

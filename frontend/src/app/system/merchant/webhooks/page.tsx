@@ -11,11 +11,10 @@ import { useDebugMode } from '../../../../lib/debugMode';
 import { api, type TypedWebhookConfig, type WebhookEventType, WEBHOOK_EVENT_LABELS } from '../../../../lib/api';
 import { JsonView } from '../../../../components/json/JsonView';
 
+// OAuth event callbacks are managed in /system/merchant/sso, not here.
 const ALL_EVENT_TYPES: WebhookEventType[] = [
   'payment.completed',
   'payment.failed',
-  'oauth.authorization_granted',
-  'oauth.authorization_revoked',
   'user.notification',
   'dispute.opened',
   'kyb.status_changed',
@@ -427,7 +426,7 @@ function WebhookForm({
         </div>
       )}
 
-      {/* Test section — always visible for configured webhooks */}
+      {/* Test section, always visible for configured webhooks */}
       {existing && (
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
           <div className="flex items-center justify-between">

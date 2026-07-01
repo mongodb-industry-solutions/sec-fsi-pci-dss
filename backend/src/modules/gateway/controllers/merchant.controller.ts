@@ -4,7 +4,7 @@
 import { FastifyInstance } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, sendTestWebhook, generateApiKey, importApiKey, updateApiKeyLabel, revokeApiKey, reviewMerchantApplication, getMerchantEvents, getMerchantApiKeys } from '../services/merchant.service';
-import { issueMerchantOAuthClient, revokeMerchantOAuthClient, rotateMerchantOAuthClientSecret } from '../services/merchantOAuth.service';
+import { issueMerchantOAuthClient, revokeMerchantOAuthClient, rotateMerchantOAuthClientSecret, updateMerchantOAuthClient } from '../services/merchantOAuth.service';
 import { WebhookService } from '../services/merchantWebhook.service';
 import type { WebhookEventType } from '../models/merchantAgreement.model';
 import { getMerchantTransactions, getMerchantTransactionById, getMerchantStats } from '../../transaction/services/cardTransaction.service';
@@ -978,6 +978,91 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
     try {
       await revokeMerchantOAuthClient(fastify.db, id);
       return { revoked: true };
+    } catch (err: any) {
+      return reply.status(err.statusCode ?? 400).send({ error: err.message });
+    }
+  });
+
+  // GET /api/v1/merchants/:id/oauth-client — retrieve OAuth client config (no secret)
+  fastify.get('/:id/oauth-client', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Get merchant OAuth 2.0 client config (SD-89)',
+      description: 'Returns the OAuth client configuration for the merchant. The client_secret is never returned. Requires merchant owner, merchant_officer, or system_admin.',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: { id: { type: 'string' } },
+      },
+      response: {
+        200: { description: 'OAuth client configuration (secret omitted).' },
+        403: { description: 'Access denied.', $ref: 'Error#' },
+        404: { description: 'Merchant not found or no OAuth client configured.', $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const user = (request as any).user as JwtUserPayload | undefined;
+    const isSystemAdmin = (user as any)?.role === 'system_admin';
+    const access = await checkKeyMutationAccess(fastify, id, user);
+    if (!('ok' in access) && !isSystemAdmin) {
+      return reply.status(access.status).send({ error: access.error });
+    }
+    const merchant = await getMerchantById(fastify.db, id) as Record<string, unknown> | null;
+    if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
+    const oauthClient = merchant.merchantOAuthClient as (Record<string, unknown> & { oauthClientSecretHash?: unknown }) | undefined;
+    if (!oauthClient) return reply.status(404).send({ error: 'No OAuth client configured for this merchant' });
+    const { oauthClientSecretHash: _omit, ...publicConfig } = oauthClient;
+    return reply.status(200).send(publicConfig);
+  });
+
+  // PATCH /api/v1/merchants/:id/oauth-client — update OAuth client config
+  fastify.patch('/:id/oauth-client', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Update merchant OAuth 2.0 client config (SD-89)',
+      description: 'Updates selected fields of the merchant OAuth client config. All body fields are optional — only provided fields are updated. Requires merchant_officer or system_admin.',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: { id: { type: 'string' } },
+      },
+      body: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          redirect_uris: { type: 'array', items: { type: 'string' } },
+          post_logout_redirect_uris: { type: 'array', items: { type: 'string' } },
+          grant_types: {
+            type: 'array',
+            items: { type: 'string', enum: ['authorization_code', 'client_credentials', 'refresh_token'] },
+          },
+          scopes: { type: 'array', items: { type: 'string' } },
+          require_pkce: { type: 'boolean' },
+          token_lifetime_seconds: { type: 'number', minimum: 300, maximum: 86400 },
+          refresh_token_lifetime_days: { type: 'number', minimum: 1, maximum: 365 },
+          claim_mapping: { type: 'object', additionalProperties: { type: 'string' } },
+        },
+      },
+      response: {
+        200: { description: 'Updated OAuth client configuration (secret omitted).' },
+        400: { description: 'No OAuth client configured, or invalid input.', $ref: 'Error#' },
+        403: { description: 'merchant_officer or system_admin required.', $ref: 'Error#' },
+        404: { description: 'Merchant not found.', $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const user = (request as any).user as JwtUserPayload | undefined;
+    if (!user?.role || !['merchant_officer', 'system_admin'].includes(user.role)) {
+      return reply.status(403).send({ error: 'merchant_officer or system_admin required' });
+    }
+    const body = request.body as any;
+    try {
+      const result = await updateMerchantOAuthClient(fastify.db, id, body);
+      return reply.status(200).send(result);
     } catch (err: any) {
       return reply.status(err.statusCode ?? 400).send({ error: err.message });
     }

@@ -2,21 +2,22 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, ShoppingCart, Link2, Receipt, Key, Webhook, Settings, Activity, type LucideIcon,
+  LayoutDashboard, ShoppingCart, Link2, Receipt, Key, Webhook, Settings, Activity, ShieldCheck, type LucideIcon,
 } from 'lucide-react';
 import { CarouselNav } from '../CarouselNav';
 
 interface NavItem { href: string; label: string; icon: LucideIcon }
 
 const ITEMS: NavItem[] = [
-  { href: '/system/merchant/overview',  label: 'Overview',          icon: LayoutDashboard },
-  { href: '/system/merchant/checkout',  label: 'Checkout Session',  icon: ShoppingCart },
-  { href: '/system/merchant/links',     label: 'Payment Links',     icon: Link2 },
-  { href: '/system/merchant/payments',  label: 'Transactions',      icon: Receipt },
-  { href: '/system/merchant/api-keys',  label: 'API Keys',          icon: Key },
-  { href: '/system/merchant/webhooks',  label: 'Webhooks',          icon: Webhook },
-  { href: '/system/merchant/events',   label: 'Events',            icon: Activity },
-  { href: '/system/merchant/settings',  label: 'Settings',          icon: Settings },
+  { href: '/system/merchant/overview',  label: 'Overview',         icon: LayoutDashboard },
+  { href: '/system/merchant/checkout',  label: 'Checkout Session', icon: ShoppingCart },
+  { href: '/system/merchant/links',     label: 'Payment Links',    icon: Link2 },
+  { href: '/system/merchant/payments',  label: 'Transactions',     icon: Receipt },
+  { href: '/system/merchant/api-keys',  label: 'API Keys',         icon: Key },
+  { href: '/system/merchant/sso',       label: 'SSO',      icon: ShieldCheck },
+  { href: '/system/merchant/webhooks',  label: 'Webhooks',         icon: Webhook },
+  { href: '/system/merchant/events',    label: 'Events',           icon: Activity },
+  { href: '/system/merchant/settings',  label: 'Settings',         icon: Settings },
 ];
 
 export function MerchantNav({ merchantName }: { merchantName?: string }) {
