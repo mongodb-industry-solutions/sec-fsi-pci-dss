@@ -169,9 +169,8 @@ export async function updatePayoutAccount(
   const safePatch: Record<string, unknown> = { recordUpdatedDateTime: now };
   if (patch.payoutAccountAlias !== undefined) safePatch.payoutAccountAlias = patch.payoutAccountAlias;
   if (patch.payoutAccountIsDefault !== undefined) safePatch.payoutAccountIsDefault = patch.payoutAccountIsDefault;
-  return col.findOneAndUpdate(
-    { payoutAccountInstanceReference: accountRef },
-    { $set: safePatch },
-    { returnDocument: 'after' }
-  );
+  // QE constraint: findOneAndUpdate with returnDocument:'after' uses new:true which is
+  // unsupported on encrypted collections. Use updateOne + findOne instead.
+  await col.updateOne({ payoutAccountInstanceReference: accountRef }, { $set: safePatch });
+  return col.findOne({ payoutAccountInstanceReference: accountRef });
 }
