@@ -77,14 +77,24 @@ export async function payoutAccountController(fastify: FastifyInstance) {
       body: {
         type: 'object',
         required: ['payoutAccountType', 'payoutAccountCurrency', 'payoutAccountCountryCode', 'payoutAccountPreferredRail'],
+        additionalProperties: false,
         properties: {
           payoutAccountType: { type: 'string', enum: ['bank_account', 'wallet', 'internal_ledger'] },
-          payoutAccountCurrency: { type: 'string' },
-          payoutAccountCountryCode: { type: 'string' },
+          payoutAccountCurrency: { type: 'string', minLength: 3, maxLength: 3 },
+          payoutAccountCountryCode: { type: 'string', minLength: 2, maxLength: 2 },
           payoutAccountPreferredRail: { type: 'string', enum: ['sepa', 'ach', 'local_bank', 'internal_wallet', 'internal_ledger'] },
-          payoutAccountAlias: { type: 'string' },
-          payoutAccountBankName: { type: 'string' },
+          payoutAccountAlias: { type: 'string', maxLength: 60 },
+          payoutAccountBankName: { type: 'string', maxLength: 100 },
           payoutAccountIsDefault: { type: 'boolean' },
+          // Plaintext banking metadata
+          payoutAccountHolderName: { type: 'string', minLength: 2, maxLength: 140 },
+          // ISO 9362: BIC = 4 bank + 2 country + 2 location + 3 branch (optional); 8 or 11 chars
+          payoutAccountBicSwift: { type: 'string', minLength: 8, maxLength: 11, pattern: '^[A-Za-z]{4}[A-Za-z]{2}[A-Za-z0-9]{2}([A-Za-z0-9]{3})?$' },
+          payoutAccountCorrespondentBic: { type: 'string', minLength: 8, maxLength: 11, pattern: '^[A-Za-z]{4}[A-Za-z]{2}[A-Za-z0-9]{2}([A-Za-z0-9]{3})?$' },
+          payoutAccountBankAddress: { type: 'string', maxLength: 200 },
+          // QE-encrypted — omit entirely when not provided (null triggers error 31041)
+          payoutAccountIban: { type: 'string', minLength: 15, maxLength: 34 },
+          payoutAccountRoutingNumber: { type: 'string', maxLength: 50 },
         },
       },
     },

@@ -31,12 +31,16 @@ export interface PayoutAccountArrangement {
   payoutAccountIsDefault: boolean;         // at most one true per party (partial unique index)
 
   // QE:none (DEK-payout-iban) — returned as Binary ciphertext by L1; decrypted by L2 only
-  payoutAccountIban?: string;
-  payoutAccountRoutingNumber?: string;     // BIC / SWIFT / sort code
+  payoutAccountIban?: string;              // ISO 13616 IBAN (15–34 chars)
+  payoutAccountRoutingNumber?: string;     // ACH ABA routing number (US, 9 digits) or UK sort code (6 digits)
 
-  // Plaintext metadata
-  payoutAccountAlias?: string;             // phone or email alias for user-to-user lookup
-  payoutAccountBankName?: string;
+  // Plaintext banking metadata — not payment credentials (no PCI DSS encryption requirement)
+  payoutAccountAlias?: string;             // user-defined nickname (max 60)
+  payoutAccountBankName?: string;          // institution name (max 100)
+  payoutAccountHolderName?: string;        // account holder legal name — BIAN SD-66 (max 140)
+  payoutAccountBicSwift?: string;          // ISO 9362 BIC/SWIFT: publicly published institution ID (8 or 11 chars)
+  payoutAccountCorrespondentBic?: string;  // correspondent bank BIC for international wire transfers (8 or 11 chars)
+  payoutAccountBankAddress?: string;       // bank branch address (max 200)
   payoutAccountCurrency: string;           // ISO 4217
   payoutAccountCountryCode: string;        // ISO 3166-1 alpha-2
   payoutAccountPreferredRail: PayoutRail;

@@ -19,6 +19,10 @@ export interface CreatePayoutAccountInput {
   payoutAccountPreferredRail: PayoutRail;
   payoutAccountAlias?: string;
   payoutAccountBankName?: string;
+  payoutAccountHolderName?: string;
+  payoutAccountBicSwift?: string;
+  payoutAccountCorrespondentBic?: string;
+  payoutAccountBankAddress?: string;
   payoutAccountIban?: string;
   payoutAccountRoutingNumber?: string;
   payoutAccountIsDefault?: boolean;
@@ -77,13 +81,20 @@ export async function createPayoutAccount(
     payoutAccountType: input.payoutAccountType,
     payoutAccountStatus: 'active',
     payoutAccountIsDefault: isDefault,
-    payoutAccountAlias: input.payoutAccountAlias,
-    payoutAccountBankName: input.payoutAccountBankName,
-    payoutAccountIban: input.payoutAccountIban,
-    payoutAccountRoutingNumber: input.payoutAccountRoutingNumber,
     payoutAccountCurrency: input.payoutAccountCurrency,
     payoutAccountCountryCode: input.payoutAccountCountryCode,
     payoutAccountPreferredRail: input.payoutAccountPreferredRail,
+    // Optional plaintext fields — only include when provided
+    ...(input.payoutAccountAlias ? { payoutAccountAlias: input.payoutAccountAlias } : {}),
+    ...(input.payoutAccountBankName ? { payoutAccountBankName: input.payoutAccountBankName } : {}),
+    ...(input.payoutAccountHolderName ? { payoutAccountHolderName: input.payoutAccountHolderName } : {}),
+    ...(input.payoutAccountBicSwift ? { payoutAccountBicSwift: input.payoutAccountBicSwift.toUpperCase() } : {}),
+    ...(input.payoutAccountCorrespondentBic ? { payoutAccountCorrespondentBic: input.payoutAccountCorrespondentBic.toUpperCase() } : {}),
+    ...(input.payoutAccountBankAddress ? { payoutAccountBankAddress: input.payoutAccountBankAddress } : {}),
+    // QE-encrypted fields: MUST be absent (not null/undefined) when not provided.
+    // MongoDB error 31041: "Cannot encrypt element of type: null" — QE driver rejects null values.
+    ...(input.payoutAccountIban ? { payoutAccountIban: input.payoutAccountIban } : {}),
+    ...(input.payoutAccountRoutingNumber ? { payoutAccountRoutingNumber: input.payoutAccountRoutingNumber } : {}),
     payoutAccountBalance: {
       pendingAmount: 0,
       availableAmount: 0,
