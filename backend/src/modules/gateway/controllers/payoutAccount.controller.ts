@@ -13,16 +13,25 @@ import {
   setDefaultPayoutAccount,
   closePayoutAccount,
   updatePayoutAccount,
+  type UpdatePayoutAccountInput,
 } from '../services/payoutAccount.service';
 import { listAccountMovements, ListMovementsOptions } from '../services/accountMovements.service';
 import { getCardsByFundingAccount } from '../../customer/services/paymentCard.service';
 
 function safeAccount(doc: unknown) {
-  // Strip Binary ciphertext fields that were not decrypted (non-L2 client)
+  // Strip QE-encrypted fields from the public response. Include boolean hints so the UI
+  // can show a reveal button without exposing the plaintext. PCI DSS Req 3.3.
   const { payoutAccountIban, payoutAccountRoutingNumber, _id, ...rest } = doc as any;
-  void payoutAccountIban; void payoutAccountRoutingNumber; void _id;
-  return rest;
+  void _id;
+  return {
+    ...rest,
+    payoutAccountHasIban: typeof payoutAccountIban === 'string' && payoutAccountIban.length > 0,
+    payoutAccountHasRoutingNumber: typeof payoutAccountRoutingNumber === 'string' && payoutAccountRoutingNumber.length > 0,
+  };
 }
+
+// Roles permitted to reveal QE-encrypted IBAN: account owner (customer) handled in-handler.
+const IBAN_REVEAL_ROLES = new Set(['level2_investigator', 'security_auditor']);
 
 function getUser(request: unknown): JwtUserPayload | undefined {
   return (request as { user?: JwtUserPayload }).user;
@@ -240,9 +249,15 @@ export async function payoutAccountController(fastify: FastifyInstance) {
       },
       body: {
         type: 'object',
+        additionalProperties: false,
         properties: {
           payoutAccountAlias: { type: 'string', maxLength: 60 },
           payoutAccountIsDefault: { type: 'boolean' },
+          payoutAccountBankName: { type: 'string', maxLength: 100 },
+          payoutAccountHolderName: { type: 'string', minLength: 2, maxLength: 140 },
+          payoutAccountBicSwift: { type: 'string', minLength: 8, maxLength: 11, pattern: '^[A-Za-z]{4}[A-Za-z]{2}[A-Za-z0-9]{2}([A-Za-z0-9]{3})?$' },
+          payoutAccountCorrespondentBic: { type: 'string', minLength: 8, maxLength: 11, pattern: '^[A-Za-z]{4}[A-Za-z]{2}[A-Za-z0-9]{2}([A-Za-z0-9]{3})?$' },
+          payoutAccountBankAddress: { type: 'string', maxLength: 200 },
         },
       },
     },
@@ -256,7 +271,7 @@ export async function payoutAccountController(fastify: FastifyInstance) {
     if (!account || account.partyInstanceReference !== partyRef) {
       return reply.status(404).send({ error: 'Account not found' });
     }
-    const body = request.body as { payoutAccountAlias?: string; payoutAccountIsDefault?: boolean };
+    const body = request.body as UpdatePayoutAccountInput;
     const updated = await updatePayoutAccount(fastify.db, accountRef, body);
     return reply.send(safeAccount(updated));
   });
@@ -285,5 +300,54 @@ export async function payoutAccountController(fastify: FastifyInstance) {
     }
     const { results } = await getCardsByFundingAccount(fastify.db, accountRef);
     return reply.send({ results, total: results.length });
+  });
+
+  // GET /:partyRef/:accountRef/iban
+  // PCI DSS Req 3.3: IBAN reveal. Scoped to:
+  //   - account owner (customer with own partyRef)
+  //   - level2_investigator (financial fraud investigation)
+  //   - security_auditor (compliance oversight)
+  // L1 analysts, merchants, managers: denied (least privilege / SoD).
+  fastify.get('/:partyRef/:accountRef/iban', {
+    preHandler: requirePermission('accounts', 'view'),
+    schema: {
+      tags: ['accounts'],
+      summary: 'Reveal decrypted IBAN — account owner, L2 investigator or security auditor only (PCI DSS Req 3.3)',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['partyRef', 'accountRef'],
+        properties: { partyRef: { type: 'string' }, accountRef: { type: 'string' } },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: { payoutAccountIban: { type: 'string' } },
+          additionalProperties: false,
+        },
+        403: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { partyRef, accountRef } = request.params as { partyRef: string; accountRef: string };
+    const user = getUser(request);
+
+    const isOwner = user?.role === 'customer' && user.partyRef === partyRef;
+    const isPrivileged = IBAN_REVEAL_ROLES.has(user?.role ?? '');
+    if (!isOwner && !isPrivileged) {
+      return reply.status(403).send({
+        error: 'IBAN access requires account ownership, L2 investigator, or security auditor role (PCI DSS Req 3.3)',
+      });
+    }
+
+    const account = await getPayoutAccount(fastify.db, accountRef);
+    if (!account || account.partyInstanceReference !== partyRef) {
+      return reply.status(404).send({ error: 'Account not found' });
+    }
+    if (!account.payoutAccountIban) {
+      return reply.status(404).send({ error: 'No IBAN registered for this account' });
+    }
+    return reply.send({ payoutAccountIban: account.payoutAccountIban });
   });
 }

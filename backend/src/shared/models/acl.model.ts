@@ -96,6 +96,7 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       merchants: ['view'],
       fraudCases: ['view', 'investigate'],
       auditEvents: ['view'],
+      accounts: ['view', 'viewSensitive'],  // PCI Req 3.3 — IBAN reveal for fraud investigations
     },
   },
   {

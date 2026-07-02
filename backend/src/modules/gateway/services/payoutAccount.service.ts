@@ -169,17 +169,35 @@ export async function closePayoutAccount(
   return result.modifiedCount === 1;
 }
 
+export interface UpdatePayoutAccountInput {
+  // Preferences
+  payoutAccountAlias?: string;
+  payoutAccountIsDefault?: boolean;
+  // Mutable banking metadata (BIAN SD-66: IBAN / currency / type are immutable)
+  payoutAccountBankName?: string;
+  payoutAccountHolderName?: string;
+  payoutAccountBicSwift?: string;
+  payoutAccountCorrespondentBic?: string;
+  payoutAccountBankAddress?: string;
+}
+
 export async function updatePayoutAccount(
   db: Db,
   accountRef: string,
-  patch: { payoutAccountAlias?: string; payoutAccountIsDefault?: boolean }
+  patch: UpdatePayoutAccountInput,
 ): Promise<PayoutAccountArrangement | null> {
   const col = db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION);
   const now = new Date();
-  // BIAN SD-66: IBAN, currency, payoutAccountType, partyInstanceReference are immutable
+  // BIAN SD-66: payoutAccountIban, payoutAccountRoutingNumber, payoutAccountCurrency,
+  // payoutAccountType, partyInstanceReference are immutable after creation.
   const safePatch: Record<string, unknown> = { recordUpdatedDateTime: now };
   if (patch.payoutAccountAlias !== undefined) safePatch.payoutAccountAlias = patch.payoutAccountAlias;
   if (patch.payoutAccountIsDefault !== undefined) safePatch.payoutAccountIsDefault = patch.payoutAccountIsDefault;
+  if (patch.payoutAccountBankName !== undefined) safePatch.payoutAccountBankName = patch.payoutAccountBankName;
+  if (patch.payoutAccountHolderName !== undefined) safePatch.payoutAccountHolderName = patch.payoutAccountHolderName;
+  if (patch.payoutAccountBicSwift !== undefined) safePatch.payoutAccountBicSwift = patch.payoutAccountBicSwift.toUpperCase();
+  if (patch.payoutAccountCorrespondentBic !== undefined) safePatch.payoutAccountCorrespondentBic = patch.payoutAccountCorrespondentBic.toUpperCase();
+  if (patch.payoutAccountBankAddress !== undefined) safePatch.payoutAccountBankAddress = patch.payoutAccountBankAddress;
   // QE constraint: findOneAndUpdate with returnDocument:'after' uses new:true which is
   // unsupported on encrypted collections. Use updateOne + findOne instead.
   await col.updateOne({ payoutAccountInstanceReference: accountRef }, { $set: safePatch });

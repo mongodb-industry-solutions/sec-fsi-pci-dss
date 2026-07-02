@@ -1417,6 +1417,12 @@ export const api = {
         { method: 'POST', body: JSON.stringify(body) },
         token
       ),
+    revealIban: (partyRef: string, accountRef: string, token: string) =>
+      apiFetch<{ payoutAccountIban: string }>(
+        `/api/v1/accounts/${encodeURIComponent(partyRef)}/${encodeURIComponent(accountRef)}/iban`,
+        {},
+        token
+      ),
     cards: (partyRef: string, accountRef: string, token: string) =>
       apiFetch<{ results: Array<{
         paymentCardInstanceReference: string;

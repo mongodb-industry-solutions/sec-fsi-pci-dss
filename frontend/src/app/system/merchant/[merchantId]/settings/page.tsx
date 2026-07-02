@@ -41,11 +41,17 @@ export default function SettingsSectionPage() {
     if (!ownerPartyRef || !token || payoutAccountsLoaded) return;
     api.accounts.list(ownerPartyRef, token, { status: 'active' })
       .then((r) => {
-        setPayoutAccounts(r.results as unknown as PayoutAccountOption[]);
+        const accts = r.results as unknown as PayoutAccountOption[];
+        setPayoutAccounts(accts);
         setPayoutAccountsLoaded(true);
+        // Auto-select: if no merchant default is set, pre-select the owner's primary account
+        if (!defaultPayoutRef) {
+          const primary = accts.find((a) => a.payoutAccountIsDefault) ?? accts[0];
+          if (primary) setDefaultPayoutRef(primary.payoutAccountInstanceReference);
+        }
       })
       .catch(() => setPayoutAccountsLoaded(true));
-  }, [ownerPartyRef, token, payoutAccountsLoaded]);
+  }, [ownerPartyRef, token, payoutAccountsLoaded, defaultPayoutRef]);
 
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [deactivateReason, setDeactivateReason] = useState('');
@@ -161,36 +167,52 @@ export default function SettingsSectionPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               <span className="flex items-center gap-1.5">
                 <Landmark size={14} className="text-gray-400" />
-                Default Payout Account
+                Settlement payout account
               </span>
             </label>
             <p className="text-xs text-gray-500 mb-2">
-              Payout settlements are credited to this account. Must be one of your active bank accounts (BIAN SD-66).
+              All customer payments and settlements will be credited to this bank account (BIAN SD-66 · SD-89). Choose from your registered active accounts.
             </p>
             {!payoutAccountsLoaded ? (
               <div className="text-xs text-gray-400">Loading accounts…</div>
             ) : payoutAccounts.length === 0 ? (
               <div className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                No active payout accounts found. Register a bank account under Payout Accounts first.
+                No active payout accounts found. Register a bank account under <strong>Payout Accounts</strong> first.
               </div>
             ) : (
-              <select
-                value={defaultPayoutRef}
-                onChange={(e) => { setDefaultPayoutRef(e.target.value); setSaved(false); }}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 w-full max-w-sm"
-              >
-                <option value="">— Not set (fallback to owner default) —</option>
-                {payoutAccounts.map((a) => (
-                  <option key={a.payoutAccountInstanceReference} value={a.payoutAccountInstanceReference}>
-                    {a.payoutAccountAlias || a.payoutAccountBankName || 'Account'} · {a.payoutAccountCurrency}
-                    {a.payoutAccountIsDefault ? ' ★' : ''}
-                  </option>
-                ))}
-              </select>
+              <div className="space-y-2">
+                <select
+                  value={defaultPayoutRef}
+                  onChange={(e) => { setDefaultPayoutRef(e.target.value); setSaved(false); }}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 w-full max-w-md"
+                >
+                  {payoutAccounts.map((a) => (
+                    <option key={a.payoutAccountInstanceReference} value={a.payoutAccountInstanceReference}>
+                      {a.payoutAccountIsDefault ? '★ ' : ''}{a.payoutAccountAlias || a.payoutAccountBankName || 'Account'} · {a.payoutAccountCurrency}
+                    </option>
+                  ))}
+                </select>
+                {/* Preview of selected account */}
+                {defaultPayoutRef && (() => {
+                  const selected = payoutAccounts.find(a => a.payoutAccountInstanceReference === defaultPayoutRef);
+                  if (!selected) return null;
+                  return (
+                    <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                      <Landmark size={12} className="text-gray-400 shrink-0" />
+                      <span className="font-medium text-gray-700">{selected.payoutAccountAlias || selected.payoutAccountBankName || 'Account'}</span>
+                      <span className="text-gray-300">·</span>
+                      <span>{selected.payoutAccountCurrency}</span>
+                      {selected.payoutAccountIsDefault && (
+                        <span className="text-amber-500 font-medium">★ Primary</span>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
             )}
             {debugMode && (
               <p className="text-[10px] font-mono text-gray-400 mt-1">
-                merchantDefaultPayoutAccountReference: FK → payoutAccountArrangement (SD-66). Ownership guard: account.partyInstanceReference must match merchantOwnerPartyReference.
+                merchantDefaultPayoutAccountReference → payoutAccountArrangement (SD-66). Guard: account.partyInstanceReference must equal merchantOwnerPartyReference.
               </p>
             )}
           </div>
