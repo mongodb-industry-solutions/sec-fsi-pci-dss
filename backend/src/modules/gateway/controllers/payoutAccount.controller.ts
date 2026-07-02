@@ -12,7 +12,9 @@ import {
   createPayoutAccount,
   setDefaultPayoutAccount,
   closePayoutAccount,
+  updatePayoutAccount,
 } from '../services/payoutAccount.service';
+import { listAccountMovements, ListMovementsOptions } from '../services/accountMovements.service';
 
 function safeAccount(doc: unknown) {
   // Strip Binary ciphertext fields that were not decrypted (non-L2 client)
@@ -176,5 +178,75 @@ export async function payoutAccountController(fastify: FastifyInstance) {
     const ok = await closePayoutAccount(fastify.db, partyRef, accountRef);
     if (!ok) return reply.status(404).send({ error: 'Account not found or already closed' });
     return reply.send({ payoutAccountInstanceReference: accountRef, payoutAccountStatus: 'closed' });
+  });
+
+  // GET /api/v1/accounts/:partyRef/:accountRef/movements
+  fastify.get('/:partyRef/:accountRef/movements', {
+    preHandler: requirePermission('accounts', 'view'),
+    schema: {
+      tags: ['accounts'],
+      summary: 'List unified account movements (SD-66 ledger)',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['partyRef', 'accountRef'], properties: { partyRef: { type: 'string' }, accountRef: { type: 'string' } } },
+      querystring: {
+        type: 'object',
+        properties: {
+          type: { type: 'string' },
+          direction: { type: 'string', enum: ['debit', 'credit'] },
+          from: { type: 'string' },
+          to: { type: 'string' },
+          page: { type: 'number', default: 1 },
+          limit: { type: 'number', default: 20, maximum: 100 },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const { partyRef, accountRef } = request.params as { partyRef: string; accountRef: string };
+    const user = getUser(request);
+    if (user?.role === 'customer' && user.partyRef !== partyRef) {
+      return reply.status(403).send({ error: 'Access denied' });
+    }
+    const account = await getPayoutAccount(fastify.db, accountRef);
+    if (!account || account.partyInstanceReference !== partyRef) {
+      return reply.status(404).send({ error: 'Account not found' });
+    }
+    const q = request.query as ListMovementsOptions;
+    const result = await listAccountMovements(fastify.db, accountRef, q);
+    return reply.send(result);
+  });
+
+  // PATCH /api/v1/accounts/:partyRef/:accountRef
+  fastify.patch('/:partyRef/:accountRef', {
+    preHandler: requirePermission('accounts', 'manage'),
+    schema: {
+      tags: ['accounts'],
+      summary: 'Update payout account editable fields (SD-66)',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['partyRef', 'accountRef'],
+        properties: { partyRef: { type: 'string' }, accountRef: { type: 'string' } },
+      },
+      body: {
+        type: 'object',
+        properties: {
+          payoutAccountAlias: { type: 'string', maxLength: 60 },
+          payoutAccountIsDefault: { type: 'boolean' },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const { partyRef, accountRef } = request.params as { partyRef: string; accountRef: string };
+    const user = getUser(request);
+    if (user?.role === 'customer' && user.partyRef !== partyRef) {
+      return reply.status(403).send({ error: 'Access denied' });
+    }
+    const account = await getPayoutAccount(fastify.db, accountRef);
+    if (!account || account.partyInstanceReference !== partyRef) {
+      return reply.status(404).send({ error: 'Account not found' });
+    }
+    const body = request.body as { payoutAccountAlias?: string; payoutAccountIsDefault?: boolean };
+    const updated = await updatePayoutAccount(fastify.db, accountRef, body);
+    return reply.send(safeAccount(updated));
   });
 }

@@ -321,6 +321,7 @@ export async function updateMerchant(
     | 'merchantSettlementSchedule'
     | 'merchantAgreementStatus'
     | 'merchantAllowedCurrencies'
+    | 'merchantDefaultPayoutAccountReference'  // E2: self-service payout account (BIAN SD-66 FK)
   >>
 ) {
   const result = await db.collection(MERCHANT_AGREEMENT_COLLECTION).findOneAndUpdate(

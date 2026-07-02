@@ -302,6 +302,7 @@ export async function getCardsByCustomer(db: Db, customerRef: string) {
       paymentCardStatus: 1,
       paymentCardIsPreferred: 1,
       paymentCardAlias: 1,
+      fundingPayoutAccountInstanceReference: 1,
       recordCreatedDateTime: 1,
     })
     .sort({ paymentCardIsPreferred: -1, recordCreatedDateTime: -1 })

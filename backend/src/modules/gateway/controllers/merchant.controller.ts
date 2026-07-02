@@ -4,6 +4,7 @@
 import { FastifyInstance } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, sendTestWebhook, generateApiKey, importApiKey, updateApiKeyLabel, revokeApiKey, reviewMerchantApplication, getMerchantEvents, getMerchantApiKeys } from '../services/merchant.service';
+import { getPayoutAccount } from '../services/payoutAccount.service';
 import { issueMerchantOAuthClient, revokeMerchantOAuthClient, rotateMerchantOAuthClientSecret, updateMerchantOAuthClient } from '../services/merchantOAuth.service';
 import { WebhookService } from '../services/merchantWebhook.service';
 import type { WebhookEventType } from '../models/merchantAgreement.model';
@@ -49,7 +50,7 @@ async function checkOAuthClientAccess(
   const merchant = await getMerchantById(fastify.db, merchantId) as Record<string, unknown> | null;
   if (!merchant) return { status: 404, error: 'Merchant not found' };
   const isOwner = !!user?.partyRef && merchant.merchantOwnerPartyReference === user.partyRef;
-  const isPrivileged = user?.role === 'merchant_officer' || user?.role === 'system_admin';
+  const isPrivileged = user?.role === 'merchant_officer' || user?.role === 'manager';
   if (!isOwner && !isPrivileged) {
     return { status: 403, error: 'Access denied: only the merchant owner, a merchant officer, or a system admin can manage OAuth client configuration.' };
   }
@@ -641,10 +642,12 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
           merchantSettlementSchedule: { type: 'string', enum: ['T+1', 'T+2', 'T+3'] },
           merchantAgreementStatus: { type: 'string', enum: ['active', 'suspended', 'closed'] },
           merchantAllowedCurrencies: { type: 'array', items: { type: 'string' } },
+          merchantDefaultPayoutAccountReference: { type: 'string', description: 'FK → payoutAccountArrangement. Must belong to merchant owner party (E4 guard).' },
         },
       },
       response: {
         200: { type: 'object', additionalProperties: true, description: 'Updated merchant agreement (partial).' },
+        400: { $ref: 'Error#' },
         401: { $ref: 'Error#' },
         403: { $ref: 'Error#' },
         404: { $ref: 'Error#' },
@@ -658,7 +661,7 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
 
     if (!isStaff) {
       // Merchant owner self-service: must own this merchant and may only touch operational fields.
-      const OWNER_FIELDS = ['merchantAllowedCurrencies', 'merchantSettlementSchedule', 'merchantWebhookEndpoint'];
+      const OWNER_FIELDS = ['merchantAllowedCurrencies', 'merchantSettlementSchedule', 'merchantWebhookEndpoint', 'merchantDefaultPayoutAccountReference'];
       if (user?.role !== 'customer' || !user?.partyRef) {
         return reply.status(403).send({ error: 'Access denied: merchant configuration update requires merchant_officer, security_auditor or the merchant owner.' });
       }
@@ -669,6 +672,18 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
       const disallowed = Object.keys(patch).filter((k) => !OWNER_FIELDS.includes(k));
       if (disallowed.length > 0) {
         return reply.status(403).send({ error: `Access denied: merchant owners can only update operational settings (${OWNER_FIELDS.join(', ')}). Risk-governed fields are PSP staff only.` });
+      }
+    }
+
+    // E4: Ownership guard — selected default payout account must belong to the merchant's owner party.
+    // Prevents a merchant from routing payouts to a bank account they don't own (BIAN SD-66 / PCI Req 7).
+    if (patch.merchantDefaultPayoutAccountReference) {
+      const merchant = await getMerchantById(fastify.db, id);
+      if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
+      const account = await getPayoutAccount(fastify.db, patch.merchantDefaultPayoutAccountReference as string);
+      if (!account) return reply.status(404).send({ error: 'Payout account not found' });
+      if (account.partyInstanceReference !== merchant.merchantOwnerPartyReference) {
+        return reply.status(400).send({ error: 'Payout account does not belong to this merchant\'s owner party' });
       }
     }
 
@@ -718,7 +733,7 @@ or new operations are permitted while suspended.
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
 
     const isOwner = !!user?.partyRef && merchant.merchantOwnerPartyReference === user.partyRef;
-    const isPrivileged = user?.role === 'merchant_officer' || user?.role === 'system_admin';
+    const isPrivileged = user?.role === 'merchant_officer' || user?.role === 'manager';
     if (!isOwner && !isPrivileged) {
       return reply.status(403).send({ error: 'Access denied: only the merchant owner, a merchant officer, or a system admin can deactivate a merchant.' });
     }

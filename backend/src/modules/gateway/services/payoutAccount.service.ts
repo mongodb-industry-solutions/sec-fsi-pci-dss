@@ -157,3 +157,21 @@ export async function closePayoutAccount(
   );
   return result.modifiedCount === 1;
 }
+
+export async function updatePayoutAccount(
+  db: Db,
+  accountRef: string,
+  patch: { payoutAccountAlias?: string; payoutAccountIsDefault?: boolean }
+): Promise<PayoutAccountArrangement | null> {
+  const col = db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION);
+  const now = new Date();
+  // BIAN SD-66: IBAN, currency, payoutAccountType, partyInstanceReference are immutable
+  const safePatch: Record<string, unknown> = { recordUpdatedDateTime: now };
+  if (patch.payoutAccountAlias !== undefined) safePatch.payoutAccountAlias = patch.payoutAccountAlias;
+  if (patch.payoutAccountIsDefault !== undefined) safePatch.payoutAccountIsDefault = patch.payoutAccountIsDefault;
+  return col.findOneAndUpdate(
+    { payoutAccountInstanceReference: accountRef },
+    { $set: safePatch },
+    { returnDocument: 'after' }
+  );
+}

@@ -1,20 +1,24 @@
 'use client';
-// BIAN SD-66: Payout Account Arrangement — Customer Accounts Page (v17)
-// PCI DSS Req 3.3: IBAN encrypted at rest with QE:none (not searchable, never indexed).
-// PCI DSS Req 7: customer can only view/manage their own accounts (own-scope enforced in backend).
+// BIAN SD-66: Payout Account — Account List Page (v17 Phase C)
+// PCI DSS Req 3.3: IBAN never shown in full. PCI DSS Req 7: partyRef from JWT enforced server-side.
 
 import { useState, useEffect, useCallback } from 'react';
-import { Landmark, Wallet, CheckCircle2, XCircle, Clock, RefreshCw, Star, StarOff, Trash2, Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Landmark, Filter, Search, X, Plus, CheckCircle2, XCircle, Clock, Star } from 'lucide-react';
 import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
-import { RequirePermission } from '../../../components/RequirePermission';
 import { SectionHeader } from '../../../components/SectionHeader';
+import { Breadcrumb, type Crumb } from '../../../components/Breadcrumb';
 import { Pagination } from '../../../components/Pagination';
+import { RequirePermission } from '../../../components/RequirePermission';
+import { useNotify } from '../../../components/ui/ConfirmProvider';
+import Link from 'next/link';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface PayoutAccount {
   payoutAccountInstanceReference: string;
+  partyInstanceReference: string;
   payoutAccountType: string;
   payoutAccountStatus: string;
   payoutAccountCurrency: string;
@@ -22,21 +26,16 @@ interface PayoutAccount {
   payoutAccountBankName?: string;
   payoutAccountIsDefault: boolean;
   payoutAccountPreferredRail: string;
-  payoutAccountBalance?: {
-    availableAmount: number;
-    pendingAmount: number;
-    reservedAmount: number;
-    currency: string;
-  };
+  payoutAccountCountryCode?: string;
   recordCreatedDateTime: string;
 }
 
-type AccountStatus = 'active' | 'suspended' | 'closed' | '';
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-const STATUS_LABELS: Record<string, string> = {
-  active:    'Active',
-  suspended: 'Suspended',
-  closed:    'Closed',
+const STATUS_CFG: Record<string, { icon: typeof CheckCircle2; cls: string }> = {
+  active:    { icon: CheckCircle2, cls: 'bg-green-50 text-green-700 border-green-200' },
+  suspended: { icon: Clock,        cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  closed:    { icon: XCircle,      cls: 'bg-gray-100 text-gray-500 border-gray-200' },
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -53,317 +52,539 @@ const RAIL_LABELS: Record<string, string> = {
   internal_ledger: 'Internal Ledger',
 };
 
-const PAGE_SIZE = 10;
+const STATUS_OPTIONS = [
+  { value: '', label: 'All statuses' },
+  { value: 'active', label: 'Active' },
+  { value: 'suspended', label: 'Suspended' },
+  { value: 'closed', label: 'Closed' },
+];
 
-// ── Formatters ────────────────────────────────────────────────────────────────
+const TYPE_OPTIONS = [
+  { value: '', label: 'All types' },
+  { value: 'bank_account', label: 'Bank Account' },
+  { value: 'wallet', label: 'Wallet' },
+  { value: 'internal_ledger', label: 'PSP Ledger' },
+];
 
-function fmtAmount(amount: number, currency: string) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 2 }).format(amount);
-}
+const ACCOUNT_TYPE_OPTIONS = [
+  { value: 'bank_account', label: 'Bank Account' },
+  { value: 'wallet', label: 'Wallet' },
+  { value: 'internal_ledger', label: 'PSP Ledger' },
+];
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+const RAIL_OPTIONS = [
+  { value: 'sepa',            label: 'SEPA' },
+  { value: 'ach',             label: 'ACH' },
+  { value: 'local_bank',      label: 'Local Bank' },
+  { value: 'internal_wallet', label: 'Internal Wallet' },
+  { value: 'internal_ledger', label: 'Internal Ledger' },
+];
+
+const CURRENCY_OPTIONS = ['EUR', 'USD', 'GBP', 'CHF', 'SEK', 'DKK', 'NOK', 'PLN'];
+
+// ── Helper components ─────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
-  const cfg = {
-    active:    { icon: CheckCircle2, cls: 'bg-green-50 text-green-700 border-green-200' },
-    suspended: { icon: Clock,        cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-    closed:    { icon: XCircle,      cls: 'bg-gray-100 text-gray-500 border-gray-200' },
-  }[status] ?? { icon: Clock, cls: 'bg-gray-100 text-gray-500 border-gray-200' };
+  const cfg = STATUS_CFG[status] ?? { icon: Clock, cls: 'bg-gray-100 text-gray-500 border-gray-200' };
   const Icon = cfg.icon;
   return (
     <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${cfg.cls}`}>
       <Icon size={11} />
-      {STATUS_LABELS[status] ?? status}
+      {status}
     </span>
   );
 }
 
-interface AccountCardProps {
-  account: PayoutAccount;
-  onSetDefault: (ref: string) => void;
-  onClose: (ref: string) => void;
-  busy: string | null;
+function fmtDate(iso?: string) {
+  if (!iso) return '-';
+  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function AccountCard({ account, onSetDefault, onClose, busy }: AccountCardProps) {
-  const bal = account.payoutAccountBalance;
-  const isBusy = busy === account.payoutAccountInstanceReference;
-  const isActive = account.payoutAccountStatus === 'active';
+// ── Register Account Modal (C2) ───────────────────────────────────────────────
+
+interface RegisterModalProps {
+  partyRef: string;
+  token: string;
+  onClose: () => void;
+  onCreated: () => void;
+}
+
+function RegisterAccountModal({ partyRef, token, onClose, onCreated }: RegisterModalProps) {
+  const notify = useNotify();
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    payoutAccountType: 'bank_account',
+    payoutAccountAlias: '',
+    payoutAccountBankName: '',
+    payoutAccountCurrency: 'EUR',
+    payoutAccountCountryCode: '',
+    payoutAccountPreferredRail: 'sepa',
+  });
+
+  function setField(key: keyof typeof form, value: string) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.payoutAccountCurrency) return;
+    setSubmitting(true);
+    try {
+      await api.accounts.create(
+        partyRef,
+        {
+          payoutAccountType: form.payoutAccountType,
+          payoutAccountCurrency: form.payoutAccountCurrency,
+          ...(form.payoutAccountAlias ? { payoutAccountAlias: form.payoutAccountAlias } : {}),
+          ...(form.payoutAccountBankName ? { payoutAccountBankName: form.payoutAccountBankName } : {}),
+          ...(form.payoutAccountCountryCode ? { payoutAccountCountryCode: form.payoutAccountCountryCode.toUpperCase() } : {}),
+          ...(form.payoutAccountPreferredRail ? { payoutAccountPreferredRail: form.payoutAccountPreferredRail } : {}),
+        },
+        token,
+      );
+      notify('Account registered successfully.', 'success');
+      onCreated();
+      onClose();
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Failed to register account.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
-    <div className={`bg-white rounded-xl border p-4 space-y-3 transition-all ${
-      account.payoutAccountIsDefault ? 'border-[#001E2B]/30 shadow-sm' : 'border-gray-200'
-    }`}>
-      {/* Header row */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className={`p-1.5 rounded-lg shrink-0 ${
-            account.payoutAccountType === 'internal_ledger' ? 'bg-[#001E2B]/10' : 'bg-blue-50'
-          }`}>
-            {account.payoutAccountType === 'internal_ledger'
-              ? <Wallet size={14} className="text-[#001E2B]" />
-              : <Landmark size={14} className="text-blue-600" />
-            }
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-[#001E2B] flex items-center justify-center">
+              <Landmark size={16} className="text-[#00ED64]" />
+            </div>
+            <h2 className="font-bold text-[#001E2B]">Register Payout Account</h2>
           </div>
-          <div className="min-w-0">
-            <p className="font-semibold text-sm text-gray-900 truncate">
-              {account.payoutAccountAlias ?? TYPE_LABELS[account.payoutAccountType] ?? account.payoutAccountType}
-            </p>
-            <p className="text-xs text-gray-400">
-              {RAIL_LABELS[account.payoutAccountPreferredRail] ?? account.payoutAccountPreferredRail}
-              {account.payoutAccountBankName ? ` · ${account.payoutAccountBankName}` : ''}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {account.payoutAccountIsDefault && (
-            <span className="text-xs font-medium bg-[#001E2B] text-[#00ED64] px-2 py-0.5 rounded-full">Default</span>
-          )}
-          <StatusBadge status={account.payoutAccountStatus} />
-        </div>
-      </div>
-
-      {/* Balance panel (v17: PSP internal ledger balance) */}
-      {bal && (
-        <div className="grid grid-cols-3 gap-2 bg-gray-50 rounded-lg p-3">
-          <div className="text-center">
-            <p className="text-[10px] text-gray-500 uppercase tracking-wide">Available</p>
-            <p className="text-sm font-semibold text-green-700 mt-0.5">{fmtAmount(bal.availableAmount, bal.currency)}</p>
-          </div>
-          <div className="text-center border-x border-gray-200">
-            <p className="text-[10px] text-gray-500 uppercase tracking-wide">Pending</p>
-            <p className="text-sm font-semibold text-amber-700 mt-0.5">{fmtAmount(bal.pendingAmount, bal.currency)}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] text-gray-500 uppercase tracking-wide">Reserved</p>
-            <p className="text-sm font-semibold text-gray-600 mt-0.5">{fmtAmount(bal.reservedAmount, bal.currency)}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Currency + account ref */}
-      <div className="flex items-center justify-between text-xs text-gray-400">
-        <span className="font-medium text-gray-600">{account.payoutAccountCurrency}</span>
-        <span className="font-mono truncate max-w-[180px]">{account.payoutAccountInstanceReference}</span>
-      </div>
-
-      {/* Actions (only for active accounts) */}
-      {isActive && (
-        <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
-          {!account.payoutAccountIsDefault && (
-            <button
-              onClick={() => onSetDefault(account.payoutAccountInstanceReference)}
-              disabled={isBusy}
-              className="flex items-center gap-1.5 text-xs font-medium text-[#001E2B] bg-[#001E2B]/5 hover:bg-[#001E2B]/10 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-            >
-              {isBusy ? <RefreshCw size={12} className="animate-spin" /> : <Star size={12} />}
-              Set Default
-            </button>
-          )}
-          <button
-            onClick={() => onClose(account.payoutAccountInstanceReference)}
-            disabled={isBusy}
-            className="flex items-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ml-auto"
-          >
-            {isBusy ? <RefreshCw size={12} className="animate-spin" /> : <Trash2 size={12} />}
-            Close
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <X size={18} />
           </button>
         </div>
-      )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Account type <span className="text-red-500">*</span></label>
+            <select
+              value={form.payoutAccountType}
+              onChange={(e) => setField('payoutAccountType', e.target.value)}
+              required
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
+            >
+              {ACCOUNT_TYPE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nickname / alias</label>
+            <input
+              type="text"
+              value={form.payoutAccountAlias}
+              onChange={(e) => setField('payoutAccountAlias', e.target.value)}
+              placeholder="e.g. Main savings"
+              maxLength={60}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Bank name</label>
+            <input
+              type="text"
+              value={form.payoutAccountBankName}
+              onChange={(e) => setField('payoutAccountBankName', e.target.value)}
+              placeholder="e.g. Deutsche Bank"
+              maxLength={100}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Currency <span className="text-red-500">*</span></label>
+              <select
+                value={form.payoutAccountCurrency}
+                onChange={(e) => setField('payoutAccountCurrency', e.target.value)}
+                required
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
+              >
+                {CURRENCY_OPTIONS.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Country code</label>
+              <input
+                type="text"
+                value={form.payoutAccountCountryCode}
+                onChange={(e) => setField('payoutAccountCountryCode', e.target.value.slice(0, 2))}
+                placeholder="DE"
+                maxLength={2}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Preferred rail</label>
+            <select
+              value={form.payoutAccountPreferredRail}
+              onChange={(e) => setField('payoutAccountPreferredRail', e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
+            >
+              {RAIL_OPTIONS.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 border border-gray-300 text-gray-700 rounded-lg py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 bg-[#001E2B] text-white rounded-lg py-2 text-sm font-medium hover:bg-[#001E2B]/80 transition-colors disabled:opacity-50"
+            >
+              {submitting ? 'Registering…' : 'Register account'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-function AccountsPageContent() {
-  const [partyRef, setPartyRef]       = useState<string | null>(null);
-  const [token, setToken]             = useState('');
+export default function AccountsPage() {
+  const router = useRouter();
+  const notify = useNotify();
 
-  const [accounts, setAccounts]       = useState<PayoutAccount[]>([]);
-  const [total, setTotal]             = useState(0);
-  const [page, setPage]               = useState(1);
-  const [loading, setLoading]         = useState(true);
-  const [filterStatus, setFilterStatus] = useState<AccountStatus>('active');
-  const [busy, setBusy]               = useState<string | null>(null);
-  const [notification, setNotification] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [token, setToken] = useState('');
+  const [partyRef, setPartyRef] = useState('');
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  // List state
+  const [accounts, setAccounts] = useState<PayoutAccount[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
 
-  // Read partyRef from JWT on mount
-  useEffect(() => {
-    const t = getToken() ?? '';
-    setToken(t);
-    const decoded = t ? decodeToken(t) : null;
-    if (decoded?.partyRef) setPartyRef(decoded.partyRef);
-  }, []);
+  // Filter state (two-step search)
+  const [nameInput, setNameInput] = useState('');   // what the user is typing
+  const [search, setSearch] = useState('');          // applied on button click / Enter
+  const [statusFilter, setStatusFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
 
-  function notify(msg: string, ok = true) {
-    setNotification({ msg, ok });
-    setTimeout(() => setNotification(null), 3500);
-  }
+  // Modal state (C2)
+  const [showRegister, setShowRegister] = useState(false);
 
-  const loadAccounts = useCallback(async (targetPage: number) => {
-    if (!partyRef || !token) return;
+  const load = useCallback(async (
+    t: string, pRef: string,
+    pg: number, lim: number, _name: string, status: string, _type: string,
+  ) => {
     setLoading(true);
     try {
-      const res = await api.accounts.list(partyRef, token, {
-        status: filterStatus || undefined,
-        page: targetPage,
-        limit: PAGE_SIZE,
+      const r = await api.accounts.list(pRef, t, {
+        page: pg, limit: lim,
+        ...(status ? { status } : {}),
       });
-      setAccounts(res.results);
-      setTotal(res.total);
+      setAccounts(r.results as unknown as PayoutAccount[]);
+      setTotal(r.total);
     } catch {
       setAccounts([]);
       setTotal(0);
     } finally {
       setLoading(false);
     }
-  }, [partyRef, token, filterStatus]);
+  }, []);
 
-  // Reload when filter changes or partyRef is resolved
   useEffect(() => {
-    if (!partyRef) return;
+    const t = getToken() ?? '';
+    const decoded = t ? decodeToken(t) : null;
+    const pRef = decoded?.partyRef ?? '';
+    if (!t || !pRef) { router.replace('/system'); return; }
+    setToken(t);
+    setPartyRef(pRef);
+    load(t, pRef, 1, 10, '', '', '').finally(() => setReady(true));
+  }, [router, load]);
+
+  function applySearch() {
+    const s = nameInput.trim();
+    setSearch(s);
     setPage(1);
-    loadAccounts(1);
-  }, [partyRef, filterStatus]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function handlePageChange(newPage: number) {
-    setPage(newPage);
-    loadAccounts(newPage);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    load(token, partyRef, 1, limit, s, statusFilter, typeFilter);
   }
 
-  async function handleSetDefault(accountRef: string) {
-    if (!partyRef || !token) return;
-    setBusy(accountRef);
-    try {
-      await api.accounts.setDefault(partyRef, accountRef, token);
-      notify('Default account updated');
-      loadAccounts(page);
-    } catch (e: unknown) {
-      notify((e as Error).message ?? 'Failed to update default account', false);
-    } finally {
-      setBusy(null);
-    }
+  function clearSearch() {
+    setNameInput('');
+    setSearch('');
+    setPage(1);
+    load(token, partyRef, 1, limit, '', statusFilter, typeFilter);
   }
 
-  async function handleClose(accountRef: string) {
-    if (!partyRef || !token) return;
-    if (!window.confirm('Close this payout account? This action cannot be undone.')) return;
-    setBusy(accountRef);
-    try {
-      await api.accounts.close(partyRef, accountRef, token);
-      notify('Account closed');
-      loadAccounts(page);
-    } catch (e: unknown) {
-      notify((e as Error).message ?? 'Failed to close account', false);
-    } finally {
-      setBusy(null);
-    }
+  function handleStatusChange(v: string) {
+    setStatusFilter(v);
+    setPage(1);
+    load(token, partyRef, 1, limit, search, v, typeFilter);
   }
 
-  return (
-    <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
-      <SectionHeader
-        icon={Landmark}
-        title="Payout Accounts"
-        description="Manage your bank accounts and PSP wallets for receiving payouts"
-        debugInfo="BIAN SD-66 Payout Account Arrangement · PCI DSS Req 3.3 (IBAN QE:none, AES-256-CBC)"
-        info="IBAN and routing numbers are encrypted at rest with MongoDB Queryable Encryption and are never returned in API responses. Balances shown are from the PSP internal ledger."
-        actions={
-          <button
-            disabled
-            title="Self-service account registration coming in a future iteration"
-            className="flex items-center gap-1.5 text-xs font-medium text-gray-400 border border-gray-200 bg-white px-3 py-1.5 rounded-lg cursor-not-allowed"
-          >
-            <Plus size={13} />
-            Add Account
-          </button>
-        }
-      />
+  function handleTypeChange(v: string) {
+    setTypeFilter(v);
+    setPage(1);
+    load(token, partyRef, 1, limit, search, statusFilter, v);
+  }
 
-      {/* Toast notification */}
-      {notification && (
-        <div className={`rounded-lg px-3 py-2 text-sm font-medium ${
-          notification.ok
-            ? 'bg-green-50 text-green-700 border border-green-200'
-            : 'bg-red-50 text-red-700 border border-red-200'
-        }`}>
-          {notification.msg}
-        </div>
-      )}
+  function handlePageChange(p: number) {
+    setPage(p);
+    load(token, partyRef, p, limit, search, statusFilter, typeFilter);
+  }
 
-      {/* Filters + count */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <span className="text-sm text-gray-500">Filter:</span>
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value as AccountStatus)}
-          className="border rounded-lg px-3 py-1.5 text-sm"
-        >
-          <option value="">All Status</option>
-          {(['active', 'suspended', 'closed'] as AccountStatus[]).map((s) => (
-            <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-          ))}
-        </select>
-        <span className="text-sm text-gray-500 ml-auto">
-          {total} account{total !== 1 ? 's' : ''}
-        </span>
-      </div>
+  function handleLimitChange(lim: number) {
+    setLimit(lim);
+    setPage(1);
+    load(token, partyRef, 1, lim, search, statusFilter, typeFilter);
+  }
 
-      {/* Account cards grid */}
-      {loading ? (
-        <div className="text-center py-10 text-gray-400">Loading accounts…</div>
-      ) : accounts.length === 0 ? (
-        <div className="bg-white rounded-xl border border-dashed border-gray-200 p-10 text-center">
-          <Landmark size={32} className="text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">No payout accounts found</p>
-          {filterStatus && (
-            <button onClick={() => setFilterStatus('')} className="mt-2 text-xs text-[#001E2B] underline">
-              Clear filter
-            </button>
-          )}
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {accounts.map((account) => (
-              <AccountCard
-                key={account.payoutAccountInstanceReference}
-                account={account}
-                onSetDefault={handleSetDefault}
-                onClose={handleClose}
-                busy={busy}
-              />
-            ))}
-          </div>
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            total={total}
-            limit={PAGE_SIZE}
-            onPageChange={handlePageChange}
-            noun="accounts"
-          />
-        </>
-      )}
+  function handleRefresh() {
+    load(token, partyRef, page, limit, search, statusFilter, typeFilter);
+  }
 
-      {/* Debug: no partyRef */}
-      {!partyRef && !loading && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-700">
-          No partyRef in JWT. This page requires a customer account with a party record.
-        </div>
-      )}
-    </div>
-  );
-}
+  const crumbs: Crumb[] = [
+    { label: 'Home', href: '/system' },
+    { label: 'Accounts' },
+  ];
 
-export default function AccountsPage() {
+  const totalPages = Math.ceil(total / limit);
+  const hasFilters = search || statusFilter || typeFilter;
+
   return (
     <RequirePermission resource="accounts" action="view">
-      <AccountsPageContent />
+      <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
+        {ready && <Breadcrumb items={crumbs} />}
+
+        <SectionHeader
+          icon={Landmark}
+          title="Payout Accounts"
+          description="Manage your registered payout and settlement accounts (BIAN SD-66)."
+          debugInfo="BIAN SD-66 Payout Account · PCI DSS Req 3.3 (IBAN encrypted QE) · Req 7 (partyRef JWT-scoped) · Req 10 (audited)"
+        />
+
+        {/* Register Account button (C2) */}
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setShowRegister(true)}
+            className="inline-flex items-center gap-2 bg-[#001E2B] hover:bg-[#001E2B]/80 text-[#00ED64] font-medium px-4 py-2 rounded-lg transition-colors text-sm"
+          >
+            <Plus size={15} />
+            Register Account
+          </button>
+        </div>
+
+        {/* Filter row (C1) */}
+        <div className="bg-white rounded-xl border p-4 space-y-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            <Filter size={13} />
+            Filter accounts
+          </div>
+
+          {/* Search row */}
+          <div className="flex gap-2 flex-wrap">
+            <div className="flex flex-1 min-w-[200px] gap-0">
+              <input
+                type="text"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && applySearch()}
+                placeholder="Search by alias or bank name…"
+                className="flex-1 border border-gray-300 rounded-l-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 focus:border-[#00ED64]"
+              />
+              <button
+                type="button"
+                onClick={applySearch}
+                className="border border-l-0 border-gray-300 bg-[#001E2B] text-[#00ED64] rounded-r-lg px-3 py-2 hover:bg-[#001E2B]/80 transition-colors"
+              >
+                <Search size={15} />
+              </button>
+            </div>
+            {search && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-2.5 py-2 transition-colors"
+              >
+                <X size={12} /> Clear search
+              </button>
+            )}
+          </div>
+
+          {/* Dropdowns row */}
+          <div className="flex gap-2 flex-wrap">
+            <select
+              value={statusFilter}
+              onChange={(e) => handleStatusChange(e.target.value)}
+              className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
+            >
+              {STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <select
+              value={typeFilter}
+              onChange={(e) => handleTypeChange(e.target.value)}
+              className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
+            >
+              {TYPE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={() => {
+                  setNameInput('');
+                  setSearch('');
+                  setStatusFilter('');
+                  setTypeFilter('');
+                  setPage(1);
+                  load(token, partyRef, 1, limit, '', '', '');
+                }}
+                className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-800 border border-red-200 rounded-lg px-2.5 py-1.5 transition-colors"
+              >
+                <X size={12} /> Clear all filters
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Accounts list */}
+        {!ready ? (
+          <div className="text-sm text-gray-400">Loading…</div>
+        ) : (
+          <div className="bg-white rounded-xl border overflow-hidden">
+            {loading && (
+              <div className="px-5 py-2 text-xs text-gray-400 border-b bg-gray-50">Refreshing…</div>
+            )}
+
+            {accounts.length === 0 && !loading ? (
+              <div className="p-8 text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto">
+                  <Landmark size={22} className="text-gray-400" />
+                </div>
+                <p className="text-sm text-gray-500">
+                  {hasFilters ? 'No accounts match the current filters.' : 'No payout accounts registered yet.'}
+                </p>
+                {!hasFilters && (
+                  <button
+                    type="button"
+                    onClick={() => setShowRegister(true)}
+                    className="inline-flex items-center gap-2 text-sm text-[#001E2B] font-medium border border-[#001E2B] rounded-lg px-4 py-2 hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors"
+                  >
+                    <Plus size={14} /> Register first account
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="divide-y">
+                {accounts.map((acc) => {
+                  const label = acc.payoutAccountAlias || acc.payoutAccountBankName || acc.payoutAccountInstanceReference;
+                  return (
+                    <Link
+                      key={acc.payoutAccountInstanceReference}
+                      href={`/system/accounts/${acc.payoutAccountInstanceReference}`}
+                      className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors group"
+                    >
+                      {/* Icon */}
+                      <div className="w-9 h-9 rounded-lg bg-[#001E2B]/8 flex items-center justify-center shrink-0 group-hover:bg-[#001E2B] transition-colors">
+                        <Landmark size={16} className="text-[#001E2B] group-hover:text-[#00ED64] transition-colors" />
+                      </div>
+
+                      {/* Main info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm text-gray-900 truncate">{label}</span>
+                          {acc.payoutAccountIsDefault && (
+                            <span className="inline-flex items-center gap-0.5 text-xs text-amber-500">
+                              <Star size={11} className="fill-amber-400 text-amber-400" /> Default
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500 flex-wrap">
+                          <span>{TYPE_LABELS[acc.payoutAccountType] ?? acc.payoutAccountType}</span>
+                          <span className="text-gray-300">·</span>
+                          <span>{acc.payoutAccountCurrency}</span>
+                          <span className="text-gray-300">·</span>
+                          <span>{RAIL_LABELS[acc.payoutAccountPreferredRail] ?? acc.payoutAccountPreferredRail}</span>
+                          {acc.payoutAccountCountryCode && (
+                            <>
+                              <span className="text-gray-300">·</span>
+                              <span>{acc.payoutAccountCountryCode}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right side */}
+                      <div className="flex items-center gap-3 shrink-0">
+                        <StatusBadge status={acc.payoutAccountStatus} />
+                        <span className="text-xs text-gray-400 hidden sm:block">{fmtDate(acc.recordCreatedDateTime)}</span>
+                        <svg className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {total > 0 && (
+              <div className="px-5 py-3 border-t bg-gray-50">
+                <Pagination
+                  page={page}
+                  totalPages={totalPages}
+                  total={total}
+                  limit={limit}
+                  onPageChange={handlePageChange}
+                  onLimitChange={handleLimitChange}
+                  limitOptions={[10, 20, 50]}
+                  noun="accounts"
+                  variant="light"
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Register Account modal (C2) */}
+      {showRegister && (
+        <RegisterAccountModal
+          partyRef={partyRef}
+          token={token}
+          onClose={() => setShowRegister(false)}
+          onCreated={handleRefresh}
+        />
+      )}
     </RequirePermission>
   );
 }

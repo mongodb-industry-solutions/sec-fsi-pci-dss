@@ -1399,6 +1399,39 @@ export const api = {
         { method: 'DELETE' },
         token,
       ),
+    get: (partyRef: string, accountRef: string, token: string) =>
+      apiFetch<Record<string, unknown>>(
+        `/api/v1/accounts/${encodeURIComponent(partyRef)}/${encodeURIComponent(accountRef)}`,
+        {},
+        token
+      ),
+    update: (partyRef: string, accountRef: string, body: { payoutAccountAlias?: string; payoutAccountIsDefault?: boolean }, token: string) =>
+      apiFetch<Record<string, unknown>>(
+        `/api/v1/accounts/${encodeURIComponent(partyRef)}/${encodeURIComponent(accountRef)}`,
+        { method: 'PATCH', body: JSON.stringify(body) },
+        token
+      ),
+    create: (partyRef: string, body: Record<string, unknown>, token: string) =>
+      apiFetch<Record<string, unknown>>(
+        `/api/v1/accounts/${encodeURIComponent(partyRef)}`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token
+      ),
+    movements: (partyRef: string, accountRef: string, token: string, params?: { type?: string; direction?: string; from?: string; to?: string; page?: number; limit?: number }) => {
+      const qs = new URLSearchParams();
+      if (params?.type) qs.set('type', params.type);
+      if (params?.direction) qs.set('direction', params.direction);
+      if (params?.from) qs.set('from', params.from);
+      if (params?.to) qs.set('to', params.to);
+      if (params?.page) qs.set('page', String(params.page));
+      if (params?.limit) qs.set('limit', String(params.limit));
+      const q = qs.toString();
+      return apiFetch<{ movements: Record<string, unknown>[]; total: number }>(
+        `/api/v1/accounts/${encodeURIComponent(partyRef)}/${encodeURIComponent(accountRef)}/movements${q ? `?${q}` : ''}`,
+        {},
+        token
+      );
+    },
   },
 
   executions: {
