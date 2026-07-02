@@ -14,7 +14,8 @@
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2025-07-26T12:00:00.000Z",
     "schemaVersion": 1,
-    "paymentCardCustomerNote": "Travel card — low FX fees."
+    "paymentCardCustomerNote": "Travel card — low FX fees.",
+    "fundingPayoutAccountInstanceReference": "pao00001-0000-4000-8000-000000000001"
   },
   {
     "paymentCardInstanceReference": "ec55cc1f-b01c-4319-8c38-4270045439cc",
@@ -31,7 +32,8 @@
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2025-02-11T12:00:00.000Z",
     "schemaVersion": 1,
-    "paymentCardCustomerNote": "Use only for online purchases."
+    "paymentCardCustomerNote": "Use only for online purchases.",
+    "fundingPayoutAccountInstanceReference": "pao00001-0000-4000-8000-000000000001"
   },
   {
     "paymentCardInstanceReference": "53eccfa6-5fe0-4cb3-9adb-66054e9fc07a",
@@ -48,7 +50,8 @@
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2025-01-22T12:00:00.000Z",
     "schemaVersion": 1,
-    "paymentCardCustomerNote": "Travel card — low FX fees."
+    "paymentCardCustomerNote": "Travel card — low FX fees.",
+    "fundingPayoutAccountInstanceReference": "pao00001-0000-4000-8000-000000000001"
   },
   {
     "paymentCardInstanceReference": "ecd3b70c-ce30-44f8-8d56-fd191015b973",
@@ -65,7 +68,8 @@
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2025-06-10T12:00:00.000Z",
     "schemaVersion": 1,
-    "paymentCardCustomerNote": "Shared household expenses."
+    "paymentCardCustomerNote": "Shared household expenses.",
+    "fundingPayoutAccountInstanceReference": "pao00001-0000-4000-8000-000000000001"
   },
   {
     "paymentCardInstanceReference": "7601f4d6-bfda-49fa-8a53-f0d91cc13ca6",
@@ -82,7 +86,8 @@
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2025-03-27T12:00:00.000Z",
     "schemaVersion": 1,
-    "paymentCardCustomerNote": "Use only for online purchases."
+    "paymentCardCustomerNote": "Use only for online purchases.",
+    "fundingPayoutAccountInstanceReference": "pau00002-0000-4000-8000-000000000002"
   },
   {
     "paymentCardInstanceReference": "287fb863-58cc-416a-bb26-00de3478b04c",
@@ -99,7 +104,8 @@
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2025-08-19T12:00:00.000Z",
     "schemaVersion": 1,
-    "paymentCardCustomerNote": "Use only for online purchases."
+    "paymentCardCustomerNote": "Use only for online purchases.",
+    "fundingPayoutAccountInstanceReference": "pau00002-0000-4000-8000-000000000002"
   },
   {
     "paymentCardInstanceReference": "29bb6b39-459d-46f0-a148-6e13464779b8",
@@ -115,7 +121,8 @@
     "bianServiceDomain": "Payment Card",
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2025-05-29T12:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "fundingPayoutAccountInstanceReference": "pau00002-0000-4000-8000-000000000002"
   },
   {
     "paymentCardInstanceReference": "c249551b-0d24-41a1-8ac7-9653076515ae",
@@ -132,7 +139,8 @@
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2024-10-28T12:00:00.000Z",
     "schemaVersion": 1,
-    "paymentCardCustomerNote": "Use only for online purchases."
+    "paymentCardCustomerNote": "Use only for online purchases.",
+    "fundingPayoutAccountInstanceReference": "pau00002-0000-4000-8000-000000000002"
   },
   {
     "paymentCardInstanceReference": "fda99131-4ad6-4422-9c3d-2df0ba371f5b",
@@ -2883,7 +2891,8 @@
     "bianServiceDomain": "Payment Card",
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2026-04-20T12:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "fundingPayoutAccountInstanceReference": "pau00005-0000-4000-8000-000000000005"
   },
   {
     "paymentCardInstanceReference": "4a55d889-0cbe-47a1-b33e-e5b34e86cd66",
@@ -2899,7 +2908,8 @@
     "bianServiceDomain": "Payment Card",
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2025-02-18T12:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "fundingPayoutAccountInstanceReference": "pau00005-0000-4000-8000-000000000005"
   },
   {
     "paymentCardInstanceReference": "2e9475fd-df74-4151-b773-a0a182036f5c",
@@ -2915,7 +2925,8 @@
     "bianServiceDomain": "Payment Card",
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2025-06-02T12:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "fundingPayoutAccountInstanceReference": "pau00005-0000-4000-8000-000000000005"
   },
   {
     "paymentCardInstanceReference": "b04d3217-8634-4043-bff1-12fdfe03fccd",
@@ -3097,7 +3108,8 @@
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2025-11-09T12:00:00.000Z",
     "schemaVersion": 1,
-    "paymentCardCustomerNote": "Use only for online purchases."
+    "paymentCardCustomerNote": "Use only for online purchases.",
+    "fundingPayoutAccountInstanceReference": "pao00002-0000-4000-8000-000000000002"
   },
   {
     "paymentCardInstanceReference": "99cb36b7-772f-4d4b-acb0-ae92272ccd47",
@@ -3114,7 +3126,8 @@
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2025-10-08T12:00:00.000Z",
     "schemaVersion": 1,
-    "paymentCardCustomerNote": "Main card for recurring bills."
+    "paymentCardCustomerNote": "Main card for recurring bills.",
+    "fundingPayoutAccountInstanceReference": "pao00002-0000-4000-8000-000000000002"
   },
   {
     "paymentCardInstanceReference": "9cc9ea38-ca13-4a71-8a34-a6edc0146c63",
@@ -3130,7 +3143,8 @@
     "bianServiceDomain": "Payment Card",
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2024-11-18T12:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "fundingPayoutAccountInstanceReference": "pao00002-0000-4000-8000-000000000002"
   },
   {
     "paymentCardInstanceReference": "3a408e11-e75d-4cdd-ade7-efac063cbf7f",
@@ -3146,7 +3160,8 @@
     "bianServiceDomain": "Payment Card",
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2025-04-25T12:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "fundingPayoutAccountInstanceReference": "pao00002-0000-4000-8000-000000000002"
   },
   {
     "paymentCardInstanceReference": "1f89f4f5-8a5b-440c-bb82-3d0deac61c76",
@@ -3162,7 +3177,8 @@
     "bianServiceDomain": "Payment Card",
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2025-09-29T12:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "fundingPayoutAccountInstanceReference": "pao00001-0000-4000-8000-000000000001"
   },
   {
     "paymentCardInstanceReference": "3333efba-3c78-49a2-ab81-352c67f4a224",
@@ -3178,7 +3194,8 @@
     "bianServiceDomain": "Payment Card",
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2025-11-08T12:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "fundingPayoutAccountInstanceReference": "pau00002-0000-4000-8000-000000000002"
   },
   {
     "paymentCardInstanceReference": "05f0f9eb-9470-4837-ae75-b59a731b5590",
