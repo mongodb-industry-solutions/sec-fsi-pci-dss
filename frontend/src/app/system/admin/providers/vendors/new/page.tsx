@@ -5,18 +5,14 @@ import Link from 'next/link';
 import { ArrowLeft, KeyRound } from 'lucide-react';
 import { api } from '../../../../../../lib/api';
 import { getToken } from '../../../../../../lib/auth';
+import { CAPABILITY_LIST } from '../../../../../../config/capabilities';
 
-const TYPE_OPTIONS = [
-  { value: 'fraud_detection',   label: 'Fraud Detection',     hint: 'SD-63' },
-  { value: 'hrp_sanctions',     label: 'HRP / Sanctions',     hint: 'SD-13' },
-  { value: 'kyc_identity',      label: 'KYC / Identity',      hint: 'SD-53' },
-  { value: 'kyb_business',      label: 'KYB / Business',      hint: 'SD-89' },
-  { value: 'aml_monitoring',    label: 'AML Monitoring',      hint: 'SD-99' },
-  { value: 'credit_bureau',     label: 'Credit Bureau',       hint: 'SD-83' },
-  { value: 'card_authorization', label: 'Card Authorization', hint: 'SD-15' },
-  { value: 'card_issuer',       label: 'Card Issuer',         hint: 'SD-88' },
-  { value: 'generic',           label: 'Generic',             hint: 'SD-193' },
-];
+// Derived from capabilities.ts — single source of truth.
+const TYPE_OPTIONS = CAPABILITY_LIST.map((c) => ({
+  value: c.providerType,
+  label: c.label,
+  hint:  c.bianServiceDomain.split(' ').slice(0, 2).join(' '),  // e.g. "SD-36"
+}));
 
 const AUTH_OPTIONS = [
   { value: 'bearer',    label: 'Bearer Token' },
@@ -34,6 +30,8 @@ const DEFAULT_CATEGORY_CONFIGS: Record<string, Record<string, unknown>> = {
   credit_bureau:      { bureauName: '', bureauRegion: 'US', pullTypes: ['soft'], defaultPullType: 'soft', scoreRangeMin: 300, scoreRangeMax: 850, consentRequired: true, refreshFrequencyDays: 90, jurisdictions: [] },
   card_authorization: { merchantCode: '', signatureVersion: 'HMAC_SHA256', enableThreeDS: false, mockMode: false, simulatorMode: 'scenario_driven' },
   card_issuer:        { cardNetworks: ['visa', 'mastercard'], cvvValidationEnabled: true, pinValidationEnabled: false, mockMode: false, pinBlockFormat: 'ISO-0' },
+  account_information: { alwaysVerifyActive: true, returnInternalBalance: true, identityCheckEnabled: true },
+  payment_initiation:  { alwaysSucceed: true, settlementDelayT0Ms: 0, settlementDelayT1Ms: 3000, settlementDelayT2Ms: 6000, settlementDelayT3Ms: 9000 },
   generic:            { categoryLabel: '', customEventTypes: [], description: '' },
 };
 

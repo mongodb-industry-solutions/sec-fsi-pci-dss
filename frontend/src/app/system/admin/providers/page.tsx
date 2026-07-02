@@ -12,6 +12,11 @@ import { ROLE_LABELS } from '../../../../lib/constants';
 import { Pagination } from '../../../../components/Pagination';
 import { useNotify } from '../../../../components/ui/ConfirmProvider';
 import { SectionHeader } from '../../../../components/SectionHeader';
+import { CAPABILITY_LIST } from '../../../../config/capabilities';
+
+const TYPE_LABEL: Record<string, string> = Object.fromEntries(
+  CAPABILITY_LIST.map((c) => [c.providerType, c.label])
+);
 
 interface Integration {
   externalProviderArrangementInstanceReference: string;
@@ -30,16 +35,6 @@ interface Integration {
   pciDssRequirements: string[];
   recordCreatedDateTime: string;
 }
-
-const TYPE_LABEL: Record<string, string> = {
-  fraud_detection: 'Fraud Detection',
-  hrp_sanctions:   'HRP / Sanctions',
-  kyc_identity:    'KYC / Identity',
-  kyb_business:    'KYB / Business',
-  aml_monitoring:  'AML Monitoring',
-  credit_bureau:   'Credit Bureau',
-  generic:         'Generic',
-};
 
 const STATUS_LABEL: Record<string, string> = {
   active:    'Active',

@@ -8,13 +8,19 @@ import { getToken, decodeToken } from '../../../../../lib/auth';
 import { SectionHeader } from '../../../../../components/SectionHeader';
 import { Pagination } from '../../../../../components/Pagination';
 import { useConfirm, useNotify } from '../../../../../components/ui/ConfirmProvider';
-import { byProviderType } from '../../../../../config/capabilities';
+import { byProviderType, CAPABILITY_LIST } from '../../../../../config/capabilities';
 
 // Map a routing group's provider type to its capability admin page (clicking a group card opens it).
 function capabilityHref(providerType: string): string | null {
   const cap = byProviderType(providerType)?.capability;
   return cap && cap !== 'generic' ? `/system/admin/providers/${cap}` : null;
 }
+
+// Derived from capabilities.ts — single source of truth; no manual sync needed.
+const PROVIDER_TYPES = CAPABILITY_LIST.map((c) => c.providerType);
+const TYPE_LABEL: Record<string, string> = Object.fromEntries(
+  CAPABILITY_LIST.map((c) => [c.providerType, c.label])
+);
 
 interface Member {
   externalProviderArrangementInstanceReference: string;
@@ -38,15 +44,6 @@ interface Provider {
   externalProviderArrangementStatus?: string;
 }
 
-const PROVIDER_TYPES = [
-  'fraud_detection', 'aml_monitoring', 'kyc_identity', 'kyb_business',
-  'hrp_sanctions', 'credit_bureau', 'card_authorization', 'card_issuer', 'generic',
-];
-const TYPE_LABEL: Record<string, string> = {
-  fraud_detection: 'Fraud Detection', aml_monitoring: 'AML Monitoring', kyc_identity: 'KYC / Identity',
-  kyb_business: 'KYB / Business', hrp_sanctions: 'HRP / Sanctions', credit_bureau: 'Credit Bureau',
-  card_authorization: 'Card Authorization', card_issuer: 'Card Issuer', generic: 'Generic',
-};
 const STRATEGIES = ['primary_fallback', 'round_robin', 'weighted', 'parallel'];
 const STRATEGY_LABEL: Record<string, string> = {
   primary_fallback: 'Primary / Fallback', round_robin: 'Round Robin', weighted: 'Weighted', parallel: 'Parallel',

@@ -163,6 +163,38 @@ export const CATEGORY_CONTRACTS: Record<string, CategoryContract> = {
     ],
   },
 
+  account_information: {
+    inputs: [
+      { name: 'payoutAccountArrangementInstanceReference', type: 'string (UUID)', description: 'Internal PSP payout account reference', required: true },
+      { name: 'verificationContext',                       type: 'string',        description: 'Context: payout_pre_check | account_registration | balance_inquiry', required: true },
+    ],
+    outputs: [
+      { name: 'accountStatus',          type: 'string',  description: 'Internal account status: active | suspended | closed', required: true },
+      { name: 'availableBalance',       type: 'number',  description: 'Available balance in minor currency units', required: true },
+      { name: 'currency',               type: 'string (ISO 4217)', description: 'Account currency', required: true },
+      { name: 'pendingBalance',         type: 'number',  description: 'Pending (reserved) balance amount', required: false },
+      { name: 'accountVerified',        type: 'boolean', description: 'Whether the account passed status and identity checks', required: true },
+      { name: 'verificationReference',  type: 'string',  description: 'Internal verification reference for audit trail', required: true },
+    ],
+  },
+
+  payment_initiation: {
+    inputs: [
+      { name: 'payoutOrderInstanceReference',              type: 'string (UUID)', description: 'PSP payout order reference', required: true },
+      { name: 'payoutAccountArrangementInstanceReference', type: 'string (UUID)', description: 'Source payout account reference', required: true },
+      { name: 'paymentAmount',                             type: 'number',        description: 'Transfer amount in minor currency units', required: true },
+      { name: 'paymentCurrency',                           type: 'string (ISO 4217)', description: 'Currency code e.g. USD, EUR', required: true },
+      { name: 'paymentRail',                               type: 'string',        description: 'Rail: sepa | ach | internal | faster_payments', required: true },
+      { name: 'settlementWindow',                          type: 'string',        description: 'Target settlement window: T+0 | T+1 | T+2 | T+3', required: false },
+    ],
+    outputs: [
+      { name: 'paymentInitiationReference', type: 'string',        description: 'PISP initiation reference (external tracking)', required: true },
+      { name: 'paymentStatus',              type: 'string',        description: 'Initial status: accepted | pending | failed', required: true },
+      { name: 'settlementExpectedAt',       type: 'string (ISO 8601)', description: 'Expected settlement timestamp', required: false },
+      { name: 'responseCode',               type: 'string',        description: 'Payment rail response code', required: false },
+    ],
+  },
+
   generic: {
     inputs: [
       { name: 'subjectReference', type: 'string', description: 'Reference to the subject entity (configurable)', required: true },
@@ -219,5 +251,15 @@ export const CATEGORY_TRIGGER_EVENTS: Record<string, TriggerEvent[]> = {
     { event: 'checkout.cvv.validation',   description: 'CVV2/CVC2 validation check triggered during checkout' },
     { event: 'payment.pin.verification',  description: 'PIN verification requested for POS or high-value transaction' },
     { event: 'card.activation.cvv',       description: 'CVV check required as part of card activation workflow' },
+  ],
+  account_information: [
+    { event: 'payout.pre_check',                description: 'Pre-payout validation: verifies account is active and has sufficient balance' },
+    { event: 'account.registration.verify',     description: 'Account status check triggered when a customer registers a new bank account' },
+    { event: 'balance.inquiry.requested',       description: 'Explicit balance inquiry requested from the payout account management UI' },
+  ],
+  payment_initiation: [
+    { event: 'payout.disbursement.initiated',   description: 'Payout disbursement initiated via the payout orchestration pipeline' },
+    { event: 'payout.settlement.t0',            description: 'Instant T+0 settlement leg triggered for eligible rails' },
+    { event: 'payout.settlement.retry',         description: 'Settlement retry triggered after a transient PISP failure' },
   ],
 };
