@@ -62,7 +62,7 @@ export async function listRoutingGroups(
   if (filter?.type) query['routingGroupProviderType'] = filter.type;
   return db.collection<IntegrationRoutingGroup>(EXTERNAL_PROVIDER_ARRANGEMENT_PORTFOLIO_COLLECTION)
     .find(query)
-    .sort({ recordCreatedDateTime: 1 })
+    .sort({ isDefaultGroup: -1, recordCreatedDateTime: 1 })
     .toArray();
 }
 

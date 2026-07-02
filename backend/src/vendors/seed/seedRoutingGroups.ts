@@ -129,11 +129,12 @@ export async function seedRoutingGroups(db: Db): Promise<void> {
       recordUpdatedDateTime: now,
     };
 
-    await groupsCol.updateOne(
+    const result = await groupsCol.updateOne(
       { routingGroupInstanceReference: def.id },
       { $setOnInsert: group },
       { upsert: true }
     );
+    console.log(`  routingGroup [${def.type}]: ${result.upsertedCount ? 'created' : 'already exists'} (id: ${def.id})`);
 
     // Bind internal provider to this default group (idempotent)
     if (internal) {

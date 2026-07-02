@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Network, Plus, Trash2, Users, Search, Star, ChevronDown, ChevronRight, Power } from 'lucide-react';
+import { Network, Plus, Trash2, Users, Search, Star, ChevronDown, ChevronRight, Power, Filter, X } from 'lucide-react';
 import { api } from '../../../../../lib/api';
 import { getToken, decodeToken } from '../../../../../lib/auth';
 import { SectionHeader } from '../../../../../components/SectionHeader';
@@ -48,7 +48,7 @@ const STRATEGIES = ['primary_fallback', 'round_robin', 'weighted', 'parallel'];
 const STRATEGY_LABEL: Record<string, string> = {
   primary_fallback: 'Primary / Fallback', round_robin: 'Round Robin', weighted: 'Weighted', parallel: 'Parallel',
 };
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 9;
 
 export default function RoutingGroupsPage() {
   const router = useRouter();
@@ -68,10 +68,12 @@ export default function RoutingGroupsPage() {
   const [creating, setCreating] = useState(false);
 
   // Filters
-  const [search, setSearch] = useState('');
+  const [nameInput, setNameInput]   = useState('');
+  const [search, setSearch]         = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [page, setPage] = useState(1);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [page, setPage]             = useState(1);
+  const [pageSize, setPageSize]     = useState(PAGE_SIZE);
+  const [busy, setBusy]             = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null); // custom-group member/strategy editor
 
   useEffect(() => {
@@ -173,9 +175,13 @@ export default function RoutingGroupsPage() {
     });
   }, [groups, search, typeFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage   = Math.min(page, totalPages);
+  const paginated  = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const hasFilters = !!search || !!typeFilter;
+
+  function handleSearch() { setSearch(nameInput.trim()); setPage(1); }
+  function handleClear()  { setNameInput(''); setSearch(''); setTypeFilter(''); setPage(1); }
 
   const providerName = (id: string) =>
     providers.find((p) => p.externalProviderArrangementInstanceReference === id)?.externalProviderArrangementName ?? id;
@@ -221,17 +227,46 @@ export default function RoutingGroupsPage() {
       </div>
 
       {/* Filter + search */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search by group name…"
-            className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
+      <div className="bg-white rounded-xl border p-4 space-y-3">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            placeholder="Search by group name…"
+            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+          />
+          <button
+            onClick={handleSearch}
+            disabled={!nameInput.trim()}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold disabled:opacity-50"
+          >
+            <Search size={14} />
+            <span className="hidden sm:inline">Search</span>
+          </button>
+          {hasFilters && (
+            <button
+              onClick={handleClear}
+              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50"
+            >
+              <X size={14} />
+              <span className="hidden sm:inline">Clear</span>
+            </button>
+          )}
         </div>
-        <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }} className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white">
-          <option value="">All types</option>
-          {PROVIDER_TYPES.map((t) => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
-        </select>
-        <span className="text-gray-400 text-sm ml-auto">{filtered.length} group{filtered.length !== 1 ? 's' : ''}</span>
+        <div className="flex gap-3 flex-wrap items-center">
+          <Filter size={14} className="text-gray-400 shrink-0" />
+          <select
+            value={typeFilter}
+            onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
+            className="border rounded-lg px-3 py-1.5 text-sm bg-white"
+          >
+            <option value="">All types</option>
+            {PROVIDER_TYPES.map((t) => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
+          </select>
+          <span className="text-gray-400 text-sm ml-auto">{filtered.length} group{filtered.length !== 1 ? 's' : ''}</span>
+        </div>
       </div>
 
       {/* Groups */}
@@ -355,7 +390,16 @@ export default function RoutingGroupsPage() {
             })}
           </div>
           <div className="mt-4">
-            <Pagination page={safePage} totalPages={totalPages} total={filtered.length} limit={PAGE_SIZE} onPageChange={setPage} noun="groups" />
+            <Pagination
+              page={safePage}
+              totalPages={totalPages}
+              total={filtered.length}
+              limit={pageSize}
+              onPageChange={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              onLimitChange={(l) => { setPageSize(l); setPage(1); }}
+              limitOptions={[6, 9, 20, 50]}
+              noun="groups"
+            />
           </div>
         </>
       )}

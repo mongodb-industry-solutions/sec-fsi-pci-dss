@@ -83,14 +83,14 @@ async function mongodbPlugin(fastify: FastifyInstance) {
     // dev.v8 P5 (§7.7): periodic sweep of lapsed pending-correlation entries (abandoned async
     // callbacks). In-memory registry; the sweep keeps it bounded.
     const { sweepExpiredCorrelations } = await import('../modules/provider/services/pendingCorrelation.service');
-    const sweepTimer = setInterval(() => sweepExpiredCorrelations(), 5 * 60 * 1000);
+    const sweepTimer = setInterval(() => { sweepExpiredCorrelations(); }, 5 * 60 * 1000);
     sweepTimer.unref();
 
     // dev.v8 P7 (§8): purge the encrypted `chd` carrier when a payment journey closes, plus a periodic
     // safety sweep for abandoned journeys so SAD/CVV is never retained after authorization (PCI Req 3.2).
     const { ChdRetention, sweepAbandonedChd } = await import('../modules/transaction/services/chdRetention.service');
     new ChdRetention(db, getEventBus()).register();
-    const chdSweepTimer = setInterval(() => { void sweepAbandonedChd(db); }, 5 * 60 * 1000);
+    const chdSweepTimer = setInterval(() => { sweepAbandonedChd(db).catch(() => {}); }, 5 * 60 * 1000);
     chdSweepTimer.unref();
 
     fastify.addHook('onClose', async () => {
