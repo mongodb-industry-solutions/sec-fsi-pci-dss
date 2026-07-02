@@ -30,6 +30,16 @@ interface CardDetail {
   fundingPayoutAccountInstanceReference?: string;
 }
 
+interface FundingAccount {
+  payoutAccountInstanceReference: string;
+  payoutAccountAlias?: string;
+  payoutAccountBankName?: string;
+  payoutAccountType: string;
+  payoutAccountStatus: string;
+  payoutAccountCurrency: string;
+  payoutAccountIsDefault: boolean;
+}
+
 interface CardTransaction {
   cardTransactionInstanceReference: string;
   cardTransactionAmount: { amount: number; currency: string };
@@ -78,6 +88,9 @@ export default function CardDetailPage() {
   const [toggling, setToggling] = useState(false);
   // Breadcrumb navigation context (non-PII: where we arrived from). Read from the query string.
   const [nav, setNav] = useState<{ from?: string; txnId?: string }>({});
+
+  // Funding account state
+  const [fundingAccount, setFundingAccount] = useState<FundingAccount | null>(null);
 
   // Transaction list state
   const [txns, setTxns] = useState<CardTransaction[]>([]);
@@ -138,6 +151,15 @@ export default function CardDetailPage() {
       setCard(c);
       setAlias(c.paymentCardAlias ?? '');
       setNote(c.paymentCardCustomerNote ?? '');
+      // Load funding account details (non-blocking)
+      if (c.fundingPayoutAccountInstanceReference) {
+        const pRef = decodeToken(t)?.partyRef;
+        if (pRef) {
+          api.accounts.get(pRef, c.fundingPayoutAccountInstanceReference, t)
+            .then((a) => setFundingAccount(a as unknown as FundingAccount))
+            .catch(() => {});
+        }
+      }
     } catch {
       setNotFound(true);
     }
@@ -293,6 +315,52 @@ export default function CardDetailPage() {
                 )}
               </div>
             </div>
+
+            {/* Funding Account — BIAN SD-88 cardAccountReference */}
+            {card.fundingPayoutAccountInstanceReference && (
+              <div className="bg-white rounded-xl border p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Landmark size={14} className="text-gray-400" />
+                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Funding Account</span>
+                </div>
+                {fundingAccount ? (
+                  <Link
+                    href={`/system/accounts/${card.fundingPayoutAccountInstanceReference}`}
+                    className="flex items-center justify-between group"
+                  >
+                    <div className="space-y-0.5">
+                      <div className="text-sm font-medium text-gray-800 group-hover:text-[#001E2B]">
+                        {fundingAccount.payoutAccountAlias || fundingAccount.payoutAccountBankName || 'Account'}
+                      </div>
+                      {fundingAccount.payoutAccountAlias && fundingAccount.payoutAccountBankName && (
+                        <div className="text-xs text-gray-400">{fundingAccount.payoutAccountBankName}</div>
+                      )}
+                      <div className="flex items-center gap-2 pt-0.5">
+                        <span className="text-xs text-gray-400 uppercase">{fundingAccount.payoutAccountCurrency}</span>
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                          {fundingAccount.payoutAccountType === 'bank_account' ? 'Bank Account' : fundingAccount.payoutAccountType === 'wallet' ? 'Wallet' : 'PSP Ledger'}
+                        </span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded border font-medium ${
+                          fundingAccount.payoutAccountStatus === 'active' ? 'bg-green-50 text-green-700 border-green-200' :
+                          fundingAccount.payoutAccountStatus === 'suspended' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                          'bg-gray-100 text-gray-500 border-gray-200'
+                        }`}>
+                          {fundingAccount.payoutAccountStatus}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-xs text-[#001E2B] font-medium group-hover:underline shrink-0 ml-4">View account →</span>
+                  </Link>
+                ) : (
+                  <Link
+                    href={`/system/accounts/${card.fundingPayoutAccountInstanceReference}`}
+                    className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                  >
+                    <Landmark size={13} /> View linked account
+                  </Link>
+                )}
+              </div>
+            )}
 
             {card.paymentCardStatus === 'suspended' && (
               <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-sm text-amber-800">

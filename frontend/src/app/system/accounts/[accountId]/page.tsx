@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Landmark, CheckCircle2, XCircle, Clock, Star, Trash2, Save, X } from 'lucide-react';
+import { Landmark, CreditCard, CheckCircle2, XCircle, Clock, Star, Trash2, Save, X } from 'lucide-react';
 import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
@@ -98,6 +98,22 @@ function fmtDate(iso?: string) {
   return new Date(iso).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+interface LinkedCard {
+  paymentCardInstanceReference: string;
+  paymentCardMaskedPanDisplay: string;
+  paymentCardNetwork: string;
+  paymentCardStatus: string;
+  paymentCardIsPreferred: boolean;
+  paymentCardAlias?: string;
+  recordCreatedDateTime: string;
+}
+
+const CARD_STATUS_CLS: Record<string, string> = {
+  active:    'bg-green-50 text-green-700 border-green-200',
+  suspended: 'bg-amber-50 text-amber-700 border-amber-200',
+  revoked:   'bg-red-50 text-red-700 border-red-200',
+};
+
 const MOVEMENT_LIMIT = 20;
 
 export default function AccountDetailPage() {
@@ -127,6 +143,10 @@ export default function AccountDetailPage() {
   const [movType, setMovType] = useState('');
   const [movLoading, setMovLoading] = useState(false);
 
+  // Linked cards state
+  const [linkedCards, setLinkedCards] = useState<LinkedCard[]>([]);
+  const [cardsLoading, setCardsLoading] = useState(false);
+
   const loadMovements = useCallback(async (t: string, pRef: string, aRef: string, page: number, direction: string, type: string) => {
     setMovLoading(true);
     try {
@@ -152,6 +172,12 @@ export default function AccountDetailPage() {
       setAlias(a.payoutAccountAlias ?? '');
       setIsDefault(a.payoutAccountIsDefault);
       await loadMovements(t, pRef, accountId, 1, '', '');
+      // Load linked cards (non-blocking — failure hides the section silently)
+      setCardsLoading(true);
+      api.accounts.cards(pRef, accountId, t)
+        .then((r) => setLinkedCards(r.results as unknown as LinkedCard[]))
+        .catch(() => setLinkedCards([]))
+        .finally(() => setCardsLoading(false));
     } catch {
       setNotFound(true);
     }
@@ -428,6 +454,50 @@ export default function AccountDetailPage() {
                   noun="movements"
                   variant="light"
                 />
+              )}
+            </div>
+
+            {/* Linked payment cards (BIAN SD-88 cardAccountReference) */}
+            <div className="bg-white rounded-xl border p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <CreditCard size={14} className="text-gray-400" />
+                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Linked Payment Cards</h2>
+              </div>
+              {cardsLoading ? (
+                <p className="text-sm text-gray-400 py-2">Loading cards…</p>
+              ) : linkedCards.length === 0 ? (
+                <p className="text-sm text-gray-400 py-2">No payment cards linked to this account.</p>
+              ) : (
+                <div className="divide-y">
+                  {linkedCards.map((c) => (
+                    <Link
+                      key={c.paymentCardInstanceReference}
+                      href={`/system/cards/${c.paymentCardInstanceReference}`}
+                      className="flex items-center justify-between py-3 hover:bg-gray-50 -mx-5 px-5 transition-colors group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <CreditCard size={16} className="text-gray-400 shrink-0" />
+                        <div>
+                          <div className="text-sm font-medium text-gray-800 group-hover:text-[#001E2B]">
+                            {c.paymentCardAlias || c.paymentCardMaskedPanDisplay}
+                          </div>
+                          {c.paymentCardAlias && (
+                            <div className="text-xs text-gray-400 font-mono">{c.paymentCardMaskedPanDisplay}</div>
+                          )}
+                        </div>
+                        {c.paymentCardIsPreferred && (
+                          <Star size={12} className="text-amber-400 fill-amber-400 shrink-0" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs text-gray-400 uppercase">{c.paymentCardNetwork}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded border font-medium ${CARD_STATUS_CLS[c.paymentCardStatus] ?? 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+                          {c.paymentCardStatus}
+                        </span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
               )}
             </div>
 

@@ -1417,6 +1417,21 @@ export const api = {
         { method: 'POST', body: JSON.stringify(body) },
         token
       ),
+    cards: (partyRef: string, accountRef: string, token: string) =>
+      apiFetch<{ results: Array<{
+        paymentCardInstanceReference: string;
+        paymentCardMaskedPanDisplay: string;
+        paymentCardNetwork: string;
+        paymentCardStatus: string;
+        paymentCardIsPreferred: boolean;
+        paymentCardAlias?: string;
+        fundingPayoutAccountInstanceReference?: string;
+        recordCreatedDateTime: string;
+      }>; total: number }>(
+        `/api/v1/accounts/${encodeURIComponent(partyRef)}/${encodeURIComponent(accountRef)}/cards`,
+        {},
+        token
+      ),
     movements: (partyRef: string, accountRef: string, token: string, params?: { type?: string; direction?: string; from?: string; to?: string; page?: number; limit?: number }) => {
       const qs = new URLSearchParams();
       if (params?.type) qs.set('type', params.type);

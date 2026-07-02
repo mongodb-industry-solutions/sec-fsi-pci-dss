@@ -15,6 +15,7 @@ import {
   updatePayoutAccount,
 } from '../services/payoutAccount.service';
 import { listAccountMovements, ListMovementsOptions } from '../services/accountMovements.service';
+import { getCardsByFundingAccount } from '../../customer/services/paymentCard.service';
 
 function safeAccount(doc: unknown) {
   // Strip Binary ciphertext fields that were not decrypted (non-L2 client)
@@ -248,5 +249,31 @@ export async function payoutAccountController(fastify: FastifyInstance) {
     const body = request.body as { payoutAccountAlias?: string; payoutAccountIsDefault?: boolean };
     const updated = await updatePayoutAccount(fastify.db, accountRef, body);
     return reply.send(safeAccount(updated));
+  });
+
+  // GET /:partyRef/:accountRef/cards
+  // BIAN SD-88 cardAccountReference: list payment cards funded by this account.
+  // PCI Req 7: scoped to the account owner; no CHD returned (masked PAN only).
+  fastify.get('/:partyRef/:accountRef/cards', {
+    preHandler: requirePermission('accounts', 'view'),
+    schema: {
+      tags: ['accounts'],
+      summary: 'List payment cards linked to this payout account (SD-88)',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['partyRef', 'accountRef'], properties: { partyRef: { type: 'string' }, accountRef: { type: 'string' } } },
+      response: { 200: { type: 'object', additionalProperties: true }, 403: { $ref: 'Error#' }, 404: { $ref: 'Error#' } },
+    },
+  }, async (request, reply) => {
+    const { partyRef, accountRef } = request.params as { partyRef: string; accountRef: string };
+    const user = getUser(request);
+    if (user?.role === 'customer' && user.partyRef !== partyRef) {
+      return reply.status(403).send({ error: 'Access denied' });
+    }
+    const account = await getPayoutAccount(fastify.db, accountRef);
+    if (!account || account.partyInstanceReference !== partyRef) {
+      return reply.status(404).send({ error: 'Account not found' });
+    }
+    const { results } = await getCardsByFundingAccount(fastify.db, accountRef);
+    return reply.send({ results, total: results.length });
   });
 }
