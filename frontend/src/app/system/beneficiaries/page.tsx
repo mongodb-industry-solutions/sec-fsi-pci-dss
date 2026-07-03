@@ -242,7 +242,7 @@ export default function BeneficiariesPage() {
         title="Beneficiaries"
         description={description}
         info={isCustomer
-          ? 'Your beneficiaries are looked up by phone or email when registered — the raw contact is never stored, only a secure reference (BIAN SD-54 Counterparty Administration).'
+          ? 'Your beneficiaries are looked up by phone or email when registered, the raw contact is never stored, only a secure reference (BIAN SD-54 Counterparty Administration).'
           : 'Contact hints are masked at registration time. Raw phone/email is resolved via QE equality search and never persisted. BIAN SD-54 Counterparty Administration.'
         }
         debugInfo="BIAN SD-54 Counterparty Administration · PCI DSS Req 3.4 · Req 7 (scope: own for customers)"
