@@ -47,15 +47,17 @@ const SOURCE_STYLES: Record<string, string> = {
 function entityHref(entityType?: string, entityId?: string | null): string | null {
   if (!entityId) return null;
   switch (entityType) {
-    case 'fraud_case':  return `/system/investigation/${entityId}`;
-    case 'transaction': return `/system/transactions/${entityId}`;
-    case 'merchant':    return `/system/merchant/${entityId}`;
-    case 'integration': return `/system/admin/providers/vendors/${entityId}`;
-    default:            return null;
+    case 'fraud_case':    return `/system/investigation/${entityId}`;
+    case 'transaction':   return `/system/transactions/${entityId}`;
+    case 'p2p_transfer':  return `/system/payment/history`;
+    case 'merchant':      return `/system/merchant/${entityId}`;
+    case 'integration':   return `/system/admin/providers/vendors/${entityId}`;
+    default:              return null;
   }
 }
 const ENTITY_LABEL: Record<string, string> = {
-  fraud_case: 'case', transaction: 'transaction', merchant: 'merchant', customer: 'customer', integration: 'integration',
+  fraud_case: 'case', transaction: 'transaction', p2p_transfer: 'P2P transfer',
+  merchant: 'merchant', customer: 'customer', integration: 'integration',
 };
 
 export default function AuditEventsPage() {

@@ -17,6 +17,8 @@ export interface FraudDiagnosisControlRecord {
   // Links to protected records (plaintext keys by design: no PII in these refs)
   cardTransactionInstanceReference: string;              // FK to cardTransactionLog (SD-254)
   customerAgreementInstanceReference: string;            // FK to customerAgreementProcedure (SD-53)
+  paymentExecutionInstanceReference?: string;            // FK to paymentExecutionProcedure (SD-65); set for P2P cases
+  transactionKind?: 'card' | 'p2p';                     // discriminator; absent = 'card' for legacy docs
 
   // Extended Reference Pattern: stable display fields from cardTransaction.
   // Embedded to make fraud investigation display a single-collection query.

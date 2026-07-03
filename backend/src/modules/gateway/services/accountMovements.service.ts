@@ -25,27 +25,71 @@ export async function listAccountMovements(
   const page = Math.max(1, opts.page ?? 1);
   const limit = Math.min(100, Math.max(1, opts.limit ?? 20));
 
-  // 1. Fetch payout disbursements from paymentExecutionProcedure
+  // 1. Fetch payout disbursements + P2P movements from paymentExecutionProcedure
   const executionCol = db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION);
-  const executions = await executionCol.find({
+
+  const toIso = (d: Date | string): string =>
+    d instanceof Date ? d.toISOString() : new Date(d).toISOString();
+
+  // 1a. Merchant/non-P2P disbursements — this account receives the payout (credit)
+  const merchantExecs = await executionCol.find({
     resolvedPayoutAccountReference: accountRef,
+    beneficiaryType: { $ne: 'user' },
   }).toArray();
 
-  const disbursements: AccountMovement[] = executions.map((exec) => ({
-    movementId: exec.paymentExecutionInstanceReference,
-    movementType: 'payout_disbursement' as MovementType,
-    direction: 'debit' as MovementDirection,
-    amount: exec.netAmount,
-    currency: exec.currency,
-    description: 'Payout disbursement',
-    counterpartyRef: exec.resolvedPayoutAccountReference,
-    status: exec.paymentExecutionStatus,
-    occurredAt: exec.recordCreatedDateTime instanceof Date
-      ? exec.recordCreatedDateTime.toISOString()
-      : new Date(exec.recordCreatedDateTime).toISOString(),
-    sourceCollection: PAYMENT_EXECUTION_COLLECTION,
-    sourceRef: exec.paymentExecutionInstanceReference,
-  }));
+  // 1b. P2P received — this account is the recipient of a user-to-user transfer (credit)
+  const p2pReceivedExecs = await executionCol.find({
+    resolvedPayoutAccountReference: accountRef,
+    beneficiaryType: 'user',
+  }).toArray();
+
+  // 1c. P2P sent — this account is the source of a user-to-user transfer (debit)
+  const p2pSentExecs = await executionCol.find({
+    sourcePayoutAccountReference: accountRef,
+    beneficiaryType: 'user',
+  }).toArray();
+
+  const disbursements: AccountMovement[] = [
+    ...merchantExecs.map((exec) => ({
+      movementId: exec.paymentExecutionInstanceReference,
+      movementType: 'payout_disbursement' as MovementType,
+      direction: 'credit' as MovementDirection,
+      amount: exec.netAmount,
+      currency: exec.currency,
+      description: 'Payout disbursement',
+      counterpartyRef: exec.resolvedPayoutAccountReference,
+      status: exec.paymentExecutionStatus,
+      occurredAt: toIso(exec.recordCreatedDateTime),
+      sourceCollection: PAYMENT_EXECUTION_COLLECTION,
+      sourceRef: exec.paymentExecutionInstanceReference,
+    })),
+    ...p2pReceivedExecs.map((exec) => ({
+      movementId: exec.paymentExecutionInstanceReference,
+      movementType: 'p2p_received' as MovementType,
+      direction: 'credit' as MovementDirection,
+      amount: exec.netAmount,
+      currency: exec.currency,
+      description: exec.routingNote ?? 'P2P transfer received',
+      counterpartyRef: exec.sourcePayoutAccountReference,
+      status: exec.paymentExecutionStatus,
+      occurredAt: toIso(exec.recordCreatedDateTime),
+      sourceCollection: PAYMENT_EXECUTION_COLLECTION,
+      sourceRef: exec.paymentExecutionInstanceReference,
+    })),
+    ...p2pSentExecs.map((exec) => ({
+      movementId: exec.paymentExecutionInstanceReference,
+      movementType: 'p2p_sent' as MovementType,
+      direction: 'debit' as MovementDirection,
+      amount: exec.netAmount,
+      currency: exec.currency,
+      description: exec.routingNote ?? 'P2P transfer sent',
+      counterpartyRef: exec.resolvedPayoutAccountReference,
+      status: exec.paymentExecutionStatus,
+      occurredAt: toIso(exec.recordCreatedDateTime),
+      sourceCollection: PAYMENT_EXECUTION_COLLECTION,
+      sourceRef: exec.paymentExecutionInstanceReference,
+    })),
+  ];
 
   // 2. Get all cards linked to this payout account
   const cardCol = db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION);

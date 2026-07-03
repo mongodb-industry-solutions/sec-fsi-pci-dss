@@ -99,6 +99,7 @@ export async function executeP2PTransfer(
     beneficiaryType: 'user',
     initiatorPartyReference: initiatorPartyRef,
     beneficiaryPartyReference: recipientPartyRef,
+    sourcePayoutAccountReference: fromAccountRef,
     resolvedPayoutAccountReference: recipientAccount.payoutAccountInstanceReference,
     grossAmount: amount,
     netAmount: amount,
@@ -131,9 +132,22 @@ export async function executeP2PTransfer(
   };
   await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).insertOne(execution);
 
+  // EDA: notify compliance subscribers (P2PComplianceProcess → FDS + HRP + AML)
+  void (async () => {
+    const { getEventBus, makeEvent } = await import('../../../vendors/eventbus');
+    void getEventBus().publish(makeEvent({
+      eventType: 'p2p.transfer.completed',
+      correlationId: transferRef,
+      businessProcess: 'payment_processing',
+      source: 'psp.p2p',
+      payload: { transferRef, amount, currency, initiatorPartyRef, sourceAccountRef: fromAccountRef, recipientAccountRef: recipientAccount.payoutAccountInstanceReference },
+      bian: { serviceDomain: 'Payment Execution', controlRecord: 'PaymentExecutionProcedure' },
+    }));
+  })();
+
   // EDA: business process event (payment_processing journey — visible in audit events / system log)
   emitProcessEvent(db, {
-    entityType: 'transaction',
+    entityType: 'p2p_transfer',
     entityId: transferRef,
     processType: 'payment_processing',
     processAction: 'p2p_transfer.executed',
@@ -154,7 +168,7 @@ export async function executeP2PTransfer(
 
   // PCI DSS Req 10: compliance audit record for every fund movement
   emitComplianceEvent(db, {
-    entityType: 'transaction',
+    entityType: 'p2p_transfer',
     entityId: transferRef,
     processType: 'payment_processing',
     processAction: 'p2p_transfer.funds_moved',

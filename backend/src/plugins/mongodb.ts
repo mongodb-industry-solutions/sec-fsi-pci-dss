@@ -80,6 +80,10 @@ async function mongodbPlugin(fastify: FastifyInstance) {
     const { PayoutOrchestrationProcess } = await import('../modules/gateway/services/payoutOrchestration.process');
     new PayoutOrchestrationProcess(db, getEventBus()).register();
 
+    // P2P compliance: FDS + HRP + AML screening for peer-to-peer transfers (SD-83, PCI DSS Req 10).
+    const { P2PComplianceProcess } = await import('../modules/gateway/services/p2pCompliance.process');
+    new P2PComplianceProcess(db, getEventBus()).register();
+
     // dev.v8 P5 (§7.7): periodic sweep of lapsed pending-correlation entries (abandoned async
     // callbacks). In-memory registry; the sweep keeps it bounded.
     const { sweepExpiredCorrelations } = await import('../modules/provider/services/pendingCorrelation.service');

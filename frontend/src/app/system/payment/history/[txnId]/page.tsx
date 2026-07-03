@@ -80,6 +80,33 @@ export default function TransactionDetailPage() {
   const [token, setToken] = useState('');
   const { debugMode } = useDebugMode();
   const [txn, setTxn] = useState<StoredTransaction | null>(null);
+  const [p2pTransfer, setP2pTransfer] = useState<{
+    paymentExecutionInstanceReference: string;
+    initiatorPartyReference: string | null;
+    beneficiaryPartyReference: string | null;
+    sourcePayoutAccountReference: string | null;
+    resolvedPayoutAccountReference: string | null;
+    grossAmount: number;
+    netAmount: number;
+    feeAmount: number;
+    currency: string;
+    paymentExecutionRail: string | null;
+    routingNote: string | null;
+    paymentExecutionStatus: string;
+    fraudCaseCreated: boolean | null;
+    fraudDiagnosisInstanceReference: string | null;
+    initiatedAt: string | null;
+    completedAt: string | null;
+    fraudCase: {
+      fraudDiagnosisInstanceReference: string;
+      fraudDiagnosisCaseReference: string;
+      fraudDiagnosisCaseStatus: string;
+      fraudDiagnosisCaseSeverity: string;
+      fraudDiagnosisScore: number | null;
+      riskIndicators: string[];
+      subsystemSignals: Record<string, unknown> | null;
+    } | null;
+  } | null>(null);
   const [apiTxn, setApiTxn] = useState<{
     paymentCardReference?: string;
     cardTransactionMerchantCategoryCode?: string;
@@ -108,7 +135,17 @@ export default function TransactionDetailPage() {
 
     // Real source of truth: fetch the transaction from the API.
     const data = await api.transactions.getById(txnId, t).catch(() => null);
-    if (!data) { if (showLoading) { setNotFound(true); setLoading(false); } return; }
+    if (!data) {
+      // Fallback: try P2P transfer lookup (BIAN SD-65)
+      const p2p = await api.accounts.getTransfer(txnId, t).catch(() => null);
+      if (p2p) {
+        setP2pTransfer(p2p);
+        if (showLoading) setLoading(false);
+        return;
+      }
+      if (showLoading) { setNotFound(true); setLoading(false); }
+      return;
+    }
 
     setTxn({
       txnId:          data.cardTransactionInstanceReference,
@@ -178,7 +215,7 @@ export default function TransactionDetailPage() {
     </PageShell>
   );
 
-  if (notFound || !txn) return (
+  if (notFound || (!txn && !p2pTransfer)) return (
     <PageShell {...shell}>
       <div className="text-center py-12 text-gray-500">
         <p className="mb-3">Transaction not found.</p>
@@ -188,6 +225,137 @@ export default function TransactionDetailPage() {
       </div>
     </PageShell>
   );
+
+  // P2P transfer detail view (BIAN SD-65)
+  if (p2pTransfer) {
+    const isSent = p2pTransfer.initiatorPartyReference === user?.partyRef;
+    const direction = isSent ? 'sent' : 'received';
+    const fc = p2pTransfer.fraudCase;
+    const isAnalyst = user?.role === 'level1_analyst' || user?.role === 'level2_investigator' || user?.role === 'security_auditor';
+    return (
+      <PageShell {...shell}>
+        <Link href="/system/payment/history" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline mb-4">
+          ← Back to transactions
+        </Link>
+        <div className="bg-white rounded-xl border p-5 mb-4">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">P2P Transfer</h1>
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`text-xs px-2 py-0.5 rounded font-medium ${direction === 'sent' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+                  {direction === 'sent' ? '↑ Sent' : '↓ Received'}
+                </span>
+                <span className={`text-xs px-2 py-0.5 rounded font-medium ${p2pTransfer.paymentExecutionStatus === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}`}>
+                  {p2pTransfer.paymentExecutionStatus}
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 mt-1">{p2pTransfer.initiatedAt ? new Date(p2pTransfer.initiatedAt).toLocaleString() : '—'}</p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className={`text-2xl font-bold ${direction === 'sent' ? 'text-red-600' : 'text-green-700'}`}>
+                {direction === 'sent' ? '−' : '+'}
+                {new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.currency }).format(p2pTransfer.grossAmount)}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm border-t pt-4">
+            <span className="text-gray-500">Initiator ref</span>
+            <span className="font-mono text-xs text-gray-700 truncate">{p2pTransfer.initiatorPartyReference ?? '—'}</span>
+
+            <span className="text-gray-500">Recipient ref</span>
+            <span className="font-mono text-xs text-gray-700 truncate">{p2pTransfer.beneficiaryPartyReference ?? '—'}</span>
+
+            <span className="text-gray-500">Source account</span>
+            <span className="font-mono text-xs text-gray-700 truncate">{p2pTransfer.sourcePayoutAccountReference ?? '—'}</span>
+
+            <span className="text-gray-500">Destination account</span>
+            <span className="font-mono text-xs text-gray-700 truncate">{p2pTransfer.resolvedPayoutAccountReference ?? '—'}</span>
+
+            <span className="text-gray-500">Amount</span>
+            <span>{new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.currency }).format(p2pTransfer.grossAmount)}</span>
+
+            <span className="text-gray-500">Currency</span>
+            <span className="font-mono">{p2pTransfer.currency}</span>
+
+            {p2pTransfer.paymentExecutionRail && (<>
+              <span className="text-gray-500">Rail</span>
+              <span className="capitalize">{p2pTransfer.paymentExecutionRail.replace(/_/g, ' ')}</span>
+            </>)}
+
+            {p2pTransfer.routingNote && (<>
+              <span className="text-gray-500">Note</span>
+              <span className="text-xs text-gray-700">{p2pTransfer.routingNote}</span>
+            </>)}
+
+            <span className="text-gray-500">Initiated at</span>
+            <span className="text-xs">{p2pTransfer.initiatedAt ? new Date(p2pTransfer.initiatedAt).toLocaleString() : '—'}</span>
+
+            {p2pTransfer.completedAt && (<>
+              <span className="text-gray-500">Completed at</span>
+              <span className="text-xs">{new Date(p2pTransfer.completedAt).toLocaleString()}</span>
+            </>)}
+
+            <span className="text-gray-500">Transfer ID</span>
+            <span className="font-mono text-xs text-gray-500 truncate">{p2pTransfer.paymentExecutionInstanceReference}</span>
+          </div>
+        </div>
+
+        {fc ? (
+          <div className="bg-white rounded-xl border p-5 mb-4">
+            <h2 className="font-semibold text-gray-800 mb-3">Security Review</h2>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="font-mono text-xs text-gray-500">{fc.fraudDiagnosisCaseReference}</span>
+              <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                fc.fraudDiagnosisCaseStatus === 'escalated'        ? 'bg-orange-100 text-orange-800' :
+                fc.fraudDiagnosisCaseStatus === 'resolved_fraud'   ? 'bg-red-100 text-red-800' :
+                fc.fraudDiagnosisCaseStatus === 'resolved_cleared' ? 'bg-green-100 text-green-800' :
+                fc.fraudDiagnosisCaseStatus === 'closed'           ? 'bg-gray-100 text-gray-700' :
+                'bg-amber-100 text-amber-800'
+              }`}>{fc.fraudDiagnosisCaseStatus.replace(/_/g, ' ')}</span>
+              <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                fc.fraudDiagnosisCaseSeverity === 'critical' ? 'bg-red-600 text-white' :
+                fc.fraudDiagnosisCaseSeverity === 'high'     ? 'bg-red-500 text-white' :
+                fc.fraudDiagnosisCaseSeverity === 'medium'   ? 'bg-yellow-500 text-black' :
+                'bg-green-600 text-white'
+              }`}>{fc.fraudDiagnosisCaseSeverity.toUpperCase()}</span>
+            </div>
+
+            {fc.riskIndicators.length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs font-semibold text-gray-600 mb-1 uppercase">Risk indicators</p>
+                <div className="flex flex-wrap gap-1">
+                  {fc.riskIndicators.map((ind) => (
+                    <span key={ind} className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">{ind}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {fc.subsystemSignals && (
+              <div className="mb-3">
+                <p className="text-xs font-semibold text-gray-600 mb-1 uppercase">Subsystem signals</p>
+                <pre className="text-xs bg-gray-50 rounded p-2 overflow-x-auto text-gray-700">{JSON.stringify(fc.subsystemSignals, null, 2)}</pre>
+              </div>
+            )}
+
+            {isAnalyst && (
+              <Link href={`/system/investigation/${fc.fraudDiagnosisInstanceReference}`} className="inline-flex items-center gap-1.5 text-sm text-[#001E2B] hover:underline font-medium">
+                Open fraud investigation ↗
+              </Link>
+            )}
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border p-5 text-center text-sm text-gray-500">
+            ✓ No security review triggered for this transfer.
+          </div>
+        )}
+      </PageShell>
+    );
+  }
+
+  // After the P2P branch, txn is guaranteed non-null (both guards above ensure it).
+  if (!txn) return null;
 
   const visibleEvents = events.filter((e) => Object.keys(EVENT_META).includes(e.actionType));
 

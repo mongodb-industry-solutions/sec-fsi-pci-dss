@@ -3,7 +3,7 @@
 //   paymentExecutionProcedure (outgoing disbursements)
 //   cardTransactionLog        (card debits / refunds — via card.fundingPayoutAccountInstanceReference)
 
-export type MovementType = 'card_debit' | 'card_refund' | 'payout_disbursement' | 'balance_credit';
+export type MovementType = 'card_debit' | 'card_refund' | 'payout_disbursement' | 'balance_credit' | 'p2p_sent' | 'p2p_received';
 export type MovementDirection = 'debit' | 'credit';
 
 export interface AccountMovement {

@@ -18,6 +18,7 @@ import {
 import { listAccountMovements, ListMovementsOptions } from '../services/accountMovements.service';
 import { getCardsByFundingAccount } from '../../customer/services/paymentCard.service';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
+import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
 
 function safeAccount(doc: unknown) {
   // Strip QE-encrypted fields from the public response. Include boolean hints so the UI
@@ -456,5 +457,114 @@ export async function payoutAccountController(fastify: FastifyInstance) {
     }));
 
     return reply.send({ results, total, page, limit });
+  });
+
+  // GET /api/v1/accounts/transfer/:transferRef
+  // Single P2P transfer lookup by paymentExecutionInstanceReference.
+  // Customer scope: must be initiator or recipient (PCI DSS Req 7).
+  fastify.get('/transfer/:transferRef', {
+    preHandler: requirePermission('accounts', 'view'),
+    schema: {
+      tags: ['accounts'],
+      summary: 'Get a single P2P transfer by reference (BIAN SD-65)',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['transferRef'],
+        properties: { transferRef: { type: 'string' } },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            paymentExecutionInstanceReference:  { type: 'string' },
+            initiatorPartyReference:            { type: 'string', nullable: true },
+            beneficiaryPartyReference:          { type: 'string', nullable: true },
+            sourcePayoutAccountReference:       { type: 'string', nullable: true },
+            resolvedPayoutAccountReference:     { type: 'string', nullable: true },
+            grossAmount:                        { type: 'number' },
+            netAmount:                          { type: 'number' },
+            feeAmount:                          { type: 'number' },
+            currency:                           { type: 'string' },
+            paymentExecutionRail:               { type: 'string', nullable: true },
+            routingNote:                        { type: 'string', nullable: true },
+            paymentExecutionStatus:             { type: 'string' },
+            fraudCaseCreated:                   { type: 'boolean', nullable: true },
+            fraudDiagnosisInstanceReference:    { type: 'string', nullable: true },
+            initiatedAt:                        { type: 'string', nullable: true },
+            completedAt:                        { type: 'string', nullable: true },
+            fraudCase: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                fraudDiagnosisInstanceReference: { type: 'string' },
+                fraudDiagnosisCaseReference:     { type: 'string' },
+                fraudDiagnosisCaseStatus:        { type: 'string' },
+                fraudDiagnosisCaseSeverity:      { type: 'string' },
+                fraudDiagnosisScore:             { type: 'number', nullable: true },
+                riskIndicators:                  { type: 'array', items: { type: 'string' } },
+                subsystemSignals:                { type: 'object', nullable: true, additionalProperties: true },
+              },
+            },
+          },
+        },
+        403: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { transferRef } = request.params as { transferRef: string };
+    const user = getUser(request);
+    const db = fastify.db;
+
+    const exec = await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION)
+      .findOne({ paymentExecutionInstanceReference: transferRef, beneficiaryType: 'user' });
+    if (!exec) return reply.status(404).send({ error: 'P2P transfer not found' });
+
+    if (user?.role === 'customer') {
+      const isInvolved = exec.initiatorPartyReference === user.partyRef || exec.beneficiaryPartyReference === user.partyRef;
+      if (!isInvolved) return reply.status(403).send({ error: 'Access denied.' });
+    }
+
+    const fraudCaseDoc = await db.collection<{
+      fraudDiagnosisInstanceReference: string;
+      fraudDiagnosisCaseReference: string;
+      fraudDiagnosisCaseStatus: string;
+      fraudDiagnosisCaseSeverity: string;
+      fraudDiagnosisAssessment?: { fraudDiagnosisScore?: number; riskIndicators?: string[] };
+      subsystemSignals?: Record<string, unknown>;
+    }>(FRAUD_DIAGNOSIS_COLLECTION).findOne(
+      { cardTransactionInstanceReference: transferRef },
+      { projection: { fraudDiagnosisInstanceReference: 1, fraudDiagnosisCaseReference: 1, fraudDiagnosisCaseStatus: 1, fraudDiagnosisCaseSeverity: 1, fraudDiagnosisAssessment: 1, subsystemSignals: 1 } }
+    );
+
+    const execRecord = exec as Record<string, unknown>;
+    return reply.send({
+      paymentExecutionInstanceReference:  exec.paymentExecutionInstanceReference,
+      initiatorPartyReference:            exec.initiatorPartyReference ?? null,
+      beneficiaryPartyReference:          exec.beneficiaryPartyReference ?? null,
+      sourcePayoutAccountReference:       exec.sourcePayoutAccountReference ?? null,
+      resolvedPayoutAccountReference:     exec.resolvedPayoutAccountReference ?? null,
+      grossAmount:                        exec.grossAmount,
+      netAmount:                          exec.netAmount,
+      feeAmount:                          exec.feeAmount,
+      currency:                           exec.currency,
+      paymentExecutionRail:               exec.paymentExecutionRail ?? null,
+      routingNote:                        exec.routingNote ?? null,
+      paymentExecutionStatus:             exec.paymentExecutionStatus,
+      fraudCaseCreated:                   execRecord.fraudCaseCreated as boolean ?? false,
+      fraudDiagnosisInstanceReference:    execRecord.fraudDiagnosisInstanceReference as string ?? null,
+      initiatedAt:                        exec.initiatedAt?.toISOString() ?? null,
+      completedAt:                        exec.completedAt?.toISOString() ?? null,
+      fraudCase: fraudCaseDoc ? {
+        fraudDiagnosisInstanceReference: fraudCaseDoc.fraudDiagnosisInstanceReference,
+        fraudDiagnosisCaseReference:     fraudCaseDoc.fraudDiagnosisCaseReference,
+        fraudDiagnosisCaseStatus:        fraudCaseDoc.fraudDiagnosisCaseStatus,
+        fraudDiagnosisCaseSeverity:      fraudCaseDoc.fraudDiagnosisCaseSeverity,
+        fraudDiagnosisScore:             fraudCaseDoc.fraudDiagnosisAssessment?.fraudDiagnosisScore ?? null,
+        riskIndicators:                  fraudCaseDoc.fraudDiagnosisAssessment?.riskIndicators ?? [],
+        subsystemSignals:                fraudCaseDoc.subsystemSignals ?? null,
+      } : null,
+    });
   });
 }

@@ -34,7 +34,8 @@ export interface PaymentExecutionProcedure {
   beneficiaryType: BeneficiaryType;
   beneficiaryPartyReference?: string;             // FK → party (SD-13) for user payouts
   initiatorPartyReference?: string;               // FK → party (SD-13); set for P2P transfers (enables customer-scoped history)
-  resolvedPayoutAccountReference?: string;        // FK → payoutAccountArrangement (SD-66)
+  sourcePayoutAccountReference?: string;          // FK → payoutAccountArrangement (SD-66); sender's account — enables per-account movement ledger
+  resolvedPayoutAccountReference?: string;        // FK → payoutAccountArrangement (SD-66); recipient's account
 
   grossAmount: number;
   netAmount: number;

@@ -1438,6 +1438,38 @@ export const api = {
         {},
         token
       ),
+    getTransfer: (transferRef: string, token: string) =>
+      apiFetch<{
+        paymentExecutionInstanceReference: string;
+        initiatorPartyReference: string | null;
+        beneficiaryPartyReference: string | null;
+        sourcePayoutAccountReference: string | null;
+        resolvedPayoutAccountReference: string | null;
+        grossAmount: number;
+        netAmount: number;
+        feeAmount: number;
+        currency: string;
+        paymentExecutionRail: string | null;
+        routingNote: string | null;
+        paymentExecutionStatus: string;
+        fraudCaseCreated: boolean | null;
+        fraudDiagnosisInstanceReference: string | null;
+        initiatedAt: string | null;
+        completedAt: string | null;
+        fraudCase: {
+          fraudDiagnosisInstanceReference: string;
+          fraudDiagnosisCaseReference: string;
+          fraudDiagnosisCaseStatus: string;
+          fraudDiagnosisCaseSeverity: string;
+          fraudDiagnosisScore: number | null;
+          riskIndicators: string[];
+          subsystemSignals: Record<string, unknown> | null;
+        } | null;
+      }>(
+        `/api/v1/accounts/transfer/${encodeURIComponent(transferRef)}`,
+        {},
+        token
+      ),
     transfers: (partyRef: string, token: string, params?: { page?: number; limit?: number }) => {
       const qs = params ? '?' + new URLSearchParams(
         Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])

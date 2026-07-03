@@ -321,7 +321,7 @@ export interface ExternalProviderArrangement {
 
 // ── Business Context Correlation (ADR-025) ────────────────────────────────────
 
-export type BusinessEntityType = 'transaction' | 'fraud_case' | 'customer' | 'merchant' | 'payment_link' | 'card' | 'execution' | 'account';
+export type BusinessEntityType = 'transaction' | 'p2p_transfer' | 'fraud_case' | 'customer' | 'merchant' | 'payment_link' | 'card' | 'execution' | 'account';
 
 export type BusinessProcessType =
   | 'payment_processing'
