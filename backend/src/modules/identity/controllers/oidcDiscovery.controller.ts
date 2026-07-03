@@ -7,7 +7,7 @@ export async function oidcDiscoveryController(fastify: FastifyInstance) {
   // OIDC Discovery 1.0 §4 — path fixed by spec, must be at root (no /api/v1 prefix)
   fastify.get('/.well-known/openid-configuration', {
     schema: {
-      tags: ['oidc'],
+      tags: ['auth:oidc'],
       summary: 'OIDC Discovery Document',
       description: 'OpenID Connect Discovery 1.0 — returns the authorization server metadata.',
     },
@@ -36,7 +36,7 @@ export async function oidcDiscoveryController(fastify: FastifyInstance) {
   // JWKS endpoint — public keys for client-side RS256 verification (ADR-036)
   fastify.get('/api/v1/auth/jwks', {
     schema: {
-      tags: ['oidc'],
+      tags: ['auth:oidc'],
       summary: 'JSON Web Key Set',
       description: 'Returns public RSA keys for verifying OAuth RS256 access tokens. All active and deprecated keys are included so tokens issued before key rotation remain verifiable during the grace period.',
     },

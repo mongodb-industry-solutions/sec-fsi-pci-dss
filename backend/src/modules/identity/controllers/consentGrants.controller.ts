@@ -18,7 +18,7 @@ export async function consentGrantsController(fastify: FastifyInstance) {
   // GET /api/v1/auth/grants — list the calling user's active OAuth consent grants
   fastify.get('/grants', {
     schema: {
-      tags: ['oauth'],
+      tags: ['auth:oauth'],
       summary: 'List my authorized apps (OAuth consent grants)',
       description: 'Returns all active OAuth consent grants for the authenticated user — the merchant apps the user has authorized via OIDC. Supports revocation per grant. Requires a valid PSP session token (any role).',
       security: [{ bearerAuth: [] }],
@@ -68,7 +68,7 @@ export async function consentGrantsController(fastify: FastifyInstance) {
   // DELETE /api/v1/auth/grants/:consentId — revoke a specific consent grant
   fastify.delete('/grants/:consentId', {
     schema: {
-      tags: ['oauth'],
+      tags: ['auth:oauth'],
       summary: 'Revoke an OAuth consent grant',
       description: 'Revokes a specific consent grant. All active access tokens and refresh tokens for this user + merchant client are immediately invalidated. The merchant receives an `oauth.authorization_revoked` webhook.',
       security: [{ bearerAuth: [] }],

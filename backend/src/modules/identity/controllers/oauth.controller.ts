@@ -35,7 +35,7 @@ export async function oauthController(fastify: FastifyInstance) {
   // ── GET /api/v1/auth/authorize ──────────────────────────────────────────────
   fastify.get('/authorize', {
     schema: {
-      tags: ['oidc'],
+      tags: ['auth:oidc'],
       summary: 'OAuth 2.0 Authorization Endpoint',
       description: `Initiates the Authorization Code flow (RFC 6749 §4.1).\n\nFor browser flows, the user is redirected here from the merchant app. The PSP frontend consent page renders the login + consent UI. On grant/deny, the endpoint redirects back to redirect_uri with code or error.\n\nRequired query params: client_id, redirect_uri, response_type=code, scope (must include openid)\n\nOptional: state, code_challenge (S256), code_challenge_method=S256, nonce`,
       querystring: {
@@ -121,7 +121,7 @@ export async function oauthController(fastify: FastifyInstance) {
   // ── POST /api/v1/auth/token ─────────────────────────────────────────────────
   fastify.post('/token', {
     schema: {
-      tags: ['oidc'],
+      tags: ['auth:oidc'],
       summary: 'OAuth 2.0 Token Endpoint',
       description: `Issues access tokens, ID tokens, and refresh tokens (RFC 6749).\n\nSupported grant_type values:\n- authorization_code: exchange code for tokens (with PKCE code_verifier if required)\n- client_credentials: service-to-service access (server auth required)\n- refresh_token: rotate access token using a refresh token\n\nClient authentication via Authorization: Basic base64(client_id:client_secret)`,
       consumes: ['application/x-www-form-urlencoded'],
@@ -178,7 +178,7 @@ export async function oauthController(fastify: FastifyInstance) {
   // ── GET /api/v1/auth/userinfo ───────────────────────────────────────────────
   fastify.get('/userinfo', {
     schema: {
-      tags: ['oidc'],
+      tags: ['auth:oidc'],
       summary: 'OIDC UserInfo Endpoint',
       description: 'Returns authenticated user claims. Requires Authorization: Bearer <access_token> with at minimum the openid scope.',
     },
@@ -198,7 +198,7 @@ export async function oauthController(fastify: FastifyInstance) {
   // ── POST /api/v1/auth/revoke ────────────────────────────────────────────────
   fastify.post('/revoke', {
     schema: {
-      tags: ['oidc'],
+      tags: ['auth:oidc'],
       summary: 'OAuth 2.0 Token Revocation (RFC 7009)',
       description: 'Revokes an access or refresh token. Always returns 200 (RFC 7009 §2.2 — no information leakage).',
       consumes: ['application/x-www-form-urlencoded'],

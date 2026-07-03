@@ -28,7 +28,7 @@ export async function keyManagementController(fastify: FastifyInstance) {
   // GET /api/v1/auth/keys — list all keys (no private material)
   fastify.get('/keys', {
     schema: {
-      tags: ['key-management'],
+      tags: ['auth:kms'],
       summary: 'List RSA Signing Keys',
       description: 'Lists all OAuth RS256 signing keys with status. Returns public key metadata only — no private key material. Requires manager or system_admin role.',
     },
@@ -45,7 +45,7 @@ export async function keyManagementController(fastify: FastifyInstance) {
   // POST /api/v1/auth/keys/generate — generate new keypair
   fastify.post('/keys/generate', {
     schema: {
-      tags: ['key-management'],
+      tags: ['auth:kms'],
       summary: 'Generate New RSA-2048 Keypair',
       description: 'Generates a new RSA-2048 keypair, registers the public key in Atlas, and sets it as active. The current active key is deprecated (remains valid during grace period). Requires manager or system_admin role.',
       body: {
@@ -63,7 +63,7 @@ export async function keyManagementController(fastify: FastifyInstance) {
   // POST /api/v1/auth/keys/rotate — explicit rotation (alias for generate)
   fastify.post('/keys/rotate', {
     schema: {
-      tags: ['key-management'],
+      tags: ['auth:kms'],
       summary: 'Rotate RSA Signing Key',
       description: 'Generates a new active key and deprecates the current one. During the grace period (default 24h), both keys are exposed in the JWKS endpoint so existing tokens remain valid. Requires manager or system_admin role.',
       body: {
@@ -82,7 +82,7 @@ export async function keyManagementController(fastify: FastifyInstance) {
   // POST /api/v1/auth/keys/upload — upload external PEM pair
   fastify.post('/keys/upload', {
     schema: {
-      tags: ['key-management'],
+      tags: ['auth:kms'],
       summary: 'Upload External RSA Keypair',
       description: 'Uploads an externally generated PEM keypair. The private key is used to update the signing provider; only the public key is stored in Atlas. Requires manager or system_admin role.',
       body: {
@@ -109,7 +109,7 @@ export async function keyManagementController(fastify: FastifyInstance) {
   // POST /api/v1/auth/keys/:keyId/revoke — revoke deprecated key
   fastify.post('/keys/:keyId/revoke', {
     schema: {
-      tags: ['key-management'],
+      tags: ['auth:kms'],
       summary: 'Revoke a Deprecated Key',
       description: 'Marks a deprecated key as revoked. It is removed from the JWKS endpoint and tokens signed with it become invalid. Cannot revoke the currently active key — rotate first. Requires manager or system_admin role.',
       params: {
@@ -132,7 +132,7 @@ export async function keyManagementController(fastify: FastifyInstance) {
   // GET /api/v1/auth/keys/:keyId/public.pem — download public key (no auth — for merchants)
   fastify.get('/keys/:keyId/public.pem', {
     schema: {
-      tags: ['key-management'],
+      tags: ['auth:kms'],
       summary: 'Download Public Key (PEM)',
       description: 'Returns the public key in PEM format for merchants who prefer to verify tokens client-side. No authentication required — public keys are safe to share.',
       params: {

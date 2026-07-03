@@ -20,7 +20,7 @@ export async function tokenIntrospectionController(fastify: FastifyInstance) {
 
   fastify.post('/introspect', {
     schema: {
-      tags: ['oidc'],
+      tags: ['auth:oidc'],
       summary: 'RFC 7662 Token Introspection',
       description: `Server-side token validation for OAuth clients. Requires client authentication (Authorization: Basic base64(client_id:client_secret)).\n\nReturns { active: true, ...claims } for valid tokens, or { active: false } for expired, revoked, or unknown tokens (RFC 7662 §2.2 — no 401/404 to avoid information leakage).\n\n**Merchant verification strategies:**\n- Introspection (this endpoint): zero merchant-side key management, +1 HTTP round-trip per request\n- Client-side JWKS verification (GET /api/v1/auth/jwks): local crypto, no round-trip, merchant manages key rotation`,
       consumes: ['application/x-www-form-urlencoded'],
