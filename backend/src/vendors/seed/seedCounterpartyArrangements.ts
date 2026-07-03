@@ -74,7 +74,7 @@ const DEMO_BENEFICIARIES: Omit<CounterpartyArrangement, 'recordCreatedDateTime' 
     counterpartyArrangementReference: 'cab00006-0000-4000-8000-000000000006',
     ownerPartyReference:      'b0000058-0000-4000-8000-000000000058',
     counterpartyPartyReference: 'b0000006-0000-4000-8000-000000000006',
-    counterpartyLabel: 'Market Vendor — Produce',
+    counterpartyLabel: 'Market Vendor, Produce',
     counterpartyLookupType: 'email',
     counterpartyLookupHint: 'm***@market.ng',
     counterpartyArrangementStatus: 'active',
