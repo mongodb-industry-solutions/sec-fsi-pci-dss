@@ -296,6 +296,9 @@ Used by customers to detect their onboarding state: no application / under_revie
             merchantAllowedCurrencies: { type: 'array', items: { type: 'string' } },
             merchantWebhookEndpoint: { type: 'string' },
             merchantSettlementSchedule: { type: 'string', enum: ['T+1', 'T+2', 'T+3'] },
+            merchantOwnerPartyReference: { type: 'string', nullable: true, description: 'FK → party.partyInstanceReference (SD-13). Enables owner self-service (settings, payout account).' },
+            merchantDefaultPayoutAccountReference: { type: 'string', nullable: true, description: 'FK → payoutAccountArrangement (SD-66). Settlement destination for this merchant.' },
+            merchantTier: { type: 'string', nullable: true },
             merchantAgreementKybCheck: {
               type: 'object',
               nullable: true,
