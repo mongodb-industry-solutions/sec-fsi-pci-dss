@@ -108,8 +108,11 @@ export async function createIndexes(client: MongoClient) {
   const db = client.db(config.mongodb.dbName);
 
   // SD-13: Party Data Management
+  // partyMobilePhoneNumber is QE-encrypted (no unique index possible), so uniqueness is
+  // enforced on its blind-index digest — a keyed HMAC stored in plaintext. See digest.ts.
   await ensureIndexes(db, 'party', [
     { key: { partyInstanceReference: 1 }, unique: true },
+    { key: { partyMobilePhoneNumberDigest: 1 }, unique: true },
   ]);
 
   // SD-254: Card Transaction Log

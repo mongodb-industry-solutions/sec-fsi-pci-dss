@@ -8,6 +8,7 @@ import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/part
 import { CUSTOMER_AUTHENTICATION_COLLECTION } from '../../identity/models/customerAuthentication.model';
 import type { UserRole } from '../../../shared/models/identity.model';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
+import { phoneDigest } from '../../../vendors/encryption/digest';
 import { canReadSensitive } from '../../../vendors/middleware/rbac';
 import { validateToken } from '../../../vendors/security/escalationTokens';
 import { appendAuditEvent } from '../../fraud/services/fraudDiagnosis.service';
@@ -190,15 +191,36 @@ export async function updateSelfProfile(
 
   // PII fields that live in party (SD-13)
   const partyPatch: Record<string, unknown> = {};
-  if (patch.customerMobilePhoneNumber) partyPatch.partyMobilePhoneNumber = patch.customerMobilePhoneNumber;
+  if (patch.customerMobilePhoneNumber) {
+    partyPatch.partyMobilePhoneNumber = patch.customerMobilePhoneNumber;
+    // Keep the uniqueness blind index in sync. Reject up-front if another party already
+    // owns this phone (the unique index is the hard guarantee; this gives a clean 409).
+    const digest = phoneDigest(patch.customerMobilePhoneNumber);
+    partyPatch.partyMobilePhoneNumberDigest = digest;
+    const clash = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION).findOne(
+      { partyMobilePhoneNumberDigest: digest, partyInstanceReference: { $ne: party.partyInstanceReference } },
+      { projection: { partyInstanceReference: 1 } }
+    );
+    if (clash) {
+      throw Object.assign(new Error('Phone number already in use by another party'), { statusCode: 409 });
+    }
+  }
   if (patch.customerName) partyPatch.partyName = patch.customerName;
 
   if (Object.keys(partyPatch).length > 0) {
     partyPatch.recordUpdatedDateTime = new Date();
-    await roleDb.collection(PARTY_COLLECTION).updateOne(
-      { partyInstanceReference: party.partyInstanceReference },
-      { $set: partyPatch }
-    );
+    try {
+      await roleDb.collection(PARTY_COLLECTION).updateOne(
+        { partyInstanceReference: party.partyInstanceReference },
+        { $set: partyPatch }
+      );
+    } catch (e: any) {
+      // Concurrent writer won the race for this phone — unique index rejected it.
+      if (e?.code === 11000 || e?.code === 11001) {
+        throw Object.assign(new Error('Phone number already in use by another party'), { statusCode: 409 });
+      }
+      throw e;
+    }
     matched = true;
 
     // Sync Extended Reference: customerAuthenticationAssessment.customerAuthenticationUserName

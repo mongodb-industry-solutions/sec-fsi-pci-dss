@@ -39,6 +39,7 @@ export interface PartyControlRecord {
   partyInstanceReference: string;        // PK, UUID; referenced as FK by SD-53, SD-91
   partyEmailAddress: string;             // QE:equality — primary investigation search key
   partyMobilePhoneNumber: string;        // QE:equality — secondary investigation search key
+  partyMobilePhoneNumberDigest: string;  // Blind index (keyed HMAC, NOT encrypted) — unique key for the phone
   partyName: string;                     // Becomes QE:equality in v2
   partyType: PartyType;
   partyDateOfBirth?: string;             // ISO 8601 date
@@ -52,6 +53,15 @@ export interface PartyControlRecord {
 
 export type PartyType = 'customer' | 'employee' | 'service_account';
 ```
+
+> **Blind index for phone uniqueness.** `partyMobilePhoneNumber` is a QE:equality field, and
+> MongoDB Queryable Encryption **cannot enforce a unique index on an encrypted field**. To
+> guarantee that a phone number identifies exactly one party, we store `partyMobilePhoneNumberDigest`
+> — a keyed HMAC-SHA256 of the *normalized* phone (leading `+` preserved, all other non-digits
+> stripped), keyed by `PSP_BLIND_INDEX_KEY` — in plaintext and put a **unique index** on it. The
+> HMAC is irreversible without the key, so indexing it in the clear leaks nothing. The digest is
+> derived server-side (`digest.ts` → `phoneDigest`) on seed and on any phone update; clients never
+> set it. The same pattern applies to any other encrypted field that must be unique (e.g. email).
 
 ### `customerAuthentication.model.ts` (SD-91 — new)
 
@@ -1366,6 +1376,8 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { partyInstanceReference: 1 }, unique: true },
     // Note: partyEmailAddress and partyMobilePhoneNumber are QE:equality —
     // QE manages its own __safeContent__ index; do NOT add manual indexes on these fields
+    // Uniqueness on the (encrypted) phone is enforced via its blind-index digest instead:
+    { key: { partyMobilePhoneNumberDigest: 1 }, unique: true },
   ]);
 
   // ── customerAuthenticationAssessment (SD-91) ──────────────────────

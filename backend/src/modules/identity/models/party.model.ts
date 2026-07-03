@@ -20,6 +20,10 @@ export interface PartyControlRecord {
   // QE equality: searched by analysts (email/phone are PII)
   partyEmailAddress: string;
   partyMobilePhoneNumber: string;
+  // Blind index: keyed HMAC of the normalized phone (NOT encrypted). Enforces phone
+  // uniqueness via a plaintext unique index — QE fields cannot have unique indexes.
+  // Derived from partyMobilePhoneNumber; never set by clients directly. See digest.ts.
+  partyMobilePhoneNumberDigest: string;
   // Plaintext display fields
   partyName: string;
   partyType: PartyType;

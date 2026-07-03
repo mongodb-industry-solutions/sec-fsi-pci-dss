@@ -79,6 +79,7 @@ export const config = {
     adminUser: pspEnv('ADM_USER'),
     adminPass: pspEnv('ADM_PASS'),
     jwtSecret: pspEnv('JWT_SECRET', 'dev-secret-change-me')!,
+    blindIndexKey: pspEnv('BLIND_INDEX_KEY', 'demo-blind-index-key-change-in-production')!,
     jwtExpiresIn: pspEnv('JWT_EXPIRES_IN', '24h')!,
     fraudAmountThreshold: parseFloat(pspEnv('FRAUD_AMOUNT_THRESHOLD', '500')!),
     riskMccList: (pspEnv('RISK_MCC_LIST', '5812,6011,7995')!).split(',').map((s) => s.trim()),
