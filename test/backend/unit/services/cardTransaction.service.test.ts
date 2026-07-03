@@ -93,7 +93,7 @@ beforeEach(() => {
 });
 
 const baseInput = {
-  cardToken: 'tok_abc123',
+  cardToken: 'pm_abc123',
   accountReference: 'ACC-001',
   amount: 100,
   currency: 'USD',
@@ -238,7 +238,7 @@ describe('getTransactionById', () => {
       cardTransactionMerchantCategoryCode: '5411',
       cardTransactionMaskedPanDisplay: '****-****-****-1234',
       cardTransactionChannel: 'online',
-      paymentCardReference: 'tok_abc',
+      paymentCardReference: 'pm_abc',
       cardTransactionAccountReference: 'ACC-001',
     };
     h.findOne.mockResolvedValueOnce(doc);
@@ -259,14 +259,14 @@ describe('getTransactionsByCardToken', () => {
   it('returns all transactions for a card token with count', async () => {
     const docs = [{ cardTransactionInstanceReference: 'txn-001' }, { cardTransactionInstanceReference: 'txn-002' }];
     const db = makeDb({ findResults: docs });
-    const result = await getTransactionsByCardToken(db, 'tok_abc');
+    const result = await getTransactionsByCardToken(db, 'pm_abc');
     expect(result.results).toHaveLength(2);
     expect(result.count).toBe(2);
   });
 
   it('returns empty results for unknown token', async () => {
     const db = makeDb({ findResults: [] });
-    const result = await getTransactionsByCardToken(db, 'tok_unknown');
+    const result = await getTransactionsByCardToken(db, 'pm_unknown');
     expect(result.results).toHaveLength(0);
     expect(result.count).toBe(0);
   });

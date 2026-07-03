@@ -1593,7 +1593,7 @@ Creates a transaction and optionally a fraud case.
 **Request body:**
 ```json
 {
-  "cardToken": "tok_abc123",
+  "cardToken": "pm_abc123",
   "accountReference": "ACC-001",
   "amount": 850.00,
   "currency": "USD",
@@ -1697,7 +1697,7 @@ Registers a tokenized card linked to a customer agreement.
 **Request body** (`customerAgreementInstanceReference` is taken from the `:customerId` path param — do not include it in the body):
 ```json
 {
-  "cardToken": "tok_abc123",
+  "cardToken": "pm_abc123",
   "paymentCardExpirationDate": "12/28",
   "paymentCardMaskedPanDisplay": "****-****-****-1234",
   "paymentCardNetwork": "VISA",
@@ -2552,7 +2552,7 @@ Each of these 5 users has a corresponding `party` document in `parties.json` lin
 ### Synthetic data rules
 
 - All personal data (names, emails, phones, addresses) is generated with `@faker-js/faker`
-- Card tokens use the format `tok_<uuid>`: never a real card number
+- Card tokens use the format `pm_<uuid>`: never a real card number
 - `paymentCardMaskedPanDisplay` / `cardTransactionMaskedPanDisplay` format: `****-****-****-XXXX` where XXXX is a random 4-digit suffix
 - `paymentCardExpirationDate` is always a future date (at least 12 months from generation)
 - CVV, PIN, full PAN, and magnetic stripe data are **never included** in seed files
@@ -2993,7 +2993,7 @@ All routes are under the `/api/v1` prefix.
 **POST `/checkout/sessions/:id/pay` request:**
 ```json
 {
-  "cardToken": "tok_abc123...",
+  "cardToken": "pm_abc123...",
   "cardholderName": "Jane Smith",
   "cardExpiryMonth": "12",
   "cardExpiryYear": "2027"
@@ -3180,7 +3180,7 @@ All 50 records include `customerAgreementKycCheck` with BIAN BQ:Step sub-documen
 | Concern | Implementation |
 |---|---|
 | SAQ A scope | Card data entered only on `{PSP_URL_FRONTEND}/checkout/` and `{PSP_URL_FRONTEND}/pay/` — merchant domain never handles CHD |
-| Card tokenization | Frontend generates `tok_<random>` surrogate; raw PAN never sent to backend API |
+| Card tokenization | Frontend generates `pm_<random>` surrogate; raw PAN never sent to backend API |
 | API key storage | bcrypt hash only (`bcryptjs`, 10 rounds); plaintext returned once at generation, never stored |
 | Webhook integrity | `X-Webhook-Signature: sha256=<hmac>` signed with per-merchant secret; constant-time comparison |
 | Session TTL | MongoDB TTL index on `checkoutSessionExpiresAt` auto-deletes expired sessions after 30 min |

@@ -11,7 +11,7 @@ export interface TokenVaultControlRecord {
   linkedPaymentCardInstanceReference?: string;      // FK → paymentCard (plaintext)
 
   // Token fields
-  tokenVaultCardToken: string;                      // Plaintext surrogate token (tok_<uuid>)
+  tokenVaultCardToken: string;                      // Plaintext surrogate token (pm_<uuid>)
   tokenVaultNetworkToken?: string;                  // QE:none  -  card scheme network token (if applicable)
   tokenVaultMaskedPanDisplay: string;               // ****-****-****-XXXX (display only)
   tokenVaultCardNetwork: 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';

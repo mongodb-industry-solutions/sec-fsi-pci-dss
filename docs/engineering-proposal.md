@@ -459,7 +459,7 @@ If a breaking schema change is needed (e.g., adding a QE range field), the colle
 | AWS KMS latency degrades demo flow | Low | Medium | Cache the unwrapped DEK in memory for the process lifetime; only call KMS on startup |
 | Atlas M0 / M2 / M5 (free tier) used by a developer: QE not supported | High | High | Gate `bin/setup.ts` with a cluster tier check; fail fast with a clear error message |
 | QE `$lookup` limitation breaks a planned join | Low | High | All joins are application-side sequential queries: no `$lookup` used. Documented in ADR-001 |
-| Seed data accidentally includes real PAN format | Medium | High | Seed generator always prefixes tokens with `tok_`; grep CI check rejects any string matching `\b\d{13,19}\b` |
+| Seed data accidentally includes real PAN format | Medium | High | Seed generator always prefixes tokens with `pm_`; grep CI check rejects any string matching `\b\d{13,19}\b` |
 | Key vault DEK reference lost (collection dropped without DEK cleanup) | Low | High | `bin/setup.ts --reset` drops collections then recreates DEKs; order is enforced in script |
 | Demo breaks at conference due to AWS KMS unavailability | Low | High | Local KMS fallback is always available with `KMS_PROVIDER=local`; test it before travel |
 
@@ -785,7 +785,7 @@ The correct cross-domain FK is `merchantOwnerPartyReference → party.partyInsta
 | Single-use link enforcement | `status = 'completed'` after first payment; subsequent `POST /pay` returns 410 |
 | Merchant API key storage | bcrypt hash in DB; plaintext returned only once on key generation |
 | Webhook authenticity (merchant receiving) | `X-Webhook-Signature: sha256=<hmac(payload, webhookSecret)>` — mirrors Stripe/GitHub pattern |
-| Card data isolation | Raw card numbers never sent to or stored by the API; client-side tokenization (`tok_<random>`) |
+| Card data isolation | Raw card numbers never sent to or stored by the API; client-side tokenization (`pm_<random>`) |
 | PCI DSS SAQ A | The hosted payment pages (`/checkout/*`, `/pay/*`) are on the PSP domain; buyers enter card details only on those pages |
 
 ### API Key Design

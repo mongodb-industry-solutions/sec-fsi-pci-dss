@@ -117,8 +117,8 @@ export default function TransactionsPage() {
       setFilterCardToken('');
     } else {
       setFilterEmail('');
-      setFilterCardToken(v.startsWith('tok_') ? v : '');
-      setFilterMerchant(!v.startsWith('tok_') ? v : '');
+      setFilterCardToken(v.startsWith('pm_') ? v : '');
+      setFilterMerchant(!v.startsWith('pm_') ? v : '');
     }
     setPage(1);
   }
@@ -188,7 +188,7 @@ export default function TransactionsPage() {
             placeholder={
               searchType === 'email'
                 ? 'customer@example.com'
-                : 'Merchant name  or  tok_xxxxxxxx'
+                : 'Merchant name  or  pm_xxxxxxxx'
             }
             className="flex-1 border rounded-lg px-3 py-2 text-sm"
           />

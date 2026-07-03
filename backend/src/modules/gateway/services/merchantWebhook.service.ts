@@ -108,7 +108,7 @@ export class WebhookService {
             merchantReference: 'TEST-ORDER-0001',
             amount: { value: 49.99, currency: 'USD' },
             status: 'ACSC', statusCode: '0000', authorizationCode: 'TEST01',
-            maskedPan: '****1234', cardToken: 'tok_test000000000000', cardScheme: 'VISA',
+            maskedPan: '****1234', cardToken: 'pm_test000000000000', cardScheme: 'VISA',
           },
         };
       case 'payment.failed':
@@ -119,7 +119,7 @@ export class WebhookService {
             merchantReference: 'TEST-ORDER-0002',
             amount: { value: 75.00, currency: 'USD' },
             status: 'RJCT', statusCode: '0190',
-            maskedPan: '****5678', cardToken: 'tok_test000000000001', cardScheme: 'MASTERCARD',
+            maskedPan: '****5678', cardToken: 'pm_test000000000001', cardScheme: 'MASTERCARD',
             declineReason: 'Authorization declined by the issuer',
           },
         };

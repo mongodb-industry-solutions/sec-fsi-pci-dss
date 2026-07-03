@@ -28,7 +28,7 @@ function uuid(): string {
 }
 
 function cardToken(): string {
-  return `tok_${crypto.randomBytes(8).toString('hex')}`;
+  return `pm_${crypto.randomBytes(8).toString('hex')}`;
 }
 
 function maskedPan(): string {
@@ -329,8 +329,8 @@ async function main() {
   // the shared-card threshold (>3 holders) so it trips the compliance signal; the registry counts
   // distinct holders. Each holder gets their own arrangement row + alias.
   const SHARED_CARDS = [
-    { token: 'tok_shared00000a4153', masked: '****-****-****-4153', network: 'VISA',       holders: 5 },
-    { token: 'tok_shared00000b8821', masked: '****-****-****-8821', network: 'MASTERCARD', holders: 2 },
+    { token: 'pm_shared00000a4153', masked: '****-****-****-4153', network: 'VISA',       holders: 5 },
+    { token: 'pm_shared00000b8821', masked: '****-****-****-8821', network: 'MASTERCARD', holders: 2 },
   ];
   let sharedCursor = 0;
   for (const s of SHARED_CARDS) {

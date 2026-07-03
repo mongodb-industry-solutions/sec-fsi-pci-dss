@@ -73,7 +73,7 @@ export async function seedIntegrityIssues(client: MongoClient): Promise<{
       ...sampleCard,
       _id: undefined,
       paymentCardInstanceReference: uuidv4(),
-      paymentCardReference: `tok_dupERR${uuidv4().replace(/-/g, '').slice(0, 10)}`, // different token
+      paymentCardReference: `pm_dupERR${uuidv4().replace(/-/g, '').slice(0, 10)}`, // different token
       paymentCardAlias: 'Duplicate (data error)',
       recordCreatedDateTime: new Date().toISOString(),
     };

@@ -370,7 +370,7 @@ export function buildSampleWebhookPayload(merchantId: string): Record<string, un
     event: 'payment.completed',
     result: 'approved',
     test: true,
-    cardToken: 'tok_test000000000000',
+    cardToken: 'pm_test000000000000',
     maskedPan: '****-****-****-4242',
     responseCode: '0000',
     authorizationCode: 'TEST01',

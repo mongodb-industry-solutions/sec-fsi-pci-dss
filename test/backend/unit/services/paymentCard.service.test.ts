@@ -22,7 +22,7 @@ function makeDb(overrides?: { findResults?: unknown[] }) {
 
 const baseInput = {
   customerAgreementInstanceReference: 'cust-001',
-  cardToken: 'tok_abcdef1234567890',
+  cardToken: 'pm_abcdef1234567890',
   paymentCardExpirationDate: '12/28',
   paymentCardMaskedPanDisplay: '****-****-****-4242',
   paymentCardNetwork: 'VISA' as const,
@@ -52,7 +52,7 @@ describe('createCard', () => {
     const db = makeDb();
     await createCard(db, baseInput);
     const doc = db._insertOne.mock.calls[0][0];
-    expect(doc.paymentCardReference).toBe('tok_abcdef1234567890');
+    expect(doc.paymentCardReference).toBe('pm_abcdef1234567890');
     expect(doc.cardNumber).toBeUndefined();
   });
 

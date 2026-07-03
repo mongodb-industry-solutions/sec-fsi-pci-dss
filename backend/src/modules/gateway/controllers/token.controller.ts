@@ -12,7 +12,7 @@ export async function tokenController(fastify: FastifyInstance) {
       tags: ['gateway'],
       summary: 'Tokenize a card instrument (SD-57)',
       description: `Creates a \`tokenVault\` entry (BIAN SD-57) that assigns a \`tokenVaultCardToken\`
-(format \`tok_<uuid>\`) to a payment card. The token is a card surrogate; it is NOT CHD under PCI DSS v4.0.
+(format \`pm_<uuid>\`) to a payment card. The token is a card surrogate; it is NOT CHD under PCI DSS v4.0.
 
 **Network tokens:** If the card scheme provides a network token (\`tokenVaultNetworkToken\`), it is stored as QE:none  -  encrypted at rest, never returned in any response.
 
@@ -35,7 +35,7 @@ export async function tokenController(fastify: FastifyInstance) {
           type: 'object',
           properties: {
             tokenVaultInstanceReference: { type: 'string', description: 'UUID of the token vault record.' },
-            tokenVaultCardToken: { type: 'string', description: 'Card surrogate token (tok_<uuid>). Use in /api/v1/transactions.' },
+            tokenVaultCardToken: { type: 'string', description: 'Card surrogate token (pm_<uuid>). Use in /api/v1/transactions.' },
             tokenVaultMaskedPanDisplay: { type: 'string' },
             tokenVaultCardNetwork: { type: 'string', enum: ['VISA', 'MASTERCARD', 'AMEX', 'ELO'] },
             tokenVaultStatus: { type: 'string', enum: ['active', 'suspended', 'expired'] },
@@ -75,7 +75,7 @@ Use this endpoint to verify a token is still \`active\` before initiating a recu
         type: 'object',
         required: ['token'],
         properties: {
-          token: { type: 'string', description: '`tokenVaultCardToken` value (tok_<uuid>).' },
+          token: { type: 'string', description: '`tokenVaultCardToken` value (pm_<uuid>).' },
         },
       },
       response: {

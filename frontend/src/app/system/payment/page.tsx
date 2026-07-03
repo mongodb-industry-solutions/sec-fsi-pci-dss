@@ -39,7 +39,7 @@ function mccNote(mcc: string): string {
   return map[mcc] ?? `MCC ${mcc}`;
 }
 
-const genToken = () => `tok_${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 10)}`;
+const genToken = () => `pm_${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 10)}`;
 
 // Static fallback; shown only if the API call fails (network error, not yet seeded)
 const MERCHANT_FALLBACK: MerchantOption[] = [

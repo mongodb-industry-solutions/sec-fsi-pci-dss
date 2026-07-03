@@ -430,7 +430,7 @@ const QA_DATA: QAItem[] = [
         <Table
           headers={['Field', 'Value example', 'Classification', 'Storage']}
           rows={[
-            [<Code>paymentCardReference</Code>, 'tok_7xB2kp1q', 'Card surrogate, not CHD', 'Plaintext, standard index'],
+            [<Code>paymentCardReference</Code>, 'pm_7xB2kp1q', 'Card surrogate, not CHD', 'Plaintext, standard index'],
             [<Code>maskedPanDisplay</Code>, '**** **** **** 4242', 'Permitted for display (last 4 digits)', 'Plaintext'],
             [<Code>cardExpirationDate</Code>, '[ciphertext]', 'CHD', 'QE:none, encrypted and non-searchable'],
             ['CVV / PIN', 'not present', 'SAD', 'Never accepted at any endpoint'],

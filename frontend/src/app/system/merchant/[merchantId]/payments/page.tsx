@@ -163,7 +163,7 @@ export default function PaymentsSectionPage() {
             <label className="block text-xs text-gray-500 mb-1">Card Token</label>
             <input value={cardTokenInput} onChange={(e) => setCardTokenInput(e.target.value.trim())}
               onKeyDown={(e) => { if (e.key === 'Enter') { setCardToken(cardTokenInput.trim()); setPage(1); } }}
-              placeholder="tok_xxxxxxxx"
+              placeholder="pm_xxxxxxxx"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
           </div>
           <div>

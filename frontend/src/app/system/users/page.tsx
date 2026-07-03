@@ -281,7 +281,7 @@ export default function UsersPage() {
                 value={cardToken}
                 onChange={(e) => setCardToken(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && loadTransactions()}
-                placeholder="Card token (tok_xxx)  or  masked PAN (****-****-****-1234)"
+                placeholder="Card token (pm_xxx)  or  masked PAN (****-****-****-1234)"
                 className="flex-1 border rounded-lg px-3 py-2 text-sm font-mono"
               />
               <button
