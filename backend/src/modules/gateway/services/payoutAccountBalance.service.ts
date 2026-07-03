@@ -155,6 +155,29 @@ export async function settleCardDebit(
 }
 
 /**
+ * Release a card authorization hold back to available (compensation when a later gate declines the
+ * journey after funds were already held). Inverse of holdCardFunds: pending -= amount, available += amount.
+ * Idempotent-safe at the amount level; callers must only release an amount they actually held.
+ */
+export async function releaseCardHold(
+  db: Db,
+  payoutAccountRef: string,
+  amount: number,
+): Promise<boolean> {
+  const result = await db.collection(PAYOUT_ACCOUNT_COLLECTION).updateOne(
+    { payoutAccountInstanceReference: payoutAccountRef, payoutAccountStatus: 'active' },
+    {
+      $inc: {
+        'payoutAccountBalance.pendingAmount': -amount,
+        'payoutAccountBalance.availableAmount': amount,
+      },
+      $set: { 'payoutAccountBalance.lastUpdatedDateTime': new Date(), recordUpdatedDateTime: new Date() },
+    },
+  );
+  return result.modifiedCount === 1;
+}
+
+/**
  * Release reserved funds back to available (e.g., dispute resolved in merchant's favour).
  */
 export async function releaseFunds(

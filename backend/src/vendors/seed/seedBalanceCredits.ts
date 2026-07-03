@@ -13,7 +13,10 @@ export async function seedBalanceCredits(db: Db): Promise<void> {
 
   let inserted = 0;
   for (const account of accounts) {
-    const available = account.payoutAccountBalance?.availableAmount ?? 0;
+    // Opening deposit reconciles to the FULL balance (available + pending + reserved) so the credit
+    // log fully explains the account balance: Σ(credits) − Σ(debits=0 at seed) == current balance.
+    const bal = account.payoutAccountBalance;
+    const available = (bal?.availableAmount ?? 0) + (bal?.pendingAmount ?? 0) + (bal?.reservedAmount ?? 0);
     if (available <= 0) continue;
 
     const existing = await col.findOne({

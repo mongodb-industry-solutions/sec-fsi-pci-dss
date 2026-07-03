@@ -20,6 +20,7 @@ export type IntegrationProviderType =
   | 'card_issuer'
   | 'account_information'    // SD-36 Open Banking AIS — external bank account identity/balance (PSD2)
   | 'payment_initiation'     // SD-66 PISP — executes bank transfers (PSD2)
+  | 'currency_exchange'      // v17 FX — converts amounts between ISO-4217 currencies (mid rate + spread)
   | 'generic';
 
 export type IntegrationStatus  = 'active' | 'inactive' | 'test' | 'suspended';

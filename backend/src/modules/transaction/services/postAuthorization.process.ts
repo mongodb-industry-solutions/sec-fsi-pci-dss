@@ -112,11 +112,11 @@ export class PostAuthorizationProcess {
   }
 
   // A5: After a card event, update the PSP internal ledger balance for the funding payout account.
-  // Purchase auth: holdCardFunds (move available → pending, BIAN SD-66 debit authorization).
-  // Refund auth: creditDirect (increment available, returning funds to cardholder).
+  // v17: DEBIT holds now happen atomically in the funds-check GATE (providerGroups.onFunds) BEFORE the
+  // payment is authorized — so this post-auth step no longer holds for purchases (that would double-debit).
+  // It only handles the REFUND credit path (return funds to the cardholder's available balance).
   // Uses only UUID references — IBAN is never accessed (PCI DSS Req 3.2).
   private async decrementCardFundingBalance(txnId: string): Promise<void> {
-    const { holdCardFunds, creditDirect } = await import('../../gateway/services/payoutAccountBalance.service');
     const txn = await this.db.collection<{
       cardTransactionAmount?: { amount: number; currency: string };
       paymentCardInstanceReference?: string;
@@ -126,19 +126,23 @@ export class PostAuthorizationProcess {
       { cardTransactionInstanceReference: txnId },
       { projection: { cardTransactionAmount: 1, paymentCardInstanceReference: 1, cardTransactionStatus: 1, cardTransactionType: 1 } }
     );
+    if (txn?.cardTransactionType !== 'refund') return; // debits are held by the funds gate, not here
     if (!txn?.paymentCardInstanceReference || !txn?.cardTransactionAmount) return;
+    const { creditDirect } = await import('../../gateway/services/payoutAccountBalance.service');
     const { PAYMENT_CARD_COLLECTION } = await import('../../customer/models/paymentCard.model');
+    const { resolveAndConvert } = await import('../../../providers/currency-exchange/services/currencyExchange.service');
     const card = await this.db.collection<{ fundingPayoutAccountInstanceReference?: string }>(PAYMENT_CARD_COLLECTION)
       .findOne({ paymentCardInstanceReference: txn.paymentCardInstanceReference }, { projection: { fundingPayoutAccountInstanceReference: 1 } });
     if (!card?.fundingPayoutAccountInstanceReference) return;
-    const amount = txn.cardTransactionAmount.amount;
     const accountRef = card.fundingPayoutAccountInstanceReference;
-    if (txn.cardTransactionType === 'refund') {
-      // Refund: return funds to cardholder available balance (BIAN SD-88 credit)
-      await creditDirect(this.db, accountRef, amount);
-    } else {
-      // Purchase / cash-advance / fee: hold funds (available → pending) at authorization time
-      await holdCardFunds(this.db, accountRef, amount);
+    // Refund: return funds to cardholder available balance (BIAN SD-88 credit), in account currency (FX).
+    const { PAYOUT_ACCOUNT_COLLECTION } = await import('../../gateway/models/payoutAccount.model');
+    const account = await this.db.collection<{ payoutAccountCurrency?: string }>(PAYOUT_ACCOUNT_COLLECTION)
+      .findOne({ payoutAccountInstanceReference: accountRef }, { projection: { payoutAccountCurrency: 1 } });
+    let amount = txn.cardTransactionAmount.amount;
+    if (account?.payoutAccountCurrency && account.payoutAccountCurrency !== txn.cardTransactionAmount.currency) {
+      try { amount = (await resolveAndConvert(this.db, amount, txn.cardTransactionAmount.currency, account.payoutAccountCurrency)).amount; } catch { /* keep original on FX error */ }
     }
+    await creditDirect(this.db, accountRef, amount);
   }
 }

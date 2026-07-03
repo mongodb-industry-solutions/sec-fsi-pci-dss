@@ -207,7 +207,7 @@ export async function initiateTransaction(
     businessProcess: 'card_payment',
     source: 'psp.core',
     // Phase-1 gates the saga must aggregate before authorizing (dev.v8 F4).
-    payload: { amount: input.amount, currency: input.currency, merchantName: input.cardTransactionMerchantName, maskedPan: input.cardTransactionMaskedPanDisplay, channel: input.cardTransactionChannel, gatesExpected: ['card.issuer', 'fds', 'hrp'] },
+    payload: { amount: input.amount, currency: input.currency, merchantName: input.cardTransactionMerchantName, maskedPan: input.cardTransactionMaskedPanDisplay, channel: input.cardTransactionChannel, gatesExpected: ['card.issuer', 'fds', 'hrp', 'funds'] },
     bian: { serviceDomain: 'SD-254 Card Transaction', controlRecord: 'CardTransactionRecord' },
   });
   void bus.publish(requestedEvent);
@@ -272,6 +272,13 @@ async function emitGateRequests(txnId: string, input: CreateTransactionInput, ca
     eventType: 'hrp.screening.requested', correlationId: txnId, businessProcess: 'card_payment', source: 'psp.core', causationId: causationParent,
     payload: { subjectPartyReference: input.accountReference, accountReference: input.accountReference, amount: input.amount, currency: input.currency, merchantName: input.cardTransactionMerchantName },
     bian: { serviceDomain: 'SD-13 Party Reference', controlRecord: 'PartyReferenceDataDirectoryEntry' },
+  }));
+  // v17 funds-availability gate (SD-36 AIS). Reference-led: only the card token + amount travel;
+  // the reactor resolves the funding account and performs the atomic hold. No CHD, no IBAN.
+  void bus.publish(makeEvent({
+    eventType: 'funds.check.requested', correlationId: txnId, businessProcess: 'card_payment', source: 'psp.core', causationId: causationParent,
+    payload: { cardToken: input.cardToken, amount: input.amount, currency: input.currency, cardTransactionType: input.cardTransactionType },
+    bian: { serviceDomain: 'SD-36 Account Information', controlRecord: 'AccountInformationValidation' },
   }));
 }
 

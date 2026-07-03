@@ -387,7 +387,7 @@ async function main() {
         settlementDate: faker.date.soon({ days: 3 }),
         processingFlags: ['standard'],
       },
-      cardTransactionAmount: { amount, currency: 'USD' },
+      cardTransactionAmount: { amount, currency: 'EUR' },
       cardTransactionDateTime: faker.date.recent({ days: 30 }),
       cardTransactionStatus: STATUSES[i % STATUSES.length],
       cardTransactionType: txType,

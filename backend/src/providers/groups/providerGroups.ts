@@ -4,6 +4,20 @@ import { dispatchProvider } from '../../modules/provider/services/integrationDis
 import { getChdCrypto } from '../../vendors/encryption/chdCrypto';
 import { recordPendingCorrelation } from '../../modules/provider/services/pendingCorrelation.service';
 import { publishIssuerValidationCompleted } from '../../modules/transaction/services/cardTransaction.service';
+import { PAYMENT_CARD_COLLECTION } from '../../modules/customer/models/paymentCard.model';
+import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../../modules/gateway/models/payoutAccount.model';
+import { holdCardFunds } from '../../modules/gateway/services/payoutAccountBalance.service';
+import { resolveAndConvert } from '../currency-exchange/services/currencyExchange.service';
+import {
+  RESPONSE_CODE_APPROVED,
+  RESPONSE_CODE_INSUFFICIENT_FUNDS,
+  DECISION_REASON_INSUFFICIENT_FUNDS,
+  DECISION_REASON_ACCOUNT_NOT_FOUND,
+} from '../../shared/models/responseCodes';
+
+// Card-transaction types that DEBIT the funding account and therefore require an atomic funds hold.
+// Refunds/adjustments credit or are non-cash and pass the gate without a hold.
+const FUNDS_DEBIT_TYPES = new Set(['purchase', 'cash_advance', 'fee']);
 
 // Provider Group reactors: each subscribes to a provider category's `*.requested` event, performs the
 // outbound call (the only place dispatchProvider runs for these flows), and publishes the matching
@@ -20,6 +34,76 @@ export class ProviderGroups {
     this.bus.subscribe('card.issuer.validation.requested', (e) => this.onIssuer(e));
     this.bus.subscribe('fds.scoring.requested', (e) => this.onFds(e));
     this.bus.subscribe('hrp.screening.requested', (e) => this.onHrp(e));
+    this.bus.subscribe('funds.check.requested', (e) => this.onFunds(e));
+  }
+
+  // v17 funds-availability gate (SD-36 AIS). Resolves the funding account from the card token, reads
+  // the balance via the account_information capability (provider-indifferent: built-in module reads the
+  // internal ledger, an external PSD2 AIS substitutes it), converts the amount to the account currency
+  // (FX), and performs the ATOMIC hold. The hold ($gte-conditional $inc) is the authoritative decision:
+  // no read-modify-write race. Insufficient funds → declined '51'. Non-debit types pass without a hold.
+  private async onFunds(e: DomainEvent): Promise<void> {
+    const p = e.payload as { cardToken?: string; amount?: number; currency?: string; cardTransactionType?: string };
+    const txnId = e.correlationId;
+    const amount = p.amount ?? 0;
+    const txnCurrency = p.currency ?? 'EUR';
+
+    const publish = (payload: Record<string, unknown>) => void this.bus.publish(makeEvent({
+      eventType: 'funds.check.completed', correlationId: txnId, businessProcess: 'card_payment',
+      source: 'callback.funds', causationId: e.eventId,
+      payload: { transactionId: txnId, ...payload },
+      bian: { serviceDomain: 'SD-36 Account Information', controlRecord: 'AccountInformationValidation' },
+    }));
+
+    // Non-debit types (refund/balance_transfer/adjustment) never hold funds — the gate approves.
+    if (!p.cardTransactionType || !FUNDS_DEBIT_TYPES.has(p.cardTransactionType)) {
+      publish({ outcome: 'approved', responseCode: RESPONSE_CODE_APPROVED });
+      return;
+    }
+
+    // Resolve funding account from the card-on-file token. The internal funds gate ONLY governs cards
+    // funded by a PSP-internal payout account (fundingPayoutAccountInstanceReference). A new/unsaved
+    // token or an external card has no internal funding account — its funds are the ISSUER's
+    // responsibility (the card.issuer gate), so this gate passes through (approve, no hold).
+    const card = await this.db.collection<{ fundingPayoutAccountInstanceReference?: string }>(PAYMENT_CARD_COLLECTION)
+      .findOne({ paymentCardReference: p.cardToken }, { projection: { fundingPayoutAccountInstanceReference: 1 } });
+    const accountRef = card?.fundingPayoutAccountInstanceReference;
+    if (!accountRef) {
+      publish({ outcome: 'approved', responseCode: RESPONSE_CODE_APPROVED, decisionReason: 'no_internal_funding_account' });
+      return;
+    }
+
+    const account = await this.db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
+      .findOne({ payoutAccountInstanceReference: accountRef });
+    if (!account || account.payoutAccountStatus !== 'active') {
+      publish({ outcome: 'declined', responseCode: RESPONSE_CODE_INSUFFICIENT_FUNDS, decisionReason: DECISION_REASON_ACCOUNT_NOT_FOUND, fundingPayoutAccountReference: accountRef });
+      return;
+    }
+
+    // FX: convert the transaction amount into the funding-account currency before holding.
+    const accountCurrency = account.payoutAccountCurrency;
+    let amountInAccountCcy = amount;
+    let fxRate = 1;
+    let converted = false;
+    try {
+      const fx = await resolveAndConvert(this.db, amount, txnCurrency, accountCurrency);
+      amountInAccountCcy = fx.amount; fxRate = fx.rate; converted = fx.converted;
+    } catch { /* missing rate: fall back to same-amount, no conversion (surfaced via converted=false) */ }
+
+    // Provider-indifferent READ for audit/observability + external substitution (fail-open on error).
+    void dispatchProvider(this.db, 'account_information', 'funds.check.requested', {
+      payoutAccountInstanceReference: accountRef, clientReference: txnId, requestedFields: ['balance', 'status'],
+    }, { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' }).catch(() => {});
+
+    const available = account.payoutAccountBalance?.availableAmount ?? 0;
+
+    // Atomic hold ($gte-conditional): the authoritative funds decision.
+    const held = await holdCardFunds(this.db, accountRef, amountInAccountCcy);
+    if (!held) {
+      publish({ outcome: 'declined', responseCode: RESPONSE_CODE_INSUFFICIENT_FUNDS, decisionReason: DECISION_REASON_INSUFFICIENT_FUNDS, available, currency: accountCurrency, fundingPayoutAccountReference: accountRef, converted, ...(converted ? { fxRate } : {}) });
+      return;
+    }
+    publish({ outcome: 'approved', responseCode: RESPONSE_CODE_APPROVED, available, held: amountInAccountCcy, currency: accountCurrency, fundingPayoutAccountReference: accountRef, converted, ...(converted ? { fxRate } : {}) });
   }
 
   // Real-time fraud scoring. Fail-open: only an explicit block/decline declines.

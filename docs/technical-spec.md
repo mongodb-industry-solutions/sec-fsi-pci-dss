@@ -3440,3 +3440,27 @@ list-filter realism.
 - `createTransaction` remains a synchronous wrapper (initiate + await terminal) so the gateway (checkout / payment-link) is unchanged. See ADR-032.
 
 *Added 2026-06-16 (dev.v8; doc + code together per repo rules).*
+
+---
+
+## v17 — Funds-Availability Gate, Currency Exchange & Balance Reconciliation
+
+Implements [engineering-proposal.md ADR-038](engineering-proposal.md). Money-movement cycle precision.
+
+**New bus events** (`shared/models/events/fundsCheck.events.ts`): `funds.check.requested` / `funds.check.completed` (BIAN SD-36). Payload of completed: `{ transactionId, outcome, responseCode?, decisionReason?, available?, held?, currency?, fundingPayoutAccountReference?, converted?, fxRate? }`.
+
+**Saga** (`paymentAuthorization.saga.ts`): `funds` added to `GATE_EVENT` + `DEFAULT_GATES` (now 4 parallel gates). `gatesExpected` type extended to include `'funds'`; `card.payment.authorization.requested` emits it. On decline, `releaseCardHold` compensates (idempotent, race-safe). `funds.check.requested` emitted from `emitGateRequests`.
+
+**Funds gate reactor** (`providers/groups/providerGroups.ts` → `onFunds`): resolves `cardToken → fundingPayoutAccount`; reads balance via `dispatchProvider('account_information', …)` (provider-indifferent); FX-converts via `resolveAndConvert`; atomic `holdCardFunds` ($gte-conditional). Only debit types (`purchase`/`cash_advance`/`fee`) with an internal funding account are gated; others pass through.
+
+**Balance ops** (`payoutAccountBalance.service.ts`): added `releaseCardHold` (pending → available). Existing `holdCardFunds`/`settleCardDebit` unchanged.
+
+**Response codes** (`shared/models/responseCodes.ts`): `RESPONSE_CODE_APPROVED='00'`, `RESPONSE_CODE_DECLINED='05'`, `RESPONSE_CODE_INSUFFICIENT_FUNDS='51'`, `DECISION_REASON_INSUFFICIENT_FUNDS`, `DECISION_REASON_ACCOUNT_NOT_FOUND`. Insufficient funds → `cardTransactionStatus='declined'` + `'51'` (no new status; BIAN uses the reason code).
+
+**Currency Exchange** (`providers/currency-exchange/services/currencyExchange.service.ts`, capability `currency_exchange` added to `IntegrationProviderType` + `bianMetaFor`): `convert(amount, from, to, config)` mid cross-rate + spread; `resolveAndConvert(db, …)` reads `capabilityModuleConfiguration('currency-exchange')`. Used at card hold/settle, merchant debit/credit, P2P credit, refund.
+
+**Post-auth** (`postAuthorization.process.ts`): debit hold removed (now in the gate — no double-hold); only refund `creditDirect` remains (FX-aware).
+
+**Seeders**: all currencies normalized to EUR (`payoutAccounts.json`, `cardTransactions.json`, `merchants.json`, `fraudCases.json`, `seed-generate.ts`); `pending/reserved` zeroed; `seedBalanceCredits` opening deposit == total balance (reconciled start).
+
+*Added 2026-07-03 (v17; doc + code together per repo rules).*

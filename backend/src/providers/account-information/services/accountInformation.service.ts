@@ -74,3 +74,35 @@ export function validateAccount(
 
   return result;
 }
+
+// v17 Funds-availability check (SD-36 AIS) for the card-payment funds gate. Reuses validateAccount
+// so the balance is ALWAYS sourced from the real ledger (never simulated). Pure: the atomic hold and
+// the DB read live in the gate reactor; this only interprets the account into a funds verdict. The
+// amount is expected already expressed in the ACCOUNT currency (FX applied upstream).
+export interface FundsCheckVerdict {
+  accountVerified: boolean;
+  accountStatus: 'active' | 'dormant' | 'closed' | 'unknown';
+  sufficient: boolean;
+  available: number;
+  currency?: string;
+}
+
+export function checkFunds(
+  account: PayoutAccountArrangement | null,
+  amountInAccountCurrency: number,
+  config: AccountInformationConfig,
+): FundsCheckVerdict {
+  const ais = validateAccount(
+    { payoutAccountInstanceReference: account?.payoutAccountInstanceReference ?? '', clientReference: 'funds-check' },
+    account,
+    { ...config, returnInternalBalance: true },
+  );
+  const available = ais.balanceAvailable ?? 0;
+  return {
+    accountVerified: ais.accountVerified,
+    accountStatus: ais.accountStatus,
+    sufficient: ais.accountVerified && available >= amountInAccountCurrency,
+    available,
+    currency: ais.currency,
+  };
+}

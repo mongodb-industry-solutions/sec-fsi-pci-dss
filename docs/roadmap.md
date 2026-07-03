@@ -596,6 +596,32 @@ As with v3 and v4, external agent adoption (e.g. Agentic ThreatSight360 performi
 
 ---
 
+## v17 — Bank-Movement Cycle Precision (Funds-Availability Gate + FX)
+
+### Objective
+Close the money-movement cycle so it is precise with no balance discrepancy at origin or destination (users or merchants): card authorization must verify real funding-account balance from the DB, decline on insufficient funds per BIAN, and keep balances consistent across the tarjeta → cuenta → ejecución → destino chain. See [engineering-proposal.md ADR-038](engineering-proposal.md).
+
+### FR-v17: Functional Requirements
+
+| ID | Requirement | Acceptance criteria |
+|---|---|---|
+| FR-v17-01 | Funds-availability gate | A PSP-funded card payment adds a 4th parallel gate `funds` (SD-36 AIS). Sufficient funds → hold + approve; insufficient → `declined` + responseCode `'51'` + `decisionReason 'insufficient_funds'`. |
+| FR-v17-02 | Atomic hold, no race | The hold is a `$gte`-conditional `$inc` (available → pending); it is the authoritative decision (no read-modify-write). |
+| FR-v17-03 | Compensation on decline | If any gate declines after the funds gate held, the hold is released (pending → available), idempotently, incl. the decline-before-hold ordering race. |
+| FR-v17-04 | Provider-indifference | The balance read uses the `account_information` capability via dispatch; built-in module and external PSD2 AIS are interchangeable with no flow change. No internal/external account branching. |
+| FR-v17-05 | Scope | Only cards with a `fundingPayoutAccountInstanceReference` are gated; new/external tokens pass through (issuer governs their funds). |
+| FR-v17-06 | Currency exchange | Amounts are converted into the account currency (mid rate + spread) before any balance mutation (card hold/settle, merchant debit/credit, P2P credit, refund). New capability `currency_exchange`, replaceable. |
+| FR-v17-07 | P2P atomicity | P2P debit respects the conditional `$gte`; if the recipient credit fails, the sender debit is reverted. Cross-currency credit is FX-converted to the recipient account currency. |
+| FR-v17-08 | Seed reconciliation | Seeders default to EUR; `pending/reserved` start at 0; `balanceCreditLog.initial_deposit == total balance`. No account starts negative. |
+
+### Definition of Done — v17
+- [ ] No card payment can be `authorized` without sufficient funds (in account currency, post-FX).
+- [ ] Every hold is released on decline; settlement clears the hold exactly once; no orphan holds or double debits.
+- [ ] No balance goes negative at origin or destination (user or merchant) in any intermediate state.
+- [ ] Σ movements (SD-66 ledger) == Δ balance per account.
+- [ ] Unit tests green (funds gate compensation, FX, checkFunds); `npm run build` exits 0.
+- [ ] (Pending infra) integration + E2E green.
+
 ## Cross-iteration NFRs
 
 These requirements apply to all versions from v1 onward:

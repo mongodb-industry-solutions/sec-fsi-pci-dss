@@ -93,8 +93,14 @@ export class PayoutOrchestrationProcess {
       return;
     }
 
-    // Debit pending balance (funds held until settlement confirmed)
-    await debitPending(db, payoutAccount.payoutAccountInstanceReference, amount);
+    // Debit pending balance (funds held until settlement confirmed). Convert to the merchant account
+    // currency (FX) so the merchant ledger is always mutated in its own currency.
+    let amountInAccountCcy = amount;
+    if (payoutAccount.payoutAccountCurrency && payoutAccount.payoutAccountCurrency !== currency) {
+      const { resolveAndConvert } = await import('../../../providers/currency-exchange/services/currencyExchange.service');
+      try { amountInAccountCcy = (await resolveAndConvert(db, amount, currency, payoutAccount.payoutAccountCurrency)).amount; } catch { /* keep original on FX error */ }
+    }
+    await debitPending(db, payoutAccount.payoutAccountInstanceReference, amountInAccountCcy);
 
     // Create execution record in 'routing' state
     const execution = await createExecution(db, {
@@ -222,9 +228,17 @@ export class PayoutOrchestrationProcess {
         stepNote: `railRef=${p.railRef} netAmount=${p.netAmount} ${p.currency}`,
       });
 
-      // Credit available balance (move from pending to available)
+      // Credit available balance (move from pending to available). Convert to the merchant account
+      // currency (FX) so it mirrors the debitPending made at authorization time — symmetric ledger.
       if (execution.resolvedPayoutAccountReference) {
-        await creditAvailable(db, execution.resolvedPayoutAccountReference, p.netAmount);
+        const acct = await db.collection<{ payoutAccountCurrency?: string }>(PAYOUT_ACCOUNT_COLLECTION)
+          .findOne({ payoutAccountInstanceReference: execution.resolvedPayoutAccountReference }, { projection: { payoutAccountCurrency: 1 } });
+        let creditAmount = p.netAmount;
+        if (acct?.payoutAccountCurrency && acct.payoutAccountCurrency !== p.currency) {
+          const { resolveAndConvert } = await import('../../../providers/currency-exchange/services/currencyExchange.service');
+          try { creditAmount = (await resolveAndConvert(db, p.netAmount, p.currency, acct.payoutAccountCurrency)).amount; } catch { /* keep original on FX error */ }
+        }
+        await creditAvailable(db, execution.resolvedPayoutAccountReference, creditAmount);
       }
 
       // Mark card transaction as settled + clear cardholder pending hold (BIAN SD-66, PCI DSS Req 10)
@@ -234,7 +248,7 @@ export class PayoutOrchestrationProcess {
           { $set: { cardTransactionStatus: 'settled', recordUpdatedDateTime: new Date() } },
         );
         // Clear the pending hold on the cardholder's funding account now that settlement is confirmed
-        void this.clearCardholderPendingHold(execution.cardTransactionInstanceReference, p.netAmount);
+        void this.clearCardholderPendingHold(execution.cardTransactionInstanceReference, p.netAmount, p.currency);
       }
 
       // Mark the linked payment order as settled (if any)
@@ -315,8 +329,11 @@ export class PayoutOrchestrationProcess {
   }
 
   // On settlement, clear the pending hold on the cardholder's funding payout account.
-  // At authorization, holdCardFunds moved amount from available → pending. Settlement finalizes the debit.
-  private async clearCardholderPendingHold(txnId: string, amount: number): Promise<void> {
+  // At authorization, the funds gate (holdCardFunds) moved amount available → pending IN THE ACCOUNT
+  // CURRENCY. Settlement finalizes that same debit, so we convert the settlement amount back to the
+  // funding-account currency (FX) before clearing pending — otherwise a mismatched-currency hold would
+  // never fully clear. Same static rate table → the cleared amount matches the held amount exactly.
+  private async clearCardholderPendingHold(txnId: string, amount: number, settlementCurrency: string): Promise<void> {
     const { PAYMENT_CARD_COLLECTION } = await import('../../customer/models/paymentCard.model');
     const txn = await this.db.collection<{ paymentCardInstanceReference?: string }>(CARD_TRANSACTION_COLLECTION)
       .findOne({ cardTransactionInstanceReference: txnId }, { projection: { paymentCardInstanceReference: 1 } });
@@ -324,7 +341,16 @@ export class PayoutOrchestrationProcess {
     const card = await this.db.collection<{ fundingPayoutAccountInstanceReference?: string }>(PAYMENT_CARD_COLLECTION)
       .findOne({ paymentCardInstanceReference: txn.paymentCardInstanceReference }, { projection: { fundingPayoutAccountInstanceReference: 1 } });
     if (!card?.fundingPayoutAccountInstanceReference) return;
-    await settleCardDebit(this.db, card.fundingPayoutAccountInstanceReference, amount);
+    const accountRef = card.fundingPayoutAccountInstanceReference;
+    const account = await this.db.collection<{ payoutAccountCurrency?: string }>(PAYOUT_ACCOUNT_COLLECTION)
+      .findOne({ payoutAccountInstanceReference: accountRef }, { projection: { payoutAccountCurrency: 1 } });
+    let heldAmount = amount;
+    if (account?.payoutAccountCurrency && account.payoutAccountCurrency !== settlementCurrency) {
+      const { resolveAndConvert } = await import('../../../providers/currency-exchange/services/currencyExchange.service');
+      try { heldAmount = (await resolveAndConvert(this.db, amount, settlementCurrency, account.payoutAccountCurrency)).amount; }
+      catch { /* keep original on FX error */ }
+    }
+    await settleCardDebit(this.db, accountRef, heldAmount);
   }
 
   private async getMerchantSettlementSchedule(merchantRef: string): Promise<'T+0' | 'T+1' | 'T+2' | 'T+3'> {

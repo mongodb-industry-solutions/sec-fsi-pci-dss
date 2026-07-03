@@ -3,7 +3,10 @@
     "cardTransactionInstanceReference": "a0000201-0000-4000-8000-000000000201",
     "paymentCardReference": "pm_okf2024sale01",
     "cardTransactionAccountReference": "ACC-LF-20240115",
-    "cardTransactionAmount": { "amount": 129.00, "currency": "USD" },
+    "cardTransactionAmount": {
+      "amount": 129,
+      "currency": "EUR"
+    },
     "cardTransactionDateTime": "2026-06-02T10:15:00.000Z",
     "cardTransactionStatus": "settled",
     "cardTransactionChannel": "online",
@@ -24,7 +27,10 @@
     "cardTransactionInstanceReference": "a0000202-0000-4000-8000-000000000202",
     "paymentCardReference": "pm_okf2024sale02",
     "cardTransactionAccountReference": "ACC-JS-20231201",
-    "cardTransactionAmount": { "amount": 49.99, "currency": "EUR" },
+    "cardTransactionAmount": {
+      "amount": 49.99,
+      "currency": "EUR"
+    },
     "cardTransactionDateTime": "2026-06-05T16:42:00.000Z",
     "cardTransactionStatus": "authorized",
     "cardTransactionChannel": "online",
@@ -45,7 +51,10 @@
     "cardTransactionInstanceReference": "a0000203-0000-4000-8000-000000000203",
     "paymentCardReference": "pm_okf2024sale03",
     "cardTransactionAccountReference": "ACC-005",
-    "cardTransactionAmount": { "amount": 299.00, "currency": "USD" },
+    "cardTransactionAmount": {
+      "amount": 299,
+      "currency": "EUR"
+    },
     "cardTransactionDateTime": "2026-06-07T09:05:00.000Z",
     "cardTransactionStatus": "settled",
     "cardTransactionChannel": "online",
@@ -66,7 +75,10 @@
     "cardTransactionInstanceReference": "a0000204-0000-4000-8000-000000000204",
     "paymentCardReference": "pm_okf2024sale04",
     "cardTransactionAccountReference": "ACC-012",
-    "cardTransactionAmount": { "amount": 79.00, "currency": "USD" },
+    "cardTransactionAmount": {
+      "amount": 79,
+      "currency": "EUR"
+    },
     "cardTransactionDateTime": "2026-06-08T13:20:00.000Z",
     "cardTransactionStatus": "authorized",
     "cardTransactionChannel": "online",
@@ -87,7 +99,10 @@
     "cardTransactionInstanceReference": "a0000205-0000-4000-8000-000000000205",
     "paymentCardReference": "pm_okf2024sale05",
     "cardTransactionAccountReference": "ACC-031",
-    "cardTransactionAmount": { "amount": 499.00, "currency": "EUR" },
+    "cardTransactionAmount": {
+      "amount": 499,
+      "currency": "EUR"
+    },
     "cardTransactionDateTime": "2026-06-09T11:48:00.000Z",
     "cardTransactionStatus": "settled",
     "cardTransactionChannel": "online",
@@ -108,7 +123,10 @@
     "cardTransactionInstanceReference": "a0000206-0000-4000-8000-000000000206",
     "paymentCardReference": "pm_okf2024sale06",
     "cardTransactionAccountReference": "ACC-019",
-    "cardTransactionAmount": { "amount": 159.00, "currency": "USD" },
+    "cardTransactionAmount": {
+      "amount": 159,
+      "currency": "EUR"
+    },
     "cardTransactionDateTime": "2026-06-10T15:30:00.000Z",
     "cardTransactionStatus": "authorized",
     "cardTransactionChannel": "online",
@@ -129,7 +147,10 @@
     "cardTransactionInstanceReference": "a0000211-0000-4000-8000-000000000211",
     "paymentCardReference": "pm_esp2024sale01",
     "cardTransactionAccountReference": "ACC-JS-20231201",
-    "cardTransactionAmount": { "amount": 12.50, "currency": "USD" },
+    "cardTransactionAmount": {
+      "amount": 12.5,
+      "currency": "EUR"
+    },
     "cardTransactionDateTime": "2026-06-03T08:10:00.000Z",
     "cardTransactionStatus": "settled",
     "cardTransactionChannel": "pos",
@@ -150,7 +171,10 @@
     "cardTransactionInstanceReference": "a0000212-0000-4000-8000-000000000212",
     "paymentCardReference": "pm_esp2024sale02",
     "cardTransactionAccountReference": "ACC-005",
-    "cardTransactionAmount": { "amount": 8.75, "currency": "USD" },
+    "cardTransactionAmount": {
+      "amount": 8.75,
+      "currency": "EUR"
+    },
     "cardTransactionDateTime": "2026-06-06T09:25:00.000Z",
     "cardTransactionStatus": "authorized",
     "cardTransactionChannel": "contactless",
@@ -171,7 +195,10 @@
     "cardTransactionInstanceReference": "a0000213-0000-4000-8000-000000000213",
     "paymentCardReference": "pm_esp2024sale03",
     "cardTransactionAccountReference": "ACC-012",
-    "cardTransactionAmount": { "amount": 24.00, "currency": "USD" },
+    "cardTransactionAmount": {
+      "amount": 24,
+      "currency": "EUR"
+    },
     "cardTransactionDateTime": "2026-06-09T18:05:00.000Z",
     "cardTransactionStatus": "settled",
     "cardTransactionChannel": "pos",
@@ -194,7 +221,7 @@
     "cardTransactionAccountReference": "ACC-LF-20240115",
     "cardTransactionAmount": {
       "amount": 452.18,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-21T00:50:09.504Z",
     "cardTransactionStatus": "authorized",
@@ -215,7 +242,7 @@
     "cardTransactionAccountReference": "ACC-JS-20231201",
     "cardTransactionAmount": {
       "amount": 417.09,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-20T08:54:01.228Z",
     "cardTransactionStatus": "settled",
@@ -236,7 +263,7 @@
     "cardTransactionAccountReference": "ACC-003",
     "cardTransactionAmount": {
       "amount": 194.69,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-20T03:29:35.900Z",
     "cardTransactionStatus": "disputed",
@@ -257,7 +284,7 @@
     "cardTransactionAccountReference": "ACC-004",
     "cardTransactionAmount": {
       "amount": 135.86,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-11T14:54:38.361Z",
     "cardTransactionStatus": "authorized",
@@ -278,7 +305,7 @@
     "cardTransactionAccountReference": "ACC-005",
     "cardTransactionAmount": {
       "amount": 957.39,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-06T20:01:09.846Z",
     "cardTransactionStatus": "settled",
@@ -299,7 +326,7 @@
     "cardTransactionAccountReference": "ACC-006",
     "cardTransactionAmount": {
       "amount": 425.26,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-04-30T07:47:39.023Z",
     "cardTransactionStatus": "disputed",
@@ -320,7 +347,7 @@
     "cardTransactionAccountReference": "ACC-007",
     "cardTransactionAmount": {
       "amount": 1401.59,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-20T13:47:24.181Z",
     "cardTransactionStatus": "authorized",
@@ -341,7 +368,7 @@
     "cardTransactionAccountReference": "ACC-008",
     "cardTransactionAmount": {
       "amount": 897.77,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-16T08:59:03.499Z",
     "cardTransactionStatus": "settled",
@@ -362,7 +389,7 @@
     "cardTransactionAccountReference": "ACC-009",
     "cardTransactionAmount": {
       "amount": 510.88,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-19T09:43:29.736Z",
     "cardTransactionStatus": "disputed",
@@ -383,7 +410,7 @@
     "cardTransactionAccountReference": "ACC-010",
     "cardTransactionAmount": {
       "amount": 1501.45,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-12T11:06:38.684Z",
     "cardTransactionStatus": "authorized",
@@ -404,7 +431,7 @@
     "cardTransactionAccountReference": "ACC-011",
     "cardTransactionAmount": {
       "amount": 1222.04,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-25T23:39:21.626Z",
     "cardTransactionStatus": "settled",
@@ -425,7 +452,7 @@
     "cardTransactionAccountReference": "ACC-012",
     "cardTransactionAmount": {
       "amount": 589.42,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-25T15:37:26.934Z",
     "cardTransactionStatus": "disputed",
@@ -446,7 +473,7 @@
     "cardTransactionAccountReference": "ACC-013",
     "cardTransactionAmount": {
       "amount": 495.79,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-26T10:19:47.557Z",
     "cardTransactionStatus": "authorized",
@@ -467,7 +494,7 @@
     "cardTransactionAccountReference": "ACC-014",
     "cardTransactionAmount": {
       "amount": 726.9,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-20T23:57:09.963Z",
     "cardTransactionStatus": "settled",
@@ -488,7 +515,7 @@
     "cardTransactionAccountReference": "ACC-015",
     "cardTransactionAmount": {
       "amount": 268.99,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-28T22:59:38.496Z",
     "cardTransactionStatus": "disputed",
@@ -509,7 +536,7 @@
     "cardTransactionAccountReference": "ACC-016",
     "cardTransactionAmount": {
       "amount": 1399.16,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-19T21:01:29.610Z",
     "cardTransactionStatus": "authorized",
@@ -530,7 +557,7 @@
     "cardTransactionAccountReference": "ACC-017",
     "cardTransactionAmount": {
       "amount": 272.69,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-12T19:01:10.037Z",
     "cardTransactionStatus": "settled",
@@ -551,7 +578,7 @@
     "cardTransactionAccountReference": "ACC-018",
     "cardTransactionAmount": {
       "amount": 586.81,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-04T13:15:31.084Z",
     "cardTransactionStatus": "disputed",
@@ -572,7 +599,7 @@
     "cardTransactionAccountReference": "ACC-019",
     "cardTransactionAmount": {
       "amount": 11.89,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-01T02:53:10.961Z",
     "cardTransactionStatus": "authorized",
@@ -593,7 +620,7 @@
     "cardTransactionAccountReference": "ACC-020",
     "cardTransactionAmount": {
       "amount": 59.86,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-27T01:01:16.044Z",
     "cardTransactionStatus": "settled",
@@ -614,7 +641,7 @@
     "cardTransactionAccountReference": "ACC-021",
     "cardTransactionAmount": {
       "amount": 147.33,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-13T23:44:27.407Z",
     "cardTransactionStatus": "disputed",
@@ -635,7 +662,7 @@
     "cardTransactionAccountReference": "ACC-022",
     "cardTransactionAmount": {
       "amount": 1286.03,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-05T03:35:26.348Z",
     "cardTransactionStatus": "authorized",
@@ -656,7 +683,7 @@
     "cardTransactionAccountReference": "ACC-023",
     "cardTransactionAmount": {
       "amount": 137.72,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-27T14:49:16.055Z",
     "cardTransactionStatus": "settled",
@@ -677,7 +704,7 @@
     "cardTransactionAccountReference": "ACC-024",
     "cardTransactionAmount": {
       "amount": 1192.83,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-01T06:10:18.851Z",
     "cardTransactionStatus": "disputed",
@@ -698,7 +725,7 @@
     "cardTransactionAccountReference": "ACC-025",
     "cardTransactionAmount": {
       "amount": 264.96,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-06T06:03:22.949Z",
     "cardTransactionStatus": "authorized",
@@ -719,7 +746,7 @@
     "cardTransactionAccountReference": "ACC-026",
     "cardTransactionAmount": {
       "amount": 940.5,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-21T12:58:09.165Z",
     "cardTransactionStatus": "settled",
@@ -740,7 +767,7 @@
     "cardTransactionAccountReference": "ACC-027",
     "cardTransactionAmount": {
       "amount": 465.04,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-01T20:57:20.785Z",
     "cardTransactionStatus": "disputed",
@@ -761,7 +788,7 @@
     "cardTransactionAccountReference": "ACC-028",
     "cardTransactionAmount": {
       "amount": 457.14,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-09T16:30:58.094Z",
     "cardTransactionStatus": "authorized",
@@ -782,7 +809,7 @@
     "cardTransactionAccountReference": "ACC-029",
     "cardTransactionAmount": {
       "amount": 167.25,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-08T03:17:18.389Z",
     "cardTransactionStatus": "settled",
@@ -803,7 +830,7 @@
     "cardTransactionAccountReference": "ACC-030",
     "cardTransactionAmount": {
       "amount": 1393.74,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-02T15:13:38.304Z",
     "cardTransactionStatus": "disputed",
@@ -824,7 +851,7 @@
     "cardTransactionAccountReference": "ACC-031",
     "cardTransactionAmount": {
       "amount": 1337.51,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-04T04:23:05.018Z",
     "cardTransactionStatus": "authorized",
@@ -845,7 +872,7 @@
     "cardTransactionAccountReference": "ACC-032",
     "cardTransactionAmount": {
       "amount": 863.05,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-07T17:58:25.471Z",
     "cardTransactionStatus": "settled",
@@ -866,7 +893,7 @@
     "cardTransactionAccountReference": "ACC-033",
     "cardTransactionAmount": {
       "amount": 1080.95,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-07T08:22:26.418Z",
     "cardTransactionStatus": "disputed",
@@ -887,7 +914,7 @@
     "cardTransactionAccountReference": "ACC-034",
     "cardTransactionAmount": {
       "amount": 1382.47,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-19T10:54:20.647Z",
     "cardTransactionStatus": "authorized",
@@ -908,7 +935,7 @@
     "cardTransactionAccountReference": "ACC-035",
     "cardTransactionAmount": {
       "amount": 80.3,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-02T00:40:13.925Z",
     "cardTransactionStatus": "settled",
@@ -929,7 +956,7 @@
     "cardTransactionAccountReference": "ACC-036",
     "cardTransactionAmount": {
       "amount": 792.19,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-19T20:53:22.136Z",
     "cardTransactionStatus": "disputed",
@@ -950,7 +977,7 @@
     "cardTransactionAccountReference": "ACC-037",
     "cardTransactionAmount": {
       "amount": 1296.08,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-16T22:38:39.139Z",
     "cardTransactionStatus": "authorized",
@@ -971,7 +998,7 @@
     "cardTransactionAccountReference": "ACC-038",
     "cardTransactionAmount": {
       "amount": 792.24,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-03T15:49:49.566Z",
     "cardTransactionStatus": "settled",
@@ -992,7 +1019,7 @@
     "cardTransactionAccountReference": "ACC-039",
     "cardTransactionAmount": {
       "amount": 842.9,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-27T02:48:55.079Z",
     "cardTransactionStatus": "disputed",
@@ -1013,7 +1040,7 @@
     "cardTransactionAccountReference": "ACC-040",
     "cardTransactionAmount": {
       "amount": 1138.88,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-04-30T14:05:39.024Z",
     "cardTransactionStatus": "authorized",
@@ -1034,7 +1061,7 @@
     "cardTransactionAccountReference": "ACC-041",
     "cardTransactionAmount": {
       "amount": 731.37,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-04-30T07:12:42.722Z",
     "cardTransactionStatus": "settled",
@@ -1055,7 +1082,7 @@
     "cardTransactionAccountReference": "ACC-042",
     "cardTransactionAmount": {
       "amount": 675.04,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-03T17:54:30.588Z",
     "cardTransactionStatus": "disputed",
@@ -1076,7 +1103,7 @@
     "cardTransactionAccountReference": "ACC-043",
     "cardTransactionAmount": {
       "amount": 86.41,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-18T09:11:20.994Z",
     "cardTransactionStatus": "authorized",
@@ -1097,7 +1124,7 @@
     "cardTransactionAccountReference": "ACC-044",
     "cardTransactionAmount": {
       "amount": 416.54,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-13T03:56:47.378Z",
     "cardTransactionStatus": "settled",
@@ -1118,7 +1145,7 @@
     "cardTransactionAccountReference": "ACC-045",
     "cardTransactionAmount": {
       "amount": 813.86,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-19T06:52:00.919Z",
     "cardTransactionStatus": "disputed",
@@ -1139,7 +1166,7 @@
     "cardTransactionAccountReference": "ACC-046",
     "cardTransactionAmount": {
       "amount": 844.88,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-21T14:51:36.226Z",
     "cardTransactionStatus": "authorized",
@@ -1160,7 +1187,7 @@
     "cardTransactionAccountReference": "ACC-047",
     "cardTransactionAmount": {
       "amount": 1098.05,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-05T21:35:41.291Z",
     "cardTransactionStatus": "settled",
@@ -1181,7 +1208,7 @@
     "cardTransactionAccountReference": "ACC-048",
     "cardTransactionAmount": {
       "amount": 579.04,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-08T12:23:16.823Z",
     "cardTransactionStatus": "disputed",
@@ -1202,7 +1229,7 @@
     "cardTransactionAccountReference": "ACC-049",
     "cardTransactionAmount": {
       "amount": 1004.25,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-09T02:24:29.618Z",
     "cardTransactionStatus": "authorized",
@@ -1223,7 +1250,7 @@
     "cardTransactionAccountReference": "ACC-050",
     "cardTransactionAmount": {
       "amount": 903.93,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-18T18:09:26.944Z",
     "cardTransactionStatus": "settled",
@@ -1244,7 +1271,7 @@
     "cardTransactionAccountReference": "ACC-LF-20240115",
     "cardTransactionAmount": {
       "amount": 1370.46,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-01T23:30:23.043Z",
     "cardTransactionStatus": "disputed",
@@ -1265,7 +1292,7 @@
     "cardTransactionAccountReference": "ACC-JS-20231201",
     "cardTransactionAmount": {
       "amount": 1033.89,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-29T08:42:39.035Z",
     "cardTransactionStatus": "authorized",
@@ -1286,7 +1313,7 @@
     "cardTransactionAccountReference": "ACC-003",
     "cardTransactionAmount": {
       "amount": 1205.03,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-28T06:16:06.789Z",
     "cardTransactionStatus": "settled",
@@ -1307,7 +1334,7 @@
     "cardTransactionAccountReference": "ACC-004",
     "cardTransactionAmount": {
       "amount": 893.47,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-08T00:16:57.111Z",
     "cardTransactionStatus": "disputed",
@@ -1328,7 +1355,7 @@
     "cardTransactionAccountReference": "ACC-005",
     "cardTransactionAmount": {
       "amount": 932.94,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-27T10:37:26.997Z",
     "cardTransactionStatus": "authorized",
@@ -1349,7 +1376,7 @@
     "cardTransactionAccountReference": "ACC-006",
     "cardTransactionAmount": {
       "amount": 528.05,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-12T14:14:23.451Z",
     "cardTransactionStatus": "settled",
@@ -1370,7 +1397,7 @@
     "cardTransactionAccountReference": "ACC-007",
     "cardTransactionAmount": {
       "amount": 1420.3,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-14T09:59:31.920Z",
     "cardTransactionStatus": "disputed",
@@ -1391,7 +1418,7 @@
     "cardTransactionAccountReference": "ACC-008",
     "cardTransactionAmount": {
       "amount": 162.54,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-08T00:52:48.842Z",
     "cardTransactionStatus": "authorized",
@@ -1412,7 +1439,7 @@
     "cardTransactionAccountReference": "ACC-009",
     "cardTransactionAmount": {
       "amount": 237.7,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-21T03:28:00.923Z",
     "cardTransactionStatus": "settled",
@@ -1433,7 +1460,7 @@
     "cardTransactionAccountReference": "ACC-010",
     "cardTransactionAmount": {
       "amount": 1492.48,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-10T10:30:01.976Z",
     "cardTransactionStatus": "disputed",
@@ -1454,7 +1481,7 @@
     "cardTransactionAccountReference": "ACC-011",
     "cardTransactionAmount": {
       "amount": 126.02,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-08T04:42:31.352Z",
     "cardTransactionStatus": "authorized",
@@ -1475,7 +1502,7 @@
     "cardTransactionAccountReference": "ACC-012",
     "cardTransactionAmount": {
       "amount": 978.88,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-04T05:06:28.153Z",
     "cardTransactionStatus": "settled",
@@ -1496,7 +1523,7 @@
     "cardTransactionAccountReference": "ACC-013",
     "cardTransactionAmount": {
       "amount": 293.13,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-02T18:32:33.189Z",
     "cardTransactionStatus": "disputed",
@@ -1517,7 +1544,7 @@
     "cardTransactionAccountReference": "ACC-014",
     "cardTransactionAmount": {
       "amount": 1502.28,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-02T14:45:10.462Z",
     "cardTransactionStatus": "authorized",
@@ -1538,7 +1565,7 @@
     "cardTransactionAccountReference": "ACC-015",
     "cardTransactionAmount": {
       "amount": 1241.75,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-07T10:26:49.055Z",
     "cardTransactionStatus": "settled",
@@ -1559,7 +1586,7 @@
     "cardTransactionAccountReference": "ACC-016",
     "cardTransactionAmount": {
       "amount": 1068.86,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-16T23:10:07.099Z",
     "cardTransactionStatus": "disputed",
@@ -1580,7 +1607,7 @@
     "cardTransactionAccountReference": "ACC-017",
     "cardTransactionAmount": {
       "amount": 1216.14,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-13T05:50:23.569Z",
     "cardTransactionStatus": "authorized",
@@ -1601,7 +1628,7 @@
     "cardTransactionAccountReference": "ACC-018",
     "cardTransactionAmount": {
       "amount": 1338.13,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-02T00:51:27.192Z",
     "cardTransactionStatus": "settled",
@@ -1622,7 +1649,7 @@
     "cardTransactionAccountReference": "ACC-019",
     "cardTransactionAmount": {
       "amount": 1096.1,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-05T01:47:34.311Z",
     "cardTransactionStatus": "disputed",
@@ -1643,7 +1670,7 @@
     "cardTransactionAccountReference": "ACC-020",
     "cardTransactionAmount": {
       "amount": 92.77,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-16T02:55:18.705Z",
     "cardTransactionStatus": "authorized",
@@ -1664,7 +1691,7 @@
     "cardTransactionAccountReference": "ACC-021",
     "cardTransactionAmount": {
       "amount": 446.73,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-07T06:25:55.100Z",
     "cardTransactionStatus": "settled",
@@ -1685,7 +1712,7 @@
     "cardTransactionAccountReference": "ACC-022",
     "cardTransactionAmount": {
       "amount": 50.61,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-29T01:11:52.765Z",
     "cardTransactionStatus": "disputed",
@@ -1706,7 +1733,7 @@
     "cardTransactionAccountReference": "ACC-023",
     "cardTransactionAmount": {
       "amount": 19.97,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-10T03:04:48.173Z",
     "cardTransactionStatus": "authorized",
@@ -1727,7 +1754,7 @@
     "cardTransactionAccountReference": "ACC-024",
     "cardTransactionAmount": {
       "amount": 190.16,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-13T16:03:25.540Z",
     "cardTransactionStatus": "settled",
@@ -1748,7 +1775,7 @@
     "cardTransactionAccountReference": "ACC-025",
     "cardTransactionAmount": {
       "amount": 1041.16,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-23T01:54:39.102Z",
     "cardTransactionStatus": "disputed",
@@ -1769,7 +1796,7 @@
     "cardTransactionAccountReference": "ACC-026",
     "cardTransactionAmount": {
       "amount": 849.79,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-12T21:00:52.824Z",
     "cardTransactionStatus": "authorized",
@@ -1790,7 +1817,7 @@
     "cardTransactionAccountReference": "ACC-027",
     "cardTransactionAmount": {
       "amount": 244.23,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-05T10:09:46.726Z",
     "cardTransactionStatus": "settled",
@@ -1811,7 +1838,7 @@
     "cardTransactionAccountReference": "ACC-028",
     "cardTransactionAmount": {
       "amount": 685.17,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-24T11:04:43.759Z",
     "cardTransactionStatus": "disputed",
@@ -1832,7 +1859,7 @@
     "cardTransactionAccountReference": "ACC-029",
     "cardTransactionAmount": {
       "amount": 560.85,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-04-29T23:07:23.109Z",
     "cardTransactionStatus": "authorized",
@@ -1853,7 +1880,7 @@
     "cardTransactionAccountReference": "ACC-030",
     "cardTransactionAmount": {
       "amount": 154.62,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-02T22:41:28.601Z",
     "cardTransactionStatus": "settled",
@@ -1874,7 +1901,7 @@
     "cardTransactionAccountReference": "ACC-031",
     "cardTransactionAmount": {
       "amount": 504.04,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-25T15:06:23.921Z",
     "cardTransactionStatus": "disputed",
@@ -1895,7 +1922,7 @@
     "cardTransactionAccountReference": "ACC-032",
     "cardTransactionAmount": {
       "amount": 1290.79,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-01T00:36:35.162Z",
     "cardTransactionStatus": "authorized",
@@ -1916,7 +1943,7 @@
     "cardTransactionAccountReference": "ACC-033",
     "cardTransactionAmount": {
       "amount": 806.11,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-27T00:52:20.334Z",
     "cardTransactionStatus": "settled",
@@ -1937,7 +1964,7 @@
     "cardTransactionAccountReference": "ACC-034",
     "cardTransactionAmount": {
       "amount": 519.16,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-10T05:33:31.319Z",
     "cardTransactionStatus": "disputed",
@@ -1958,7 +1985,7 @@
     "cardTransactionAccountReference": "ACC-035",
     "cardTransactionAmount": {
       "amount": 810.33,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-14T10:14:27.865Z",
     "cardTransactionStatus": "authorized",
@@ -1979,7 +2006,7 @@
     "cardTransactionAccountReference": "ACC-036",
     "cardTransactionAmount": {
       "amount": 45.75,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-16T08:25:57.214Z",
     "cardTransactionStatus": "settled",
@@ -2000,7 +2027,7 @@
     "cardTransactionAccountReference": "ACC-037",
     "cardTransactionAmount": {
       "amount": 570.88,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-26T05:54:25.461Z",
     "cardTransactionStatus": "disputed",
@@ -2021,7 +2048,7 @@
     "cardTransactionAccountReference": "ACC-038",
     "cardTransactionAmount": {
       "amount": 1144.89,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-19T17:44:35.280Z",
     "cardTransactionStatus": "authorized",
@@ -2042,7 +2069,7 @@
     "cardTransactionAccountReference": "ACC-039",
     "cardTransactionAmount": {
       "amount": 1396.19,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-08T15:25:41.685Z",
     "cardTransactionStatus": "settled",
@@ -2063,7 +2090,7 @@
     "cardTransactionAccountReference": "ACC-040",
     "cardTransactionAmount": {
       "amount": 1304.07,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-20T10:00:12.335Z",
     "cardTransactionStatus": "disputed",
@@ -2084,7 +2111,7 @@
     "cardTransactionAccountReference": "ACC-041",
     "cardTransactionAmount": {
       "amount": 1499.9,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-24T20:08:38.527Z",
     "cardTransactionStatus": "authorized",
@@ -2105,7 +2132,7 @@
     "cardTransactionAccountReference": "ACC-042",
     "cardTransactionAmount": {
       "amount": 810.97,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-19T09:46:59.655Z",
     "cardTransactionStatus": "settled",
@@ -2126,7 +2153,7 @@
     "cardTransactionAccountReference": "ACC-043",
     "cardTransactionAmount": {
       "amount": 977.91,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-27T21:09:39.444Z",
     "cardTransactionStatus": "disputed",
@@ -2147,7 +2174,7 @@
     "cardTransactionAccountReference": "ACC-044",
     "cardTransactionAmount": {
       "amount": 773.63,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-14T09:23:52.497Z",
     "cardTransactionStatus": "authorized",
@@ -2168,7 +2195,7 @@
     "cardTransactionAccountReference": "ACC-045",
     "cardTransactionAmount": {
       "amount": 777.75,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-09T03:47:10.122Z",
     "cardTransactionStatus": "settled",
@@ -2189,7 +2216,7 @@
     "cardTransactionAccountReference": "ACC-046",
     "cardTransactionAmount": {
       "amount": 1343.16,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-15T22:03:03.859Z",
     "cardTransactionStatus": "disputed",
@@ -2210,7 +2237,7 @@
     "cardTransactionAccountReference": "ACC-047",
     "cardTransactionAmount": {
       "amount": 1132.2,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-04-30T03:39:54.149Z",
     "cardTransactionStatus": "authorized",
@@ -2231,7 +2258,7 @@
     "cardTransactionAccountReference": "ACC-048",
     "cardTransactionAmount": {
       "amount": 1085.87,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-25T17:23:19.241Z",
     "cardTransactionStatus": "settled",
@@ -2252,7 +2279,7 @@
     "cardTransactionAccountReference": "ACC-049",
     "cardTransactionAmount": {
       "amount": 648.46,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-04-30T13:51:18.299Z",
     "cardTransactionStatus": "disputed",
@@ -2273,7 +2300,7 @@
     "cardTransactionAccountReference": "ACC-050",
     "cardTransactionAmount": {
       "amount": 1361.51,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-29T11:47:09.541Z",
     "cardTransactionStatus": "authorized",
@@ -2294,7 +2321,7 @@
     "cardTransactionAccountReference": "ACC-LF-20240115",
     "cardTransactionAmount": {
       "amount": 738.47,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-13T10:39:24.527Z",
     "cardTransactionStatus": "settled",
@@ -2315,7 +2342,7 @@
     "cardTransactionAccountReference": "ACC-JS-20231201",
     "cardTransactionAmount": {
       "amount": 1425.74,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-26T05:57:29.150Z",
     "cardTransactionStatus": "disputed",
@@ -2336,7 +2363,7 @@
     "cardTransactionAccountReference": "ACC-003",
     "cardTransactionAmount": {
       "amount": 1089.27,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-20T02:57:03.741Z",
     "cardTransactionStatus": "authorized",
@@ -2357,7 +2384,7 @@
     "cardTransactionAccountReference": "ACC-004",
     "cardTransactionAmount": {
       "amount": 823.83,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-27T09:21:16.537Z",
     "cardTransactionStatus": "settled",
@@ -2378,7 +2405,7 @@
     "cardTransactionAccountReference": "ACC-005",
     "cardTransactionAmount": {
       "amount": 679.95,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-14T02:33:43.111Z",
     "cardTransactionStatus": "disputed",
@@ -2399,7 +2426,7 @@
     "cardTransactionAccountReference": "ACC-006",
     "cardTransactionAmount": {
       "amount": 1170.43,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-26T07:30:15.847Z",
     "cardTransactionStatus": "authorized",
@@ -2420,7 +2447,7 @@
     "cardTransactionAccountReference": "ACC-007",
     "cardTransactionAmount": {
       "amount": 1469.12,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-04-30T07:03:26.483Z",
     "cardTransactionStatus": "settled",
@@ -2441,7 +2468,7 @@
     "cardTransactionAccountReference": "ACC-008",
     "cardTransactionAmount": {
       "amount": 272.72,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-21T07:58:59.178Z",
     "cardTransactionStatus": "disputed",
@@ -2462,7 +2489,7 @@
     "cardTransactionAccountReference": "ACC-009",
     "cardTransactionAmount": {
       "amount": 1042.97,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-18T02:54:45.059Z",
     "cardTransactionStatus": "authorized",
@@ -2483,7 +2510,7 @@
     "cardTransactionAccountReference": "ACC-010",
     "cardTransactionAmount": {
       "amount": 827.67,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-23T12:30:15.519Z",
     "cardTransactionStatus": "settled",
@@ -2504,7 +2531,7 @@
     "cardTransactionAccountReference": "ACC-011",
     "cardTransactionAmount": {
       "amount": 533.76,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-04-29T17:35:22.689Z",
     "cardTransactionStatus": "disputed",
@@ -2525,7 +2552,7 @@
     "cardTransactionAccountReference": "ACC-012",
     "cardTransactionAmount": {
       "amount": 91.91,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-12T00:27:18.694Z",
     "cardTransactionStatus": "authorized",
@@ -2546,7 +2573,7 @@
     "cardTransactionAccountReference": "ACC-013",
     "cardTransactionAmount": {
       "amount": 1373.41,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-01T15:36:32.435Z",
     "cardTransactionStatus": "settled",
@@ -2567,7 +2594,7 @@
     "cardTransactionAccountReference": "ACC-014",
     "cardTransactionAmount": {
       "amount": 356.81,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-11T05:58:44.907Z",
     "cardTransactionStatus": "disputed",
@@ -2588,7 +2615,7 @@
     "cardTransactionAccountReference": "ACC-015",
     "cardTransactionAmount": {
       "amount": 164.62,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-28T03:14:01.004Z",
     "cardTransactionStatus": "authorized",
@@ -2609,7 +2636,7 @@
     "cardTransactionAccountReference": "ACC-016",
     "cardTransactionAmount": {
       "amount": 537.73,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-04-30T02:38:31.595Z",
     "cardTransactionStatus": "settled",
@@ -2630,7 +2657,7 @@
     "cardTransactionAccountReference": "ACC-017",
     "cardTransactionAmount": {
       "amount": 951.21,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-04T17:33:33.932Z",
     "cardTransactionStatus": "disputed",
@@ -2651,7 +2678,7 @@
     "cardTransactionAccountReference": "ACC-018",
     "cardTransactionAmount": {
       "amount": 67.91,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-07T12:44:54.908Z",
     "cardTransactionStatus": "authorized",
@@ -2672,7 +2699,7 @@
     "cardTransactionAccountReference": "ACC-019",
     "cardTransactionAmount": {
       "amount": 183.26,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-07T04:32:05.103Z",
     "cardTransactionStatus": "settled",
@@ -2693,7 +2720,7 @@
     "cardTransactionAccountReference": "ACC-020",
     "cardTransactionAmount": {
       "amount": 610.16,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-24T03:00:28.546Z",
     "cardTransactionStatus": "disputed",
@@ -2714,7 +2741,7 @@
     "cardTransactionAccountReference": "ACC-021",
     "cardTransactionAmount": {
       "amount": 1360.12,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-12T10:50:14.904Z",
     "cardTransactionStatus": "authorized",
@@ -2735,7 +2762,7 @@
     "cardTransactionAccountReference": "ACC-022",
     "cardTransactionAmount": {
       "amount": 887.73,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-28T02:05:12.091Z",
     "cardTransactionStatus": "settled",
@@ -2756,7 +2783,7 @@
     "cardTransactionAccountReference": "ACC-023",
     "cardTransactionAmount": {
       "amount": 263.09,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-02T19:01:01.196Z",
     "cardTransactionStatus": "disputed",
@@ -2777,7 +2804,7 @@
     "cardTransactionAccountReference": "ACC-024",
     "cardTransactionAmount": {
       "amount": 853.34,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-04T18:47:12.107Z",
     "cardTransactionStatus": "authorized",
@@ -2798,7 +2825,7 @@
     "cardTransactionAccountReference": "ACC-025",
     "cardTransactionAmount": {
       "amount": 360.84,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-07T02:03:04.327Z",
     "cardTransactionStatus": "settled",
@@ -2819,7 +2846,7 @@
     "cardTransactionAccountReference": "ACC-026",
     "cardTransactionAmount": {
       "amount": 490.8,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-08T20:52:49.613Z",
     "cardTransactionStatus": "disputed",
@@ -2840,7 +2867,7 @@
     "cardTransactionAccountReference": "ACC-027",
     "cardTransactionAmount": {
       "amount": 1271.41,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-12T20:05:46.431Z",
     "cardTransactionStatus": "authorized",
@@ -2861,7 +2888,7 @@
     "cardTransactionAccountReference": "ACC-028",
     "cardTransactionAmount": {
       "amount": 581.05,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-08T03:27:57.402Z",
     "cardTransactionStatus": "settled",
@@ -2882,7 +2909,7 @@
     "cardTransactionAccountReference": "ACC-029",
     "cardTransactionAmount": {
       "amount": 526.63,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-19T02:55:03.127Z",
     "cardTransactionStatus": "disputed",
@@ -2903,7 +2930,7 @@
     "cardTransactionAccountReference": "ACC-030",
     "cardTransactionAmount": {
       "amount": 1084.48,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-04T02:27:56.227Z",
     "cardTransactionStatus": "authorized",
@@ -2924,7 +2951,7 @@
     "cardTransactionAccountReference": "ACC-031",
     "cardTransactionAmount": {
       "amount": 750.5,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-01T06:33:03.823Z",
     "cardTransactionStatus": "settled",
@@ -2945,7 +2972,7 @@
     "cardTransactionAccountReference": "ACC-032",
     "cardTransactionAmount": {
       "amount": 526.93,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-03T14:27:13.222Z",
     "cardTransactionStatus": "disputed",
@@ -2966,7 +2993,7 @@
     "cardTransactionAccountReference": "ACC-033",
     "cardTransactionAmount": {
       "amount": 1022.33,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-21T15:08:10.164Z",
     "cardTransactionStatus": "authorized",
@@ -2987,7 +3014,7 @@
     "cardTransactionAccountReference": "ACC-034",
     "cardTransactionAmount": {
       "amount": 287.82,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-18T21:30:50.132Z",
     "cardTransactionStatus": "settled",
@@ -3008,7 +3035,7 @@
     "cardTransactionAccountReference": "ACC-035",
     "cardTransactionAmount": {
       "amount": 51.38,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-23T02:17:46.139Z",
     "cardTransactionStatus": "disputed",
@@ -3029,7 +3056,7 @@
     "cardTransactionAccountReference": "ACC-036",
     "cardTransactionAmount": {
       "amount": 1274.92,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-19T11:26:41.610Z",
     "cardTransactionStatus": "authorized",
@@ -3050,7 +3077,7 @@
     "cardTransactionAccountReference": "ACC-037",
     "cardTransactionAmount": {
       "amount": 133.61,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-01T09:04:31.937Z",
     "cardTransactionStatus": "settled",
@@ -3071,7 +3098,7 @@
     "cardTransactionAccountReference": "ACC-038",
     "cardTransactionAmount": {
       "amount": 20.15,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-18T21:28:16.370Z",
     "cardTransactionStatus": "disputed",
@@ -3092,7 +3119,7 @@
     "cardTransactionAccountReference": "ACC-039",
     "cardTransactionAmount": {
       "amount": 401.08,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-16T02:47:01.171Z",
     "cardTransactionStatus": "authorized",
@@ -3113,7 +3140,7 @@
     "cardTransactionAccountReference": "ACC-040",
     "cardTransactionAmount": {
       "amount": 158.47,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-21T17:05:48.615Z",
     "cardTransactionStatus": "settled",
@@ -3134,7 +3161,7 @@
     "cardTransactionAccountReference": "ACC-041",
     "cardTransactionAmount": {
       "amount": 1233.53,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-19T22:00:11.384Z",
     "cardTransactionStatus": "disputed",
@@ -3155,7 +3182,7 @@
     "cardTransactionAccountReference": "ACC-042",
     "cardTransactionAmount": {
       "amount": 462.96,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-27T00:07:43.387Z",
     "cardTransactionStatus": "authorized",
@@ -3176,7 +3203,7 @@
     "cardTransactionAccountReference": "ACC-043",
     "cardTransactionAmount": {
       "amount": 381.79,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-19T12:35:05.065Z",
     "cardTransactionStatus": "settled",
@@ -3197,7 +3224,7 @@
     "cardTransactionAccountReference": "ACC-044",
     "cardTransactionAmount": {
       "amount": 581.83,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-23T04:06:58.933Z",
     "cardTransactionStatus": "disputed",
@@ -3218,7 +3245,7 @@
     "cardTransactionAccountReference": "ACC-045",
     "cardTransactionAmount": {
       "amount": 500.72,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-03T18:33:14.820Z",
     "cardTransactionStatus": "authorized",
@@ -3239,7 +3266,7 @@
     "cardTransactionAccountReference": "ACC-046",
     "cardTransactionAmount": {
       "amount": 1345.45,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-23T02:24:01.998Z",
     "cardTransactionStatus": "settled",
@@ -3260,7 +3287,7 @@
     "cardTransactionAccountReference": "ACC-047",
     "cardTransactionAmount": {
       "amount": 579.5,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-04T17:18:45.697Z",
     "cardTransactionStatus": "disputed",
@@ -3281,7 +3308,7 @@
     "cardTransactionAccountReference": "ACC-048",
     "cardTransactionAmount": {
       "amount": 612.19,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-01T04:06:45.680Z",
     "cardTransactionStatus": "authorized",
@@ -3302,7 +3329,7 @@
     "cardTransactionAccountReference": "ACC-049",
     "cardTransactionAmount": {
       "amount": 1369.65,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-29T11:25:17.609Z",
     "cardTransactionStatus": "settled",
@@ -3323,7 +3350,7 @@
     "cardTransactionAccountReference": "ACC-050",
     "cardTransactionAmount": {
       "amount": 1419.71,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-04T01:38:25.017Z",
     "cardTransactionStatus": "disputed",
@@ -3344,7 +3371,7 @@
     "cardTransactionAccountReference": "ACC-LF-20240115",
     "cardTransactionAmount": {
       "amount": 515.82,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-20T15:15:53.203Z",
     "cardTransactionStatus": "authorized",
@@ -3365,7 +3392,7 @@
     "cardTransactionAccountReference": "ACC-JS-20231201",
     "cardTransactionAmount": {
       "amount": 141.95,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-26T09:44:57.519Z",
     "cardTransactionStatus": "settled",
@@ -3386,7 +3413,7 @@
     "cardTransactionAccountReference": "ACC-003",
     "cardTransactionAmount": {
       "amount": 997.28,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-16T02:28:05.951Z",
     "cardTransactionStatus": "disputed",
@@ -3407,7 +3434,7 @@
     "cardTransactionAccountReference": "ACC-004",
     "cardTransactionAmount": {
       "amount": 867.17,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-11T18:58:14.036Z",
     "cardTransactionStatus": "authorized",
@@ -3428,7 +3455,7 @@
     "cardTransactionAccountReference": "ACC-005",
     "cardTransactionAmount": {
       "amount": 975.65,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-11T14:38:09.046Z",
     "cardTransactionStatus": "settled",
@@ -3449,7 +3476,7 @@
     "cardTransactionAccountReference": "ACC-006",
     "cardTransactionAmount": {
       "amount": 1026.34,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-23T03:21:50.145Z",
     "cardTransactionStatus": "disputed",
@@ -3470,7 +3497,7 @@
     "cardTransactionAccountReference": "ACC-007",
     "cardTransactionAmount": {
       "amount": 1375.74,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-11T09:52:11.705Z",
     "cardTransactionStatus": "authorized",
@@ -3491,7 +3518,7 @@
     "cardTransactionAccountReference": "ACC-008",
     "cardTransactionAmount": {
       "amount": 987.31,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-07T13:25:37.270Z",
     "cardTransactionStatus": "settled",
@@ -3512,7 +3539,7 @@
     "cardTransactionAccountReference": "ACC-009",
     "cardTransactionAmount": {
       "amount": 441.9,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-26T20:04:58.729Z",
     "cardTransactionStatus": "disputed",
@@ -3533,7 +3560,7 @@
     "cardTransactionAccountReference": "ACC-010",
     "cardTransactionAmount": {
       "amount": 490.06,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-18T19:59:58.650Z",
     "cardTransactionStatus": "authorized",
@@ -3554,7 +3581,7 @@
     "cardTransactionAccountReference": "ACC-011",
     "cardTransactionAmount": {
       "amount": 301.02,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-12T02:05:41.683Z",
     "cardTransactionStatus": "settled",
@@ -3575,7 +3602,7 @@
     "cardTransactionAccountReference": "ACC-012",
     "cardTransactionAmount": {
       "amount": 1215.35,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-16T12:02:19.035Z",
     "cardTransactionStatus": "disputed",
@@ -3596,7 +3623,7 @@
     "cardTransactionAccountReference": "ACC-013",
     "cardTransactionAmount": {
       "amount": 1429.76,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-16T05:01:52.049Z",
     "cardTransactionStatus": "authorized",
@@ -3617,7 +3644,7 @@
     "cardTransactionAccountReference": "ACC-014",
     "cardTransactionAmount": {
       "amount": 585.65,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-22T18:10:00.128Z",
     "cardTransactionStatus": "settled",
@@ -3638,7 +3665,7 @@
     "cardTransactionAccountReference": "ACC-015",
     "cardTransactionAmount": {
       "amount": 368.2,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-23T21:29:28.651Z",
     "cardTransactionStatus": "disputed",
@@ -3659,7 +3686,7 @@
     "cardTransactionAccountReference": "ACC-016",
     "cardTransactionAmount": {
       "amount": 64.42,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-10T14:17:22.109Z",
     "cardTransactionStatus": "authorized",
@@ -3680,7 +3707,7 @@
     "cardTransactionAccountReference": "ACC-017",
     "cardTransactionAmount": {
       "amount": 1309.54,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-01T21:20:52.002Z",
     "cardTransactionStatus": "settled",
@@ -3701,7 +3728,7 @@
     "cardTransactionAccountReference": "ACC-018",
     "cardTransactionAmount": {
       "amount": 1509.36,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-06T00:38:17.716Z",
     "cardTransactionStatus": "disputed",
@@ -3722,7 +3749,7 @@
     "cardTransactionAccountReference": "ACC-019",
     "cardTransactionAmount": {
       "amount": 923.39,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-21T20:48:37.202Z",
     "cardTransactionStatus": "authorized",
@@ -3743,7 +3770,7 @@
     "cardTransactionAccountReference": "ACC-020",
     "cardTransactionAmount": {
       "amount": 547.86,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-05T17:27:58.815Z",
     "cardTransactionStatus": "settled",
@@ -3764,7 +3791,7 @@
     "cardTransactionAccountReference": "ACC-021",
     "cardTransactionAmount": {
       "amount": 740,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-21T12:09:25.594Z",
     "cardTransactionStatus": "disputed",
@@ -3785,7 +3812,7 @@
     "cardTransactionAccountReference": "ACC-022",
     "cardTransactionAmount": {
       "amount": 1191.96,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-04-29T18:32:01.489Z",
     "cardTransactionStatus": "authorized",
@@ -3806,7 +3833,7 @@
     "cardTransactionAccountReference": "ACC-023",
     "cardTransactionAmount": {
       "amount": 436.4,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-27T04:39:47.012Z",
     "cardTransactionStatus": "settled",
@@ -3827,7 +3854,7 @@
     "cardTransactionAccountReference": "ACC-024",
     "cardTransactionAmount": {
       "amount": 1116.34,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-04-30T05:21:26.116Z",
     "cardTransactionStatus": "disputed",
@@ -3848,7 +3875,7 @@
     "cardTransactionAccountReference": "ACC-025",
     "cardTransactionAmount": {
       "amount": 688.33,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-20T01:43:49.978Z",
     "cardTransactionStatus": "authorized",
@@ -3869,7 +3896,7 @@
     "cardTransactionAccountReference": "ACC-026",
     "cardTransactionAmount": {
       "amount": 803.59,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-05T22:48:33.526Z",
     "cardTransactionStatus": "settled",
@@ -3890,7 +3917,7 @@
     "cardTransactionAccountReference": "ACC-027",
     "cardTransactionAmount": {
       "amount": 520.55,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-11T07:31:46.732Z",
     "cardTransactionStatus": "disputed",
@@ -3911,7 +3938,7 @@
     "cardTransactionAccountReference": "ACC-028",
     "cardTransactionAmount": {
       "amount": 1056.1,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-21T10:04:53.643Z",
     "cardTransactionStatus": "authorized",
@@ -3932,7 +3959,7 @@
     "cardTransactionAccountReference": "ACC-029",
     "cardTransactionAmount": {
       "amount": 708.35,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-16T06:50:01.770Z",
     "cardTransactionStatus": "settled",
@@ -3953,7 +3980,7 @@
     "cardTransactionAccountReference": "ACC-030",
     "cardTransactionAmount": {
       "amount": 419.87,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-05T04:46:33.484Z",
     "cardTransactionStatus": "disputed",
@@ -3974,7 +4001,7 @@
     "cardTransactionAccountReference": "ACC-031",
     "cardTransactionAmount": {
       "amount": 537.54,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-20T21:37:16.887Z",
     "cardTransactionStatus": "authorized",
@@ -3995,7 +4022,7 @@
     "cardTransactionAccountReference": "ACC-032",
     "cardTransactionAmount": {
       "amount": 239.33,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-01T02:45:31.101Z",
     "cardTransactionStatus": "settled",
@@ -4016,7 +4043,7 @@
     "cardTransactionAccountReference": "ACC-033",
     "cardTransactionAmount": {
       "amount": 1259.63,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-13T15:07:05.302Z",
     "cardTransactionStatus": "disputed",
@@ -4037,7 +4064,7 @@
     "cardTransactionAccountReference": "ACC-034",
     "cardTransactionAmount": {
       "amount": 602.5,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-06T08:39:56.328Z",
     "cardTransactionStatus": "authorized",
@@ -4058,7 +4085,7 @@
     "cardTransactionAccountReference": "ACC-035",
     "cardTransactionAmount": {
       "amount": 981.8,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-08T07:12:12.656Z",
     "cardTransactionStatus": "settled",
@@ -4079,7 +4106,7 @@
     "cardTransactionAccountReference": "ACC-036",
     "cardTransactionAmount": {
       "amount": 918.24,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-21T21:51:26.445Z",
     "cardTransactionStatus": "disputed",
@@ -4100,7 +4127,7 @@
     "cardTransactionAccountReference": "ACC-037",
     "cardTransactionAmount": {
       "amount": 696.05,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-18T11:37:38.323Z",
     "cardTransactionStatus": "authorized",
@@ -4121,7 +4148,7 @@
     "cardTransactionAccountReference": "ACC-038",
     "cardTransactionAmount": {
       "amount": 1480.22,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-12T21:29:37.313Z",
     "cardTransactionStatus": "settled",
@@ -4142,7 +4169,7 @@
     "cardTransactionAccountReference": "ACC-039",
     "cardTransactionAmount": {
       "amount": 843.28,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-04T01:16:26.102Z",
     "cardTransactionStatus": "disputed",
@@ -4163,7 +4190,7 @@
     "cardTransactionAccountReference": "ACC-040",
     "cardTransactionAmount": {
       "amount": 707.28,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-19T17:00:49.369Z",
     "cardTransactionStatus": "authorized",
@@ -4184,7 +4211,7 @@
     "cardTransactionAccountReference": "ACC-041",
     "cardTransactionAmount": {
       "amount": 1022.94,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-04T10:34:42.281Z",
     "cardTransactionStatus": "settled",
@@ -4205,7 +4232,7 @@
     "cardTransactionAccountReference": "ACC-042",
     "cardTransactionAmount": {
       "amount": 679.86,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-24T01:48:55.020Z",
     "cardTransactionStatus": "disputed",
@@ -4226,7 +4253,7 @@
     "cardTransactionAccountReference": "ACC-043",
     "cardTransactionAmount": {
       "amount": 700.51,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-28T02:32:21.003Z",
     "cardTransactionStatus": "authorized",
@@ -4247,7 +4274,7 @@
     "cardTransactionAccountReference": "ACC-044",
     "cardTransactionAmount": {
       "amount": 799.74,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-18T16:43:46.388Z",
     "cardTransactionStatus": "settled",
@@ -4268,7 +4295,7 @@
     "cardTransactionAccountReference": "ACC-045",
     "cardTransactionAmount": {
       "amount": 344.77,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-09T09:49:33.761Z",
     "cardTransactionStatus": "disputed",
@@ -4289,7 +4316,7 @@
     "cardTransactionAccountReference": "ACC-046",
     "cardTransactionAmount": {
       "amount": 336.9,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-06T05:46:48.865Z",
     "cardTransactionStatus": "authorized",
@@ -4310,7 +4337,7 @@
     "cardTransactionAccountReference": "ACC-047",
     "cardTransactionAmount": {
       "amount": 452.2,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-17T18:58:39.440Z",
     "cardTransactionStatus": "settled",
@@ -4331,7 +4358,7 @@
     "cardTransactionAccountReference": "ACC-048",
     "cardTransactionAmount": {
       "amount": 174.38,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-12T18:56:43.342Z",
     "cardTransactionStatus": "disputed",
@@ -4352,7 +4379,7 @@
     "cardTransactionAccountReference": "ACC-049",
     "cardTransactionAmount": {
       "amount": 942.78,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-17T02:42:55.682Z",
     "cardTransactionStatus": "authorized",
@@ -4373,7 +4400,7 @@
     "cardTransactionAccountReference": "ACC-050",
     "cardTransactionAmount": {
       "amount": 978.26,
-      "currency": "USD"
+      "currency": "EUR"
     },
     "cardTransactionDateTime": "2026-05-28T11:32:34.758Z",
     "cardTransactionStatus": "settled",

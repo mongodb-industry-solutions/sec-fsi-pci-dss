@@ -87,8 +87,20 @@ export async function executeP2PTransfer(
     return { transferReference: '', amount, currency, status: 'failed', failureReason: 'Insufficient available balance.' };
   }
 
-  // 5. Credit recipient
-  await creditDirect(db, recipientAccount.payoutAccountInstanceReference, amount);
+  // 5. Credit recipient — in the recipient account's currency (FX when cross-currency). Atomic
+  //    consistency: if the credit fails, revert the sender debit so funds never vanish in flight.
+  let creditAmount = amount;
+  if (recipientAccount.payoutAccountCurrency && recipientAccount.payoutAccountCurrency !== currency) {
+    const { resolveAndConvert } = await import('../../../providers/currency-exchange/services/currencyExchange.service');
+    try { creditAmount = (await resolveAndConvert(db, amount, currency, recipientAccount.payoutAccountCurrency)).amount; }
+    catch { await creditDirect(db, fromAccountRef, amount); return { transferReference: '', amount, currency, status: 'failed', failureReason: `No FX rate for ${currency}->${recipientAccount.payoutAccountCurrency}.` }; }
+  }
+  const credited = await creditDirect(db, recipientAccount.payoutAccountInstanceReference, creditAmount);
+  if (!credited) {
+    // Compensate: return the debited funds to the sender (recipient account not creditable).
+    await creditDirect(db, fromAccountRef, amount);
+    return { transferReference: '', amount, currency, status: 'failed', failureReason: 'Recipient account could not be credited.' };
+  }
 
   // 6. Create immutable paymentExecutionProcedure audit record (PCI DSS Req 10)
   const transferRef = uuidv4();

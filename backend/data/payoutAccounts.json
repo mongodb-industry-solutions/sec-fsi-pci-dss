@@ -7,14 +7,14 @@
     "payoutAccountIsDefault": true,
     "payoutAccountAlias": "espressoworks-ledger",
     "payoutAccountBankName": "PSP Internal Ledger",
-    "payoutAccountCurrency": "USD",
+    "payoutAccountCurrency": "EUR",
     "payoutAccountCountryCode": "US",
     "payoutAccountPreferredRail": "internal_ledger",
     "payoutAccountBalance": {
-      "pendingAmount": 142.0,
+      "pendingAmount": 0,
       "availableAmount": 2847.5,
       "reservedAmount": 0,
-      "currency": "USD",
+      "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
     },
     "bianServiceDomain": "Payment Initiation",
@@ -31,14 +31,14 @@
     "payoutAccountIsDefault": true,
     "payoutAccountAlias": "okafor-digital-ledger",
     "payoutAccountBankName": "PSP Internal Ledger",
-    "payoutAccountCurrency": "USD",
+    "payoutAccountCurrency": "EUR",
     "payoutAccountCountryCode": "US",
     "payoutAccountPreferredRail": "internal_ledger",
     "payoutAccountBalance": {
-      "pendingAmount": 320.0,
+      "pendingAmount": 0,
       "availableAmount": 1540.75,
       "reservedAmount": 0,
-      "currency": "USD",
+      "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
     },
     "bianServiceDomain": "Payment Initiation",
@@ -60,8 +60,8 @@
     "payoutAccountPreferredRail": "internal_ledger",
     "payoutAccountBalance": {
       "pendingAmount": 0,
-      "availableAmount": 9800.0,
-      "reservedAmount": 250.0,
+      "availableAmount": 9800,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
     },
@@ -107,14 +107,14 @@
     "payoutAccountRoutingNumber": "NWBKGB2L",
     "payoutAccountAlias": "Julia main account",
     "payoutAccountBankName": "NatWest",
-    "payoutAccountCurrency": "USD",
+    "payoutAccountCurrency": "EUR",
     "payoutAccountCountryCode": "GB",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 75.0,
+      "pendingAmount": 0,
       "availableAmount": 1284.6,
       "reservedAmount": 0,
-      "currency": "USD",
+      "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
     },
     "bianServiceDomain": "Payment Initiation",
@@ -138,8 +138,8 @@
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
       "pendingAmount": 0,
-      "availableAmount": 3210.0,
-      "reservedAmount": 100.0,
+      "availableAmount": 3210,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
     },
@@ -157,14 +157,14 @@
     "payoutAccountIsDefault": false,
     "payoutAccountAlias": "Lena PSP wallet",
     "payoutAccountBankName": "PSP Wallet",
-    "payoutAccountCurrency": "USD",
+    "payoutAccountCurrency": "EUR",
     "payoutAccountCountryCode": "DE",
     "payoutAccountPreferredRail": "internal_wallet",
     "payoutAccountBalance": {
-      "pendingAmount": 18.5,
-      "availableAmount": 92.0,
+      "pendingAmount": 0,
+      "availableAmount": 92,
       "reservedAmount": 0,
-      "currency": "USD",
+      "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
     },
     "bianServiceDomain": "Payment Initiation",
@@ -187,7 +187,7 @@
     "payoutAccountCountryCode": "ES",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 200.0,
+      "pendingAmount": 0,
       "availableAmount": 560.8,
       "reservedAmount": 0,
       "currency": "EUR",
@@ -239,9 +239,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 12.51,
+      "pendingAmount": 0,
       "availableAmount": 5489.21,
-      "reservedAmount": 55.01,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -265,9 +265,9 @@
     "payoutAccountCountryCode": "NL",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 296.62,
+      "pendingAmount": 0,
       "availableAmount": 2013.81,
-      "reservedAmount": 135.34,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -287,14 +287,14 @@
     "payoutAccountRoutingNumber": "HBUKGB4BXXX",
     "payoutAccountAlias": "HSBC account",
     "payoutAccountBankName": "HSBC",
-    "payoutAccountCurrency": "USD",
+    "payoutAccountCurrency": "EUR",
     "payoutAccountCountryCode": "GB",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 43.47,
+      "pendingAmount": 0,
       "availableAmount": 7599.7,
-      "reservedAmount": 84.38,
-      "currency": "USD",
+      "reservedAmount": 0,
+      "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
     "bianServiceDomain": "Payment Initiation",
@@ -317,9 +317,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 17.44,
+      "pendingAmount": 0,
       "availableAmount": 398.81,
-      "reservedAmount": 20.15,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -343,9 +343,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 14.78,
+      "pendingAmount": 0,
       "availableAmount": 371.58,
-      "reservedAmount": 24.15,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -365,14 +365,14 @@
     "payoutAccountRoutingNumber": "HBUKGB4BXXX",
     "payoutAccountAlias": "HSBC account",
     "payoutAccountBankName": "HSBC",
-    "payoutAccountCurrency": "USD",
+    "payoutAccountCurrency": "EUR",
     "payoutAccountCountryCode": "GB",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 110.22,
+      "pendingAmount": 0,
       "availableAmount": 4700.26,
-      "reservedAmount": 117.85,
-      "currency": "USD",
+      "reservedAmount": 0,
+      "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
     "bianServiceDomain": "Payment Initiation",
@@ -395,9 +395,9 @@
     "payoutAccountCountryCode": "ES",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 3.25,
+      "pendingAmount": 0,
       "availableAmount": 6908.74,
-      "reservedAmount": 161.16,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -417,14 +417,14 @@
     "payoutAccountRoutingNumber": "BARCGB22XXX",
     "payoutAccountAlias": "Barclays account",
     "payoutAccountBankName": "Barclays",
-    "payoutAccountCurrency": "USD",
+    "payoutAccountCurrency": "EUR",
     "payoutAccountCountryCode": "GB",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 170.13,
+      "pendingAmount": 0,
       "availableAmount": 5979.46,
-      "reservedAmount": 31.1,
-      "currency": "USD",
+      "reservedAmount": 0,
+      "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
     "bianServiceDomain": "Payment Initiation",
@@ -443,14 +443,14 @@
     "payoutAccountRoutingNumber": "BARCGB22XXX",
     "payoutAccountAlias": "Barclays account",
     "payoutAccountBankName": "Barclays",
-    "payoutAccountCurrency": "USD",
+    "payoutAccountCurrency": "EUR",
     "payoutAccountCountryCode": "GB",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 168.3,
+      "pendingAmount": 0,
       "availableAmount": 8142.73,
-      "reservedAmount": 18.55,
-      "currency": "USD",
+      "reservedAmount": 0,
+      "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
     "bianServiceDomain": "Payment Initiation",
@@ -473,9 +473,9 @@
     "payoutAccountCountryCode": "NL",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 162.31,
+      "pendingAmount": 0,
       "availableAmount": 957.58,
-      "reservedAmount": 57.81,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -495,14 +495,14 @@
     "payoutAccountRoutingNumber": "HBUKGB4BXXX",
     "payoutAccountAlias": "HSBC account",
     "payoutAccountBankName": "HSBC",
-    "payoutAccountCurrency": "USD",
+    "payoutAccountCurrency": "EUR",
     "payoutAccountCountryCode": "GB",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 364.87,
+      "pendingAmount": 0,
       "availableAmount": 6889.52,
-      "reservedAmount": 107.25,
-      "currency": "USD",
+      "reservedAmount": 0,
+      "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
     "bianServiceDomain": "Payment Initiation",
@@ -525,9 +525,9 @@
     "payoutAccountCountryCode": "NL",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 189.27,
+      "pendingAmount": 0,
       "availableAmount": 8275.52,
-      "reservedAmount": 110.41,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -551,9 +551,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 309.26,
+      "pendingAmount": 0,
       "availableAmount": 7075.53,
-      "reservedAmount": 172.34,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -577,9 +577,9 @@
     "payoutAccountCountryCode": "NL",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 352.29,
+      "pendingAmount": 0,
       "availableAmount": 4970.89,
-      "reservedAmount": 9.16,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -603,9 +603,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 118.82,
+      "pendingAmount": 0,
       "availableAmount": 2052.95,
-      "reservedAmount": 15.96,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -629,9 +629,9 @@
     "payoutAccountCountryCode": "NL",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 42.3,
+      "pendingAmount": 0,
       "availableAmount": 2093.8,
-      "reservedAmount": 55.59,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -655,9 +655,9 @@
     "payoutAccountCountryCode": "DE",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 182.42,
+      "pendingAmount": 0,
       "availableAmount": 5457.97,
-      "reservedAmount": 74.04,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -677,14 +677,14 @@
     "payoutAccountRoutingNumber": "BARCGB22XXX",
     "payoutAccountAlias": "Barclays account",
     "payoutAccountBankName": "Barclays",
-    "payoutAccountCurrency": "USD",
+    "payoutAccountCurrency": "EUR",
     "payoutAccountCountryCode": "GB",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 101.42,
+      "pendingAmount": 0,
       "availableAmount": 1899.38,
-      "reservedAmount": 177.91,
-      "currency": "USD",
+      "reservedAmount": 0,
+      "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
     "bianServiceDomain": "Payment Initiation",
@@ -707,9 +707,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 304.57,
+      "pendingAmount": 0,
       "availableAmount": 5561.1,
-      "reservedAmount": 34.23,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -733,9 +733,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 81.7,
+      "pendingAmount": 0,
       "availableAmount": 6238.21,
-      "reservedAmount": 75.89,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -759,9 +759,9 @@
     "payoutAccountCountryCode": "NL",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 320.0,
+      "pendingAmount": 0,
       "availableAmount": 8412.52,
-      "reservedAmount": 111.39,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -785,9 +785,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 421.43,
+      "pendingAmount": 0,
       "availableAmount": 5866.53,
-      "reservedAmount": 155.2,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -811,9 +811,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 13.24,
+      "pendingAmount": 0,
       "availableAmount": 2062.55,
-      "reservedAmount": 63.09,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -837,9 +837,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 100.67,
+      "pendingAmount": 0,
       "availableAmount": 2385.64,
-      "reservedAmount": 188.58,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -863,9 +863,9 @@
     "payoutAccountCountryCode": "NL",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 157.34,
+      "pendingAmount": 0,
       "availableAmount": 7467.67,
-      "reservedAmount": 131.09,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -889,9 +889,9 @@
     "payoutAccountCountryCode": "DE",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 457.27,
+      "pendingAmount": 0,
       "availableAmount": 3453.53,
-      "reservedAmount": 91.77,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -915,9 +915,9 @@
     "payoutAccountCountryCode": "NL",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 116.49,
+      "pendingAmount": 0,
       "availableAmount": 2361.75,
-      "reservedAmount": 112.27,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -941,9 +941,9 @@
     "payoutAccountCountryCode": "NL",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 274.04,
+      "pendingAmount": 0,
       "availableAmount": 2343.89,
-      "reservedAmount": 179.56,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -967,9 +967,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 109.66,
+      "pendingAmount": 0,
       "availableAmount": 3484.99,
-      "reservedAmount": 199.51,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -993,9 +993,9 @@
     "payoutAccountCountryCode": "DE",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 45.45,
+      "pendingAmount": 0,
       "availableAmount": 4404.54,
-      "reservedAmount": 9.42,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -1019,9 +1019,9 @@
     "payoutAccountCountryCode": "DE",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 133.72,
+      "pendingAmount": 0,
       "availableAmount": 1065.57,
-      "reservedAmount": 84.4,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -1041,14 +1041,14 @@
     "payoutAccountRoutingNumber": "HBUKGB4BXXX",
     "payoutAccountAlias": "HSBC account",
     "payoutAccountBankName": "HSBC",
-    "payoutAccountCurrency": "USD",
+    "payoutAccountCurrency": "EUR",
     "payoutAccountCountryCode": "GB",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 31.76,
+      "pendingAmount": 0,
       "availableAmount": 3675.04,
-      "reservedAmount": 76.32,
-      "currency": "USD",
+      "reservedAmount": 0,
+      "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
     "bianServiceDomain": "Payment Initiation",
@@ -1071,9 +1071,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 264.56,
+      "pendingAmount": 0,
       "availableAmount": 8467.61,
-      "reservedAmount": 194.22,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -1093,14 +1093,14 @@
     "payoutAccountRoutingNumber": "HBUKGB4BXXX",
     "payoutAccountAlias": "HSBC account",
     "payoutAccountBankName": "HSBC",
-    "payoutAccountCurrency": "USD",
+    "payoutAccountCurrency": "EUR",
     "payoutAccountCountryCode": "GB",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 5.74,
+      "pendingAmount": 0,
       "availableAmount": 7337.51,
-      "reservedAmount": 144.14,
-      "currency": "USD",
+      "reservedAmount": 0,
+      "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
     "bianServiceDomain": "Payment Initiation",
@@ -1123,9 +1123,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 268.49,
+      "pendingAmount": 0,
       "availableAmount": 5842.28,
-      "reservedAmount": 53.37,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -1145,14 +1145,14 @@
     "payoutAccountRoutingNumber": "HBUKGB4BXXX",
     "payoutAccountAlias": "HSBC account",
     "payoutAccountBankName": "HSBC",
-    "payoutAccountCurrency": "USD",
+    "payoutAccountCurrency": "EUR",
     "payoutAccountCountryCode": "GB",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 55.78,
+      "pendingAmount": 0,
       "availableAmount": 5502.03,
-      "reservedAmount": 86.95,
-      "currency": "USD",
+      "reservedAmount": 0,
+      "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
     "bianServiceDomain": "Payment Initiation",
@@ -1175,9 +1175,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 476.91,
+      "pendingAmount": 0,
       "availableAmount": 3938.59,
-      "reservedAmount": 175.17,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -1201,9 +1201,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 235.21,
+      "pendingAmount": 0,
       "availableAmount": 2349.3,
-      "reservedAmount": 35.73,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -1227,9 +1227,9 @@
     "payoutAccountCountryCode": "NL",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 435.26,
+      "pendingAmount": 0,
       "availableAmount": 7770.44,
-      "reservedAmount": 59.69,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -1253,9 +1253,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 304.49,
+      "pendingAmount": 0,
       "availableAmount": 5485.23,
-      "reservedAmount": 30.57,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -1279,9 +1279,9 @@
     "payoutAccountCountryCode": "NL",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 269.69,
+      "pendingAmount": 0,
       "availableAmount": 6516.97,
-      "reservedAmount": 155.73,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -1305,9 +1305,9 @@
     "payoutAccountCountryCode": "ES",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 0.29,
+      "pendingAmount": 0,
       "availableAmount": 4578.45,
-      "reservedAmount": 64.83,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -1331,9 +1331,9 @@
     "payoutAccountCountryCode": "NL",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 58.09,
+      "pendingAmount": 0,
       "availableAmount": 312.63,
-      "reservedAmount": 27.47,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -1357,9 +1357,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 153.76,
+      "pendingAmount": 0,
       "availableAmount": 7094.41,
-      "reservedAmount": 11.59,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -1383,9 +1383,9 @@
     "payoutAccountCountryCode": "DE",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 473.47,
+      "pendingAmount": 0,
       "availableAmount": 7481.38,
-      "reservedAmount": 17.13,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -1409,9 +1409,9 @@
     "payoutAccountCountryCode": "FR",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 34.61,
+      "pendingAmount": 0,
       "availableAmount": 4208.02,
-      "reservedAmount": 152.12,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -1435,9 +1435,9 @@
     "payoutAccountCountryCode": "NL",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 64.2,
+      "pendingAmount": 0,
       "availableAmount": 6544.72,
-      "reservedAmount": 95.06,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -1461,9 +1461,9 @@
     "payoutAccountCountryCode": "ES",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 132.53,
+      "pendingAmount": 0,
       "availableAmount": 4740.86,
-      "reservedAmount": 174.49,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -1483,14 +1483,14 @@
     "payoutAccountRoutingNumber": "HBUKGB4BXXX",
     "payoutAccountAlias": "HSBC account",
     "payoutAccountBankName": "HSBC",
-    "payoutAccountCurrency": "USD",
+    "payoutAccountCurrency": "EUR",
     "payoutAccountCountryCode": "GB",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 105.9,
+      "pendingAmount": 0,
       "availableAmount": 3683.2,
-      "reservedAmount": 107.86,
-      "currency": "USD",
+      "reservedAmount": 0,
+      "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
     "bianServiceDomain": "Payment Initiation",
@@ -1513,9 +1513,9 @@
     "payoutAccountCountryCode": "NL",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 100.58,
+      "pendingAmount": 0,
       "availableAmount": 6244.92,
-      "reservedAmount": 62.34,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },
@@ -1539,9 +1539,9 @@
     "payoutAccountCountryCode": "DE",
     "payoutAccountPreferredRail": "sepa",
     "payoutAccountBalance": {
-      "pendingAmount": 324.94,
+      "pendingAmount": 0,
       "availableAmount": 8459.5,
-      "reservedAmount": 87.62,
+      "reservedAmount": 0,
       "currency": "EUR",
       "lastUpdatedDateTime": "2026-07-02T00:00:00.000Z"
     },

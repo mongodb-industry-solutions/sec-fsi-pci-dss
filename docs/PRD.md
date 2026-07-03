@@ -278,6 +278,15 @@ BIAN (Banking Industry Architecture Network) provides a standardized vocabulary 
 | 11 | **Payment Execution** | SD-65 | Gateway routing and authorization orchestration | *(service layer, no dedicated collection)* | v4 |
 | 12 | **Card eToken** | SD-57 | Token vault: card token references and network tokens | `cardEtokenProcedure` | v4 stub |
 
+#### v17: Bank-movement precision SDs (Funds-Availability Gate + FX)
+
+| # | BIAN Service Domain | SD Reference | Role in Demo | Collection | Version |
+|---|---|---|---|---|---|
+| 13 | **Account Information (AIS)** | SD-36 | Funds-availability gate: reads funding-account balance (built-in reads internal ledger; PSD2 AIS substitutable) and drives the atomic hold | `payoutAccountArrangement` (read) | v17 |
+| 14 | **Currency Exchange** | — (adjunct SD-66) | Converts amounts into the account currency before any balance mutation (mid rate + spread); replaceable by an external FX provider | *(built-in module, config in `capabilityModuleConfiguration`)* | v17 |
+
+> **Note 5 (v17):** Card-payment authorization adds a 4th parallel gate `funds` (SD-36) to the issuer/FDS/HRP gates. The hold is atomic (`$gte`-conditional `$inc`) and is the authoritative decision; it is released as a saga compensation if any gate declines. Insufficient funds → `declined` + ISO-8583 `'51'`. See [engineering-proposal.md ADR-038](engineering-proposal.md).
+
 > **Note 1:** BIAN does not define separate "sensitive" collections; the split is an architectural pattern for separating searchable QE fields from non-searchable QE fields, as required by MongoDB QE design constraints.
 >
 > **Note 2:** `customerAuthenticationAssessment` (SD-91) stores pre-seeded user accounts (email as QE:equality, bcrypt password hash, role) to support Application Mode login. Identity verification events belong to `partyAuthenticationAssessment` (SD-16). In a production FSI system, authentication would be delegated to an identity provider (e.g., MS Entra ID). The SD-91 collection demonstrates that even user credential lookups can be encrypted via QE.

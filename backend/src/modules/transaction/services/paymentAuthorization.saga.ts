@@ -1,6 +1,7 @@
 import { Db } from 'mongodb';
 import { EventBus, DomainEvent, makeEvent } from '../../../vendors/eventbus';
 import { completeAuthorized, declineTransaction } from './cardTransaction.service';
+import { releaseCardHold } from '../../gateway/services/payoutAccountBalance.service';
 
 // Real-PSP Phase-1 gate (dev.v8 F4): card-payment authorization waits on card-issuer + fraud scoring
 // (FDS) + sanctions screening (HRP), each arriving as its own bus event. The saga aggregates the
@@ -13,11 +14,21 @@ const GATE_EVENT: Record<string, string> = {
   'card.issuer.validation.completed': 'card.issuer',
   'fds.scoring.completed': 'fds',
   'hrp.screening.completed': 'hrp',
+  'funds.check.completed': 'funds',
 };
-const DEFAULT_GATES = ['card.issuer', 'fds', 'hrp'];
+const DEFAULT_GATES = ['card.issuer', 'fds', 'hrp', 'funds'];
 
 interface GateVerdict { approved: boolean; responseCode?: string; reason?: string; riskScore?: number; recommendation?: 'approve' | 'review' | 'decline'; fraudFlag?: boolean; rulesFired?: string[] }
-interface JourneyState { expected: Set<string>; verdicts: Map<string, GateVerdict>; decided: boolean }
+// fundsHold: the atomic hold the funds gate made (available -> pending). Released as a compensation if
+// the journey is later declined by any gate (or if the hold lands after an earlier decline — race).
+interface JourneyState {
+  expected: Set<string>;
+  verdicts: Map<string, GateVerdict>;
+  decided: boolean;
+  decisionOutcome?: 'authorized' | 'declined';
+  fundsHold?: { accountRef: string; amount: number };
+  holdReleased?: boolean;
+}
 
 export class PaymentAuthorizationSaga {
   private readonly journeys = new Map<string, JourneyState>();
@@ -48,12 +59,20 @@ export class PaymentAuthorizationSaga {
     // Fallback if the gate result beats the `requested` event (in-process race): assume the default set.
     let st = this.journeys.get(txnId);
     if (!st) { st = { expected: new Set(DEFAULT_GATES), verdicts: new Map(), decided: false }; this.journeys.set(txnId, st); }
-    if (st.decided) return;
 
     // Gate verdict travels in the *.completed payload. Accept the §7 `outcome` enum
     // ('approved'|'declined') and the legacy `approved` boolean for forward/back compatibility.
-    const p = e.payload as { outcome?: 'approved' | 'declined'; approved?: boolean; responseCode?: string; decisionReason?: string; reason?: string; riskScore?: number; recommendation?: 'approve' | 'review' | 'decline'; fraudFlag?: boolean; rulesFired?: string[] };
+    const p = e.payload as { outcome?: 'approved' | 'declined'; approved?: boolean; responseCode?: string; decisionReason?: string; reason?: string; riskScore?: number; recommendation?: 'approve' | 'review' | 'decline'; fraudFlag?: boolean; rulesFired?: string[]; held?: number; fundingPayoutAccountReference?: string };
     const approved = p.outcome ? p.outcome !== 'declined' : p.approved !== false;
+
+    // Record any hold the funds gate made — even after the journey is decided (ordering race): a gate
+    // may decline BEFORE the funds gate runs, so the hold can land on an already-declined journey.
+    if (gate === 'funds' && p.held && p.fundingPayoutAccountReference) {
+      st.fundsHold = { accountRef: p.fundingPayoutAccountReference, amount: p.held };
+      if (st.decided && st.decisionOutcome === 'declined') { await this.releaseHold(st); }
+    }
+
+    if (st.decided) return;
     st.verdicts.set(gate, { approved, responseCode: p.responseCode, reason: p.decisionReason ?? p.reason, riskScore: p.riskScore, recommendation: p.recommendation, fraudFlag: p.fraudFlag, rulesFired: p.rulesFired });
 
     const declinedEntry = [...st.verdicts.entries()].find(([, v]) => !v.approved);
@@ -69,6 +88,9 @@ export class PaymentAuthorizationSaga {
     // One closing event per journey (§6.1): outcome lives in the payload, not in the event name.
     if (declinedEntry) {
       const [declinedBy, verdict] = declinedEntry;
+      st.decisionOutcome = 'declined';
+      // Compensation: release any funds hold already made by the funds gate before this decline.
+      await this.releaseHold(st);
       await declineTransaction(this.db, txnId, verdict.reason ?? 'declined', verdict.responseCode ?? 'declined');
       void this.bus.publish(makeEvent({
         eventType: 'card.payment.authorization.completed', correlationId: txnId, businessProcess: 'card_payment',
@@ -81,6 +103,7 @@ export class PaymentAuthorizationSaga {
       const fdsVerdict = fdsV?.recommendation
         ? { riskScore: fdsV.riskScore ?? 0, recommendation: fdsV.recommendation, fraudFlag: !!fdsV.fraudFlag, rulesFired: fdsV.rulesFired ?? [] }
         : undefined;
+      st.decisionOutcome = 'authorized';
       const outcome = await completeAuthorized(this.db, txnId, fdsVerdict);
       void this.bus.publish(makeEvent({
         eventType: 'card.payment.authorization.completed', correlationId: txnId, businessProcess: 'card_payment',
@@ -88,5 +111,14 @@ export class PaymentAuthorizationSaga {
         payload: { outcome: 'authorized', ...outcome }, bian,
       }));
     }
+  }
+
+  // Release the funds-gate hold (pending -> available) exactly once. Idempotent per journey via the
+  // holdReleased flag: called both at decline time and on a late-arriving hold after an earlier decline.
+  private async releaseHold(st: JourneyState): Promise<void> {
+    if (!st.fundsHold || st.holdReleased) return;
+    st.holdReleased = true;
+    try { await releaseCardHold(this.db, st.fundsHold.accountRef, st.fundsHold.amount); }
+    catch (err) { console.error('[saga] releaseCardHold failed:', err); }
   }
 }

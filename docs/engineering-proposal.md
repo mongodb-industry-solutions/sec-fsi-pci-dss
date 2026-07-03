@@ -1813,3 +1813,22 @@ All responses are scoped to the authenticated merchant's own records only:
 - (+) OAuth client lifecycle (issue / rotate / revoke) satisfies Req 8.6 system account management.
 - (+) All merchant portal calls emit `businessProcessEvent` via existing EventBus — Req 10 audit.
 - (−) New middleware in the request path; tested independently with expired/revoked/wrong-scope tokens.
+
+## ADR-038 — Funds-Availability Gate + Currency Exchange (Bank-Movement Cycle Precision)
+
+**Status:** Accepted (2026-07-03). Implements **v17**. Aligns **BIAN SD-36** (Account Information / AIS), **SD-15** (Card Authorization), **SD-66** (Payout Account / PISP), **PCI DSS Req 10.2.1** (audit of fund movements).
+
+**Context.** Card-payment authorization verified the issuer, fraud (FDS) and sanctions (HRP) gates but **never checked whether the funding account had sufficient balance**. The balance hold ran *post-authorization*, asynchronously and fire-and-forget, so an authorized payment could exceed available funds (the conditional hold failed silently). Balances could also be mutated in a mismatched currency (EUR card on a USD account). This broke the invariant that no balance goes negative in origin or destination.
+
+**Decision.**
+1. **Funds gate as a 4th parallel gate** of `PaymentAuthorizationSaga` (`card.issuer` + `fds` + `hrp` + **`funds`**). Events `funds.check.requested` / `funds.check.completed` (BIAN SD-36). The reactor (`providerGroups.onFunds`) resolves `cardToken → fundingPayoutAccount`, reads balance via the **`account_information` capability** (provider-indifferent: built-in module reads the internal ledger; an external PSD2 AIS substitutes it via `dispatchProvider` — **no internal/external branching**), and performs the **atomic hold** (`holdCardFunds`, `$gte`-conditional `$inc`). The hold is the authoritative decision: no read-modify-write race.
+2. **Scope of the gate.** It governs ONLY cards funded by a PSP-internal payout account (`fundingPayoutAccountInstanceReference`). New/unsaved tokens and external cards pass through (their funds are the issuer's responsibility — the `card.issuer` gate).
+3. **Compensation.** On any-gate decline, the saga releases the hold (`releaseCardHold`, pending → available), idempotently, including the ordering race where the hold lands after an earlier decline. Settlement clears the hold via `settleCardDebit`. Insufficient funds → `declined` + ISO-8583 `'51'` + `decisionReason 'insufficient_funds'` (no new BIAN status; the reason code carries it).
+4. **Currency Exchange built-in module** (new capability `currency_exchange`): `convert(amount, from, to)` = mid cross-rate (via base currency) + configurable spread. Money-movement points (card hold/settle, merchant debit/credit, P2P credit, refund) convert into the account currency so **no balance is ever mutated in a mismatched currency**. Replaceable by an external FX provider.
+5. **Seed reconciliation.** All seeders default to **EUR**; `pending/reserved` start at 0 and `balanceCreditLog` `initial_deposit == total balance`, so seeds start fully reconciled (Σ credits − Σ debits == balance).
+
+**Consequences.**
+- (+) A payment can no longer be authorized without sufficient funds; origin and destination balances stay consistent and non-negative. Req 10.2.1 audit preserved (every hold/release/settle is atomic `$inc`).
+- (+) Provider-indifferent: swapping the built-in AIS/FX for an external provider requires no flow change.
+- (+) The post-auth double-hold is removed (`decrementCardFundingBalance` now only credits refunds).
+- (−) One extra parallel gate + HTTP loopback read per PSP-funded card payment (consistent with the existing gate cost). Full transaction-replay for seed balances was deliberately NOT done (opening deposit == reconciled current balance) to preserve story-persona balances; a `reconcilePayoutBalances` replay seeder is deferred.
