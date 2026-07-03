@@ -10,13 +10,14 @@ export interface AccountMovement {
   movementId: string;             // source document ID
   movementType: MovementType;
   direction: MovementDirection;
-  amount: number;                 // in minor units (cents)
+  amount: number;                 // major units (e.g. EUR), matches payoutAccountBalance
   currency: string;               // ISO 4217
   description: string;
   counterpartyName?: string;      // merchant name (card_debit) or bank name (payout)
   counterpartyRef?: string;       // merchant ref or destination account ref
   status: string;                 // original status from source document
   occurredAt: string;             // ISO 8601
+  balanceAfter?: number;          // running available balance after this movement (chronological cumulative)
   sourceCollection: string;       // for audit trail
   sourceRef: string;              // original document _id or reference
 }

@@ -53,6 +53,7 @@ interface AccountMovement {
   counterpartyRef?: string;
   status: string;
   occurredAt: string;
+  balanceAfter?: number;
   sourceCollection: string;
   sourceRef: string;
 }
@@ -74,7 +75,16 @@ const MOVEMENT_TYPE_LABELS: Record<string, string> = {
   card_refund:         'Card Refund',
   payout_disbursement: 'Payout',
   balance_credit:      'Credit',
+  p2p_sent:            'P2P Sent',
+  p2p_received:        'P2P Received',
 };
+
+// Movement types whose detail resolves at /system/payment/history/:id
+// (card transactions via getById, payment executions via getTransfer). balance_credit
+// has no detail page, so those rows are rendered non-clickable.
+const LINKABLE_MOVEMENT_TYPES = new Set([
+  'card_debit', 'card_refund', 'payout_disbursement', 'p2p_sent', 'p2p_received',
+]);
 
 const RAIL_LABELS: Record<string, string> = {
   sepa:            'SEPA',
@@ -96,7 +106,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function fmtAmount(amount: number, currency: string) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 2 }).format(amount / 100);
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 2 }).format(amount);
 }
 
 function fmtDate(iso?: string) {
@@ -147,34 +157,39 @@ export default function AccountDetailPage() {
   const [saving, setSaving] = useState(false);
   const [closing, setClosing] = useState(false);
 
-  // Movements state
-  const [movements, setMovements] = useState<AccountMovement[]>([]);
-  const [movTotal, setMovTotal] = useState(0);
+  // Movements state — loaded once in full, then filtered/searched/paginated in-memory
+  // (standard pattern, mirrors /system/payment/history). Running balance (balanceAfter)
+  // is computed server-side over the complete set, so it stays correct under any filter.
+  const [allMovements, setAllMovements] = useState<AccountMovement[]>([]);
   const [movPage, setMovPage] = useState(1);
+  const [movPageSize, setMovPageSize] = useState(MOVEMENT_LIMIT);
   const [movDirection, setMovDirection] = useState('');
   const [movType, setMovType] = useState('');
+  const [movQInput, setMovQInput] = useState('');
+  const [movQ, setMovQ] = useState('');
   const [movLoading, setMovLoading] = useState(false);
 
-  // Linked cards state
+  // Linked cards state — full set loaded once, filtered/searched/paginated in-memory
   const [linkedCards, setLinkedCards] = useState<LinkedCard[]>([]);
   const [cardsLoading, setCardsLoading] = useState(false);
+  const [cardPage, setCardPage] = useState(1);
+  const [cardPageSize, setCardPageSize] = useState(MOVEMENT_LIMIT);
+  const [cardStatus, setCardStatus] = useState('');
+  const [cardQInput, setCardQInput] = useState('');
+  const [cardQ, setCardQ] = useState('');
 
   // IBAN reveal state
   const [ibanRevealed, setIbanRevealed] = useState(false);
   const [ibanValue, setIbanValue] = useState<string | null>(null);
   const [ibanLoading, setIbanLoading] = useState(false);
 
-  const loadMovements = useCallback(async (t: string, pRef: string, aRef: string, page: number, direction: string, type: string) => {
+  const loadMovements = useCallback(async (t: string, pRef: string, aRef: string) => {
     setMovLoading(true);
     try {
-      const r = await api.accounts.movements(pRef, aRef, t, {
-        page,
-        limit: MOVEMENT_LIMIT,
-        ...(direction ? { direction: direction as 'debit' | 'credit' } : {}),
-        ...(type ? { type } : {}),
-      });
-      setMovements(r.movements as unknown as AccountMovement[]);
-      setMovTotal(r.total);
+      // Load the full ledger once (backend computes running balance over the complete set),
+      // then filter/search/paginate client-side.
+      const r = await api.accounts.movements(pRef, aRef, t, { page: 1, limit: 100 });
+      setAllMovements(r.movements as unknown as AccountMovement[]);
     } catch {
       // non-blocking
     } finally {
@@ -193,7 +208,7 @@ export default function AccountDetailPage() {
       setBicSwift(a.payoutAccountBicSwift ?? '');
       setCorrespondentBic(a.payoutAccountCorrespondentBic ?? '');
       setBankAddress(a.payoutAccountBankAddress ?? '');
-      await loadMovements(t, pRef, accountId, 1, '', '');
+      await loadMovements(t, pRef, accountId);
       // Load linked cards (non-blocking — failure hides the section silently)
       setCardsLoading(true);
       api.accounts.cards(pRef, accountId, t)
@@ -314,12 +329,45 @@ export default function AccountDetailPage() {
     }
   }
 
-  function handleMovFilter(direction: string, type: string, page: number) {
-    setMovDirection(direction);
-    setMovType(type);
-    setMovPage(page);
-    loadMovements(token, partyRef, accountId, page, direction, type);
-  }
+  function applyMovSearch() { setMovPage(1); setMovQ(movQInput.trim().toLowerCase()); }
+  function clearMovFilters() { setMovDirection(''); setMovType(''); setMovQInput(''); setMovQ(''); setMovPage(1); }
+  const movIsFiltering = !!(movDirection || movType || movQ || movQInput);
+
+  // Filter → search → paginate, all in-memory over the full loaded ledger.
+  const movFiltered = allMovements.filter((m) => {
+    if (movDirection && m.direction !== movDirection) return false;
+    if (movType && m.movementType !== movType) return false;
+    if (!movQ) return true;
+    return (
+      (m.description ?? '').toLowerCase().includes(movQ) ||
+      (m.counterpartyName ?? '').toLowerCase().includes(movQ) ||
+      (m.counterpartyRef ?? '').toLowerCase().includes(movQ) ||
+      (MOVEMENT_TYPE_LABELS[m.movementType] ?? m.movementType).toLowerCase().includes(movQ) ||
+      m.movementId.toLowerCase().includes(movQ) ||
+      String(m.amount).includes(movQ)
+    );
+  });
+  const movTotalPages = Math.max(1, Math.ceil(movFiltered.length / movPageSize));
+  const movPaginated = movFiltered.slice((movPage - 1) * movPageSize, movPage * movPageSize);
+
+  function applyCardSearch() { setCardPage(1); setCardQ(cardQInput.trim().toLowerCase()); }
+  function clearCardFilters() { setCardStatus(''); setCardQInput(''); setCardQ(''); setCardPage(1); }
+  const cardIsFiltering = !!(cardStatus || cardQ || cardQInput);
+
+  const cardFiltered = linkedCards.filter((c) => {
+    if (cardStatus && c.paymentCardStatus !== cardStatus) return false;
+    if (!cardQ) return true;
+    return (
+      (c.paymentCardAlias ?? '').toLowerCase().includes(cardQ) ||
+      (c.paymentCardMaskedPanDisplay ?? '').toLowerCase().includes(cardQ) ||
+      (c.paymentCardNetwork ?? '').toLowerCase().includes(cardQ) ||
+      (c.paymentCardStatus ?? '').toLowerCase().includes(cardQ) ||
+      c.paymentCardInstanceReference.toLowerCase().includes(cardQ)
+    );
+  });
+  const cardTotalPages = Math.max(1, Math.ceil(cardFiltered.length / cardPageSize));
+  const cardPaginated = cardFiltered.slice((cardPage - 1) * cardPageSize, cardPage * cardPageSize);
+  const cardStatusKeys = Array.from(new Set(linkedCards.map((c) => c.paymentCardStatus)));
 
   const accountLabel = account?.payoutAccountAlias || account?.payoutAccountBankName || 'Account';
   const crumbs: Crumb[] = [
@@ -602,11 +650,19 @@ export default function AccountDetailPage() {
             <div className="bg-white rounded-xl border p-5 space-y-4">
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Account Movements</h2>
 
-              {/* Movement filters */}
+              {/* Movement filters + search (standard pattern) */}
               <div className="flex flex-wrap gap-2">
+                <input
+                  type="text"
+                  value={movQInput}
+                  onChange={(e) => setMovQInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') applyMovSearch(); }}
+                  placeholder="Search by description, counterparty, id…"
+                  className="flex-1 min-w-[160px] border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none"
+                />
                 <select
                   value={movDirection}
-                  onChange={(e) => handleMovFilter(e.target.value, movType, 1)}
+                  onChange={(e) => { setMovDirection(e.target.value); setMovPage(1); }}
                   className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none"
                 >
                   <option value="">All directions</option>
@@ -615,7 +671,7 @@ export default function AccountDetailPage() {
                 </select>
                 <select
                   value={movType}
-                  onChange={(e) => handleMovFilter(movDirection, e.target.value, 1)}
+                  onChange={(e) => { setMovType(e.target.value); setMovPage(1); }}
                   className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none"
                 >
                   <option value="">All types</option>
@@ -623,10 +679,18 @@ export default function AccountDetailPage() {
                   <option value="card_refund">Card Refund</option>
                   <option value="payout_disbursement">Payout</option>
                   <option value="balance_credit">Balance Credit</option>
+                  <option value="p2p_sent">P2P Sent</option>
+                  <option value="p2p_received">P2P Received</option>
                 </select>
-                {(movDirection || movType) && (
+                <button
+                  onClick={applyMovSearch}
+                  className="px-3 py-1.5 rounded-lg bg-[#001E2B] text-[#00ED64] text-xs font-semibold"
+                >
+                  Search
+                </button>
+                {movIsFiltering && (
                   <button
-                    onClick={() => handleMovFilter('', '', 1)}
+                    onClick={clearMovFilters}
                     className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-2 py-1.5"
                   >
                     <X size={11} /> Clear
@@ -636,48 +700,80 @@ export default function AccountDetailPage() {
 
               {movLoading ? (
                 <div className="text-sm text-gray-400 py-4 text-center">Loading movements…</div>
-              ) : movements.length === 0 ? (
+              ) : allMovements.length === 0 ? (
                 <div className="text-sm text-gray-400 py-4 text-center">No movements yet for this account.</div>
+              ) : movFiltered.length === 0 ? (
+                <div className="text-sm text-gray-400 py-4 text-center">No movements match your filters.</div>
               ) : (
                 <div className="divide-y">
-                  {movements.map((m) => (
-                    <div key={m.movementId} className="py-3 flex items-start justify-between gap-3 text-sm">
-                      <div className="flex items-start gap-3 min-w-0">
-                        <span className={`mt-0.5 inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border shrink-0 ${
-                          m.direction === 'credit'
-                            ? 'bg-green-50 text-green-700 border-green-200'
-                            : 'bg-red-50 text-red-700 border-red-200'
-                        }`}>
-                          {m.direction === 'credit' ? '+' : '-'}
-                        </span>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
-                              {MOVEMENT_TYPE_LABELS[m.movementType] ?? m.movementType}
-                            </span>
-                            {m.counterpartyName && (
-                              <span className="text-gray-700 truncate">{m.counterpartyName}</span>
+                  {movPaginated.map((m) => {
+                    const linkable = LINKABLE_MOVEMENT_TYPES.has(m.movementType);
+                    const inner = (
+                      <>
+                        <div className="flex items-start gap-3 min-w-0">
+                          <span className={`mt-0.5 inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border shrink-0 ${
+                            m.direction === 'credit'
+                              ? 'bg-green-50 text-green-700 border-green-200'
+                              : 'bg-red-50 text-red-700 border-red-200'
+                          }`}>
+                            {m.direction === 'credit' ? '+' : '-'}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                                {MOVEMENT_TYPE_LABELS[m.movementType] ?? m.movementType}
+                              </span>
+                              {m.counterpartyName && (
+                                <span className="text-gray-700 truncate">{m.counterpartyName}</span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5">{m.description}</div>
+                            <div className="text-xs text-gray-400 mt-0.5">{fmtDate(m.occurredAt)}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="text-right">
+                            <div className={`font-medium tabular-nums ${m.direction === 'credit' ? 'text-green-700' : 'text-red-600'}`}>
+                              {m.direction === 'credit' ? '+' : '-'}{fmtAmount(m.amount, m.currency)}
+                            </div>
+                            {m.balanceAfter !== undefined && (
+                              <div className="text-xs text-gray-400 tabular-nums mt-0.5">
+                                Balance {fmtAmount(m.balanceAfter, m.currency)}
+                              </div>
                             )}
                           </div>
-                          <div className="text-xs text-gray-500 mt-0.5">{m.description}</div>
-                          <div className="text-xs text-gray-400 mt-0.5">{fmtDate(m.occurredAt)}</div>
+                          {linkable && (
+                            <span className="text-gray-300 group-hover:text-[#001E2B] transition-colors text-lg leading-none">›</span>
+                          )}
                         </div>
+                      </>
+                    );
+                    return linkable ? (
+                      <Link
+                        key={m.movementId}
+                        href={`/system/payment/history/${m.movementId}`}
+                        className="group py-3 flex items-start justify-between gap-3 text-sm -mx-5 px-5 hover:bg-gray-50 transition-colors cursor-pointer"
+                      >
+                        {inner}
+                      </Link>
+                    ) : (
+                      <div key={m.movementId} className="py-3 flex items-start justify-between gap-3 text-sm">
+                        {inner}
                       </div>
-                      <div className={`font-medium tabular-nums shrink-0 ${m.direction === 'credit' ? 'text-green-700' : 'text-red-600'}`}>
-                        {m.direction === 'credit' ? '+' : '-'}{fmtAmount(m.amount, m.currency)}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
-              {movTotal > MOVEMENT_LIMIT && (
+              {movFiltered.length > 0 && (
                 <Pagination
                   page={movPage}
-                  totalPages={Math.ceil(movTotal / MOVEMENT_LIMIT)}
-                  total={movTotal}
-                  limit={MOVEMENT_LIMIT}
-                  onPageChange={(p) => handleMovFilter(movDirection, movType, p)}
+                  totalPages={movTotalPages}
+                  total={movFiltered.length}
+                  limit={movPageSize}
+                  onPageChange={setMovPage}
+                  onLimitChange={(n) => { setMovPageSize(n); setMovPage(1); }}
+                  limitOptions={[10, 20, 50]}
                   noun="movements"
                   variant="light"
                 />
@@ -690,13 +786,54 @@ export default function AccountDetailPage() {
                 <CreditCard size={14} className="text-gray-400" />
                 <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Linked Payment Cards</h2>
               </div>
+
+              {/* Card filters + search (standard pattern) */}
+              {!cardsLoading && linkedCards.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    type="text"
+                    value={cardQInput}
+                    onChange={(e) => setCardQInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') applyCardSearch(); }}
+                    placeholder="Search by alias, PAN, network, id…"
+                    className="flex-1 min-w-[160px] border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none"
+                  />
+                  <select
+                    value={cardStatus}
+                    onChange={(e) => { setCardStatus(e.target.value); setCardPage(1); }}
+                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none"
+                  >
+                    <option value="">All statuses</option>
+                    {cardStatusKeys.map((k) => (
+                      <option key={k} value={k}>{k}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={applyCardSearch}
+                    className="px-3 py-1.5 rounded-lg bg-[#001E2B] text-[#00ED64] text-xs font-semibold"
+                  >
+                    Search
+                  </button>
+                  {cardIsFiltering && (
+                    <button
+                      onClick={clearCardFilters}
+                      className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-2 py-1.5"
+                    >
+                      <X size={11} /> Clear
+                    </button>
+                  )}
+                </div>
+              )}
+
               {cardsLoading ? (
                 <p className="text-sm text-gray-400 py-2">Loading cards…</p>
               ) : linkedCards.length === 0 ? (
                 <p className="text-sm text-gray-400 py-2">No payment cards linked to this account.</p>
+              ) : cardFiltered.length === 0 ? (
+                <p className="text-sm text-gray-400 py-2">No cards match your filters.</p>
               ) : (
                 <div className="divide-y">
-                  {linkedCards.map((c) => (
+                  {cardPaginated.map((c) => (
                     <Link
                       key={c.paymentCardInstanceReference}
                       href={`/system/cards/${c.paymentCardInstanceReference}`}
@@ -725,6 +862,20 @@ export default function AccountDetailPage() {
                     </Link>
                   ))}
                 </div>
+              )}
+
+              {cardFiltered.length > 0 && (
+                <Pagination
+                  page={cardPage}
+                  totalPages={cardTotalPages}
+                  total={cardFiltered.length}
+                  limit={cardPageSize}
+                  onPageChange={setCardPage}
+                  onLimitChange={(n) => { setCardPageSize(n); setCardPage(1); }}
+                  limitOptions={[10, 20, 50]}
+                  noun="cards"
+                  variant="light"
+                />
               )}
             </div>
 

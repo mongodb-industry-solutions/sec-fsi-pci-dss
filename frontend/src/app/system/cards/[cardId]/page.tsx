@@ -592,7 +592,7 @@ export default function CardDetailPage() {
                           <td className="py-2.5 pr-3 text-gray-800 truncate max-w-[180px]">{txn.cardTransactionMerchantName || '-'}</td>
                           <td className="py-2.5 pr-3 text-gray-800 text-right font-mono whitespace-nowrap">
                             {txn.cardTransactionAmount
-                              ? new Intl.NumberFormat(undefined, { style: 'currency', currency: txn.cardTransactionAmount.currency, minimumFractionDigits: 2 }).format(txn.cardTransactionAmount.amount / 100)
+                              ? new Intl.NumberFormat(undefined, { style: 'currency', currency: txn.cardTransactionAmount.currency, minimumFractionDigits: 2 }).format(txn.cardTransactionAmount.amount)
                               : '-'}
                           </td>
                           <td className="py-2.5 text-right">

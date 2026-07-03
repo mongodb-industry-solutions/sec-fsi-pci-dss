@@ -148,6 +148,21 @@ export async function listAccountMovements(
   // 4. Merge all movements
   let all: AccountMovement[] = [...disbursements, ...cardMovements, ...creditMovements];
 
+  // 4b. Running available balance — computed chronologically (ascending) over the FULL
+  //     unfiltered set so each row reflects the true balance at that point in time,
+  //     independent of the active filter/page. Credits add, debits subtract; rounded to
+  //     2 decimals to avoid float drift. Final cumulative should reconcile with the
+  //     account's current availableAmount (opening deposit + all settled movements).
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const chronological = [...all].sort(
+    (a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime(),
+  );
+  let running = 0;
+  for (const m of chronological) {
+    running = round2(running + (m.direction === 'credit' ? m.amount : -m.amount));
+    m.balanceAfter = running;
+  }
+
   // 5. Apply type/direction filters in-memory
   if (opts.type) {
     all = all.filter((m) => m.movementType === opts.type);
