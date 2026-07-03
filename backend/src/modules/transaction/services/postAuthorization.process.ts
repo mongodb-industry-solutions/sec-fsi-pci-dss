@@ -111,32 +111,34 @@ export class PostAuthorizationProcess {
     if (caseDoc) await this.enrichCase(e.correlationId, caseDoc.fraudDiagnosisInstanceReference);
   }
 
-  // A5: After a card authorization, decrement the PSP internal ledger balance for the funding account.
-  // Uses only cardTransactionInstanceReference → card → fundingPayoutAccountInstanceReference (UUID).
-  // IBAN is never accessed here (PCI Req 3.2 — no SAD after auth).
+  // A5: After a card event, update the PSP internal ledger balance for the funding payout account.
+  // Purchase auth: holdCardFunds (move available → pending, BIAN SD-66 debit authorization).
+  // Refund auth: creditDirect (increment available, returning funds to cardholder).
+  // Uses only UUID references — IBAN is never accessed (PCI DSS Req 3.2).
   private async decrementCardFundingBalance(txnId: string): Promise<void> {
+    const { holdCardFunds, creditDirect } = await import('../../gateway/services/payoutAccountBalance.service');
     const txn = await this.db.collection<{
       cardTransactionAmount?: { amount: number; currency: string };
       paymentCardInstanceReference?: string;
       cardTransactionStatus?: string;
+      cardTransactionType?: string;
     }>(CARD_TRANSACTION_COLLECTION).findOne(
       { cardTransactionInstanceReference: txnId },
-      { projection: { cardTransactionAmount: 1, paymentCardInstanceReference: 1, cardTransactionStatus: 1 } }
+      { projection: { cardTransactionAmount: 1, paymentCardInstanceReference: 1, cardTransactionStatus: 1, cardTransactionType: 1 } }
     );
     if (!txn?.paymentCardInstanceReference || !txn?.cardTransactionAmount) return;
     const { PAYMENT_CARD_COLLECTION } = await import('../../customer/models/paymentCard.model');
-    const { PAYOUT_ACCOUNT_COLLECTION } = await import('../../gateway/models/payoutAccount.model');
     const card = await this.db.collection<{ fundingPayoutAccountInstanceReference?: string }>(PAYMENT_CARD_COLLECTION)
       .findOne({ paymentCardInstanceReference: txn.paymentCardInstanceReference }, { projection: { fundingPayoutAccountInstanceReference: 1 } });
     if (!card?.fundingPayoutAccountInstanceReference) return;
     const amount = txn.cardTransactionAmount.amount;
-    const now = new Date();
-    await this.db.collection(PAYOUT_ACCOUNT_COLLECTION).updateOne(
-      { payoutAccountInstanceReference: card.fundingPayoutAccountInstanceReference },
-      {
-        $inc: { 'payoutAccountBalance.pendingAmount': amount },
-        $set: { 'payoutAccountBalance.lastUpdatedDateTime': now },
-      }
-    );
+    const accountRef = card.fundingPayoutAccountInstanceReference;
+    if (txn.cardTransactionType === 'refund') {
+      // Refund: return funds to cardholder available balance (BIAN SD-88 credit)
+      await creditDirect(this.db, accountRef, amount);
+    } else {
+      // Purchase / cash-advance / fee: hold funds (available → pending) at authorization time
+      await holdCardFunds(this.db, accountRef, amount);
+    }
   }
 }

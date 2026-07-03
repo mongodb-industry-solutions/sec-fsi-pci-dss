@@ -10,7 +10,7 @@ import { PAYMENT_ORDER_COLLECTION } from '../models/paymentOrder.model';
 import { MERCHANT_AGREEMENT_COLLECTION } from '../models/merchantAgreement.model';
 import { createExecution, transitionExecution, appendResolutionStep, getExecution } from './paymentExecution.service';
 import { getDefaultPayoutAccount } from './payoutAccount.service';
-import { creditAvailable, debitPending } from './payoutAccountBalance.service';
+import { creditAvailable, debitPending, settleCardDebit } from './payoutAccountBalance.service';
 import { validateAccount } from '../../../providers/account-information/services/accountInformation.service';
 import { resolveAccountInformationConfig } from '../../../providers/account-information/services/accountInformation.service';
 import { initiateTransfer, resolvePaymentInitiationConfig } from '../../../providers/payment-initiation/services/paymentInitiation.service';
@@ -227,12 +227,14 @@ export class PayoutOrchestrationProcess {
         await creditAvailable(db, execution.resolvedPayoutAccountReference, p.netAmount);
       }
 
-      // Mark card transaction as settled
+      // Mark card transaction as settled + clear cardholder pending hold (BIAN SD-66, PCI DSS Req 10)
       if (execution.cardTransactionInstanceReference) {
         await db.collection(CARD_TRANSACTION_COLLECTION).updateOne(
           { cardTransactionInstanceReference: execution.cardTransactionInstanceReference },
           { $set: { cardTransactionStatus: 'settled', recordUpdatedDateTime: new Date() } },
         );
+        // Clear the pending hold on the cardholder's funding account now that settlement is confirmed
+        void this.clearCardholderPendingHold(execution.cardTransactionInstanceReference, p.netAmount);
       }
 
       // Mark the linked payment order as settled (if any)
@@ -310,6 +312,19 @@ export class PayoutOrchestrationProcess {
       stepOutcome: 'not_found',
       stepNote: `No eligible payout account for merchant ${merchantRef}: ${reason}`,
     });
+  }
+
+  // On settlement, clear the pending hold on the cardholder's funding payout account.
+  // At authorization, holdCardFunds moved amount from available → pending. Settlement finalizes the debit.
+  private async clearCardholderPendingHold(txnId: string, amount: number): Promise<void> {
+    const { PAYMENT_CARD_COLLECTION } = await import('../../customer/models/paymentCard.model');
+    const txn = await this.db.collection<{ paymentCardInstanceReference?: string }>(CARD_TRANSACTION_COLLECTION)
+      .findOne({ cardTransactionInstanceReference: txnId }, { projection: { paymentCardInstanceReference: 1 } });
+    if (!txn?.paymentCardInstanceReference) return;
+    const card = await this.db.collection<{ fundingPayoutAccountInstanceReference?: string }>(PAYMENT_CARD_COLLECTION)
+      .findOne({ paymentCardInstanceReference: txn.paymentCardInstanceReference }, { projection: { fundingPayoutAccountInstanceReference: 1 } });
+    if (!card?.fundingPayoutAccountInstanceReference) return;
+    await settleCardDebit(this.db, card.fundingPayoutAccountInstanceReference, amount);
   }
 
   private async getMerchantSettlementSchedule(merchantRef: string): Promise<'T+0' | 'T+1' | 'T+2' | 'T+3'> {

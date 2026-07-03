@@ -7,6 +7,7 @@ import { AccountMovement, MovementType, MovementDirection } from '../models/acco
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 import { PAYMENT_CARD_COLLECTION, PaymentCardManagementControlRecord } from '../../customer/models/paymentCard.model';
 import { CARD_TRANSACTION_COLLECTION, CardTransactionLogControlRecord } from '../../transaction/models/cardTransaction.model';
+import { BALANCE_CREDIT_LOG_COLLECTION, BalanceCreditLogEntry } from '../models/balanceCreditLog.model';
 
 export interface ListMovementsOptions {
   type?: MovementType;
@@ -128,8 +129,24 @@ export async function listAccountMovements(
     });
   }
 
+  // 3b. Balance credit log entries (initial deposits, bank-in transfers, admin credits)
+  const creditLogEntries = await db.collection<BalanceCreditLogEntry>(BALANCE_CREDIT_LOG_COLLECTION)
+    .find({ payoutAccountInstanceReference: accountRef }).toArray();
+  const creditMovements: AccountMovement[] = creditLogEntries.map((c) => ({
+    movementId: c.creditId,
+    movementType: 'balance_credit' as MovementType,
+    direction: 'credit' as MovementDirection,
+    amount: c.amount,
+    currency: c.currency,
+    description: c.description,
+    status: 'settled',
+    occurredAt: c.creditedAt instanceof Date ? c.creditedAt.toISOString() : new Date(c.creditedAt).toISOString(),
+    sourceCollection: BALANCE_CREDIT_LOG_COLLECTION,
+    sourceRef: c.creditId,
+  }));
+
   // 4. Merge all movements
-  let all: AccountMovement[] = [...disbursements, ...cardMovements];
+  let all: AccountMovement[] = [...disbursements, ...cardMovements, ...creditMovements];
 
   // 5. Apply type/direction filters in-memory
   if (opts.type) {

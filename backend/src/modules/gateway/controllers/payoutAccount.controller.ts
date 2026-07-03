@@ -19,6 +19,10 @@ import { listAccountMovements, ListMovementsOptions } from '../services/accountM
 import { getCardsByFundingAccount } from '../../customer/services/paymentCard.service';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
+import { BALANCE_CREDIT_LOG_COLLECTION, BalanceCreditLogEntry, CreditType } from '../models/balanceCreditLog.model';
+import { creditDirect } from '../services/payoutAccountBalance.service';
+import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
+import { v4 as uuidv4 } from 'uuid';
 
 function safeAccount(doc: unknown) {
   // Strip QE-encrypted fields from the public response. Include boolean hints so the UI
@@ -565,6 +569,94 @@ export async function payoutAccountController(fastify: FastifyInstance) {
         riskIndicators:                  fraudCaseDoc.fraudDiagnosisAssessment?.riskIndicators ?? [],
         subsystemSignals:                fraudCaseDoc.subsystemSignals ?? null,
       } : null,
+    });
+  });
+
+  // POST /api/v1/accounts/:accountRef/credit
+  // Deposit funds into a payout account (bank-in, admin credit, initial deposit).
+  // Restricted to manage permission (system_admin, level2_investigator, bank_ops roles).
+  // Creates an immutable balanceCreditLog entry for full audit trail (PCI DSS Req 10).
+  fastify.post('/:accountRef/credit', {
+    preHandler: requirePermission('accounts', 'manage'),
+    schema: {
+      tags: ['accounts'],
+      summary: 'Credit a payout account balance (BIAN SD-66 — bank deposit / admin)',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['accountRef'], properties: { accountRef: { type: 'string' } } },
+      body: {
+        type: 'object',
+        required: ['amount', 'currency', 'creditType'],
+        properties: {
+          amount:      { type: 'number', minimum: 0.01 },
+          currency:    { type: 'string', minLength: 3, maxLength: 3 },
+          creditType:  { type: 'string', enum: ['initial_deposit', 'bank_deposit', 'admin_credit', 'return', 'interest'] },
+          description: { type: 'string', maxLength: 255 },
+          referenceId: { type: 'string', maxLength: 128 },
+        },
+      },
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            creditId: { type: 'string' },
+            payoutAccountInstanceReference: { type: 'string' },
+            amount: { type: 'number' },
+            currency: { type: 'string' },
+            creditType: { type: 'string' },
+            creditedAt: { type: 'string' },
+          },
+        },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { accountRef } = request.params as { accountRef: string };
+    const user = getUser(request);
+    const body = request.body as { amount: number; currency: string; creditType: CreditType; description?: string; referenceId?: string };
+    const db = fastify.db;
+
+    const account = await db.collection<{ payoutAccountInstanceReference: string; partyInstanceReference?: string; payoutAccountStatus?: string }>(
+      'payoutAccountArrangement'
+    ).findOne({ payoutAccountInstanceReference: accountRef }, { projection: { payoutAccountInstanceReference: 1, partyInstanceReference: 1, payoutAccountStatus: 1 } });
+    if (!account) return reply.status(404).send({ error: 'Account not found.' });
+
+    const now = new Date();
+    const creditId = uuidv4();
+    const entry: BalanceCreditLogEntry = {
+      creditId,
+      payoutAccountInstanceReference: accountRef,
+      partyInstanceReference: account.partyInstanceReference,
+      amount: body.amount,
+      currency: body.currency,
+      creditType: body.creditType,
+      description: body.description ?? `${body.creditType.replace(/_/g, ' ')} credit`,
+      creditedAt: now,
+      performedByPartyReference: user?.partyRef ?? null,
+      referenceId: body.referenceId,
+      bianServiceDomain: 'SD-66 Payout Account Arrangement',
+      bianControlRecordType: 'PayoutAccountBalance',
+      recordCreatedDateTime: now,
+      schemaVersion: 1,
+    };
+    await db.collection<BalanceCreditLogEntry>(BALANCE_CREDIT_LOG_COLLECTION).insertOne(entry);
+    await creditDirect(db, accountRef, body.amount);
+
+    emitProcessEvent(db, {
+      entityType: 'account', entityId: accountRef,
+      processType: 'payment_processing', processAction: 'account.balance.credited',
+      processOutcome: 'approved',
+      performedByPartyReference: user?.partyRef ?? null, performedByRole: user?.role ?? null,
+      eventSummary: { creditId, amount: body.amount, currency: body.currency, creditType: body.creditType },
+      bianServiceDomain: 'SD-66 Payout Account Arrangement', bianControlRecordType: 'PayoutAccountBalance',
+    });
+
+    return reply.status(201).send({
+      creditId,
+      payoutAccountInstanceReference: accountRef,
+      amount: body.amount,
+      currency: body.currency,
+      creditType: body.creditType,
+      creditedAt: now.toISOString(),
     });
   });
 }

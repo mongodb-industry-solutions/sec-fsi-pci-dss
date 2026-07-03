@@ -108,6 +108,53 @@ export async function creditDirect(
 }
 
 /**
+ * Hold funds on card authorization (cardholder / issuer perspective).
+ * Moves amount from availableAmount → pendingAmount atomically.
+ * Conditional on sufficient available balance — returns false if insufficient.
+ * PCI DSS Req 3: no SAD stored; operates only on PSP-internal UUID references.
+ */
+export async function holdCardFunds(
+  db: Db,
+  payoutAccountRef: string,
+  amount: number,
+): Promise<boolean> {
+  const result = await db.collection(PAYOUT_ACCOUNT_COLLECTION).updateOne(
+    {
+      payoutAccountInstanceReference: payoutAccountRef,
+      payoutAccountStatus: 'active',
+      'payoutAccountBalance.availableAmount': { $gte: amount },
+    },
+    {
+      $inc: {
+        'payoutAccountBalance.availableAmount': -amount,
+        'payoutAccountBalance.pendingAmount': amount,
+      },
+      $set: { 'payoutAccountBalance.lastUpdatedDateTime': new Date(), recordUpdatedDateTime: new Date() },
+    },
+  );
+  return result.modifiedCount === 1;
+}
+
+/**
+ * Clear the pending hold when a card purchase settles.
+ * Decrements pendingAmount only — available was already reduced at auth time.
+ */
+export async function settleCardDebit(
+  db: Db,
+  payoutAccountRef: string,
+  amount: number,
+): Promise<boolean> {
+  const result = await db.collection(PAYOUT_ACCOUNT_COLLECTION).updateOne(
+    { payoutAccountInstanceReference: payoutAccountRef, payoutAccountStatus: 'active' },
+    {
+      $inc: { 'payoutAccountBalance.pendingAmount': -amount },
+      $set: { 'payoutAccountBalance.lastUpdatedDateTime': new Date(), recordUpdatedDateTime: new Date() },
+    },
+  );
+  return result.modifiedCount === 1;
+}
+
+/**
  * Release reserved funds back to available (e.g., dispute resolved in merchant's favour).
  */
 export async function releaseFunds(

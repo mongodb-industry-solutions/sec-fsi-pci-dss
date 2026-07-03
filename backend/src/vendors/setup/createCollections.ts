@@ -8,6 +8,7 @@ import { PARTY_AUTH_CONSENT_COLLECTION } from '../../modules/identity/models/par
 import { PAYOUT_ACCOUNT_COLLECTION } from '../../modules/gateway/models/payoutAccount.model';
 import { PAYMENT_EXECUTION_COLLECTION } from '../../modules/gateway/models/paymentExecution.model';
 import { COUNTERPARTY_COLLECTION } from '../../modules/identity/models/counterpartyArrangement.model';
+import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/gateway/models/balanceCreditLog.model';
 
 const kmsConfig = getKmsConfig();
 
@@ -415,5 +416,16 @@ export async function createCollections(
     console.log(`  created: ${COUNTERPARTY_COLLECTION} (SD-54 beneficiary registry)`);
   } else {
     console.log(`  skip:    ${COUNTERPARTY_COLLECTION} (already exists)`);
+  }
+
+  if (!existingNames.has(BALANCE_CREDIT_LOG_COLLECTION) || reset) {
+    if (existingNames.has(BALANCE_CREDIT_LOG_COLLECTION) && reset) {
+      await db.collection(BALANCE_CREDIT_LOG_COLLECTION).drop();
+      console.log(`  dropped: ${BALANCE_CREDIT_LOG_COLLECTION}`);
+    }
+    await db.createCollection(BALANCE_CREDIT_LOG_COLLECTION);
+    console.log(`  created: ${BALANCE_CREDIT_LOG_COLLECTION} (SD-66 balance credit audit log, PCI DSS Req 10)`);
+  } else {
+    console.log(`  skip:    ${BALANCE_CREDIT_LOG_COLLECTION} (already exists)`);
   }
 }
