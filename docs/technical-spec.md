@@ -58,7 +58,11 @@ export type PartyType = 'customer' | 'employee' | 'service_account';
 > MongoDB Queryable Encryption **cannot enforce a unique index on an encrypted field**. To
 > guarantee that a phone number identifies exactly one party, we store `partyMobilePhoneNumberDigest`
 > — a keyed HMAC-SHA256 of the *normalized* phone (leading `+` preserved, all other non-digits
-> stripped), keyed by `PSP_BLIND_INDEX_KEY` — in plaintext and put a **unique index** on it. The
+> stripped), keyed by the blind-index key — in plaintext and put a **unique index** on it. The
+> key is resolved in order: `PSP_BLIND_INDEX_KEY` if set; otherwise an HKDF-SHA256 subkey derived
+> from `KMS_LOCAL_MASTER_KEY` (the QE master key is never reused verbatim — domain separation);
+> otherwise a dev-only default. Whichever source is active must stay stable (changing it invalidates
+> all digests → re-seed/backfill). The
 > HMAC is irreversible without the key, so indexing it in the clear leaks nothing. The digest is
 > derived server-side (`digest.ts` → `phoneDigest`) on seed and on any phone update; clients never
 > set it. The same pattern applies to any other encrypted field that must be unique (e.g. email).
