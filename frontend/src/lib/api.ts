@@ -1520,6 +1520,17 @@ export const api = {
         { method: 'DELETE' },
         token,
       ),
+    transfer: (
+      ownerRef: string,
+      beneficiaryRef: string,
+      body: { fromAccountRef: string; amount: number; currency: string; note?: string },
+      token: string,
+    ) =>
+      apiFetch<{ transferReference: string; amount: number; currency: string; status: string; recipientHint?: string }>(
+        `/api/v1/beneficiaries/${encodeURIComponent(ownerRef)}/${encodeURIComponent(beneficiaryRef)}/transfer`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token,
+      ),
   },
 
   executions: {

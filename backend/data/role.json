@@ -12,7 +12,8 @@
       "cards": ["view", "manage"],
       "merchants": ["view"],
       "consents": ["view"],
-      "accounts": ["view", "manage"]
+      "accounts": ["view", "manage"],
+      "beneficiaries": ["view", "manage"]
     }
   },
   {
@@ -29,7 +30,8 @@
       "cards": ["view"],
       "merchants": ["view"],
       "fraudCases": ["view", "investigate"],
-      "auditEvents": ["view"]
+      "auditEvents": ["view"],
+      "beneficiaries": ["view"]
     }
   },
   {
@@ -46,7 +48,8 @@
       "cards": ["view", "viewSensitive"],
       "merchants": ["view"],
       "fraudCases": ["view", "investigate"],
-      "auditEvents": ["view"]
+      "auditEvents": ["view"],
+      "beneficiaries": ["view", "manage"]
     }
   },
   {
@@ -66,7 +69,8 @@
       "providers": ["view"],
       "modules": ["view"],
       "auditEvents": ["view"],
-      "accounts": ["view", "viewSensitive"]
+      "accounts": ["view", "viewSensitive"],
+      "beneficiaries": ["view", "manage"]
     }
   },
   {
