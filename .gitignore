@@ -1,3 +1,7 @@
+# OAuth/OIDC signing keys — generated locally via `npm run setup:keys`, never commit
+backend/keys/
+*.pem
+
 # Logs
 logs
 !frontend/src/app/**/logs/
