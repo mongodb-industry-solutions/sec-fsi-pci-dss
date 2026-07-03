@@ -8,6 +8,7 @@ import {
   COUNTERPARTY_COLLECTION,
   COUNTERPARTY_MAX_PER_USER,
   CounterpartyArrangement,
+  CounterpartyArrangementStatus,
   CounterpartyLookupType,
   maskLookupValue,
 } from '../models/counterpartyArrangement.model';
@@ -142,4 +143,60 @@ export async function removeBeneficiary(
     { $set: { counterpartyArrangementStatus: 'removed', recordUpdatedDateTime: new Date() } },
   );
   return result.modifiedCount === 1;
+}
+
+// Staff-facing: list all beneficiaries across all users, with optional filtering.
+export async function listAllBeneficiaries(
+  db: Db,
+  opts?: {
+    ownerRef?: string;
+    q?: string;
+    status?: CounterpartyArrangementStatus;
+    page?: number;
+    limit?: number;
+  },
+): Promise<{ results: CounterpartyArrangement[]; total: number }> {
+  const query: Record<string, unknown> = {};
+  if (opts?.ownerRef) query.ownerPartyReference = opts.ownerRef;
+  query.counterpartyArrangementStatus = opts?.status ?? 'active';
+  if (opts?.q) {
+    const safe = opts.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(safe, 'i');
+    query.$or = [
+      { counterpartyLabel: { $regex: re } },
+      { counterpartyLookupHint: { $regex: re } },
+    ];
+  }
+
+  const page = Math.max(1, opts?.page ?? 1);
+  const limit = Math.min(100, Math.max(1, opts?.limit ?? 20));
+  const skip = (page - 1) * limit;
+  const col = db.collection<CounterpartyArrangement>(COUNTERPARTY_COLLECTION);
+  const [results, total] = await Promise.all([
+    col.find(query as Parameters<typeof col.find>[0]).sort({ recordCreatedDateTime: -1 }).skip(skip).limit(limit).toArray(),
+    col.countDocuments(query as Parameters<typeof col.countDocuments>[0]),
+  ]);
+  return { results, total };
+}
+
+export async function getOneBeneficiary(
+  db: Db,
+  counterpartyArrangementReference: string,
+): Promise<CounterpartyArrangement | null> {
+  return db
+    .collection<CounterpartyArrangement>(COUNTERPARTY_COLLECTION)
+    .findOne({ counterpartyArrangementReference }, { projection: { _id: 0 } });
+}
+
+export async function updateBeneficiaryLabel(
+  db: Db,
+  counterpartyArrangementReference: string,
+  newLabel: string,
+): Promise<CounterpartyArrangement | null> {
+  const col = db.collection<CounterpartyArrangement>(COUNTERPARTY_COLLECTION);
+  await col.updateOne(
+    { counterpartyArrangementReference, counterpartyArrangementStatus: 'active' },
+    { $set: { counterpartyLabel: newLabel.trim(), recordUpdatedDateTime: new Date() } },
+  );
+  return col.findOne({ counterpartyArrangementReference }, { projection: { _id: 0 } });
 }

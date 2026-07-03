@@ -1455,6 +1455,73 @@ export const api = {
     },
   },
 
+  // SD-54 Counterparty Administration — staff-facing beneficiary registry (v18)
+  beneficiaries: {
+    list: (
+      token: string,
+      params?: { ownerRef?: string; q?: string; status?: 'active' | 'removed'; page?: number; limit?: number },
+    ) => {
+      const qs = params
+        ? '?' + new URLSearchParams(
+            Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]),
+          ).toString()
+        : '';
+      return apiFetch<{
+        results: Array<{
+          counterpartyArrangementReference: string;
+          ownerPartyReference: string;
+          counterpartyPartyReference: string;
+          counterpartyLabel: string;
+          counterpartyLookupType: 'phone' | 'email';
+          counterpartyLookupHint: string;
+          counterpartyArrangementStatus: 'active' | 'removed';
+          recordCreatedDateTime: string;
+          recordUpdatedDateTime: string;
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/beneficiaries${qs}`, {}, token);
+    },
+    get: (beneficiaryRef: string, token: string) =>
+      apiFetch<{
+        counterpartyArrangementReference: string;
+        ownerPartyReference: string;
+        counterpartyPartyReference: string;
+        counterpartyLabel: string;
+        counterpartyLookupType: 'phone' | 'email';
+        counterpartyLookupHint: string;
+        counterpartyArrangementStatus: 'active' | 'removed';
+        bianServiceDomain: string;
+        bianControlRecordType: string;
+        recordCreatedDateTime: string;
+        recordUpdatedDateTime: string;
+        schemaVersion: number;
+      }>(`/api/v1/beneficiaries/by-ref/${encodeURIComponent(beneficiaryRef)}`, {}, token),
+    updateLabel: (ownerRef: string, beneficiaryRef: string, counterpartyLabel: string, token: string) =>
+      apiFetch<Record<string, unknown>>(
+        `/api/v1/beneficiaries/${encodeURIComponent(ownerRef)}/${encodeURIComponent(beneficiaryRef)}`,
+        { method: 'PATCH', body: JSON.stringify({ counterpartyLabel }) },
+        token,
+      ),
+    add: (
+      ownerRef: string,
+      body: { lookupType: 'phone' | 'email'; lookupValue: string; label?: string },
+      token: string,
+    ) =>
+      apiFetch<{ found: boolean; counterpartyArrangementReference?: string; counterpartyLabel?: string; counterpartyLookupHint?: string }>(
+        `/api/v1/beneficiaries/${encodeURIComponent(ownerRef)}`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token,
+      ),
+    remove: (ownerRef: string, beneficiaryRef: string, token: string) =>
+      apiFetch<{ counterpartyArrangementReference: string; counterpartyArrangementStatus: string }>(
+        `/api/v1/beneficiaries/${encodeURIComponent(ownerRef)}/${encodeURIComponent(beneficiaryRef)}`,
+        { method: 'DELETE' },
+        token,
+      ),
+  },
+
   executions: {
     list: (token: string, params?: { status?: string; page?: number; limit?: number }) => {
       const qs = params ? '?' + new URLSearchParams(
