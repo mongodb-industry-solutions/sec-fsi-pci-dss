@@ -321,7 +321,7 @@ export default function BeneficiariesPage() {
                       <div className="flex items-center justify-end gap-1">
                         {isCustomer && b.counterpartyArrangementStatus === 'active' && (
                           <button type="button"
-                            onClick={() => router.push(`/system/beneficiaries/${b.counterpartyArrangementReference}`)}
+                            onClick={() => router.push(`/system/beneficiaries/${b.counterpartyArrangementReference}?action=send`)}
                             className="flex items-center gap-1 text-xs text-[#001E2B] hover:text-[#001E2B]/70 border border-gray-200 hover:border-gray-300 rounded-lg px-2.5 py-1 transition-colors"
                             title="Send money">
                             <SendHorizonal size={12} /> Send

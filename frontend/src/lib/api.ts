@@ -1438,6 +1438,32 @@ export const api = {
         {},
         token
       ),
+    transfers: (partyRef: string, token: string, params?: { page?: number; limit?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])
+      ).toString() : '';
+      return apiFetch<{
+        results: Array<{
+          paymentExecutionInstanceReference: string;
+          initiatorPartyReference: string | null;
+          beneficiaryPartyReference: string | null;
+          resolvedPayoutAccountReference: string | null;
+          grossAmount: number;
+          netAmount: number;
+          feeAmount: number;
+          currency: string;
+          paymentExecutionRail: string | null;
+          routingNote: string | null;
+          paymentExecutionStatus: string;
+          direction: 'sent' | 'received';
+          initiatedAt: string | null;
+          completedAt: string | null;
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/accounts/${encodeURIComponent(partyRef)}/transfers${qs}`, {}, token);
+    },
     movements: (partyRef: string, accountRef: string, token: string, params?: { type?: string; direction?: string; from?: string; to?: string; page?: number; limit?: number }) => {
       const qs = new URLSearchParams();
       if (params?.type) qs.set('type', params.type);

@@ -17,6 +17,7 @@ import {
 } from '../services/payoutAccount.service';
 import { listAccountMovements, ListMovementsOptions } from '../services/accountMovements.service';
 import { getCardsByFundingAccount } from '../../customer/services/paymentCard.service';
+import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 
 function safeAccount(doc: unknown) {
   // Strip QE-encrypted fields from the public response. Include boolean hints so the UI
@@ -349,5 +350,111 @@ export async function payoutAccountController(fastify: FastifyInstance) {
       return reply.status(404).send({ error: 'No IBAN registered for this account' });
     }
     return reply.send({ payoutAccountIban: account.payoutAccountIban });
+  });
+
+  // GET /api/v1/accounts/:partyRef/transfers
+  // Customer-scoped P2P transfer history (BIAN SD-65 paymentExecutionProcedure, beneficiaryType: 'user').
+  // Returns transfers where initiatorPartyReference === partyRef (sent) or beneficiaryPartyReference === partyRef (received).
+  // PCI DSS Req 7: customer role is restricted to their own partyRef; analysts/auditors may query any partyRef.
+  fastify.get('/:partyRef/transfers', {
+    preHandler: requirePermission('accounts', 'view'),
+    schema: {
+      tags: ['accounts'],
+      summary: 'List P2P transfers for a party (BIAN SD-65 Payment Execution, beneficiaryType: user)',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['partyRef'],
+        properties: { partyRef: { type: 'string' } },
+      },
+      querystring: {
+        type: 'object',
+        properties: {
+          page:  { type: 'integer', minimum: 1, default: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            results: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  paymentExecutionInstanceReference: { type: 'string' },
+                  initiatorPartyReference:           { type: 'string', nullable: true },
+                  beneficiaryPartyReference:         { type: 'string', nullable: true },
+                  resolvedPayoutAccountReference:    { type: 'string', nullable: true },
+                  grossAmount:                       { type: 'number' },
+                  netAmount:                         { type: 'number' },
+                  feeAmount:                         { type: 'number' },
+                  currency:                          { type: 'string' },
+                  paymentExecutionRail:              { type: 'string', nullable: true },
+                  routingNote:                       { type: 'string', nullable: true },
+                  paymentExecutionStatus:            { type: 'string' },
+                  direction:                         { type: 'string', description: '"sent" or "received" relative to partyRef' },
+                  initiatedAt:                       { type: 'string', nullable: true },
+                  completedAt:                       { type: 'string', nullable: true },
+                },
+              },
+            },
+            total: { type: 'integer' },
+            page:  { type: 'integer' },
+            limit: { type: 'integer' },
+          },
+        },
+        403: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { partyRef } = request.params as { partyRef: string };
+    const { page = 1, limit = 20 } = request.query as { page?: number; limit?: number };
+    const user = getUser(request);
+
+    // PCI DSS Req 7: customers may only view their own transfers
+    if (user?.role === 'customer' && user.partyRef !== partyRef) {
+      return reply.status(403).send({ error: 'Access denied: you may only view your own transfers.' });
+    }
+
+    const db = fastify.db;
+    const skip = (page - 1) * limit;
+    const filter = {
+      beneficiaryType: 'user' as const,
+      $or: [
+        { initiatorPartyReference: partyRef },
+        { beneficiaryPartyReference: partyRef },
+      ],
+    };
+
+    const [docs, total] = await Promise.all([
+      db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION)
+        .find(filter)
+        .sort({ initiatedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .toArray(),
+      db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).countDocuments(filter),
+    ]);
+
+    const results = docs.map(d => ({
+      paymentExecutionInstanceReference: d.paymentExecutionInstanceReference,
+      initiatorPartyReference:           d.initiatorPartyReference ?? null,
+      beneficiaryPartyReference:         d.beneficiaryPartyReference ?? null,
+      resolvedPayoutAccountReference:    d.resolvedPayoutAccountReference ?? null,
+      grossAmount:                       d.grossAmount,
+      netAmount:                         d.netAmount,
+      feeAmount:                         d.feeAmount,
+      currency:                          d.currency,
+      paymentExecutionRail:              d.paymentExecutionRail ?? null,
+      routingNote:                       d.routingNote ?? null,
+      paymentExecutionStatus:            d.paymentExecutionStatus,
+      direction:                         d.initiatorPartyReference === partyRef ? 'sent' : 'received',
+      initiatedAt:                       d.initiatedAt?.toISOString() ?? null,
+      completedAt:                       d.completedAt?.toISOString() ?? null,
+    }));
+
+    return reply.send({ results, total, page, limit });
   });
 }

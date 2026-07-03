@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, ClipboardList } from 'lucide-react';
+import { Plus, ClipboardList, SendHorizonal } from 'lucide-react';
 import { SectionHeader } from '../../../../components/SectionHeader';
 import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
@@ -47,6 +47,21 @@ interface TransactionWithCase extends StoredTransaction {
   caseRef?: string;
   customerNote?: string | null;
   resolutionOutcome?: string | null;
+}
+
+interface P2PTransfer {
+  paymentExecutionInstanceReference: string;
+  initiatorPartyReference: string | null;
+  beneficiaryPartyReference: string | null;
+  resolvedPayoutAccountReference: string | null;
+  grossAmount: number;
+  currency: string;
+  paymentExecutionRail: string | null;
+  routingNote: string | null;
+  paymentExecutionStatus: string;
+  direction: 'sent' | 'received';
+  initiatedAt: string | null;
+  completedAt: string | null;
 }
 
 // Payment authorization status (did the payment go through). This is SEPARATE from the fraud/risk
@@ -96,6 +111,10 @@ export default function TransactionHistoryPage() {
   // 'any' = has a fraud case, or a specific case status.
   const [fraudFilter, setFraudFilter] = useState('');
 
+  // P2P transfers (BIAN SD-65 — separate from card transactions)
+  const [p2pTransfers, setP2pTransfers] = useState<P2PTransfer[]>([]);
+  const [p2pLoading, setP2pLoading] = useState(true);
+
   function handleLimitChange(newLimit: number) {
     setPageSize(newLimit);
     setPage(1);
@@ -103,6 +122,22 @@ export default function TransactionHistoryPage() {
   function applySearch() { setPage(1); setQ(qInput.trim()); }
   function clearSearch() { setQInput(''); setQ(''); setPage(1); }
   const { debugMode } = useDebugMode();
+
+  useEffect(() => {
+    const loadP2P = async () => {
+      const t = getToken() ?? '';
+      const u = t ? decodeToken(t) : null;
+      if (!u?.partyRef) { setP2pLoading(false); return; }
+      try {
+        const res = await api.accounts.transfers(u.partyRef, t, { limit: 50 });
+        setP2pTransfers(res.results as P2PTransfer[]);
+      } catch {
+        setP2pTransfers([]);
+      }
+      setP2pLoading(false);
+    };
+    loadP2P();
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -336,6 +371,59 @@ export default function TransactionHistoryPage() {
             )}
           </>
         )}
+        {/* ── P2P Transfers (BIAN SD-65 Payment Execution) ─────────────────────── */}
+        <div className="mt-8">
+          <div className="flex items-center gap-2 mb-4">
+            <SendHorizonal size={16} className="text-[#001E2B]" />
+            <h2 className="text-base font-semibold text-gray-900">P2P Transfers</h2>
+            <span className="text-xs text-gray-400 ml-1">BIAN SD-65 · direct account-to-account</span>
+          </div>
+
+          {p2pLoading ? (
+            <div className="text-sm text-gray-400">Loading transfers…</div>
+          ) : p2pTransfers.length === 0 ? (
+            <div className="bg-white rounded-xl border p-5 text-center text-gray-500 text-sm">
+              No P2P transfers yet.{' '}
+              <Link href="/system/beneficiaries" className="text-blue-600 hover:underline">Send money to a contact</Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {p2pTransfers.map(t => (
+                <div key={t.paymentExecutionInstanceReference}
+                  className="bg-white rounded-xl border p-4 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className={`text-xs px-2 py-0.5 rounded font-medium ${t.direction === 'sent' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+                        {t.direction === 'sent' ? '↑ Sent' : '↓ Received'}
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded font-medium ${t.paymentExecutionStatus === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}`}>
+                        {t.paymentExecutionStatus}
+                      </span>
+                      {t.paymentExecutionRail && (
+                        <span className="text-xs text-gray-400 capitalize">{t.paymentExecutionRail.replace(/_/g, ' ')}</span>
+                      )}
+                    </div>
+                    {t.routingNote && (
+                      <p className="text-xs text-gray-500 truncate mt-0.5">{t.routingNote}</p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {t.initiatedAt ? new Date(t.initiatedAt).toLocaleString() : '—'}
+                    </p>
+                    {debugMode && (
+                      <p className="text-xs font-mono text-gray-400 mt-0.5 truncate">id: {t.paymentExecutionInstanceReference}</p>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className={`font-bold ${t.direction === 'sent' ? 'text-red-600' : 'text-green-700'}`}>
+                      {t.direction === 'sent' ? '−' : '+'}
+                      {new Intl.NumberFormat('en-US', { style: 'currency', currency: t.currency }).format(t.grossAmount)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );

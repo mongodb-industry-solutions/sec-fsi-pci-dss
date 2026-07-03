@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   UserCheck, ArrowLeft, Mail, Phone, Check, Edit3, X, AlertTriangle, SendHorizonal, Landmark,
 } from 'lucide-react';
@@ -217,6 +217,7 @@ function SendMoneyModal({ beneficiary, ownerPartyRef, token, onClose }: SendMone
 export default function BeneficiaryDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { debugMode } = useDebugMode();
   const beneficiaryId = params?.beneficiaryId as string;
 
@@ -264,6 +265,10 @@ export default function BeneficiaryDetailPage() {
 
   // Send money modal
   const [showSend, setShowSend] = useState(false);
+  // Auto-open when navigated from the list page Send quick-action button (?action=send)
+  useEffect(() => {
+    if (record && searchParams?.get('action') === 'send') setShowSend(true);
+  }, [record, searchParams]);
 
   if (loadError) return (
     <div className="w-full px-5 sm:px-8 py-6">

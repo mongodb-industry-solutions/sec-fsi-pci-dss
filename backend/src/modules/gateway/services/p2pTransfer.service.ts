@@ -9,6 +9,7 @@ import { getPayoutAccount, getDefaultPayoutAccount } from './payoutAccount.servi
 import { debitAvailable, creditDirect } from './payoutAccountBalance.service';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
+import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 
 export interface P2PTransferInput {
   initiatorPartyRef: string;         // the customer initiating the transfer
@@ -96,6 +97,7 @@ export async function executeP2PTransfer(
     paymentExecutionInstanceReference: transferRef,
     paymentOrderInstanceReference: transferRef, // direct P2P: no separate order record
     beneficiaryType: 'user',
+    initiatorPartyReference: initiatorPartyRef,
     beneficiaryPartyReference: recipientPartyRef,
     resolvedPayoutAccountReference: recipientAccount.payoutAccountInstanceReference,
     grossAmount: amount,
@@ -128,6 +130,46 @@ export async function executeP2PTransfer(
     schemaVersion: 1,
   };
   await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).insertOne(execution);
+
+  // EDA: business process event (payment_processing journey — visible in audit events / system log)
+  emitProcessEvent(db, {
+    entityType: 'transaction',
+    entityId: transferRef,
+    processType: 'payment_processing',
+    processAction: 'p2p_transfer.executed',
+    processOutcome: 'approved',
+    performedByPartyReference: initiatorPartyRef,
+    performedByRole: 'customer',
+    eventSummary: {
+      amount, currency,
+      fromAccount: fromAccountRef,
+      toAccount: recipientAccount.payoutAccountInstanceReference,
+      beneficiaryArrangement: counterpartyArrangementRef,
+      beneficiaryLabel: arrangement.counterpartyLabel,
+      rail: senderAccount.payoutAccountPreferredRail ?? 'internal_ledger',
+    },
+    bianServiceDomain: 'Payment Execution',
+    bianControlRecordType: 'PaymentExecutionProcedure',
+  });
+
+  // PCI DSS Req 10: compliance audit record for every fund movement
+  emitComplianceEvent(db, {
+    entityType: 'transaction',
+    entityId: transferRef,
+    processType: 'payment_processing',
+    processAction: 'p2p_transfer.funds_moved',
+    processOutcome: 'approved',
+    performedByPartyReference: initiatorPartyRef,
+    performedByRole: 'customer',
+    eventSummary: {
+      grossAmount: amount, currency,
+      debitAccount: fromAccountRef,
+      creditAccount: recipientAccount.payoutAccountInstanceReference,
+      beneficiaryType: 'user',
+    },
+    bianServiceDomain: 'Payment Execution',
+    bianControlRecordType: 'PaymentExecutionProcedure',
+  });
 
   return {
     transferReference: transferRef,
