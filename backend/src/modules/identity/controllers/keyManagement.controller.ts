@@ -5,11 +5,11 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { Db } from 'mongodb';
 import {
-  getJwks,
   generateAndActivateKey,
   rotateKey,
   revokeKey,
   uploadKey,
+  getPublicPemByKid,
 } from '../services/oidcKeys.service';
 import { PARTY_AUTHENTICATION_KEY_COLLECTION, PartyAuthenticationKeyRecord } from '../models/partyAuthenticationKey.model';
 
@@ -143,16 +143,15 @@ export async function keyManagementController(fastify: FastifyInstance) {
     },
   }, async (req: FastifyRequest, reply: FastifyReply) => {
     const { keyId } = req.params as { keyId: string };
-    const key = await db()
-      .collection<PartyAuthenticationKeyRecord>(PARTY_AUTHENTICATION_KEY_COLLECTION)
-      .findOne({ keyId, keyStatus: { $ne: 'revoked' } });
+    // Served from the key provider (filesystem/KMS) — the single source of truth (ADR-036).
+    const publicKeyPem = await getPublicPemByKid(keyId);
 
-    if (!key) {
+    if (!publicKeyPem) {
       return reply.status(404).send({ error: 'Key not found or revoked' });
     }
 
     reply.header('Content-Type', 'application/x-pem-file');
     reply.header('Content-Disposition', `attachment; filename="oauth-public-${keyId}.pem"`);
-    return reply.send(key.publicKeyPem);
+    return reply.send(publicKeyPem);
   });
 }

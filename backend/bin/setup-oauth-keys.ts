@@ -50,6 +50,7 @@ async function run(): Promise<void> {
 async function runLocalProvider(col: any): Promise<void> {
   const storeDir = path.resolve(process.env.PSP_OAUTH_KEY_STORE_DIR ?? process.env.OAUTH_KEY_STORE_DIR ?? './keys');
   const privateKeyPath = path.join(storeDir, 'private.pem');
+  const publicKeyPath = path.join(storeDir, 'public.pem');
 
   if (fs.existsSync(privateKeyPath) && !force) {
     console.log(`\n[setup:keys] Private key already exists at ${privateKeyPath}`);
@@ -61,8 +62,11 @@ async function runLocalProvider(col: any): Promise<void> {
     const der = pubKey.export({ type: 'spki', format: 'der' }) as Buffer;
     const kid = crypto.createHash('sha256').update(der).digest('hex').slice(0, 16);
     const publicKeyPem = pubKey.export({ type: 'spki', format: 'pem' }) as string;
+    // Ensure the public key is also present on disk (derived from the private key)
+    fs.writeFileSync(publicKeyPath, publicKeyPem, { mode: 0o644 });
     await upsertPublicKey(col, kid, publicKeyPem);
     console.log(`  kid: ${kid}`);
+    console.log(`  Public key:  ${publicKeyPath}`);
     return;
   }
 
@@ -74,6 +78,7 @@ async function runLocalProvider(col: any): Promise<void> {
   });
 
   fs.writeFileSync(privateKeyPath, privateKey as string, { mode: 0o600 });
+  fs.writeFileSync(publicKeyPath, publicKey as string, { mode: 0o644 });
 
   const der = crypto.createPublicKey(publicKey as string).export({ type: 'spki', format: 'der' }) as Buffer;
   const kid = crypto.createHash('sha256').update(der).digest('hex').slice(0, 16);
@@ -93,7 +98,7 @@ async function runLocalProvider(col: any): Promise<void> {
   console.log('\n[setup:keys] RSA-2048 keypair generated:');
   console.log(`  kid:         ${kid}`);
   console.log(`  Private key: ${privateKeyPath}  (chmod 600, never committed)`);
-  console.log('  Public key:  registered in Atlas partyAuthenticationKey');
+  console.log(`  Public key:  ${publicKeyPath}  (chmod 644) + registered in Atlas partyAuthenticationKey`);
   console.log('\nNext steps:');
   console.log('  npm run setup:seed');
   console.log('  npm run dev\n');

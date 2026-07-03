@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import { OAuthKeyProvider } from './index';
+import { OAuthKeyProvider, OAuthPublicKeyEntry } from './index';
 
 // Lazy-import AWS SDK so the server starts without AWS credentials when OAUTH_KEY_PROVIDER=local
 // @ts-ignore — @aws-sdk/client-kms is an optional peer dependency (only required when OAUTH_KEY_PROVIDER=aws)
@@ -61,8 +61,45 @@ export class AwsKmsKeyProvider implements OAuthKeyProvider {
     return this.kid;
   }
 
-  getPublicKeyPem(): string {
-    throw new Error('getPublicKeyPem() not available on AwsKmsKeyProvider — use getPublicKeyJwk()');
+  private async getPublicKeyPemInternal(): Promise<string> {
+    await this.getPublicKeyJwk(); // ensures kid + jwk cached
+    const pubKey = crypto.createPublicKey({ key: this.cachedJwk as crypto.JsonWebKey, format: 'jwk' });
+    return pubKey.export({ type: 'spki', format: 'pem' }) as string;
+  }
+
+  async listPublicKeys(): Promise<OAuthPublicKeyEntry[]> {
+    const publicKeyPem = await this.getPublicKeyPemInternal();
+    return [{ kid: this.getKid(), publicKeyPem, status: 'active' }];
+  }
+
+  async getPublicPemByKid(kid: string): Promise<string | null> {
+    const publicKeyPem = await this.getPublicKeyPemInternal();
+    return kid === this.getKid() ? publicKeyPem : null;
+  }
+
+  supportsRotation(): boolean {
+    return false;
+  }
+
+  async rotate(): Promise<{ kid: string; publicKeyPem: string }> {
+    throw Object.assign(
+      new Error('Rotation is managed inside AWS KMS — create a new CMK / KMS key rotation, not via this API'),
+      { statusCode: 400 },
+    );
+  }
+
+  async importKeypair(): Promise<{ kid: string; publicKeyPem: string }> {
+    throw Object.assign(
+      new Error('Key import is not supported with the AWS KMS provider — the private key never leaves KMS'),
+      { statusCode: 400 },
+    );
+  }
+
+  async revoke(): Promise<void> {
+    throw Object.assign(
+      new Error('Key revocation is managed inside AWS KMS — disable/schedule deletion of the CMK there'),
+      { statusCode: 400 },
+    );
   }
 
   private deriveKid(der: Buffer): string {

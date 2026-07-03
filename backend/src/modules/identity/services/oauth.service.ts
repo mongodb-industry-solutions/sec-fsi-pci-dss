@@ -472,13 +472,12 @@ export async function verifyAccessToken(token: string): Promise<jwt.JwtPayload> 
   const kid = header.kid as string;
 
   const provider = getOAuthKeyProvider();
-  if (provider.getKid() !== kid) {
-    throw oauth401('invalid_token', `Unknown kid: ${kid}`);
+  // Resolve the public key for this token's kid — active OR a deprecated key still in
+  // its grace period (ADR-036). Revoked/unknown kids return null and are rejected.
+  const pubPem = await provider.getPublicPemByKid(kid);
+  if (!pubPem) {
+    throw oauth401('invalid_token', `Unknown or revoked kid: ${kid}`);
   }
-
-  const jwk = await provider.getPublicKeyJwk();
-  const pubKey = crypto.createPublicKey({ key: jwk as crypto.JsonWebKey, format: 'jwk' });
-  const pubPem = pubKey.export({ type: 'spki', format: 'pem' }) as string;
 
   try {
     return jwt.verify(token, pubPem, { algorithms: ['RS256'] }) as jwt.JwtPayload;

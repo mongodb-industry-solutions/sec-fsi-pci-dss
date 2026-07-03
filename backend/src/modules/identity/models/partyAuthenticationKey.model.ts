@@ -1,5 +1,9 @@
-// SD-16: Party Authentication — RSA public key registry
-// ADR-036: Only public key is stored. Private key is managed by OAuthKeyProvider (local file or AWS KMS).
+// SD-16: Party Authentication — RSA public key audit registry
+// ADR-036 (FS-first): the OAuthKeyProvider (local filesystem / AWS KMS) is the single source
+// of truth for key material. This collection is an AUDIT MIRROR only — it records key status
+// and provenance (who rotated, when) and backs the admin dashboard listing. It is NOT read to
+// verify tokens or to build the JWKS; those are served directly from the provider. The private
+// key is never stored here.
 
 export const PARTY_AUTHENTICATION_KEY_COLLECTION = 'partyAuthenticationKey';
 

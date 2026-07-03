@@ -1775,15 +1775,21 @@ OAUTH_KEY_PROVIDER=aws  →  AwsKmsKeyProvider
   Same AWS credentials as QE (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)
 ```
 
-Both providers expose a common `OAuthKeyProvider` interface: `sign(data)`, `getPublicKeyJwk()`, `getKid()`. The Atlas `partyAuthenticationKey` collection stores **only the public key PEM** — safe to expose at the JWKS endpoint and used as the key rotation audit log.
-
-`npm run setup:keys` generates/registers the keypair before first run (analogous to `npm run setup:db` for QE).
+Both providers expose a common `OAuthKeyProvider` interface. `npm run setup:keys` generates the keypair (`private.pem` + `public.pem`) before first run (analogous to `npm run setup:db` for QE).
 
 **Consequences.**
 - (+) Private key never in the database; FIPS 140-2 hardware boundary available via `aws` provider.
 - (+) Same operational pattern as QE — existing runbooks and K8s Secret patterns apply.
-- (+) Public key registry in Atlas enables JWKS multi-key rotation with grace period.
+- (+) JWKS multi-key rotation with grace period, driven by the provider (see amendment).
 - (−) One new setup step (`npm run setup:keys`); documented in README and installation guide.
+
+**Amendment (2026-07-03) — FS-first: provider is the single source of truth.**
+The original design used the Atlas `partyAuthenticationKey` collection as the source for the JWKS and stored the public key there on rotation. This created a dual source of truth that broke dashboard-initiated rotation: `generateAndActivateKey`/`uploadKey` wrote the new **public** key to the DB and marked it active, but **never persisted the new private key**, so the signing provider kept using the old key file — the advertised active `kid` could never sign. Corrected design:
+- The `OAuthKeyProvider` (filesystem / KMS) owns all key material and is the only source for signing, verification, and the JWKS. Interface: `sign`, `getKid`, `getPublicKeyJwk`, `listPublicKeys`, `getPublicPemByKid`, `supportsRotation`, `rotate`, `importKeypair`, `revoke`.
+- `LocalKeyProvider` layout: active private at `private.pem`, active public at `public.pem`, and deprecated **public-only** keys under `retired/<kid>.pub.pem` for the grace period (deprecated private material is dropped — only the active key ever signs).
+- Token verification resolves the public key by the token's `kid` (active **or** a deprecated key still in grace), enabling a real rotation grace period.
+- `partyAuthenticationKey` is now an **audit mirror** only (status + provenance for the admin dashboard), reconciled from the provider on startup and after every mutation. It is never read to verify tokens or build the JWKS.
+- KMS rotation/import/revoke are unsupported in-process (managed inside AWS KMS); `supportsRotation()` returns false.
 
 ---
 

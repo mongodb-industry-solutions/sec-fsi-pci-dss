@@ -41,8 +41,7 @@ export async function oidcDiscoveryController(fastify: FastifyInstance) {
       description: 'Returns public RSA keys for verifying OAuth RS256 access tokens. All active and deprecated keys are included so tokens issued before key rotation remain verifiable during the grace period.',
     },
   }, async (_req, reply) => {
-    const db = (fastify as any).db;
-    const jwks = await getJwks(db);
+    const jwks = await getJwks();
     reply.header('Cache-Control', 'public, max-age=3600');
     return jwks;
   });
