@@ -80,7 +80,7 @@ function SendForm({ partyRef, token, onDone }: { partyRef: string; token: string
 
   if (success) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4 max-w-lg">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
         <div className="text-center py-4">
           <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
             <Check size={24} className="text-green-600" />
