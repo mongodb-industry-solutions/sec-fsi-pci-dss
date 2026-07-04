@@ -220,7 +220,8 @@ function RegisteredAccountForm({ partyRef, token, onDone }: { partyRef: string; 
           </div>
           <p className="font-semibold text-gray-900">{fmtAmount(success.amount, success.currency)} sent</p>
           <p className="text-xs text-gray-500 mt-1">To: {success.label}</p>
-          <p className="text-xs text-gray-400 mt-1">Status: {success.status === 'submitted' ? 'pending settlement' : success.status} · Ref: {success.ref.slice(0, 8)}</p>
+          <p className="text-xs text-gray-400 mt-1">Status: {success.status === 'submitted' ? 'pending settlement' : success.status}</p>
+          <p className="text-xs font-mono text-gray-400 mt-1 break-all">Ref: {success.ref}</p>
         </div>
         <div className="flex gap-2">
           <Link href={`/system/payment/history/${success.ref}`}
