@@ -169,7 +169,7 @@ function checkEnvVars(): boolean {
         const decoded = Buffer.from(localKey, 'base64');
         decoded.length === 96
           ? check('pass', 'PSP_KMS_LOCAL_MASTER_KEY length', '96 bytes ✓')
-          : check('fail', 'PSP_KMS_LOCAL_MASTER_KEY length', `expected 96 bytes, got ${decoded.length} - regenerate with setup:key`);
+          : check('fail', 'PSP_KMS_LOCAL_MASTER_KEY length', `expected 96 bytes, got ${decoded.length} - regenerate with setup:key:master`);
       } catch {
         check('fail', 'PSP_KMS_LOCAL_MASTER_KEY', 'invalid base64 encoding');
       }

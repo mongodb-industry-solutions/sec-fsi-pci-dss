@@ -18,7 +18,8 @@ interface CommandDef {
 
 const COMMANDS: CommandDef[] = [
   { id: 'setup',            label: 'Full Setup',        description: 'Install all dependencies (frontend + backend)',    icon: '📦', group: 'setup' },
-  { id: 'setup:key',        label: 'Generate Key',      description: 'Generate the local master encryption key',         icon: '🔑', group: 'setup' },
+  { id: 'setup:key:master', label: 'Generate Master Key', description: 'Generate the local KMS master key for Queryable Encryption (KMS_LOCAL_MASTER_KEY)', icon: '🔑', group: 'setup' },
+  { id: 'setup:key:rsa',    label: 'Generate RSA Keys', description: 'Generate the RSA OAuth/OIDC signing keypair (private.pem + public.pem)', icon: '🔐', group: 'setup' },
   { id: 'setup:db',         label: 'Setup Database',    description: 'Create collections, indexes, and provision DEKs', icon: '🗄️', group: 'setup' },
   { id: 'setup:generate',   label: 'Generate Data',     description: 'Generate synthetic demo dataset',                  icon: '🎲', group: 'setup' },
   { id: 'setup:seed',       label: 'Seed Database',     description: 'Insert generated data into MongoDB Atlas',         icon: '🌱', group: 'setup' },

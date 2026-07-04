@@ -17,7 +17,7 @@ export async function runSetup(reset = false) {
       'MONGODB_URI is not set.\n' +
       '  1. Copy .env.example to .env\n' +
       '  2. Fill in MONGODB_URI (Atlas connection string)\n' +
-      '  3. Set KMS_PROVIDER=local and run: npm run setup:key\n' +
+      '  3. Set KMS_PROVIDER=local and run: npm run setup:key:master\n' +
       '  4. Re-run: npm run setup:db'
     );
   }

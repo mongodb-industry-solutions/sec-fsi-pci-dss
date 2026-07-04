@@ -160,7 +160,8 @@ function spawnFrontend(): void {
 
 const ALLOWED_NPM_COMMANDS: Record<string, string[]> = {
   'setup':             ['run', 'setup'],
-  'setup:key':         ['run', 'setup:key'],
+  'setup:key:master':  ['run', 'setup:key:master'],
+  'setup:key:rsa':     ['run', 'setup:key:rsa'],
   'setup:db':          ['run', 'setup:db'],
   'setup:generate':    ['run', 'setup:generate'],
   'setup:seed':        ['run', 'setup:seed'],
