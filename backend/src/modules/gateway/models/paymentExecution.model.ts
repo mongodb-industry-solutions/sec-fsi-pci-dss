@@ -37,6 +37,13 @@ export interface PaymentExecutionProcedure {
   sourcePayoutAccountReference?: string;          // FK → payoutAccountArrangement (SD-66); sender's account — enables per-account movement ledger
   resolvedPayoutAccountReference?: string;        // FK → payoutAccountArrangement (SD-66); recipient's account
 
+  // External bank-transfer recipient snapshot (SEPA/ACH/SWIFT). The full destination coordinates
+  // stay transaction-scoped and are never persisted (PCI DSS Req 3.3 — IBAN is QE:none / non-searchable).
+  // We retain only a display-safe identity so the Recipient can be shown and traced.
+  beneficiaryName?: string;                       // holder legal name as entered at initiation
+  destinationAccountMasked?: string;              // masked IBAN / account, e.g. "FR76••••3000"
+  destinationCountry?: string;                    // ISO 3166-1 alpha-2 (destination banking country)
+
   grossAmount: number;
   netAmount: number;
   feeAmount: number;

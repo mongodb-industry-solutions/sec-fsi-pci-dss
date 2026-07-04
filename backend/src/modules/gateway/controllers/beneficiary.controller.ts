@@ -269,10 +269,12 @@ export async function beneficiaryController(fastify: FastifyInstance) {
       note: body.note,
     });
 
-    if (result.status === 'failed') {
+    // Pre-creation failure (no execution persisted): return an error to fix the form.
+    if (!result.transferReference) {
       return reply.status(422).send({ error: result.failureReason ?? 'Transfer failed.' });
     }
-
+    // Submitted, or created-but-blocked/failed (execution + audit exist): return the full result so
+    // the UI can show a details screen and link to the created transfer.
     return reply.send(result);
   });
 }

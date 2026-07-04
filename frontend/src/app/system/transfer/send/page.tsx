@@ -55,7 +55,7 @@ function SendForm({ partyRef, token, onDone }: { partyRef: string; token: string
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState<{ ref: string; amount: number; currency: string } | null>(null);
+  const [result, setResult] = useState<{ ref: string; amount: number; currency: string; status: string; reason?: string } | null>(null);
 
   const selectedAccount = accounts.find(a => a.payoutAccountInstanceReference === fromAccountRef);
 
@@ -71,29 +71,47 @@ function SendForm({ partyRef, token, onDone }: { partyRef: string; token: string
         { fromAccountRef, amount: parsed, note: note.trim() || undefined },
         token,
       );
-      setSuccess({ ref: res.transferReference, amount: parsed, currency: res.currency });
+      setResult({ ref: res.transferReference, amount: parsed, currency: res.currency, status: res.status, reason: res.failureReason });
     } catch (err) {
+      // Pre-creation failure (no transfer persisted): fix the form and retry.
       setError(err instanceof Error ? err.message : 'Transfer failed.');
     }
     setSending(false);
   }
 
-  if (success) {
+  if (result) {
     const contact = beneficiaries.find(b => b.counterpartyArrangementReference === beneficiaryRef);
     const fromLabel = selectedAccount
       ? `${selectedAccount.payoutAccountAlias || selectedAccount.payoutAccountBankName || 'Account'} · ${selectedAccount.payoutAccountCurrency}`
       : fromAccountRef;
+    const ok = result.status === 'submitted';
+    const blocked = result.status === 'exception';
+    const tone = ok ? 'green' : blocked ? 'amber' : 'red';
+    const toneBg = ok ? 'bg-green-100' : blocked ? 'bg-amber-100' : 'bg-red-100';
+    const toneText = ok ? 'text-green-600' : blocked ? 'text-amber-600' : 'text-red-600';
+    const title = ok ? `${fmtAmount(result.amount, result.currency)} sent`
+      : blocked ? 'Transfer blocked for review'
+      : 'Transfer could not be completed';
+    const statusLine = ok ? 'Status: pending settlement'
+      : blocked ? 'Status: exception · under fraud review'
+      : 'Status: failed';
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
         <div className="text-center py-4">
-          <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-            <Check size={24} className="text-green-600" />
+          <div className={`w-12 h-12 ${toneBg} rounded-full flex items-center justify-center mx-auto mb-3`}>
+            {ok ? <Check size={24} className={toneText} /> : <AlertCircle size={24} className={toneText} />}
           </div>
-          <p className="font-semibold text-gray-900">{fmtAmount(success.amount, success.currency)} sent</p>
-          <p className="text-xs text-gray-500 mt-1">Status: pending settlement</p>
+          <p className="font-semibold text-gray-900">{title}</p>
+          <p className="text-xs text-gray-500 mt-1">{statusLine}</p>
+          {!ok && result.reason && (
+            <p className={`text-xs ${tone === 'amber' ? 'text-amber-700' : 'text-red-700'} mt-2 max-w-md mx-auto`}>{result.reason}</p>
+          )}
+          {blocked && (
+            <p className="text-xs text-gray-500 mt-2 max-w-md mx-auto">A case has been opened for review by our team. No funds were moved. You can review the created transfer or try again.</p>
+          )}
         </div>
 
-        {/* Confirmation: origin, destination and reference. Full detail via "View transfer". */}
+        {/* Operation details: origin, destination and reference. Full detail via "View transfer". */}
         <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm border-t border-gray-100 pt-4">
           <dt className="text-gray-500">From</dt>
           <dd className="text-gray-900 text-right break-all">{fromLabel}</dd>
@@ -105,7 +123,7 @@ function SendForm({ partyRef, token, onDone }: { partyRef: string; token: string
           </dd>
 
           <dt className="text-gray-500">Amount</dt>
-          <dd className="text-gray-900 text-right font-medium">{fmtAmount(success.amount, success.currency)}</dd>
+          <dd className="text-gray-900 text-right font-medium">{fmtAmount(result.amount, result.currency)}</dd>
 
           {note.trim() && (<>
             <dt className="text-gray-500">Note</dt>
@@ -113,15 +131,22 @@ function SendForm({ partyRef, token, onDone }: { partyRef: string; token: string
           </>)}
 
           <dt className="text-gray-500">Reference</dt>
-          <dd className="text-gray-700 text-right font-mono text-xs break-all">{success.ref}</dd>
+          <dd className="text-gray-700 text-right font-mono text-xs break-all">{result.ref}</dd>
         </dl>
 
         <div className="flex flex-col sm:flex-row gap-2 pt-1">
-          <Link href="/system/transfer"
-            className="flex-1 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-center">
-            Back to transfers
-          </Link>
-          <Link href={`/system/payment/history/${success.ref}`}
+          {ok ? (
+            <Link href="/system/transfer"
+              className="flex-1 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-center">
+              Back to transfers
+            </Link>
+          ) : (
+            <button type="button" onClick={() => setResult(null)}
+              className="flex-1 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-center">
+              Try again
+            </button>
+          )}
+          <Link href={`/system/payment/history/${result.ref}`}
             className="flex-1 py-2 text-sm font-medium bg-[#001E2B] text-white rounded-lg hover:bg-[#001E2B]/80 transition-colors text-center">
             View transfer
           </Link>

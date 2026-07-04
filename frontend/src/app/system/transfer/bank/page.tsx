@@ -396,6 +396,8 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
       routingNumber: form.routingNumber || undefined,
       bic: form.bic || undefined,
       correspondentBic: form.correspondentBic || undefined,
+      beneficiaryName: form.holderName || undefined,
+      bankName: form.bankName || undefined,
     };
   }
 

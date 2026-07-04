@@ -18,6 +18,32 @@ import { screenTransfer, openTransferFraudCase } from './transferRiskGate';
 import { config as appConfig } from '../../../config';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 
+/**
+ * Mask a bank account identifier (IBAN or domestic account number) for display storage.
+ * Keeps the first 4 and last 4 characters, masks the middle with bullets — enough to recognise
+ * and trace the destination without persisting the full number (PCI DSS Req 3.3).
+ * "FR7630006000011234567890189" → "FR76••••0189"; short values keep only the last 2.
+ */
+export function maskAccountIdentifier(raw: string): string {
+  const v = raw.replace(/\s/g, '');
+  if (v.length <= 6) return `••${v.slice(-2)}`;
+  return `${v.slice(0, 4)}••••${v.slice(-4)}`;
+}
+
+/** Build the display-safe recipient snapshot for an external bank transfer. */
+function buildRecipientSnapshot(destination: RailDestination): {
+  beneficiaryName?: string;
+  destinationAccountMasked?: string;
+  destinationCountry: string;
+} {
+  const accountId = destination.iban ?? destination.accountNumber;
+  return {
+    beneficiaryName: destination.beneficiaryName?.trim() || undefined,
+    destinationAccountMasked: accountId ? maskAccountIdentifier(accountId) : undefined,
+    destinationCountry: destination.countryCode,
+  };
+}
+
 export interface BankTransferPreview {
   ok: boolean;
   rail?: BankRail;
@@ -116,6 +142,7 @@ export async function executeBankTransfer(
     paymentOrderInstanceReference: executionRef,
     beneficiaryType: 'user',
     initiatorPartyReference: input.initiatorPartyRef,
+    ...buildRecipientSnapshot(input.destination),
     grossAmount: input.amount,
     netAmount: input.amount,
     feeAmount: preview.feeAmount ?? 0,
@@ -198,6 +225,7 @@ async function recordException(
     paymentOrderInstanceReference: executionRef,
     beneficiaryType: 'user',
     initiatorPartyReference: input.initiatorPartyRef,
+    ...buildRecipientSnapshot(input.destination),
     grossAmount: input.amount, netAmount: input.amount, feeAmount: 0, currency: input.currency,
     routingNote: 'Bank transfer blocked at rail validation',
     paymentExecutionStatus: 'exception',

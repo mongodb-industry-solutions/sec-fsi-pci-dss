@@ -1044,6 +1044,12 @@ export interface PaymentExecutionProcedure {
   beneficiaryPartyReference?:    string;            // FK → party (SD-13) for user payouts
   resolvedPayoutAccountReference?: string;          // FK → payoutAccountArrangement (SD-66)
 
+  // External bank-transfer recipient snapshot (SEPA/ACH/SWIFT) — display-safe only.
+  // Full destination coordinates stay transaction-scoped (PCI DSS Req 3.3; IBAN is QE:none).
+  beneficiaryName?:          string;   // holder legal name as entered at initiation
+  destinationAccountMasked?: string;   // masked IBAN / account, e.g. "FR76••••0189"
+  destinationCountry?:       string;   // ISO 3166-1 alpha-2 destination banking country
+
   grossAmount: number;
   netAmount:   number;
   feeAmount:   number;

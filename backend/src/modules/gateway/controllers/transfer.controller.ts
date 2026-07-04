@@ -29,6 +29,8 @@ const destinationSchema = {
     routingNumber: { type: 'string' },
     bic: { type: 'string' },
     correspondentBic: { type: 'string' },
+    beneficiaryName: { type: 'string', maxLength: 140 },
+    bankName: { type: 'string', maxLength: 100 },
   },
 } as const;
 

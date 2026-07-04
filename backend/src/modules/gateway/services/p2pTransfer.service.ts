@@ -29,7 +29,7 @@ export interface P2PTransferResult {
   transferReference: string;
   amount: number;
   currency: string;
-  status: 'submitted' | 'completed' | 'failed';
+  status: 'submitted' | 'completed' | 'failed' | 'exception';
   failureReason?: string;
   recipientAccountRef?: string;
   recipientHint?: string;
@@ -115,7 +115,13 @@ export async function executeP2PTransfer(
       eventSummary: { amount, currency: transferCurrency, indicators: screen.indicators, score: screen.score },
       bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
     });
-    return fail(amount, transferCurrency, screen.reason ?? 'Transfer blocked by risk screening.');
+    // Created as an exception (execution + L1 case exist). Return the ref so the UI can show a
+    // details screen and link to the created transfer instead of a bare error.
+    return {
+      transferReference: transferRef, amount, currency: transferCurrency,
+      status: 'exception', failureReason: screen.reason ?? 'Transfer blocked by risk screening.',
+      recipientAccountRef: recipientAccount.payoutAccountInstanceReference, recipientHint: arrangement.counterpartyLabel,
+    };
   }
 
   // 4. Hold sender funds (available -> pending), conditional on sufficient available balance.
@@ -178,7 +184,11 @@ export async function executeP2PTransfer(
       { paymentExecutionInstanceReference: transferRef },
       { $set: { paymentExecutionStatus: 'failed', failureReason: `PISP dispatch ${dispatch.status}`, recordUpdatedDateTime: new Date() } },
     );
-    return fail(amount, transferCurrency, 'Transfer could not be submitted.');
+    return {
+      transferReference: transferRef, amount, currency: transferCurrency,
+      status: 'failed', failureReason: 'Transfer could not be submitted to the payment rail.',
+      recipientAccountRef: recipientAccount.payoutAccountInstanceReference, recipientHint: arrangement.counterpartyLabel,
+    };
   }
 
   await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).updateOne(
