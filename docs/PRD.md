@@ -1321,3 +1321,15 @@ The Integration Hub is designed around PCI DSS v4.0 third-party service provider
 ---
 
 *This document is a living artifact. Update the Decisions Log with any architectural or scope change agreed during development.*
+
+## v17.1 — Bank Transfers (ACH / SEPA / SWIFT)
+
+The PSP supports outbound bank transfers over ACH, SEPA and SWIFT, to registered accounts and to
+unregistered accounts (details entered on a form). All transfers are external bank transfers executed
+through providers (BIAN SD-65/66): the rail is auto-derived (with override) and validated per standard
+(ISO 13616 IBAN, ISO 9362 BIC, NACHA ABA), fees are quoted per rail, and a pre-initiation risk gate
+(FDS/HRP/AML) blocks and opens an L1-reviewable fraud case on a negative evaluation. Recurring payments
+(ACH Direct Debit, SEPA SDD) are supported via mandates. PCI DSS: bank coordinates are transaction-scoped
+and never travel on the bus; every transfer is audited (Req 10) with the execution reference as correlation id.
+
+*Added 2026-07-04 (v17.1).*

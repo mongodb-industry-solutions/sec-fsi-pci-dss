@@ -1786,3 +1786,15 @@ After login, David accesses the standard merchant portal (Ch-04 §10.4):
 | 3 | (After simulator ran Luis scenario) | Webhook log: `checkout.completed, amount: €850, fraudCaseCreated: true` |
 | 4 | Go to Payment Links tab | Luis's payment link shows status: `completed` |
 | 5 | Present Debug Mode | Shows raw MongoDB document — `merchantName` plaintext, customer fields encrypted |
+
+## v17.1 — Bank transfer UX (/system/transfer/bank)
+
+Two tabs:
+- Registered account: send to an own account or a saved contact; no bank details required. Executes as
+  an external bank transfer (async): funds are held on submit and settle after T+N ("pending settlement").
+- New bank account: enter destination country, IBAN/routing/account and BIC. The rail (SEPA/ACH/SWIFT) is
+  auto-detected and shown as a badge with the quoted fee; details validate live (preview endpoint). "Send
+  wire" submits and the success screen polls live status (pending -> settled/failed). A "recurring (Direct
+  Debit)" option creates a SEPA SDD / ACH SDD mandate with a chosen frequency.
+
+*Added 2026-07-04 (v17.1).*
