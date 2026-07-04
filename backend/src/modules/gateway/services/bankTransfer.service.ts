@@ -15,6 +15,7 @@ import {
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import { screenTransfer, openTransferFraudCase } from './transferRiskGate';
+import { config as appConfig } from '../../../config';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 
 export interface BankTransferPreview {
@@ -120,7 +121,7 @@ export async function executeBankTransfer(
     feeAmount: preview.feeAmount ?? 0,
     currency: input.currency,
     paymentExecutionRail: rail,
-    routingNote: input.reference ? `Bank transfer: ${input.reference}` : `Bank transfer via ${rail.toUpperCase()}`,
+    routingNote: `${appConfig.payout.sandbox ? '[sandbox] ' : ''}${input.reference ? `Bank transfer: ${input.reference}` : `Bank transfer via ${rail.toUpperCase()}`}`,
     paymentExecutionStatus: 'routing',
     initiatedAt: now,
     resolutionLog: [

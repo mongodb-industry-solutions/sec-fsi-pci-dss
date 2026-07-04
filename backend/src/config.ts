@@ -99,5 +99,15 @@ export const config = {
     // SD-54 Counterparty Administration — beneficiary registry limits
     beneficiaryMaxPerUser: parseInt(pspEnv('BENEFICIARY_MAX_PER_USER', '100')!, 10),
     beneficiaryRateLimitRpm: parseInt(pspEnv('BENEFICIARY_RATE_LIMIT_RPM', '20')!, 10),
+    // v17.1 Bank transfers — sandbox mode (transfers are simulated end to end; no real rail effect)
+    sandbox: pspEnv('PAYOUT_SANDBOX', 'true') === 'true',
+    // v17.1 Rail fee schedule (config-driven, single source; consumed by FeeCalculator)
+    railFees: {
+      sepa: parseFloat(pspEnv('PAYOUT_FEE_SEPA', '0')!),
+      ach: parseFloat(pspEnv('PAYOUT_FEE_ACH', '0.25')!),
+      swift: parseFloat(pspEnv('PAYOUT_FEE_SWIFT', '15')!),
+      localBank: parseFloat(pspEnv('PAYOUT_FEE_LOCAL_BANK', '0')!),
+      swiftCorrespondentSurcharge: parseFloat(pspEnv('PAYOUT_FEE_SWIFT_CORRESPONDENT', '10')!),
+    },
   },
 } as const;

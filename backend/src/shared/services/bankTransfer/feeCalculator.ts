@@ -3,6 +3,7 @@
 // Pure and reusable; the fee schedule is injectable so an external provider can override it.
 
 import type { BankRail, RailDestination } from './railTypes';
+import { config as appConfig } from '../../../config';
 
 export interface RailFeeSchedule {
   sepa: number;
@@ -12,12 +13,13 @@ export interface RailFeeSchedule {
   swiftCorrespondentSurcharge: number;  // added when a correspondent BIC is present
 }
 
+// Config-driven (single source): the schedule comes from config.payout.railFees (env-tunable).
 export const DEFAULT_FEE_SCHEDULE: RailFeeSchedule = {
-  sepa: 0,
-  ach: 0.25,
-  swift: 15,
-  local_bank: 0,
-  swiftCorrespondentSurcharge: 10,
+  sepa: appConfig.payout.railFees.sepa,
+  ach: appConfig.payout.railFees.ach,
+  swift: appConfig.payout.railFees.swift,
+  local_bank: appConfig.payout.railFees.localBank,
+  swiftCorrespondentSurcharge: appConfig.payout.railFees.swiftCorrespondentSurcharge,
 };
 
 export class FeeCalculator {

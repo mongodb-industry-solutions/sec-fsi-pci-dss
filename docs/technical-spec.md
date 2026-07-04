@@ -3485,3 +3485,13 @@ sync). `InitiateTransferInput` accepts optional `rail`, `destination`, `recurrin
 emits business + compliance events correlated by the execution reference (PCI DSS Req 10).
 
 *Added 2026-07-04 (v17.1; doc + code together per repo rules).*
+
+### v17.1 — Bank transfer config (G7)
+
+Env vars (config.payout): `PAYOUT_SANDBOX` (default true; transfers simulated end to end),
+`PAYOUT_FEE_SEPA` (0), `PAYOUT_FEE_ACH` (0.25), `PAYOUT_FEE_SWIFT` (15), `PAYOUT_FEE_LOCAL_BANK` (0),
+`PAYOUT_FEE_SWIFT_CORRESPONDENT` (10). The fee schedule is the single source consumed by
+`FeeCalculator` (preview and execution quote the same fee). Rail failure simulation reuses
+`PAYMENT_INITIATION_ALWAYS_SUCCEED`.
+
+*Added 2026-07-04 (v17.1/G7).*
