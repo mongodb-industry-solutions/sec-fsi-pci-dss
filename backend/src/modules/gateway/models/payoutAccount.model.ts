@@ -7,7 +7,7 @@ export const PAYOUT_ACCOUNT_COLLECTION = 'payoutAccountArrangement';
 
 export type PayoutAccountType = 'bank_account' | 'wallet' | 'internal_ledger';
 export type PayoutAccountStatus = 'active' | 'pending_validation' | 'suspended' | 'closed';
-export type PayoutRail = 'sepa' | 'ach' | 'local_bank' | 'internal_wallet' | 'internal_ledger';
+export type PayoutRail = 'sepa' | 'ach' | 'swift' | 'local_bank' | 'internal_wallet' | 'internal_ledger';
 
 export interface PayoutAccountBalance {
   // All three fields updated atomically via MongoDB $inc — never read-modify-write.

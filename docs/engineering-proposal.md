@@ -1832,3 +1832,28 @@ All responses are scoped to the authenticated merchant's own records only:
 - (+) Provider-indifferent: swapping the built-in AIS/FX for an external provider requires no flow change.
 - (+) The post-auth double-hold is removed (`decrementCardFundingBalance` now only credits refunds).
 - (−) One extra parallel gate + HTTP loopback read per PSP-funded card payment (consistent with the existing gate cost). Full transaction-replay for seed balances was deliberately NOT done (opening deposit == reconciled current balance) to preserve story-persona balances; a `reconcilePayoutBalances` replay seeder is deferred.
+
+## ADR-039: Bank transfers via provider dispatch + shared rail engine (v17.1)
+
+**Status:** Accepted (2026-07-04)
+
+**Context:** v17.1 adds ACH/SEPA/SWIFT bank transfers. The PSP does not own balances or virtual
+accounts; it operates over accounts held by external banks. Every money movement and balance read must
+therefore go through providers (external or built-in), preserving the EDA + Hexagonal architecture.
+
+**Decision:**
+1. Bank transfers are executed by dispatching to the `payment_initiation` provider (never a direct
+   built-in import), so an external PISP can replace the built-in module without changing the flow.
+2. Rail derivation, validation and fee pricing live in one shared, pure, OOP module
+   (`shared/services/bankTransfer`: `RailResolver`, `FeeCalculator`, IBAN/BIC/ABA validators, standard
+   return-code maps) reused by the provider, the orchestrator, the API and the frontend contract (DRY).
+3. Rail is auto-derived (EUR+IBAN+EEA -> SEPA; USD+routing+US -> ACH; BIC cross-border -> SWIFT) with a
+   user override; validation follows ISO 13616, ISO 9362 and the NACHA ABA checksum.
+4. Unregistered destinations are transaction-scoped by default (bound to the execution); persisted as a
+   beneficiary only on explicit opt-in.
+
+**Consequences:** No deviation from BIAN SD-65/66 or PCI DSS (Req 3 encryption of bank data, Req 10
+audit via `businessProcessEvent`/`complianceProcessEvent` correlated by execution reference). The
+built-in module may read the PSP DB, but callers stay provider-agnostic.
+
+*Added 2026-07-04 (v17.1; doc + code together per repo rules).*

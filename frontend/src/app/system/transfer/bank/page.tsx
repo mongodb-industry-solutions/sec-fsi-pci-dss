@@ -123,7 +123,7 @@ function BankForm({ partyRef, token, onDone }: { partyRef: string; token: string
 
       {tab === 'registered'
         ? <RegisteredAccountForm partyRef={partyRef} token={token} onDone={onDone} />
-        : <NewIbanForm onDone={onDone} />
+        : <NewIbanForm token={token} onDone={onDone} />
       }
     </div>
   );
@@ -357,27 +357,131 @@ function RegisteredAccountForm({ partyRef, token, onDone }: { partyRef: string; 
 
 interface IbanFormState {
   iban: string; bic: string; holderName: string; bankName: string;
+  countryCode: string; accountNumber: string; routingNumber: string; correspondentBic: string;
   amount: string; currency: string; reference: string; save: boolean;
 }
 
-function NewIbanForm({ onDone }: { onDone: () => void }) {
+function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
   const [form, setForm] = useState<IbanFormState>({
     iban: '', bic: '', holderName: '', bankName: '',
+    countryCode: 'DE', accountNumber: '', routingNumber: '', correspondentBic: '',
     amount: '', currency: 'EUR', reference: '', save: false,
   });
+  const [preview, setPreview] = useState<{ ok: boolean; rail?: string; feeAmount?: number; errors: string[] } | null>(null);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState<{ rail: string; ref: string } | null>(null);
 
   function set(field: keyof IbanFormState, value: string | boolean) {
     setForm(f => ({ ...f, [field]: value }));
   }
 
+  function buildDestination() {
+    return {
+      countryCode: form.countryCode.toUpperCase(),
+      currency: form.currency,
+      iban: form.iban || undefined,
+      accountNumber: form.accountNumber || undefined,
+      routingNumber: form.routingNumber || undefined,
+      bic: form.bic || undefined,
+      correspondentBic: form.correspondentBic || undefined,
+    };
+  }
+
+  // Debounced live preview: derive rail, validate coordinates, quote fee.
+  useEffect(() => {
+    const hasAny = form.iban || form.accountNumber || form.bic;
+    if (!hasAny || !token) { setPreview(null); return; }
+    const t = setTimeout(() => {
+      api.transfers.preview({ destination: buildDestination(), amountCurrency: form.currency }, token)
+        .then(setPreview)
+        .catch(() => setPreview(null));
+    }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.iban, form.accountNumber, form.routingNumber, form.bic, form.correspondentBic, form.countryCode, form.currency, token]);
+
+  async function handleSend() {
+    const parsed = parseFloat(form.amount);
+    if (isNaN(parsed) || parsed <= 0) { setError('Enter a valid amount.'); return; }
+    if (!preview?.ok) { setError('Fix the destination details before sending.'); return; }
+    setError(''); setSubmitting(true);
+    try {
+      const res = await api.transfers.bank(
+        { amount: parsed, currency: form.currency, destination: buildDestination(), reference: form.reference.trim() || undefined },
+        token,
+      );
+      if (res.status === 'submitted') setSuccess({ rail: res.rail ?? preview.rail ?? '', ref: res.executionReference });
+      else setError(res.errors?.join(' ') || 'Transfer could not be submitted.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Transfer failed.');
+    } finally { setSubmitting(false); }
+  }
+
+  if (success) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+        <div className="text-center py-4">
+          <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+            <Check size={24} className="text-green-600" />
+          </div>
+          <p className="font-semibold text-gray-900">Transfer submitted via {success.rail.toUpperCase()}</p>
+          <p className="text-xs text-gray-500 mt-1">Status: pending settlement · Ref: {success.ref.slice(0, 8)}</p>
+        </div>
+        <button type="button" onClick={onDone}
+          className="w-full py-2 text-sm font-medium bg-[#001E2B] text-white rounded-lg hover:bg-[#001E2B]/80 transition-colors">
+          Done
+        </button>
+      </div>
+    );
+  }
+
+  const railBadge = preview?.rail
+    ? <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${preview.ok ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{preview.rail.toUpperCase()}</span>
+    : null;
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-      <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700 space-y-1">
-        <p className="font-medium">Wire transfer: coming soon</p>
-        <p className="text-xs">Transfers to unregistered accounts require a live payment rail integration (SEPA / SWIFT). You can fill in the details and save the account for when this feature becomes available.</p>
+      <div className="flex items-center justify-between rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-sm">
+        <div>
+          <p className="font-medium text-gray-700">Detected rail {railBadge}</p>
+          <p className="text-xs text-gray-500">Auto-derived from country, currency and details (SEPA / ACH / SWIFT).{preview?.feeAmount !== undefined ? ` Fee: ${preview.feeAmount} ${form.currency}.` : ''}</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <FieldLabel tip="Destination country (ISO 3166-1 alpha-2). Drives rail derivation: an EEA country with EUR + IBAN routes via SEPA; US with a routing number routes via ACH; otherwise a SWIFT wire.">
+            Destination country
+          </FieldLabel>
+          <input value={form.countryCode} onChange={e => set('countryCode', e.target.value.toUpperCase().slice(0, 2))}
+            placeholder="e.g. DE" maxLength={2}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
+        </div>
+        <div>
+          <FieldLabel tip="ABA routing number (US, 9 digits). Required for ACH transfers; validated with the standard NACHA checksum.">
+            Routing number <span className="text-gray-400 font-normal">(ACH)</span>
+          </FieldLabel>
+          <input value={form.routingNumber} onChange={e => set('routingNumber', e.target.value.replace(/\D/g, '').slice(0, 9))}
+            placeholder="e.g. 021000021"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
+        </div>
+        <div>
+          <FieldLabel tip="Domestic account number for ACH / local transfers (not needed when an IBAN is supplied).">
+            Account number <span className="text-gray-400 font-normal">(ACH / local)</span>
+          </FieldLabel>
+          <input value={form.accountNumber} onChange={e => set('accountNumber', e.target.value)}
+            placeholder="e.g. 123456789"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
+        </div>
+        <div>
+          <FieldLabel tip="Correspondent bank BIC for international SWIFT wires. Optional; adds a correspondent surcharge to the fee when present.">
+            Correspondent BIC <span className="text-gray-400 font-normal">(SWIFT)</span>
+          </FieldLabel>
+          <input value={form.correspondentBic} onChange={e => set('correspondentBic', e.target.value.toUpperCase())}
+            placeholder="e.g. CHASUS33"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
+        </div>
         <div className="sm:col-span-2">
           <FieldLabel tip="International Bank Account Number (ISO 13616). Identifies the recipient's bank account globally. Format: 2-letter country code, 2 check digits, then up to 30 alphanumeric characters. Example: DE89370400440532013000. Spaces are ignored.">
             IBAN
@@ -443,17 +547,30 @@ function NewIbanForm({ onDone }: { onDone: () => void }) {
         <input type="checkbox" checked={form.save} onChange={e => set('save', e.target.checked)}
           className="rounded border-gray-300 text-[#00ED64] focus:ring-[#00ED64]/40" />
         <span className="text-xs text-gray-600">Save this account for future transfers</span>
-        <FieldTip text="If checked, the IBAN and BIC are stored as a new registered account in your profile. The IBAN is encrypted at rest. You can select it next time without re-entering the details." />
+        <FieldTip text="If checked, the IBAN and BIC are stored as a new registered account in your profile. The IBAN is encrypted at rest. Otherwise the destination is transaction-scoped: bound only to this transfer." />
       </label>
+
+      {preview && !preview.ok && preview.errors.length > 0 && (
+        <div className="flex items-start gap-2 text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs">
+          <AlertCircle size={14} className="shrink-0 mt-0.5" />
+          <span>{preview.errors.join(' ')}</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="flex items-start gap-2 text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs">
+          <AlertCircle size={14} className="shrink-0 mt-0.5" />{error}
+        </div>
+      )}
 
       <div className="flex gap-2 pt-1">
         <Link href="/system/transfer"
           className="flex-1 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-center">
           Cancel
         </Link>
-        <button type="button" disabled
-          className="flex-1 py-2 text-sm font-medium bg-[#001E2B] text-white rounded-lg opacity-40 cursor-not-allowed">
-          Send wire
+        <button type="button" onClick={handleSend} disabled={submitting || !preview?.ok}
+          className={`flex-1 py-2 text-sm font-medium text-white rounded-lg transition-colors ${submitting || !preview?.ok ? 'bg-[#001E2B] opacity-40 cursor-not-allowed' : 'bg-[#001E2B] hover:bg-[#001E2B]/80'}`}>
+          {submitting ? 'Sending…' : 'Send wire'}
         </button>
       </div>
     </div>

@@ -6,6 +6,10 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { PaymentInitiationInbound } from '../../../shared/models/events/wire.contracts';
 import { config as appConfig } from '../../../config';
+import {
+  railResolver, feeCalculator,
+  type BankRail, type RailDestination, type RecurringMandate,
+} from '../../../shared/services/bankTransfer';
 
 export interface PaymentInitiationConfig {
   settlementDelayMs: {
@@ -50,6 +54,11 @@ export interface InitiateTransferInput {
   amount: number;
   currency: string;
   settlementSchedule: SettlementSchedule;
+  // v17.1: rail + destination let the builtin PISP derive/validate the rail and price the fee.
+  // Optional so existing callers (internal_ledger P2P) keep working unchanged.
+  rail?: BankRail;                  // user override; when absent it is auto-derived
+  destination?: RailDestination;    // banking coordinates (resolved by the orchestrator)
+  recurring?: RecurringMandate;     // ACH SDD / SEPA SDD mandate
 }
 
 export interface InitiateTransferResult {
@@ -57,6 +66,10 @@ export interface InitiateTransferResult {
   status: 'submitted';
   settlementDelayMs: number;
   willSucceed: boolean;
+  rail?: BankRail;                  // the rail actually used (derived or overridden)
+  feeAmount?: number;
+  feeCurrency?: string;
+  validationErrors?: string[];      // non-empty => the destination failed validation (no submit)
 }
 
 export function initiateTransfer(
@@ -66,6 +79,18 @@ export function initiateTransfer(
   const railRef = `${config.simulateRailPrefix}${uuidv4().slice(0, 8).toUpperCase()}`;
   const delayMs = config.settlementDelayMs[input.settlementSchedule] ?? config.settlementDelayMs['T+1'];
 
+  // v17.1: when a destination is supplied, derive + validate the rail and price the fee.
+  let rail: BankRail | undefined;
+  let feeAmount: number | undefined;
+  if (input.destination) {
+    rail = railResolver.resolve(input.destination, input.rail);
+    const validation = railResolver.validate(rail, input.destination);
+    if (!validation.ok) {
+      return { railRef, status: 'submitted', settlementDelayMs: delayMs, willSucceed: false, rail, validationErrors: validation.errors };
+    }
+    feeAmount = feeCalculator.calculate(rail, input.destination);
+  }
+
   // Deterministic "random" failure for staging tests when alwaysSucceed=false
   const willSucceed = config.alwaysSucceed || Math.random() > 0.05;
 
@@ -74,6 +99,8 @@ export function initiateTransfer(
     status: 'submitted',
     settlementDelayMs: delayMs,
     willSucceed,
+    ...(rail ? { rail } : {}),
+    ...(feeAmount !== undefined ? { feeAmount, feeCurrency: input.currency } : {}),
   };
 }
 

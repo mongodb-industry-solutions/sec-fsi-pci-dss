@@ -20,6 +20,7 @@ import { payoutAccountController }        from './controllers/payoutAccount.cont
 import { paymentExecutionController }     from './controllers/paymentExecution.controller';
 import { merchantBeneficiaryController }  from './controllers/merchantBeneficiary.controller';
 import { beneficiaryController }          from './controllers/beneficiary.controller';
+import { transferController }             from './controllers/transfer.controller';
 
 export async function gatewayModule(fastify: FastifyInstance) {
   // SD-89: Merchant Relations  -  top-level resource
@@ -48,4 +49,7 @@ export async function gatewayModule(fastify: FastifyInstance) {
 
   // SD-54: Counterparty Admin — staff-facing JWT view + management
   await fastify.register(beneficiaryController,         { prefix: '/beneficiaries' });
+
+  // SD-65 + SD-66: Bank transfers (ACH/SEPA/SWIFT rail engine)  (v17.1)
+  await fastify.register(transferController,            { prefix: '/gateway/transfers' });
 }

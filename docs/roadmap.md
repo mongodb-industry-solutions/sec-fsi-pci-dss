@@ -635,3 +635,20 @@ These requirements apply to all versions from v1 onward:
 | NFR-X-05 | Documentation | Every new API endpoint added at any version is documented in technical-spec.md before merging |
 | NFR-X-06 | Type safety | `npm run build` exits 0 at every version: no TypeScript `any` escape hatches in production code |
 | NFR-X-07 | Agent security | AI agents (v5) use only the public API layer: no direct MongoDB credentials or DEK access |
+
+## v17.1 — Bank Transfers (ACH / SEPA / SWIFT)
+
+| FR | Area | Acceptance criteria |
+|---|---|---|
+| FR-v17.1-01 | Rail engine | Rail auto-derived from country/currency/data with user override; IBAN/BIC/routing validated per ISO 13616 / ISO 9362 / NACHA |
+| FR-v17.1-02 | Provider dispatch | Transfers executed via `dispatchProvider('payment_initiation')`; built-in replaceable by external without flow change |
+| FR-v17.1-03 | API | `POST /gateway/transfers/preview` and `POST /gateway/transfers/bank` return rail, fee, validation and execution reference |
+| FR-v17.1-04 | Frontend | `/system/transfer/bank` "New bank account" tab: live rail detection, validation, fee, submit; status feedback |
+| FR-v17.1-05 | Compliance | Bank coordinates transaction-scoped; business + compliance audit events correlated by execution reference |
+| FR-v17.1-06 | Test data | Wiki `Dataset.md` documents demo users, cards and bank accounts with approve/block scenarios, aligned with seeders |
+
+**Definition of Done (v17.1):** rail engine unit-tested; backend + frontend typecheck clean; preview/execute
+endpoints working; UI enabled; docs + wiki published. Full orchestration refactor (P2P/payout to provider
+dispatch), recurring mandates execution, seeds and E2E remain tracked in `tmp/dev.v17.plan.md` (G4/G7/G8).
+
+*Added 2026-07-04 (v17.1).*

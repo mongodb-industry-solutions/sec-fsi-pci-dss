@@ -138,7 +138,7 @@ export interface AisValidationInbound extends WireCorrelation {
  */
 export interface PaymentInitiationOutbound extends WireCorrelation {
   payoutAccountInstanceReference: string;  // PSP ref — adapter resolves IBAN via L2 vault
-  railType: 'sepa' | 'ach' | 'local_bank' | 'internal_ledger';
+  railType: 'sepa' | 'ach' | 'swift' | 'local_bank' | 'internal_ledger';
   amount: number;
   currency: string;
   settlementSchedule: 'T+0' | 'T+1' | 'T+2' | 'T+3';

@@ -27,6 +27,17 @@ async function apiFetch<T>(
   return res.json() as Promise<T>;
 }
 
+// v17.1 bank transfer destination (banking coordinates for the rail engine).
+export interface BankDestination {
+  countryCode: string;
+  currency: string;
+  iban?: string;
+  accountNumber?: string;
+  routingNumber?: string;
+  bic?: string;
+  correspondentBic?: string;
+}
+
 export interface LoginResponse {
   token: string;
   user: { partyAuthenticationInstanceReference: string; name: string; email: string; role: string };
@@ -1589,6 +1600,28 @@ export const api = {
     ) =>
       apiFetch<{ transferReference: string; amount: number; currency: string; status: string; recipientHint?: string }>(
         `/api/v1/beneficiaries/${encodeURIComponent(ownerRef)}/${encodeURIComponent(beneficiaryRef)}/transfer`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token,
+      ),
+  },
+
+  // v17.1: bank transfers (ACH / SEPA / SWIFT) — rail engine preview + execute.
+  transfers: {
+    preview: (
+      body: { destination: BankDestination; amountCurrency?: string; rail?: string },
+      token: string,
+    ) =>
+      apiFetch<{ ok: boolean; rail?: string; feeAmount?: number; feeCurrency?: string; errors: string[] }>(
+        `/api/v1/gateway/transfers/preview`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token,
+      ),
+    bank: (
+      body: { amount: number; currency: string; destination: BankDestination; rail?: string; reference?: string; settlementSchedule?: string },
+      token: string,
+    ) =>
+      apiFetch<{ executionReference: string; status: string; rail?: string; feeAmount?: number; currency: string; errors?: string[] }>(
+        `/api/v1/gateway/transfers/bank`,
         { method: 'POST', body: JSON.stringify(body) },
         token,
       ),

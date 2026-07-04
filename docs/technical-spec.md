@@ -3464,3 +3464,24 @@ Implements [engineering-proposal.md ADR-038](engineering-proposal.md). Money-mov
 **Seeders**: all currencies normalized to EUR (`payoutAccounts.json`, `cardTransactions.json`, `merchants.json`, `fraudCases.json`, `seed-generate.ts`); `pending/reserved` zeroed; `seedBalanceCredits` opening deposit == total balance (reconciled start).
 
 *Added 2026-07-03 (v17; doc + code together per repo rules).*
+
+## v17.1 — Bank Transfers (ACH / SEPA / SWIFT)
+
+**Rail engine** (`backend/src/shared/services/bankTransfer/`): `RailResolver.resolve(destination, override?)`
++ `.validate(rail, destination)`, `FeeCalculator`, pure validators `isValidIban` (ISO 13616 mod-97),
+`isValidBic` (ISO 9362), `isValidRoutingNumber` (NACHA ABA checksum). Standard return-code maps:
+`ACH_RETURN_CODES`, `SEPA_REJECT_CODES`, `SWIFT_ERROR_CODES`.
+
+**Types:** `PayoutRail` and `PaymentInitiationOutbound.railType` extended with `'swift'` (unions kept in
+sync). `InitiateTransferInput` accepts optional `rail`, `destination`, `recurring`.
+
+**API:**
+- `POST /api/v1/gateway/transfers/preview` — derive rail, validate coordinates, quote fee (stateless).
+- `POST /api/v1/gateway/transfers/bank` — execute a transfer to an external account; validates via the
+  rail engine, persists an SD-65 `PaymentExecutionProcedure` (routing -> in_flight), and dispatches to
+  the `payment_initiation` provider. Returns `202` (submitted) or `422` (exception/failed).
+
+**Compliance:** bank coordinates never travel on the bus (wire adapter resolves them); every transfer
+emits business + compliance events correlated by the execution reference (PCI DSS Req 10).
+
+*Added 2026-07-04 (v17.1; doc + code together per repo rules).*
