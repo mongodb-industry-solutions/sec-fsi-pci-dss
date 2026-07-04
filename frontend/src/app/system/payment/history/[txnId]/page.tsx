@@ -307,18 +307,13 @@ export default function TransactionDetailPage() {
                 <FieldInfo label="Sender" description="The party who initiated and funded this P2P transfer. In BIAN SD-65 this is the Payment Execution initiator. Their payout account (SD-66) is debited." />
               </p>
               <p className="text-xs text-gray-500 flex items-center gap-0.5 mb-0.5">
-                Party ID
-                <FieldInfo label="Party ID" description="Unique identifier of the registered PSP customer who sent the funds (BIAN SD-13 Party Reference Directory)." />
-              </p>
-              <p className="font-mono text-xs text-gray-700 truncate mb-2">{p2pTransfer.initiatorPartyReference ?? '—'}</p>
-              <p className="text-xs text-gray-500 flex items-center gap-0.5 mb-0.5">
                 Payout account
                 <FieldInfo label="Sender payout account" description="The SD-66 Payout Account Arrangement debited for this transfer. Funds are moved from availableAmount to the recipient's account atomically." />
               </p>
               {p2pTransfer.sourcePayoutAccountReference ? (
                 <Link
                   href={`/system/accounts/${p2pTransfer.sourcePayoutAccountReference}`}
-                  className="font-mono text-xs text-blue-600 hover:underline truncate block"
+                  className="font-mono text-xs text-blue-600 hover:underline break-all block"
                 >
                   {p2pTransfer.sourcePayoutAccountReference} ↗
                 </Link>
@@ -332,18 +327,13 @@ export default function TransactionDetailPage() {
                 <FieldInfo label="Recipient" description="The party who receives the funds. Identified via a registered beneficiary arrangement (BIAN SD-54 Counterparty Administration). Their payout account is credited." />
               </p>
               <p className="text-xs text-gray-500 flex items-center gap-0.5 mb-0.5">
-                Party ID
-                <FieldInfo label="Party ID" description="Unique identifier of the registered PSP customer who receives the funds (BIAN SD-13 Party Reference Directory). Only PSP-registered users can be internal P2P recipients." />
-              </p>
-              <p className="font-mono text-xs text-gray-700 truncate mb-2">{p2pTransfer.beneficiaryPartyReference ?? '—'}</p>
-              <p className="text-xs text-gray-500 flex items-center gap-0.5 mb-0.5">
                 Payout account
                 <FieldInfo label="Recipient payout account" description="The SD-66 Payout Account Arrangement credited for this transfer. The resolved account is determined from the beneficiary arrangement at execution time." />
               </p>
               {p2pTransfer.resolvedPayoutAccountReference ? (
                 <Link
                   href={`/system/accounts/${p2pTransfer.resolvedPayoutAccountReference}`}
-                  className="font-mono text-xs text-green-600 hover:underline truncate block"
+                  className="font-mono text-xs text-green-600 hover:underline break-all block"
                 >
                   {p2pTransfer.resolvedPayoutAccountReference} ↗
                 </Link>
@@ -490,9 +480,50 @@ export default function TransactionDetailPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm border-t pt-4">
+        {/* Sender ↔ Recipient blocks — consistent with P2P detail */}
+        <div className="grid grid-cols-2 gap-3 text-sm border-t pt-4 mb-4">
+          <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+            <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2 flex items-center gap-1">
+              Sender
+              <FieldInfo label="Sender" description="The cardholder who authorised this transaction. In BIAN SD-88 Payment Card Management this is the payment card owner. The linked payout account (SD-66) is the funding source debited at authorisation." />
+            </p>
+            <p className="text-xs text-gray-500 flex items-center gap-0.5 mb-0.5">
+              Card
+              <FieldInfo label="Card (masked PAN)" description="PAN masked to the last 4 digits per PCI DSS Req 3.3. The full PAN is never stored or displayed. The card token (paymentCardReference) links this transaction to the physical/virtual card." />
+            </p>
+            {matchedCardId ? (
+              <Link href={`/system/cards/${matchedCardId}?from=history&txnId=${txnId}`} className="font-mono text-xs text-blue-600 hover:underline block">
+                {txn.maskedPan} ↗
+              </Link>
+            ) : (
+              <span className="font-mono text-xs text-gray-700">{txn.maskedPan}</span>
+            )}
+            {txn.network && (
+              <p className="text-xs text-gray-400 mt-1">{txn.network}</p>
+            )}
+          </div>
+
+          <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
+            <p className="text-xs font-semibold text-orange-700 uppercase tracking-wide mb-2 flex items-center gap-1">
+              Recipient
+              <FieldInfo label="Recipient (Merchant)" description="The merchant or payee who received the funds. Identified by merchant name and MCC (Merchant Category Code). In BIAN SD-89 Merchant Agreement this is the acquiring merchant." />
+            </p>
+            <p className="text-xs text-gray-500 flex items-center gap-0.5 mb-0.5">
+              Merchant
+              <FieldInfo label="Merchant name" description="Name of the merchant as reported by the acquiring bank or payment processor in the authorisation request." />
+            </p>
+            <p className="font-medium text-xs text-gray-800 mb-1">{txn.merchant}</p>
+            <p className="text-xs text-gray-500 flex items-center gap-0.5">
+              MCC
+              <FieldInfo label="MCC — Merchant Category Code" description="4-digit ISO 18245 code classifying the merchant's business type. Used by issuers for transaction risk scoring, spend controls, and compliance reporting (VISA/Mastercard rule 5.8.4)." />
+            </p>
+            <p className="font-mono text-xs text-gray-700">{apiTxn?.cardTransactionMerchantCategoryCode ?? txn.mcc}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
           {/* Card info; links to the saved card detail when it's one of the customer's cards */}
-          <span className="text-gray-500">Card (masked)</span>
+          <FieldLabel info="PAN masked to last 4 digits per PCI DSS Req 3.3. Click to manage the card or view its full detail.">Card (masked)</FieldLabel>
           {matchedCardId ? (
             <Link href={`/system/cards/${matchedCardId}?from=history&txnId=${txnId}`} className="font-mono text-[#001E2B] hover:underline inline-flex items-center gap-1 w-fit">
               {txn.maskedPan} <span className="text-xs text-gray-400">↗</span>
@@ -503,7 +534,7 @@ export default function TransactionDetailPage() {
 
           {txn.network && (
             <>
-              <span className="text-gray-500">Network</span>
+              <FieldLabel info="Card network (e.g. Visa, Mastercard) that processed the authorisation. Determines the interchange rules and dispute resolution process.">Network</FieldLabel>
               <span className="font-medium">{txn.network}</span>
             </>
           )}
@@ -524,12 +555,12 @@ export default function TransactionDetailPage() {
           )}
 
           {/* Transaction details  -  prefer API data, fallback to localStorage */}
-          <span className="text-gray-500">Channel</span>
+          <FieldLabel info="The channel through which the cardholder presented the card. POS = physical terminal, online = e-commerce, contactless = NFC tap, ATM = cash withdrawal.">Channel</FieldLabel>
           <span>{CHANNEL_LABELS[apiTxn?.cardTransactionChannel ?? txn.channel] ?? txn.channel}</span>
 
           {(apiTxn?.cardTransactionInitiationType || txn.initiationType) && (
             <>
-              <span className="text-gray-500">Initiation</span>
+              <FieldLabel info="CIT (Customer Initiated Transaction) means the cardholder was present and triggered the payment. MIT (Merchant Initiated Transaction) means the merchant charged the card without real-time cardholder interaction (e.g. subscriptions, instalment).">Initiation</FieldLabel>
               <span>
                 {(apiTxn?.cardTransactionInitiationType ?? txn.initiationType) === 'customerInitiated'
                   ? 'Customer Initiated (CIT)'
@@ -538,46 +569,43 @@ export default function TransactionDetailPage() {
             </>
           )}
 
-          <span className="text-gray-500">Merchant category</span>
-          <span className="font-mono text-xs">MCC {apiTxn?.cardTransactionMerchantCategoryCode ?? txn.mcc}</span>
-
           {apiTxn?.cardTransactionType && (
             <>
-              <span className="text-gray-500">Transaction type</span>
+              <FieldLabel info="Subtype of card transaction: purchase (standard debit), refund (credit back to cardholder), fee, or reversal. Determines the balance movement direction (SD-66 availableAmount).">Transaction type</FieldLabel>
               <span className="capitalize">{apiTxn.cardTransactionType.replace('_', ' ')}</span>
             </>
           )}
 
           {apiTxn?.cardTransactionDescription && (
             <>
-              <span className="text-gray-500">Statement descriptor</span>
+              <FieldLabel info="Statement descriptor as received from the acquirer — the text the cardholder sees on their statement. Governed by VISA/MC rules for clarity requirements.">Statement descriptor</FieldLabel>
               <span className="font-mono text-xs">{apiTxn.cardTransactionDescription}</span>
             </>
           )}
 
           {apiTxn?.cardTransactionNarrative && (
             <>
-              <span className="text-gray-500">Description</span>
+              <FieldLabel info="Enriched description added by the PSP or card scheme during processing. Supplements the raw descriptor with human-readable context.">Description</FieldLabel>
               <span className="text-xs text-gray-700">{apiTxn.cardTransactionNarrative}</span>
             </>
           )}
 
           {txn.paymentReference && (
             <>
-              <span className="text-gray-500">Reference</span>
+              <FieldLabel info="External payment reference number assigned by the acquirer or card scheme. Used for reconciliation and dispute filing.">Reference</FieldLabel>
               <span>{txn.paymentReference}</span>
             </>
           )}
 
           {fraudCase?.fraudDiagnosisCaseReference && (
             <>
-              <span className="text-gray-500">Case reference</span>
+              <FieldLabel info="Reference of the FraudDiagnosisCase (BIAN SD-83) opened for this transaction. Present when FDS, HRP, or AML flagged a risk at authorisation time.">Case reference</FieldLabel>
               <span className="font-mono text-xs">{fraudCase.fraudDiagnosisCaseReference}</span>
             </>
           )}
 
-          <span className="text-gray-500">Transaction ID</span>
-          <span className="font-mono text-xs text-gray-500 truncate">{txn.txnId}</span>
+          <FieldLabel info="Unique immutable identifier for this card transaction (BIAN SD-254 cardTransactionInstanceReference). Use this ID to look up audit events, the correlated event trail, or dispute records.">Transaction ID</FieldLabel>
+          <span className="font-mono text-xs text-gray-500 break-all">{txn.txnId}</span>
         </div>
       </div>
 

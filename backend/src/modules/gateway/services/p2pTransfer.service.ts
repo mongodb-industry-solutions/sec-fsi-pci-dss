@@ -54,20 +54,19 @@ export async function executeP2PTransfer(
   if (!senderAccount || senderAccount.partyInstanceReference !== initiatorPartyRef || senderAccount.payoutAccountStatus !== 'active') {
     return { transferReference: '', amount, currency, status: 'failed', failureReason: 'Source account not found or not active.' };
   }
-  if (senderAccount.payoutAccountCurrency !== currency) {
-    return { transferReference: '', amount, currency, status: 'failed', failureReason: `Source account currency (${senderAccount.payoutAccountCurrency}) does not match transfer currency (${currency}).` };
-  }
+  // Currency is always the sender account's native currency (server-authoritative — client hint is ignored).
+  const transferCurrency = senderAccount.payoutAccountCurrency;
 
   // 3. Find the recipient's payout account — prefer currency-matched active account, fall back to any active account
   const recipientPartyRef = arrangement.counterpartyPartyReference;
   let recipientAccount: PayoutAccountArrangement | null = await db
     .collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
-    .findOne({ partyInstanceReference: recipientPartyRef, payoutAccountCurrency: currency, payoutAccountStatus: 'active', payoutAccountIsDefault: true });
+    .findOne({ partyInstanceReference: recipientPartyRef, payoutAccountCurrency: transferCurrency, payoutAccountStatus: 'active', payoutAccountIsDefault: true });
 
   if (!recipientAccount) {
     recipientAccount = await db
       .collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
-      .findOne({ partyInstanceReference: recipientPartyRef, payoutAccountCurrency: currency, payoutAccountStatus: 'active' });
+      .findOne({ partyInstanceReference: recipientPartyRef, payoutAccountCurrency: transferCurrency, payoutAccountStatus: 'active' });
   }
 
   if (!recipientAccount) {
@@ -78,28 +77,28 @@ export async function executeP2PTransfer(
   }
 
   if (!recipientAccount) {
-    return { transferReference: '', amount, currency, status: 'failed', failureReason: 'Recipient has no active payout account.' };
+    return { transferReference: '', amount, currency: transferCurrency, status: 'failed', failureReason: 'Recipient has no active payout account.' };
   }
 
   // 4. Debit sender — conditional on sufficient available balance
   const debited = await debitAvailable(db, fromAccountRef, amount);
   if (!debited) {
-    return { transferReference: '', amount, currency, status: 'failed', failureReason: 'Insufficient available balance.' };
+    return { transferReference: '', amount, currency: transferCurrency, status: 'failed', failureReason: 'Insufficient available balance.' };
   }
 
   // 5. Credit recipient — in the recipient account's currency (FX when cross-currency). Atomic
   //    consistency: if the credit fails, revert the sender debit so funds never vanish in flight.
   let creditAmount = amount;
-  if (recipientAccount.payoutAccountCurrency && recipientAccount.payoutAccountCurrency !== currency) {
+  if (recipientAccount.payoutAccountCurrency && recipientAccount.payoutAccountCurrency !== transferCurrency) {
     const { resolveAndConvert } = await import('../../../providers/currency-exchange/services/currencyExchange.service');
-    try { creditAmount = (await resolveAndConvert(db, amount, currency, recipientAccount.payoutAccountCurrency)).amount; }
-    catch { await creditDirect(db, fromAccountRef, amount); return { transferReference: '', amount, currency, status: 'failed', failureReason: `No FX rate for ${currency}->${recipientAccount.payoutAccountCurrency}.` }; }
+    try { creditAmount = (await resolveAndConvert(db, amount, transferCurrency, recipientAccount.payoutAccountCurrency)).amount; }
+    catch { await creditDirect(db, fromAccountRef, amount); return { transferReference: '', amount, currency: transferCurrency, status: 'failed', failureReason: `No FX rate for ${transferCurrency}->${recipientAccount.payoutAccountCurrency}.` }; }
   }
   const credited = await creditDirect(db, recipientAccount.payoutAccountInstanceReference, creditAmount);
   if (!credited) {
     // Compensate: return the debited funds to the sender (recipient account not creditable).
     await creditDirect(db, fromAccountRef, amount);
-    return { transferReference: '', amount, currency, status: 'failed', failureReason: 'Recipient account could not be credited.' };
+    return { transferReference: '', amount, currency: transferCurrency, status: 'failed', failureReason: 'Recipient account could not be credited.' };
   }
 
   // 6. Create immutable paymentExecutionProcedure audit record (PCI DSS Req 10)
@@ -116,7 +115,7 @@ export async function executeP2PTransfer(
     grossAmount: amount,
     netAmount: amount,
     feeAmount: 0,
-    currency,
+    currency: transferCurrency,
     paymentExecutionRail: senderAccount.payoutAccountPreferredRail ?? 'internal_ledger',
     routingNote: input.note ? `P2P transfer note: ${input.note}` : 'P2P transfer via beneficiary portal',
     paymentExecutionStatus: 'completed',
@@ -152,7 +151,7 @@ export async function executeP2PTransfer(
       correlationId: transferRef,
       businessProcess: 'payment_processing',
       source: 'psp.p2p',
-      payload: { transferRef, amount, currency, initiatorPartyRef, sourceAccountRef: fromAccountRef, recipientAccountRef: recipientAccount.payoutAccountInstanceReference },
+      payload: { transferRef, amount, currency: transferCurrency, initiatorPartyRef, sourceAccountRef: fromAccountRef, recipientAccountRef: recipientAccount.payoutAccountInstanceReference },
       bian: { serviceDomain: 'Payment Execution', controlRecord: 'PaymentExecutionProcedure' },
     }));
   })();
@@ -167,7 +166,7 @@ export async function executeP2PTransfer(
     performedByPartyReference: initiatorPartyRef,
     performedByRole: 'customer',
     eventSummary: {
-      amount, currency,
+      amount, currency: transferCurrency,
       fromAccount: fromAccountRef,
       toAccount: recipientAccount.payoutAccountInstanceReference,
       beneficiaryArrangement: counterpartyArrangementRef,
@@ -188,7 +187,7 @@ export async function executeP2PTransfer(
     performedByPartyReference: initiatorPartyRef,
     performedByRole: 'customer',
     eventSummary: {
-      grossAmount: amount, currency,
+      grossAmount: amount, currency: transferCurrency,
       debitAccount: fromAccountRef,
       creditAccount: recipientAccount.payoutAccountInstanceReference,
       beneficiaryType: 'user',
@@ -200,7 +199,7 @@ export async function executeP2PTransfer(
   return {
     transferReference: transferRef,
     amount,
-    currency,
+    currency: transferCurrency,
     status: 'completed',
     recipientAccountRef: recipientAccount.payoutAccountInstanceReference,
     recipientHint: arrangement.counterpartyLabel,
