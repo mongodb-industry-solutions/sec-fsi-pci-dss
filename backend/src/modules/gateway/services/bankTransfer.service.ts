@@ -14,6 +14,7 @@ import {
 } from '../../../shared/services/bankTransfer';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
+import { screenTransfer } from './transferRiskGate';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 
 export interface BankTransferPreview {
@@ -84,6 +85,27 @@ export async function executeBankTransfer(
     return { executionReference: executionRef, status: 'exception', currency: input.currency, errors: preview.errors };
   }
   const rail = preview.rail;
+
+  // 1b. Pre-initiation risk gate (G4c): FDS + HRP + AML via providers, before any funds move.
+  const screen = await screenTransfer(db, {
+    transferRef: executionRef,
+    amount: input.amount,
+    currency: input.currency,
+    initiatorPartyRef: input.initiatorPartyRef,
+    destinationCountry: input.destination.countryCode,
+  });
+  if (screen.blocked) {
+    await recordException(db, executionRef, input, [screen.reason ?? 'Blocked by risk screening', ...screen.indicators], now);
+    emitComplianceEvent(db, {
+      entityType: 'execution', entityId: executionRef,
+      processType: 'payment_processing', processAction: 'bank.transfer.blocked',
+      processOutcome: 'rejected',
+      performedByPartyReference: input.initiatorPartyRef, performedByRole: 'customer',
+      eventSummary: { amount: input.amount, currency: input.currency, rail, indicators: screen.indicators, score: screen.score },
+      bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+    });
+    return { executionReference: executionRef, status: 'exception', rail, currency: input.currency, errors: [screen.reason ?? 'Blocked by risk screening'] };
+  }
 
   // 2. Persist the SD-65 execution in routing state (append-only resolution log).
   const execution: PaymentExecutionProcedure = {

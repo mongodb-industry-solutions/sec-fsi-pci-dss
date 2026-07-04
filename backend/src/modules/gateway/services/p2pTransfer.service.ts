@@ -15,6 +15,7 @@ import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../mode
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
+import { screenTransfer } from './transferRiskGate';
 
 export interface P2PTransferInput {
   initiatorPartyRef: string;         // the customer initiating the transfer
@@ -77,14 +78,50 @@ export async function executeP2PTransfer(
   }
   if (!recipientAccount) return fail(amount, transferCurrency, 'Recipient has no active payout account.');
 
+  const transferRef = uuidv4();
+  const now = new Date();
+
+  // 3b. Pre-initiation risk gate (G4c): FDS + HRP + AML via providers, BEFORE any funds move.
+  const screen = await screenTransfer(db, {
+    transferRef, amount, currency: transferCurrency,
+    initiatorPartyRef, sourceAccountRef: fromAccountRef,
+    destinationCountry: recipientAccount.payoutAccountCountryCode,
+  });
+  if (screen.blocked) {
+    const blockedExec: PaymentExecutionProcedure = {
+      paymentExecutionInstanceReference: transferRef,
+      paymentOrderInstanceReference: transferRef,
+      beneficiaryType: 'user',
+      initiatorPartyReference: initiatorPartyRef,
+      beneficiaryPartyReference: recipientPartyRef,
+      sourcePayoutAccountReference: fromAccountRef,
+      resolvedPayoutAccountReference: recipientAccount.payoutAccountInstanceReference,
+      grossAmount: amount, netAmount: amount, feeAmount: 0, currency: transferCurrency,
+      routingNote: 'P2P transfer blocked by pre-initiation risk gate',
+      paymentExecutionStatus: 'exception',
+      failureReason: [screen.reason, ...screen.indicators].filter(Boolean).join('; '),
+      initiatedAt: now,
+      resolutionLog: [{ stepName: 'risk.gate', stepOutcome: 'failed', stepNote: screen.indicators.join(', ') || 'blocked', stepDateTime: now }],
+      bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+      recordCreatedDateTime: now, recordUpdatedDateTime: now, schemaVersion: 1,
+    };
+    await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).insertOne(blockedExec);
+    emitComplianceEvent(db, {
+      entityType: 'execution', entityId: transferRef,
+      processType: 'payment_processing', processAction: 'bank.transfer.blocked', processOutcome: 'rejected',
+      performedByPartyReference: initiatorPartyRef, performedByRole: 'customer',
+      eventSummary: { amount, currency: transferCurrency, indicators: screen.indicators, score: screen.score },
+      bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+    });
+    return fail(amount, transferCurrency, screen.reason ?? 'Transfer blocked by risk screening.');
+  }
+
   // 4. Hold sender funds (available -> pending), conditional on sufficient available balance.
   const held = await holdCardFunds(db, fromAccountRef, amount);
   if (!held) return fail(amount, transferCurrency, 'Insufficient available balance.');
 
   // 5. Create the immutable SD-65 execution in routing state. sourcePayoutAccountReference marks this
   //    as a P2P transfer so the settlement handler clears the sender hold and credits the recipient.
-  const transferRef = uuidv4();
-  const now = new Date();
   const rail = recipientAccount.payoutAccountPreferredRail ?? senderAccount.payoutAccountPreferredRail;
   const execution: PaymentExecutionProcedure = {
     paymentExecutionInstanceReference: transferRef,
