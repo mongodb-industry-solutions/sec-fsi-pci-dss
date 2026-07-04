@@ -433,6 +433,14 @@ The API URL surface follows REST nesting and module semantics: `/api/v1/customer
 | **P24** | Frontend: gateway simulator step + merchant profile view in Application Mode | P22, P23 | v4 |
 | **P25** | Backend + Frontend: AI agent integration (Magenta, `agentDraftDiagnosis` field) | P5 | v5 |
 | **P26** | Frontend: AI draft inline panel (Accept / Override / Dismiss) | P25 | v5 |
+| **P27** | Backend: bank-transfer rail engine (`shared/services/bankTransfer`: RailResolver, FeeCalculator, IBAN/BIC/ABA validators, return-code maps) | P19 | v17.1 |
+| **P28** | Backend: provider-based transfer execution — `bankTransfer.service` + `dispatchProvider`; refactor `payoutOrchestration` + `p2pTransfer` off direct builtin imports; async settlement | P27 | v17.1 |
+| **P29** | Backend: pre-initiation risk gate (`transferRiskGate`: FDS/HRP/AML) with L1 fraud-case opening on block | P28 | v17.1 |
+| **P30** | Backend: recurring mandates (ACH SDD / SEPA SDD) — model, service, API, background scheduler | P28 | v17.1 |
+| **P31** | Backend: transfer status endpoint + idempotency store + config-driven fees/sandbox | P28 | v17.1 |
+| **P32** | Frontend: `/system/transfer/bank` — rail auto-detect, live validation, fee, status polling, recurring Direct Debit | P28, P31 | v17.1 |
+
+See ADR-039 (§ADRs) and `tmp/dev.v17.plan.md` for the detailed v17.1 change plan and progress board.
 
 ---
 

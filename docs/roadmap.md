@@ -638,17 +638,23 @@ These requirements apply to all versions from v1 onward:
 
 ## v17.1 — Bank Transfers (ACH / SEPA / SWIFT)
 
-| FR | Area | Acceptance criteria |
-|---|---|---|
-| FR-v17.1-01 | Rail engine | Rail auto-derived from country/currency/data with user override; IBAN/BIC/routing validated per ISO 13616 / ISO 9362 / NACHA |
-| FR-v17.1-02 | Provider dispatch | Transfers executed via `dispatchProvider('payment_initiation')`; built-in replaceable by external without flow change |
-| FR-v17.1-03 | API | `POST /gateway/transfers/preview` and `POST /gateway/transfers/bank` return rail, fee, validation and execution reference |
-| FR-v17.1-04 | Frontend | `/system/transfer/bank` "New bank account" tab: live rail detection, validation, fee, submit; status feedback |
-| FR-v17.1-05 | Compliance | Bank coordinates transaction-scoped; business + compliance audit events correlated by execution reference |
-| FR-v17.1-06 | Test data | Wiki `Dataset.md` documents demo users, cards and bank accounts with approve/block scenarios, aligned with seeders |
+| FR | Area | Acceptance criteria | Status |
+|---|---|---|---|
+| FR-v17.1-01 | Rail engine | Rail auto-derived from country/currency/data with user override; IBAN/BIC/routing validated per ISO 13616 / ISO 9362 / NACHA; per-rail fees and standard return-code maps (ACH R-codes, SEPA reject, SWIFT) | ✅ |
+| FR-v17.1-02 | Provider dispatch | All transfers (bank, P2P, merchant payout) and account validation execute via `dispatchProvider` (`payment_initiation` / `account_information`); no direct builtin import; builtin replaceable by external without flow change | ✅ |
+| FR-v17.1-03 | API | `POST /gateway/transfers/preview` (rail+fee+validation), `POST /gateway/transfers/bank` (execute, `Idempotency-Key`), `GET /gateway/transfers/:ref/status` (real-time) | ✅ |
+| FR-v17.1-04 | Frontend | `/system/transfer/bank`: live rail detection, validation, fee, submit; live status polling; recurring Direct Debit option | ✅ |
+| FR-v17.1-05 | Async lifecycle | Transfers are external and async: funds held on submit, credited/cleared on settlement (`bank.transfer.settled`), released on `failed` | ✅ |
+| FR-v17.1-06 | Risk gate | Pre-initiation FDS + HRP + AML screening blocks before funds move and opens an L1-reviewable fraud case (status `open`) on a negative evaluation | ✅ |
+| FR-v17.1-07 | Recurring mandates | ACH Direct Debit / SEPA SDD mandates: create/list/cancel + background scheduler (`runDueMandates`) reusing the transfer flow | ✅ |
+| FR-v17.1-08 | Compliance & audit | Bank coordinates transaction-scoped, never on the bus; business + compliance events correlated by execution reference (PCI DSS Req 10) | ✅ |
+| FR-v17.1-09 | Config | Config-driven rail fees (`PAYOUT_FEE_*`), sandbox flag (`PAYOUT_SANDBOX`), scheduler interval (`PAYOUT_MANDATE_SCHEDULER_MS`) | ✅ |
+| FR-v17.1-10 | Test data | Wiki `Dataset.md` (users, cards, accounts, approve/block scenarios) + end-user guide `Bank-Transfers.md`, aligned with seeders and validators | ✅ |
 
-**Definition of Done (v17.1):** rail engine unit-tested; backend + frontend typecheck clean; preview/execute
-endpoints working; UI enabled; docs + wiki published. Full orchestration refactor (P2P/payout to provider
-dispatch), recurring mandates execution, seeds and E2E remain tracked in `tmp/dev.v17.plan.md` (G4/G7/G8).
+**Definition of Done (v17.1):** ✅ rail engine unit-tested; backend + frontend typecheck clean; preview /
+execute / status endpoints + idempotency working; async settlement via provider; risk gate + L1 case;
+recurring mandates + scheduler; UI enabled; docs + wiki published. ⏳ Remaining (infra-gated): integration
++ E2E (MongoDB + Playwright) and the `ks-core` / `ks-mongodb-ist-demo` compliance-skill gate. Detail in
+`tmp/dev.v17.plan.md`.
 
 *Added 2026-07-04 (v17.1).*
