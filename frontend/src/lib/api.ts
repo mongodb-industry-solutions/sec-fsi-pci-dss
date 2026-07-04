@@ -1449,6 +1449,9 @@ export const api = {
         netAmount: number;
         feeAmount: number;
         currency: string;
+        recipientCurrency: string | null;
+        recipientAmount: number | null;
+        fxRate: number | null;
         paymentExecutionRail: string | null;
         routingNote: string | null;
         paymentExecutionStatus: string;

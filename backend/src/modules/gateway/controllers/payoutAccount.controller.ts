@@ -491,6 +491,9 @@ export async function payoutAccountController(fastify: FastifyInstance) {
             netAmount:                          { type: 'number' },
             feeAmount:                          { type: 'number' },
             currency:                           { type: 'string' },
+            recipientCurrency:                  { type: 'string', nullable: true },
+            recipientAmount:                    { type: 'number', nullable: true },
+            fxRate:                             { type: 'number', nullable: true },
             paymentExecutionRail:               { type: 'string', nullable: true },
             routingNote:                        { type: 'string', nullable: true },
             paymentExecutionStatus:             { type: 'string' },
@@ -555,6 +558,26 @@ export async function payoutAccountController(fastify: FastifyInstance) {
       sourceAccountRef = fallback?.payoutAccountInstanceReference ?? null;
     }
 
+    // FX: use stored fields when present (new records); for older records that predate the FX
+    // fields, derive the rate on-the-fly from the recipient account's currency.
+    let recipientCurrency = exec.recipientCurrency ?? null;
+    let recipientAmount   = exec.recipientAmount   ?? null;
+    let fxRate            = exec.fxRate            ?? null;
+    if (fxRate === null && exec.resolvedPayoutAccountReference) {
+      const recipientAcct = await db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
+        .findOne({ payoutAccountInstanceReference: exec.resolvedPayoutAccountReference }, { projection: { payoutAccountCurrency: 1 } });
+      const destCcy = recipientAcct?.payoutAccountCurrency;
+      if (destCcy && destCcy !== exec.currency) {
+        try {
+          const { resolveAndConvert } = await import('../../../providers/currency-exchange/services/currencyExchange.service');
+          const fx = await resolveAndConvert(db, exec.grossAmount, exec.currency, destCcy);
+          recipientCurrency = destCcy;
+          recipientAmount   = fx.amount;
+          fxRate            = fx.rate;
+        } catch { /* no FX config — leave null */ }
+      }
+    }
+
     const execRecord = exec as Record<string, unknown>;
     return reply.send({
       paymentExecutionInstanceReference:  exec.paymentExecutionInstanceReference,
@@ -566,6 +589,9 @@ export async function payoutAccountController(fastify: FastifyInstance) {
       netAmount:                          exec.netAmount,
       feeAmount:                          exec.feeAmount,
       currency:                           exec.currency,
+      recipientCurrency,
+      recipientAmount,
+      fxRate,
       paymentExecutionRail:               exec.paymentExecutionRail ?? null,
       routingNote:                        exec.routingNote ?? null,
       paymentExecutionStatus:             exec.paymentExecutionStatus,

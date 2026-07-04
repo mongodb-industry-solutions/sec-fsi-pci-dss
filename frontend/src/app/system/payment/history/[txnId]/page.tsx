@@ -193,6 +193,9 @@ export default function TransactionDetailPage() {
     netAmount: number;
     feeAmount: number;
     currency: string;
+    recipientCurrency: string | null;
+    recipientAmount: number | null;
+    fxRate: number | null;
     paymentExecutionRail: string | null;
     routingNote: string | null;
     paymentExecutionStatus: string;
@@ -432,6 +435,19 @@ export default function TransactionDetailPage() {
             <MetaRow label="Net amount" info="Amount credited to the recipient after fee deduction. Equal to gross when fee is zero.">
               {new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.currency }).format(p2pTransfer.netAmount)}
             </MetaRow>
+
+            {p2pTransfer.fxRate != null && p2pTransfer.recipientCurrency && (
+              <MetaRow label="FX rate" info={`Exchange rate applied at execution time (BIAN SD-65). Sender was debited in ${p2pTransfer.currency}; recipient was credited in ${p2pTransfer.recipientCurrency} at this rate.`}>
+                <span className="font-mono">
+                  1 {p2pTransfer.currency} = {p2pTransfer.fxRate.toFixed(6)} {p2pTransfer.recipientCurrency}
+                  {p2pTransfer.recipientAmount != null && (
+                    <span className="ml-2 text-gray-400">
+                      → {new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.recipientCurrency }).format(p2pTransfer.recipientAmount)}
+                    </span>
+                  )}
+                </span>
+              </MetaRow>
+            )}
 
             <MetaRow label="Status" info="Lifecycle status of this payment execution (BIAN SD-65). 'completed' means funds have settled.">
               <StatusChip status={p2pTransfer.paymentExecutionStatus} />

@@ -40,7 +40,12 @@ export interface PaymentExecutionProcedure {
   grossAmount: number;
   netAmount: number;
   feeAmount: number;
-  currency: string;                               // ISO 4217
+  currency: string;                               // ISO 4217 — sender's currency
+
+  // FX fields — populated only for cross-currency transfers
+  recipientCurrency?: string;                     // ISO 4217 — recipient's account currency
+  recipientAmount?: number;                       // amount credited after FX conversion
+  fxRate?: number;                                // sender → recipient rate at execution time
 
   paymentExecutionRail?: PayoutRail;
   routingNote?: string;

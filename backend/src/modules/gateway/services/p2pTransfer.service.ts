@@ -88,9 +88,16 @@ export async function executeP2PTransfer(
   // 5. Credit recipient — in the recipient account's currency (FX when cross-currency). Atomic
   //    consistency: if the credit fails, revert the sender debit so funds never vanish in flight.
   let creditAmount = amount;
+  let fxRate: number | undefined;
+  let recipientCurrency: string | undefined;
   if (recipientAccount.payoutAccountCurrency && recipientAccount.payoutAccountCurrency !== transferCurrency) {
     const { resolveAndConvert } = await import('../../../providers/currency-exchange/services/currencyExchange.service');
-    try { creditAmount = (await resolveAndConvert(db, amount, transferCurrency, recipientAccount.payoutAccountCurrency)).amount; }
+    try {
+      const fx = await resolveAndConvert(db, amount, transferCurrency, recipientAccount.payoutAccountCurrency);
+      creditAmount = fx.amount;
+      fxRate = fx.rate;
+      recipientCurrency = recipientAccount.payoutAccountCurrency;
+    }
     catch { await creditDirect(db, fromAccountRef, amount); return { transferReference: '', amount, currency: transferCurrency, status: 'failed', failureReason: `No FX rate for ${transferCurrency}->${recipientAccount.payoutAccountCurrency}.` }; }
   }
   const credited = await creditDirect(db, recipientAccount.payoutAccountInstanceReference, creditAmount);
@@ -115,6 +122,7 @@ export async function executeP2PTransfer(
     netAmount: amount,
     feeAmount: 0,
     currency: transferCurrency,
+    ...(recipientCurrency ? { recipientCurrency, recipientAmount: creditAmount, fxRate } : {}),
     paymentExecutionRail: senderAccount.payoutAccountPreferredRail ?? 'internal_ledger',
     routingNote: input.note ? `P2P transfer note: ${input.note}` : 'P2P transfer via beneficiary portal',
     paymentExecutionStatus: 'completed',
