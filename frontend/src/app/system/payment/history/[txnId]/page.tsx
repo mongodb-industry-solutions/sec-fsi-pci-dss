@@ -32,8 +32,8 @@ function FieldInfo({ label, description }: { label: string; description: string 
       </button>
       {open && (
         <div className="absolute z-50 bottom-full left-0 mb-1.5 w-64 bg-[#001E2B] text-white text-xs rounded-lg shadow-xl p-3 leading-relaxed">
-          <p className="font-semibold mb-1 text-[#00ED64]">{label}</p>
-          <p>{description}</p>
+          <span className="block font-semibold mb-1 text-[#00ED64]">{label}</span>
+          <span className="block">{description}</span>
         </div>
       )}
     </div>
