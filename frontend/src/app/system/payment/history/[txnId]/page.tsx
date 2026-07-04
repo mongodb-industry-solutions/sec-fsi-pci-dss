@@ -62,15 +62,30 @@ function CopyButton({ value }: { value: string }) {
   );
 }
 
-// Label + value row for the shared metadata grid — responsive on narrow screens.
+// Label + value row for the shared metadata grid — two fixed columns.
 function MetaRow({ label, info, children }: { label: string; info: string; children: React.ReactNode }) {
   return (
     <>
-      <span className="text-gray-500 text-sm flex items-center gap-0.5 min-w-0">
+      <span className="text-gray-500 text-sm flex items-center gap-0.5 min-w-0 whitespace-nowrap">
         {label}
         <FieldInfo label={label} description={info} />
       </span>
       <span className="text-sm min-w-0">{children}</span>
+    </>
+  );
+}
+
+// Label + value pair inside a Sender/Recipient block.
+// Renders as two grid cells (dt + dd) so the parent <dl> grid aligns all labels/values.
+// On small screens the parent switches to 1-col, stacking dt above dd.
+function BlockRow({ label, info, children }: { label: string; info: string; children: React.ReactNode }) {
+  return (
+    <>
+      <dt className="text-xs text-gray-500 whitespace-nowrap flex items-center gap-0.5 self-baseline leading-5">
+        {label}
+        <FieldInfo label={label} description={info} />
+      </dt>
+      <dd className="text-xs min-w-0 break-all m-0 leading-5">{children}</dd>
     </>
   );
 }
@@ -360,18 +375,16 @@ export default function TransactionDetailPage() {
                     <FieldInfo label="Sender" description="The party who initiated and funded this P2P transfer (BIAN SD-65 initiator). Their payout account (SD-66) is debited atomically." />
                   </p>
                   {canSeeSource ? (
-                    <>
-                      <p className="text-xs text-gray-500 mb-0.5 flex items-center gap-0.5">
-                        Payout account
-                        <FieldInfo label="Sender payout account" description="SD-66 Payout Account Arrangement debited for this transfer. Per GDPR, only the account holder and authorised staff can see this reference." />
-                      </p>
-                      {p2pTransfer.sourcePayoutAccountReference ? (
-                        <Link href={`/system/accounts/${p2pTransfer.sourcePayoutAccountReference}`}
-                          className="font-mono text-xs text-blue-600 hover:underline break-all block">
-                          {p2pTransfer.sourcePayoutAccountReference} ↗
-                        </Link>
-                      ) : <span className="font-mono text-xs text-gray-400">—</span>}
-                    </>
+                    <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
+                      <BlockRow label="Payout account" info="SD-66 Payout Account Arrangement debited for this transfer. Per GDPR, only the account holder and authorised staff can see this reference.">
+                        {p2pTransfer.sourcePayoutAccountReference ? (
+                          <Link href={`/system/accounts/${p2pTransfer.sourcePayoutAccountReference}`}
+                            className="font-mono text-blue-600 hover:underline">
+                            {p2pTransfer.sourcePayoutAccountReference} ↗
+                          </Link>
+                        ) : <span className="text-gray-400">—</span>}
+                      </BlockRow>
+                    </dl>
                   ) : (
                     <p className="text-xs text-gray-400 italic">Account details not disclosed (privacy)</p>
                   )}
@@ -383,18 +396,16 @@ export default function TransactionDetailPage() {
                     <FieldInfo label="Recipient" description="The PSP-registered party receiving the funds (BIAN SD-54 Counterparty Administration). Their payout account is credited at execution time." />
                   </p>
                   {canSeeDest ? (
-                    <>
-                      <p className="text-xs text-gray-500 mb-0.5 flex items-center gap-0.5">
-                        Payout account
-                        <FieldInfo label="Recipient payout account" description="SD-66 Payout Account Arrangement credited for this transfer. Resolved from the beneficiary arrangement at execution time. Per GDPR, only the account holder and authorised staff can see this reference." />
-                      </p>
-                      {p2pTransfer.resolvedPayoutAccountReference ? (
-                        <Link href={`/system/accounts/${p2pTransfer.resolvedPayoutAccountReference}`}
-                          className="font-mono text-xs text-green-600 hover:underline break-all block">
-                          {p2pTransfer.resolvedPayoutAccountReference} ↗
-                        </Link>
-                      ) : <span className="font-mono text-xs text-gray-400">—</span>}
-                    </>
+                    <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
+                      <BlockRow label="Payout account" info="SD-66 Payout Account Arrangement credited for this transfer. Resolved from the beneficiary arrangement at execution time. Per GDPR, only the account holder and authorised staff can see this reference.">
+                        {p2pTransfer.resolvedPayoutAccountReference ? (
+                          <Link href={`/system/accounts/${p2pTransfer.resolvedPayoutAccountReference}`}
+                            className="font-mono text-green-600 hover:underline">
+                            {p2pTransfer.resolvedPayoutAccountReference} ↗
+                          </Link>
+                        ) : <span className="text-gray-400">—</span>}
+                      </BlockRow>
+                    </dl>
                   ) : (
                     <p className="text-xs text-gray-400 italic">Account details not disclosed (privacy)</p>
                   )}
@@ -529,20 +540,30 @@ export default function TransactionDetailPage() {
       </Link>
 
       {/* Main transaction card */}
+      {(() => {
+        const isRefund = apiTxn?.cardTransactionType === 'refund';
+        const cardDirection = isRefund ? 'credit' : 'debit';
+        return (
       <div className="bg-white rounded-xl border p-5 mb-4">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
             <h1 className="text-xl font-bold text-gray-900">{txn.merchant}</h1>
-            <p className="text-sm text-gray-500 mt-0.5">{new Date(txn.createdAt).toLocaleString()}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className={`text-xs px-2 py-0.5 rounded font-medium border ${cardDirection === 'debit' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                {cardDirection === 'debit' ? '↑ Sent' : '↓ Received'}
+              </span>
+              <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${statusMeta.color}`}>
+                <span>{statusMeta.icon}</span>
+                {statusMeta.label}
+              </span>
+            </div>
+            <p className="text-sm text-gray-500 mt-1">{new Date(txn.createdAt).toLocaleString()}</p>
           </div>
           <div className="text-right shrink-0">
-            <p className="text-2xl font-bold text-gray-900">
+            <p className={`text-2xl font-bold ${cardDirection === 'debit' ? 'text-red-600' : 'text-green-700'}`}>
+              {cardDirection === 'debit' ? '−' : '+'}
               {new Intl.NumberFormat('en-US', { style: 'currency', currency: txn.currency }).format(txn.amount)}
             </p>
-            <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${statusMeta.color}`}>
-              <span>{statusMeta.icon}</span>
-              {statusMeta.label}
-            </span>
           </div>
         </div>
 
@@ -553,42 +574,47 @@ export default function TransactionDetailPage() {
               Sender
               <FieldInfo label="Sender" description="The cardholder who authorised this transaction (BIAN SD-88). The funding payout account (SD-66) is debited at authorisation; the hold is cleared at settlement." />
             </p>
-            <p className="text-xs text-gray-500 mb-0.5 flex items-center gap-0.5">
-              Card
-              <FieldInfo label="Card (masked PAN)" description="PAN masked to last 4 digits per PCI DSS Req 3.3. The full PAN is never stored after authorisation. Click to manage the card." />
-            </p>
-            {matchedCardId ? (
-              <Link href={`/system/cards/${matchedCardId}?from=history&txnId=${txnId}`}
-                className="font-mono text-xs text-blue-600 hover:underline block mb-1">{txn.maskedPan} ↗</Link>
-            ) : (
-              <p className="font-mono text-xs text-gray-700 mb-1">{txn.maskedPan}</p>
-            )}
-            {txn.network && <p className="text-xs text-gray-400">{txn.network}</p>}
-            {(apiTxn?.paymentCardReference || txn.cardToken) && (
-              <div className="mt-1.5">
-                <p className="text-xs text-gray-500 mb-0.5">Card token</p>
-                <div className="flex items-center gap-2">
-                  <CardTokenField token={(apiTxn?.paymentCardReference ?? txn.cardToken)!} />
-                  {matchedCardId && (
-                    <Link href={`/system/cards/${matchedCardId}?from=history&txnId=${txnId}`}
-                      className="text-xs text-[#001E2B] hover:underline shrink-0">Manage ↗</Link>
-                  )}
-                </div>
-              </div>
-            )}
+            <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
+              <BlockRow label="Card" info="PAN masked to last 4 digits per PCI DSS Req 3.3. The full PAN is never stored after authorisation. Click to manage the card.">
+                {matchedCardId ? (
+                  <Link href={`/system/cards/${matchedCardId}?from=history&txnId=${txnId}`}
+                    className="font-mono text-blue-600 hover:underline">{txn.maskedPan} ↗</Link>
+                ) : (
+                  <span className="font-mono text-gray-700">{txn.maskedPan}</span>
+                )}
+              </BlockRow>
+              {txn.network && (
+                <BlockRow label="Network" info="Card network (Visa, Mastercard, etc.) that processed the authorisation. Determines interchange rules and dispute resolution process.">
+                  <span className="text-gray-700">{txn.network}</span>
+                </BlockRow>
+              )}
+              {(apiTxn?.paymentCardReference || txn.cardToken) && (
+                <BlockRow label="Card token" info="Opaque reference replacing the PAN for downstream processing (tokenisation per PCI DSS Req 3.5). Use this token to link the card to related transactions.">
+                  <span className="flex items-center gap-1.5 flex-wrap">
+                    <CardTokenField token={(apiTxn?.paymentCardReference ?? txn.cardToken)!} />
+                    {matchedCardId && (
+                      <Link href={`/system/cards/${matchedCardId}?from=history&txnId=${txnId}`}
+                        className="text-[#001E2B] hover:underline shrink-0">Manage ↗</Link>
+                    )}
+                  </span>
+                </BlockRow>
+              )}
+            </dl>
           </div>
 
           <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
             <p className="text-xs font-semibold text-orange-700 uppercase tracking-wide mb-2 flex items-center gap-1">
               Recipient
-              <FieldInfo label="Recipient (Merchant)" description="The merchant who received the funds (BIAN SD-89 Merchant Agreement). MCC is disclosed to cardholders per Visa/Mastercard rules — it appears on official statements." />
+              <FieldInfo label="Recipient (Merchant)" description="The merchant who received the funds (BIAN SD-89 Merchant Agreement). MCC is disclosed to cardholders per Visa/Mastercard Core Rules — it appears on official statements." />
             </p>
-            <p className="font-medium text-xs text-gray-800 mb-1">{txn.merchant}</p>
-            <p className="text-xs text-gray-500 mb-0.5 flex items-center gap-0.5">
-              MCC
-              <FieldInfo label="MCC — Merchant Category Code" description="4-digit ISO 18245 code classifying the merchant type. Disclosed to cardholders on statements per Visa/Mastercard Core Rules (VCCR 5.8.4). Used for spend controls and tax reporting." />
-            </p>
-            <p className="font-mono text-xs text-gray-700">{apiTxn?.cardTransactionMerchantCategoryCode ?? txn.mcc}</p>
+            <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
+              <BlockRow label="Merchant" info="Name of the merchant as reported by the acquiring bank in the authorisation request.">
+                <span className="font-medium text-gray-800">{txn.merchant}</span>
+              </BlockRow>
+              <BlockRow label="MCC" info="4-digit ISO 18245 Merchant Category Code. Disclosed to cardholders on statements per Visa/Mastercard Core Rules (VCCR 5.8.4). Used for spend controls and tax reporting.">
+                <span className="font-mono text-gray-700">{apiTxn?.cardTransactionMerchantCategoryCode ?? txn.mcc}</span>
+              </BlockRow>
+            </dl>
           </div>
         </div>
 
@@ -662,6 +688,8 @@ export default function TransactionDetailPage() {
           </MetaRow>
         </div>
       </div>
+        );
+      })()}
 
       {/* Notes and messages from the security team */}
       {caseNotes?.caseFound && (
