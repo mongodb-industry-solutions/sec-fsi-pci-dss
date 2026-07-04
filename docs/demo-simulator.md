@@ -1787,7 +1787,7 @@ After login, David accesses the standard merchant portal (Ch-04 §10.4):
 | 4 | Go to Payment Links tab | Luis's payment link shows status: `completed` |
 | 5 | Present Debug Mode | Shows raw MongoDB document — `merchantName` plaintext, customer fields encrypted |
 
-## v17.1 — Bank transfer UX (/system/transfer/bank)
+## Bank transfer UX (/system/transfer/bank) — add-on (dev plan v17)
 
 Two tabs:
 - Registered account: send to an own account or a saved contact; no bank details required. Executes as

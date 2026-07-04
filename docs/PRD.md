@@ -1322,7 +1322,9 @@ The Integration Hub is designed around PCI DSS v4.0 third-party service provider
 
 *This document is a living artifact. Update the Decisions Log with any architectural or scope change agreed during development.*
 
-## v17.1 — Bank Transfers (ACH / SEPA / SWIFT)
+## Bank Transfers (ACH / SEPA / SWIFT) — capability add-on
+
+> Delivered under development plan v17 (dev-plan tranche "v17.1"), not a numbered product release.
 
 The PSP supports outbound bank transfers over ACH, SEPA and SWIFT, to registered accounts and to
 unregistered accounts (details entered on a form). All transfers are external bank transfers executed

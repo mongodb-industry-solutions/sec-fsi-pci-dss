@@ -636,7 +636,11 @@ These requirements apply to all versions from v1 onward:
 | NFR-X-06 | Type safety | `npm run build` exits 0 at every version: no TypeScript `any` escape hatches in production code |
 | NFR-X-07 | Agent security | AI agents (v5) use only the public API layer: no direct MongoDB credentials or DEK access |
 
-## v17.1 — Bank Transfers (ACH / SEPA / SWIFT)
+## Bank Transfers (ACH / SEPA / SWIFT) — capability add-on
+
+> Delivered under **development plan v17** (`tmp/dev.v17.plan.md`, tranche "v17.1"). "v17" is a
+> development-plan iteration, not a product release version (product themes are v1–v5). FR ids below
+> carry the `v17.1` dev-plan tag for traceability only.
 
 | FR | Area | Acceptance criteria | Status |
 |---|---|---|---|
