@@ -71,9 +71,11 @@ export async function oauthController(fastify: FastifyInstance) {
         nonce: q.nonce,
       });
 
-      // If consent action submitted (from PSP frontend consent form)
+      // If consent action submitted (from PSP frontend consent form).
+      // Always redirect to the registered redirect_uri returned by initiateAuthorization
+      // (validated.redirectUri), never the raw query value — prevents open redirect.
       if (q._psp_action === 'deny') {
-        const redirectUrl = new URL(q.redirect_uri);
+        const redirectUrl = new URL(validated.redirectUri);
         redirectUrl.searchParams.set('error', 'access_denied');
         if (q.state) redirectUrl.searchParams.set('state', q.state);
         return reply.redirect(redirectUrl.toString());
@@ -81,7 +83,7 @@ export async function oauthController(fastify: FastifyInstance) {
 
       if (q._psp_action === 'grant' && q._psp_sub) {
         const { code, state } = await issueAuthorizationCode(db(), q.client_id, q._psp_sub, validated);
-        const redirectUrl = new URL(q.redirect_uri);
+        const redirectUrl = new URL(validated.redirectUri);
         redirectUrl.searchParams.set('code', code);
         if (state) redirectUrl.searchParams.set('state', state);
         return reply.redirect(redirectUrl.toString());
@@ -102,16 +104,22 @@ export async function oauthController(fastify: FastifyInstance) {
       if (err.oauthError === 'invalid_request' && err.message?.includes('redirect_uri')) {
         return oauthErrorReply(reply, err);
       }
-      // All other errors: redirect to redirect_uri?error=...
-      if (q.redirect_uri) {
+      // All other errors: redirect to redirect_uri?error=... — but ONLY after confirming the
+      // redirect_uri is registered for this client. Some errors (e.g. unsupported response_type,
+      // unknown client) are thrown before initiateAuthorization validates the redirect_uri, so we
+      // must re-check the client allowlist here to avoid an open redirect (RFC 6749 §4.1.2.1).
+      if (q.redirect_uri && q.client_id) {
         try {
-          const redirectUrl = new URL(q.redirect_uri);
-          redirectUrl.searchParams.set('error', err.oauthError ?? 'server_error');
-          redirectUrl.searchParams.set('error_description', err.message);
-          if (q.state) redirectUrl.searchParams.set('state', q.state);
-          return reply.redirect(redirectUrl.toString());
+          const client = await resolveOAuthClient(db(), q.client_id);
+          if (client.redirectUris.includes(q.redirect_uri)) {
+            const redirectUrl = new URL(q.redirect_uri);
+            redirectUrl.searchParams.set('error', err.oauthError ?? 'server_error');
+            redirectUrl.searchParams.set('error_description', err.message);
+            if (q.state) redirectUrl.searchParams.set('state', q.state);
+            return reply.redirect(redirectUrl.toString());
+          }
         } catch {
-          // If redirect_uri is malformed, fall through to direct error
+          // Client not resolvable or redirect_uri malformed — fall through to direct error.
         }
       }
       return oauthErrorReply(reply, err);
