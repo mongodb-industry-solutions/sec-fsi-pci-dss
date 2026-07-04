@@ -4,17 +4,16 @@
 // On settlement: credits balance, marks transaction as settled.
 
 import { Db } from 'mongodb';
-import { EventBus, DomainEvent, makeEvent } from '../../../vendors/eventbus';
+import { EventBus, DomainEvent } from '../../../vendors/eventbus';
 import { CARD_TRANSACTION_COLLECTION } from '../../transaction/models/cardTransaction.model';
 import { PAYMENT_ORDER_COLLECTION } from '../models/paymentOrder.model';
 import { MERCHANT_AGREEMENT_COLLECTION } from '../models/merchantAgreement.model';
 import { createExecution, transitionExecution, appendResolutionStep, getExecution } from './paymentExecution.service';
 import { getDefaultPayoutAccount } from './payoutAccount.service';
 import { creditAvailable, debitPending, settleCardDebit } from './payoutAccountBalance.service';
-import { validateAccount } from '../../../providers/account-information/services/accountInformation.service';
-import { resolveAccountInformationConfig } from '../../../providers/account-information/services/accountInformation.service';
-import { initiateTransfer, resolvePaymentInitiationConfig } from '../../../providers/payment-initiation/services/paymentInitiation.service';
-import { getCapabilityModuleConfig } from '../../provider/services/capabilityModuleConfig.service';
+// ADR-039: AIS + PISP are reached ONLY through dispatchProvider (never a direct builtin import),
+// so an external provider can replace the builtin module without changing this flow.
+import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
 import type { BankTransferSettled, BankTransferFailed } from '../../../shared/models/events/payoutOrchestration.events';
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
@@ -116,22 +115,24 @@ export class PayoutOrchestrationProcess {
     });
     const execRef = execution.paymentExecutionInstanceReference;
 
-    // AIS: validate the payout account
-    const aisStoredConfig = await getCapabilityModuleConfig(db, 'account-information');
-    const aisConfig = resolveAccountInformationConfig(aisStoredConfig?.moduleConfig as Record<string, unknown> | undefined);
-    const aisResult = validateAccount(
+    // AIS: validate the payout account via the account_information provider (ADR-039).
+    const aisDispatch = await dispatchProvider(
+      db,
+      'account_information',
+      'provider.account_information.account.validation.requested',
       { payoutAccountInstanceReference: payoutAccount.payoutAccountInstanceReference, clientReference: execRef },
-      payoutAccount,
-      aisConfig,
+      { entityType: 'execution', entityId: execRef, processType: 'payment_processing' },
     );
+    const aisBody = (aisDispatch.responseBody ?? {}) as { accountVerified?: boolean; accountStatus?: string };
+    const accountVerified = aisBody.accountVerified === true;
 
     await appendResolutionStep(db, execRef, {
-      stepName: 'ais.account.validation',
-      stepOutcome: aisResult.accountVerified ? 'found' : 'failed',
-      stepNote: `status=${aisResult.accountStatus} verified=${aisResult.accountVerified}`,
+      stepName: 'provider.account_information.validation',
+      stepOutcome: accountVerified ? 'found' : 'failed',
+      stepNote: `provider=${aisDispatch.provider} status=${aisBody.accountStatus ?? aisDispatch.status} verified=${accountVerified}`,
     });
 
-    if (!aisResult.accountVerified) {
+    if (!accountVerified) {
       await transitionExecution(db, execRef, 'exception', { routingNote: 'AIS validation failed: account not verified' });
       return;
     }
@@ -142,19 +143,38 @@ export class PayoutOrchestrationProcess {
 
     await transitionExecution(db, execRef, 'scheduled', { scheduledAt: new Date() });
 
-    // PISP: initiate the bank transfer
-    const pispStoredConfig = await getCapabilityModuleConfig(db, 'payment-initiation');
-    const pispConfig = resolvePaymentInitiationConfig(pispStoredConfig?.moduleConfig as Record<string, unknown> | undefined);
-    const pispResult = initiateTransfer(
-      { clientReference: execRef, paymentExecutionInstanceReference: execRef, amount, currency, settlementSchedule },
-      pispConfig,
+    // PISP: initiate the bank transfer via the payment_initiation provider (ADR-039). The builtin
+    // module (or an external PISP) emits bank.transfer.settled/failed on the bus after T+N; this
+    // process consumes those below. No settlement timer lives here anymore.
+    const pispDispatch = await dispatchProvider(
+      db,
+      'payment_initiation',
+      'provider.payment_initiation.transfer.requested',
+      {
+        clientReference: execRef,
+        paymentExecutionInstanceReference: execRef,
+        railType: payoutAccount.payoutAccountPreferredRail,
+        amount,
+        currency,
+        settlementSchedule,
+        paymentReference: `Merchant settlement ${merchantRef}`,
+      },
+      { entityType: 'execution', entityId: execRef, processType: 'payment_processing' },
     );
+    const railRef = (pispDispatch.responseBody as { railRef?: string } | undefined)?.railRef ?? '';
+    const submitted = pispDispatch.status === 'sent' || pispDispatch.status === 'received';
+
+    if (!submitted) {
+      await transitionExecution(db, execRef, 'failed', { failureReason: `PISP dispatch ${pispDispatch.status}: ${pispDispatch.error ?? 'no submission'}` });
+      await appendResolutionStep(db, execRef, { stepName: 'provider.payment_initiation.transfer', stepOutcome: 'failed', stepNote: `provider=${pispDispatch.provider} status=${pispDispatch.status}` });
+      return;
+    }
 
     await transitionExecution(db, execRef, 'in_flight', { initiatedAt: new Date(), paymentExecutionRail: payoutAccount.payoutAccountPreferredRail });
     await appendResolutionStep(db, execRef, {
-      stepName: 'pisp.transfer.initiated',
+      stepName: 'provider.payment_initiation.transfer',
       stepOutcome: 'found',
-      stepNote: `railRef=${pispResult.railRef} delay=${pispResult.settlementDelayMs}ms`,
+      stepNote: `provider=${pispDispatch.provider} railRef=${railRef}`,
     });
 
     // Link execution to card transaction
@@ -163,51 +183,12 @@ export class PayoutOrchestrationProcess {
       { $set: { paymentExecutionInstanceReference: execRef, recordUpdatedDateTime: new Date() } },
     );
 
-    // Schedule the simulated settlement callback (mirrors payment-initiation controller logic)
-    if (pispResult.settlementDelayMs >= 0) {
-      const bus = this.bus;
-      const corrId = execRef;
-      setTimeout(() => {
-        try {
-          if (pispResult.willSucceed) {
-            const settled: BankTransferSettled = {
-              paymentExecutionInstanceReference: execRef,
-              railRef: pispResult.railRef,
-              completedAt: new Date().toISOString(),
-              netAmount: amount,
-              currency,
-            };
-            void bus.publish(makeEvent({
-              eventType: 'bank.transfer.settled',
-              businessProcess: 'payment_processing',
-              correlationId: corrId,
-              causationId: corrId,
-              payload: settled,
-            }));
-          } else {
-            const failed: BankTransferFailed = {
-              paymentExecutionInstanceReference: execRef,
-              errorCode: 'RAIL_FAILURE',
-              errorReason: 'Simulated rail failure (alwaysSucceed=false)',
-            };
-            void bus.publish(makeEvent({
-              eventType: 'bank.transfer.failed',
-              businessProcess: 'payment_processing',
-              correlationId: corrId,
-              causationId: corrId,
-              payload: failed,
-            }));
-          }
-        } catch { /* bus may be stopping */ }
-      }, pispResult.settlementDelayMs);
-    }
-
     emitProcessEvent(db, {
       entityType: 'execution', entityId: execRef,
       processType: 'payment_processing', processAction: 'payout.execution.initiated',
       processOutcome: 'in_flight',
       performedByPartyReference: null, performedByRole: null,
-      eventSummary: { txnId, merchantRef, payoutAccountRef: payoutAccount.payoutAccountInstanceReference, amount, currency, railRef: pispResult.railRef },
+      eventSummary: { txnId, merchantRef, payoutAccountRef: payoutAccount.payoutAccountInstanceReference, amount, currency, railRef },
       bianServiceDomain: 'SD-65 Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
     });
   }

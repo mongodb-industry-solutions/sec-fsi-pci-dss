@@ -385,7 +385,10 @@
     "externalProviderHealthStatus": "ok",
     "externalProviderLastHealthCheckAt": "2026-06-11T09:00:00.000Z",
     "categoryConfig": {
-      "cardNetworks": ["visa", "mastercard"],
+      "cardNetworks": [
+        "visa",
+        "mastercard"
+      ],
       "cvvValidationEnabled": true,
       "pinValidationEnabled": true,
       "mockMode": true,
@@ -414,7 +417,7 @@
     "externalProviderArrangementType": "account_information",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
-    "externalProviderApiEndpoint": "/api/v1/modules/account-information/validate",
+    "externalProviderApiEndpoint": "/api/v1/modules/account-information/score",
     "externalProviderInternalHandler": "accountInformation.internalHandler",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
@@ -441,7 +444,10 @@
     "routingPriority": 999,
     "bianServiceDomain": "SD-36 Open Banking",
     "bianControlRecordType": "AccountInformationValidation",
-    "pciDssRequirements": ["Req 12.8.1", "Req 10.2.1"],
+    "pciDssRequirements": [
+      "Req 12.8.1",
+      "Req 10.2.1"
+    ],
     "recordCreatedDateTime": "2026-07-01T00:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z",
     "schemaVersion": 2
@@ -452,7 +458,7 @@
     "externalProviderArrangementType": "payment_initiation",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
-    "externalProviderApiEndpoint": "/api/v1/modules/payment-initiation/transfer",
+    "externalProviderApiEndpoint": "/api/v1/modules/payment-initiation/score",
     "externalProviderInternalHandler": "paymentInitiation.internalHandler",
     "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
@@ -483,7 +489,10 @@
     "routingPriority": 999,
     "bianServiceDomain": "SD-65 Payment Execution",
     "bianControlRecordType": "PaymentExecutionProcedure",
-    "pciDssRequirements": ["Req 12.8.1", "Req 10.2.1"],
+    "pciDssRequirements": [
+      "Req 12.8.1",
+      "Req 10.2.1"
+    ],
     "recordCreatedDateTime": "2026-07-01T00:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z",
     "schemaVersion": 2
@@ -508,13 +517,28 @@
     "externalProviderLastHealthCheckAt": "2026-06-11T09:00:00.000Z",
     "fieldMappingConfig": {
       "outbound": [
-        { "sourcePath": "cardToken", "targetPath": "card_token" },
-        { "sourcePath": "result", "targetPath": "status" },
-        { "sourcePath": "responseCode", "targetPath": "response_code" },
-        { "sourcePath": "declineReason", "targetPath": "decline_reason" }
+        {
+          "sourcePath": "cardToken",
+          "targetPath": "card_token"
+        },
+        {
+          "sourcePath": "result",
+          "targetPath": "status"
+        },
+        {
+          "sourcePath": "responseCode",
+          "targetPath": "response_code"
+        },
+        {
+          "sourcePath": "declineReason",
+          "targetPath": "decline_reason"
+        }
       ],
       "inbound": [
-        { "sourcePath": "acknowledged", "targetPath": "merchantAcknowledged" }
+        {
+          "sourcePath": "acknowledged",
+          "targetPath": "merchantAcknowledged"
+        }
       ],
       "schemaVersion": 1
     },
