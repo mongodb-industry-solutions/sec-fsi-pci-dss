@@ -5,6 +5,7 @@
 import { Db } from 'mongodb';
 import { AccountMovement, MovementType, MovementDirection } from '../models/accountMovement.model';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
+import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
 import { PAYMENT_CARD_COLLECTION, PaymentCardManagementControlRecord } from '../../customer/models/paymentCard.model';
 import { CARD_TRANSACTION_COLLECTION, CardTransactionLogControlRecord } from '../../transaction/models/cardTransaction.model';
 import { BALANCE_CREDIT_LOG_COLLECTION, BalanceCreditLogEntry } from '../models/balanceCreditLog.model';
@@ -148,19 +149,37 @@ export async function listAccountMovements(
   // 4. Merge all movements
   let all: AccountMovement[] = [...disbursements, ...cardMovements, ...creditMovements];
 
-  // 4b. Running available balance — computed chronologically (ascending) over the FULL
-  //     unfiltered set so each row reflects the true balance at that point in time,
-  //     independent of the active filter/page. Credits add, debits subtract; rounded to
-  //     2 decimals to avoid float drift. Final cumulative should reconcile with the
-  //     account's current availableAmount (opening deposit + all settled movements).
+  // 4b. Running available balance — per settled movement, "balance after this movement".
+  //
+  //     Only movements that actually SETTLED (funds moved) affect the available balance.
+  //     A failed/exception/reversed transfer or a still-pending card authorisation never
+  //     debited the ledger, so it must not shift the running balance (otherwise e.g. a
+  //     rejected transfer would appear to have moved money). Non-settled rows still show
+  //     in the ledger for audit, but carry no balanceAfter.
+  //
+  //     We ANCHOR to the account's current stored availableAmount and walk BACKWARDS: the
+  //     newest settled movement's balanceAfter equals the current balance; each older row is
+  //     the balance before the newer one settled. This keeps the ledger consistent with the
+  //     authoritative stored balance even if historical execution records are incomplete or
+  //     were reseeded independently — rather than reconstructing forward from zero.
+  const SETTLED_STATUSES = new Set(['completed', 'settled']);
+  const isSettled = (m: AccountMovement): boolean =>
+    m.movementType === 'balance_credit' || SETTLED_STATUSES.has(m.status);
+
   const round2 = (n: number) => Math.round(n * 100) / 100;
-  const chronological = [...all].sort(
-    (a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime(),
-  );
-  let running = 0;
-  for (const m of chronological) {
-    running = round2(running + (m.direction === 'credit' ? m.amount : -m.amount));
-    m.balanceAfter = running;
+  const account = await db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
+    .findOne({ payoutAccountInstanceReference: accountRef }, { projection: { payoutAccountBalance: 1 } });
+  const currentAvailable = account?.payoutAccountBalance?.availableAmount ?? 0;
+
+  // Newest → oldest over settled movements only.
+  const settledDesc = all
+    .filter(isSettled)
+    .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+  let balanceAfter = currentAvailable;
+  for (const m of settledDesc) {
+    m.balanceAfter = round2(balanceAfter);
+    // Undo this movement's effect to get the balance that preceded it (= balanceAfter of the next older row).
+    balanceAfter = balanceAfter - (m.direction === 'credit' ? m.amount : -m.amount);
   }
 
   // 5. Apply type/direction filters in-memory

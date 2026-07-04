@@ -373,8 +373,13 @@ export default function TransactionDetailPage() {
           {/* Sender ↔ Recipient — customer only sees their own account (GDPR / privacy) */}
           {(() => {
             const isCustomer = user?.role === 'customer';
+            const isReceived = p2pTransfer.beneficiaryPartyReference === user?.partyRef;
+            // Privacy: a recipient does not see the sender's source account. But the SENDER always
+            // sees the recipient they chose (their registered beneficiary / destination account),
+            // and the recipient sees their own destination — so the Recipient block is visible to
+            // both involved parties; only the Sender block is hidden from the recipient.
             const canSeeSource = !isCustomer || isSent;
-            const canSeeDest   = !isCustomer || !isSent;
+            const canSeeDest   = !isCustomer || isSent || isReceived;
             return (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm border-t pt-4 mb-4">
                 <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
@@ -404,27 +409,28 @@ export default function TransactionDetailPage() {
                     <FieldInfo label="Recipient" description="The PSP-registered party receiving the funds (BIAN SD-54 Counterparty Administration). Their payout account is credited at execution time." />
                   </div>
                   {canSeeDest ? (
-                    // Link every known resource: a saved beneficiary (SD-54 arrangement) or a
-                    // registered payout account (SD-66) are navigable; an unregistered external
-                    // destination shows the full IBAN the user typed (GDPR Art. 32 / PSD2 — the
-                    // IBAN is stored QE-encrypted and shown to the owner, not PCI-scoped card data).
-                    p2pTransfer.beneficiaryArrangementReference || p2pTransfer.resolvedPayoutAccountReference ? (
+                    // One link per known resource, no duplication (priority order):
+                    //  1. saved beneficiary (SD-54)  → link the contact only (its payout account is
+                    //     the beneficiary's private account — a third party — so we don't also expose it)
+                    //  2. registered payout account (SD-66) → link the destination account
+                    //  3. unregistered external → full IBAN the user typed (GDPR Art. 32 / PSD2:
+                    //     QE-encrypted at rest, shown to the owner; not PCI-scoped card data)
+                    p2pTransfer.beneficiaryArrangementReference ? (
                       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-                        {p2pTransfer.beneficiaryArrangementReference && (
-                          <BlockRow label="Beneficiary" info="SD-54 Counterparty Administration — the saved contact this transfer was sent to. Open it to see the beneficiary's details.">
-                            <Link href={`/system/beneficiaries/${encodeURIComponent(p2pTransfer.beneficiaryArrangementReference)}`}
-                              className="font-mono text-green-600 hover:underline">
-                              {p2pTransfer.beneficiaryArrangementReference} ↗
-                            </Link>
-                          </BlockRow>
-                        )}
-                        <BlockRow label="Payout account" info="SD-66 Payout Account Arrangement credited for this transfer. Open it to see the destination account details. Per GDPR, only the account holder and authorised staff can see this reference.">
-                          {p2pTransfer.resolvedPayoutAccountReference ? (
-                            <Link href={`/system/accounts/${p2pTransfer.resolvedPayoutAccountReference}`}
-                              className="font-mono text-green-600 hover:underline">
-                              {p2pTransfer.resolvedPayoutAccountReference} ↗
-                            </Link>
-                          ) : <span className="text-gray-400">not resolved</span>}
+                        <BlockRow label="Beneficiary" info="SD-54 Counterparty Administration — the saved contact this transfer was sent to. Open it to see the beneficiary's details.">
+                          <Link href={`/system/beneficiaries/${encodeURIComponent(p2pTransfer.beneficiaryArrangementReference)}`}
+                            className="font-mono text-green-600 hover:underline">
+                            {p2pTransfer.beneficiaryArrangementReference} ↗
+                          </Link>
+                        </BlockRow>
+                      </dl>
+                    ) : p2pTransfer.resolvedPayoutAccountReference ? (
+                      <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
+                        <BlockRow label="Payout account" info="SD-66 Payout Account Arrangement credited for this transfer — a registered destination account. Open it to see the account details.">
+                          <Link href={`/system/accounts/${p2pTransfer.resolvedPayoutAccountReference}`}
+                            className="font-mono text-green-600 hover:underline">
+                            {p2pTransfer.resolvedPayoutAccountReference} ↗
+                          </Link>
                         </BlockRow>
                       </dl>
                     ) : (p2pTransfer.beneficiaryName || p2pTransfer.destinationIban || p2pTransfer.destinationAccountMasked || p2pTransfer.destinationCountry) ? (
