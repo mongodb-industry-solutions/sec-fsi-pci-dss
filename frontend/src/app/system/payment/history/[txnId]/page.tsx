@@ -1,14 +1,53 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, FraudCase, ActionEvent, TransactionNotesResponse } from '../../../../../lib/api';
 import { getToken, decodeToken } from '../../../../../lib/auth';
 import { useDebugMode } from '../../../../../lib/debugMode';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Info } from 'lucide-react';
 import { RawMongoPanel } from '../../../../../components/RawMongoPanel';
 import { CustomerQuestionsPanel } from '../../../../../components/CustomerQuestionsPanel';
 import { useNotificationsStream } from '../../../../../lib/useNotificationsStream';
+
+// Inline tooltip: renders a ⓘ button that opens a floating description popup.
+function FieldInfo({ label, description }: { label: string; description: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+  return (
+    <div className="relative inline-flex items-center" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="ml-1 text-gray-300 hover:text-gray-500 transition-colors align-middle"
+        title={`About: ${label}`}
+      >
+        <Info size={12} />
+      </button>
+      {open && (
+        <div className="absolute z-50 bottom-full left-0 mb-1.5 w-64 bg-[#001E2B] text-white text-xs rounded-lg shadow-xl p-3 leading-relaxed">
+          <p className="font-semibold mb-1 text-[#00ED64]">{label}</p>
+          <p>{description}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FieldLabel({ children, info }: { children: React.ReactNode; info: string }) {
+  return (
+    <span className="text-gray-500 flex items-center gap-0.5">
+      {children}
+      <FieldInfo label={String(children)} description={info} />
+    </span>
+  );
+}
 
 interface StoredTransaction {
   txnId: string;
@@ -259,51 +298,113 @@ export default function TransactionDetailPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm border-t pt-4">
-            <span className="text-gray-500">Initiator ref</span>
-            <span className="font-mono text-xs text-gray-700 truncate">{p2pTransfer.initiatorPartyReference ?? '—'}</span>
+          {/* Sender ↔ Recipient blocks */}
+          <div className="grid grid-cols-2 gap-3 text-sm border-t pt-4 mb-4">
+            {/* Sender */}
+            <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+              <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2 flex items-center gap-1">
+                Sender
+                <FieldInfo label="Sender" description="The party who initiated and funded this P2P transfer. In BIAN SD-65 this is the Payment Execution initiator. Their payout account (SD-66) is debited." />
+              </p>
+              <p className="text-xs text-gray-500 flex items-center gap-0.5 mb-0.5">
+                Party ID
+                <FieldInfo label="Party ID" description="Unique identifier of the registered PSP customer who sent the funds (BIAN SD-13 Party Reference Directory)." />
+              </p>
+              <p className="font-mono text-xs text-gray-700 truncate mb-2">{p2pTransfer.initiatorPartyReference ?? '—'}</p>
+              <p className="text-xs text-gray-500 flex items-center gap-0.5 mb-0.5">
+                Payout account
+                <FieldInfo label="Sender payout account" description="The SD-66 Payout Account Arrangement debited for this transfer. Funds are moved from availableAmount to the recipient's account atomically." />
+              </p>
+              {p2pTransfer.sourcePayoutAccountReference ? (
+                <Link
+                  href={`/system/accounts/${p2pTransfer.sourcePayoutAccountReference}`}
+                  className="font-mono text-xs text-blue-600 hover:underline truncate block"
+                >
+                  {p2pTransfer.sourcePayoutAccountReference} ↗
+                </Link>
+              ) : <span className="font-mono text-xs text-gray-400">—</span>}
+            </div>
 
-            <span className="text-gray-500">Recipient ref</span>
-            <span className="font-mono text-xs text-gray-700 truncate">{p2pTransfer.beneficiaryPartyReference ?? '—'}</span>
+            {/* Recipient */}
+            <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+              <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-2 flex items-center gap-1">
+                Recipient
+                <FieldInfo label="Recipient" description="The party who receives the funds. Identified via a registered beneficiary arrangement (BIAN SD-54 Counterparty Administration). Their payout account is credited." />
+              </p>
+              <p className="text-xs text-gray-500 flex items-center gap-0.5 mb-0.5">
+                Party ID
+                <FieldInfo label="Party ID" description="Unique identifier of the registered PSP customer who receives the funds (BIAN SD-13 Party Reference Directory). Only PSP-registered users can be internal P2P recipients." />
+              </p>
+              <p className="font-mono text-xs text-gray-700 truncate mb-2">{p2pTransfer.beneficiaryPartyReference ?? '—'}</p>
+              <p className="text-xs text-gray-500 flex items-center gap-0.5 mb-0.5">
+                Payout account
+                <FieldInfo label="Recipient payout account" description="The SD-66 Payout Account Arrangement credited for this transfer. The resolved account is determined from the beneficiary arrangement at execution time." />
+              </p>
+              {p2pTransfer.resolvedPayoutAccountReference ? (
+                <Link
+                  href={`/system/accounts/${p2pTransfer.resolvedPayoutAccountReference}`}
+                  className="font-mono text-xs text-green-600 hover:underline truncate block"
+                >
+                  {p2pTransfer.resolvedPayoutAccountReference} ↗
+                </Link>
+              ) : <span className="font-mono text-xs text-gray-400">—</span>}
+            </div>
+          </div>
 
-            <span className="text-gray-500">Source account</span>
-            <span className="font-mono text-xs text-gray-700 truncate">{p2pTransfer.sourcePayoutAccountReference ?? '—'}</span>
+          {/* Transfer metadata */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
+            <FieldLabel info="The gross amount transferred before any fees are deducted. In BIAN SD-65 this is paymentExecutionGrossAmount.">Gross amount</FieldLabel>
+            <span className="font-semibold">
+              {new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.currency }).format(p2pTransfer.grossAmount)}
+              <span className="ml-1 text-xs font-normal text-gray-400">{p2pTransfer.currency}</span>
+            </span>
 
-            <span className="text-gray-500">Destination account</span>
-            <span className="font-mono text-xs text-gray-700 truncate">{p2pTransfer.resolvedPayoutAccountReference ?? '—'}</span>
+            {p2pTransfer.feeAmount > 0 && (<>
+              <FieldLabel info="Fee charged by the PSP for processing this transfer. Deducted from the gross amount to arrive at the net amount credited to the recipient.">Fee</FieldLabel>
+              <span className="text-red-600">
+                {new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.currency }).format(p2pTransfer.feeAmount)}
+              </span>
+            </>)}
 
-            <span className="text-gray-500">Amount</span>
-            <span>{new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.currency }).format(p2pTransfer.grossAmount)}</span>
-
-            <span className="text-gray-500">Currency</span>
-            <span className="font-mono">{p2pTransfer.currency}</span>
+            <FieldLabel info="The net amount credited to the recipient's account after fee deduction. For zero-fee transfers gross = net.">Net amount</FieldLabel>
+            <span>
+              {new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.currency }).format(p2pTransfer.netAmount)}
+            </span>
 
             {p2pTransfer.paymentExecutionRail && (<>
-              <span className="text-gray-500">Rail</span>
+              <FieldLabel info="The settlement rail used to route this transfer. internal_ledger means both accounts are held at this PSP and the movement is a book-entry with no external network involvement.">Settlement rail</FieldLabel>
               <span className="capitalize">{p2pTransfer.paymentExecutionRail.replace(/_/g, ' ')}</span>
             </>)}
 
             {p2pTransfer.routingNote && (<>
-              <span className="text-gray-500">Note</span>
+              <FieldLabel info="Free-text note attached by the sender or the system during routing. May describe the transfer purpose or carry internal routing metadata.">Note</FieldLabel>
               <span className="text-xs text-gray-700">{p2pTransfer.routingNote}</span>
             </>)}
 
-            <span className="text-gray-500">Initiated at</span>
+            <FieldLabel info="UTC timestamp when the transfer was submitted by the sender. In BIAN SD-65 this is the PaymentExecutionProcedure initiation datetime.">Initiated at</FieldLabel>
             <span className="text-xs">{p2pTransfer.initiatedAt ? new Date(p2pTransfer.initiatedAt).toLocaleString() : '—'}</span>
 
             {p2pTransfer.completedAt && (<>
-              <span className="text-gray-500">Completed at</span>
+              <FieldLabel info="UTC timestamp when funds were confirmed as credited to the recipient's account and the execution record was marked completed.">Completed at</FieldLabel>
               <span className="text-xs">{new Date(p2pTransfer.completedAt).toLocaleString()}</span>
             </>)}
 
-            <span className="text-gray-500">Transfer ID</span>
-            <span className="font-mono text-xs text-gray-500 truncate">{p2pTransfer.paymentExecutionInstanceReference}</span>
+            <FieldLabel info="Unique immutable identifier for this payment execution (BIAN SD-65 paymentExecutionInstanceReference). Use this reference to look up audit events, compliance logs, or dispute records.">Transfer ID</FieldLabel>
+            <span className="font-mono text-xs text-gray-500 break-all">{p2pTransfer.paymentExecutionInstanceReference}</span>
+
+            <FieldLabel info="Lifecycle status of this payment execution as tracked in BIAN SD-65. 'completed' means funds have settled. 'pending' or 'failed' indicate an in-flight or error state.">Status</FieldLabel>
+            <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded font-medium w-fit ${p2pTransfer.paymentExecutionStatus === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}`}>
+              {p2pTransfer.paymentExecutionStatus}
+            </span>
           </div>
         </div>
 
         {fc ? (
           <div className="bg-white rounded-xl border p-5 mb-4">
-            <h2 className="font-semibold text-gray-800 mb-3">Security Review</h2>
+            <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-1">
+              Security Review
+              <FieldInfo label="Security Review" description="A FraudDiagnosisCase (BIAN SD-83) opened automatically when FDS, HRP (sanctions), or AML providers signal risk during the compliance pipeline. Opened in parallel with transfer settlement — does not block funds." />
+            </h2>
             <div className="flex items-center gap-2 mb-3">
               <span className="font-mono text-xs text-gray-500">{fc.fraudDiagnosisCaseReference}</span>
               <span className={`text-xs px-2 py-0.5 rounded font-medium ${
@@ -323,7 +424,10 @@ export default function TransactionDetailPage() {
 
             {fc.riskIndicators.length > 0 && (
               <div className="mb-3">
-                <p className="text-xs font-semibold text-gray-600 mb-1 uppercase">Risk indicators</p>
+                <p className="text-xs font-semibold text-gray-600 mb-1 uppercase flex items-center gap-1">
+                  Risk indicators
+                  <FieldInfo label="Risk indicators" description="Signals returned by FDS (Fraud Detection Score), HRP (High-Risk Party / sanctions screening), or AML (Anti-Money Laundering) providers. Each indicator corresponds to a specific compliance gate that flagged the transfer." />
+                </p>
                 <div className="flex flex-wrap gap-1">
                   {fc.riskIndicators.map((ind) => (
                     <span key={ind} className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">{ind}</span>
@@ -334,7 +438,10 @@ export default function TransactionDetailPage() {
 
             {fc.subsystemSignals && (
               <div className="mb-3">
-                <p className="text-xs font-semibold text-gray-600 mb-1 uppercase">Subsystem signals</p>
+                <p className="text-xs font-semibold text-gray-600 mb-1 uppercase flex items-center gap-1">
+                  Subsystem signals
+                  <FieldInfo label="Subsystem signals" description="Raw aggregated responses from each compliance provider (FDS score, HRP match result, AML alert level). Extracted from the correlated event trail and attached to the fraud case for investigator context." />
+                </p>
                 <pre className="text-xs bg-gray-50 rounded p-2 overflow-x-auto text-gray-700">{JSON.stringify(fc.subsystemSignals, null, 2)}</pre>
               </div>
             )}
