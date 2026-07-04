@@ -16,7 +16,6 @@ export interface P2PTransferInput {
   counterpartyArrangementRef: string; // beneficiary token
   fromAccountRef: string;            // sender's payout account
   amount: number;
-  currency: string;
   note?: string;
 }
 
@@ -34,10 +33,10 @@ export async function executeP2PTransfer(
   db: Db,
   input: P2PTransferInput,
 ): Promise<P2PTransferResult> {
-  const { initiatorPartyRef, counterpartyArrangementRef, fromAccountRef, amount, currency } = input;
+  const { initiatorPartyRef, counterpartyArrangementRef, fromAccountRef, amount } = input;
 
   if (amount <= 0) {
-    return { transferReference: '', amount, currency, status: 'failed', failureReason: 'Amount must be greater than zero.' };
+    return { transferReference: '', amount, currency: '', status: 'failed', failureReason: 'Amount must be greater than zero.' };
   }
 
   // 1. Verify the beneficiary arrangement exists, is active, and belongs to the initiator
@@ -46,13 +45,13 @@ export async function executeP2PTransfer(
     .findOne({ counterpartyArrangementReference: counterpartyArrangementRef, ownerPartyReference: initiatorPartyRef, counterpartyArrangementStatus: 'active' });
 
   if (!arrangement) {
-    return { transferReference: '', amount, currency, status: 'failed', failureReason: 'Beneficiary not found or no longer active.' };
+    return { transferReference: '', amount, currency: '', status: 'failed', failureReason: 'Beneficiary not found or no longer active.' };
   }
 
   // 2. Verify the sender's account belongs to the initiator and is active
   const senderAccount = await getPayoutAccount(db, fromAccountRef);
   if (!senderAccount || senderAccount.partyInstanceReference !== initiatorPartyRef || senderAccount.payoutAccountStatus !== 'active') {
-    return { transferReference: '', amount, currency, status: 'failed', failureReason: 'Source account not found or not active.' };
+    return { transferReference: '', amount, currency: '', status: 'failed', failureReason: 'Source account not found or not active.' };
   }
   // Currency is always the sender account's native currency (server-authoritative — client hint is ignored).
   const transferCurrency = senderAccount.payoutAccountCurrency;

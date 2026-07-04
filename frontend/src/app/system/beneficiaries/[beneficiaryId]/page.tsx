@@ -54,7 +54,6 @@ function SendMoneyModal({ beneficiary, ownerPartyRef, token, onClose }: SendMone
   const [accountsLoaded, setAccountsLoaded] = useState(false);
   const [fromAccountRef, setFromAccountRef] = useState('');
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('EUR');
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -68,18 +67,13 @@ function SendMoneyModal({ beneficiary, ownerPartyRef, token, onClose }: SendMone
         setAccounts(accts);
         setAccountsLoaded(true);
         const primary = accts.find(a => a.payoutAccountIsDefault) ?? accts[0];
-        if (primary) {
-          setFromAccountRef(primary.payoutAccountInstanceReference);
-          setCurrency(primary.payoutAccountCurrency);
-        }
+        if (primary) setFromAccountRef(primary.payoutAccountInstanceReference);
       })
       .catch(() => setAccountsLoaded(true));
   }, [ownerPartyRef, token]);
 
   function handleAccountChange(ref: string) {
     setFromAccountRef(ref);
-    const acct = accounts.find(a => a.payoutAccountInstanceReference === ref);
-    if (acct) setCurrency(acct.payoutAccountCurrency);
   }
 
   async function handleSend() {
@@ -92,10 +86,10 @@ function SendMoneyModal({ beneficiary, ownerPartyRef, token, onClose }: SendMone
       const res = await api.beneficiaries.transfer(
         ownerPartyRef,
         beneficiary.counterpartyArrangementReference,
-        { fromAccountRef, amount: parsedAmount, currency, note: note.trim() || undefined },
+        { fromAccountRef, amount: parsedAmount, note: note.trim() || undefined },
         token,
       );
-      setSuccess({ ref: res.transferReference, amount: parsedAmount, currency });
+      setSuccess({ ref: res.transferReference, amount: parsedAmount, currency: res.currency });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Transfer failed.');
     }
@@ -175,7 +169,7 @@ function SendMoneyModal({ beneficiary, ownerPartyRef, token, onClose }: SendMone
                     className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
                   />
                   <span className="flex items-center px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm font-medium text-gray-600">
-                    {currency}
+                    {selectedAccount?.payoutAccountCurrency ?? '—'}
                   </span>
                 </div>
               </div>

@@ -564,6 +564,7 @@ export default function TransactionDetailPage() {
               {cardDirection === 'debit' ? '−' : '+'}
               {new Intl.NumberFormat('en-US', { style: 'currency', currency: txn.currency }).format(txn.amount)}
             </p>
+            <span className="text-xs text-gray-400 font-normal">{txn.currency}</span>
           </div>
         </div>
 

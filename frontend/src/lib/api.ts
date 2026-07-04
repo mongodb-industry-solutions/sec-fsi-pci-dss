@@ -1581,7 +1581,7 @@ export const api = {
     transfer: (
       ownerRef: string,
       beneficiaryRef: string,
-      body: { fromAccountRef: string; amount: number; currency: string; note?: string },
+      body: { fromAccountRef: string; amount: number; note?: string },
       token: string,
     ) =>
       apiFetch<{ transferReference: string; amount: number; currency: string; status: string; recipientHint?: string }>(

@@ -242,11 +242,10 @@ export async function beneficiaryController(fastify: FastifyInstance) {
       },
       body: {
         type: 'object',
-        required: ['fromAccountRef', 'amount', 'currency'],
+        required: ['fromAccountRef', 'amount'],
         properties: {
           fromAccountRef: { type: 'string' },
           amount: { type: 'number', exclusiveMinimum: 0 },
-          currency: { type: 'string', minLength: 3, maxLength: 3 },
           note: { type: 'string', maxLength: 140 },
         },
       },
@@ -260,14 +259,13 @@ export async function beneficiaryController(fastify: FastifyInstance) {
       return reply.status(403).send({ error: 'Access denied.' });
     }
 
-    const body = request.body as { fromAccountRef: string; amount: number; currency: string; note?: string };
+    const body = request.body as { fromAccountRef: string; amount: number; note?: string };
 
     const result = await executeP2PTransfer(fastify.db, {
       initiatorPartyRef: ownerRef,
       counterpartyArrangementRef: beneficiaryRef,
       fromAccountRef: body.fromAccountRef,
       amount: body.amount,
-      currency: body.currency,
       note: body.note,
     });
 
