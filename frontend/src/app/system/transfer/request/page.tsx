@@ -8,6 +8,15 @@ import { getToken, decodeToken } from '../../../../lib/auth';
 import { Breadcrumb } from '../../../../components/Breadcrumb';
 import { SectionHeader } from '../../../../components/SectionHeader';
 
+interface MerchantOption {
+  merchantAgreementInstanceReference: string;
+  merchantName: string;
+  merchantAgreementStatus: string;
+  merchantAllowedCurrencies: string[];
+}
+
+const APPROVED_STATUSES = new Set(['agreed', 'active', 'amended']);
+
 export default function RequestPaymentPage() {
   const router = useRouter();
   const [token, setToken] = useState('');
@@ -23,7 +32,7 @@ export default function RequestPaymentPage() {
     return (
       <div className="w-full px-5 sm:px-8 py-6">
         <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-          Access denied — this page is available to customers only.
+          Access denied, this page is available to customers only.
         </div>
       </div>
     );
@@ -42,8 +51,9 @@ export default function RequestPaymentPage() {
 }
 
 function RequestForm({ token, onDone }: { token: string; onDone: () => void }) {
-  const [merchantRef, setMerchantRef] = useState<string | null>(null);
+  const [merchants, setMerchants] = useState<MerchantOption[]>([]);
   const [mLoaded, setMLoaded] = useState(false);
+  const [merchantRef, setMerchantRef] = useState('');
 
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('USD');
@@ -55,14 +65,28 @@ function RequestForm({ token, onDone }: { token: string; onDone: () => void }) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    api.auth.me(token)
-      .then(me => {
-        const ref = (me as unknown as { merchant?: { id: string } }).merchant?.id ?? null;
-        setMerchantRef(ref);
+    api.merchants.list({}, token)
+      .then(r => {
+        const all = (r.results ?? []) as unknown as MerchantOption[];
+        const approved = all.filter(m => APPROVED_STATUSES.has(m.merchantAgreementStatus));
+        setMerchants(approved);
+        if (approved.length > 0) {
+          setMerchantRef(approved[0].merchantAgreementInstanceReference);
+          const currencies = approved[0].merchantAllowedCurrencies;
+          if (currencies?.length > 0) setCurrency(currencies[0]);
+        }
         setMLoaded(true);
       })
       .catch(() => setMLoaded(true));
   }, [token]);
+
+  const selectedMerchant = merchants.find(m => m.merchantAgreementInstanceReference === merchantRef);
+
+  function handleMerchantChange(ref: string) {
+    setMerchantRef(ref);
+    const m = merchants.find(x => x.merchantAgreementInstanceReference === ref);
+    if (m?.merchantAllowedCurrencies?.length > 0) setCurrency(m.merchantAllowedCurrencies[0]);
+  }
 
   async function handleCreate() {
     const parsed = parseFloat(amount);
@@ -101,12 +125,12 @@ function RequestForm({ token, onDone }: { token: string; onDone: () => void }) {
     );
   }
 
-  if (!merchantRef) {
+  if (merchants.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
         <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700 space-y-1">
-          <p className="font-medium">Merchant account required</p>
-          <p className="text-xs">Payment links are scoped to a merchant agreement. Your account does not have a linked merchant — request this via a merchant application.</p>
+          <p className="font-medium">No approved merchant account</p>
+          <p className="text-xs">Payment links require an approved merchant agreement. Your account has no merchant with KYB approved, submit a merchant application or wait for your existing application to be reviewed.</p>
         </div>
         <Link href="/system/transfer"
           className="block w-full py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-center">
@@ -147,6 +171,18 @@ function RequestForm({ token, onDone }: { token: string; onDone: () => void }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
       <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Merchant</label>
+        <select value={merchantRef} onChange={e => handleMerchantChange(e.target.value)}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40">
+          {merchants.map(m => (
+            <option key={m.merchantAgreementInstanceReference} value={m.merchantAgreementInstanceReference}>
+              {m.merchantName} ({m.merchantAgreementStatus})
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
         <label className="block text-xs font-medium text-gray-700 mb-1">Amount</label>
         <div className="flex gap-2">
           <input value={amount} onChange={e => setAmount(e.target.value)}
@@ -154,7 +190,10 @@ function RequestForm({ token, onDone }: { token: string; onDone: () => void }) {
             className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
           <select value={currency} onChange={e => setCurrency(e.target.value)}
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40">
-            {['USD', 'EUR', 'GBP', 'CAD', 'AUD'].map(c => <option key={c}>{c}</option>)}
+            {(selectedMerchant?.merchantAllowedCurrencies?.length
+              ? selectedMerchant.merchantAllowedCurrencies
+              : ['USD', 'EUR', 'GBP', 'CAD', 'AUD']
+            ).map(c => <option key={c}>{c}</option>)}
           </select>
         </div>
       </div>

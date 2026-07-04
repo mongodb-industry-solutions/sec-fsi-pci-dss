@@ -239,7 +239,7 @@ function AddBeneficiaryModal({ ownerRef: initialOwner, lockOwner, token, onClose
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <p className="text-xs text-gray-500">
-          Enter the phone or email of the person you want to add. We look them up securely — their raw contact details are never stored.
+          Enter the phone or email of the person you want to add. We look them up securely, their raw contact details are never stored.
         </p>
 
         <div className="space-y-3">
@@ -288,7 +288,7 @@ function AddBeneficiaryModal({ ownerRef: initialOwner, lockOwner, token, onClose
         )}
         {done && (
           <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-            Beneficiary added — <strong>{done.label}</strong> ({done.hint})
+            Beneficiary added: <strong>{done.label}</strong> ({done.hint})
           </div>
         )}
         {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
@@ -353,7 +353,7 @@ export default function BeneficiariesPage() {
     if (!token) return;
     setLoading(true); setError('');
     try {
-      // Customers: always scoped to own — pass ownerRef so backend returns own records only
+      // Customers: always scoped to own, pass ownerRef so backend returns own records only
       const effectiveOwner = isCustomer ? ownPartyRef : owner;
       const res = await api.beneficiaries.list(token, {
         page: pg, limit: LIMIT,
@@ -404,7 +404,7 @@ export default function BeneficiariesPage() {
         title="Beneficiaries"
         description={description}
         info={isCustomer
-          ? 'Your saved contacts for quick transfers. Add someone by phone or email — we never store their raw contact details, only a secure reference.'
+          ? 'Your saved contacts for quick transfers. Add someone by phone or email, we never store their raw contact details, only a secure reference.'
           : 'Saved contacts registered by customers for transfers and payments. Contact details are masked at registration time.'
         }
         debugInfo="BIAN SD-54 Counterparty Administration · PCI DSS Req 3.4 · Req 7 (scope: own for customers)"

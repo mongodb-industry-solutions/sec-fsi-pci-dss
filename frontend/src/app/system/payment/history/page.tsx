@@ -212,7 +212,7 @@ export default function TransactionHistoryPage() {
           <SectionHeader
             icon={ClipboardList}
             title="Payment History"
-            description="Card transactions and P2P transfers — your complete payment record."
+            description="Card transactions and P2P transfers, your complete payment record."
             debugInfo="BIAN SD-254 Card Transaction · SD-65 Payment Execution · PCI DSS Req 7.2"
             actions={
               <Link href="/system/payment" className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium">
@@ -244,14 +244,14 @@ export default function TransactionHistoryPage() {
                 placeholder="Search by merchant, card, reference, id…"
                 className="flex-1 min-w-[160px] border rounded-lg px-3 py-2 text-sm"
               />
-              {/* Category — allows isolating card vs P2P */}
+              {/* Category allows isolating card vs P2P */}
               <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value as typeof categoryFilter); setStatusFilter(''); setFraudFilter(''); setPage(1); }}
                 className="border rounded-lg px-3 py-2 text-sm bg-white" title="Transaction category">
                 <option value="">All types</option>
                 <option value="card">💳 Card transactions</option>
                 <option value="p2p">↕ P2P transfers</option>
               </select>
-              {/* Payment status — only meaningful for card transactions */}
+              {/* Payment status only meaningful for card transactions */}
               {showCardFilters && (
                 <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
                   className="border rounded-lg px-3 py-2 text-sm bg-white" title="Payment authorization status">
@@ -261,7 +261,7 @@ export default function TransactionHistoryPage() {
                   ))}
                 </select>
               )}
-              {/* Fraud filter — only meaningful for card transactions */}
+              {/* Fraud filter only meaningful for card transactions */}
               {showCardFilters && (
                 <select value={fraudFilter} onChange={(e) => { setFraudFilter(e.target.value); setPage(1); }}
                   className="border rounded-lg px-3 py-2 text-sm bg-white" title="Fraud / risk status">
