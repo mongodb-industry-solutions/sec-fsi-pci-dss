@@ -20,7 +20,7 @@ import type { BankTransferSettled, BankTransferFailed } from '../../../shared/mo
 export async function paymentInitiationController(fastify: FastifyInstance) {
   const CAP = 'payment-initiation';
 
-  fastify.post('/score', {
+  fastify.post('/transfer', {
     schema: {
       tags: ['modules:payment-initiation'],
       summary: 'Payment initiation — submit bank transfer (internal builtin)',

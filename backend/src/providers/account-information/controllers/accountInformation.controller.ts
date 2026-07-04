@@ -18,7 +18,7 @@ import type { PayoutAccountArrangement } from '../../../modules/gateway/models/p
 export async function accountInformationController(fastify: FastifyInstance) {
   const CAP = 'account-information';
 
-  fastify.post('/score', {
+  fastify.post('/validate', {
     schema: {
       tags: ['modules:account-information'],
       summary: 'AIS account validation (internal builtin)',

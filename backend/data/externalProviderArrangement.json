@@ -417,7 +417,7 @@
     "externalProviderArrangementType": "account_information",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
-    "externalProviderApiEndpoint": "/api/v1/modules/account-information/score",
+    "externalProviderApiEndpoint": "/api/v1/modules/account-information/validate",
     "externalProviderInternalHandler": "accountInformation.internalHandler",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
@@ -458,7 +458,7 @@
     "externalProviderArrangementType": "payment_initiation",
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
-    "externalProviderApiEndpoint": "/api/v1/modules/payment-initiation/score",
+    "externalProviderApiEndpoint": "/api/v1/modules/payment-initiation/transfer",
     "externalProviderInternalHandler": "paymentInitiation.internalHandler",
     "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [

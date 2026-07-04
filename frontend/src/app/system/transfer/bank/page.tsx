@@ -151,7 +151,7 @@ function RegisteredAccountForm({ partyRef, token, onDone }: { partyRef: string; 
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState<{ label: string; amount: number; currency: string } | null>(null);
+  const [success, setSuccess] = useState<{ label: string; amount: number; currency: string; ref: string; status: string } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -205,7 +205,7 @@ function RegisteredAccountForm({ partyRef, token, onDone }: { partyRef: string; 
         token,
       );
       const contact = contacts.find(c => c.ref === toContactRef);
-      setSuccess({ label: contact?.label ?? 'contact', amount: parsed, currency: res.currency });
+      setSuccess({ label: contact?.label ?? 'contact', amount: parsed, currency: res.currency, ref: res.transferReference, status: res.status });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Transfer failed.');
     }
@@ -220,12 +220,18 @@ function RegisteredAccountForm({ partyRef, token, onDone }: { partyRef: string; 
           </div>
           <p className="font-semibold text-gray-900">{fmtAmount(success.amount, success.currency)} sent</p>
           <p className="text-xs text-gray-500 mt-1">To: {success.label}</p>
-          <p className="text-xs text-gray-400 mt-1">Status: pending settlement</p>
+          <p className="text-xs text-gray-400 mt-1">Status: {success.status === 'submitted' ? 'pending settlement' : success.status} · Ref: {success.ref.slice(0, 8)}</p>
         </div>
-        <button type="button" onClick={onDone}
-          className="w-full py-2 text-sm font-medium bg-[#001E2B] text-white rounded-lg hover:bg-[#001E2B]/80 transition-colors">
-          Done
-        </button>
+        <div className="flex gap-2">
+          <Link href={`/system/payment/history/${success.ref}`}
+            className="flex-1 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-center">
+            View transfer
+          </Link>
+          <button type="button" onClick={onDone}
+            className="flex-1 py-2 text-sm font-medium bg-[#001E2B] text-white rounded-lg hover:bg-[#001E2B]/80 transition-colors">
+            Done
+          </button>
+        </div>
       </div>
     );
   }
@@ -471,10 +477,18 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
               : `Status: ${liveStatus || 'pending settlement'} · Ref: ${success.ref.slice(0, 8)}`}
           </p>
         </div>
-        <button type="button" onClick={onDone}
-          className="w-full py-2 text-sm font-medium bg-[#001E2B] text-white rounded-lg hover:bg-[#001E2B]/80 transition-colors">
-          Done
-        </button>
+        <div className="flex gap-2">
+          {!success.mandate && (
+            <Link href={`/system/payment/history/${success.ref}`}
+              className="flex-1 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-center">
+              View transfer
+            </Link>
+          )}
+          <button type="button" onClick={onDone}
+            className="flex-1 py-2 text-sm font-medium bg-[#001E2B] text-white rounded-lg hover:bg-[#001E2B]/80 transition-colors">
+            Done
+          </button>
+        </div>
       </div>
     );
   }

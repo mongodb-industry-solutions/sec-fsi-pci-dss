@@ -400,13 +400,21 @@ export default function TransactionDetailPage() {
                   </div>
                   {canSeeDest ? (
                     <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
+                      <BlockRow label="Beneficiary" info="SD-54 Counterparty Administration — the PSP-registered party receiving the funds (the saved contact / beneficiary this transfer was sent to).">
+                        {p2pTransfer.beneficiaryPartyReference ? (
+                          <Link href={`/system/beneficiaries?party=${encodeURIComponent(p2pTransfer.beneficiaryPartyReference)}`}
+                            className="font-mono text-green-600 hover:underline">
+                            {p2pTransfer.beneficiaryPartyReference} ↗
+                          </Link>
+                        ) : <span className="text-gray-400">not resolved</span>}
+                      </BlockRow>
                       <BlockRow label="Payout account" info="SD-66 Payout Account Arrangement credited for this transfer. Resolved from the beneficiary arrangement at execution time. Per GDPR, only the account holder and authorised staff can see this reference.">
                         {p2pTransfer.resolvedPayoutAccountReference ? (
                           <Link href={`/system/accounts/${p2pTransfer.resolvedPayoutAccountReference}`}
                             className="font-mono text-green-600 hover:underline">
                             {p2pTransfer.resolvedPayoutAccountReference} ↗
                           </Link>
-                        ) : <span className="text-gray-400">—</span>}
+                        ) : <span className="text-gray-400">not resolved</span>}
                       </BlockRow>
                     </dl>
                   ) : (
