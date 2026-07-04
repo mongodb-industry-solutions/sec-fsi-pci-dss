@@ -1775,13 +1775,13 @@ OAUTH_KEY_PROVIDER=aws  →  AwsKmsKeyProvider
   Same AWS credentials as QE (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)
 ```
 
-Both providers expose a common `OAuthKeyProvider` interface. `npm run setup:keys` generates the keypair (`private.pem` + `public.pem`) before first run (analogous to `npm run setup:db` for QE).
+Both providers expose a common `OAuthKeyProvider` interface. `npm run setup:key:rsa` generates the keypair (`private.pem` + `public.pem`) before first run (analogous to `npm run setup:db` for QE).
 
 **Consequences.**
 - (+) Private key never in the database; FIPS 140-2 hardware boundary available via `aws` provider.
 - (+) Same operational pattern as QE — existing runbooks and K8s Secret patterns apply.
 - (+) JWKS multi-key rotation with grace period, driven by the provider (see amendment).
-- (−) One new setup step (`npm run setup:keys`); documented in README and installation guide.
+- (−) One new setup step (`npm run setup:key:rsa`); documented in README and installation guide.
 
 **Amendment (2026-07-03) — FS-first: provider is the single source of truth.**
 The original design used the Atlas `partyAuthenticationKey` collection as the source for the JWKS and stored the public key there on rotation. This created a dual source of truth that broke dashboard-initiated rotation: `generateAndActivateKey`/`uploadKey` wrote the new **public** key to the DB and marked it active, but **never persisted the new private key**, so the signing provider kept using the old key file — the advertised active `kid` could never sign. Corrected design:

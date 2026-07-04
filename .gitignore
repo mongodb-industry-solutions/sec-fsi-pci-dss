@@ -1,4 +1,4 @@
-# OAuth/OIDC signing keys — generated locally via `npm run setup:keys`, never commit
+# OAuth/OIDC signing keys — generated locally via `npm run setup:key:rsa`, never commit
 backend/keys/
 *.pem
 

@@ -8,8 +8,8 @@
 #
 # Prerequisites:
 #   1. Copy .env.example to .env and fill in MONGODB_URI, JWT_SECRET, KMS_PROVIDER.
-#   2. For offline/local KMS: run `npm run setup:rsa` and set KMS_LOCAL_MASTER_KEY.
-#   3. For OAuth/OIDC signing keys: run `npm run setup:keys` (generates backend/keys/oauth/private.pem).
+#   2. For offline/local KMS: run `npm run setup:key:master` and set KMS_LOCAL_MASTER_KEY.
+#   3. For OAuth/OIDC signing keys: run `npm run setup:key:rsa` (generates backend/keys/private.pem).
 #      The backend/keys/ directory is mounted into the container via the volume below.
 #      In production use PSP_OAUTH_KEY_PROVIDER=aws instead (no file needed).
 #   4. For QE shared library: set MONGODB_CRYPT_SHARED_LIB_PATH in .env.

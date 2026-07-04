@@ -121,7 +121,7 @@ export class LocalKeyProvider implements OAuthKeyProvider {
       } else {
         throw new Error(
           `OAuth private key not found at ${this.privateKeyPath}.\n` +
-          '  Run: npm run setup:keys\n' +
+          '  Run: npm run setup:key:rsa\n' +
           '  Or set OAUTH_KEY_PROVIDER=aws for KMS-backed signing.'
         );
       }

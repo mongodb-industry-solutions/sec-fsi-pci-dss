@@ -1,5 +1,5 @@
 /**
- * npm run setup:keys
+ * npm run setup:key:rsa
  *
  * Generates and registers RSA-2048 OAuth signing keypair.
  * Behaviour depends on PSP_OAUTH_KEY_PROVIDER:
@@ -53,7 +53,7 @@ async function runLocalProvider(col: any): Promise<void> {
   const publicKeyPath = path.join(storeDir, 'public.pem');
 
   if (fs.existsSync(privateKeyPath) && !force) {
-    console.log(`\n[setup:keys] Private key already exists at ${privateKeyPath}`);
+    console.log(`\n[setup:key:rsa] Private key already exists at ${privateKeyPath}`);
     console.log('  Use --force to regenerate.\n');
     // Still register public key in case collection is empty
     const pem = fs.readFileSync(privateKeyPath, 'utf8');
@@ -95,7 +95,7 @@ async function runLocalProvider(col: any): Promise<void> {
     }
   }
 
-  console.log('\n[setup:keys] RSA-2048 keypair generated:');
+  console.log('\n[setup:key:rsa] RSA-2048 keypair generated:');
   console.log(`  kid:         ${kid}`);
   console.log(`  Private key: ${privateKeyPath}  (chmod 600, never committed)`);
   console.log(`  Public key:  ${publicKeyPath}  (chmod 644) + registered in Atlas partyAuthenticationKey`);
@@ -113,7 +113,7 @@ async function runAwsProvider(col: any): Promise<void> {
   let keyArn = process.env.PSP_OAUTH_AWS_KEY_ARN ?? process.env.OAUTH_AWS_KEY_ARN;
 
   if (!keyArn) {
-    console.log('[setup:keys] OAUTH_AWS_KEY_ARN not set — creating new RSA_2048 CMK in KMS...');
+    console.log('[setup:key:rsa] OAUTH_AWS_KEY_ARN not set — creating new RSA_2048 CMK in KMS...');
     const result = await kms.send(new CreateKeyCommand({
       Description: 'PSP OAuth RS256 JWT signing key',
       KeyUsage: 'SIGN_VERIFY',
@@ -132,7 +132,7 @@ async function runAwsProvider(col: any): Promise<void> {
 
   await upsertPublicKey(col, kid, publicKeyPem);
 
-  console.log('\n[setup:keys] AWS KMS key registered:');
+  console.log('\n[setup:key:rsa] AWS KMS key registered:');
   console.log(`  kid:         ${kid}`);
   console.log(`  CMK ARN:     ${keyArn}`);
   console.log('  Public key:  registered in Atlas partyAuthenticationKey');
@@ -160,6 +160,6 @@ async function upsertPublicKey(col: any, kid: string, publicKeyPem: string): Pro
 }
 
 run().catch((err) => {
-  console.error('[setup:keys] Error:', err.message);
+  console.error('[setup:key:rsa] Error:', err.message);
   process.exit(1);
 });
