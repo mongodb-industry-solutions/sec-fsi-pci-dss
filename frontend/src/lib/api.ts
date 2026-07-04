@@ -1619,9 +1619,25 @@ export const api = {
     bank: (
       body: { amount: number; currency: string; destination: BankDestination; rail?: string; reference?: string; settlementSchedule?: string },
       token: string,
+      idempotencyKey?: string,
     ) =>
       apiFetch<{ executionReference: string; status: string; rail?: string; feeAmount?: number; currency: string; errors?: string[] }>(
         `/api/v1/gateway/transfers/bank`,
+        { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined },
+        token,
+      ),
+    status: (ref: string, token: string) =>
+      apiFetch<{ executionReference: string; status: string; rail?: string; grossAmount: number; feeAmount: number; currency: string; failureReason?: string; completedAt?: string }>(
+        `/api/v1/gateway/transfers/${encodeURIComponent(ref)}/status`,
+        {},
+        token,
+      ),
+    createMandate: (
+      body: { scheme: string; amount: number; currency: string; destination: BankDestination; frequency: string; reference?: string; maxRuns?: number },
+      token: string,
+    ) =>
+      apiFetch<{ recurringMandateInstanceReference: string; mandateReference: string; scheme: string; frequency: string; nextRunAt: string }>(
+        `/api/v1/gateway/transfers/mandates`,
         { method: 'POST', body: JSON.stringify(body) },
         token,
       ),

@@ -360,6 +360,7 @@ interface IbanFormState {
   iban: string; bic: string; holderName: string; bankName: string;
   countryCode: string; accountNumber: string; routingNumber: string; correspondentBic: string;
   amount: string; currency: string; reference: string; save: boolean;
+  recurring: boolean; frequency: string;
 }
 
 function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
@@ -367,11 +368,13 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
     iban: '', bic: '', holderName: '', bankName: '',
     countryCode: 'DE', accountNumber: '', routingNumber: '', correspondentBic: '',
     amount: '', currency: 'EUR', reference: '', save: false,
+    recurring: false, frequency: 'monthly',
   });
   const [preview, setPreview] = useState<{ ok: boolean; rail?: string; feeAmount?: number; errors: string[] } | null>(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState<{ rail: string; ref: string } | null>(null);
+  const [success, setSuccess] = useState<{ rail: string; ref: string; mandate?: boolean } | null>(null);
+  const [liveStatus, setLiveStatus] = useState<string>('');
 
   function set(field: keyof IbanFormState, value: string | boolean) {
     setForm(f => ({ ...f, [field]: value }));
@@ -402,18 +405,51 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.iban, form.accountNumber, form.routingNumber, form.bic, form.correspondentBic, form.countryCode, form.currency, token]);
 
+  // Poll the execution status until it reaches a terminal state (settled/failed) or a few tries pass.
+  async function pollStatus(ref: string) {
+    for (let i = 0; i < 12; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        const s = await api.transfers.status(ref, token);
+        setLiveStatus(s.status);
+        if (s.status === 'completed' || s.status === 'failed' || s.status === 'exception') return;
+      } catch { /* keep polling */ }
+    }
+  }
+
   async function handleSend() {
     const parsed = parseFloat(form.amount);
     if (isNaN(parsed) || parsed <= 0) { setError('Enter a valid amount.'); return; }
     if (!preview?.ok) { setError('Fix the destination details before sending.'); return; }
+
+    // Recurring mandates (Direct Debit) are only defined for SEPA and ACH rails.
+    if (form.recurring && preview.rail !== 'sepa' && preview.rail !== 'ach') {
+      setError('Recurring mandates are available for SEPA and ACH only.'); return;
+    }
     setError(''); setSubmitting(true);
     try {
+      if (form.recurring) {
+        const scheme = preview.rail === 'ach' ? 'ach_direct_debit' : 'sepa_sdd';
+        const m = await api.transfers.createMandate(
+          { scheme, amount: parsed, currency: form.currency, destination: buildDestination(), frequency: form.frequency, reference: form.reference.trim() || undefined },
+          token,
+        );
+        setSuccess({ rail: preview.rail ?? '', ref: m.recurringMandateInstanceReference, mandate: true });
+        return;
+      }
       const res = await api.transfers.bank(
         { amount: parsed, currency: form.currency, destination: buildDestination(), reference: form.reference.trim() || undefined },
         token,
+        // Idempotency key: a replay of this exact submission will not send twice.
+        (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
       );
-      if (res.status === 'submitted') setSuccess({ rail: res.rail ?? preview.rail ?? '', ref: res.executionReference });
-      else setError(res.errors?.join(' ') || 'Transfer could not be submitted.');
+      if (res.status === 'submitted') {
+        setSuccess({ rail: res.rail ?? preview.rail ?? '', ref: res.executionReference });
+        setLiveStatus('in_flight');
+        void pollStatus(res.executionReference);
+      } else {
+        setError(res.errors?.join(' ') || 'Transfer could not be submitted.');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Transfer failed.');
     } finally { setSubmitting(false); }
@@ -426,8 +462,14 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
           <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
             <Check size={24} className="text-green-600" />
           </div>
-          <p className="font-semibold text-gray-900">Transfer submitted via {success.rail.toUpperCase()}</p>
-          <p className="text-xs text-gray-500 mt-1">Status: pending settlement · Ref: {success.ref.slice(0, 8)}</p>
+          <p className="font-semibold text-gray-900">
+            {success.mandate ? `Recurring mandate created (${success.rail.toUpperCase()})` : `Transfer submitted via ${success.rail.toUpperCase()}`}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {success.mandate
+              ? `Direct Debit · Ref: ${success.ref.slice(0, 8)}`
+              : `Status: ${liveStatus || 'pending settlement'} · Ref: ${success.ref.slice(0, 8)}`}
+          </p>
         </div>
         <button type="button" onClick={onDone}
           className="w-full py-2 text-sm font-medium bg-[#001E2B] text-white rounded-lg hover:bg-[#001E2B]/80 transition-colors">
@@ -551,6 +593,24 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
         <FieldTip text="If checked, the IBAN and BIC are stored as a new registered account in your profile. The IBAN is encrypted at rest. Otherwise the destination is transaction-scoped: bound only to this transfer." />
       </label>
 
+      <div className="space-y-2">
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input type="checkbox" checked={form.recurring} onChange={e => set('recurring', e.target.checked)}
+            className="rounded border-gray-300 text-[#00ED64] focus:ring-[#00ED64]/40" />
+          <span className="text-xs text-gray-600">Set up as a recurring payment (Direct Debit)</span>
+          <FieldTip text="Creates a recurring mandate (SEPA SDD or ACH Direct Debit, per the detected rail). The transfer runs automatically on the chosen frequency until cancelled. Available for SEPA and ACH only." />
+        </label>
+        {form.recurring && (
+          <div className="pl-6">
+            <FieldLabel tip="How often the recurring collection runs.">Frequency</FieldLabel>
+            <select value={form.frequency} onChange={e => set('frequency', e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40">
+              {['weekly', 'monthly', 'quarterly', 'yearly'].map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
+
       {preview && !preview.ok && preview.errors.length > 0 && (
         <div className="flex items-start gap-2 text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs">
           <AlertCircle size={14} className="shrink-0 mt-0.5" />
@@ -571,7 +631,7 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
         </Link>
         <button type="button" onClick={handleSend} disabled={submitting || !preview?.ok}
           className={`flex-1 py-2 text-sm font-medium text-white rounded-lg transition-colors ${submitting || !preview?.ok ? 'bg-[#001E2B] opacity-40 cursor-not-allowed' : 'bg-[#001E2B] hover:bg-[#001E2B]/80'}`}>
-          {submitting ? 'Sending…' : 'Send wire'}
+          {submitting ? 'Sending…' : form.recurring ? 'Create mandate' : 'Send wire'}
         </button>
       </div>
     </div>
