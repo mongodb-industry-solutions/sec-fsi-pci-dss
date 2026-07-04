@@ -161,7 +161,7 @@ function SendMoneyModal({ beneficiary, ownerPartyRef, token, onClose }: SendMone
             </div>
             {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
             <p className="text-xs text-gray-400">
-              Funds transfer immediately (BIAN SD-65 Payment Execution). Recipient's default payout account is credited.
+              The transfer is processed immediately. Funds are credited to the recipient's default account.
             </p>
             <div className="flex justify-end gap-3 pt-1">
               <button type="button" onClick={onClose}
@@ -239,7 +239,7 @@ function AddBeneficiaryModal({ ownerRef: initialOwner, lockOwner, token, onClose
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <p className="text-xs text-gray-500">
-          Enter the phone or email of the person you want to add. Their contact is resolved via secure search — it is never stored in plain text (BIAN SD-54 · PCI DSS Req 3.4).
+          Enter the phone or email of the person you want to add. We look them up securely — their raw contact details are never stored.
         </p>
 
         <div className="space-y-3">
@@ -404,8 +404,8 @@ export default function BeneficiariesPage() {
         title="Beneficiaries"
         description={description}
         info={isCustomer
-          ? 'Your beneficiaries are looked up by phone or email when registered, the raw contact is never stored, only a secure reference (BIAN SD-54 Counterparty Administration).'
-          : 'Contact hints are masked at registration time. Raw phone/email is resolved via QE equality search and never persisted. BIAN SD-54 Counterparty Administration.'
+          ? 'Your saved contacts for quick transfers. Add someone by phone or email — we never store their raw contact details, only a secure reference.'
+          : 'Saved contacts registered by customers for transfers and payments. Contact details are masked at registration time.'
         }
         debugInfo="BIAN SD-54 Counterparty Administration · PCI DSS Req 3.4 · Req 7 (scope: own for customers)"
       />
@@ -553,7 +553,7 @@ export default function BeneficiariesPage() {
             <h3 className="font-semibold text-gray-900">Remove contact?</h3>
             <p className="text-sm text-gray-600">
               This will remove <strong>{confirmRemove.counterpartyLabel}</strong> from your contacts.
-              The record is retained for audit purposes (PCI DSS Req 10).
+              The record is retained for your transaction history.
             </p>
             <div className="flex justify-end gap-3">
               <button type="button" onClick={() => setConfirmRemove(null)}

@@ -634,7 +634,7 @@ export default function AccountsPage() {
         <SectionHeader
           icon={Landmark}
           title="Payout Accounts"
-          description="Manage your registered payout and settlement accounts (BIAN SD-66)."
+          description="Manage your registered payout and settlement accounts."
           debugInfo="BIAN SD-66 Payout Account · PCI DSS Req 3.3 (IBAN encrypted QE) · Req 7 (partyRef JWT-scoped) · Req 10 (audited)"
         />
 

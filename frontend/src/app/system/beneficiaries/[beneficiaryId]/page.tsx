@@ -186,7 +186,7 @@ function SendMoneyModal({ beneficiary, ownerPartyRef, token, onClose }: SendMone
             {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
 
             <p className="text-xs text-gray-400">
-              Funds transfer immediately (BIAN SD-65 Payment Execution). Recipient's default payout account is credited.
+              The transfer is processed immediately. Funds are credited to the recipient's default account.
             </p>
 
             <div className="flex justify-end gap-3 pt-1">
@@ -293,7 +293,7 @@ export default function BeneficiaryDetailPage() {
           <SectionHeader
             icon={UserCheck}
             title={record.counterpartyLabel}
-            description={isCustomer ? 'Saved contact — tap Send to transfer money instantly.' : 'Beneficiary contact entry — BIAN SD-54 Counterparty Administration'}
+            description={isCustomer ? 'Saved contact — tap Send to transfer money instantly.' : 'Saved contact registered for transfers and payments.'}
             debugInfo={`counterpartyArrangementReference: ${record.counterpartyArrangementReference} · schemaVersion: ${record.schemaVersion}`}
           />
         </div>
@@ -371,7 +371,7 @@ export default function BeneficiaryDetailPage() {
           <div>
             <dt className="text-xs text-gray-500 mb-0.5">Masked identifier</dt>
             <dd className="font-mono text-sm text-gray-800">{record.counterpartyLookupHint}</dd>
-            <dd className="text-[10px] text-gray-400 mt-0.5">Raw contact not stored (PCI DSS Req 3.4)</dd>
+            <dd className="text-[10px] text-gray-400 mt-0.5">Contact details are stored securely and never shown in full.</dd>
           </div>
           <div>
             <dt className="text-xs text-gray-500 mb-0.5">Status</dt>

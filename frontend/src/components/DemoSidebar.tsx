@@ -8,7 +8,7 @@ import {
   User, PlusCircle, Store, ClipboardCheck,
   ChevronLeft, ChevronRight, Settings2, Plug,
   KeyRound, ShieldCheck, Activity, Network,
-  HelpCircle, LayoutGrid, Lock, Bell, Landmark, UserCheck,
+  HelpCircle, LayoutGrid, Lock, Bell, Landmark, UserCheck, ArrowLeftRight,
   type LucideIcon,
 } from 'lucide-react';
 import { getToken, decodeToken } from '../lib/auth';
@@ -51,12 +51,13 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
   ],
   customer: [
     { label: 'Transactions',    path: '/system/payment/history',  icon: ClipboardList },
+    { label: 'Transfer',        path: '/system/transfer',         icon: ArrowLeftRight },
     { label: 'New Payment',     path: '/system/payment',          icon: PlusCircle, exact: true },
     { label: 'Payment Methods', path: '/system/cards',            icon: CreditCard },
-    { label: 'Payout Accounts', path: '/system/accounts',         icon: Landmark, tooltip: 'SD-66 Payout Account Arrangement, manage your payout accounts (v17)' },
-    { label: 'Beneficiaries',   path: '/system/beneficiaries',    icon: UserCheck, tooltip: 'SD-54 Counterparty Administration, saved contacts for transfers' },
+    { label: 'Payout Accounts', path: '/system/accounts',         icon: Landmark, tooltip: 'Payout Account Arrangement, manage your payout accounts' },
+    { label: 'Beneficiaries',   path: '/system/beneficiaries',    icon: UserCheck, tooltip: 'Counterparty Administration, saved contacts for transfers' },
     { label: 'Notifications',   path: '/system/notifications',    icon: Bell },
-    { label: 'Merchant',        path: '/system/merchant',         icon: Store },
+    { label: 'Merchants',        path: '/system/merchant',         icon: Store },
   ],
   merchant_officer: [
     { label: 'Review Queue', path: '/system/merchant/review', icon: ClipboardCheck },

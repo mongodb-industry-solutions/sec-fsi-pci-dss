@@ -30,9 +30,9 @@ interface Transaction {
 }
 
 const FIELD_LABELS: Record<SearchField, string> = {
-  email:      'Email (QE:equality)',
-  phone:      'Phone (QE:equality)',
-  accountRef: 'Account Reference (QE:equality)',
+  email:      'Email',
+  phone:      'Phone',
+  accountRef: 'Account Reference',
 };
 
 const FIELD_PLACEHOLDERS: Record<SearchField, string> = {
