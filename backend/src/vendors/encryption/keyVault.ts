@@ -31,6 +31,7 @@ export interface DEKs {
   cardExpiry: Binary;             // paymentCardManagement.paymentCardExpirationDate
   payoutIban: Binary;             // payoutAccountArrangement.payoutAccountIban (SD-66)
   payoutRouting: Binary;          // payoutAccountArrangement.payoutAccountRoutingNumber (SD-66)
+  execDestIban: Binary;           // paymentExecutionProcedure.destinationIban (SD-65) — unregistered destination
 }
 
 export async function provisionDataEncryptionKeys(client: MongoClient): Promise<DEKs> {
@@ -74,10 +75,11 @@ export async function provisionDataEncryptionKeys(client: MongoClient): Promise<
   const cardExpiry = await getOrCreate('DEK-card-expiry');
   const payoutIban = await getOrCreate('DEK-payout-iban');
   const payoutRouting = await getOrCreate('DEK-payout-routing');
+  const execDestIban = await getOrCreate('DEK-exec-dest-iban');
 
   return {
     txAccountRef, partyEmail, partyPhone, customerAccountRef, authEmail,
     txRawPayload, txProcessorMeta, customerAddress, customerGovId, customerRiskNotes, cardExpiry,
-    payoutIban, payoutRouting,
+    payoutIban, payoutRouting, execDestIban,
   };
 }

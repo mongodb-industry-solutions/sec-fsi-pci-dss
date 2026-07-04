@@ -37,11 +37,15 @@ export interface PaymentExecutionProcedure {
   sourcePayoutAccountReference?: string;          // FK → payoutAccountArrangement (SD-66); sender's account — enables per-account movement ledger
   resolvedPayoutAccountReference?: string;        // FK → payoutAccountArrangement (SD-66); recipient's account
 
-  // External bank-transfer recipient snapshot (SEPA/ACH/SWIFT). The full destination coordinates
-  // stay transaction-scoped and are never persisted (PCI DSS Req 3.3 — IBAN is QE:none / non-searchable).
-  // We retain only a display-safe identity so the Recipient can be shown and traced.
+  beneficiaryArrangementReference?: string;       // FK → counterpartyArrangement (SD-54); set for P2P-to-beneficiary transfers → enables link to the beneficiary
+
+  // External bank-transfer recipient identity (SEPA/ACH/SWIFT to an unregistered account).
+  // GDPR Art. 32 / PSD2 (NOT PCI DSS — that governs card data). destinationIban is QE:none
+  // (encrypted at rest, L2-only), shown full to the account owner; the masked form stays
+  // plaintext for list views. beneficiaryName/destinationCountry are display metadata.
   beneficiaryName?: string;                       // holder legal name as entered at initiation
-  destinationAccountMasked?: string;              // masked IBAN / account, e.g. "FR76••••3000"
+  destinationIban?: string;                       // full destination IBAN — QE:none (DEK-exec-dest-iban), L2 only
+  destinationAccountMasked?: string;              // masked IBAN / account, e.g. "ES12••••5477"
   destinationCountry?: string;                    // ISO 3166-1 alpha-2 (destination banking country)
 
   grossAmount: number;

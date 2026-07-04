@@ -46,6 +46,11 @@ export async function createCollections(
       ? [{ name: PAYOUT_ACCOUNT_COLLECTION, map: maps.payoutAccountArrangement }]
       : [{ name: PAYOUT_ACCOUNT_COLLECTION, map: { fields: [] } }]
     ),
+    // SD-65: Payment Execution Procedure (destinationIban QE:none, L2 only — GDPR Art. 32 / PSD2)
+    ...(maps.paymentExecutionProcedure
+      ? [{ name: PAYMENT_EXECUTION_COLLECTION, map: maps.paymentExecutionProcedure }]
+      : [{ name: PAYMENT_EXECUTION_COLLECTION, map: { fields: [] } }]
+    ),
   ];
 
   const existingList = await db.listCollections().toArray();
@@ -394,17 +399,8 @@ export async function createCollections(
     console.log(`  skip:    ${MERCHANT_WEBHOOK_LOG_COLLECTION} (already exists)`);
   }
 
-  // SD-65: Payment Execution Procedure — plaintext (lifecycle states + append-only audit log)
-  if (!existingNames.has(PAYMENT_EXECUTION_COLLECTION) || reset) {
-    if (existingNames.has(PAYMENT_EXECUTION_COLLECTION) && reset) {
-      await db.collection(PAYMENT_EXECUTION_COLLECTION).drop();
-      console.log(`  dropped: ${PAYMENT_EXECUTION_COLLECTION}`);
-    }
-    await db.createCollection(PAYMENT_EXECUTION_COLLECTION);
-    console.log(`  created: ${PAYMENT_EXECUTION_COLLECTION} (SD-65 settlement lifecycle)`);
-  } else {
-    console.log(`  skip:    ${PAYMENT_EXECUTION_COLLECTION} (already exists)`);
-  }
+  // SD-65: Payment Execution Procedure — created above as a QE-encrypted collection
+  // (destinationIban QE:none). See the qeCollections loop; no plaintext creation here.
 
   // SD-54: Counterparty Arrangement — plaintext (beneficiary registry, no raw PII stored)
   if (!existingNames.has(COUNTERPARTY_COLLECTION) || reset) {

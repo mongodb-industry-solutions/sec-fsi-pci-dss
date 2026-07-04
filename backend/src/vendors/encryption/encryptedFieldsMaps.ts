@@ -132,7 +132,8 @@ export function buildEncryptedFieldsMaps(deks: DEKs, tier: QETier = 'level2') {
     },
 
     // -- SD-66: Payout Account Arrangement -----------------------------------─
-    // IBAN and routing number are PCI DSS Req 3.3 sensitive — QE:none, L2 only.
+    // IBAN and routing number are GDPR Art. 32 / PSD2 sensitive bank data — QE:none, L2 only.
+    // (Not PCI DSS: PCI scope is card data / PAN, not bank accounts.)
     // No QE:equality needed (accounts are looked up by payoutAccountInstanceReference).
     ...(includeSensitive ? {
       payoutAccountArrangement: {
@@ -147,6 +148,23 @@ export function buildEncryptedFieldsMaps(deks: DEKs, tier: QETier = 'level2') {
             keyId: deks.payoutRouting,
             path: 'payoutAccountRoutingNumber',
             bsonType: 'string',
+          },
+        ],
+      },
+    } : {}),
+
+    // -- SD-65: Payment Execution Procedure ----------------------------------─
+    // destinationIban holds the full IBAN of an UNREGISTERED external destination the user typed
+    // for a one-off bank transfer. GDPR Art. 32 / PSD2 sensitive bank data — QE:none, L2 only.
+    // (Not PCI DSS.) The masked form (destinationAccountMasked) stays plaintext for list views.
+    ...(includeSensitive ? {
+      paymentExecutionProcedure: {
+        fields: [
+          {
+            keyId: deks.execDestIban,
+            path: 'destinationIban',
+            bsonType: 'string',
+            // QE:none — non-searchable, retrieval only
           },
         ],
       },

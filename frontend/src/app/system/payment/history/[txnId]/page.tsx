@@ -189,7 +189,9 @@ export default function TransactionDetailPage() {
     beneficiaryPartyReference: string | null;
     sourcePayoutAccountReference: string | null;
     resolvedPayoutAccountReference: string | null;
+    beneficiaryArrangementReference: string | null;
     beneficiaryName: string | null;
+    destinationIban: string | null;
     destinationAccountMasked: string | null;
     destinationCountry: string | null;
     grossAmount: number;
@@ -402,20 +404,21 @@ export default function TransactionDetailPage() {
                     <FieldInfo label="Recipient" description="The PSP-registered party receiving the funds (BIAN SD-54 Counterparty Administration). Their payout account is credited at execution time." />
                   </div>
                   {canSeeDest ? (
-                    // Registered internal recipient (P2P to a saved contact) resolves to a linkable
-                    // beneficiary + payout account. External bank transfers (SEPA/ACH/SWIFT) have no
-                    // in-system party — we show the masked destination snapshot instead (PCI DSS Req 3.3).
-                    p2pTransfer.beneficiaryPartyReference || p2pTransfer.resolvedPayoutAccountReference ? (
+                    // Link every known resource: a saved beneficiary (SD-54 arrangement) or a
+                    // registered payout account (SD-66) are navigable; an unregistered external
+                    // destination shows the full IBAN the user typed (GDPR Art. 32 / PSD2 — the
+                    // IBAN is stored QE-encrypted and shown to the owner, not PCI-scoped card data).
+                    p2pTransfer.beneficiaryArrangementReference || p2pTransfer.resolvedPayoutAccountReference ? (
                       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-                        <BlockRow label="Beneficiary" info="SD-54 Counterparty Administration — the PSP-registered party receiving the funds (the saved contact / beneficiary this transfer was sent to).">
-                          {p2pTransfer.beneficiaryPartyReference ? (
-                            <Link href={`/system/beneficiaries?party=${encodeURIComponent(p2pTransfer.beneficiaryPartyReference)}`}
+                        {p2pTransfer.beneficiaryArrangementReference && (
+                          <BlockRow label="Beneficiary" info="SD-54 Counterparty Administration — the saved contact this transfer was sent to. Open it to see the beneficiary's details.">
+                            <Link href={`/system/beneficiaries/${encodeURIComponent(p2pTransfer.beneficiaryArrangementReference)}`}
                               className="font-mono text-green-600 hover:underline">
-                              {p2pTransfer.beneficiaryPartyReference} ↗
+                              {p2pTransfer.beneficiaryArrangementReference} ↗
                             </Link>
-                          ) : <span className="text-gray-400">not resolved</span>}
-                        </BlockRow>
-                        <BlockRow label="Payout account" info="SD-66 Payout Account Arrangement credited for this transfer. Resolved from the beneficiary arrangement at execution time. Per GDPR, only the account holder and authorised staff can see this reference.">
+                          </BlockRow>
+                        )}
+                        <BlockRow label="Payout account" info="SD-66 Payout Account Arrangement credited for this transfer. Open it to see the destination account details. Per GDPR, only the account holder and authorised staff can see this reference.">
                           {p2pTransfer.resolvedPayoutAccountReference ? (
                             <Link href={`/system/accounts/${p2pTransfer.resolvedPayoutAccountReference}`}
                               className="font-mono text-green-600 hover:underline">
@@ -424,17 +427,19 @@ export default function TransactionDetailPage() {
                           ) : <span className="text-gray-400">not resolved</span>}
                         </BlockRow>
                       </dl>
-                    ) : (p2pTransfer.beneficiaryName || p2pTransfer.destinationAccountMasked || p2pTransfer.destinationCountry) ? (
+                    ) : (p2pTransfer.beneficiaryName || p2pTransfer.destinationIban || p2pTransfer.destinationAccountMasked || p2pTransfer.destinationCountry) ? (
                       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
                         <BlockRow label="Beneficiary" info="Account holder name as entered at initiation. This external account is not registered in the PSP, so there is no in-system party to link.">
                           {p2pTransfer.beneficiaryName
                             ? <span>{p2pTransfer.beneficiaryName}</span>
                             : <span className="text-gray-400">not provided</span>}
                         </BlockRow>
-                        <BlockRow label="Destination account" info="Masked destination IBAN / account number (PCI DSS Req 3.3 — the full number is transaction-scoped and never persisted). Enough to recognise the account without exposing it.">
-                          {p2pTransfer.destinationAccountMasked
-                            ? <span className="font-mono">{p2pTransfer.destinationAccountMasked}</span>
-                            : <span className="text-gray-400">—</span>}
+                        <BlockRow label="Destination IBAN" info="Full destination IBAN (ISO 13616) for this transfer. Stored encrypted at rest (GDPR Art. 32 / PSD2) and shown to the account owner and authorised staff — this is bank data, not PCI-scoped card data.">
+                          {p2pTransfer.destinationIban
+                            ? <span className="font-mono break-all">{p2pTransfer.destinationIban}</span>
+                            : p2pTransfer.destinationAccountMasked
+                              ? <span className="font-mono">{p2pTransfer.destinationAccountMasked}</span>
+                              : <span className="text-gray-400">—</span>}
                         </BlockRow>
                         <BlockRow label="Country" info="ISO 3166-1 destination banking country used to derive the settlement rail (SEPA / ACH / SWIFT).">
                           {p2pTransfer.destinationCountry

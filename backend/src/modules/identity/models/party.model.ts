@@ -15,6 +15,17 @@ export interface PartyTransferPreferences {
   requireConfirmationAboveCurrency?: string; // ISO 4217
 }
 
+// BIAN SD-13 Party Reference Data — postal contact point. Applies uniformly to any party
+// type (customer or employee). PII under GDPR; stored plaintext for display (same posture as
+// partyName / partyDateOfBirth in this record — this is not PCI-scoped card data).
+export interface PartyPostalAddress {
+  line1: string;
+  line2?: string;
+  city: string;
+  postalCode: string;
+  countryCode: string;                      // ISO 3166-1 alpha-2
+}
+
 export interface PartyControlRecord {
   partyInstanceReference: string;           // PK, UUID
   // QE equality: searched by analysts (email/phone are PII)
@@ -29,6 +40,7 @@ export interface PartyControlRecord {
   partyType: PartyType;
   partyDateOfBirth?: string;                // ISO 8601 date string, QE:none in v2
   partyNationality?: string;                // ISO 3166-1 alpha-2
+  partyPostalAddress?: PartyPostalAddress;  // SD-13 postal contact point (customer + employee)
   // v17: inbound transfer preferences and sender block list
   partyTransferPreferences?: PartyTransferPreferences;
   bianServiceDomain: 'Party Data Management';

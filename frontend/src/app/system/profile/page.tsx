@@ -42,6 +42,7 @@ interface ProfileData {
   role: string;
   domain: string;
   partyInstanceReference?: string;
+  party?: Record<string, unknown> | null;
   agreement: {
     customerAgreementInstanceReference?: string;
     partyInstanceReference?: string;
@@ -371,6 +372,14 @@ export default function ProfilePage() {
   if (!profile) return null;
 
   const ag = profile.agreement;
+  // SD-13 Party demographics — populated for every role (staff included), so non-customer
+  // profiles are not empty. Customers get these from the agreement above; staff from party.
+  const pty = profile.party as {
+    partyMobilePhoneNumber?: string;
+    partyDateOfBirth?: string;
+    partyNationality?: string;
+    partyPostalAddress?: { line1: string; line2?: string; city: string; postalCode: string; countryCode: string };
+  } | null | undefined;
   const name   = ag?.customerName ?? profile.name;
   const status = ag?.customerAgreementStatus ?? 'active';
   const hasAddress = ag?.sensitive?.customerAgreementResidentialAddress;
@@ -574,6 +583,25 @@ export default function ProfilePage() {
                 {debugMode && <CollectionChip name="customerAgreementProcedure" />}
               </div>
               <span className="text-gray-400 text-xs italic">Not on file</span>
+            </>
+          )}
+
+          {/* SD-13 Party demographics — shown for staff (no customer agreement), so their
+              profile carries the same KYC-typical detail as customers: phone, DOB, nationality, address. */}
+          {!ag && pty && (
+            <>
+              {pty.partyMobilePhoneNumber && (
+                <RevealField label="Phone" plainValue={pty.partyMobilePhoneNumber} maskedValue={maskPhone(pty.partyMobilePhoneNumber)} type="qe-equality" collection="party" />
+              )}
+              {pty.partyDateOfBirth && <PlainField label="Date of birth" value={new Date(pty.partyDateOfBirth).toLocaleDateString()} collection="party" />}
+              {pty.partyNationality && <PlainField label="Nationality" value={pty.partyNationality} collection="party" />}
+              {pty.partyPostalAddress && (
+                <PlainField
+                  label="Address"
+                  value={[pty.partyPostalAddress.line1, pty.partyPostalAddress.line2, pty.partyPostalAddress.city, pty.partyPostalAddress.postalCode, pty.partyPostalAddress.countryCode].filter(Boolean).join(', ')}
+                  collection="party"
+                />
+              )}
             </>
           )}
 

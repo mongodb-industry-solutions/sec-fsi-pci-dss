@@ -1865,3 +1865,34 @@ audit via `businessProcessEvent`/`complianceProcessEvent` correlated by executio
 built-in module may read the PSP DB, but callers stay provider-agnostic.
 
 *Added 2026-07-04 (v17.1; doc + code together per repo rules).*
+
+## ADR-040: Recipient identity on the payment execution + regulatory framing (v17.2)
+
+**Status:** Accepted (2026-07-04)
+
+**Context:** The payment-history detail (`/system/payment/history/{ref}`) showed an empty Recipient for
+bank transfers because the execution (SD-65) persisted no destination identity. Earlier code (and a
+comment on `payoutAccountIban`) mislabelled IBAN handling as "PCI DSS Req 3.3".
+
+**Decision:**
+1. **Regulatory framing corrected:** PCI DSS governs **card data (PAN/CHD)** only. IBAN / routing / BIC
+   are **bank account data → GDPR Art. 32 + PSD2**. Both are QE-encrypted at rest, for distinct drivers.
+2. **Recipient identity persisted on SD-65**, linking every known resource: `beneficiaryArrangementReference`
+   (→ `/system/beneficiaries/{cab…}`), `resolvedPayoutAccountReference` (→ `/system/accounts/{pau…}`), and
+   for unregistered externals `destinationIban` (full IBAN, **QE:none `DEK-exec-dest-iban`, L2 only**) +
+   `beneficiaryName` + `destinationAccountMasked` (plaintext, list views) + `destinationCountry`.
+   Registered destinations are not matched by IBAN (QE:none is non-searchable — that is the control); the
+   linking reference is captured at initiation instead.
+3. **KYC demographics belong to Party (SD-13), uniformly for all party types** (customer + employee):
+   `partyPostalAddress` added; `partyDateOfBirth`/`partyNationality` backfilled by the seeder. The KYC
+   *verification* workflow + govId stay in SD-53 (customers); KYB stays merchant-level. No SD-53 record is
+   forced onto employees (that would deviate from BIAN). `GET /auth/me` returns the Party record for all roles.
+4. **Setup + seeder are the source of truth** for the data-model change (new collection encryption, DEK,
+   seed demographics), per `CLAUDE.md §Data-model changes`. `paymentExecutionProcedure` becomes a
+   QE-encrypted collection created via `createCollections`; DB is rebuilt with `--reset` + reseed.
+
+**Consequences:** No BIAN/PCI/GDPR deviation; staff profiles are as complete as customers'; the Recipient
+block always shows a navigable link or the full destination. Existing executions predating the change show
+"Recipient not resolved" until reseeded.
+
+*Added 2026-07-04 (v17.2; doc + code together per repo rules).*

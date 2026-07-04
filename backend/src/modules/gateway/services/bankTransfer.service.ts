@@ -30,15 +30,19 @@ export function maskAccountIdentifier(raw: string): string {
   return `${v.slice(0, 4)}••••${v.slice(-4)}`;
 }
 
-/** Build the display-safe recipient snapshot for an external bank transfer. */
+/** Build the recipient identity for an external bank transfer to an unregistered account.
+ *  destinationIban is the full IBAN (persisted QE:none, shown full to the owner); the masked
+ *  form stays plaintext for list views. */
 function buildRecipientSnapshot(destination: RailDestination): {
   beneficiaryName?: string;
+  destinationIban?: string;
   destinationAccountMasked?: string;
   destinationCountry: string;
 } {
   const accountId = destination.iban ?? destination.accountNumber;
   return {
     beneficiaryName: destination.beneficiaryName?.trim() || undefined,
+    destinationIban: destination.iban?.replace(/\s/g, '') || undefined,
     destinationAccountMasked: accountId ? maskAccountIdentifier(accountId) : undefined,
     destinationCountry: destination.countryCode,
   };

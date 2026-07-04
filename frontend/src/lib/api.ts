@@ -541,6 +541,7 @@ export const api = {
         role: string;
         domain: string;
         partyInstanceReference?: string;
+        party?: Record<string, unknown> | null;
         agreement: Record<string, unknown> | null;
       }>('/api/v1/auth/me', {}, token),
   },
@@ -1456,7 +1457,9 @@ export const api = {
         beneficiaryPartyReference: string | null;
         sourcePayoutAccountReference: string | null;
         resolvedPayoutAccountReference: string | null;
+        beneficiaryArrangementReference: string | null;
         beneficiaryName: string | null;
+        destinationIban: string | null;
         destinationAccountMasked: string | null;
         destinationCountry: string | null;
         grossAmount: number;

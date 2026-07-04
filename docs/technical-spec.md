@@ -44,6 +44,9 @@ export interface PartyControlRecord {
   partyType: PartyType;
   partyDateOfBirth?: string;             // ISO 8601 date
   partyNationality?: string;             // ISO 3166-1 alpha-2
+  partyPostalAddress?: PartyPostalAddress; // SD-13 postal contact point (line1/line2/city/postalCode/countryCode)
+                                         // KYC-typical demographics apply to EVERY party (customer + employee),
+                                         // so staff profiles are as complete as customers'. GDPR PII, plaintext display.
   bianServiceDomain: 'Party Data Management';
   bianControlRecordType: 'Party';
   recordCreatedDateTime: Date;
@@ -988,8 +991,8 @@ export interface PayoutAccountArrangement {
   payoutAccountIsDefault:    boolean;  // at most one true per party (partial unique index)
 
   // QE:none (DEK-payout-iban / DEK-payout-routing) — L1 returns Binary; L2 auto-decrypts
-  payoutAccountIban?:          string;  // IBAN — PCI DSS Req 3.3
-  payoutAccountRoutingNumber?: string;  // BIC / SWIFT / sort code — PCI DSS Req 3.3
+  payoutAccountIban?:          string;  // IBAN — GDPR Art. 32 / PSD2 (bank data, not PCI-scoped card data)
+  payoutAccountRoutingNumber?: string;  // BIC / SWIFT / sort code — GDPR Art. 32 / PSD2
 
   payoutAccountAlias?:          string;  // phone or email alias for lookup
   payoutAccountBankName?:       string;
@@ -1042,12 +1045,16 @@ export interface PaymentExecutionProcedure {
 
   beneficiaryType:               BeneficiaryType;  // 'merchant' | 'user' | 'anonymous'
   beneficiaryPartyReference?:    string;            // FK → party (SD-13) for user payouts
+  beneficiaryArrangementReference?: string;         // FK → counterpartyArrangement (SD-54) — links the detail page to the saved beneficiary
   resolvedPayoutAccountReference?: string;          // FK → payoutAccountArrangement (SD-66)
 
-  // External bank-transfer recipient snapshot (SEPA/ACH/SWIFT) — display-safe only.
-  // Full destination coordinates stay transaction-scoped (PCI DSS Req 3.3; IBAN is QE:none).
+  // Recipient identity for a bank transfer to an UNREGISTERED external account (SEPA/ACH/SWIFT).
+  // Bank data under GDPR Art. 32 / PSD2 (NOT PCI DSS — that governs card data). destinationIban is
+  // QE:none (DEK-exec-dest-iban), encrypted at rest and shown full to the account owner; the masked
+  // form is plaintext for list views. Registered destinations link via the FKs above instead.
   beneficiaryName?:          string;   // holder legal name as entered at initiation
-  destinationAccountMasked?: string;   // masked IBAN / account, e.g. "FR76••••0189"
+  destinationIban?:          string;   // full destination IBAN — QE:none (L2 only)
+  destinationAccountMasked?: string;   // masked IBAN / account, e.g. "ES12••••5477"
   destinationCountry?:       string;   // ISO 3166-1 alpha-2 destination banking country
 
   grossAmount: number;
@@ -1133,8 +1140,11 @@ All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `k
 | `deks.txRawPayload` | `DEK-tx-raw-payload` | `cardTransactionLog.rawGatewayPayload` (QE:none, inline v2) |
 | `deks.txProcessorMeta` | `DEK-tx-processor-meta` | `cardTransactionLog.processorTransactionMetadata` (QE:none, inline v2) |
 | `deks.cardExpiry` | `DEK-card-expiry` | `paymentCardManagement.paymentCardExpirationDate` |
-| `deks.payoutIban` | `DEK-payout-iban` | `payoutAccountArrangement.payoutAccountIban` (QE:none, PCI DSS Req 3.3) |
-| `deks.payoutRouting` | `DEK-payout-routing` | `payoutAccountArrangement.payoutAccountRoutingNumber` (QE:none, PCI DSS Req 3.3) |
+| `deks.payoutIban` | `DEK-payout-iban` | `payoutAccountArrangement.payoutAccountIban` (QE:none — GDPR Art. 32 / PSD2) |
+| `deks.payoutRouting` | `DEK-payout-routing` | `payoutAccountArrangement.payoutAccountRoutingNumber` (QE:none — GDPR Art. 32 / PSD2) |
+| `deks.execDestIban` | `DEK-exec-dest-iban` | `paymentExecutionProcedure.destinationIban` — unregistered external destination (QE:none — GDPR Art. 32 / PSD2) |
+
+> **Regulatory note:** IBAN / routing / BIC are **bank account data → GDPR Art. 32 + PSD2**, not PCI DSS. PCI DSS scope is card data (PAN / CHD). Both are QE-encrypted at rest here, but for distinct regulatory drivers.
 
 ```typescript
 // backend/src/vendors/encryption/encryptedFieldsMaps.ts
@@ -1198,7 +1208,7 @@ export function buildEncryptedFieldsMaps(deks: DEKs, tier: QETier = 'level2') {
     // fraudDiagnosisCase: no QE (operational metadata only, no PII or CHD)
 
     // ── payoutAccountArrangement (SD-66) ──────────────────────────────
-    // QE:none only — IBAN and routing number are sensitive at rest (PCI DSS Req 3.3)
+    // QE:none only — IBAN and routing number are sensitive bank data at rest (GDPR Art. 32 / PSD2)
     // but NOT searchable (accounts looked up by payoutAccountInstanceReference, not IBAN).
     // L1 map omits this block → driver returns Binary. L2 map includes it → auto-decrypts.
     ...(includeSensitive ? {
@@ -1206,6 +1216,17 @@ export function buildEncryptedFieldsMaps(deks: DEKs, tier: QETier = 'level2') {
         fields: [
           { keyId: deks.payoutIban,    path: 'payoutAccountIban',          bsonType: 'string' },
           { keyId: deks.payoutRouting, path: 'payoutAccountRoutingNumber',  bsonType: 'string' },
+        ],
+      },
+    } : {}),
+
+    // ── paymentExecutionProcedure (SD-65) ─────────────────────────────
+    // destinationIban = full IBAN of an UNREGISTERED external transfer destination the user typed.
+    // QE:none (GDPR Art. 32 / PSD2), L2 only. Registered destinations link via FK instead of storing IBAN.
+    ...(includeSensitive ? {
+      paymentExecutionProcedure: {
+        fields: [
+          { keyId: deks.execDestIban, path: 'destinationIban', bsonType: 'string' },
         ],
       },
     } : {}),

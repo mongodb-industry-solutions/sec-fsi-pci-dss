@@ -64,6 +64,10 @@ async function buildQEClient(uri: string, tier: 'level1' | 'level2'): Promise<Mo
         ...(maps.payoutAccountArrangement
           ? { [`${dbName}.payoutAccountArrangement`]: maps.payoutAccountArrangement }
           : {}),
+        // SD-65: destinationIban (unregistered external destination) QE:none — level2 only
+        ...(maps.paymentExecutionProcedure
+          ? { [`${dbName}.paymentExecutionProcedure`]: maps.paymentExecutionProcedure }
+          : {}),
       },
       extraOptions: {
         ...(cryptLib.cryptSharedLibPath && { cryptSharedLibPath: cryptLib.cryptSharedLibPath }),
