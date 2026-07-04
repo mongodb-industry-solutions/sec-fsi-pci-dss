@@ -134,24 +134,6 @@ function SendForm({ partyRef, token, onDone }: { partyRef: string; token: string
     <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1">Send to</label>
-        {!bLoaded ? (
-          <div className="text-xs text-gray-400">Loading contacts…</div>
-        ) : beneficiaries.length === 0 ? (
-          <div className="text-xs text-amber-600">No saved contacts. <Link href="/system/beneficiaries" className="underline">Add one from the Beneficiaries page.</Link></div>
-        ) : (
-          <select value={beneficiaryRef} onChange={e => setBeneficiaryRef(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40">
-            {beneficiaries.map(b => (
-              <option key={b.counterpartyArrangementReference} value={b.counterpartyArrangementReference}>
-                {b.counterpartyLabel} · {b.counterpartyLookupHint}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
-
-      <div>
         <label className="block text-xs font-medium text-gray-700 mb-1">From account</label>
         {!aLoaded ? (
           <div className="text-xs text-gray-400">Loading accounts…</div>
@@ -172,6 +154,24 @@ function SendForm({ partyRef, token, onDone }: { partyRef: string; token: string
             <Landmark size={11} />
             Available: <span className="font-medium text-gray-600">{fmtAmount(selectedAccount.payoutAccountBalance.availableAmount, selectedAccount.payoutAccountCurrency)}</span>
           </p>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Send to</label>
+        {!bLoaded ? (
+          <div className="text-xs text-gray-400">Loading contacts…</div>
+        ) : beneficiaries.length === 0 ? (
+          <div className="text-xs text-amber-600">No saved contacts. <Link href="/system/beneficiaries" className="underline">Add one from the Beneficiaries page.</Link></div>
+        ) : (
+          <select value={beneficiaryRef} onChange={e => setBeneficiaryRef(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40">
+            {beneficiaries.map(b => (
+              <option key={b.counterpartyArrangementReference} value={b.counterpartyArrangementReference}>
+                {b.counterpartyLabel} · {b.counterpartyLookupHint}
+              </option>
+            ))}
+          </select>
         )}
       </div>
 

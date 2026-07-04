@@ -28,6 +28,11 @@ export interface RailDestination {
   routingNumber?: string;         // ACH ABA routing (US, 9 digits)
   bic?: string;                   // ISO 9362
   correspondentBic?: string;      // SWIFT correspondent bank
+
+  // Display metadata (not payment credentials): retained only in masked/plaintext-safe form so
+  // the recipient can be shown and traced without exposing the full IBAN (PCI DSS Req 3.3).
+  beneficiaryName?: string;       // account holder legal name as entered at initiation (max 140)
+  bankName?: string;              // recipient institution name (max 100)
 }
 
 export type RecurringScheme = 'ach_direct_debit' | 'sepa_sdd';
