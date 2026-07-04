@@ -220,6 +220,7 @@ function RegisteredAccountForm({ partyRef, token, onDone }: { partyRef: string; 
           </div>
           <p className="font-semibold text-gray-900">{fmtAmount(success.amount, success.currency)} sent</p>
           <p className="text-xs text-gray-500 mt-1">To: {success.label}</p>
+          <p className="text-xs text-gray-400 mt-1">Status: pending settlement</p>
         </div>
         <button type="button" onClick={onDone}
           className="w-full py-2 text-sm font-medium bg-[#001E2B] text-white rounded-lg hover:bg-[#001E2B]/80 transition-colors">

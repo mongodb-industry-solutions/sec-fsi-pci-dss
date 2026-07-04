@@ -10,7 +10,7 @@ import { PAYMENT_ORDER_COLLECTION } from '../models/paymentOrder.model';
 import { MERCHANT_AGREEMENT_COLLECTION } from '../models/merchantAgreement.model';
 import { createExecution, transitionExecution, appendResolutionStep, getExecution } from './paymentExecution.service';
 import { getDefaultPayoutAccount } from './payoutAccount.service';
-import { creditAvailable, debitPending, settleCardDebit } from './payoutAccountBalance.service';
+import { creditAvailable, debitPending, settleCardDebit, creditDirect, releaseCardHold } from './payoutAccountBalance.service';
 // ADR-039: AIS + PISP are reached ONLY through dispatchProvider (never a direct builtin import),
 // so an external provider can replace the builtin module without changing this flow.
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
@@ -209,8 +209,7 @@ export class PayoutOrchestrationProcess {
         stepNote: `railRef=${p.railRef} netAmount=${p.netAmount} ${p.currency}`,
       });
 
-      // Credit available balance (move from pending to available). Convert to the merchant account
-      // currency (FX) so it mirrors the debitPending made at authorization time — symmetric ledger.
+      // Credit the recipient. Convert to the recipient account currency (FX).
       if (execution.resolvedPayoutAccountReference) {
         const acct = await db.collection<{ payoutAccountCurrency?: string }>(PAYOUT_ACCOUNT_COLLECTION)
           .findOne({ payoutAccountInstanceReference: execution.resolvedPayoutAccountReference }, { projection: { payoutAccountCurrency: 1 } });
@@ -219,7 +218,14 @@ export class PayoutOrchestrationProcess {
           const { resolveAndConvert } = await import('../../../providers/currency-exchange/services/currencyExchange.service');
           try { creditAmount = (await resolveAndConvert(db, p.netAmount, p.currency, acct.payoutAccountCurrency)).amount; } catch { /* keep original on FX error */ }
         }
-        await creditAvailable(db, execution.resolvedPayoutAccountReference, creditAmount);
+        if (execution.sourcePayoutAccountReference) {
+          // P2P bank transfer: clear the sender's hold (pending -= gross) then credit the recipient.
+          await settleCardDebit(db, execution.sourcePayoutAccountReference, execution.grossAmount ?? p.netAmount);
+          await creditDirect(db, execution.resolvedPayoutAccountReference, creditAmount);
+        } else {
+          // Merchant settlement: pending was debited at authorization — move pending -> available.
+          await creditAvailable(db, execution.resolvedPayoutAccountReference, creditAmount);
+        }
       }
 
       // Mark card transaction as settled + clear cardholder pending hold (BIAN SD-66, PCI DSS Req 10)
@@ -269,6 +275,11 @@ export class PayoutOrchestrationProcess {
         stepOutcome: 'failed',
         stepNote: `errorCode=${p.errorCode} reason=${p.errorReason}`,
       });
+
+      // P2P bank transfer: the rail rejected the payment — release the sender hold (pending -> available).
+      if (execution.sourcePayoutAccountReference) {
+        await releaseCardHold(db, execution.sourcePayoutAccountReference, execution.grossAmount ?? 0);
+      }
 
       emitProcessEvent(db, {
         entityType: 'execution', entityId: execRef,
