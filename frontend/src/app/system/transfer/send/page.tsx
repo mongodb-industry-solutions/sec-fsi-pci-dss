@@ -79,6 +79,10 @@ function SendForm({ partyRef, token, onDone }: { partyRef: string; token: string
   }
 
   if (success) {
+    const contact = beneficiaries.find(b => b.counterpartyArrangementReference === beneficiaryRef);
+    const fromLabel = selectedAccount
+      ? `${selectedAccount.payoutAccountAlias || selectedAccount.payoutAccountBankName || 'Account'} · ${selectedAccount.payoutAccountCurrency}`
+      : fromAccountRef;
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
         <div className="text-center py-4">
@@ -86,9 +90,33 @@ function SendForm({ partyRef, token, onDone }: { partyRef: string; token: string
             <Check size={24} className="text-green-600" />
           </div>
           <p className="font-semibold text-gray-900">{fmtAmount(success.amount, success.currency)} sent</p>
-          <p className="text-xs font-mono text-gray-400 mt-2 break-all">Ref: {success.ref}</p>
+          <p className="text-xs text-gray-500 mt-1">Status: pending settlement</p>
         </div>
-        <div className="flex gap-2">
+
+        {/* Confirmation: origin, destination and reference. Full detail via "View transfer". */}
+        <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm border-t border-gray-100 pt-4">
+          <dt className="text-gray-500">From</dt>
+          <dd className="text-gray-900 text-right break-all">{fromLabel}</dd>
+
+          <dt className="text-gray-500">To</dt>
+          <dd className="text-gray-900 text-right break-all">
+            {contact ? contact.counterpartyLabel : 'Beneficiary'}
+            {contact?.counterpartyLookupHint && <span className="block text-xs text-gray-400">{contact.counterpartyLookupHint}</span>}
+          </dd>
+
+          <dt className="text-gray-500">Amount</dt>
+          <dd className="text-gray-900 text-right font-medium">{fmtAmount(success.amount, success.currency)}</dd>
+
+          {note.trim() && (<>
+            <dt className="text-gray-500">Note</dt>
+            <dd className="text-gray-900 text-right break-all">{note.trim()}</dd>
+          </>)}
+
+          <dt className="text-gray-500">Reference</dt>
+          <dd className="text-gray-700 text-right font-mono text-xs break-all">{success.ref}</dd>
+        </dl>
+
+        <div className="flex gap-2 pt-1">
           <Link href="/system/transfer"
             className="flex-1 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-center">
             Back to transfers
