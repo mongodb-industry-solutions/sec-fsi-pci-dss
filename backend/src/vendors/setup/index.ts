@@ -5,18 +5,19 @@ import { provisionDEKs } from './provisionDEKs';
 import { createCollections } from './createCollections';
 import { createIndexes } from './createIndexes';
 import { createAtlasRoles } from './createAtlasRoles';
+import { config } from '../../config';
 
 // Load .env from project root  -  works regardless of CWD (npm --prefix changes CWD to backend/)
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
 
 export async function runSetup(reset = false) {
-  const uri = process.env.MONGODB_URI;
+  const uri = config.mongodb.uri;
   if (!uri) {
     throw new Error(
       'MONGODB_URI is not set.\n' +
       '  1. Copy .env.example to .env\n' +
       '  2. Fill in MONGODB_URI (Atlas connection string)\n' +
-      '  3. Set KMS_PROVIDER=local and run: npm run setup:key\n' +
+      '  3. Set KMS_PROVIDER=local and run: npm run setup:key:master\n' +
       '  4. Re-run: npm run setup:db'
     );
   }

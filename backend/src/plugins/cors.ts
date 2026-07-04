@@ -1,16 +1,17 @@
 import fp from 'fastify-plugin';
 import cors from '@fastify/cors';
 import { FastifyInstance } from 'fastify';
+import { config } from '../config';
 
 function buildOrigin(): string | string[] | boolean {
-  const env = process.env.PSP_CORS_ORIGIN;
+  const env = config.server.corsOrigin;
 
   if (!env || env === '*') return true;
 
   const origins = env.split(',').map((o) => o.trim()).filter(Boolean);
 
   // Always allow requests from the API's own origin (Swagger UI is co-hosted)
-  const port = process.env.PORT || '8081';
+  const port = String(config.server.port);
   const self = [`http://localhost:${port}`, `http://127.0.0.1:${port}`];
   for (const s of self) {
     if (!origins.includes(s)) origins.push(s);

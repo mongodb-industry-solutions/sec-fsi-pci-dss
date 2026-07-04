@@ -69,7 +69,7 @@ for (const ag of agreements) {
     const card = {
       paymentCardInstanceReference: randomUUID(),
       customerAgreementInstanceReference: agId,
-      paymentCardReference: `tok_${hex(16)}`,
+      paymentCardReference: `pm_${hex(16)}`,
       paymentCardExpirationDate: expiry(),
       paymentCardMaskedPanDisplay: `****-****-****-${last4()}`,
       paymentCardNetwork: network,
@@ -97,8 +97,8 @@ for (const ag of agreements) {
 // agreements, each with their own alias. The registry deduplicates the card and counts holders.
 // One card is shared beyond the threshold (>3) so it trips the shared-card compliance signal.
 const SHARED = [
-  { token: 'tok_shared00000a4153', masked: '****-****-****-4153', network: 'VISA',       holders: 5, aliasPool: ['Family card', 'Shared home', 'Joint', 'Household', 'Shared'] },
-  { token: 'tok_shared00000b8821', masked: '****-****-****-8821', network: 'MASTERCARD', holders: 2, aliasPool: ['Shared business', 'Company card'] },
+  { token: 'pm_shared00000a4153', masked: '****-****-****-4153', network: 'VISA',       holders: 5, aliasPool: ['Family card', 'Shared home', 'Joint', 'Household', 'Shared'] },
+  { token: 'pm_shared00000b8821', masked: '****-****-****-8821', network: 'MASTERCARD', holders: 2, aliasPool: ['Shared business', 'Company card'] },
 ];
 const agIds = agreements.map((a) => a.customerAgreementInstanceReference);
 let cursor = 0;

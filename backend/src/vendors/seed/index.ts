@@ -3,6 +3,7 @@ import { resolve, join } from 'path';
 import { existsSync } from 'fs';
 import { execSync } from 'child_process';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
+import { config } from '../../config';
 import { seedParties } from './seedParties';
 import { seedRoles } from './seedRoles';
 import { seedUsers } from './seedUsers';
@@ -17,12 +18,16 @@ import { seedNotifications } from './seedNotifications';
 import { seedCreditRatings } from './seedCreditRatings';
 import { seedIntegrations } from './seedIntegrations';
 import { seedCapabilityModules } from './seedCapabilityModules';
+import { seedPayoutAccounts } from './seedPayoutAccounts';
+import { seedPaymentExecutions } from './seedPaymentExecutions';
+import { seedCounterpartyArrangements } from './seedCounterpartyArrangements';
+import { seedBalanceCredits } from './seedBalanceCredits';
 
 // Load .env from project root  -  works regardless of CWD (npm --prefix changes CWD to backend/)
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
 
 // DATA_DIR resolution  -  compatible with local dev, ts-node, compiled build, and Docker
-const DATA_DIR: string = process.env.PSP_SEED_DATA_DIR ?? join(process.cwd(), 'data');
+const DATA_DIR: string = config.app.seedDataDir ?? join(process.cwd(), 'data');
 
 /**
  * Generates JSON seed files if they are missing.
@@ -68,7 +73,7 @@ export async function runSeed() {
   ensureDataFiles();
 
   const client = await getQEClient();
-  const db = client.db(process.env.MONGODB_DB_NAME!);
+  const db = client.db(config.mongodb.dbName);
 
   try {
     console.log('Seeding party (SD-13)...');
@@ -106,6 +111,20 @@ export async function runSeed() {
 
     console.log('Seeding merchantAgreementProcedure (SD-89, Ch-05)...');
     await seedMerchants(db);
+
+    console.log('Seeding payoutAccountArrangement (SD-66, v17)...');
+    await seedPayoutAccounts(db);
+
+    console.log('Seeding counterpartyArrangement (SD-54, v17)...');
+    await seedCounterpartyArrangements(db);
+
+    console.log('Seeding balanceCreditLog (SD-66 initial deposits, PCI DSS Req 10)...');
+    await seedBalanceCredits(db);
+
+    // After opening deposits are logged (pre-transfer balances), so the demo executions can
+    // apply their balance movements and the ledger reconciles: opening − Σ(settled sent) + Σ(received).
+    console.log('Seeding paymentExecutionProcedure (SD-65, v17)...');
+    await seedPaymentExecutions(db);
 
     console.log('Seeding externalProviderArrangement (SD-193, Ch-07)...');
     await seedIntegrations(db);

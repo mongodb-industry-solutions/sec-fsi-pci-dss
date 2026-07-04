@@ -27,6 +27,9 @@ export interface PaymentCardManagementControlRecord {
   paymentCardMandateStatus?: 'active' | 'cancelled' | 'expired';
   paymentCardConsentDateTime?: Date;
   paymentCardMandateExpiryDate?: Date;
+  // BIAN SD-88 cardAccountReference: references the SD-66 PayoutAccountArrangement that funds this
+  // card. UUID only — IBAN never stored here (PCI DSS Req 3.3). Optional: null = card not yet linked.
+  fundingPayoutAccountInstanceReference?: string;
   bianServiceDomain: 'Payment Card';
   bianControlRecordType: 'PaymentCardManagement';
   recordCreatedDateTime: Date;

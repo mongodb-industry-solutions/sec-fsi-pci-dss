@@ -10,17 +10,19 @@ export const ROLE_COLLECTION = 'role';
 
 // Resources map 1:1 to BIAN Service Domains (or ADRs) — the protected business/admin areas.
 export const RESOURCES = [
-  'transactions',  // SD-254 Card Transaction
-  'customers',     // SD-53 Customer Agreement
-  'cards',         // SD-88 Payment Card
-  'fraudCases',    // SD-83 Fraud Diagnosis
-  'merchants',     // SD-89 Merchant Relations
-  'providers',     // SD-193 External Provider Arrangements
-  'modules',       // ADR-029 internal capability modules
-  'authDomains',   // SD-16 Party Authentication
-  'roles',         // SD-16 RBAC administration
-  'auditEvents',   // ADR-025 / PCI Req 10
-  'consents',      // Open Banking consent
+  'transactions',   // SD-254 Card Transaction
+  'customers',      // SD-53 Customer Agreement
+  'cards',          // SD-88 Payment Card
+  'fraudCases',     // SD-83 Fraud Diagnosis
+  'merchants',      // SD-89 Merchant Relations
+  'providers',      // SD-193 External Provider Arrangements
+  'modules',        // ADR-029 internal capability modules
+  'authDomains',    // SD-16 Party Authentication
+  'roles',          // SD-16 RBAC administration
+  'auditEvents',    // ADR-025 / PCI Req 10
+  'consents',       // Open Banking consent
+  'accounts',       // SD-66 Payout Account Arrangement (v17)
+  'beneficiaries',  // SD-54 Counterparty Administration (v18)
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
@@ -60,6 +62,8 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       cards: ['view', 'manage'],
       merchants: ['view'],
       consents: ['view'],
+      accounts: ['view', 'manage'],
+      beneficiaries: ['view', 'manage'],  // SD-54: own contacts (scope: own enforced per-handler)
     },
   },
   {
@@ -77,6 +81,7 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       merchants: ['view'],
       fraudCases: ['view', 'investigate'],
       auditEvents: ['view'],
+      beneficiaries: ['view'],  // SD-54: read-only view of beneficiary contacts
     },
   },
   {
@@ -94,6 +99,8 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       merchants: ['view'],
       fraudCases: ['view', 'investigate'],
       auditEvents: ['view'],
+      accounts: ['view', 'viewSensitive'],  // PCI Req 3.3 — IBAN reveal for fraud investigations
+      beneficiaries: ['view', 'manage'],    // SD-54: can edit/remove beneficiary contacts for investigations
     },
   },
   {
@@ -113,6 +120,8 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       providers: ['view'],
       modules: ['view'],
       auditEvents: ['view'],
+      accounts: ['view', 'viewSensitive'],
+      beneficiaries: ['view', 'manage'],  // SD-54: full audit visibility
     },
   },
   {
@@ -126,6 +135,7 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
     rolePermissions: {
       merchants: ['view', 'manage'],
       auditEvents: ['view'],
+      accounts: ['view'],
     },
   },
   {

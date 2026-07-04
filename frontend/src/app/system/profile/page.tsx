@@ -1,11 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { api } from '../../../lib/api';
+import { api, type ConsentGrant } from '../../../lib/api';
 import { Store } from 'lucide-react';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { ROLE_LABELS } from '../../../lib/constants';
 import { useDebugMode } from '../../../lib/debugMode';
-import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, User } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, User, Layers, Trash2 } from 'lucide-react';
 import { RawMongoPanel } from '../../../components/RawMongoPanel';
 import { SectionHeader } from '../../../components/SectionHeader';
 
@@ -42,6 +42,7 @@ interface ProfileData {
   role: string;
   domain: string;
   partyInstanceReference?: string;
+  party?: Record<string, unknown> | null;
   agreement: {
     customerAgreementInstanceReference?: string;
     partyInstanceReference?: string;
@@ -263,6 +264,9 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState('');
   const [merchant, setMerchant] = useState<MerchantProfileData | null>(null);
+  const [grants, setGrants] = useState<ConsentGrant[]>([]);
+  const [grantsLoading, setGrantsLoading] = useState(false);
+  const [revoking, setRevoking] = useState<string | null>(null);
 
   // Edit state
   const [editing, setEditing] = useState(false);
@@ -308,6 +312,12 @@ export default function ProfilePage() {
         api.merchants.getMe(t)
           .then(res => { if (res.found && res.merchant) setMerchant(res.merchant as unknown as MerchantProfileData); })
           .catch(() => null);
+        // Load OAuth consent grants (authorized apps)
+        setGrantsLoading(true);
+        api.consentGrants.list(t)
+          .then((r) => setGrants(r.grants))
+          .catch(() => { /* not fatal */ })
+          .finally(() => setGrantsLoading(false));
       })
       .catch(() => {
         const user = decodeToken(t);
@@ -362,6 +372,14 @@ export default function ProfilePage() {
   if (!profile) return null;
 
   const ag = profile.agreement;
+  // SD-13 Party demographics — populated for every role (staff included), so non-customer
+  // profiles are not empty. Customers get these from the agreement above; staff from party.
+  const pty = profile.party as {
+    partyMobilePhoneNumber?: string;
+    partyDateOfBirth?: string;
+    partyNationality?: string;
+    partyPostalAddress?: { line1: string; line2?: string; city: string; postalCode: string; countryCode: string };
+  } | null | undefined;
   const name   = ag?.customerName ?? profile.name;
   const status = ag?.customerAgreementStatus ?? 'active';
   const hasAddress = ag?.sensitive?.customerAgreementResidentialAddress;
@@ -456,22 +474,22 @@ export default function ProfilePage() {
             </>
           ) : ag?.customerMobilePhoneNumber ? (
             <RevealField label="Phone" plainValue={ag.customerMobilePhoneNumber} maskedValue={maskPhone(ag.customerMobilePhoneNumber)} type="qe-equality" collection="party" />
-          ) : (
+          ) : ag ? (
             <>
               <span className="text-gray-500 text-sm">Phone</span>
               <span className="text-gray-400 text-xs italic">{editing ? '' : 'Not on file'}</span>
             </>
-          )}
+          ) : null /* staff: phone rendered from the party record below (no duplicate row) */}
 
-          {/* Account Reference - read-only */}
+          {/* Account Reference - customers only (staff have no customer agreement) */}
           {ag?.customerAgreementReference ? (
             <RevealField label="Account Reference" plainValue={ag.customerAgreementReference} maskedValue={maskAccountRef(ag.customerAgreementReference)} type="qe-equality" collection="customerAgreementProcedure" />
-          ) : (
+          ) : ag ? (
             <>
               <span className="text-gray-500 text-sm">Account Reference</span>
               <span className="text-gray-400 text-xs italic">Not on file</span>
             </>
-          )}
+          ) : null}
 
           {/* Segment / member since - read-only */}
           {ag?.customerSegment && <PlainField label="Account type" value={SEGMENT_LABELS[ag.customerSegment] ?? ag.customerSegment} collection="customerAgreementProcedure" />}
@@ -568,6 +586,33 @@ export default function ProfilePage() {
             </>
           )}
 
+          {/* SD-13 Party demographics — shown for staff (no customer agreement), so their profile
+              carries the same KYC-typical detail as customers: phone, DOB, nationality, address.
+              Phone/DOB/address are GDPR PII (QE-encrypted at rest), shown with a reveal toggle. */}
+          {!ag && pty && (() => {
+            const dob = pty.partyDateOfBirth ? new Date(pty.partyDateOfBirth) : null;
+            const dobValid = dob && !isNaN(dob.getTime());
+            const addr = pty.partyPostalAddress;
+            const addrFull = addr
+              ? [addr.line1, addr.line2, addr.city, addr.postalCode, addr.countryCode].filter(Boolean).join(', ')
+              : '';
+            const addrMasked = addr ? `••• ${addr.city}, ${addr.countryCode}` : '';
+            return (
+              <>
+                {pty.partyMobilePhoneNumber && (
+                  <RevealField label="Phone" plainValue={pty.partyMobilePhoneNumber} maskedValue={maskPhone(pty.partyMobilePhoneNumber)} type="qe-equality" collection="party" />
+                )}
+                {dobValid && (
+                  <RevealField label="Date of birth" plainValue={dob!.toLocaleDateString()} maskedValue="••/••/••••" type="qe-none" collection="party" />
+                )}
+                {pty.partyNationality && <PlainField label="Nationality" value={pty.partyNationality} collection="party" />}
+                {addr && (
+                  <RevealField label="Address" plainValue={addrFull} maskedValue={addrMasked} type="qe-none" collection="party" />
+                )}
+              </>
+            );
+          })()}
+
           {/* Inline Save / Cancel - only when editing */}
           {editing && (
             <div className="col-span-2 flex gap-2 pt-3 mt-1 border-t">
@@ -655,6 +700,64 @@ export default function ProfilePage() {
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {/* OAuth Authorized Apps — visible to any user; shows granted consent via OIDC */}
+      {(grants.length > 0 || grantsLoading) && (
+        <div className="bg-white rounded-xl border p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Layers size={16} className="text-gray-500 shrink-0" />
+              <h2 className="font-semibold text-gray-800 text-sm">Authorized Applications</h2>
+            </div>
+            {debugMode && (
+              <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-teal-50 text-teal-700 border-teal-200 shrink-0">
+                SD-16 · ConsentGrant · OAuth 2.0 · OIDC
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500">Apps and merchants you have authorized to access your account via OIDC. You can revoke access at any time.</p>
+
+          {grantsLoading ? (
+            <p className="text-xs text-gray-400">Loading authorized apps…</p>
+          ) : (
+            <div className="space-y-2">
+              {grants.map((grant) => (
+                <div key={grant.consentId} className="flex items-start justify-between gap-3 border border-gray-100 rounded-lg p-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm text-gray-800">{grant.merchantName}</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {grant.grantedScopes.map((scope) => (
+                        <span key={scope} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">{scope}</span>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Granted {new Date(grant.consentGrantedAt).toLocaleDateString()}
+                      {grant.lastUsedAt && ` · Last used ${new Date(grant.lastUsedAt).toLocaleDateString()}`}
+                    </p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      setRevoking(grant.consentId);
+                      try {
+                        await api.consentGrants.revoke(grant.consentId, token);
+                        setGrants((g) => g.filter((x) => x.consentId !== grant.consentId));
+                      } catch { /* ignore */ }
+                      setRevoking(null);
+                    }}
+                    disabled={revoking === grant.consentId}
+                    className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 rounded-lg px-2 py-1 disabled:opacity-50 shrink-0"
+                  >
+                    <Trash2 size={12} />{revoking === grant.consentId ? 'Revoking…' : 'Revoke'}
+                  </button>
+                </div>
+              ))}
+              {grants.length === 0 && (
+                <p className="text-xs text-gray-400 italic">No active authorized applications.</p>
+              )}
+            </div>
+          )}
         </div>
       )}
 

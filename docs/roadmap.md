@@ -596,6 +596,32 @@ As with v3 and v4, external agent adoption (e.g. Agentic ThreatSight360 performi
 
 ---
 
+## v17 — Bank-Movement Cycle Precision (Funds-Availability Gate + FX)
+
+### Objective
+Close the money-movement cycle so it is precise with no balance discrepancy at origin or destination (users or merchants): card authorization must verify real funding-account balance from the DB, decline on insufficient funds per BIAN, and keep balances consistent across the tarjeta → cuenta → ejecución → destino chain. See [engineering-proposal.md ADR-038](engineering-proposal.md).
+
+### FR-v17: Functional Requirements
+
+| ID | Requirement | Acceptance criteria |
+|---|---|---|
+| FR-v17-01 | Funds-availability gate | A PSP-funded card payment adds a 4th parallel gate `funds` (SD-36 AIS). Sufficient funds → hold + approve; insufficient → `declined` + responseCode `'51'` + `decisionReason 'insufficient_funds'`. |
+| FR-v17-02 | Atomic hold, no race | The hold is a `$gte`-conditional `$inc` (available → pending); it is the authoritative decision (no read-modify-write). |
+| FR-v17-03 | Compensation on decline | If any gate declines after the funds gate held, the hold is released (pending → available), idempotently, incl. the decline-before-hold ordering race. |
+| FR-v17-04 | Provider-indifference | The balance read uses the `account_information` capability via dispatch; built-in module and external PSD2 AIS are interchangeable with no flow change. No internal/external account branching. |
+| FR-v17-05 | Scope | Only cards with a `fundingPayoutAccountInstanceReference` are gated; new/external tokens pass through (issuer governs their funds). |
+| FR-v17-06 | Currency exchange | Amounts are converted into the account currency (mid rate + spread) before any balance mutation (card hold/settle, merchant debit/credit, P2P credit, refund). New capability `currency_exchange`, replaceable. |
+| FR-v17-07 | P2P atomicity | P2P debit respects the conditional `$gte`; if the recipient credit fails, the sender debit is reverted. Cross-currency credit is FX-converted to the recipient account currency. |
+| FR-v17-08 | Seed reconciliation | Seeders default to EUR; `pending/reserved` start at 0; `balanceCreditLog.initial_deposit == total balance`. No account starts negative. |
+
+### Definition of Done — v17
+- [ ] No card payment can be `authorized` without sufficient funds (in account currency, post-FX).
+- [ ] Every hold is released on decline; settlement clears the hold exactly once; no orphan holds or double debits.
+- [ ] No balance goes negative at origin or destination (user or merchant) in any intermediate state.
+- [ ] Σ movements (SD-66 ledger) == Δ balance per account.
+- [ ] Unit tests green (funds gate compensation, FX, checkFunds); `npm run build` exits 0.
+- [ ] (Pending infra) integration + E2E green.
+
 ## Cross-iteration NFRs
 
 These requirements apply to all versions from v1 onward:
@@ -609,3 +635,30 @@ These requirements apply to all versions from v1 onward:
 | NFR-X-05 | Documentation | Every new API endpoint added at any version is documented in technical-spec.md before merging |
 | NFR-X-06 | Type safety | `npm run build` exits 0 at every version: no TypeScript `any` escape hatches in production code |
 | NFR-X-07 | Agent security | AI agents (v5) use only the public API layer: no direct MongoDB credentials or DEK access |
+
+## Bank Transfers (ACH / SEPA / SWIFT) — capability add-on
+
+> Delivered under **development plan v17** (`tmp/dev.v17.plan.md`, tranche "v17.1"). "v17" is a
+> development-plan iteration, not a product release version (product themes are v1–v5). FR ids below
+> carry the `v17.1` dev-plan tag for traceability only.
+
+| FR | Area | Acceptance criteria | Status |
+|---|---|---|---|
+| FR-v17.1-01 | Rail engine | Rail auto-derived from country/currency/data with user override; IBAN/BIC/routing validated per ISO 13616 / ISO 9362 / NACHA; per-rail fees and standard return-code maps (ACH R-codes, SEPA reject, SWIFT) | ✅ |
+| FR-v17.1-02 | Provider dispatch | All transfers (bank, P2P, merchant payout) and account validation execute via `dispatchProvider` (`payment_initiation` / `account_information`); no direct builtin import; builtin replaceable by external without flow change | ✅ |
+| FR-v17.1-03 | API | `POST /gateway/transfers/preview` (rail+fee+validation), `POST /gateway/transfers/bank` (execute, `Idempotency-Key`), `GET /gateway/transfers/:ref/status` (real-time) | ✅ |
+| FR-v17.1-04 | Frontend | `/system/transfer/bank`: live rail detection, validation, fee, submit; live status polling; recurring Direct Debit option | ✅ |
+| FR-v17.1-05 | Async lifecycle | Transfers are external and async: funds held on submit, credited/cleared on settlement (`bank.transfer.settled`), released on `failed` | ✅ |
+| FR-v17.1-06 | Risk gate | Pre-initiation FDS + HRP + AML screening blocks before funds move and opens an L1-reviewable fraud case (status `open`) on a negative evaluation | ✅ |
+| FR-v17.1-07 | Recurring mandates | ACH Direct Debit / SEPA SDD mandates: create/list/cancel + background scheduler (`runDueMandates`) reusing the transfer flow | ✅ |
+| FR-v17.1-08 | Compliance & audit | Bank coordinates transaction-scoped, never on the bus; business + compliance events correlated by execution reference (PCI DSS Req 10) | ✅ |
+| FR-v17.1-09 | Config | Config-driven rail fees (`PAYOUT_FEE_*`), sandbox flag (`PAYOUT_SANDBOX`), scheduler interval (`PAYOUT_MANDATE_SCHEDULER_MS`) | ✅ |
+| FR-v17.1-10 | Test data | Wiki `Dataset.md` (users, cards, accounts, approve/block scenarios) + end-user guide `Bank-Transfers.md`, aligned with seeders and validators | ✅ |
+
+**Definition of Done (v17.1):** ✅ rail engine unit-tested; backend + frontend typecheck clean; preview /
+execute / status endpoints + idempotency working; async settlement via provider; risk gate + L1 case;
+recurring mandates + scheduler; UI enabled; docs + wiki published. ⏳ Remaining (infra-gated): integration
++ E2E (MongoDB + Playwright) and the `ks-core` / `ks-mongodb-ist-demo` compliance-skill gate. Detail in
+`tmp/dev.v17.plan.md`.
+
+*Added 2026-07-04 (v17.1).*

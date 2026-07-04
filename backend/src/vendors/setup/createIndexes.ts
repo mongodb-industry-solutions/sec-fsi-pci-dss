@@ -1,4 +1,12 @@
 import { MongoClient, Db, IndexSpecification, CreateIndexesOptions, IndexDescription, MongoServerError } from 'mongodb';
+import { MERCHANT_WEBHOOK_LOG_COLLECTION } from '../../modules/gateway/models/merchantWebhookLog.model';
+import { PARTY_AUTH_CONSENT_COLLECTION } from '../../modules/identity/models/partyAuthConsent.model';
+import { PAYOUT_ACCOUNT_COLLECTION } from '../../modules/gateway/models/payoutAccount.model';
+import { PAYMENT_EXECUTION_COLLECTION } from '../../modules/gateway/models/paymentExecution.model';
+import { COUNTERPARTY_COLLECTION } from '../../modules/identity/models/counterpartyArrangement.model';
+import { RECURRING_MANDATE_COLLECTION } from '../../modules/gateway/models/recurringMandate.model';
+import { IDEMPOTENCY_COLLECTION } from '../../modules/gateway/services/idempotency.service';
+import { config } from '../../config';
 
 // ── Self-healing index helpers ────────────────────────────────────────────────
 
@@ -99,11 +107,14 @@ async function ensureIndexes(
 // ── Main index creation ───────────────────────────────────────────────────────
 
 export async function createIndexes(client: MongoClient) {
-  const db = client.db(process.env.MONGODB_DB_NAME!);
+  const db = client.db(config.mongodb.dbName);
 
   // SD-13: Party Data Management
+  // partyMobilePhoneNumber is QE-encrypted (no unique index possible), so uniqueness is
+  // enforced on its blind-index digest — a keyed HMAC stored in plaintext. See digest.ts.
   await ensureIndexes(db, 'party', [
     { key: { partyInstanceReference: 1 }, unique: true },
+    { key: { partyMobilePhoneNumberDigest: 1 }, unique: true },
   ]);
 
   // SD-254: Card Transaction Log
@@ -319,4 +330,84 @@ export async function createIndexes(client: MongoClient) {
     { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
     { key: { processType: 1, eventDateTime: -1 } },
   ]).catch(() => { /* timeseries collection may not exist on the very first run */ });
+
+  // v16 (ADR-036): SD-16 RSA public key registry — unique kid, status filter for JWKS
+  await ensureIndexes(db, 'partyAuthenticationKey', [
+    { key: { keyId: 1 }, unique: true },
+    { key: { keyStatus: 1 } },
+  ]);
+
+  // v16 (ADR-033): SD-16 OAuth authorization codes — unique code, TTL 5min on expiresAt
+  await ensureIndexes(db, 'partyAuthorizationCode', [
+    { key: { code: 1 }, unique: true },
+    { key: { clientId: 1 } },
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
+  ]);
+
+  // v16 (ADR-033): SD-16 Issued OAuth tokens — unique tokenId, TTL on expiresAt, accessTokenJti lookup
+  await ensureIndexes(db, 'partyIssuedToken', [
+    { key: { tokenId: 1 }, unique: true },
+    { key: { accessTokenJti: 1 }, sparse: true },
+    { key: { clientId: 1, tokenType: 1 } },
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
+  ]);
+
+  // v16 (ADR-037): OAuth client lookup on merchantAgreementProcedure
+  await ensureIndex(
+    db,
+    'merchantAgreementProcedure',
+    { 'merchantOAuthClient.oauthClientId': 1 },
+    { sparse: true },
+  );
+
+  // v16 (ADR-038): SD-16 PartyAuthentication, ConsentGrant — unique per-user+client pair, sub lookup, revocation
+  await ensureIndexes(db, PARTY_AUTH_CONSENT_COLLECTION, [
+    { key: { consentId: 1 }, unique: true },
+    { key: { partyAuthenticationInstanceReference: 1, oauthClientId: 1 }, unique: true },
+    { key: { partyAuthenticationInstanceReference: 1, consentStatus: 1 } },
+    { key: { oauthClientId: 1, consentStatus: 1 } },
+  ]);
+
+  // merchantWebhookDeliveryLog indexes (ADR-038)
+  await ensureIndexes(db, MERCHANT_WEBHOOK_LOG_COLLECTION, [
+    { key: { logId: 1 }, unique: true },
+    { key: { merchantAgreementInstanceReference: 1, deliveredAt: -1 } },
+    { key: { merchantAgreementInstanceReference: 1, webhookEventType: 1, deliveredAt: -1 } },
+  ]);
+
+  // SD-66: Payout Account Arrangement (v17)
+  // Partial unique index: at most one default account per party (sparse on the true flag).
+  await ensureIndexes(db, PAYOUT_ACCOUNT_COLLECTION, [
+    { key: { payoutAccountInstanceReference: 1 }, unique: true },
+    { key: { partyInstanceReference: 1, payoutAccountStatus: 1 } },
+    { key: { partyInstanceReference: 1, payoutAccountIsDefault: 1 }, sparse: true },
+  ]);
+
+  // SD-65: Payment Execution Procedure (v17)
+  await ensureIndexes(db, PAYMENT_EXECUTION_COLLECTION, [
+    { key: { paymentExecutionInstanceReference: 1 }, unique: true },
+    { key: { paymentOrderInstanceReference: 1 } },
+    { key: { cardTransactionInstanceReference: 1 }, sparse: true },
+    { key: { paymentExecutionStatus: 1, recordCreatedDateTime: -1 } },
+  ]);
+
+  // SD-54: Counterparty Arrangement / Beneficiary Registry (v17)
+  // Unique on (owner, counterparty) pair — prevents duplicate entries for same beneficiary.
+  await ensureIndexes(db, COUNTERPARTY_COLLECTION, [
+    { key: { counterpartyArrangementReference: 1 }, unique: true },
+    { key: { ownerPartyReference: 1, counterpartyArrangementStatus: 1 } },
+    { key: { ownerPartyReference: 1, counterpartyPartyReference: 1 }, unique: true },
+  ]);
+
+  // v17.1: Recurring mandates (SD-66) — due-run scan by status + nextRunAt.
+  await ensureIndexes(db, RECURRING_MANDATE_COLLECTION, [
+    { key: { recurringMandateInstanceReference: 1 }, unique: true },
+    { key: { ownerPartyReference: 1, recordCreatedDateTime: -1 } },
+    { key: { mandateStatus: 1, nextRunAt: 1 } },
+  ]);
+
+  // v17.1: Idempotency store — unique composite key (first writer wins under a race).
+  await ensureIndexes(db, IDEMPOTENCY_COLLECTION, [
+    { key: { idempotencyKey: 1 }, unique: true },
+  ]);
 }

@@ -4,10 +4,15 @@ import * as fs from 'fs';
 import { ROLE_COLLECTION, BUILTIN_ROLES, RoleRecord } from '../../shared/models/acl.model';
 
 // ADR-030: seed the 6 builtin roles (plan §13.2 matrix) into the `role` collection.
-// Source of truth = backend/data/role.json (same pattern as the other seeds). If the file is
-// missing, falls back to BUILTIN_ROLES in code — which is ALSO the runtime enforcement fallback,
-// so the DB can never diverge from what the ACL guard expects.
-// Uses $setOnInsert so a manager's later edits to a builtin role's permissions survive re-seeds.
+// Source of truth = backend/data/role.json. Falls back to BUILTIN_ROLES in code.
+//
+// Merge strategy for existing builtin roles:
+//   - $setOnInsert: metadata fields (label, description, scope, bianServiceDomain, createdAt)
+//     — preserves manager edits to those fields.
+//   - $set rolePermissions: always overwritten from seed so new resources added to code
+//     (e.g. 'accounts' in v17) propagate on re-seed without needing a manual DB patch.
+//     A manager who customised permissions will see them reset; that is acceptable for builtin
+//     roles because the seed is the authoritative permission matrix (ADR-030 §3).
 type SeedRole = Omit<RoleRecord, 'recordCreatedDateTime' | 'recordUpdatedDateTime'>;
 
 function loadSeedRoles(): SeedRole[] {
@@ -24,13 +29,24 @@ export async function seedRoles(db: Db) {
   const now = new Date();
   let upserted = 0;
   for (const role of loadSeedRoles()) {
-    const doc: RoleRecord = { ...role, recordCreatedDateTime: now, recordUpdatedDateTime: now };
     await db.collection<RoleRecord>(ROLE_COLLECTION).updateOne(
       { roleName: role.roleName },
-      { $setOnInsert: doc },
+      {
+        $setOnInsert: { recordCreatedDateTime: now },
+        $set: {
+          roleLabel:              role.roleLabel,
+          roleDescription:        role.roleDescription,
+          rolePermissions:        role.rolePermissions,
+          roleScope:              role.roleScope,
+          roleIsBuiltin:          role.roleIsBuiltin,
+          bianServiceDomain:      role.bianServiceDomain,
+          bianControlRecordType:  role.bianControlRecordType,
+          recordUpdatedDateTime:  now,
+        },
+      },
       { upsert: true }
     );
     upserted++;
   }
-  console.log(`  roles: ${upserted} builtin upserted`);
+  console.log(`  roles: ${upserted} builtin synced`);
 }

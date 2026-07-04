@@ -7,7 +7,7 @@
 # To enable: RUN npx playwright install --with-deps chromium
 # ──────────────────────────────────────────────────────────────────
 
-FROM node:20-slim
+FROM node:22-slim
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends wget ca-certificates && \
@@ -52,6 +52,9 @@ COPY test/ test/
 COPY vitest.config.ts tsconfig.base.json ./
 COPY frontend/src/ frontend/src/
 COPY frontend/tsconfig.json frontend/
+
+# Create keys directory for volume mount (keys are never baked into the image).
+RUN mkdir -p /app/backend/keys
 
 # Generate seed data JSON files if not present in the build context.
 RUN if [ ! -f backend/data/parties.json ]; then \

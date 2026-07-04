@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { CreditCard, Pause, Pencil, Play, Save, Star, Trash2, Users, X } from 'lucide-react';
+import Link from 'next/link';
+import { CreditCard, Landmark, Pause, Pencil, Play, Save, Star, Trash2, Users, X } from 'lucide-react';
 import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { useDebugMode } from '../../../../lib/debugMode';
@@ -26,6 +27,26 @@ interface CardDetail {
   recordCreatedDateTime?: string;
   recordUpdatedDateTime?: string;
   cardHolderCount?: number;
+  fundingPayoutAccountInstanceReference?: string;
+}
+
+interface FundingAccount {
+  payoutAccountInstanceReference: string;
+  payoutAccountAlias?: string;
+  payoutAccountBankName?: string;
+  payoutAccountType: string;
+  payoutAccountStatus: string;
+  payoutAccountCurrency: string;
+  payoutAccountIsDefault: boolean;
+}
+
+interface CardTransaction {
+  cardTransactionInstanceReference: string;
+  cardTransactionAmount: { amount: number; currency: string };
+  cardTransactionDateTime: string;
+  cardTransactionStatus: string;
+  cardTransactionMerchantName: string;
+  cardTransactionMaskedPanDisplay: string;
 }
 
 function statusClass(status?: string): string {
@@ -68,10 +89,60 @@ export default function CardDetailPage() {
   // Breadcrumb navigation context (non-PII: where we arrived from). Read from the query string.
   const [nav, setNav] = useState<{ from?: string; txnId?: string }>({});
 
+  // Funding account state
+  const [fundingAccount, setFundingAccount] = useState<FundingAccount | null>(null);
+
+  // Transaction list state
+  const [txns, setTxns] = useState<CardTransaction[]>([]);
+  const [txnsTotal, setTxnsTotal] = useState(0);
+  const [txnsPage, setTxnsPage] = useState(1);
+  const [txnsStatus, setTxnsStatus] = useState('');
+  const [txnsDateFrom, setTxnsDateFrom] = useState('');
+  const [txnsDateTo, setTxnsDateTo] = useState('');
+  const [txnsLoading, setTxnsLoading] = useState(false);
+  const TXNS_LIMIT = 10;
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const sp = new URLSearchParams(window.location.search);
     setNav({ from: sp.get('from') ?? undefined, txnId: sp.get('txnId') ?? undefined });
+  }, []);
+
+  const loadTxns = useCallback(async (
+    t: string,
+    cardToken: string,
+    page: number,
+    status: string,
+    dateFrom: string,
+    dateTo: string,
+  ) => {
+    setTxnsLoading(true);
+    try {
+      const params: Parameters<typeof api.transactions.listAll>[0] = {
+        cardToken,
+        page,
+        limit: 10,
+      };
+      if (status) params.status = status;
+      const res = await api.transactions.listAll(params, t);
+      // Filter by date client-side when dateFrom/dateTo are set, since listAll doesn't support them
+      let results = res.results as unknown as CardTransaction[];
+      if (dateFrom) {
+        const from = new Date(dateFrom).getTime();
+        results = results.filter((r) => new Date(r.cardTransactionDateTime).getTime() >= from);
+      }
+      if (dateTo) {
+        const to = new Date(dateTo + 'T23:59:59').getTime();
+        results = results.filter((r) => new Date(r.cardTransactionDateTime).getTime() <= to);
+      }
+      setTxns(results);
+      setTxnsTotal(res.total);
+    } catch {
+      setTxns([]);
+      setTxnsTotal(0);
+    } finally {
+      setTxnsLoading(false);
+    }
   }, []);
 
   const load = useCallback(async (t: string, agId: string) => {
@@ -80,6 +151,15 @@ export default function CardDetailPage() {
       setCard(c);
       setAlias(c.paymentCardAlias ?? '');
       setNote(c.paymentCardCustomerNote ?? '');
+      // Load funding account details (non-blocking)
+      if (c.fundingPayoutAccountInstanceReference) {
+        const pRef = decodeToken(t)?.partyRef;
+        if (pRef) {
+          api.accounts.get(pRef, c.fundingPayoutAccountInstanceReference, t)
+            .then((a) => setFundingAccount(a as unknown as FundingAccount))
+            .catch(() => {});
+        }
+      }
     } catch {
       setNotFound(true);
     }
@@ -100,6 +180,12 @@ export default function CardDetailPage() {
       .catch(() => setNotFound(true))
       .finally(() => setReady(true));
   }, [router, load]);
+
+  // Load transactions whenever the card (and its card token) become available or filters change.
+  useEffect(() => {
+    if (!token || !card?.paymentCardReference) return;
+    loadTxns(token, card.paymentCardReference, txnsPage, txnsStatus, txnsDateFrom, txnsDateTo);
+  }, [token, card?.paymentCardReference, txnsPage, txnsStatus, txnsDateFrom, txnsDateTo, loadTxns]);
 
   async function handleSave() {
     if (!agreementId) return;
@@ -217,10 +303,26 @@ export default function CardDetailPage() {
                   <p className="text-sm text-gray-500 font-mono mt-0.5">{card.paymentCardMaskedPanDisplay}{card.paymentCardNetwork ? ` · ${card.paymentCardNetwork}` : ''}</p>
                 </div>
               </div>
-              <span className={`text-xs px-2.5 py-1 rounded font-medium shrink-0 ${statusClass(card.paymentCardStatus)}`}>
-                {card.paymentCardStatus}
-              </span>
+              <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                <span className={`text-xs px-2.5 py-1 rounded font-medium ${statusClass(card.paymentCardStatus)}`}>
+                  {card.paymentCardStatus}
+                </span>
+                {card.fundingPayoutAccountInstanceReference && (
+                  <Link href={`/system/accounts/${card.fundingPayoutAccountInstanceReference}`} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors">
+                    <Landmark size={10} />
+                    Funded by linked account
+                  </Link>
+                )}
+              </div>
             </div>
+
+            {/* Funding account chip — in header */}
+            {card.fundingPayoutAccountInstanceReference && (
+              <div className="flex items-center gap-1.5 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-1 w-fit">
+                <Landmark size={11} />
+                Linked to a bank account
+              </div>
+            )}
 
             {card.paymentCardStatus === 'suspended' && (
               <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-sm text-amber-800">
@@ -236,6 +338,63 @@ export default function CardDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Funding Account — BIAN SD-88 cardAccountReference (standalone panel) */}
+          {card.fundingPayoutAccountInstanceReference && (
+            <div className="bg-white rounded-xl border p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                  <Landmark size={14} className="text-blue-600" />
+                </div>
+                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Funding Bank Account</h2>
+                <span className="text-xs text-gray-400 font-mono hidden sm:inline">BIAN SD-88 cardAccountReference</span>
+              </div>
+              {fundingAccount ? (
+                <Link
+                  href={`/system/accounts/${card.fundingPayoutAccountInstanceReference}`}
+                  className="flex items-center justify-between group hover:bg-gray-50 -mx-5 px-5 py-3 rounded-b-xl transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-lg bg-[#001E2B]/8 flex items-center justify-center shrink-0 group-hover:bg-[#001E2B] transition-colors">
+                      <Landmark size={16} className="text-[#001E2B] group-hover:text-[#00ED64] transition-colors" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-gray-800 group-hover:text-[#001E2B]">
+                        {fundingAccount.payoutAccountAlias || fundingAccount.payoutAccountBankName || 'Account'}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        {fundingAccount.payoutAccountBankName && fundingAccount.payoutAccountAlias && (
+                          <span className="text-xs text-gray-400">{fundingAccount.payoutAccountBankName}</span>
+                        )}
+                        <span className="text-xs text-gray-400 uppercase">{fundingAccount.payoutAccountCurrency}</span>
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                          {fundingAccount.payoutAccountType === 'bank_account' ? 'Bank Account' : fundingAccount.payoutAccountType === 'wallet' ? 'Wallet' : 'PSP Ledger'}
+                        </span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded border font-medium ${
+                          fundingAccount.payoutAccountStatus === 'active' ? 'bg-green-50 text-green-700 border-green-200' :
+                          fundingAccount.payoutAccountStatus === 'suspended' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                          'bg-gray-100 text-gray-500 border-gray-200'
+                        }`}>
+                          {fundingAccount.payoutAccountStatus}
+                        </span>
+                        {fundingAccount.payoutAccountIsDefault && (
+                          <span className="text-xs text-amber-500">★ Primary</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-xs text-[#001E2B] font-medium group-hover:underline shrink-0 ml-4">View account →</span>
+                </Link>
+              ) : (
+                <Link
+                  href={`/system/accounts/${card.fundingPayoutAccountInstanceReference}`}
+                  className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 -mx-5 px-5 py-3 rounded-b-xl transition-colors"
+                >
+                  <Landmark size={14} /> View linked account →
+                </Link>
+              )}
+            </div>
+          )}
 
           {/* Card details */}
           <div className="bg-white rounded-xl border p-5 space-y-3">
@@ -358,6 +517,126 @@ export default function CardDetailPage() {
               <Trash2 size={15} /> {removing ? 'Removing…' : 'Remove card'}
             </button>
           </div>
+
+          {/* Transaction list — only rendered when this card has a card token to filter by */}
+          {card.paymentCardReference && (
+            <div className="bg-white rounded-xl border p-5 space-y-4">
+              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Transactions on this card</h2>
+
+              {/* Filters */}
+              <div className="flex flex-wrap gap-2 items-end">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-0.5">Status</label>
+                  <select
+                    value={txnsStatus}
+                    onChange={(e) => { setTxnsStatus(e.target.value); setTxnsPage(1); }}
+                    className="border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#001E2B]/20"
+                  >
+                    <option value="">All statuses</option>
+                    <option value="authorized">Authorized</option>
+                    <option value="declined">Declined</option>
+                    <option value="pending">Pending</option>
+                    <option value="reversed">Reversed</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-0.5">From</label>
+                  <input
+                    type="date"
+                    value={txnsDateFrom}
+                    onChange={(e) => { setTxnsDateFrom(e.target.value); setTxnsPage(1); }}
+                    className="border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#001E2B]/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-0.5">To</label>
+                  <input
+                    type="date"
+                    value={txnsDateTo}
+                    onChange={(e) => { setTxnsDateTo(e.target.value); setTxnsPage(1); }}
+                    className="border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#001E2B]/20"
+                  />
+                </div>
+                {(txnsStatus || txnsDateFrom || txnsDateTo) && (
+                  <button
+                    onClick={() => { setTxnsStatus(''); setTxnsDateFrom(''); setTxnsDateTo(''); setTxnsPage(1); }}
+                    className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+
+              {/* Table */}
+              {txnsLoading ? (
+                <p className="text-sm text-gray-400 py-4 text-center">Loading transactions…</p>
+              ) : txns.length === 0 ? (
+                <p className="text-sm text-gray-400 py-4 text-center">No transactions found for this card.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left">
+                        <th className="pb-2 font-medium text-gray-500 text-xs">Date</th>
+                        <th className="pb-2 font-medium text-gray-500 text-xs">Merchant</th>
+                        <th className="pb-2 font-medium text-gray-500 text-xs text-right">Amount</th>
+                        <th className="pb-2 font-medium text-gray-500 text-xs text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {txns.map((txn) => (
+                        <tr key={txn.cardTransactionInstanceReference}
+                          className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => router.push(`/system/payment/history/${txn.cardTransactionInstanceReference}?from=card&cardId=${cardId}`)}>
+                          <td className="py-2.5 pr-3 text-gray-700 whitespace-nowrap">{fmtDate(txn.cardTransactionDateTime)}</td>
+                          <td className="py-2.5 pr-3 text-gray-800 truncate max-w-[180px]">{txn.cardTransactionMerchantName || '-'}</td>
+                          <td className="py-2.5 pr-3 text-gray-800 text-right font-mono whitespace-nowrap">
+                            {txn.cardTransactionAmount
+                              ? new Intl.NumberFormat(undefined, { style: 'currency', currency: txn.cardTransactionAmount.currency, minimumFractionDigits: 2 }).format(txn.cardTransactionAmount.amount)
+                              : '-'}
+                          </td>
+                          <td className="py-2.5 text-right">
+                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                              txn.cardTransactionStatus === 'authorized' ? 'bg-green-100 text-green-700' :
+                              txn.cardTransactionStatus === 'declined'   ? 'bg-red-100 text-red-700' :
+                              txn.cardTransactionStatus === 'pending'    ? 'bg-amber-100 text-amber-700' :
+                              'bg-gray-100 text-gray-500'
+                            }`}>
+                              {txn.cardTransactionStatus}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Pagination */}
+              {txnsTotal > TXNS_LIMIT && (
+                <div className="flex items-center justify-between pt-2 text-xs text-gray-500">
+                  <span>{txnsTotal} total</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setTxnsPage((p) => Math.max(1, p - 1))}
+                      disabled={txnsPage <= 1}
+                      className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-gray-50"
+                    >
+                      Previous
+                    </button>
+                    <span>Page {txnsPage} of {Math.ceil(txnsTotal / TXNS_LIMIT)}</span>
+                    <button
+                      onClick={() => setTxnsPage((p) => p + 1)}
+                      disabled={txnsPage >= Math.ceil(txnsTotal / TXNS_LIMIT)}
+                      className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-gray-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>

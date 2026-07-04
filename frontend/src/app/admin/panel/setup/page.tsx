@@ -18,11 +18,13 @@ interface CommandDef {
 
 const COMMANDS: CommandDef[] = [
   { id: 'setup',            label: 'Full Setup',        description: 'Install all dependencies (frontend + backend)',    icon: '📦', group: 'setup' },
-  { id: 'setup:key',        label: 'Generate Key',      description: 'Generate the local master encryption key',         icon: '🔑', group: 'setup' },
+  { id: 'setup:key:master', label: 'Generate Master Key', description: 'Generate the local KMS master key for Queryable Encryption (KMS_LOCAL_MASTER_KEY)', icon: '🔑', group: 'setup' },
+  { id: 'setup:key:rsa',    label: 'Generate RSA Keys', description: 'Generate the RSA OAuth/OIDC signing keypair (private.pem + public.pem)', icon: '🔐', group: 'setup' },
   { id: 'setup:db',         label: 'Setup Database',    description: 'Create collections, indexes, and provision DEKs', icon: '🗄️', group: 'setup' },
   { id: 'setup:generate',   label: 'Generate Data',     description: 'Generate synthetic demo dataset',                  icon: '🎲', group: 'setup' },
   { id: 'setup:seed',       label: 'Seed Database',     description: 'Insert generated data into MongoDB Atlas',         icon: '🌱', group: 'setup' },
   { id: 'setup:check',     label: 'Validate Setup',    description: 'Check env vars, collections, indexes, DEKs, and Atlas roles are provisioned', icon: '✅', group: 'setup' },
+  { id: 'reload',           label: 'Reload Runtime',    description: 'Hot-reload .env + QE client + event bus in-process (no restart). Use after Drop + Setup DB + Seed on servers you cannot restart, to pick up the new key vault / DEKs.', icon: '♻️', group: 'setup' },
   { id: 'test',             label: 'All Tests',         description: 'Run unit + integration test suites',                              icon: '🧪', group: 'test'  },
   { id: 'test:unit',        label: 'Unit Tests',        description: 'Run unit tests only',                                             icon: '🔬', group: 'test'  },
   { id: 'test:integration', label: 'Integration Tests', description: 'Run integration tests only',                                      icon: '🔗', group: 'test'  },
@@ -95,6 +97,36 @@ async function _runCommand(commandId: string) {
     logs: [],
     startedAt: Date.now(),
   });
+
+  // Hot-reload is an in-process action (not a spawned script): plain JSON POST, no SSE stream.
+  if (commandId === 'reload') {
+    try {
+      _pushLog({ type: 'start', text: '$ reload — hot-reload runtime (.env + QE client + event bus), no restart' });
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/reload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({}),
+        signal: _controller.signal,
+      });
+      const body = await res.json().catch(() => ({ error: res.statusText })) as { message?: string; steps?: string[]; error?: string };
+      if (res.ok) {
+        for (const step of body.steps ?? []) _pushLog({ type: 'log', text: `• ${step}` });
+        _pushLog({ type: 'log', text: body.message ?? 'Runtime reloaded.' });
+        _pushLog({ type: 'done', text: 'Done — exit code 0' });
+        _update({ commandStatus: 'success' });
+      } else {
+        _pushLog({ type: 'error', text: body.error ?? 'Reload failed' });
+        _update({ commandStatus: 'failure' });
+      }
+    } catch (err: unknown) {
+      _pushLog({ type: 'error', text: String(err) });
+      _update({ commandStatus: 'failure' });
+    } finally {
+      _update({ running: false, activeCommand: null });
+      _controller = null;
+    }
+    return;
+  }
 
   try {
     const res = await fetch(`${API_BASE_URL}/api/v1/admin/run`, {

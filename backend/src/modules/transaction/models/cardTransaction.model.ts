@@ -40,6 +40,9 @@ export interface CardTransactionLogControlRecord {
   // transactions created without a merchant context omit it.
   merchantAgreementInstanceReference?: string;
 
+  // v17: FK → paymentExecutionProcedure (SD-65) — set when payout orchestration creates the execution
+  paymentExecutionInstanceReference?: string;
+
   // BIAN SD-254 transaction description (not CHD - plaintext, no QE)
   // cardTransactionDescription: statement descriptor visible on the cardholder's bank statement (max 22 chars)
   // cardTransactionNarrative: extended free-text context for L1/L2 fraud investigation

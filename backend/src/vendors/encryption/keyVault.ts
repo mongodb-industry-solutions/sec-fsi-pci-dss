@@ -29,6 +29,11 @@ export interface DEKs {
   customerGovId: Binary;          // customerAgreementProcedureSensitive.governmentIdentificationReference
   customerRiskNotes: Binary;      // customerAgreementProcedureSensitive.customerAgreementRiskNotes
   cardExpiry: Binary;             // paymentCardManagement.paymentCardExpirationDate
+  payoutIban: Binary;             // payoutAccountArrangement.payoutAccountIban (SD-66)
+  payoutRouting: Binary;          // payoutAccountArrangement.payoutAccountRoutingNumber (SD-66)
+  execDestIban: Binary;           // paymentExecutionProcedure.destinationIban (SD-65) — unregistered destination
+  partyAddress: Binary;           // party.partyPostalAddress (SD-13) — GDPR PII
+  partyDob: Binary;               // party.partyDateOfBirth (SD-13) — GDPR PII
 }
 
 export async function provisionDataEncryptionKeys(client: MongoClient): Promise<DEKs> {
@@ -70,9 +75,15 @@ export async function provisionDataEncryptionKeys(client: MongoClient): Promise<
   const customerGovId = await getOrCreate('DEK-customer-gov-id');
   const customerRiskNotes = await getOrCreate('DEK-customer-risk-notes');
   const cardExpiry = await getOrCreate('DEK-card-expiry');
+  const payoutIban = await getOrCreate('DEK-payout-iban');
+  const payoutRouting = await getOrCreate('DEK-payout-routing');
+  const execDestIban = await getOrCreate('DEK-exec-dest-iban');
+  const partyAddress = await getOrCreate('DEK-party-address');
+  const partyDob = await getOrCreate('DEK-party-dob');
 
   return {
     txAccountRef, partyEmail, partyPhone, customerAccountRef, authEmail,
     txRawPayload, txProcessorMeta, customerAddress, customerGovId, customerRiskNotes, cardExpiry,
+    payoutIban, payoutRouting, execDestIban, partyAddress, partyDob,
   };
 }

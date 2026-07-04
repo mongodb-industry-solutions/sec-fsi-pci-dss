@@ -292,7 +292,7 @@ Card number field: raw digits replaced with `****` on each keystroke. Last 4 dig
 │  │  🔒 Email (QE)        →  \x02\xa1\x7c\x33\xd8... (cipher) │  │
 │  │  🔒 Phone (QE)        →  \x09\xfe\x45\x21\xb2... (cipher) │  │
 │  │  🔒 Account ref (QE)  →  \x11\xbc\x78\xd2\xe4... (cipher) │  │
-│  │  Card token           →  tok_7xB2kp1q         (plaintext)  │  │
+│  │  Card token           →  pm_7xB2kp1q         (plaintext)  │  │
 │  │  Amount               →  850.00               (plaintext)  │  │
 │  │  Merchant             →  TechGadgets Ltd.      (plaintext)  │  │
 │  └────────────────────────────────────────────────────────────┘  │
@@ -396,8 +396,8 @@ The email search matches `luis.fernandez@back.es` against the encrypted `custome
 │                                   "\x02\xa1\x7c\x33\xd8\x5e..."  │
 │                                   🔒 QE ciphertext               │
 │                                                                  │
-│  Card:   tok_7xB2kp1q        →  "paymentCardReference":          │
-│                                   "tok_7xB2kp1q"                 │
+│  Card:   pm_7xB2kp1q        →  "paymentCardReference":          │
+│                                   "pm_7xB2kp1q"                 │
 │                                   ✅ plaintext (token is not CHD)│
 │                                                                  │
 │  Amount: 850.00                 "transactionAmount.amount": 850  │
@@ -1177,7 +1177,7 @@ Public page. Buyer is redirected here by the merchant after calling `POST /api/v
 - Expiry month / year (MM / YY)
 - CVV (UI only — not sent to backend)
 
-**Tokenization (demo):** Frontend generates `tok_<12 random hex><last4>` as the card token. Raw PAN is never sent to the backend. This is the PCI DSS SAQ A pattern.
+**Tokenization (demo):** Frontend generates `pm_<12 random hex><last4>` as the card token. Raw PAN is never sent to the backend. This is the PCI DSS SAQ A pattern.
 
 **On success:** `router.push(redirectUrl)` after 2 seconds — `redirectUrl` is `returnUrl?status=success&session={id}` from the pay response.
 
@@ -1786,3 +1786,15 @@ After login, David accesses the standard merchant portal (Ch-04 §10.4):
 | 3 | (After simulator ran Luis scenario) | Webhook log: `checkout.completed, amount: €850, fraudCaseCreated: true` |
 | 4 | Go to Payment Links tab | Luis's payment link shows status: `completed` |
 | 5 | Present Debug Mode | Shows raw MongoDB document — `merchantName` plaintext, customer fields encrypted |
+
+## Bank transfer UX (/system/transfer/bank) — add-on (dev plan v17)
+
+Two tabs:
+- Registered account: send to an own account or a saved contact; no bank details required. Executes as
+  an external bank transfer (async): funds are held on submit and settle after T+N ("pending settlement").
+- New bank account: enter destination country, IBAN/routing/account and BIC. The rail (SEPA/ACH/SWIFT) is
+  auto-detected and shown as a badge with the quoted fee; details validate live (preview endpoint). "Send
+  wire" submits and the success screen polls live status (pending -> settled/failed). A "recurring (Direct
+  Debit)" option creates a SEPA SDD / ACH SDD mandate with a chosen frequency.
+
+*Added 2026-07-04 (v17.1).*

@@ -14,6 +14,8 @@ export type CapabilityKey =
   | 'kyb'
   | 'card-authorization'
   | 'card-issuer'
+  | 'account-information'
+  | 'payment-initiation'
   | 'generic';
 
 export type ModuleDomain = 'fraud' | 'customer' | 'gateway';
@@ -78,6 +80,18 @@ export const CAPABILITIES: Record<CapabilityKey, CapabilityDescriptor> = {
     description: 'CVV/PIN validation and card lifecycle (activate/block/replace).',
     callbackSegment: 'card/issuer', frontendFolder: 'card-issuer', moduleDomain: 'gateway', hasModule: true,
     bianServiceDomain: 'SD-88 Payment Card',
+  },
+  'account-information': {
+    capability: 'account-information', providerType: 'account_information', label: 'Account Information (AIS)',
+    description: 'Validates payout account status and retrieves internal ledger balance (PSD2 AIS). IBAN never exposed on the wire — resolved by the adapter from the QE vault.',
+    callbackSegment: 'account-information', frontendFolder: 'account-information', moduleDomain: 'gateway', hasModule: true,
+    bianServiceDomain: 'SD-36 Open Banking',
+  },
+  'payment-initiation': {
+    capability: 'payment-initiation', providerType: 'payment_initiation', label: 'Payment Initiation (PISP)',
+    description: 'Initiates bank transfers over SEPA / ACH / internal rails with configurable T+N settlement delays (PSD2 PISP). Amount and PSP account ref only — no IBAN on the wire.',
+    callbackSegment: 'payment-initiation', frontendFolder: 'payment-initiation', moduleDomain: 'gateway', hasModule: true,
+    bianServiceDomain: 'SD-65 Payment Execution',
   },
   generic: {
     capability: 'generic', providerType: 'generic', label: 'Merchant Notifications',

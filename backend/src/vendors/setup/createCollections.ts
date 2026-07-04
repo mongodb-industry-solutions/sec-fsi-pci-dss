@@ -2,6 +2,13 @@ import { MongoClient, ClientEncryption } from 'mongodb';
 import { buildKmsProviders, getKmsConfig } from '../encryption/kms';
 import { buildEncryptedFieldsMaps } from '../encryption/encryptedFieldsMaps';
 import { DEKs } from '../encryption/keyVault';
+import { config } from '../../config';
+import { MERCHANT_WEBHOOK_LOG_COLLECTION } from '../../modules/gateway/models/merchantWebhookLog.model';
+import { PARTY_AUTH_CONSENT_COLLECTION } from '../../modules/identity/models/partyAuthConsent.model';
+import { PAYOUT_ACCOUNT_COLLECTION } from '../../modules/gateway/models/payoutAccount.model';
+import { PAYMENT_EXECUTION_COLLECTION } from '../../modules/gateway/models/paymentExecution.model';
+import { COUNTERPARTY_COLLECTION } from '../../modules/identity/models/counterpartyArrangement.model';
+import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/gateway/models/balanceCreditLog.model';
 
 const kmsConfig = getKmsConfig();
 
@@ -10,7 +17,7 @@ export async function createCollections(
   deks: DEKs,
   reset = false
 ) {
-  const dbName = process.env.MONGODB_DB_NAME!;
+  const dbName = config.mongodb.dbName;
   const db = client.db(dbName);
   const maps = buildEncryptedFieldsMaps(deks);
 
@@ -34,7 +41,17 @@ export async function createCollections(
     { name: 'paymentCardManagement',            map: maps.paymentCardManagement },
     // SD-91: Customer Authentication
     { name: 'customerAuthenticationAssessment', map: maps.customerAuthenticationAssessment },
-  ] as const;
+    // SD-66: Payout Account Arrangement (IBAN/routing QE:none, L2 only — PCI DSS Req 3.3)
+    ...(maps.payoutAccountArrangement
+      ? [{ name: PAYOUT_ACCOUNT_COLLECTION, map: maps.payoutAccountArrangement }]
+      : [{ name: PAYOUT_ACCOUNT_COLLECTION, map: { fields: [] } }]
+    ),
+    // SD-65: Payment Execution Procedure (destinationIban QE:none, L2 only — GDPR Art. 32 / PSD2)
+    ...(maps.paymentExecutionProcedure
+      ? [{ name: PAYMENT_EXECUTION_COLLECTION, map: maps.paymentExecutionProcedure }]
+      : [{ name: PAYMENT_EXECUTION_COLLECTION, map: { fields: [] } }]
+    ),
+  ];
 
   const existingList = await db.listCollections().toArray();
   const existingNames = new Set(existingList.map((c) => c.name));
@@ -50,10 +67,10 @@ export async function createCollections(
       }
     }
 
-    const provider = process.env.KMS_PROVIDER === 'local' ? 'local' : 'aws';
+    const provider = config.kms.provider;
     const masterKey =
-      process.env.KMS_PROVIDER !== 'local'
-        ? { key: process.env.AWS_CMK_ARN!, region: process.env.AWS_REGION! }
+      config.kms.provider !== 'local'
+        ? { key: config.kms.awsCmkArn!, region: config.kms.awsRegion }
         : undefined;
 
     await clientEncryption.createEncryptedCollection(db, name, {
@@ -323,5 +340,88 @@ export async function createCollections(
     console.log('  created: domainEvent (event store)');
   } else {
     console.log('  skip:    domainEvent (already exists)');
+  }
+
+  // v16 (ADR-036): SD-16 RSA public key registry — public keys only, never private. JWKS + rotation audit.
+  if (!existingNames.has('partyAuthenticationKey') || reset) {
+    if (existingNames.has('partyAuthenticationKey') && reset) {
+      await db.collection('partyAuthenticationKey').drop();
+      console.log('  dropped: partyAuthenticationKey');
+    }
+    await db.createCollection('partyAuthenticationKey');
+    console.log('  created: partyAuthenticationKey (OAuth RS256 public key registry)');
+  } else {
+    console.log('  skip:    partyAuthenticationKey (already exists)');
+  }
+
+  // v16 (ADR-033): SD-16 OAuth 2.0 authorization codes — TTL 5 minutes (expiresAt index)
+  if (!existingNames.has('partyAuthorizationCode') || reset) {
+    if (existingNames.has('partyAuthorizationCode') && reset) {
+      await db.collection('partyAuthorizationCode').drop();
+      console.log('  dropped: partyAuthorizationCode');
+    }
+    await db.createCollection('partyAuthorizationCode');
+    console.log('  created: partyAuthorizationCode (OAuth auth codes, TTL 5min)');
+  } else {
+    console.log('  skip:    partyAuthorizationCode (already exists)');
+  }
+
+  // v16 (ADR-033): SD-16 Issued OAuth tokens — refresh tokens + revocation registry. TTL on expiresAt.
+  if (!existingNames.has('partyIssuedToken') || reset) {
+    if (existingNames.has('partyIssuedToken') && reset) {
+      await db.collection('partyIssuedToken').drop();
+      console.log('  dropped: partyIssuedToken');
+    }
+    await db.createCollection('partyIssuedToken');
+    console.log('  created: partyIssuedToken (OAuth refresh tokens + revocation registry)');
+  } else {
+    console.log('  skip:    partyIssuedToken (already exists)');
+  }
+
+  // v16 (ADR-038): SD-16 PartyAuthentication, ConsentGrant — per-user per-client consent with revocation support.
+  if (!existingNames.has(PARTY_AUTH_CONSENT_COLLECTION) || reset) {
+    if (existingNames.has(PARTY_AUTH_CONSENT_COLLECTION) && reset) {
+      await db.collection(PARTY_AUTH_CONSENT_COLLECTION).drop();
+      console.log(`  dropped: ${PARTY_AUTH_CONSENT_COLLECTION}`);
+    }
+    await db.createCollection(PARTY_AUTH_CONSENT_COLLECTION);
+    console.log(`  created: ${PARTY_AUTH_CONSENT_COLLECTION} (consent grants; user-authorized apps registry)`);
+  } else {
+    console.log(`  skip:    ${PARTY_AUTH_CONSENT_COLLECTION} (already exists)`);
+  }
+
+  // merchantWebhookDeliveryLog — persisted delivery attempt records (ADR-038)
+  const logColls = await db.listCollections({ name: MERCHANT_WEBHOOK_LOG_COLLECTION }).toArray();
+  if (logColls.length === 0) {
+    await db.createCollection(MERCHANT_WEBHOOK_LOG_COLLECTION);
+    console.log(`  created: ${MERCHANT_WEBHOOK_LOG_COLLECTION}`);
+  } else {
+    console.log(`  skip:    ${MERCHANT_WEBHOOK_LOG_COLLECTION} (already exists)`);
+  }
+
+  // SD-65: Payment Execution Procedure — created above as a QE-encrypted collection
+  // (destinationIban QE:none). See the qeCollections loop; no plaintext creation here.
+
+  // SD-54: Counterparty Arrangement — plaintext (beneficiary registry, no raw PII stored)
+  if (!existingNames.has(COUNTERPARTY_COLLECTION) || reset) {
+    if (existingNames.has(COUNTERPARTY_COLLECTION) && reset) {
+      await db.collection(COUNTERPARTY_COLLECTION).drop();
+      console.log(`  dropped: ${COUNTERPARTY_COLLECTION}`);
+    }
+    await db.createCollection(COUNTERPARTY_COLLECTION);
+    console.log(`  created: ${COUNTERPARTY_COLLECTION} (SD-54 beneficiary registry)`);
+  } else {
+    console.log(`  skip:    ${COUNTERPARTY_COLLECTION} (already exists)`);
+  }
+
+  if (!existingNames.has(BALANCE_CREDIT_LOG_COLLECTION) || reset) {
+    if (existingNames.has(BALANCE_CREDIT_LOG_COLLECTION) && reset) {
+      await db.collection(BALANCE_CREDIT_LOG_COLLECTION).drop();
+      console.log(`  dropped: ${BALANCE_CREDIT_LOG_COLLECTION}`);
+    }
+    await db.createCollection(BALANCE_CREDIT_LOG_COLLECTION);
+    console.log(`  created: ${BALANCE_CREDIT_LOG_COLLECTION} (SD-66 balance credit audit log, PCI DSS Req 10)`);
+  } else {
+    console.log(`  skip:    ${BALANCE_CREDIT_LOG_COLLECTION} (already exists)`);
   }
 }

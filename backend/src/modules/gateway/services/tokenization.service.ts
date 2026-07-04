@@ -12,7 +12,7 @@ export interface CreateTokenInput {
 }
 
 export async function createToken(input: CreateTokenInput) {
-  const token = `tok_${uuidv4().replace(/-/g, '')}`;
+  const token = `pm_${uuidv4().replace(/-/g, '')}`;
   return {
     tokenVaultInstanceReference: uuidv4(),
     tokenVaultCardToken: token,

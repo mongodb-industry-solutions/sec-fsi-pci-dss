@@ -49,7 +49,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
       .post('/api/v1/card-transactions')
       .set('Authorization', `Bearer ${authToken}`)
       .send({
-        cardToken: `tok_${Date.now()}`,
+        cardToken: `pm_${Date.now()}`,
         accountReference: 'ACC-TEST-001',
         amount: 100,
         currency: 'USD',
@@ -73,7 +73,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
       .post('/api/v1/card-transactions')
       .set('Authorization', `Bearer ${authToken}`)
       .send({
-        cardToken: `tok_fraud_${Date.now()}`,
+        cardToken: `pm_fraud_${Date.now()}`,
         accountReference: 'ACC-TEST-002',
         amount: 850,
         currency: 'USD',
@@ -96,7 +96,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
       .post('/api/v1/card-transactions')
       .set('Authorization', `Bearer ${authToken}`)
       .send({
-        cardToken: `tok_mcc_${Date.now()}`,
+        cardToken: `pm_mcc_${Date.now()}`,
         accountReference: 'ACC-TEST-003',
         amount: 50,
         currency: 'USD',
@@ -118,7 +118,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
       .post('/api/v1/card-transactions')
       .set('Authorization', `Bearer ${authToken}`)
       .send({
-        cardToken: `tok_get_${Date.now()}`,
+        cardToken: `pm_get_${Date.now()}`,
         accountReference: 'ACC-SECRET',
         amount: 99,
         currency: 'USD',
@@ -147,7 +147,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
       .set('Authorization', `Bearer ${authToken}`)
       .send({
         customerAgreementInstanceReference: 'cust-test-001',
-        cardToken: `tok_card_${Date.now()}`,
+        cardToken: `pm_card_${Date.now()}`,
         paymentCardExpirationDate: '12/28',
         paymentCardMaskedPanDisplay: '****-****-****-1111',
         paymentCardNetwork: 'VISA',
@@ -212,7 +212,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
   // FR-v1-04.4: cardToken lookup uses a standard (non-QE) index (ADR-003)
   skip('GET /card-transactions?cardToken= uses standard index', async () => {
     const res = await supertest(app.server)
-      .get('/api/v1/card-transactions?cardToken=tok_nonexistent')
+      .get('/api/v1/card-transactions?cardToken=pm_nonexistent')
       .set('Authorization', `Bearer ${authToken}`);
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.results)).toBe(true);
@@ -225,7 +225,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
       .post('/api/v1/card-transactions')
       .set('Authorization', `Bearer ${authToken}`)
       .send({
-        cardToken: `tok_desc_${Date.now()}`,
+        cardToken: `pm_desc_${Date.now()}`,
         accountReference: 'ACC-DESC-001',
         amount: 42,
         currency: 'USD',
@@ -256,7 +256,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
       .post('/api/v1/card-transactions')
       .set('Authorization', `Bearer ${authToken}`)
       .send({
-        cardToken: `tok_nodesc_${Date.now()}`,
+        cardToken: `pm_nodesc_${Date.now()}`,
         accountReference: 'ACC-NODESC-001',
         amount: 10,
         currency: 'USD',

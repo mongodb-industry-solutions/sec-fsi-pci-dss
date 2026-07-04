@@ -73,6 +73,20 @@ const DEFAULT_GROUP_DEFS: DefaultGroupDef[] = [
     pciDssRequirements: ['Req 3.3.1', 'Req 3.5.1', 'Req 8.3.6'],
   },
   {
+    id: 'default-group-account-information',
+    type: 'account_information',
+    name: 'Default Account Information Service (AIS)',
+    bianServiceDomain: 'SD-36 Open Banking',
+    pciDssRequirements: ['Req 12.8.1', 'Req 10.2.1'],
+  },
+  {
+    id: 'default-group-payment-initiation',
+    type: 'payment_initiation',
+    name: 'Default Payment Initiation Service (PISP)',
+    bianServiceDomain: 'SD-65 Payment Execution',
+    pciDssRequirements: ['Req 12.8.1', 'Req 10.2.1'],
+  },
+  {
     id: 'default-group-generic',
     type: 'generic',
     name: 'Default Generic Integration Group',
@@ -115,11 +129,12 @@ export async function seedRoutingGroups(db: Db): Promise<void> {
       recordUpdatedDateTime: now,
     };
 
-    await groupsCol.updateOne(
+    const result = await groupsCol.updateOne(
       { routingGroupInstanceReference: def.id },
       { $setOnInsert: group },
       { upsert: true }
     );
+    console.log(`  routingGroup [${def.type}]: ${result.upsertedCount ? 'created' : 'already exists'} (id: ${def.id})`);
 
     // Bind internal provider to this default group (idempotent)
     if (internal) {

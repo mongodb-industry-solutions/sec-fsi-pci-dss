@@ -7,7 +7,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 452.18,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Treutel - Altenwerth",
       "cardTransactionDateTime": "2026-05-21T00:50:09.504Z",
@@ -38,7 +38,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 417.09,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Brakus - Fahey",
       "cardTransactionDateTime": "2026-05-20T08:54:01.228Z",
@@ -69,7 +69,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 194.69,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Keeling LLC",
       "cardTransactionDateTime": "2026-05-20T03:29:35.900Z",
@@ -100,7 +100,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 135.86,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Dach and Sons",
       "cardTransactionDateTime": "2026-05-11T14:54:38.361Z",
@@ -131,7 +131,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 957.39,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Huel, Rutherford and DuBuque",
       "cardTransactionDateTime": "2026-05-06T20:01:09.846Z",
@@ -162,7 +162,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 425.26,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Dach Group",
       "cardTransactionDateTime": "2026-04-30T07:47:39.023Z",
@@ -193,7 +193,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 1401.59,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Cruickshank - Predovic",
       "cardTransactionDateTime": "2026-05-20T13:47:24.181Z",
@@ -224,7 +224,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 897.77,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "McKenzie and Sons",
       "cardTransactionDateTime": "2026-05-16T08:59:03.499Z",
@@ -255,7 +255,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 510.88,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Beier - Stokes",
       "cardTransactionDateTime": "2026-05-19T09:43:29.736Z",
@@ -287,7 +287,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 1501.45,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Kreiger LLC",
       "cardTransactionDateTime": "2026-05-12T11:06:38.684Z",
@@ -319,7 +319,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 1222.04,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "McClure, Erdman and Kuhlman",
       "cardTransactionDateTime": "2026-05-25T23:39:21.626Z",
@@ -351,7 +351,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 589.42,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Johnson LLC",
       "cardTransactionDateTime": "2026-05-25T15:37:26.934Z",
@@ -382,7 +382,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 495.79,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Wiegand and Sons",
       "cardTransactionDateTime": "2026-05-26T10:19:47.557Z",
@@ -413,7 +413,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 726.9,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Wehner, Runolfsson and Hodkiewicz",
       "cardTransactionDateTime": "2026-05-20T23:57:09.963Z",
@@ -444,7 +444,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 268.99,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Wolf, Goyette and Schaefer",
       "cardTransactionDateTime": "2026-05-28T22:59:38.496Z",
@@ -475,7 +475,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 1399.16,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Romaguera LLC",
       "cardTransactionDateTime": "2026-05-19T21:01:29.610Z",
@@ -506,7 +506,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 272.69,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Schaden, Gislason and Lockman",
       "cardTransactionDateTime": "2026-05-12T19:01:10.037Z",
@@ -537,7 +537,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 586.81,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Frami, Powlowski and Leannon",
       "cardTransactionDateTime": "2026-05-04T13:15:31.084Z",
@@ -569,7 +569,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 11.89,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Hand, Fay and Runolfsdottir",
       "cardTransactionDateTime": "2026-05-01T02:53:10.961Z",
@@ -600,7 +600,7 @@
     "transactionSnapshot": {
       "cardTransactionAmount": {
         "amount": 59.86,
-        "currency": "USD"
+        "currency": "EUR"
       },
       "cardTransactionMerchantName": "Sauer Inc",
       "cardTransactionDateTime": "2026-05-27T01:01:16.044Z",

@@ -302,11 +302,32 @@ export async function getCardsByCustomer(db: Db, customerRef: string) {
       paymentCardStatus: 1,
       paymentCardIsPreferred: 1,
       paymentCardAlias: 1,
+      fundingPayoutAccountInstanceReference: 1,
       recordCreatedDateTime: 1,
     })
     .sort({ paymentCardIsPreferred: -1, recordCreatedDateTime: -1 })
     .toArray();
 
+  return { results };
+}
+
+// BIAN SD-88 cardAccountReference: return all active cards that fund from a specific payout account.
+// Used by the account detail page to show linked payment methods. Read-only; no CHD returned.
+export async function getCardsByFundingAccount(db: Db, accountRef: string) {
+  const results = await db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION)
+    .find({ fundingPayoutAccountInstanceReference: accountRef, paymentCardStatus: { $ne: 'revoked' } })
+    .project({
+      paymentCardInstanceReference: 1,
+      paymentCardMaskedPanDisplay: 1,
+      paymentCardNetwork: 1,
+      paymentCardStatus: 1,
+      paymentCardIsPreferred: 1,
+      paymentCardAlias: 1,
+      fundingPayoutAccountInstanceReference: 1,
+      recordCreatedDateTime: 1,
+    })
+    .sort({ paymentCardIsPreferred: -1, recordCreatedDateTime: -1 })
+    .toArray();
   return { results };
 }
 

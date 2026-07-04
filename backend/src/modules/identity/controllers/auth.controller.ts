@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest } from 'fastify';
 import { loginUser, getDemoUsers, getEnabledDomains, updateAuthProfile, JwtPayload } from '../services/auth.service';
 import { getSelfProfile, updateSelfProfile } from '../../customer/services/customerAgreement.service';
 import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
+import { PARTY_COLLECTION, PartyControlRecord } from '../models/party.model';
 
 export async function authController(fastify: FastifyInstance) {
   fastify.post('/login', {
@@ -247,6 +248,8 @@ a \`customerAgreement\` record.`,
             name:   { type: 'string' },
             role:   { type: 'string' },
             domain: { type: 'string' },
+            partyInstanceReference: { type: 'string', nullable: true },
+            party: { type: 'object', nullable: true, additionalProperties: true },
             agreement: { type: 'object', nullable: true, additionalProperties: true },
           },
         },
@@ -272,6 +275,17 @@ a \`customerAgreement\` record.`,
       partyInstanceReference = authRec?.partyInstanceReference;
     }
 
+    // Load the SD-13 Party record (KYC-typical demographics: name, DOB, nationality, postal
+    // address, contact points) so every role — staff included — has a populated profile.
+    // fastify.db is the L2 client, so QE fields (email/phone) return decrypted for the caller.
+    let party: Record<string, unknown> | null = null;
+    if (partyInstanceReference) {
+      party = await fastify.db
+        .collection<PartyControlRecord>(PARTY_COLLECTION)
+        .findOne({ partyInstanceReference }, { projection: { _id: 0 } })
+        .catch(() => null) as Record<string, unknown> | null;
+    }
+
     return reply.send({
       sub:                   user.sub,
       email:                 user.email,
@@ -279,6 +293,7 @@ a \`customerAgreement\` record.`,
       role:                  user.role,
       domain:                user.domain,
       partyInstanceReference,
+      party,
       agreement,
     });
   });

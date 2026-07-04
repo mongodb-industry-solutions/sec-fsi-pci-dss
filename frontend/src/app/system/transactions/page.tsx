@@ -23,10 +23,15 @@ interface Transaction {
 
 const STATUS_COLORS: Record<string, string> = {
   authorized: 'bg-green-100 text-green-800',
-  settled:    'bg-green-100 text-green-800',
+  settled:    'bg-emerald-100 text-emerald-800 font-semibold',
+  captured:   'bg-teal-100 text-teal-800',
   disputed:   'bg-red-100 text-red-800',
   declined:   'bg-red-100 text-red-800',
   pending:    'bg-amber-100 text-amber-800',
+  voided:     'bg-gray-100 text-gray-500',
+  refunded:   'bg-purple-100 text-purple-700',
+  failed:     'bg-red-100 text-red-800',
+  expired:    'bg-gray-100 text-gray-500',
 };
 
 const PAGE_SIZE = 10;
@@ -112,8 +117,8 @@ export default function TransactionsPage() {
       setFilterCardToken('');
     } else {
       setFilterEmail('');
-      setFilterCardToken(v.startsWith('tok_') ? v : '');
-      setFilterMerchant(!v.startsWith('tok_') ? v : '');
+      setFilterCardToken(v.startsWith('pm_') ? v : '');
+      setFilterMerchant(!v.startsWith('pm_') ? v : '');
     }
     setPage(1);
   }
@@ -183,7 +188,7 @@ export default function TransactionsPage() {
             placeholder={
               searchType === 'email'
                 ? 'customer@example.com'
-                : 'Merchant name  or  tok_xxxxxxxx'
+                : 'Merchant name  or  pm_xxxxxxxx'
             }
             className="flex-1 border rounded-lg px-3 py-2 text-sm"
           />

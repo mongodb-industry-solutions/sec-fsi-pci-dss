@@ -4,6 +4,7 @@
 // Process class an event belongs to, used to group events for audit/investigation.
 export type BusinessProcess =
   | 'card_payment'
+  | 'payment_processing'    // SD-65 payout execution + settlement (v17)
   | 'fraud_investigation'
   | 'card_management'
   | 'customer_onboarding'

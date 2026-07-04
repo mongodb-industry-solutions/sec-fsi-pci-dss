@@ -4,11 +4,12 @@ import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import fastifyStatic from '@fastify/static';
 import { join } from 'path';
+import { config } from '../config';
 
 // PSP_PROJECT_ROOT=/app is set in Docker (compiled: dist/plugins → wrong relative path).
 // Local dev: PSP_PROJECT_ROOT is unset, __dirname is src/plugins so ../../public is correct.
-const PUBLIC = process.env.PSP_PROJECT_ROOT
-  ? join(process.env.PSP_PROJECT_ROOT, 'backend/public')
+const PUBLIC = config.server.projectRoot
+  ? join(config.server.projectRoot, 'backend/public')
   : join(__dirname, '../../public');
 
 // fp() removes encapsulation so @fastify/swagger's onRoute hook
@@ -126,6 +127,9 @@ Obtain a token via \`POST /api/v1/auth/login\`.
       },
       tags: [
         { name: 'auth',         description: 'module:identity · SD-16 Party Authentication. /api/v1/auth. Public routes, no JWT required.' },
+        { name: 'auth:oauth',   description: 'module:identity · OAuth 2.0 Authorization Server (ADR-031). /api/v1/oauth. Authorization code + PKCE, client credentials, token exchange, consent grants.' },
+        { name: 'auth:oidc',    description: 'module:identity · OpenID Connect layer (ADR-031). /api/v1/.well-known · /api/v1/oauth/userinfo · token introspection. Discovery, ID token issuance, UserInfo endpoint.' },
+        { name: 'auth:kms',     description: 'module:identity · Key Management Service (ADR-035). /api/v1/keys. DEK provisioning, rotation, and tenant key-set administration (PCI DSS Req 3.6).' },
         { name: 'customer',     description: 'module:customer · SD-53 Customer Agreement. /api/v1/customer. QE:equality search on email, phone, account reference.' },
         { name: 'cards',        description: 'module:customer · SD-88 Payment Card. /api/v1/customer/:customerId/cards. Cards as sub-resource of Customer Agreement.' },
         { name: 'transactions', description: 'module:transactions · SD-254 Card Transaction. /api/v1/transactions. QE:equality on account reference. Auto-triggers fraud case.' },
@@ -134,6 +138,9 @@ Obtain a token via \`POST /api/v1/auth/login\`.
         { name: 'gateway',          description: 'module:psp-platform · SD-64 Payment Order · SD-65 Payment Execution · SD-57 Card Token. /api/v1/gateway/payments · /api/v1/gateway/tokens. Prototype (v5 roadmap).' },
         { name: 'payment:checkout', description: 'module:psp-platform · SD-64 · Redirect checkout sessions. /api/v1/gateway/checkout. Hosted-payment-page flow for merchants.' },
         { name: 'payment:links',    description: 'module:psp-platform · SD-64 · Payment links. /api/v1/gateway/pay. Shareable pay-by-link flow for merchants.' },
+        { name: 'accounts',     description: 'module:gateway · SD-66 Payout Account Arrangement (ADR-029). /api/v1/accounts. Customer payout account management: create, list, movements, IBAN, linked cards, P2P transfer history. PCI DSS Req 7: customer-scoped.' },
+        { name: 'beneficiaries', description: 'module:identity · SD-54 Counterparty Administration. /api/v1/beneficiaries. Registered transfer recipients (internal PSP users). BIAN: CounterpartyArrangement. P2P transfers dispatched here.' },
+        { name: 'executions',   description: 'module:gateway · SD-65 Payment Execution. /api/v1/executions. Payout execution records: status lifecycle, resolution log, audit trail. PCI DSS Req 10.' },
         { name: 'system',       description: 'module:system · /api/v1/system. Health check (public) + raw document viewer (non-production, JWT required).' },
         { name: 'admin',        description: 'module:admin · /api/v1/admin. Administration panel: setup commands, terminal, log streaming, system info. Login via POST /admin/login.' },
         { name: 'providers',    description: 'module:providers · SD-193 External Provider Arrangements (ADR-029). /api/v1/providers. Vendors (external integrations), routing groups, and inbound callbacks (/providers/callback/<capability>/:id).' },
@@ -170,7 +177,7 @@ Obtain a token via \`POST /api/v1/auth/login\`.
     },
     staticCSP: true,
     transformStaticCSP: (header) => {
-      const port = process.env.PORT || '8081';
+      const port = String(config.server.port);
       return `${header}; connect-src 'self' http://localhost:${port} http://127.0.0.1:${port}`;
     },
     transformSpecification: (spec) => spec,

@@ -7,6 +7,7 @@ import { getRawClient } from '../../../vendors/encryption/rawClient';
 import { getDemoUsers } from '../../identity/services/auth.service';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
+import { config } from '../../../config';
 
 // ── Health check helpers (IETF draft-inadarei-api-health-check) ─────────────
 
@@ -31,7 +32,7 @@ interface CheckEntry {
 }
 
 function serverChecks(): Record<string, CheckEntry[]> {
-  const cryptPath = process.env.MONGODB_CRYPT_SHARED_LIB_PATH ?? '';
+  const cryptPath = config.mongodb.cryptSharedLibPath;
   const cryptExists = cryptPath ? fs.existsSync(cryptPath) : false;
   const mem = process.memoryUsage();
   return {
@@ -65,7 +66,7 @@ function serverChecks(): Record<string, CheckEntry[]> {
     'server:kmsProvider': [{
       status: 'pass',
       componentType: 'system',
-      observedValue: process.env.KMS_PROVIDER ?? 'local',
+      observedValue: config.kms.provider,
     }],
   };
 }
@@ -81,14 +82,14 @@ async function dbChecks(db: Db): Promise<Record<string, CheckEntry[]>> {
   const checks: Record<string, CheckEntry[]> = {};
   try {
     const buildInfo = await db.admin().command({ buildInfo: 1 }) as { version?: string; modules?: string[] };
-    const host = (process.env.MONGODB_URI ?? '').replace(/^mongodb(\+srv)?:\/\/[^@]*@/, '').split('/')[0].split('?')[0];
+    const host = config.mongodb.uri.replace(/^mongodb(\+srv)?:\/\/[^@]*@/, '').split('/')[0].split('?')[0];
     const mongoType = resolveMongoType(buildInfo.modules ?? [], host);
     checks['db:server'] = [{
       status: 'pass',
       componentType: 'datastore',
       observedValue: {
         host,
-        database: process.env.MONGODB_DB_NAME ?? db.databaseName,
+        database: config.mongodb.dbName || db.databaseName,
         serverVersion: buildInfo.version ?? 'unknown',
         type: mongoType,
         modules: buildInfo.modules ?? [],
@@ -376,7 +377,7 @@ QE-protected fields appear as BSON binary ciphertext  -  this is the core of the
       }
 
       const rawClient = await getRawClient();
-      const db = rawClient.db(process.env.MONGODB_DB_NAME!);
+      const db = rawClient.db(config.mongodb.dbName);
       const doc = await db.collection(collection).findOne({
         $or: [
           { partyInstanceReference: resolvedId },

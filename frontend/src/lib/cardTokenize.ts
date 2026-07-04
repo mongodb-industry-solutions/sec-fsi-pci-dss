@@ -59,7 +59,7 @@ export interface TokenizeResult { token: string; maskedPan: string; network: Car
 // so this key is a stand-in; a real deployment performs this server-side / in the vault.
 const TOKEN_KEY = process.env.NEXT_PUBLIC_CARD_TOKEN_KEY || 'demo-psp-tokenization-key-v1';
 
-// Deterministic surrogate token: HMAC-SHA256(PAN) keyed with TOKEN_KEY → `tok_<24 hex><last4>`.
+// Deterministic surrogate token: HMAC-SHA256(PAN) keyed with TOKEN_KEY → `pm_<24 hex><last4>`.
 // Same PAN → same token, so a card is never duplicated in the registry / a customer's wallet.
 export async function deriveCardToken(panDigits: string): Promise<string> {
   const enc = new TextEncoder();
@@ -68,7 +68,7 @@ export async function deriveCardToken(panDigits: string): Promise<string> {
   const bytes = new Uint8Array(sig);
   let hex = '';
   for (let i = 0; i < 12; i++) hex += bytes[i].toString(16).padStart(2, '0');
-  return `tok_${hex}${panDigits.slice(-4)}`;
+  return `pm_${hex}${panDigits.slice(-4)}`;
 }
 
 // Validate the raw card details and return only non-sensitive, storable artifacts.

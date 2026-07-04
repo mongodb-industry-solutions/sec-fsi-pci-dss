@@ -18,6 +18,9 @@ export type IntegrationProviderType =
   | 'credit_bureau'
   | 'card_authorization'
   | 'card_issuer'
+  | 'account_information'    // SD-36 Open Banking AIS — external bank account identity/balance (PSD2)
+  | 'payment_initiation'     // SD-66 PISP — executes bank transfers (PSD2)
+  | 'currency_exchange'      // v17 FX — converts amounts between ISO-4217 currencies (mid rate + spread)
   | 'generic';
 
 export type IntegrationStatus  = 'active' | 'inactive' | 'test' | 'suspended';
@@ -319,7 +322,7 @@ export interface ExternalProviderArrangement {
 
 // ── Business Context Correlation (ADR-025) ────────────────────────────────────
 
-export type BusinessEntityType = 'transaction' | 'fraud_case' | 'customer' | 'merchant' | 'payment_link' | 'card';
+export type BusinessEntityType = 'transaction' | 'p2p_transfer' | 'fraud_case' | 'customer' | 'merchant' | 'payment_link' | 'card' | 'execution' | 'account';
 
 export type BusinessProcessType =
   | 'payment_processing'
@@ -335,9 +338,11 @@ export type ComplianceProcessType =
   | 'kyb_verification'
   | 'merchant_onboarding'
   | 'customer_onboarding'
-  | 'card_management';   // SD-88 stored-card lifecycle (register / remove) — PCI DSS Req 10
+  | 'card_management'       // SD-88 stored-card lifecycle (register / remove) — PCI DSS Req 10
+  | 'payment_processing';   // SD-65/SD-36 payout execution + AIS/PISP audit trail (v17)
 
-export type ProcessEventOutcome = 'approved' | 'rejected' | 'pending' | 'failed' | 'escalated';
+export type ProcessEventOutcome = 'approved' | 'rejected' | 'pending' | 'failed' | 'escalated'
+  | 'in_flight' | 'settled' | 'verified' | 'submitted'; // SD-65 payout execution outcomes (v17)
 
 export interface BusinessContextRef {
   entityType: BusinessEntityType;

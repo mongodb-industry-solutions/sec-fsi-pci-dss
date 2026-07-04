@@ -29,6 +29,10 @@ export function invalidateRoleCache(roleName?: string): void {
 
 // Resolve a role record from the DB; fall back to the builtin matrix if the collection is
 // unavailable or the role is a not-yet-seeded builtin. Never throws — enforcement must not fail open.
+//
+// For builtin roles loaded from DB: any resource present in the in-code builtin but absent from the
+// DB record is merged in. This means new resources (e.g. 'beneficiaries' in v18) take effect without
+// requiring a manual re-seed — only additions are merged, so manager permission edits are preserved.
 export async function loadRole(db: Db, roleName: string | undefined): Promise<RoleRecord | null> {
   if (!roleName) return null;
   const cached = cache.get(roleName);
@@ -41,7 +45,24 @@ export async function loadRole(db: Db, roleName: string | undefined): Promise<Ro
   } catch {
     role = null;
   }
-  if (!role) role = builtinFallback(roleName);
+  if (!role) {
+    role = builtinFallback(roleName);
+  } else if (role.roleIsBuiltin) {
+    // Merge any missing resources from the in-code builtin into the DB record so new resources
+    // added to code propagate immediately without a re-seed.
+    const builtin = BUILTIN_BY_NAME.get(roleName);
+    if (builtin) {
+      const merged: RolePermissions = { ...role.rolePermissions };
+      let patched = false;
+      for (const [res, actions] of Object.entries(builtin.rolePermissions) as [Resource, Action[]][]) {
+        if (!merged[res]) {
+          merged[res] = actions;
+          patched = true;
+        }
+      }
+      if (patched) role = { ...role, rolePermissions: merged };
+    }
+  }
   cache.set(roleName, { role, expires: now + CACHE_TTL_MS });
   return role;
 }

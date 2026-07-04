@@ -53,6 +53,9 @@ export class PostAuthorizationProcess {
     if (p.fraudCaseCreated && p.fraudDiagnosisInstanceReference) {
       await this.enrichCase(txnId, p.fraudDiagnosisInstanceReference);
     }
+    // A5: Debit card funding account balance (BIAN SD-88 cardAccountReference, PCI Req 3.2)
+    // Uses only the UUID reference — IBAN is never read here.
+    void this.decrementCardFundingBalance(txnId).catch(() => {});
   }
 
   // AML transaction monitoring, post-auth. May raise an alert; never blocks the (already done) payment.
@@ -106,5 +109,40 @@ export class PostAuthorizationProcess {
     const caseDoc = await this.db.collection<{ fraudDiagnosisInstanceReference: string }>(FRAUD_DIAGNOSIS_COLLECTION)
       .findOne({ cardTransactionInstanceReference: e.correlationId }, { projection: { _id: 0, fraudDiagnosisInstanceReference: 1 } });
     if (caseDoc) await this.enrichCase(e.correlationId, caseDoc.fraudDiagnosisInstanceReference);
+  }
+
+  // A5: After a card event, update the PSP internal ledger balance for the funding payout account.
+  // v17: DEBIT holds now happen atomically in the funds-check GATE (providerGroups.onFunds) BEFORE the
+  // payment is authorized — so this post-auth step no longer holds for purchases (that would double-debit).
+  // It only handles the REFUND credit path (return funds to the cardholder's available balance).
+  // Uses only UUID references — IBAN is never accessed (PCI DSS Req 3.2).
+  private async decrementCardFundingBalance(txnId: string): Promise<void> {
+    const txn = await this.db.collection<{
+      cardTransactionAmount?: { amount: number; currency: string };
+      paymentCardInstanceReference?: string;
+      cardTransactionStatus?: string;
+      cardTransactionType?: string;
+    }>(CARD_TRANSACTION_COLLECTION).findOne(
+      { cardTransactionInstanceReference: txnId },
+      { projection: { cardTransactionAmount: 1, paymentCardInstanceReference: 1, cardTransactionStatus: 1, cardTransactionType: 1 } }
+    );
+    if (txn?.cardTransactionType !== 'refund') return; // debits are held by the funds gate, not here
+    if (!txn?.paymentCardInstanceReference || !txn?.cardTransactionAmount) return;
+    const { creditDirect } = await import('../../gateway/services/payoutAccountBalance.service');
+    const { PAYMENT_CARD_COLLECTION } = await import('../../customer/models/paymentCard.model');
+    const { resolveAndConvert } = await import('../../../providers/currency-exchange/services/currencyExchange.service');
+    const card = await this.db.collection<{ fundingPayoutAccountInstanceReference?: string }>(PAYMENT_CARD_COLLECTION)
+      .findOne({ paymentCardInstanceReference: txn.paymentCardInstanceReference }, { projection: { fundingPayoutAccountInstanceReference: 1 } });
+    if (!card?.fundingPayoutAccountInstanceReference) return;
+    const accountRef = card.fundingPayoutAccountInstanceReference;
+    // Refund: return funds to cardholder available balance (BIAN SD-88 credit), in account currency (FX).
+    const { PAYOUT_ACCOUNT_COLLECTION } = await import('../../gateway/models/payoutAccount.model');
+    const account = await this.db.collection<{ payoutAccountCurrency?: string }>(PAYOUT_ACCOUNT_COLLECTION)
+      .findOne({ payoutAccountInstanceReference: accountRef }, { projection: { payoutAccountCurrency: 1 } });
+    let amount = txn.cardTransactionAmount.amount;
+    if (account?.payoutAccountCurrency && account.payoutAccountCurrency !== txn.cardTransactionAmount.currency) {
+      try { amount = (await resolveAndConvert(this.db, amount, txn.cardTransactionAmount.currency, account.payoutAccountCurrency)).amount; } catch { /* keep original on FX error */ }
+    }
+    await creditDirect(this.db, accountRef, amount);
   }
 }

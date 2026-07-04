@@ -27,7 +27,7 @@ const FIELD_PLACEHOLDERS: Record<SearchField, string> = {
   email:      'customer@example.com',
   phone:      '+1-555-0000',
   accountRef: 'ACC-001',
-  cardToken:  'tok_xxxxxxxx',
+  cardToken:  'pm_xxxxxxxx',
   customerId: 'CUST-...',
 };
 

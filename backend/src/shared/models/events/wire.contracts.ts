@@ -100,6 +100,64 @@ export interface AmlMonitoringOutbound extends WireCorrelation {
  */
 export type AmlMonitoringInbound = WireCorrelation & AmlMonitoringCompleted;
 
+// ── v17: Account Information Service (SD-36 AIS) wire contracts ──────────────
+
+/**
+ * @event    ais.account.validation.requested  @type outbound
+ * @note     Carries only the PSP-internal payoutAccountInstanceReference.
+ *           The wire adapter resolves the actual IBAN from the QE L2 vault BEFORE
+ *           sending — IBAN never travels on the bus and never appears in logs.
+ */
+export interface AisValidationOutbound extends WireCorrelation {
+  payoutAccountInstanceReference: string;  // PSP reference — adapter resolves IBAN via L2 vault
+  accountCountryCode: string;              // ISO 3166-1 alpha-2
+  accountCurrency: string;                 // ISO 4217
+  requestedFields: ('balance' | 'identity' | 'status')[];
+  consentReference?: string;              // FK → consentAgreement (required for real PSD2 AIS)
+}
+
+/**
+ * @event    ais.account.validation.completed  @type inbound
+ */
+export interface AisValidationInbound extends WireCorrelation {
+  accountVerified: boolean;
+  accountStatus: 'active' | 'dormant' | 'closed' | 'unknown';
+  identityMatch?: 'full' | 'partial' | 'failed' | 'not_checked';
+  balancePending?: number;
+  balanceAvailable?: number;
+  currency?: string;
+  providerReference?: string;
+}
+
+// ── v17: Payment Initiation (SD-66 PISP) wire contracts ──────────────────────
+
+/**
+ * @event    payment.initiation.requested  @type outbound
+ * @note     payoutAccountInstanceReference is the PSP-opaque ref.
+ *           Adapter resolves IBAN from L2 vault before sending on TLS wire only.
+ */
+export interface PaymentInitiationOutbound extends WireCorrelation {
+  payoutAccountInstanceReference: string;  // PSP ref — adapter resolves IBAN via L2 vault
+  railType: 'sepa' | 'ach' | 'swift' | 'local_bank' | 'internal_ledger';
+  amount: number;
+  currency: string;
+  settlementSchedule: 'T+0' | 'T+1' | 'T+2' | 'T+3';
+  paymentReference: string;               // for bank statement narrative
+  debtorReference?: string;
+}
+
+/**
+ * @event    payment.initiation.completed  @type inbound
+ * @note     Async: status='submitted' arrives immediately; 'settled'/'failed' arrive later.
+ */
+export interface PaymentInitiationInbound extends WireCorrelation {
+  railRef: string;
+  status: 'submitted' | 'settled' | 'failed';
+  completedAt?: string;                   // ISO 8601 — present on settled / failed
+  errorCode?: string;
+  errorReason?: string;
+}
+
 /**
  * Short-lived dispatch-time entry that lets an async callback restore the full envelope (§7.7).
  * Indexed by `ref` (clientReference / vendor ack), never by a URL token.

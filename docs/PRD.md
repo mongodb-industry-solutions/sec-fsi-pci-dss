@@ -278,6 +278,15 @@ BIAN (Banking Industry Architecture Network) provides a standardized vocabulary 
 | 11 | **Payment Execution** | SD-65 | Gateway routing and authorization orchestration | *(service layer, no dedicated collection)* | v4 |
 | 12 | **Card eToken** | SD-57 | Token vault: card token references and network tokens | `cardEtokenProcedure` | v4 stub |
 
+#### v17: Bank-movement precision SDs (Funds-Availability Gate + FX)
+
+| # | BIAN Service Domain | SD Reference | Role in Demo | Collection | Version |
+|---|---|---|---|---|---|
+| 13 | **Account Information (AIS)** | SD-36 | Funds-availability gate: reads funding-account balance (built-in reads internal ledger; PSD2 AIS substitutable) and drives the atomic hold | `payoutAccountArrangement` (read) | v17 |
+| 14 | **Currency Exchange** | — (adjunct SD-66) | Converts amounts into the account currency before any balance mutation (mid rate + spread); replaceable by an external FX provider | *(built-in module, config in `capabilityModuleConfiguration`)* | v17 |
+
+> **Note 5 (v17):** Card-payment authorization adds a 4th parallel gate `funds` (SD-36) to the issuer/FDS/HRP gates. The hold is atomic (`$gte`-conditional `$inc`) and is the authoritative decision; it is released as a saga compensation if any gate declines. Insufficient funds → `declined` + ISO-8583 `'51'`. See [engineering-proposal.md ADR-038](engineering-proposal.md).
+
 > **Note 1:** BIAN does not define separate "sensitive" collections; the split is an architectural pattern for separating searchable QE fields from non-searchable QE fields, as required by MongoDB QE design constraints.
 >
 > **Note 2:** `customerAuthenticationAssessment` (SD-91) stores pre-seeded user accounts (email as QE:equality, bcrypt password hash, role) to support Application Mode login. Identity verification events belong to `partyAuthenticationAssessment` (SD-16). In a production FSI system, authentication would be delegated to an identity provider (e.g., MS Entra ID). The SD-91 collection demonstrates that even user credential lookups can be encrypted via QE.
@@ -1312,3 +1321,17 @@ The Integration Hub is designed around PCI DSS v4.0 third-party service provider
 ---
 
 *This document is a living artifact. Update the Decisions Log with any architectural or scope change agreed during development.*
+
+## Bank Transfers (ACH / SEPA / SWIFT) — capability add-on
+
+> Delivered under development plan v17 (dev-plan tranche "v17.1"), not a numbered product release.
+
+The PSP supports outbound bank transfers over ACH, SEPA and SWIFT, to registered accounts and to
+unregistered accounts (details entered on a form). All transfers are external bank transfers executed
+through providers (BIAN SD-65/66): the rail is auto-derived (with override) and validated per standard
+(ISO 13616 IBAN, ISO 9362 BIC, NACHA ABA), fees are quoted per rail, and a pre-initiation risk gate
+(FDS/HRP/AML) blocks and opens an L1-reviewable fraud case on a negative evaluation. Recurring payments
+(ACH Direct Debit, SEPA SDD) are supported via mandates. PCI DSS: bank coordinates are transaction-scoped
+and never travel on the bus; every transfer is audited (Req 10) with the execution reference as correlation id.
+
+*Added 2026-07-04 (v17.1).*

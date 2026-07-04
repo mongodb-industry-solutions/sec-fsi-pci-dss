@@ -56,7 +56,7 @@ function maskCardNumber(raw: string): string {
 }
 
 function generateToken(): string {
-  return `tok_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+  return `pm_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
 }
 
 function simulateCipher(seed: string): string {

@@ -15,6 +15,7 @@ import { deliverWebhook, type WebhookDeliveryResult } from './webhook.service';
 import { MERCHANT_AGREEMENT_COLLECTION, MerchantAgreementControlRecord } from '../models/merchantAgreement.model';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
+import { WebhookService } from './merchantWebhook.service';
 
 // Human-readable decline reasons keyed by the PSP/issuer response code (BIAN SD-15).
 export const DECLINE_REASONS: Record<string, string> = {
@@ -82,7 +83,21 @@ export async function sendMerchantPaymentCallback(db: Db, o: MerchantPaymentCall
     }
   } catch { /* merchant lookup failure never blocks the payment outcome */ }
 
-  // 2) Unified-audit business event (visible + searchable in /system/audit-events) — now WITH the
+  // 2) Typed webhook dispatch (new per-event-type system; fire-and-forget, non-blocking)
+  const typedEventType = o.result === 'approved' ? 'payment.completed' : 'payment.failed';
+  new WebhookService(db).dispatch(o.merchantAgreementInstanceReference, typedEventType, {
+    transactionReference: transactionId ?? o.contextRef,
+    merchantReference: o.merchantReference,
+    amount: { value: o.amount, currency: o.currency },
+    status: o.result === 'approved' ? 'ACSC' : 'RJCT',
+    statusCode: o.responseCode,
+    ...(o.authorizationCode ? { authorizationCode: o.authorizationCode } : {}),
+    maskedPan: o.maskedPan,
+    cardToken: o.cardToken,
+    ...(o.declineReason ? { declineReason: o.declineReason } : {}),
+  }).catch(() => { /* delivery failure never blocks payment */ });
+
+  // 3) Unified-audit business event (visible + searchable in /system/audit-events) — now WITH the
   // webhook request (method/headers/body) and the merchant's response, for PCI DSS Req 10.7 auditing.
   emitProcessEvent(db, {
     entityType: 'transaction',
@@ -119,7 +134,7 @@ export async function sendMerchantPaymentCallback(db: Db, o: MerchantPaymentCall
     bianControlRecordType: 'PaymentOrderProcedure',
   });
 
-  // 3) Integration Hub audit event (inbound/outbound mechanism).
+  // 5) Integration Hub audit event (inbound/outbound mechanism).
   try {
     await dispatchProvider(db, 'generic', o.triggeredBy, payload, {
       entityType: 'transaction',

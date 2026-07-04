@@ -27,6 +27,17 @@ async function apiFetch<T>(
   return res.json() as Promise<T>;
 }
 
+// v17.1 bank transfer destination (banking coordinates for the rail engine).
+export interface BankDestination {
+  countryCode: string;
+  currency: string;
+  iban?: string;
+  accountNumber?: string;
+  routingNumber?: string;
+  bic?: string;
+  correspondentBic?: string;
+}
+
 export interface LoginResponse {
   token: string;
   user: { partyAuthenticationInstanceReference: string; name: string; email: string; role: string };
@@ -70,6 +81,101 @@ export interface AuthDomain {
   flowType?: 'client_credentials' | 'authorization_code' | 'saml' | 'oidc';
   /** Optional banner text shown below the domain selector (sourced from DB) */
   alertMessage?: string;
+}
+
+// v16: Typed webhook types (ADR-038)
+export type WebhookEventType =
+  | 'payment.completed'
+  | 'payment.failed'
+  | 'oauth.authorization_granted'
+  | 'oauth.authorization_revoked'
+  | 'user.notification'
+  | 'dispute.opened'
+  | 'kyb.status_changed';
+
+export const WEBHOOK_EVENT_LABELS: Record<WebhookEventType, string> = {
+  'payment.completed': 'Payment Completed',
+  'payment.failed': 'Payment Failed',
+  'oauth.authorization_granted': 'OAuth Authorization Granted',
+  'oauth.authorization_revoked': 'OAuth Authorization Revoked',
+  'user.notification': 'User Notification (delegation)',
+  'dispute.opened': 'Dispute Opened',
+  'kyb.status_changed': 'KYB Status Changed',
+};
+
+export interface TypedWebhookConfig {
+  webhookId: string;
+  webhookEventType: WebhookEventType;
+  webhookUrl: string;
+  webhookSecret: string;           // Masked on GET
+  webhookStatus: 'active' | 'inactive';
+  webhookAttributeMapping?: Record<string, string>;
+  webhookHeaders?: Record<string, string>;
+  webhookApiKeyId?: string;
+  webhookApiKeyTransport?: 'header' | 'body';
+  webhookApiKeyFieldName?: string;
+  webhookCreatedDateTime: string;
+  webhookLastTestedAt?: string;
+  webhookLastDeliveryStatus?: 'success' | 'failed';
+  webhookLastDeliveryError?: string;
+}
+
+export interface TypedWebhookTestResult {
+  delivered: boolean;
+  statusCode?: number;
+  attempts: number;
+  requestHeaders: Record<string, string>;
+  requestBody: unknown;
+  response?: { status: number; headers: Record<string, string>; body: unknown };
+  error?: string;
+  signature: string;
+}
+
+export interface WebhookDeliveryLog {
+  logId: string;
+  merchantAgreementInstanceReference: string;
+  webhookId: string;
+  webhookEventType: WebhookEventType;
+  deliveryType: 'live' | 'test';
+  requestUrl: string;
+  requestHeaders: Record<string, string>;
+  requestBody: unknown;
+  responseStatus?: number;
+  responseHeaders?: Record<string, string>;
+  responseBody?: unknown;
+  delivered: boolean;
+  attempts: number;
+  error?: string;
+  signature: string;
+  deliveredAt: string;
+}
+
+// v16: Merchant OAuth 2.0 client registration (SD-89 BQ:Grant)
+export interface MerchantOAuthClient {
+  oauthClientId: string;
+  oauthClientSecretPrefix: string;          // First 8 chars — plaintext never returned
+  oauthRedirectUris: string[];
+  oauthGrantTypes: ('authorization_code' | 'client_credentials' | 'refresh_token')[];
+  oauthScopes: string[];
+  oauthClientStatus: 'active' | 'suspended' | 'revoked';
+  oauthClientCreatedDateTime: string;
+  oauthTokenLifetimeSeconds: number;
+  oauthRefreshTokenLifetimeDays: number;
+  oauthRequirePkce: boolean;
+  oauthPostLogoutRedirectUris?: string[];
+  oauthClaimMapping?: Record<string, string>;
+}
+
+// v16: OAuth consent grants (user-authorized apps)
+export interface ConsentGrant {
+  consentId: string;
+  oauthClientId: string;
+  merchantAgreementInstanceReference: string;
+  merchantName: string;
+  grantedScopes: string[];
+  consentStatus: 'active' | 'revoked';
+  consentGrantedAt: string;
+  lastUsedAt?: string | null;
 }
 
 export interface Merchant {
@@ -435,6 +541,7 @@ export const api = {
         role: string;
         domain: string;
         partyInstanceReference?: string;
+        party?: Record<string, unknown> | null;
         agreement: Record<string, unknown> | null;
       }>('/api/v1/auth/me', {}, token),
   },
@@ -815,6 +922,12 @@ export const api = {
         { method: 'PATCH', body: JSON.stringify(patch) },
         token,
       ),
+    deactivate: (id: string, token: string, reason?: string) =>
+      apiFetch<{ merchantAgreementInstanceReference: string; merchantAgreementStatus: string; merchantDeactivatedDateTime: string }>(
+        `/api/v1/merchants/${id}/deactivate`,
+        { method: 'POST', body: JSON.stringify({ reason }) },
+        token,
+      ),
     transactions: (merchantId: string, params: {
       page?: number; limit?: number; status?: string; search?: string;
       txnId?: string; cardToken?: string; dateFrom?: string; dateTo?: string;
@@ -914,6 +1027,49 @@ export const api = {
       apiFetch<{ revoked: boolean; keyId: string }>(
         `/api/v1/merchants/${merchantId}/keys/${keyId}`, { method: 'DELETE' }, token
       ),
+    // v16: OAuth 2.0 client management (SD-89 BQ:Grant)
+    getOAuthClient: (merchantId: string, token: string) =>
+      apiFetch<MerchantOAuthClient>(`/api/v1/merchants/${merchantId}/oauth-client`, {}, token),
+    createOAuthClient: (merchantId: string, token: string, body: {
+      redirect_uris: string[];
+      grant_types: string[];
+      scopes: string[];
+      require_pkce?: boolean;
+      token_lifetime_seconds?: number;
+      refresh_token_lifetime_days?: number;
+    }) =>
+      apiFetch<{ client: MerchantOAuthClient; oauthClientSecret: string }>(
+        `/api/v1/merchants/${merchantId}/oauth-client`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token,
+      ),
+    updateOAuthClient: (merchantId: string, token: string, patch: {
+      redirect_uris?: string[];
+      post_logout_redirect_uris?: string[];
+      grant_types?: string[];
+      scopes?: string[];
+      require_pkce?: boolean;
+      token_lifetime_seconds?: number;
+      refresh_token_lifetime_days?: number;
+      claim_mapping?: Record<string, string>;
+    }) =>
+      apiFetch<MerchantOAuthClient>(
+        `/api/v1/merchants/${merchantId}/oauth-client`,
+        { method: 'PATCH', body: JSON.stringify(patch) },
+        token,
+      ),
+    rotateOAuthClientSecret: (merchantId: string, token: string) =>
+      apiFetch<{ oauthClientId: string; oauthClientSecret: string }>(
+        `/api/v1/merchants/${merchantId}/oauth-client/rotate-secret`,
+        { method: 'POST' },
+        token,
+      ),
+    revokeOAuthClient: (merchantId: string, token: string) =>
+      apiFetch<{ revoked: boolean }>(
+        `/api/v1/merchants/${merchantId}/oauth-client`,
+        { method: 'DELETE' },
+        token,
+      ),
     registerWebhook: (merchantId: string, webhookEndpoint: string, token: string) =>
       apiFetch<{ merchantAgreementInstanceReference: string; merchantWebhookEndpoint: string; merchantWebhookSecret?: string }>(
         `/api/v1/merchants/${merchantId}/webhooks`,
@@ -935,6 +1091,79 @@ export const api = {
         response?: unknown;
         error?: string;
       }>(`/api/v1/merchants/${merchantId}/webhooks/test`, { method: 'POST', body: JSON.stringify(body ?? {}) }, token),
+
+    // v16: Typed webhook registry (ADR-038) — per-event-type webhooks
+    listTypedWebhooks: (merchantId: string, token: string) =>
+      apiFetch<{ webhooks: TypedWebhookConfig[] }>(`/api/v1/merchants/${merchantId}/webhooks/registry`, {}, token),
+    registerTypedWebhook: (merchantId: string, token: string, body: {
+      eventType: WebhookEventType; url: string;
+      attributeMapping?: Record<string, string>; headers?: Record<string, string>;
+      apiKeyId?: string; apiKeyTransport?: 'header' | 'body'; apiKeyFieldName?: string;
+    }) =>
+      apiFetch<{ webhook: TypedWebhookConfig; webhookSecret: string }>(
+        `/api/v1/merchants/${merchantId}/webhooks/registry`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token,
+      ),
+    updateTypedWebhook: (merchantId: string, webhookId: string, token: string, patch: {
+      url?: string; status?: 'active' | 'inactive';
+      attributeMapping?: Record<string, string>; headers?: Record<string, string>;
+      apiKeyId?: string | null; apiKeyTransport?: 'header' | 'body'; apiKeyFieldName?: string;
+    }) =>
+      apiFetch<TypedWebhookConfig>(
+        `/api/v1/merchants/${merchantId}/webhooks/registry/${webhookId}`,
+        { method: 'PATCH', body: JSON.stringify(patch) },
+        token,
+      ),
+    deleteTypedWebhook: (merchantId: string, webhookId: string, token: string) =>
+      apiFetch<{ deleted: boolean; webhookId: string }>(
+        `/api/v1/merchants/${merchantId}/webhooks/registry/${webhookId}`,
+        { method: 'DELETE' },
+        token,
+      ),
+    testTypedWebhook: (merchantId: string, webhookId: string, token: string, payload?: Record<string, unknown>) =>
+      apiFetch<TypedWebhookTestResult>(
+        `/api/v1/merchants/${merchantId}/webhooks/registry/${webhookId}/test`,
+        { method: 'POST', body: JSON.stringify(payload ? { payload } : {}) },
+        token,
+      ),
+    getTestPayload: (merchantId: string, webhookId: string, token: string) =>
+      apiFetch<{ payload: Record<string, unknown> }>(
+        `/api/v1/merchants/${merchantId}/webhooks/registry/${webhookId}/test-payload`,
+        {},
+        token,
+      ),
+    listDeliveryLogs: (
+      merchantId: string,
+      token: string,
+      filter?: { eventType?: WebhookEventType; deliveryType?: 'live' | 'test'; delivered?: boolean },
+      pagination?: { page?: number; limit?: number },
+    ) => {
+      const params = new URLSearchParams();
+      if (filter?.eventType) params.set('eventType', filter.eventType);
+      if (filter?.deliveryType) params.set('deliveryType', filter.deliveryType);
+      if (filter?.delivered !== undefined) params.set('delivered', String(filter.delivered));
+      if (pagination?.page) params.set('page', String(pagination.page));
+      if (pagination?.limit) params.set('limit', String(pagination.limit));
+      const qs = params.toString();
+      return apiFetch<{ logs: WebhookDeliveryLog[]; total: number; page: number; limit: number; totalPages: number }>(
+        `/api/v1/merchants/${merchantId}/webhooks/logs${qs ? '?' + qs : ''}`,
+        {},
+        token,
+      );
+    },
+  },
+
+  // v16: OAuth consent grants (user's authorized apps)
+  consentGrants: {
+    list: (token: string) =>
+      apiFetch<{ grants: ConsentGrant[] }>('/api/v1/auth/grants', {}, token),
+    revoke: (consentId: string, token: string) =>
+      apiFetch<{ revoked: boolean; consentId: string }>(
+        `/api/v1/auth/grants/${consentId}`,
+        { method: 'DELETE' },
+        token,
+      ),
   },
 
   checkout: {
@@ -1144,6 +1373,307 @@ export const api = {
       remove: (id: string, token: string) =>
         apiFetch<{ deleted: boolean }>(`/api/v1/modules/domains/${id}`, { method: 'DELETE' }, token),
     },
+  },
+
+  // SD-66 Payout Account Arrangement + SD-65 Payment Execution (v17)
+  accounts: {
+    list: (partyRef: string, token: string, params?: { status?: string; page?: number; limit?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+      ).toString() : '';
+      return apiFetch<{
+        results: Array<{
+          payoutAccountInstanceReference: string;
+          payoutAccountType: string;
+          payoutAccountStatus: string;
+          payoutAccountCurrency: string;
+          payoutAccountAlias?: string;
+          payoutAccountBankName?: string;
+          payoutAccountIsDefault: boolean;
+          payoutAccountPreferredRail: string;
+          payoutAccountBalance?: { availableAmount: number; pendingAmount: number; reservedAmount: number; currency: string };
+          recordCreatedDateTime: string;
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/accounts/${encodeURIComponent(partyRef)}${qs}`, {}, token);
+    },
+    setDefault: (partyRef: string, accountRef: string, token: string) =>
+      apiFetch<{ payoutAccountInstanceReference: string; payoutAccountIsDefault: boolean }>(
+        `/api/v1/accounts/${encodeURIComponent(partyRef)}/${encodeURIComponent(accountRef)}/default`,
+        { method: 'POST', body: JSON.stringify({}) },
+        token,
+      ),
+    close: (partyRef: string, accountRef: string, token: string) =>
+      apiFetch<{ payoutAccountInstanceReference: string; payoutAccountStatus: string }>(
+        `/api/v1/accounts/${encodeURIComponent(partyRef)}/${encodeURIComponent(accountRef)}`,
+        { method: 'DELETE' },
+        token,
+      ),
+    get: (partyRef: string, accountRef: string, token: string) =>
+      apiFetch<Record<string, unknown>>(
+        `/api/v1/accounts/${encodeURIComponent(partyRef)}/${encodeURIComponent(accountRef)}`,
+        {},
+        token
+      ),
+    update: (partyRef: string, accountRef: string, body: { payoutAccountAlias?: string; payoutAccountIsDefault?: boolean }, token: string) =>
+      apiFetch<Record<string, unknown>>(
+        `/api/v1/accounts/${encodeURIComponent(partyRef)}/${encodeURIComponent(accountRef)}`,
+        { method: 'PATCH', body: JSON.stringify(body) },
+        token
+      ),
+    create: (partyRef: string, body: Record<string, unknown>, token: string) =>
+      apiFetch<Record<string, unknown>>(
+        `/api/v1/accounts/${encodeURIComponent(partyRef)}`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token
+      ),
+    revealIban: (partyRef: string, accountRef: string, token: string) =>
+      apiFetch<{ payoutAccountIban: string }>(
+        `/api/v1/accounts/${encodeURIComponent(partyRef)}/${encodeURIComponent(accountRef)}/iban`,
+        {},
+        token
+      ),
+    cards: (partyRef: string, accountRef: string, token: string) =>
+      apiFetch<{ results: Array<{
+        paymentCardInstanceReference: string;
+        paymentCardMaskedPanDisplay: string;
+        paymentCardNetwork: string;
+        paymentCardStatus: string;
+        paymentCardIsPreferred: boolean;
+        paymentCardAlias?: string;
+        fundingPayoutAccountInstanceReference?: string;
+        recordCreatedDateTime: string;
+      }>; total: number }>(
+        `/api/v1/accounts/${encodeURIComponent(partyRef)}/${encodeURIComponent(accountRef)}/cards`,
+        {},
+        token
+      ),
+    getTransfer: (transferRef: string, token: string) =>
+      apiFetch<{
+        paymentExecutionInstanceReference: string;
+        initiatorPartyReference: string | null;
+        beneficiaryPartyReference: string | null;
+        sourcePayoutAccountReference: string | null;
+        resolvedPayoutAccountReference: string | null;
+        beneficiaryArrangementReference: string | null;
+        beneficiaryName: string | null;
+        destinationIban: string | null;
+        destinationAccountMasked: string | null;
+        destinationCountry: string | null;
+        grossAmount: number;
+        netAmount: number;
+        feeAmount: number;
+        currency: string;
+        recipientCurrency: string | null;
+        recipientAmount: number | null;
+        fxRate: number | null;
+        paymentExecutionRail: string | null;
+        routingNote: string | null;
+        paymentExecutionStatus: string;
+        fraudCaseCreated: boolean | null;
+        fraudDiagnosisInstanceReference: string | null;
+        initiatedAt: string | null;
+        completedAt: string | null;
+        fraudCase: {
+          fraudDiagnosisInstanceReference: string;
+          fraudDiagnosisCaseReference: string;
+          fraudDiagnosisCaseStatus: string;
+          fraudDiagnosisCaseSeverity: string;
+          fraudDiagnosisScore: number | null;
+          riskIndicators: string[];
+          subsystemSignals: Record<string, unknown> | null;
+        } | null;
+      }>(
+        `/api/v1/accounts/transfer/${encodeURIComponent(transferRef)}`,
+        {},
+        token
+      ),
+    transfers: (partyRef: string, token: string, params?: { page?: number; limit?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])
+      ).toString() : '';
+      return apiFetch<{
+        results: Array<{
+          paymentExecutionInstanceReference: string;
+          initiatorPartyReference: string | null;
+          beneficiaryPartyReference: string | null;
+          resolvedPayoutAccountReference: string | null;
+          grossAmount: number;
+          netAmount: number;
+          feeAmount: number;
+          currency: string;
+          paymentExecutionRail: string | null;
+          routingNote: string | null;
+          paymentExecutionStatus: string;
+          direction: 'sent' | 'received';
+          initiatedAt: string | null;
+          completedAt: string | null;
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/accounts/${encodeURIComponent(partyRef)}/transfers${qs}`, {}, token);
+    },
+    movements: (partyRef: string, accountRef: string, token: string, params?: { type?: string; direction?: string; from?: string; to?: string; page?: number; limit?: number }) => {
+      const qs = new URLSearchParams();
+      if (params?.type) qs.set('type', params.type);
+      if (params?.direction) qs.set('direction', params.direction);
+      if (params?.from) qs.set('from', params.from);
+      if (params?.to) qs.set('to', params.to);
+      if (params?.page) qs.set('page', String(params.page));
+      if (params?.limit) qs.set('limit', String(params.limit));
+      const q = qs.toString();
+      return apiFetch<{ movements: Record<string, unknown>[]; total: number }>(
+        `/api/v1/accounts/${encodeURIComponent(partyRef)}/${encodeURIComponent(accountRef)}/movements${q ? `?${q}` : ''}`,
+        {},
+        token
+      );
+    },
+  },
+
+  // SD-54 Counterparty Administration — staff-facing beneficiary registry (v18)
+  beneficiaries: {
+    list: (
+      token: string,
+      params?: { ownerRef?: string; q?: string; status?: 'active' | 'removed'; page?: number; limit?: number },
+    ) => {
+      const qs = params
+        ? '?' + new URLSearchParams(
+            Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]),
+          ).toString()
+        : '';
+      return apiFetch<{
+        results: Array<{
+          counterpartyArrangementReference: string;
+          ownerPartyReference: string;
+          counterpartyPartyReference: string;
+          counterpartyLabel: string;
+          counterpartyLookupType: 'phone' | 'email';
+          counterpartyLookupHint: string;
+          counterpartyArrangementStatus: 'active' | 'removed';
+          recordCreatedDateTime: string;
+          recordUpdatedDateTime: string;
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/beneficiaries${qs}`, {}, token);
+    },
+    get: (beneficiaryRef: string, token: string) =>
+      apiFetch<{
+        counterpartyArrangementReference: string;
+        ownerPartyReference: string;
+        counterpartyPartyReference: string;
+        counterpartyLabel: string;
+        counterpartyLookupType: 'phone' | 'email';
+        counterpartyLookupHint: string;
+        counterpartyArrangementStatus: 'active' | 'removed';
+        bianServiceDomain: string;
+        bianControlRecordType: string;
+        recordCreatedDateTime: string;
+        recordUpdatedDateTime: string;
+        schemaVersion: number;
+      }>(`/api/v1/beneficiaries/by-ref/${encodeURIComponent(beneficiaryRef)}`, {}, token),
+    updateLabel: (ownerRef: string, beneficiaryRef: string, counterpartyLabel: string, token: string) =>
+      apiFetch<Record<string, unknown>>(
+        `/api/v1/beneficiaries/${encodeURIComponent(ownerRef)}/${encodeURIComponent(beneficiaryRef)}`,
+        { method: 'PATCH', body: JSON.stringify({ counterpartyLabel }) },
+        token,
+      ),
+    add: (
+      ownerRef: string,
+      body: { lookupType: 'phone' | 'email'; lookupValue: string; label?: string },
+      token: string,
+    ) =>
+      apiFetch<{ found: boolean; counterpartyArrangementReference?: string; counterpartyLabel?: string; counterpartyLookupHint?: string }>(
+        `/api/v1/beneficiaries/${encodeURIComponent(ownerRef)}`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token,
+      ),
+    remove: (ownerRef: string, beneficiaryRef: string, token: string) =>
+      apiFetch<{ counterpartyArrangementReference: string; counterpartyArrangementStatus: string }>(
+        `/api/v1/beneficiaries/${encodeURIComponent(ownerRef)}/${encodeURIComponent(beneficiaryRef)}`,
+        { method: 'DELETE' },
+        token,
+      ),
+    transfer: (
+      ownerRef: string,
+      beneficiaryRef: string,
+      body: { fromAccountRef: string; amount: number; note?: string },
+      token: string,
+    ) =>
+      apiFetch<{ transferReference: string; amount: number; currency: string; status: string; failureReason?: string; recipientHint?: string }>(
+        `/api/v1/beneficiaries/${encodeURIComponent(ownerRef)}/${encodeURIComponent(beneficiaryRef)}/transfer`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token,
+      ),
+  },
+
+  // v17.1: bank transfers (ACH / SEPA / SWIFT) — rail engine preview + execute.
+  transfers: {
+    preview: (
+      body: { destination: BankDestination; amountCurrency?: string; rail?: string },
+      token: string,
+    ) =>
+      apiFetch<{ ok: boolean; rail?: string; feeAmount?: number; feeCurrency?: string; errors: string[] }>(
+        `/api/v1/gateway/transfers/preview`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token,
+      ),
+    bank: (
+      body: { amount: number; currency: string; destination: BankDestination; rail?: string; reference?: string; settlementSchedule?: string },
+      token: string,
+      idempotencyKey?: string,
+    ) =>
+      apiFetch<{ executionReference: string; status: string; rail?: string; feeAmount?: number; currency: string; errors?: string[] }>(
+        `/api/v1/gateway/transfers/bank`,
+        { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined },
+        token,
+      ),
+    status: (ref: string, token: string) =>
+      apiFetch<{ executionReference: string; status: string; rail?: string; grossAmount: number; feeAmount: number; currency: string; failureReason?: string; completedAt?: string }>(
+        `/api/v1/gateway/transfers/${encodeURIComponent(ref)}/status`,
+        {},
+        token,
+      ),
+    createMandate: (
+      body: { scheme: string; amount: number; currency: string; destination: BankDestination; frequency: string; reference?: string; maxRuns?: number },
+      token: string,
+    ) =>
+      apiFetch<{ recurringMandateInstanceReference: string; mandateReference: string; scheme: string; frequency: string; nextRunAt: string }>(
+        `/api/v1/gateway/transfers/mandates`,
+        { method: 'POST', body: JSON.stringify(body) },
+        token,
+      ),
+  },
+
+  executions: {
+    list: (token: string, params?: { status?: string; page?: number; limit?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+      ).toString() : '';
+      return apiFetch<{
+        results: Array<{
+          paymentExecutionInstanceReference: string;
+          paymentExecutionStatus: string;
+          grossAmount: number;
+          netAmount: number;
+          currency: string;
+          beneficiaryType: string;
+          resolvedPayoutAccountReference?: string;
+          cardTransactionInstanceReference?: string;
+          paymentExecutionRail?: string;
+          recordCreatedDateTime: string;
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/executions${qs}`, {}, token);
+    },
+    getById: (executionRef: string, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/executions/${encodeURIComponent(executionRef)}`, {}, token),
   },
 
   processEvents: {

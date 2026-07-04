@@ -341,6 +341,9 @@ export function bianMetaFor(type: IntegrationProviderType): { domain: string; co
     credit_bureau:      { domain: 'Customer Credit Rating',             controlRecordType: 'CustomerCreditRatingState',                  pciDss: ['Req 12.8.1'] },
     card_authorization: { domain: 'Card Authorization',                 controlRecordType: 'CardAuthorizationRecord',                    pciDss: ['Req 3.3.1', 'Req 10.2.1'] },
     card_issuer:        { domain: 'Payment Card',                       controlRecordType: 'PaymentCardProcedure',                        pciDss: ['Req 3.3.1', 'Req 3.5.1', 'Req 8.3.6'] },
+    account_information: { domain: 'SD-36 Open Banking',               controlRecordType: 'AccountInformationValidation',               pciDss: ['Req 12.8.1', 'Req 10.2.1'] },
+    payment_initiation:  { domain: 'SD-65 Payment Execution',          controlRecordType: 'PaymentExecutionProcedure',                  pciDss: ['Req 12.8.1', 'Req 10.2.1'] },
+    currency_exchange:   { domain: 'SD-66 Payment Initiation',          controlRecordType: 'CurrencyExchangeConversion',                 pciDss: ['Req 10.2.1'] },
     generic:            { domain: 'External Provider Arrangements',     controlRecordType: 'ExternalProviderArrangementPortfolio',       pciDss: ['Req 12.8.1'] },
   };
   return map[type];

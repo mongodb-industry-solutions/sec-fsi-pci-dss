@@ -23,10 +23,15 @@ import { amlModule }       from '../src/providers/aml';
 import { kycModule }       from '../src/providers/kyc';
 import { kybModule }       from '../src/providers/kyb';
 import { creditBureauModule }      from '../src/providers/credit-bureau';
-import { cardAuthorizationModule } from '../src/providers/card-authorization';
-import { cardIssuerModule }        from '../src/providers/card-issuer';
+import { cardAuthorizationModule }  from '../src/providers/card-authorization';
+import { cardIssuerModule }         from '../src/providers/card-issuer';
+import { accountInformationModule } from '../src/providers/account-information';
+import { paymentInitiationModule }  from '../src/providers/payment-initiation';
 import { domainModule }       from '../src/modules/domain';
 import { notificationsModule } from '../src/modules/notification';
+import { oidcDiscoveryController } from '../src/modules/identity/controllers/oidcDiscovery.controller';
+import { initOidcKeys } from '../src/modules/identity/services/oidcKeys.service';
+import { merchantPortalController } from '../src/modules/gateway/controllers/merchantPortal.controller';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
@@ -54,6 +59,17 @@ export async function buildApp(): Promise<FastifyInstance> {
   // MongoDB plugin is fault-tolerant: if connection fails the server still starts.
   // fastify.dbError is set to a non-null string on failure (credentials stripped).
   await fastify.register(mongodbPlugin);
+
+  // v16: initialise OAuth key provider after DB is connected (registers public key in Atlas)
+  fastify.addHook('onReady', async () => {
+    if (!fastify.dbError && fastify.db) {
+      try {
+        await initOidcKeys(fastify.db);
+      } catch (err) {
+        fastify.log.warn({ err }, '[oauth-keys] Key init failed — OIDC endpoints unavailable until fixed');
+      }
+    }
+  });
 
   // Auth: skip JWT check for public routes and Swagger UI
   fastify.addHook('preHandler', authMiddleware);
@@ -128,6 +144,10 @@ export async function buildApp(): Promise<FastifyInstance> {
     }
   });
 
+  // v16: OIDC Discovery at root (/.well-known/openid-configuration) + JWKS (/api/v1/auth/jwks)
+  // These MUST be registered at root level — oidcDiscovery handles both paths internally.
+  await fastify.register(oidcDiscoveryController);
+
   // API routes  -  each module registers its own routes internally
   await fastify.register(identityModule,     { prefix: '/api/v1' });
   await fastify.register(customerModule,     { prefix: '/api/v1' });
@@ -144,12 +164,16 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(kycModule,          { prefix: '/api/v1' });
   await fastify.register(kybModule,          { prefix: '/api/v1' });
   await fastify.register(creditBureauModule, { prefix: '/api/v1' });
-  await fastify.register(cardAuthorizationModule, { prefix: '/api/v1' });
-  await fastify.register(cardIssuerModule,   { prefix: '/api/v1' });
+  await fastify.register(cardAuthorizationModule,  { prefix: '/api/v1' });
+  await fastify.register(cardIssuerModule,         { prefix: '/api/v1' });
+  await fastify.register(accountInformationModule, { prefix: '/api/v1' });
+  await fastify.register(paymentInitiationModule,  { prefix: '/api/v1' });
   // Internal Module without a Provider counterpart (ADR-029).
   await fastify.register(domainModule,  { prefix: '/api/v1' });
   // Customer notifications (pending fraud-investigation questions to answer).
   await fastify.register(notificationsModule, { prefix: '/api/v1' });
+  // v16: Merchant Portal — OAuth-authenticated programmatic access (ADR-037)
+  await fastify.register(merchantPortalController, { prefix: '/api/v1/merchant/portal' });
 
   return fastify;
 }

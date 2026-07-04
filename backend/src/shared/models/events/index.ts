@@ -10,3 +10,4 @@ export * from './onboarding.events';
 export * from './system.events';
 export * from './wire.contracts';
 export * from './pii.envelope';
+export * from './payoutOrchestration.events';

@@ -28,6 +28,7 @@ import { provisionDataEncryptionKeys } from './keyVault';
 import { resolveCryptLibOptions } from './cryptLib';
 import { canReadSensitive } from '../middleware/rbac';
 import type { UserRole } from '../../shared/models/identity.model';
+import { config } from '../../config';
 
 const kmsConfig = getKmsConfig();
 
@@ -35,7 +36,7 @@ let _l1Client: MongoClient | null = null;
 let _l2Client: MongoClient | null = null;
 
 async function buildQEClient(uri: string, tier: 'level1' | 'level2'): Promise<MongoClient> {
-  const plainClient = new MongoClient(process.env.MONGODB_URI!, {
+  const plainClient = new MongoClient(config.mongodb.uri, {
     serverSelectionTimeoutMS: 8000,
     connectTimeoutMS: 8000,
   });
@@ -44,7 +45,7 @@ async function buildQEClient(uri: string, tier: 'level1' | 'level2'): Promise<Mo
   await plainClient.close();
 
   const maps = buildEncryptedFieldsMaps(deks, tier);
-  const dbName = process.env.MONGODB_DB_NAME!;
+  const dbName = config.mongodb.dbName;
   const cryptLib = resolveCryptLibOptions();
 
   const client = new MongoClient(uri, {
@@ -59,6 +60,14 @@ async function buildQEClient(uri: string, tier: 'level1' | 'level2'): Promise<Mo
         [`${dbName}.customerAgreementProcedure`]:       maps.customerAgreementProcedure,
         [`${dbName}.paymentCardManagement`]:            maps.paymentCardManagement,
         [`${dbName}.customerAuthenticationAssessment`]: maps.customerAuthenticationAssessment,
+        // SD-66: IBAN/routing are QE:none (level2 only) — level1 map omits this entry entirely
+        ...(maps.payoutAccountArrangement
+          ? { [`${dbName}.payoutAccountArrangement`]: maps.payoutAccountArrangement }
+          : {}),
+        // SD-65: destinationIban (unregistered external destination) QE:none — level2 only
+        ...(maps.paymentExecutionProcedure
+          ? { [`${dbName}.paymentExecutionProcedure`]: maps.paymentExecutionProcedure }
+          : {}),
       },
       extraOptions: {
         ...(cryptLib.cryptSharedLibPath && { cryptSharedLibPath: cryptLib.cryptSharedLibPath }),
@@ -73,14 +82,14 @@ async function buildQEClient(uri: string, tier: 'level1' | 'level2'): Promise<Mo
 
 export async function getL1QEClient(): Promise<MongoClient> {
   if (_l1Client) return _l1Client;
-  const uri = process.env.MONGODB_URI_LEVEL1 ?? process.env.MONGODB_URI!;
+  const uri = config.mongodb.uriLevel1 ?? config.mongodb.uri;
   _l1Client = await buildQEClient(uri, 'level1');
   return _l1Client;
 }
 
 export async function getL2QEClient(): Promise<MongoClient> {
   if (_l2Client) return _l2Client;
-  const uri = process.env.MONGODB_URI_LEVEL2 ?? process.env.MONGODB_URI!;
+  const uri = config.mongodb.uriLevel2 ?? config.mongodb.uri;
   _l2Client = await buildQEClient(uri, 'level2');
   return _l2Client;
 }
@@ -93,7 +102,7 @@ export async function getL2QEClient(): Promise<MongoClient> {
 export async function getDbForRole(role: UserRole, hasValidToken = false): Promise<Db> {
   const useL2 = canReadSensitive(role, hasValidToken);
   const client = useL2 ? await getL2QEClient() : await getL1QEClient();
-  return client.db(process.env.MONGODB_DB_NAME!);
+  return client.db(config.mongodb.dbName);
 }
 
 export async function closeRoleClients(): Promise<void> {

@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import { spawn, execSync } from 'child_process';
 import * as path from 'path';
+import { reloadDbRuntime } from '../../../plugins/mongodb';
 import { logBuffer, appendLog, writeCount } from '../../../shared/services/logBuffer';
 import { beginSSE } from '../../../shared/services/sse';
 import { resolveTestStrategy, NormalizedTestSummary } from '../services/testRunners';
@@ -160,7 +161,8 @@ function spawnFrontend(): void {
 
 const ALLOWED_NPM_COMMANDS: Record<string, string[]> = {
   'setup':             ['run', 'setup'],
-  'setup:key':         ['run', 'setup:key'],
+  'setup:key:master':  ['run', 'setup:key:master'],
+  'setup:key:rsa':     ['run', 'setup:key:rsa'],
   'setup:db':          ['run', 'setup:db'],
   'setup:generate':    ['run', 'setup:generate'],
   'setup:seed':        ['run', 'setup:seed'],
@@ -665,5 +667,61 @@ export async function adminController(fastify: FastifyInstance) {
     appendLog('[admin] Backend restart initiated');
     await reply.send({ ok: true, message: 'Backend restarting...' });
     setTimeout(() => process.exit(0), 800);
+  });
+
+  // POST /admin/reload
+  // Hot-reload the DB runtime IN-PROCESS (no restart): reloads .env, rebuilds the Queryable
+  // Encryption client + event bus/subscribers against a fresh connection. Use this after a
+  // drop + setup:db + seed on servers that cannot be restarted — it picks up the new key
+  // vault / DEKs and fixes "not all keys requested were satisfied" without exiting the process.
+  // Cross-platform (pure Node). Independent of /admin/restart.
+  fastify.post('/reload', {
+    schema: {
+      tags: ['admin'],
+      summary: 'Hot-reload env + DB/QE runtime in-process (no restart)',
+      description: 'Reloads .env and rebuilds the QE client + event bus/subscribers so a new key vault / DEK set (after drop + setup + seed) is picked up without restarting the process.',
+      security: [{ adminAuth: [] }],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            ok:      { type: 'boolean' },
+            message: { type: 'string' },
+            steps:   { type: 'array', items: { type: 'string' } },
+          },
+        },
+        401: { $ref: 'Error#' },
+        429: { $ref: 'Error#' },
+        500: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const ip = request.ip ?? 'unknown';
+    const rl = checkOpsRateLimit(ip);
+    if (!rl.allowed) {
+      reply.header('Retry-After', String(rl.retryAfter));
+      return reply.status(429).send({ error: `Too many requests. Retry after ${rl.retryAfter}s.` });
+    }
+    if (!verifyAdminToken(request.headers.authorization)) {
+      return reply.status(401).send({ error: 'Invalid admin token' });
+    }
+
+    const startedIso = new Date().toISOString();
+    appendLog(`[admin] command "reload" — hot-reload runtime (in-process, no restart) @ ${startedIso}`);
+    appendLog(`[admin] reload requested from ${ip}`);
+    try {
+      const { steps } = await reloadDbRuntime(fastify);
+      for (const s of steps) appendLog(`[admin] reload · ${s}`);
+      appendLog('[admin] command "reload" finished OK (login/QE now use the current key vault)');
+      return reply.send({
+        ok: true,
+        message: 'Runtime reloaded — .env + QE client + event bus rebuilt.',
+        steps,
+      });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      appendLog(`[admin] command "reload" FAILED: ${reason}`);
+      return reply.status(500).send({ error: `Reload failed: ${reason}` });
+    }
   });
 }

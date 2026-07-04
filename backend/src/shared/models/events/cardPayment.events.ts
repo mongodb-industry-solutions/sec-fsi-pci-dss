@@ -16,7 +16,7 @@ export interface CardPaymentAuthorizationRequested {
   cardNetwork?: string;
   cardToken?: string;                       // tokenized card-on-file reference
   accountReference?: string;
-  gatesExpected: Array<'card.issuer' | 'fds' | 'hrp'>;
+  gatesExpected: Array<'card.issuer' | 'fds' | 'hrp' | 'funds'>;
 }
 
 /**
@@ -107,8 +107,8 @@ export interface HrpScreeningCompleted {
 export interface CardPaymentAuthorizationCompleted {
   outcome: 'authorized' | 'declined';
   responseCode?: string;
-  decisionReason?: string;                  // set on decline, e.g. "sanctions_match"
-  declinedBy?: 'card.issuer' | 'fds' | 'hrp';
+  decisionReason?: string;                  // set on decline, e.g. "sanctions_match" | "insufficient_funds"
+  declinedBy?: 'card.issuer' | 'fds' | 'hrp' | 'funds';
   settledAmount?: { amount: number; currency: string };
   fraudCaseCreated: boolean;
   fraudDiagnosisInstanceReference?: string; // the case to enrich in Phase 2

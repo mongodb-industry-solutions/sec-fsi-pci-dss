@@ -26,6 +26,7 @@
 
 import * as https from 'https';
 import { buildBasicAuthHeader } from '../encryption/digest';
+import { config } from '../../config';
 
 const ATLAS_API_BASE = 'cloud.mongodb.com';
 const ATLAS_API_PATH_BASE = '/api/atlas/v2';
@@ -154,10 +155,10 @@ async function upsertDbUser(
 // -- Public entry point ------------------------------------------------------─
 
 export async function createAtlasRoles(): Promise<void> {
-  const publicKey  = process.env.ATLAS_PUBLIC_KEY;
-  const privateKey = process.env.ATLAS_PRIVATE_KEY;
-  const projectId  = process.env.ATLAS_PROJECT_ID;
-  const dbName     = process.env.MONGODB_DB_NAME;
+  const publicKey  = config.atlas.publicKey;
+  const privateKey = config.atlas.privateKey;
+  const projectId  = config.atlas.projectId;
+  const dbName     = config.mongodb.dbName;
 
   if (!publicKey || !privateKey || !projectId || !dbName) {
     console.log('   ATLAS_PUBLIC_KEY / ATLAS_PRIVATE_KEY / ATLAS_PROJECT_ID not set - skipping Atlas role automation.');
@@ -173,10 +174,10 @@ export async function createAtlasRoles(): Promise<void> {
     buildActions(dbName, ['FIND', 'UPDATE', 'INSERT']));
 
   // DB users
-  const l1User  = process.env.ATLAS_DB_USER_LEVEL1;
-  const l1Pass  = process.env.ATLAS_DB_USER_LEVEL1_PASSWORD;
-  const l2User  = process.env.ATLAS_DB_USER_LEVEL2;
-  const l2Pass  = process.env.ATLAS_DB_USER_LEVEL2_PASSWORD;
+  const l1User  = config.atlas.dbUserLevel1;
+  const l1Pass  = config.atlas.dbUserLevel1Password;
+  const l2User  = config.atlas.dbUserLevel2;
+  const l2Pass  = config.atlas.dbUserLevel2Password;
 
   if (l1User && l1Pass) {
     await upsertDbUser(projectId, publicKey, privateKey, l1User, l1Pass, 'pci_level1_role', dbName);

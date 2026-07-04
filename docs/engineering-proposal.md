@@ -433,6 +433,14 @@ The API URL surface follows REST nesting and module semantics: `/api/v1/customer
 | **P24** | Frontend: gateway simulator step + merchant profile view in Application Mode | P22, P23 | v4 |
 | **P25** | Backend + Frontend: AI agent integration (Magenta, `agentDraftDiagnosis` field) | P5 | v5 |
 | **P26** | Frontend: AI draft inline panel (Accept / Override / Dismiss) | P25 | v5 |
+| **P27** | Backend: bank-transfer rail engine (`shared/services/bankTransfer`: RailResolver, FeeCalculator, IBAN/BIC/ABA validators, return-code maps) | P19 | Add-on (dev v17) |
+| **P28** | Backend: provider-based transfer execution — `bankTransfer.service` + `dispatchProvider`; refactor `payoutOrchestration` + `p2pTransfer` off direct builtin imports; async settlement | P27 | Add-on (dev v17) |
+| **P29** | Backend: pre-initiation risk gate (`transferRiskGate`: FDS/HRP/AML) with L1 fraud-case opening on block | P28 | Add-on (dev v17) |
+| **P30** | Backend: recurring mandates (ACH SDD / SEPA SDD) — model, service, API, background scheduler | P28 | Add-on (dev v17) |
+| **P31** | Backend: transfer status endpoint + idempotency store + config-driven fees/sandbox | P28 | Add-on (dev v17) |
+| **P32** | Frontend: `/system/transfer/bank` — rail auto-detect, live validation, fee, status polling, recurring Direct Debit | P28, P31 | Add-on (dev v17) |
+
+See ADR-039 (§ADRs) and `tmp/dev.v17.plan.md` for the detailed v17.1 change plan and progress board.
 
 ---
 
@@ -459,7 +467,7 @@ If a breaking schema change is needed (e.g., adding a QE range field), the colle
 | AWS KMS latency degrades demo flow | Low | Medium | Cache the unwrapped DEK in memory for the process lifetime; only call KMS on startup |
 | Atlas M0 / M2 / M5 (free tier) used by a developer: QE not supported | High | High | Gate `bin/setup.ts` with a cluster tier check; fail fast with a clear error message |
 | QE `$lookup` limitation breaks a planned join | Low | High | All joins are application-side sequential queries: no `$lookup` used. Documented in ADR-001 |
-| Seed data accidentally includes real PAN format | Medium | High | Seed generator always prefixes tokens with `tok_`; grep CI check rejects any string matching `\b\d{13,19}\b` |
+| Seed data accidentally includes real PAN format | Medium | High | Seed generator always prefixes tokens with `pm_`; grep CI check rejects any string matching `\b\d{13,19}\b` |
 | Key vault DEK reference lost (collection dropped without DEK cleanup) | Low | High | `bin/setup.ts --reset` drops collections then recreates DEKs; order is enforced in script |
 | Demo breaks at conference due to AWS KMS unavailability | Low | High | Local KMS fallback is always available with `KMS_PROVIDER=local`; test it before travel |
 
@@ -785,7 +793,7 @@ The correct cross-domain FK is `merchantOwnerPartyReference → party.partyInsta
 | Single-use link enforcement | `status = 'completed'` after first payment; subsequent `POST /pay` returns 410 |
 | Merchant API key storage | bcrypt hash in DB; plaintext returned only once on key generation |
 | Webhook authenticity (merchant receiving) | `X-Webhook-Signature: sha256=<hmac(payload, webhookSecret)>` — mirrors Stripe/GitHub pattern |
-| Card data isolation | Raw card numbers never sent to or stored by the API; client-side tokenization (`tok_<random>`) |
+| Card data isolation | Raw card numbers never sent to or stored by the API; client-side tokenization (`pm_<random>`) |
 | PCI DSS SAQ A | The hosted payment pages (`/checkout/*`, `/pay/*`) are on the PSP domain; buyers enter card details only on those pages |
 
 ### API Key Design
@@ -1692,3 +1700,199 @@ ADR-004 established the dual-mode frontend. In practice the Simulator had drifte
 - (+) Realistic PSP flow: client waits via SSE; issuer/sanctions/fraud gate in real time; AML/investigation are post-auth.
 - (+) No CHD on the bus or in the event store (Req 3.2).
 - (−) Saga/Phase-2 aggregation state is in-memory (matches the in-process bus); a multi-instance deployment persists it alongside the broker migration. Event-store retention is not yet a TTL (regular collection for the unique `eventId` index); to be revisited.
+
+---
+
+## ADR-033 — OIDC Authorization Server Implemented from Scratch (No oidc-provider Library)
+
+**Status:** Accepted (2026-07-01). Implements **v16** (Issue #29). Aligns **BIAN SD-16** (Party Authentication) and **PCI DSS Req 8.6** (system account credential management).
+
+**Context.** External merchants and third-party systems need a standard mechanism to authenticate against the PSP and access merchant-scoped data. The `oidc-provider` npm package is the most complete Node.js OIDC library, but it requires a complex MongoDB adapter and introduces a large external security surface in a PCI DSS demo.
+
+**Decision.** Implement the Authorization Server manually using primitives already in the project: `jsonwebtoken` (RS256 signing), `crypto` (PKCE SHA256, RSA keypair generation), `bcryptjs` (client secrets), `uuid` (code/token IDs). Support three grant types: `authorization_code` + PKCE (S256), `client_credentials`, and `refresh_token`. All flows are defined in RFC 6749, RFC 7636, and OIDC Core 1.0.
+
+**Consequences.**
+- (+) Fully auditable line-by-line; no hidden adapter layers — appropriate for a PCI DSS demonstration.
+- (+) Zero new npm dependencies; no additional CVE surface.
+- (+) All grant types are well-specified; implementation is straightforward.
+- (−) More development time than a library; no automatic spec-compliance guarantees (covered by integration tests instead).
+
+---
+
+## ADR-034 — OIDC Routes Under /api/v1/auth/ Prefix; Discovery at /.well-known/openid-configuration
+
+**Status:** Accepted (2026-07-01). Implements **v16**.
+
+**Context.** OIDC Discovery 1.0 §4 mandates that the discovery document is served at `{issuer}/.well-known/openid-configuration`. All other endpoint paths are advertised inside that document and have no mandated paths in the spec.
+
+**Decision.** Serve `/.well-known/openid-configuration` at root (no `/api/v1` prefix — spec-mandated). All other OIDC/OAuth2 endpoints use the `/api/v1/auth/` prefix for consistency with the existing internal auth controller (`/api/v1/auth/login`). Fastify's plugin system registers the discovery controller at root level separately from the `/api/v1` prefix.
+
+OIDC endpoints:
+- `GET /.well-known/openid-configuration` — discovery document (root, spec-mandated)
+- `GET /api/v1/auth/jwks` — JSON Web Key Set (public keys)
+- `GET /api/v1/auth/authorize` — Authorization Code flow initiation
+- `POST /api/v1/auth/token` — token issuance (all grant types)
+- `GET /api/v1/auth/userinfo` — OIDC userinfo claims
+- `POST /api/v1/auth/revoke` — RFC 7009 token revocation
+- `POST /api/v1/auth/introspect` — RFC 7662 token introspection
+
+**Consequences.**
+- (+) Discovery document at spec-mandated path; all other paths consistent with existing codebase convention.
+- (+) Any OIDC-compliant client can discover all endpoints from the well-known URL.
+- (−) Two registration points in `server.ts` (root + `/api/v1`); mitigated by clear comments.
+
+---
+
+## ADR-035 — RS256 JWT for OAuth Access Tokens; HS256 Retained for Internal PSP Sessions
+
+**Status:** Accepted (2026-07-01). Implements **v16**.
+
+**Context.** The existing internal authentication uses HS256 JWTs (`PSP_JWT_SECRET`). OAuth access tokens must be verifiable by merchants without sharing the PSP's secret — RS256 with a published JWKS endpoint enables this.
+
+**Decision.** Maintain two parallel signing mechanisms:
+1. **Internal PSP sessions** — HS256, `PSP_JWT_SECRET`. Used by `loginUser()` for employee/customer sessions. Unchanged.
+2. **OAuth access tokens + ID tokens** — RS256, RSA-2048 private key. Issued only by the OAuth token endpoint. Verifiable by anyone holding the public key from `/api/v1/auth/jwks`.
+
+The `sub` claim in OAuth tokens is the `customerAuthenticationInstanceReference` (for user-bearing flows) or `clientId` (for `client_credentials` flow). The `iss` claim is the PSP base URL (`PSP_BASE_URL` env var).
+
+**Consequences.**
+- (+) Merchant-verifiable tokens without sharing any PSP secret — standard OAuth architecture.
+- (+) Existing internal authentication is completely unaffected.
+- (−) Two key types to manage; mitigated by the `OAuthKeyProvider` abstraction (ADR-036).
+
+---
+
+## ADR-036 — RSA Private Key Is Never Persisted in MongoDB; Switchable OAuthKeyProvider (local|aws) Mirrors QE KMS_PROVIDER Pattern
+
+**Status:** Accepted (2026-07-01). Implements **v16**. Aligns **PCI DSS Req 3.6** (cryptographic key management).
+
+**Context.** JWT signing requires an RSA private key at runtime. Storing it in MongoDB would mean any client with a valid connection string could extract and forge any JWT — a complete authentication bypass, violating PCI DSS Req 3.6. The project already uses a `KMS_PROVIDER=local|aws` pattern for QE field encryption.
+
+**Decision.** Mirror the existing pattern with `OAUTH_KEY_PROVIDER=local|aws`:
+
+```
+OAUTH_KEY_PROVIDER=local  →  LocalKeyProvider
+  Private key: $OAUTH_KEY_STORE_DIR/private.pem  (chmod 600, never committed)
+  Dev:         auto-generated on first startup (NODE_ENV=development only)
+  Docker:      bind-mount or named volume
+  K8s:         Secret mounted as volume
+
+OAUTH_KEY_PROVIDER=aws  →  AwsKmsKeyProvider
+  Private key: never exported from AWS KMS hardware
+  Signing:     kms.sign() call — key never in application memory
+  Same AWS credentials as QE (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)
+```
+
+Both providers expose a common `OAuthKeyProvider` interface. `npm run setup:key:rsa` generates the keypair (`private.pem` + `public.pem`) before first run (analogous to `npm run setup:db` for QE).
+
+**Consequences.**
+- (+) Private key never in the database; FIPS 140-2 hardware boundary available via `aws` provider.
+- (+) Same operational pattern as QE — existing runbooks and K8s Secret patterns apply.
+- (+) JWKS multi-key rotation with grace period, driven by the provider (see amendment).
+- (−) One new setup step (`npm run setup:key:rsa`); documented in README and installation guide.
+
+**Amendment (2026-07-03) — FS-first: provider is the single source of truth.**
+The original design used the Atlas `partyAuthenticationKey` collection as the source for the JWKS and stored the public key there on rotation. This created a dual source of truth that broke dashboard-initiated rotation: `generateAndActivateKey`/`uploadKey` wrote the new **public** key to the DB and marked it active, but **never persisted the new private key**, so the signing provider kept using the old key file — the advertised active `kid` could never sign. Corrected design:
+- The `OAuthKeyProvider` (filesystem / KMS) owns all key material and is the only source for signing, verification, and the JWKS. Interface: `sign`, `getKid`, `getPublicKeyJwk`, `listPublicKeys`, `getPublicPemByKid`, `supportsRotation`, `rotate`, `importKeypair`, `revoke`.
+- `LocalKeyProvider` layout: active private at `private.pem`, active public at `public.pem`, and deprecated **public-only** keys under `retired/<kid>.pub.pem` for the grace period (deprecated private material is dropped — only the active key ever signs).
+- Token verification resolves the public key by the token's `kid` (active **or** a deprecated key still in grace), enabling a real rotation grace period.
+- `partyAuthenticationKey` is now an **audit mirror** only (status + provenance for the admin dashboard), reconciled from the provider on startup and after every mutation. It is never read to verify tokens or build the JWKS.
+- KMS rotation/import/revoke are unsupported in-process (managed inside AWS KMS); `supportsRotation()` returns false.
+
+---
+
+## ADR-037 — Merchant Portal API as OAuth-Authenticated Namespace (/api/v1/merchant/portal/)
+
+**Status:** Accepted (2026-07-01). Implements **v16**. Aligns **BIAN SD-89** (Merchant Relations), **PCI DSS Req 7** (least privilege), **Req 8.6** (system account lifecycle).
+
+**Context.** Merchants today access their data through the PSP application UI. To support programmatic integration, merchants need a machine-readable API. Reusing the internal PSP JWT (`role: merchant`) would conflate PSP-internal roles with external system accounts, violating PCI DSS Req 8.6's requirement for separate system account management.
+
+**Decision.** Create a dedicated `/api/v1/merchant/portal/` namespace authenticated by OAuth merchant access tokens (not internal JWTs). A `validateMerchantToken` middleware: (1) verifies RS256 JWT signature, (2) extracts `client_id`, (3) resolves the merchant from `merchantAgreementProcedure`, (4) checks `oauthClientStatus === 'active'`, (5) enforces scope-based access control per endpoint.
+
+All responses are scoped to the authenticated merchant's own records only:
+- `GET /api/v1/merchant/portal/me` — own merchant profile (scope: `read:merchant_profile`)
+- `GET /api/v1/merchant/portal/transactions` — own transaction metadata, NO customer PII (scope: `read:transactions`)
+- `GET /api/v1/merchant/portal/checkout-sessions` — own sessions (scope: `read:orders`)
+- `GET /api/v1/merchant/portal/payment-links` — own links (scope: `read:orders`)
+- `GET /api/v1/merchant/portal/notifications` + SSE (scope: `read:notifications`)
+
+**Consequences.**
+- (+) Merchants access only their own data — Req 7 least privilege enforced at middleware level.
+- (+) OAuth client lifecycle (issue / rotate / revoke) satisfies Req 8.6 system account management.
+- (+) All merchant portal calls emit `businessProcessEvent` via existing EventBus — Req 10 audit.
+- (−) New middleware in the request path; tested independently with expired/revoked/wrong-scope tokens.
+
+## ADR-038 — Funds-Availability Gate + Currency Exchange (Bank-Movement Cycle Precision)
+
+**Status:** Accepted (2026-07-03). Implements **v17**. Aligns **BIAN SD-36** (Account Information / AIS), **SD-15** (Card Authorization), **SD-66** (Payout Account / PISP), **PCI DSS Req 10.2.1** (audit of fund movements).
+
+**Context.** Card-payment authorization verified the issuer, fraud (FDS) and sanctions (HRP) gates but **never checked whether the funding account had sufficient balance**. The balance hold ran *post-authorization*, asynchronously and fire-and-forget, so an authorized payment could exceed available funds (the conditional hold failed silently). Balances could also be mutated in a mismatched currency (EUR card on a USD account). This broke the invariant that no balance goes negative in origin or destination.
+
+**Decision.**
+1. **Funds gate as a 4th parallel gate** of `PaymentAuthorizationSaga` (`card.issuer` + `fds` + `hrp` + **`funds`**). Events `funds.check.requested` / `funds.check.completed` (BIAN SD-36). The reactor (`providerGroups.onFunds`) resolves `cardToken → fundingPayoutAccount`, reads balance via the **`account_information` capability** (provider-indifferent: built-in module reads the internal ledger; an external PSD2 AIS substitutes it via `dispatchProvider` — **no internal/external branching**), and performs the **atomic hold** (`holdCardFunds`, `$gte`-conditional `$inc`). The hold is the authoritative decision: no read-modify-write race.
+2. **Scope of the gate.** It governs ONLY cards funded by a PSP-internal payout account (`fundingPayoutAccountInstanceReference`). New/unsaved tokens and external cards pass through (their funds are the issuer's responsibility — the `card.issuer` gate).
+3. **Compensation.** On any-gate decline, the saga releases the hold (`releaseCardHold`, pending → available), idempotently, including the ordering race where the hold lands after an earlier decline. Settlement clears the hold via `settleCardDebit`. Insufficient funds → `declined` + ISO-8583 `'51'` + `decisionReason 'insufficient_funds'` (no new BIAN status; the reason code carries it).
+4. **Currency Exchange built-in module** (new capability `currency_exchange`): `convert(amount, from, to)` = mid cross-rate (via base currency) + configurable spread. Money-movement points (card hold/settle, merchant debit/credit, P2P credit, refund) convert into the account currency so **no balance is ever mutated in a mismatched currency**. Replaceable by an external FX provider.
+5. **Seed reconciliation.** All seeders default to **EUR**; `pending/reserved` start at 0 and `balanceCreditLog` `initial_deposit == total balance`, so seeds start fully reconciled (Σ credits − Σ debits == balance).
+
+**Consequences.**
+- (+) A payment can no longer be authorized without sufficient funds; origin and destination balances stay consistent and non-negative. Req 10.2.1 audit preserved (every hold/release/settle is atomic `$inc`).
+- (+) Provider-indifferent: swapping the built-in AIS/FX for an external provider requires no flow change.
+- (+) The post-auth double-hold is removed (`decrementCardFundingBalance` now only credits refunds).
+- (−) One extra parallel gate + HTTP loopback read per PSP-funded card payment (consistent with the existing gate cost). Full transaction-replay for seed balances was deliberately NOT done (opening deposit == reconciled current balance) to preserve story-persona balances; a `reconcilePayoutBalances` replay seeder is deferred.
+
+## ADR-039: Bank transfers via provider dispatch + shared rail engine (v17.1)
+
+**Status:** Accepted (2026-07-04)
+
+**Context:** v17.1 adds ACH/SEPA/SWIFT bank transfers. The PSP does not own balances or virtual
+accounts; it operates over accounts held by external banks. Every money movement and balance read must
+therefore go through providers (external or built-in), preserving the EDA + Hexagonal architecture.
+
+**Decision:**
+1. Bank transfers are executed by dispatching to the `payment_initiation` provider (never a direct
+   built-in import), so an external PISP can replace the built-in module without changing the flow.
+2. Rail derivation, validation and fee pricing live in one shared, pure, OOP module
+   (`shared/services/bankTransfer`: `RailResolver`, `FeeCalculator`, IBAN/BIC/ABA validators, standard
+   return-code maps) reused by the provider, the orchestrator, the API and the frontend contract (DRY).
+3. Rail is auto-derived (EUR+IBAN+EEA -> SEPA; USD+routing+US -> ACH; BIC cross-border -> SWIFT) with a
+   user override; validation follows ISO 13616, ISO 9362 and the NACHA ABA checksum.
+4. Unregistered destinations are transaction-scoped by default (bound to the execution); persisted as a
+   beneficiary only on explicit opt-in.
+
+**Consequences:** No deviation from BIAN SD-65/66 or PCI DSS (Req 3 encryption of bank data, Req 10
+audit via `businessProcessEvent`/`complianceProcessEvent` correlated by execution reference). The
+built-in module may read the PSP DB, but callers stay provider-agnostic.
+
+*Added 2026-07-04 (v17.1; doc + code together per repo rules).*
+
+## ADR-040: Recipient identity on the payment execution + regulatory framing (v17.2)
+
+**Status:** Accepted (2026-07-04)
+
+**Context:** The payment-history detail (`/system/payment/history/{ref}`) showed an empty Recipient for
+bank transfers because the execution (SD-65) persisted no destination identity. Earlier code (and a
+comment on `payoutAccountIban`) mislabelled IBAN handling as "PCI DSS Req 3.3".
+
+**Decision:**
+1. **Regulatory framing corrected:** PCI DSS governs **card data (PAN/CHD)** only. IBAN / routing / BIC
+   are **bank account data → GDPR Art. 32 + PSD2**. Both are QE-encrypted at rest, for distinct drivers.
+2. **Recipient identity persisted on SD-65**, linking every known resource: `beneficiaryArrangementReference`
+   (→ `/system/beneficiaries/{cab…}`), `resolvedPayoutAccountReference` (→ `/system/accounts/{pau…}`), and
+   for unregistered externals `destinationIban` (full IBAN, **QE:none `DEK-exec-dest-iban`, L2 only**) +
+   `beneficiaryName` + `destinationAccountMasked` (plaintext, list views) + `destinationCountry`.
+   Registered destinations are not matched by IBAN (QE:none is non-searchable — that is the control); the
+   linking reference is captured at initiation instead.
+3. **KYC demographics belong to Party (SD-13), uniformly for all party types** (customer + employee):
+   `partyPostalAddress` added; `partyDateOfBirth`/`partyNationality` backfilled by the seeder. The KYC
+   *verification* workflow + govId stay in SD-53 (customers); KYB stays merchant-level. No SD-53 record is
+   forced onto employees (that would deviate from BIAN). `GET /auth/me` returns the Party record for all roles.
+4. **Setup + seeder are the source of truth** for the data-model change (new collection encryption, DEK,
+   seed demographics), per `CLAUDE.md §Data-model changes`. `paymentExecutionProcedure` becomes a
+   QE-encrypted collection created via `createCollections`; DB is rebuilt with `--reset` + reseed.
+
+**Consequences:** No BIAN/PCI/GDPR deviation; staff profiles are as complete as customers'; the Recipient
+block always shows a navigable link or the full destination. Existing executions predating the change show
+"Recipient not resolved" until reseeded.
+
+*Added 2026-07-04 (v17.2; doc + code together per repo rules).*

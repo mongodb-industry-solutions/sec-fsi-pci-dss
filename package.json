@@ -1,11 +1,12 @@
 {
   "name": "fsi-psp-leafy-pay",
   "description": "Leafy Pay is a PCI DSS-aligned Payment Service Provider (PSP) platform designed to provide digital banks and card issuers with secure and efficient payment processing capabilities, built on MongoDB.",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "private": true,
   "scripts": {
     "setup": "npm install && npm install --prefix frontend && npm install --prefix backend",
-    "setup:key": "npm run generate:key --prefix backend",
+    "setup:key:master": "npm run setup:key:master --prefix backend",
+    "setup:key:rsa": "npm run setup:key:rsa --prefix backend",
     "setup:db": "npm run setup:db --prefix backend",
     "setup:db:drop": "npm run setup:db:drop --prefix backend",
     "setup:check": "npm run setup:check --prefix backend",

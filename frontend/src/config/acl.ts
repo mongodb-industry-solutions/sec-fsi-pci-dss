@@ -6,6 +6,7 @@
 export const RESOURCES = [
   'transactions', 'customers', 'cards', 'fraudCases', 'merchants',
   'providers', 'modules', 'authDomains', 'roles', 'auditEvents', 'consents',
+  'accounts',
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
@@ -24,6 +25,7 @@ export const RESOURCE_LABELS: Record<string, string> = {
   roles: 'Roles',
   auditEvents: 'Audit Events',
   consents: 'Consents',
+  accounts: 'Payout Accounts',
 };
 
 export const ACTION_LABELS: Record<string, string> = {
@@ -46,6 +48,7 @@ export const RESOURCE_BIAN: Record<string, string> = {
   roles: 'SD-16 RBAC',
   auditEvents: 'ADR-025 · PCI Req 10',
   consents: 'Open Banking Consent',
+  accounts: 'SD-66 Payout Account Arrangement',
 };
 
 export type AclPermissionMap = Record<string, string[]>;
