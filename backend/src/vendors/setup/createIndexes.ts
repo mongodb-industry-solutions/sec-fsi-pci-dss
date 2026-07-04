@@ -4,6 +4,8 @@ import { PARTY_AUTH_CONSENT_COLLECTION } from '../../modules/identity/models/par
 import { PAYOUT_ACCOUNT_COLLECTION } from '../../modules/gateway/models/payoutAccount.model';
 import { PAYMENT_EXECUTION_COLLECTION } from '../../modules/gateway/models/paymentExecution.model';
 import { COUNTERPARTY_COLLECTION } from '../../modules/identity/models/counterpartyArrangement.model';
+import { RECURRING_MANDATE_COLLECTION } from '../../modules/gateway/models/recurringMandate.model';
+import { IDEMPOTENCY_COLLECTION } from '../../modules/gateway/services/idempotency.service';
 import { config } from '../../config';
 
 // ── Self-healing index helpers ────────────────────────────────────────────────
@@ -395,5 +397,17 @@ export async function createIndexes(client: MongoClient) {
     { key: { counterpartyArrangementReference: 1 }, unique: true },
     { key: { ownerPartyReference: 1, counterpartyArrangementStatus: 1 } },
     { key: { ownerPartyReference: 1, counterpartyPartyReference: 1 }, unique: true },
+  ]);
+
+  // v17.1: Recurring mandates (SD-66) — due-run scan by status + nextRunAt.
+  await ensureIndexes(db, RECURRING_MANDATE_COLLECTION, [
+    { key: { recurringMandateInstanceReference: 1 }, unique: true },
+    { key: { ownerPartyReference: 1, recordCreatedDateTime: -1 } },
+    { key: { mandateStatus: 1, nextRunAt: 1 } },
+  ]);
+
+  // v17.1: Idempotency store — unique composite key (first writer wins under a race).
+  await ensureIndexes(db, IDEMPOTENCY_COLLECTION, [
+    { key: { idempotencyKey: 1 }, unique: true },
   ]);
 }

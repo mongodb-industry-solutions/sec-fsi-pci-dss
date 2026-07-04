@@ -7,8 +7,10 @@
 import { FastifyInstance } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { requirePermission } from '../../../vendors/middleware/acl';
-import { previewBankTransfer, executeBankTransfer } from '../services/bankTransfer.service';
+import { previewBankTransfer, executeBankTransfer, type ExecuteBankTransferResult } from '../services/bankTransfer.service';
 import { createMandate, listMandates, cancelMandate, runDueMandates } from '../services/recurringMandate.service';
+import { getExecution } from '../services/paymentExecution.service';
+import { getIdempotent, saveIdempotent } from '../services/idempotency.service';
 import type { BankRail, RailDestination, RecurringScheme } from '../../../shared/services/bankTransfer';
 import type { MandateFrequency } from '../models/recurringMandate.model';
 
@@ -81,6 +83,14 @@ export async function transferController(fastify: FastifyInstance) {
     const user = getUser(request);
     if (!user?.partyRef) return reply.code(401).send({ error: 'Unauthenticated' });
     const body = request.body as ExecuteBody;
+
+    // Idempotency: replaying the same Idempotency-Key returns the original outcome (no double send).
+    const idemKey = request.headers['idempotency-key'] as string | undefined;
+    if (idemKey) {
+      const prior = await getIdempotent<ExecuteBankTransferResult>(fastify.db, 'transfer.bank', user.partyRef, idemKey);
+      if (prior) return reply.code(prior.status === 'submitted' ? 202 : 422).send(prior);
+    }
+
     const result = await executeBankTransfer(fastify.db, {
       initiatorPartyRef: user.partyRef,
       amount: body.amount,
@@ -90,8 +100,41 @@ export async function transferController(fastify: FastifyInstance) {
       reference: body.reference,
       settlementSchedule: body.settlementSchedule,
     });
+    if (idemKey) await saveIdempotent(fastify.db, 'transfer.bank', user.partyRef, idemKey, result);
     const code = result.status === 'submitted' ? 202 : 422;
     return reply.code(code).send(result);
+  });
+
+  // GET /api/v1/gateway/transfers/:ref/status — real-time execution status (customer-scoped).
+  fastify.get('/:ref/status', {
+    preHandler: requirePermission('beneficiaries', 'view'),
+    schema: {
+      tags: ['transfers'],
+      summary: 'Get bank-transfer execution status (SD-65)',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['ref'], properties: { ref: { type: 'string' } } },
+    },
+  }, async (request, reply) => {
+    const user = getUser(request);
+    if (!user?.partyRef) return reply.code(401).send({ error: 'Unauthenticated' });
+    const { ref } = request.params as { ref: string };
+    const exec = await getExecution(fastify.db, ref);
+    if (!exec) return reply.code(404).send({ error: 'Execution not found.' });
+    // Customer scope: only the initiator may read their own transfer status.
+    if (user.role === 'customer' && exec.initiatorPartyReference !== user.partyRef) {
+      return reply.code(403).send({ error: 'Access denied.' });
+    }
+    return reply.send({
+      executionReference: exec.paymentExecutionInstanceReference,
+      status: exec.paymentExecutionStatus,
+      rail: exec.paymentExecutionRail,
+      grossAmount: exec.grossAmount,
+      feeAmount: exec.feeAmount,
+      currency: exec.currency,
+      failureReason: exec.failureReason,
+      resolutionLog: exec.resolutionLog,
+      completedAt: exec.completedAt,
+    });
   });
 
   // ── Recurring mandates (ACH Direct Debit / SEPA SDD) ──────────────────────────

@@ -97,9 +97,20 @@ async function mongodbPlugin(fastify: FastifyInstance) {
     const chdSweepTimer = setInterval(() => { sweepAbandonedChd(db).catch(() => {}); }, 5 * 60 * 1000);
     chdSweepTimer.unref();
 
+    // v17.1: recurring-mandate scheduler — periodically run due ACH SDD / SEPA SDD collections.
+    // Config-gated (PAYOUT_MANDATE_SCHEDULER_MS=0 disables). Each run reuses executeBankTransfer.
+    const { config: appConfig } = await import('../config');
+    let mandateTimer: NodeJS.Timeout | undefined;
+    if (appConfig.payout.mandateSchedulerMs > 0) {
+      const { runDueMandates } = await import('../modules/gateway/services/recurringMandate.service');
+      mandateTimer = setInterval(() => { runDueMandates(db).catch(() => {}); }, appConfig.payout.mandateSchedulerMs);
+      mandateTimer.unref();
+    }
+
     fastify.addHook('onClose', async () => {
       clearInterval(sweepTimer);
       clearInterval(chdSweepTimer);
+      if (mandateTimer) clearInterval(mandateTimer);
       await getEventBus().stop().catch(() => {}); // drains/disconnects the broker engine cleanly
       const { closeQEClient } = await import('../vendors/encryption/qeClient');
       await closeQEClient();

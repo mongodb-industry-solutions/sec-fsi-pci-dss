@@ -101,6 +101,8 @@ export const config = {
     beneficiaryRateLimitRpm: parseInt(pspEnv('BENEFICIARY_RATE_LIMIT_RPM', '20')!, 10),
     // v17.1 Bank transfers — sandbox mode (transfers are simulated end to end; no real rail effect)
     sandbox: pspEnv('PAYOUT_SANDBOX', 'true') === 'true',
+    // v17.1 Recurring mandate scheduler poll interval (ms); 0 disables the background runner.
+    mandateSchedulerMs: parseInt(pspEnv('PAYOUT_MANDATE_SCHEDULER_MS', '60000')!, 10),
     // v17.1 Rail fee schedule (config-driven, single source; consumed by FeeCalculator)
     railFees: {
       sepa: parseFloat(pspEnv('PAYOUT_FEE_SEPA', '0')!),
