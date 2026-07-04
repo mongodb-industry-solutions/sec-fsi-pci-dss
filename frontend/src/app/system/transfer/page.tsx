@@ -38,7 +38,7 @@ export default function TransferPage() {
     return (
       <div className="w-full px-5 sm:px-8 py-6">
         <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-          Access denied — this page is available to customers only.
+          Access denied. This page is available to customers only.
         </div>
       </div>
     );

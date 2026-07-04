@@ -29,7 +29,7 @@ export default function SendToContactPage() {
     return (
       <div className="w-full px-5 sm:px-8 py-6">
         <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-          Access denied — this page is available to customers only.
+          Access denied. This page is available to customers only.
         </div>
       </div>
     );
@@ -147,7 +147,7 @@ function SendForm({ partyRef, token, onDone }: { partyRef: string; token: string
             type="number" min="0.01" step="0.01" placeholder="0.00"
             className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
           <span className="flex items-center px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm font-medium text-gray-600">
-            {selectedAccount?.payoutAccountCurrency ?? '—'}
+            {selectedAccount?.payoutAccountCurrency ?? 'N/A'}
           </span>
         </div>
       </div>
