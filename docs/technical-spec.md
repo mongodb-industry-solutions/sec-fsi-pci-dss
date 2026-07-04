@@ -3495,3 +3495,13 @@ Env vars (config.payout): `PAYOUT_SANDBOX` (default true; transfers simulated en
 `PAYMENT_INITIATION_ALWAYS_SUCCEED`.
 
 *Added 2026-07-04 (v17.1/G7).*
+
+### v17.1 — Recurring mandates (ACH SDD / SEPA SDD)
+
+Collection `recurringMandateProcedure` (SD-66). Endpoints:
+- `POST /api/v1/gateway/transfers/mandates` — create a mandate (scheme, amount, currency, destination, frequency, optional maxRuns). Destination validated by the rail engine.
+- `GET /api/v1/gateway/transfers/mandates` — list the caller's mandates.
+- `DELETE /api/v1/gateway/transfers/mandates/:ref` — cancel a mandate.
+- `POST /api/v1/gateway/transfers/mandates/run-due` — scheduler hook: runs all mandates with nextRunAt <= now, each via executeBankTransfer (rail engine + provider dispatch + risk gate), advancing nextRunAt (UTC) and completing at maxRuns.
+
+*Added 2026-07-04 (v17.1).*

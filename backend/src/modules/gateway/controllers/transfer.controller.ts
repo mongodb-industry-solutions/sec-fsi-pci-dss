@@ -8,7 +8,9 @@ import { FastifyInstance } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { requirePermission } from '../../../vendors/middleware/acl';
 import { previewBankTransfer, executeBankTransfer } from '../services/bankTransfer.service';
-import type { BankRail, RailDestination } from '../../../shared/services/bankTransfer';
+import { createMandate, listMandates, cancelMandate, runDueMandates } from '../services/recurringMandate.service';
+import type { BankRail, RailDestination, RecurringScheme } from '../../../shared/services/bankTransfer';
+import type { MandateFrequency } from '../models/recurringMandate.model';
 
 function getUser(request: unknown): JwtUserPayload | undefined {
   return (request as { user?: JwtUserPayload }).user;
@@ -90,5 +92,71 @@ export async function transferController(fastify: FastifyInstance) {
     });
     const code = result.status === 'submitted' ? 202 : 422;
     return reply.code(code).send(result);
+  });
+
+  // ── Recurring mandates (ACH Direct Debit / SEPA SDD) ──────────────────────────
+
+  // POST /api/v1/gateway/transfers/mandates — create a recurring mandate.
+  fastify.post('/mandates', {
+    preHandler: requirePermission('beneficiaries', 'manage'),
+    schema: {
+      tags: ['transfers'],
+      summary: 'Create a recurring payment mandate (ACH SDD / SEPA SDD) (SD-66)',
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['scheme', 'amount', 'currency', 'destination', 'frequency'],
+        properties: {
+          scheme: { type: 'string', enum: ['ach_direct_debit', 'sepa_sdd'] },
+          amount: { type: 'number', exclusiveMinimum: 0 },
+          currency: { type: 'string', minLength: 3, maxLength: 3 },
+          destination: destinationSchema,
+          frequency: { type: 'string', enum: ['weekly', 'monthly', 'quarterly', 'yearly'] },
+          reference: { type: 'string', maxLength: 140 },
+          maxRuns: { type: 'number', minimum: 1 },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const user = getUser(request);
+    if (!user?.partyRef) return reply.code(401).send({ error: 'Unauthenticated' });
+    const b = request.body as { scheme: RecurringScheme; amount: number; currency: string; destination: RailDestination; frequency: MandateFrequency; reference?: string; maxRuns?: number };
+    try {
+      const mandate = await createMandate(fastify.db, { ownerPartyReference: user.partyRef, ...b });
+      return reply.code(201).send(mandate);
+    } catch (err) {
+      const code = (err as { code?: number }).code === 400 ? 400 : 500;
+      return reply.code(code).send({ error: err instanceof Error ? err.message : 'Could not create mandate.' });
+    }
+  });
+
+  // GET /api/v1/gateway/transfers/mandates — list the caller's mandates.
+  fastify.get('/mandates', {
+    preHandler: requirePermission('beneficiaries', 'view'),
+    schema: { tags: ['transfers'], summary: 'List recurring mandates (SD-66)', security: [{ bearerAuth: [] }] },
+  }, async (request, reply) => {
+    const user = getUser(request);
+    if (!user?.partyRef) return reply.code(401).send({ error: 'Unauthenticated' });
+    return reply.send({ results: await listMandates(fastify.db, user.partyRef) });
+  });
+
+  // DELETE /api/v1/gateway/transfers/mandates/:ref — cancel a mandate.
+  fastify.delete('/mandates/:ref', {
+    preHandler: requirePermission('beneficiaries', 'manage'),
+    schema: { tags: ['transfers'], summary: 'Cancel a recurring mandate (SD-66)', security: [{ bearerAuth: [] }], params: { type: 'object', required: ['ref'], properties: { ref: { type: 'string' } } } },
+  }, async (request, reply) => {
+    const user = getUser(request);
+    if (!user?.partyRef) return reply.code(401).send({ error: 'Unauthenticated' });
+    const { ref } = request.params as { ref: string };
+    const ok = await cancelMandate(fastify.db, ref, user.partyRef);
+    return ok ? reply.send({ cancelled: true }) : reply.code(404).send({ error: 'Mandate not found or not active.' });
+  });
+
+  // POST /api/v1/gateway/transfers/mandates/run-due — run all due mandates (scheduler/admin).
+  fastify.post('/mandates/run-due', {
+    preHandler: requirePermission('beneficiaries', 'manage'),
+    schema: { tags: ['transfers'], summary: 'Run all due recurring mandates (scheduler hook)', security: [{ bearerAuth: [] }] },
+  }, async (_request, reply) => {
+    return reply.send(await runDueMandates(fastify.db));
   });
 }

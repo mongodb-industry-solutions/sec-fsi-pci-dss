@@ -68,6 +68,18 @@ describe('RailResolver', () => {
   });
 });
 
+import { nextRunDate } from '../../../../backend/src/modules/gateway/models/recurringMandate.model';
+
+describe('recurring mandate nextRunDate', () => {
+  test('advances by frequency period', () => {
+    const base = new Date('2026-01-15T00:00:00.000Z');
+    expect(nextRunDate(base, 'weekly').toISOString()).toBe('2026-01-22T00:00:00.000Z');
+    expect(nextRunDate(base, 'monthly').toISOString()).toBe('2026-02-15T00:00:00.000Z');
+    expect(nextRunDate(base, 'quarterly').toISOString()).toBe('2026-04-15T00:00:00.000Z');
+    expect(nextRunDate(base, 'yearly').toISOString()).toBe('2027-01-15T00:00:00.000Z');
+  });
+});
+
 describe('FeeCalculator', () => {
   const f = new FeeCalculator(DEFAULT_FEE_SCHEDULE);
 
