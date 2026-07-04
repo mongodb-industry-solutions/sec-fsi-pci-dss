@@ -27,7 +27,7 @@ function FieldInfo({ label, description }: { label: string; description: string 
         <Info size={12} />
       </button>
       {open && (
-        <div className="absolute z-50 bottom-full left-0 mb-1.5 w-64 bg-[#001E2B] text-white text-xs rounded-lg shadow-xl p-3 leading-relaxed">
+        <div className="absolute z-50 bottom-full left-0 mb-1.5 w-72 max-w-xs bg-[#001E2B] text-white text-xs rounded-lg shadow-xl p-3 leading-relaxed whitespace-normal">
           <span className="block font-semibold mb-1 text-[#00ED64]">{label}</span>
           <span className="block">{description}</span>
         </div>
@@ -370,10 +370,10 @@ export default function TransactionDetailPage() {
             return (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm border-t pt-4 mb-4">
                 <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
-                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2 flex items-center gap-1">
+                  <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2 flex items-center gap-1">
                     Sender
                     <FieldInfo label="Sender" description="The party who initiated and funded this P2P transfer (BIAN SD-65 initiator). Their payout account (SD-66) is debited atomically." />
-                  </p>
+                  </div>
                   {canSeeSource ? (
                     <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
                       <BlockRow label="Payout account" info="SD-66 Payout Account Arrangement debited for this transfer. Per GDPR, only the account holder and authorised staff can see this reference.">
@@ -391,10 +391,10 @@ export default function TransactionDetailPage() {
                 </div>
 
                 <div className="bg-green-50 rounded-lg p-3 border border-green-100">
-                  <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-2 flex items-center gap-1">
+                  <div className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-2 flex items-center gap-1">
                     Recipient
                     <FieldInfo label="Recipient" description="The PSP-registered party receiving the funds (BIAN SD-54 Counterparty Administration). Their payout account is credited at execution time." />
-                  </p>
+                  </div>
                   {canSeeDest ? (
                     <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
                       <BlockRow label="Payout account" info="SD-66 Payout Account Arrangement credited for this transfer. Resolved from the beneficiary arrangement at execution time. Per GDPR, only the account holder and authorised staff can see this reference.">
@@ -491,10 +491,10 @@ export default function TransactionDetailPage() {
 
             {fc.riskIndicators.length > 0 && (
               <div className="mb-3">
-                <p className="text-xs font-semibold text-gray-600 mb-1 uppercase flex items-center gap-1">
+                <div className="text-xs font-semibold text-gray-600 mb-1 uppercase flex items-center gap-1">
                   Risk indicators
                   <FieldInfo label="Risk indicators" description="Signals returned by FDS (Fraud Detection Score), HRP (High-Risk Party / sanctions screening), or AML (Anti-Money Laundering) providers. Each indicator corresponds to a specific compliance gate that flagged the transfer." />
-                </p>
+                </div>
                 <div className="flex flex-wrap gap-1">
                   {fc.riskIndicators.map((ind) => (
                     <span key={ind} className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">{ind}</span>
@@ -505,10 +505,10 @@ export default function TransactionDetailPage() {
 
             {fc.subsystemSignals && (
               <div className="mb-3">
-                <p className="text-xs font-semibold text-gray-600 mb-1 uppercase flex items-center gap-1">
+                <div className="text-xs font-semibold text-gray-600 mb-1 uppercase flex items-center gap-1">
                   Subsystem signals
                   <FieldInfo label="Subsystem signals" description="Raw aggregated responses from each compliance provider (FDS score, HRP match result, AML alert level). Extracted from the correlated event trail and attached to the fraud case for investigator context." />
-                </p>
+                </div>
                 <pre className="text-xs bg-gray-50 rounded p-2 overflow-x-auto text-gray-700">{JSON.stringify(fc.subsystemSignals, null, 2)}</pre>
               </div>
             )}
@@ -571,10 +571,10 @@ export default function TransactionDetailPage() {
         {/* Sender ↔ Recipient — consistent layout across all transaction types */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm border-t pt-4 mb-4">
           <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
-            <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2 flex items-center gap-1">
+            <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2 flex items-center gap-1">
               Sender
               <FieldInfo label="Sender" description="The cardholder who authorised this transaction (BIAN SD-88). The funding payout account (SD-66) is debited at authorisation; the hold is cleared at settlement." />
-            </p>
+            </div>
             <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
               <BlockRow label="Card" info="PAN masked to last 4 digits per PCI DSS Req 3.3. The full PAN is never stored after authorisation. Click to manage the card.">
                 {matchedCardId ? (
@@ -604,10 +604,10 @@ export default function TransactionDetailPage() {
           </div>
 
           <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
-            <p className="text-xs font-semibold text-orange-700 uppercase tracking-wide mb-2 flex items-center gap-1">
+            <div className="text-xs font-semibold text-orange-700 uppercase tracking-wide mb-2 flex items-center gap-1">
               Recipient
               <FieldInfo label="Recipient (Merchant)" description="The merchant who received the funds (BIAN SD-89 Merchant Agreement). MCC is disclosed to cardholders per Visa/Mastercard Core Rules — it appears on official statements." />
-            </p>
+            </div>
             <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
               <BlockRow label="Merchant" info="Name of the merchant as reported by the acquiring bank in the authorisation request.">
                 <span className="font-medium text-gray-800">{txn.merchant}</span>
