@@ -15,7 +15,7 @@ import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../mode
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
-import { screenTransfer } from './transferRiskGate';
+import { screenTransfer, openTransferFraudCase } from './transferRiskGate';
 
 export interface P2PTransferInput {
   initiatorPartyRef: string;         // the customer initiating the transfer
@@ -106,6 +106,8 @@ export async function executeP2PTransfer(
       recordCreatedDateTime: now, recordUpdatedDateTime: now, schemaVersion: 1,
     };
     await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).insertOne(blockedExec);
+    // Open an L1-reviewable fraud investigation case for the negative HRP/FDS/AML evaluation.
+    await openTransferFraudCase(db, { transferRef, initiatorPartyRef, indicators: screen.indicators, score: screen.score, amount, currency: transferCurrency, destinationRef: recipientAccount.payoutAccountInstanceReference });
     emitComplianceEvent(db, {
       entityType: 'execution', entityId: transferRef,
       processType: 'payment_processing', processAction: 'bank.transfer.blocked', processOutcome: 'rejected',

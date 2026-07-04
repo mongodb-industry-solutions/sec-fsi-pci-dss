@@ -8,6 +8,10 @@
 
 import { Db } from 'mongodb';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
+import { createFraudCase } from '../../fraud/services/fraudDiagnosis.service';
+import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
+import type { RiskSeverity } from '../../../shared/models/risk.model';
+import type { TransactionSnapshot } from '../../../shared/models/transaction.model';
 
 export interface TransferScreeningInput {
   transferRef: string;
@@ -58,6 +62,39 @@ export async function screenTransfer(
         : undefined;
 
   return { blocked, indicators, score: fdsR.score, reason };
+}
+
+/**
+ * Open a fraud investigation case (status 'open') for a transfer blocked by the risk gate, so an
+ * L1 support analyst (level1_analyst) reviews it. Emits fraud.case.opened + a notification via
+ * createFraudCase. Reused by the bank-transfer and P2P flows (DRY). Never throws.
+ */
+export async function openTransferFraudCase(
+  db: Db,
+  input: { transferRef: string; initiatorPartyRef?: string; indicators: string[]; score: number; amount: number; currency: string; destinationRef?: string },
+): Promise<void> {
+  try {
+    const { transferRef, initiatorPartyRef, indicators, score, amount, currency, destinationRef } = input;
+    // Resolve the initiator's customer agreement (falls back to the party ref).
+    let customerRef = initiatorPartyRef ?? transferRef;
+    if (initiatorPartyRef) {
+      const agreement = await db.collection<{ customerAgreementInstanceReference: string }>(CUSTOMER_AGREEMENT_COLLECTION)
+        .findOne({ partyInstanceReference: initiatorPartyRef }, { projection: { customerAgreementInstanceReference: 1 } });
+      customerRef = agreement?.customerAgreementInstanceReference ?? initiatorPartyRef;
+    }
+    const severity: RiskSeverity = (score >= 80 ? 'critical' : score >= 60 ? 'high' : score >= 40 ? 'medium' : 'high') as RiskSeverity;
+    const snapshot = {
+      cardTransactionInstanceReference: transferRef,
+      cardTransactionMaskedPanDisplay: 'Bank transfer',
+      cardTransactionMerchantName: `Transfer → ${destinationRef?.slice(0, 8) ?? 'external account'}`,
+      cardTransactionMerchantCategoryCode: '6012',
+      cardTransactionAmount: { amount, currency },
+      cardTransactionDateTime: new Date(),
+      cardTransactionStatus: 'exception',
+      cardTransactionChannel: 'transfer',
+    } as unknown as TransactionSnapshot;
+    await createFraudCase(db, transferRef, customerRef, indicators.length ? indicators : ['transfer.risk.block'], severity, snapshot, score);
+  } catch { /* case-opening must never block the (already-blocked) transfer response */ }
 }
 
 async function runFds(db: Db, ref: string, amount: number, currency: string): Promise<{ flag: boolean; score: number; reason?: string }> {

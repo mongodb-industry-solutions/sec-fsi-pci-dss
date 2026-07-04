@@ -14,7 +14,7 @@ import {
 } from '../../../shared/services/bankTransfer';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
-import { screenTransfer } from './transferRiskGate';
+import { screenTransfer, openTransferFraudCase } from './transferRiskGate';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 
 export interface BankTransferPreview {
@@ -96,6 +96,8 @@ export async function executeBankTransfer(
   });
   if (screen.blocked) {
     await recordException(db, executionRef, input, [screen.reason ?? 'Blocked by risk screening', ...screen.indicators], now);
+    // Open an L1-reviewable fraud investigation case for the negative HRP/FDS/AML evaluation.
+    await openTransferFraudCase(db, { transferRef: executionRef, initiatorPartyRef: input.initiatorPartyRef, indicators: screen.indicators, score: screen.score, amount: input.amount, currency: input.currency });
     emitComplianceEvent(db, {
       entityType: 'execution', entityId: executionRef,
       processType: 'payment_processing', processAction: 'bank.transfer.blocked',
