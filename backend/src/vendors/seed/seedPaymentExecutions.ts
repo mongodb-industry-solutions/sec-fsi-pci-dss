@@ -1,5 +1,6 @@
 import { Db } from 'mongodb';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../../modules/gateway/models/paymentExecution.model';
+import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../../modules/gateway/models/payoutAccount.model';
 
 // Demo bank-transfer executions (SD-65) covering the three recipient-identity variants so the
 // payment-history detail page (/system/payment/history/{ref}) shows a navigable link or full
@@ -76,14 +77,34 @@ const DEMO_EXECUTIONS: PaymentExecutionProcedure[] = [
 ];
 
 export async function seedPaymentExecutions(db: Db) {
+  const accountCol = db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION);
   let upserted = 0;
   for (const exec of DEMO_EXECUTIONS) {
-    await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).updateOne(
+    const res = await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).updateOne(
       { paymentExecutionInstanceReference: exec.paymentExecutionInstanceReference },
       { $set: exec },
       { upsert: true },
     );
     upserted++;
+
+    // Apply the balance movement ONLY when the execution is newly inserted (idempotent across
+    // reseeds), and only for settled (completed) transfers — so the seeded balances reconcile with
+    // the account-movement ledger (opening deposit − Σ sent + Σ received). Debit the source; credit
+    // an internal destination when present (external IBAN destinations leave the PSP → no credit).
+    if (res.upsertedCount === 1 && exec.paymentExecutionStatus === 'completed') {
+      if (exec.sourcePayoutAccountReference) {
+        await accountCol.updateOne(
+          { payoutAccountInstanceReference: exec.sourcePayoutAccountReference },
+          { $inc: { 'payoutAccountBalance.availableAmount': -exec.netAmount }, $set: { 'payoutAccountBalance.lastUpdatedDateTime': new Date() } },
+        );
+      }
+      if (exec.resolvedPayoutAccountReference) {
+        await accountCol.updateOne(
+          { payoutAccountInstanceReference: exec.resolvedPayoutAccountReference },
+          { $inc: { 'payoutAccountBalance.availableAmount': exec.netAmount }, $set: { 'payoutAccountBalance.lastUpdatedDateTime': new Date() } },
+        );
+      }
+    }
   }
-  console.log(`  ${PAYMENT_EXECUTION_COLLECTION}: ${upserted} demo executions upserted (beneficiary / registered account / external IBAN)`);
+  console.log(`  ${PAYMENT_EXECUTION_COLLECTION}: ${upserted} demo executions upserted (beneficiary / registered account / external IBAN); balances adjusted`);
 }

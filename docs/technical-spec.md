@@ -42,11 +42,12 @@ export interface PartyControlRecord {
   partyMobilePhoneNumberDigest: string;  // Blind index (keyed HMAC, NOT encrypted) — unique key for the phone
   partyName: string;                     // Becomes QE:equality in v2
   partyType: PartyType;
-  partyDateOfBirth?: string;             // ISO 8601 date
-  partyNationality?: string;             // ISO 3166-1 alpha-2
-  partyPostalAddress?: PartyPostalAddress; // SD-13 postal contact point (line1/line2/city/postalCode/countryCode)
+  partyDateOfBirth?: string;             // ISO 8601 date — GDPR PII, QE:none (DEK-party-dob, L2 only)
+  partyNationality?: string;             // ISO 3166-1 alpha-2 (plaintext — low sensitivity)
+  partyPostalAddress?: PartyPostalAddress; // SD-13 postal contact point — GDPR PII, QE:none (DEK-party-address, L2 only)
                                          // KYC-typical demographics apply to EVERY party (customer + employee),
-                                         // so staff profiles are as complete as customers'. GDPR PII, plaintext display.
+                                         // so staff profiles are as complete as customers'. Address + DOB are
+                                         // encrypted at rest and decrypted only for the L2 client / the party themselves.
   bianServiceDomain: 'Party Data Management';
   bianControlRecordType: 'Party';
   recordCreatedDateTime: Date;
@@ -1131,6 +1132,8 @@ All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `k
 |---|---|---|
 | `deks.partyEmail` | `DEK-party-email` | `party.partyEmailAddress` |
 | `deks.partyPhone` | `DEK-party-phone` | `party.partyMobilePhoneNumber` |
+| `deks.partyAddress` | `DEK-party-address` | `party.partyPostalAddress` (QE:none — GDPR PII, L2 only) |
+| `deks.partyDob` | `DEK-party-dob` | `party.partyDateOfBirth` (QE:none — GDPR PII, L2 only) |
 | `deks.authEmail` | `DEK-auth-email` | `customerAuthenticationAssessment.customerAuthenticationEmailAddress` |
 | `deks.customerAccountRef` | `DEK-customer-account-ref` | `customerAgreementProcedure.customerAgreementReference` |
 | `deks.txAccountRef` | `DEK-tx-account-ref` | `cardTransactionLog.cardTransactionAccountReference` |
@@ -1163,6 +1166,11 @@ export function buildEncryptedFieldsMaps(deks: DEKs, tier: QETier = 'level2') {
       fields: [
         { keyId: deks.partyEmail,  path: 'partyEmailAddress',      bsonType: 'string', queries: { queryType: 'equality' } },
         { keyId: deks.partyPhone,  path: 'partyMobilePhoneNumber', bsonType: 'string', queries: { queryType: 'equality' } },
+        // GDPR PII — QE:none, Level 2 only (postal address + date of birth)
+        ...(includeSensitive ? [
+          { keyId: deks.partyAddress, path: 'partyPostalAddress', bsonType: 'object' },
+          { keyId: deks.partyDob,     path: 'partyDateOfBirth',   bsonType: 'string' },
+        ] : []),
       ],
     },
 

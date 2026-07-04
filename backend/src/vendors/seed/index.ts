@@ -115,14 +115,16 @@ export async function runSeed() {
     console.log('Seeding payoutAccountArrangement (SD-66, v17)...');
     await seedPayoutAccounts(db);
 
-    console.log('Seeding paymentExecutionProcedure (SD-65, v17)...');
-    await seedPaymentExecutions(db);
-
     console.log('Seeding counterpartyArrangement (SD-54, v17)...');
     await seedCounterpartyArrangements(db);
 
     console.log('Seeding balanceCreditLog (SD-66 initial deposits, PCI DSS Req 10)...');
     await seedBalanceCredits(db);
+
+    // After opening deposits are logged (pre-transfer balances), so the demo executions can
+    // apply their balance movements and the ledger reconciles: opening − Σ(settled sent) + Σ(received).
+    console.log('Seeding paymentExecutionProcedure (SD-65, v17)...');
+    await seedPaymentExecutions(db);
 
     console.log('Seeding externalProviderArrangement (SD-193, Ch-07)...');
     await seedIntegrations(db);

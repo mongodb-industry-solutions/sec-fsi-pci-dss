@@ -474,22 +474,22 @@ export default function ProfilePage() {
             </>
           ) : ag?.customerMobilePhoneNumber ? (
             <RevealField label="Phone" plainValue={ag.customerMobilePhoneNumber} maskedValue={maskPhone(ag.customerMobilePhoneNumber)} type="qe-equality" collection="party" />
-          ) : (
+          ) : ag ? (
             <>
               <span className="text-gray-500 text-sm">Phone</span>
               <span className="text-gray-400 text-xs italic">{editing ? '' : 'Not on file'}</span>
             </>
-          )}
+          ) : null /* staff: phone rendered from the party record below (no duplicate row) */}
 
-          {/* Account Reference - read-only */}
+          {/* Account Reference - customers only (staff have no customer agreement) */}
           {ag?.customerAgreementReference ? (
             <RevealField label="Account Reference" plainValue={ag.customerAgreementReference} maskedValue={maskAccountRef(ag.customerAgreementReference)} type="qe-equality" collection="customerAgreementProcedure" />
-          ) : (
+          ) : ag ? (
             <>
               <span className="text-gray-500 text-sm">Account Reference</span>
               <span className="text-gray-400 text-xs italic">Not on file</span>
             </>
-          )}
+          ) : null}
 
           {/* Segment / member since - read-only */}
           {ag?.customerSegment && <PlainField label="Account type" value={SEGMENT_LABELS[ag.customerSegment] ?? ag.customerSegment} collection="customerAgreementProcedure" />}
@@ -586,24 +586,32 @@ export default function ProfilePage() {
             </>
           )}
 
-          {/* SD-13 Party demographics — shown for staff (no customer agreement), so their
-              profile carries the same KYC-typical detail as customers: phone, DOB, nationality, address. */}
-          {!ag && pty && (
-            <>
-              {pty.partyMobilePhoneNumber && (
-                <RevealField label="Phone" plainValue={pty.partyMobilePhoneNumber} maskedValue={maskPhone(pty.partyMobilePhoneNumber)} type="qe-equality" collection="party" />
-              )}
-              {pty.partyDateOfBirth && <PlainField label="Date of birth" value={new Date(pty.partyDateOfBirth).toLocaleDateString()} collection="party" />}
-              {pty.partyNationality && <PlainField label="Nationality" value={pty.partyNationality} collection="party" />}
-              {pty.partyPostalAddress && (
-                <PlainField
-                  label="Address"
-                  value={[pty.partyPostalAddress.line1, pty.partyPostalAddress.line2, pty.partyPostalAddress.city, pty.partyPostalAddress.postalCode, pty.partyPostalAddress.countryCode].filter(Boolean).join(', ')}
-                  collection="party"
-                />
-              )}
-            </>
-          )}
+          {/* SD-13 Party demographics — shown for staff (no customer agreement), so their profile
+              carries the same KYC-typical detail as customers: phone, DOB, nationality, address.
+              Phone/DOB/address are GDPR PII (QE-encrypted at rest), shown with a reveal toggle. */}
+          {!ag && pty && (() => {
+            const dob = pty.partyDateOfBirth ? new Date(pty.partyDateOfBirth) : null;
+            const dobValid = dob && !isNaN(dob.getTime());
+            const addr = pty.partyPostalAddress;
+            const addrFull = addr
+              ? [addr.line1, addr.line2, addr.city, addr.postalCode, addr.countryCode].filter(Boolean).join(', ')
+              : '';
+            const addrMasked = addr ? `••• ${addr.city}, ${addr.countryCode}` : '';
+            return (
+              <>
+                {pty.partyMobilePhoneNumber && (
+                  <RevealField label="Phone" plainValue={pty.partyMobilePhoneNumber} maskedValue={maskPhone(pty.partyMobilePhoneNumber)} type="qe-equality" collection="party" />
+                )}
+                {dobValid && (
+                  <RevealField label="Date of birth" plainValue={dob!.toLocaleDateString()} maskedValue="••/••/••••" type="qe-none" collection="party" />
+                )}
+                {pty.partyNationality && <PlainField label="Nationality" value={pty.partyNationality} collection="party" />}
+                {addr && (
+                  <RevealField label="Address" plainValue={addrFull} maskedValue={addrMasked} type="qe-none" collection="party" />
+                )}
+              </>
+            );
+          })()}
 
           {/* Inline Save / Cancel - only when editing */}
           {editing && (

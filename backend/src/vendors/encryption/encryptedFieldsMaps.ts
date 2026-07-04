@@ -35,6 +35,12 @@ export function buildEncryptedFieldsMaps(deks: DEKs, tier: QETier = 'level2') {
           bsonType: 'string',
           queries: { queryType: 'equality' },
         },
+        // GDPR PII — QE:none (L2 only). Postal address and date of birth are sensitive personal
+        // data; encrypted at rest, decrypted only for the L2 client (or the party themselves).
+        ...(includeSensitive ? [
+          { keyId: deks.partyAddress, path: 'partyPostalAddress', bsonType: 'object' },
+          { keyId: deks.partyDob,     path: 'partyDateOfBirth',   bsonType: 'string' },
+        ] : []),
       ],
     },
 
