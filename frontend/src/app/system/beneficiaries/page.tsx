@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  UserCheck, Search, Plus, Mail, Phone, Trash2, ChevronLeft, ChevronRight, X, SendHorizonal,
+  UserCheck, Search, Plus, Mail, Phone, Trash2, ChevronLeft, ChevronRight, X, SendHorizonal, Check, Landmark,
 } from 'lucide-react';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { useDebugMode } from '../../../lib/debugMode';
@@ -18,6 +18,167 @@ interface Beneficiary {
   counterpartyLookupHint: string;
   counterpartyArrangementStatus: 'active' | 'removed';
   recordCreatedDateTime: string;
+}
+
+interface PayoutAccountOption {
+  payoutAccountInstanceReference: string;
+  payoutAccountAlias?: string;
+  payoutAccountBankName?: string;
+  payoutAccountCurrency: string;
+  payoutAccountIsDefault: boolean;
+  payoutAccountBalance?: { availableAmount: number };
+}
+
+function fmtAmount(n: number, currency: string) {
+  return new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(n);
+}
+
+// ── Send Money Modal ──────────────────────────────────────────────────────────
+interface SendMoneyModalProps {
+  beneficiary: Pick<Beneficiary, 'counterpartyArrangementReference' | 'counterpartyLabel'>;
+  ownerPartyRef: string;
+  token: string;
+  onClose: () => void;
+}
+
+function SendMoneyModal({ beneficiary, ownerPartyRef, token, onClose }: SendMoneyModalProps) {
+  const [accounts, setAccounts] = useState<PayoutAccountOption[]>([]);
+  const [accountsLoaded, setAccountsLoaded] = useState(false);
+  const [fromAccountRef, setFromAccountRef] = useState('');
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState<{ ref: string; amount: number; currency: string } | null>(null);
+
+  useEffect(() => {
+    if (!ownerPartyRef || !token) return;
+    api.accounts.list(ownerPartyRef, token, { status: 'active' })
+      .then(r => {
+        const accts = r.results as unknown as PayoutAccountOption[];
+        setAccounts(accts);
+        setAccountsLoaded(true);
+        const primary = accts.find(a => a.payoutAccountIsDefault) ?? accts[0];
+        if (primary) setFromAccountRef(primary.payoutAccountInstanceReference);
+      })
+      .catch(() => setAccountsLoaded(true));
+  }, [ownerPartyRef, token]);
+
+  async function handleSend() {
+    const parsedAmount = parseFloat(amount);
+    if (!fromAccountRef || isNaN(parsedAmount) || parsedAmount <= 0) {
+      setError('Select an account and enter a valid amount.'); return;
+    }
+    setSending(true); setError('');
+    try {
+      const res = await api.beneficiaries.transfer(
+        ownerPartyRef,
+        beneficiary.counterpartyArrangementReference,
+        { fromAccountRef, amount: parsedAmount, note: note.trim() || undefined },
+        token,
+      );
+      setSuccess({ ref: res.transferReference, amount: parsedAmount, currency: res.currency });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Transfer failed.');
+    }
+    setSending(false);
+  }
+
+  const selectedAccount = accounts.find(a => a.payoutAccountInstanceReference === fromAccountRef);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <SendHorizonal size={18} className="text-[#001E2B]" />
+            <div>
+              <h3 className="font-semibold text-gray-900">Send money</h3>
+              <p className="text-xs text-gray-500">to <span className="font-medium text-gray-700">{beneficiary.counterpartyLabel}</span></p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        {success ? (
+          <div className="space-y-4">
+            <div className="text-center py-4">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Check size={24} className="text-green-600" />
+              </div>
+              <p className="font-semibold text-gray-900">{fmtAmount(success.amount, success.currency)} sent</p>
+              <p className="text-sm text-gray-500 mt-1">to {beneficiary.counterpartyLabel}</p>
+              <p className="text-xs font-mono text-gray-400 mt-2">Ref: {success.ref.slice(0, 8)}…</p>
+            </div>
+            <button type="button" onClick={onClose}
+              className="w-full py-2 text-sm font-medium bg-[#001E2B] text-white rounded-lg hover:bg-[#001E2B]/80 transition-colors">
+              Done
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">From account</label>
+                {!accountsLoaded ? (
+                  <div className="text-xs text-gray-400">Loading accounts…</div>
+                ) : accounts.length === 0 ? (
+                  <div className="text-xs text-amber-600">No active payout accounts found.</div>
+                ) : (
+                  <select value={fromAccountRef} onChange={e => setFromAccountRef(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40">
+                    {accounts.map(a => (
+                      <option key={a.payoutAccountInstanceReference} value={a.payoutAccountInstanceReference}>
+                        {a.payoutAccountIsDefault ? '★ ' : ''}{a.payoutAccountAlias || a.payoutAccountBankName || 'Account'} · {a.payoutAccountCurrency}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {selectedAccount?.payoutAccountBalance && (
+                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                    <Landmark size={11} />
+                    Available: <span className="font-medium text-gray-600">{fmtAmount(selectedAccount.payoutAccountBalance.availableAmount, selectedAccount.payoutAccountCurrency)}</span>
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Amount</label>
+                <div className="flex gap-2">
+                  <input value={amount} onChange={e => setAmount(e.target.value)}
+                    type="number" min="0.01" step="0.01" placeholder="0.00"
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
+                  <span className="flex items-center px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm font-medium text-gray-600">
+                    {selectedAccount?.payoutAccountCurrency ?? '—'}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Note <span className="text-gray-400">(optional)</span></label>
+                <input value={note} onChange={e => setNote(e.target.value)} maxLength={140}
+                  placeholder="e.g. Dinner split, rent contribution…"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
+              </div>
+            </div>
+            {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
+            <p className="text-xs text-gray-400">
+              Funds transfer immediately (BIAN SD-65 Payment Execution). Recipient's default payout account is credited.
+            </p>
+            <div className="flex justify-end gap-3 pt-1">
+              <button type="button" onClick={onClose}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button type="button" onClick={handleSend} disabled={sending || accounts.length === 0}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[#001E2B] hover:bg-[#001E2B]/80 text-white rounded-lg transition-colors disabled:opacity-50">
+                <SendHorizonal size={14} />
+                {sending ? 'Sending…' : 'Send'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function shortRef(ref: string) {
@@ -182,6 +343,7 @@ export default function BeneficiariesPage() {
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [sendTarget, setSendTarget] = useState<Beneficiary | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<Beneficiary | null>(null);
   const [removing, setRemoving] = useState(false);
 
@@ -321,7 +483,7 @@ export default function BeneficiariesPage() {
                       <div className="flex items-center justify-end gap-1">
                         {isCustomer && b.counterpartyArrangementStatus === 'active' && (
                           <button type="button"
-                            onClick={() => router.push(`/system/beneficiaries/${b.counterpartyArrangementReference}?action=send`)}
+                            onClick={() => setSendTarget(b)}
                             className="flex items-center gap-1 text-xs text-[#001E2B] hover:text-[#001E2B]/70 border border-gray-200 hover:border-gray-300 rounded-lg px-2.5 py-1 transition-colors"
                             title="Send money">
                             <SendHorizonal size={12} /> Send
@@ -364,6 +526,15 @@ export default function BeneficiariesPage() {
         <p className="text-[10px] font-mono text-gray-400">
           GET /api/v1/beneficiaries · SD-54 · roleScope: {isCustomer ? 'own' : 'all'} · ownerRef: {isCustomer ? ownPartyRef : ownerFilter || '(all)'}
         </p>
+      )}
+
+      {sendTarget && (
+        <SendMoneyModal
+          beneficiary={sendTarget}
+          ownerPartyRef={ownPartyRef}
+          token={token}
+          onClose={() => setSendTarget(null)}
+        />
       )}
 
       {showAddModal && (
