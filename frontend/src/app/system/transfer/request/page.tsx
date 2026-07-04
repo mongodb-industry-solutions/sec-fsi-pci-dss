@@ -85,7 +85,7 @@ function RequestForm({ token, onDone }: { token: string; onDone: () => void }) {
   function handleMerchantChange(ref: string) {
     setMerchantRef(ref);
     const m = merchants.find(x => x.merchantAgreementInstanceReference === ref);
-    if (m?.merchantAllowedCurrencies?.length > 0) setCurrency(m.merchantAllowedCurrencies[0]);
+    if ((m?.merchantAllowedCurrencies?.length ?? 0) > 0) setCurrency(m!.merchantAllowedCurrencies![0]);
   }
 
   async function handleCreate() {
