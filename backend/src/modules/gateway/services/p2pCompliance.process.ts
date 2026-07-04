@@ -66,9 +66,9 @@ export class P2PComplianceProcess {
 
     // Open fraud case if any gate flagged
     const riskIndicators: string[] = [
-      ...(fdsR.flag ? [`fds_high_risk${fdsR.reason ? ': ' + fdsR.reason : ''}`] : []),
-      ...(hrpR.match ? ['hrp_sanctions_match'] : []),
-      ...(amlR.alert ? [`aml_alert${amlR.severity ? ': ' + amlR.severity : ''}`] : []),
+      ...(fdsR.flag ? [`fds.high.risk${fdsR.reason ? ': ' + fdsR.reason : ''}`] : []),
+      ...(hrpR.match ? ['hrp.sanctions.match'] : []),
+      ...(amlR.alert ? [`aml.alert${amlR.severity ? ': ' + amlR.severity : ''}`] : []),
     ];
 
     if (riskIndicators.length > 0) {
@@ -80,7 +80,7 @@ export class P2PComplianceProcess {
     try {
       const r = await dispatchProvider(this.db, 'fraud_detection', 'fds.scoring.requested', {
         cardTransactionInstanceReference: transferRef, amount, currency, merchantName: 'P2P Transfer',
-      }, { entityType: 'p2p_transfer', entityId: transferRef, processType: 'fraud_evaluation' });
+      }, { entityType: 'transaction', entityId: transferRef, processType: 'fraud_evaluation' });
       const b = r.responseBody as { riskScore?: number; recommendation?: string; fraudFlag?: boolean; reason?: string } | undefined;
       const flag = !!(b?.recommendation === 'block' || b?.recommendation === 'decline' || b?.fraudFlag);
       return { flag, score: b?.riskScore ?? 0, reason: b?.reason };
@@ -91,7 +91,7 @@ export class P2PComplianceProcess {
     try {
       const r = await dispatchProvider(this.db, 'hrp_sanctions', 'hrp.screening.requested', {
         cardTransactionInstanceReference: transferRef, accountReference: partyRef,
-      }, { entityType: 'p2p_transfer', entityId: transferRef, processType: 'aml_screening' });
+      }, { entityType: 'transaction', entityId: transferRef, processType: 'aml_screening' });
       const b = r.responseBody as { hrpcMatch?: boolean; match?: boolean } | undefined;
       return { match: !!(b?.hrpcMatch ?? b?.match) };
     } catch { return { match: false }; }
@@ -101,7 +101,7 @@ export class P2PComplianceProcess {
     try {
       const r = await dispatchProvider(this.db, 'aml_monitoring', 'aml.monitoring.requested', {
         cardTransactionInstanceReference: transferRef, amount, accountReference: accountRef,
-      }, { entityType: 'p2p_transfer', entityId: transferRef, processType: 'aml_screening' });
+      }, { entityType: 'transaction', entityId: transferRef, processType: 'aml_screening' });
       const b = r.responseBody as { requiresReview?: boolean; alertLevel?: string; alert?: boolean; severity?: string } | undefined;
       const alert = !!(b?.requiresReview || (b?.alertLevel && b.alertLevel !== 'none') || b?.alert);
       return { alert, severity: b?.severity ?? b?.alertLevel };

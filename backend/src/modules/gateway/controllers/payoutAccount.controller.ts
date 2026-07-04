@@ -4,6 +4,7 @@
 
 import { FastifyInstance } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
+import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
 import type { PayoutAccountStatus } from '../models/payoutAccount.model';
 import { requirePermission } from '../../../vendors/middleware/acl';
 import {
@@ -542,12 +543,24 @@ export async function payoutAccountController(fastify: FastifyInstance) {
       { projection: { fraudDiagnosisInstanceReference: 1, fraudDiagnosisCaseReference: 1, fraudDiagnosisCaseStatus: 1, fraudDiagnosisCaseSeverity: 1, fraudDiagnosisAssessment: 1, subsystemSignals: 1 } }
     );
 
+    // Fallback: if the execution predates the sourcePayoutAccountReference field, look up
+    // the initiator's primary active account (PCI DSS Req 10 — source must always be traceable).
+    let sourceAccountRef = exec.sourcePayoutAccountReference ?? null;
+    if (!sourceAccountRef && exec.initiatorPartyReference) {
+      const fallback = await db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
+        .findOne(
+          { partyInstanceReference: exec.initiatorPartyReference, payoutAccountStatus: 'active' },
+          { sort: { isDefault: -1, recordCreatedDateTime: 1 }, projection: { payoutAccountInstanceReference: 1 } }
+        );
+      sourceAccountRef = fallback?.payoutAccountInstanceReference ?? null;
+    }
+
     const execRecord = exec as Record<string, unknown>;
     return reply.send({
       paymentExecutionInstanceReference:  exec.paymentExecutionInstanceReference,
       initiatorPartyReference:            exec.initiatorPartyReference ?? null,
       beneficiaryPartyReference:          exec.beneficiaryPartyReference ?? null,
-      sourcePayoutAccountReference:       exec.sourcePayoutAccountReference ?? null,
+      sourcePayoutAccountReference:       sourceAccountRef,
       resolvedPayoutAccountReference:     exec.resolvedPayoutAccountReference ?? null,
       grossAmount:                        exec.grossAmount,
       netAmount:                          exec.netAmount,

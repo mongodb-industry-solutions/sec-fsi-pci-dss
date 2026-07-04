@@ -79,6 +79,8 @@ const CANONICAL_LEDGER_EVENTS: Record<string, { processType: BusinessProcessType
   'card.issuer.validation.completed':     { processType: 'payment_processing', entityType: 'transaction', bian: { serviceDomain: 'SD-88 Payment Card', controlRecord: 'PaymentCardValidation' } },
   'fds.scoring.completed':                { processType: 'fraud_evaluation',   entityType: 'transaction', bian: { serviceDomain: 'SD-63 Fraud Evaluation', controlRecord: 'FraudEvaluationAssessment' } },
   'hrp.screening.completed':              { processType: 'aml_screening',      entityType: 'transaction', bian: { serviceDomain: 'SD-13 Party Reference', controlRecord: 'PartyReferenceDataDirectoryEntry' } },
+  'aml.monitoring.completed':             { processType: 'aml_screening',      entityType: 'transaction', bian: { serviceDomain: 'SD-99 AML', controlRecord: 'SuspiciousActivityAnalysisAssessment' } },
+  'p2p.transfer.completed':               { processType: 'payment_processing', entityType: 'transaction', bian: { serviceDomain: 'Payment Execution', controlRecord: 'PaymentExecutionProcedure' } },
 };
 
 // §5.0 / §9.2: the durable audit ledger is a PROJECTION written by this single bus subscriber from the
