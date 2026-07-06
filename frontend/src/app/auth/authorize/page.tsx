@@ -5,7 +5,7 @@
  * validates the request against the backend, and renders the consent form.
  */
 import { headers } from 'next/headers';
-import OAuthConsentForm from './OAuthConsentForm';
+import OAuthConsentForm, { MerchantAvatar } from './OAuthConsentForm';
 
 interface AuthorizePageProps {
   // Next.js 15+/16: searchParams is a Promise and must be awaited.
@@ -88,31 +88,25 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
   const scopeDetails: ScopeDescriptor[] =
     info.scope_details ?? info.scopes.map((s) => ({ scope: s, description: `Access to ${s}`, required: s === 'openid' }));
 
+  // Demo convenience: prefill the login form from the authorize URL.
+  // login_hint is the standard OIDC param; prefill_email / prefill_password are demo-only aliases.
+  const prefillEmail = params.login_hint || params.prefill_email || '';
+  const prefillPassword = params.prefill_password || '';
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
       <div className="max-w-md w-full">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-            <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Leafy Pay</h1>
-          <p className="text-sm text-gray-500 mt-1">Secure sign-in with Leafy Pay</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/app-logo.png" alt="Leafy Pay" className="h-14 w-auto mx-auto mb-3" />
+          <p className="text-sm text-gray-500 mt-1">Payments made effortless and secure</p>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {/* App requesting access — merchant logo (OIDC logo_uri) with graceful fallback (E-11) */}
           <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3">
-            {info.logo_uri ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={info.logo_uri} alt={`${info.client_name} logo`} className="w-10 h-10 rounded-lg object-contain border border-gray-100" />
-            ) : (
-              <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 font-semibold">
-                {info.client_name.charAt(0).toUpperCase()}
-              </div>
-            )}
+            <MerchantAvatar logoUri={info.logo_uri} clientName={info.client_name} />
             <p className="text-sm text-gray-600">
               <span className="font-semibold text-gray-900">{info.client_name}</span>
               {' '}is requesting access to your account
@@ -123,12 +117,15 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
           <OAuthConsentForm
             clientId={info.client_id}
             clientName={info.client_name}
+            logoUri={info.logo_uri}
             redirectUri={info.redirect_uri}
             scopeDetails={scopeDetails}
             state={info.state}
             codeChallenge={info.code_challenge}
             nonce={info.nonce}
             originalSearchParams={params}
+            prefillEmail={prefillEmail}
+            prefillPassword={prefillPassword}
           />
         </div>
 

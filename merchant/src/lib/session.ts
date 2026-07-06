@@ -3,6 +3,7 @@
 import 'server-only';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 import { cookies } from 'next/headers';
+import type { NextRequest, NextResponse } from 'next/server';
 import { ENV } from './env';
 
 const COOKIE_NAME = 'ew_session';
@@ -56,6 +57,13 @@ function decrypt<T>(blob: string): T | null {
 
 const secureCookie = () => ENV.baseUrl().startsWith('https');
 
+// Shared cookie options. Kept identical between the next/headers path and the
+// response-object path so behaviour does not drift.
+const sessionCookieOpts = () =>
+  ({ httpOnly: true, secure: secureCookie(), sameSite: 'lax' as const, path: '/', maxAge: 60 * 60 * 8 });
+const loginCookieOpts = () =>
+  ({ httpOnly: true, secure: secureCookie(), sameSite: 'lax' as const, path: '/', maxAge: 600 });
+
 // ── Auth session ──────────────────────────────────────────────────────────────
 export async function getSession(): Promise<Session | null> {
   const c = (await cookies()).get(COOKIE_NAME);
@@ -63,13 +71,14 @@ export async function getSession(): Promise<Session | null> {
 }
 
 export async function setSession(session: Session): Promise<void> {
-  (await cookies()).set(COOKIE_NAME, encrypt(session), {
-    httpOnly: true,
-    secure: secureCookie(),
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 60 * 60 * 8, // 8h — refresh token rotates the access token within this window
-  });
+  (await cookies()).set(COOKIE_NAME, encrypt(session), sessionCookieOpts());
+}
+
+// Attach the session cookie directly to a NextResponse. Use this in route
+// handlers that return a redirect — mutating next/headers cookies() is not
+// reliably merged into a returned NextResponse across Next versions.
+export function attachSession(res: NextResponse, session: Session): void {
+  res.cookies.set(COOKIE_NAME, encrypt(session), sessionCookieOpts());
 }
 
 export async function clearSession(): Promise<void> {
@@ -80,13 +89,13 @@ export async function clearSession(): Promise<void> {
 const LOGIN_COOKIE = 'ew_login';
 
 export async function setLoginState(s: LoginState): Promise<void> {
-  (await cookies()).set(LOGIN_COOKIE, encrypt(s), {
-    httpOnly: true,
-    secure: secureCookie(),
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 600, // 10 min to complete the flow
-  });
+  (await cookies()).set(LOGIN_COOKIE, encrypt(s), loginCookieOpts());
+}
+
+// Attach the transient login-state cookie directly to a NextResponse (reliable
+// on returned redirects — see attachSession).
+export function attachLoginState(res: NextResponse, s: LoginState): void {
+  res.cookies.set(LOGIN_COOKIE, encrypt(s), loginCookieOpts());
 }
 
 export async function consumeLoginState(): Promise<LoginState | null> {
@@ -95,6 +104,17 @@ export async function consumeLoginState(): Promise<LoginState | null> {
   if (!c) return null;
   jar.delete(LOGIN_COOKIE);
   return decrypt<LoginState>(c.value);
+}
+
+// Read the login-state from the incoming request (no mutation). Pair with
+// clearLoginStateOn(res) to expire the cookie on the response you return.
+export function readLoginState(req: NextRequest): LoginState | null {
+  const c = req.cookies.get(LOGIN_COOKIE);
+  return c ? decrypt<LoginState>(c.value) : null;
+}
+
+export function clearLoginStateOn(res: NextResponse): void {
+  res.cookies.set(LOGIN_COOKIE, '', { ...loginCookieOpts(), maxAge: 0 });
 }
 
 export function hasScope(session: Session | null, scope: string): boolean {

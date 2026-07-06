@@ -1,6 +1,6 @@
 // Landing (C-12). SSO login, or the logged-in user (verified via PSP userinfo) + granted scopes.
 import Link from 'next/link';
-import { ArrowRight, BadgeCheck, LogIn, ShieldCheck, ShoppingBag, TriangleAlert } from 'lucide-react';
+import { ArrowRight, BadgeCheck, LogIn, RefreshCw, ShieldCheck, ShoppingBag, TriangleAlert } from 'lucide-react';
 import { PspClient } from '@/lib/PspClient';
 import { getSession } from '@/lib/session';
 import { Chip } from '@/components/ui/Bits';
@@ -16,6 +16,22 @@ const SCOPE_HELP: Record<string, string> = {
   'read:accounts': 'View your payout accounts (masked IBAN).',
   'read:transactions': 'View your payment and transfer history.',
   'write:payments': 'Let the merchant charge card payments.',
+};
+
+// Friendly, actionable copy for the OAuth error codes the callback can return.
+const AUTH_ERROR_INFO: Record<string, { title: string; hint: string }> = {
+  invalid_state: {
+    title: 'Your sign-in session expired',
+    hint: 'This can happen if the sign-in took too long, cookies were blocked, or you switched between "localhost" and "127.0.0.1". Please start again from the same browser tab.',
+  },
+  token_exchange_failed: {
+    title: 'We could not complete sign-in',
+    hint: 'Leafy Pay approved the request but the token exchange failed. This is usually temporary. Please try again in a moment.',
+  },
+  access_denied: {
+    title: 'Sign-in was cancelled',
+    hint: 'You declined to share access with Espresso Works. You can try again whenever you are ready.',
+  },
 };
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ auth_error?: string }> }) {
@@ -46,9 +62,20 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
         </p>
 
         {auth_error && (
-          <p className="relative mt-4 flex items-center gap-2 rounded-lg bg-[var(--err)]/20 px-3 py-2 text-sm">
-            <TriangleAlert className="h-4 w-4" aria-hidden /> Sign-in failed: {auth_error}
-          </p>
+          <div className="relative mt-4 rounded-lg bg-[var(--err)]/20 px-4 py-3 text-sm">
+            <p className="flex items-center gap-2 font-medium">
+              <TriangleAlert className="h-4 w-4" aria-hidden /> {AUTH_ERROR_INFO[auth_error]?.title ?? 'Sign-in could not be completed'}
+            </p>
+            <p className="mt-1 text-white/80">
+              {AUTH_ERROR_INFO[auth_error]?.hint ?? 'Something went wrong during sign-in. Please try again.'}
+            </p>
+            <a
+              href="/api/auth/login"
+              className="mt-3 inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 font-medium ring-1 ring-white/20 transition hover:bg-white/20"
+            >
+              <RefreshCw className="h-3.5 w-3.5" aria-hidden /> Try again
+            </a>
+          </div>
         )}
 
         {session ? (

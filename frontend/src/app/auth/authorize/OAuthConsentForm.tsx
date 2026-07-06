@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { BACKEND_PUBLIC_URL } from '../../../lib/constants';
 
 interface ScopeDescriptor {
@@ -12,29 +13,60 @@ interface ScopeDescriptor {
 interface OAuthConsentFormProps {
   clientId: string;
   clientName: string;
+  logoUri?: string;
   redirectUri: string;
   scopeDetails: ScopeDescriptor[];
   state?: string;
   codeChallenge?: string;
   nonce?: string;
   originalSearchParams: Record<string, string>;
+  /** Demo convenience: prefill values coming from the authorize URL (login_hint / prefill_*). */
+  prefillEmail?: string;
+  prefillPassword?: string;
+}
+
+/** Merchant avatar: logo with a graceful initial-letter fallback if missing or broken. */
+export function MerchantAvatar({ logoUri, clientName, size = 'md' }: { logoUri?: string; clientName: string; size?: 'md' | 'lg' }) {
+  const [broken, setBroken] = useState(false);
+  const dim = size === 'lg' ? 'w-14 h-14 text-lg' : 'w-10 h-10';
+  if (logoUri && !broken) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return (
+      <img
+        src={logoUri}
+        alt={`${clientName} logo`}
+        onError={() => setBroken(true)}
+        className={`${dim} rounded-lg object-contain border border-gray-100 bg-white`}
+      />
+    );
+  }
+  return (
+    <div className={`${dim} rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 font-semibold`}>
+      {clientName.charAt(0).toUpperCase()}
+    </div>
+  );
 }
 
 export default function OAuthConsentForm({
   clientId,
   clientName,
+  logoUri,
   redirectUri,
   scopeDetails,
   state,
   codeChallenge,
   nonce,
   originalSearchParams,
+  prefillEmail = '',
+  prefillPassword = '',
 }: OAuthConsentFormProps) {
   const [view, setView] = useState<'login' | 'consent'>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(prefillEmail);
+  const [password, setPassword] = useState(prefillPassword);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const isPrefilled = Boolean(prefillEmail || prefillPassword);
   const [userSub, setUserSub] = useState('');
   // Granular selection (E-08): all requested scopes pre-checked; required ones locked on.
   const [selected, setSelected] = useState<Set<string>>(() => new Set(scopeDetails.map((s) => s.scope)));
@@ -99,37 +131,59 @@ export default function OAuthConsentForm({
   if (view === 'login') {
     return (
       <div className="px-6 py-5">
-        <p className="text-sm text-gray-600 mb-4">Sign in to your Leafy Pay account to continue</p>
+        {/* Neutral login header. The merchant identity is shown once, in the row above the form. */}
+        <div className="text-center mb-5">
+          <h2 className="text-base font-semibold text-gray-900">Sign in to your account</h2>
+          <p className="text-xs text-gray-500 mt-1">Your password stays with Leafy Pay and is never shared.</p>
+        </div>
         <form onSubmit={handleLogin} className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+            <label htmlFor="oauth-email" className="block text-xs font-medium text-gray-700 mb-1">Email / username</label>
             <input
-              type="email"
+              id="oauth-email"
+              type="text"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder="you@example.com or username"
+              autoComplete="username"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
+            <label htmlFor="oauth-password" className="block text-xs font-medium text-gray-700 mb-1">Password</label>
+            <div className="relative">
+              <input
+                id="oauth-password"
+                type={showPassword ? 'text' : 'password'}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Your password"
+                autoComplete="current-password"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600 focus:outline-none focus:text-green-600"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" aria-hidden /> : <Eye className="w-4 h-4" aria-hidden />}
+              </button>
+            </div>
           </div>
+          {isPrefilled && (
+            <p className="text-[11px] text-amber-600">Demo credentials pre-filled for convenience. You can edit them.</p>
+          )}
           {error && <p className="text-red-600 text-xs">{error}</p>}
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium py-2 px-4 rounded-lg text-sm transition-colors"
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
       </div>

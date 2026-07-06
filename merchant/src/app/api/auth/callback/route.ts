@@ -1,7 +1,7 @@
 // GET /api/auth/callback — validate state, exchange code→tokens, verify id_token, persist session.
 import { NextRequest, NextResponse } from 'next/server';
 import { exchangeCode, verifyIdToken } from '@/lib/oauth';
-import { consumeLoginState, setSession } from '@/lib/session';
+import { attachSession, clearLoginStateOn, readLoginState } from '@/lib/session';
 import { ENV } from '@/lib/env';
 
 export async function GET(req: NextRequest) {
@@ -16,12 +16,26 @@ export async function GET(req: NextRequest) {
 
   const code = searchParams.get('code');
   const state = searchParams.get('state');
-  const login = await consumeLoginState();
+  // Read (do not mutate) the login-state; we expire it on the response we return.
+  const login = readLoginState(req);
 
   // CSRF: state must match the value we issued at /login.
   if (!code || !login || !state || state !== login.state) {
+    // Concise diagnostic (no secrets) to explain spurious invalid_state.
+    console.warn(
+      '[auth/callback] invalid_state',
+      JSON.stringify({
+        hasCode: !!code,
+        cookiePresent: !!login,
+        stateParamPresent: !!state,
+        stateMatches: !!login && !!state && state === login.state,
+        host: req.nextUrl.host,
+      }),
+    );
     home.searchParams.set('auth_error', 'invalid_state');
-    return NextResponse.redirect(home);
+    const res = NextResponse.redirect(home);
+    clearLoginStateOn(res);
+    return res;
   }
 
   try {
@@ -38,7 +52,9 @@ export async function GET(req: NextRequest) {
       email = claims.email;
     }
 
-    await setSession({
+    // Set session + expire the transient login cookie on the SAME redirect response.
+    const res = NextResponse.redirect(new URL('/', ENV.baseUrl()));
+    attachSession(res, {
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
       idToken: tokens.id_token,
@@ -48,10 +64,12 @@ export async function GET(req: NextRequest) {
       name,
       email,
     });
-  } catch (e) {
+    clearLoginStateOn(res);
+    return res;
+  } catch {
     home.searchParams.set('auth_error', 'token_exchange_failed');
-    return NextResponse.redirect(home);
+    const res = NextResponse.redirect(home);
+    clearLoginStateOn(res);
+    return res;
   }
-
-  return NextResponse.redirect(new URL('/', ENV.baseUrl()));
 }

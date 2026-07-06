@@ -1,17 +1,29 @@
 // GET /api/auth/login — start authorization_code + PKCE flow, redirect to PSP consent page.
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { buildAuthorizeUrl, generatePkce, randomToken } from '@/lib/oauth';
-import { setLoginState } from '@/lib/session';
-import { REQUESTED_SCOPES } from '@/lib/env';
+import { attachLoginState } from '@/lib/session';
+import { ENV, REQUESTED_SCOPES } from '@/lib/env';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Host consistency: the seeded redirect_uri points at a fixed host (localhost:8082).
+  // If the user started on a different host (e.g. 127.0.0.1), the ew_login cookie would be
+  // set on that host and never sent back to the callback host → spurious invalid_state.
+  // Bounce them to the canonical host first so login + callback share the same origin.
+  const canonical = new URL(ENV.redirectUri()); // <base>/api/auth/callback
+  if (req.nextUrl.host !== canonical.host) {
+    return NextResponse.redirect(new URL('/api/auth/login', canonical.origin));
+  }
+
   const { verifier, challenge } = generatePkce();
   const state = randomToken();
   const nonce = randomToken();
 
-  // Stash PKCE verifier + state + nonce in a short-lived encrypted cookie (CSRF defence).
-  await setLoginState({ state, nonce, codeVerifier: verifier });
-
   const url = buildAuthorizeUrl({ state, nonce, codeChallenge: challenge, scopes: REQUESTED_SCOPES });
-  return NextResponse.redirect(url);
+
+  // Set the short-lived encrypted state/PKCE cookie DIRECTLY on the redirect response
+  // (CSRF defence). Cookie mutations via next/headers are not reliably merged into a
+  // returned NextResponse.redirect across Next versions.
+  const res = NextResponse.redirect(url);
+  attachLoginState(res, { state, nonce, codeVerifier: verifier });
+  return res;
 }
