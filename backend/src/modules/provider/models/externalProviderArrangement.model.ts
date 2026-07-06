@@ -331,6 +331,7 @@ export type BusinessProcessType =
   | 'card_authorization'
   | 'credit_assessment'
   | 'sanctions_check'
+  | 'consent_management'   // v18: OAuth consent grant/update/reuse audit (SD-16)
   | 'checkout';
 
 export type ComplianceProcessType =

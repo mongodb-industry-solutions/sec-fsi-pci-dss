@@ -11,24 +11,24 @@ interface AuthorizePageProps {
   searchParams: Record<string, string>;
 }
 
+interface ScopeDescriptor {
+  scope: string;
+  description: string;
+  required: boolean;
+}
+
 interface ConsentInfo {
   client_name: string;
   client_id: string;
   scopes: string[];
+  scope_details?: ScopeDescriptor[];
+  logo_uri?: string;
+  client_uri?: string;
   redirect_uri: string;
   state?: string;
   code_challenge?: string;
   nonce?: string;
 }
-
-const SCOPE_LABELS: Record<string, { label: string; description: string }> = {
-  openid: { label: 'Identity', description: 'Verify your identity' },
-  profile: { label: 'Profile', description: 'Read your name and username' },
-  email: { label: 'Email', description: 'Read your email address' },
-  phone: { label: 'Phone', description: 'Read your phone number' },
-  'read:transactions': { label: 'Transactions', description: 'View your transaction history' },
-  'read:userinfo': { label: 'User Info', description: 'Read your full profile information' },
-};
 
 async function fetchConsentInfo(searchParams: Record<string, string>): Promise<ConsentInfo | { error: string }> {
   const backendUrl = process.env.PSP_URL_BACKEND_PRIVATE || process.env.NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC || 'http://localhost:8081';
@@ -79,9 +79,9 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
     );
   }
 
-  const scopeDetails = info.scopes
-    .filter((s) => s !== 'openid')
-    .map((s) => SCOPE_LABELS[s] ?? { label: s, description: `Access to ${s.replace(':', ' ')}` });
+  // Scope metadata comes from the backend catalog (E-01/E-03); fall back to a bare list if absent.
+  const scopeDetails: ScopeDescriptor[] =
+    info.scope_details ?? info.scopes.map((s) => ({ scope: s, description: `Access to ${s}`, required: s === 'openid' }));
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
@@ -98,40 +98,28 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          {/* App requesting access */}
-          <div className="px-6 py-5 border-b border-gray-100">
+          {/* App requesting access — merchant logo (OIDC logo_uri) with graceful fallback (E-11) */}
+          <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3">
+            {info.logo_uri ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={info.logo_uri} alt={`${info.client_name} logo`} className="w-10 h-10 rounded-lg object-contain border border-gray-100" />
+            ) : (
+              <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 font-semibold">
+                {info.client_name.charAt(0).toUpperCase()}
+              </div>
+            )}
             <p className="text-sm text-gray-600">
               <span className="font-semibold text-gray-900">{info.client_name}</span>
               {' '}is requesting access to your account
             </p>
           </div>
 
-          {/* Scopes */}
-          {scopeDetails.length > 0 && (
-            <div className="px-6 py-4 border-b border-gray-100">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">This app will be able to:</p>
-              <ul className="space-y-2">
-                {scopeDetails.map((s) => (
-                  <li key={s.label} className="flex items-start gap-2">
-                    <svg className="w-4 h-4 text-green-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-sm text-gray-700">
-                      <span className="font-medium">{s.label}</span>
-                      {' — '}{s.description}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Consent form (client component handles login + allow/deny) */}
+          {/* Consent form (client component handles login + granular scope selection + allow/deny) */}
           <OAuthConsentForm
             clientId={info.client_id}
             clientName={info.client_name}
             redirectUri={info.redirect_uri}
-            scopes={info.scopes}
+            scopeDetails={scopeDetails}
             state={info.state}
             codeChallenge={info.code_challenge}
             nonce={info.nonce}

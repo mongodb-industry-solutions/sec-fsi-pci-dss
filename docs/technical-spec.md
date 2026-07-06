@@ -3153,6 +3153,26 @@ Error codes: 404 merchant not found, 410 link expired/deactivated/completed.
 - `PATCH /merchants/:id/oauth-client` accepts `logo_uri` and `client_uri` (OIDC client metadata, RFC 7591); both validated as **https** URLs (empty string clears). Persisted as `merchantOAuthClient.oauthLogoUri` / `oauthClientUri`.
 - `GET /auth/grants` (self-scoped — the caller's own consent grants) payload now includes `merchantAgreementInstanceReference` and `oauthLogoUri` (nullable) alongside the existing `merchantName`, `grantedScopes`, `consentGrantedAt`, `lastUsedAt`. Used by the user's "Authorized Applications" listing.
 
+**v18 — Granular consent (OAuth scope selection, E-01…E-13).**
+- **Scope catalog** (`SCOPE_CATALOG`, single source of truth in `merchantOAuth.service.ts`): each scope maps to `{ description, required }`. `openid` is the only **required** scope; all others are optional/de-selectable (least-privilege, OAuth 2.0 Security BCP):
+
+  | Scope | Description | Required |
+  |---|---|---|
+  | `openid` | Verify your identity | ✅ |
+  | `profile` | Read your name and username | — |
+  | `email` | Read your email address | — |
+  | `payment:read` | View your payments and their status | — |
+  | `payment:write` | Initiate payments on your behalf | — |
+  | `beneficiary:read` | View your saved beneficiaries | — |
+  | `beneficiary:manage` | Add and manage your beneficiaries | — |
+  | `balance:read` | View your account balance | — |
+  | `transactions:read` | View your transaction history | — |
+
+- `GET /auth/authorize` (consent render) now returns `scope_details` (array of `{ scope, description, required }`), `logo_uri`/`client_uri` (merchant branding), and — when called with `_psp_sub` — `previously_granted_scopes` (for re-consent highlighting).
+- `GET /auth/authorize` (grant) accepts `_psp_scopes` (space/comma-separated user selection). The effective grant = `userSelected ⊆ allowedScopes` with all `required` scopes force-included. A requested scope **outside the client allowlist** returns `invalid_scope` (RFC 6749 §4.1.2.1) rather than being silently dropped.
+- The authorization code and issued token scope derive from the user's selection (`grantedScopes`), not the raw request.
+- **Incremental consent:** on token exchange, if a prior active consent grant exists, the added/removed scope delta is computed and audited on `businessProcessEvent` (`processType: consent_management`, actions `oauth.consent.granted|updated|reused`, SD-16) with merchant attribution. `grantedScopes` always reflects the freshly-consented set. Downstream (`GET /auth/grants`, "Authorized Applications") consumes the real `grantedScopes`.
+
 **POST `/merchants` request (BIAN Action: Initiate):**
 ```json
 {

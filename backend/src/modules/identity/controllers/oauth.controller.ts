@@ -13,6 +13,8 @@ import {
   revokeToken,
   resolveOAuthClient,
   verifyAccessToken,
+  applyUserScopeSelection,
+  getPriorConsentScopes,
 } from '../services/oauth.service';
 
 function parseBasicAuth(header: string | undefined): { id: string; secret: string } | null {
@@ -53,6 +55,7 @@ export async function oauthController(fastify: FastifyInstance) {
           // Internal: consent form submission flags
           _psp_action: { type: 'string', enum: ['grant', 'deny'] },
           _psp_sub: { type: 'string' }, // user sub after login
+          _psp_scopes: { type: 'string' }, // v18: user's granular scope selection (space/comma separated)
         },
       },
     },
@@ -82,6 +85,12 @@ export async function oauthController(fastify: FastifyInstance) {
       }
 
       if (q._psp_action === 'grant' && q._psp_sub) {
+        // v18 E-04/E-05: apply the user's granular selection (force-including required scopes).
+        // Falls back to the full allowed set if no selection was submitted (backward compatible).
+        if (q._psp_scopes !== undefined) {
+          const userSelected = q._psp_scopes.split(/[\s,]+/).filter(Boolean);
+          validated.scopes = applyUserScopeSelection(validated.scopes, userSelected);
+        }
         const { code, state } = await issueAuthorizationCode(db(), q.client_id, q._psp_sub, validated);
         const redirectUrl = new URL(validated.redirectUri);
         redirectUrl.searchParams.set('code', code);
@@ -89,11 +98,20 @@ export async function oauthController(fastify: FastifyInstance) {
         return reply.redirect(redirectUrl.toString());
       }
 
-      // No action yet — return validated params so frontend can render consent page
+      // No action yet — return validated params so frontend can render consent page.
+      // v18 E-03/E-10: include scope metadata, merchant branding, and (post-login) the scopes
+      // already granted to this client so the UI can highlight newly-requested permissions.
+      const previouslyGranted = q._psp_sub
+        ? await getPriorConsentScopes(db(), q._psp_sub, q.client_id)
+        : [];
       return {
         client_name: validated.client.merchantName,
         client_id: validated.client.clientId,
         scopes: validated.scopes,
+        scope_details: validated.scopeDescriptors,
+        logo_uri: validated.client.oauthLogoUri,
+        client_uri: validated.client.oauthClientUri,
+        previously_granted_scopes: previouslyGranted,
         redirect_uri: q.redirect_uri,
         state: q.state,
         code_challenge: q.code_challenge,

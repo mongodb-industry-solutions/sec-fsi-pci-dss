@@ -12,6 +12,51 @@ import {
   OAuthGrantType,
 } from '../models/merchantAgreement.model';
 
+// ── Scope Catalog (v18 E-01) ────────────────────────────────────────────────
+// Single source of truth for OAuth scope metadata: human-readable description +
+// whether the scope is mandatory (cannot be de-selected on the consent page).
+// `openid` is the only required scope (OIDC baseline); everything else is opt-in,
+// enforcing least-privilege granular consent (OAuth 2.0 Security BCP). Documented in
+// technical-spec.md §6. Unknown scopes fall back to a generated label at render time.
+export interface ScopeCatalogEntry {
+  description: string;
+  required: boolean;
+}
+
+export const SCOPE_CATALOG: Record<string, ScopeCatalogEntry> = {
+  openid: { description: 'Verify your identity', required: true },
+  profile: { description: 'Read your name and username', required: false },
+  email: { description: 'Read your email address', required: false },
+  'payment:read': { description: 'View your payments and their status', required: false },
+  'payment:write': { description: 'Initiate payments on your behalf', required: false },
+  'beneficiary:read': { description: 'View your saved beneficiaries', required: false },
+  'beneficiary:manage': { description: 'Add and manage your beneficiaries', required: false },
+  'balance:read': { description: 'View your account balance', required: false },
+  'transactions:read': { description: 'View your transaction history', required: false },
+};
+
+// Scope descriptor returned to the consent UI (E-03).
+export interface ScopeDescriptor {
+  scope: string;
+  description: string;
+  required: boolean;
+}
+
+// DRY: describe an arbitrary scope, falling back gracefully for scopes not in the catalog.
+export function describeScope(scope: string): ScopeDescriptor {
+  const entry = SCOPE_CATALOG[scope];
+  return {
+    scope,
+    description: entry?.description ?? `Access to ${scope.replace(/[:._]/g, ' ')}`,
+    required: entry?.required ?? false,
+  };
+}
+
+// Required scopes present in a given allowlist (always force-included on grant, E-04).
+export function requiredScopesIn(scopes: string[]): string[] {
+  return scopes.filter((s) => SCOPE_CATALOG[s]?.required);
+}
+
 export interface IssueMerchantOAuthClientInput {
   redirect_uris: string[];
   grant_types: OAuthGrantType[];
