@@ -261,6 +261,15 @@ export interface CardTransactionLogControlRecord {
   cardTransactionDescription: string;                 // Max 22 chars; visible on cardholder statement
   cardTransactionNarrative?: string;                  // Extended context for fraud investigation
 
+  merchantAgreementInstanceReference?: string;        // Acquiring-side FK → SD-89 (plaintext, indexed)
+
+  // v18 (A-06): merchant commission captured at RUNTIME on a merchant-attributed acquiring payment.
+  // feeAmount is the numeric source of truth; `fee` (= PaymentExecutionFee shape) records who the
+  // commission is attributed to and how it was derived. Set ONCE at authorization (idempotent).
+  // NOT CHD → NOT QE-encrypted. Aggregated into the merchant dashboard commissionRevenue (SD-89).
+  feeAmount?: number;
+  fee?: PaymentExecutionFee;                          // { feeMerchantReference, feeRateApplied, feeCollectedDateTime }
+
   bianServiceDomain: 'Card Transaction';
   bianControlRecordType: 'CardTransactionLog';
   recordCreatedDateTime: Date;
@@ -1483,6 +1492,8 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { cardTransactionStatus: 1 } },
     // Acquiring-side: list a merchant's received payments, newest first (SD-89). Plaintext id, not QE.
     { key: { merchantAgreementInstanceReference: 1, cardTransactionDateTime: -1 } },
+    // v18 (A-06): runtime merchant commission revenue aggregation (SD-89 dashboard). Sparse.
+    { key: { 'fee.feeMerchantReference': 1, 'fee.feeCollectedDateTime': -1 }, sparse: true },
   ]);
 
   // Note: cardTransactionLogSensitive collection removed in v2 (fields inline)
@@ -3137,7 +3148,7 @@ Error codes: 404 merchant not found, 410 link expired/deactivated/completed.
 | `GET` | `/merchants/me` | JWT | `customer` | Return the merchant agreement owned by the caller's `partyRef`. Returns `{ found: false }` when none exists. Enables role-based state machine in frontend. |
 | `GET` | `/merchants/:id` | JWT | `customer`, `merchant_officer`, `security_auditor` | Retrieve merchant agreement details. Response includes `merchantAgreementKybCheck` sub-document. |
 | `GET` | `/merchants/:id/transactions` | JWT | owner (`partyRef` = `merchantOwnerPartyReference`), `merchant_officer`, `security_auditor` | Acquiring-side view (SD-89): payments the merchant **received**, newest first. Query: `page`, `limit`, `status`, `search` (case-insensitive on masked PAN / descriptor / merchant name). PCI DSS Req 3/7 — payer PII (account ref, email, raw gateway payload) is **never** returned; only masked PAN, amount, status, type, channel, descriptor, timestamp. Non-owner customers get 403. |
-| `GET` | `/merchants/:id/stats` | JWT | owner, `merchant_officer`, `security_auditor` | Acquiring analytics (BIAN Merchant Activity Analysis): MongoDB aggregation returning totals, average ticket, breakdown by status, by currency, and operations per month. **v18:** also returns `commissionRevenue { total, count, byMonth[] }` aggregated from `paymentExecutionProcedure.fee` filtered by `fee.feeMerchantReference` (SD-89 commission as revenue). Aggregates only — no payer PII. Powers the merchant Overview dashboard. |
+| `GET` | `/merchants/:id/stats` | JWT | owner, `merchant_officer`, `security_auditor` | Acquiring analytics (BIAN Merchant Activity Analysis): MongoDB aggregation returning totals, average ticket, breakdown by status, by currency, and operations per month. **v18:** also returns `commissionRevenue { total, count, byMonth[] }` — the UNION of two fee-attribution sources filtered by `fee.feeMerchantReference`: seeded payout executions (`paymentExecutionProcedure.fee`, SD-65) **and** runtime acquiring card payments (`cardTransactionLog.fee`, SD-254, populated at authorization by A-06). No double-counting (a payment lives in exactly one source). Aggregates only — no payer PII. Powers the merchant Overview dashboard. |
 | `PATCH` | `/merchants/:id` | JWT | owner (own merchant), `merchant_officer`, `security_auditor` | Partial update of operational settings. Owner-editable: `merchantAllowedCurrencies`, `merchantSettlementSchedule`, `merchantWebhookEndpoint`, `merchantDefaultPayoutAccountReference`, **v18** `merchantCommissionRate` (SD-89, number 0..1, max 4 decimals; validated; change audited via `merchant.commission_rate.updated` event). Risk-governed fields (`merchantTransactionLimitAmount`, `merchantAgreementStatus`) are PSP staff only. |
 | `GET` | `/merchants/:id/events` | JWT | owner, `merchant_officer`, `security_auditor` | Merchant lifecycle **audit trail** (BIAN SD-89, PCI DSS Req 10): append-only `merchantAgreementEvents` log of `submitted` / `approved` / `rejected` / `updated` actions with actor and timestamp. Operational metadata only — no cardholder data. |
 | `GET` | `/merchants/:id/activity` | JWT | owner, `merchant_officer`, `security_auditor`, `level1_analyst`, `level2_investigator` | **v18 (B-01/B-12) — activity view "user × merchant × action".** Reads `businessProcessEvent` where `merchantAgreementReference == :id` (OAuth-originated actions tagged in the activity attribution). Query filters: `user` (`actingPartyReference` exact), `q` (free text on `processAction` / `entityId` / `processType` / user), `dateFrom` / `dateTo` (ISO 8601), `page` / `limit`. Response `{ events[{ id, eventDateTime, processType, processAction, processOutcome, entityType, entityId, clientId, actingPartyReference, actingChannel, summary }], total, page, limit }`. **Display-safe** — never returns CHD or raw IBAN (PCI DSS Req 3/7 · Req 10). |
@@ -3180,6 +3191,7 @@ These live under the OAuth consent-grant controller (`/api/v1/auth/grants/*`) an
   | `read:merchant_profile` | View the merchant profile | — | `GET /merchant/portal/me` |
   | `read:notifications` | View your notifications | — | `GET /merchant/portal/notifications` |
   | `write:transfers` | Preview and execute bank transfers on your behalf | — | `POST /merchant/transfers/:partyRef/{preview,bank}` |
+  | `write:payments` | Create payments (server-to-server merchant charge) | machine only (`client_credentials`) | `POST /gateway/payments` |
 
 - **v18 — Merchant on-behalf-of gateway endpoints (`merchantGateway.controller.ts`, mounted `/api/v1/merchant`).** All use `config: { skipAuth: true }` (opt out of the global HS256 preHandler) + `validateMerchantToken` + **sub-binding** (`token.sub === :partyRef`) + scope. Separation of duties: never combined with `requirePermission`. Reuse SD-66 `listPayoutAccounts` and SD-65 `bankTransfer.service`; display-safe, no CHD, IBAN masked-only (GDPR/PSD2).
 
@@ -3191,6 +3203,8 @@ These live under the OAuth consent-grant controller (`/api/v1/auth/grants/*`) an
   | `POST` | `/merchant/transfers/:partyRef/bank` | `write:transfers` | Execute a bank transfer; emits attributed `businessProcessEvent` (`merchant.transfer.bank`). |
 
   > The pre-existing `/merchant/beneficiaries/*` (SD-54) and `/merchant/portal/*` routes were also switched to `config: { skipAuth: true }` in v18 so the RS256 OAuth token reaches their in-handler `validateMerchantToken` instead of being 401'd by the global HS256 middleware.
+
+- **v18 Item 2 — Server-to-server API payment (`POST /api/v1/gateway/payments`, `payment.controller.ts`).** Authenticated with the merchant's OWN OAuth **`client_credentials`** token (RS256, scope `write:payments`) — NOT a user session (HS256) and NOT the user `authorization_code` token. `config: { skipAuth: true }` + in-handler `validateMerchantToken(req, reply, 'write:payments')`; the acquiring merchant is bound to the token (a body `merchantAgreementInstanceReference` must match or is rejected 403). The PSP charges a **tokenised** card (test token vault, `PSP_API_PAYMENT_TEST_TOKEN`) so no PAN/CVV ever reaches the merchant (PCI SAQ A). Persists the SD-64 order + drives an SD-254 card transaction attributed to the merchant, so the commission fee (A-06) is applied and the merchant dashboard revenue reflects the API payment. Emits attributed `businessProcessEvent` (`merchant.payment.api`). Rejects 401 when no credential is presented, 403 without `write:payments`.
 
 - `GET /auth/authorize` (consent render) now returns `scope_details` (array of `{ scope, description, required }`), `logo_uri`/`client_uri` (merchant branding), and — when called with `_psp_sub` — `previously_granted_scopes` (for re-consent highlighting).
 - `GET /auth/authorize` (grant) accepts `_psp_scopes` (space/comma-separated user selection). The effective grant = `userSelected ⊆ allowedScopes` with all `required` scopes force-included. A requested scope **outside the client allowlist** returns `invalid_scope` (RFC 6749 §4.1.2.1) rather than being silently dropped.

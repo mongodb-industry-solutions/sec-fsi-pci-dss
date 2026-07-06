@@ -17,6 +17,8 @@ import { sendMerchantPaymentCallback } from '../../gateway/services/merchantCall
 import { createNotification } from '../../notification/notifications.service';
 import { getEventBus, makeEvent } from '../../../vendors/eventbus';
 import { PAYMENT_EXECUTION_COLLECTION } from '../../gateway/models/paymentExecution.model';
+import { computeFee } from '../../gateway/services/paymentExecution.service';
+import { MERCHANT_AGREEMENT_COLLECTION, MerchantAgreementControlRecord } from '../../gateway/models/merchantAgreement.model';
 
 export interface CreateTransactionInput {
   cardToken: string;
@@ -298,6 +300,42 @@ export function publishIssuerValidationCompleted(txnId: string, decision: { appr
   }));
 }
 
+// v18 (A-06/A-07): apply the merchant's CURRENT commission (SD-89) to an authorized acquiring payment
+// (SD-254) and persist feeAmount + attribution on the cardTransactionLog. Idempotent — the `fee.$exists`
+// filter makes a re-run a no-op, so the same transaction is never charged twice. Emits an attributed
+// businessProcessEvent (SD-16, PCI DSS Req 10) so the collection is auditable and shows in the merchant
+// activity view. `fee` carries only amounts/attribution (no CHD) → not QE-encrypted.
+async function applyMerchantCommissionToCardTxn(
+  db: Db,
+  writeDb: Db,
+  txnId: string,
+  merchantReference: string,
+  amount: number,
+  currency: string,
+): Promise<void> {
+  const merchant = await db
+    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
+    .findOne({ merchantAgreementInstanceReference: merchantReference }, { projection: { merchantCommissionRate: 1 } });
+  const { feeAmount, fee } = computeFee(amount, merchant?.merchantCommissionRate, currency, merchantReference);
+  if (feeAmount <= 0) return; // no rate configured / zero fee → nothing to attribute
+  const res = await writeDb.collection(CARD_TRANSACTION_COLLECTION).updateOne(
+    { cardTransactionInstanceReference: txnId, fee: { $exists: false } },
+    { $set: { feeAmount, fee, recordUpdatedDateTime: new Date() } },
+  );
+  if (res.modifiedCount !== 1) return; // already attributed (idempotent) → do not double-emit
+  emitProcessEvent(db, {
+    entityType: 'transaction', entityId: txnId, processType: 'payment_processing',
+    processAction: 'merchant.commission.collected', processOutcome: 'approved',
+    performedByPartyReference: null, performedByRole: null,
+    eventSummary: {
+      cardTransactionInstanceReference: txnId, merchantAgreementInstanceReference: merchantReference,
+      feeAmount, feeCurrency: currency, feeRateApplied: fee.feeRateApplied, grossAmount: amount,
+    },
+    bianServiceDomain: 'Merchant Relations', bianControlRecordType: 'MerchantAgreementProcedure',
+    attribution: { merchantAgreementReference: merchantReference, actingChannel: 'oauth_merchant' },
+  });
+}
+
 // Finish an APPROVED payment: card-on-file, fraud case, audit event, merchant callback, status flip.
 // Idempotent on the pending context (a second call is a no-op). Returns the fraud-case outcome.
 export async function completeAuthorized(db: Db, txnId: string, fdsVerdict?: FdsVerdict): Promise<{ fraudCaseCreated: boolean; fraudDiagnosisInstanceReference?: string }> {
@@ -312,6 +350,16 @@ export async function completeAuthorized(db: Db, txnId: string, fdsVerdict?: Fds
     { cardTransactionInstanceReference: txnId },
     { $set: { cardTransactionStatus: 'authorized', recordUpdatedDateTime: now } },
   );
+
+  // v18 (A-06): merchant commission at RUNTIME. For a merchant-attributed acquiring payment, compute the
+  // fee from the merchant's CURRENT rate (SD-89) and persist it on this acquiring record (SD-254) so the
+  // merchant dashboard's commissionRevenue reflects newly-created payments — not only seed data. DRY:
+  // reuses computeFee (single source of the calc). Idempotent (fee.$exists guard); not CHD → no QE.
+  if (input.merchantAgreementInstanceReference) {
+    try {
+      await applyMerchantCommissionToCardTxn(db, txWriteDb, txnId, input.merchantAgreementInstanceReference, input.amount, input.currency);
+    } catch { /* commission accounting must never block the payment outcome */ }
+  }
 
   // Card-on-file auto-registration (SD-88): using a card to pay IS the registration. Idempotent.
   if (resolvedUuid) {
@@ -726,11 +774,13 @@ export async function getMerchantStats(db: Db, merchantId: string) {
   const coll = db.collection(CARD_TRANSACTION_COLLECTION);
   const match = { merchantAgreementInstanceReference: merchantId };
 
-  // v18: commission revenue (SD-89) aggregated from payment-execution fee attribution (SD-65).
+  // v18: commission revenue (SD-89) is the UNION of two fee-attribution sources, keyed by
+  // fee.feeMerchantReference — so BOTH seeded payout executions (SD-65) and runtime acquiring card
+  // payments (SD-254, A-06) count, with no double-counting (a payment lives in exactly one source).
   const execColl = db.collection(PAYMENT_EXECUTION_COLLECTION);
   const commissionMatch = { 'fee.feeMerchantReference': merchantId };
 
-  const [totalsAgg, byStatus, byMonth, byCurrency, commissionAgg, commissionByMonth] = await Promise.all([
+  const [totalsAgg, byStatus, byMonth, byCurrency, execCommissionAgg, execCommissionByMonth, cardCommissionAgg, cardCommissionByMonth] = await Promise.all([
     coll.aggregate([
       { $match: match },
       { $group: { _id: null, count: { $sum: 1 }, totalAmount: { $sum: '$cardTransactionAmount.amount' }, avgAmount: { $avg: '$cardTransactionAmount.amount' } } },
@@ -759,10 +809,31 @@ export async function getMerchantStats(db: Db, merchantId: string) {
       { $group: { _id: { y: { $year: { $toDate: '$fee.feeCollectedDateTime' } }, m: { $month: { $toDate: '$fee.feeCollectedDateTime' } } }, amount: { $sum: '$feeAmount' }, count: { $sum: 1 } } },
       { $sort: { '_id.y': 1, '_id.m': 1 } },
     ]).toArray(),
+    // Runtime acquiring-side commission (SD-254, A-06): fee persisted on the card transaction itself.
+    coll.aggregate([
+      { $match: commissionMatch },
+      { $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$feeAmount' } } },
+    ]).toArray(),
+    coll.aggregate([
+      { $match: commissionMatch },
+      { $group: { _id: { y: { $year: { $toDate: '$fee.feeCollectedDateTime' } }, m: { $month: { $toDate: '$fee.feeCollectedDateTime' } } }, amount: { $sum: '$feeAmount' }, count: { $sum: 1 } } },
+      { $sort: { '_id.y': 1, '_id.m': 1 } },
+    ]).toArray(),
   ]);
 
   const totals = totalsAgg[0] ?? { count: 0, totalAmount: 0, avgAmount: 0 };
-  const commission = commissionAgg[0] ?? { count: 0, total: 0 };
+  // Union the two commission sources (SD-65 executions + SD-254 acquiring payments) into one revenue view.
+  const execCommission = execCommissionAgg[0] ?? { count: 0, total: 0 };
+  const cardCommission = cardCommissionAgg[0] ?? { count: 0, total: 0 };
+  const commission = { count: (execCommission.count ?? 0) + (cardCommission.count ?? 0), total: (execCommission.total ?? 0) + (cardCommission.total ?? 0) };
+  const monthlyMap = new Map<string, { year: number; month: number; count: number; amount: number }>();
+  for (const s of [...execCommissionByMonth, ...cardCommissionByMonth]) {
+    const y = (s._id as { y: number }).y; const m = (s._id as { m: number }).m;
+    const key = `${y}-${m}`;
+    const prev = monthlyMap.get(key) ?? { year: y, month: m, count: 0, amount: 0 };
+    monthlyMap.set(key, { year: y, month: m, count: prev.count + (s.count as number), amount: prev.amount + (s.amount as number) });
+  }
+  const commissionByMonth = [...monthlyMap.values()].sort((a, b) => a.year - b.year || a.month - b.month);
   return {
     count: totals.count ?? 0,
     totalAmount: totals.totalAmount ?? 0,
@@ -774,7 +845,7 @@ export async function getMerchantStats(db: Db, merchantId: string) {
     commissionRevenue: {
       total: commission.total ?? 0,
       count: commission.count ?? 0,
-      byMonth: commissionByMonth.map((s) => ({ year: (s._id as { y: number }).y, month: (s._id as { m: number }).m, count: s.count as number, amount: s.amount as number })),
+      byMonth: commissionByMonth,
     },
   };
 }

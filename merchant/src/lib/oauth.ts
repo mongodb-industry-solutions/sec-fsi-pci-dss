@@ -120,6 +120,24 @@ export async function refreshTokens(refreshToken: string): Promise<TokenResponse
   return (await res.json()) as TokenResponse;
 }
 
+// Item 2 (v18): obtain a SERVER-TO-SERVER access token via the OAuth client_credentials grant. This is
+// the merchant's OWN machine identity (not a user token), used only for server-side merchant charges
+// (write:payments). Confidential client auth (client_secret_basic); the token never reaches the browser.
+export async function clientCredentialsToken(scope = 'write:payments'): Promise<TokenResponse> {
+  const cfg = await discover();
+  const res = await fetch(cfg.token_endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: basicAuthHeader() },
+    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: ENV.clientId(), scope }),
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`client_credentials token failed: ${res.status} ${JSON.stringify(err)}`);
+  }
+  return (await res.json()) as TokenResponse;
+}
+
 export async function revoke(token: string): Promise<void> {
   const cfg = await discover();
   await fetch(cfg.revocation_endpoint, {

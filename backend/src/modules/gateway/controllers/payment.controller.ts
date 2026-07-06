@@ -11,6 +11,9 @@ import {
   refundPaymentOrder,
   getPaymentOrder,
 } from '../services/paymentOrder.service';
+import { validateMerchantToken } from '../../../vendors/middleware/validateMerchantToken';
+import { createTransaction, CardIssuerDeclinedError } from '../../transaction/services/cardTransaction.service';
+import { attributionFromMerchantContext, emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
 
 const PAYMENT_STATUS_ENUM = [
   'initiated', 'confirmed', 'authorized', 'captured',
@@ -20,10 +23,17 @@ const PAYMENT_STATUS_ENUM = [
 export async function paymentController(fastify: FastifyInstance) {
 
   // POST /api/v1/gateway/payments
+  // Item 2 (v18): SERVER-TO-SERVER merchant charge. Authenticated with the merchant's OAuth
+  // client_credentials token (RS256, scope write:payments) — NOT a user session (HS256) and NOT the
+  // user authorization_code token. `skipAuth` bypasses the global HS256 preHandler; validateMerchantToken
+  // verifies the machine token in-handler and resolves the acquiring merchant, so the charge is always
+  // attributed to that merchant and the commission fee (Item 1) is applied to it. No CHD ever reaches the
+  // merchant: the PSP charges a tokenised card (test token vault), never a PAN/CVV.
   fastify.post('/', {
+    config: { skipAuth: true },
     schema: {
       tags: ['gateway'],
-      summary: 'Create a payment order (SD-64)',
+      summary: 'Create a payment order (SD-64) — server-to-server merchant charge',
       description: `Creates a \`paymentOrder\` (BIAN SD-64) with initial status \`initiated\`.
 
 **Idempotency:** The \`X-Idempotency-Key\` header is **required**. _(v5: duplicate-key detection and 409 enforcement are not yet implemented in this prototype.)_
@@ -74,27 +84,84 @@ initiated → confirmed → authorized → captured → settled
         },
         400: { $ref: 'Error#' },
         401: { $ref: 'Error#' },
+        402: { description: 'Card issuer declined the tokenised charge.', $ref: 'Error#' },
+        403: { description: 'Merchant token missing write:payments scope or merchant mismatch.', $ref: 'Error#' },
         409: { description: '(v5-only) Duplicate idempotency key  -  not yet enforced in this prototype.', $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
+    // S2S auth: verify the merchant machine token (client_credentials, scope write:payments). On failure
+    // validateMerchantToken sends 401/403 and leaves merchantContext undefined → reject (no credential).
+    await validateMerchantToken(request, reply, 'write:payments');
+    if (!request.merchantContext) return;
+    const { merchantId, merchantName } = request.merchantContext;
+
     const idempotencyKey = (request.headers as Record<string, string>)['x-idempotency-key'];
     if (!idempotencyKey) return reply.status(400).send({ error: 'X-Idempotency-Key header is required' });
 
     const body = request.body as {
-      merchantAgreementInstanceReference: string;
+      merchantAgreementInstanceReference?: string;
       paymentOrderMerchantReference: string;
       amount: number;
       currency: string;
       paymentOrderDescription?: string;
     };
 
-    if (!body.merchantAgreementInstanceReference || body.amount == null || !body.currency || !body.paymentOrderMerchantReference) {
-      return reply.status(400).send({ error: 'merchantAgreementInstanceReference, paymentOrderMerchantReference, amount, and currency are required' });
+    if (body.amount == null || !body.currency || !body.paymentOrderMerchantReference) {
+      return reply.status(400).send({ error: 'paymentOrderMerchantReference, amount, and currency are required' });
+    }
+    // The acquiring merchant is bound to the token, never trusted from the body (a merchant cannot charge
+    // on behalf of another). If a body reference is present it MUST match the authenticated merchant.
+    if (body.merchantAgreementInstanceReference && body.merchantAgreementInstanceReference !== merchantId) {
+      return reply.status(403).send({ error: 'access_denied', error_description: 'merchantAgreementInstanceReference does not match the authenticated client' });
     }
 
-    const result = await createPaymentOrder(fastify.db, { ...body, idempotencyKey });
-    return reply.status(201).send(result);
+    // SD-64: persist the payment order (idempotent on X-Idempotency-Key).
+    const order = await createPaymentOrder(fastify.db, {
+      merchantAgreementInstanceReference: merchantId,
+      paymentOrderMerchantReference: body.paymentOrderMerchantReference,
+      amount: body.amount,
+      currency: body.currency,
+      paymentOrderDescription: body.paymentOrderDescription,
+      idempotencyKey,
+    });
+
+    // Charge a TOKENISED card server-side (PCI DSS Req 3: no PAN/CVV in the merchant; the PSP holds the
+    // token). The card transaction (SD-254) carries the acquiring merchant reference, so completeAuthorized
+    // applies the commission fee (Item 1) and the merchant dashboard revenue reflects this API payment.
+    const apiChargeToken = process.env.PSP_API_PAYMENT_TEST_TOKEN ?? 'pm_test_espresso_api';
+    try {
+      const tx = await createTransaction(fastify.db, {
+        cardToken: apiChargeToken,
+        accountReference: `${merchantId}:api`,
+        amount: body.amount,
+        currency: body.currency,
+        cardTransactionMerchantName: merchantName,
+        cardTransactionMerchantCategoryCode: '5812',
+        cardTransactionChannel: 'online',
+        cardTransactionMaskedPanDisplay: '****-****-****-4242',
+        cardTransactionType: 'purchase',
+        cardTransactionDescription: (body.paymentOrderDescription ?? 'API payment').slice(0, 22),
+        cardTransactionNarrative: `API payment ${body.paymentOrderMerchantReference}`,
+        merchantAgreementInstanceReference: merchantId,
+        gatewayPayload: { source: 'api_payment', merchantReference: body.paymentOrderMerchantReference, paymentOrderInstanceReference: order.paymentOrderInstanceReference },
+      });
+      // Attribute the merchant-originated charge (SD-16 audit, PCI DSS Req 10).
+      emitProcessEvent(fastify.db, {
+        entityType: 'transaction', entityId: tx.cardTransactionInstanceReference,
+        processType: 'payment_processing', processAction: 'merchant.payment.api', processOutcome: 'approved',
+        performedByPartyReference: null, performedByRole: null,
+        eventSummary: { amount: body.amount, currency: body.currency, paymentOrderInstanceReference: order.paymentOrderInstanceReference, merchantReference: body.paymentOrderMerchantReference },
+        bianServiceDomain: 'Payment Order', bianControlRecordType: 'PaymentOrderProcedure',
+        attribution: attributionFromMerchantContext(request.merchantContext),
+      });
+      return reply.status(201).send({ ...order, paymentOrderStatus: 'authorized', cardTransactionInstanceReference: tx.cardTransactionInstanceReference });
+    } catch (err) {
+      if (err instanceof CardIssuerDeclinedError) {
+        return reply.status(402).send({ error: 'payment_declined', error_description: err.reason, responseCode: err.responseCode, ...order, paymentOrderStatus: 'failed' });
+      }
+      throw err;
+    }
   });
 
   // GET /api/v1/gateway/payments/:id

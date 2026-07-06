@@ -6,6 +6,8 @@
 // from its encryptedFieldsMap → returned as Binary ciphertext, stripped from response.
 // Level 2 QE client includes them → auto-decrypted by the driver. See roleClients.ts.
 
+import type { PaymentExecutionFee } from '../../gateway/models/paymentExecution.model';
+
 export const CARD_TRANSACTION_COLLECTION = 'cardTransactionLog';
 
 export interface CardTransactionLogControlRecord {
@@ -42,6 +44,14 @@ export interface CardTransactionLogControlRecord {
 
   // v17: FK → paymentExecutionProcedure (SD-65) — set when payout orchestration creates the execution
   paymentExecutionInstanceReference?: string;
+
+  // v18 (SD-254 acquiring / SD-89 pricing): merchant-commission captured on an ACQUIRING card payment.
+  // The numeric amount lives in the flat `feeAmount`; the `fee` sub-doc records WHO the commission is
+  // attributed to and HOW it was derived, so the merchant dashboard aggregates commission revenue
+  // (SD-89) from this acquiring record at runtime. Not CHD (just amounts) → NOT QE-encrypted.
+  // Set once at authorization for merchant-attributed payments (idempotent); absent otherwise.
+  feeAmount?: number;
+  fee?: PaymentExecutionFee;
 
   // BIAN SD-254 transaction description (not CHD - plaintext, no QE)
   // cardTransactionDescription: statement descriptor visible on the cardholder's bank statement (max 22 chars)

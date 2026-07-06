@@ -35,6 +35,9 @@ export const SCOPE_CATALOG: Record<string, ScopeCatalogEntry> = {
   'read:merchant_profile': { description: 'View the merchant profile', required: false },
   'read:notifications': { description: 'View your notifications', required: false },
   'write:transfers': { description: 'Preview and execute bank transfers on your behalf', required: false },
+  // v18 (Item 2): server-to-server merchant charge scope. Machine grant (client_credentials) only —
+  // never requested on the user consent page (it is the merchant's own capability, not user-delegated).
+  'write:payments': { description: 'Create payments (server-to-server merchant charge)', required: false },
 };
 
 // Scope descriptor returned to the consent UI (E-03).

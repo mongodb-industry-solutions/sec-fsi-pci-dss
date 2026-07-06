@@ -35,8 +35,15 @@ PSP `frontend/`), and docker-compose maps host `8082:8080`. The port is env-driv
 | client_id | `oauth001-0000-4000-8000-000000000001` |
 | client_secret | `espresso-demo-secret-2026` |
 | redirect_uri | `http://localhost:8082/api/auth/callback` |
-| scopes | `openid profile read:beneficiaries write:beneficiaries read:transactions read:accounts read:merchant_profile read:notifications write:transfers` |
-| PKCE | S256 required |
+| scopes (user SSO) | `openid profile read:beneficiaries write:beneficiaries read:transactions read:accounts read:merchant_profile read:notifications write:transfers` |
+| grant types | `authorization_code`, `refresh_token` (user SSO) + `client_credentials` (server-to-server API payment) |
+| machine scope | `write:payments` (client_credentials only — never on the user consent page) |
+| PKCE | S256 required (authorization_code) |
+
+The **same** confidential client is reused for the server-to-server **API payment**: the merchant app
+fetches a `client_credentials` token (scope `write:payments`) server-side and calls `POST /gateway/payments`.
+This is NOT the user's session/`authorization_code` token — it is the merchant's own machine identity. The
+`client_secret` stays server-only (never `NEXT_PUBLIC_`).
 
 Log in on the PSP consent page with a seeded Espresso Works user (owner: `luis.fernandez@back.es`).
 
@@ -77,7 +84,7 @@ PSP_MERCHANT_SESSION_SECRET=change-me-to-a-32-byte-random-secret-value
 |---|---|---|
 | Espresso Beans 1kg | Payment Link | `POST /payment/links` |
 | Espresso Machine | Redirect (hosted checkout) | `POST /checkout/sessions` |
-| Barista Course | API Payment (token vault, no CHD) | `POST /gateway/payments` |
+| Barista Course | API Payment — server-to-server, `client_credentials` + `write:payments` (token vault, no CHD) | `POST /gateway/payments` |
 | Coffee Subscription | Redirect (subscription) | `POST /checkout/sessions` |
 
 The merchant **never** handles PAN/CVV (PCI DSS SAQ A). API payments use a test token, never card data.

@@ -63,10 +63,12 @@ export async function payForProduct(productId: string): Promise<ActionResult> {
         return { ok: true, redirectUrl: session.paymentPageUrl, message: 'Redirecting to secure checkout…' };
       }
       case 'api_payment': {
-        // No CHD in the merchant: create + confirm the order; the PSP captures the card.
-        const order = await c.createApiPayment(
+        // Server-to-server charge: the merchant's OWN client_credentials token (write:payments), NOT the
+        // user session token. No CHD in the merchant; the PSP charges a tokenised card. `c` (user session)
+        // is intentionally unused here — this is a machine action attributed to the merchant.
+        void c;
+        const order = await PspClient.apiPaymentServerToServer(
           {
-            merchantAgreementInstanceReference: merchantRef,
             paymentOrderMerchantReference: `${product.id}-${Date.now()}`,
             amount: product.price,
             currency: product.currency,
@@ -74,7 +76,7 @@ export async function payForProduct(productId: string): Promise<ActionResult> {
           },
           randomUUID(),
         );
-        return { ok: true, message: `API payment order created: ${order.paymentOrderReference} (status ${order.paymentOrderStatus}).`, data: order };
+        return { ok: true, message: `API payment charged: ${order.paymentOrderReference} (status ${order.paymentOrderStatus}).`, data: order };
       }
       default:
         return { ok: false, message: 'Unsupported method' };

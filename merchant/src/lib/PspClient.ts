@@ -3,7 +3,7 @@
 // - On 401, transparently refreshes once and retries.
 // - Throws PspError so callers (pages) can degrade gracefully (E-12).
 import 'server-only';
-import { discover, refreshTokens } from './oauth';
+import { discover, refreshTokens, clientCredentialsToken } from './oauth';
 import { ENV } from './env';
 import { getSession, setSession, Session } from './session';
 
@@ -143,22 +143,30 @@ export class PspClient {
     );
   }
 
-  // API payment (no CHD in the merchant; PSP handles card capture / token vault).
-  createApiPayment(
-    input: { merchantAgreementInstanceReference: string; paymentOrderMerchantReference: string; amount: number; currency: string; paymentOrderDescription?: string },
+  // API payment — SERVER-TO-SERVER merchant charge (Item 2). Uses the merchant's OWN client_credentials
+  // machine token (scope write:payments), NOT the logged-in user's session/authorization_code token. No
+  // CHD in the merchant: the PSP charges a tokenised card and returns the order + card-transaction ref.
+  // Static because it needs no user session — it is the merchant's own identity.
+  static async apiPaymentServerToServer(
+    input: { paymentOrderMerchantReference: string; amount: number; currency: string; paymentOrderDescription?: string },
     idempotencyKey: string,
-  ) {
-    return this.request<{ paymentOrderInstanceReference: string; paymentOrderReference: string; paymentOrderStatus: string }>(
-      '/api/v1/gateway/payments',
-      { method: 'POST', body: input, headers: { 'X-Idempotency-Key': idempotencyKey } },
-    );
-  }
-
-  confirmApiPayment(orderRef: string, customerAgreementInstanceReference: string) {
-    return this.request(`/api/v1/gateway/payments/${orderRef}/confirm`, {
+  ): Promise<{ paymentOrderInstanceReference: string; paymentOrderReference: string; paymentOrderStatus: string; cardTransactionInstanceReference?: string }> {
+    const token = await clientCredentialsToken('write:payments');
+    const base = ENV.pspBaseUrl();
+    const res = await fetch(`${base}/api/v1/gateway/payments`, {
       method: 'POST',
-      body: { customerAgreementInstanceReference },
+      headers: {
+        Authorization: `Bearer ${token.access_token}`,
+        'Content-Type': 'application/json',
+        'X-Idempotency-Key': idempotencyKey,
+      },
+      body: JSON.stringify(input),
+      cache: 'no-store',
     });
+    const text = await res.text();
+    const data = text ? safeJson(text) : undefined;
+    if (!res.ok) throw new PspError(res.status, data, (data as any)?.error_description ?? (data as any)?.error);
+    return data as { paymentOrderInstanceReference: string; paymentOrderReference: string; paymentOrderStatus: string; cardTransactionInstanceReference?: string };
   }
 
   // ── Beneficiaries (OAuth on-behalf-of; sub-binding token.sub === partyRef) ─────

@@ -73,6 +73,7 @@ const EXPECTED_UNIQUE_INDEXES: Record<string, string> = {
 // v18: representative NON-unique secondary indexes that must exist (first key checked by presence).
 const EXPECTED_SECONDARY_INDEXES: { collection: string; firstKey: string; label: string }[] = [
   { collection: 'paymentExecutionProcedure', firstKey: 'fee.feeMerchantReference', label: 'commission revenue (SD-89)' },
+  { collection: 'cardTransactionLog',        firstKey: 'fee.feeMerchantReference', label: 'acquiring commission revenue (SD-254/SD-89, A-06)' },
   { collection: 'businessProcessEvent',      firstKey: 'merchantAgreementReference', label: 'activity attribution (SD-16)' },
 ];
 

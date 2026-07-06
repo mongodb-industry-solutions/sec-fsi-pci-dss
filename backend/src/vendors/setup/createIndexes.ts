@@ -124,6 +124,9 @@ export async function createIndexes(client: MongoClient) {
     { key: { cardTransactionDateTime: -1 } },
     { key: { cardTransactionStatus: 1 } },
     { key: { merchantAgreementInstanceReference: 1, cardTransactionDateTime: -1 } },
+    // v18 (A-06): runtime merchant commission revenue aggregation (SD-89 dashboard). Sparse — only
+    // fee-bearing acquiring payments carry the attribution sub-doc.
+    { key: { 'fee.feeMerchantReference': 1, 'fee.feeCollectedDateTime': -1 }, sparse: true },
   ]);
 
   // SD-53: Customer Agreement Procedure
