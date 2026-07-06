@@ -1,11 +1,11 @@
 'use client';
-// BIAN SD-66: Payout Account Detail — Customer Account Detail Page (v17 Phase C)
+// BIAN SD-66: Payout Account Detail, Customer Account Detail Page (v17 Phase C)
 // PCI DSS Req 3.3: IBAN never shown in full. GDPR: account holder data visible to data subject only.
 // PCI DSS Req 7: partyRef from JWT must match account's partyInstanceReference (enforced backend).
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Landmark, CreditCard, CheckCircle2, XCircle, Clock, Star, Trash2, Save, X, Lock, Pencil, Eye, EyeOff } from 'lucide-react';
+import { Landmark, CreditCard, CheckCircle2, XCircle, Clock, Star, Trash2, Save, X, Lock, Pencil, Eye, EyeOff, Copy, Check } from 'lucide-react';
 import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
@@ -94,6 +94,29 @@ const RAIL_LABELS: Record<string, string> = {
   internal_ledger: 'Internal Ledger',
 };
 
+// Copy-to-clipboard affordance for a bank-detail value (IBAN, BIC, holder name, …).
+// Owner-scoped page, so copying the plaintext is safe (same trust boundary as the reveal).
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1200);
+        } catch { /* clipboard unavailable, no-op */ }
+      }}
+      title={copied ? 'Copied' : `Copy ${label}`}
+      aria-label={`Copy ${label}`}
+      className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+    >
+      {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+    </button>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   const cfg = STATUS_CFG[status] ?? { icon: Clock, cls: 'bg-gray-100 text-gray-500 border-gray-200' };
   const Icon = cfg.icon;
@@ -157,7 +180,7 @@ export default function AccountDetailPage() {
   const [saving, setSaving] = useState(false);
   const [closing, setClosing] = useState(false);
 
-  // Movements state — loaded once in full, then filtered/searched/paginated in-memory
+  // Movements state, loaded once in full, then filtered/searched/paginated in-memory
   // (standard pattern, mirrors /system/payment/history). Running balance (balanceAfter)
   // is computed server-side over the complete set, so it stays correct under any filter.
   const [allMovements, setAllMovements] = useState<AccountMovement[]>([]);
@@ -169,7 +192,7 @@ export default function AccountDetailPage() {
   const [movQ, setMovQ] = useState('');
   const [movLoading, setMovLoading] = useState(false);
 
-  // Linked cards state — full set loaded once, filtered/searched/paginated in-memory
+  // Linked cards state, full set loaded once, filtered/searched/paginated in-memory
   const [linkedCards, setLinkedCards] = useState<LinkedCard[]>([]);
   const [cardsLoading, setCardsLoading] = useState(false);
   const [cardPage, setCardPage] = useState(1);
@@ -209,7 +232,7 @@ export default function AccountDetailPage() {
       setCorrespondentBic(a.payoutAccountCorrespondentBic ?? '');
       setBankAddress(a.payoutAccountBankAddress ?? '');
       await loadMovements(t, pRef, accountId);
-      // Load linked cards (non-blocking — failure hides the section silently)
+      // Load linked cards (non-blocking, failure hides the section silently)
       setCardsLoading(true);
       api.accounts.cards(pRef, accountId, t)
         .then((r) => setLinkedCards(r.results as unknown as LinkedCard[]))
@@ -261,7 +284,7 @@ export default function AccountDetailPage() {
   async function handleSave() {
     if (!account) return;
     if (bicSwift && !BIC_RE.test(bicSwift.trim().toUpperCase())) {
-      notify('Invalid BIC/SWIFT format — must be 8 or 11 characters (e.g. DEUTDEDB or DEUTDEDBXXX).', 'error');
+      notify('Invalid BIC/SWIFT format, must be 8 or 11 characters (e.g. DEUTDEDB or DEUTDEDBXXX).', 'error');
       return;
     }
     if (correspondentBic && !BIC_RE.test(correspondentBic.trim().toUpperCase())) {
@@ -472,8 +495,23 @@ export default function AccountDetailPage() {
               </div>
             )}
 
-            {/* Bank details + Edit section */}
-            {account.payoutAccountStatus !== 'closed' && (
+            {/* Non-bank accounts (PSP internal ledger, wallet) have no external routing details
+                (IBAN/BIC/holder) by design, show an explanatory note instead of an empty bank card. */}
+            {account.payoutAccountStatus !== 'closed' && account.payoutAccountType !== 'bank_account' && (
+              <div className="bg-white rounded-xl border p-5">
+                <div className="flex items-start gap-2 text-sm text-gray-500">
+                  <Landmark size={14} className="text-gray-400 mt-0.5 shrink-0" />
+                  <span>
+                    {account.payoutAccountType === 'internal_ledger'
+                      ? 'This is a PSP internal ledger, an in-house balance account with no external bank routing (no IBAN, BIC, or holder details).'
+                      : 'This is a wallet balance, it has no external bank routing details (no IBAN or BIC).'}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Bank details + Edit section, only for external bank accounts */}
+            {account.payoutAccountStatus !== 'closed' && account.payoutAccountType === 'bank_account' && (
               <div className="bg-white rounded-xl border p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Bank details</h2>
@@ -509,12 +547,15 @@ export default function AccountDetailPage() {
                       { label: 'Bank address', value: account.payoutAccountBankAddress },
                       { label: 'Nickname', value: account.payoutAccountAlias },
                     ].filter(f => f.value).map(({ label, value, mono }) => (
-                      <div key={label} className="flex justify-between py-2.5 gap-4">
+                      <div key={label} className="flex justify-between items-center py-2.5 gap-4">
                         <span className="text-gray-500 shrink-0">{label}</span>
-                        <span className={`text-gray-800 text-right ${mono ? 'font-mono' : ''}`}>{value}</span>
+                        <div className="flex items-center gap-1 min-w-0">
+                          <span className={`text-gray-800 text-right break-all ${mono ? 'font-mono' : ''}`}>{value}</span>
+                          <CopyButton value={value as string} label={label} />
+                        </div>
                       </div>
                     ))}
-                    {/* IBAN — QE-encrypted; reveal on demand for owner / L2 / auditor */}
+                    {/* IBAN, QE-encrypted; reveal on demand for owner / L2 / auditor */}
                     {account.payoutAccountHasIban && (
                       <div className="flex justify-between items-center py-2.5 gap-4">
                         <span className="text-gray-500 shrink-0 flex items-center gap-1">
@@ -543,6 +584,8 @@ export default function AccountDetailPage() {
                               <Eye size={14} />
                             )}
                           </button>
+                          {/* Copy the raw (unformatted) IBAN, only once revealed */}
+                          {ibanRevealed && ibanValue && <CopyButton value={ibanValue} label="IBAN" />}
                         </div>
                       </div>
                     )}
@@ -638,7 +681,7 @@ export default function AccountDetailPage() {
                     <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700">
                       <Lock size={13} className="mt-0.5 shrink-0" />
                       <span>
-                        <strong>IBAN is immutable</strong> per BIAN SD-66 — it uniquely identifies the account. Use the eye icon in the read-only view to reveal it. To correct an IBAN, close this account and register a new one.
+                        <strong>IBAN is immutable</strong> per BIAN SD-66, it uniquely identifies the account. Use the eye icon in the read-only view to reveal it. To correct an IBAN, close this account and register a new one.
                       </span>
                     </div>
                   </div>
