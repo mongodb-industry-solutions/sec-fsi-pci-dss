@@ -14,6 +14,8 @@ export async function merchantPortalController(fastify: FastifyInstance) {
 
   // ── GET /api/v1/merchant/portal/me ─────────────────────────────────────────
   fastify.get('/me', {
+    // OAuth-guarded: bypass the global HS256 preHandler; validateMerchantToken does RS256 + scope in-handler.
+    config: { skipAuth: true },
     schema: {
       tags: ['merchant-portal'],
       summary: 'Merchant profile (OAuth)',
@@ -41,6 +43,7 @@ export async function merchantPortalController(fastify: FastifyInstance) {
 
   // ── GET /api/v1/merchant/portal/transactions ────────────────────────────────
   fastify.get('/transactions', {
+    config: { skipAuth: true },
     schema: {
       tags: ['merchant-portal'],
       summary: 'Merchant transactions (OAuth)',
@@ -96,6 +99,7 @@ export async function merchantPortalController(fastify: FastifyInstance) {
 
   // ── GET /api/v1/merchant/portal/notifications ───────────────────────────────
   fastify.get('/notifications', {
+    config: { skipAuth: true },
     schema: {
       tags: ['merchant-portal'],
       summary: 'Merchant notifications (OAuth)',
@@ -139,6 +143,7 @@ export async function merchantPortalController(fastify: FastifyInstance) {
 
   // ── POST /api/v1/merchant/portal/notifications/:id/read ────────────────────
   fastify.post('/notifications/:id/read', {
+    config: { skipAuth: true },
     schema: {
       tags: ['merchant-portal'],
       summary: 'Mark notification as read (OAuth)',

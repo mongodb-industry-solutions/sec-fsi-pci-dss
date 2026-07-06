@@ -23,16 +23,18 @@ export interface ScopeCatalogEntry {
   required: boolean;
 }
 
+// Real PSP `verb:resource` scope convention (enforced by merchantBeneficiary/merchantPortal/
+// merchantGateway controllers). `openid` is the only required scope (OIDC baseline).
 export const SCOPE_CATALOG: Record<string, ScopeCatalogEntry> = {
   openid: { description: 'Verify your identity', required: true },
   profile: { description: 'Read your name and username', required: false },
-  email: { description: 'Read your email address', required: false },
-  'payment:read': { description: 'View your payments and their status', required: false },
-  'payment:write': { description: 'Initiate payments on your behalf', required: false },
-  'beneficiary:read': { description: 'View your saved beneficiaries', required: false },
-  'beneficiary:manage': { description: 'Add and manage your beneficiaries', required: false },
-  'balance:read': { description: 'View your account balance', required: false },
-  'transactions:read': { description: 'View your transaction history', required: false },
+  'read:beneficiaries': { description: 'View your saved beneficiaries', required: false },
+  'write:beneficiaries': { description: 'Add and manage your beneficiaries', required: false },
+  'read:transactions': { description: 'View your transaction and operation history', required: false },
+  'read:accounts': { description: 'View your bank accounts (masked IBAN)', required: false },
+  'read:merchant_profile': { description: 'View the merchant profile', required: false },
+  'read:notifications': { description: 'View your notifications', required: false },
+  'write:transfers': { description: 'Preview and execute bank transfers on your behalf', required: false },
 };
 
 // Scope descriptor returned to the consent UI (E-03).

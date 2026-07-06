@@ -38,8 +38,8 @@ function makeDb(clientScopes: string[]) {
 describe('SCOPE_CATALOG (E-01)', () => {
   it('marks only openid as required', () => {
     expect(SCOPE_CATALOG.openid.required).toBe(true);
-    expect(SCOPE_CATALOG['payment:read'].required).toBe(false);
-    expect(SCOPE_CATALOG['balance:read'].required).toBe(false);
+    expect(SCOPE_CATALOG['read:beneficiaries'].required).toBe(false);
+    expect(SCOPE_CATALOG['read:accounts'].required).toBe(false);
   });
 
   it('describeScope falls back gracefully for unknown scopes', () => {
@@ -47,24 +47,24 @@ describe('SCOPE_CATALOG (E-01)', () => {
   });
 
   it('requiredScopesIn returns required scopes present in the list', () => {
-    expect(requiredScopesIn(['openid', 'payment:read'])).toEqual(['openid']);
-    expect(requiredScopesIn(['payment:read'])).toEqual([]);
+    expect(requiredScopesIn(['openid', 'read:beneficiaries'])).toEqual(['openid']);
+    expect(requiredScopesIn(['read:beneficiaries'])).toEqual([]);
   });
 });
 
 describe('applyUserScopeSelection (E-04/E-05)', () => {
-  const allowed = ['openid', 'profile', 'payment:read', 'balance:read'];
+  const allowed = ['openid', 'profile', 'read:beneficiaries', 'read:accounts'];
 
   it('keeps only user-selected scopes within the allowlist', () => {
-    expect(applyUserScopeSelection(allowed, ['profile', 'payment:read'])).toEqual(['openid', 'profile', 'payment:read']);
+    expect(applyUserScopeSelection(allowed, ['profile', 'read:beneficiaries'])).toEqual(['openid', 'profile', 'read:beneficiaries']);
   });
 
   it('force-includes required scopes even if the user omits them', () => {
-    expect(applyUserScopeSelection(allowed, ['payment:read'])).toContain('openid');
+    expect(applyUserScopeSelection(allowed, ['read:beneficiaries'])).toContain('openid');
   });
 
   it('drops selected scopes that are not allowed', () => {
-    expect(applyUserScopeSelection(allowed, ['profile', 'transactions:read'])).toEqual(['openid', 'profile']);
+    expect(applyUserScopeSelection(allowed, ['profile', 'write:transfers'])).toEqual(['openid', 'profile']);
   });
 });
 
@@ -79,16 +79,16 @@ describe('initiateAuthorization scope validation (E-03/E-04)', () => {
   it('rejects a requested scope outside the client allowlist with invalid_scope', async () => {
     const db = makeDb(['openid', 'profile']);
     await expect(
-      initiateAuthorization(db, { ...base, scope: 'openid profile transactions:read' }),
+      initiateAuthorization(db, { ...base, scope: 'openid profile read:transactions' }),
     ).rejects.toMatchObject({ oauthError: 'invalid_scope' });
   });
 
   it('returns scope descriptors for allowed scopes', async () => {
-    const db = makeDb(['openid', 'profile', 'payment:read']);
-    const v = await initiateAuthorization(db, { ...base, scope: 'openid profile payment:read' });
-    expect(v.scopes).toEqual(['openid', 'profile', 'payment:read']);
+    const db = makeDb(['openid', 'profile', 'read:beneficiaries']);
+    const v = await initiateAuthorization(db, { ...base, scope: 'openid profile read:beneficiaries' });
+    expect(v.scopes).toEqual(['openid', 'profile', 'read:beneficiaries']);
     expect(v.scopeDescriptors.find((d) => d.scope === 'openid')?.required).toBe(true);
-    expect(v.scopeDescriptors.find((d) => d.scope === 'payment:read')?.required).toBe(false);
+    expect(v.scopeDescriptors.find((d) => d.scope === 'read:beneficiaries')?.required).toBe(false);
   });
 
   it('requires openid', async () => {

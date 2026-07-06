@@ -55,7 +55,7 @@ describe('v18 Fase D: Authorized Applications (self-scoped)', () => {
       oauthClientId: ESPRESSO_CLIENT_ID,
       merchantAgreementInstanceReference: ESPRESSO_MERCHANT_ID,
       merchantName: 'Espresso Works Ltd',
-      grantedScopes: ['openid', 'profile', 'payment:read'],
+      grantedScopes: ['openid', 'profile', 'read:transactions'],
       consentStatus: 'active',
       consentGrantedAt: now,
       lastUsedAt: now,

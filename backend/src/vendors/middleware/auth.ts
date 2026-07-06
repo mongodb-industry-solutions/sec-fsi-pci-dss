@@ -2,6 +2,13 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import * as jwt from 'jsonwebtoken';
 import { attachRbacContext } from './rbac';
 
+// Route-level opt-out of the global HS256 auth preHandler (self-guarded / OAuth / internal routes).
+declare module 'fastify' {
+  interface FastifyContextConfig {
+    skipAuth?: boolean;
+  }
+}
+
 const JWT_SECRET = process.env.PSP_JWT_SECRET ?? 'demo-local-secret-change-in-production';
 
 // Exact URL matches that bypass JWT auth

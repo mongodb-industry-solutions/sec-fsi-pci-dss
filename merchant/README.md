@@ -35,7 +35,7 @@ PSP `frontend/`), and docker-compose maps host `8082:8080`. The port is env-driv
 | client_id | `oauth001-0000-4000-8000-000000000001` |
 | client_secret | `espresso-demo-secret-2026` |
 | redirect_uri | `http://localhost:8082/api/auth/callback` |
-| scopes | `openid profile payment:read payment:write beneficiary:read beneficiary:manage balance:read transactions:read` |
+| scopes | `openid profile read:beneficiaries write:beneficiaries read:transactions read:accounts read:merchant_profile read:notifications write:transfers` |
 | PKCE | S256 required |
 
 Log in on the PSP consent page with a seeded Espresso Works user (owner: `luis.fernandez@back.es`).

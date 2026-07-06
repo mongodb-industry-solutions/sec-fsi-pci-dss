@@ -3166,17 +3166,31 @@ These live under the OAuth consent-grant controller (`/api/v1/auth/grants/*`) an
 **v18 — Granular consent (OAuth scope selection, E-01…E-13).**
 - **Scope catalog** (`SCOPE_CATALOG`, single source of truth in `merchantOAuth.service.ts`): each scope maps to `{ description, required }`. `openid` is the only **required** scope; all others are optional/de-selectable (least-privilege, OAuth 2.0 Security BCP):
 
-  | Scope | Description | Required |
-  |---|---|---|
-  | `openid` | Verify your identity | ✅ |
-  | `profile` | Read your name and username | — |
-  | `email` | Read your email address | — |
-  | `payment:read` | View your payments and their status | — |
-  | `payment:write` | Initiate payments on your behalf | — |
-  | `beneficiary:read` | View your saved beneficiaries | — |
-  | `beneficiary:manage` | Add and manage your beneficiaries | — |
-  | `balance:read` | View your account balance | — |
-  | `transactions:read` | View your transaction history | — |
+  Scopes follow the PSP `verb:resource` convention enforced by the merchant controllers
+  (`merchantBeneficiary`, `merchantPortal`, `merchantGateway`). Final Espresso Works client set:
+
+  | Scope | Description | Required | Enforced by |
+  |---|---|---|---|
+  | `openid` | Verify your identity | ✅ | OIDC baseline |
+  | `profile` | Read your name and username | — | userinfo |
+  | `read:beneficiaries` | View your saved beneficiaries | — | `GET /merchant/beneficiaries/:partyRef` |
+  | `write:beneficiaries` | Add and manage your beneficiaries | — | `POST/DELETE /merchant/beneficiaries/*` |
+  | `read:transactions` | View your transaction and operation history | — | `GET /merchant/portal/transactions`, `GET /merchant/transactions/:partyRef` |
+  | `read:accounts` | View your bank accounts (masked IBAN) | — | `GET /merchant/accounts/:partyRef` |
+  | `read:merchant_profile` | View the merchant profile | — | `GET /merchant/portal/me` |
+  | `read:notifications` | View your notifications | — | `GET /merchant/portal/notifications` |
+  | `write:transfers` | Preview and execute bank transfers on your behalf | — | `POST /merchant/transfers/:partyRef/{preview,bank}` |
+
+- **v18 — Merchant on-behalf-of gateway endpoints (`merchantGateway.controller.ts`, mounted `/api/v1/merchant`).** All use `config: { skipAuth: true }` (opt out of the global HS256 preHandler) + `validateMerchantToken` + **sub-binding** (`token.sub === :partyRef`) + scope. Separation of duties: never combined with `requirePermission`. Reuse SD-66 `listPayoutAccounts` and SD-65 `bankTransfer.service`; display-safe, no CHD, IBAN masked-only (GDPR/PSD2).
+
+  | Method | Path | Scope | Description |
+  |---|---|---|---|
+  | `GET` | `/merchant/accounts/:partyRef` | `read:accounts` | User's payout accounts; raw IBAN/routing stripped, `payoutAccountMaskedIban` only. |
+  | `GET` | `/merchant/transactions/:partyRef` | `read:transactions` | User's SD-65 execution/operation history, display-safe projection. |
+  | `POST` | `/merchant/transfers/:partyRef/preview` | `write:transfers` | Stateless rail derivation + fee quote (no side effects). |
+  | `POST` | `/merchant/transfers/:partyRef/bank` | `write:transfers` | Execute a bank transfer; emits attributed `businessProcessEvent` (`merchant.transfer.bank`). |
+
+  > The pre-existing `/merchant/beneficiaries/*` (SD-54) and `/merchant/portal/*` routes were also switched to `config: { skipAuth: true }` in v18 so the RS256 OAuth token reaches their in-handler `validateMerchantToken` instead of being 401'd by the global HS256 middleware.
 
 - `GET /auth/authorize` (consent render) now returns `scope_details` (array of `{ scope, description, required }`), `logo_uri`/`client_uri` (merchant branding), and — when called with `_psp_sub` — `previously_granted_scopes` (for re-consent highlighting).
 - `GET /auth/authorize` (grant) accepts `_psp_scopes` (space/comma-separated user selection). The effective grant = `userSelected ⊆ allowedScopes` with all `required` scopes force-included. A requested scope **outside the client allowlist** returns `invalid_scope` (RFC 6749 §4.1.2.1) rather than being silently dropped.

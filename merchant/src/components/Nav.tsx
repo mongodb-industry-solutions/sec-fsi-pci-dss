@@ -7,10 +7,10 @@ export default async function Nav() {
 
   const links: { href: string; label: string; show: boolean }[] = [
     { href: '/products', label: 'Products', show: true },
-    { href: '/beneficiaries', label: 'Beneficiaries', show: hasScope(session, 'beneficiary:read') },
-    { href: '/transfers', label: 'Transfers', show: hasScope(session, 'beneficiary:manage') },
-    { href: '/accounts', label: 'Accounts', show: hasScope(session, 'balance:read') },
-    { href: '/history', label: 'History', show: hasScope(session, 'transactions:read') },
+    { href: '/beneficiaries', label: 'Beneficiaries', show: hasScope(session, 'read:beneficiaries') },
+    { href: '/transfers', label: 'Transfers', show: hasScope(session, 'write:transfers') },
+    { href: '/accounts', label: 'Accounts', show: hasScope(session, 'read:accounts') },
+    { href: '/history', label: 'History', show: hasScope(session, 'read:transactions') },
   ];
 
   return (

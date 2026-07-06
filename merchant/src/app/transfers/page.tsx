@@ -7,7 +7,7 @@ import TransferForm from './TransferForm';
 export default async function TransfersPage() {
   const session = await getSession();
   if (!session) redirect('/');
-  if (!hasScope(session, 'beneficiary:manage')) return <ScopeMissing scope="beneficiary:manage" />;
+  if (!hasScope(session, 'write:transfers')) return <ScopeMissing scope="write:transfers" />;
 
   return (
     <div>

@@ -31,10 +31,11 @@ export const ENV = {
 export const REQUESTED_SCOPES = [
   'openid',
   'profile',
-  'payment:read',
-  'payment:write',
-  'beneficiary:read',
-  'beneficiary:manage',
-  'balance:read',
-  'transactions:read',
+  'read:beneficiaries',
+  'write:beneficiaries',
+  'read:transactions',
+  'read:accounts',
+  'read:merchant_profile',
+  'read:notifications',
+  'write:transfers',
 ];

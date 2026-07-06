@@ -7,7 +7,7 @@ import { ScopeMissing, PspUnavailable } from '@/components/ScopeGate';
 export default async function AccountsPage() {
   const session = await getSession();
   if (!session) redirect('/');
-  if (!hasScope(session, 'balance:read')) return <ScopeMissing scope="balance:read" />;
+  if (!hasScope(session, 'read:accounts')) return <ScopeMissing scope="read:accounts" />;
 
   const c = await PspClient.fromSession();
   let results: any[] = [];

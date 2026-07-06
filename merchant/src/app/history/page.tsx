@@ -14,7 +14,7 @@ function money(a?: { amount: number; currency: string } | number, currency?: str
 export default async function HistoryPage() {
   const session = await getSession();
   if (!session) redirect('/');
-  if (!hasScope(session, 'transactions:read')) return <ScopeMissing scope="transactions:read" />;
+  if (!hasScope(session, 'read:transactions')) return <ScopeMissing scope="read:transactions" />;
 
   const c = await PspClient.fromSession();
   let results: any[] = [];

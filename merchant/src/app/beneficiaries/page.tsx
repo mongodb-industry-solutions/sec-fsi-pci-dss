@@ -8,7 +8,7 @@ import { ScopeMissing, PspUnavailable } from '@/components/ScopeGate';
 export default async function BeneficiariesPage() {
   const session = await getSession();
   if (!session) redirect('/');
-  if (!hasScope(session, 'beneficiary:read')) return <ScopeMissing scope="beneficiary:read" />;
+  if (!hasScope(session, 'read:beneficiaries')) return <ScopeMissing scope="read:beneficiaries" />;
 
   const c = await PspClient.fromSession();
   let results: any[] = [];
@@ -24,7 +24,7 @@ export default async function BeneficiariesPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Beneficiaries</h1>
-        {hasScope(session, 'beneficiary:manage') && (
+        {hasScope(session, 'write:transfers') && (
           <Link href="/transfers" className="rounded bg-espresso text-crema px-4 py-2 text-sm">Send money</Link>
         )}
       </div>
@@ -43,7 +43,7 @@ export default async function BeneficiariesPage() {
                   {b.maskedContact ?? b.beneficiaryMaskedHint ?? b.counterpartyMaskedIdentifier ?? '••••'}
                 </div>
               </div>
-              {hasScope(session, 'beneficiary:manage') && (
+              {hasScope(session, 'write:transfers') && (
                 <Link href="/transfers" className="text-sm text-blue-700 underline">Pay</Link>
               )}
             </li>

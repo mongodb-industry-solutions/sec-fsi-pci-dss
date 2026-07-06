@@ -48,6 +48,9 @@ export async function merchantBeneficiaryController(fastify: FastifyInstance) {
   // POST /api/v1/merchant/beneficiaries/:partyRef/lookup
   // Resolve a phone or email to a beneficiary token — anti-enumeration response
   fastify.post('/:partyRef/lookup', {
+    // OAuth-guarded route: opt out of the global HS256 JWT preHandler; requireMerchantOnBehalfOf
+    // validates the RS256 OAuth token + scope + sub-binding in-handler.
+    config: { skipAuth: true },
     schema: {
       tags: ['merchant-portal'],
       summary: 'Lookup beneficiary by phone or email (SD-54)',
@@ -92,6 +95,7 @@ export async function merchantBeneficiaryController(fastify: FastifyInstance) {
   // GET /api/v1/merchant/beneficiaries/:partyRef
   // List the user's registered beneficiaries
   fastify.get('/:partyRef', {
+    config: { skipAuth: true },
     schema: {
       tags: ['merchant-portal'],
       summary: "List user's beneficiaries (SD-54)",
@@ -118,6 +122,7 @@ export async function merchantBeneficiaryController(fastify: FastifyInstance) {
   // DELETE /api/v1/merchant/beneficiaries/:partyRef/:beneficiaryToken
   // Remove a beneficiary
   fastify.delete('/:partyRef/:beneficiaryToken', {
+    config: { skipAuth: true },
     schema: {
       tags: ['merchant-portal'],
       summary: 'Remove a beneficiary (SD-54)',

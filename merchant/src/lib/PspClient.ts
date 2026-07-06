@@ -187,27 +187,27 @@ export class PspClient {
     );
   }
 
-  // ── Bank transfers (ACH / SEPA / SWIFT) ────────────────────────────────────────
+  // ── Bank transfers (ACH / SEPA / SWIFT) — merchant OAuth on-behalf-of (write:transfers) ──
   previewTransfer(input: { destination: Record<string, unknown>; amountCurrency?: { amount: number; currency: string }; rail?: string }) {
-    return this.request('/api/v1/gateway/transfers/preview', { method: 'POST', body: input });
+    return this.request(`/api/v1/merchant/transfers/${encodeURIComponent(this.sub)}/preview`, { method: 'POST', body: input });
   }
 
   bankTransfer(input: { amount: number; currency: string; destination: Record<string, unknown>; rail?: string; reference?: string; settlementSchedule?: string }) {
-    return this.request('/api/v1/gateway/transfers/bank', { method: 'POST', body: input });
+    return this.request(`/api/v1/merchant/transfers/${encodeURIComponent(this.sub)}/bank`, { method: 'POST', body: input });
   }
 
-  // ── Accounts (masked IBAN only; GDPR/PSD2 minimisation) ────────────────────────
+  // ── Accounts (masked IBAN only; GDPR/PSD2 minimisation) — merchant OAuth (read:accounts) ──
   listAccounts(page = 1, limit = 20) {
     return this.request<{ results: any[]; total: number; page: number; limit: number }>(
-      `/api/v1/accounts/${encodeURIComponent(this.sub)}`,
+      `/api/v1/merchant/accounts/${encodeURIComponent(this.sub)}`,
       { query: { page, limit } },
     );
   }
 
-  // ── History (payment executions for this party) ────────────────────────────────
+  // ── History (payment executions for this party) — merchant OAuth (read:transactions) ──
   listHistory(page = 1, limit = 20) {
     return this.request<{ results: any[]; total: number; page: number; limit: number }>(
-      `/api/v1/accounts/${encodeURIComponent(this.sub)}/transfers`,
+      `/api/v1/merchant/transactions/${encodeURIComponent(this.sub)}`,
       { query: { page, limit } },
     );
   }
