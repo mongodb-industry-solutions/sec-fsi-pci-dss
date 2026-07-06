@@ -33,7 +33,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",
-    "dotenv": "^16.4.5",
+    "dotenv": "^17.4.2",
     "tsx": "^4.22.3",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.6",
