@@ -464,6 +464,66 @@ export async function listMerchantActivity(
   return { events, total, page, limit };
 }
 
+// v18 D-02: operations the CALLING USER executed through a given app (self-scoped connected-apps view).
+// Filters businessProcessEvent by actingPartyReference === sub AND (clientId === app OR
+// merchantAgreementReference === app's merchant). Reuses MerchantActivityRow (same display-safe shape:
+// no CHD — stripped by the bus, PCI Req 3.2 — and no raw IBAN). Free-text search + date range + paging.
+export async function listPartyAppActivity(
+  db: Db,
+  opts: {
+    actingPartyReference: string;
+    clientId?: string;
+    merchantAgreementReference?: string;
+    q?: string;
+    from?: Date;
+    to?: Date;
+    page?: number;
+    limit?: number;
+  },
+): Promise<{ events: MerchantActivityRow[]; total: number; page: number; limit: number }> {
+  const page = Math.max(1, opts.page ?? 1);
+  const limit = Math.min(opts.limit ?? 20, 100);
+
+  // Self-scope: only the caller's own attributed activity.
+  const and: Record<string, unknown>[] = [{ actingPartyReference: opts.actingPartyReference }];
+  // App-scope: match either the OAuth client id or the merchant reference (whichever the events carry).
+  const appOr: Record<string, unknown>[] = [];
+  if (opts.clientId) appOr.push({ clientId: opts.clientId });
+  if (opts.merchantAgreementReference) appOr.push({ merchantAgreementReference: opts.merchantAgreementReference });
+  if (appOr.length) and.push({ $or: appOr });
+  if (opts.q) {
+    const rx = { $regex: opts.q, $options: 'i' };
+    and.push({ $or: [{ processAction: rx }, { entityId: rx }, { processType: rx }] });
+  }
+  if (opts.from || opts.to) {
+    const dateFilter: Record<string, Date> = {};
+    if (opts.from) dateFilter.$gte = opts.from;
+    if (opts.to)   dateFilter.$lte = opts.to;
+    and.push({ eventDateTime: dateFilter });
+  }
+  const query = { $and: and };
+
+  const col = db.collection<BusinessProcessEvent>(BUSINESS_PROCESS_EVENTS_COLLECTION);
+  const [docs, total] = await Promise.all([
+    col.find(query).sort({ eventDateTime: -1 }).skip((page - 1) * limit).limit(limit).toArray(),
+    col.countDocuments(query),
+  ]);
+  const events: MerchantActivityRow[] = docs.map((d) => ({
+    id: d.businessProcessEventInstanceReference,
+    eventDateTime: d.eventDateTime,
+    processType: d.processType,
+    processAction: d.processAction,
+    processOutcome: d.processOutcome,
+    entityType: d.entityType,
+    entityId: d.entityId,
+    clientId: d.clientId,
+    actingPartyReference: d.actingPartyReference,
+    actingChannel: d.actingChannel,
+    summary: d.eventSummary,
+  }));
+  return { events, total, page, limit };
+}
+
 export async function listComplianceEvents(
   db: Db,
   opts: {

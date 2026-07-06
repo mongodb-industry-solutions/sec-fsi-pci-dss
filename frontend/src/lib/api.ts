@@ -172,7 +172,27 @@ export interface ConsentGrant {
   oauthClientId: string;
   merchantAgreementInstanceReference: string;
   merchantName: string;
+  oauthLogoUri?: string | null; // v18: OIDC logo_uri (branding) for the authorized-apps list
   grantedScopes: string[];
+  consentStatus: 'active' | 'revoked';
+  consentGrantedAt: string;
+  lastUsedAt?: string | null;
+}
+
+// v18 D-01: detail of one authorized app — scopes expanded with human-readable descriptions + branding.
+export interface ConsentGrantScope {
+  scope: string;
+  description: string;
+  required: boolean;
+}
+export interface ConsentGrantDetail {
+  consentId: string;
+  oauthClientId: string;
+  merchantAgreementInstanceReference: string;
+  merchantName: string;
+  oauthLogoUri?: string | null;
+  oauthClientUri?: string | null;
+  grantedScopes: ConsentGrantScope[];
   consentStatus: 'active' | 'revoked';
   consentGrantedAt: string;
   lastUsedAt?: string | null;
@@ -1216,12 +1236,44 @@ export const api = {
   },
 
   // v16: OAuth consent grants (user's authorized apps)
+  // Self-scoped "Authorized Applications" (connected apps). All routes resolve the caller's own `sub`.
   consentGrants: {
     list: (token: string) =>
       apiFetch<{ grants: ConsentGrant[] }>('/api/v1/auth/grants', {}, token),
+    // v18 D-01: detail of one authorized app (scopes with descriptions, approval date/time, branding).
+    getDetail: (consentId: string, token: string) =>
+      apiFetch<ConsentGrantDetail>(`/api/v1/auth/grants/${encodeURIComponent(consentId)}`, {}, token),
+    // v18 D-02: operations the caller executed through this app (display-safe). Filter + paginate.
+    getOperations: (
+      consentId: string,
+      filters: { q?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number },
+      token: string,
+    ) => {
+      const qs = new URLSearchParams(
+        Object.entries(filters).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+      ).toString();
+      return apiFetch<{
+        events: Array<{
+          id: string;
+          eventDateTime: string;
+          processType: string;
+          processAction: string;
+          processOutcome: string;
+          entityType: string;
+          entityId: string;
+          clientId?: string;
+          actingPartyReference?: string;
+          actingChannel?: string;
+          summary?: Record<string, unknown>;
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/auth/grants/${encodeURIComponent(consentId)}/operations${qs ? `?${qs}` : ''}`, {}, token);
+    },
     revoke: (consentId: string, token: string) =>
       apiFetch<{ revoked: boolean; consentId: string }>(
-        `/api/v1/auth/grants/${consentId}`,
+        `/api/v1/auth/grants/${encodeURIComponent(consentId)}`,
         { method: 'DELETE' },
         token,
       ),

@@ -3155,6 +3155,14 @@ Error codes: 404 merchant not found, 410 link expired/deactivated/completed.
 - `PATCH /merchants/:id/oauth-client` accepts `logo_uri` and `client_uri` (OIDC client metadata, RFC 7591); both validated as **https** URLs (empty string clears). Persisted as `merchantOAuthClient.oauthLogoUri` / `oauthClientUri`.
 - `GET /auth/grants` (self-scoped — the caller's own consent grants) payload now includes `merchantAgreementInstanceReference` and `oauthLogoUri` (nullable) alongside the existing `merchantName`, `grantedScopes`, `consentGrantedAt`, `lastUsedAt`. Used by the user's "Authorized Applications" listing.
 
+**v18 — Authorized Applications: connected-app detail + per-app operations (D-01…D-02, self-scoped).**
+These live under the OAuth consent-grant controller (`/api/v1/auth/grants/*`) and are **always scoped to the caller's own `sub`** (any PSP session token; no elevated role). A `consentId` that does not belong to the caller returns **404** (existence is never leaked). Display-safe — no CHD, no raw IBAN.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/auth/grants/:consentId` | JWT (own session) | **D-01 — one authorized app (detail).** Returns `{ consentId, oauthClientId, merchantAgreementInstanceReference, merchantName, oauthLogoUri, oauthClientUri, grantedScopes[{ scope, description, required }], consentStatus, consentGrantedAt, lastUsedAt }`. `grantedScopes` expands each scope with its human-readable description from `SCOPE_CATALOG`. Branding (`oauthLogoUri`/`oauthClientUri`) from the merchant's `merchantOAuthClient` (OIDC client metadata). 404 if the grant is not the caller's. |
+| `GET` | `/auth/grants/:consentId/operations` | JWT (own session) | **D-02 — operations the caller executed through this app.** Reads `businessProcessEvent` where `actingPartyReference == caller.sub` **AND** (`clientId == grant.oauthClientId` **OR** `merchantAgreementReference == grant.merchantAgreementInstanceReference`). Query filters: `q` (free text on `processAction`/`entityId`/`processType`), `dateFrom`/`dateTo` (ISO 8601), `page`/`limit`. Response `{ events[{ id, eventDateTime, processType, processAction, processOutcome, entityType, entityId, clientId, actingPartyReference, actingChannel, summary }], total, page, limit }`. Ownership of `:consentId` is verified first (404 otherwise). Display-safe (PCI DSS Req 3/7 · Req 10). |
+
 **v18 — Granular consent (OAuth scope selection, E-01…E-13).**
 - **Scope catalog** (`SCOPE_CATALOG`, single source of truth in `merchantOAuth.service.ts`): each scope maps to `{ description, required }`. `openid` is the only **required** scope; all others are optional/de-selectable (least-privilege, OAuth 2.0 Security BCP):
 

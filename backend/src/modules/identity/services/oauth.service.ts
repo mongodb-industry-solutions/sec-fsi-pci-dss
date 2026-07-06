@@ -587,6 +587,56 @@ export async function listUserConsentGrants(
   return grants.map((g) => ({ ...g, oauthLogoUri: logoByClient.get(g.oauthClientId) }));
 }
 
+// v18 D-01: detail of ONE consent grant owned by the calling user. Enriches the grant with the
+// merchant's OIDC branding (logo_uri/client_uri) and expands each granted scope into a human-readable
+// descriptor (SCOPE_CATALOG). Returns null when the grant does not belong to `sub` (the controller
+// maps this to 404 so a foreign consentId does not leak existence). Self-scoped by construction.
+export interface ConsentGrantDetail {
+  consentId: string;
+  oauthClientId: string;
+  merchantAgreementInstanceReference: string;
+  merchantName: string;
+  oauthLogoUri?: string;
+  oauthClientUri?: string;
+  grantedScopes: ScopeDescriptor[];
+  consentStatus: PartyAuthConsentRecord['consentStatus'];
+  consentGrantedAt: Date;
+  lastUsedAt?: Date;
+}
+
+export async function getUserConsentGrantDetail(
+  db: Db,
+  sub: string,
+  consentId: string,
+): Promise<ConsentGrantDetail | null> {
+  const grant = await db
+    .collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION)
+    .findOne({ consentId, partyAuthenticationInstanceReference: sub });
+  if (!grant) return null;
+
+  // Attach the merchant's OIDC branding (logo_uri/client_uri) — same source as the list view.
+  const merchant = await db
+    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
+    .findOne(
+      { 'merchantOAuthClient.oauthClientId': grant.oauthClientId },
+      { projection: { 'merchantOAuthClient.oauthLogoUri': 1, 'merchantOAuthClient.oauthClientUri': 1 } },
+    );
+  const cfg = merchant?.merchantOAuthClient;
+
+  return {
+    consentId: grant.consentId,
+    oauthClientId: grant.oauthClientId,
+    merchantAgreementInstanceReference: grant.merchantAgreementInstanceReference,
+    merchantName: grant.merchantName,
+    oauthLogoUri: cfg?.oauthLogoUri,
+    oauthClientUri: cfg?.oauthClientUri,
+    grantedScopes: grant.grantedScopes.map(describeScope),
+    consentStatus: grant.consentStatus,
+    consentGrantedAt: grant.consentGrantedAt,
+    lastUsedAt: grant.lastUsedAt,
+  };
+}
+
 // v18 B-10: users who authorized a given merchant (cross-merchant audit for L1/L2/auditor).
 // Reads partyAuthConsent filtered by merchantAgreementInstanceReference, joins the user's display
 // name/email (SD-13) for a display-safe row. Search matches the user name/email/party ref. Paginated.
