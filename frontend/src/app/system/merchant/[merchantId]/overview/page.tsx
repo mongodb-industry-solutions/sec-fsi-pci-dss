@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Receipt, TrendingUp, CreditCard, CalendarDays, ArrowRight, ShoppingCart, Link2, LayoutDashboard,
-  Check, Clock, XCircle, ShieldCheck, MessageSquare, Info,
+  Check, Clock, XCircle, ShieldCheck, MessageSquare, Info, Percent,
 } from 'lucide-react';
 import { SectionHeader } from '../../../../../components/SectionHeader';
 import { useRequireActiveMerchant, isActiveOwner, type MerchantRecord } from '../../../../../lib/merchantContext';
@@ -14,6 +14,12 @@ type Stats = {
   byStatus: Array<{ status: string; count: number; amount: number }>;
   byMonth: Array<{ year: number; month: number; count: number; amount: number }>;
   byCurrency: Array<{ currency: string; count: number; amount: number }>;
+  // v18 B-06: commission revenue (SD-89) aggregated from paymentExecution fee (SD-65).
+  commissionRevenue?: {
+    total: number;
+    count: number;
+    byMonth: Array<{ year: number; month: number; count: number; amount: number }>;
+  };
 };
 type Sale = {
   cardTransactionInstanceReference: string;
@@ -309,6 +315,39 @@ export default function OverviewSectionPage() {
               value={topCurrency ? fmt(stats.avgAmount, topCurrency.currency) : stats.avgAmount.toFixed(2)} sub="across all currencies" />
             <StatCard icon={<CalendarDays size={14} />} label="This month" value={String(thisMonth?.count ?? 0)} sub={`${MONTHS[now.getMonth()]} ${now.getFullYear()}`} />
           </div>
+
+          {/* v18 B-06: commission revenue (SD-89) — recognized from the fee applied per operation (SD-65). */}
+          {stats.commissionRevenue && stats.commissionRevenue.count > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Percent size={14} className="text-[#001E2B]" />
+                <h2 className="font-semibold text-gray-800 text-sm">Commission revenue</h2>
+              </div>
+              <div className="flex flex-wrap items-end gap-8">
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {topCurrency ? fmt(stats.commissionRevenue.total, topCurrency.currency) : stats.commissionRevenue.total.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">{stats.commissionRevenue.count} operations with commission</p>
+                </div>
+                {stats.commissionRevenue.byMonth.length > 0 && (
+                  <div className="flex-1 min-w-[240px]">
+                    <ul className="divide-y divide-gray-100">
+                      {stats.commissionRevenue.byMonth.slice(-6).map((m) => (
+                        <li key={`${m.year}-${m.month}`} className="py-1.5 flex items-center justify-between text-sm">
+                          <span className="text-gray-500">{MONTHS[m.month - 1]} {m.year}</span>
+                          <span className="text-gray-900 font-medium">
+                            {topCurrency ? fmt(m.amount, topCurrency.currency) : m.amount.toFixed(2)}
+                          </span>
+                          <span className="text-xs text-gray-400">{m.count} ops</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-800 text-sm mb-4">Operations by month</h2>

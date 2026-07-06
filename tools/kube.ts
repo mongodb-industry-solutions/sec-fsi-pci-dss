@@ -256,6 +256,8 @@ async function generateKubeconfig() {
     }
 
     const loginEnv = { ...process.env, KUBECONFIG: configFile };
+    const ctx = contextName(cluster === "prod" ? PROD_API : STAGING_API);
+    spawnSync("kubectl", ["config", "use-context", ctx], { shell: true, stdio: "pipe", env: loginEnv });
     console.log(`${DIM}[cmd]    kanopy-oidc kube login${NC}`);
     const loginResult = spawnSync("kanopy-oidc", ["kube", "login"], { shell: true, stdio: "inherit", env: loginEnv });
     if (loginResult.status !== 0) {
@@ -284,10 +286,22 @@ async function kanopyLogin() {
   for (const cluster of clusters) {
     const cfg = join(KUBE_DIR, `config.${cluster}`);
     if (!existsSync(cfg)) { fail(`Kubeconfig not found: ${cfg}. Run option 6 first.`); continue; }
+    const env = { ...process.env, KUBECONFIG: cfg };
+    const apiServer = cluster === "prod" ? PROD_API : STAGING_API;
+    const ctx = contextName(apiServer);
+
+    // kanopy-oidc kube login authenticates the kubeconfig's current-context.
+    // If the file's current-context points at another cluster (e.g. prod),
+    // login fails with "context ... does not exist". Pin it first.
+    action(`Selecting context '${ctx}' in ${cfg}`);
+    const setCtx = spawnSync("kubectl", ["config", "use-context", ctx], { shell: true, stdio: "pipe", env });
+    if (setCtx.status !== 0) {
+      warn(`Context '${ctx}' not found in ${cfg}. Regenerate it with option 6.`);
+      continue;
+    }
+
     action(`Logging in with config: ${cfg}`);
-    const result = spawnSync("kanopy-oidc", ["kube", "login"], {
-      shell: true, stdio: "inherit", env: { ...process.env, KUBECONFIG: cfg },
-    });
+    const result = spawnSync("kanopy-oidc", ["kube", "login"], { shell: true, stdio: "inherit", env });
     result.status === 0 ? ok(`Login successful for ${cluster}`) : fail(`Login failed for ${cluster}`);
   }
 }
@@ -850,8 +864,10 @@ async function deployEnvSetup() {
 
   // Login
   action(`Authenticating to ${envLabel}...`);
+  const loginEnv = { ...process.env, KUBECONFIG: configFile };
+  spawnSync("kubectl", ["config", "use-context", contextName(apiServer)], { shell: true, stdio: "pipe", env: loginEnv });
   const loginResult = spawnSync("kanopy-oidc", ["kube", "login"], {
-    shell: true, stdio: "inherit", env: { ...process.env, KUBECONFIG: configFile },
+    shell: true, stdio: "inherit", env: loginEnv,
   });
   step(`Login to ${envLabel}`, loginResult.status === 0);
   if (loginResult.status !== 0) {

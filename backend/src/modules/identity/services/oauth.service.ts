@@ -587,6 +587,71 @@ export async function listUserConsentGrants(
   return grants.map((g) => ({ ...g, oauthLogoUri: logoByClient.get(g.oauthClientId) }));
 }
 
+// v18 B-10: users who authorized a given merchant (cross-merchant audit for L1/L2/auditor).
+// Reads partyAuthConsent filtered by merchantAgreementInstanceReference, joins the user's display
+// name/email (SD-13) for a display-safe row. Search matches the user name/email/party ref. Paginated.
+export interface MerchantAuthorizationRow {
+  consentId: string;
+  partyAuthenticationInstanceReference: string;
+  userName?: string;
+  userEmail?: string;
+  grantedScopes: string[];
+  consentStatus: ConsentGrantStatusLike;
+  consentGrantedAt: Date;
+  lastUsedAt?: Date;
+}
+type ConsentGrantStatusLike = PartyAuthConsentRecord['consentStatus'];
+
+export async function listMerchantAuthorizations(
+  db: Db,
+  merchantId: string,
+  opts: { q?: string; page?: number; limit?: number },
+): Promise<{ authorizations: MerchantAuthorizationRow[]; total: number; page: number; limit: number }> {
+  const page = Math.max(1, opts.page ?? 1);
+  const limit = Math.min(opts.limit ?? 20, 100);
+
+  const grants = await db
+    .collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION)
+    .find({ merchantAgreementInstanceReference: merchantId })
+    .sort({ consentGrantedAt: -1 })
+    .toArray();
+
+  // Resolve display-safe user identity (SD-13) in one batch — no CHD, no IBAN.
+  const subs = [...new Set(grants.map((g) => g.partyAuthenticationInstanceReference))];
+  const users = subs.length
+    ? await db.collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
+        .find({ customerAuthenticationInstanceReference: { $in: subs } })
+        .toArray()
+    : [];
+  const userById = new Map(users.map((u) => [u.customerAuthenticationInstanceReference, u]));
+
+  let rows: MerchantAuthorizationRow[] = grants.map((g) => {
+    const u = userById.get(g.partyAuthenticationInstanceReference);
+    return {
+      consentId: g.consentId,
+      partyAuthenticationInstanceReference: g.partyAuthenticationInstanceReference,
+      userName: u?.customerAuthenticationUserName,
+      userEmail: u?.customerAuthenticationEmailAddress,
+      grantedScopes: g.grantedScopes,
+      consentStatus: g.consentStatus,
+      consentGrantedAt: g.consentGrantedAt,
+      lastUsedAt: g.lastUsedAt,
+    };
+  });
+
+  if (opts.q) {
+    const q = opts.q.toLowerCase();
+    rows = rows.filter((r) =>
+      (r.userName ?? '').toLowerCase().includes(q) ||
+      (r.userEmail ?? '').toLowerCase().includes(q) ||
+      r.partyAuthenticationInstanceReference.toLowerCase().includes(q));
+  }
+
+  const total = rows.length;
+  const authorizations = rows.slice((page - 1) * limit, page * limit);
+  return { authorizations, total, page, limit };
+}
+
 export async function revokeConsentGrant(
   db: Db,
   sub: string,

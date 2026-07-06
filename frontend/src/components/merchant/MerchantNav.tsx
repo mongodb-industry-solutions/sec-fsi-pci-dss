@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, ShoppingCart, Link2, Receipt, Key, Webhook, Settings, Activity, ShieldCheck, Lock, type LucideIcon,
+  LayoutDashboard, ShoppingCart, Link2, Receipt, Key, Webhook, Settings, Activity, ShieldCheck, Lock, ListChecks, Users, type LucideIcon,
 } from 'lucide-react';
 import { CarouselNav } from '../CarouselNav';
 import type { MerchantPanelState } from '../../lib/merchantContext';
@@ -20,6 +20,8 @@ function buildItems(merchantId: string): NavItem[] {
     { href: `${base}/sso`,       label: 'SSO',              icon: ShieldCheck },
     { href: `${base}/webhooks`,  label: 'Webhooks',         icon: Webhook },
     { href: `${base}/events`,    label: 'Events',           icon: Activity },
+    { href: `${base}/activity`,  label: 'Activity',         icon: ListChecks },
+    { href: `${base}/authorizations`, label: 'Authorizations', icon: Users },
     { href: `${base}/settings`,  label: 'Settings',         icon: Settings },
   ];
 }

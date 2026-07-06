@@ -914,6 +914,8 @@ export const api = {
         merchantWebhookEndpoint: string;
         merchantTransactionLimitAmount: number;
         merchantAgreementStatus: string;
+        merchantDefaultPayoutAccountReference: string;
+        merchantCommissionRate: number; // v18 B-08: SD-89 commission rate 0..1
       }>,
       token: string,
     ) =>
@@ -979,7 +981,66 @@ export const api = {
         byStatus: Array<{ status: string; count: number; amount: number }>;
         byMonth: Array<{ year: number; month: number; count: number; amount: number }>;
         byCurrency: Array<{ currency: string; count: number; amount: number }>;
+        // v18 B-06: commission revenue (SD-89) aggregated from paymentExecution fee (SD-65).
+        commissionRevenue?: {
+          total: number;
+          count: number;
+          byMonth: Array<{ year: number; month: number; count: number; amount: number }>;
+        };
       }>(`/api/v1/merchants/${merchantId}/stats`, {}, token),
+    // v18 B-03: merchant activity view — who did what through this merchant (SD-16 audit). Display-safe.
+    activity: (
+      merchantId: string,
+      filters: { user?: string; q?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number },
+      token: string,
+    ) => {
+      const qs = new URLSearchParams(
+        Object.entries(filters).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+      ).toString();
+      return apiFetch<{
+        events: Array<{
+          id: string;
+          eventDateTime: string;
+          processType: string;
+          processAction: string;
+          processOutcome: string;
+          entityType: string;
+          entityId: string;
+          clientId?: string;
+          actingPartyReference?: string;
+          actingChannel?: string;
+          summary?: Record<string, unknown>;
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/merchants/${merchantId}/activity${qs ? `?${qs}` : ''}`, {}, token);
+    },
+    // v18 B-08: users who authorized this merchant (OAuth consent grants, SD-16). Display-safe.
+    authorizations: (
+      merchantId: string,
+      filters: { q?: string; page?: number; limit?: number },
+      token: string,
+    ) => {
+      const qs = new URLSearchParams(
+        Object.entries(filters).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+      ).toString();
+      return apiFetch<{
+        authorizations: Array<{
+          consentId: string;
+          partyAuthenticationInstanceReference: string;
+          userName?: string;
+          userEmail?: string;
+          grantedScopes: string[];
+          consentStatus: 'active' | 'revoked';
+          consentGrantedAt: string;
+          lastUsedAt?: string | null;
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/merchants/${merchantId}/authorizations${qs ? `?${qs}` : ''}`, {}, token);
+    },
     // Merchant lifecycle audit trail (SD-89, PCI DSS Req 10).
     events: (merchantId: string, token: string) =>
       apiFetch<{

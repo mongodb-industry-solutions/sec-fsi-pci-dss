@@ -4,7 +4,8 @@
 import { FastifyInstance } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, sendTestWebhook, generateApiKey, importApiKey, updateApiKeyLabel, revokeApiKey, reviewMerchantApplication, getMerchantEvents, getMerchantApiKeys, appendMerchantEvent } from '../services/merchant.service';
-import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
+import { emitComplianceEvent, listMerchantActivity } from '../../provider/services/businessProcessEvent.service';
+import { listMerchantAuthorizations } from '../../identity/services/oauth.service';
 import { getPayoutAccount } from '../services/payoutAccount.service';
 import { issueMerchantOAuthClient, revokeMerchantOAuthClient, rotateMerchantOAuthClientSecret, updateMerchantOAuthClient } from '../services/merchantOAuth.service';
 import { WebhookService } from '../services/merchantWebhook.service';
@@ -564,6 +565,164 @@ Used by customers to detect their onboarding state: no application / under_revie
     }
     const events = await getMerchantEvents(fastify.db, id);
     return reply.send({ events });
+  });
+
+  // GET /api/v1/merchants/:id/activity  — v18 B-01/B-12: "user × merchant × action" audit view.
+  // Reads businessProcessEvent tagged with merchantAgreementReference (OAuth-originated actions).
+  // Filter by user (actingPartyReference) + free-text + date range, paginated. Display-safe
+  // (no CHD, no raw IBAN). Same authorization as /:id/events (owner / officer / auditor / L1 / L2).
+  fastify.get('/:id/activity', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Merchant activity view — who did what through this merchant (SD-89 / SD-16 audit)',
+      description: `Lists \`businessProcessEvent\` records attributed to this merchant's OAuth client
+(v18 activity attribution). Shows the acting user (party display-safe), action/event, channel
+(\`oauth_merchant\`), timestamp and the related operation reference.
+
+**Filters:** \`user\` (actingPartyReference exact), \`q\` (free text on action/entity/user), \`dateFrom\`/\`dateTo\` (ISO 8601), \`page\`/\`limit\`.
+
+**Authorization:** merchant owner, \`merchant_officer\`, \`security_auditor\`, \`level1_analyst\`, \`level2_investigator\`.
+
+**PCI DSS Req 3/7 (data minimization):** never returns CHD or raw IBAN.`,
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      querystring: {
+        type: 'object',
+        properties: {
+          user:     { type: 'string', description: 'Filter by acting party reference (the user sub).' },
+          q:        { type: 'string', description: 'Free-text match on action, entity id, process type or user.' },
+          dateFrom: { type: 'string', format: 'date-time' },
+          dateTo:   { type: 'string', format: 'date-time' },
+          page:     { type: 'integer', minimum: 1, default: 1 },
+          limit:    { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            events: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id:                    { type: 'string' },
+                  eventDateTime:         { type: 'string', format: 'date-time' },
+                  processType:           { type: 'string' },
+                  processAction:         { type: 'string' },
+                  processOutcome:        { type: 'string' },
+                  entityType:            { type: 'string' },
+                  entityId:              { type: 'string' },
+                  clientId:              { type: 'string' },
+                  actingPartyReference:  { type: 'string' },
+                  actingChannel:         { type: 'string' },
+                  summary:               { type: 'object', additionalProperties: true },
+                },
+              },
+            },
+            total: { type: 'number' },
+            page:  { type: 'number' },
+            limit: { type: 'number' },
+          },
+        },
+        401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { user: actingUser, q, dateFrom, dateTo, page = 1, limit = 20 } = request.query as {
+      user?: string; q?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number;
+    };
+    const user = (request as { user?: JwtUserPayload }).user;
+    const merchant = await getMerchantById(fastify.db, id);
+    if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
+    const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
+    const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
+    const isStaff = MERCHANT_DETAIL_READ_ROLES.has(user?.role ?? '');
+    if (!isOwner && !isStaff) {
+      return reply.status(403).send({ error: 'Access denied: only the merchant owner, PSP staff, or a fraud investigator can view merchant activity.' });
+    }
+    const result = await listMerchantActivity(fastify.db, id, {
+      actingPartyReference: actingUser,
+      q,
+      from: dateFrom ? new Date(dateFrom) : undefined,
+      to: dateTo ? new Date(dateTo) : undefined,
+      page: Number(page),
+      limit: Number(limit),
+    });
+    return reply.send(result);
+  });
+
+  // GET /api/v1/merchants/:id/authorizations  — v18 B-10: users who granted consent to this merchant.
+  // Reads partyAuthConsent filtered by merchantAgreementInstanceReference. Display-safe user identity
+  // (SD-13), scopes, status, grant/last-used timestamps. Search by user, paginated. Same authorization.
+  fastify.get('/:id/authorizations', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Users who authorized this merchant (OAuth consent grants, SD-16)',
+      description: `Lists the users who granted OAuth consent to this merchant's app.
+
+**Filters:** \`q\` (search by user name / email / party ref), \`page\`/\`limit\`.
+
+**Authorization:** merchant owner, \`merchant_officer\`, \`security_auditor\`, \`level1_analyst\`, \`level2_investigator\`.
+
+Display-safe — no CHD, no raw IBAN.`,
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      querystring: {
+        type: 'object',
+        properties: {
+          q:     { type: 'string', description: 'Search by user name, email or party reference.' },
+          page:  { type: 'integer', minimum: 1, default: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            authorizations: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  consentId:                            { type: 'string' },
+                  partyAuthenticationInstanceReference: { type: 'string' },
+                  userName:                             { type: 'string' },
+                  userEmail:                            { type: 'string' },
+                  grantedScopes:                        { type: 'array', items: { type: 'string' } },
+                  consentStatus:                        { type: 'string', enum: ['active', 'revoked'] },
+                  consentGrantedAt:                     { type: 'string', format: 'date-time' },
+                  lastUsedAt:                           { type: 'string', format: 'date-time', nullable: true },
+                },
+              },
+            },
+            total: { type: 'number' },
+            page:  { type: 'number' },
+            limit: { type: 'number' },
+          },
+        },
+        401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { q, page = 1, limit = 20 } = request.query as { q?: string; page?: number; limit?: number };
+    const user = (request as { user?: JwtUserPayload }).user;
+    const merchant = await getMerchantById(fastify.db, id);
+    if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
+    const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
+    const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
+    const isStaff = MERCHANT_DETAIL_READ_ROLES.has(user?.role ?? '');
+    if (!isOwner && !isStaff) {
+      return reply.status(403).send({ error: 'Access denied: only the merchant owner, PSP staff, or a fraud investigator can view merchant authorizations.' });
+    }
+    const result = await listMerchantAuthorizations(fastify.db, id, { q, page: Number(page), limit: Number(limit) });
+    return reply.send(result);
   });
 
   // PATCH /api/v1/merchants/:id/review  (Ch-05 — BIAN Action Term: Control)
