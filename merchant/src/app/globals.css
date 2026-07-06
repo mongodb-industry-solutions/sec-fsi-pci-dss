@@ -2,10 +2,133 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Palette — "Leafy Pay × Espresso Works".
+ * Modern, clean, slightly futuristic: Leafy green (#00ED64) + MongoDB deep
+ * (#001E2B) as the primary identity over neutral surfaces, with a fresh teal
+ * highlight. Espresso brown / cream stay as a warm brand accent only (product
+ * icons, badges), never the base. All pairings target WCAG AA contrast.
+ */
 :root {
   color-scheme: light;
+
+  /* Modern system font stack (no network fetch, premium feel) */
+  --font-sans: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  /* Brand identity */
+  --leaf: #00ed64;      /* bright accent / highlight */
+  --leaf-deep: #00684a; /* accessible green for text/borders/buttons */
+  --leaf-ink: #001e2b;  /* MongoDB deep ink */
+  --highlight: #0aa6a0; /* fresh teal, futuristic accent */
+
+  /* Warm brand accent (secondary, decorative) */
+  --brand: #6f4a38;      /* espresso, for product iconography */
+  --brand-soft: #f3e7da; /* crema tint for icon tiles / badges */
+
+  /* Semantic surfaces (light, cool neutral base) */
+  --canvas: #f2f6f4;
+  --surface: #ffffff;
+  --surface-alt: #eaf2ee;
+  --ink: #001e2b;
+  --muted: #4f6470;
+  --line: #dbe7e1;
+
+  /* Interactive */
+  --primary: #00684a;    /* deep leaf green */
+  --primary-ink: #ffffff;
+  --accent: #00684a;
+  --accent-ink: #ffffff;
+
+  /* Status */
+  --ok: #0b7a4b;
+  --ok-bg: #e4f6ec;
+  --warn: #8a5a00;
+  --warn-bg: #fbf1dd;
+  --err: #b42318;
+  --err-bg: #fdecea;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --leaf: #00ed64;
+    --leaf-deep: #3ff08d;
+    --leaf-ink: #001e2b;
+    --highlight: #2be0ce;
+    --brand: #d0a688;
+    --brand-soft: #22303a;
+
+    --canvas: #00121a;
+    --surface: #002230;
+    --surface-alt: #06313d;
+    --ink: #e6f2ec;
+    --muted: #93aaa7;
+    --line: #123a44;
+
+    --primary: #00ed64;
+    --primary-ink: #001e2b;
+    --accent: #3ff08d;
+    --accent-ink: #001e2b;
+
+    --ok: #4fd08a;
+    --ok-bg: #06291d;
+    --warn: #e0b25c;
+    --warn-bg: #2a2110;
+    --err: #f2897f;
+    --err-bg: #2c1512;
+  }
 }
 
 body {
-  @apply bg-crema/30 text-espresso-dark;
+  @apply bg-canvas text-ink antialiased;
+  /* Subtle futuristic mesh: soft Leafy + teal glows fixed behind content. */
+  background-image:
+    radial-gradient(60rem 40rem at 12% -8%, color-mix(in srgb, var(--leaf) 14%, transparent), transparent 60%),
+    radial-gradient(50rem 36rem at 100% 0%, color-mix(in srgb, var(--highlight) 12%, transparent), transparent 55%);
+  background-attachment: fixed;
+}
+
+@layer components {
+  /* Translucent glass surface with a fine luminous border. */
+  .glass {
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    @apply border border-line shadow-card;
+  }
+  .card {
+    @apply rounded-2xl border border-line bg-surface shadow-card;
+  }
+  /* Primary action: deep leaf green with a soft glow on hover. */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 font-medium text-primary-ink transition duration-200 hover:shadow-glow hover:brightness-110 active:scale-[.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-leaf/60 disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-surface px-4 py-2 font-medium text-ink transition duration-200 hover:bg-surface-alt active:scale-[.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-leaf/60 disabled:opacity-50;
+  }
+  /* Elegant loading skeleton block. */
+  .skeleton {
+    @apply relative overflow-hidden rounded-lg bg-surface-alt;
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 animate-shimmer;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 8%, transparent), transparent);
+  }
+}
+
+/* Radix Tooltip animation */
+@keyframes tt-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Respect reduced-motion: disable animations / transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

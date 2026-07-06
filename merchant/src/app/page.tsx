@@ -1,7 +1,22 @@
-// Landing (C-12). Shows SSO login, or the logged-in user (verified via PSP userinfo) + granted scopes.
+// Landing (C-12). SSO login, or the logged-in user (verified via PSP userinfo) + granted scopes.
 import Link from 'next/link';
+import { ArrowRight, BadgeCheck, LogIn, ShieldCheck, ShoppingBag, TriangleAlert } from 'lucide-react';
 import { PspClient } from '@/lib/PspClient';
 import { getSession } from '@/lib/session';
+import { Chip } from '@/components/ui/Bits';
+import { Tip } from '@/components/ui/Tooltip';
+
+// Human-readable meaning for each OAuth scope (shown as tooltips).
+const SCOPE_HELP: Record<string, string> = {
+  openid: 'Confirms who you are (your Leafy Pay identity).',
+  profile: 'Share your name so we can greet you.',
+  email: 'Share your email address.',
+  'read:beneficiaries': 'View your saved payees (masked).',
+  'write:transfers': 'Send bank transfers on your behalf.',
+  'read:accounts': 'View your payout accounts (masked IBAN).',
+  'read:transactions': 'View your payment and transfer history.',
+  'write:payments': 'Let the merchant charge card payments.',
+};
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ auth_error?: string }> }) {
   const { auth_error } = await searchParams;
@@ -17,36 +32,63 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
 
   return (
     <div className="space-y-8">
-      <section className="rounded-2xl bg-espresso text-crema p-10">
-        <h1 className="text-3xl font-bold">Espresso Works Ltd</h1>
-        <p className="mt-2 max-w-xl text-crema/80">
-          Premium coffee, powered by Leafy Pay. Sign in with your Leafy Pay account to shop,
-          pay beneficiaries, and manage transfers — all without sharing your card details with us.
+      <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-leaf-ink via-[#04322c] to-[#062b2b] p-8 text-white shadow-card sm:p-10">
+        {/* Futuristic glow accents */}
+        <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-leaf/25 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-highlight/20 blur-3xl" />
+        <span className="relative inline-flex items-center gap-1.5 rounded-full bg-leaf/15 px-3 py-1 text-xs font-medium text-leaf ring-1 ring-leaf/30">
+          <ShieldCheck className="h-3.5 w-3.5" aria-hidden /> Powered by Leafy Pay
+        </span>
+        <h1 className="relative mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Espresso Works Ltd</h1>
+        <p className="relative mt-3 max-w-xl text-white/80">
+          Premium coffee, powered by Leafy Pay. Sign in with your Leafy Pay account to shop, pay beneficiaries, and
+          manage transfers, all without sharing your card details with us.
         </p>
+
         {auth_error && (
-          <p className="mt-4 rounded bg-red-500/20 px-3 py-2 text-sm">Sign-in failed: {auth_error}</p>
+          <p className="relative mt-4 flex items-center gap-2 rounded-lg bg-[var(--err)]/20 px-3 py-2 text-sm">
+            <TriangleAlert className="h-4 w-4" aria-hidden /> Sign-in failed: {auth_error}
+          </p>
         )}
+
         {session ? (
-          <div className="mt-6 flex flex-wrap items-center gap-4">
-            <span className="rounded-full bg-crema/20 px-4 py-2">Signed in as <b>{displayName}</b></span>
-            <Link href="/products" className="rounded bg-crema text-espresso-dark px-4 py-2 font-medium">Browse products</Link>
+          <div className="relative mt-6 flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm ring-1 ring-white/10">
+              <BadgeCheck className="h-4 w-4 text-leaf" aria-hidden /> Signed in as <b>{displayName}</b>
+            </span>
+            <Link
+              href="/products"
+              className="inline-flex items-center gap-2 rounded-xl bg-leaf px-4 py-2 font-semibold text-leaf-ink transition duration-200 hover:shadow-glow hover:brightness-105 active:scale-[.98]"
+            >
+              <ShoppingBag className="h-4 w-4" aria-hidden /> Browse products <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
           </div>
         ) : (
-          <a href="/api/auth/login" className="mt-6 inline-block rounded bg-crema text-espresso-dark px-5 py-2.5 font-semibold">
-            Login with Leafy Pay
-          </a>
+          <Tip label="OAuth2 / OIDC single sign-on with PKCE. Card and password stay with the PSP.">
+            <a
+              href="/api/auth/login"
+              className="relative mt-6 inline-flex items-center gap-2 rounded-xl bg-leaf px-5 py-2.5 font-semibold text-leaf-ink transition duration-200 hover:shadow-glow hover:brightness-105 active:scale-[.98]"
+            >
+              <LogIn className="h-4 w-4" aria-hidden /> Login with Leafy Pay
+            </a>
+          </Tip>
         )}
       </section>
 
       {session && (
-        <section className="rounded-xl border border-espresso/10 bg-white p-6">
-          <h2 className="font-semibold mb-2">Granted permissions</h2>
-          <p className="text-sm text-espresso-light mb-3">
-            Consent is granular — features you did not grant are hidden automatically.
+        <section className="glass rounded-2xl p-6">
+          <h2 className="font-semibold">Granted permissions</h2>
+          <p className="mt-1 text-sm text-muted">
+            Consent is granular. Features you did not grant are hidden automatically. Hover a permission to see what it
+            allows.
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             {session.grantedScopes.map((s) => (
-              <span key={s} className="rounded-full bg-crema px-3 py-1 text-xs font-mono">{s}</span>
+              <Tip key={s} label={SCOPE_HELP[s] ?? 'Granted permission.'}>
+                <span>
+                  <Chip tone="accent" className="cursor-help font-mono">{s}</Chip>
+                </span>
+              </Tip>
             ))}
           </div>
         </section>

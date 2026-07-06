@@ -1,8 +1,10 @@
 // Accounts (C-16): the user's payout accounts — masked IBAN only (GDPR/PSD2), default flagged.
 import { redirect } from 'next/navigation';
+import { Wallet, Landmark, Lock } from 'lucide-react';
 import { PspClient, PspError } from '@/lib/PspClient';
 import { getSession, hasScope } from '@/lib/session';
 import { ScopeMissing, PspUnavailable } from '@/components/ScopeGate';
+import { Chip, EmptyState, InfoHint } from '@/components/ui/Bits';
 
 export default async function AccountsPage() {
   const session = await getSession();
@@ -21,31 +23,46 @@ export default async function AccountsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Your accounts</h1>
+      <h1 className="mb-6 flex items-center gap-2 text-2xl font-bold">
+        <Wallet className="h-6 w-6 text-leaf-deep" aria-hidden /> Your accounts
+        <InfoHint label="Payout accounts held at Leafy Pay. IBANs are always masked, so the merchant never receives them in clear (GDPR / PSD2)." />
+      </h1>
+
       {error ? (
         <PspUnavailable message={error} />
       ) : results.length === 0 ? (
-        <p className="text-espresso-light">No accounts found.</p>
+        <EmptyState icon={<Wallet className="h-8 w-8" />} title="No accounts found" hint="Payout accounts you add in Leafy Pay will appear here." />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {results.map((a, i) => (
-            <div key={a.payoutAccountInstanceReference ?? i} className="rounded-xl border border-espresso/10 bg-white p-5">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">{a.payoutAccountAlias ?? a.payoutAccountBankName ?? 'Account'}</h3>
-                {a.payoutAccountIsDefault && <span className="rounded-full bg-crema px-2 py-0.5 text-xs">Default</span>}
+            <div key={a.payoutAccountInstanceReference ?? i} className="glass rounded-2xl p-5 transition duration-200 hover:-translate-y-0.5 hover:border-leaf/40">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="flex items-center gap-2 font-semibold text-ink">
+                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-leaf/10 text-leaf-deep ring-1 ring-leaf/20">
+                    <Landmark className="h-4 w-4" aria-hidden />
+                  </span>
+                  {a.payoutAccountAlias ?? a.payoutAccountBankName ?? 'Account'}
+                </h3>
+                {a.payoutAccountIsDefault && <Chip tone="accent">Default</Chip>}
               </div>
-              <dl className="mt-2 text-sm text-espresso-light space-y-0.5">
-                <div className="flex justify-between"><dt>Type</dt><dd>{a.payoutAccountType}</dd></div>
-                <div className="flex justify-between"><dt>Currency</dt><dd>{a.payoutAccountCurrency}</dd></div>
-                <div className="flex justify-between"><dt>Country</dt><dd>{a.payoutAccountCountryCode}</dd></div>
-                <div className="flex justify-between"><dt>Rail</dt><dd>{a.payoutAccountPreferredRail}</dd></div>
-                <div className="flex justify-between"><dt>IBAN</dt><dd className="font-mono">{a.payoutAccountMaskedIban ?? (a.payoutAccountHasIban ? '•••• (masked)' : '—')}</dd></div>
+              <dl className="mt-3 space-y-1 text-sm text-muted">
+                <div className="flex justify-between"><dt>Type</dt><dd className="text-ink">{a.payoutAccountType ?? 'n/a'}</dd></div>
+                <div className="flex justify-between"><dt>Currency</dt><dd className="text-ink">{a.payoutAccountCurrency ?? 'n/a'}</dd></div>
+                <div className="flex justify-between"><dt>Country</dt><dd className="text-ink">{a.payoutAccountCountryCode ?? 'n/a'}</dd></div>
+                <div className="flex justify-between"><dt>Rail</dt><dd className="text-ink">{a.payoutAccountPreferredRail ?? 'n/a'}</dd></div>
+                <div className="flex justify-between">
+                  <dt>IBAN</dt>
+                  <dd className="font-mono text-ink">{a.payoutAccountMaskedIban ?? (a.payoutAccountHasIban ? '•••• (masked)' : 'n/a')}</dd>
+                </div>
               </dl>
             </div>
           ))}
         </div>
       )}
-      <p className="mt-4 text-xs text-espresso-light">IBANs are always shown masked — the merchant never receives them in clear.</p>
+
+      <p className="mt-4 flex items-center gap-1.5 text-xs text-muted">
+        <Lock className="h-3.5 w-3.5" aria-hidden /> IBANs are always shown masked, so the merchant never receives them in clear.
+      </p>
     </div>
   );
 }

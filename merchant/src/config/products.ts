@@ -10,7 +10,8 @@ export interface Product {
   currency: string;
   method: PaymentMethod;
   methodLabel: string;
-  image: string; // emoji placeholder (KISS, no asset pipeline)
+  /** lucide-react icon key (see ProductCard ICONS map). */
+  icon: 'beans' | 'machine' | 'course' | 'subscription';
 }
 
 export const PRODUCTS: Product[] = [
@@ -22,7 +23,7 @@ export const PRODUCTS: Product[] = [
     currency: 'GBP',
     method: 'payment_link',
     methodLabel: 'Payment Link',
-    image: '🫘',
+    icon: 'beans',
   },
   {
     id: 'espresso-machine',
@@ -32,7 +33,7 @@ export const PRODUCTS: Product[] = [
     currency: 'GBP',
     method: 'redirect',
     methodLabel: 'Redirect (Hosted Checkout)',
-    image: '☕',
+    icon: 'machine',
   },
   {
     id: 'barista-course',
@@ -42,7 +43,7 @@ export const PRODUCTS: Product[] = [
     currency: 'GBP',
     method: 'api_payment',
     methodLabel: 'API Payment (tokenised)',
-    image: '🎓',
+    icon: 'course',
   },
   {
     id: 'coffee-subscription',
@@ -52,7 +53,7 @@ export const PRODUCTS: Product[] = [
     currency: 'GBP',
     method: 'subscription',
     methodLabel: 'Redirect (Subscription)',
-    image: '🔁',
+    icon: 'subscription',
   },
 ];
 

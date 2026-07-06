@@ -46,7 +46,7 @@ export async function payForProduct(productId: string): Promise<ActionResult> {
           currency: product.currency,
           description: product.name,
         });
-        return { ok: true, paymentUrl: link.paymentUrl, message: 'Payment link created — share it with the buyer.' };
+        return { ok: true, paymentUrl: link.paymentUrl, message: 'Payment link created. Share it with the buyer.' };
       }
       case 'redirect':
       case 'subscription': {

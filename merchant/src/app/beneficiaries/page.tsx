@@ -1,9 +1,12 @@
 // Beneficiaries (C-14): list the user's saved beneficiaries (masked) + link to direct pay.
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { Users, Send, ArrowRight } from 'lucide-react';
 import { PspClient, PspError } from '@/lib/PspClient';
 import { getSession, hasScope } from '@/lib/session';
 import { ScopeMissing, PspUnavailable } from '@/components/ScopeGate';
+import { EmptyState, InfoHint } from '@/components/ui/Bits';
+import { Tip } from '@/components/ui/Tooltip';
 
 export default async function BeneficiariesPage() {
   const session = await getSession();
@@ -22,29 +25,45 @@ export default async function BeneficiariesPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Beneficiaries</h1>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <h1 className="flex items-center gap-2 text-2xl font-bold">
+          <Users className="h-6 w-6 text-leaf-deep" aria-hidden /> Beneficiaries
+          <InfoHint label="People and accounts you can pay. Identifiers are masked, so the merchant never sees them in clear." />
+        </h1>
         {hasScope(session, 'write:transfers') && (
-          <Link href="/transfers" className="rounded bg-espresso text-crema px-4 py-2 text-sm">Send money</Link>
+          <Tip label="Send a bank transfer to a beneficiary.">
+            <Link href="/transfers" className="btn-primary text-sm">
+              <Send className="h-4 w-4" aria-hidden /> Send money
+            </Link>
+          </Tip>
         )}
       </div>
 
       {error ? (
         <PspUnavailable message={error} />
       ) : results.length === 0 ? (
-        <p className="text-espresso-light">No saved beneficiaries yet.</p>
+        <EmptyState icon={<Users className="h-8 w-8" />} title="No saved beneficiaries yet" hint="Payees you add in Leafy Pay will appear here." />
       ) : (
-        <ul className="divide-y divide-espresso/10 rounded-xl border border-espresso/10 bg-white">
+        <ul className="glass divide-y divide-line/60 overflow-hidden rounded-2xl">
           {results.map((b, i) => (
-            <li key={b.counterpartyArrangementReference ?? b.beneficiaryToken ?? i} className="flex items-center justify-between p-4">
-              <div>
-                <div className="font-medium">{b.counterpartyName ?? b.label ?? b.beneficiaryLabel ?? 'Beneficiary'}</div>
-                <div className="text-sm text-espresso-light font-mono">
-                  {b.maskedContact ?? b.beneficiaryMaskedHint ?? b.counterpartyMaskedIdentifier ?? '••••'}
+            <li key={b.counterpartyArrangementReference ?? b.beneficiaryToken ?? i} className="flex items-center justify-between gap-3 p-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-leaf/10 text-leaf-deep ring-1 ring-leaf/20">
+                  <Users className="h-4 w-4" aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate font-medium text-ink">{b.counterpartyName ?? b.label ?? b.beneficiaryLabel ?? 'Beneficiary'}</div>
+                  <div className="truncate font-mono text-sm text-muted">
+                    {b.maskedContact ?? b.beneficiaryMaskedHint ?? b.counterpartyMaskedIdentifier ?? '••••'}
+                  </div>
                 </div>
               </div>
               {hasScope(session, 'write:transfers') && (
-                <Link href="/transfers" className="text-sm text-blue-700 underline">Pay</Link>
+                <Tip label="Pay this beneficiary.">
+                  <Link href="/transfers" className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-leaf-deep hover:underline">
+                    Pay <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                  </Link>
+                </Tip>
               )}
             </li>
           ))}

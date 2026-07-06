@@ -1,7 +1,9 @@
 // Transfers (C-15): preview → execute a bank transfer (ACH / SEPA / SWIFT).
 import { redirect } from 'next/navigation';
+import { Send } from 'lucide-react';
 import { getSession, hasScope } from '@/lib/session';
 import { ScopeMissing } from '@/components/ScopeGate';
+import { InfoHint } from '@/components/ui/Bits';
 import TransferForm from './TransferForm';
 
 export default async function TransfersPage() {
@@ -11,8 +13,11 @@ export default async function TransfersPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Bank transfer</h1>
-      <p className="text-sm text-espresso-light mb-6">Preview fees and rail, then submit. The PSP holds all balances.</p>
+      <h1 className="flex items-center gap-2 text-2xl font-bold">
+        <Send className="h-6 w-6 text-leaf-deep" aria-hidden /> Bank transfer
+        <InfoHint label="Espresso Works asks Leafy Pay to move money on your behalf. The PSP holds all balances; the merchant never does." />
+      </h1>
+      <p className="mb-6 mt-1 text-sm text-muted">Preview fees and rail, then submit. The PSP holds all balances.</p>
       <TransferForm />
     </div>
   );
