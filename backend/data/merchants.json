@@ -22,7 +22,7 @@
       "oauthClientId": "oauth001-0000-4000-8000-000000000001",
       "oauthClientSecretHash": "$2a$12$e6yVXVoz4p8vtEA/fopsnOKb5o.wrOrfKMfL1qn/4NorixtoGE8sG",
       "oauthClientSecretPrefix": "espresso",
-      "oauthRedirectUris": ["http://localhost:4000/api/auth/callback"],
+      "oauthRedirectUris": ["http://localhost:8082/api/auth/callback", "https://sec-fsi-pci-dss-merchant.industrysolutions.staging.corp.mongodb.com/api/auth/callback", "https://sec-fsi-pci-dss-merchant.industrysolutions.prod.corp.mongodb.com/api/auth/callback"],
       "oauthGrantTypes": ["authorization_code", "refresh_token"],
       "oauthScopes": ["openid", "profile", "payment:read", "payment:write", "beneficiary:read", "beneficiary:manage", "balance:read", "transactions:read"],
       "oauthClientStatus": "active",
@@ -30,8 +30,8 @@
       "oauthTokenLifetimeSeconds": 3600,
       "oauthRefreshTokenLifetimeDays": 30,
       "oauthRequirePkce": true,
-      "oauthLogoUri": "http://localhost:4000/espresso-logo.svg",
-      "oauthClientUri": "http://localhost:4000"
+      "oauthLogoUri": "http://localhost:8082/espresso-logo.svg",
+      "oauthClientUri": "http://localhost:8082"
     },
     "merchantWebhooks": [
       {

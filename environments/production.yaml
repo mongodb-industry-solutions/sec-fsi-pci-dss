@@ -10,9 +10,9 @@ env:
 envSecrets:
   MONGODB_URI: sec-fsi-pci-dss-secrets-prod
   MONGODB_DB_NAME: sec-fsi-pci-dss-secrets-prod
-  KMS_LOCAL_MASTER_KEY: sec-fsi-pci-dss-secrets-prod
-  KMS_KEY_VAULT_DATABASE: sec-fsi-pci-dss-secrets-prod
-  KMS_KEY_VAULT_COLLECTION: sec-fsi-pci-dss-secrets-prod
+  PSP_KMS_LOCAL_MASTER_KEY: sec-fsi-pci-dss-secrets-prod
+  PSP_KMS_KEY_VAULT_DATABASE: sec-fsi-pci-dss-secrets-prod
+  PSP_KMS_KEY_VAULT_COLLECTION: sec-fsi-pci-dss-secrets-prod
   PSP_ADM_USER: sec-fsi-pci-dss-secrets-prod
   PSP_ADM_PASS: sec-fsi-pci-dss-secrets-prod
   PSP_OAUTH_AWS_KEY_ARN: sec-fsi-pci-dss-secrets-prod
