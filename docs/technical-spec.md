@@ -3,7 +3,7 @@
 **Project:** FSI PCI DSS Payment Security Demo  
 **PRD reference:** [PRD.md](PRD.md)  
 **Engineering Proposal:** [engineering-proposal.md](engineering-proposal.md)  
-**Last updated:** 2026-05-28
+**Last updated:** 2026-07-01
 
 This document covers the implementation-level detail that the PRD deliberately omits: BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index creation, and environment configuration. Engineers start here.
 
@@ -25,159 +25,256 @@ This document covers the implementation-level detail that the PRD deliberately o
 
 ## 1. BIAN TypeScript Models
 
-All models live in `backend/src/models/`. Each file exports the TypeScript interface for the collection document and the collection name constant.
+All models live in `backend/src/modules/*/models/`. Each file exports the TypeScript interface for the collection document and the collection name constant. All collections follow strict BIAN Service Domain (SD) naming.
 
-### `cardTransaction.model.ts`
+### `party.model.ts` (SD-13 — new)
 
 ```typescript
-// BIAN SD-254: Card Transaction
+// BIAN SD-13: Party Data Management
+// Canonical PII store. All other SDs reference parties via partyInstanceReference (FK).
 
-export const CARD_TRANSACTION_COLLECTION = 'cardTransaction';
-export const CARD_TRANSACTION_SENSITIVE_COLLECTION = 'cardTransactionSensitive';
+export const PARTY_COLLECTION = 'party';
 
-export interface CardTransactionLogControlRecord {
-  // Identifiers
-  cardTransactionInstanceReference: string;       // UUID, primary key
-  cardTransactionExternalReference?: string;      // Gateway transaction ID
-
-  // Plaintext: card token is a surrogate, not CHD under PCI DSS v4.0
-  paymentCardReference: string;                   // Indexed plaintext: standard query, not QE
-
-  // QE equality: searchable encrypted fields
-  cardTransactionAccountReference: string;        // Account reference
-
-  // Plaintext operational fields
-  cardTransactionAmount: {
-    amount: number;                               // QE range in v2
-    currency: string;                             // ISO 4217
-  };
-  cardTransactionDateTime: Date;
-  cardTransactionStatus: CardTransactionStatus;
-  cardTransactionChannel: CardTransactionChannel;
-  cardTransactionInitiationType: CardTransactionInitiationType; // v4: MIT vs CIT for Visa/MC recurring rules
-  cardTransactionMerchantCategoryCode: string;    // MCC code
-  cardTransactionMerchantName: string;
-  cardTransactionMaskedPanDisplay: string;        // Display only: ****-****-****-1234
-
-  // BIAN metadata
-  bianServiceDomain: 'CardTransaction';
-  bianControlRecordType: 'CardTransactionLog';
+export interface PartyControlRecord {
+  partyInstanceReference: string;        // PK, UUID; referenced as FK by SD-53, SD-91
+  partyEmailAddress: string;             // QE:equality — primary investigation search key
+  partyMobilePhoneNumber: string;        // QE:equality — secondary investigation search key
+  partyMobilePhoneNumberDigest: string;  // Blind index (keyed HMAC, NOT encrypted) — unique key for the phone
+  partyName: string;                     // Becomes QE:equality in v2
+  partyType: PartyType;
+  partyDateOfBirth?: string;             // ISO 8601 date — GDPR PII, QE:none (DEK-party-dob, L2 only)
+  partyNationality?: string;             // ISO 3166-1 alpha-2 (plaintext — low sensitivity)
+  partyPostalAddress?: PartyPostalAddress; // SD-13 postal contact point — GDPR PII, QE:none (DEK-party-address, L2 only)
+                                         // KYC-typical demographics apply to EVERY party (customer + employee),
+                                         // so staff profiles are as complete as customers'. Address + DOB are
+                                         // encrypted at rest and decrypted only for the L2 client / the party themselves.
+  bianServiceDomain: 'Party Data Management';
+  bianControlRecordType: 'Party';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
-  schemaVersion: number;                           // Schema Versioning Pattern
-}
-
-export interface CardTransactionSensitiveRecord {
-  cardTransactionInstanceReference: string;       // FK: plaintext linking key
-  rawGatewayPayload: object;                      // QE none
-  processorTransactionMetadata: object;           // QE none
   schemaVersion: number;
 }
 
-export type CardTransactionStatus =
-  'authorized' | 'declined' | 'pending' | 'settled' | 'disputed';
-
-export type CardTransactionChannel =
-  'online' | 'pos' | 'contactless' | 'atm';
-
-export type CardTransactionInitiationType = 'customerInitiated' | 'merchantInitiated';
+export type PartyType = 'customer' | 'employee' | 'service_account';
 ```
 
-### `customerAgreement.model.ts`
+> **Blind index for phone uniqueness.** `partyMobilePhoneNumber` is a QE:equality field, and
+> MongoDB Queryable Encryption **cannot enforce a unique index on an encrypted field**. To
+> guarantee that a phone number identifies exactly one party, we store `partyMobilePhoneNumberDigest`
+> — a keyed HMAC-SHA256 of the *normalized* phone (leading `+` preserved, all other non-digits
+> stripped), keyed by the blind-index key — in plaintext and put a **unique index** on it. The
+> key is resolved in order: `PSP_BLIND_INDEX_KEY` if set; otherwise an HKDF-SHA256 subkey derived
+> from `KMS_LOCAL_MASTER_KEY` (the QE master key is never reused verbatim — domain separation);
+> otherwise a dev-only default. Whichever source is active must stay stable (changing it invalidates
+> all digests → re-seed/backfill). The
+> HMAC is irreversible without the key, so indexing it in the clear leaks nothing. The digest is
+> derived server-side (`digest.ts` → `phoneDigest`) on seed and on any phone update; clients never
+> set it. The same pattern applies to any other encrypted field that must be unique (e.g. email).
+
+### `customerAuthentication.model.ts` (SD-91 — new)
+
+```typescript
+// BIAN SD-91: Customer Authentication
+// Owns login credentials, roles, and account access state.
+// Linked to party (SD-13) via partyInstanceReference.
+
+export const CUSTOMER_AUTHENTICATION_COLLECTION = 'customerAuthenticationAssessment';
+
+export interface CustomerAuthenticationAssessmentRecord {
+  customerAuthenticationInstanceReference: string;    // PK, UUID; used as JWT sub
+  partyInstanceReference: string;                     // FK to party (SD-13)
+  customerAuthenticationEmailAddress: string;         // QE:equality — login lookup
+  customerAuthenticationCredentialHash: string;       // bcrypt 12-round; NOT QE (hash is not PII)
+  customerAuthenticationUserRole: CustomerAuthRole;
+  customerAuthenticationUserName: string;             // Denormalized from party for JWT name claim
+  customerAuthenticationLoginDomain: 'local' | 'msentra';
+  customerAuthenticationAccountStatus: 'active' | 'suspended';
+  customerAuthenticationLastLoginDateTime?: Date;
+  bianServiceDomain: 'Customer Authentication';
+  bianControlRecordType: 'CustomerAuthenticationAssessment';
+  recordCreatedDateTime: Date;
+  schemaVersion: number;
+}
+
+export type CustomerAuthRole =
+  | 'customer'
+  | 'level1_analyst'
+  | 'level2_investigator'
+  | 'security_auditor'
+  | 'merchant_officer';   // SD-89 Merchant Relations — Merchant Acquiring bank employee
+```
+
+### `customerAgreement.model.ts` (SD-53 — v3 updated)
+
+> **v2 change**: `customerAgreementProcedureSensitive` collection removed. Sensitive QE:none fields are now **inline** in `customerAgreementProcedure`. The QE tier (Level 1 / Level 2 client) controls whether they are returned as Binary or decrypted.
+>
+> **v3 change (Ch-06)**: Added `customerAgreementKycCheck` as a **BIAN BQ:Step** sub-document (SD-53 Behavior Qualifier type Step). This is the formal KYC identity-verification record for the onboarding lifecycle. PCI DSS Req 8.1. All fields use the BIAN-canonical BQ naming prefix `customerAgreementKycCheck*`. `schemaVersion` bumped to 3.
 
 ```typescript
 // BIAN SD-53: Customer Agreement
+// Business contract: account reference, segment, status, and sensitive PII (inline, QE:none).
+// PII (email, phone, name) separated to party (SD-13).
 
-export const CUSTOMER_AGREEMENT_COLLECTION = 'customerAgreement';
-export const CUSTOMER_AGREEMENT_SENSITIVE_COLLECTION = 'customerAgreementSensitive';
+export const CUSTOMER_AGREEMENT_COLLECTION = 'customerAgreementProcedure';
+// CUSTOMER_AGREEMENT_SENSITIVE_COLLECTION removed in v2
 
-export interface CustomerAgreementControlRecord {
-  // Identifiers
-  customerAgreementInstanceReference: string;    // UUID, primary key
+// BQ:Step — KYC identity verification (BIAN SD-53 Behavior Qualifier type Step).
+// Status vocabulary follows BIAN lifecycle: initiated | verified | rejected | expired.
+// PCI DSS Req 8.1 — unique user identity verification at onboarding.
+export type KycCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
 
-  // QE equality: searchable encrypted fields
-  customerEmailAddress: string;
-  customerMobilePhoneNumber: string;
-  customerAgreementReference: string;            // Account number reference
-
-  // Plaintext fields (v1): customerName becomes QE equality in v2
-  customerName: string;
-  customerSegment: CustomerSegment;
-  customerAgreementStatus: CustomerAgreementStatus;
-  customerAgreementEnrollmentDate: Date;
-  customerAgreementPreferredLanguage: string;     // ISO 639-1
-
-  // v4: recurring payment mandate
-  preferredPaymentCardReference?: string;        // FK: paymentCardReference of the saved card
-
-  // BIAN metadata
-  bianServiceDomain: 'CustomerAgreement';
-  bianControlRecordType: 'CustomerAgreement';
-  recordCreatedDateTime: Date;
-  recordUpdatedDateTime: Date;
-  schemaVersion: number;                          // Schema Versioning Pattern
+export interface CustomerAgreementKycCheck {
+  customerAgreementKycCheckStatus: KycCheckStatus;
+  customerAgreementKycCheckCompletedDate?: Date;
+  customerAgreementKycCheckReference?: string;  // External AML/ID verification reference
+  customerAgreementKycCheckNotes?: string;
 }
 
-export interface CustomerAgreementSensitiveRecord {
-  customerAgreementInstanceReference: string;   // FK: plaintext linking key
+export interface CustomerAgreementControlRecord {
+  customerAgreementInstanceReference: string;         // PK, UUID
+  partyInstanceReference: string;                     // FK to party (SD-13)
 
-  // QE none: retrieval only under Level 2 escalation
-  customerAgreementResidentialAddress: ResidentialAddress;
-  governmentIdentificationReference: string;
-  customerAgreementRiskNotes: string;
-  schemaVersion: number;
+  // QE:equality — direct search key
+  customerAgreementReference: string;
+
+  // QE:none (DEK-sensitive tier) — returned as Binary by L1 client; decrypted by L2
+  customerAgreementResidentialAddress?: ResidentialAddress;
+  governmentIdentificationReference?: string;
+  customerAgreementRiskNotes?: string;
+
+  // Plaintext operational fields
+  customerSegment: CustomerSegment;
+  customerAgreementStatus: AgreementStatus;
+  customerAgreementEnrollmentDate: Date;
+  customerAgreementPreferredLanguage: string;          // ISO 639-1
+  customerAgreementPreferredPaymentCardReference?: string; // FK to paymentCardManagement UUID
+
+  // Ch-06: BQ:Step — KYC identity check (BIAN SD-53). PCI DSS Req 8.1.
+  customerAgreementKycCheck?: CustomerAgreementKycCheck;
+
+  bianServiceDomain: 'Customer Agreement';
+  bianControlRecordType: 'CustomerAgreementProcedure';
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+  schemaVersion: number;                              // Current: 3
+}
+
+// Binary field detection helper: returns false if field is BSON Binary (not decrypted by L1 client)
+export function isSensitiveDecrypted(field: unknown): boolean {
+  if (field === undefined || field === null) return false;
+  if (typeof field === 'object' && field !== null &&
+      'sub_type' in field && 'buffer' in field) return false;
+  return true;
 }
 
 export interface ResidentialAddress {
   streetAddress: string;
   city: string;
   postalCode: string;
-  countryCode: string;                           // ISO 3166-1 alpha-2
+  countryCode: string;                                // ISO 3166-1 alpha-2
 }
 
 export type CustomerSegment = 'retail' | 'premium' | 'corporate' | 'sme';
-export type CustomerAgreementStatus = 'active' | 'suspended' | 'closed';
+export type AgreementStatus =
+  | 'initiated'
+  | 'agreed'
+  | 'active'
+  | 'amended'
+  | 'suspended'
+  | 'dormant'
+  | 'closed';
 ```
 
-### `paymentCard.model.ts`
+### `paymentCard.model.ts` (SD-88 — updated)
 
 ```typescript
 // BIAN SD-88: Payment Card
 
-export const PAYMENT_CARD_COLLECTION = 'paymentCard';
+export const PAYMENT_CARD_COLLECTION = 'paymentCardManagement';
 
 export interface PaymentCardManagementControlRecord {
-  // Identifiers
-  paymentCardInstanceReference: string;          // UUID, primary key
-  customerAgreementInstanceReference: string;    // FK: plaintext linking key
+  paymentCardInstanceReference: string;               // PK, UUID
+  customerAgreementInstanceReference: string;         // FK to customerAgreementProcedure
 
   // Plaintext: token is a card surrogate, not CHD under PCI DSS v4.0
-  paymentCardReference: string;                  // Indexed plaintext: standard query, not QE
-
-  // QE none: expiry date is CHD co-located with card reference
-  paymentCardExpirationDate: string;             // MM/YY format
-
-  // Plaintext display fields
-  paymentCardMaskedPanDisplay: string;           // ****-****-****-1234
+  paymentCardReference: string;                       // Indexed plaintext; standard query, not QE
+  paymentCardExpirationDate: string;                  // QE:none (MM/YY, CHD co-located with card ref)
+  paymentCardMaskedPanDisplay: string;                // ****-****-****-1234
   paymentCardNetwork: CardNetwork;
   paymentCardStatus: PaymentCardStatus;
   paymentCardIssuanceDateTime: Date;
-  paymentCardIsPreferred: boolean;               // true when saved as preferred payment method
+  paymentCardIsPreferred: boolean;
 
   // v4: recurring payment mandate (PCI DSS Req 3.1 + 3.7)
   paymentCardMandateStatus?: 'active' | 'cancelled' | 'expired';
-  paymentCardConsentDateTime?: Date;             // Req 3.1: explicit consent recorded at save-card time
-  paymentCardMandateExpiryDate?: Date;           // Req 3.7: auto-purge trigger
+  paymentCardConsentDateTime?: Date;
+  paymentCardMandateExpiryDate?: Date;
 
   // BIAN metadata
-  bianServiceDomain: 'PaymentCard';
+  bianServiceDomain: 'Payment Card';
   bianControlRecordType: 'PaymentCardManagement';
   recordCreatedDateTime: Date;
-  schemaVersion: number;                          // Schema Versioning Pattern
+  schemaVersion: number;
 }
 
 export type CardNetwork = 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
-export type PaymentCardStatus = 'active' | 'blocked' | 'expired' | 'pending_activation';
+export type PaymentCardStatus =
+  | 'issued'
+  | 'active'
+  | 'pending_activation'
+  | 'blocked'
+  | 'suspended'
+  | 'revoked'
+  | 'expired';
+```
+
+### `cardTransaction.model.ts` (SD-254 — v2 updated)
+
+> **v2 change**: `cardTransactionLogSensitive` collection removed. Sensitive QE:none fields are now **inline** in `cardTransactionLog`. The QE tier controls whether they are returned as Binary or decrypted.
+
+```typescript
+// BIAN SD-254: Card Transaction
+
+export const CARD_TRANSACTION_COLLECTION = 'cardTransactionLog';
+// CARD_TRANSACTION_SENSITIVE_COLLECTION removed in v2
+
+export interface CardTransactionLogControlRecord {
+  cardTransactionInstanceReference: string;           // PK, UUID
+  paymentCardReference: string;                       // Indexed plaintext (surrogate, not CHD)
+  cardTransactionAccountReference: string;            // QE:equality — investigator search key
+
+  // QE:none (DEK-sensitive tier) — returned as Binary by L1 client; decrypted by L2
+  rawGatewayPayload?: object;
+  processorTransactionMetadata?: object;
+
+  cardTransactionAmount: { amount: number; currency: string };
+  cardTransactionDateTime: Date;
+  cardTransactionStatus: CardTransactionStatus;
+  cardTransactionType: CardTransactionType;           // BIAN SD-254 classification
+  cardTransactionChannel: CardTransactionChannel;
+  cardTransactionInitiationType: CardTransactionInitiationType;
+  cardTransactionMerchantCategoryCode: string;
+  cardTransactionMerchantName: string;
+  cardTransactionMaskedPanDisplay: string;
+
+  // BIAN SD-254 statement descriptor fields (plaintext, not CHD, no QE)
+  cardTransactionDescription: string;                 // Max 22 chars; visible on cardholder statement
+  cardTransactionNarrative?: string;                  // Extended context for fraud investigation
+
+  bianServiceDomain: 'Card Transaction';
+  bianControlRecordType: 'CardTransactionLog';
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+  schemaVersion: number;                              // Current: 3
+}
+
+export type CardTransactionStatus =
+  'authorized' | 'declined' | 'pending' | 'settled' | 'disputed';
+export type CardTransactionType =
+  'purchase' | 'cash_advance' | 'balance_transfer' | 'refund' | 'fee' | 'adjustment';
+export type CardTransactionChannel =
+  'online' | 'pos' | 'contactless' | 'atm';
+export type CardTransactionInitiationType = 'customerInitiated' | 'merchantInitiated';
 ```
 
 ### `fraudDiagnosis.model.ts`
@@ -193,9 +290,9 @@ export interface FraudDiagnosisControlRecord {
   fraudDiagnosisInstanceReference: string;               // UUID, primary key
   fraudDiagnosisCaseReference: string;                   // FD-2026-001234
 
-  // Links to protected records (plaintext keys by design: no PII in these refs)
-  linkedCardTransactionReference: string;                // FK to cardTransaction
-  linkedCustomerAgreementReference: string;              // FK to customerAgreement
+  // Links to protected records — BIAN *InstanceReference FK naming pattern
+  cardTransactionInstanceReference: string;              // FK to cardTransactionLog (SD-254)
+  customerAgreementInstanceReference: string;            // FK to customerAgreementProcedure (SD-53)
 
   // Extended Reference Pattern: stable display fields from cardTransaction.
   // Embedded to make fraud investigation display a single-collection query.
@@ -215,8 +312,8 @@ export interface FraudDiagnosisControlRecord {
   fraudDiagnosisCaseClosingDateTime?: Date;
 
   // Assignment (v2: populated when case is assigned)
-  fraudDiagnosisAnalystInstanceReference?: string;       // FK to partyAuthentication (L1)
-  fraudDiagnosisInvestigatorInstanceReference?: string;  // FK to partyAuthentication (L2)
+  fraudDiagnosisAnalystInstanceReference?: string;       // FK to customerAuthenticationAssessment (L1)
+  fraudDiagnosisInvestigatorInstanceReference?: string;  // FK to customerAuthenticationAssessment (L2)
 
   // Assessment
   fraudDiagnosisAssessment: {
@@ -241,7 +338,7 @@ export interface FraudDiagnosisControlRecord {
     resolvedByInstanceReference: string;
   };
 
-  // AI agent draft (v3: populated by agent, absent if agent disabled)
+  // AI agent draft (v5: populated by agent, absent if agent disabled)
   agentDraftDiagnosis?: {
     riskSummary: string;
     recommendedAction: 'clear' | 'escalate' | 'investigate';
@@ -251,12 +348,12 @@ export interface FraudDiagnosisControlRecord {
   };
 
   // BIAN metadata
-  bianServiceDomain: 'FraudDiagnosis';
+  bianServiceDomain: 'Fraud Diagnosis';
   bianControlRecordType: 'FraudDiagnosis';
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
 
-  // Schema Versioning Pattern: enables zero-downtime schema evolution across v1-v4
+  // Schema Versioning Pattern: enables zero-downtime schema evolution across v1-v5
   schemaVersion: number;
 }
 
@@ -294,6 +391,7 @@ export type ActionType =
   | 'case_opened'
   | 'assigned'
   | 'note_added'
+  | 'note_retracted'
   | 'field_accessed'
   | 'escalated'
   | 'ai_review'
@@ -303,174 +401,843 @@ export type ActionType =
 export type ResolutionOutcome = 'cleared' | 'confirmed_fraud' | 'referred';
 ```
 
-### `partyAuthentication.model.ts`
+**Collection:** `fraudDiagnosisCaseEvents` (SD-83) — append-only audit and notes log. Every case event (including notes) is stored here. Indexed on `(fraudDiagnosisInstanceReference, actionDateTime)` for ordered retrieval. See §5 for index definitions.
+
+Document shape:
+
+| Field | Type | Notes |
+|---|---|---|
+| `fraudDiagnosisInstanceReference` | `string` | FK to `fraudDiagnosisCase` |
+| `actionDateTime` | `Date` | Event timestamp |
+| `actionType` | `ActionType` | Includes `note_added`, `note_retracted` |
+| `performedByRole` | `AnalystRole` | Role of the acting user |
+| `actionDetails` | `Record<string, unknown>` | Shape varies by `actionType` |
+| `schemaVersion` | `number` | Schema version |
+
+**`NoteEntry` — API response shape for note records (used by note endpoints in §6.4):**
 
 ```typescript
-// BIAN SD-16: Party Authentication (demo-only: stores pre-seeded user accounts)
+export interface NoteEntry {
+  noteId: string;
+  noteText: string;
+  visibility: 'internal' | 'customer';
+  performedByRole: string;
+  actionDateTime: string;           // ISO 8601
+  isRetracted: boolean;
+  retractionReason: string | null;
+  retractionDateTime: string | null;
+}
+```
 
-export const PARTY_AUTHENTICATION_COLLECTION = 'partyAuthentication';
+`noteId` is the `_id` of the `note_added` event in `fraudDiagnosisCaseEvents`. Retracted notes remain in the collection (BIAN SD-83 append-only); a `note_retracted` event is appended referencing the original `noteId`.
 
-export interface PartyAuthenticationControlRecord {
-  // Identifiers
-  partyAuthenticationInstanceReference: string;   // UUID, primary key
+---
 
-  // QE equality: searchable by email (login lookup)
-  partyAuthenticationUserEmailAddress: string;     // QE:equality: used as username
+### `partyAuthentication.model.ts` (SD-16 — updated)
 
-  // Plaintext fields (hashed credential, not sensitive after hashing)
-  partyAuthenticationCredentialHash: string;       // bcrypt hash: never store plaintext
-  partyAuthenticationUserRole: DemoUserRole;
-  partyAuthenticationUserName: string;             // Display name
-  partyAuthenticationLoginDomain: 'local' | 'msentra'; // Identity domain
+```typescript
+// BIAN SD-16: Party Authentication
+// Identity verification events only. Credentials and roles live in SD-91 (customerAuthenticationAssessment).
+
+export const PARTY_AUTHENTICATION_COLLECTION = 'partyAuthenticationAssessment';
+
+export interface PartyAuthenticationAssessmentRecord {
+  partyAuthenticationInstanceReference: string;           // PK, UUID
+  partyInstanceReference: string;                         // FK to party (SD-13)
+  partyAuthenticationLoginDomain: 'local' | 'msentra';
   partyAuthenticationAccountStatus: 'active' | 'suspended';
-
-  // BIAN metadata
-  bianServiceDomain: 'PartyAuthentication';
-  bianControlRecordType: 'PartyAuthentication';
+  bianServiceDomain: 'Party Authentication';
+  bianControlRecordType: 'PartyAuthenticationAssessment';
   recordCreatedDateTime: Date;
-  schemaVersion: number;                          // Schema Versioning Pattern
+  schemaVersion: number;
+}
+```
+
+> **Auth credentials live in SD-91.** `customerAuthenticationAssessment` owns bcrypt hashes, roles, and login state. SD-16 (`partyAuthenticationAssessment`) is reserved for formal identity verification events (document scan, OTP, biometric) — v4+ scope.
+
+### `authenticationDomain.model.ts`
+
+```typescript
+// BIAN SD-16: Party Authentication — Authentication Domain configuration registry
+
+export const AUTHENTICATION_DOMAIN_COLLECTION = 'authenticationDomain';
+
+export type AuthDomainType = 'local' | 'oidc' | 'saml';
+export type AuthDomainName = 'local' | 'msentra' | 'bigid';
+
+export interface AuthenticationDomainRecord {
+  partyAuthenticationDomainInstanceReference: string;  // UUID, primary key
+  partyAuthenticationDomainName: AuthDomainName;       // Slug used in login + JWT claim
+  partyAuthenticationDomainDisplayName: string;        // UI label (e.g. "Microsoft Entra ID")
+  partyAuthenticationDomainType: AuthDomainType;       // Protocol: local | oidc | saml
+  partyAuthenticationDomainEnabled: boolean;           // Only enabled domains appear in UI
+  partyAuthenticationDomainConfiguration: Record<string, unknown>; // Provider-specific config
+  bianServiceDomain: 'PartyAuthentication';
+  bianControlRecordType: 'AuthenticationDomain';
+  recordCreatedDateTime: Date;
+  schemaVersion: number;
+}
+```
+
+**Collection:** `authenticationDomain` — plaintext, no QE (domain config contains no CHD or PII).
+**Seed file:** `backend/data/authDomains.json` — 3 pre-seeded domains: `local` (enabled), `msentra` (disabled), `bigid` (disabled).
+**API:** `GET /api/v1/auth/domains` (public) — returns only domains with `partyAuthenticationDomainEnabled: true`.
+
+---
+
+### `creditRating.model.ts`
+
+```typescript
+// BIAN SD-60: Customer Credit Rating — HRPC risk classification state per customer account
+
+export const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
+
+export type HrpcCategory =
+  | 'pep'
+  | 'sip'
+  | 'hnwi'
+  | 'ubo'
+  | 'terrorism_linked'
+  | 'high_risk_jurisdiction'
+  | 'sanctioned'
+  | 'financial_fraud_history'
+  | 'suspicious_transaction_patterns';
+
+export type HrpcRiskLevel = 'low' | 'medium' | 'high';
+
+export type HrpcClassificationSource =
+  | 'kyc_periodic_review'
+  | 'transaction_monitoring'
+  | 'correspondent_screening'
+  | 'aml_due_diligence'
+  | 'internal_case_history';
+
+export interface CustomerCreditRatingClassificationFlag {
+  customerCreditRatingClassificationCategory: HrpcCategory;
+  customerCreditRatingClassificationLevel: HrpcRiskLevel;
+  customerCreditRatingClassificationLabel: string;           // Human-readable label for UI
+  customerCreditRatingClassificationDescription: string;     // Narrative explanation
+  customerCreditRatingClassificationDetectedDateTime: string; // ISO 8601 date
+  customerCreditRatingClassificationSource: HrpcClassificationSource;
+  customerCreditRatingReviewRequiredIndicator: boolean;
 }
 
-export type DemoUserRole =
-  | 'customer'
-  | 'level1_analyst'
-  | 'level2_investigator'
-  | 'security_auditor';
+export interface CustomerCreditRatingStateControlRecord {
+  customerCreditRatingInstanceReference: string;             // UUID, primary key
+  customerAgreementReference: string;                        // FK to customerAgreement (by account ref, not UUID)
+  customerCreditRatingClassificationFlags: CustomerCreditRatingClassificationFlag[];
+  bianServiceDomain: 'Customer Credit Rating';
+  bianControlRecordType: 'CustomerCreditRatingState';
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+  schemaVersion: number;
+}
 ```
+
+**Collection:** `customerCreditRatingState` — plaintext, no QE. Contains compliance classification metadata only; no PII, no CHD.
+**Seed file:** `backend/data/customerCreditRatings.json` — 5 pre-seeded HRPC profiles covering accounts ACC-003, ACC-007, ACC-012, ACC-019, ACC-025.
+**API:** `GET /api/v1/fraud/hrpc/check?accountRef=<ref>` — see §6.6.
+**Link key:** `customerAgreementReference` (a QE:equality field in `customerAgreementProcedure`) is used as the join key. The API looks up the fraud case's `customerAgreementInstanceReference`, resolves the account reference, then queries this collection. This avoids a cross-QE-collection `$lookup` (per ADR-001).
+
+---
+
+### 1.13 SD-193 — `externalProviderArrangement` (ExternalProviderArrangement)
+
+> **Schema v2** — Updated 2026-06-11. Adds `generic` type, enhanced config sub-documents, multi-provider routing, and default routing groups.
+> **dev.v7 Fase 2 (2026-06-14)** — Collections renamed to pure BIAN SD-193 control-record names; added `capabilityModuleConfiguration` (internal Module engine config, ADR-029). Constant identifiers keep `INTEGRATION_*` until the module rename (Fase 3).
+
+```typescript
+export const INTEGRATION_REGISTRY_COLLECTION       = 'externalProviderArrangement';
+export const INTEGRATION_EVENTS_COLLECTION         = 'externalProviderArrangementActionLog';
+export const INTEGRATION_ROUTING_GROUPS_COLLECTION = 'externalProviderArrangementPortfolio';
+export const CAPABILITY_MODULE_CONFIGURATION_COLLECTION = 'capabilityModuleConfiguration';
+
+export type IntegrationProviderType =
+  | 'fraud_detection'
+  | 'aml_monitoring'
+  | 'kyc_identity'
+  | 'kyb_business'
+  | 'hrp_sanctions'
+  | 'credit_bureau'
+  | 'card_authorization'     // SD-254 Card Transaction Authorization
+  | 'card_issuer'            // SD-88 Payment Card Issuer
+  | 'generic';               // SD-193 catch-all for custom event-driven integrations
+
+export type IntegrationStatus  = 'active' | 'inactive' | 'test' | 'suspended';
+export type IntegrationMode    = 'sync' | 'async';
+export type IntegrationAuth    = 'bearer' | 'api_key' | 'hmac' | 'oauth2_cc';
+export type IntegrationHealth  = 'ok' | 'degraded' | 'unreachable' | 'unknown';
+export type RoutingStrategy    = 'primary_fallback' | 'round_robin' | 'weighted' | 'parallel';
+
+export interface ExternalProviderArrangement {
+  externalProviderArrangementInstanceReference: string;    // UUID, primary key
+  externalProviderArrangementName: string;
+  externalProviderArrangementType: IntegrationProviderType;
+  externalProviderArrangementStatus: IntegrationStatus;
+
+  // Internal provider flag — pre-seeded, cannot be deleted or suspended
+  externalProviderIsInternal: boolean;
+  externalProviderInternalHandler?: string;               // e.g. "fraudDiagnosis.internalFraudScoring"
+
+  // Outbound REST (external providers only)
+  externalProviderApiEndpoint?: string;
+  externalProviderApiKeyHash?: string;                    // bcrypt — NEVER returned in API responses
+  externalProviderApiKeyPrefix?: string;                  // visible prefix for UI (e.g. "fds_live_...")
+  externalProviderAuthScheme?: IntegrationAuth;
+
+  // Inbound callback config (async providers)
+  externalProviderCallbackEnabled: boolean;
+  externalProviderCallbackPath?: string;                  // /webhooks/{type}/{arrangementId}/callback
+  externalProviderCallbackSecretHash?: string;            // bcrypt — never returned
+
+  // Event routing
+  externalProviderTriggerEvents: string[];                // ['transaction.authorized', 'kyc.initiated']
+  externalProviderMode: IntegrationMode;
+
+  // Reliability
+  externalProviderTimeoutMs: number;                      // 100–30000 ms
+  externalProviderRetryPolicy: { maxAttempts: number; backoffMs: number };
+
+  // Health
+  externalProviderLastHealthCheckAt?: Date;
+  externalProviderHealthStatus?: IntegrationHealth;
+
+  // v2: Category-specific operational config (discriminated by type)
+  categoryConfig?: CategoryConfig;
+
+  // v2: Structured authentication config
+  authConfig?: IntegrationAuthConfig;
+
+  // v2: Field mapping — outbound (pre-dispatch) and inbound (post-callback)
+  fieldMappingConfig?: FieldMappingConfig;
+
+  // v2: Multi-provider routing — auto-set on creation to default group of the type
+  routingGroupId?: string;                                // FK to integrationRoutingGroups
+  routingPriority?: number;                               // lower = higher priority; internals use 999
+  routingWeight?: number;                                 // 0–100 for weighted strategy
+
+  // BIAN + PCI DSS metadata
+  bianServiceDomain: string;
+  bianControlRecordType: string;
+  pciDssRequirements: string[];
+
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+  schemaVersion: number;                                  // current: 2
+}
+
+// ── Routing Groups ──────────────────────────────────────────────────────────
+// One default group per IntegrationProviderType is seeded automatically.
+// External providers auto-join their type's default group on creation.
+// Internal providers are members at priority=999 as fallback terminals.
+
+export interface RoutingGroupMember {
+  externalProviderArrangementInstanceReference: string;
+  memberPriority: number;                                 // lower = tried first
+  memberWeight?: number;                                  // 0–100 for weighted strategy
+  memberRole?: 'primary' | 'fallback' | 'peer';
+}
+
+export interface IntegrationRoutingGroup {
+  routingGroupInstanceReference: string;                  // UUID, primary key
+  routingGroupName: string;
+  routingGroupProviderType: IntegrationProviderType;      // all members must be this type
+  routingGroupStrategy: RoutingStrategy;
+  routingGroupStatus: 'active' | 'inactive';
+  routingGroupMembers: RoutingGroupMember[];
+  isDefaultGroup: boolean;                                // true = system-managed, one per type
+  bianServiceDomain: string;
+  bianControlRecordType: string;                          // 'ExternalProviderArrangementPortfolio'
+  pciDssRequirements: string[];
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+}
+
+// ── Business Context Correlation ────────────────────────────────────────────
+// ADR-025: Added to IntegrationEvent to enable cross-entity audit queries.
+
+export interface BusinessContextRef {
+  entityType: 'transaction' | 'fraud_case' | 'customer' | 'merchant' | 'payment_link' | 'card';
+  entityId: string;                                       // PK of the business entity
+  processType: BusinessProcessType | ComplianceProcessType;
+}
+
+// ── Event Audit Log ─────────────────────────────────────────────────────────
+// ADR-025: integrationEvents is a timeseries collection (timeField: recordCreatedDateTime).
+// Unique secondary index removed — incompatible with MongoDB timeseries.
+
+export interface IntegrationEvent {
+  integrationEventInstanceReference: string;              // UUID
+  externalProviderArrangementInstanceReference: string;   // FK to integrationRegistry
+  integrationEventType: 'dispatch' | 'callback' | 'health_check' | 'test';
+  integrationEventStatus: 'sent' | 'received' | 'error' | 'timeout';
+  integrationEventPayloadHash?: string;                   // sha256 of payload — never the payload itself
+  integrationEventResponseCode?: number;
+  integrationEventLatencyMs?: number;
+  integrationEventErrorMessage?: string;
+  integrationEventTriggeredBy: string;
+  integrationEventMeta?: Record<string, unknown>;         // fieldMappingApplied, mappingRulesCount, etc.
+  businessContext?: BusinessContextRef;                   // ADR-025: correlation to originating entity
+  bianServiceDomain: string;
+  bianControlRecordType: string;
+  recordCreatedDateTime: Date;
+}
+```
+
+**Collections:**
+- `integrationRegistry` — plaintext, no QE. Provider configuration, key hashes, health state.
+- `integrationRoutingGroups` — plaintext, no QE. One default group per type + user-created groups.
+- `integrationEvents` — **timeseries** (ADR-025), no QE. Append-only audit log; timeField=`recordCreatedDateTime`, TTL 90 days.
+
+**Seed files:**
+- `backend/data/integrationRegistry.json` — 6 pre-seeded internal providers (FDS, HRP, AML, KYC, KYB, CreditBureau) at `routingPriority=999`.
+- Default routing groups seeded programmatically by `seedRoutingGroups.ts` (called from `seedIntegrations`).
+
+**Default group invariant:**
+- Exactly one `isDefaultGroup=true` document per `IntegrationProviderType` (7 total).
+- Each internal provider is a group member at `memberPriority=999`, `memberRole='fallback'`.
+- External providers auto-join on creation: `memberPriority = max(external priorities) + 10`, minimum 10.
+
+**Security notes:**
+- `externalProviderApiKeyHash` and `externalProviderCallbackSecretHash` are bcrypt hashes — never returned in API responses.
+- Plaintext API key returned exactly once at creation and once at rotation.
+- Payload content is never logged; only a SHA-256 hash is stored for audit reference.
+- Field mapping engine enforces a PCI DSS blocklist: PAN, CVV, expiryDate, cardholderName cannot be mapped.
+
+---
+
+### 1.14 Business Process Events — timeseries audit layer (ADR-025)
+
+> **Schema v1** — Added 2026-06-13. Unified append-only business process audit trail; two TTL-differentiated timeseries collections.
+
+```typescript
+// ── Business Process Event Log ───────────────────────────────────────────────
+
+export const BUSINESS_PROCESS_EVENTS_COLLECTION  = 'businessProcessEvent';
+export const COMPLIANCE_PROCESS_EVENTS_COLLECTION = 'complianceProcessEvent';
+
+// Transactional processes → businessProcessEvent (TTL 90 days)
+export type BusinessProcessType =
+  | 'payment_processing'       // SD-64 Payment Order
+  | 'fraud_evaluation'         // SD-83 Fraud Diagnosis
+  | 'aml_screening'            // SD-99 Suspicious Activity Analysis
+  | 'card_authorization'       // SD-254 Card Transaction
+  | 'credit_assessment'        // SD-60 Customer Credit Rating
+  | 'sanctions_check'          // SD-HRP High Risk Payments
+  | 'checkout';                // SD-64 Payment Link checkout flow
+
+// Compliance processes → complianceProcessEvent (TTL 365 days)
+export type ComplianceProcessType =
+  | 'kyc_verification'         // SD-16 Party Authentication
+  | 'kyb_verification'         // SD-89 Merchant Relations
+  | 'merchant_onboarding'      // SD-89 Merchant Relations
+  | 'customer_onboarding';     // SD-13 Party Data
+
+export type ProcessEventOutcome = 'approved' | 'rejected' | 'pending' | 'failed' | 'escalated';
+
+export interface ProcessEventMeta {
+  integrationEventRefs?: string[];      // integrationEventInstanceReference[] — correlated dispatch events
+  ruleIds?: string[];                   // compliance rule identifiers
+  thresholds?: Record<string, number>;  // e.g. { riskScoreThreshold: 75 }
+  [key: string]: unknown;
+}
+
+// Shared shape — used by both businessProcessEvent and complianceProcessEvent
+export interface BusinessProcessEvent {
+  // Timeseries fields
+  eventDateTime: Date;                                    // timeField
+  processType: BusinessProcessType | ComplianceProcessType; // metaField
+
+  // Identity
+  businessProcessEventInstanceReference: string;          // UUID, for idempotency reference
+  entityType: BusinessContextRef['entityType'];
+  entityId: string;                                       // PK of the business entity
+
+  // Action
+  processAction: string;                                  // e.g. 'transaction.authorized', 'kyc.completed'
+  processOutcome: ProcessEventOutcome;
+
+  // Actor
+  performedByPartyReference: string | null;               // null = system-initiated
+  performedByRole: string | null;
+
+  // Audit summary (CHD blocklist applied — no PAN, CVV, cardholderName, expiryDate, trackData)
+  eventSummary: Record<string, unknown>;
+
+  // BIAN
+  bianServiceDomain: string;
+  bianControlRecordType: string;
+
+  // Meta
+  processMeta?: ProcessEventMeta;
+}
+
+// ── Typed Payload Contracts per Integration Category ─────────────────────────
+// Each category has an Outbound (dispatch body) and Inbound (callback body) interface.
+// CHD blocklist enforced — PAN, CVV, expiryDate, cardholderName, trackData NEVER appear.
+
+// fraud_detection (SD-83)
+export interface FdsOutboundPayload {
+  transactionInstanceReference: string;
+  transactionAmount: number;
+  transactionCurrency: string;
+  transactionChannel: string;
+  deviceFingerprint?: string;
+  ipAddress?: string;
+}
+export interface FdsInboundPayload {
+  riskScore: number;                  // 0–100
+  fraudFlag: boolean;
+  recommendation: 'approve' | 'review' | 'decline';
+  rulesFired?: string[];
+}
+
+// aml_monitoring (SD-99)
+export interface AmlOutboundPayload {
+  partyInstanceReference: string;
+  transactionInstanceReference: string;
+  transactionAmount: number;
+  transactionCurrency: string;
+  counterpartyReference?: string;
+}
+export interface AmlInboundPayload {
+  alertLevel: 'none' | 'low' | 'medium' | 'high';
+  matchedPatterns?: string[];
+  requiresReview: boolean;
+}
+
+// kyc_identity (SD-16)
+export interface KycOutboundPayload {
+  partyInstanceReference: string;
+  partyName: string;
+  partyDateOfBirth?: string;
+  partyNationality?: string;
+  documentType?: string;
+}
+export interface KycInboundPayload {
+  verificationStatus: 'pass' | 'fail' | 'manual_review';
+  confidenceScore: number;            // 0–100
+  failureReasons?: string[];
+}
+
+// kyb_business (SD-89)
+export interface KybOutboundPayload {
+  merchantAgreementInstanceReference: string;
+  merchantName: string;
+  merchantLegalEntityType?: string;
+  merchantRegistrationNumber?: string;
+  merchantCountry?: string;
+}
+export interface KybInboundPayload {
+  verificationStatus: 'pass' | 'fail' | 'manual_review';
+  businessRiskLevel: 'low' | 'medium' | 'high';
+  sanctionsMatch: boolean;
+  failureReasons?: string[];
+}
+
+// hrp_sanctions (SD-HRP)
+export interface HrpOutboundPayload {
+  partyInstanceReference: string;
+  partyName: string;
+  transactionCountry?: string;
+  transactionAmount?: number;
+}
+export interface HrpInboundPayload {
+  sanctionsHit: boolean;
+  pepHit: boolean;
+  matchedLists?: string[];
+  riskRating: 'low' | 'medium' | 'high' | 'blocked';
+}
+
+// credit_bureau (SD-60)
+export interface CreditBureauOutboundPayload {
+  partyInstanceReference: string;
+  partyName: string;
+  requestedCreditAmount?: number;
+}
+export interface CreditBureauInboundPayload {
+  creditScore: number;
+  creditRating: string;              // e.g. 'A', 'BB+'
+  defaultProbability: number;        // 0–1
+}
+
+// card_authorization (SD-254)
+export interface CardAuthOutboundPayload {
+  cardTransactionInstanceReference: string;
+  transactionAmount: number;
+  transactionCurrency: string;
+  merchantCategoryCode?: string;
+  transactionChannel: string;
+}
+export interface CardAuthInboundPayload {
+  authorizationCode: string;
+  authorizationStatus: 'approved' | 'declined' | 'referral';
+  responseCode: string;
+  declineReason?: string;
+}
+
+// card_issuer (SD-88)
+export interface CardIssuerOutboundPayload {
+  paymentCardInstanceReference: string;
+  requestType: 'activate' | 'block' | 'replace' | 'status_check';
+  reason?: string;
+}
+export interface CardIssuerInboundPayload {
+  cardStatus: 'active' | 'blocked' | 'expired' | 'replaced';
+  actionConfirmed: boolean;
+  effectiveDateTime?: string;
+}
+
+// generic (SD-193)
+export interface GenericOutboundPayload {
+  eventType: string;
+  entityReference: string;
+  payload: Record<string, unknown>;
+}
+export interface GenericInboundPayload {
+  status: 'ok' | 'error';
+  result?: Record<string, unknown>;
+  errorMessage?: string;
+}
+```
+
+**Collections:**
+- `businessProcessEvent` — **timeseries**, no QE. timeField=`eventDateTime`, metaField=`processType`, TTL 90 days, granularity=`hours`.
+- `complianceProcessEvent` — **timeseries**, no QE. timeField=`eventDateTime`, metaField=`processType`, TTL 365 days, granularity=`hours`.
+
+**CHD blocklist** (enforced in `eventSummary` at service layer): `pan`, `cardNumber`, `cvv`, `cvv2`, `cvc`, `expiryDate`, `cardExpiry`, `cardholderName`, `trackData`, `track1`, `track2`, `pinBlock`.
+
+**Emission pattern** (fire-and-forget — never blocks request path):
+```typescript
+void db.collection(BUSINESS_PROCESS_EVENTS_COLLECTION).insertOne(event).catch(() => {});
+```
+
+---
+
+### 1.15 RBAC/ACL — data-driven permission model (ADR-030, SD-16)
+
+Authorization is **data-driven, default-deny** (PCI DSS Req 7). The permission **catalog** (resource × action) is static code (`backend/src/shared/models/acl.model.ts`, mirrored in `frontend/src/config/acl.ts`); the role→permission **assignment** is data in the **`role`** collection (CRUD by the `manager`).
+
+**Resources** (→ BIAN SD): `transactions`(SD-254) · `customers`(SD-53) · `cards`(SD-88) · `fraudCases`(SD-83) · `merchants`(SD-89) · `providers`(SD-193) · `modules`(ADR-029) · `authDomains`(SD-16) · `roles` · `auditEvents`(ADR-025) · `consents`.
+**Actions** (PCI levels): `view` · `viewSensitive` (CHD/PII — Req 3/7, bound to the escalation flow) · `manage` · `investigate`. Scope `own` for `customer`.
+
+**`role` collection** — `{ roleName (PK, unique), roleLabel, roleDescription, rolePermissions: {[resource]: action[]}, roleScope: 'own'|'all', roleIsBuiltin, bianServiceDomain, bianControlRecordType, recordCreated/UpdatedDateTime }`. Builtin roles are editable (permissions) but not deletable; custom roles support any subset, including full-manage.
+
+**Builtin role matrix (seed):**
+
+| Role | transactions | customers | cards | fraudCases | merchants | providers | modules | authDomains | roles | auditEvents | consents |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| **customer** (own) | view | — | view·manage | — | view | — | — | — | — | — | view |
+| **level1_analyst** | view | view | view | view·investigate | view | — | — | — | — | view | — |
+| **level2_investigator** | view·**viewSensitive** | view·**viewSensitive** | view·**viewSensitive** | view·investigate | view | — | — | — | — | view | — |
+| **security_auditor** | view·viewSensitive | view·viewSensitive | view·viewSensitive | view·viewSensitive | view | view | view | — | — | view | — |
+| **merchant_officer** | — | — | — | — | view·manage | — | — | — | — | view | — |
+| **manager** | **—** | **—** | **—** | **—** | — | view·manage | view·manage | view·manage | view·manage | view | — |
+
+> The `manager` (SD-193 platform admin) has **no** access to business/cardholder data — separation of duties (PCI Req 7). `can('manager','transactions','view') === false` ⇒ **403 backend** (`requirePermission` preHandler) + **`<AccessDenied>` frontend** (`<RequirePermission>`), with the role's responsibilities rendered from the live ACL.
+
+**Enforcement & API:** `requirePermission(resource, action)` (Fastify preHandler, default-deny, cached role load + builtin fallback). `GET /api/v1/acl/effective` returns the caller's resolved permissions (frontend `can()` — permissions never live in the JWT). Roles CRUD: `GET/POST /api/v1/roles`, `GET/PUT/DELETE /api/v1/roles/:roleName` (`roles:manage`; builtin not deletable). Users (local): `GET/POST /api/v1/users`, `PUT/DELETE /api/v1/users/:id` (`authDomains:manage`). Remote role mappings: `partyAuthenticationDomainRoleMappings` on `authenticationDomain` (claim/group → role).
+
+---
+
+### 1.16 Customer Questions (ADR-031, SD-83)
+
+Structured investigator→customer questions on a fraud case, answered by the customer on the related transaction; **immutable once answered** (PCI DSS Req 10).
+
+**Collection `fraudDiagnosisCustomerQuestion`** (plaintext, no CHD) — `{ customerQuestionInstanceReference (PK), fraudDiagnosisInstanceReference, fraudDiagnosisCaseReference, cardTransactionInstanceReference, customerAgreementInstanceReference, partyInstanceReference, questionText, questionOptions[], allowOther, questionStatus('pending'|'closed'), askedBy{InstanceReference,Name,Role}, askedDateTime, responseOption?, responseText?, respondedByInstanceReference?, respondedDateTime?, bianServiceDomain, bianControlRecordType, recordCreated/UpdatedDateTime, schemaVersion }`. Indexes: unique `customerQuestionInstanceReference`; `cardTransactionInstanceReference`; `{fraudDiagnosisInstanceReference, askedDateTime}`; `{partyInstanceReference, questionStatus}`.
+
+**API:**
+- `POST /api/v1/fraud/:id/questions` (L1/L2) — body `{ questionText, options[], allowOther }`; creates a pending question on the case.
+- `GET /api/v1/fraud/:id/questions` (investigation roles) — list questions + responses.
+- `GET /api/v1/transactions/:id/questions` (`transactions:view`; customers scoped to own party) — customer-facing list.
+- `POST /api/v1/transactions/:id/questions/:questionId/response` — customer answers `{ option, text? }`; atomic pending→closed (immutable; 409 if already closed; 403 if not the owner; 400 if the option is not valid / "Other" without text).
+- `GET /api/v1/notifications` — the caller's pending questions (drives the menu badge).
+
+**Events (Req 10):** create/answer emit `businessProcessEvent` (`fraud.question.created` / `fraud.question.answered`) and append `fraudDiagnosisCaseEvents` (`question_created` / `question_answered`). No CHD is ever stored in the question or response.
+
+---
+
+### 1.17 PSP Payout Orchestration Models (v17 — SD-54/65/66)
+
+Three new collections added in v17 to support the end-to-end payout pipeline.
+
+---
+
+#### `payoutAccountArrangement` (SD-66 — Payment Initiation)
+
+PSP-internal bank account record for each party. IBAN and routing number are encrypted at rest with `QE:none` (PCI DSS Req 3.3). Balance sub-document is updated atomically via `$inc`.
+
+```typescript
+// backend/src/modules/gateway/models/payoutAccount.model.ts
+export const PAYOUT_ACCOUNT_COLLECTION = 'payoutAccountArrangement';
+
+export type PayoutAccountType   = 'bank_account' | 'wallet' | 'internal_ledger';
+export type PayoutAccountStatus = 'active' | 'pending_validation' | 'suspended' | 'closed';
+export type PayoutRail          = 'sepa' | 'ach' | 'local_bank' | 'internal_wallet' | 'internal_ledger';
+
+export interface PayoutAccountBalance {
+  pendingAmount:   number;   // authorized, awaiting settlement
+  availableAmount: number;   // settled funds available for withdrawal
+  reservedAmount:  number;   // held for disputes / chargebacks
+  currency:        string;   // ISO 4217 — must match payoutAccountCurrency
+  lastUpdatedDateTime: Date;
+}
+
+export interface PayoutAccountArrangement {
+  payoutAccountInstanceReference: string;  // UUID, PK
+  partyInstanceReference:         string;  // FK → party (SD-13)
+
+  payoutAccountType:         PayoutAccountType;
+  payoutAccountStatus:       PayoutAccountStatus;
+  payoutAccountIsDefault:    boolean;  // at most one true per party (partial unique index)
+
+  // QE:none (DEK-payout-iban / DEK-payout-routing) — L1 returns Binary; L2 auto-decrypts
+  payoutAccountIban?:          string;  // IBAN — GDPR Art. 32 / PSD2 (bank data, not PCI-scoped card data)
+  payoutAccountRoutingNumber?: string;  // BIC / SWIFT / sort code — GDPR Art. 32 / PSD2
+
+  payoutAccountAlias?:          string;  // phone or email alias for lookup
+  payoutAccountBankName?:       string;
+  payoutAccountCurrency:        string;  // ISO 4217
+  payoutAccountCountryCode:     string;  // ISO 3166-1 alpha-2
+  payoutAccountPreferredRail:   PayoutRail;
+
+  payoutAccountBalance: PayoutAccountBalance;  // PSP internal ledger — $inc only
+
+  bianServiceDomain:      'Payment Initiation';
+  bianControlRecordType:  'PayoutAccountArrangement';
+  recordCreatedDateTime:  Date;
+  recordUpdatedDateTime:  Date;
+  schemaVersion:          number;
+}
+```
+
+---
+
+#### `paymentExecutionProcedure` (SD-65 — Payment Execution)
+
+Lifecycle record for each payout. Created after card authorization; tracks the full journey from beneficiary resolution to final settlement. `resolutionLog` is append-only (PCI DSS Req 10).
+
+```typescript
+// backend/src/modules/gateway/models/paymentExecution.model.ts
+export const PAYMENT_EXECUTION_COLLECTION = 'paymentExecutionProcedure';
+
+export type PaymentExecutionStatus =
+  | 'pending'     // created, not yet routed
+  | 'routing'     // beneficiary resolution in progress
+  | 'scheduled'   // destination resolved; waiting for T+N window
+  | 'in_flight'   // funds dispatched to payout rail
+  | 'completed'   // settlement confirmed
+  | 'failed'      // terminal failure
+  | 'exception'   // blocked: no eligible destination; manual review required
+  | 'refunded'    // reversed post-settlement
+  | 'reversed';   // rolled back before settlement
+
+export interface PaymentExecutionResolutionStep {
+  stepName:    string;
+  stepOutcome: 'found' | 'not_found' | 'fallback' | 'failed';
+  stepNote?:   string;
+  stepDateTime: Date;
+}
+
+export interface PaymentExecutionProcedure {
+  paymentExecutionInstanceReference:  string;   // UUID, PK
+  paymentOrderInstanceReference:      string;   // FK → paymentOrderProcedure (SD-64)
+  cardTransactionInstanceReference?:  string;   // FK → cardTransactionLog (SD-254)
+
+  beneficiaryType:               BeneficiaryType;  // 'merchant' | 'user' | 'anonymous'
+  beneficiaryPartyReference?:    string;            // FK → party (SD-13) for user payouts
+  beneficiaryArrangementReference?: string;         // FK → counterpartyArrangement (SD-54) — links the detail page to the saved beneficiary
+  resolvedPayoutAccountReference?: string;          // FK → payoutAccountArrangement (SD-66)
+
+  // Recipient identity for a bank transfer to an UNREGISTERED external account (SEPA/ACH/SWIFT).
+  // Bank data under GDPR Art. 32 / PSD2 (NOT PCI DSS — that governs card data). destinationIban is
+  // QE:none (DEK-exec-dest-iban), encrypted at rest and shown full to the account owner; the masked
+  // form is plaintext for list views. Registered destinations link via the FKs above instead.
+  beneficiaryName?:          string;   // holder legal name as entered at initiation
+  destinationIban?:          string;   // full destination IBAN — QE:none (L2 only)
+  destinationAccountMasked?: string;   // masked IBAN / account, e.g. "ES12••••5477"
+  destinationCountry?:       string;   // ISO 3166-1 alpha-2 destination banking country
+
+  grossAmount: number;
+  netAmount:   number;
+  feeAmount:   number;
+  currency:    string;  // ISO 4217
+
+  paymentExecutionRail?: PayoutRail;
+  routingNote?:          string;
+
+  paymentExecutionStatus: PaymentExecutionStatus;
+  failureReason?:  string;
+  scheduledAt?:    Date;
+  initiatedAt?:    Date;
+  completedAt?:    Date;
+
+  resolutionLog: PaymentExecutionResolutionStep[];  // append-only, never cleared
+
+  bianServiceDomain:     'Payment Execution';
+  bianControlRecordType: 'PaymentExecutionProcedure';
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+  schemaVersion:         number;
+}
+```
+
+---
+
+#### `counterpartyArrangement` (SD-54 — Counterparty Administration)
+
+Beneficiary registry entry. Raw phone/email is **never stored** — only the resolved `partyInstanceReference` and a masked display hint. The opaque `counterpartyArrangementReference` is the "beneficiary token" shared with merchants for payment initiation.
+
+```typescript
+// backend/src/modules/identity/models/counterpartyArrangement.model.ts
+export const COUNTERPARTY_COLLECTION = 'counterpartyArrangement';
+
+// Max beneficiaries per user — configurable via PSP_BENEFICIARY_MAX_PER_USER (default: 100)
+export const COUNTERPARTY_MAX_PER_USER = config.payout.beneficiaryMaxPerUser;
+
+export type CounterpartyArrangementStatus = 'active' | 'removed';
+export type CounterpartyLookupType        = 'phone' | 'email';
+
+export interface CounterpartyArrangement {
+  counterpartyArrangementReference: string;  // UUID v4 — the opaque beneficiary token
+  ownerPartyReference:              string;  // FK → party: who owns this contact
+  counterpartyPartyReference:       string;  // FK → party: the resolved beneficiary (PSP internal)
+
+  counterpartyLabel:       string;                  // owner-defined or masked hint
+  counterpartyLookupType:  CounterpartyLookupType;
+  counterpartyLookupHint:  string;                  // masked at store: "+34 6** *** 789" / "j***@example.com"
+                                                     // NEVER stores raw phone/email
+
+  counterpartyArrangementStatus: CounterpartyArrangementStatus;
+
+  bianServiceDomain:     'Counterparty Administration';
+  bianControlRecordType: 'CounterpartyArrangement';
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+  schemaVersion:         number;
+}
+```
+
+*Added 2026-07-01 (v17). Code and doc travel together per SDD rule.*
 
 ---
 
 ## 2. QE encryptedFieldsMaps
 
-All maps live in `backend/src/encryption/encryptedFieldsMaps.ts`. The `keyId` values are BSON UUIDs resolved at runtime from the provisioned DEKs.
+All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `keyId` values are per-field BSON Binary UUIDs resolved at runtime from the provisioned DEKs via `provisionDEKs.ts`.
+
+**DEK naming (as of v3 BIAN compliance update):**
+
+| DEK key | Atlas key vault name | Protects |
+|---|---|---|
+| `deks.partyEmail` | `DEK-party-email` | `party.partyEmailAddress` |
+| `deks.partyPhone` | `DEK-party-phone` | `party.partyMobilePhoneNumber` |
+| `deks.partyAddress` | `DEK-party-address` | `party.partyPostalAddress` (QE:none — GDPR PII, L2 only) |
+| `deks.partyDob` | `DEK-party-dob` | `party.partyDateOfBirth` (QE:none — GDPR PII, L2 only) |
+| `deks.authEmail` | `DEK-auth-email` | `customerAuthenticationAssessment.customerAuthenticationEmailAddress` |
+| `deks.customerAccountRef` | `DEK-customer-account-ref` | `customerAgreementProcedure.customerAgreementReference` |
+| `deks.txAccountRef` | `DEK-tx-account-ref` | `cardTransactionLog.cardTransactionAccountReference` |
+| `deks.customerAddress` | `DEK-customer-address` | `customerAgreementProcedure.customerAgreementResidentialAddress` (QE:none, inline v2) |
+| `deks.customerGovId` | `DEK-customer-gov-id` | `customerAgreementProcedure.governmentIdentificationReference` (QE:none, inline v2) |
+| `deks.customerRiskNotes` | `DEK-customer-risk-notes` | `customerAgreementProcedure.customerAgreementRiskNotes` (QE:none, inline v2) |
+| `deks.txRawPayload` | `DEK-tx-raw-payload` | `cardTransactionLog.rawGatewayPayload` (QE:none, inline v2) |
+| `deks.txProcessorMeta` | `DEK-tx-processor-meta` | `cardTransactionLog.processorTransactionMetadata` (QE:none, inline v2) |
+| `deks.cardExpiry` | `DEK-card-expiry` | `paymentCardManagement.paymentCardExpirationDate` |
+| `deks.payoutIban` | `DEK-payout-iban` | `payoutAccountArrangement.payoutAccountIban` (QE:none — GDPR Art. 32 / PSD2) |
+| `deks.payoutRouting` | `DEK-payout-routing` | `payoutAccountArrangement.payoutAccountRoutingNumber` (QE:none — GDPR Art. 32 / PSD2) |
+| `deks.execDestIban` | `DEK-exec-dest-iban` | `paymentExecutionProcedure.destinationIban` — unregistered external destination (QE:none — GDPR Art. 32 / PSD2) |
+
+> **Regulatory note:** IBAN / routing / BIC are **bank account data → GDPR Art. 32 + PSD2**, not PCI DSS. PCI DSS scope is card data (PAN / CHD). Both are QE-encrypted at rest here, but for distinct regulatory drivers.
 
 ```typescript
-// backend/src/encryption/encryptedFieldsMaps.ts
+// backend/src/vendors/encryption/encryptedFieldsMaps.ts
+// v2: tier parameter selects which QE:none fields are included in the map.
+// Level 1 map omits QE:none fields → driver returns Binary for those fields.
+// Level 2 map includes all fields → driver auto-decrypts everything.
 
-import { Binary } from 'mongodb';
+export type QETier = 'level1' | 'level2';
 
-export function buildEncryptedFieldsMaps(
-  dekLookupId: Binary,       // DEK-lookup UUID
-  dekSensitiveId: Binary     // DEK-sensitive UUID
-) {
+export function buildEncryptedFieldsMaps(deks: DEKs, tier: QETier = 'level2') {
+  const includeSensitive = tier === 'level2';
   return {
 
-    // ── cardTransaction ──────────────────────────────────────────
-    // NOTE: paymentCardReference is NOT in QE. A payment token is a card
-    // surrogate, not CHD under PCI DSS v4.0. It is stored plaintext and
-    // searched via a standard MongoDB index.
-    cardTransaction: {
+    // ── party (SD-13) ─────────────────────────────────────────────
+    party: {
       fields: [
-        {
-          keyId: dekLookupId,
-          path: 'cardTransactionAccountReference',
-          bsonType: 'string',
-          queries: { queryType: 'equality' },
-        },
-        // v2: add cardTransactionAmount.amount with queryType: 'range'
-        // {
-        //   keyId: dekLookupId,
-        //   path: 'cardTransactionAmount.amount',
-        //   bsonType: 'double',
-        //   queries: { queryType: 'range', min: 0, max: 999999, precision: 2 },
-        // },
+        { keyId: deks.partyEmail,  path: 'partyEmailAddress',      bsonType: 'string', queries: { queryType: 'equality' } },
+        { keyId: deks.partyPhone,  path: 'partyMobilePhoneNumber', bsonType: 'string', queries: { queryType: 'equality' } },
+        // GDPR PII — QE:none, Level 2 only (postal address + date of birth)
+        ...(includeSensitive ? [
+          { keyId: deks.partyAddress, path: 'partyPostalAddress', bsonType: 'object' },
+          { keyId: deks.partyDob,     path: 'partyDateOfBirth',   bsonType: 'string' },
+        ] : []),
       ],
     },
 
-    // ── cardTransactionSensitive ─────────────────────────────────
-    cardTransactionSensitive: {
+    // ── customerAuthenticationAssessment (SD-91) ──────────────────
+    customerAuthenticationAssessment: {
       fields: [
-        {
-          keyId: dekSensitiveId,
-          path: 'rawGatewayPayload',
-          bsonType: 'object',
-          // no queries = QE:none: encrypted but not searchable
-        },
-        {
-          keyId: dekSensitiveId,
-          path: 'processorTransactionMetadata',
-          bsonType: 'object',
-        },
+        { keyId: deks.authEmail, path: 'customerAuthenticationEmailAddress', bsonType: 'string', queries: { queryType: 'equality' } },
       ],
     },
 
-    // ── customerAgreement ────────────────────────────────────────
-    customerAgreement: {
+    // ── customerAgreementProcedure (SD-53) ────────────────────────
+    // QE:equality always included; QE:none sensitive fields only in Level 2 map
+    customerAgreementProcedure: {
       fields: [
-        {
-          keyId: dekLookupId,
-          path: 'customerEmailAddress',
-          bsonType: 'string',
-          queries: { queryType: 'equality' },
-        },
-        {
-          keyId: dekLookupId,
-          path: 'customerMobilePhoneNumber',
-          bsonType: 'string',
-          queries: { queryType: 'equality' },
-        },
-        {
-          keyId: dekLookupId,
-          path: 'customerAgreementReference',
-          bsonType: 'string',
-          queries: { queryType: 'equality' },
-        },
-        // v2: customerName
-        // { keyId: dekLookupId, path: 'customerName', bsonType: 'string',
-        //   queries: { queryType: 'equality' } },
+        { keyId: deks.customerAccountRef, path: 'customerAgreementReference', bsonType: 'string', queries: { queryType: 'equality' } },
+        ...(includeSensitive ? [
+          { keyId: deks.customerAddress,   path: 'customerAgreementResidentialAddress', bsonType: 'object' },
+          { keyId: deks.customerGovId,     path: 'governmentIdentificationReference',   bsonType: 'string' },
+          { keyId: deks.customerRiskNotes, path: 'customerAgreementRiskNotes',          bsonType: 'string' },
+        ] : []),
       ],
     },
 
-    // ── customerAgreementSensitive ───────────────────────────────
-    customerAgreementSensitive: {
+    // ── cardTransactionLog (SD-254) ───────────────────────────────
+    // QE:equality always included; QE:none gateway fields only in Level 2 map
+    cardTransactionLog: {
       fields: [
-        {
-          keyId: dekSensitiveId,
-          path: 'customerAgreementResidentialAddress',
-          bsonType: 'object',
-          // QE:none: no queries
-        },
-        {
-          keyId: dekSensitiveId,
-          path: 'governmentIdentificationReference',
-          bsonType: 'string',
-        },
-        {
-          keyId: dekSensitiveId,
-          path: 'customerAgreementRiskNotes',
-          bsonType: 'string',
-        },
+        { keyId: deks.txAccountRef, path: 'cardTransactionAccountReference', bsonType: 'string', queries: { queryType: 'equality' } },
+        ...(includeSensitive ? [
+          { keyId: deks.txRawPayload,    path: 'rawGatewayPayload',            bsonType: 'object' },
+          { keyId: deks.txProcessorMeta, path: 'processorTransactionMetadata', bsonType: 'object' },
+        ] : []),
       ],
     },
 
-    // ── paymentCard ──────────────────────────────────────────────
-    // NOTE: paymentCardReference is NOT in QE (see cardTransaction note).
-    // paymentCardExpirationDate IS protected: expiry date is CHD when co-located with
-    // a card reference, and here it travels alongside the token.
-    paymentCard: {
+    // ── paymentCardManagement (SD-88) ─────────────────────────────
+    paymentCardManagement: {
       fields: [
-        {
-          keyId: dekSensitiveId,
-          path: 'paymentCardExpirationDate',
-          bsonType: 'string',
-          // QE:none — non-searchable, retrieval only
-        },
+        { keyId: deks.cardExpiry, path: 'paymentCardExpirationDate', bsonType: 'string' },
       ],
     },
 
-    // ── partyAuthentication ─────────────────────────────────────
-    partyAuthentication: {
-      fields: [
-        {
-          keyId: dekLookupId,
-          path: 'partyAuthenticationUserEmailAddress',
-          bsonType: 'string',
-          queries: { queryType: 'equality' },   // login lookup by email
-        },
-      ],
-    },
+    // fraudDiagnosisCase: no QE (operational metadata only, no PII or CHD)
 
-    // fraudDiagnosisCase: no QE, standard collection
+    // ── payoutAccountArrangement (SD-66) ──────────────────────────────
+    // QE:none only — IBAN and routing number are sensitive bank data at rest (GDPR Art. 32 / PSD2)
+    // but NOT searchable (accounts looked up by payoutAccountInstanceReference, not IBAN).
+    // L1 map omits this block → driver returns Binary. L2 map includes it → auto-decrypts.
+    ...(includeSensitive ? {
+      payoutAccountArrangement: {
+        fields: [
+          { keyId: deks.payoutIban,    path: 'payoutAccountIban',          bsonType: 'string' },
+          { keyId: deks.payoutRouting, path: 'payoutAccountRoutingNumber',  bsonType: 'string' },
+        ],
+      },
+    } : {}),
+
+    // ── paymentExecutionProcedure (SD-65) ─────────────────────────────
+    // destinationIban = full IBAN of an UNREGISTERED external transfer destination the user typed.
+    // QE:none (GDPR Art. 32 / PSD2), L2 only. Registered destinations link via FK instead of storing IBAN.
+    ...(includeSensitive ? {
+      paymentExecutionProcedure: {
+        fields: [
+          { keyId: deks.execDestIban, path: 'destinationIban', bsonType: 'string' },
+        ],
+      },
+    } : {}),
   };
 }
 ```
@@ -486,8 +1253,8 @@ import { KMSProviders } from 'mongodb';
 
 export function buildKmsProviders(): KMSProviders {
   if (process.env.KMS_PROVIDER === 'local') {
-    const key = process.env.LOCAL_MASTER_KEY_BASE64;
-    if (!key) throw new Error('LOCAL_MASTER_KEY_BASE64 is required when KMS_PROVIDER=local');
+    const key = process.env.KMS_LOCAL_MASTER_KEY;
+    if (!key) throw new Error('KMS_LOCAL_MASTER_KEY is required when KMS_PROVIDER=local');
     return {
       local: { key: Buffer.from(key, 'base64') },
     };
@@ -568,58 +1335,66 @@ export async function provisionDataEncryptionKeys(client: MongoClient) {
 
 ## 4. MongoDB Client Initialization
 
-```typescript
-// backend/src/encryption/client.ts
+> **v2**: Two MongoClient pools replace the single client. `getDbForRole(role, hasToken)` in `roleClients.ts` selects the correct pool.
 
-import { MongoClient } from 'mongodb';
-import { buildKmsProviders } from './kms';
-import { buildEncryptedFieldsMaps } from './encryptedFieldsMaps';
+```typescript
+// backend/src/vendors/encryption/roleClients.ts (v2)
+
+import { MongoClient, Db } from 'mongodb';
+import { buildEncryptedFieldsMaps, QETier } from './encryptedFieldsMaps';
 import { provisionDataEncryptionKeys } from './keyVault';
+import { buildKmsProviders } from './kms';
+import { canReadSensitive } from '../middleware/rbac';
+import type { UserRole } from '../../shared/models/identity.model';
 
 const KEY_VAULT_NAMESPACE = 'encryption.__keyVault';
+let _l1Client: MongoClient | null = null;
+let _l2Client: MongoClient | null = null;
 
-let _client: MongoClient | null = null;
+async function buildQEClient(uri: string, tier: QETier): Promise<MongoClient> {
+  // Resolve DEKs with a plain (non-QE) connection
+  const plain = new MongoClient(process.env.MONGODB_URI!);
+  await plain.connect();
+  const deks = await provisionDataEncryptionKeys(plain);
+  await plain.close();
 
-export async function getMongoClient(): Promise<MongoClient> {
-  if (_client) return _client;
+  const maps = buildEncryptedFieldsMaps(deks, tier);
+  const db = process.env.MONGODB_DB_NAME!;
 
-  // Step 1: plain client to provision DEKs
-  const plainClient = new MongoClient(process.env.MONGODB_URI!);
-  await plainClient.connect();
-
-  const { dekLookupId, dekSensitiveId } = await provisionDataEncryptionKeys(plainClient);
-  await plainClient.close();
-
-  // Step 2: QE-enabled client
-  const encryptedFieldsMap = buildEncryptedFieldsMaps(dekLookupId, dekSensitiveId);
-
-  _client = new MongoClient(process.env.MONGODB_URI!, {
+  const client = new MongoClient(uri, {
     autoEncryption: {
       keyVaultNamespace: KEY_VAULT_NAMESPACE,
       kmsProviders: buildKmsProviders(),
       encryptedFieldsMap: {
-        [`${process.env.MONGODB_DB_NAME}.cardTransaction`]:
-          encryptedFieldsMap.cardTransaction,
-        [`${process.env.MONGODB_DB_NAME}.cardTransactionSensitive`]:
-          encryptedFieldsMap.cardTransactionSensitive,
-        [`${process.env.MONGODB_DB_NAME}.customerAgreement`]:
-          encryptedFieldsMap.customerAgreement,
-        [`${process.env.MONGODB_DB_NAME}.customerAgreementSensitive`]:
-          encryptedFieldsMap.customerAgreementSensitive,
-        [`${process.env.MONGODB_DB_NAME}.paymentCard`]:
-          encryptedFieldsMap.paymentCard,
-        [`${process.env.MONGODB_DB_NAME}.partyAuthentication`]:
-          encryptedFieldsMap.partyAuthentication,
+        [`${db}.party`]:                            maps.party,
+        [`${db}.cardTransactionLog`]:               maps.cardTransactionLog,
+        [`${db}.customerAgreementProcedure`]:       maps.customerAgreementProcedure,
+        [`${db}.paymentCardManagement`]:            maps.paymentCardManagement,
+        [`${db}.customerAuthenticationAssessment`]: maps.customerAuthenticationAssessment,
       },
-      // crypt_shared is auto-discovered from node_modules/mongodb-client-encryption
-      extraOptions: {
-        cryptSharedLibRequired: true,
-      },
+      extraOptions: { cryptSharedLibRequired: true },
     },
   });
+  await client.connect();
+  return client;
+}
 
-  await _client.connect();
-  return _client;
+export async function getL1QEClient(): Promise<MongoClient> {
+  if (_l1Client) return _l1Client;
+  _l1Client = await buildQEClient(process.env.MONGODB_URI_LEVEL1 ?? process.env.MONGODB_URI!, 'level1');
+  return _l1Client;
+}
+
+export async function getL2QEClient(): Promise<MongoClient> {
+  if (_l2Client) return _l2Client;
+  _l2Client = await buildQEClient(process.env.MONGODB_URI_LEVEL2 ?? process.env.MONGODB_URI!, 'level2');
+  return _l2Client;
+}
+
+// Selects L1 or L2 pool based on role + escalation token validity
+export async function getDbForRole(role: UserRole, hasValidToken = false): Promise<Db> {
+  const client = canReadSensitive(role, hasValidToken) ? await getL2QEClient() : await getL1QEClient();
+  return client.db(process.env.MONGODB_DB_NAME!);
 }
 ```
 
@@ -635,53 +1410,217 @@ import { MongoClient, ClientEncryption } from 'mongodb';
 async function createIndexes(client: MongoClient, dbName: string) {
   const db = client.db(dbName);
 
-  await db.collection('cardTransaction').createIndexes([
-    { key: { cardTransactionInstanceReference: 1 }, unique: true },
-    { key: { paymentCardReference: 1 } },             // standard index: token is not QE
-    { key: { cardTransactionDateTime: -1 } },
-    { key: { cardTransactionStatus: 1 } },
+  // ── party (SD-13) ─────────────────────────────────────────────────
+  await db.collection('party').createIndexes([
+    { key: { partyInstanceReference: 1 }, unique: true },
+    // Note: partyEmailAddress and partyMobilePhoneNumber are QE:equality —
+    // QE manages its own __safeContent__ index; do NOT add manual indexes on these fields
+    // Uniqueness on the (encrypted) phone is enforced via its blind-index digest instead:
+    { key: { partyMobilePhoneNumberDigest: 1 }, unique: true },
   ]);
 
-  await db.collection('cardTransactionSensitive').createIndexes([
-    { key: { cardTransactionInstanceReference: 1 }, unique: true },
+  // ── customerAuthenticationAssessment (SD-91) ──────────────────────
+  await db.collection('customerAuthenticationAssessment').createIndexes([
+    { key: { customerAuthenticationInstanceReference: 1 }, unique: true },
+    { key: { partyInstanceReference: 1 } },
+    { key: { customerAuthenticationUserRole: 1 } },
   ]);
 
-  await db.collection('customerAgreement').createIndexes([
+  // ── partyAuthenticationAssessment (SD-16) ─────────────────────────
+  await db.collection('partyAuthenticationAssessment').createIndexes([
+    { key: { partyAuthenticationInstanceReference: 1 }, unique: true },
+    { key: { partyInstanceReference: 1 } },
+  ]);
+
+  // ── authenticationDomain (SD-16 support) ──────────────────────────
+  await db.collection('authenticationDomain').createIndexes([
+    { key: { partyAuthenticationDomainInstanceReference: 1 }, unique: true },
+    { key: { partyAuthenticationDomainName: 1 }, unique: true },
+    { key: { partyAuthenticationDomainEnabled: 1 } },
+  ]);
+
+  // ── customerAgreementProcedure (SD-53) ────────────────────────────
+  await db.collection('customerAgreementProcedure').createIndexes([
     { key: { customerAgreementInstanceReference: 1 }, unique: true },
+    { key: { partyInstanceReference: 1 } },               // two-step lookup join key
     { key: { customerAgreementStatus: 1 } },
   ]);
 
-  await db.collection('customerAgreementSensitive').createIndexes([
-    { key: { customerAgreementInstanceReference: 1 }, unique: true },
-  ]);
+  // Note: customerAgreementProcedureSensitive collection removed in v2 (fields inline)
 
-  await db.collection('paymentCard').createIndexes([
+  // ── paymentCardManagement (SD-88) ─────────────────────────────────
+  await db.collection('paymentCardManagement').createIndexes([
     { key: { paymentCardInstanceReference: 1 }, unique: true },
-    { key: { paymentCardReference: 1 } },             // standard index: token is not QE
+    { key: { paymentCardReference: 1 } },                 // standard index: token is not QE
     { key: { customerAgreementInstanceReference: 1 } },
   ]);
 
+  // ── cardTransactionLog (SD-254) ───────────────────────────────────
+  await db.collection('cardTransactionLog').createIndexes([
+    { key: { cardTransactionInstanceReference: 1 }, unique: true },
+    { key: { paymentCardReference: 1 } },                 // standard index: token is not QE
+    { key: { cardTransactionDateTime: -1 } },
+    { key: { cardTransactionStatus: 1 } },
+    // Acquiring-side: list a merchant's received payments, newest first (SD-89). Plaintext id, not QE.
+    { key: { merchantAgreementInstanceReference: 1, cardTransactionDateTime: -1 } },
+  ]);
+
+  // Note: cardTransactionLogSensitive collection removed in v2 (fields inline)
+
+  // ── fraudDiagnosisCase (SD-83) ────────────────────────────────────
   await db.collection('fraudDiagnosisCase').createIndexes([
     { key: { fraudDiagnosisInstanceReference: 1 }, unique: true },
-    { key: { linkedCardTransactionReference: 1 } },
+    { key: { cardTransactionInstanceReference: 1 } },
+    { key: { customerAgreementInstanceReference: 1 } },
     { key: { fraudDiagnosisCaseStatus: 1, fraudDiagnosisCaseSeverity: -1 } },
   ]);
 
-  // fraudDiagnosisCaseEvents: supports ordered audit retrieval per case
-  // and filtered queries by actionType (e.g. fetch only escalation events)
+  // fraudDiagnosisCaseEvents: ordered audit retrieval per case
   await db.collection('fraudDiagnosisCaseEvents').createIndexes([
     { key: { fraudDiagnosisInstanceReference: 1, actionDateTime: -1 } },
     { key: { fraudDiagnosisInstanceReference: 1, actionType: 1 } },
   ]);
 
-  await db.collection('partyAuthentication').createIndexes([
-    { key: { partyAuthenticationInstanceReference: 1 }, unique: true },
-    { key: { partyAuthenticationUserRole: 1 } },
+  // ── customerCreditRatingState (SD-60) ─────────────────────────────
+  await db.collection('customerCreditRatingState').createIndexes([
+    { key: { customerCreditRatingInstanceReference: 1 }, unique: true },
+    { key: { customerAgreementReference: 1 } },           // HRPC lookup by account reference
+  ]);
+
+  // ── consentAgreement (SD-36) — Open Banking v3 stub ──────────────
+  await db.collection('consentAgreement').createIndexes([
+    { key: { consentAgreementInstanceReference: 1 }, unique: true },
+    { key: { partyInstanceReference: 1 } },
+    { key: { consentRecipientIdentifier: 1 } },
+    { key: { consentStatus: 1, consentExpiryDateTime: 1 } },
+  ]);
+
+  // ── consentAccessLog (SD-36) — Open Banking audit trail ──────────
+  await db.collection('consentAccessLog').createIndexes([
+    { key: { consentAccessLogInstanceReference: 1 }, unique: true },
+    { key: { consentAgreementInstanceReference: 1, accessDateTime: -1 } },
+    { key: { accessDateTime: -1 } },
   ]);
 }
 ```
 
 > **Important:** Do not create manual indexes on QE-encrypted fields (`paymentCardReference`, `customerEmailAddress`, etc.). QE manages its own `__safeContent__` metadata index automatically.
+
+```typescript
+  // ── integrationRegistry (SD-193) ─────────────────────────────────
+  await db.collection('integrationRegistry').createIndexes([
+    { key: { externalProviderArrangementInstanceReference: 1 }, unique: true },
+    { key: { externalProviderArrangementType: 1, externalProviderArrangementStatus: 1 } },
+    { key: { externalProviderIsInternal: 1 } },
+    // Non-unique: multi-provider support — multiple providers can share the same type+endpoint
+    { key: { externalProviderArrangementType: 1, externalProviderApiEndpoint: 1 }, sparse: true },
+    { key: { routingGroupId: 1 }, sparse: true },
+    { key: { routingPriority: 1, externalProviderArrangementType: 1 } },
+  ]);
+
+  // ── integrationRoutingGroups (SD-193) ────────────────────────────
+  // One default group (isDefaultGroup=true) per IntegrationProviderType, seeded programmatically.
+  await db.collection('integrationRoutingGroups').createIndexes([
+    { key: { routingGroupInstanceReference: 1 }, unique: true },
+    { key: { routingGroupProviderType: 1, routingGroupStatus: 1 } },
+    { key: { isDefaultGroup: 1 }, sparse: true },
+  ]);
+
+  // ── integrationEvents (SD-193 Action Log) — TIMESERIES (ADR-025) ────────
+  // Timeseries collection created in createCollections.ts with expireAfterSeconds: 7776000 (90d).
+  // TTL is set on the collection, NOT via a manual TTL index.
+  // Unique index on integrationEventInstanceReference removed — incompatible with timeseries.
+  await db.collection('integrationEvents').createIndexes([
+    { key: { externalProviderArrangementInstanceReference: 1, recordCreatedDateTime: -1 } },
+    { key: { integrationEventType: 1, recordCreatedDateTime: -1 } },
+    { key: { 'businessContext.entityType': 1, 'businessContext.entityId': 1, recordCreatedDateTime: -1 }, sparse: true },
+  ]);
+
+  // ── businessProcessEvent (ADR-025) — TIMESERIES ──────────────────────────
+  // Timeseries collection created in createCollections.ts with expireAfterSeconds: 7776000 (90d).
+  // Timeseries collections do NOT support unique secondary indexes.
+  await db.collection('businessProcessEvent').createIndexes([
+    { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
+    { key: { processType: 1, eventDateTime: -1 } },
+    { key: { processAction: 1, processOutcome: 1 } },
+  ]);
+
+  // ── complianceProcessEvent (ADR-025) — TIMESERIES ────────────────────────
+  // Timeseries collection created in createCollections.ts with expireAfterSeconds: 31536000 (365d).
+  await db.collection('complianceProcessEvent').createIndexes([
+    { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
+    { key: { processType: 1, eventDateTime: -1 } },
+  ]);
+```
+
+**Timeseries collection creation** (in `createCollections.ts`, not `createIndexes.ts`):
+
+```typescript
+// integrationEvents — timeseries (ADR-025: replaces standard collection)
+await db.createCollection('integrationEvents', {
+  timeseries: {
+    timeField: 'recordCreatedDateTime',
+    metaField: 'externalProviderArrangementInstanceReference',
+    granularity: 'hours',
+  },
+  expireAfterSeconds: 7776000,  // 90 days
+});
+
+// businessProcessEvent — timeseries (ADR-025)
+await db.createCollection('businessProcessEvent', {
+  timeseries: {
+    timeField: 'eventDateTime',
+    metaField: 'processType',
+    granularity: 'hours',
+  },
+  expireAfterSeconds: 7776000,  // 90 days (transactional)
+});
+
+// complianceProcessEvent — timeseries (ADR-025)
+await db.createCollection('complianceProcessEvent', {
+  timeseries: {
+    timeField: 'eventDateTime',
+    metaField: 'processType',
+    granularity: 'hours',
+  },
+  expireAfterSeconds: 31536000, // 365 days (KYC/KYB regulatory)
+});
+
+// merchantAgreementEvents — standard collection (ADR-025: was lazily created, now explicit)
+await db.createCollection('merchantAgreementEvents');
+```
+
+**v17 index additions** (`createIndexes.ts`):
+
+```typescript
+// ── payoutAccountArrangement (SD-66) ────────────────────────────────────────
+await ensureIndexes(db, 'payoutAccountArrangement', [
+  { key: { payoutAccountInstanceReference: 1 }, unique: true },
+  { key: { partyInstanceReference: 1, payoutAccountStatus: 1 } },
+  // Partial unique: only one default per party. Filter avoids false conflicts with non-default.
+  {
+    key:    { partyInstanceReference: 1, payoutAccountIsDefault: 1 },
+    unique: true,
+    partialFilterExpression: { payoutAccountIsDefault: true },
+  },
+]);
+
+// ── paymentExecutionProcedure (SD-65) ───────────────────────────────────────
+await ensureIndexes(db, 'paymentExecutionProcedure', [
+  { key: { paymentExecutionInstanceReference: 1 }, unique: true },
+  { key: { paymentOrderInstanceReference: 1 } },
+  { key: { cardTransactionInstanceReference: 1 } },
+  { key: { paymentExecutionStatus: 1, recordCreatedDateTime: -1 } },
+]);
+
+// ── counterpartyArrangement (SD-54) ─────────────────────────────────────────
+await ensureIndexes(db, 'counterpartyArrangement', [
+  { key: { counterpartyArrangementReference: 1 }, unique: true },
+  { key: { ownerPartyReference: 1, counterpartyArrangementStatus: 1 } },
+  // Unique (owner, counterparty) pair — prevents duplicate beneficiary entries.
+  { key: { ownerPartyReference: 1, counterpartyPartyReference: 1 }, unique: true },
+]);
+```
 
 ---
 
@@ -694,16 +1633,18 @@ Role is passed via `X-Demo-Role` header (v2+). Omitted defaults to `level1_analy
 
 ---
 
-### 6.1 Card Transactions
+### 6.1 Transactions — `module: transactions` (SD-254 · SD-88)
 
-#### `POST /card-transactions`
+> Base path: `/api/v1/transactions`
+
+#### `POST /transactions`
 
 Creates a transaction and optionally a fraud case.
 
 **Request body:**
 ```json
 {
-  "cardToken": "tok_abc123",
+  "cardToken": "pm_abc123",
   "accountReference": "ACC-001",
   "amount": 850.00,
   "currency": "USD",
@@ -711,9 +1652,18 @@ Creates a transaction and optionally a fraud case.
   "cardTransactionMerchantCategoryCode": "5999",
   "cardTransactionChannel": "online",
   "cardTransactionMaskedPanDisplay": "****-****-****-1234",
+  "cardTransactionType": "purchase",
+  "cardTransactionDescription": "ONLINE STORE INC.",
+  "cardTransactionNarrative": "PURCHASE at Online Store Inc. — ref AB12CD34",
   "gatewayPayload": { "raw": "..." }
 }
 ```
+
+Required: `cardToken`, `accountReference`, `amount`, `currency`, `cardTransactionMerchantName`, `cardTransactionMerchantCategoryCode`, `cardTransactionChannel`, `cardTransactionMaskedPanDisplay`, `cardTransactionType`, `cardTransactionDescription`.
+Optional: `cardTransactionNarrative`, `gatewayPayload`.
+
+`cardTransactionType` enum: `purchase | cash_advance | balance_transfer | refund | fee | adjustment`
+`cardTransactionDescription`: max 22 chars, visible on cardholder bank statement (BIAN SD-254).
 
 **Response 201:**
 ```json
@@ -727,7 +1677,7 @@ Creates a transaction and optionally a fraud case.
 
 ---
 
-#### `GET /card-transactions/:id`
+#### `GET /transactions/:id`
 
 Returns transaction by ID (no QE field values returned to Level 1).
 
@@ -738,15 +1688,18 @@ Returns transaction by ID (no QE field values returned to Level 1).
   "cardTransactionAmount": { "amount": 850.00, "currency": "USD" },
   "cardTransactionDateTime": "2026-05-26T14:30:00Z",
   "cardTransactionStatus": "authorized",
+  "cardTransactionType": "purchase",
   "cardTransactionMerchantName": "Online Store Inc.",
   "cardTransactionMerchantCategoryCode": "5999",
-  "cardTransactionMaskedPanDisplay": "****-****-****-1234"
+  "cardTransactionMaskedPanDisplay": "****-****-****-1234",
+  "cardTransactionDescription": "ONLINE STORE INC.",
+  "cardTransactionNarrative": "PURCHASE at Online Store Inc. — ref AB12CD34"
 }
 ```
 
 ---
 
-#### `GET /card-transactions?cardToken=<value>`
+#### `GET /transactions?cardToken=<value>`
 
 Standard index query on `paymentCardReference` (plaintext field: token is a card surrogate, not CHD under PCI DSS v4.0).
 
@@ -760,11 +1713,13 @@ Standard index query on `paymentCardReference` (plaintext field: token is a card
 
 ---
 
-### 6.2 Customer Agreements
+### 6.2 Customer — `module: customer` (SD-53)
 
-#### `GET /customer-agreements?email=<value>`
-#### `GET /customer-agreements?phone=<value>`
-#### `GET /customer-agreements?accountRef=<value>`
+> Base path: `/api/v1/customer`
+
+#### `GET /customer?email=<value>`
+#### `GET /customer?phone=<value>`
+#### `GET /customer?accountRef=<value>`
 
 QE equality search on the corresponding encrypted field.
 
@@ -782,17 +1737,18 @@ QE equality search on the corresponding encrypted field.
 
 ---
 
-### 6.3 Payment Cards
+### 6.3 Cards — `module: customer` (SD-88)
 
-#### `POST /payment-cards`
+> Base path: `/api/v1/customer/:customerId/cards` — cards as sub-resource of Customer Agreement (SD-53)
+
+#### `POST /customer/:customerId/cards`
 
 Registers a tokenized card linked to a customer agreement.
 
-**Request body:**
+**Request body** (`customerAgreementInstanceReference` is taken from the `:customerId` path param — do not include it in the body):
 ```json
 {
-  "customerAgreementInstanceReference": "uuid-v4",
-  "cardToken": "tok_abc123",
+  "cardToken": "pm_abc123",
   "paymentCardExpirationDate": "12/28",
   "paymentCardMaskedPanDisplay": "****-****-****-1234",
   "paymentCardNetwork": "VISA",
@@ -810,7 +1766,7 @@ Registers a tokenized card linked to a customer agreement.
 
 ---
 
-#### `GET /payment-cards?customerRef=<customerAgreementInstanceReference>`
+#### `GET /customer/:customerId/cards`
 
 Returns cards linked to a customer (plaintext lookup by FK).
 
@@ -831,11 +1787,13 @@ Returns cards linked to a customer (plaintext lookup by FK).
 
 ---
 
-### 6.4 Fraud Diagnosis Cases
+### 6.4 Fraud — `module: fraud` (SD-83)
 
-#### `GET /fraud-diagnosis-cases`
+> Base path: `/api/v1/fraud`
 
-**Query params:** `status`, `severity`, `page` (default 1), `limit` (default 20)
+#### `GET /fraud`
+
+**Query params:** `status`, `severity`, `transactionId`, `customerId`, `caseReference` (case-insensitive contains on the human reference, e.g. `FD-2026-001001`), `page` (default 1), `limit` (default 20)
 
 **Response 200:**
 ```json
@@ -849,7 +1807,13 @@ Returns cards linked to a customer (plaintext lookup by FK).
 
 ---
 
-#### `GET /fraud-diagnosis-cases/:id`
+#### `GET /fraud/stats`
+
+Investigation analytics for the L1 / L2 / auditor dashboards. MongoDB aggregation returning case `total`, counts by lifecycle (`open`, `underReview`, `escalated`, `resolvedFraud`, `resolvedCleared`), and breakdowns `byStatus`, `bySeverity`, `byMonth`. Aggregates over operational case metadata only — `fraudDiagnosisCase` holds no cardholder PII (PCI DSS Req 3/7). Registered before `/:id` so `stats` is not matched as a case id. (Customers are blocked from `/fraud` by middleware.)
+
+---
+
+#### `GET /fraud/:id`
 
 **Response 200:**
 ```json
@@ -862,30 +1826,160 @@ Returns cards linked to a customer (plaintext lookup by FK).
   "linkedCustomerAgreementReference": "...",
   "assignedAnalystRole": "level1_analyst",
   "escalationFlag": false,
+  "escalationAcceptedAt": null,
   "diagnosisActionLog": []
 }
 ```
 
+`escalationAcceptedAt` (`string | null`) — ISO 8601 timestamp set by L2 when they approve an escalation (`POST /fraud/:id/escalate/approve`). Cleared (set to `null`) when L2 rejects the escalation.
+
 ---
 
-#### `POST /fraud-diagnosis-cases/:id/escalate` *(v2)*
+#### `POST /fraud/:id/escalate` *(v2 — L1 triggers escalation)*
 
 **Request header:** `X-Demo-Role: level1_analyst`
+
+**Request body:**
+```json
+{ "escalationReason": "Risk score exceeds L1 threshold. High-risk MCC." }
+```
 
 **Response 200:**
 ```json
 {
   "fraudDiagnosisInstanceReference": "...",
-  "caseStatus": "escalated",
+  "fraudDiagnosisCaseStatus": "escalated",
   "escalationDateTime": "2026-05-26T15:00:00Z"
 }
 ```
 
+Side effects: case status set to `escalated`; `escalated` event appended to `fraudDiagnosisCaseEvents`.
+
 ---
 
-### 6.5 Audit Events *(v2)*
+#### `POST /fraud/:id/escalate/approve` *(v2 — L2 approves and gets token)*
 
-#### `GET /audit-events?caseId=<id>`
+**Request header:** `X-Demo-Role: level2_investigator`
+
+**Request body:**
+```json
+{ "approvalNotes": "Confirmed high-risk transaction. Proceeding with full investigation." }
+```
+
+**Response 200:**
+```json
+{
+  "fraudDiagnosisInstanceReference": "...",
+  "fraudDiagnosisCaseStatus": "escalated",
+  "escalationToken": "4e7a9f2b-c831-4d50-b9f0-1e2a3b4c5d6e",
+  "escalationApprovedAt": "2026-05-26T15:05:00Z",
+  "tokenExpiresAt": "2026-05-26T19:05:00Z"
+}
+```
+
+The `escalationToken` is a short-lived UUID (TTL 4 hours) stored in an in-memory token store. Include it in `X-Escalation-Token` on subsequent requests to customer and transaction sensitive endpoints. Side effects: `field_accessed` event appended to `fraudDiagnosisCaseEvents` with `action: "escalation_approved"`.
+
+**Response 422:** Case is not in `escalated` status.
+
+---
+
+#### `POST /fraud/:id/notes` *(Ch-03 — BIAN SD-83 append-only)*
+
+Creates a note on a fraud case. Appends a `note_added` event to `fraudDiagnosisCaseEvents`.
+
+**Auth:** `level1_analyst` or `level2_investigator`. Returns 403 for `customer` or `security_auditor` roles.
+
+**Request header:** `X-Demo-Role: level1_analyst` (or `level2_investigator`)
+
+**Request body:**
+```json
+{
+  "noteText": "Customer confirmed travel to Brazil; merchant appears legitimate.",
+  "visibility": "internal"
+}
+```
+
+`visibility` enum: `internal | customer`
+
+**Response 201:**
+```json
+{
+  "noteId": "uuid-v4",
+  "actionDateTime": "2026-06-10T09:15:00Z"
+}
+```
+
+`noteId` is the `_id` of the inserted `fraudDiagnosisCaseEvents` document.
+
+---
+
+#### `DELETE /fraud/:id/notes/:noteId` *(Ch-03 — retraction, not physical delete)*
+
+Retracts a note by appending a `note_retracted` event to `fraudDiagnosisCaseEvents`. The original `note_added` event is never deleted (BIAN SD-83 append-only).
+
+**Auth:** Same role that created the note. Returns 403 if a different role attempts retraction.
+
+**Request body (optional):**
+```json
+{ "retractionReason": "Note contained incorrect merchant name." }
+```
+
+**Response 200:**
+```json
+{
+  "retractedNoteId": "uuid-v4",
+  "retractionDateTime": "2026-06-10T09:30:00Z"
+}
+```
+
+**Error responses:**
+- **403** — requesting role differs from the role that created the note
+- **404** — `noteId` not found on this case
+- **409** — note has already been retracted
+
+---
+
+#### `GET /fraud/:id/notes` *(Ch-03)*
+
+Returns all notes for a fraud case, including retracted entries (visible to analysts and auditors), sorted chronologically (oldest first).
+
+**Auth:** `level1_analyst`, `level2_investigator`, `security_auditor`. Returns 403 for `customer`.
+
+**Response 200:**
+```json
+{
+  "notes": [
+    {
+      "noteId": "uuid-v4",
+      "noteText": "Customer confirmed travel to Brazil; merchant appears legitimate.",
+      "visibility": "internal",
+      "performedByRole": "level1_analyst",
+      "actionDateTime": "2026-06-10T09:15:00Z",
+      "isRetracted": false,
+      "retractionReason": null,
+      "retractionDateTime": null
+    }
+  ]
+}
+```
+
+> **Customer-facing variant:** `GET /api/v1/transactions/:id/notes` returns the same `{ notes: NoteEntry[] }` shape but filters out entries where `isRetracted: true` and restricts to `visibility: "customer"` notes only.
+
+---
+
+#### ~~`fraudDiagnosisCaseNotes`~~ and ~~`fraudDiagnosisCustomerSubjectNotes`~~ — **Deprecated**
+
+> **Deprecated** — These legacy note fields/collections are superseded by `POST /api/v1/fraud/:id/notes`. Legacy data stored under these paths remains **readable** for backward compatibility. **Write operations to these fields are rejected with HTTP 400.** Use the note endpoints above for all new note creation and retraction.
+
+---
+
+### 6.5 Fraud — Audit Events *(v2)*
+
+> Base path: `/api/v1/fraud`
+
+#### `GET /fraud/:id/events`
+
+Returns the chronological event log for a single case.
 
 **Response 200:**
 ```json
@@ -896,7 +1990,13 @@ Returns cards linked to a customer (plaintext lookup by FK).
       "actionDateTime": "2026-05-26T14:35:00Z",
       "actionType": "case_opened",
       "performedByRole": "payment_service",
-      "actionDetails": "Fraud case auto-created on authorization"
+      "actionDetails": { "trigger": "amount_threshold" }
+    },
+    {
+      "actionDateTime": "2026-05-26T15:00:00Z",
+      "actionType": "escalated",
+      "performedByRole": "level1_analyst",
+      "actionDetails": { "escalationReason": "Risk score exceeds L1 threshold." }
     }
   ]
 }
@@ -904,7 +2004,69 @@ Returns cards linked to a customer (plaintext lookup by FK).
 
 ---
 
-### 6.6 Diagnostics *(v3)*
+#### `GET /fraud/audit-events` *(v2 — Security Auditor)*
+
+Returns all events across all cases, sorted descending by `actionDateTime`. Joins `fraudDiagnosisCaseReference` from `fraudDiagnosisCase` via aggregation.
+
+**Query params:** `page` (default 1), `limit` (default 50)
+
+**Response 200:**
+```json
+{
+  "events": [
+    {
+      "fraudDiagnosisInstanceReference": "...",
+      "fraudDiagnosisCaseReference": "FD-2026-000001",
+      "actionDateTime": "2026-05-26T15:05:00Z",
+      "actionType": "field_accessed",
+      "performedByInstanceReference": "rbac-layer",
+      "performedByRole": "level2_investigator",
+      "actionDetails": { "action": "escalation_approved" }
+    }
+  ],
+  "total": 42,
+  "page": 1,
+  "limit": 50
+}
+```
+
+---
+
+### 6.6 Fraud — HRPC Check *(v2)*
+
+> Base path: `/api/v1/fraud`
+
+#### `GET /fraud/hrpc/check?accountRef=<ref>`
+
+Checks whether a customer account appears in any HRPC (High-Risk Person and Counterparty) category. Queries `customerCreditRatingState` (SD-60) collection by `customerAgreementReference`.
+
+**Query params:** `accountRef` (required) — the customer's account reference (e.g. `ACC-003`).
+
+**Response 200:**
+```json
+{
+  "accountRef": "ACC-003",
+  "hrpcMatch": true,
+  "highestRiskLevel": "high",
+  "hrpcFlags": [
+    {
+      "category": "suspicious_transaction_patterns",
+      "riskLevel": "high",
+      "label": "Suspicious Transaction Patterns",
+      "description": "Multiple high-value card transactions at high-risk MCC merchants detected over 90 days.",
+      "detectedAt": "2026-03-15",
+      "source": "internal_transaction_monitoring",
+      "reviewRequired": true
+    }
+  ]
+}
+```
+
+Returns `hrpcMatch: false` and empty `hrpcFlags` when no profile exists for the given account reference. No 404 is returned — absence of a profile is a valid and expected result.
+
+---
+
+### 6.7 Diagnostics *(v3)*
 
 #### `GET /diagnostics/query-timing`
 
@@ -928,12 +2090,12 @@ All auth endpoints are public (no JWT required).
 
 #### `POST /auth/login`
 
-Validates credentials against `partyAuthentication` (QE equality search on email). Returns a signed JWT on success.
+Validates credentials against `customerAuthenticationAssessment` (SD-91, QE equality search on `customerAuthenticationEmailAddress`). Returns a signed JWT on success.
 
 **Request body:**
 ```json
 {
-  "email": "sarah.chen@leafybank.demo",
+  "email": "sarah.chen@back.es",
   "password": "demo-password",
   "domain": "local"
 }
@@ -944,9 +2106,9 @@ Validates credentials against `partyAuthentication` (QE equality search on email
 {
   "token": "<HS256 JWT>",
   "user": {
-    "partyAuthenticationInstanceReference": "uuid-v4",
+    "customerAuthenticationInstanceReference": "uuid-v4",
     "name": "Sarah Chen",
-    "email": "sarah.chen@leafybank.demo",
+    "email": "sarah.chen@back.es",
     "role": "level1_analyst"
   }
 }
@@ -958,17 +2120,56 @@ Validates credentials against `partyAuthentication` (QE equality search on email
 
 #### `GET /auth/users`
 
-Returns the list of demo users for the login screen dropdown. Passwords are never included.
+Returns the list of local domain demo users for the login screen dropdown. Data is read from `backend/data/customerAuthentications.json` (seed file) rather than the QE-encrypted collection to avoid decryption overhead on this helper endpoint. Passwords are never included.
+
+Pass `?featured=true` to return only the curated demo roster (`customerAuthenticationDemoFeatured: true`) surfaced in the debug-mode user picker (application mode) and used by the simulator. The full set of seeded users remains available without the filter for ad-hoc testing.
+
+#### `GET /fraud/integrity` *(security_auditor only)*
+
+Data-integrity oversight for the auditor dashboard (PCI DSS Req 10). Returns `totalCases`, `duplicateCount` + `duplicateReferences[]` (case references on more than one case — must be 0; enforced by the unique index, ADR-024), `orphanTransactionRefs`, `orphanCustomerRefs`, and a `healthy` flag. Aggregates only — no PII. Non-auditor roles receive 403.
 
 **Response 200:**
 ```json
 {
   "users": [
-    { "email": "luis.fernandez@leafybank.demo", "name": "Luis Fernandez", "role": "customer" },
-    { "email": "julia.santos@leafybank.demo",   "name": "Julia Santos",   "role": "customer" },
-    { "email": "sarah.chen@leafybank.demo",     "name": "Sarah Chen",     "role": "level1_analyst" },
-    { "email": "michael.obi@leafybank.demo",    "name": "Michael Obi",    "role": "level2_investigator" },
-    { "email": "admin@leafybank.demo",          "name": "Admin",          "role": "security_auditor" }
+    { "email": "luis.fernandez@back.es", "name": "Luis Fernandez", "role": "customer" },
+    { "email": "julia.santos@back.es",   "name": "Julia Santos",   "role": "customer" },
+    { "email": "sarah.chen@back.es",     "name": "Sarah Chen",     "role": "level1_analyst" },
+    { "email": "michael.obi@back.es",    "name": "Michael Obi",    "role": "level2_investigator" },
+    { "email": "admin@back.es",          "name": "Admin",          "role": "security_auditor" }
+  ]
+}
+```
+
+---
+
+#### `GET /auth/domains`
+
+Returns only enabled authentication domains from the `authenticationDomain` collection (BIAN SD-16). Public endpoint — no Bearer token required. Used by the Application Mode login screen to populate the domain selector dynamically.
+
+**Response 200:**
+```json
+{
+  "domains": [
+    { "name": "local", "displayName": "Local (Demo Users)", "type": "local" }
+  ]
+}
+```
+
+> Domains with `partyAuthenticationDomainEnabled: false` (e.g., `msentra`, `bigid`) are excluded. Enable them by updating the `authenticationDomain` collection document.
+
+---
+
+#### `GET /transactions/merchants`
+
+Returns unique `{ name, mcc }` pairs aggregated from the `cardTransactionLog` collection, sorted alphabetically. Public endpoint — used by the Simulator STEP 1 form to populate the Merchant Name selector.
+
+**Response 200:**
+```json
+{
+  "merchants": [
+    { "name": "TechGadgets Ltd.", "mcc": "5734" },
+    { "name": "City Restaurant", "mcc": "5812" }
   ]
 }
 ```
@@ -983,12 +2184,12 @@ Available only when `NODE_ENV !== 'production'`. Used by the "Encrypted in Atlas
 
 Returns the raw BSON document as stored in Atlas (ciphertext visible, no auto-decryption). Uses a plain MongoClient without `autoEncryption`.
 
-**Path params:** `collection` (e.g., `cardTransaction`), `id` (document `_id` or primary key value)
+**Path params:** `collection` (e.g., `cardTransactionLog`), `id` (document `_id` or primary key value)
 
 **Response 200:**
 ```json
 {
-  "collection": "cardTransaction",
+  "collection": "cardTransactionLog",
   "document": {
     "_id": "...",
     "paymentCardReference": { "$binary": { "base64": "BhKJ9KMsA...", "subType": "06" } },
@@ -1004,7 +2205,7 @@ Returns the raw BSON document as stored in Atlas (ciphertext visible, no auto-de
 
 ### 6.9 Health
 
-#### `GET /health`
+#### `GET /api/v1/system/health`
 
 **Response 200:**
 ```json
@@ -1018,51 +2219,349 @@ Returns the raw BSON document as stored in Atlas (ciphertext visible, no auto-de
 
 ---
 
+### 6.10 Business Process Events (ADR-025)
+
+> Base path: `/api/v1/events`  
+> Authorized roles: `security_auditor`, `system_admin`. All other roles → 403.
+
+#### `GET /api/v1/events/process`
+
+Returns paginated `businessProcessEvent` documents.
+
+**Query params:** `processType` (optional), `entityType` (optional), `from` (ISO date, optional), `to` (ISO date, optional), `page` (default 1), `limit` (default 20, max 100)
+
+**Response 200:**
+```json
+{
+  "events": [
+    {
+      "businessProcessEventInstanceReference": "uuid",
+      "eventDateTime": "2026-06-13T10:00:00Z",
+      "processType": "payment_processing",
+      "processAction": "transaction.authorized",
+      "processOutcome": "approved",
+      "entityType": "transaction",
+      "entityId": "txn-001",
+      "performedByPartyReference": null,
+      "performedByRole": null,
+      "eventSummary": { "amount": 850, "currency": "USD" },
+      "bianServiceDomain": "Card Transaction",
+      "bianControlRecordType": "CardTransactionRecord"
+    }
+  ],
+  "total": 42,
+  "page": 1,
+  "limit": 20
+}
+```
+
+---
+
+#### `GET /api/v1/events/process/:entityType/:entityId`
+
+Returns all process events for a specific business entity.
+
+**Path params:** `entityType` (`transaction` | `fraud_case` | `customer` | `merchant` | `payment_link` | `card`), `entityId` (entity primary key)
+
+**Query params:** `page` (default 1), `limit` (default 50)
+
+**Response 200:** Same shape as `GET /events/process` but filtered to the entity.
+
+---
+
+#### `GET /api/v1/events/compliance`
+
+Returns paginated `complianceProcessEvent` documents.
+
+**Query params:** `processType` (optional, `kyc_verification` | `kyb_verification` | `merchant_onboarding` | `customer_onboarding`), `from`, `to`, `page`, `limit`
+
+**Response 200:** Same shape as `GET /events/process`.
+
+---
+
+### 6.11 Internal Integration Stubs (ADR-025)
+
+> Base path: `/api/v1/internal`  
+> No JWT required. Validated via `X-Integration-Source: internal` header → 401 if absent.  
+> Not exposed in public Swagger.
+
+All internal stub endpoints follow the same request/response shape (typed per category).
+
+#### `POST /api/v1/internal/fds/score`
+
+**Request body:** `FdsOutboundPayload`  
+**Response 200:** `FdsInboundPayload`
+
+#### `POST /api/v1/internal/aml/score`
+
+**Request body:** `AmlOutboundPayload`  
+**Response 200:** `AmlInboundPayload`
+
+#### `POST /api/v1/internal/kyc/score`
+
+**Request body:** `KycOutboundPayload`  
+**Response 200:** `KycInboundPayload`
+
+#### `POST /api/v1/internal/kyb/score`
+
+**Request body:** `KybOutboundPayload`  
+**Response 200:** `KybInboundPayload`
+
+#### `POST /api/v1/internal/hrp/score`
+
+**Request body:** `HrpOutboundPayload`  
+**Response 200:** `HrpInboundPayload`
+
+#### `POST /api/v1/internal/card_auth/score`
+
+**Request body:** `CardAuthOutboundPayload`  
+**Response 200:** `CardAuthInboundPayload`
+
+#### `POST /api/v1/internal/card_issuer/score`
+
+**Request body:** `CardIssuerOutboundPayload`  
+**Response 200:** `CardIssuerInboundPayload`
+
+---
+
+### 6.10 Payout Accounts — `module: accounts` (SD-66 · v17)
+
+> Base path: `/api/v1/accounts`  
+> Auth: Bearer JWT  
+> Scope: customers can only access their own `partyRef`; `security_auditor` / `manager` can view all.
+
+#### `GET /accounts/:partyRef`
+
+Lists payout accounts for a party.
+
+**Query:** `status` (filter), `page` (default 1), `limit` (default 20, max 100)
+
+**Response 200:**
+```json
+{
+  "results": [
+    {
+      "payoutAccountInstanceReference": "acct-uuid",
+      "partyInstanceReference": "party-uuid",
+      "payoutAccountType": "bank_account",
+      "payoutAccountStatus": "active",
+      "payoutAccountIsDefault": true,
+      "payoutAccountAlias": "My Savings",
+      "payoutAccountBankName": "Demo Bank",
+      "payoutAccountCurrency": "EUR",
+      "payoutAccountCountryCode": "ES",
+      "payoutAccountPreferredRail": "sepa",
+      "payoutAccountBalance": {
+        "pendingAmount": 0, "availableAmount": 1250.00, "reservedAmount": 0,
+        "currency": "EUR", "lastUpdatedDateTime": "2026-07-01T10:00:00Z"
+      },
+      "recordCreatedDateTime": "2026-01-15T08:00:00Z"
+    }
+  ],
+  "total": 1, "page": 1, "limit": 20
+}
+```
+
+Note: `payoutAccountIban` and `payoutAccountRoutingNumber` are **never returned to L1 clients** — they remain as BSON Binary ciphertext and are stripped by `safeAccount()`.
+
+#### `POST /accounts/:partyRef`
+
+Registers a new payout account. Requires `accounts:manage`.
+
+**Body:**
+```json
+{
+  "payoutAccountType": "bank_account",
+  "payoutAccountCurrency": "EUR",
+  "payoutAccountCountryCode": "ES",
+  "payoutAccountPreferredRail": "sepa",
+  "payoutAccountAlias": "My Savings",
+  "payoutAccountBankName": "Demo Bank",
+  "payoutAccountIsDefault": true
+}
+```
+
+**Response 201:** Created account document (IBAN/routing stripped).
+
+#### `GET /accounts/:partyRef/:accountRef`
+
+Returns a single payout account. Requires `accounts:view`.
+
+#### `POST /accounts/:partyRef/:accountRef/default`
+
+Sets the account as the party's default. Atomic: clears the prior default. Requires `accounts:manage`.
+
+**Response 200:** `{ "payoutAccountInstanceReference": "...", "payoutAccountIsDefault": true }`
+
+#### `DELETE /accounts/:partyRef/:accountRef`
+
+Closes a payout account (soft delete — status → `'closed'`). Requires `accounts:manage`.
+
+**Response 200:** `{ "payoutAccountInstanceReference": "...", "payoutAccountStatus": "closed" }`
+
+---
+
+### 6.11 Payment Executions — `module: executions` (SD-65 · v17)
+
+> Base path: `/api/v1/executions`  
+> Auth: Bearer JWT  
+> Roles: `level1_analyst`, `level2_investigator`, `security_auditor`, `manager`
+
+#### `GET /executions`
+
+Lists payment execution records with optional filters.
+
+**Query:** `status`, `partyRef`, `from` (ISO date), `to` (ISO date), `page`, `limit`
+
+**Response 200:**
+```json
+{
+  "results": [
+    {
+      "paymentExecutionInstanceReference": "exec-uuid",
+      "paymentOrderInstanceReference": "order-uuid",
+      "cardTransactionInstanceReference": "txn-uuid",
+      "beneficiaryType": "merchant",
+      "resolvedPayoutAccountReference": "acct-uuid",
+      "grossAmount": 99.99, "netAmount": 99.99, "feeAmount": 0,
+      "currency": "EUR",
+      "paymentExecutionRail": "sepa",
+      "paymentExecutionStatus": "completed",
+      "completedAt": "2026-07-01T11:00:00Z",
+      "resolutionLog": [
+        { "stepName": "ais.account.validation", "stepOutcome": "found", "stepDateTime": "..." },
+        { "stepName": "pisp.transfer.initiated", "stepOutcome": "found", "stepDateTime": "..." },
+        { "stepName": "bank.transfer.settled",   "stepOutcome": "found", "stepDateTime": "..." }
+      ]
+    }
+  ],
+  "total": 1, "page": 1, "limit": 20
+}
+```
+
+#### `GET /executions/:executionRef`
+
+Returns a single execution by reference. Includes full `resolutionLog`.
+
+---
+
+### 6.12 Merchant Beneficiary API — SD-54 (Merchant OAuth · v17)
+
+> Base path: `/api/v1/merchant/beneficiaries`  
+> Auth: Merchant Bearer token (`Authorization: Bearer <merchant-oauth-token>`)  
+> Required scope: see per-endpoint table below  
+> All endpoints enforce OAuth `sub` binding: `token.sub` must match the `partyRef` in the path.
+
+| Endpoint | Scope | Description |
+|---|---|---|
+| `POST /:partyRef/lookup` | `write:beneficiaries` | Resolve phone or email → beneficiary token |
+| `GET /:partyRef` | `read:beneficiaries` | List saved beneficiaries for the party |
+| `DELETE /:partyRef/:beneficiaryToken` | `write:beneficiaries` | Remove a beneficiary entry |
+
+#### `POST /merchant/beneficiaries/:partyRef/lookup`
+
+Resolves a phone number or email to a PSP user and returns an opaque beneficiary token. Anti-enumeration: returns `{ found: false }` for any non-success case (no diff between unknown user and other errors).
+
+**Body:**
+```json
+{ "lookupType": "phone", "lookupValue": "+34612345678" }
+```
+
+**Response 200 (found):**
+```json
+{
+  "found": true,
+  "beneficiaryToken": "btoken-uuid",
+  "maskedHint": "+34 6** *** 678",
+  "lookupType": "phone"
+}
+```
+
+**Response 200 (not found / error):** `{ "found": false }`
+
+#### `GET /merchant/beneficiaries/:partyRef`
+
+Lists the calling party's saved beneficiaries. Returns masked hints only — no raw phone/email.
+
+**Response 200:**
+```json
+{
+  "results": [
+    {
+      "counterpartyArrangementReference": "btoken-uuid",
+      "counterpartyLabel": "My Friend",
+      "counterpartyLookupType": "phone",
+      "counterpartyLookupHint": "+34 6** *** 678",
+      "counterpartyArrangementStatus": "active",
+      "recordCreatedDateTime": "2026-07-01T09:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+#### `DELETE /merchant/beneficiaries/:partyRef/:beneficiaryToken`
+
+Marks a beneficiary entry as `'removed'` (soft delete). The resolved counterparty is not affected.
+
+**Response 200:** `{ "removed": true, "counterpartyArrangementReference": "btoken-uuid" }`
+
+---
+
 ## 7. Environment Variables Reference
 
 ```bash
-# .env.example
+# .env  (see backend/src/vendors/setup/env.example for full reference)
 
-# ── MongoDB Atlas ─────────────────────────────────────────────────
+# ── MongoDB connection ─────────────────────────────────────────────
 MONGODB_URI=mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/?retryWrites=true&w=majority
-MONGODB_DB_NAME=pci_dss_demo
+MONGODB_DB_NAME=pcidb
 
-# ── AWS KMS ───────────────────────────────────────────────────────
-# Required when KMS_PROVIDER=aws (default)
+# v2: role-pool connection strings (fall back to MONGODB_URI if not set)
+MONGODB_URI_LEVEL1=mongodb+srv://<l1-user>:<l1-pass>@<cluster>.mongodb.net/
+MONGODB_URI_LEVEL2=mongodb+srv://<l2-user>:<l2-pass>@<cluster>.mongodb.net/
+
+# ── KMS / Queryable Encryption ────────────────────────────────────
+KMS_PROVIDER=local              # 'local' | 'aws'
+LOCAL_MASTER_KEY=               # 96-byte hex (generated by `npm run setup:key:master`)
+AWS_KMS_KEY_ARN=
 AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
-AWS_SESSION_TOKEN=              # Optional: for temporary IAM credentials
-AWS_REGION=us-east-1
-AWS_CMK_ARN=arn:aws:kms:us-east-1:<account>:key/<key-id>
+AWS_REGION=
+CRYPT_SHARED_LIB_PATH=          # Path to mongo_crypt_v1 shared library
 
-# ── KMS provider selection ────────────────────────────────────────
-KMS_PROVIDER=aws                # 'aws' | 'local'
-
-# ── Local KMS (offline / docker-compose dev only) ─────────────────
-# Generate with: node -e "require('crypto').randomBytes(96).toString('base64')"
-LOCAL_MASTER_KEY_BASE64=
+# ── Atlas Admin API (v2 setup automation) ─────────────────────────
+# Leave blank to skip; roles must be created manually in Atlas UI instead.
+ATLAS_PUBLIC_KEY=
+ATLAS_PRIVATE_KEY=
+ATLAS_PROJECT_ID=
+ATLAS_DB_USER_LEVEL1=pci_l1
+ATLAS_DB_USER_LEVEL1_PASSWORD=
+ATLAS_DB_USER_LEVEL2=pci_l2
+ATLAS_DB_USER_LEVEL2_PASSWORD=
 
 # ── Backend (Fastify) ─────────────────────────────────────────────
-API_PORT=3001
-API_HOST=0.0.0.0
-CORS_ORIGIN=http://localhost:3000
+# PORT: defaults to 8081 in source; Dockerfile sets 8080 for K8s
+PORT=8081
+NODE_ENV=development
+JWT_SECRET=                     # 32-char random string
+PSP_URL_FRONTEND=http://localhost:8080
+PSP_CORS_ORIGIN=http://localhost:8080
 
-# ── Authentication (Application Mode) ────────────────────────────
-# Generate with: node -e "require('crypto').randomBytes(32).toString('hex')"
-JWT_SECRET=
-JWT_EXPIRES_IN=24h
-AUTH_DOMAIN=local               # 'local' | 'msentra' (msentra: v2)
+# ── Fraud detection ────────────────────────────────────────────────
+FRAUD_AMOUNT_THRESHOLD=500
+RISK_MCC_LIST=5812,6011,7995
+ESCALATION_TOKEN_TTL_SECONDS=3600
 
-# ── Frontend (Next.js) ────────────────────────────────────────────
-NEXT_PUBLIC_API_URL=http://localhost:3001
-
-# ── Demo configuration ────────────────────────────────────────────
-FRAUD_AMOUNT_THRESHOLD=500      # Transactions above this create a fraud case
-RISK_MCC_LIST=5812,6011,7995    # MCC codes that auto-trigger fraud diagnosis
-
-# ── AI Agent (v3) ─────────────────────────────────────────────────
-AGENT_ENABLED=false             # 'true' | 'false': set true to enable v3 agent
-MAGENTA_API_KEY=                # MongoDB Agentic Platform (Magenta) API key
+# ── Payout Orchestration (v17 — PSP_ prefix) ───────────────────────
+# All read via pspEnv('NAME', 'default') helper in backend/src/config.ts
+PSP_BENEFICIARY_MAX_PER_USER=100          # Max beneficiaries per user (SD-54)
+PSP_BENEFICIARY_RATE_LIMIT_RPM=20        # Max lookups/min per merchant+user pair
+PSP_PAYOUT_SETTLEMENT_DELAY_T1_MS=3000  # Simulated T+1 delay in ms (builtin PISP)
+PSP_PAYOUT_SETTLEMENT_DELAY_T2_MS=6000  # Simulated T+2 delay in ms
+PSP_PAYOUT_SETTLEMENT_DELAY_T3_MS=9000  # Simulated T+3 delay in ms
+PSP_PAYMENT_INITIATION_ALWAYS_SUCCEED=true  # Set false to simulate 5% rail failures
+PSP_AIS_ALWAYS_VERIFY=true               # Set false for builtin AIS to return unverified
 ```
 
 ---
@@ -1073,32 +2572,38 @@ Seed files live in `backend/data/`. The seed script (`backend/bin/seed.ts`) read
 
 ### Seed volumes
 
-| File | Collection | Documents |
-|---|---|---|
-| `backend/data/users.json` | `partyAuthentication` | 5 |
-| `backend/data/customerAgreements.json` | `customerAgreement` | 50 |
-| `backend/data/customerAgreementsSensitive.json` | `customerAgreementSensitive` | 50 |
-| `backend/data/paymentCards.json` | `paymentCard` | 50 |
-| `backend/data/cardTransactions.json` | `cardTransaction` | 200 |
-| `backend/data/cardTransactionsSensitive.json` | `cardTransactionSensitive` | 200 |
-| `backend/data/fraudCases.json` | `fraudDiagnosisCase` | 20 |
+| File | Collection (BIAN SD) | Documents | Generator |
+|---|---|---|---|
+| `backend/data/parties.json` | `party` (SD-13) | 53 (50 customers + 3 employees) | `bin/seed-generate.ts` |
+| `backend/data/customerAuthentications.json` | `customerAuthenticationAssessment` (SD-91) | 5 | `bin/seed-generate.ts` |
+| `backend/data/authDomains.json` | `authenticationDomain` (SD-16) | 3 | manual |
+| `backend/data/customerAgreements.json` | `customerAgreementProcedure` (SD-53) | 50 | `bin/seed-generate.ts` — includes inline QE:none fields (v2) |
+| `backend/data/paymentCards.json` | `paymentCardManagement` (SD-88) | 50 | `bin/seed-generate.ts` |
+| `backend/data/cardTransactions.json` | `cardTransactionLog` (SD-254) | 200 | `bin/seed-generate.ts` — includes inline QE:none fields (v2) |
+| `backend/data/fraudCases.json` | `fraudDiagnosisCase` (SD-83) | 20 | `bin/seed-generate.ts` |
+| `backend/data/fraudCaseEvents.json` | `fraudDiagnosisCaseEvents` (SD-83) | 20 | `bin/seed-generate.ts` |
+| `backend/data/customerCreditRatings.json` | `customerCreditRatingState` (SD-60) | 5 | manual (HRPC profiles) |
 
-### Demo users (`data/users.json`)
+**Regenerating synthetic data:** Run `npm run setup:data --prefix backend` (executes `bin/seed-generate.ts`). This overwrites all files marked `bin/seed-generate.ts` above. Manual files (`authDomains.json`, `customerCreditRatings.json`) are never overwritten by the generator.
 
-Passwords are stored as bcrypt hashes (12 rounds). Plaintext passwords are in `.env.example` comments for demo convenience only.
+### Demo users (`data/customerAuthentications.json`)
+
+Credentials are stored in `customerAuthenticationAssessment` (SD-91). Passwords stored as bcrypt hashes (12 rounds). Email is a QE:equality field. Plaintext passwords are in `.env.example` comments for demo convenience only.
 
 | Email | Role | Display Name |
 |---|---|---|
-| `luis.fernandez@leafybank.demo` | `customer` | Luis Fernandez |
-| `julia.santos@leafybank.demo` | `customer` | Julia Santos |
-| `sarah.chen@leafybank.demo` | `level1_analyst` | Sarah Chen |
-| `michael.obi@leafybank.demo` | `level2_investigator` | Michael Obi |
-| `admin@leafybank.demo` | `security_auditor` | Admin |
+| `luis.fernandez@back.es` | `customer` | Luis Fernandez |
+| `julia.santos@back.es` | `customer` | Julia Santos |
+| `sarah.chen@back.es` | `level1_analyst` | Sarah Chen |
+| `michael.obi@back.es` | `level2_investigator` | Michael Obi |
+| `admin@back.es` | `security_auditor` | Admin |
+
+Each of these 5 users has a corresponding `party` document in `parties.json` linked via `partyInstanceReference`.
 
 ### Synthetic data rules
 
 - All personal data (names, emails, phones, addresses) is generated with `@faker-js/faker`
-- Card tokens use the format `tok_<uuid>`: never a real card number
+- Card tokens use the format `pm_<uuid>`: never a real card number
 - `paymentCardMaskedPanDisplay` / `cardTransactionMaskedPanDisplay` format: `****-****-****-XXXX` where XXXX is a random 4-digit suffix
 - `paymentCardExpirationDate` is always a future date (at least 12 months from generation)
 - CVV, PIN, full PAN, and magnetic stripe data are **never included** in seed files
@@ -1107,86 +2612,157 @@ Passwords are stored as bcrypt hashes (12 rounds). Plaintext passwords are in `.
 
 ### Upsert key per collection
 
-| Collection | Upsert filter key |
+| Collection (BIAN name) | Upsert filter key |
 |---|---|
-| `partyAuthentication` | `partyAuthenticationInstanceReference` |
-| `customerAgreement` | `customerAgreementInstanceReference` |
-| `customerAgreementSensitive` | `customerAgreementInstanceReference` |
-| `paymentCard` | `paymentCardInstanceReference` |
-| `cardTransaction` | `cardTransactionInstanceReference` |
-| `cardTransactionSensitive` | `cardTransactionInstanceReference` |
+| `party` | `partyInstanceReference` |
+| `customerAuthenticationAssessment` | `customerAuthenticationInstanceReference` |
+| `partyAuthenticationAssessment` | `partyAuthenticationInstanceReference` |
+| `authenticationDomain` | `partyAuthenticationDomainInstanceReference` |
+| `customerAgreementProcedure` | `customerAgreementInstanceReference` |
+| `paymentCardManagement` | `paymentCardInstanceReference` |
+| `cardTransactionLog` | `cardTransactionInstanceReference` |
 | `fraudDiagnosisCase` | `fraudDiagnosisInstanceReference` |
+| `fraudDiagnosisCaseEvents` | `fraudDiagnosisInstanceReference` + `actionDateTime` |
+| `customerCreditRatingState` | `customerCreditRatingInstanceReference` |
+| `consentAgreement` *(v3 stub)* | `consentAgreementInstanceReference` |
+| `consentAccessLog` *(v3 stub)* | `consentAccessLogInstanceReference` |
 
 ---
 
 ## 9. Backend Source Structure
 
+The backend uses a **domain-module layout** aligned with BIAN Service Domains. See [engineering-proposal.md §3.8](engineering-proposal.md#38-backend-module-architecture-and-bian-map) for the full BIAN module map, shared/vendors boundary rules, and dependency graph.
+
 ```
 backend/
 ├── bin/
-│   ├── setup.ts                         # Calls src/vendors/setup/runSetup()
-│   └── seed.ts                          # Calls src/vendors/seed/runSeed()
-├── data/                                # JSON seed files (consumed by bin/seed.ts only)
-│   ├── users.json
-│   ├── customerAgreements.json
-│   ├── customerAgreementsSensitive.json
-│   ├── paymentCards.json
-│   ├── cardTransactions.json
-│   ├── cardTransactionsSensitive.json
-│   └── fraudCases.json
-├── src/
-├── controllers/
-│   ├── auth.controller.ts
-│   ├── cardTransaction.controller.ts
-│   ├── customerAgreement.controller.ts
-│   ├── paymentCard.controller.ts
-│   ├── fraudDiagnosis.controller.ts
-│   └── demo.controller.ts               # Raw document endpoint (non-prod only)
+│   ├── setup.ts                    # thin wrapper → src/vendors/setup/runSetup()
+│   ├── seed.ts                     # thin wrapper → src/vendors/seed/runSeed()
+│   └── seed-generate.ts            # synthetic data generator → writes backend/data/*.json
 │
-├── services/
-│   ├── auth.service.ts                  # JWT sign/verify, bcrypt compare
-│   ├── cardTransaction.service.ts
-│   ├── customerAgreement.service.ts
-│   ├── paymentCard.service.ts
-│   └── fraudDiagnosis.service.ts
+├── data/                           # JSON seed files (consumed by bin/seed.ts only)
+│   ├── parties.json                # generated → party (SD-13): 53 party records
+│   ├── customerAuthentications.json # generated → customerAuthenticationAssessment (SD-91): 5 users
+│   ├── authDomains.json            # manual: local + msentra + bigid domains
+│   ├── customerAgreements.json     # generated → customerAgreementProcedure (SD-53) [inline QE:none v2]
+│   ├── paymentCards.json           # generated → paymentCardManagement (SD-88)
+│   ├── cardTransactions.json       # generated → cardTransactionLog (SD-254) [inline QE:none v2]
+│   ├── fraudCases.json             # generated → fraudDiagnosisCase (SD-83)
+│   ├── fraudCaseEvents.json        # generated → fraudDiagnosisCaseEvents (SD-83)
+│   ├── customerCreditRatings.json  # manual: 5 HRPC profiles → customerCreditRatingState (SD-60)
+│   └── merchants.json              # [v4] seed data for merchantAgreement collection
 │
-├── models/
-│   ├── partyAuthentication.model.ts     # BIAN SD-16
-│   ├── cardTransaction.model.ts         # BIAN SD-254
-│   ├── customerAgreement.model.ts       # BIAN SD-53
-│   ├── paymentCard.model.ts             # BIAN SD-88
-│   └── fraudDiagnosis.model.ts          # BIAN SD-83
-│
-├── vendors/
-│   ├── encryption/
-│   │   ├── qeClient.ts                  # MongoClient with autoEncryption
-│   │   ├── rawClient.ts                 # Plain MongoClient (no decryption)
-│   │   ├── kms.ts                       # buildKmsProviders(), buildCmkOptions()
-│   │   ├── keyVault.ts                  # provisionDataEncryptionKeys()
-│   │   └── encryptedFieldsMaps.ts       # buildEncryptedFieldsMaps()
-│   ├── setup/
-│   │   ├── index.ts                     # runSetup(): orchestrates all setup steps
-│   │   ├── createCollections.ts         # createEncryptedCollection() calls
-│   │   ├── createIndexes.ts             # all index definitions
-│   │   └── provisionDEKs.ts             # DEK-lookup + DEK-sensitive
-│   └── seed/
-│       ├── index.ts                     # runSeed(): orchestrates all seed steps
-│       ├── seedUsers.ts                 # partyAuthentication upserts
-│       ├── seedCustomers.ts             # customerAgreement + sensitive upserts
-│       ├── seedCards.ts                 # paymentCard upserts
-│       ├── seedTransactions.ts          # cardTransaction + sensitive upserts
-│       └── seedCases.ts                 # fraudDiagnosisCase upserts
-│
-├── middleware/
-│   ├── auth.ts                          # JWT verification: reads Authorization header
-│   └── rbac.ts                          # Role enforcement: gates sensitive collections
-│
-├── plugins/
-│   ├── mongodb.ts                       # Fastify plugin: registers QE client
-│   └── cors.ts
-│
-└── server.ts                            # Fastify app setup + route registration
+└── src/
+    │
+    ├── shared/                     # Business logic shared by 2+ modules
+    │   ├── models/
+    │   │   ├── risk.model.ts       # RiskSeverity · FraudTriggerInput
+    │   │   ├── identity.model.ts   # UserRole · AnalystRole · JwtDemoPayload
+    │   │   └── transaction.model.ts # TransactionSnapshot (defined in fraud, built in transactions)
+    │   └── services/
+    │       └── fraudTrigger.service.ts  # [v4] triggerFraudEvaluation() — shared when gateway also triggers fraud
+    │
+    ├── vendors/                    # Infrastructure shared by all modules (no business logic)
+    │   ├── encryption/
+    │   │   ├── qeClient.ts         # MongoClient with autoEncryption (QE)
+    │   │   ├── rawClient.ts        # Plain MongoClient (ciphertext view for simulator toggle)
+    │   │   ├── kms.ts              # buildKmsProviders() · buildCmkOptions()
+    │   │   ├── keyVault.ts         # provisionDataEncryptionKeys(): DEK-lookup + DEK-sensitive
+    │   │   └── encryptedFieldsMaps.ts  # buildEncryptedFieldsMaps(): QE schemas for all collections
+    │   ├── middleware/
+    │   │   ├── auth.ts             # JWT verification (Fastify preHandler, all routes)
+    │   │   └── rbac.ts             # Role enforcement (Fastify preHandler, protected routes)
+    │   ├── setup/
+    │   │   ├── index.ts            # runSetup(): orchestrates all setup steps
+    │   │   ├── createCollections.ts
+    │   │   ├── createIndexes.ts
+    │   │   └── provisionDEKs.ts
+    │   └── seed/
+    │       ├── index.ts            # runSeed(): orchestrates all seed steps
+    │       ├── seedUsers.ts
+    │       ├── seedAuthDomains.ts
+    │       ├── seedCustomers.ts
+    │       ├── seedCards.ts
+    │       ├── seedTransactions.ts
+    │       ├── seedCases.ts
+    │       ├── seedCreditRatings.ts  # BIAN SD-60: upserts customerCreditRatings.json
+    │       └── seedMerchants.ts    # [v4]
+    │
+    ├── modules/                    # Domain modules — one per BIAN SD cluster
+    │   │
+    │   ├── identity/               # BIAN SD-16: Party Authentication
+    │   │   ├── controllers/
+    │   │   │   └── auth.controller.ts
+    │   │   ├── services/
+    │   │   │   └── auth.service.ts         # JWT sign/verify, bcrypt compare
+    │   │   ├── models/
+    │   │   │   └── partyAuthentication.model.ts
+    │   │   └── index.ts                    # Fastify plugin → /auth/login
+    │   │
+    │   ├── customer/               # BIAN SD-53: Customer Agreement
+    │   │   ├── controllers/
+    │   │   │   └── customerAgreement.controller.ts
+    │   │   ├── services/
+    │   │   │   └── customerAgreement.service.ts  # QE equality search (email/phone/accountRef)
+    │   │   ├── models/
+    │   │   │   └── customerAgreement.model.ts
+    │   │   └── index.ts                    # Fastify plugin → /customer + /customer/:id/cards
+    │   │
+    │   ├── transactions/           # BIAN SD-254: Card Transaction · SD-88: Payment Card
+    │   │   ├── controllers/
+    │   │   │   ├── cardTransaction.controller.ts
+    │   │   │   └── paymentCard.controller.ts
+    │   │   ├── services/
+    │   │   │   ├── cardTransaction.service.ts   # writes QE fields; imports createFraudCase from fraud/
+    │   │   │   └── paymentCard.service.ts
+    │   │   ├── models/
+    │   │   │   ├── cardTransaction.model.ts
+    │   │   │   └── paymentCard.model.ts
+    │   │   └── index.ts                    # Fastify plugin → /transactions
+    │   │
+    │   ├── fraud/                  # BIAN SD-83: Fraud Diagnosis
+    │   │   ├── controllers/
+    │   │   │   └── fraudDiagnosis.controller.ts
+    │   │   ├── services/
+    │   │   │   └── fraudDiagnosis.service.ts    # createFraudCase(); getCases(); getCaseById()
+    │   │   ├── models/
+    │   │   │   └── fraudDiagnosis.model.ts
+    │   │   └── index.ts                    # Fastify plugin → /fraud (+ /fraud/:id/events in v2)
+    │   │
+    │   ├── gateway/                # [v4] BIAN SD-64+SD-65+SD-89+SD-57
+    │   │   ├── controllers/
+    │   │   │   ├── merchant.controller.ts
+    │   │   │   ├── payment.controller.ts    # /gateway/payments lifecycle
+    │   │   │   ├── token.controller.ts
+    │   │   │   └── webhook.controller.ts
+    │   │   ├── services/
+    │   │   │   ├── merchant.service.ts      # SD-89: merchant CRUD + limit validation
+    │   │   │   ├── paymentOrder.service.ts  # SD-64: initiated→authorized→captured→settled
+    │   │   │   ├── routing.service.ts       # SD-65: simulated processor routing
+    │   │   │   ├── tokenization.service.ts  # SD-57: token vault operations
+    │   │   │   └── webhook.service.ts       # webhook delivery + retry
+    │   │   ├── models/
+    │   │   │   ├── merchantAgreement.model.ts   # SD-89: MCC, limits, settlement config
+    │   │   │   ├── paymentOrder.model.ts         # SD-64: payment intent lifecycle
+    │   │   │   └── tokenVault.model.ts           # SD-57: token references
+    │   │   └── index.ts                    # Fastify plugin → /gateway/*
+    │   │
+    │   └── system/                 # Demo infrastructure (non-BIAN)
+    │       ├── controllers/
+    │       │   └── demo.controller.ts       # raw-document endpoint + diagnostics
+    │       └── index.ts                    # Registered only when NODE_ENV !== 'production'
+    │
+    ├── plugins/
+    │   ├── mongodb.ts              # Fastify plugin: registers QE client on fastify.db
+    │   ├── swagger.ts
+    │   └── cors.ts
+    │
+    └── server.ts                   # Registers shared schemas, plugins, middleware, and all modules
 ```
+
+**Cross-module dependency rule:** `transactions` imports `createFraudCase` from `modules/fraud/` directly (permanent, unidirectional). All other cross-module dependencies are types from `shared/models/` (no runtime cost). In v4, `shared/services/fraudTrigger.service.ts` is introduced when `gateway` becomes a second caller of fraud case creation.
+
+**API URL semantics follow REST nesting.** Cards (SD-88) are a sub-resource of Customer Agreement (SD-53): `/api/v1/customer/:id/cards`. Other resources are top-level: `/api/v1/transactions` (SD-254), `/api/v1/fraud` (SD-83), `/api/v1/auth` (SD-16).
 
 `backend/bin/setup.ts` and `backend/bin/seed.ts` are thin wrappers inside the backend package:
 
@@ -1216,8 +2792,751 @@ runSeed().then(() => process.exit(0)).catch(err => { console.error(err); process
 // root package.json (relevant entries)
 {
   "scripts": {
-    "setup:db": "npm run setup:db --prefix backend",
-    "seed":     "npm run seed --prefix backend"
+    "setup:db":   "npm run setup:db --prefix backend",
+    "setup:seed": "npm run seed --prefix backend"
   }
 }
 ```
+
+---
+
+## 8. Ch-04 Payment Integration: Redirect Checkout + Payment Links
+
+### 8.0 Merchant payment callback (PSP → merchant, ADR-010/025/028)
+After a payment is processed (hosted checkout **or** payment link), the PSP notifies the merchant via
+`sendMerchantPaymentCallback`, on **both** approval and decline, through TWO channels:
+1. **The merchant's own webhook** (per-merchant): `deliverWebhook` POSTs the HMAC-signed event to the
+   merchant's `merchantWebhookEndpoint` using `merchantWebhookSecret`. Each merchant has a **distinct**
+   endpoint (seeded), so the correct merchant is notified per its configuration (ADR-028).
+2. **The Integration Hub** OUTBOUND event (`dispatchIntegration`, type `generic` — the seeded
+   "Merchant Payment Notifications" provider) as the auditable inbound/outbound record.
+
+**Single chokepoint (ADR-028/PM-4).** The **approved** callback is fired inside `createTransaction`,
+so it covers EVERY merchant-attributed payment — app/api-card, hosted checkout and payment link — not
+just the gateway flows. A third effect is added: a unified-audit **businessProcessEvent**
+`payment.callback` (entityType=transaction) so the outcome is visible/searchable in `/system/audit-events`
+for manager/auditor (previously only `transaction.authorized` appeared). The webhook payload always
+includes the **transactionId**. Declines fire the callback per-flow (a decline never reaches
+`createTransaction`).
+
+**Webhook test + lifecycle events (PM-5).** `POST /merchants/:id/webhooks/test` (owner/officer) delivers
+a simulated `payment.completed` (HMAC-signed, `test:true`) to the merchant's endpoint so they can verify
+their integration without a payment — returns the payload + delivery outcome (status, attempts, response).
+The `payment.callback` audit event now records the actual webhook **method/headers/body + the merchant's
+response** (delivered/statusCode/attempts), not just `webhookConfigured`. Each payment also emits a
+`payment.card.validation` (card_issuer integrator) before charging, and a `card.registered` (new) or
+`card.matched` (existing) compliance event — full card lifecycle behind a transaction for the auditor.
+(If `webhookConfigured` is false, the merchant has no endpoint in the DB — set it in
+`/system/merchant/webhooks` or re-seed.)
+
+**Auditable search + capture (PM-4).** `/events/audit` adds a `ref` deep-match filter (entityId +
+event summary/payload) so the auditor finds EVERY event for a transaction id, case id, merchant,
+customer/account ref or card token; integration events use their `businessContext` for entity linking.
+Integration events now persist `integrationEventRequest` {method,url,headers,body} and
+`integrationEventResponse` {status,headers,body} (sanitized) for outbound dispatch and inbound
+callbacks (PCI DSS Req 10.7).
+
+The event carries on **both** outcomes:
+- **Approved** → `payment.completed` with `cardToken` (surrogate, not CHD), `maskedPan`,
+  `responseCode`, `authorizationCode`, amount/currency, references.
+- **Declined** → `payment.declined` with `cardToken`, `responseCode` (e.g. `0540` = card
+  deactivated/removed) and a human `declineReason`. The decline path also returns a `redirectUrl`
+  and the real `code`/reason (no longer hard-coded `0190`).
+
+PCI DSS Req 3: the callback carries only the surrogate token + masked PAN — never the PAN/CVV
+(`logEvent` also applies the CHD blocklist). The browser return URL receives the same outcome via
+`{result}`, `{card_token}`, `{response_code}`, `{reason}` placeholders. The integration event is
+auditable in the events stream (Req 10). Saving the card is the merchant's decision on receiving
+this callback — not a checkbox in the PSP-hosted payment UI.
+
+### 8.1 New TypeScript Models
+
+#### `CheckoutSessionRecord` (SD-64 — `checkoutSessionLog`)
+
+```typescript
+// backend/src/modules/gateway/models/checkoutSession.model.ts
+export const CHECKOUT_SESSION_COLLECTION = 'checkoutSessionLog';
+
+export type CheckoutSessionStatus = 'pending' | 'completed' | 'expired' | 'cancelled';
+
+export interface CheckoutSessionRecord {
+  bianServiceDomain: 'Payment Order';
+  bianControlRecordType: 'CheckoutSessionLog';
+  schemaVersion: 1;
+  checkoutSessionInstanceReference: string;        // UUID
+  merchantAgreementInstanceReference: string;      // FK → merchantAgreementProcedure
+  merchantName: string;
+  checkoutSessionAmount: number;
+  checkoutSessionCurrency: string;                 // ISO 4217
+  checkoutSessionDescription: string;
+  checkoutSessionStatus: CheckoutSessionStatus;
+  checkoutSessionReturnUrl: string;
+  checkoutSessionCancelUrl: string;
+  checkoutSessionMerchantReference: string;        // Merchant's own order ID
+  checkoutSessionCreatedDateTime: Date;
+  checkoutSessionExpiresAt: Date;                  // TTL index target — 30 min default
+  checkoutSessionCompletedDateTime?: Date;
+  cardTransactionInstanceReference?: string;       // Set on completion
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+}
+```
+
+#### `PaymentLinkRecord` (SD-64 — `paymentLinkRecord`)
+
+```typescript
+// backend/src/modules/gateway/models/paymentLink.model.ts
+export const PAYMENT_LINK_COLLECTION = 'paymentLinkRecord';
+
+export type PaymentLinkStatus = 'active' | 'completed' | 'expired' | 'deactivated';
+export type PaymentLinkUsageType = 'single_use' | 'multi_use';
+
+export interface PaymentLinkRecord {
+  bianServiceDomain: 'Payment Order';
+  bianControlRecordType: 'PaymentLinkRecord';
+  schemaVersion: 1;
+  paymentLinkInstanceReference: string;            // UUID
+  paymentLinkCode: string;                         // 8-char, unique index
+  merchantAgreementInstanceReference: string;      // FK → merchantAgreementProcedure
+  merchantName: string;
+  paymentLinkAmount: number;
+  paymentLinkCurrency: string;                     // ISO 4217
+  paymentLinkDescription: string;
+  paymentLinkCustomerMessage?: string;
+  paymentLinkStatus: PaymentLinkStatus;
+  paymentLinkUsageType: PaymentLinkUsageType;
+  paymentLinkCurrentUses: number;
+  paymentLinkMaxUses?: number;                     // multi_use cap
+  paymentLinkCreatedDateTime: Date;
+  paymentLinkExpiresAt?: Date;                     // Sparse TTL index — optional
+  paymentLinkTransactionReferences: string[];      // FK array → cardTransactionLog
+  recordCreatedDateTime: Date;
+  recordUpdatedDateTime: Date;
+}
+```
+
+#### `MerchantAgreementControlRecord` update (SD-89 — `merchantAgreementProcedure`)
+
+> **Ch-06 update**: Added `merchantAgreementKybCheck` as a **BIAN BQ:Step** sub-document. This replaces the loose top-level review fields as the authoritative KYB record. Top-level fields (`merchantReviewNote`, `merchantReviewedByPartyReference`, `merchantReviewedDateTime`) are retained for backward compatibility. `schemaVersion` bumped to 2.
+
+Added to the existing merchant model:
+
+```typescript
+export interface MerchantApiKeyRecord {
+  keyId: string;           // UUID — used for revocation
+  keyPrefix: string;       // First 12 chars for display (e.g., "lbpk_live_ab")
+  keyHashBcrypt: string;   // bcrypt hash — NEVER store plaintext
+  keyStatus: 'active' | 'revoked';
+  keyCreatedDateTime: Date;
+  keyLastUsedDateTime?: Date;
+}
+
+// Added / corrected fields on MerchantAgreementControlRecord:
+merchantApiKeys: MerchantApiKeyRecord[];
+merchantWebhookSecret?: string;          // HMAC signing secret for webhook delivery
+
+// D-21 (BIAN audit 2026-06-10): Party owner link — canonical BIAN cross-domain reference.
+// Points to the partyInstanceReference (SD-13) of the individual or legal entity that owns
+// this merchant agreement. Enables the dual-role pattern: the same Party can hold both a
+// CustomerAgreement (SD-53) and a MerchantAgreement (SD-89).
+// Correct field is merchantOwnerPartyReference (NOT customerReference) because
+// 'customer' is a role-scoped concept (SD-53 contract), while 'Party' is the identity anchor.
+merchantOwnerPartyReference?: string;    // FK → party.partyInstanceReference (SD-13)
+
+// Ch-05: Review metadata (top-level) — kept for backward compat. Set by merchant_officer.
+merchantReviewNote?: string;                     // Officer's comment for audit trail
+merchantReviewedByPartyReference?: string;       // FK → party.partyInstanceReference (SD-13) of reviewing employee
+merchantReviewedDateTime?: Date;                 // When the review decision was made
+
+// Ch-06: BQ:Step — KYB business verification (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
+// Authoritative KYB record. Status vocabulary: initiated | verified | rejected | expired.
+// All fields use BIAN-canonical BQ naming prefix: merchantAgreementKybCheck*.
+merchantAgreementKybCheck?: MerchantAgreementKybCheck;
+
+// Ch-05: Full BIAN SD-89 Agreement lifecycle including KYB review states.
+// BIAN Action Terms: Initiate (customer) → Control (merchant_officer) → Update (amend) → Terminate (close)
+type MerchantAgreementStatus =
+  | 'initiated'      // Customer submits application (Initiate)
+  | 'under_review'   // merchant_officer performing KYB validation (BQ:Step KybCheck)
+  | 'agreed'         // KYB passed; T&C presented to applicant (Control: approve)
+  | 'active'         // Applicant accepted T&C; API key issued; can process payments
+  | 'amended'        // Terms updated by merchant_officer (Update)
+  | 'suspended'      // Temporarily blocked — fraud investigation or compliance hold
+  | 'rejected'       // KYB failed or compliance issue (Control: reject)
+  | 'closed';        // Agreement terminated (Terminate)
+
+// Ch-06: BQ:Step — KYB business verification types
+type KybCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
+
+interface MerchantAgreementKybCheck {
+  merchantAgreementKybCheckStatus: KybCheckStatus;
+  merchantAgreementKybCheckCompletedDate?: Date;
+  merchantAgreementKybCheckReference?: string;      // Trade register / AML screening reference
+  merchantAgreementKybCheckNotes?: string;
+  merchantAgreementKybCheckPerformedByPartyReference?: string;  // FK → party (reviewing officer)
+}
+```
+
+Key format: `lbpk_live_<32 hex chars>` — plaintext returned once on generation; only bcrypt hash persisted.
+
+---
+
+### 8.2 New Index Strategy
+
+```typescript
+// merchantAgreementProcedure
+{ merchantAgreementInstanceReference: 1 }  // unique
+{ merchantAgreementStatus: 1 }
+{ merchantCategoryCode: 1 }
+{ merchantOwnerPartyReference: 1 }         // Ch-05: dual-role lookup — find merchant by owner Party
+
+// checkoutSessionLog
+{ checkoutSessionInstanceReference: 1 }    // unique
+{ merchantAgreementInstanceReference: 1 }
+{ checkoutSessionMerchantReference: 1, merchantAgreementInstanceReference: 1 }
+{ checkoutSessionExpiresAt: 1 }             // TTL: expireAfterSeconds: 0
+
+// paymentLinkRecord
+{ paymentLinkInstanceReference: 1 }        // unique
+{ paymentLinkCode: 1 }                      // unique
+{ merchantAgreementInstanceReference: 1 }
+{ paymentLinkStatus: 1 }
+{ paymentLinkExpiresAt: 1 }                 // Sparse TTL: expireAfterSeconds: 0, sparse: true
+```
+
+---
+
+### 8.3 API Contracts
+
+All routes are under the `/api/v1` prefix.
+
+#### Redirect Checkout (Method A) — prefix `/checkout`
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| `POST` | `/checkout/sessions` | JWT | Create checkout session; returns `paymentPageUrl` |
+| `GET` | `/checkout/sessions/:id` | Public | Get session display data; used by hosted payment page |
+| `POST` | `/checkout/sessions/:id/pay` | Public | Process card payment; returns `redirectUrl` |
+| `DELETE` | `/checkout/sessions/:id` | JWT | Cancel session |
+
+**POST `/checkout/sessions` request:**
+```json
+{
+  "merchantAgreementInstanceReference": "uuid",
+  "amount": 99.00,
+  "currency": "USD",
+  "description": "Order #1234",
+  "returnUrl": "https://merchant.com/success",
+  "cancelUrl": "https://merchant.com/cancel",
+  "merchantReference": "ORDER-1234"
+}
+```
+
+**POST `/checkout/sessions` response (201):**
+```json
+{
+  "checkoutSessionInstanceReference": "uuid",
+  "paymentPageUrl": "http://localhost:3000/checkout/{id}",
+  "expiresAt": "2026-06-10T12:30:00Z"
+}
+```
+
+**POST `/checkout/sessions/:id/pay` request:**
+```json
+{
+  "cardToken": "pm_abc123...",
+  "cardholderName": "Jane Smith",
+  "cardExpiryMonth": "12",
+  "cardExpiryYear": "2027"
+}
+```
+
+**POST `/checkout/sessions/:id/pay` response (200):**
+```json
+{
+  "success": true,
+  "cardTransactionInstanceReference": "uuid",
+  "redirectUrl": "https://merchant.com/success?status=success&session={id}"
+}
+```
+
+Error codes: 404 not found, 409 already completed, 410 expired/cancelled.
+
+#### Payment Links (Method B) — prefix `/payment-links`
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| `POST` | `/payment-links` | JWT | Create shareable payment link |
+| `GET` | `/payment-links` | JWT | List links for a merchant |
+| `GET` | `/payment-links/:code` | Public | Resolve link by 8-char code |
+| `POST` | `/payment-links/:code/pay` | Public | Process card payment |
+| `PATCH` | `/payment-links/:id` | JWT | Deactivate link |
+
+**POST `/payment-links` request:**
+```json
+{
+  "merchantAgreementInstanceReference": "uuid",
+  "amount": 49.99,
+  "currency": "USD",
+  "description": "Consulting Session",
+  "customerMessage": "Thank you for booking!",
+  "usageType": "single_use"
+}
+```
+
+**POST `/payment-links` response (201):**
+```json
+{
+  "paymentLinkInstanceReference": "uuid",
+  "paymentLinkCode": "ab3x7yzm",
+  "paymentUrl": "http://localhost:3000/pay/ab3x7yzm"
+}
+```
+
+Error codes: 404 merchant not found, 410 link expired/deactivated/completed.
+
+#### Merchant Onboarding & Review — prefix `/merchants`
+
+| Method | Route | Auth | Roles | Description |
+|---|---|---|---|---|
+| `POST` | `/merchants` | JWT | `customer` | Submit new merchant application (BIAN Action: Initiate). Sets status `under_review`. Initialises `merchantAgreementKybCheck.status = 'initiated'`. |
+| `GET` | `/merchants/me` | JWT | `customer` | Return the merchant agreement owned by the caller's `partyRef`. Returns `{ found: false }` when none exists. Enables role-based state machine in frontend. |
+| `GET` | `/merchants/:id` | JWT | `customer`, `merchant_officer`, `security_auditor` | Retrieve merchant agreement details. Response includes `merchantAgreementKybCheck` sub-document. |
+| `GET` | `/merchants/:id/transactions` | JWT | owner (`partyRef` = `merchantOwnerPartyReference`), `merchant_officer`, `security_auditor` | Acquiring-side view (SD-89): payments the merchant **received**, newest first. Query: `page`, `limit`, `status`, `search` (case-insensitive on masked PAN / descriptor / merchant name). PCI DSS Req 3/7 — payer PII (account ref, email, raw gateway payload) is **never** returned; only masked PAN, amount, status, type, channel, descriptor, timestamp. Non-owner customers get 403. |
+| `GET` | `/merchants/:id/stats` | JWT | owner, `merchant_officer`, `security_auditor` | Acquiring analytics (BIAN Merchant Activity Analysis): MongoDB aggregation returning totals, average ticket, breakdown by status, by currency, and operations per month. Aggregates only — no payer PII. Powers the merchant Overview dashboard. |
+| `GET` | `/merchants/:id/events` | JWT | owner, `merchant_officer`, `security_auditor` | Merchant lifecycle **audit trail** (BIAN SD-89, PCI DSS Req 10): append-only `merchantAgreementEvents` log of `submitted` / `approved` / `rejected` / `updated` actions with actor and timestamp. Operational metadata only — no cardholder data. |
+| `GET` | `/merchants` | JWT | `merchant_officer`, `security_auditor` | List all merchant applications (officer review queue) |
+| `PATCH` | `/merchants/:id/review` | JWT | `merchant_officer`, `security_auditor` | Approve or reject application (BIAN Action: Control). Transitions status to `agreed` or `rejected`. Writes `merchantAgreementKybCheck` BQ:Step. |
+| `POST` | `/merchants/:id/keys` | JWT | `customer` | Generate new API key (plaintext returned once; `keyOrigin: 'generated'`) |
+| `POST` | `/merchants/:id/keys/import` | JWT | `customer` | Register an EXISTING key from the merchant's own system. Hashed server-side (bcrypt), plaintext never stored/returned; only the prefix is shown. `keyOrigin: 'imported'`. 400 if too short, 409 if already registered |
+| `PATCH` | `/merchants/:id/keys/:keyId` | JWT | `customer` | Rename (relabel) a key — `{ label }`; empty label clears it. Label is never a secret |
+| `DELETE` | `/merchants/:id/keys/:keyId` | JWT | `customer` | Revoke API key |
+
+`MerchantApiKeyRecord` adds `keyOrigin?: 'generated' | 'imported'` (display only; absent = generated). Both generate and import store only the bcrypt hash + display prefix (PCI DSS Req 3).
+
+**POST `/merchants` request (BIAN Action: Initiate):**
+```json
+{
+  "merchantName": "Espresso Works Ltd",
+  "merchantBusinessDescription": "Specialty coffee shop and online roastery",
+  "merchantCategoryCode": "5814",
+  "merchantLegalEntityType": "LLC",
+  "merchantTaxId": "12-3456789",
+  "merchantCountry": "US",
+  "merchantExpectedMonthlyVolume": 15000,
+  "merchantSettlementSchedule": "T+2",
+  "merchantOwnerPartyReference": "PTY-001"
+}
+```
+
+**POST `/merchants` response (201):**
+```json
+{
+  "merchantAgreementInstanceReference": "uuid",
+  "merchantAgreementStatus": "under_review",
+  "message": "Application submitted. A Merchant Acquiring officer will review within 2 business days."
+}
+```
+
+**PATCH `/merchants/:id/review` request (BIAN Action: Control):**
+```json
+{
+  "action": "approve",
+  "reviewNote": "KYB passed — business registered, tax ID verified, no adverse media"
+}
+```
+or
+```json
+{
+  "action": "reject",
+  "reviewNote": "KYB failed — tax ID not found in business registry"
+}
+```
+
+**PATCH `/merchants/:id/review` response (200):**
+```json
+{
+  "merchantAgreementInstanceReference": "uuid",
+  "merchantAgreementStatus": "agreed",
+  "merchantReviewedDateTime": "2026-06-10T14:30:00Z",
+  "merchantAgreementKybCheckStatus": "verified"
+}
+```
+
+Status transitions: `approve` → `agreed` (KYB `verified`); `reject` → `rejected` (KYB `rejected`). Emits webhook event `merchant.agreement.activated` on approve.
+
+Error codes: 404 merchant not found, 403 insufficient role, 400 invalid status transition.
+
+#### Merchant Key Management — prefix `/merchants`
+
+**POST `/merchants/:id/keys` response (201):**
+```json
+{
+  "keyId": "uuid",
+  "keyPrefix": "lbpk_live_ab",
+  "merchantApiKey": "lbpk_live_<32hex>"
+}
+```
+
+---
+
+### 8.4 Seed Data Schema (Ch-05)
+
+New seed files required for the merchant onboarding + debug mode features.
+
+#### `backend/data/parties.json` — Additional Party records
+
+| partyInstanceReference | partyName | partyType | Notes |
+|---|---|---|---|
+| `PTY-056` | `Rachel Torres` | `employee` | Merchant Acquiring officer — has `merchant_officer` auth role |
+| `PTY-057` | `David Chen` | `customer` | Customer 2 — no merchant, simple cardholder |
+| `PTY-058` | `Amara Okafor` | `customer` | Customer 3 — has a pending merchant application |
+| `PTY-059` | `Lena Fischer` | `customer` | Customer 4 — dual-role (customer + active merchant) |
+
+> Note: `partyType` must be one of the defined values: `'customer' | 'employee' | 'service_account'`. The value `'individual'` does not exist in the project model — it is a BIAN term, not a project-level enum value.
+
+#### `backend/data/customerAuthentications.json` — Additional auth records
+
+| login | role | linkedPartyRef | Notes |
+|---|---|---|---|
+| `officer@bank.demo` / `demo1234` | `merchant_officer` | `PTY-056` | Merchant Acquiring officer |
+| `customer2@demo.com` / `demo1234` | `customer` | `PTY-057` | Simple customer, no merchant |
+| `customer3@demo.com` / `demo1234` | `customer` | `PTY-058` | Customer with pending merchant app |
+| `customer4@demo.com` / `demo1234` | `customer` | `PTY-059` | Dual-role customer + merchant |
+
+#### `backend/data/merchants.json` — Demo merchant records (`schemaVersion: 2`)
+
+| merchantName | status | kybCheckStatus | owner | Purpose |
+|---|---|---|---|---|
+| `Espresso Works Ltd` | `active` | `verified` | `PTY-001` | Dual-role demo — main customer also owns an active merchant |
+| `Okafor Digital Services` | `under_review` | `initiated` | `PTY-058` | Pending approval — demonstrates review queue for `merchant_officer` |
+| `Fischer Web Studio` | `active` | `verified` | `PTY-059` | Active merchant — customer4 owns this |
+
+All merchant records include `merchantOwnerPartyReference`, `merchantCategoryCode`, `merchantLegalEntityReference`, `merchantSettlementSchedule`, and `merchantAgreementKybCheck` (Ch-06 BQ:Step).
+
+#### `backend/data/customerAgreements.json` — KYC seed distribution (`schemaVersion: 3`)
+
+| customerAgreementKycCheckStatus | Count | Notes |
+|---|---|---|
+| `verified` | 48 | Standard onboarded customers — KYC passed at enrollment |
+| `expired` | 1 | `b0000049` — KYC completed >12 months ago with no renewal |
+| `initiated` | 1 | `b0000050` — KYC in progress (onboarding not yet complete) |
+
+All 50 records include `customerAgreementKycCheck` with BIAN BQ:Step sub-document (Ch-06).
+
+---
+
+### 8.5 PCI DSS + Security Notes
+
+| Concern | Implementation |
+|---|---|
+| SAQ A scope | Card data entered only on `{PSP_URL_FRONTEND}/checkout/` and `{PSP_URL_FRONTEND}/pay/` — merchant domain never handles CHD |
+| Card tokenization | Frontend generates `pm_<random>` surrogate; raw PAN never sent to backend API |
+| API key storage | bcrypt hash only (`bcryptjs`, 10 rounds); plaintext returned once at generation, never stored |
+| Webhook integrity | `X-Webhook-Signature: sha256=<hmac>` signed with per-merchant secret; constant-time comparison |
+| Session TTL | MongoDB TTL index on `checkoutSessionExpiresAt` auto-deletes expired sessions after 30 min |
+| Payment link codes | 8-char charset `[a-z2-9]` excluding ambiguous characters (O/0, I/l); unique index enforced |
+
+---
+
+### 8.6 Debug Mode Architecture
+
+Debug Mode is a demo-only UX toggle that switches from the business narrative to a technical deep-dive view. It is protected by the environment variable `DEMO_DEBUG_ENABLED=true` (must be set; absent or `false` = hidden in production-like deployments).
+
+**Client-side state:** `DebugContext` React context provider wraps the application layout. State persisted to `localStorage` key `demo_debug_mode`.
+
+**Hook:** `useDebugMode(): { debugMode: boolean; toggleDebug: () => void; debugEnabled: boolean }`
+
+**Components introduced in Ch-05:**
+
+| Component | Purpose |
+|---|---|
+| `DebugBadge` | Chip showing BIAN Service Domain (e.g., `SD-89 · Merchant Relations`) and PCI DSS requirement |
+| `DebugInfo` | Expandable info panel on action buttons — shows BIAN Action Term, HTTP method, MongoDB op, PCI DSS control |
+| `DebugRawDoc` | Raw MongoDB document viewer — fetches from `/api/v1/system/raw/:collection/:id`; shows encrypted fields as Binary hex |
+| `DebugFieldLabel` | Field wrapper showing QE mode (`QE:equality`, `QE:none`, `unencrypted`) and PCI classification |
+
+**When debug mode is ON:**
+- Every entity card shows a `DebugBadge` with BIAN SD and collection name
+- Every encrypted field has a lock icon tooltip: `"QE:equality — BSON Binary subtype 6 · PCI DSS Req 3.5.1"`
+- Every action button has an `[ℹ]` icon expanding a `DebugInfo` panel
+- Key entity pages (merchant, transaction, case, checkout) show a `DebugRawDoc` panel with live ciphertext
+- Login screen shows all demo users as cards (role badge + click-to-fill)
+- Forms show "Load test data" dropdowns with 2–3 realistic presets
+
+**When debug mode is OFF:** Clean business UI with no technical annotations.
+
+---
+
+### 8.7 PSP_URL_FRONTEND Environment Variable
+
+The `PSP_URL_FRONTEND` env var is used to construct hosted page URLs:
+- `paymentPageUrl = ${PSP_URL_FRONTEND}/checkout/{sessionId}`
+- `paymentUrl = ${PSP_URL_FRONTEND}/pay/{linkCode}`
+
+Defaults to `http://localhost:8080` when not set.
+
+---
+
+## 9. Integration Hub (SD-193) — API Contracts & Implementation
+
+### 9.1 Integration Registry Routes (requires role: `system_admin`)
+
+```
+GET    /api/v1/integrations
+       → 200 { integrations: IntegrationSummary[] }
+
+POST   /api/v1/integrations
+       body: { name, type, endpoint?, authScheme?, apiKey?, callbackEnabled, triggerEvents[], mode, timeoutMs?, retryPolicy? }
+       → 201 { integration: ExternalProviderArrangement, apiKey?: string }   ← plaintext key ONCE
+
+GET    /api/v1/integrations/:id
+       → 200 { integration: ExternalProviderArrangement }                    ← no keyHash field
+
+PATCH  /api/v1/integrations/:id
+       body: { endpoint?, triggerEvents?, mode?, timeoutMs?, retryPolicy? }  ← no key update
+       → 200 { integration: ExternalProviderArrangement }
+
+POST   /api/v1/integrations/:id/rotate-key
+       → 200 { integration: ExternalProviderArrangement, apiKey: string }    ← new key ONCE
+
+POST   /api/v1/integrations/:id/test
+       → 200 { status: 'ok'|'error', latencyMs: number, response?: object }
+
+POST   /api/v1/integrations/:id/suspend
+       body: {}
+       → 200 { integration: ExternalProviderArrangement }  ← 400 if internal provider
+
+GET    /api/v1/integrations/:id/events?page=1&limit=20
+       → 200 { events: IntegrationEvent[], total: number, page: number }
+```
+
+**Role guard:** All routes require `X-Demo-Role: system_admin`. Returns 403 for any other role.
+
+**Key management rules:**
+- `externalProviderApiKeyHash` and `externalProviderCallbackSecretHash` are **never** returned in any API response.
+- `externalProviderApiKeyPrefix` (first 12 chars of the plaintext key) is always returned for UI identification.
+- Plaintext key is returned exactly once in the `apiKey` field of POST and POST /rotate-key responses.
+
+### 9.2 Inbound Callback Routes (no JWT — HMAC validated)
+
+All callbacks require `X-Webhook-Signature: sha256=<hmac-sha256-of-body>` header.
+
+```
+POST   /webhooks/fds/:arrangementId/callback
+       body: { fraudScore: number, recommendation: string, caseId?: string, metadata?: object }
+       → 200 { received: true }  |  401 (invalid signature)  |  404 (unknown arrangement)
+
+POST   /webhooks/aml/:arrangementId/callback
+       body: { alertType: string, severity: string, entities: string[], caseId?: string }
+       → 200 { received: true }
+
+POST   /webhooks/kyc/:arrangementId/callback
+       body: { status: 'verified'|'rejected'|'expired', agreementRef: string, reference?: string }
+       → 200 { received: true }
+
+POST   /webhooks/kyb/:arrangementId/callback
+       body: { status: 'verified'|'rejected'|'expired', merchantRef: string, reference?: string }
+       → 200 { received: true }
+
+POST   /webhooks/hrp/:arrangementId/callback
+       body: { hrpcMatch: boolean, flags: string[], accountRef: string }
+       → 200 { received: true }
+```
+
+### 9.3 Index Strategy
+
+See §5 above for the full `integrationRegistry` and `integrationEvents` index definitions.
+
+---
+
+## 10. Stored Payment Card Management (SD-88) — customer card-on-file
+
+Customer-managed card-on-file (view / add / remove). Aligns with BIAN SD-88 (Payment Card) and
+PCI DSS Req 3 (no PAN/CVV stored; only masked PAN + QE:none expiry + surrogate token), Req 7
+(least privilege / ownership), Req 10 (audit of lifecycle).
+
+### 10.1 API contracts (`/api/v1/customer/:customerId/cards`)
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| GET | `/api/v1/customer/:customerId/cards` | owner (customer) **or** L1/L2/auditor (read) | Lists non-revoked cards; masked PAN + network + status + surrogate token + alias + registration date. Sorted preferred-first. Expiry (QE:none) NOT returned. |
+| GET | `/api/v1/customer/:customerId/cards/:cardId` | **owner only** | Self-service detail: surrogate token, expiry (QE:none, **owner-visible**), lifecycle dates, status, mandate, alias/note. Emits `card.accessed`. |
+| POST | `/api/v1/customer/:customerId/cards` | owner only | Registers a card (token + expiry + masked PAN + network + optional alias). **No CVV accepted.** Emits `card.registered`. |
+| PATCH | `/api/v1/customer/:customerId/cards/:cardId` | owner only | Edits the **only** mutable attributes — `paymentCardAlias` (≤40) and `paymentCardCustomerNote` (≤280). Emits `card.updated`. |
+| PATCH | `/api/v1/customer/:customerId/cards/:cardId/status` | owner only | Deactivate/reactivate (`active`↔`suspended`). A suspended card stays on file but is declined by the PSP. Emits `card.deactivated`/`card.reactivated`. |
+| DELETE | `/api/v1/customer/:customerId/cards/:cardId` | owner only | Soft-delete: `paymentCardStatus='revoked'`, mandate `cancelled`; record retained. Emits `card.removed`. |
+
+### 10.1.1 Tokenization, activation control & auto-registration
+- **Registration (client-side tokenization).** `POST` never receives the PAN or CVV. The browser
+  (`frontend/src/lib/cardTokenize.ts`) validates the PAN (Luhn + network), expiry (future MM/YY) and
+  CVV (3, or 4 for AMEX), then derives the masked PAN + a surrogate token and sends only those. The
+  **CVV (SAD) is validated and discarded — never transmitted or stored** at any layer (PCI DSS Req 3.2).
+  UI: `/system/cards/new`.
+- **Deactivation = PSP-level decline.** A `suspended` card is retained (never physically deleted) but
+  the PSP **declines every authorization** with it regardless of the issuer's decision. Enforced at two
+  points via `getCardByToken`: the gateway authorizer (`authorizeCard`, BIAN SD-15 — response code
+  `0540`, provider `psp-policy`, *before* any issuer/provider call) and the app-mode transaction path
+  (`createTransaction` throws `CardNotActiveError` → HTTP 422). `revoked` (removed) cards are likewise
+  declined. New/unsaved tokens have no card-on-file and pass through. Only `active`↔`suspended` are
+  customer-toggleable; `expired`/issuer-`blocked`/`revoked` are not.
+- **Auto-registration on every payment (any source).** `createTransaction` is the single chokepoint
+  for all payment flows — app-mode, hosted checkout, payment links, the simulator, and any external
+  system integrating with the PSP. It **unconditionally** calls `upsertCardByToken` (idempotent) for
+  the resolved customer, so **using a card to pay IS the registration** — there is no "save card"
+  opt-in (the old `saveCard` flag is gone). Expiry/network are stored when the source reports them
+  (`paymentCardExpirationDate` + `paymentCardNetwork`, both optional); otherwise the card is still
+  registered (masked PAN + surrogate token) and the customer can complete the details later. Cards
+  with no resolvable owner (token-only, no customer) are not registered. The `/system/payment` picker
+  shows at most 4 active cards (default first, auto-selected) plus a search/autocomplete for the rest.
+- **Optional card fields.** `paymentCardNetwork` and `paymentCardExpirationDate` are optional on the
+  model and in `CreateCardInput` to support externally-originated registrations; the list/detail
+  responses omit them when absent and the UI shows a neutral fallback.
+
+- **Ownership** is enforced server-side: the caller's JWT `partyRef` must resolve to a
+  `customerAgreement` whose `customerAgreementInstanceReference` equals `:customerId`
+  (`getOwnAgreementId`). All read/detail/update/delete are additionally scoped by `customerRef` in
+  the query filter (defense in depth). The auth middleware carves the own-card path out of the
+  customer block (`CUSTOMER_OWN_CARD_PATH`, which also matches `/cards/:cardId`).
+- **Editable attributes:** only `paymentCardAlias` (nickname) and `paymentCardCustomerNote` are
+  customer-editable — non-CHD display metadata (BIAN SD-88 presentation attributes). The PAN, token,
+  expiry, network and status are immutable from the customer side. The alias/note MUST NOT contain a
+  PAN/CVV (free-text labels only).
+- **Surrogate token in the list:** `paymentCardReference` is returned in the list so the payment
+  flow can pay with a saved card and so investigators can correlate transactions. It is **not CHD**
+  under PCI DSS v4.0. The QE:none expiry stays out of the list (detail endpoint only).
+- **Payment integration:** `/system/payment` step 1 lists the customer's **active** saved cards;
+  selecting one reuses its surrogate token so the transaction references the real card-on-file.
+- **Auto-save:** every payment auto-registers the card-on-file in `createTransaction` (see §10.1.1);
+  there is no opt-in.
+- **Step-up MFA:** production re-auth/TOTP plugs in at POST/PATCH/DELETE; the demo gates DELETE with
+  an explicit client confirmation. CVV/PIN are never accepted or stored at any layer.
+
+### 10.2 Model additions (BIAN SD-88)
+`PaymentCardManagementControlRecord` (the **per-customer card-on-file arrangement**) adds optional
+`paymentCardAlias`, `paymentCardCustomerNote` (non-CHD, customer-editable), `recordUpdatedDateTime`,
+and makes `paymentCardNetwork` / `paymentCardExpirationDate` optional (external sources may omit them).
+
+### 10.2.1 Physical-card registry + deterministic token + shared-card signal (ADR-027)
+- **Deterministic token.** The browser derives the surrogate token as a keyed HMAC-SHA256 of the PAN
+  (`deriveCardToken`), so the same PAN → the same token. PCI: irreversible (keyed), not a bare hash.
+  Production tokenizes server-side / in a vault; the demo key is a `NEXT_PUBLIC` stand-in.
+  **Every payment surface uses it** — wallet add (`/system/cards/new`), wallet payment
+  (`/system/payment`), hosted checkout (`/gateway/checkout`), payment link (`/gateway/pay`) and the
+  simulator. This is what makes dedup work end-to-end: paying repeatedly with the same card (any
+  channel) always yields the same token, so the registry/arrangement never duplicates it. (Earlier,
+  these flows minted a *random* token per payment, which created a new card-on-file each time.)
+- **Two entities (no duplicated card).** `paymentCardManagement` = per-customer arrangement (unique
+  compound index `(customerAgreementInstanceReference, paymentCardReference)` — a customer can't hold a
+  card twice). **`paymentCardRegistry`** (new, plaintext, token unique) = the physical card, with
+  `cardHolderAgreementReferences[]` + `cardHolderCount`. The card is stored once; the registry counts
+  distinct holders. `syncCardRegistry` recomputes on register/auto-register/revoke; crossing
+  `SHARED_CARD_HOLDER_THRESHOLD` (3) emits `card.shared.threshold.exceeded`.
+- **Dedup.** POST → `registerCardForCustomer` (re-adding returns the existing arrangement with
+  `reused:true`; a removed card reactivates). Auto-register → `upsertCardByToken`, scoped by
+  `(customer, token)`.
+- **FDS/AML surfaces.** Customer card detail returns `cardHolderCount` (number only). Investigation
+  (L1/L2/auditor): `GET /api/v1/customer/card-registry/:token` → holders + count; transaction detail
+  shows a shared-card indicator. Auditor Data Integrity (`/api/v1/fraud/integrity` → `cards`):
+  duplicate arrangements, inconsistent tokenization (same masked card under multiple tokens), registry
+  drift.
+
+### 10.3 Audit
+Lifecycle actions emit a **compliance** event (`complianceProcessEvent`) with
+`processType: 'card_management'`, `entityType: 'card'`,
+`processAction: 'card.registered' | 'card.accessed' | 'card.updated' | 'card.deactivated' | 'card.reactivated' | 'card.removed'`,
+`performedByPartyReference`/`performedByRole` from the JWT. Visible in the unified audit
+(`/system/audit-events`). `eventSummary` carries masked PAN + network only (no CHD).
+
+### 10.4 Seed data
+`backend/data/paymentCards.json` provides 3–4 cards per real `customerAgreement` (generator:
+`backend/bin/seed-generate-cards.mjs`): valid future expiry (`MM/YY`), masked PAN, surrogate token,
+unique alias per customer, one preferred card each, with a few non-active (expired/blocked) for
+list-filter realism.
+
+### 10.5 Frontend
+- `/system/cards` — list with search (nickname / last-4), network + status filters, pagination
+  (`Pagination`), rows link to detail. Customer-only (own section, not part of the profile).
+- `/system/cards/[cardId]` — owner self-service detail: token, expiry, dates, status; inline edit
+  of alias/note; remove (soft-delete with confirm). Technical labels (QE/token) only in debug mode.
+
+*Added 2026-06-13; detail/edit/seed/payment-integration extension same day (doc + code together per repo rules).*
+
+---
+
+## 11. Event-Driven Architecture (dev.v8)
+
+**EventBus vendor** (`backend/src/vendors/eventbus`). One bus for all events behind the `EventBus` port (`publish`/`subscribe`); default adapter `EventBusInProcess` (Node `EventEmitter`). Swap to Kafka/RabbitMQ = change the adapter in `initEventBus` only. `DomainEvent` envelope: `eventId` (idempotency), `eventType` (dotted, module-prefixed), `occurredAt`, `correlationId` (the journey; = `cardTransactionInstanceReference` for a payment), `causationId`, `businessProcess`, `partitionKey`, `source`, `actor?`, `bian?`, `payload` (CHD stripped on publish), `schemaVersion`, `transient?` (delivered, not persisted).
+
+**Collection `domainEvent`** (regular, not time-series — carries a unique `eventId` index). Indexes: `{eventId} unique`, `{correlationId, occurredAt}`, `{businessProcess, occurredAt}`, `{eventType, occurredAt}`, `{partitionKey, occurredAt}`. Created in `createCollections`/`createIndexes`; validated in `validateSetup`. Every business/compliance/integration emit also mirrors here (correlated). Read the journey with `GET /api/v1/events/trail/:correlationId` (auditor/manager).
+
+**Async payment authorization.** `POST /api/v1/transactions` returns `202 { cardTransactionInstanceReference, cardTransactionStatus: 'pending' }`. The client subscribes to `GET /api/v1/transactions/:id/stream` (SSE, public by txn UUID, `skipAuth`, no PII/CHD, race-safe) for the terminal `authorized`/`declined`. Transient `cardVerification { cardNumber, cvv, expiry }` on create is forwarded to the issuer only and never stored or logged.
+- **Phase 1 gate** (parallel, out-of-band): `card-issuer` + `fds` + `hrp` (sanctions). Each publishes its `*.completed` verdict; `PaymentAuthorizationSaga` aggregates, any hard decline gives `payment.declined`, all approve gives `payment.authorized`.
+- **Phase 2** (post-auth, async): `PostAuthorizationProcess` runs AML monitoring and enriches the case from the correlated trail into a new schemaless field `fraudDiagnosisCase.subsystemSignals { issuer, fds, sanctions, aml }`.
+- `createTransaction` remains a synchronous wrapper (initiate + await terminal) so the gateway (checkout / payment-link) is unchanged. See ADR-032.
+
+*Added 2026-06-16 (dev.v8; doc + code together per repo rules).*
+
+---
+
+## v17 — Funds-Availability Gate, Currency Exchange & Balance Reconciliation
+
+Implements [engineering-proposal.md ADR-038](engineering-proposal.md). Money-movement cycle precision.
+
+**New bus events** (`shared/models/events/fundsCheck.events.ts`): `funds.check.requested` / `funds.check.completed` (BIAN SD-36). Payload of completed: `{ transactionId, outcome, responseCode?, decisionReason?, available?, held?, currency?, fundingPayoutAccountReference?, converted?, fxRate? }`.
+
+**Saga** (`paymentAuthorization.saga.ts`): `funds` added to `GATE_EVENT` + `DEFAULT_GATES` (now 4 parallel gates). `gatesExpected` type extended to include `'funds'`; `card.payment.authorization.requested` emits it. On decline, `releaseCardHold` compensates (idempotent, race-safe). `funds.check.requested` emitted from `emitGateRequests`.
+
+**Funds gate reactor** (`providers/groups/providerGroups.ts` → `onFunds`): resolves `cardToken → fundingPayoutAccount`; reads balance via `dispatchProvider('account_information', …)` (provider-indifferent); FX-converts via `resolveAndConvert`; atomic `holdCardFunds` ($gte-conditional). Only debit types (`purchase`/`cash_advance`/`fee`) with an internal funding account are gated; others pass through.
+
+**Balance ops** (`payoutAccountBalance.service.ts`): added `releaseCardHold` (pending → available). Existing `holdCardFunds`/`settleCardDebit` unchanged.
+
+**Response codes** (`shared/models/responseCodes.ts`): `RESPONSE_CODE_APPROVED='00'`, `RESPONSE_CODE_DECLINED='05'`, `RESPONSE_CODE_INSUFFICIENT_FUNDS='51'`, `DECISION_REASON_INSUFFICIENT_FUNDS`, `DECISION_REASON_ACCOUNT_NOT_FOUND`. Insufficient funds → `cardTransactionStatus='declined'` + `'51'` (no new status; BIAN uses the reason code).
+
+**Currency Exchange** (`providers/currency-exchange/services/currencyExchange.service.ts`, capability `currency_exchange` added to `IntegrationProviderType` + `bianMetaFor`): `convert(amount, from, to, config)` mid cross-rate + spread; `resolveAndConvert(db, …)` reads `capabilityModuleConfiguration('currency-exchange')`. Used at card hold/settle, merchant debit/credit, P2P credit, refund.
+
+**Post-auth** (`postAuthorization.process.ts`): debit hold removed (now in the gate — no double-hold); only refund `creditDirect` remains (FX-aware).
+
+**Seeders**: all currencies normalized to EUR (`payoutAccounts.json`, `cardTransactions.json`, `merchants.json`, `fraudCases.json`, `seed-generate.ts`); `pending/reserved` zeroed; `seedBalanceCredits` opening deposit == total balance (reconciled start).
+
+*Added 2026-07-03 (v17; doc + code together per repo rules).*
+
+## v17.1 — Bank Transfers (ACH / SEPA / SWIFT)
+
+**Rail engine** (`backend/src/shared/services/bankTransfer/`): `RailResolver.resolve(destination, override?)`
++ `.validate(rail, destination)`, `FeeCalculator`, pure validators `isValidIban` (ISO 13616 mod-97),
+`isValidBic` (ISO 9362), `isValidRoutingNumber` (NACHA ABA checksum). Standard return-code maps:
+`ACH_RETURN_CODES`, `SEPA_REJECT_CODES`, `SWIFT_ERROR_CODES`.
+
+**Types:** `PayoutRail` and `PaymentInitiationOutbound.railType` extended with `'swift'` (unions kept in
+sync). `InitiateTransferInput` accepts optional `rail`, `destination`, `recurring`.
+
+**API:**
+- `POST /api/v1/gateway/transfers/preview` — derive rail, validate coordinates, quote fee (stateless).
+- `POST /api/v1/gateway/transfers/bank` — execute a transfer to an external account; validates via the
+  rail engine, persists an SD-65 `PaymentExecutionProcedure` (routing -> in_flight), and dispatches to
+  the `payment_initiation` provider. Returns `202` (submitted) or `422` (exception/failed).
+
+**Compliance:** bank coordinates never travel on the bus (wire adapter resolves them); every transfer
+emits business + compliance events correlated by the execution reference (PCI DSS Req 10).
+
+*Added 2026-07-04 (v17.1; doc + code together per repo rules).*
+
+### v17.1 — Bank transfer config (G7)
+
+Env vars (config.payout): `PAYOUT_SANDBOX` (default true; transfers simulated end to end),
+`PAYOUT_FEE_SEPA` (0), `PAYOUT_FEE_ACH` (0.25), `PAYOUT_FEE_SWIFT` (15), `PAYOUT_FEE_LOCAL_BANK` (0),
+`PAYOUT_FEE_SWIFT_CORRESPONDENT` (10). The fee schedule is the single source consumed by
+`FeeCalculator` (preview and execution quote the same fee). Rail failure simulation reuses
+`PAYMENT_INITIATION_ALWAYS_SUCCEED`.
+
+*Added 2026-07-04 (v17.1/G7).*
+
+### v17.1 — Recurring mandates (ACH SDD / SEPA SDD)
+
+Collection `recurringMandateProcedure` (SD-66). Endpoints:
+- `POST /api/v1/gateway/transfers/mandates` — create a mandate (scheme, amount, currency, destination, frequency, optional maxRuns). Destination validated by the rail engine.
+- `GET /api/v1/gateway/transfers/mandates` — list the caller's mandates.
+- `DELETE /api/v1/gateway/transfers/mandates/:ref` — cancel a mandate.
+- `POST /api/v1/gateway/transfers/mandates/run-due` — scheduler hook: runs all mandates with nextRunAt <= now, each via executeBankTransfer (rail engine + provider dispatch + risk gate), advancing nextRunAt (UTC) and completing at maxRuns.
+
+*Added 2026-07-04 (v17.1).*

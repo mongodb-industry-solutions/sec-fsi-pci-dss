@@ -1,52 +1,78 @@
 /**
  * Unit tests: auth.service (FR-v1-05)
- * Source: backend/src/services/auth.service.ts
+ * Source: backend/src/modules/identity/services/auth.service.ts
  */
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
-import { loginUser, getDemoUsers } from '../../../../backend/src/services/auth.service';
+
+// ESM namespaces are not spy-able, so mock fs and drive readFileSync through this stub.
+const h = vi.hoisted(() => ({ readFileSync: vi.fn() }));
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return { ...actual, readFileSync: h.readFileSync };
+});
+
+import { loginUser, getDemoUsers } from '../../../../backend/src/modules/identity/services/auth.service';
 
 function makeDb(user: Record<string, unknown> | null) {
   const findOneMock = vi.fn().mockResolvedValue(user);
-  const toArrayMock = vi.fn().mockResolvedValue(user ? [user] : []);
   return {
     collection: vi.fn().mockReturnValue({
       findOne: findOneMock,
-      find: vi.fn().mockReturnValue({ toArray: toArrayMock }),
     }),
   } as any;
 }
 
+// getDemoUsers is DB-backed (not file-based): it queries customerAuthentication with a status/
+// featured/role filter, then merchantAgreement for owners. This mock applies the status+featured
+// filter to a seed and returns no merchants (the `merchantOwnerPartyReference` query → []).
+function makeDemoDb(records: Record<string, unknown>[]) {
+  return {
+    collection: vi.fn(() => ({
+      find: vi.fn((query: Record<string, unknown> = {}) => ({
+        toArray: vi.fn().mockResolvedValue(
+          'merchantOwnerPartyReference' in query
+            ? []
+            : records.filter((r) =>
+                (!query.customerAuthenticationAccountStatus || r.customerAuthenticationAccountStatus === query.customerAuthenticationAccountStatus) &&
+                (query.customerAuthenticationDemoFeatured === undefined || r.customerAuthenticationDemoFeatured === query.customerAuthenticationDemoFeatured),
+              ),
+        ),
+      })),
+    })),
+  } as any;
+}
+
 beforeAll(() => {
-  process.env.JWT_SECRET = 'test-secret-key';
-  process.env.JWT_EXPIRES_IN = '1h';
+  process.env.PSP_JWT_SECRET = 'test-secret-key';
+  process.env.PSP_JWT_EXPIRES_IN = '1h';
 });
 
 describe('loginUser', () => {
   const validUser = {
-    partyAuthenticationInstanceReference: 'usr-001',
-    partyAuthenticationUserEmailAddress: 'sarah.chen@leafybank.demo',
-    partyAuthenticationCredentialHash: bcrypt.hashSync('demo-password', 4),
-    partyAuthenticationUserRole: 'level1_analyst',
-    partyAuthenticationUserName: 'Sarah Chen',
-    partyAuthenticationLoginDomain: 'local',
+    customerAuthenticationInstanceReference: 'usr-001',
+    customerAuthenticationEmailAddress: 'sarah.chen@back.es',
+    customerAuthenticationCredentialHash: bcrypt.hashSync('demo-password', 4),
+    customerAuthenticationUserRole: 'level1_analyst',
+    customerAuthenticationUserName: 'Sarah Chen',
+    customerAuthenticationLoginDomain: 'local',
   };
 
   it('returns a signed JWT for valid credentials', async () => {
     const db = makeDb(validUser);
-    const { token, user } = await loginUser(db, 'sarah.chen@leafybank.demo', 'demo-password', 'local');
+    const { token, user } = await loginUser(db, 'sarah.chen@back.es', 'demo-password', 'local');
     expect(typeof token).toBe('string');
-    expect(user.email).toBe('sarah.chen@leafybank.demo');
+    expect(user.email).toBe('sarah.chen@back.es');
     expect(user.role).toBe('level1_analyst');
   });
 
   it('JWT payload contains sub, email, role, name, domain', async () => {
     const db = makeDb(validUser);
-    const { token } = await loginUser(db, 'sarah.chen@leafybank.demo', 'demo-password', 'local');
+    const { token } = await loginUser(db, 'sarah.chen@back.es', 'demo-password', 'local');
     const decoded = jwt.verify(token, 'test-secret-key') as Record<string, unknown>;
     expect(decoded.sub).toBe('usr-001');
-    expect(decoded.email).toBe('sarah.chen@leafybank.demo');
+    expect(decoded.email).toBe('sarah.chen@back.es');
     expect(decoded.role).toBe('level1_analyst');
     expect(decoded.name).toBe('Sarah Chen');
     expect(decoded.domain).toBe('local');
@@ -54,42 +80,76 @@ describe('loginUser', () => {
 
   it('throws 401 when user is not found', async () => {
     const db = makeDb(null);
-    await expect(loginUser(db, 'unknown@leafybank.demo', 'demo-password', 'local'))
+    await expect(loginUser(db, 'unknown@back.es', 'demo-password', 'local'))
       .rejects.toMatchObject({ message: 'Invalid credentials', statusCode: 401 });
   });
 
   it('throws 401 for wrong password', async () => {
     const db = makeDb(validUser);
-    await expect(loginUser(db, 'sarah.chen@leafybank.demo', 'wrong-pass', 'local'))
+    await expect(loginUser(db, 'sarah.chen@back.es', 'wrong-pass', 'local'))
       .rejects.toMatchObject({ message: 'Invalid credentials', statusCode: 401 });
   });
 
-  it('response user object contains no password hash', async () => {
+  it('throws 401 when the login domain does not match', async () => {
     const db = makeDb(validUser);
-    const { user } = await loginUser(db, 'sarah.chen@leafybank.demo', 'demo-password', 'local');
-    expect((user as Record<string, unknown>).partyAuthenticationCredentialHash).toBeUndefined();
+    await expect(loginUser(db, 'sarah.chen@back.es', 'demo-password', 'corporate'))
+      .rejects.toMatchObject({ message: 'Invalid credentials', statusCode: 401 });
+  });
+
+  it('response user object contains no credential hash', async () => {
+    const db = makeDb(validUser);
+    const { user } = await loginUser(db, 'sarah.chen@back.es', 'demo-password', 'local');
+    expect((user as Record<string, unknown>).customerAuthenticationCredentialHash).toBeUndefined();
   });
 });
 
 describe('getDemoUsers', () => {
-  it('returns name, email, role — no password hash', async () => {
-    const raw = {
-      partyAuthenticationUserName: 'Sarah Chen',
-      partyAuthenticationUserEmailAddress: 'sarah.chen@leafybank.demo',
-      partyAuthenticationUserRole: 'level1_analyst',
-      partyAuthenticationCredentialHash: 'bcrypt-hash-must-not-leak',
-    };
-    const db = {
-      collection: vi.fn().mockReturnValue({
-        find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([raw]) }),
-      }),
-    } as any;
+  // getDemoUsers reads plaintext name/email/role from the seed file (passwords stay
+  // bcrypt-hashed and are never returned). Stub fs so the test is deterministic.
+  const seed = [
+    {
+      customerAuthenticationUserName: 'Sarah Chen',
+      customerAuthenticationEmailAddress: 'sarah.chen@back.es',
+      customerAuthenticationUserRole: 'level1_analyst',
+      customerAuthenticationCredentialHash: 'bcrypt-hash-must-not-leak',
+      customerAuthenticationAccountStatus: 'active',
+      customerAuthenticationDemoFeatured: true,
+    },
+    {
+      customerAuthenticationUserName: 'Ad Hoc Tester',
+      customerAuthenticationEmailAddress: 'tester@back.es',
+      customerAuthenticationUserRole: 'level2_investigator',
+      customerAuthenticationCredentialHash: 'bcrypt-hash-must-not-leak',
+      customerAuthenticationAccountStatus: 'active',
+      customerAuthenticationDemoFeatured: false,
+    },
+    {
+      customerAuthenticationUserName: 'Disabled User',
+      customerAuthenticationEmailAddress: 'disabled@back.es',
+      customerAuthenticationUserRole: 'customer',
+      customerAuthenticationCredentialHash: 'bcrypt-hash-must-not-leak',
+      customerAuthenticationAccountStatus: 'disabled',
+      customerAuthenticationDemoFeatured: true,
+    },
+  ];
 
-    const users = await getDemoUsers(db);
+  afterEach(() => {
+    h.readFileSync.mockReset();
+  });
+
+  it('returns only active users, projected to name/email/role - no hash', async () => {
+    const users = await getDemoUsers(makeDemoDb(seed));
+    expect(users).toHaveLength(2); // disabled user excluded
+    const sarah = users.find((u) => u.email === 'sarah.chen@back.es')!;
+    expect(sarah.name).toBe('Sarah Chen');
+    expect(sarah.role).toBe('level1_analyst');
+    expect((sarah as Record<string, unknown>).customerAuthenticationCredentialHash).toBeUndefined();
+  });
+
+  it('featured=true returns only the curated featured roster', async () => {
+    const users = await getDemoUsers(makeDemoDb(seed), { featured: true });
     expect(users).toHaveLength(1);
-    expect(users[0].email).toBe('sarah.chen@leafybank.demo');
-    expect(users[0].name).toBe('Sarah Chen');
-    expect(users[0].role).toBe('level1_analyst');
-    expect((users[0] as Record<string, unknown>).partyAuthenticationCredentialHash).toBeUndefined();
+    expect(users[0].email).toBe('sarah.chen@back.es');
+    expect(users[0].featured).toBe(true);
   });
 });

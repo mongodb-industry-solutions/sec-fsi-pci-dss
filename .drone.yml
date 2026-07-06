@@ -1,0 +1,177 @@
+---
+kind: pipeline
+type: kubernetes
+name: staging
+
+trigger:
+  branch:
+    - staging
+  event:
+    - push
+
+steps:
+  - name: publish-backend
+    image: plugins/kaniko-ecr
+    settings:
+      create_repository: true
+      registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
+      repo: industrysolutions/sec-fsi-pci-dss-backend
+      dockerfile: backend/Dockerfile
+      context: .
+      tags:
+        - git-${DRONE_COMMIT_SHA:0:7}
+        - latest
+      access_key:
+        from_secret: ecr_access_key
+      secret_key:
+        from_secret: ecr_secret_key
+
+  - name: publish-frontend
+    image: plugins/kaniko-ecr
+    settings:
+      create_repository: true
+      registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
+      repo: industrysolutions/sec-fsi-pci-dss-frontend
+      dockerfile: frontend/Dockerfile
+      context: frontend/
+      tags:
+        - git-${DRONE_COMMIT_SHA:0:7}
+        - latest
+      build_args:
+        - NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC=https://sec-fsi-pci-dss-backend.industrysolutions.staging.corp.mongodb.com
+        - NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=http://sec-fsi-pci-dss-backend-web-app:80
+      access_key:
+        from_secret: ecr_access_key
+      secret_key:
+        from_secret: ecr_secret_key
+
+  - name: deploy-backend-staging
+    image: public.ecr.aws/kanopy/drone-helm:v3
+    settings:
+      chart: mongodb/web-app
+      chart_version: 4.25.0
+      add_repos:
+        - mongodb=https://10gen.github.io/helm-charts
+      namespace: industrysolutions
+      release: sec-fsi-pci-dss-backend
+      values:
+        - image.tag=git-${DRONE_COMMIT_SHA:0:7}
+        - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-backend
+        - ingress.enabled=true
+        - ingress.hosts[0]=sec-fsi-pci-dss-backend.industrysolutions.staging.corp.mongodb.com
+        - mesh.enabled=true
+      api_server: https://api.staging.corp.mongodb.com
+      kubernetes_token:
+        from_secret: staging_kubernetes_token
+      values_files:
+        - environments/staging.yaml
+
+  - name: deploy-frontend-staging
+    image: public.ecr.aws/kanopy/drone-helm:v3
+    settings:
+      chart: mongodb/web-app
+      chart_version: 4.25.0
+      add_repos:
+        - mongodb=https://10gen.github.io/helm-charts
+      namespace: industrysolutions
+      release: sec-fsi-pci-dss-frontend
+      values:
+        - image.tag=git-${DRONE_COMMIT_SHA:0:7}
+        - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-frontend
+        - ingress.enabled=true
+        - ingress.hosts[0]=sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com
+        - mesh.enabled=true
+      api_server: https://api.staging.corp.mongodb.com
+      kubernetes_token:
+        from_secret: staging_kubernetes_token
+      values_files:
+        - environments/staging.yaml
+
+---
+kind: pipeline
+type: kubernetes
+name: production
+
+trigger:
+  branch:
+    - main
+  event:
+    - push
+
+steps:
+  - name: publish-backend
+    image: plugins/kaniko-ecr
+    settings:
+      create_repository: true
+      registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
+      repo: industrysolutions/sec-fsi-pci-dss-backend
+      dockerfile: backend/Dockerfile
+      context: .
+      tags:
+        - git-${DRONE_COMMIT_SHA:0:7}
+        - latest
+      access_key:
+        from_secret: ecr_access_key
+      secret_key:
+        from_secret: ecr_secret_key
+
+  - name: publish-frontend
+    image: plugins/kaniko-ecr
+    settings:
+      create_repository: true
+      registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
+      repo: industrysolutions/sec-fsi-pci-dss-frontend
+      dockerfile: frontend/Dockerfile
+      context: frontend/
+      tags:
+        - git-${DRONE_COMMIT_SHA:0:7}
+        - latest
+      build_args:
+        - NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC=https://sec-fsi-pci-dss-backend.industrysolutions.prod.corp.mongodb.com
+        - NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=http://sec-fsi-pci-dss-backend-web-app:80
+      access_key:
+        from_secret: ecr_access_key
+      secret_key:
+        from_secret: ecr_secret_key
+
+  - name: deploy-backend-production
+    image: public.ecr.aws/kanopy/drone-helm:v3
+    settings:
+      chart: mongodb/web-app
+      chart_version: 4.25.0
+      add_repos:
+        - mongodb=https://10gen.github.io/helm-charts
+      namespace: industrysolutions
+      release: sec-fsi-pci-dss-backend
+      values:
+        - image.tag=git-${DRONE_COMMIT_SHA:0:7}
+        - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-backend
+        - ingress.enabled=true
+        - ingress.hosts[0]=sec-fsi-pci-dss-backend.industrysolutions.prod.corp.mongodb.com
+        - mesh.enabled=true
+      api_server: https://api.prod.corp.mongodb.com
+      kubernetes_token:
+        from_secret: prod_kubernetes_token
+      values_files:
+        - environments/production.yaml
+
+  - name: deploy-frontend-production
+    image: public.ecr.aws/kanopy/drone-helm:v3
+    settings:
+      chart: mongodb/web-app
+      chart_version: 4.25.0
+      add_repos:
+        - mongodb=https://10gen.github.io/helm-charts
+      namespace: industrysolutions
+      release: sec-fsi-pci-dss-frontend
+      values:
+        - image.tag=git-${DRONE_COMMIT_SHA:0:7}
+        - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-frontend
+        - ingress.enabled=true
+        - ingress.hosts[0]=sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com
+        - mesh.enabled=true
+      api_server: https://api.prod.corp.mongodb.com
+      kubernetes_token:
+        from_secret: prod_kubernetes_token
+      values_files:
+        - environments/production.yaml

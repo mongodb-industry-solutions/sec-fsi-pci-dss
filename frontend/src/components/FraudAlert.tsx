@@ -7,11 +7,12 @@ interface Props {
   severity: string;
   caseRef: string;
   investigationPath: string;
+  noAutoRedirect?: boolean;
 }
 
-export function FraudAlert({ caseId, severity, caseRef, investigationPath }: Props) {
-  const [countdown, setCountdown] = useState(3);
-  const [stopped, setStopped] = useState(false);
+export function FraudAlert({ caseId, severity, caseRef, investigationPath, noAutoRedirect }: Props) {
+  const [countdown, setCountdown] = useState(noAutoRedirect ? -1 : 15);
+  const [stopped, setStopped] = useState(noAutoRedirect ?? false);
   const router = useRouter();
 
   useEffect(() => {

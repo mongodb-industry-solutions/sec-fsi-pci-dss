@@ -1,0 +1,626 @@
+[
+  {
+    "fraudDiagnosisInstanceReference": "c08292cf-39f4-4ac9-8d89-7784dfcd68d9",
+    "fraudDiagnosisCaseReference": "FD-2026-000001",
+    "cardTransactionInstanceReference": "4dd6a964-deac-4975-96aa-b9c630f4f517",
+    "customerAgreementInstanceReference": "78d58c43-f9dc-426f-b7d8-eb2f3487f541",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 452.18,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Treutel - Altenwerth",
+      "cardTransactionDateTime": "2026-05-21T00:50:09.504Z",
+      "cardTransactionStatus": "authorized",
+      "cardTransactionMaskedPanDisplay": "****-****-****-4153"
+    },
+    "fraudDiagnosisCaseStatus": "open",
+    "fraudDiagnosisCaseSeverity": "medium",
+    "fraudDiagnosisRequestDateTime": "2026-05-21T00:50:09.504Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "high_risk_mcc"
+      ],
+      "fraudDiagnosisScore": 76,
+      "fraudDiagnosisConclusion": "Suspicious activity detected"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-21T00:50:09.504Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "b361e999-37aa-4290-9980-164d8b288657",
+    "fraudDiagnosisCaseReference": "FD-2026-000002",
+    "cardTransactionInstanceReference": "36d59340-be0a-4e08-b056-ed51f3a1473b",
+    "customerAgreementInstanceReference": "d4d288de-8a3f-40c9-a0ec-e7e3f857dffa",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 417.09,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Brakus - Fahey",
+      "cardTransactionDateTime": "2026-05-20T08:54:01.228Z",
+      "cardTransactionStatus": "settled",
+      "cardTransactionMaskedPanDisplay": "****-****-****-4243"
+    },
+    "fraudDiagnosisCaseStatus": "open",
+    "fraudDiagnosisCaseSeverity": "medium",
+    "fraudDiagnosisRequestDateTime": "2026-05-20T08:54:01.228Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "high_risk_mcc"
+      ],
+      "fraudDiagnosisScore": 82,
+      "fraudDiagnosisConclusion": "Suspicious activity detected"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-20T08:54:01.228Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "1d5ca4b5-8038-4b98-a002-dd4efc1a0040",
+    "fraudDiagnosisCaseReference": "FD-2026-000003",
+    "cardTransactionInstanceReference": "0f86bccf-f74b-4402-84e5-0c324f1eea5e",
+    "customerAgreementInstanceReference": "b57261f4-e956-4026-82f9-b2e9d47c93e3",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 194.69,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Keeling LLC",
+      "cardTransactionDateTime": "2026-05-20T03:29:35.900Z",
+      "cardTransactionStatus": "disputed",
+      "cardTransactionMaskedPanDisplay": "****-****-****-9928"
+    },
+    "fraudDiagnosisCaseStatus": "open",
+    "fraudDiagnosisCaseSeverity": "low",
+    "fraudDiagnosisRequestDateTime": "2026-05-20T03:29:35.900Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "high_risk_mcc"
+      ],
+      "fraudDiagnosisScore": 89,
+      "fraudDiagnosisConclusion": "Suspicious activity detected"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-20T03:29:35.900Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "c460f542-bd31-491d-97d1-8173b7e43eb3",
+    "fraudDiagnosisCaseReference": "FD-2026-000004",
+    "cardTransactionInstanceReference": "f29b4bc3-a63c-428c-a8bf-7b79b54cdee6",
+    "customerAgreementInstanceReference": "ef94403e-3530-4c08-959b-bd85cafa5ffc",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 135.86,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Dach and Sons",
+      "cardTransactionDateTime": "2026-05-11T14:54:38.361Z",
+      "cardTransactionStatus": "authorized",
+      "cardTransactionMaskedPanDisplay": "****-****-****-1623"
+    },
+    "fraudDiagnosisCaseStatus": "open",
+    "fraudDiagnosisCaseSeverity": "low",
+    "fraudDiagnosisRequestDateTime": "2026-05-11T14:54:38.361Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "manual_review"
+      ],
+      "fraudDiagnosisScore": 64,
+      "fraudDiagnosisConclusion": "Routine review"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-11T14:54:38.361Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "5b3b7a60-fa68-4255-9073-c8e570e621f0",
+    "fraudDiagnosisCaseReference": "FD-2026-000005",
+    "cardTransactionInstanceReference": "b7296269-6140-4874-9728-f867086a715b",
+    "customerAgreementInstanceReference": "33a46103-01bd-4509-b1d9-e52b802beb40",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 957.39,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Huel, Rutherford and DuBuque",
+      "cardTransactionDateTime": "2026-05-06T20:01:09.846Z",
+      "cardTransactionStatus": "settled",
+      "cardTransactionMaskedPanDisplay": "****-****-****-7205"
+    },
+    "fraudDiagnosisCaseStatus": "open",
+    "fraudDiagnosisCaseSeverity": "high",
+    "fraudDiagnosisRequestDateTime": "2026-05-06T20:01:09.846Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "amount_threshold"
+      ],
+      "fraudDiagnosisScore": 89,
+      "fraudDiagnosisConclusion": "Suspicious activity detected"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-06T20:01:09.846Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "ca1afa2e-0ad3-4f05-b5f0-b74b2ba35c93",
+    "fraudDiagnosisCaseReference": "FD-2026-000006",
+    "cardTransactionInstanceReference": "d27562b0-81ca-4d18-b8ee-1aaa96fbca32",
+    "customerAgreementInstanceReference": "499f8479-43ac-4ba3-adde-3cb64b96a94a",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 425.26,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Dach Group",
+      "cardTransactionDateTime": "2026-04-30T07:47:39.023Z",
+      "cardTransactionStatus": "disputed",
+      "cardTransactionMaskedPanDisplay": "****-****-****-4124"
+    },
+    "fraudDiagnosisCaseStatus": "under_review",
+    "fraudDiagnosisCaseSeverity": "medium",
+    "fraudDiagnosisRequestDateTime": "2026-04-30T07:47:39.023Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "manual_review"
+      ],
+      "fraudDiagnosisScore": 37,
+      "fraudDiagnosisConclusion": "Routine review"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-04-30T07:47:39.023Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "bc08415b-67e1-48aa-aabb-8bc1c07e2172",
+    "fraudDiagnosisCaseReference": "FD-2026-000007",
+    "cardTransactionInstanceReference": "a6ef41a1-c719-40ee-a174-025b531428e0",
+    "customerAgreementInstanceReference": "73b6880a-0f6a-4607-a3da-5fe701e1817c",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 1401.59,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Cruickshank - Predovic",
+      "cardTransactionDateTime": "2026-05-20T13:47:24.181Z",
+      "cardTransactionStatus": "authorized",
+      "cardTransactionMaskedPanDisplay": "****-****-****-8516"
+    },
+    "fraudDiagnosisCaseStatus": "under_review",
+    "fraudDiagnosisCaseSeverity": "critical",
+    "fraudDiagnosisRequestDateTime": "2026-05-20T13:47:24.181Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "amount_threshold"
+      ],
+      "fraudDiagnosisScore": 64,
+      "fraudDiagnosisConclusion": "Suspicious activity detected"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-20T13:47:24.181Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "3a9ff6e2-d2ad-491e-a83d-39fcb9422f9c",
+    "fraudDiagnosisCaseReference": "FD-2026-000008",
+    "cardTransactionInstanceReference": "f41000c3-7a65-4762-89fa-347fc5287a22",
+    "customerAgreementInstanceReference": "6c18ffbe-6283-4fd0-b197-9d7af4e7815a",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 897.77,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "McKenzie and Sons",
+      "cardTransactionDateTime": "2026-05-16T08:59:03.499Z",
+      "cardTransactionStatus": "settled",
+      "cardTransactionMaskedPanDisplay": "****-****-****-8118"
+    },
+    "fraudDiagnosisCaseStatus": "under_review",
+    "fraudDiagnosisCaseSeverity": "high",
+    "fraudDiagnosisRequestDateTime": "2026-05-16T08:59:03.499Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "amount_threshold"
+      ],
+      "fraudDiagnosisScore": 55,
+      "fraudDiagnosisConclusion": "Suspicious activity detected"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-16T08:59:03.499Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "d05683c0-7d04-4f36-b35b-f9511f1bf931",
+    "fraudDiagnosisCaseReference": "FD-2026-000009",
+    "cardTransactionInstanceReference": "708df675-3bfb-425a-8fc5-66a1c4710c5b",
+    "customerAgreementInstanceReference": "189d5b8f-3cdf-4ce3-9a43-006066fe0d4c",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 510.88,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Beier - Stokes",
+      "cardTransactionDateTime": "2026-05-19T09:43:29.736Z",
+      "cardTransactionStatus": "disputed",
+      "cardTransactionMaskedPanDisplay": "****-****-****-2204"
+    },
+    "fraudDiagnosisCaseStatus": "under_review",
+    "fraudDiagnosisCaseSeverity": "high",
+    "fraudDiagnosisRequestDateTime": "2026-05-19T09:43:29.736Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "amount_threshold",
+        "high_risk_mcc"
+      ],
+      "fraudDiagnosisScore": 86,
+      "fraudDiagnosisConclusion": "Suspicious activity detected"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-19T09:43:29.736Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "25eae091-2d90-41a6-b25f-590026320834",
+    "fraudDiagnosisCaseReference": "FD-2026-000010",
+    "cardTransactionInstanceReference": "f611c4c8-3faa-4477-95b6-f6ce284c0b58",
+    "customerAgreementInstanceReference": "616f62e9-1f61-4b68-a4ae-21f9b90c7ff5",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 1501.45,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Kreiger LLC",
+      "cardTransactionDateTime": "2026-05-12T11:06:38.684Z",
+      "cardTransactionStatus": "authorized",
+      "cardTransactionMaskedPanDisplay": "****-****-****-1209"
+    },
+    "fraudDiagnosisCaseStatus": "under_review",
+    "fraudDiagnosisCaseSeverity": "critical",
+    "fraudDiagnosisRequestDateTime": "2026-05-12T11:06:38.684Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "amount_threshold",
+        "high_risk_mcc"
+      ],
+      "fraudDiagnosisScore": 74,
+      "fraudDiagnosisConclusion": "Suspicious activity detected"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-12T11:06:38.684Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "52765a01-a4e9-4bed-80a3-8e80c3a7d2a2",
+    "fraudDiagnosisCaseReference": "FD-2026-000011",
+    "cardTransactionInstanceReference": "3f5d36b5-563c-465f-9fdb-0e8187859099",
+    "customerAgreementInstanceReference": "3f778384-51ec-45f2-b093-6ab1242c8bf2",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 1222.04,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "McClure, Erdman and Kuhlman",
+      "cardTransactionDateTime": "2026-05-25T23:39:21.626Z",
+      "cardTransactionStatus": "settled",
+      "cardTransactionMaskedPanDisplay": "****-****-****-5252"
+    },
+    "fraudDiagnosisCaseStatus": "escalated",
+    "fraudDiagnosisCaseSeverity": "critical",
+    "fraudDiagnosisRequestDateTime": "2026-05-25T23:39:21.626Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "amount_threshold",
+        "high_risk_mcc"
+      ],
+      "fraudDiagnosisScore": 45,
+      "fraudDiagnosisConclusion": "Suspicious activity detected"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-25T23:39:21.626Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "2ed9eaeb-2348-4be6-a85f-833d3050d3f0",
+    "fraudDiagnosisCaseReference": "FD-2026-000012",
+    "cardTransactionInstanceReference": "b065217e-50c9-47b0-800a-525dfd689919",
+    "customerAgreementInstanceReference": "d1bea47e-bb79-41e8-ae4a-4834f4dad78d",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 589.42,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Johnson LLC",
+      "cardTransactionDateTime": "2026-05-25T15:37:26.934Z",
+      "cardTransactionStatus": "disputed",
+      "cardTransactionMaskedPanDisplay": "****-****-****-6561"
+    },
+    "fraudDiagnosisCaseStatus": "escalated",
+    "fraudDiagnosisCaseSeverity": "high",
+    "fraudDiagnosisRequestDateTime": "2026-05-25T15:37:26.934Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "amount_threshold"
+      ],
+      "fraudDiagnosisScore": 65,
+      "fraudDiagnosisConclusion": "Suspicious activity detected"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-25T15:37:26.934Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "d450fb14-ddc7-4455-927f-b4e7bdeaea1e",
+    "fraudDiagnosisCaseReference": "FD-2026-000013",
+    "cardTransactionInstanceReference": "4ab58c42-1d11-4ddd-9486-8d23bd6334ae",
+    "customerAgreementInstanceReference": "055a212f-3b82-4bdf-b588-b1c54005fa85",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 495.79,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Wiegand and Sons",
+      "cardTransactionDateTime": "2026-05-26T10:19:47.557Z",
+      "cardTransactionStatus": "authorized",
+      "cardTransactionMaskedPanDisplay": "****-****-****-1678"
+    },
+    "fraudDiagnosisCaseStatus": "escalated",
+    "fraudDiagnosisCaseSeverity": "medium",
+    "fraudDiagnosisRequestDateTime": "2026-05-26T10:19:47.557Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "manual_review"
+      ],
+      "fraudDiagnosisScore": 72,
+      "fraudDiagnosisConclusion": "Routine review"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-26T10:19:47.557Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "1b7ed9a2-e39d-42bb-8b6a-fd7e1ae248f2",
+    "fraudDiagnosisCaseReference": "FD-2026-000014",
+    "cardTransactionInstanceReference": "855ed3ac-e087-4895-b76b-9ba06235e46b",
+    "customerAgreementInstanceReference": "62e6270e-bd62-4d27-81f3-6cc8128a97b5",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 726.9,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Wehner, Runolfsson and Hodkiewicz",
+      "cardTransactionDateTime": "2026-05-20T23:57:09.963Z",
+      "cardTransactionStatus": "settled",
+      "cardTransactionMaskedPanDisplay": "****-****-****-7583"
+    },
+    "fraudDiagnosisCaseStatus": "escalated",
+    "fraudDiagnosisCaseSeverity": "high",
+    "fraudDiagnosisRequestDateTime": "2026-05-20T23:57:09.963Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "amount_threshold"
+      ],
+      "fraudDiagnosisScore": 84,
+      "fraudDiagnosisConclusion": "Suspicious activity detected"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-20T23:57:09.963Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "bbf72422-4190-45fb-ab1d-a2640fcca740",
+    "fraudDiagnosisCaseReference": "FD-2026-000015",
+    "cardTransactionInstanceReference": "2c5dbf72-2036-47e5-a11c-18c63acc1392",
+    "customerAgreementInstanceReference": "d75b1048-9c4a-4db0-9bc4-5d51faff9fe6",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 268.99,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Wolf, Goyette and Schaefer",
+      "cardTransactionDateTime": "2026-05-28T22:59:38.496Z",
+      "cardTransactionStatus": "disputed",
+      "cardTransactionMaskedPanDisplay": "****-****-****-6119"
+    },
+    "fraudDiagnosisCaseStatus": "escalated",
+    "fraudDiagnosisCaseSeverity": "medium",
+    "fraudDiagnosisRequestDateTime": "2026-05-28T22:59:38.496Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "manual_review"
+      ],
+      "fraudDiagnosisScore": 72,
+      "fraudDiagnosisConclusion": "Routine review"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-28T22:59:38.496Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "858578fc-fb87-4ffc-b588-94e3f2dd6e07",
+    "fraudDiagnosisCaseReference": "FD-2026-000016",
+    "cardTransactionInstanceReference": "313957e8-5dc8-401d-a161-3341d9c68d86",
+    "customerAgreementInstanceReference": "e497e7d8-5f5f-448a-a1fa-f6ebaaa8547e",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 1399.16,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Romaguera LLC",
+      "cardTransactionDateTime": "2026-05-19T21:01:29.610Z",
+      "cardTransactionStatus": "authorized",
+      "cardTransactionMaskedPanDisplay": "****-****-****-6472"
+    },
+    "fraudDiagnosisCaseStatus": "resolved_cleared",
+    "fraudDiagnosisCaseSeverity": "critical",
+    "fraudDiagnosisRequestDateTime": "2026-05-19T21:01:29.610Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "amount_threshold"
+      ],
+      "fraudDiagnosisScore": 65,
+      "fraudDiagnosisConclusion": "Suspicious activity detected"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-19T21:01:29.610Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "28bab209-fe8c-4261-aa05-e10ec68aec0b",
+    "fraudDiagnosisCaseReference": "FD-2026-000017",
+    "cardTransactionInstanceReference": "d7531b1a-d6dd-4acc-abaf-fd7cce426624",
+    "customerAgreementInstanceReference": "da01b491-d9ae-43da-89b7-7d6f73643323",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 272.69,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Schaden, Gislason and Lockman",
+      "cardTransactionDateTime": "2026-05-12T19:01:10.037Z",
+      "cardTransactionStatus": "settled",
+      "cardTransactionMaskedPanDisplay": "****-****-****-8066"
+    },
+    "fraudDiagnosisCaseStatus": "resolved_cleared",
+    "fraudDiagnosisCaseSeverity": "medium",
+    "fraudDiagnosisRequestDateTime": "2026-05-12T19:01:10.037Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "high_risk_mcc"
+      ],
+      "fraudDiagnosisScore": 33,
+      "fraudDiagnosisConclusion": "Suspicious activity detected"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-12T19:01:10.037Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "64f0f7ed-6f22-4041-8074-f984a9a40dd2",
+    "fraudDiagnosisCaseReference": "FD-2026-000018",
+    "cardTransactionInstanceReference": "eec4c0b6-c81a-497c-abea-375682d2adc6",
+    "customerAgreementInstanceReference": "8a8fa4fd-b4b9-4b27-92be-0c149b574247",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 586.81,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Frami, Powlowski and Leannon",
+      "cardTransactionDateTime": "2026-05-04T13:15:31.084Z",
+      "cardTransactionStatus": "disputed",
+      "cardTransactionMaskedPanDisplay": "****-****-****-7564"
+    },
+    "fraudDiagnosisCaseStatus": "resolved_cleared",
+    "fraudDiagnosisCaseSeverity": "high",
+    "fraudDiagnosisRequestDateTime": "2026-05-04T13:15:31.084Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "amount_threshold",
+        "high_risk_mcc"
+      ],
+      "fraudDiagnosisScore": 32,
+      "fraudDiagnosisConclusion": "Suspicious activity detected"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-04T13:15:31.084Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "11f1b1e9-f9bd-448e-a555-7f410cf54f5b",
+    "fraudDiagnosisCaseReference": "FD-2026-000019",
+    "cardTransactionInstanceReference": "5afc8486-2c72-452e-ba41-9290eb1e9e06",
+    "customerAgreementInstanceReference": "ef4ae506-9804-42bd-9d76-df70e42881ed",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 11.89,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Hand, Fay and Runolfsdottir",
+      "cardTransactionDateTime": "2026-05-01T02:53:10.961Z",
+      "cardTransactionStatus": "authorized",
+      "cardTransactionMaskedPanDisplay": "****-****-****-0094"
+    },
+    "fraudDiagnosisCaseStatus": "resolved_cleared",
+    "fraudDiagnosisCaseSeverity": "low",
+    "fraudDiagnosisRequestDateTime": "2026-05-01T02:53:10.961Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "high_risk_mcc"
+      ],
+      "fraudDiagnosisScore": 82,
+      "fraudDiagnosisConclusion": "Suspicious activity detected"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-01T02:53:10.961Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "43251c33-7683-4b3b-8922-1ffdbef4a706",
+    "fraudDiagnosisCaseReference": "FD-2026-000020",
+    "cardTransactionInstanceReference": "59da4b13-59b5-4bd0-a1b4-85029b4ec4cb",
+    "customerAgreementInstanceReference": "ca377496-2999-4f61-97f0-0c0fce3cd6b4",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 59.86,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Sauer Inc",
+      "cardTransactionDateTime": "2026-05-27T01:01:16.044Z",
+      "cardTransactionStatus": "settled",
+      "cardTransactionMaskedPanDisplay": "****-****-****-6673"
+    },
+    "fraudDiagnosisCaseStatus": "resolved_cleared",
+    "fraudDiagnosisCaseSeverity": "low",
+    "fraudDiagnosisRequestDateTime": "2026-05-27T01:01:16.044Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "manual_review"
+      ],
+      "fraudDiagnosisScore": 70,
+      "fraudDiagnosisConclusion": "Routine review"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-05-27T01:01:16.044Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 1
+  }
+]

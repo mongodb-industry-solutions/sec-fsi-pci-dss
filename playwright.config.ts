@@ -9,7 +9,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['html', { outputFolder: 'test/.playwright-report' }]],
   use: {
-    baseURL: process.env.BASE_URL ?? 'http://localhost:3000',
+    baseURL: process.env.BASE_URL ?? 'http://localhost:8080',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'on-first-retry',
@@ -24,7 +24,7 @@ export default defineConfig({
   // Auto-start dev server when running locally
   webServer: {
     command: 'npm run dev:frontend',
-    url: 'http://localhost:3000',
+    url: 'http://localhost:8080',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

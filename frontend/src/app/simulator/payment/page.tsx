@@ -1,43 +1,62 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '../../../lib/api';
+import { api, awaitPaymentOutcome } from '../../../lib/api';
 import { FraudAlert } from '../../../components/FraudAlert';
 import { EncryptionBadge } from '../../../components/EncryptionBadge';
+import { Tooltip } from '../../../components/Tooltip';
+import { Eye, EyeOff } from 'lucide-react';
+import { StepExplainer } from '../../../components/StepExplainer';
+import { RedirectionPaymentFlow } from '../../../components/simulator/RedirectionPaymentFlow';
+import { PaymentLinkFlow } from '../../../components/simulator/PaymentLinkFlow';
+import type { PaymentMethodId, SimulatorScenario } from '../../../types/simulator';
+import simulatorConfig from '../../../config/simulator.json';
+import { variedAmount, variedDescription } from '../../../lib/simVary';
+import { deriveCardToken } from '../../../lib/cardTokenize';
 
 type Step = 1 | 2 | 3;
 
 interface FormData {
-  cardNumber: string;
   cardholderName: string;
   expiry: string;
+  cvv: string;
   email: string;
   phone: string;
   amount: string;
+  description: string;
   merchantName: string;
   merchantCategoryCode: string;
 }
 
+// Default card number for demo (masked immediately on mount)
+const DEMO_CARD_NUMBER = simulatorConfig.defaultCard;
+
+// Test card presets for demo selection
+const TEST_CARDS = simulatorConfig.testCards;
+
 const DEFAULTS: FormData = {
-  cardNumber: '',
   cardholderName: 'Luis Fernandez',
   expiry: '12/28',
-  email: 'luis.fernandez@leafybank.demo',
+  cvv: '',
+  email: 'luis.fernandez@back.es',
   phone: '+44 7700 900123',
   amount: '850.00',
+  description: '',
   merchantName: 'TechGadgets Ltd.',
   merchantCategoryCode: '5734',
 };
 
+// Preset amount options for quick selection
+const AMOUNT_PRESETS = simulatorConfig.amountPresets;
+
 function maskCardNumber(raw: string): string {
   const digits = raw.replace(/\D/g, '').slice(0, 16);
-  if (digits.length <= 12) return digits.replace(/(.{4})/g, '****-').replace(/-$/, '');
-  const last4 = digits.slice(-4);
+  const last4 = digits.slice(-4).padStart(4, '*');
   return `****-****-****-${last4}`;
 }
 
 function generateToken(): string {
-  return `tok_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+  return `pm_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
 }
 
 function simulateCipher(seed: string): string {
@@ -47,58 +66,421 @@ function simulateCipher(seed: string): string {
   return `\\x${bytes.slice(0, 4).join('\\x')}...`;
 }
 
+// -- Amount selector ----------------------------------------------------------
+function AmountSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [custom, setCustom] = useState(!AMOUNT_PRESETS.includes(value));
+
+  if (custom) {
+    return (
+      <div className="flex gap-2 items-center">
+        <span className="text-gray-500 text-sm">$</span>
+        <input
+          type="number"
+          step="0.01"
+          min="0.01"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="flex-1 border rounded-lg px-3 py-2 text-sm"
+          placeholder="0.00"
+        />
+        <button
+          type="button"
+          onClick={() => setCustom(false)}
+          className="text-xs text-blue-600 underline whitespace-nowrap"
+        >
+          Use presets
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2 flex-wrap">
+        {AMOUNT_PRESETS.map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            onClick={() => onChange(preset)}
+            className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+              value === preset
+                ? 'bg-[#001E2B] text-[#00ED64] border-[#001E2B]'
+                : 'bg-white text-gray-700 border-gray-300 hover:border-[#001E2B]'
+            }`}
+          >
+            ${preset}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => setCustom(true)}
+          className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-400 text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+        >
+          ✏ Custom
+        </button>
+      </div>
+      <p className="text-xs text-amber-700">
+        ⚠ Amounts above ${simulatorConfig.fraudAmountThreshold} trigger automatic fraud case creation.
+      </p>
+    </div>
+  );
+}
+
+// -- Card selector ------------------------------------------------------------─
+// Proposes a list of cards (the customer's cards on file when a scenario is loaded, or the
+// generic test cards otherwise) and always allows entering a different card number by hand.
+function CardSelector({
+  maskedCard,
+  onCardChange,
+  cards,
+  customerName,
+  defaultNumber,
+}: {
+  maskedCard: string;
+  onCardChange: (raw: string) => void;
+  cards: { label: string; number: string }[];
+  customerName?: string;
+  defaultNumber?: string;
+}) {
+  const [custom, setCustom] = useState(false);
+  const presetValue = defaultNumber && cards.some((c) => c.number === defaultNumber) ? defaultNumber : '';
+
+  function handlePreset(e: React.ChangeEvent<HTMLSelectElement>) {
+    if (e.target.value === '__custom__') {
+      setCustom(true);
+    } else if (e.target.value) {
+      onCardChange(e.target.value);
+    }
+  }
+
+  if (custom) {
+    return (
+      <div className="space-y-1">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Enter card number"
+            onChange={(e) => onCardChange(e.target.value.replace(/\D/g, '').slice(0, 16))}
+            className="flex-1 border rounded-lg px-3 py-2 font-mono text-sm"
+            maxLength={19}
+          />
+          <button
+            type="button"
+            onClick={() => setCustom(false)}
+            className="text-xs text-blue-600 underline whitespace-nowrap"
+          >
+            Use presets
+          </button>
+        </div>
+        {maskedCard && (
+          <div className="font-mono text-gray-700 bg-gray-50 rounded px-3 py-2 flex items-center gap-2 text-sm">
+            <span className="text-[#00ED64]">🔒</span> {maskedCard}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <select
+        onChange={handlePreset}
+        defaultValue={presetValue}
+        className="w-full border rounded-lg px-3 py-2 text-sm bg-white"
+      >
+        <option value="" disabled>
+          {customerName ? `Select a card on file for ${customerName}…` : 'Select a test card or enter custom…'}
+        </option>
+        {cards.map((c) => (
+          <option key={c.number} value={c.number}>{c.label}</option>
+        ))}
+        <option value="__custom__">✏ Enter a different card number…</option>
+      </select>
+      {maskedCard && (
+        <div className="font-mono text-gray-700 bg-gray-50 rounded px-3 py-2 flex items-center gap-2 text-sm">
+          <span className="text-[#00ED64]">🔒</span> {maskedCard}
+        </div>
+      )}
+      <p className="text-xs text-gray-500">
+        {customerName
+          ? 'Pick one of the customer’s cards on file, or enter a different one. Masked immediately; raw PAN never stored.'
+          : 'Masked immediately. Raw PAN never stored. Leave blank to use the pre-filled demo card.'}
+      </p>
+    </div>
+  );
+}
+
+// -- Validation ----------------------------------------------------------------
+interface ValidationErrors {
+  cardNumber?: string;
+  email?: string;
+  phone?: string;
+  amount?: string;
+  merchantName?: string;
+}
+
+function validateStep1(form: FormData, maskedCard: string): ValidationErrors {
+  const errors: ValidationErrors = {};
+  if (!maskedCard) errors.cardNumber = 'Enter a card number to continue.';
+  if (!form.email.includes('@')) errors.email = 'Enter a valid email address.';
+  if (!form.phone.trim()) errors.phone = 'Phone number is required.';
+  const amt = parseFloat(form.amount);
+  if (!form.amount || isNaN(amt) || amt <= 0) errors.amount = 'Enter a valid amount greater than $0.';
+  if (!form.merchantName.trim()) errors.merchantName = 'Merchant name is required.';
+  return errors;
+}
+
+// -- Main component ------------------------------------------------------------
 export default function PaymentPage() {
   const router = useRouter();
+  const [simMethod, setSimMethod] = useState<PaymentMethodId | null>(null);
+  const [simScenario, setSimScenario] = useState<SimulatorScenario | null>(null);
+  // The merchant (payee) chosen on the landing page; drives attribution + per-merchant callback.
+  const [merchantId, setMerchantId] = useState<string>(simulatorConfig.merchantId);
+  const [methodReady, setMethodReady] = useState(false);
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<FormData>(DEFAULTS);
-  const [maskedCard, setMaskedCard] = useState('');
+  const [showCvv, setShowCvv] = useState(false);
+  const [maskedCard, setMaskedCard] = useState<string>(maskCardNumber(DEMO_CARD_NUMBER));
+  // Raw PAN digits kept only to derive the deterministic token at submit time (never sent).
+  const [rawCard, setRawCard] = useState<string>(DEMO_CARD_NUMBER.replace(/\D/g, ''));
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{
     txnId: string;
     fraudCaseCreated: boolean;
     caseId?: string;
     caseRef?: string;
+    cardToken: string;
   } | null>(null);
+  const [returning, setReturning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const cardToken = generateToken();
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const [varyNote, setVaryNote] = useState<string | null>(null);
+  const cardTokenRef = useRef<string>(generateToken());
 
-  function handleCardInput(e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = e.target.value.replace(/\D/g, '').slice(0, 16);
-    setMaskedCard(maskCardNumber(raw));
-    // Raw PAN is never stored in state; we only keep the token
+  // Read sim_method + sim_scenario from sessionStorage on mount
+  useEffect(() => {
+    const method = (sessionStorage.getItem('sim_method') as PaymentMethodId) ?? null;
+    const scenarioId = sessionStorage.getItem('sim_scenario');
+    setSimMethod(method);
+
+    // Merchant (payee) chosen on the landing page. Overrides the scenario's merchant prefill so the
+    // payment is attributed to the selected merchant and its webhook callback is the one notified.
+    const selMerchantId = sessionStorage.getItem('sim_merchant_id') ?? simulatorConfig.merchantId;
+    const selMerchantName = sessionStorage.getItem('sim_merchant_name') ?? simulatorConfig.merchantName;
+    const selMerchantMcc = sessionStorage.getItem('sim_merchant_mcc') ?? undefined;
+    setMerchantId(selMerchantId);
+
+    if (scenarioId) {
+      const found = (simulatorConfig.scenarios as SimulatorScenario[]).find(s => s.id === scenarioId) ?? null;
+      setSimScenario(found);
+      if (found && method === 'api-card') {
+        // Pre-fill from scenario (payer) + the selected merchant (payee). The merchant is fixed
+        // (chosen on the landing page); the other values stay editable so the operator can vary them.
+        setForm({
+          cardholderName: found.prefill.cardholderName,
+          // Expiry is card data: take the scenario's own card expiry (not a blanket constant).
+          expiry: found.prefill.cardExpiry ?? '',
+          // CVV is entered by the user at payment time (never predefined). Placeholder hints the demo value.
+          cvv: '',
+          email: found.prefill.email,
+          phone: found.prefill.phone,
+          amount: String(found.prefill.amount),
+          description: '',
+          merchantName: selMerchantName,
+          merchantCategoryCode: selMerchantMcc ?? found.prefill.merchantCategoryCode,
+        });
+        // Pre-select the customer's primary card on file so the masked display reflects their card.
+        const primary = found.savedCards?.[0]?.number ?? found.prefill.cardHint;
+        if (primary) {
+          setRawCard(primary.replace(/\D/g, ''));
+          setMaskedCard(maskCardNumber(primary));
+        }
+      }
+    } else if (method === 'api-card') {
+      // No scenario: still reflect the merchant fixed on the landing page.
+      setForm((f) => ({ ...f, merchantName: selMerchantName, merchantCategoryCode: selMerchantMcc ?? f.merchantCategoryCode }));
+    }
+
+    if (!method) {
+      // No method selected; guard: redirect to landing
+      router.replace('/simulator');
+      return;
+    }
+    setMethodReady(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Restore step 3 from sessionStorage (existing api-card flow)
+  useEffect(() => {
+    if (simMethod !== 'api-card' || !methodReady) return;
+    try {
+      const saved = sessionStorage.getItem('sim_payment_step3');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const { savedResult, savedForm, savedMasked } = parsed._restore ?? parsed;
+        cardTokenRef.current = savedResult.cardToken || cardTokenRef.current;
+        setResult(savedResult);
+        setForm(savedForm);
+        setMaskedCard(savedMasked);
+        setStep(3);
+        setReturning(true);
+        return;
+      }
+    } catch {
+      sessionStorage.removeItem('sim_payment_step3');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simMethod, methodReady]);
+
+  // ── Route to non-api-card flows ──────────────────────────────────────────
+  if (!methodReady) {
+    return (
+      <div className="max-w-xl mx-auto text-center py-16 text-gray-400 text-sm">
+        Loading…
+      </div>
+    );
+  }
+
+  if (simMethod === 'redirection') {
+    const scenario = simScenario ?? (simulatorConfig.scenarios[0] as SimulatorScenario);
+    return (
+      <RedirectionPaymentFlow
+        scenario={scenario}
+        merchantId={merchantId}
+      />
+    );
+  }
+
+  if (simMethod === 'payment-link') {
+    const scenario = simScenario ?? (simulatorConfig.scenarios[0] as SimulatorScenario);
+    return (
+      <PaymentLinkFlow
+        scenario={scenario}
+        merchantId={merchantId}
+      />
+    );
+  }
+
+  // ── API Card flow (default) ───────────────────────────────────────────────
+
+  // Cards proposed in the selector: the customer's cards on file when a scenario is loaded,
+  // otherwise the generic demo test cards. A different card can always be entered by hand.
+  const customerCards = simScenario?.savedCards?.length
+    ? simScenario.savedCards.map((c) => ({ label: `${c.alias} ${maskCardNumber(c.number)}`, number: c.number }))
+    : TEST_CARDS;
+
+  // One-click variation of the payment amount for repeated demo runs. The persona, merchant and
+  // descriptor stay fixed; only the amount varies, so each run is easy to tell apart in history.
+  function handleVary() {
+    const amount = variedAmount(form.amount);
+    const description = variedDescription(form.merchantName, form.description);
+    setForm((f) => ({ ...f, amount, description }));
+    setValidationErrors({});
+    setVaryNote(`New amount generated. Find this transaction by amount $${amount}.`);
+  }
+
+  function handleNext() {
+    const errors = validateStep1(form, maskedCard);
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+    setValidationErrors({});
+    setError(null);
+    setStep(2);
   }
 
   async function handleConfirm() {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await api.cardTransactions.create({
-        cardToken,
-        accountReference: `ACC-${Date.now().toString(36).toUpperCase()}`,
+      // Deterministic token from the entered card number: paying again with the same card reuses
+      // the same token, so the card-on-file is never duplicated (dedups in the registry).
+      if (rawCard) cardTokenRef.current = await deriveCardToken(rawCard);
+      const res = await api.transactions.create({
+        cardToken: cardTokenRef.current,
+        accountReference: form.email,
         amount: parseFloat(form.amount),
-        currency: 'USD',
+        currency: simulatorConfig.defaultCurrency,
         cardTransactionMerchantName: form.merchantName,
         cardTransactionMerchantCategoryCode: form.merchantCategoryCode,
         cardTransactionChannel: 'online',
         cardTransactionMaskedPanDisplay: maskedCard || '****-****-****-1234',
+        cardTransactionType: 'purchase',
+        cardTransactionDescription: (form.description.trim() || form.merchantName.toUpperCase()).slice(0, 22),
+        // Acquiring-side link: the payment is charged to the MERCHANT selected on the landing page,
+        // so it surfaces in that merchant's received-payments view and its webhook callback fires.
+        merchantAgreementInstanceReference: merchantId,
         gatewayPayload: { source: 'simulator', timestamp: new Date().toISOString() },
-      }, '');
-
-      setResult({
-        txnId: res.cardTransactionInstanceReference,
-        fraudCaseCreated: res.fraudCaseCreated,
-        caseId: res.fraudDiagnosisInstanceReference,
-        caseRef: res.fraudDiagnosisInstanceReference
-          ? `FD-SIM-${res.fraudDiagnosisInstanceReference.slice(-6).toUpperCase()}`
-          : undefined,
+        // Transient verification values sent to the card issuer for authorization (never stored/logged).
+        cardVerification: { ...(rawCard ? { cardNumber: rawCard } : {}), ...(form.cvv ? { cvv: form.cvv } : {}), ...(form.expiry ? { expiry: form.expiry } : {}) },
       });
+
+      // dev.v8 F3: the payment is PENDING; wait for the issuer's async decision over SSE.
+      const txnId = res.cardTransactionInstanceReference;
+      const outcome = await awaitPaymentOutcome(txnId);
+      if (outcome.status === 'declined') {
+        setError(`The card issuer declined this payment${outcome.declineReason ? ` (${outcome.declineReason.replace(/_/g, ' ')})` : ''}. No charge was made.`);
+        return;
+      }
+
+      const newResult = {
+        txnId,
+        fraudCaseCreated: !!outcome.fraudCaseCreated,
+        caseId: outcome.caseId ?? undefined,
+        caseRef: outcome.caseId ? `FD-SIM-${outcome.caseId.slice(-6).toUpperCase()}` : undefined,
+        cardToken: cardTokenRef.current,
+      };
+      try {
+        sessionStorage.setItem('sim_payment_step3', JSON.stringify({
+          cardTransactionInstanceReference: newResult.txnId,
+          caseId: newResult.caseId ?? null,
+          email: form.email,
+          amount: parseFloat(form.amount),
+          currency: simulatorConfig.defaultCurrency,
+          merchantName: form.merchantName,
+          method: 'api-card',
+          customerName: simScenario?.persona ?? form.cardholderName,
+          _restore: { savedResult: newResult, savedForm: form, savedMasked: maskedCard },
+        }));
+      } catch { /* ignore storage errors */ }
+      setResult(newResult);
       setStep(3);
+      // Transaction is persisted server-side; application-mode history reads it
+      // from the real API (GET /api/v1/transactions/all), no local mirror needed.
     } catch (err) {
-      setError((err as Error).message);
+      const msg = (err as Error).message ?? '';
+      if (msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('fetch')) {
+        setError('Cannot reach the backend server. Make sure the API is running on the configured port and try again.');
+      } else {
+        setError(msg || 'An unexpected error occurred while processing the payment.');
+      }
     } finally {
       setSubmitting(false);
     }
   }
+
+  function handleReset() {
+    try { sessionStorage.removeItem('sim_payment_step3'); } catch { /* ignore */ }
+    sessionStorage.removeItem('sim_method');
+    sessionStorage.removeItem('sim_scenario');
+    sessionStorage.removeItem('sim_step');
+    setStep(1);
+    setForm(DEFAULTS);
+    setMaskedCard(maskCardNumber(DEMO_CARD_NUMBER));
+    setRawCard(DEMO_CARD_NUMBER.replace(/\D/g, ''));
+    setResult(null);
+    setReturning(false);
+    setError(null);
+    setValidationErrors({});
+    setVaryNote(null);
+    cardTokenRef.current = generateToken();
+    router.push('/simulator');
+  }
+
+  // -- Step indicator ----------------------------------------------------------
+  const stepLabels = ['Card Details', 'Review & Encrypt', 'Confirmation'];
 
   return (
     <div className="max-w-xl mx-auto">
@@ -107,7 +489,7 @@ export default function PaymentPage() {
         {([1, 2, 3] as Step[]).map((s) => (
           <div key={s} className="flex items-center gap-1">
             <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
                 step === s
                   ? 'bg-[#001E2B] text-[#00ED64] border-2 border-[#00ED64]'
                   : step > s
@@ -115,120 +497,370 @@ export default function PaymentPage() {
                   : 'bg-gray-200 text-gray-500'
               }`}
             >
-              {s}
+              {step > s ? '✓' : s}
             </div>
-            {s < 3 && <div className={`h-px w-8 ${step > s ? 'bg-[#00ED64]' : 'bg-gray-300'}`} />}
+            {s < 3 && <div className={`h-px w-8 transition-colors ${step > s ? 'bg-[#00ED64]' : 'bg-gray-300'}`} />}
           </div>
         ))}
         <span className="text-sm text-gray-500 ml-2">
-          Step {step} of 3:{' '}
-          {step === 1 ? 'Card Details' : step === 2 ? 'Review' : 'Confirmation'}
+          Step {step} of 3: <strong>{stepLabels[step - 1]}</strong>
         </span>
       </div>
 
-      {/* Step 1: Card Details */}
+      {/* -- STEP 1: Card Details --------------------------------------------─ */}
       {step === 1 && (
         <div className="bg-white rounded-xl border p-6 space-y-4">
-          <h2 className="text-xl font-bold">💳 New Payment</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">💳 New Payment</h2>
+            <StepExplainer title="Step 1: Card Details">
+              <p>
+                The customer enters their card details. The raw PAN (Primary Account Number) is
+                masked immediately in the browser; it never enters component state or network traffic.
+              </p>
+              <p>
+                A <strong>card token</strong> (surrogate reference) is generated locally and sent to
+                the backend instead of the PAN. Under PCI DSS v4.0 a token is not Cardholder Data
+                and can be stored in plaintext.
+              </p>
+              <p>
+                PII fields (email, phone) will be encrypted with{' '}
+                <strong>MongoDB Queryable Encryption</strong> before leaving the browser in Step 2.
+              </p>
+            </StepExplainer>
+          </div>
+
+          {/* Edit / vary values before paying */}
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-xs text-blue-800">
+                This scenario fixes the persona and merchant. You can still adjust the payment
+                options below (amount, description) before paying, or use <strong>Vary values</strong>
+                {' '}to generate a distinct variation so repeated runs are easy to tell apart.
+              </p>
+              <button
+                type="button"
+                onClick={handleVary}
+                className="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors"
+              >
+                🎲 Vary values
+              </button>
+            </div>
+            {varyNote && <p className="text-xs text-blue-700 font-medium">{varyNote}</p>}
+          </div>
+
+          {/* Card number */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
               Card Number
+              <Tooltip text="Select a test card or enter a custom PAN. The raw PAN is masked immediately on input and is never stored in component state or sent to the server. A secure token is generated instead." />
+            </label>
+            <CardSelector
+              maskedCard={maskedCard}
+              onCardChange={(raw) => { setRawCard(raw); setMaskedCard(maskCardNumber(raw)); }}
+              cards={customerCards}
+              customerName={simScenario?.persona}
+              defaultNumber={rawCard}
+            />
+            {validationErrors.cardNumber && (
+              <p className="text-xs text-red-600 mt-0.5">{validationErrors.cardNumber}</p>
+            )}
+          </div>
+
+          {/* Cardholder name */}
+          <div>
+            <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+              Cardholder Name
+              <Tooltip text="Name as it appears on the card. Stored as plaintext, not classified as Cardholder Data under PCI DSS v4.0 when stored without a PAN." />
             </label>
             <input
               type="text"
-              placeholder="Enter card number"
-              onChange={handleCardInput}
-              className="w-full border rounded-lg px-3 py-2 font-mono"
-              maxLength={19}
+              value={form.cardholderName}
+              onChange={(e) => setForm((f) => ({ ...f, cardholderName: e.target.value }))}
+              className="w-full border rounded-lg px-3 py-2"
             />
-            {maskedCard && (
-              <div className="mt-1 font-mono text-gray-700 bg-gray-50 rounded px-3 py-2">
-                {maskedCard}
-              </div>
-            )}
-            <p className="text-xs text-gray-500 mt-1">
-              Masked immediately — raw PAN never stored
-            </p>
           </div>
-          {(['cardholderName', 'expiry'] as const).map((field) => (
-            <div key={field}>
-              <label className="block text-sm font-medium text-gray-700 mb-1 capitalize">
-                {field.replace(/([A-Z])/g, ' $1')}
+
+          {/* Expiry + CVV */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                Expiry Date
+                <Tooltip text="Card expiration date (MM/YY). The card issuer declines an expired card; the value is sent for authorization only and never stored." />
               </label>
               <input
                 type="text"
-                value={form[field]}
-                onChange={(e) => setForm((f) => ({ ...f, [field]: e.target.value }))}
-                className="w-full border rounded-lg px-3 py-2"
+                value={form.expiry}
+                onChange={(e) => setForm((f) => ({ ...f, expiry: e.target.value }))}
+                className="w-full border rounded-lg px-3 py-2 font-mono"
+                placeholder="MM/YY"
               />
             </div>
-          ))}
-          <div className="border-t pt-4 space-y-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase">Payment Details</p>
-            {(['email', 'phone', 'amount', 'merchantName', 'merchantCategoryCode'] as const).map(
-              (field) => (
-                <div key={field}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1 capitalize">
-                    {field.replace(/([A-Z])/g, ' $1')}
-                  </label>
-                  <input
-                    type="text"
-                    value={form[field]}
-                    onChange={(e) => setForm((f) => ({ ...f, [field]: e.target.value }))}
-                    className="w-full border rounded-lg px-3 py-2"
-                  />
-                </div>
-              )
-            )}
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                CVV
+                <Tooltip text="Card verification value. Sent to the card issuer for authorization only, never stored or logged (PCI DSS Req 3.2). The demo issuer accepts 123; any other value is declined." />
+              </label>
+              <div className="relative">
+                <input
+                  type={showCvv ? 'text' : 'password'}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={form.cvv}
+                  onChange={(e) => setForm((f) => ({ ...f, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                  className="w-full border rounded-lg pl-3 pr-9 py-2 font-mono"
+                  placeholder="123"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCvv((s) => !s)}
+                  aria-label={showCvv ? 'Hide CVV' : 'Show CVV'}
+                  className="absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400 hover:text-gray-700"
+                >
+                  {showCvv ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
           </div>
+
+          <div className="border-t pt-4 space-y-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payment Details</p>
+
+            {/* Email */}
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                Email Address
+                <Tooltip text="Customer email address (QE:equality field). Encrypted with Queryable Encryption before being sent to Atlas. MongoDB stores only ciphertext and can still perform exact-match queries without seeing the plaintext." />
+              </label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => { setForm((f) => ({ ...f, email: e.target.value })); setValidationErrors((v) => ({ ...v, email: undefined })); }}
+                className={`w-full border rounded-lg px-3 py-2 ${validationErrors.email ? 'border-red-400' : ''}`}
+              />
+              {validationErrors.email && (
+                <p className="text-xs text-red-600 mt-0.5">{validationErrors.email}</p>
+              )}
+            </div>
+
+            {/* Phone */}
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                Mobile Phone
+                <Tooltip text="Customer mobile number (QE:equality field). Encrypted at origin with Queryable Encryption. L1 Analysts can search by phone without Atlas seeing the plaintext number." />
+              </label>
+              <input
+                type="text"
+                value={form.phone}
+                onChange={(e) => { setForm((f) => ({ ...f, phone: e.target.value })); setValidationErrors((v) => ({ ...v, phone: undefined })); }}
+                className={`w-full border rounded-lg px-3 py-2 ${validationErrors.phone ? 'border-red-400' : ''}`}
+              />
+              {validationErrors.phone && (
+                <p className="text-xs text-red-600 mt-0.5">{validationErrors.phone}</p>
+              )}
+            </div>
+
+            {/* Amount */}
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                Amount (USD)
+                <Tooltip text={`Transaction amount. Stored as plaintext in cardTransactionAmount. Amounts above $${simulatorConfig.fraudAmountThreshold} automatically trigger fraud case creation (configurable via FRAUD_AMOUNT_THRESHOLD env var). Selecting $850 will trigger a fraud alert.`} />
+              </label>
+              <AmountSelector value={form.amount} onChange={(v) => { setForm((f) => ({ ...f, amount: v })); setValidationErrors((v2) => ({ ...v2, amount: undefined })); }} />
+              {validationErrors.amount && (
+                <p className="text-xs text-red-600 mt-0.5">{validationErrors.amount}</p>
+              )}
+            </div>
+
+            {/* Description / statement descriptor */}
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                Description
+                <Tooltip text="Statement descriptor stored in cardTransactionDescription (max 22 chars). Optional; defaults to the merchant name. Vary it to make repeated runs distinguishable." />
+              </label>
+              <input
+                type="text"
+                value={form.description}
+                maxLength={22}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder={form.merchantName.toUpperCase().slice(0, 22)}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+
+            {/* Merchant Name (read-only; the payee is fixed on the landing page) */}
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                Merchant Name
+                <Tooltip text="The business receiving the payment (the payee), fixed when you chose the merchant on the previous screen. Stored as plaintext in cardTransactionMerchantName. Its ISO 18245 MCC drives fraud risk: codes such as 5812 (restaurants), 6011 (ATM) and 7995 (gambling) are high-risk." />
+              </label>
+              <div className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700 flex items-center justify-between gap-2">
+                <span className="truncate">{form.merchantName}</span>
+                <span className="text-[10px] uppercase tracking-wide text-gray-400 shrink-0">Preset</span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Chosen on the previous screen; the payment is attributed to this merchant.</p>
+            </div>
+
+            {/* MCC (read-only display) */}
+            <div>
+              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                Merchant Category Code (MCC)
+                <Tooltip text="ISO 18245 four-digit code classifying the merchant's business type. Set automatically when you select a merchant. High-risk codes (5812, 6011, 7995) trigger automatic fraud case creation regardless of transaction amount." />
+              </label>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={form.merchantCategoryCode}
+                  onChange={(e) => setForm((f) => ({ ...f, merchantCategoryCode: e.target.value }))}
+                  className="w-28 border rounded-lg px-3 py-2 font-mono text-sm"
+                  maxLength={4}
+                />
+                {['5812', '6011', '7995'].includes(form.merchantCategoryCode) && (
+                  <span className="text-xs text-red-600 font-medium">⚠ High-risk MCC: fraud case will be created</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Validation summary */}
+          {Object.keys(validationErrors).length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
+              Please fix the highlighted fields before continuing.
+            </div>
+          )}
+
           <button
-            onClick={() => setStep(2)}
+            onClick={handleNext}
             className="w-full bg-[#001E2B] text-[#00ED64] py-2.5 rounded-lg font-semibold hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors"
           >
-            Next: Review →
+            Next: Review & Encrypt →
+          </button>
+          <button onClick={handleReset} className="w-full text-xs text-gray-400 hover:text-gray-600 transition-colors py-1">
+            ← Cancel and change scenario
           </button>
         </div>
       )}
 
-      {/* Step 2: Review (Encryption Explainer) */}
+      {/* -- STEP 2: Review (Encryption Explainer) --------------------------─ */}
       {step === 2 && (
         <div className="bg-white rounded-xl border p-6 space-y-4">
-          <h2 className="text-xl font-bold">🔐 Review Payment</h2>
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800 font-medium">
-            🔒 PII fields encrypted before leaving your browser
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">🔐 Review & Encryption</h2>
+            <StepExplainer title="Step 2: Review and Encryption">
+              <p>
+                Before the data is sent to MongoDB Atlas, the client-side MongoDB driver applies
+                <strong> Queryable Encryption (QE)</strong> to PII fields.
+              </p>
+              <p>
+                The table below shows what each field looks like <em>as stored in Atlas</em>.
+                Fields marked 🔒 are encrypted ciphertext. Atlas never sees the plaintext values.
+              </p>
+              <p>
+                Decryption happens only in the application process, using keys stored in your KMS
+                (AWS KMS or local key provider). <strong>MongoDB has zero access to the keys.</strong>
+              </p>
+            </StepExplainer>
           </div>
+
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800 font-medium">
+            🔒 PII fields will be encrypted before leaving your browser
+          </div>
+
           <div className="rounded-lg border overflow-hidden text-sm">
-            <div className="bg-gray-50 px-4 py-2 grid grid-cols-2 font-semibold text-gray-600 text-xs uppercase">
-              <span>Field</span>
-              <span>Sent to Atlas</span>
+            <div className="bg-gray-50 px-4 py-2 grid grid-cols-2 font-semibold text-gray-600 text-xs uppercase tracking-wide">
+              <span>
+                Field
+                <Tooltip text="Name of the field being sent to MongoDB Atlas." />
+              </span>
+              <span>
+                Sent to Atlas
+                <Tooltip text="Value as stored in Atlas. Encrypted fields show simulated ciphertext (🔒). Plaintext fields show the actual value." />
+              </span>
             </div>
             {[
-              { label: '🔒 Email', value: form.email, type: 'qe-equality' as const, cipher: simulateCipher(form.email) },
-              { label: '🔒 Phone', value: form.phone, type: 'qe-equality' as const, cipher: simulateCipher(form.phone) },
-              { label: '🔒 Account Ref', value: 'auto-generated', type: 'qe-equality' as const, cipher: simulateCipher('ACC-') },
-              { label: 'Card token', value: cardToken, type: 'plaintext' as const, cipher: cardToken },
-              { label: 'Amount', value: `$${form.amount}`, type: 'plaintext' as const, cipher: form.amount },
-              { label: 'Merchant', value: form.merchantName, type: 'plaintext' as const, cipher: form.merchantName },
-            ].map(({ label, type, cipher }) => (
+              {
+                label: '🔒 Email',
+                value: form.email,
+                type: 'qe-equality' as const,
+                cipher: simulateCipher(form.email),
+                tooltip: 'QE:equality: encrypted at origin, searchable by exact match. Atlas stores only ciphertext.',
+              },
+              {
+                label: '🔒 Phone',
+                value: form.phone,
+                type: 'qe-equality' as const,
+                cipher: simulateCipher(form.phone),
+                tooltip: 'QE:equality: encrypted at origin, searchable by exact match. Atlas stores only ciphertext.',
+              },
+              {
+                label: '🔒 Account Ref',
+                value: 'auto-generated',
+                type: 'qe-equality' as const,
+                cipher: simulateCipher('ACC-'),
+                tooltip: 'QE:equality: a unique account reference generated server-side, stored encrypted, searchable by exact match.',
+              },
+              {
+                label: 'Card Token',
+                value: cardTokenRef.current,
+                type: 'plaintext' as const,
+                cipher: cardTokenRef.current,
+                tooltip: 'Plain surrogate token (not the PAN). Under PCI DSS v4.0, a token is not Cardholder Data and may be stored in plaintext with a standard index.',
+              },
+              {
+                label: 'Masked PAN',
+                value: maskedCard,
+                type: 'plaintext' as const,
+                cipher: maskedCard,
+                tooltip: 'Last-4 display only (****-****-****-XXXX). PCI DSS permits storing the last four digits in plaintext.',
+              },
+              {
+                label: 'Amount',
+                value: `$${form.amount}`,
+                type: 'plaintext' as const,
+                cipher: form.amount,
+                tooltip: 'Transaction amount stored as plaintext. Not considered Cardholder Data under PCI DSS.',
+              },
+              {
+                label: 'Merchant',
+                value: form.merchantName,
+                type: 'plaintext' as const,
+                cipher: form.merchantName,
+                tooltip: 'Merchant display name stored as plaintext. Not Cardholder Data.',
+              },
+              {
+                label: 'MCC',
+                value: form.merchantCategoryCode,
+                type: 'plaintext' as const,
+                cipher: form.merchantCategoryCode,
+                tooltip: 'ISO 18245 Merchant Category Code stored as plaintext. Used for fraud risk evaluation.',
+              },
+            ].map(({ label, type, cipher, tooltip }) => (
               <div key={label} className="px-4 py-2.5 grid grid-cols-2 border-t items-center">
-                <div>
+                <div className="flex items-center">
                   <EncryptionBadge label={label} type={type} />
+                  <Tooltip text={tooltip} />
                 </div>
                 <div className={`font-mono text-xs truncate ${type !== 'plaintext' ? 'text-yellow-700' : 'text-gray-600'}`}>
-                  {type !== 'plaintext' ? cipher : cipher}
+                  {cipher}
                 </div>
               </div>
             ))}
           </div>
+
           <p className="text-xs text-gray-500">
-            PII fields are encrypted at origin. The card token is a surrogate — not cardholder
-            data. Your KMS key controls decryption. MongoDB has zero access.
+            PII fields are encrypted at origin. The card token is a surrogate, not cardholder data.
+            Your KMS key controls decryption. MongoDB has zero access.
           </p>
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
+              <strong>Error:</strong> {error}
+            </div>
+          )}
+
           <div className="flex gap-3">
             <button
-              onClick={() => setStep(1)}
-              className="flex-1 border rounded-lg py-2.5 text-gray-700 hover:bg-gray-50"
+              onClick={() => { setStep(1); setError(null); }}
+              className="flex-1 border rounded-lg py-2.5 text-gray-700 hover:bg-gray-50 transition-colors"
             >
               ← Back
             </button>
@@ -243,24 +875,79 @@ export default function PaymentPage() {
         </div>
       )}
 
-      {/* Step 3: Confirmation + Fraud Alert */}
+      {/* -- STEP 3: Confirmation + Fraud Alert ------------------------------ */}
       {step === 3 && result && (
         <div className="bg-white rounded-xl border p-6 space-y-4">
-          <h2 className="text-xl font-bold">✅ Payment Confirmed</h2>
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-1 text-sm">
-            <p>
-              <strong>Transaction:</strong>{' '}
-              <span className="font-mono">{result.txnId.slice(0, 16)}…</span>
-            </p>
-            <p>
-              <strong>Amount:</strong> ${form.amount} · {form.merchantName}
-            </p>
-            <p>
-              <strong>Card:</strong> {maskedCard || '****-****-****-1234'}
-            </p>
-            <p>
-              <strong>Time:</strong> {new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC
-            </p>
+          {returning && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center justify-between">
+              <span className="text-sm text-amber-800 font-medium">Simulation completed. Reset to run a new one.</span>
+              <button
+                onClick={handleReset}
+                className="px-4 py-1.5 bg-[#001E2B] text-[#00ED64] rounded-lg text-sm font-semibold hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors"
+              >
+                Restart Simulation
+              </button>
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">✅ Payment Confirmed</h2>
+            <StepExplainer title="Step 3: Confirmation">
+              <p>
+                The transaction has been written to MongoDB Atlas. The QE-encrypted fields are stored
+                as opaque ciphertext; no plaintext PII ever reaches the database server.
+              </p>
+              <p>
+                If the amount exceeded <strong>${simulatorConfig.fraudAmountThreshold}</strong> or the MCC is high-risk, a
+                <strong> FraudDiagnosisCase</strong> (BIAN SD-83) was automatically opened and you
+                will be redirected to the Investigation Dashboard.
+              </p>
+              <p>
+                In the Investigation Dashboard, analysts can search for this transaction by encrypted
+                email or phone. Atlas runs the equality query without decrypting the stored values.
+              </p>
+            </StepExplainer>
+          </div>
+
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Transaction ID</span>
+              <span className="font-mono text-xs text-gray-800">
+                {result.txnId.slice(0, 16)}…
+                <Tooltip text="UUID of the cardTransaction document (BIAN SD-254 Control Record). Use this to fetch the transaction via GET /api/v1/transactions/:id." />
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Amount</span>
+              <span className="font-semibold">
+                ${form.amount}
+                <Tooltip text="Plaintext amount stored in cardTransactionAmount.amount. Not considered Cardholder Data under PCI DSS." />
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Merchant</span>
+              <span>
+                {form.merchantName}
+                <Tooltip text="Plaintext merchant name stored in cardTransactionMerchantName." />
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Card</span>
+              <span className="font-mono">
+                {maskedCard || '****-****-****-1234'}
+                <Tooltip text="Masked PAN (last 4 digits only). PCI DSS permits displaying this. The raw PAN was never stored." />
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Token</span>
+              <span className="font-mono text-xs">
+                {result.cardToken}
+                <Tooltip text="Card surrogate token generated client-side. This is what is stored in paymentCardReference, not the PAN." />
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Time</span>
+              <span className="text-xs">{new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC</span>
+            </div>
           </div>
 
           {result.fraudCaseCreated && result.caseId && (
@@ -269,23 +956,20 @@ export default function PaymentPage() {
               severity="high"
               caseRef={result.caseRef ?? 'FD-SIM-XXXXXX'}
               investigationPath="/simulator/investigation"
+              noAutoRedirect={returning}
             />
           )}
 
           {!result.fraudCaseCreated && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
               ✅ No fraud risk detected for this transaction.
+              <Tooltip text="No fraud case was created because the amount was below $500 and the MCC was not in the high-risk list (5812, 6011, 7995). Try $850 with MCC 5734 to trigger a fraud alert." />
             </div>
           )}
 
           <button
-            onClick={() => {
-              setStep(1);
-              setForm(DEFAULTS);
-              setMaskedCard('');
-              setResult(null);
-            }}
-            className="w-full border rounded-lg py-2.5 text-gray-700 hover:bg-gray-50"
+            onClick={handleReset}
+            className="w-full border rounded-lg py-2.5 text-gray-700 hover:bg-gray-50 transition-colors"
           >
             ← New Payment
           </button>

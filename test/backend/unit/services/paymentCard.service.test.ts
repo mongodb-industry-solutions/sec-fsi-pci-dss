@@ -1,9 +1,9 @@
 /**
  * Unit tests: paymentCard.service (FR-v1-03.2)
- * Source: backend/src/services/paymentCard.service.ts
+ * Source: backend/src/modules/customer/services/paymentCard.service.ts
  */
 import { describe, it, expect, vi } from 'vitest';
-import { createCard, getCardsByCustomer } from '../../../../backend/src/services/paymentCard.service';
+import { createCard, getCardsByCustomer } from '../../../../backend/src/modules/customer/services/paymentCard.service';
 
 function makeDb(overrides?: { findResults?: unknown[] }) {
   const insertOneMock = vi.fn().mockResolvedValue({ insertedId: 'mock' });
@@ -12,6 +12,7 @@ function makeDb(overrides?: { findResults?: unknown[] }) {
       insertOne: insertOneMock,
       find: vi.fn().mockReturnValue({
         project: vi.fn().mockReturnThis(),
+        sort: vi.fn().mockReturnThis(),
         toArray: vi.fn().mockResolvedValue(overrides?.findResults ?? []),
       }),
     }),
@@ -21,7 +22,7 @@ function makeDb(overrides?: { findResults?: unknown[] }) {
 
 const baseInput = {
   customerAgreementInstanceReference: 'cust-001',
-  cardToken: 'tok_abcdef1234567890',
+  cardToken: 'pm_abcdef1234567890',
   paymentCardExpirationDate: '12/28',
   paymentCardMaskedPanDisplay: '****-****-****-4242',
   paymentCardNetwork: 'VISA' as const,
@@ -51,7 +52,7 @@ describe('createCard', () => {
     const db = makeDb();
     await createCard(db, baseInput);
     const doc = db._insertOne.mock.calls[0][0];
-    expect(doc.paymentCardReference).toBe('tok_abcdef1234567890');
+    expect(doc.paymentCardReference).toBe('pm_abcdef1234567890');
     expect(doc.cardNumber).toBeUndefined();
   });
 

@@ -3,7 +3,7 @@
 **Project:** FSI PCI DSS Payment Security Demo  
 **PRD reference:** [PRD.md](PRD.md)  
 **Engineering Proposal:** [engineering-proposal.md](engineering-proposal.md)  
-**Last updated:** 2026-05-26
+**Last updated:** 2026-06-10
 
 ---
 
@@ -12,9 +12,29 @@
 | Version | Theme | Goal | Target timeline |
 |---|---|---|---|
 | **v1** | Security Foundation | Working end-to-end: payment → QE encryption → fraud investigation | 2–3 weeks |
-| **v2** | Investigation & Control | CISO-ready: RBAC, escalation, audit trail, KMS key rotation | 4–6 weeks after v1 |
-| **v3** | Agentic Fraud Investigation | AI-assisted L1 pre-review using MongoDB Agentic Platform (Magenta preferred) | TBD after v2 validated |
-| **v4** | Advanced Capabilities | Leafy Bank-ready: recurring payment, range queries, performance story | TBD after v3 validated |
+| **v2** | Investigation & Control | CISO (Chief Information Security Officer)  ready: RBAC, escalation, audit trail, KMS key rotation | 4–6 weeks after v1 |
+| **v3** | Integration-ready API Surface | Expose stable webhook events and API contracts that external systems can consume; recurring payment; performance story. External adoption (e.g. Leafy Bank) is decoupled and does not gate this iteration. | TBD after v2 validated |
+| **v4** | PSP Payment Platform + Integration Refinement | Full PSP payment layer (SD-64/65/89/57), modular backend, finalised OpenAPI contracts and webhook schemas for external integrators. | TBD after v3 validated |
+| **v5** | Agentic Integration | AI agent integration for fraud investigation: MongoDB Agentic Platform (Magenta) and/or external agentic systems such as Agentic ThreatSight360. | TBD after v4 validated |
+
+---
+
+## BIAN Compliance Status *(achieved 2026-06-08)*
+
+All collection names, type suffixes, and `bianServiceDomain` values were brought into strict BIAN compliance as a pre-v1 alignment pass. This is not a new iteration — it is a baseline correction that all iterations (v1–v5) inherit.
+
+| Compliance decision | Standard | Status |
+|---|---|---|
+| PII separated into SD-13 `party` collection | BIAN SD-13 | ✅ Done |
+| Auth credentials in SD-91 `customerAuthenticationAssessment` | BIAN SD-91 | ✅ Done |
+| Collection names use BIAN Control Record type suffixes | BIAN naming convention | ✅ Done |
+| `bianServiceDomain` values use BIAN catalogue names with spaces | BIAN SD catalogue | ✅ Done |
+| Open Banking consent stubs `consentAgreement` + `consentAccessLog` | SD-36 | ✅ Done (v3 stub) |
+| FK names use `*InstanceReference` suffix | BIAN FK convention | ✅ Done |
+| Expanded lifecycle states (all BIAN-defined states on model types) | BIAN lifecycle | ✅ Done |
+| DEK-per-field naming (11 DEKs) | QE best practice | ✅ Done |
+
+**Impact on NFRs:** email/phone lookup P95 threshold updated from 300 ms to 500 ms due to two-step PII separation pattern (SD-13 query + SD-53 join). See `tmp/wiki/bian-openbanking-tradeoffs.md §1` for full analysis.
 
 ---
 
@@ -26,8 +46,8 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 
 ### Definition of Done
 
-- [ ] `npm run install:all && npm run setup:db && npm run seed` completes without errors
-- [ ] `docker compose up` starts both services and the demo is accessible at `http://localhost:3000`
+- [ ] `npm run setup && npm run setup:db && npm run setup:seed` completes without errors
+- [ ] `docker compose up` starts both services and the demo is accessible at `http://localhost:8080`
 - [ ] Payment flow completes and creates a fraud diagnosis case in Atlas
 - [ ] Investigation search returns a result for an encrypted `customerEmailAddress`
 - [ ] Atlas Data Explorer shows ciphertext in QE fields (not plaintext)
@@ -63,28 +83,28 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 03.1 | `POST /api/v1/card-transactions` writes to `cardTransaction` and `cardTransactionSensitive` via QE auto-encryption | QE fields in Atlas are ciphertext; plaintext fields are readable |
-| 03.2 | `POST /api/v1/payment-cards` registers a tokenized card in `paymentCard` | Card token stored encrypted; expiry date stored as QE:none |
-| 03.3 | `GET /api/v1/card-transactions/:id` returns transaction by ID | Response includes transaction metadata; sensitive fields excluded from Level 1 response |
+| 03.1 | `POST /api/v1/transactions` writes to `cardTransactionLog` via QE auto-encryption (QE:none fields stored inline) | QE equality and QE:none fields in Atlas are ciphertext; plaintext fields are readable |
+| 03.2 | `POST /api/v1/customer/:customerId/cards` registers a tokenized card in `paymentCardManagement` | Card token stored encrypted; expiry date stored as QE:none |
+| 03.3 | `GET /api/v1/transactions/:id` returns transaction by ID | Response includes transaction metadata; sensitive fields excluded from Level 1 response |
 | 03.4 | Auto-create a `fraudDiagnosisCase` when amount > 500 or MCC is in a risk list | Case is created and linked to the transaction on every triggering event |
-| 03.5 | `GET /health` returns 200 with Atlas connection status | Returns `{ status: "ok", atlas: "connected" }` when Atlas is reachable |
+| 03.5 | `GET /api/v1/system/health` returns 200 with Atlas connection status | Returns `{ status: "ok", atlas: "connected", kmsProvider, timestamp }` when Atlas is reachable; returns 503 when unreachable |
 
 #### FR-v1-04: Investigation API (Backend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 04.1 | `GET /api/v1/customer-agreements?email=<value>` performs QE equality search | Returns matching record when email value matches an encrypted field |
-| 04.2 | `GET /api/v1/customer-agreements?phone=<value>` performs QE equality search | Returns matching record when phone value matches |
-| 04.3 | `GET /api/v1/customer-agreements?accountRef=<value>` performs QE equality search | Returns matching record when account reference matches |
-| 04.4 | `GET /api/v1/card-transactions?cardToken=<value>` performs standard index query on `paymentCardReference` | Returns matching transactions for the given card token (token is not CHD: standard index, not QE) |
-| 04.5 | `GET /api/v1/fraud-diagnosis-cases` returns paginated list with filters `status` and `severity` | Filtering works; response includes pagination metadata |
-| 04.6 | `GET /api/v1/fraud-diagnosis-cases/:id` returns full case detail | Response includes linked transaction reference and customer reference |
+| 04.1 | `GET /api/v1/customer?email=<value>` performs QE equality search | Returns matching record when email value matches an encrypted field |
+| 04.2 | `GET /api/v1/customer?phone=<value>` performs QE equality search | Returns matching record when phone value matches |
+| 04.3 | `GET /api/v1/customer?accountRef=<value>` performs QE equality search | Returns matching record when account reference matches |
+| 04.4 | `GET /api/v1/transactions?cardToken=<value>` performs standard index query on `paymentCardReference` | Returns matching transactions for the given card token (token is not CHD: standard index, not QE) |
+| 04.5 | `GET /api/v1/fraud` returns paginated list with filters `status` and `severity` | Filtering works; response includes pagination metadata |
+| 04.6 | `GET /api/v1/fraud/:id` returns full case detail | Response includes linked transaction reference and customer reference |
 
 #### FR-v1-05: Authentication (Backend + Frontend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 05A.1 | `POST /api/v1/auth/login` validates credentials against `partyAuthentication` and returns a JWT | Valid credentials return `{ token, user: { name, email, role } }`; invalid credentials return 401 |
+| 05A.1 | `POST /api/v1/auth/login` validates credentials against `customerAuthenticationAssessment` (SD-91) and returns a JWT | Valid credentials return `{ token, user: { name, email, role } }`; invalid credentials return 401 |
 | 05A.2 | `GET /api/v1/auth/users` returns list of demo users (name, email, role) without passwords | Response used by frontend user selector dropdown |
 | 05A.3 | Application Mode login screen shows domain selector (`local`) and username dropdown | Selecting a username auto-fills the password field |
 | 05A.4 | JWT is verified on all protected `/api/v1/*` endpoints | Missing or invalid token returns 401 |
@@ -94,10 +114,10 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 06.1 | `bin/setup.ts` creates all 7 collections via `createEncryptedCollection()` (6 domain + `partyAuthentication`) | All collections exist in Atlas after setup; QE metadata is provisioned |
-| 06.2 | `bin/setup.ts` provisions `DEK-lookup` and `DEK-sensitive` in `encryption.__keyVault` | Key vault contains exactly two DEK documents after setup |
+| 06.1 | `bin/setup.ts` creates all QE collections via `createEncryptedCollection()` (5 QE collections: `party`, `customerAuthenticationAssessment`, `customerAgreementProcedure`, `cardTransactionLog`, `paymentCardManagement`) | All collections exist in Atlas after setup; QE metadata is provisioned |
+| 06.2 | `bin/setup.ts` provisions 11 DEKs in `encryption.__keyVault`: `partyEmail`, `partyPhone`, `authEmail`, `customerAccountRef`, `txAccountRef`, `customerAddress`, `customerGovId`, `customerRiskNotes`, `txRawPayload`, `txProcessorMeta`, `cardExpiry` | Key vault contains exactly 11 DEK documents after setup |
 | 06.3 | `bin/setup.ts` creates all indexes defined in the Technical Specification | Index exists on every field listed in the index strategy |
-| 06.4 | `bin/seed.ts` inserts synthetic BIAN-compliant data into all collections | 5 demo users, 50 customers, 50 sensitive records, 50 cards, 200 transactions, 200 sensitive transactions, 20 fraud cases |
+| 06.4 | `bin/seed.ts` inserts synthetic BIAN-compliant data into all collections | 53 parties, 5 demo users, 50 customers, 50 sensitive records, 50 cards, 200 transactions, 200 sensitive transactions, 20 fraud cases |
 | 06.5 | `bin/seed.ts` is idempotent: safe to re-run without creating duplicates | Running seed twice produces the same number of documents |
 
 ---
@@ -132,6 +152,10 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 - [ ] Audit trail shows every field-access event for a given case
 - [ ] QE range query on `transactionAmount.amount` works (e.g., "find transactions between $200 and $1000")
 - [ ] KMS key rotation walkthrough is demonstrable (step-by-step in the UI or docs)
+- [x] Case notes as BIAN append-only events (`POST`/`DELETE`/`GET /api/v1/fraud/:id/notes`)
+- [x] Customer-visible notes list in transaction detail
+- [x] Note retraction with audit event (BIAN + PCI DSS Req 10.3 compliant)
+- [x] `escalationAcceptedAt` persisted on case document (L2 accept survives refresh)
 
 ---
 
@@ -150,7 +174,7 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 11.1 | Level 1 can trigger an escalation request on an open case | `POST /api/v1/fraud-diagnosis-cases/:id/escalate` changes status to `escalated` |
+| 11.1 | Level 1 can trigger an escalation request on an open case | `POST /api/v1/fraud/:id/escalate` changes status to `escalated` |
 | 11.2 | Level 2 Investigator sees pending escalation cases in a dedicated queue | Cases with status `escalated` appear in the Level 2 dashboard |
 | 11.3 | Level 2 approves and sensitive QE:none fields are decrypted and displayed | `residentialAddressFull` and `governmentIdentificationReference` are shown after approval |
 | 11.4 | Escalation approval writes an audit event with timestamp, role, and field names accessed | Audit event persists in `fraudDiagnosisCase.diagnosisActionLog` |
@@ -168,8 +192,8 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | 13.1 | API reads role from `X-Demo-Role` request header | Missing header defaults to `level1_analyst` |
-| 13.2 | Level 1 requests never query `customerAgreementSensitive` or `cardTransactionSensitive` | Collections are not touched; no sensitive fields appear in Level 1 responses |
-| 13.3 | Level 2 access to sensitive collections requires a valid escalation token | Request without escalation token returns 403 |
+| 13.2 | Level 1 requests use the L1 QE client, which omits QE:none fields from its `encryptedFieldsMap`; Binary ciphertext fields are stripped from Level 1 API responses | No sensitive fields (address, govId, rawGatewayPayload) appear in Level 1 responses |
+| 13.3 | Level 2 access to QE:none fields requires a valid escalation token to activate the L2 QE client | Request without escalation token returns 403 |
 | 13.4 | Every sensitive field access writes an audit event | `field_accessed` event is appended to the case action log |
 
 #### FR-v2-14: Audit Log API
@@ -177,13 +201,13 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | 14.1 | `GET /api/v1/audit-events?caseId=<id>` returns action log for the case | Response contains all events in chronological order |
-| 14.2 | `POST /api/v1/fraud-diagnosis-cases/:id/escalate` creates escalation record | Status changes to `escalated`; escalation event is logged |
+| 14.2 | `POST /api/v1/fraud/:id/escalate` creates escalation record | Status changes to `escalated`; escalation event is logged |
 
 #### FR-v2-15: Range Query Support (Backend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| 15.1 | `GET /api/v1/card-transactions?amountMin=<n>&amountMax=<n>` performs QE range query on `transactionAmount.amount` | Returns only transactions within the encrypted amount range |
+| 15.1 | `GET /api/v1/transactions?amountMin=<n>&amountMax=<n>` performs QE range query on `transactionAmount.amount` | Returns only transactions within the encrypted amount range |
 | 15.2 | `transactionAmount.amount` is defined in `encryptedFieldsMap` with `queryType: "range"`, `min: 0`, `max: 999999`, `precision: 2` | QE range query executes without error |
 
 ---
@@ -200,17 +224,229 @@ Answer the CISO's hardest questions: *"Who can see what?"* and *"Can I prove it?
 
 ---
 
-## v3: Agentic Fraud Investigation
+### Ch-03 / Architecture Changes *(implemented 2026-06-10)*
+
+These changes were applied during v2 development and are now part of the v2 baseline. All v2 acceptance criteria inherit them.
+
+| Change | Detail | Status |
+|---|---|---|
+| Case notes migrated to append-only events | `POST /api/v1/fraud/:id/notes`, `DELETE /api/v1/fraud/:id/notes/:noteId`, and `GET /api/v1/fraud/:id/notes` replace the deprecated note fields on the `PATCH` endpoint. Each note is stored as an immutable `note_added` event in `fraudDiagnosisCaseEvents`. Errors are corrected via a `note_retracted` event (BIAN SD-83 append-only principle, PCI DSS Req 10.3). | ✅ Done |
+| `escalationAcceptedAt` on case document | `GET /api/v1/fraud/:id` now returns `escalationAcceptedAt`. The timestamp is persisted on the `fraudDiagnosisCase` document when a Level 2 Investigator approves an escalation, so the approval state survives a page refresh. | ✅ Done |
+| Deprecated: `fraudDiagnosisCaseNotes` | The single-string `fraudDiagnosisCaseNotes` field on `fraudDiagnosisCase` is **deprecated**. New writes must use the notes event endpoints above. Existing seed data retains the field for backward compatibility; it will be removed in v3. | ⚠️ Deprecated |
+| Deprecated: `fraudDiagnosisCustomerSubjectNotes` | The single-string `fraudDiagnosisCustomerSubjectNotes` field is **deprecated** for the same reason. Customer-visible notes are now the chronological list of `visibility:'customer'` events returned by `GET /api/v1/fraud/:id/notes`. | ⚠️ Deprecated |
+
+---
+
+## v3: Advanced Capabilities
 
 ### Objective
 
-Introduce an AI agent (MongoDB Agentic Platform, Magenta preferred) into the fraud investigation workflow. The agent automatically pre-reviews each fraud case when it opens, queries the encrypted QE collections to gather context, produces a structured draft diagnosis, and presents it to the L1 analyst as a suggested action. The human analyst confirms, overrides, or escalates. This demonstrates how Agentic AI integrates with existing encrypted data workflows without relaxing security controls.
+Expose the integration-ready API surface that external systems can consume without this demo having to wait for them. Add the save-card / recurring payment flow, stable webhook event contracts, a performance visualisation, and optionally prefix/substring QE (Queryable Encryption) queries if MongoDB 8.2 is available.
+
+External systems such as Leafy Bank or Agentic ThreatSight360 **may** consume the endpoints and events published in this iteration, but their adoption is entirely decoupled. If a peer system has not yet performed its own refactoring, the PSP platform roadmap is unaffected: v3 is complete when the contracts are published and the PSP implements them, regardless of whether any external consumer has integrated.
 
 ### Definition of Done
 
 - [ ] All v1 and v2 DoD criteria still pass
+- [ ] "Save this card for future payments" flow works end-to-end
+- [ ] Returning customer can select a saved card and complete payment without re-entering card details
+- [ ] Performance comparison panel shows query time with QE vs a plaintext reference collection
+- [ ] Webhook event payloads for card-lifecycle and transaction-created events are documented in technical-spec.md
+- [ ] API contracts for all v3 endpoints are stable, versioned, and documented in technical-spec.md
+- [ ] Solutions Library article draft is created (ks-mongodb-ist-content checklist complete)
+
+---
+
+### FR-v3: Functional Requirements
+
+#### FR-v3-20: Save Card / Recurring Payment (Frontend + Backend)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| 20.1 | After successful payment, a consent checkbox "Save this card for future payments" appears unchecked by default | Checkbox is visible on the confirmation screen; requires explicit opt-in |
+| 20.2 | Accepting consent records `isPreferredCard: true`, `mandateStatus: 'active'`, and `cardholderConsentTimestamp` in `paymentCardManagement` | All three mandate fields are present in the Atlas document |
+| 20.3 | `customerAgreementProcedure.preferredPaymentCardReference` is updated to link to the saved card token | Field equals the `paymentCardReference` of the saved card |
+| 20.4 | On next payment, "Use saved card ****-1234" option appears | Saved card is retrieved via `preferredPaymentCardReference` from the customer agreement |
+| 20.5 | Selecting a saved card completes checkout without re-entering card details; CVV is never requested | Card transaction is created with `cardTransactionInitiationType: 'merchantInitiated'`; no CVV field in the flow |
+| 20.6 | Mandate can be cancelled: `mandateStatus` updates to `'cancelled'` and the card is no longer offered | Cancelled card does not appear on next payment; `preferredPaymentCardReference` is cleared |
+| 20.7 | Explainer panel: "No card data is stored in your browser: only a token, encrypted in Atlas" | Panel is visible on the saved card selection screen |
+
+#### FR-v3-21: Performance Visualization (Backend + Frontend)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| 21.1 | `GET /api/v1/diagnostics/query-timing` runs the same equality search on the encrypted collection and a plaintext shadow collection | Both queries execute and timing data is returned |
+| 21.2 | Response includes timing in milliseconds for both queries | `{ encrypted_ms: number, plaintext_ms: number, overhead_pct: number }` |
+| 21.3 | Frontend displays a side-by-side comparison panel with the timing values | Panel is visible in the investigation dashboard; values update on each search |
+
+#### FR-v3-22: External Integration API Surface
+
+This feature exposes the contracts and events that any external system can consume. No external system is required to adopt them in v3; this iteration is complete when the PSP platform publishes the contracts, not when a consumer has integrated.
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| 22.1 | All v3 API endpoints follow a stable versioned contract (`/api/v1/`) and are fully documented in technical-spec.md before merge | technical-spec.md §6 covers every new endpoint introduced in v3 with request/response schema |
+| 22.2 | Card-lifecycle events (card registered, card updated, mandate changed) are emitted as structured webhook payloads | Webhook payload schema documented in technical-spec.md; event is emitted on each trigger |
+| 22.3 | Transaction-created event is emitted after every successful `POST /api/v1/transactions` | Event payload includes `cardTransactionInstanceReference`, `paymentCardReference`, `cardTransactionAmount`, `cardTransactionStatus` |
+| 22.4 | Authentication contract for service-to-service callers is defined: JWT header structure, required claims, and role mapping | Documented in technical-spec.md; a `level1_analyst` or `level2_investigator` service credential can authenticate without a frontend session |
+
+---
+
+### NFR-v3: Non-Functional Requirements
+
+| ID | Category | Requirement | Measure |
+|---|---|---|---|
+| NFR-v3-01 | Performance | QE overhead for equality search is below a defined threshold | Overhead < 20% vs plaintext on Atlas M10 under single-user demo load |
+| NFR-v3-02 | UX | Returning customer payment with saved card completes in fewer steps than first-time payment | Saved card flow requires ≤ 2 steps vs 3 for new card |
+| NFR-v3-03 | Portability | Any external system with a service credential can call all v3 endpoints without changes to the PSP platform | Validated by IST team design review against the published integration contract in technical-spec.md; no dependency on external team availability |
+| NFR-v3-04 | Content readiness | Solutions Library article passes the four-section template check | Validated using ks-mongodb-ist-content checklist |
+
+---
+
+## v4: Payment Gateway + Modular Architecture
+
+### Objective
+
+Extend the demo from a **fraud investigation tool** to a **full payment platform story**: MongoDB as the PCI DSS-aligned data backbone for a PSP platform. The backend is restructured into domain modules (one per BIAN SD cluster) and a new gateway module adds four BIAN Service Domains (SD-89, SD-64, SD-65, SD-57), three collections, and a full payment order lifecycle API. The frontend adds the merchant as a visible actor in the demo flow.
+
+The structural refactor (P1) has zero functional impact: same API surface, same QE behaviour, same frontend. The gateway module (P2–P5) adds new capabilities on top.
+
+v4 also finalises the external integration surface introduced in v3: OpenAPI schemas are published for all PSP payment endpoints, webhook contracts are versioned, and the OAuth (Open Authorization) 2.0 groundwork is documented so that external systems (such as Leafy Bank's Open Finance Service or Agentic ThreatSight360) can integrate at their own pace without requiring changes to the PSP platform. Integration by external systems is optional and does not gate any v4 acceptance criteria.
+
+### Definition of Done
+
+- [ ] All v3 DoD criteria still pass
+- [ ] `npm run build` exits 0; no TypeScript errors after structural refactor
+- [ ] No file remains in `backend/src/controllers/`, `backend/src/services/`, `backend/src/models/`, `backend/src/middleware/` (all moved to modules)
+- [ ] `npm run setup:db` creates `merchantAgreementProcedure`, `paymentOrderProcedure`, `cardEtokenProcedure` collections
+- [ ] Atlas Data Explorer confirms `merchantApiKeyHash` is ciphertext (QE:none)
+- [ ] `POST /api/v1/gateway/payments` creates a payment order with status `initiated`
+- [ ] Full authorize flow: create → confirm → authorize creates a linked `cardTransactionLog` entry and `fraudDiagnosisCase` (if MCC/amount triggers)
+- [ ] Idempotency: duplicate `X-Idempotency-Key` returns 409
+- [ ] Merchant profile panel visible in fraud case detail (merchant name, MCC, risk category, amount ratio)
+- [ ] Simulator Mode step 0 shows merchant creating the payment intent
+
+---
+
+### FR-v4: Functional Requirements
+
+#### FR-v4-P1: Backend Structural Refactor (no functional change)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| P1.1 | All backend source files moved to `src/modules/<module>/controllers/services/models/` | No file remains in the old flat `src/controllers/`, `src/services/`, `src/models/` directories |
+| P1.2 | Shared types extracted to `src/shared/models/` (`risk`, `identity`, `transaction`) | `RiskSeverity`, `AnalystRole`, `TransactionSnapshot` imported from `shared/models/` in all consuming modules |
+| P1.3 | Each module exports a single Fastify plugin via `index.ts`; `server.ts` registers modules with `prefix: '/api/v1'` | All existing routes respond with identical status codes and response shapes as before the refactor |
+| P1.4 | `middleware/auth.ts` and `rbac.ts` moved to `vendors/middleware/` | Imports updated in `server.ts`; middleware behaviour unchanged |
+| P1.5 | `models/index.ts` barrel deleted; each module imports from its own `models/` directory | `grep -r "from '../models'" backend/src/modules` returns zero results |
+
+#### FR-v4-P2: Merchant Relations (SD-89)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| P2.1 | `POST /api/v1/merchants` creates a `merchantAgreement` document with all required BIAN fields | Document visible in Atlas; `merchantApiKeyHash` is ciphertext (QE:none) |
+| P2.2 | `GET /api/v1/merchants/:id` returns merchant profile without `merchantApiKeyHash` | Response includes `merchantName`, `merchantCategoryCode`, `merchantRiskCategory`, `merchantTransactionLimitAmount`; hash field absent |
+| P2.3 | `GET /api/v1/merchants` returns paginated merchant list with filters `status` and `mcc` | Pagination metadata present; filter by `merchantCategoryCode=5812` returns only gambling/restaurant merchants |
+| P2.4 | `cardTransactionLog` documents include `merchantAgreementInstanceReference` FK after v4 seed | FK links transaction to a seeded merchant; existing transactions without FK are valid (optional field, schema version 2) |
+
+#### FR-v4-P3: Payment Order Lifecycle (SD-64 + SD-65)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| P3.1 | `POST /api/v1/gateway/payments` creates a `paymentOrder` with status `initiated`; requires `X-Idempotency-Key` header | Order created; second call with same key returns 409 |
+| P3.2 | `POST /api/v1/gateway/payments/:id/confirm` transitions `initiated → confirmed`; sets `customerAgreementInstanceReference` | Status updated in Atlas; invalid transitions (e.g., confirm a voided order) return 422 |
+| P3.3 | Authorization step creates a `cardTransactionLog` entry (SD-254) and links it to the `paymentOrder` | `paymentOrder.linkedCardTransactionReference` populated; transaction visible in the investigation dashboard |
+| P3.4 | Authorization triggers fraud evaluation if amount/MCC criteria met | `fraudDiagnosisCase` created and linked; uses `shared/services/fraudTrigger.service.ts` |
+| P3.5 | `POST /api/v1/gateway/payments/:id/capture` transitions `authorized → captured` | Status updated; only valid from `authorized` state |
+| P3.6 | `DELETE /api/v1/gateway/payments/:id` (void) transitions `authorized | confirmed → voided` | Status updated; no `cardTransaction` reversal required in v4 (documented limitation) |
+| P3.7 | `POST /api/v1/gateway/payments/:id/refund` records a partial or full refund; transitions `captured → refunded` | `refundAmount` recorded; amount validation against original amount |
+| P3.8 | `GET /api/v1/gateway/payments/:id` returns full payment order with current status and routing decision | Response includes `paymentOrderStatus`, `routingDecision.processor`, `linkedCardTransactionReference` |
+| P3.9 | `paymentOrder` TTL index expires stale `initiated` orders after 24 hours | MongoDB removes expired `initiated` orders automatically (verified in Atlas) |
+
+#### FR-v4-P4: Token Vault (SD-57)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| P4.1 | `POST /api/v1/gateway/tokens` creates a `tokenVault` record linked to a `customerAgreementProcedure` | Record visible in Atlas; `tokenVaultNetworkToken` is ciphertext if populated |
+| P4.2 | `GET /api/v1/gateway/tokens/:token` returns token metadata without `tokenVaultNetworkToken` | Response includes `tokenVaultStatus`, `tokenVaultCreatedAt`, `tokenVaultLastUsedAt`; network token absent |
+
+#### FR-v4-P5: Frontend — Merchant Context
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| P5.1 | Simulator Mode: step 0 "Merchant creates payment intent" is inserted before the checkout step | Step visible; shows merchant card (name, MCC, risk category) and the generated payment order reference |
+| P5.2 | Fraud case detail (Simulator + Application Mode): "Merchant Profile" panel shows merchant name, MCC description, risk category, average transaction amount, and amount ratio | Panel visible; ratio calculated as `transactionAmount / merchantAverageTransactionAmount`; label "78x merchant average" when ratio ≥ 10 |
+| P5.3 | Application Mode: route `/system/merchant` accessible to users with role `customer` | Route loads without errors; shows merchant's payment links, checkout sessions, and profile |
+
+#### FR-v4-P6: Merchant Onboarding Lifecycle (Ch-05)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| P6.1 | Customer can submit a merchant application via `POST /api/v1/merchants` — application starts at `under_review` | Atlas document has `merchantAgreementStatus: 'under_review'`; `merchantOwnerPartyReference` FK populated from JWT |
+| P6.2 | `merchant_officer` role can list all pending applications via `GET /api/v1/merchants?status=under_review` | Officer dashboard shows applications with merchant name, category, owner, submitted date |
+| P6.3 | `merchant_officer` can approve an application via `PATCH /api/v1/merchants/:id/review` — body `{ action: 'approve', reviewNote: '...' }` | Status transitions to `agreed`; `merchantReviewedByPartyReference`, `merchantReviewedDateTime`, `merchantReviewNote` populated |
+| P6.4 | `merchant_officer` can reject an application via `PATCH /api/v1/merchants/:id/review` — body `{ action: 'reject', reviewNote: '...' }` | Status transitions to `rejected`; review metadata populated |
+| P6.5 | Webhook event `merchant.agreement.activated` is emitted when a merchant is approved | Event payload includes `merchantAgreementInstanceReference`, `merchantName`, `reviewedByPartyReference` |
+| P6.6 | Frontend: `/system/merchant` shows "Request Merchant Account" form when authenticated customer has no linked merchant | Form includes all required BIAN fields; "Load test data" dropdown with 3 presets |
+| P6.7 | Frontend: after submission, merchant portal shows "Application under review" state with application details | Status badge displayed; timestamp shown |
+| P6.8 | Frontend: `/system/merchant/review` route accessible to `merchant_officer` — shows pending applications queue | Each card has Approve / Reject buttons; review notes input field |
+| P6.9 | Seed data: `backend/data/merchants.json` contains 3 records — 1 `active`, 1 `under_review`, 1 `active` (different owner) | `npm run db:seed` inserts all 3 without error |
+
+#### FR-v4-P7: Debug Mode (Ch-05)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| P7.1 | `[⚡ Debug]` button visible in top nav bar when `DEMO_DEBUG_ENABLED=true` env var is set | Button absent when env var is absent or false |
+| P7.2 | Toggle persists across navigation via `localStorage` key `demo_debug_mode` | Reload browser tab — debug state unchanged |
+| P7.3 | When debug ON: every entity card shows a BIAN Service Domain chip (e.g., `SD-89 · Merchant Relations`) | Chip visible on merchant cards, transaction cards, case cards |
+| P7.4 | When debug ON: every encrypted field shows a lock icon with QE mode tooltip | Tooltip text: `"QE:equality — BSON Binary subtype 6 · PCI DSS Req 3.5.1"` |
+| P7.5 | When debug ON: key entity pages show a `DebugRawDoc` panel with live MongoDB document | Panel uses `GET /api/v1/system/raw/:collection/:id`; encrypted fields show as `Binary('...')` |
+| P7.6 | When debug ON: action buttons have `[ℹ]` icon opening an info panel | Info panel shows: BIAN Action Term, HTTP endpoint, MongoDB operation, PCI DSS control |
+| P7.7 | When debug ON: forms show "Load test data" dropdown | Dropdown has 2–3 realistic presets; selecting one fills all form fields |
+
+#### FR-v4-P8: Enhanced Login UX (Ch-05)
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| P8.1 | When debug OFF: standard login form (username + password) | Functional login with all demo credentials |
+| P8.2 | When debug ON: login page shows all 7 demo users as clickable cards | Cards replace the form; each shows name, role badge, department |
+| P8.3 | Role badge colors: customer=blue, analyst=amber, investigator=orange, auditor=red, merchant_officer=purple | Color consistent across all pages that reference roles |
+| P8.4 | Clicking a user card logs in immediately (no password required in debug mode) | JWT issued; user redirected to role-appropriate home page |
+| P8.5 | In debug mode: each login card shows `partyInstanceReference` and `customerAuthenticationInstanceReference` | BIAN SD-13 and SD-91 references visible on card |
+
+---
+
+### NFR-v4: Non-Functional Requirements
+
+| ID | Category | Requirement | Measure |
+|---|---|---|---|
+| NFR-v4-01 | Backward compatibility | Structural refactor does not change any API URL, request schema, or response shape | All v3 integration tests pass unchanged after refactor |
+| NFR-v4-02 | PCI CDE scope | Modules `customer`, `transactions`, `gateway` are explicitly documented as in-scope; `fraud`, `identity` as adjacent; `system` as non-CDE | EP §3.8.1 BIAN Module Map confirms scope classification; no CHD in `fraud` or `system` module responses |
+| NFR-v4-03 | Security | `merchantApiKeyHash` is never returned in any GET response | Integration test: `GET /merchants/:id` response parsed for absence of `merchantApiKeyHash` field |
+| NFR-v4-04 | Idempotency | Duplicate `X-Idempotency-Key` on any gateway write endpoint returns 409 within P95 < 100ms | Load test with duplicate key; verify consistent 409 response |
+| NFR-v4-05 | Demo explainability | A non-technical AE can narrate the gateway flow (merchant → intent → authorization → fraud case) in ≤ 2 minutes | Validated by IST team walkthrough |
+| NFR-v4-06 | Module isolation | No module imports from another module's `controllers/` or `models/` directory directly | `grep -r "from '../../[^s]" backend/src/modules` returns zero cross-module direct imports (only `shared/` and `vendors/` allowed) |
+| NFR-v4-07 | Debug Mode safety | `DebugRawDoc` component is only rendered when `DEMO_DEBUG_ENABLED=true`; never in production | Build time check: component import guarded by env var; E2E test confirms panel absent when env var unset |
+| NFR-v4-08 | Onboarding realism | Merchant application flow (submit → review → approve) completes without manual DB edits | Full end-to-end test: customer submits, officer approves, merchant portal shows `agreed` status |
+| NFR-v4-09 | Seed completeness | `npm run db:seed` populates all 7 demo users and 3 merchants without error on a clean Atlas cluster | CI: seed runs against a test cluster and all collections have expected document counts |
+
+---
+
+## v5: Agentic Fraud Investigation
+
+### Objective
+
+Introduce AI agent integration into the fraud investigation workflow. The primary target is the MongoDB Agentic Platform (Magenta preferred), but the architecture is designed so that any external agentic system — such as Agentic ThreatSight360 (fsi/fsi-aml-fraud-detection) — can integrate through the same REST (Representational State Transfer) API surface using a `level2_investigator` service credential.
+
+The agent automatically pre-reviews each fraud case when it opens, queries the encrypted QE collections to gather context, produces a structured draft diagnosis, and presents it to the L1 analyst as a suggested action. The human analyst confirms, overrides, or escalates. This demonstrates how agentic AI integrates with existing encrypted data workflows without relaxing security controls.
+
+As with v3 and v4, external agent adoption (e.g. Agentic ThreatSight360 performing its own integration work) is fully decoupled: v5 is complete when the PSP platform publishes the agent-accessible API contracts and the Magenta-based agent works end-to-end, regardless of whether any third-party agent has integrated.
+
+### Definition of Done
+
+- [ ] All v1, v2, v3, and v4 DoD criteria still pass
 - [ ] AI agent fires automatically when a `fraudDiagnosisCase` is created
-- [ ] Agent queries `customerAgreement` and `cardTransaction` via existing QE equality endpoints
+- [ ] Agent queries `customerAgreementProcedure` and `cardTransactionLog` via existing QE equality endpoints
 - [ ] Agent produces a structured draft: risk summary, recommended action (`clear` / `escalate` / `investigate`), confidence score 0–100
 - [ ] L1 analyst sees the AI draft inline in the case detail view; can confirm, override, or dismiss
 - [ ] Agent action is logged in `diagnosisActionLog` with `performedByRole: 'ai_agent'`
@@ -218,19 +454,19 @@ Introduce an AI agent (MongoDB Agentic Platform, Magenta preferred) into the fra
 
 ---
 
-### FR-v3: Functional Requirements
+### FR-v5: Functional Requirements
 
-#### FR-v3-30: AI Agent Pre-Review (Backend)
+#### FR-v5-30: AI Agent Pre-Review (Backend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | 30.1 | Agent is triggered automatically when a fraud case status transitions to `open` | Agent invocation logged within 2 seconds of case creation |
-| 30.2 | Agent queries `customerAgreement` by `cardTransactionAccountReference` to retrieve customer profile | Agent uses existing QE equality search endpoint: `GET /api/v1/customer-agreements?accountRef=<value>` |
-| 30.3 | Agent queries `cardTransaction` for prior transactions by same card token | Agent uses `GET /api/v1/card-transactions?cardToken=<value>` |
+| 30.2 | Agent queries `customerAgreementProcedure` by `cardTransactionAccountReference` to retrieve customer profile | Agent uses existing QE equality search endpoint: `GET /api/v1/customer?accountRef=<value>` |
+| 30.3 | Agent queries `cardTransactionLog` for prior transactions by same card token | Agent uses `GET /api/v1/transactions?cardToken=<value>` |
 | 30.4 | Agent produces a structured JSON draft: `{ riskSummary, recommendedAction, confidenceScore, supportingEvidence[] }` | All four fields are present in the agent output |
 | 30.5 | Agent action is appended to `diagnosisActionLog` with `performedByRole: 'ai_agent'` | Log entry present in MongoDB document after agent completes |
 
-#### FR-v3-31: AI Draft UI (Frontend)
+#### FR-v5-31: AI Draft UI (Frontend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -240,7 +476,7 @@ Introduce an AI agent (MongoDB Agentic Platform, Magenta preferred) into the fra
 | 31.4 | L2 investigator case detail shows the AI context note alongside sensitive fields | AI summary visible in L2 view |
 | 31.5 | Audit trail includes agent events with `performedByRole: 'ai_agent'` and action type `ai_review` | Events appear in the audit timeline |
 
-#### FR-v3-32: Agent Infrastructure (Backend)
+#### FR-v5-32: Agent Infrastructure (Backend)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -250,75 +486,141 @@ Introduce an AI agent (MongoDB Agentic Platform, Magenta preferred) into the fra
 
 ---
 
-### NFR-v3: Non-Functional Requirements
+### NFR-v5: Non-Functional Requirements
 
 | ID | Category | Requirement | Measure |
 |---|---|---|---|
-| NFR-v3-01 | Performance | Agent pre-review completes within acceptable latency for demo | Agent draft available within 5 seconds of case creation |
-| NFR-v3-02 | Security | Agent uses only existing API endpoints: no direct MongoDB connection, no key access | Agent cannot bypass QE or RBAC layer |
-| NFR-v3-03 | Explainability | Non-technical audience can understand what the agent did and why | Agent evidence list uses plain English; no raw JSON shown in UI |
-| NFR-v3-04 | Backward compatibility | v1 and v2 flows work unchanged when agent is disabled (`AGENT_ENABLED=false`) | Full payment-to-investigation flow completes with `AGENT_ENABLED=false` |
+| NFR-v5-01 | Performance | Agent pre-review completes within acceptable latency for demo | Agent draft available within 5 seconds of case creation |
+| NFR-v5-02 | Security | Agent uses only existing API endpoints: no direct MongoDB connection, no key access | Agent cannot bypass QE or RBAC layer |
+| NFR-v5-03 | Explainability | Non-technical audience can understand what the agent did and why | Agent evidence list uses plain English; no raw JSON shown in UI |
+| NFR-v5-04 | Backward compatibility | v1–v4 flows work unchanged when agent is disabled (`AGENT_ENABLED=false`) | Full payment-to-investigation flow completes with `AGENT_ENABLED=false` |
 
 ---
 
-## v4: Advanced Capabilities
+## v6 — Integration Hub & Compliance Orchestration
+
+**Goal:** Connect the demo to external compliance systems using BIAN SD-193 External Provider Arrangements. Every compliance function ships with an internal default provider that works out-of-the-box. External providers (Refinitiv, FICO, Onfido, NICE Actimize, etc.) can be registered at runtime and override the internal defaults. This transforms the demo from an isolated proof-of-concept to an integration-ready reference architecture.
+
+**Key deliverables:** `integrationRegistry` collection (SD-193), integration dispatch service, inbound callback + HMAC validation, `system_admin` business role, `/system/admin` management portal.
+
+**BIAN Service Domains:** SD-193 (External Provider Arrangements) + all existing SDs for internal defaults (SD-63, SD-13, SD-53, SD-89, SD-99, SD-83)
+
+**PCI DSS:** Req 12.8 (third-party service provider list and agreements), Req 10.2.1 (audit log of provider access), Req 10.7 (log retention 90 days), Req 6.3.3 (credential protection), Req 7.1 (Separation of Duties — system_admin vs devops admin)
+
+**Pre-requisites:** v5 (AI Agent fraud investigation) complete.
+
+---
+
+### v6 Functional Requirements
+
+| ID | Feature | Acceptance Criteria | Priority |
+|---|---|---|---|
+| FR-v6-01 | Integration Registry — CRUD | system_admin can register, view, update, and list integration providers via `/api/v1/integrations`. Non-system_admin roles receive 403. | Critical |
+| FR-v6-02 | Integration Registry — API key management | POST /integrations returns plaintext key exactly once. Subsequent GET never exposes the key — only a visible prefix (e.g. `fds_live_...`). POST /rotate-key invalidates old key and returns new key once. | Critical |
+| FR-v6-03 | Internal-First dispatch | For each integration type, the dispatch service uses the internal handler when no active external provider is registered. The system never returns errors due to absent external configuration. | Critical |
+| FR-v6-04 | External provider dispatch (sync) | When an active external provider is registered for `fraud_detection` or `hrp_sanctions`, the dispatch service calls the provider's endpoint, parses the response, and updates the relevant record. Timeout and retry policy are respected. | High |
+| FR-v6-05 | External provider dispatch (async + callback) | When an active external provider is registered for `kyc_identity`, `kyb_business`, or `aml_monitoring` in async mode, the dispatch service sends a request and waits for a callback on `/webhooks/{type}/{id}/callback`. | High |
+| FR-v6-06 | Inbound callback — HMAC validation | Every POST to `/webhooks/*` validates the `X-Webhook-Signature: sha256=<hmac>` header. Requests without a valid signature return 401. | Critical |
+| FR-v6-07 | Integration Event audit log | Every dispatch, callback, health check, and test fires an `IntegrationEvent` record. The record includes timestamp, event type, arrangement reference, status, latency, and a SHA-256 hash of the payload (not the payload itself). | Critical |
+| FR-v6-08 | Provider health check + test | POST /integrations/:id/test fires a synthetic event to the configured endpoint and returns `{ status, latencyMs }`. The `externalProviderHealthStatus` field is updated after every test. | High |
+| FR-v6-09 | Suspend integration | POST /integrations/:id/suspend sets status to `suspended`. Internal providers (externalProviderIsInternal: true) return 400 — cannot be suspended. | High |
+| FR-v6-10 | system_admin role | A new `system_admin` role can log in via `/system`. After login, the user is redirected to `/system/admin`. The role has no access to fraud investigation or merchant approval workflows. | Critical |
+| FR-v6-11 | Admin portal — integration dashboard | `/system/admin` shows 6 integration type tiles (one per type), each with the active provider name, health status indicator, and last check time. Internal providers show a "Built-in" badge. | High |
+| FR-v6-12 | Admin portal — integration list | `/system/admin/integrations` lists all providers with name, type, status, mode (sync/async), health, and last event timestamp. | High |
+| FR-v6-13 | Admin portal — integration detail + test | `/system/admin/integrations/[id]` shows full provider config (no key hash visible), event log (last 20), and a "Test connection" button. After test, latency and status are displayed. | High |
+| FR-v6-14 | Admin portal — register new integration | `/system/admin/integrations/new` wizard: select type → enter name/endpoint/auth scheme → paste API key → select trigger events → submit. API key is shown in a one-time reveal panel after creation. | High |
+| FR-v6-15 | Admin portal — token lifecycle | `/system/admin/tokens` lists API tokens by prefix, creation date, and last-used date. "Rotate key" and "Suspend" actions available. | Medium |
+| FR-v6-16 | Pre-seeded internal providers | On first seed, 3 internal providers are created: FDS (fraud_detection), HRPC (hrp_sanctions), AML (aml_monitoring). All have `externalProviderIsInternal: true` and `externalProviderArrangementStatus: active`. | Critical |
+
+---
+
+### v6 Non-Functional Requirements
+
+| ID | Category | Requirement | Measure |
+|---|---|---|---|
+| NFR-v6-01 | Security | API key never stored in plaintext | bcrypt hash only in DB; plaintext returned at creation/rotation ONCE, not retrievable after |
+| NFR-v6-02 | Security | Inbound callbacks authenticated | Every POST to /webhooks/* rejected without valid HMAC-SHA256 `X-Webhook-Signature` |
+| NFR-v6-03 | Security | Separation of Duties | `system_admin` role has zero access to: server exec, env vars, service restart (devops admin) |
+| NFR-v6-04 | Reliability | Internal-First guarantee | System operates with zero external providers configured: all 3 internal providers active from seed |
+| NFR-v6-05 | Performance | Dispatch adds <5ms on internal path | Internal dispatch (no HTTP call) completes within 5ms on the fraud scoring hot path |
+| NFR-v6-06 | Observability | Every provider interaction logged | IntegrationEvent record created for every dispatch, callback, health check, test |
+| NFR-v6-07 | Compliance | Event log retention ≥ 90 days | TTL index on integrationEvents: expireAfterSeconds: 7776000 (PCI DSS Req 10.7) |
+| NFR-v6-08 | Compliance | Provider list maintained | All registered providers (internal + external) visible in registry (PCI DSS Req 12.8.1) |
+| NFR-v6-09 | Backward compat | v1–v5 flows unchanged | All existing fraud investigation, KYC/KYB, merchant onboarding flows work with internal providers active |
+| NFR-v6-10 | Type safety | No `any` types | `npm run build` exits 0 on backend + frontend |
+
+---
+
+### v6 BIAN Service Domain Coverage
+
+| BIAN SD | Role in v6 | New or Existing |
+|---|---|---|
+| SD-193 External Provider Arrangements | `integrationRegistry` collection — the Integration Hub registry | **New** |
+| SD-63 Fraud Evaluation | Internal FDS default provider | Existing (SD-63 already implemented) |
+| SD-13 Party Reference Data | Internal HRPC sanctions default | Existing (HRPC endpoint already implemented) |
+| SD-53 Customer Agreement | Internal KYC identity default (BQ:Step) | Existing (KYC BQ:Step already implemented) |
+| SD-89 Merchant Relations | Internal KYB business default (BQ:Step) | Existing (KYB BQ:Step already implemented) |
+| SD-99 Suspicious Activity Analysis | Internal AML monitoring stub | New stub (simple pattern matching) |
+| SD-83 Customer Credit Rating | Internal credit bureau default | Existing (customerCreditRatingState already seeded) |
+
+---
+
+### v6 New Collections
+
+| Collection | BIAN SD | Control Record Type | QE | Index strategy |
+|---|---|---|---|---|
+| `integrationRegistry` | SD-193 | ExternalProviderArrangement | No | type+endpoint unique; type+status; isInternal |
+| `integrationEvents` | SD-193 | ExternalProviderArrangementActionLog | No | arrangementRef + recordCreatedDateTime; TTL 90d |
+
+---
+
+### v6 Definition of Done
+
+- [ ] `npm run build` exits 0 (backend + frontend)
+- [ ] `npm run seed` completes without errors; 3 internal providers visible in `integrationRegistry`
+- [ ] `POST /api/v1/integrations` (system_admin token): returns 201 with plaintext `apiKey`
+- [ ] Subsequent `GET /api/v1/integrations/:id`: no `apiKey` or `externalProviderApiKeyHash` in response
+- [ ] `POST /webhooks/fds/:id/callback` without signature: returns 401
+- [ ] `POST /webhooks/fds/:id/callback` with valid HMAC: returns 200 and updates fraud case
+- [ ] `POST /api/v1/integrations/:id/suspend` on internal provider: returns 400
+- [ ] `system_admin` login at `/system`: redirected to `/system/admin`
+- [ ] Non-system_admin login: `/system/admin` redirects to `/system`
+- [ ] Integration dashboard shows 3 internal providers with "Built-in" badges
+- [ ] `POST /api/v1/integrations/:id/test` returns `{ status: 'ok', latencyMs: <n> }` for a reachable endpoint
+- [ ] Integration event log records: at least one event per dispatch + callback
+- [ ] TTL index on `integrationEvents` set to 7776000 seconds
+- [ ] All FR-v6-01 to FR-v6-16 acceptance criteria pass
+- [ ] All NFR-v6-01 to NFR-v6-10 measures pass
+- [ ] Phase 7 test suite (unit + integration + E2E) passes with 0 failures
+- [ ] `docs/technical-spec.md` §1, §5, §6 updated with new models, indexes, and API contracts before first commit
+
+---
+
+## v17 — Bank-Movement Cycle Precision (Funds-Availability Gate + FX)
 
 ### Objective
+Close the money-movement cycle so it is precise with no balance discrepancy at origin or destination (users or merchants): card authorization must verify real funding-account balance from the DB, decline on insufficient funds per BIAN, and keep balances consistent across the tarjeta → cuenta → ejecución → destino chain. See [engineering-proposal.md ADR-038](engineering-proposal.md).
 
-Make the demo Leafy Bank integration-ready and Solutions Library publishable. Add the save-card / recurring payment flow (the "browser cache" scenario raised by domain experts), a performance visualization, and optionally prefix/substring QE queries if MongoDB 8.2 is available.
+### FR-v17: Functional Requirements
 
-### Definition of Done
-
-- [ ] All v1, v2, and v3 DoD criteria still pass
-- [ ] "Save this card for future payments" flow works end-to-end
-- [ ] Returning customer can select a saved card and complete payment without re-entering card details
-- [ ] Performance comparison panel shows query time with QE vs a plaintext reference collection
-- [ ] API contracts are aligned with Leafy Bank integration design
-- [ ] Solutions Library article draft is created (ks-mongodb-ist-content checklist complete)
-
----
-
-### FR-v4: Functional Requirements
-
-#### FR-v4-20: Save Card / Recurring Payment (Frontend + Backend)
-
-| # | Requirement | Acceptance Criteria |
+| ID | Requirement | Acceptance criteria |
 |---|---|---|
-| 20.1 | After successful payment, a consent checkbox "Save this card for future payments" appears unchecked by default | Checkbox is visible on the confirmation screen; requires explicit opt-in |
-| 20.2 | Accepting consent records `isPreferredCard: true`, `mandateStatus: 'active'`, and `cardholderConsentTimestamp` in `paymentCard` | All three mandate fields are present in the Atlas document |
-| 20.3 | `customerAgreement.preferredPaymentCardReference` is updated to link to the saved card token | Field equals the `paymentCardReference` of the saved card |
-| 20.4 | On next payment, "Use saved card ****-1234" option appears | Saved card is retrieved via `preferredPaymentCardReference` from the customer agreement |
-| 20.5 | Selecting a saved card completes checkout without re-entering card details; CVV is never requested | Card transaction is created with `cardTransactionInitiationType: 'merchantInitiated'`; no CVV field in the flow |
-| 20.6 | Mandate can be cancelled: `mandateStatus` updates to `'cancelled'` and the card is no longer offered | Cancelled card does not appear on next payment; `preferredPaymentCardReference` is cleared |
-| 20.7 | Explainer panel: "No card data is stored in your browser: only a token, encrypted in Atlas" | Panel is visible on the saved card selection screen |
+| FR-v17-01 | Funds-availability gate | A PSP-funded card payment adds a 4th parallel gate `funds` (SD-36 AIS). Sufficient funds → hold + approve; insufficient → `declined` + responseCode `'51'` + `decisionReason 'insufficient_funds'`. |
+| FR-v17-02 | Atomic hold, no race | The hold is a `$gte`-conditional `$inc` (available → pending); it is the authoritative decision (no read-modify-write). |
+| FR-v17-03 | Compensation on decline | If any gate declines after the funds gate held, the hold is released (pending → available), idempotently, incl. the decline-before-hold ordering race. |
+| FR-v17-04 | Provider-indifference | The balance read uses the `account_information` capability via dispatch; built-in module and external PSD2 AIS are interchangeable with no flow change. No internal/external account branching. |
+| FR-v17-05 | Scope | Only cards with a `fundingPayoutAccountInstanceReference` are gated; new/external tokens pass through (issuer governs their funds). |
+| FR-v17-06 | Currency exchange | Amounts are converted into the account currency (mid rate + spread) before any balance mutation (card hold/settle, merchant debit/credit, P2P credit, refund). New capability `currency_exchange`, replaceable. |
+| FR-v17-07 | P2P atomicity | P2P debit respects the conditional `$gte`; if the recipient credit fails, the sender debit is reverted. Cross-currency credit is FX-converted to the recipient account currency. |
+| FR-v17-08 | Seed reconciliation | Seeders default to EUR; `pending/reserved` start at 0; `balanceCreditLog.initial_deposit == total balance`. No account starts negative. |
 
-#### FR-v4-21: Performance Visualization (Backend + Frontend)
-
-| # | Requirement | Acceptance Criteria |
-|---|---|---|
-| 21.1 | `GET /api/v1/diagnostics/query-timing` runs the same equality search on the encrypted collection and a plaintext shadow collection | Both queries execute and timing data is returned |
-| 21.2 | Response includes timing in milliseconds for both queries | `{ encrypted_ms: number, plaintext_ms: number, overhead_pct: number }` |
-| 21.3 | Frontend displays a side-by-side comparison panel with the timing values | Panel is visible in the investigation dashboard; values update on each search |
-
-#### FR-v4-22: Leafy Bank Integration Scaffold
-
-| # | Requirement | Acceptance Criteria |
-|---|---|---|
-| 22.1 | API response shapes are aligned with Leafy Bank API contract design | No breaking changes needed for Leafy Bank integration |
-| 22.2 | Authentication contract defined: JWT header structure compatible with Leafy Bank auth service | Documented in technical-spec.md |
-
----
-
-### NFR-v4: Non-Functional Requirements
-
-| ID | Category | Requirement | Measure |
-|---|---|---|---|
-| NFR-v4-01 | Performance | QE overhead for equality search is below a defined threshold | Overhead < 20% vs plaintext on Atlas M10 under single-user demo load |
-| NFR-v4-02 | UX | Returning customer payment with saved card completes in fewer steps than first-time payment | Saved card flow requires ≤ 2 steps vs 3 for new card |
-| NFR-v4-03 | Portability | Demo can be embedded into Leafy Bank with ≤ 1 week of integration work | Integration scaffold validated by Leafy Bank team review |
-| NFR-v4-04 | Content readiness | Solutions Library article passes the four-section template check | Validated using ks-mongodb-ist-content checklist |
-
----
+### Definition of Done — v17
+- [ ] No card payment can be `authorized` without sufficient funds (in account currency, post-FX).
+- [ ] Every hold is released on decline; settlement clears the hold exactly once; no orphan holds or double debits.
+- [ ] No balance goes negative at origin or destination (user or merchant) in any intermediate state.
+- [ ] Σ movements (SD-66 ledger) == Δ balance per account.
+- [ ] Unit tests green (funds gate compensation, FX, checkFunds); `npm run build` exits 0.
+- [ ] (Pending infra) integration + E2E green.
 
 ## Cross-iteration NFRs
 
@@ -332,4 +634,31 @@ These requirements apply to all versions from v1 onward:
 | NFR-X-04 | Accessibility | LeafyGreen components used: WCAG 2.1 AA compliance inherited from the design system |
 | NFR-X-05 | Documentation | Every new API endpoint added at any version is documented in technical-spec.md before merging |
 | NFR-X-06 | Type safety | `npm run build` exits 0 at every version: no TypeScript `any` escape hatches in production code |
-| NFR-X-07 | Agent security | AI agents (v3+) use only the public API layer: no direct MongoDB credentials or DEK access |
+| NFR-X-07 | Agent security | AI agents (v5) use only the public API layer: no direct MongoDB credentials or DEK access |
+
+## Bank Transfers (ACH / SEPA / SWIFT) — capability add-on
+
+> Delivered under **development plan v17** (`tmp/dev.v17.plan.md`, tranche "v17.1"). "v17" is a
+> development-plan iteration, not a product release version (product themes are v1–v5). FR ids below
+> carry the `v17.1` dev-plan tag for traceability only.
+
+| FR | Area | Acceptance criteria | Status |
+|---|---|---|---|
+| FR-v17.1-01 | Rail engine | Rail auto-derived from country/currency/data with user override; IBAN/BIC/routing validated per ISO 13616 / ISO 9362 / NACHA; per-rail fees and standard return-code maps (ACH R-codes, SEPA reject, SWIFT) | ✅ |
+| FR-v17.1-02 | Provider dispatch | All transfers (bank, P2P, merchant payout) and account validation execute via `dispatchProvider` (`payment_initiation` / `account_information`); no direct builtin import; builtin replaceable by external without flow change | ✅ |
+| FR-v17.1-03 | API | `POST /gateway/transfers/preview` (rail+fee+validation), `POST /gateway/transfers/bank` (execute, `Idempotency-Key`), `GET /gateway/transfers/:ref/status` (real-time) | ✅ |
+| FR-v17.1-04 | Frontend | `/system/transfer/bank`: live rail detection, validation, fee, submit; live status polling; recurring Direct Debit option | ✅ |
+| FR-v17.1-05 | Async lifecycle | Transfers are external and async: funds held on submit, credited/cleared on settlement (`bank.transfer.settled`), released on `failed` | ✅ |
+| FR-v17.1-06 | Risk gate | Pre-initiation FDS + HRP + AML screening blocks before funds move and opens an L1-reviewable fraud case (status `open`) on a negative evaluation | ✅ |
+| FR-v17.1-07 | Recurring mandates | ACH Direct Debit / SEPA SDD mandates: create/list/cancel + background scheduler (`runDueMandates`) reusing the transfer flow | ✅ |
+| FR-v17.1-08 | Compliance & audit | Bank coordinates transaction-scoped, never on the bus; business + compliance events correlated by execution reference (PCI DSS Req 10) | ✅ |
+| FR-v17.1-09 | Config | Config-driven rail fees (`PAYOUT_FEE_*`), sandbox flag (`PAYOUT_SANDBOX`), scheduler interval (`PAYOUT_MANDATE_SCHEDULER_MS`) | ✅ |
+| FR-v17.1-10 | Test data | Wiki `Dataset.md` (users, cards, accounts, approve/block scenarios) + end-user guide `Bank-Transfers.md`, aligned with seeders and validators | ✅ |
+
+**Definition of Done (v17.1):** ✅ rail engine unit-tested; backend + frontend typecheck clean; preview /
+execute / status endpoints + idempotency working; async settlement via provider; risk gate + L1 case;
+recurring mandates + scheduler; UI enabled; docs + wiki published. ⏳ Remaining (infra-gated): integration
++ E2E (MongoDB + Playwright) and the `ks-core` / `ks-mongodb-ist-demo` compliance-skill gate. Detail in
+`tmp/dev.v17.plan.md`.
+
+*Added 2026-07-04 (v17.1).*

@@ -1,0 +1,32 @@
+{
+  "services": [
+    {
+      "id": "api-server",
+      "name": "API Server",
+      "description": "Backend Fastify server, runtime, crypto lib, KMS",
+      "type": "api",
+      "url": "/api/v1/system/health",
+      "detailUrl": "/api/v1/system/health?detail=server",
+      "method": "GET",
+      "enabled": true,
+      "intervalMs": 30000,
+      "timeoutMs": 10000,
+      "expectedStatus": 200,
+      "useApiBase": true
+    },
+    {
+      "id": "mongodb",
+      "name": "MongoDB",
+      "description": "Database connectivity, version, and collections",
+      "type": "atlas",
+      "url": "/api/v1/system/health",
+      "detailUrl": "/api/v1/system/health?detail=db",
+      "method": "GET",
+      "enabled": true,
+      "intervalMs": 30000,
+      "timeoutMs": 10000,
+      "expectedStatus": 200,
+      "useApiBase": true
+    }
+  ]
+}

@@ -67,11 +67,11 @@ describe('setToken / getToken / clearToken', () => {
 
 describe('decodeToken', () => {
   it('returns payload for a valid JWT', () => {
-    const payload = { sub: 'usr-001', email: 'sarah.chen@leafybank.demo', role: 'level1_analyst', name: 'Sarah Chen', domain: 'local', iat: 0, exp: 9999999999 };
+    const payload = { sub: 'usr-001', email: 'sarah.chen@back.es', role: 'level1_analyst', name: 'Sarah Chen', domain: 'local', iat: 0, exp: 9999999999 };
     const token = buildJwt(payload);
     const decoded = decodeToken(token);
     expect(decoded).not.toBeNull();
-    expect(decoded!.email).toBe('sarah.chen@leafybank.demo');
+    expect(decoded!.email).toBe('sarah.chen@back.es');
     expect(decoded!.role).toBe('level1_analyst');
   });
 

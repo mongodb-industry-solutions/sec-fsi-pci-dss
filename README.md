@@ -1,6 +1,8 @@
-# 🏦 FSI PCI DSS Payment Security Demo
+# 🏦 Leafy Pay: FSI PSP + PCI DSS + MongoDB
 
-> A MongoDB IST demo that shows how a digital bank or card issuer can run a complete card payment lifecycle: from checkout to fraud investigation: while keeping sensitive cardholder data encrypted end-to-end.
+![](./frontend/public/app-logo.png)
+
+> A Payment Service Provider (PSP) solution: a PCI DSS-aligned platform used by digital banks or card issuers to authorize card payments, detect fraud, and investigate cases. It runs the full payment lifecycle on MongoDB Atlas, from checkout and authorization, through automated transaction scoring, to multi-tier analyst investigation and resolution.
 
 **Core message:** *🔐 Encrypt everything. 🔍 Query anything. 🔑 Keys are yours.*
 
@@ -8,7 +10,7 @@
 
 ## 🎯 What This Demo Shows
 
-A synthetic digital bank uses **MongoDB Queryable Encryption (QE)** with **AWS KMS** to protect cardholder data. The server stores only ciphertext. Fraud analysts still search encrypted fields by email, phone, and account reference: without server-side decryption. Access is controlled by role. Every action is audited.
+A PSP platform uses **MongoDB Queryable Encryption (QE)** with **AWS KMS** to protect cardholder data. The server stores only ciphertext. Fraud analysts still search encrypted fields by email, phone, and account reference: without server-side decryption. Access is controlled by role. Every action is audited.
 
 This answers the most common FSI prospect question:
 
@@ -26,21 +28,6 @@ This answers the most common FSI prospect question:
 | 👤 **RBAC** | Level 1 Analyst vs Level 2 Investigator field visibility (v2) |
 | 📋 **Atlas Audit Log** | Per-field access trail in the investigation workflow (v2) |
 | 🌐 **TLS 1.3** | All Atlas connections encrypted in transit by default |
-
----
-
-## 📚 Documentation
-
-| Document | Description |
-|---|---|
-| 📖 [Project Wiki](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki) | Installation guide, Q&A, and additional resources for non-engineering readers |
-| 📋 [PRD](docs/PRD.md) | What and why: audience, storyline, BIAN data model, QE design overview |
-| 🗺️ [Roadmap](docs/roadmap.md) | FR and NFR per iteration (v1 / v2 / v3 / v4) with acceptance criteria and Definition of Done |
-| 🛠️ [Technical Specification](docs/technical-spec.md) | BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index strategy |
-| 🏗️ [Engineering Proposal](docs/engineering-proposal.md) | Architecture decisions, implementation phases, risks, alternatives, ADRs |
-| 🗂️ [Architecture Overview](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki/architecture) | Data model, PII fields, encryption design, collection relationships, and role model |
-| ❓ [Q&A: PCI DSS](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki/q&a) | Common FSI client questions about MongoDB and PCI DSS compliance |
-| 🐛 [Issues](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/issues) | Bug reports, feature requests, and task tracking |
 
 ---
 
@@ -82,17 +69,18 @@ To begin the process of testing, installation, and execution, please follow the 
 
 ## 🗄️ Data Architecture
 
-The data model follows **BIAN Service Domain** naming conventions across 7 collections:
+The data model follows **BIAN Service Domain** naming conventions across 8 collections:
 
 | Collection | BIAN Service Domain | QE Protection |
 |---|---|---|
-| `partyAuthentication` | Party Authentication (SD-16) | equality: user email |
-| `cardTransaction` | Card Transaction (SD-254) | equality: account reference; card token is plaintext (not CHD) |
-| `cardTransactionSensitive` | Card Transaction: Sensitive | none: gateway payload, processor metadata |
-| `customerAgreement` | Customer Agreement (SD-53) | equality: email, phone, account reference |
-| `customerAgreementSensitive` | Customer Agreement: Sensitive | none: address, government ID, risk notes |
-| `paymentCard` | Payment Card (SD-88) | none: expiry date; card token is plaintext (not CHD) |
+| `partyAuthenticationAssessment` | Party Authentication (SD-16) | equality: user email |
+| `cardTransactionLog` | Card Transaction (SD-254) | equality: account reference; QE:none fields (gateway payload, processor metadata) are **inline** in the same document — no separate sensitive collection |
+| `customerAgreementProcedure` | Customer Agreement (SD-53) | equality: email, phone, account reference; QE:none: address, government ID |
+| `paymentCardManagement` | Payment Card (SD-88) | none: expiry date; card token is plaintext (not CHD) |
 | `fraudDiagnosisCase` | Fraud Diagnosis (SD-83) | plaintext: operational metadata only |
+| `fraudDiagnosisCaseEvents` | Fraud Diagnosis (SD-83) — audit log | plaintext: immutable event records (notes, escalations, accesses) |
+| `party` | Party (SD-13) | equality: PII identifiers |
+| `customerAuthenticationAssessment` | Customer Authentication (SD-91) | equality: credential hash |
 
 > Full schema definitions, field-level QE modes, index strategy, and collection relationships are in [docs/technical-spec.md](docs/technical-spec.md).
 
@@ -138,14 +126,37 @@ sec-fsi-pci-dss/
 
 ## 🗺️ Roadmap
 
-| Version | Theme | Key Features |
-|---|---|---|
-| 🟢 **v1** | Security Foundation | Payment simulation, JWT auth, dual-mode UI, QE encryption visible, fraud investigation |
-| 🔵 **v2** | Investigation & Control | RBAC, escalation workflow, audit trail, KMS key rotation |
-| 🟠 **v3** | Agentic | AI agent (Magenta) for automated fraud pre-review; draft diagnosis with Accept / Override |
-| 🟣 **v4** | Advanced Capabilities | Save card / recurring payment, range queries, performance visualization, Leafy Bank scaffold |
+| Version | Theme | Status | Key Features |
+|---|---|---|---|
+| 🟢 **v1** | Security Foundation | Complete | Payment simulation, JWT auth, dual-mode UI, QE encryption visible, fraud investigation |
+| 🔵 **v2** | Investigation & Control | In Development | RBAC, escalation workflow, audit trail, HRPC check, profile management |
+| 🟠 **v3** | Integration-ready API Surface | Planned | Recurring payments, webhook events, stable OpenAPI contracts, performance visualization, Leafy Bank scaffold |
+| 🟣 **v4** | Payment Gateway + Integration Refinement | Planned | Modular backend (BIAN SD modules), gateway API, merchant as first-class actor, full payment order lifecycle |
+| 🔴 **v5** | Agentic Integration | Planned | AI agent (Magenta / ThreatSight360) for automated fraud pre-review; draft diagnosis with Accept / Override |
 
-See [docs/roadmap.md](docs/roadmap.md) for the complete FR, NFR, and acceptance criteria per iteration.
+See [Scope](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki/Scope) for a detailed breakdown of what each iteration implements, what is out of scope, and how this compares to a real payment gateway. For the complete FR, NFR, and acceptance criteria per iteration, see [docs/roadmap.md](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/blob/staging/docs/roadmap.md).
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|---|---|
+| 📖 [Project Wiki](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki) | Installation guide, Q&A, and additional resources for non-engineering readers |
+| 📋 [PRD](docs/PRD.md) | What and why: audience, storyline, BIAN data model, QE design overview |
+| 🗺️ [Roadmap](docs/roadmap.md) | FR and NFR per iteration (v1 / v2 / v3 / v4) with acceptance criteria and Definition of Done |
+| 🛠️ [Technical Specification](docs/technical-spec.md) | BIAN TypeScript interfaces, QE `encryptedFieldsMaps`, API contracts, index strategy |
+| 🏗️ [Engineering Proposal](docs/engineering-proposal.md) | Architecture decisions, implementation phases, risks, alternatives, ADRs |
+| 🗂️ [Architecture Overview](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki/architecture) | Data model, PII fields, encryption design, collection relationships, and role model |
+| ❓ [Q&A: PCI DSS](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki/q&a) | Common FSI client questions about MongoDB and PCI DSS compliance |
+| 🐛 [Issues](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/issues) | Bug reports, feature requests, and task tracking |
+
+### External References 
+- [Redsys: Continue with the Integration](https://pagosonline.redsys.es/desarrolladores-inicio/continar-integracion/)
+- [Redsys: Virtual POS Integration Models](https://pagosonline.redsys.es/desarrolladores-inicio/)
+- [Redsys: Make a payment](https://pagosonline.redsys.es/desarrolladores-inicio/documentacion-operativa/autorizacion/#rest)
+- [Redsys: Card validation (authentication)](https://pagosonline.redsys.es/desarrolladores-inicio/documentacion-operativa/operacion-autenticacion/)
+- [Redsys: PSD2 and Strong Customer Authentication (SCA)](https://pagosonline.redsys.es/desarrolladores-inicio/documentacion-operativa/autenticacion-reforzada-sca-y-normativa-psd2/)
 
 ---
 

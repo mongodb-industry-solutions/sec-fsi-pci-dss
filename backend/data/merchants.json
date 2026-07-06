@@ -1,0 +1,124 @@
+[
+  {
+    "merchantAgreementInstanceReference": "m0000001-0000-4000-8000-000000000001",
+    "merchantName": "Espresso Works Ltd",
+    "merchantLegalEntityReference": "12-3456789",
+    "merchantCategoryCode": "5812",
+    "merchantCountryCode": "US",
+    "merchantAgreementStatus": "active",
+    "merchantOwnerPartyReference": "b0000001-0000-4000-8000-000000000001",
+    "merchantTier": "standard",
+    "merchantAllowedCurrencies": [
+      "EUR"
+    ],
+    "merchantTransactionLimitAmount": 10000,
+    "merchantSettlementSchedule": "T+2",
+    "merchantAverageTransactionAmount": 28.5,
+    "merchantTransactionCount30d": 142,
+    "merchantRiskCategory": "low",
+    "merchantApiKeys": [],
+    "merchantWebhooks": [
+      {
+        "webhookId": "wh000001-0000-4000-8000-000000000001",
+        "webhookEventType": "payment.completed",
+        "webhookUrl": "https://hooks.espressoworks.example.com/psp/payment",
+        "webhookSecret": "demo-secret-replace-in-production",
+        "webhookStatus": "active",
+        "webhookHeaders": {
+          "X-Merchant-Id": "m0000001",
+          "X-Environment": "demo"
+        },
+        "webhookAttributeMapping": {
+          "statusCode": "responseCode",
+          "maskedPan": "cardMask"
+        },
+        "webhookCreatedDateTime": "2026-05-15T10:30:00.000Z"
+      }
+    ],
+    "merchantReviewNote": "KYB passed, business registered, tax ID verified, no adverse media",
+    "merchantReviewedByPartyReference": "b0000056-0000-4000-8000-000000000056",
+    "merchantReviewedDateTime": "2026-05-15T10:30:00.000Z",
+    "merchantAgreementKybCheck": {
+      "merchantAgreementKybCheckStatus": "verified",
+      "merchantAgreementKybCheckCompletedDate": "2026-05-15T10:30:00.000Z",
+      "merchantAgreementKybCheckReference": "KYB-US-2026-001",
+      "merchantAgreementKybCheckNotes": "KYB passed, business registered, tax ID verified, no adverse media",
+      "merchantAgreementKybCheckPerformedByPartyReference": "b0000056-0000-4000-8000-000000000056"
+    },
+    "bianServiceDomain": "Merchant Relations",
+    "bianControlRecordType": "MerchantAgreementProcedure",
+    "recordCreatedDateTime": "2026-05-14T09:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-15T10:30:00.000Z",
+    "schemaVersion": 2
+  },
+  {
+    "merchantAgreementInstanceReference": "m0000002-0000-4000-8000-000000000002",
+    "merchantName": "Leafy Wallet - Digital Services at the Edge",
+    "merchantLegalEntityReference": "98-7654321",
+    "merchantCategoryCode": "7372",
+    "merchantCountryCode": "US",
+    "merchantAgreementStatus": "active",
+    "merchantOwnerPartyReference": "b0000058-0000-4000-8000-000000000058",
+    "merchantTier": "standard",
+    "merchantAllowedCurrencies": [
+      "EUR"
+    ],
+    "merchantTransactionLimitAmount": 5000,
+    "merchantSettlementSchedule": "T+2",
+    "merchantAverageTransactionAmount": 0,
+    "merchantTransactionCount30d": 0,
+    "merchantRiskCategory": "low",
+    "merchantApiKeys": [],
+    "merchantWebhooks": [],
+    "merchantReviewNote": "KYB passed; US-registered LLC, EIN verified, no adverse media",
+    "merchantReviewedByPartyReference": "b0000056-0000-4000-8000-000000000056",
+    "merchantReviewedDateTime": "2026-06-10T09:00:00.000Z",
+    "merchantAgreementKybCheck": {
+      "merchantAgreementKybCheckStatus": "verified",
+      "merchantAgreementKybCheckCompletedDate": "2026-06-10T09:00:00.000Z",
+      "merchantAgreementKybCheckReference": "KYB-US-2026-002",
+      "merchantAgreementKybCheckNotes": "KYB passed; US-registered LLC, EIN verified, no adverse media",
+      "merchantAgreementKybCheckPerformedByPartyReference": "b0000056-0000-4000-8000-000000000056"
+    },
+    "bianServiceDomain": "Merchant Relations",
+    "bianControlRecordType": "MerchantAgreementProcedure",
+    "recordCreatedDateTime": "2026-06-08T11:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-10T09:00:00.000Z",
+    "schemaVersion": 2
+  },
+  {
+    "merchantAgreementInstanceReference": "m0000003-0000-4000-8000-000000000003",
+    "merchantName": "Fischer Web Studio",
+    "merchantLegalEntityReference": "55-1234567",
+    "merchantCategoryCode": "7371",
+    "merchantCountryCode": "DE",
+    "merchantAgreementStatus": "active",
+    "merchantOwnerPartyReference": "b0000057-0000-4000-8000-000000000057",
+    "merchantTier": "standard",
+    "merchantAllowedCurrencies": [
+      "EUR"
+    ],
+    "merchantTransactionLimitAmount": 8000,
+    "merchantSettlementSchedule": "T+2",
+    "merchantAverageTransactionAmount": 350,
+    "merchantTransactionCount30d": 28,
+    "merchantRiskCategory": "low",
+    "merchantApiKeys": [],
+    "merchantWebhooks": [],
+    "merchantReviewNote": "KYB passed, German trade register verified, VAT ID confirmed",
+    "merchantReviewedByPartyReference": "b0000056-0000-4000-8000-000000000056",
+    "merchantReviewedDateTime": "2026-05-20T14:15:00.000Z",
+    "merchantAgreementKybCheck": {
+      "merchantAgreementKybCheckStatus": "verified",
+      "merchantAgreementKybCheckCompletedDate": "2026-05-20T14:15:00.000Z",
+      "merchantAgreementKybCheckReference": "KYB-DE-2026-003",
+      "merchantAgreementKybCheckNotes": "KYB passed, German trade register verified, VAT ID confirmed",
+      "merchantAgreementKybCheckPerformedByPartyReference": "b0000056-0000-4000-8000-000000000056"
+    },
+    "bianServiceDomain": "Merchant Relations",
+    "bianControlRecordType": "MerchantAgreementProcedure",
+    "recordCreatedDateTime": "2026-05-19T08:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-20T14:15:00.000Z",
+    "schemaVersion": 2
+  }
+]

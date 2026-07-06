@@ -1,19 +1,39 @@
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+// Full external backend URL for display: webhook hook URLs, API docs, vendor callbacks.
+export const BACKEND_PUBLIC_URL =
+  process.env.NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC || 'http://localhost:8081';
 
-export const DEMO_USERS_PASSWORDS: Record<string, string> = {
-  'luis.fernandez@leafybank.demo': 'demo-password',
-  'julia.santos@leafybank.demo': 'demo-password',
-  'sarah.chen@leafybank.demo': 'demo-password',
-  'michael.obi@leafybank.demo': 'demo-password',
-  'admin@leafybank.demo': 'demo-password',
-};
+// Base URL the browser uses for fetch / SSE calls.
+// When PRIVATE is defined → proxy mode: browser uses same-origin (''), Next.js
+// rewrites forward to the PRIVATE URL server-side (see next.config.js).
+// When PRIVATE is not defined → direct mode: browser calls PUBLIC URL directly.
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE !== undefined
+    ? ''
+    : BACKEND_PUBLIC_URL;
+
+// All seeded demo accounts share the same bcrypt-hashed credential.
+// The plaintext is a fixed demo convention (documented in auth.controller.ts);
+// the seed stores only the hash. Used to auto-fill the login form (debug mode)
+// and by the simulator to obtain a real JWT per role via POST /api/v1/auth/login.
+export const DEMO_PASSWORD = 'demo-password';
 
 export const ROLE_LABELS: Record<string, string> = {
   customer: 'Customer',
   level1_analyst: 'L1 Analyst',
   level2_investigator: 'L2 Investigator',
   security_auditor: 'Security Auditor',
+  merchant_officer: 'Merchant Officer',
+  manager:          'Manager',
+};
+
+export const PERFORMER_LABELS: Record<string, string> = {
+  payment_service: 'System - Automated detection',
+  level1_analyst: 'L1 Analyst',
+  level2_investigator: 'L2 Investigator',
+  security_auditor: 'Security Auditor',
+  ai_agent: 'AI Agent',
+  'rbac-layer': 'System - Access control',
+  system: 'System',
 };
 
 export const SEVERITY_COLORS: Record<string, string> = {
@@ -31,3 +51,26 @@ export const STATUS_COLORS: Record<string, string> = {
   resolved_fraud: 'bg-red-100 text-red-800',
   closed: 'bg-gray-100 text-gray-800',
 };
+
+const MCC_LABELS: Record<string, string> = {
+  '5411': 'Grocery Stores',
+  '5732': 'Electronics Stores',
+  '5812': 'Restaurants / Food Service',
+  '5834': 'Pharmacy',
+  '6011': 'Cash Advance / ATM',
+  '7011': 'Hotels / Lodging',
+  '7995': 'Gambling / Betting',
+};
+
+export function formatRiskIndicator(indicator: string): string {
+  if (indicator === 'amount_threshold') {
+    return 'High-value transaction (amount exceeds fraud threshold)';
+  }
+  const mccMatch = indicator.match(/^high_risk_mcc_(\d+)$/);
+  if (mccMatch) {
+    const mcc = mccMatch[1];
+    const label = MCC_LABELS[mcc];
+    return `High-risk merchant category: MCC ${mcc}${label ? ` (${label})` : ''}`;
+  }
+  return indicator.replace(/_/g, ' ');
+}

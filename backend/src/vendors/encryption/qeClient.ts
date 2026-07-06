@@ -1,45 +1,15 @@
-import { MongoClient, Binary } from 'mongodb';
-import { buildKmsProviders } from './kms';
-import { buildEncryptedFieldsMaps } from './encryptedFieldsMaps';
-import { provisionDataEncryptionKeys } from './keyVault';
+/**
+ * Legacy QE client - used only by setup/seed scripts that need full DEK access.
+ * Application request handlers must use getDbForRole() from roleClients.ts instead.
+ */
+import { MongoClient } from 'mongodb';
+import { getL2QEClient, closeRoleClients } from './roleClients';
 
-const KEY_VAULT_NAMESPACE = 'encryption.__keyVault';
-let _client: MongoClient | null = null;
-
+/** Returns the Level 2 (full) QE MongoClient. Used by setup and seed scripts. */
 export async function getQEClient(): Promise<MongoClient> {
-  if (_client) return _client;
-
-  const plainClient = new MongoClient(process.env.MONGODB_URI!);
-  await plainClient.connect();
-  const { dekLookupId, dekSensitiveId } = await provisionDataEncryptionKeys(plainClient);
-  await plainClient.close();
-
-  const encryptedFieldsMap = buildEncryptedFieldsMaps(dekLookupId as Binary, dekSensitiveId as Binary);
-  const dbName = process.env.MONGODB_DB_NAME!;
-
-  _client = new MongoClient(process.env.MONGODB_URI!, {
-    autoEncryption: {
-      keyVaultNamespace: KEY_VAULT_NAMESPACE,
-      kmsProviders: buildKmsProviders(),
-      encryptedFieldsMap: {
-        [`${dbName}.cardTransaction`]: encryptedFieldsMap.cardTransaction,
-        [`${dbName}.cardTransactionSensitive`]: encryptedFieldsMap.cardTransactionSensitive,
-        [`${dbName}.customerAgreement`]: encryptedFieldsMap.customerAgreement,
-        [`${dbName}.customerAgreementSensitive`]: encryptedFieldsMap.customerAgreementSensitive,
-        [`${dbName}.paymentCard`]: encryptedFieldsMap.paymentCard,
-        [`${dbName}.partyAuthentication`]: encryptedFieldsMap.partyAuthentication,
-      },
-      extraOptions: { cryptSharedLibRequired: true },
-    },
-  });
-
-  await _client.connect();
-  return _client;
+  return getL2QEClient();
 }
 
 export async function closeQEClient(): Promise<void> {
-  if (_client) {
-    await _client.close();
-    _client = null;
-  }
+  return closeRoleClients();
 }

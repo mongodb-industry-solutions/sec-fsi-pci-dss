@@ -1,11 +1,19 @@
+# OAuth/OIDC signing keys — generated locally via `npm run setup:key:rsa`, never commit
+backend/keys/
+*.pem
+
 # Logs
 logs
+!frontend/src/app/**/logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 package-lock.json
+test/.verify-carousel/
+test-results/
+test/.playwright-report/
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json

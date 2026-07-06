@@ -1,4 +1,4 @@
-// Global test setup — loaded by vitest before each test file
+// Global test setup - loaded by vitest before each test file
 import { vi } from 'vitest';
 
 // Silence console output in tests unless explicitly needed
