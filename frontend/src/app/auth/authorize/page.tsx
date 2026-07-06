@@ -8,7 +8,8 @@ import { headers } from 'next/headers';
 import OAuthConsentForm from './OAuthConsentForm';
 
 interface AuthorizePageProps {
-  searchParams: Record<string, string>;
+  // Next.js 15+/16: searchParams is a Promise and must be awaited.
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 interface ScopeDescriptor {
@@ -47,7 +48,11 @@ async function fetchConsentInfo(searchParams: Record<string, string>): Promise<C
 }
 
 export default async function AuthorizePage({ searchParams }: AuthorizePageProps) {
-  const params = searchParams ?? {};
+  // Await the params Promise (Next 16) and normalize to a flat string map.
+  const raw = (await searchParams) ?? {};
+  const params: Record<string, string> = Object.fromEntries(
+    Object.entries(raw).map(([k, v]) => [k, Array.isArray(v) ? (v[0] ?? '') : (v ?? '')]),
+  );
 
   // Validate required OAuth params before hitting the backend.
   const required = ['client_id', 'redirect_uri', 'response_type', 'scope'] as const;
