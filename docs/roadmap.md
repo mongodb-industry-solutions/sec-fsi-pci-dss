@@ -271,6 +271,19 @@ External systems such as Leafy Bank or Agentic ThreatSight360 **may** consume th
 | 20.6 | Mandate can be cancelled: `mandateStatus` updates to `'cancelled'` and the card is no longer offered | Cancelled card does not appear on next payment; `preferredPaymentCardReference` is cleared |
 | 20.7 | Explainer panel: "No card data is stored in your browser: only a token, encrypted in Atlas" | Panel is visible on the saved card selection screen |
 
+#### FR-v3-20b: SD-88 Self-Service Card Management (as implemented)
+
+Card-on-file management is its own section (`/system/cards` list + `/system/cards/[cardId]` detail), **not** part of `/system/profile`. This subsection records the API contract as implemented (BIAN SD-88, customer-only, ownership + audit enforced server-side), which supersedes the earlier assumption that a card was revoked via `PATCH {paymentCardStatus:'revoked'}` and that `paymentCardIsPreferred` was toggled via `PATCH` on an existing card.
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| 20b.1 | List saved cards | `GET /api/v1/customer/:customerId/cards` returns the customer's cards (masked PAN + status); rendered by `SavedCardsPanel` at `/system/cards` |
+| 20b.2 | Add a card, optionally marking it preferred | `POST /api/v1/customer/:customerId/cards` with `paymentCardIsPreferred?: boolean`. **Preferred is set only at add time** (checkbox on `/system/cards/new`); there is no toggle-preferred action on an existing card |
+| 20b.3 | View card detail | `GET /api/v1/customer/:customerId/cards/:cardId` (surrogate token, expiry QE:none, alias/note) |
+| 20b.4 | Edit alias/note only | `PATCH /api/v1/customer/:customerId/cards/:cardId` — alias/note are the only mutable attributes |
+| 20b.5 | Deactivate / reactivate a card | `PATCH /api/v1/customer/:customerId/cards/:cardId/status { active: boolean }`; a deactivated card is declined by the PSP on every operation regardless of issuer decision |
+| 20b.6 | Remove a card (soft-delete, replaces the old revoke-via-status) | `DELETE /api/v1/customer/:customerId/cards/:cardId`; confirmation dialog required; emits a compliance audit event server-side (PCI DSS Req 10) |
+
 #### FR-v3-21: Performance Visualization (Backend + Frontend)
 
 | # | Requirement | Acceptance Criteria |
