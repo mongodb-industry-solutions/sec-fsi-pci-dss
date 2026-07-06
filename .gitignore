@@ -93,6 +93,7 @@ dist
 .output
 CLAUDE.md
 .claude
+skills-lock.json
 .agents
 tmp
 
