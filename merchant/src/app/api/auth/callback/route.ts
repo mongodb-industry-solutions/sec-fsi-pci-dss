@@ -1,6 +1,6 @@
 // GET /api/auth/callback — validate state, exchange code→tokens, verify id_token, persist session.
 import { NextRequest, NextResponse } from 'next/server';
-import { exchangeCode, verifyIdToken } from '@/lib/oauth';
+import { exchangeCode, verifyIdToken, fetchUserinfo } from '@/lib/oauth';
 import { attachSession, clearLoginStateOn, readLoginState } from '@/lib/session';
 import { ENV } from '@/lib/env';
 
@@ -43,14 +43,30 @@ export async function GET(req: NextRequest) {
     const grantedScopes = tokens.scope ? tokens.scope.split(' ').filter(Boolean) : [];
 
     let sub = '';
-    let name: string | undefined;
+    let idName: string | undefined;
     let email: string | undefined;
     if (tokens.id_token) {
       const claims = await verifyIdToken(tokens.id_token, login.nonce);
       sub = claims.sub;
-      name = claims.name;
-      email = claims.email;
+      idName = claims.name;
+      // Only trust an email claim if the `email` scope was actually granted — never store
+      // an address the user did not consent to share (GDPR data minimization / scope binding).
+      email = grantedScopes.includes('email') ? claims.email : undefined;
     }
+
+    // Enrich the display identity from the UserInfo endpoint. The id_token may omit `name`
+    // (e.g. the user unchecked the opt-in `profile` scope, or a lean id_token); UserInfo is the
+    // authoritative claims source and returns only what the granted scopes allow. Fallback order:
+    // userinfo.name → id_token name → preferred_username → email local-part. `preferred_username`
+    // is the address, so we display only its local part (avoids surfacing a full email as a name).
+    const info = sub ? await fetchUserinfo(tokens.access_token) : null;
+    const localPart = (v?: string) => (v && v.includes('@') ? v.split('@')[0] : v);
+    const name =
+      info?.name ??
+      idName ??
+      localPart(info?.preferred_username) ??
+      localPart(email) ??
+      undefined;
 
     // Set session + expire the transient login cookie on the SAME redirect response.
     const res = NextResponse.redirect(new URL('/', ENV.baseUrl()));

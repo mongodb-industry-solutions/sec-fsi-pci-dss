@@ -92,10 +92,12 @@ export default function MerchantAuthorizationsPage() {
               <li key={row.consentId} className="px-5 py-3 flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium text-gray-800 truncate">{row.userName ?? row.userEmail ?? row.partyAuthenticationInstanceReference}</span>
+                    <span className="text-sm font-medium text-gray-800 truncate">{row.userName || row.userEmail || 'Unknown user'}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${row.consentStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{row.consentStatus}</span>
                   </div>
-                  {row.userEmail && <p className="text-xs text-gray-400">{row.userEmail}</p>}
+                  {row.userEmail
+                    ? <p className="text-xs text-gray-400">{row.userEmail}</p>
+                    : <p className="text-xs text-gray-400 font-mono">{row.partyAuthenticationInstanceReference}</p>}
                   <div className="flex flex-wrap gap-1 mt-1">
                     {row.grantedScopes.map((s) => (
                       <span key={s} className="text-[10px] font-mono text-gray-500 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5">{s}</span>

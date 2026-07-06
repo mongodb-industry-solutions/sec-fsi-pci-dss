@@ -148,6 +148,26 @@ export async function revoke(token: string): Promise<void> {
   }).catch(() => undefined); // RFC 7009: revoke is best-effort
 }
 
+// Call the PSP UserInfo endpoint with a freshly-issued access token (used at callback time,
+// before a session cookie exists). Returns only the claims the granted scopes allow — the PSP
+// gates `name`/`preferred_username` behind `profile` and `email` behind `email`. Non-fatal:
+// resolves to null on any failure so login still completes from id_token claims alone.
+export async function fetchUserinfo(
+  accessToken: string,
+): Promise<{ sub: string; name?: string; preferred_username?: string; email?: string } | null> {
+  try {
+    const cfg = await discover();
+    const res = await fetch(cfg.userinfo_endpoint, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as { sub: string; name?: string; preferred_username?: string; email?: string };
+  } catch {
+    return null;
+  }
+}
+
 // Verify id_token signature (RS256, JWKS) + issuer/audience/nonce.
 export async function verifyIdToken(idToken: string, expectedNonce?: string): Promise<{ sub: string; name?: string; email?: string }> {
   const cfg = await discover();
