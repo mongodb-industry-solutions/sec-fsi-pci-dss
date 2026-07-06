@@ -50,23 +50,32 @@ test.describe('FR-v1-01: Simulator Payment Flow', () => {
   });
 
   test('01.6 Confirm with fraud case shows FraudAlert with countdown', async ({ page }) => {
-    await page.route('**/api/v1/card-transactions', (route, req) => {
+    // The payment is created via POST /api/v1/transactions; the terminal authorization
+    // outcome (incl. fraud case) is delivered over the per-transaction SSE stream.
+    await page.route('**/api/v1/transactions', (route, req) => {
       if (req.method() === 'POST') {
         route.fulfill({
           status: 201,
           contentType: 'application/json',
           body: JSON.stringify({
             cardTransactionInstanceReference: 'txn-e2e-sim-001',
-            cardTransactionStatus: 'authorized',
-            fraudCaseCreated: true,
-            fraudDiagnosisInstanceReference: 'case-sim-001',
+            cardTransactionStatus: 'pending',
           }),
         });
       } else route.continue();
     });
+    await page.route('**/api/v1/transactions/txn-e2e-sim-001/stream', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: `data: ${JSON.stringify({ status: 'authorized', fraudCaseCreated: true, caseId: 'case-sim-001' })}\n\n`,
+      });
+    });
     await page.locator('button:has-text("Next"), button:has-text("→")').first().click();
     await page.locator('button:has-text("Confirm"), button:has-text("→")').last().click();
-    await expect(page.locator('text=/fraud|suspicious|Redirecting/i').first()).toBeVisible({ timeout: 5_000 });
+    // FraudAlert renders: "🚨 Fraud Alert…" + "Switching to Investigation in Ns…" countdown
+    await expect(page.locator('text=/fraud/i').first()).toBeVisible({ timeout: 8_000 });
+    await expect(page.locator('text=/Switching to Investigation/i').first()).toBeVisible({ timeout: 8_000 });
   });
 
   test('01.7 Confirm without fraud shows success screen', async ({ page }) => {
