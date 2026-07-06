@@ -20,6 +20,16 @@ const PUBLIC_EXACT: Set<string> = new Set([
   '/api/v1/auth/login',
   '/api/v1/auth/users',
   '/api/v1/auth/domains',
+  // OAuth2/OIDC authorization-server endpoints: authenticated by client credentials, PKCE,
+  // or their own RS256 access token — NOT the PSP session JWT. Exact paths only, so the
+  // session-protected /auth/me, /auth/grants and /auth/keys stay behind the middleware.
+  '/.well-known/openid-configuration',
+  '/api/v1/auth/jwks',
+  '/api/v1/auth/authorize',
+  '/api/v1/auth/token',
+  '/api/v1/auth/userinfo',
+  '/api/v1/auth/introspect',
+  '/api/v1/auth/revoke',
   '/api/v1/transactions/merchants',
   // Simulator mode: transaction creation without a user session
   '/api/v1/transactions',

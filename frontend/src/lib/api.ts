@@ -96,8 +96,8 @@ export type WebhookEventType =
 export const WEBHOOK_EVENT_LABELS: Record<WebhookEventType, string> = {
   'payment.completed': 'Payment Completed',
   'payment.failed': 'Payment Failed',
-  'oauth.authorization_granted': 'OAuth Authorization Granted',
-  'oauth.authorization_revoked': 'OAuth Authorization Revoked',
+  'oauth.authorization_granted': 'App Access Granted',
+  'oauth.authorization_revoked': 'App Access Revoked',
   'user.notification': 'User Notification (delegation)',
   'dispute.opened': 'Dispute Opened',
   'kyb.status_changed': 'KYB Status Changed',

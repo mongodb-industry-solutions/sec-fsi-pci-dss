@@ -117,7 +117,7 @@ export default function AuthorizedApplicationDetailPage() {
   if (notFound || !detail) {
     return (
       <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-4">
-        <Link href="/system/profile/applications" className="inline-flex items-center gap-1 text-sm text-[#001E2B] hover:underline">
+        <Link href="/system/applications" className="inline-flex items-center gap-1 text-sm text-[#001E2B] hover:underline">
           <ArrowLeft size={14} /> Authorized Applications
         </Link>
         <div className="bg-white rounded-xl border p-8 text-center text-sm text-gray-500">This application was not found among your authorizations.</div>
@@ -127,7 +127,7 @@ export default function AuthorizedApplicationDetailPage() {
 
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
-      <Link href="/system/profile/applications" className="inline-flex items-center gap-1 text-sm text-[#001E2B] hover:underline">
+      <Link href="/system/applications" className="inline-flex items-center gap-1 text-sm text-[#001E2B] hover:underline">
         <ArrowLeft size={14} /> Authorized Applications
       </Link>
 

@@ -78,7 +78,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
 // from the role-specific navigation above (profile + help, available to all roles).
 const ACCOUNT_ITEMS: NavItem[] = [
   { label: 'My Profile',   path: '/system/profile', icon: User },
-  { label: 'Authorized Apps', path: '/system/profile/applications', icon: Layers, tooltip: 'Apps you authorized via OIDC (connected apps); review scopes and revoke access' },
+  { label: 'Authorized Apps', path: '/system/applications', icon: Layers, tooltip: 'Apps you authorized via OIDC (connected apps); review scopes and revoke access' },
   { label: 'Help & Guide', path: '/system/help',    icon: HelpCircle },
 ];
 

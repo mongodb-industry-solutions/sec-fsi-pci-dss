@@ -99,7 +99,7 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Leafy Pay</h1>
-          <p className="text-sm text-gray-500 mt-1">Secure OAuth Authorization</p>
+          <p className="text-sm text-gray-500 mt-1">Secure sign-in with Leafy Pay</p>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">

@@ -106,7 +106,7 @@ export default function AuthorizedApplicationsPage() {
           <ul className="divide-y divide-gray-100">
             {pageRows.map((grant) => (
               <li key={grant.consentId} className="px-5 py-3 flex items-center gap-3">
-                <Link href={`/system/profile/applications/${encodeURIComponent(grant.consentId)}`}
+                <Link href={`/system/applications/${encodeURIComponent(grant.consentId)}`}
                   className="flex items-center gap-3 flex-1 min-w-0 group">
                   <AppLogo name={grant.merchantName} logoUri={grant.oauthLogoUri} />
                   <div className="min-w-0">
