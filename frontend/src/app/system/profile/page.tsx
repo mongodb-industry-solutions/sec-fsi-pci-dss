@@ -4,7 +4,7 @@ import { api, type ConsentGrant } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { ROLE_LABELS } from '../../../lib/constants';
 import { useDebugMode } from '../../../lib/debugMode';
-import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, User, Layers, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, User, Layers, Trash2, Copy, Check } from 'lucide-react';
 import { RawMongoPanel } from '../../../components/RawMongoPanel';
 import { SectionHeader } from '../../../components/SectionHeader';
 
@@ -134,6 +134,29 @@ function CollectionChip({ name }: { name: string }) {
   );
 }
 
+// Copy-to-clipboard for a protected field's plaintext value. Mirrors the account-detail affordance;
+// copies the real value regardless of reveal state (this is the data subject's own record).
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1200);
+        } catch { /* clipboard unavailable — no-op */ }
+      }}
+      title={copied ? 'Copied' : `Copy ${label}`}
+      aria-label={`Copy ${label}`}
+      className="text-gray-400 hover:text-[#001E2B] transition-colors shrink-0"
+    >
+      {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+    </button>
+  );
+}
+
 function RevealField({
   label,
   plainValue,
@@ -175,6 +198,7 @@ function RevealField({
         >
           {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
         </button>
+        <CopyButton value={plainValue} label={label} />
       </div>
     </>
   );

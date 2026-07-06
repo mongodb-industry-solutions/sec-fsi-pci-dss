@@ -5,7 +5,7 @@
     "payoutAccountType": "internal_ledger",
     "payoutAccountStatus": "active",
     "payoutAccountIsDefault": true,
-    "payoutAccountAlias": "espressoworks-ledger",
+    "payoutAccountAlias": "Espressoworks Ledger",
     "payoutAccountBankName": "PSP Internal Ledger",
     "payoutAccountCurrency": "EUR",
     "payoutAccountCountryCode": "US",
@@ -29,7 +29,7 @@
     "payoutAccountType": "internal_ledger",
     "payoutAccountStatus": "active",
     "payoutAccountIsDefault": true,
-    "payoutAccountAlias": "okafor-digital-ledger",
+    "payoutAccountAlias": "Okafor Digital Ledger",
     "payoutAccountBankName": "PSP Internal Ledger",
     "payoutAccountCurrency": "EUR",
     "payoutAccountCountryCode": "US",
@@ -95,7 +95,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2026-06-01T12:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Luis Fernandez",
+    "payoutAccountBicSwift": "CAIXESBBXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Calle Pintor Sorolla 2-4, 46002 Valencia, Spain"
   },
   {
     "payoutAccountInstanceReference": "pau00002-0000-4000-8000-000000000002",
@@ -121,7 +125,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2026-06-01T12:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Julia Santos",
+    "payoutAccountBicSwift": "NWBKGB2L",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "250 Bishopsgate, London EC2M 4AA, United Kingdom"
   },
   {
     "payoutAccountInstanceReference": "pau00003-0000-4000-8000-000000000003",
@@ -147,7 +155,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2026-06-15T08:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Lena Fischer",
+    "payoutAccountBicSwift": "COBADEFFXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Kaiserstrasse 16, 60311 Frankfurt am Main, Germany"
   },
   {
     "payoutAccountInstanceReference": "pau00004-0000-4000-8000-000000000004",
@@ -197,7 +209,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2026-06-22T15:30:00.000Z",
     "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Carlos Garcia",
+    "payoutAccountBicSwift": "BBVAESMMXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Plaza de San Nicolas 4, 48005 Bilbao, Spain"
   },
   {
     "payoutAccountInstanceReference": "pau00006-0000-4000-8000-000000000006",
@@ -223,7 +239,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2026-05-01T09:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Carlos Garcia",
+    "payoutAccountBicSwift": "CAIXESBBXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Calle Pintor Sorolla 2-4, 46002 Valencia, Spain"
   },
   {
     "payoutAccountInstanceReference": "pau00007-0000-4000-8000-000000000007",
@@ -249,7 +269,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-07-27T14:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Carlos Fernandez",
+    "payoutAccountBicSwift": "SOGEFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "29 Boulevard Haussmann, 75009 Paris, France"
   },
   {
     "payoutAccountInstanceReference": "pau00008-0000-4000-8000-000000000008",
@@ -275,7 +299,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-02-10T09:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Clifford Hegmann",
+    "payoutAccountBicSwift": "INGBNL2AXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Bijlmerdreef 106, 1102 CT Amsterdam, Netherlands"
   },
   {
     "payoutAccountInstanceReference": "pau00009-0000-4000-8000-000000000009",
@@ -301,7 +329,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-10-02T17:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Fatou Diallo",
+    "payoutAccountBicSwift": "HBUKGB4BXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "8 Canada Square, Canary Wharf, London E14 5HQ, United Kingdom"
   },
   {
     "payoutAccountInstanceReference": "pau00010-0000-4000-8000-000000000010",
@@ -327,7 +359,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-07-19T14:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Percy McGlynn",
+    "payoutAccountBicSwift": "SOGEFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "29 Boulevard Haussmann, 75009 Paris, France"
   },
   {
     "payoutAccountInstanceReference": "pau00011-0000-4000-8000-000000000011",
@@ -353,7 +389,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-11-19T18:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Ivan Stamm-Huel",
+    "payoutAccountBicSwift": "AGRIFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "12 Place des Etats-Unis, 92127 Montrouge, France"
   },
   {
     "payoutAccountInstanceReference": "pau00012-0000-4000-8000-000000000012",
@@ -379,7 +419,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-10-26T17:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Patricia Stokes",
+    "payoutAccountBicSwift": "HBUKGB4BXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "8 Canada Square, Canary Wharf, London E14 5HQ, United Kingdom"
   },
   {
     "payoutAccountInstanceReference": "pau00013-0000-4000-8000-000000000013",
@@ -405,7 +449,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-04-12T11:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Doyle Quitzon",
+    "payoutAccountBicSwift": "BSCHESMMXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Avenida de Cantabria s/n, 28660 Boadilla del Monte, Madrid, Spain"
   },
   {
     "payoutAccountInstanceReference": "pau00014-0000-4000-8000-000000000014",
@@ -431,7 +479,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-05-17T12:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Naomi Bergnaum",
+    "payoutAccountBicSwift": "BARCGB22XXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "1 Churchill Place, Canary Wharf, London E14 5HP, United Kingdom"
   },
   {
     "payoutAccountInstanceReference": "pau00015-0000-4000-8000-000000000015",
@@ -457,7 +509,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-05-09T12:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Jessica Haag I",
+    "payoutAccountBicSwift": "BARCGB22XXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "1 Churchill Place, Canary Wharf, London E14 5HP, United Kingdom"
   },
   {
     "payoutAccountInstanceReference": "pau00016-0000-4000-8000-000000000016",
@@ -483,7 +539,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-02-22T09:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Pamela Lubowitz",
+    "payoutAccountBicSwift": "INGBNL2AXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Bijlmerdreef 106, 1102 CT Amsterdam, Netherlands"
   },
   {
     "payoutAccountInstanceReference": "pau00017-0000-4000-8000-000000000017",
@@ -509,7 +569,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-10-22T17:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Warren Hyatt",
+    "payoutAccountBicSwift": "HBUKGB4BXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "8 Canada Square, Canary Wharf, London E14 5HQ, United Kingdom"
   },
   {
     "payoutAccountInstanceReference": "pau00018-0000-4000-8000-000000000018",
@@ -535,7 +599,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-12-28T19:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Devin Heathcote",
+    "payoutAccountBicSwift": "ABNANL2AXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Gustav Mahlerlaan 10, 1082 PP Amsterdam, Netherlands"
   },
   {
     "payoutAccountInstanceReference": "pau00019-0000-4000-8000-000000000019",
@@ -561,7 +629,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-11-19T18:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Esther Prohaska Jr.",
+    "payoutAccountBicSwift": "AGRIFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "12 Place des Etats-Unis, 92127 Montrouge, France"
   },
   {
     "payoutAccountInstanceReference": "pau00020-0000-4000-8000-000000000020",
@@ -587,7 +659,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-12-12T19:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Grant Veum",
+    "payoutAccountBicSwift": "ABNANL2AXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Gustav Mahlerlaan 10, 1082 PP Amsterdam, Netherlands"
   },
   {
     "payoutAccountInstanceReference": "pau00021-0000-4000-8000-000000000021",
@@ -613,7 +689,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-01-01T08:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Holly Boyer",
+    "payoutAccountBicSwift": "BNPAFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "16 Boulevard des Italiens, 75009 Paris, France"
   },
   {
     "payoutAccountInstanceReference": "pau00022-0000-4000-8000-000000000022",
@@ -639,7 +719,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-08-08T15:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Miss Anna Doyle",
+    "payoutAccountBicSwift": "RABONL2UXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Croeselaan 18, 3521 CB Utrecht, Netherlands"
   },
   {
     "payoutAccountInstanceReference": "pau00023-0000-4000-8000-000000000023",
@@ -665,7 +749,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-09-25T16:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Tyler Langosh",
+    "payoutAccountBicSwift": "COBADEFFXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Kaiserstrasse 16, 60311 Frankfurt am Main, Germany"
   },
   {
     "payoutAccountInstanceReference": "pau00024-0000-4000-8000-000000000024",
@@ -691,7 +779,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-05-13T12:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Jason Hegmann",
+    "payoutAccountBicSwift": "BARCGB22XXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "1 Churchill Place, Canary Wharf, London E14 5HP, United Kingdom"
   },
   {
     "payoutAccountInstanceReference": "pau00025-0000-4000-8000-000000000025",
@@ -717,7 +809,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-07-11T14:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Robin Hirthe-Nienow",
+    "payoutAccountBicSwift": "SOGEFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "29 Boulevard Haussmann, 75009 Paris, France"
   },
   {
     "payoutAccountInstanceReference": "pau00026-0000-4000-8000-000000000026",
@@ -743,7 +839,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-01-21T08:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Warren Kohler",
+    "payoutAccountBicSwift": "BNPAFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "16 Boulevard des Italiens, 75009 Paris, France"
   },
   {
     "payoutAccountInstanceReference": "pau00027-0000-4000-8000-000000000027",
@@ -769,7 +869,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-02-18T09:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Morris Hansen III",
+    "payoutAccountBicSwift": "INGBNL2AXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Bijlmerdreef 106, 1102 CT Amsterdam, Netherlands"
   },
   {
     "payoutAccountInstanceReference": "pau00028-0000-4000-8000-000000000028",
@@ -795,7 +899,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-11-15T18:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Katherine Kuhic",
+    "payoutAccountBicSwift": "AGRIFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "12 Place des Etats-Unis, 92127 Montrouge, France"
   },
   {
     "payoutAccountInstanceReference": "pau00029-0000-4000-8000-000000000029",
@@ -821,7 +929,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-07-27T14:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Mr. Fredrick Crooks",
+    "payoutAccountBicSwift": "SOGEFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "29 Boulevard Haussmann, 75009 Paris, France"
   },
   {
     "payoutAccountInstanceReference": "pau00030-0000-4000-8000-000000000030",
@@ -847,7 +959,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-07-19T14:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Crystal Hettinger",
+    "payoutAccountBicSwift": "SOGEFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "29 Boulevard Haussmann, 75009 Paris, France"
   },
   {
     "payoutAccountInstanceReference": "pau00031-0000-4000-8000-000000000031",
@@ -873,7 +989,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-02-22T09:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Rickey Greenfelder Sr.",
+    "payoutAccountBicSwift": "INGBNL2AXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Bijlmerdreef 106, 1102 CT Amsterdam, Netherlands"
   },
   {
     "payoutAccountInstanceReference": "pau00032-0000-4000-8000-000000000032",
@@ -899,7 +1019,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-09-13T16:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Teresa Zemlak",
+    "payoutAccountBicSwift": "COBADEFFXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Kaiserstrasse 16, 60311 Frankfurt am Main, Germany"
   },
   {
     "payoutAccountInstanceReference": "pau00033-0000-4000-8000-000000000033",
@@ -925,7 +1049,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-02-18T09:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Dr. Zachary Turcotte",
+    "payoutAccountBicSwift": "INGBNL2AXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Bijlmerdreef 106, 1102 CT Amsterdam, Netherlands"
   },
   {
     "payoutAccountInstanceReference": "pau00034-0000-4000-8000-000000000034",
@@ -951,7 +1079,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-02-14T09:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Francisco Pfannerstill",
+    "payoutAccountBicSwift": "INGBNL2AXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Bijlmerdreef 106, 1102 CT Amsterdam, Netherlands"
   },
   {
     "payoutAccountInstanceReference": "pau00035-0000-4000-8000-000000000035",
@@ -977,7 +1109,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-07-19T14:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Kathy Hackett",
+    "payoutAccountBicSwift": "SOGEFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "29 Boulevard Haussmann, 75009 Paris, France"
   },
   {
     "payoutAccountInstanceReference": "pau00036-0000-4000-8000-000000000036",
@@ -1003,7 +1139,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-03-19T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Alexis Schiller",
+    "payoutAccountBicSwift": "DEUTDEDBXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Taunusanlage 12, 60325 Frankfurt am Main, Germany"
   },
   {
     "payoutAccountInstanceReference": "pau00037-0000-4000-8000-000000000037",
@@ -1029,7 +1169,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-03-27T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Darlene Cartwright",
+    "payoutAccountBicSwift": "DEUTDEDBXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Taunusanlage 12, 60325 Frankfurt am Main, Germany"
   },
   {
     "payoutAccountInstanceReference": "pau00038-0000-4000-8000-000000000038",
@@ -1055,7 +1199,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-10-22T17:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Jennie Parisian",
+    "payoutAccountBicSwift": "HBUKGB4BXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "8 Canada Square, Canary Wharf, London E14 5HQ, United Kingdom"
   },
   {
     "payoutAccountInstanceReference": "pau00039-0000-4000-8000-000000000039",
@@ -1081,7 +1229,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-01-17T08:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Cecilia Barrows PhD",
+    "payoutAccountBicSwift": "BNPAFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "16 Boulevard des Italiens, 75009 Paris, France"
   },
   {
     "payoutAccountInstanceReference": "pau00040-0000-4000-8000-000000000040",
@@ -1107,7 +1259,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-10-06T17:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Kathryn Beahan",
+    "payoutAccountBicSwift": "HBUKGB4BXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "8 Canada Square, Canary Wharf, London E14 5HQ, United Kingdom"
   },
   {
     "payoutAccountInstanceReference": "pau00041-0000-4000-8000-000000000041",
@@ -1133,7 +1289,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-11-15T18:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Pat Lowe",
+    "payoutAccountBicSwift": "AGRIFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "12 Place des Etats-Unis, 92127 Montrouge, France"
   },
   {
     "payoutAccountInstanceReference": "pau00042-0000-4000-8000-000000000042",
@@ -1159,7 +1319,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-10-22T17:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Bob Conroy",
+    "payoutAccountBicSwift": "HBUKGB4BXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "8 Canada Square, Canary Wharf, London E14 5HQ, United Kingdom"
   },
   {
     "payoutAccountInstanceReference": "pau00043-0000-4000-8000-000000000043",
@@ -1185,7 +1349,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-07-23T14:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Simon Dare",
+    "payoutAccountBicSwift": "SOGEFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "29 Boulevard Haussmann, 75009 Paris, France"
   },
   {
     "payoutAccountInstanceReference": "pau00044-0000-4000-8000-000000000044",
@@ -1211,7 +1379,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-01-13T08:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Raquel Davis",
+    "payoutAccountBicSwift": "BNPAFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "16 Boulevard des Italiens, 75009 Paris, France"
   },
   {
     "payoutAccountInstanceReference": "pau00045-0000-4000-8000-000000000045",
@@ -1237,7 +1409,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-08-16T15:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Sadie Hintz",
+    "payoutAccountBicSwift": "RABONL2UXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Croeselaan 18, 3521 CB Utrecht, Netherlands"
   },
   {
     "payoutAccountInstanceReference": "pau00046-0000-4000-8000-000000000046",
@@ -1263,7 +1439,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-11-27T18:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Anita Swaniawski",
+    "payoutAccountBicSwift": "AGRIFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "12 Place des Etats-Unis, 92127 Montrouge, France"
   },
   {
     "payoutAccountInstanceReference": "pau00047-0000-4000-8000-000000000047",
@@ -1289,7 +1469,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-12-24T19:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Ruth Homenick",
+    "payoutAccountBicSwift": "ABNANL2AXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Gustav Mahlerlaan 10, 1082 PP Amsterdam, Netherlands"
   },
   {
     "payoutAccountInstanceReference": "pau00048-0000-4000-8000-000000000048",
@@ -1315,7 +1499,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-04-20T11:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Miss Brittany Stanton",
+    "payoutAccountBicSwift": "BSCHESMMXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Avenida de Cantabria s/n, 28660 Boadilla del Monte, Madrid, Spain"
   },
   {
     "payoutAccountInstanceReference": "pau00049-0000-4000-8000-000000000049",
@@ -1341,7 +1529,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-08-08T15:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Aaron Watsica",
+    "payoutAccountBicSwift": "RABONL2UXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Croeselaan 18, 3521 CB Utrecht, Netherlands"
   },
   {
     "payoutAccountInstanceReference": "pau00050-0000-4000-8000-000000000050",
@@ -1367,7 +1559,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-11-11T18:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Arnold Mann",
+    "payoutAccountBicSwift": "AGRIFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "12 Place des Etats-Unis, 92127 Montrouge, France"
   },
   {
     "payoutAccountInstanceReference": "pau00051-0000-4000-8000-000000000051",
@@ -1393,7 +1589,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-09-25T16:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Toby Cormier",
+    "payoutAccountBicSwift": "COBADEFFXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Kaiserstrasse 16, 60311 Frankfurt am Main, Germany"
   },
   {
     "payoutAccountInstanceReference": "pau00052-0000-4000-8000-000000000052",
@@ -1419,7 +1619,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-11-27T18:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Alice Hoeger",
+    "payoutAccountBicSwift": "AGRIFRPPXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "12 Place des Etats-Unis, 92127 Montrouge, France"
   },
   {
     "payoutAccountInstanceReference": "pau00053-0000-4000-8000-000000000053",
@@ -1445,7 +1649,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-08-04T15:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Andres Yost",
+    "payoutAccountBicSwift": "RABONL2UXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Croeselaan 18, 3521 CB Utrecht, Netherlands"
   },
   {
     "payoutAccountInstanceReference": "pau00054-0000-4000-8000-000000000054",
@@ -1471,7 +1679,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-04-16T11:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Mr. Loren Raynor",
+    "payoutAccountBicSwift": "BSCHESMMXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Avenida de Cantabria s/n, 28660 Boadilla del Monte, Madrid, Spain"
   },
   {
     "payoutAccountInstanceReference": "pau00055-0000-4000-8000-000000000055",
@@ -1497,7 +1709,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-10-22T17:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Priya Patel",
+    "payoutAccountBicSwift": "HBUKGB4BXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "8 Canada Square, Canary Wharf, London E14 5HQ, United Kingdom"
   },
   {
     "payoutAccountInstanceReference": "pau00056-0000-4000-8000-000000000056",
@@ -1523,7 +1739,11 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-08-28T15:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Maria Garcia",
+    "payoutAccountBicSwift": "RABONL2UXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Croeselaan 18, 3521 CB Utrecht, Netherlands"
   },
   {
     "payoutAccountInstanceReference": "pau00057-0000-4000-8000-000000000057",
@@ -1549,6 +1769,10 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2025-09-09T16:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-02T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountHolderName": "Ahmed Hassan",
+    "payoutAccountBicSwift": "COBADEFFXXX",
+    "payoutAccountCorrespondentBic": "DEUTDEFF",
+    "payoutAccountBankAddress": "Kaiserstrasse 16, 60311 Frankfurt am Main, Germany"
   }
 ]

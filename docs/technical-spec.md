@@ -997,6 +997,10 @@ export interface PayoutAccountArrangement {
 
   payoutAccountAlias?:          string;  // phone or email alias for lookup
   payoutAccountBankName?:       string;
+  payoutAccountHolderName?:        string;  // account holder legal name (from party) — SD-66 (max 140)
+  payoutAccountBicSwift?:          string;  // ISO 9362 BIC/SWIFT: /^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/ (8 or 11 chars)
+  payoutAccountCorrespondentBic?:  string;  // correspondent bank BIC for international wires (8 or 11 chars, same pattern)
+  payoutAccountBankAddress?:       string;  // bank branch/HQ address (max 200)
   payoutAccountCurrency:        string;  // ISO 4217
   payoutAccountCountryCode:     string;  // ISO 3166-1 alpha-2
   payoutAccountPreferredRail:   PayoutRail;
