@@ -770,6 +770,14 @@ export interface BusinessProcessEvent {
 
   // Meta
   processMeta?: ProcessEventMeta;
+
+  // v18 (SD-16 audit attribution) — optional, backwards-compatible. Set when an action originates from
+  // a merchant OAuth request (request.merchantContext). Powers the "user × merchant × action" activity
+  // view without a new collection. Session (non-OAuth) actions leave these unset.
+  clientId?: string;                    // OAuth client_id that originated the action
+  merchantAgreementReference?: string;  // SD-89 merchant the action was performed through
+  actingPartyReference?: string;        // party of the acting user (token sub)
+  actingChannel?: 'session' | 'oauth_merchant';
 }
 
 // ── Typed Payload Contracts per Integration Category ─────────────────────────
@@ -1064,7 +1072,15 @@ export interface PaymentExecutionProcedure {
 
   grossAmount: number;
   netAmount:   number;
-  feeAmount:   number;
+  feeAmount:   number;  // commission/processing amount (numeric source of truth)
+  // v18 (SD-65 attribution / SD-89 pricing): merchant-commission ATTRIBUTION only. The numeric amount
+  // stays in feeAmount above (do NOT duplicate it). Records who the fee belongs to and how it was
+  // derived so the merchant dashboard aggregates commissionRevenue. NOT CHD → NOT QE-encrypted.
+  fee?: {
+    feeMerchantReference: string;   // FK → merchantAgreementInstanceReference (SD-89)
+    feeRateApplied:       number;   // commission rate 0..1 applied at capture
+    feeCollectedDateTime: Date;     // when the commission was collected
+  };
   currency:    string;  // ISO 4217
 
   paymentExecutionRail?: PayoutRail;
@@ -1547,6 +1563,8 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
     { key: { processType: 1, eventDateTime: -1 } },
     { key: { processAction: 1, processOutcome: 1 } },
+    // v18: "user × merchant × action" activity view (SD-16). Sparse — only OAuth-attributed events.
+    { key: { merchantAgreementReference: 1, actingPartyReference: 1, eventDateTime: -1 }, sparse: true },
   ]);
 
   // ── complianceProcessEvent (ADR-025) — TIMESERIES ────────────────────────
@@ -1615,6 +1633,8 @@ await ensureIndexes(db, 'paymentExecutionProcedure', [
   { key: { paymentOrderInstanceReference: 1 } },
   { key: { cardTransactionInstanceReference: 1 } },
   { key: { paymentExecutionStatus: 1, recordCreatedDateTime: -1 } },
+  // v18: commission revenue aggregation (SD-89 dashboard). Sparse — only fee-bearing executions.
+  { key: { 'fee.feeMerchantReference': 1, 'fee.feeCollectedDateTime': -1 }, sparse: true },
 ]);
 
 // ── counterpartyArrangement (SD-54) ─────────────────────────────────────────
@@ -2957,6 +2977,16 @@ merchantReviewedDateTime?: Date;                 // When the review decision was
 // All fields use BIAN-canonical BQ naming prefix: merchantAgreementKybCheck*.
 merchantAgreementKybCheck?: MerchantAgreementKybCheck;
 
+// v18 (SD-89 pricing): per-operation commission rate 0..1 (e.g. 0.025 = 2.5%). Editable from
+// merchant settings (PATCH /merchants/:id, RBAC merchants:manage); the seeder only sets an initial
+// default. Consumed by computeFee() to populate paymentExecution.feeAmount + fee attribution (SD-65).
+merchantCommissionRate?: number;
+
+// v18 (OIDC client metadata, RFC 7591) on MerchantOAuthClientConfig — branding on the consent/login
+// page and the user's "Authorized Applications" listing. Validated as https on the OAuth-client PATCH.
+// oauthLogoUri?: string;    // merchant logo/icon URL (OIDC logo_uri)
+// oauthClientUri?: string;  // merchant home page URL (OIDC client_uri)
+
 // Ch-05: Full BIAN SD-89 Agreement lifecycle including KYB review states.
 // BIAN Action Terms: Initiate (customer) → Control (merchant_officer) → Update (amend) → Terminate (close)
 type MerchantAgreementStatus =
@@ -3107,7 +3137,8 @@ Error codes: 404 merchant not found, 410 link expired/deactivated/completed.
 | `GET` | `/merchants/me` | JWT | `customer` | Return the merchant agreement owned by the caller's `partyRef`. Returns `{ found: false }` when none exists. Enables role-based state machine in frontend. |
 | `GET` | `/merchants/:id` | JWT | `customer`, `merchant_officer`, `security_auditor` | Retrieve merchant agreement details. Response includes `merchantAgreementKybCheck` sub-document. |
 | `GET` | `/merchants/:id/transactions` | JWT | owner (`partyRef` = `merchantOwnerPartyReference`), `merchant_officer`, `security_auditor` | Acquiring-side view (SD-89): payments the merchant **received**, newest first. Query: `page`, `limit`, `status`, `search` (case-insensitive on masked PAN / descriptor / merchant name). PCI DSS Req 3/7 — payer PII (account ref, email, raw gateway payload) is **never** returned; only masked PAN, amount, status, type, channel, descriptor, timestamp. Non-owner customers get 403. |
-| `GET` | `/merchants/:id/stats` | JWT | owner, `merchant_officer`, `security_auditor` | Acquiring analytics (BIAN Merchant Activity Analysis): MongoDB aggregation returning totals, average ticket, breakdown by status, by currency, and operations per month. Aggregates only — no payer PII. Powers the merchant Overview dashboard. |
+| `GET` | `/merchants/:id/stats` | JWT | owner, `merchant_officer`, `security_auditor` | Acquiring analytics (BIAN Merchant Activity Analysis): MongoDB aggregation returning totals, average ticket, breakdown by status, by currency, and operations per month. **v18:** also returns `commissionRevenue { total, count, byMonth[] }` aggregated from `paymentExecutionProcedure.fee` filtered by `fee.feeMerchantReference` (SD-89 commission as revenue). Aggregates only — no payer PII. Powers the merchant Overview dashboard. |
+| `PATCH` | `/merchants/:id` | JWT | owner (own merchant), `merchant_officer`, `security_auditor` | Partial update of operational settings. Owner-editable: `merchantAllowedCurrencies`, `merchantSettlementSchedule`, `merchantWebhookEndpoint`, `merchantDefaultPayoutAccountReference`, **v18** `merchantCommissionRate` (SD-89, number 0..1, max 4 decimals; validated; change audited via `merchant.commission_rate.updated` event). Risk-governed fields (`merchantTransactionLimitAmount`, `merchantAgreementStatus`) are PSP staff only. |
 | `GET` | `/merchants/:id/events` | JWT | owner, `merchant_officer`, `security_auditor` | Merchant lifecycle **audit trail** (BIAN SD-89, PCI DSS Req 10): append-only `merchantAgreementEvents` log of `submitted` / `approved` / `rejected` / `updated` actions with actor and timestamp. Operational metadata only — no cardholder data. |
 | `GET` | `/merchants` | JWT | `merchant_officer`, `security_auditor` | List all merchant applications (officer review queue) |
 | `PATCH` | `/merchants/:id/review` | JWT | `merchant_officer`, `security_auditor` | Approve or reject application (BIAN Action: Control). Transitions status to `agreed` or `rejected`. Writes `merchantAgreementKybCheck` BQ:Step. |
@@ -3117,6 +3148,10 @@ Error codes: 404 merchant not found, 410 link expired/deactivated/completed.
 | `DELETE` | `/merchants/:id/keys/:keyId` | JWT | `customer` | Revoke API key |
 
 `MerchantApiKeyRecord` adds `keyOrigin?: 'generated' | 'imported'` (display only; absent = generated). Both generate and import store only the bcrypt hash + display prefix (PCI DSS Req 3).
+
+**v18 — OAuth client branding + consent grants payload (OIDC).**
+- `PATCH /merchants/:id/oauth-client` accepts `logo_uri` and `client_uri` (OIDC client metadata, RFC 7591); both validated as **https** URLs (empty string clears). Persisted as `merchantOAuthClient.oauthLogoUri` / `oauthClientUri`.
+- `GET /auth/grants` (self-scoped — the caller's own consent grants) payload now includes `merchantAgreementInstanceReference` and `oauthLogoUri` (nullable) alongside the existing `merchantName`, `grantedScopes`, `consentGrantedAt`, `lastUsedAt`. Used by the user's "Authorized Applications" listing.
 
 **POST `/merchants` request (BIAN Action: Initiate):**
 ```json

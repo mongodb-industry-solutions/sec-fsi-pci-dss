@@ -60,6 +60,8 @@ function publishLedgerEvent(opts: EmitProcessEventOpts | EmitComplianceEventOpts
       processType: opts.processType,
       ledgerKind,
       ...(opts.processMeta ? { processMeta: opts.processMeta } : {}),
+      // v18: activity attribution (rides the payload; projected out of eventSummary in buildRow).
+      ...(opts.attribution ? { attribution: opts.attribution } : {}),
     },
     actor: { partyRef: opts.performedByPartyReference, role: opts.performedByRole },
     bian: { serviceDomain: opts.bianServiceDomain, controlRecord: opts.bianControlRecordType },
@@ -67,7 +69,7 @@ function publishLedgerEvent(opts: EmitProcessEventOpts | EmitComplianceEventOpts
 }
 
 // Payload keys that carry projection metadata (not part of the ledger eventSummary).
-const LEDGER_META_KEYS = new Set(['outcome', 'entityType', 'processType', 'ledgerKind', 'processMeta', 'chd']);
+const LEDGER_META_KEYS = new Set(['outcome', 'entityType', 'processType', 'ledgerKind', 'processMeta', 'chd', 'attribution']);
 
 // P13.4 (§5): canonical choreography milestones are published directly on the bus (not via emit*), so
 // they carry no `ledgerKind`. The projection ALSO writes them to the business ledger so the unified
@@ -120,6 +122,7 @@ export class LedgerProjection {
   ): BusinessProcessEvent {
     const eventSummary: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(p)) if (!LEDGER_META_KEYS.has(k)) eventSummary[k] = v;
+    const attr = (p.attribution ?? {}) as EventActivityAttribution;
     return {
       eventDateTime: new Date(e.occurredAt),
       processType,
@@ -134,8 +137,20 @@ export class LedgerProjection {
       bianServiceDomain,
       bianControlRecordType,
       processMeta: p.processMeta as ProcessEventMeta | undefined,
+      ...(attr.clientId && { clientId: attr.clientId }),
+      ...(attr.merchantAgreementReference && { merchantAgreementReference: attr.merchantAgreementReference }),
+      ...(attr.actingPartyReference && { actingPartyReference: attr.actingPartyReference }),
+      ...(attr.actingChannel && { actingChannel: attr.actingChannel }),
     };
   }
+}
+
+// v18: activity attribution passed to emit* when an action originates from a merchant OAuth request.
+export interface EventActivityAttribution {
+  clientId?: string;
+  merchantAgreementReference?: string;
+  actingPartyReference?: string;
+  actingChannel?: 'session' | 'oauth_merchant';
 }
 
 interface EmitProcessEventOpts {
@@ -150,6 +165,7 @@ interface EmitProcessEventOpts {
   bianServiceDomain: string;
   bianControlRecordType: string;
   processMeta?: ProcessEventMeta;
+  attribution?: EventActivityAttribution;
 }
 
 interface EmitComplianceEventOpts {
@@ -164,6 +180,7 @@ interface EmitComplianceEventOpts {
   bianServiceDomain: string;
   bianControlRecordType: string;
   processMeta?: ProcessEventMeta;
+  attribution?: EventActivityAttribution;
 }
 
 // §9.2 flip — publish-then-project. Business logic publishes the domain event; the LedgerProjection
@@ -172,6 +189,21 @@ interface EmitComplianceEventOpts {
 // `_db` is retained for call-site compatibility but unused — the projection owns the DB write.
 export function emitProcessEvent(_db: Db, opts: EmitProcessEventOpts): void {
   publishLedgerEvent(opts, 'business');
+}
+
+// v18: DRY helper — build the activity attribution from a merchant OAuth context (request.merchantContext).
+// Merchant endpoints pass the result as `attribution` to emit* so every OAuth-originated action is tagged
+// uniformly (SD-16 audit). Session (non-OAuth) actions omit it → default 'session' channel downstream.
+export function attributionFromMerchantContext(
+  ctx?: { clientId?: string; merchantId?: string; sub?: string },
+): EventActivityAttribution | undefined {
+  if (!ctx?.clientId) return undefined;
+  return {
+    clientId: ctx.clientId,
+    merchantAgreementReference: ctx.merchantId,
+    actingPartyReference: ctx.sub,
+    actingChannel: 'oauth_merchant',
+  };
 }
 
 export function emitComplianceEvent(_db: Db, opts: EmitComplianceEventOpts): void {

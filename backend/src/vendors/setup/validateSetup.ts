@@ -70,6 +70,12 @@ const EXPECTED_UNIQUE_INDEXES: Record<string, string> = {
   // externalProviderArrangementActionLog is timeseries — no unique index (checked by presence only)
 };
 
+// v18: representative NON-unique secondary indexes that must exist (first key checked by presence).
+const EXPECTED_SECONDARY_INDEXES: { collection: string; firstKey: string; label: string }[] = [
+  { collection: 'paymentExecutionProcedure', firstKey: 'fee.feeMerchantReference', label: 'commission revenue (SD-89)' },
+  { collection: 'businessProcessEvent',      firstKey: 'merchantAgreementReference', label: 'activity attribution (SD-16)' },
+];
+
 // -- Result tracking ----------------------------------------------------------
 
 type Status = 'pass' | 'fail' | 'warn' | 'skip';
@@ -318,6 +324,20 @@ async function checkMongoDB(client: MongoClient): Promise<void> {
         : check('fail', `${col} - unique index on ${field} not found`);
     } catch (e) {
       check('warn', `${col} - index check error: ${(e as Error).message}`);
+    }
+  }
+
+  // v18: secondary (non-unique) indexes for commission revenue + activity attribution.
+  for (const { collection, firstKey, label } of EXPECTED_SECONDARY_INDEXES) {
+    if (!existingSet.has(collection)) { check('skip', `${collection}.${firstKey} - collection missing`); continue; }
+    try {
+      const indexes = await db.collection(collection).listIndexes().toArray();
+      const hasIt = indexes.some((idx) => idx.key?.[firstKey] !== undefined);
+      hasIt
+        ? check('pass', `${collection} - index on ${firstKey} (${label})`)
+        : check('fail', `${collection} - index on ${firstKey} not found (${label})`);
+    } catch (e) {
+      check('warn', `${collection} - index check error: ${(e as Error).message}`);
     }
   }
 

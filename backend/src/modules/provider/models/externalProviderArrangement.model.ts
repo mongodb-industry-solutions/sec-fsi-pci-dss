@@ -371,6 +371,13 @@ export interface BusinessProcessEvent {
   bianServiceDomain: string;
   bianControlRecordType: string;
   processMeta?: ProcessEventMeta;
+  // v18 (SD-16 audit attribution): optional, backwards-compatible. Populated when an action originates
+  // from a merchant OAuth-authenticated request (request.merchantContext). Enables the "user × merchant
+  // × action" activity view without a new collection.
+  clientId?: string;                    // OAuth client_id that originated the action
+  merchantAgreementReference?: string;  // SD-89 merchant the action was performed through
+  actingPartyReference?: string;        // party of the acting user (token sub)
+  actingChannel?: 'session' | 'oauth_merchant';
 }
 
 // ── Typed Payload Contracts per Integration Category (ADR-025) ────────────────

@@ -3,7 +3,8 @@
 
 import { FastifyInstance } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
-import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, sendTestWebhook, generateApiKey, importApiKey, updateApiKeyLabel, revokeApiKey, reviewMerchantApplication, getMerchantEvents, getMerchantApiKeys } from '../services/merchant.service';
+import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, sendTestWebhook, generateApiKey, importApiKey, updateApiKeyLabel, revokeApiKey, reviewMerchantApplication, getMerchantEvents, getMerchantApiKeys, appendMerchantEvent } from '../services/merchant.service';
+import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import { getPayoutAccount } from '../services/payoutAccount.service';
 import { issueMerchantOAuthClient, revokeMerchantOAuthClient, rotateMerchantOAuthClientSecret, updateMerchantOAuthClient } from '../services/merchantOAuth.service';
 import { WebhookService } from '../services/merchantWebhook.service';
@@ -484,6 +485,15 @@ Used by customers to detect their onboarding state: no application / under_revie
             byStatus:    { type: 'array', items: { type: 'object', properties: { status: { type: 'string' }, count: { type: 'number' }, amount: { type: 'number' } } } },
             byMonth:     { type: 'array', items: { type: 'object', properties: { year: { type: 'number' }, month: { type: 'number' }, count: { type: 'number' }, amount: { type: 'number' } } } },
             byCurrency:  { type: 'array', items: { type: 'object', properties: { currency: { type: 'string' }, count: { type: 'number' }, amount: { type: 'number' } } } },
+            commissionRevenue: {
+              type: 'object',
+              description: 'v18: merchant commission revenue (SD-89) aggregated from paymentExecution fee attribution (SD-65).',
+              properties: {
+                total:   { type: 'number' },
+                count:   { type: 'number' },
+                byMonth: { type: 'array', items: { type: 'object', properties: { year: { type: 'number' }, month: { type: 'number' }, count: { type: 'number' }, amount: { type: 'number' } } } },
+              },
+            },
           },
         },
         401: { $ref: 'Error#' },
@@ -646,6 +656,7 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
           merchantAgreementStatus: { type: 'string', enum: ['active', 'suspended', 'closed'] },
           merchantAllowedCurrencies: { type: 'array', items: { type: 'string' } },
           merchantDefaultPayoutAccountReference: { type: 'string', description: 'FK → payoutAccountArrangement. Must belong to merchant owner party (E4 guard).' },
+          merchantCommissionRate: { type: 'number', minimum: 0, maximum: 1, description: 'v18: SD-89 commission rate 0..1 (max 4 decimals). Editable by merchant owner or merchant_officer.' },
         },
       },
       response: {
@@ -662,9 +673,20 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
     const patch = request.body as Record<string, unknown>;
     const isStaff = user?.role === 'merchant_officer' || user?.role === 'security_auditor';
 
+    // v18: validate the commission rate (SD-89). number, 0 ≤ rate ≤ 1, max 4 decimals.
+    if (patch.merchantCommissionRate !== undefined) {
+      const rate = patch.merchantCommissionRate;
+      if (typeof rate !== 'number' || !isFinite(rate) || rate < 0 || rate > 1) {
+        return reply.status(400).send({ error: 'merchantCommissionRate must be a number between 0 and 1.' });
+      }
+      if (Math.round(rate * 10000) !== rate * 10000) {
+        return reply.status(400).send({ error: 'merchantCommissionRate supports at most 4 decimal places.' });
+      }
+    }
+
     if (!isStaff) {
       // Merchant owner self-service: must own this merchant and may only touch operational fields.
-      const OWNER_FIELDS = ['merchantAllowedCurrencies', 'merchantSettlementSchedule', 'merchantWebhookEndpoint', 'merchantDefaultPayoutAccountReference'];
+      const OWNER_FIELDS = ['merchantAllowedCurrencies', 'merchantSettlementSchedule', 'merchantWebhookEndpoint', 'merchantDefaultPayoutAccountReference', 'merchantCommissionRate'];
       if (user?.role !== 'customer' || !user?.partyRef) {
         return reply.status(403).send({ error: 'Access denied: merchant configuration update requires merchant_officer, security_auditor or the merchant owner.' });
       }
@@ -692,6 +714,28 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
 
     const result = await updateMerchant(fastify.db, id, patch as never);
     if (!result) return reply.status(404).send({ error: 'Merchant not found' });
+
+    // v18: audit the commission-rate change explicitly (SD-89, PCI DSS Req 10).
+    if (patch.merchantCommissionRate !== undefined) {
+      const actor = user?.partyRef ?? user?.sub ?? 'unknown';
+      await appendMerchantEvent(fastify.db, id, 'merchant.commission_rate.updated', {
+        performedByPartyReference: actor,
+        performedByRole: user?.role,
+        details: { merchantCommissionRate: patch.merchantCommissionRate },
+      }).catch(() => { /* non-blocking */ });
+      emitComplianceEvent(fastify.db, {
+        entityType: 'merchant',
+        entityId: id,
+        processType: 'merchant_onboarding',
+        processAction: 'merchant.commission_rate.updated',
+        processOutcome: 'approved',
+        performedByPartyReference: actor,
+        performedByRole: user?.role ?? null,
+        eventSummary: { merchantCommissionRate: patch.merchantCommissionRate },
+        bianServiceDomain: 'Merchant Relations',
+        bianControlRecordType: 'MerchantAgreementProcedure',
+      });
+    }
     return reply.send(result);
   });
 
@@ -1143,6 +1187,8 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
           token_lifetime_seconds: { type: 'number', minimum: 300, maximum: 86400 },
           refresh_token_lifetime_days: { type: 'number', minimum: 1, maximum: 365 },
           claim_mapping: { type: 'object', additionalProperties: { type: 'string' } },
+          logo_uri: { type: 'string', description: 'v18: OIDC client logo_uri (https). Shown on the consent page and app listings.' },
+          client_uri: { type: 'string', description: 'v18: OIDC client_uri (https) — merchant home page.' },
         },
       },
       response: {

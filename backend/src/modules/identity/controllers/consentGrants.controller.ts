@@ -33,7 +33,9 @@ export async function consentGrantsController(fastify: FastifyInstance) {
                 properties: {
                   consentId: { type: 'string' },
                   oauthClientId: { type: 'string' },
+                  merchantAgreementInstanceReference: { type: 'string', description: 'v18: SD-89 merchant reference (for detail/activity views).' },
                   merchantName: { type: 'string' },
+                  oauthLogoUri: { type: 'string', nullable: true, description: 'v18: OIDC logo_uri of the merchant app (branding).' },
                   grantedScopes: { type: 'array', items: { type: 'string' } },
                   consentStatus: { type: 'string', enum: ['active', 'revoked'] },
                   consentGrantedAt: { type: 'string', format: 'date-time' },
@@ -57,6 +59,7 @@ export async function consentGrantsController(fastify: FastifyInstance) {
         oauthClientId: g.oauthClientId,
         merchantAgreementInstanceReference: g.merchantAgreementInstanceReference,
         merchantName: g.merchantName,
+        oauthLogoUri: g.oauthLogoUri ?? null,
         grantedScopes: g.grantedScopes,
         consentStatus: g.consentStatus,
         consentGrantedAt: g.consentGrantedAt,

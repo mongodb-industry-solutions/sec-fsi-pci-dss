@@ -16,6 +16,7 @@ import { getCardByToken, upsertCardByToken } from '../../customer/services/payme
 import { sendMerchantPaymentCallback } from '../../gateway/services/merchantCallback.service';
 import { createNotification } from '../../notification/notifications.service';
 import { getEventBus, makeEvent } from '../../../vendors/eventbus';
+import { PAYMENT_EXECUTION_COLLECTION } from '../../gateway/models/paymentExecution.model';
 
 export interface CreateTransactionInput {
   cardToken: string;
@@ -725,7 +726,11 @@ export async function getMerchantStats(db: Db, merchantId: string) {
   const coll = db.collection(CARD_TRANSACTION_COLLECTION);
   const match = { merchantAgreementInstanceReference: merchantId };
 
-  const [totalsAgg, byStatus, byMonth, byCurrency] = await Promise.all([
+  // v18: commission revenue (SD-89) aggregated from payment-execution fee attribution (SD-65).
+  const execColl = db.collection(PAYMENT_EXECUTION_COLLECTION);
+  const commissionMatch = { 'fee.feeMerchantReference': merchantId };
+
+  const [totalsAgg, byStatus, byMonth, byCurrency, commissionAgg, commissionByMonth] = await Promise.all([
     coll.aggregate([
       { $match: match },
       { $group: { _id: null, count: { $sum: 1 }, totalAmount: { $sum: '$cardTransactionAmount.amount' }, avgAmount: { $avg: '$cardTransactionAmount.amount' } } },
@@ -745,9 +750,19 @@ export async function getMerchantStats(db: Db, merchantId: string) {
       { $group: { _id: '$cardTransactionAmount.currency', count: { $sum: 1 }, amount: { $sum: '$cardTransactionAmount.amount' } } },
       { $sort: { amount: -1 } },
     ]).toArray(),
+    execColl.aggregate([
+      { $match: commissionMatch },
+      { $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$feeAmount' } } },
+    ]).toArray(),
+    execColl.aggregate([
+      { $match: commissionMatch },
+      { $group: { _id: { y: { $year: { $toDate: '$fee.feeCollectedDateTime' } }, m: { $month: { $toDate: '$fee.feeCollectedDateTime' } } }, amount: { $sum: '$feeAmount' }, count: { $sum: 1 } } },
+      { $sort: { '_id.y': 1, '_id.m': 1 } },
+    ]).toArray(),
   ]);
 
   const totals = totalsAgg[0] ?? { count: 0, totalAmount: 0, avgAmount: 0 };
+  const commission = commissionAgg[0] ?? { count: 0, total: 0 };
   return {
     count: totals.count ?? 0,
     totalAmount: totals.totalAmount ?? 0,
@@ -755,5 +770,11 @@ export async function getMerchantStats(db: Db, merchantId: string) {
     byStatus:   byStatus.map((s) => ({ status: s._id as string, count: s.count as number, amount: s.amount as number })),
     byMonth:    byMonth.map((s) => ({ year: (s._id as { y: number }).y, month: (s._id as { m: number }).m, count: s.count as number, amount: s.amount as number })),
     byCurrency: byCurrency.map((s) => ({ currency: s._id as string, count: s.count as number, amount: s.amount as number })),
+    // v18: commission revenue (SD-89) — total + monthly breakdown.
+    commissionRevenue: {
+      total: commission.total ?? 0,
+      count: commission.count ?? 0,
+      byMonth: commissionByMonth.map((s) => ({ year: (s._id as { y: number }).y, month: (s._id as { m: number }).m, count: s.count as number, amount: s.amount as number })),
+    },
   };
 }

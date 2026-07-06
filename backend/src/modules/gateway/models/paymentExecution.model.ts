@@ -26,6 +26,16 @@ export interface PaymentExecutionResolutionStep {
   stepDateTime: Date;
 }
 
+// v18 (SD-65 / SD-89): merchant-commission ATTRIBUTION sub-doc. The numeric commission amount stays
+// in the flat `feeAmount` field (single source of truth — do NOT duplicate it here); this sub-doc only
+// records WHO the fee belongs to and HOW it was derived, so the merchant dashboard can aggregate
+// commission revenue (SD-89) from the execution record (SD-65). Not CHD → NOT QE-encrypted.
+export interface PaymentExecutionFee {
+  feeMerchantReference: string;   // FK → merchantAgreementInstanceReference (SD-89) the fee is attributed to
+  feeRateApplied: number;         // commission rate 0..1 applied at capture time
+  feeCollectedDateTime: Date;     // when the commission was collected
+}
+
 export interface PaymentExecutionProcedure {
   paymentExecutionInstanceReference: string;      // UUID, PK
   paymentOrderInstanceReference: string;          // FK → paymentOrderProcedure (SD-64)
@@ -50,7 +60,8 @@ export interface PaymentExecutionProcedure {
 
   grossAmount: number;
   netAmount: number;
-  feeAmount: number;
+  feeAmount: number;                              // commission/processing amount (numeric source of truth)
+  fee?: PaymentExecutionFee;                      // v18: merchant-commission attribution (see PaymentExecutionFee)
   currency: string;                               // ISO 4217 — sender's currency
 
   // FX fields — populated only for cross-currency transfers

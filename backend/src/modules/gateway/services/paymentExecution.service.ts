@@ -11,6 +11,11 @@ import {
   BeneficiaryType,
 } from '../models/paymentExecution.model';
 import type { PayoutRail } from '../models/payoutAccount.model';
+import {
+  MERCHANT_AGREEMENT_COLLECTION,
+  MerchantAgreementControlRecord,
+} from '../models/merchantAgreement.model';
+import type { PaymentExecutionFee } from '../models/paymentExecution.model';
 
 export interface CreateExecutionInput {
   paymentOrderInstanceReference: string;
@@ -23,6 +28,51 @@ export interface CreateExecutionInput {
   feeAmount?: number;
   currency: string;
   paymentExecutionRail?: PayoutRail;
+}
+
+// ── v18: merchant-commission fee (SD-65 attribution / SD-89 pricing) ───────────
+
+// DRY, single place to derive a commission fee. Rounds to 2 decimals (currency minor unit for the demo
+// currencies). rate is 0..1; a missing/invalid rate yields a zero fee. Returns both the numeric amount
+// (stored in feeAmount) and the attribution sub-doc (stored in fee).
+export function computeFee(
+  amount: number,
+  rate: number | undefined,
+  currency: string,
+  merchantReference: string,
+): { feeAmount: number; feeCurrency: string; fee: PaymentExecutionFee } {
+  const safeRate = typeof rate === 'number' && rate > 0 && rate <= 1 ? rate : 0;
+  const feeAmount = Math.round(amount * safeRate * 100) / 100;
+  return {
+    feeAmount,
+    feeCurrency: currency,
+    fee: {
+      feeMerchantReference: merchantReference,
+      feeRateApplied: safeRate,
+      feeCollectedDateTime: new Date(),
+    },
+  };
+}
+
+// Apply the merchant's CURRENT commission rate (SD-89) to a finalized execution (SD-65) and persist
+// feeAmount + fee attribution. Idempotent: skips if a fee is already attributed to this merchant.
+export async function applyMerchantFee(
+  db: Db,
+  executionRef: string,
+  merchantReference: string,
+): Promise<PaymentExecutionFee | null> {
+  const exec = await getExecution(db, executionRef);
+  if (!exec) return null;
+  if (exec.fee?.feeMerchantReference === merchantReference) return exec.fee; // idempotent
+  const merchant = await db
+    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
+    .findOne({ merchantAgreementInstanceReference: merchantReference }, { projection: { merchantCommissionRate: 1 } });
+  const { feeAmount, fee } = computeFee(exec.grossAmount, merchant?.merchantCommissionRate, exec.currency, merchantReference);
+  await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).updateOne(
+    { paymentExecutionInstanceReference: executionRef },
+    { $set: { feeAmount, netAmount: exec.grossAmount - feeAmount, fee, recordUpdatedDateTime: new Date() } },
+  );
+  return fee;
 }
 
 export async function createExecution(

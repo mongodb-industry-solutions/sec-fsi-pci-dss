@@ -105,6 +105,16 @@ export interface UpdateMerchantOAuthClientInput {
   token_lifetime_seconds?: number;
   refresh_token_lifetime_days?: number;
   claim_mapping?: Record<string, string>;
+  logo_uri?: string;    // v18: OIDC client logo_uri (https)
+  client_uri?: string;  // v18: OIDC client_uri home page (https)
+}
+
+// v18: OIDC client metadata must be an https URL (RFC 7591). Empty string clears the field.
+function assertHttpsOrEmpty(value: string | undefined, label: string): void {
+  if (value === undefined || value === '') return;
+  let ok = false;
+  try { ok = new URL(value).protocol === 'https:'; } catch { ok = false; }
+  if (!ok) throw Object.assign(new Error(`${label} must be a valid https URL`), { statusCode: 400 });
 }
 
 export type MerchantOAuthClientConfigPublic = Omit<MerchantOAuthClientConfig, 'oauthClientSecretHash'>;
@@ -124,10 +134,15 @@ export async function updateMerchantOAuthClient(
     throw Object.assign(new Error('No OAuth client configured for this merchant — issue one first'), { statusCode: 400 });
   }
 
+  assertHttpsOrEmpty(patch.logo_uri, 'logo_uri');
+  assertHttpsOrEmpty(patch.client_uri, 'client_uri');
+
   const existing = merchant.merchantOAuthClient;
   const updated: MerchantOAuthClientConfig = {
     ...existing,
     ...(patch.redirect_uris !== undefined && { oauthRedirectUris: patch.redirect_uris }),
+    ...(patch.logo_uri !== undefined && { oauthLogoUri: patch.logo_uri }),
+    ...(patch.client_uri !== undefined && { oauthClientUri: patch.client_uri }),
     ...(patch.post_logout_redirect_uris !== undefined && { oauthPostLogoutRedirectUris: patch.post_logout_redirect_uris }),
     ...(patch.grant_types !== undefined && { oauthGrantTypes: patch.grant_types }),
     ...(patch.scopes !== undefined && { oauthScopes: patch.scopes }),

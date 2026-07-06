@@ -13,10 +13,26 @@
     ],
     "merchantTransactionLimitAmount": 10000,
     "merchantSettlementSchedule": "T+2",
+    "merchantCommissionRate": 0.025,
     "merchantAverageTransactionAmount": 28.5,
     "merchantTransactionCount30d": 142,
     "merchantRiskCategory": "low",
     "merchantApiKeys": [],
+    "merchantOAuthClient": {
+      "oauthClientId": "oauth001-0000-4000-8000-000000000001",
+      "oauthClientSecretHash": "$2a$12$e6yVXVoz4p8vtEA/fopsnOKb5o.wrOrfKMfL1qn/4NorixtoGE8sG",
+      "oauthClientSecretPrefix": "espresso",
+      "oauthRedirectUris": ["http://localhost:4000/api/auth/callback"],
+      "oauthGrantTypes": ["authorization_code", "refresh_token"],
+      "oauthScopes": ["openid", "profile", "payment:read", "payment:write", "beneficiary:read", "beneficiary:manage", "balance:read", "transactions:read"],
+      "oauthClientStatus": "active",
+      "oauthClientCreatedDateTime": "2026-05-15T10:30:00.000Z",
+      "oauthTokenLifetimeSeconds": 3600,
+      "oauthRefreshTokenLifetimeDays": 30,
+      "oauthRequirePkce": true,
+      "oauthLogoUri": "http://localhost:4000/espresso-logo.svg",
+      "oauthClientUri": "http://localhost:4000"
+    },
     "merchantWebhooks": [
       {
         "webhookId": "wh000001-0000-4000-8000-000000000001",

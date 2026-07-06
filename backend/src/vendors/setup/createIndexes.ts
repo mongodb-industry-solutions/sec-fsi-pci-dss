@@ -323,6 +323,8 @@ export async function createIndexes(client: MongoClient) {
     { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
     { key: { processType: 1, eventDateTime: -1 } },
     { key: { processAction: 1, processOutcome: 1 } },
+    // v18: "user × merchant × action" activity view (SD-16 audit). Sparse — only OAuth-attributed events.
+    { key: { merchantAgreementReference: 1, actingPartyReference: 1, eventDateTime: -1 }, sparse: true },
   ]).catch(() => { /* timeseries collection may not exist on the very first run */ });
 
   // ADR-025: Compliance Process Events — timeseries
@@ -389,6 +391,8 @@ export async function createIndexes(client: MongoClient) {
     { key: { paymentOrderInstanceReference: 1 } },
     { key: { cardTransactionInstanceReference: 1 }, sparse: true },
     { key: { paymentExecutionStatus: 1, recordCreatedDateTime: -1 } },
+    // v18: merchant commission revenue aggregation (SD-89 dashboard). Sparse — only fee-bearing execs.
+    { key: { 'fee.feeMerchantReference': 1, 'fee.feeCollectedDateTime': -1 }, sparse: true },
   ]);
 
   // SD-54: Counterparty Arrangement / Beneficiary Registry (v17)

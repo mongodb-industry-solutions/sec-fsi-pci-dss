@@ -488,15 +488,29 @@ export async function verifyAccessToken(token: string): Promise<jwt.JwtPayload> 
 
 // ── Consent Grant Management (SD-16) ─────────────────────────────────────────
 
+// v18: consent grant enriched with the merchant's OIDC logo (branding on the "Authorized Apps" list).
+export type ConsentGrantWithBranding = PartyAuthConsentRecord & { oauthLogoUri?: string };
+
 export async function listUserConsentGrants(
   db: Db,
   sub: string,
-): Promise<PartyAuthConsentRecord[]> {
-  return db
+): Promise<ConsentGrantWithBranding[]> {
+  const grants = await db
     .collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION)
     .find({ partyAuthenticationInstanceReference: sub, consentStatus: 'active' })
     .sort({ consentGrantedAt: -1 })
     .toArray();
+  if (grants.length === 0) return [];
+
+  // Batch-fetch the merchants to attach oauthLogoUri (OIDC logo_uri) without a per-grant round-trip.
+  const clientIds = [...new Set(grants.map((g) => g.oauthClientId))];
+  const merchants = await db
+    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
+    .find({ 'merchantOAuthClient.oauthClientId': { $in: clientIds } }, { projection: { 'merchantOAuthClient.oauthClientId': 1, 'merchantOAuthClient.oauthLogoUri': 1 } })
+    .toArray();
+  const logoByClient = new Map(merchants.map((m) => [m.merchantOAuthClient?.oauthClientId, m.merchantOAuthClient?.oauthLogoUri]));
+
+  return grants.map((g) => ({ ...g, oauthLogoUri: logoByClient.get(g.oauthClientId) }));
 }
 
 export async function revokeConsentGrant(
