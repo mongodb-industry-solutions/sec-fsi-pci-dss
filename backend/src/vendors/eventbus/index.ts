@@ -17,7 +17,10 @@ let instance: EventBus | null = null;
 export type EventBusEngine = 'in-process' | 'kafka' | 'rabbitmq';
 
 export function resolveEventBusEngine(): EventBusEngine {
-  return config.app.eventBusEngine;
+  // Read live from the environment (PSP_-prefixed, then legacy) so the engine can be selected at
+  // startup regardless of when the config snapshot was taken; falls back to the config default.
+  const raw = process.env.PSP_EVENT_BUS_ENGINE ?? process.env.EVENT_BUS_ENGINE;
+  return (raw as EventBusEngine) ?? config.app.eventBusEngine;
 }
 
 export function initEventBus(db: Db, store?: EventStore): EventBus {
