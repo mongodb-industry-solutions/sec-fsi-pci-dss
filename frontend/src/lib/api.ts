@@ -1158,6 +1158,8 @@ export const api = {
       claim_mapping?: Record<string, string>;
       logo_uri?: string;    // https URL (or '' to clear); http allowed only for localhost
       client_uri?: string;  // https URL (or '' to clear); http allowed only for localhost
+      client_id?: string;     // set a custom client_id (changing it orphans existing tokens/consents)
+      client_secret?: string; // set a custom secret (re-hashed; prefix re-derived; plaintext never returned)
     }) =>
       apiFetch<MerchantOAuthClient>(
         `/api/v1/merchants/${merchantId}/oauth-client`,

@@ -157,6 +157,12 @@ export interface UpdateMerchantOAuthClientInput {
   claim_mapping?: Record<string, string>;
   logo_uri?: string;    // v18: OIDC client logo_uri (https)
   client_uri?: string;  // v18: OIDC client_uri home page (https)
+  // Full credential management from the admin UI. Changing client_id ROTATES the client identity:
+  // existing access tokens (aud) and consent grants that reference the old id are orphaned and the
+  // relying party's configured client_id must be updated too. Setting client_secret re-hashes it and
+  // re-derives the display prefix. Omit either to leave it unchanged.
+  client_id?: string;
+  client_secret?: string;
 }
 
 // v18: OIDC client metadata must be an https URL (RFC 7591). Empty string clears the field.
@@ -193,9 +199,33 @@ export async function updateMerchantOAuthClient(
   assertHttpsOrEmpty(patch.logo_uri, 'logo_uri');
   assertHttpsOrEmpty(patch.client_uri, 'client_uri');
 
+  // Credential rotation from the admin UI.
+  let credentialPatch: Partial<MerchantOAuthClientConfig> = {};
+  if (patch.client_id !== undefined) {
+    const newId = patch.client_id.trim();
+    if (!newId) throw Object.assign(new Error('client_id cannot be empty'), { statusCode: 400 });
+    if (newId !== merchant.merchantOAuthClient.oauthClientId) {
+      // Enforce global uniqueness — the client_id is the OAuth identity used to resolve the merchant.
+      const clash = await col.findOne({
+        'merchantOAuthClient.oauthClientId': newId,
+        merchantAgreementInstanceReference: { $ne: merchantId },
+      }, { projection: { _id: 1 } });
+      if (clash) throw Object.assign(new Error('client_id already in use by another merchant'), { statusCode: 409 });
+    }
+    credentialPatch.oauthClientId = newId;
+  }
+  if (patch.client_secret !== undefined && patch.client_secret !== '') {
+    if (patch.client_secret.length < 8) {
+      throw Object.assign(new Error('client_secret must be at least 8 characters'), { statusCode: 400 });
+    }
+    credentialPatch.oauthClientSecretHash = await bcrypt.hash(patch.client_secret, 12);
+    credentialPatch.oauthClientSecretPrefix = patch.client_secret.slice(0, 8); // display prefix, re-derived
+  }
+
   const existing = merchant.merchantOAuthClient;
   const updated: MerchantOAuthClientConfig = {
     ...existing,
+    ...credentialPatch,
     ...(patch.redirect_uris !== undefined && { oauthRedirectUris: patch.redirect_uris }),
     ...(patch.logo_uri !== undefined && { oauthLogoUri: patch.logo_uri }),
     ...(patch.client_uri !== undefined && { oauthClientUri: patch.client_uri }),

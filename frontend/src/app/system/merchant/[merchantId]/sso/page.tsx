@@ -261,6 +261,14 @@ export default function MerchantSSOPage() {
   const [oauthWebhooks, setOauthWebhooks] = useState<TypedWebhookConfig[]>([]);
   const [loadError, setLoadError] = useState(false);
 
+  // Credential edit state (Client ID + secret)
+  const [credClientId, setCredClientId] = useState('');
+  const [credSecret, setCredSecret] = useState(''); // '' = leave the stored secret unchanged
+  const [showCredSecret, setShowCredSecret] = useState(false);
+  const [credSaving, setCredSaving] = useState(false);
+  const [credSaved, setCredSaved] = useState(false);
+  const [credError, setCredError] = useState<string | null>(null);
+
   // Config edit state (Authorization section)
   const [redirectUris, setRedirectUris] = useState<string[]>([]);
   const [postLogoutUris, setPostLogoutUris] = useState<string[]>([]);
@@ -293,6 +301,8 @@ export default function MerchantSSOPage() {
       ]);
       setClient(clientRes);
       if (clientRes) {
+        setCredClientId(clientRes.oauthClientId ?? '');
+        setCredSecret('');
         setRedirectUris(clientRes.oauthRedirectUris ?? []);
         setPostLogoutUris(clientRes.oauthPostLogoutRedirectUris ?? []);
         setGrantTypes(clientRes.oauthGrantTypes ?? []);
@@ -319,6 +329,8 @@ export default function MerchantSSOPage() {
 
   function syncToState(updated: MerchantOAuthClient) {
     setClient(updated);
+    setCredClientId(updated.oauthClientId ?? '');
+    setCredSecret('');
     setRedirectUris(updated.oauthRedirectUris ?? []);
     setPostLogoutUris(updated.oauthPostLogoutRedirectUris ?? []);
     setGrantTypes(updated.oauthGrantTypes ?? []);
@@ -329,6 +341,26 @@ export default function MerchantSSOPage() {
     setClaimMapping(updated.oauthClaimMapping ?? {});
     setLogoUri(updated.oauthLogoUri ?? '');
     setClientUri(updated.oauthClientUri ?? '');
+  }
+
+  async function saveCredentials() {
+    if (!client) return;
+    setCredSaving(true);
+    setCredSaved(false);
+    setCredError(null);
+    try {
+      const updated = await api.merchants.updateOAuthClient(merchantId, token, {
+        client_id: credClientId.trim(),
+        ...(credSecret ? { client_secret: credSecret } : {}), // only rotate the secret when one is entered
+      });
+      syncToState(updated); // resets the secret input; prefix re-derives from the new value
+      setCredSaved(true);
+      setTimeout(() => setCredSaved(false), 2500);
+    } catch (e) {
+      setCredError(e instanceof Error ? e.message : 'Failed to save credentials');
+    } finally {
+      setCredSaving(false);
+    }
   }
 
   async function saveConfig() {
@@ -500,28 +532,67 @@ export default function MerchantSSOPage() {
           </div>
         </div>
 
+        {/* Editable credentials. The seeder sets working defaults; change here only to sync with the
+            relying party or to rotate. Changing the client_id orphans existing tokens/consents. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
           <div>
-            <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1 flex items-center">
+            <label className="text-[10px] text-gray-400 uppercase tracking-wide mb-1 flex items-center">
               Client ID
-              <Tooltip text="The public OAuth 2.0 client identifier (client_id). Not a secret — the merchant app sends it on every authorize and token request. Safe to share." />
-            </p>
-            <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
-              <code className="text-xs text-gray-700 flex-1 break-all">{client.oauthClientId}</code>
-              <CopyButton value={client.oauthClientId} small />
+              <Tooltip text="The public OAuth 2.0 client identifier (client_id) the merchant app sends on every authorize/token request. Editable here for full management, but changing it ORPHANS existing access tokens (aud) and consent grants and requires updating the relying party's config. Use Generate for a fresh UUID." />
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                value={credClientId}
+                onChange={(e) => setCredClientId(e.target.value)}
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 break-all"
+              />
+              <button type="button" onClick={() => setCredClientId(crypto.randomUUID())} title="Generate a new client_id"
+                className="flex items-center gap-1 text-xs border border-gray-300 text-gray-600 hover:bg-gray-50 px-2 py-2 rounded-lg transition-colors">
+                <RefreshCw size={12} /> Generate
+              </button>
+              <CopyButton value={credClientId} small />
             </div>
           </div>
           <div>
-            <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1 flex items-center">
-              Secret Prefix
-              <Tooltip text="The first 8 characters of the client secret, kept for identification only (like the visible prefix of a GitHub/Stripe key). It is NOT the secret and cannot authenticate. The full secret is shown only once, at issuance or rotation." />
-            </p>
-            <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
-              <code className="text-xs text-gray-700 flex-1 break-all">{client.oauthClientSecretPrefix || '—'}</code>
-              {client.oauthClientSecretPrefix && <CopyButton value={client.oauthClientSecretPrefix} small />}
+            <label className="text-[10px] text-gray-400 uppercase tracking-wide mb-1 flex items-center">
+              Client Secret
+              <Tooltip text="The confidential client secret. Stored only as a bcrypt hash — never returned — so this field is blank (unchanged) unless you set a new value. Type a custom secret or Generate one, then Save; copy it to the relying party's config. The Secret Prefix below is the first 8 chars, kept for identification only." />
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type={showCredSecret ? 'text' : 'password'}
+                value={credSecret}
+                onChange={(e) => setCredSecret(e.target.value)}
+                placeholder="•••••••• (unchanged)"
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 break-all"
+              />
+              <button type="button" onClick={() => setShowCredSecret((s) => !s)} title={showCredSecret ? 'Hide' : 'Reveal'}
+                className="text-gray-400 hover:text-[#001E2B] px-1">
+                {showCredSecret ? <EyeOff size={13} /> : <Eye size={13} />}
+              </button>
+              <button type="button" onClick={() => { setCredSecret(crypto.randomUUID()); setShowCredSecret(true); }} title="Generate a new secret"
+                className="flex items-center gap-1 text-xs border border-gray-300 text-gray-600 hover:bg-gray-50 px-2 py-2 rounded-lg transition-colors">
+                <RefreshCw size={12} /> Generate
+              </button>
             </div>
-            <p className="text-[11px] text-gray-400 mt-1">The full secret is shown once, on issuance or rotation.</p>
+            <p className="text-[11px] text-gray-400 mt-1">
+              Prefix: <code className="text-gray-600">{(credSecret || '').slice(0, 8) || client.oauthClientSecretPrefix || '—'}</code>
+              <span className="ml-1">(display only; derived from the secret)</span>
+            </p>
           </div>
+        </div>
+        <div className="flex items-center gap-3 mt-3">
+          <button
+            type="button" onClick={saveCredentials} disabled={credSaving}
+            className="flex items-center gap-2 bg-[#001E2B] hover:bg-[#001E2B]/80 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-60 text-sm"
+          >
+            {credSaving ? 'Saving...' : <><Check size={14} /> Save credentials</>}
+          </button>
+          {credSaved && <span className="text-sm text-green-700 flex items-center gap-1"><Check size={13} /> Saved.</span>}
+          {credError && <span className="text-sm text-red-600">{credError}</span>}
+          {credClientId.trim() !== client.oauthClientId && (
+            <span className="text-[11px] text-amber-700">⚠ Changing the Client ID orphans existing tokens &amp; consents.</span>
+          )}
         </div>
 
         {newSecret && (
