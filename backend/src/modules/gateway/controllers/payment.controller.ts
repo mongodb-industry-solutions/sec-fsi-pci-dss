@@ -9,6 +9,7 @@ import {
   capturePaymentOrder,
   voidPaymentOrder,
   refundPaymentOrder,
+  failPaymentOrder,
   getPaymentOrder,
 } from '../services/paymentOrder.service';
 import { validateMerchantToken } from '../../../vendors/middleware/validateMerchantToken';
@@ -177,9 +178,14 @@ initiated → confirmed → authorized → captured → settled
           ? { ...baseAttribution, ...(body.actingSubjectReference && { actingPartyReference: body.actingSubjectReference }) }
           : undefined,
       });
-      return reply.status(201).send({ ...order, paymentOrderStatus: 'authorized', cardTransactionInstanceReference: tx.cardTransactionInstanceReference });
+      // Persist the SD-64 status transition so GET /gateway/payments/:id agrees with this response
+      // (the order was created as 'initiated'). Fall back to the returned status if already advanced.
+      const authorized = await authorizePaymentOrder(fastify.db, order.paymentOrderInstanceReference);
+      return reply.status(201).send({ ...order, paymentOrderStatus: authorized?.paymentOrderStatus ?? 'authorized', cardTransactionInstanceReference: tx.cardTransactionInstanceReference });
     } catch (err) {
       if (err instanceof CardIssuerDeclinedError) {
+        // Persist the terminal failure so the order does not remain stuck at 'initiated'.
+        await failPaymentOrder(fastify.db, order.paymentOrderInstanceReference);
         return reply.status(402).send({ error: 'payment_declined', error_description: err.reason, responseCode: err.responseCode, ...order, paymentOrderStatus: 'failed' });
       }
       throw err;

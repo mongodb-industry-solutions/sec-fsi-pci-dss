@@ -86,7 +86,19 @@ function safeMerchantAccount(doc: Record<string, unknown>) {
   };
 }
 
-interface PreviewBody { destination: RailDestination; amountCurrency?: string; rail?: BankRail }
+// The merchant client (merchant/src/lib/PspClient.ts previewTransfer) sends amountCurrency as an
+// { amount, currency } object; older/direct callers send a bare currency-code string. Accept both.
+type AmountCurrency = string | { amount?: number; currency: string };
+interface PreviewBody { destination: RailDestination; amountCurrency?: AmountCurrency; rail?: BankRail }
+
+// Normalise amountCurrency to the ISO currency code previewBankTransfer expects (used as feeCurrency).
+// Falls back to the destination currency so a missing/blank value still yields a correct preview.
+function resolvePreviewCurrency(body: PreviewBody): string {
+  const ac = body.amountCurrency;
+  if (ac && typeof ac === 'object' && typeof ac.currency === 'string' && ac.currency) return ac.currency;
+  if (typeof ac === 'string' && ac) return ac;
+  return body.destination.currency;
+}
 interface ExecuteBody {
   amount: number; currency: string; destination: RailDestination;
   rail?: BankRail; reference?: string; fromAccountRef?: string;
@@ -236,7 +248,17 @@ export async function merchantGatewayController(fastify: FastifyInstance) {
       body: {
         type: 'object',
         required: ['destination'],
-        properties: { destination: destinationSchema, amountCurrency: { type: 'string' }, rail: { type: 'string' } },
+        properties: {
+          destination: destinationSchema,
+          // Accept a bare currency string OR an { amount, currency } object (merchant client shape).
+          amountCurrency: {
+            oneOf: [
+              { type: 'string' },
+              { type: 'object', properties: { amount: { type: 'number' }, currency: { type: 'string' } }, required: ['currency'] },
+            ],
+          },
+          rail: { type: 'string' },
+        },
       },
     },
   }, async (req: FastifyRequest, reply: FastifyReply) => {
@@ -245,7 +267,7 @@ export async function merchantGatewayController(fastify: FastifyInstance) {
     if (!ok) return;
 
     const body = req.body as PreviewBody;
-    const result = previewBankTransfer(body.destination, body.amountCurrency ?? body.destination.currency, body.rail);
+    const result = previewBankTransfer(body.destination, resolvePreviewCurrency(body), body.rail);
     return reply.send(result);
   });
 

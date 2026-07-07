@@ -3,7 +3,10 @@ replicaCount: 2
 env:
   NODE_ENV: production
   PSP_KMS_PROVIDER: local
-  PSP_OAUTH_KEY_PROVIDER: local
+  # KMS-backed RS256 signing (matches staging). The chart provides PSP_OAUTH_AWS_KEY_ARN below; a
+  # `local` provider would require a mounted key store (PSP_OAUTH_KEY_STORE_DIR + key files), which
+  # prod does not have, and would throw at startup under NODE_ENV=production.
+  PSP_OAUTH_KEY_PROVIDER: aws
   PSP_CORS_ORIGIN: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com"
   PSP_URL_FRONTEND: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com"
 

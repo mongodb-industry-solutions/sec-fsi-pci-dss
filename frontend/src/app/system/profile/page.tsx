@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, type ConsentGrant } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { ROLE_LABELS } from '../../../lib/constants';
@@ -134,10 +134,12 @@ function CollectionChip({ name }: { name: string }) {
   );
 }
 
-// Copy-to-clipboard for a protected field's plaintext value. Mirrors the account-detail affordance;
-// copies the real value regardless of reveal state (this is the data subject's own record).
+// Copy-to-clipboard for a protected field's plaintext value. Mirrors the account-detail affordance.
 function CopyButton({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Clear any pending reset on unmount so the timer never fires setState after the component is gone.
+  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
   return (
     <button
       type="button"
@@ -145,7 +147,8 @@ function CopyButton({ value, label }: { value: string; label: string }) {
         try {
           await navigator.clipboard.writeText(value);
           setCopied(true);
-          setTimeout(() => setCopied(false), 1200);
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          timeoutRef.current = setTimeout(() => setCopied(false), 1200);
         } catch { /* clipboard unavailable — no-op */ }
       }}
       title={copied ? 'Copied' : `Copy ${label}`}
@@ -198,7 +201,9 @@ function RevealField({
         >
           {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
         </button>
-        <CopyButton value={plainValue} label={label} />
+        {/* Only offer copy once the value is revealed — avoids copying/leaking the plaintext of a
+            still-masked field (e.g. during a screen share). Matches the account-detail IBAN behavior. */}
+        {revealed && <CopyButton value={plainValue} label={label} />}
       </div>
     </>
   );

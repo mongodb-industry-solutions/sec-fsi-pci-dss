@@ -9,10 +9,9 @@ import { loginAs, json } from './support/auth';
 // /system/merchant root shows the registration form when the list is empty.
 function customerMerchantList(page: Page, merchants: unknown[]) {
   const body = json({ results: merchants, total: merchants.length });
-  return Promise.all([
-    page.route('**/api/v1/merchants?**', (r) => r.fulfill(body)),
-    page.route('**/api/v1/merchants', (r) => r.fulfill(body)),
-  ]);
+  // Anchor to the LIST endpoint only (optional query string). A glob like `**/api/v1/merchants?**`
+  // would also match `/api/v1/merchants/:id` (`?` is a single-char wildcard), stubbing the wrong route.
+  return page.route(/\/api\/v1\/merchants(\?.*)?$/, (r) => r.fulfill(body));
 }
 
 // Onboarding status (under_review / rejected) is shown on the merchant overview
@@ -33,8 +32,8 @@ const MERCHANT_ROW = {
 };
 
 async function merchantList(page: Page) {
-  await page.route('**/api/v1/merchants?**', (r) => r.fulfill(json({ results: [MERCHANT_ROW], total: 1 })));
-  await page.route('**/api/v1/merchants', (r) => r.fulfill(json({ results: [MERCHANT_ROW], total: 1 })));
+  // Anchor to the LIST endpoint only (optional query string) so `/api/v1/merchants/:id` is not caught.
+  await page.route(/\/api\/v1\/merchants(\?.*)?$/, (r) => r.fulfill(json({ results: [MERCHANT_ROW], total: 1 })));
 }
 
 test.describe('FR-v4-P6: customer onboarding states', () => {

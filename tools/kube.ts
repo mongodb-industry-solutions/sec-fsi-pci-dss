@@ -257,7 +257,10 @@ async function generateKubeconfig() {
 
     const loginEnv = { ...process.env, KUBECONFIG: configFile };
     const ctx = contextName(cluster === "prod" ? PROD_API : STAGING_API);
-    spawnSync("kubectl", ["config", "use-context", ctx], { shell: true, stdio: "pipe", env: loginEnv });
+    const ctxResult = spawnSync("kubectl", ["config", "use-context", ctx], { shell: true, stdio: "pipe", env: loginEnv });
+    if (ctxResult.status !== 0) {
+      warn(`Could not select context "${ctx}" (it may not exist yet). Continuing to login, which can create it.`);
+    }
     console.log(`${DIM}[cmd]    kanopy-oidc kube login${NC}`);
     const loginResult = spawnSync("kanopy-oidc", ["kube", "login"], { shell: true, stdio: "inherit", env: loginEnv });
     if (loginResult.status !== 0) {
@@ -865,7 +868,10 @@ async function deployEnvSetup() {
   // Login
   action(`Authenticating to ${envLabel}...`);
   const loginEnv = { ...process.env, KUBECONFIG: configFile };
-  spawnSync("kubectl", ["config", "use-context", contextName(apiServer)], { shell: true, stdio: "pipe", env: loginEnv });
+  const ctxResult = spawnSync("kubectl", ["config", "use-context", contextName(apiServer)], { shell: true, stdio: "pipe", env: loginEnv });
+  if (ctxResult.status !== 0) {
+    warn(`Could not select context "${contextName(apiServer)}" (it may not exist yet). Continuing to login, which can create it.`);
+  }
   const loginResult = spawnSync("kanopy-oidc", ["kube", "login"], {
     shell: true, stdio: "inherit", env: loginEnv,
   });

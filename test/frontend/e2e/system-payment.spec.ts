@@ -78,7 +78,9 @@ test.describe('FR-v1-01/03: new payment wizard', () => {
       : route.continue());
     await advanceToConfirmation(page);
     await expect(page.getByText(/Payment Confirmed/i)).toBeVisible({ timeout: 8000 });
-    await expect(page.getByText('Authorized')).toBeVisible();
+    // Exact match: the sidebar's "Authorized Apps" link also contains the substring "Authorized",
+    // which would otherwise trip Playwright strict mode.
+    await expect(page.getByText('Authorized', { exact: true })).toBeVisible();
   });
 
   test('a fraud-flagged payment surfaces the fraud alert', async ({ page }) => {

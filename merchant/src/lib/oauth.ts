@@ -175,7 +175,10 @@ export async function verifyIdToken(idToken: string, expectedNonce?: string): Pr
     issuer: cfg.issuer,
     audience: ENV.clientId(),
   });
-  if (expectedNonce && payload.nonce && payload.nonce !== expectedNonce) {
+  // If the authorize request carried a nonce, the id_token MUST echo the same value. A missing nonce
+  // claim is a mismatch (not a pass) — otherwise a token without a nonce would be accepted for a
+  // request that required one, weakening replay protection (OIDC Core §3.1.3.7).
+  if (expectedNonce && payload.nonce !== expectedNonce) {
     throw new Error('id_token nonce mismatch');
   }
   return {

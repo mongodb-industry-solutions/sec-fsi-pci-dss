@@ -3,7 +3,7 @@
 // PCI DSS Req 3.3: IBAN never shown in full. GDPR: account holder data visible to data subject only.
 // PCI DSS Req 7: partyRef from JWT must match account's partyInstanceReference (enforced backend).
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Landmark, CreditCard, CheckCircle2, XCircle, Clock, Star, Trash2, Save, X, Lock, Pencil, Eye, EyeOff, Copy, Check } from 'lucide-react';
 import { api } from '../../../../lib/api';
@@ -98,6 +98,9 @@ const RAIL_LABELS: Record<string, string> = {
 // Owner-scoped page, so copying the plaintext is safe (same trust boundary as the reveal).
 function CopyButton({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Clear any pending reset on unmount so the timer never fires setState after the component is gone.
+  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
   return (
     <button
       type="button"
@@ -105,7 +108,8 @@ function CopyButton({ value, label }: { value: string; label: string }) {
         try {
           await navigator.clipboard.writeText(value);
           setCopied(true);
-          setTimeout(() => setCopied(false), 1200);
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          timeoutRef.current = setTimeout(() => setCopied(false), 1200);
         } catch { /* clipboard unavailable, no-op */ }
       }}
       title={copied ? 'Copied' : `Copy ${label}`}

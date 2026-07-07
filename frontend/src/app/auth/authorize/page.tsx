@@ -89,9 +89,11 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
     info.scope_details ?? info.scopes.map((s) => ({ scope: s, description: `Access to ${s}`, required: s === 'openid' }));
 
   // Demo convenience: prefill the login form from the authorize URL.
-  // login_hint is the standard OIDC param; prefill_email / prefill_password are demo-only aliases.
+  // login_hint is the standard OIDC param; prefill_email is a demo-only alias.
   const prefillEmail = params.login_hint || params.prefill_email || '';
-  const prefillPassword = params.prefill_password || '';
+  // prefill_password is accepted ONLY in non-production builds: URLs leak into browser history,
+  // server/proxy logs and Referer headers, so a password must never ride in a query param in prod.
+  const prefillPassword = process.env.NODE_ENV !== 'production' ? (params.prefill_password || '') : '';
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">

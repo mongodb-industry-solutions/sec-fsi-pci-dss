@@ -20,12 +20,21 @@ declare module 'fastify' {
   }
 }
 
+// Defensive Authorization-header parse: case-insensitive "Bearer" prefix + trimmed token, so
+// odd casing / extra whitespace does not leak the scheme into the token or mis-parse the header.
+// A naive `replace('Bearer ', '')` would mishandle those and could pick up a later substring match.
+export function extractBearerToken(authorization: string | undefined): string | undefined {
+  if (!authorization) return undefined;
+  const match = /^\s*Bearer\s+(.+?)\s*$/i.exec(authorization);
+  return match ? match[1] : undefined;
+}
+
 export async function validateMerchantToken(
   request: FastifyRequest,
   reply: FastifyReply,
   requiredScope?: string,
 ): Promise<void> {
-  const bearer = request.headers.authorization?.replace('Bearer ', '');
+  const bearer = extractBearerToken(request.headers.authorization);
   if (!bearer) {
     return reply.status(401).send({ error: 'invalid_token', error_description: 'Missing Bearer token' }) as any;
   }
@@ -77,7 +86,7 @@ export async function validateMerchantToken(
  * fail the request when it is absent/invalid. Never sends a reply; returns undefined on any problem.
  */
 export async function tryMerchantContext(request: FastifyRequest): Promise<MerchantTokenContext | undefined> {
-  const bearer = request.headers.authorization?.replace('Bearer ', '');
+  const bearer = extractBearerToken(request.headers.authorization);
   if (!bearer) return undefined;
   try {
     const payload = await verifyAccessToken(bearer);

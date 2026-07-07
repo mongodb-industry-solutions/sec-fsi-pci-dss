@@ -68,9 +68,16 @@ export async function applyMerchantFee(
     .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
     .findOne({ merchantAgreementInstanceReference: merchantReference }, { projection: { merchantCommissionRate: 1 } });
   const { feeAmount, fee } = computeFee(exec.grossAmount, merchant?.merchantCommissionRate, exec.currency, merchantReference);
+  // Sparse: only fee-bearing executions carry a `fee` sub-document. A zero commission (no rate
+  // configured, or rate ≤ 0) attributes nothing — otherwise commission counts/revenue would be
+  // inflated by zero-fee executions. Mirrors the acquiring path (applyMerchantCommissionToCardTxn).
+  if (feeAmount <= 0) return null;
+  // Round netAmount to 2 decimals like feeAmount, so gross − fee cannot leak float artifacts
+  // (e.g. 10.1 − 0.3 → 9.799999999) into the persisted balance-affecting figure.
+  const netAmount = Math.round((exec.grossAmount - feeAmount) * 100) / 100;
   await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).updateOne(
     { paymentExecutionInstanceReference: executionRef },
-    { $set: { feeAmount, netAmount: exec.grossAmount - feeAmount, fee, recordUpdatedDateTime: new Date() } },
+    { $set: { feeAmount, netAmount, fee, recordUpdatedDateTime: new Date() } },
   );
   return fee;
 }

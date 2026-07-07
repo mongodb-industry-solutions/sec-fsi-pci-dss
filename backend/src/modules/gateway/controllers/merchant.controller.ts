@@ -839,7 +839,11 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
       if (typeof rate !== 'number' || !isFinite(rate) || rate < 0 || rate > 1) {
         return reply.status(400).send({ error: 'merchantCommissionRate must be a number between 0 and 1.' });
       }
-      if (Math.round(rate * 10000) !== rate * 10000) {
+      // At most 4 decimal places. Compare the rounded value back to the original rate (tolerating
+      // binary-float error) instead of comparing scaled integers directly — `rate * 10000` is not
+      // guaranteed to be an exact integer even for valid inputs (e.g. 0.1 * 10000 = 1000.0000000001).
+      const rounded = Math.round(rate * 10000) / 10000;
+      if (Math.abs(rounded - rate) > 1e-9) {
         return reply.status(400).send({ error: 'merchantCommissionRate supports at most 4 decimal places.' });
       }
     }

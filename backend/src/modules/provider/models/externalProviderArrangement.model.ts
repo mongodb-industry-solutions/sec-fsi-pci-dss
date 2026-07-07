@@ -377,7 +377,7 @@ export interface BusinessProcessEvent {
   // × action" activity view without a new collection.
   clientId?: string;                    // OAuth client_id that originated the action
   merchantAgreementReference?: string;  // SD-89 merchant the action was performed through
-  actingPartyReference?: string;        // party of the acting user (token sub)
+  actingPartyReference?: string;        // OAuth subject of the acting user (token.sub = customerAuthenticationInstanceReference, NOT an SD-13 Party ref); matched as such in businessProcessEvent joins
   actingChannel?: 'session' | 'oauth_merchant';
 }
 

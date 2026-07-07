@@ -160,11 +160,17 @@ export interface UpdateMerchantOAuthClientInput {
 }
 
 // v18: OIDC client metadata must be an https URL (RFC 7591). Empty string clears the field.
+// Exception: http://localhost and http://127.0.0.1 are allowed so the documented local-dev workflow
+// (merchant app on http://localhost:8082) can update branding without switching to https.
 function assertHttpsOrEmpty(value: string | undefined, label: string): void {
   if (value === undefined || value === '') return;
   let ok = false;
-  try { ok = new URL(value).protocol === 'https:'; } catch { ok = false; }
-  if (!ok) throw Object.assign(new Error(`${label} must be a valid https URL`), { statusCode: 400 });
+  try {
+    const url = new URL(value);
+    const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    ok = url.protocol === 'https:' || (url.protocol === 'http:' && isLocalhost);
+  } catch { ok = false; }
+  if (!ok) throw Object.assign(new Error(`${label} must be a valid https URL (http allowed only for localhost)`), { statusCode: 400 });
 }
 
 export type MerchantOAuthClientConfigPublic = Omit<MerchantOAuthClientConfig, 'oauthClientSecretHash'>;
