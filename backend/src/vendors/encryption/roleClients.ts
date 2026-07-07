@@ -17,7 +17,7 @@
  *   MONGODB_URI_LEVEL2  - connection string for the Atlas DB user with pci_level2_role
  *   MONGODB_URI         - fallback for both pools when role-specific URIs are not set
  *
- * In KMS_PROVIDER=local (offline demo) mode both pools use the same local URI and
+ * In PSP_KMS_PROVIDER=local (offline demo) mode both pools use the same local URI and
  * the DEK tier distinction is still enforced at the encryptedFieldsMap level.
  */
 

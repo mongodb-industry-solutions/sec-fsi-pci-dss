@@ -469,7 +469,7 @@ If a breaking schema change is needed (e.g., adding a QE range field), the colle
 | QE `$lookup` limitation breaks a planned join | Low | High | All joins are application-side sequential queries: no `$lookup` used. Documented in ADR-001 |
 | Seed data accidentally includes real PAN format | Medium | High | Seed generator always prefixes tokens with `pm_`; grep CI check rejects any string matching `\b\d{13,19}\b` |
 | Key vault DEK reference lost (collection dropped without DEK cleanup) | Low | High | `bin/setup.ts --reset` drops collections then recreates DEKs; order is enforced in script |
-| Demo breaks at conference due to AWS KMS unavailability | Low | High | Local KMS fallback is always available with `KMS_PROVIDER=local`; test it before travel |
+| Demo breaks at conference due to AWS KMS unavailability | Low | High | Local KMS fallback is always available with `PSP_KMS_PROVIDER=local`; test it before travel |
 
 ---
 

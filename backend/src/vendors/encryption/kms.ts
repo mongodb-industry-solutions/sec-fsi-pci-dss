@@ -4,7 +4,7 @@ import { config } from '../../config';
 export function buildKmsProviders(): KMSProviders {
   if (config.kms.provider === 'local') {
     const key = config.kms.localMasterKey;
-    if (!key) throw new Error('KMS_LOCAL_MASTER_KEY is required when KMS_PROVIDER=local');
+    if (!key) throw new Error('PSP_KMS_LOCAL_MASTER_KEY is required when PSP_KMS_PROVIDER=local');
     return { local: { key: Buffer.from(key, 'base64') } };
   }
 
@@ -12,7 +12,7 @@ export function buildKmsProviders(): KMSProviders {
   const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY;
   const AWS_SESSION_TOKEN = process.env.AWS_SESSION_TOKEN;
   if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
-    throw new Error('AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required when KMS_PROVIDER=aws');
+    throw new Error('AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required when PSP_KMS_PROVIDER=aws');
   }
 
   return {

@@ -52,9 +52,9 @@ export default async function BeneficiariesPage() {
                   <Users className="h-4 w-4" aria-hidden />
                 </span>
                 <div className="min-w-0">
-                  <div className="truncate font-medium text-ink">{b.counterpartyName ?? b.label ?? b.beneficiaryLabel ?? 'Beneficiary'}</div>
+                  <div className="truncate font-medium text-ink">{b.counterpartyLabel ?? b.counterpartyName ?? b.label ?? 'Beneficiary'}</div>
                   <div className="truncate font-mono text-sm text-muted">
-                    {b.maskedContact ?? b.beneficiaryMaskedHint ?? b.counterpartyMaskedIdentifier ?? '••••'}
+                    {b.counterpartyLookupHint ?? b.maskedContact ?? b.counterpartyMaskedIdentifier ?? '••••'}
                   </div>
                 </div>
               </div>

@@ -123,7 +123,18 @@ export async function merchantBeneficiaryController(fastify: FastifyInstance) {
     const ownerParty = await resolvePartyInstanceReference(fastify.db, partyRef);
     if (!ownerParty) return reply.send({ results: [], total: 0, page: q.page ?? 1, limit: q.limit ?? 20 });
     const { results, total } = await listBeneficiaries(fastify.db, ownerParty, q);
-    return reply.send({ results, total, page: q.page ?? 1, limit: q.limit ?? 20 });
+    // Display-safe projection: expose only the opaque token, owner label, lookup type,
+    // masked hint and status. NEVER leak counterpartyPartyReference (PSP-internal identity)
+    // or the raw lookup value to the merchant (GDPR minimisation, SD-54 v17 design).
+    const safe = results.map((b) => ({
+      counterpartyArrangementReference: b.counterpartyArrangementReference,
+      counterpartyLabel: b.counterpartyLabel,
+      counterpartyLookupType: b.counterpartyLookupType,
+      counterpartyLookupHint: b.counterpartyLookupHint,
+      counterpartyArrangementStatus: b.counterpartyArrangementStatus,
+      recordCreatedDateTime: b.recordCreatedDateTime,
+    }));
+    return reply.send({ results: safe, total, page: q.page ?? 1, limit: q.limit ?? 20 });
   });
 
   // DELETE /api/v1/merchant/beneficiaries/:partyRef/:beneficiaryToken
