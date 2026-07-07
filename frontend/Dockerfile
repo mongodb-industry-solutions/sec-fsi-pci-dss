@@ -14,6 +14,11 @@ ENV NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=$NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE
 ARG NEXT_PUBLIC_PSP_URL_MERCHANT=http://localhost:8082
 ENV NEXT_PUBLIC_PSP_URL_MERCHANT=$NEXT_PUBLIC_PSP_URL_MERCHANT
 
+# MERCHANT_PRIVATE = in-cluster merchant service URL, used server-side by next.config rewrites so the
+# admin monitoring page probes /merchant-health same-origin (no CORS / public-ingress dependency).
+ARG NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE
+ENV NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE=$NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE
+
 # Install dependencies (layer cached unless package.json changes)
 COPY package*.json ./
 RUN npm install

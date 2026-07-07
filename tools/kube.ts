@@ -41,6 +41,7 @@ function contextName(apiUrl: string): string {
 const DEMO_NAME = process.env.KUBE_DEMO_NAME ?? "sec-fsi-pci-dss";
 const RELEASE_BACKEND = process.env.KUBE_RELEASE_BACKEND ?? `${DEMO_NAME}-backend`;
 const RELEASE_FRONTEND = process.env.KUBE_RELEASE_FRONTEND ?? `${DEMO_NAME}-frontend`;
+const RELEASE_MERCHANT = process.env.KUBE_RELEASE_MERCHANT ?? `${DEMO_NAME}-merchant`;
 const KSEC_SECRET_STAGING = process.env.KUBE_KSEC_SECRET_STAGING ?? `${DEMO_NAME}-secrets-staging`;
 const KSEC_SECRET_PROD = process.env.KUBE_KSEC_SECRET_PROD ?? `${DEMO_NAME}-secrets-prod`;
 
@@ -448,14 +449,17 @@ async function manageSecretKeys() {
 //  4. DEPLOYMENT
 // ============================================================
 
+// List all pods in the namespace (backend, frontend AND merchant). A label selector like
+// `app.kubernetes.io/instance in (a,b)` contains spaces/parens that the Windows shell mangles under
+// spawnSync (shell: IS_WIN) and it also silently excluded the merchant — so list them all with -o wide.
 async function getPods() {
-  spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "-l", `app.kubernetes.io/instance in (${RELEASE_BACKEND},${RELEASE_FRONTEND})`], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
+  spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "-o", "wide"], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
 }
 
 async function getAll() {
   const env = kubeEnv();
   console.log("--- Pods ---");
-  spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "-l", `app.kubernetes.io/instance in (${RELEASE_BACKEND},${RELEASE_FRONTEND})`], { shell: IS_WIN, stdio: "inherit", env });
+  spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "-o", "wide"], { shell: IS_WIN, stdio: "inherit", env });
   console.log("\n--- Deployments ---");
   spawnSync("kubectl", ["get", "deployments", "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
   console.log("\n--- Services ---");
@@ -465,11 +469,39 @@ async function getAll() {
 }
 
 async function podLogs() {
-  console.log("\n  1. backend\n  2. frontend");
+  // Custom covers anything not fixed here (e.g. the merchant, which isn't always deployed, or any
+  // pod visible under option 14) — enter its exact pod name.
+  console.log("\n  1. backend\n  2. frontend\n  3. custom (enter a pod name)");
   const input = await ask("Which service? ");
-  const release = input === "2" ? RELEASE_FRONTEND : RELEASE_BACKEND;
+  if (!["1", "2", "3"].includes(input)) { warn(`Invalid choice "${input}". Choose 1, 2 or 3.`); return; }
   const tail = (await ask("Lines to show (default: 50): ")) || "50";
-  spawnSync("kubectl", ["logs", "-l", `app.kubernetes.io/instance=${release}`, "-n", IST_NAMESPACE, `--tail=${tail}`], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
+  const env = kubeEnv();
+
+  if (input === "3") {
+    const entered = (await ask("Pod or deployment name: ")).trim();
+    if (!entered) { warn("No name given."); return; }
+    // kubectl logs needs a real POD name. Accept a deployment/release name too: if the entry isn't an
+    // exact pod, resolve the newest pod whose name starts with it (pod = <deployment>-<hash>-<hash>).
+    // `-o name` avoids braces/spaces so it is safe under the Windows shell.
+    const list = spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "-o", "name"], { shell: IS_WIN, encoding: "utf-8", env });
+    const names = (list.stdout || "").split(/\r?\n/).map((l) => l.replace(/^pod\//, "").trim()).filter(Boolean);
+    let pod = entered;
+    if (!names.includes(entered)) {
+      const matches = names.filter((n) => n.startsWith(entered)).sort();
+      if (matches.length === 0) { warn(`No pod found matching "${entered}" in ${IST_NAMESPACE}.`); return; }
+      pod = matches[matches.length - 1];
+      console.log(`${DIM}[resolved] ${entered} -> ${pod}${NC}`);
+    }
+    // --previous shows the last crashed instance (useful for CrashLoopBackOff).
+    const prev = (await ask("Show the CRASHED (previous) container's logs instead of the current one? Use this for CrashLoopBackOff. [y/N]: ")).trim().toLowerCase() === "y";
+    const args = ["logs", pod, "-n", IST_NAMESPACE, `--tail=${tail}`, "--all-containers"];
+    if (prev) args.push("--previous");
+    spawnSync("kubectl", args, { shell: IS_WIN, stdio: "inherit", env });
+    return;
+  }
+
+  const release = input === "2" ? RELEASE_FRONTEND : RELEASE_BACKEND;
+  spawnSync("kubectl", ["logs", "-l", `app.kubernetes.io/instance=${release}`, "-n", IST_NAMESPACE, `--tail=${tail}`, "--all-containers"], { shell: IS_WIN, stdio: "inherit", env });
 }
 
 async function helmStatus() {
@@ -481,14 +513,17 @@ async function helmStatus() {
 }
 
 async function rolloutRestart() {
-  console.log("\n  1. backend\n  2. frontend\n  3. both");
+  console.log("\n  1. backend\n  2. frontend\n  3. merchant\n  4. all");
   const input = await ask("Restart which? ");
-  const env = kubeEnv();
-  if (input === "1" || input === "3") {
+  if (!["1", "2", "3", "4"].includes(input)) { warn(`Invalid choice "${input}". Choose 1-4.`); return; }
+  if (input === "1" || input === "4") {
     run(`kubectl rollout restart deployment ${RELEASE_BACKEND}-web-app -n ${IST_NAMESPACE}`);
   }
-  if (input === "2" || input === "3") {
+  if (input === "2" || input === "4") {
     run(`kubectl rollout restart deployment ${RELEASE_FRONTEND}-web-app -n ${IST_NAMESPACE}`);
+  }
+  if (input === "3" || input === "4") {
+    run(`kubectl rollout restart deployment ${RELEASE_MERCHANT}-web-app -n ${IST_NAMESPACE}`);
   }
   ok("Rollout restart initiated.");
 }
@@ -682,18 +717,18 @@ async function describePod() {
 }
 
 async function execIntoPod() {
-  console.log("\n  1. backend\n  2. frontend");
+  console.log("\n  1. backend\n  2. frontend\n  3. merchant");
   const input = await ask("Which service? ");
-  const release = input === "2" ? RELEASE_FRONTEND : RELEASE_BACKEND;
+  const release = input === "2" ? RELEASE_FRONTEND : input === "3" ? RELEASE_MERCHANT : RELEASE_BACKEND;
   const deployment = `${release}-web-app`;
   console.log(`${DIM}[cmd]    kubectl exec -it deployment/${deployment} -n ${IST_NAMESPACE} -- sh${NC}`);
   spawnSync("kubectl", ["exec", "-it", `deployment/${deployment}`, "-n", IST_NAMESPACE, "--", "sh"], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
 }
 
 async function checkEnvVars() {
-  console.log("\n  1. backend\n  2. frontend");
+  console.log("\n  1. backend\n  2. frontend\n  3. merchant");
   const input = await ask("Which service? ");
-  const release = input === "2" ? RELEASE_FRONTEND : RELEASE_BACKEND;
+  const release = input === "2" ? RELEASE_FRONTEND : input === "3" ? RELEASE_MERCHANT : RELEASE_BACKEND;
   const deployment = `${release}-web-app`;
   spawnSync("kubectl", ["exec", `deployment/${deployment}`, "-n", IST_NAMESPACE, "--", "env"], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
 }

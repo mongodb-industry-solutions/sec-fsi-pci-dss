@@ -41,6 +41,7 @@ steps:
         - NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC=https://sec-fsi-pci-dss-backend.industrysolutions.staging.corp.mongodb.com
         - NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=http://sec-fsi-pci-dss-backend-web-app:80
         - NEXT_PUBLIC_PSP_URL_MERCHANT=https://sec-fsi-pci-dss-merchant.industrysolutions.staging.corp.mongodb.com
+        - NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE=http://sec-fsi-pci-dss-merchant-web-app:80
       access_key:
         from_secret: ecr_access_key
       secret_key:
@@ -174,6 +175,7 @@ steps:
         - NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC=https://sec-fsi-pci-dss-backend.industrysolutions.prod.corp.mongodb.com
         - NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=http://sec-fsi-pci-dss-backend-web-app:80
         - NEXT_PUBLIC_PSP_URL_MERCHANT=https://sec-fsi-pci-dss-merchant.industrysolutions.prod.corp.mongodb.com
+        - NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE=http://sec-fsi-pci-dss-merchant-web-app:80
       access_key:
         from_secret: ecr_access_key
       secret_key:

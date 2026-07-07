@@ -33,7 +33,7 @@
       "name": "Merchant App",
       "description": "External merchant demo (Espresso Works) — Next.js SSO/API client",
       "type": "http",
-      "url": "{{MERCHANT_BASE_URL}}/health",
+      "url": "/merchant-health",
       "method": "GET",
       "enabled": true,
       "intervalMs": 30000,
