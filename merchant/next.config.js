@@ -1,4 +1,3 @@
-const path = require('path');
 /** @type {import('next').NextConfig} */
 // Autonomous merchant demo app. No PSP workspace coupling; all domain data via PSP API.
 const nextConfig = {
