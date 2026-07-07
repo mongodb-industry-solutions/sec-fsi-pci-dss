@@ -159,10 +159,12 @@ export interface UpdateMerchantOAuthClientInput {
   client_uri?: string;  // v18: OIDC client_uri home page (https)
   // Full credential management from the admin UI. Changing client_id ROTATES the client identity:
   // existing access tokens (aud) and consent grants that reference the old id are orphaned and the
-  // relying party's configured client_id must be updated too. Setting client_secret re-hashes it and
-  // re-derives the display prefix. Omit either to leave it unchanged.
+  // relying party's configured client_id must be updated too. Setting client_secret re-hashes it.
+  // client_secret_prefix is an INDEPENDENT display/identification label (not derived from the secret,
+  // so it leaks no secret bytes); set or generate it on its own. Omit any field to leave it unchanged.
   client_id?: string;
   client_secret?: string;
+  client_secret_prefix?: string;
 }
 
 // v18: OIDC client metadata must be an https URL (RFC 7591). Empty string clears the field.
@@ -218,8 +220,16 @@ export async function updateMerchantOAuthClient(
     if (patch.client_secret.length < 8) {
       throw Object.assign(new Error('client_secret must be at least 8 characters'), { statusCode: 400 });
     }
+    // Hash the secret only. The prefix is an independent label (see below) — not derived here — so
+    // setting a secret never changes it and no part of the real secret is exposed via the prefix.
     credentialPatch.oauthClientSecretHash = await bcrypt.hash(patch.client_secret, 12);
-    credentialPatch.oauthClientSecretPrefix = patch.client_secret.slice(0, 8); // display prefix, re-derived
+  }
+  if (patch.client_secret_prefix !== undefined) {
+    const prefix = patch.client_secret_prefix.trim();
+    if (prefix.length > 16) {
+      throw Object.assign(new Error('client_secret_prefix must be at most 16 characters'), { statusCode: 400 });
+    }
+    credentialPatch.oauthClientSecretPrefix = prefix; // independent display/identification label
   }
 
   const existing = merchant.merchantOAuthClient;

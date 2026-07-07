@@ -1354,7 +1354,8 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
           logo_uri: { type: 'string', description: 'v18: OIDC client logo_uri (https). Shown on the consent page and app listings.' },
           client_uri: { type: 'string', description: 'v18: OIDC client_uri (https) — merchant home page.' },
           client_id: { type: 'string', minLength: 1, description: 'Set a custom client_id. Changing it orphans existing tokens/consents (aud mismatch) and requires updating the relying party config.' },
-          client_secret: { type: 'string', minLength: 8, description: 'Set a custom client secret (re-hashed; display prefix re-derived). The plaintext is never returned; store it now.' },
+          client_secret: { type: 'string', minLength: 8, description: 'Set a custom client secret (re-hashed). The plaintext is never returned; store it now.' },
+          client_secret_prefix: { type: 'string', maxLength: 16, description: 'Independent display/identification label (not derived from the secret). Set or generate on its own.' },
         },
       },
       response: {

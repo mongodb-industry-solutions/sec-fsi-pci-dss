@@ -1159,7 +1159,8 @@ export const api = {
       logo_uri?: string;    // https URL (or '' to clear); http allowed only for localhost
       client_uri?: string;  // https URL (or '' to clear); http allowed only for localhost
       client_id?: string;     // set a custom client_id (changing it orphans existing tokens/consents)
-      client_secret?: string; // set a custom secret (re-hashed; prefix re-derived; plaintext never returned)
+      client_secret?: string; // set a custom secret (re-hashed; plaintext never returned)
+      client_secret_prefix?: string; // independent display label (not derived from the secret)
     }) =>
       apiFetch<MerchantOAuthClient>(
         `/api/v1/merchants/${merchantId}/oauth-client`,

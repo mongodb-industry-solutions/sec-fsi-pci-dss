@@ -264,6 +264,7 @@ export default function MerchantSSOPage() {
   // Credential edit state (Client ID + secret)
   const [credClientId, setCredClientId] = useState('');
   const [credSecret, setCredSecret] = useState(''); // '' = leave the stored secret unchanged
+  const [credPrefix, setCredPrefix] = useState(''); // independent display label (not derived from secret)
   const [showCredSecret, setShowCredSecret] = useState(false);
   const [credSaving, setCredSaving] = useState(false);
   const [credSaved, setCredSaved] = useState(false);
@@ -303,6 +304,7 @@ export default function MerchantSSOPage() {
       if (clientRes) {
         setCredClientId(clientRes.oauthClientId ?? '');
         setCredSecret('');
+        setCredPrefix(clientRes.oauthClientSecretPrefix ?? '');
         setRedirectUris(clientRes.oauthRedirectUris ?? []);
         setPostLogoutUris(clientRes.oauthPostLogoutRedirectUris ?? []);
         setGrantTypes(clientRes.oauthGrantTypes ?? []);
@@ -331,6 +333,7 @@ export default function MerchantSSOPage() {
     setClient(updated);
     setCredClientId(updated.oauthClientId ?? '');
     setCredSecret('');
+    setCredPrefix(updated.oauthClientSecretPrefix ?? '');
     setRedirectUris(updated.oauthRedirectUris ?? []);
     setPostLogoutUris(updated.oauthPostLogoutRedirectUris ?? []);
     setGrantTypes(updated.oauthGrantTypes ?? []);
@@ -351,6 +354,7 @@ export default function MerchantSSOPage() {
     try {
       const updated = await api.merchants.updateOAuthClient(merchantId, token, {
         client_id: credClientId.trim(),
+        client_secret_prefix: credPrefix.trim(), // independent label; sent every save
         ...(credSecret ? { client_secret: credSecret } : {}), // only rotate the secret when one is entered
       });
       syncToState(updated); // resets the secret input; prefix re-derives from the new value
@@ -556,7 +560,7 @@ export default function MerchantSSOPage() {
           <div>
             <label className="text-[10px] text-gray-400 uppercase tracking-wide mb-1 flex items-center">
               Client Secret
-              <Tooltip text="The confidential client secret. Stored only as a bcrypt hash — never returned — so this field is blank (unchanged) unless you set a new value. Type a custom secret or Generate one, then Save; copy it to the relying party's config. The Secret Prefix below is the first 8 chars, kept for identification only." />
+              <Tooltip text="The confidential client secret. Stored only as a bcrypt hash — never returned — so this field is blank (unchanged) unless you set a new value. Type a custom secret or Generate one, then Save; copy it to the relying party's config. The Secret Prefix is a separate, independent label (not derived from this secret)." />
             </label>
             <div className="flex items-center gap-2">
               <input
@@ -575,10 +579,27 @@ export default function MerchantSSOPage() {
                 <RefreshCw size={12} /> Generate
               </button>
             </div>
-            <p className="text-[11px] text-gray-400 mt-1">
-              Prefix: <code className="text-gray-600">{(credSecret || '').slice(0, 8) || client.oauthClientSecretPrefix || '—'}</code>
-              <span className="ml-1">(display only; derived from the secret)</span>
-            </p>
+          </div>
+          <div>
+            <label className="text-[10px] text-gray-400 uppercase tracking-wide mb-1 flex items-center">
+              Secret Prefix
+              <Tooltip text="An independent display/identification label for this credential (like a key nickname). It is NOT part of the secret and cannot authenticate — decoupling it means no byte of the real secret is ever exposed. Specify your own or Generate one." />
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                value={credPrefix}
+                onChange={(e) => setCredPrefix(e.target.value)}
+                maxLength={16}
+                placeholder="e.g. espresso"
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 break-all"
+              />
+              <button type="button" onClick={() => setCredPrefix(crypto.randomUUID().replace(/-/g, '').slice(0, 8))} title="Generate a prefix"
+                className="flex items-center gap-1 text-xs border border-gray-300 text-gray-600 hover:bg-gray-50 px-2 py-2 rounded-lg transition-colors">
+                <RefreshCw size={12} /> Generate
+              </button>
+              <CopyButton value={credPrefix} small />
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1">Display label only (max 16 chars); not derived from the secret.</p>
           </div>
         </div>
         <div className="flex items-center gap-3 mt-3">
