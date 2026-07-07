@@ -185,12 +185,14 @@ async function mongodbPlugin(fastify: FastifyInstance) {
     const { server, database } = sanitizeUri(config.mongodb.uri);
     const reason = err instanceof Error ? err.message : String(err);
 
+    // Always log the full reason to the server logs (operators need it to diagnose e.g. a bad
+    // MONGODB_CRYPT_SHARED_LIB_PATH, which makes the QE client fail to init and looks like a plain
+    // connection failure). But fastify.dbError is echoed verbatim in the PUBLIC /system/health
+    // response, so only expose the raw driver reason in non-production; prod stays generic to avoid
+    // leaking internal details (paths, hostnames, driver internals).
     console.error(`[mongodb] Connection failed: server=${server} database=${database}. ${reason}`);
-    // Surface the underlying reason, not just "Connection failed". A wrong/invalid
-    // MONGODB_CRYPT_SHARED_LIB_PATH makes the QE-enabled client fail to initialize and manifests here
-    // as a connection failure — without the reason it looks like a network/Atlas problem and is
-    // misdiagnosed. The reason is a driver/crypt_shared message (no credentials; the URI is sanitized).
-    fastify.dbError = `Connection failed: server=${server} database=${database}. ${reason}`;
+    const base = `Connection failed: server=${server} database=${database}`;
+    fastify.dbError = process.env.NODE_ENV === 'production' ? base : `${base}. ${reason}`;
     // Server continues to start; Swagger UI and /health remain accessible.
   }
 }

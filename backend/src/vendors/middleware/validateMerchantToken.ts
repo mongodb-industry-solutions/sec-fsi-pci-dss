@@ -97,6 +97,10 @@ export async function tryMerchantContext(request: FastifyRequest): Promise<Merch
       .collection(MERCHANT_AGREEMENT_COLLECTION)
       .findOne({ 'merchantOAuthClient.oauthClientId': clientId }) as MerchantAgreementControlRecord | null;
     if (!merchant || !merchant.merchantOAuthClient) return undefined;
+    // Same eligibility as validateMerchantToken: never attribute actions to an inactive client or a
+    // non-active merchant (would pollute audit/activity data with suspended/revoked principals).
+    if (merchant.merchantOAuthClient.oauthClientStatus !== 'active') return undefined;
+    if (merchant.merchantAgreementStatus !== 'active') return undefined;
     return {
       merchantId: merchant.merchantAgreementInstanceReference,
       merchantName: merchant.merchantName,

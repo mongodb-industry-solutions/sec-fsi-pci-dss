@@ -21,10 +21,13 @@ let globalEnvCache: Record<string, string> | undefined;
 function globalEnv(): Record<string, string> {
   if (globalEnvCache) return globalEnvCache;
   const cache: Record<string, string> = {};
-  const candidates = [
-    path.resolve(process.cwd(), '..', '.env'), // repo root when cwd = <root>/merchant
-    path.resolve(process.cwd(), '.env'),       // cwd already at the repo root
-  ];
+  // Prefer the .env in the current working directory. Only look one level up when cwd is actually the
+  // merchant package (so `next dev` from merchant/ still finds the repo-root .env), never when started
+  // from the repo root — otherwise a stray .env ABOVE the repo could wrongly win ("first file wins").
+  const candidates = [path.resolve(process.cwd(), '.env')];
+  if (path.basename(process.cwd()) === 'merchant') {
+    candidates.push(path.resolve(process.cwd(), '..', '.env')); // repo root when cwd = <root>/merchant
+  }
   for (const file of candidates) {
     try {
       if (!fs.existsSync(file)) continue;
