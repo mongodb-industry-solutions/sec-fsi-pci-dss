@@ -211,7 +211,10 @@ export async function checkoutController(fastify: FastifyInstance) {
       },
       body: {
         type: 'object',
-        required: ['cardToken', 'cardholderName', 'cardExpiryMonth', 'cardExpiryYear'],
+        // Expiry is OPTIONAL: a saved/tokenized card pays by token and the issuer authorizes on the
+        // token (not the expiry), so the payer only re-enters the CVV. New-card entry still sends expiry
+        // (the patterns below validate it when present).
+        required: ['cardToken', 'cardholderName'],
         properties: {
           cardToken: { type: 'string', description: 'Client-side generated card token (not the raw PAN).' },
           cardholderName: { type: 'string', minLength: 1, maxLength: 100 },
@@ -247,8 +250,8 @@ export async function checkoutController(fastify: FastifyInstance) {
     const body = request.body as {
       cardToken: string;
       cardholderName: string;
-      cardExpiryMonth: string;
-      cardExpiryYear: string;
+      cardExpiryMonth?: string;
+      cardExpiryYear?: string;
       cardCvv?: string;
       cardholderEmail?: string;
       saveCard?: boolean;

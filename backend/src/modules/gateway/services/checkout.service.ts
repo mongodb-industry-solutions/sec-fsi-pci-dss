@@ -180,8 +180,10 @@ export interface ProcessCheckoutPaymentInput {
   sessionId: string;
   cardToken: string;
   cardholderName: string;
-  cardExpiryMonth: string;
-  cardExpiryYear: string;
+  // Optional: a saved/tokenized card authorizes on the token (issuer does not validate expiry for it);
+  // only new-card entry supplies expiry.
+  cardExpiryMonth?: string;
+  cardExpiryYear?: string;
   merchantCategoryCode?: string;
   customerEmail?: string;
   saveCard?: boolean;

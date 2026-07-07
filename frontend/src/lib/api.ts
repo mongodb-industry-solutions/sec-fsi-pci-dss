@@ -1319,7 +1319,7 @@ export const api = {
           paymentCardIsPreferred?: boolean;
         }>;
       }>(`/api/v1/checkout/sessions/${sessionId}/saved-cards`),
-    pay: (sessionId: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth: string; cardExpiryYear: string; cardCvv?: string; cardholderEmail?: string; saveCard?: boolean }) =>
+    pay: (sessionId: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth?: string; cardExpiryYear?: string; cardCvv?: string; cardholderEmail?: string; saveCard?: boolean }) =>
       apiFetch<{ success: boolean; declined?: boolean; cardTransactionInstanceReference?: string | null; responseCode?: string; declineReason?: string; redirectUrl?: string | null }>(
         `/api/v1/checkout/sessions/${sessionId}/pay`, { method: 'POST', body: JSON.stringify(body) }
       ),

@@ -177,8 +177,11 @@ function CheckoutPageInner() {
       const result = await api.checkout.pay(sessionId, {
         cardToken,
         cardholderName: payName,
-        cardExpiryMonth: expiryMonth.padStart(2, '0'),
-        cardExpiryYear: `20${expiryYear}`,
+        // Saved card: no expiry (the issuer authorizes on the token; only the CVV is re-checked).
+        // New card: send the entered expiry.
+        ...(usingSavedCard
+          ? {}
+          : { cardExpiryMonth: expiryMonth.padStart(2, '0'), cardExpiryYear: `20${expiryYear}` }),
         // Forward the entered CVV for issuer verification (never persisted; PCI Req 3.2). A wrong CVV declines.
         cardCvv: cvv,
         cardholderEmail: cardholderEmail || undefined,
@@ -337,9 +340,10 @@ function CheckoutPageInner() {
             {savedCards.length > 0 && (
               <fieldset className="mb-4 space-y-2">
                 <legend className="text-xs text-gray-500 mb-1">Pay with</legend>
-                {/* Saved cards: cap the visible height to ~3 rows and scroll the rest, so the list
-                    never dominates the page. "Use a new card" stays pinned below, outside the scroll. */}
-                <div className="max-h-[10.5rem] space-y-2 overflow-y-auto pr-1">
+                {/* Saved cards: show up to 3 in full; only when there are MORE than 3 do we cap the
+                    height to ~3 rows and scroll (so 2 to 3 cards never look cut off). "Use a new card"
+                    stays pinned below, outside the scroll. pr-1 kept always so widths align. */}
+                <div className={`space-y-2 pr-1 ${savedCards.length > 3 ? 'max-h-[12rem] overflow-y-auto' : ''}`}>
                 {savedCards.map((card) => {
                   const id = card.paymentCardInstanceReference;
                   const active = selectedCardId === id;
@@ -446,12 +450,15 @@ function CheckoutPageInner() {
                 </>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className={`grid gap-3 ${usingSavedCard ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                {/* Expiry is only entered for a NEW card. For a saved/tokenized card it is on file and
+                    the issuer authorizes on the token, so the payer re-enters only the CVV below. */}
+                {!usingSavedCard && (
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Expiry (MM / YY)</label>
                   <div className="flex gap-2">
                     <input
-                      required
+                      required={!usingSavedCard}
                       type="text"
                       value={expiryMonth}
                       onChange={(e) => setExpiryMonth(e.target.value.replace(/\D/g, '').slice(0, 2))}
@@ -460,7 +467,7 @@ function CheckoutPageInner() {
                       className="w-1/2 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 focus:border-[#00ED64]"
                     />
                     <input
-                      required
+                      required={!usingSavedCard}
                       type="text"
                       value={expiryYear}
                       onChange={(e) => setExpiryYear(e.target.value.replace(/\D/g, '').slice(0, 2))}
@@ -470,6 +477,7 @@ function CheckoutPageInner() {
                     />
                   </div>
                 </div>
+                )}
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">CVV</label>
                   <div className="relative">
