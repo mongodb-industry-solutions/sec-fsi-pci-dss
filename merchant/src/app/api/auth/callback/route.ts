@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exchangeCode, verifyIdToken, fetchUserinfo } from '@/lib/oauth';
 import { attachSession, clearLoginStateOn, readLoginState } from '@/lib/session';
-import { expiresAtFrom } from '@/lib/PspClient';
+import { expiresAtFrom } from '@/lib/expiry';
 import { ENV } from '@/lib/env';
 
 export async function GET(req: NextRequest) {

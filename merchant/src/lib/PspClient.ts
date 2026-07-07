@@ -6,11 +6,7 @@ import 'server-only';
 import { discover } from './oauth';
 import { ENV } from './env';
 import { getSession, setSession, Session } from './session';
-import { expiresAtFrom } from './expiry';
 import { getFreshUserToken, peekToken, primeToken, getClientCredentialsToken } from './tokenCache';
-
-// Re-exported for callers (e.g. the OAuth callback route) that compute expiry from `expires_in`.
-export { expiresAtFrom };
 
 export class PspError extends Error {
   constructor(public status: number, public body: unknown, msg?: string) {
