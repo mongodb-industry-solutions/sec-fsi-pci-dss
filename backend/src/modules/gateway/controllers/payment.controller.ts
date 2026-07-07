@@ -64,9 +64,12 @@ initiated → confirmed → authorized → captured → settled
       },
       body: {
         type: 'object',
-        required: ['merchantAgreementInstanceReference', 'paymentOrderMerchantReference', 'amount', 'currency'],
+        // merchantAgreementInstanceReference is NOT required: the merchant is derived from the
+        // client_credentials OAuth token (merchantContext.merchantId). If supplied it must match
+        // the authenticated client (enforced in-handler → 403 on mismatch).
+        required: ['paymentOrderMerchantReference', 'amount', 'currency'],
         properties: {
-          merchantAgreementInstanceReference: { type: 'string', description: 'UUID of the merchant initiating this payment.' },
+          merchantAgreementInstanceReference: { type: 'string', description: 'Optional; must match the authenticated client if provided. Normally derived from the OAuth token.' },
           paymentOrderMerchantReference: { type: 'string', description: "Merchant's own order or cart ID." },
           amount: { type: 'number', description: 'Payment amount in the specified currency.' },
           currency: { type: 'string', description: 'ISO 4217 three-letter currency code.' },
