@@ -45,6 +45,27 @@ export default async function AccountsPage() {
                 </h3>
                 {a.payoutAccountIsDefault && <Chip tone="accent">Default</Chip>}
               </div>
+              {(() => {
+                // PSP internal ledger balance (SD-66): available now vs pending settlement.
+                const bal = a.payoutAccountBalance as
+                  | { availableAmount?: number; pendingAmount?: number; currency?: string }
+                  | undefined;
+                if (!bal) return null;
+                const cur = bal.currency ?? a.payoutAccountCurrency ?? 'EUR';
+                const fmt = (n: number) => {
+                  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur }).format(n); }
+                  catch { return `${n.toFixed(2)} ${cur}`; }
+                };
+                return (
+                  <div className="mt-3 rounded-xl bg-leaf/5 p-3 ring-1 ring-leaf/15">
+                    <div className="text-xs text-muted">Available balance</div>
+                    <div className="text-xl font-semibold text-ink">{fmt(bal.availableAmount ?? 0)}</div>
+                    {(bal.pendingAmount ?? 0) > 0 && (
+                      <div className="mt-0.5 text-xs text-muted">{fmt(bal.pendingAmount ?? 0)} pending settlement</div>
+                    )}
+                  </div>
+                );
+              })()}
               <dl className="mt-3 space-y-1 text-sm text-muted">
                 <div className="flex justify-between"><dt>Type</dt><dd className="text-ink">{a.payoutAccountType ?? 'n/a'}</dd></div>
                 <div className="flex justify-between"><dt>Currency</dt><dd className="text-ink">{a.payoutAccountCurrency ?? 'n/a'}</dd></div>
