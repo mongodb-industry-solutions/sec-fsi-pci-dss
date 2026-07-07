@@ -164,6 +164,8 @@ export interface MerchantOAuthClient {
   oauthRequirePkce: boolean;
   oauthPostLogoutRedirectUris?: string[];
   oauthClaimMapping?: Record<string, string>;
+  oauthLogoUri?: string;   // v18: OIDC logo_uri (https) — branding on the consent page + app listings
+  oauthClientUri?: string; // v18: OIDC client_uri (https) — merchant home page link
 }
 
 // v16: OAuth consent grants (user-authorized apps)
@@ -1154,6 +1156,8 @@ export const api = {
       token_lifetime_seconds?: number;
       refresh_token_lifetime_days?: number;
       claim_mapping?: Record<string, string>;
+      logo_uri?: string;    // https URL (or '' to clear); http allowed only for localhost
+      client_uri?: string;  // https URL (or '' to clear); http allowed only for localhost
     }) =>
       apiFetch<MerchantOAuthClient>(
         `/api/v1/merchants/${merchantId}/oauth-client`,

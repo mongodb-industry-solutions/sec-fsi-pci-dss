@@ -263,6 +263,8 @@ export default function MerchantSSOPage() {
   // Config edit state (Authorization section)
   const [redirectUris, setRedirectUris] = useState<string[]>([]);
   const [postLogoutUris, setPostLogoutUris] = useState<string[]>([]);
+  const [logoUri, setLogoUri] = useState('');
+  const [clientUri, setClientUri] = useState('');
   const [grantTypes, setGrantTypes] = useState<string[]>([]);
   const [scopes, setScopes] = useState<string[]>([]);
   const [requirePkce, setRequirePkce] = useState(true);
@@ -298,6 +300,8 @@ export default function MerchantSSOPage() {
         setTokenLifetime(clientRes.oauthTokenLifetimeSeconds ?? 3600);
         setRefreshLifetime(clientRes.oauthRefreshTokenLifetimeDays ?? 30);
         setClaimMapping(clientRes.oauthClaimMapping ?? {});
+        setLogoUri(clientRes.oauthLogoUri ?? '');
+        setClientUri(clientRes.oauthClientUri ?? '');
       }
       const oauthHooks = (webhooksRes.webhooks ?? []).filter((w) =>
         w.webhookEventType === 'oauth.authorization_granted' || w.webhookEventType === 'oauth.authorization_revoked',
@@ -322,6 +326,8 @@ export default function MerchantSSOPage() {
     setTokenLifetime(updated.oauthTokenLifetimeSeconds ?? 3600);
     setRefreshLifetime(updated.oauthRefreshTokenLifetimeDays ?? 30);
     setClaimMapping(updated.oauthClaimMapping ?? {});
+    setLogoUri(updated.oauthLogoUri ?? '');
+    setClientUri(updated.oauthClientUri ?? '');
   }
 
   async function saveConfig() {
@@ -337,6 +343,8 @@ export default function MerchantSSOPage() {
         token_lifetime_seconds: tokenLifetime,
         refresh_token_lifetime_days: refreshLifetime,
         claim_mapping: claimMapping,
+        logo_uri: logoUri.trim(),
+        client_uri: clientUri.trim(),
       });
       syncToState(updated);
       setConfigSaved(true);
@@ -541,6 +549,36 @@ export default function MerchantSSOPage() {
             <span className="text-gray-400 font-normal ml-1">(optional)</span>
           </label>
           <UriListEditor uris={postLogoutUris} onChange={setPostLogoutUris} placeholder="https://your-app.com/signed-out" />
+        </div>
+
+        {/* Branding (OIDC logo_uri / client_uri) */}
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1.5">
+            Logo URL
+            <span className="text-gray-400 font-normal ml-1">(OIDC logo_uri — shown on the consent page & app listings)</span>
+          </label>
+          <input
+            type="url"
+            value={logoUri}
+            onChange={(e) => setLogoUri(e.target.value)}
+            placeholder="https://your-app.com/logo.svg"
+            className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
+          />
+          <p className="text-xs text-gray-400 mt-1">https only (http allowed for localhost). Leave empty to clear.</p>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1.5">
+            Home page URL
+            <span className="text-gray-400 font-normal ml-1">(OIDC client_uri)</span>
+          </label>
+          <input
+            type="url"
+            value={clientUri}
+            onChange={(e) => setClientUri(e.target.value)}
+            placeholder="https://your-app.com"
+            className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
+          />
+          <p className="text-xs text-gray-400 mt-1">https only (http allowed for localhost). Leave empty to clear.</p>
         </div>
 
         {/* Grant types */}
