@@ -46,6 +46,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC: ${NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC:-http://localhost:8081}
+        NEXT_PUBLIC_PSP_URL_MERCHANT: ${PSP_MERCHANT_BASE_URL:-http://localhost:8082}
     ports:
       - "8080:8080"
     env_file:

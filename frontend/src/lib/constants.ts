@@ -11,6 +11,12 @@ export const API_BASE_URL =
     ? ''
     : BACKEND_PUBLIC_URL;
 
+// External merchant demo app URL (Espresso Works). Same detection pattern as the backend:
+// baked into the bundle at build time from NEXT_PUBLIC_PSP_URL_MERCHANT, with a localhost
+// default for docker compose. Used by the simulator hub's "Simulate Merchant" card.
+export const MERCHANT_PUBLIC_URL =
+  process.env.NEXT_PUBLIC_PSP_URL_MERCHANT || 'http://localhost:8082';
+
 // All seeded demo accounts share the same bcrypt-hashed credential.
 // The plaintext is a fixed demo convention (documented in auth.controller.ts);
 // the seed stores only the hash. Used to auto-fill the login form (debug mode)

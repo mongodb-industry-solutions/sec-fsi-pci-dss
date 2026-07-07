@@ -80,7 +80,7 @@ export default function SimulatorLayout({ children }: { children: React.ReactNod
           </span>
           <Link href="/simulator" className="flex items-center gap-0.5 text-xs text-gray-400 hover:text-white transition-colors">
             <ChevronLeft size={13} />
-            <span className="hidden sm:block">Change</span>
+            <span className="hidden sm:block">Menu</span>
           </Link>
           <Link href="/" className="text-xs text-gray-400 hover:text-white transition-colors">
             Exit
