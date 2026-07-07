@@ -78,11 +78,11 @@ export async function getFreshUserToken(
 // ── client_credentials (server-to-server machine token) cache ────────────────────
 // The merchant's own machine identity token (write:payments) is reusable within its
 // TTL. Caching it avoids a fresh POST /auth/token on every server-side charge.
-const ccBypScope = new Map<string, CachedToken>();
+const ccByScope = new Map<string, CachedToken>();
 const ccInFlight = new Map<string, Promise<string>>();
 
 export async function getClientCredentialsToken(scope = 'write:payments'): Promise<string> {
-  const cached = ccBypScope.get(scope);
+  const cached = ccByScope.get(scope);
   if (cached && Date.now() < cached.expiresAt - SKEW_MS) return cached.accessToken;
 
   const inFlight = ccInFlight.get(scope);
@@ -90,7 +90,7 @@ export async function getClientCredentialsToken(scope = 'write:payments'): Promi
 
   const p = (async (): Promise<string> => {
     const t = await clientCredentialsToken(scope);
-    ccBypScope.set(scope, {
+    ccByScope.set(scope, {
       accessToken: t.access_token,
       refreshToken: '',
       grantedScopes: t.scope ? t.scope.split(' ').filter(Boolean) : [scope],

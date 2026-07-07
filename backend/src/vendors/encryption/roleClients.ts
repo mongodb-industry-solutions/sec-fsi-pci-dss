@@ -121,10 +121,13 @@ export async function getDbForRole(role: UserRole, hasValidToken = false): Promi
 }
 
 export async function closeRoleClients(): Promise<void> {
-  // Wait for any in-flight build to settle so we don't leak a client that finishes
-  // constructing after teardown (hot-reload path rebuilds fresh clients afterwards).
+  // Wait for any in-flight build to settle FIRST so we don't leak a client that finishes
+  // constructing after teardown (its .then sets _l1Client/_l2Client). Capture the promises, let
+  // them resolve, then close whatever ended up assigned (hot-reload rebuilds fresh clients after).
+  const inFlight = [_l1Building, _l2Building].filter((p): p is Promise<MongoClient> => p !== null);
   _l1Building = null;
   _l2Building = null;
+  if (inFlight.length) await Promise.allSettled(inFlight);
   if (_l1Client) { await _l1Client.close(); _l1Client = null; }
   if (_l2Client) { await _l2Client.close(); _l2Client = null; }
 }
