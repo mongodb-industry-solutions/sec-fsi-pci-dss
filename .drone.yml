@@ -10,6 +10,16 @@ trigger:
     - push
 
 steps:
+  # Gate: run the headless test suites (unit + integration) before building/deploying. Uses test:ci
+  # (NOT test) — e2e needs a browser + a running frontend, which this runner does not provide.
+  - name: test
+    image: node:22
+    commands:
+      - npm install --no-audit --no-fund
+      - (cd backend && npm install --no-audit --no-fund)
+      - (cd frontend && npm install --no-audit --no-fund)
+      - npm run test:ci
+
   - name: publish-backend
     image: plugins/kaniko-ecr
     settings:
@@ -144,6 +154,16 @@ trigger:
     - push
 
 steps:
+  # Gate: run the headless test suites (unit + integration) before building/deploying. Uses test:ci
+  # (NOT test) — e2e needs a browser + a running frontend, which this runner does not provide.
+  - name: test
+    image: node:22
+    commands:
+      - npm install --no-audit --no-fund
+      - (cd backend && npm install --no-audit --no-fund)
+      - (cd frontend && npm install --no-audit --no-fund)
+      - npm run test:ci
+
   - name: publish-backend
     image: plugins/kaniko-ecr
     settings:
