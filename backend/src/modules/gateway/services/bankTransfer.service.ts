@@ -169,6 +169,8 @@ export async function executeBankTransfer(
     currency: input.currency,
     paymentExecutionRail: rail,
     routingNote: `${appConfig.payout.sandbox ? '[sandbox] ' : ''}${input.reference ? `Bank transfer: ${input.reference}` : `Bank transfer via ${rail.toUpperCase()}`}`,
+    // ISO 20022 remittance info: the clean concept/reference the user typed (queryable for AML/FDS).
+    ...(input.reference ? { paymentExecutionRemittanceInformation: input.reference } : {}),
     paymentExecutionStatus: 'routing',
     initiatedAt: now,
     resolutionLog: [

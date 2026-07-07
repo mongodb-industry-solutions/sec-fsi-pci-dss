@@ -182,6 +182,8 @@ export async function merchantGatewayController(fastify: FastifyInstance) {
       currency: d.currency,
       paymentExecutionRail: d.paymentExecutionRail ?? null,
       paymentExecutionStatus: d.paymentExecutionStatus,
+      // Payment concept (ISO 20022 remittance info); falls back to the operational routing note.
+      concept: d.paymentExecutionRemittanceInformation ?? d.routingNote ?? null,
       beneficiaryName: d.beneficiaryName ?? null,
       destinationAccountMasked: d.destinationAccountMasked ?? null,
       initiatedAt: d.initiatedAt?.toISOString() ?? null,
@@ -203,6 +205,7 @@ export async function merchantGatewayController(fastify: FastifyInstance) {
       currency: t.currency,
       paymentExecutionRail: 'card',
       paymentExecutionStatus: t.status,
+      concept: t.cardTransactionDescription ?? null,
       beneficiaryName: t.merchantName,
       destinationAccountMasked: t.maskedPan,
       initiatedAt: t.initiatedAt,

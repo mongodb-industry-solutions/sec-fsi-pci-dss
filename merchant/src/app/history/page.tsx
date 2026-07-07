@@ -53,6 +53,7 @@ export default async function HistoryPage() {
       key: t.paymentExecutionInstanceReference ?? i,
       txnId,
       date: (t.completedAt ?? t.initiatedAt ?? '').toString().slice(0, 10) || 'n/a',
+      concept: (t.concept ?? '') as string,
       direction: t.direction ?? 'n/a',
       amount: money(gross, t.currency),
       fee: money(t.feeAmount, t.currency),
@@ -84,6 +85,7 @@ export default async function HistoryPage() {
                 <tr>
                   <th className="p-3 font-medium">Date</th>
                   <th className="p-3 font-medium">Transaction ID</th>
+                  <th className="p-3 font-medium">Concept</th>
                   <th className="p-3 font-medium">Direction</th>
                   <th className="p-3 font-medium">Amount</th>
                   <th className="p-3 font-medium">Fee</th>
@@ -104,6 +106,7 @@ export default async function HistoryPage() {
                           {r.txnId && <CopyButton value={r.txnId} label="transaction ID" />}
                         </span>
                       </td>
+                      <td className="p-3 text-muted max-w-[14rem] truncate" title={r.concept || undefined}>{r.concept || 'n/a'}</td>
                       <td className="p-3"><span className="inline-flex items-center gap-1"><Icon className="h-3.5 w-3.5 text-muted" aria-hidden /> {r.direction}</span></td>
                       <td className="p-3 font-medium">{r.amount}</td>
                       <td className="p-3 text-muted">{r.fee}</td>

@@ -152,6 +152,7 @@ export interface PartyCardTransactionRow {
   merchantName: string;
   maskedPan: string;
   channel: string;
+  cardTransactionDescription: string;
   initiatedAt: string | null;
 }
 
@@ -188,6 +189,7 @@ export async function getPartyCardTransactions(
     merchantName: d.cardTransactionMerchantName,
     maskedPan: d.cardTransactionMaskedPanDisplay,
     channel: d.cardTransactionChannel,
+    cardTransactionDescription: d.cardTransactionDescription,
     initiatedAt: d.cardTransactionDateTime ? new Date(d.cardTransactionDateTime).toISOString() : null,
   }));
 }

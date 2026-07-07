@@ -9,6 +9,7 @@ import { SectionHeader } from '../../../../../components/SectionHeader';
 import { Pagination } from '../../../../../components/Pagination';
 import { api, type ConsentGrantDetail } from '../../../../../lib/api';
 import { getToken } from '../../../../../lib/auth';
+import { useConfirm, useNotify } from '../../../../../components/ui/ConfirmProvider';
 
 const LIMIT_OPTIONS = [10, 25, 50];
 
@@ -51,6 +52,8 @@ function operationHref(row: OperationRow): string | null {
 
 export default function AuthorizedApplicationDetailPage() {
   const params = useParams();
+  const confirm = useConfirm();
+  const notify = useNotify();
   const consentId = decodeURIComponent(String(params?.consentId ?? ''));
   const [token, setToken] = useState('');
 
@@ -101,12 +104,22 @@ export default function AuthorizedApplicationDetailPage() {
 
   async function revoke() {
     if (!detail) return;
-    if (!confirm(`Revoke access for "${detail.merchantName}"? This immediately invalidates its tokens.`)) return;
+    const ok = await confirm({
+      title: `Revoke access for "${detail.merchantName}"?`,
+      // Soft-revoke (kept in the DB): the operations below stay attributable to this app for audit.
+      message: 'This immediately invalidates its tokens. Transactions already made through this app remain recorded and linked to it for audit.',
+      confirmLabel: 'Revoke access',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setRevoking(true);
     try {
       await api.consentGrants.revoke(consentId, token);
       setRevoked(true);
-    } catch { /* keep the page; can retry */ }
+      notify('Access revoked. This app can no longer access your account.', 'success');
+    } catch {
+      notify('Could not revoke access. Please try again.', 'error');
+    }
     setRevoking(false);
   }
 

@@ -1100,6 +1100,7 @@ export interface PaymentExecutionProcedure {
 
   paymentExecutionRail?: PayoutRail;
   routingNote?:          string;
+  paymentExecutionRemittanceInformation?: string; // ISO 20022 RemittanceInformation — payment concept/reference (bank transfer / P2P note); first-class + queryable for AML/FDS. Not CHD → NOT QE.
 
   paymentExecutionStatus: PaymentExecutionStatus;
   failureReason?:  string;

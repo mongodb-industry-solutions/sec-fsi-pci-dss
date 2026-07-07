@@ -1641,6 +1641,7 @@ export const api = {
           currency: string;
           paymentExecutionRail: string | null;
           routingNote: string | null;
+          paymentExecutionRemittanceInformation: string | null;
           paymentExecutionStatus: string;
           direction: 'sent' | 'received';
           initiatedAt: string | null;
