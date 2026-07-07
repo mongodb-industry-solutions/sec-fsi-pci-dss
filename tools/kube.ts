@@ -477,10 +477,22 @@ async function podLogs() {
   const env = kubeEnv();
 
   if (input === "3") {
-    const pod = (await ask("Pod name: ")).trim();
-    if (!pod) { warn("No pod name given."); return; }
+    const entered = (await ask("Pod or deployment name: ")).trim();
+    if (!entered) { warn("No name given."); return; }
+    // kubectl logs needs a real POD name. Accept a deployment/release name too: if the entry isn't an
+    // exact pod, resolve the newest pod whose name starts with it (pod = <deployment>-<hash>-<hash>).
+    // `-o name` avoids braces/spaces so it is safe under the Windows shell.
+    const list = spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "-o", "name"], { shell: IS_WIN, encoding: "utf-8", env });
+    const names = (list.stdout || "").split(/\r?\n/).map((l) => l.replace(/^pod\//, "").trim()).filter(Boolean);
+    let pod = entered;
+    if (!names.includes(entered)) {
+      const matches = names.filter((n) => n.startsWith(entered)).sort();
+      if (matches.length === 0) { warn(`No pod found matching "${entered}" in ${IST_NAMESPACE}.`); return; }
+      pod = matches[matches.length - 1];
+      console.log(`${DIM}[resolved] ${entered} -> ${pod}${NC}`);
+    }
     // --previous shows the last crashed instance (useful for CrashLoopBackOff).
-    const prev = (await ask("Previous (crashed) instance? [y/N]: ")).trim().toLowerCase() === "y";
+    const prev = (await ask("Show the CRASHED (previous) container's logs instead of the current one? Use this for CrashLoopBackOff. [y/N]: ")).trim().toLowerCase() === "y";
     const args = ["logs", pod, "-n", IST_NAMESPACE, `--tail=${tail}`, "--all-containers"];
     if (prev) args.push("--previous");
     spawnSync("kubectl", args, { shell: IS_WIN, stdio: "inherit", env });
