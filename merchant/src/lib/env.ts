@@ -33,7 +33,9 @@ function globalEnv(): Record<string, string> {
         if (!m) continue; // skip blank lines and comments (# ...)
         let val = m[2];
         if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-          val = val.slice(1, -1);
+          val = val.slice(1, -1); // quoted: keep verbatim (may legitimately contain '#')
+        } else {
+          val = val.replace(/\s+#.*$/, ''); // unquoted: strip an inline comment (whitespace + # ...)
         }
         if (!(m[1] in cache)) cache[m[1]] = val; // first file wins
       }

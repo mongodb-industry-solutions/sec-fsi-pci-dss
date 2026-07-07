@@ -32,7 +32,10 @@ const SKEW_MS = 5000;
 /** Return a cached token for this user if it is still comfortably valid, else null. */
 export function peekToken(sub: string): CachedToken | null {
   const t = tokenBySub.get(sub);
-  return t && Date.now() < t.expiresAt - SKEW_MS ? t : null;
+  if (!t) return null;
+  if (Date.now() < t.expiresAt - SKEW_MS) return t;
+  tokenBySub.delete(sub); // self-clean expired entry so the Map cannot grow unbounded
+  return null;
 }
 
 /** Seed/refresh the cache from a token the caller already holds (e.g. a valid cookie token). */

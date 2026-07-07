@@ -97,8 +97,10 @@ function tryVerifyToken(authHeader: string | undefined): jwt.JwtPayload | null {
 
 // Server-side logout enforcement: a session JWT stamps the epoch current at sign time; if the user's
 // epoch has since advanced (they logged out), the token is stale and must be rejected. Tokens with no
-// `sub`/`epoch` (legacy) compare against epoch 0. Fails OPEN on a DB error so a transient outage does
-// not lock every user out (demo posture; production could fail closed).
+// `sub`/`epoch` (legacy) compare against epoch 0. On a DB error the posture is environment-dependent:
+// PRODUCTION fails CLOSED (reject) so a logged-out token cannot be accepted during a DB blip and
+// server-side logout semantics hold; non-prod fails OPEN so a transient outage doesn't lock every
+// user out mid-demo.
 async function sessionEpochOk(request: FastifyRequest, payload: jwt.JwtPayload): Promise<boolean> {
   const sub = (payload as { sub?: string }).sub;
   if (!sub) return true;
@@ -107,7 +109,7 @@ async function sessionEpochOk(request: FastifyRequest, payload: jwt.JwtPayload):
     const current = await getCurrentSessionEpoch(request.server.db, sub);
     return tokenEpoch >= current;
   } catch {
-    return true;
+    return process.env.NODE_ENV !== 'production'; // prod: fail closed; else fail open
   }
 }
 
