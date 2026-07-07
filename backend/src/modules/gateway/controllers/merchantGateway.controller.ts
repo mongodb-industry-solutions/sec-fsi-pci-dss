@@ -160,9 +160,11 @@ export async function merchantGatewayController(fastify: FastifyInstance) {
     // merchantAgreementInstanceReference bound to the OAuth client on the token.
     const merchantId = req.merchantContext!.merchantId;
 
-    // Source 1 — bank-transfer executions (SD-65) the party initiated THROUGH THIS merchant.
+    // Source 1 — executions (SD-65) the party made THROUGH THIS merchant: beneficiary P2P sends
+    // AND external bank transfers. Scope = merchant (SD-89) + party; no beneficiaryType constraint
+    // (that wrongly excluded external/anonymous bank-transfer destinations). Merchant isolation is
+    // enforced by merchantAgreementReference, so other merchants' and PSP-direct ops never appear.
     const filter = {
-      beneficiaryType: 'user' as const,
       merchantAgreementReference: merchantId,
       $or: [{ initiatorPartyReference: partyInstanceReference }, { beneficiaryPartyReference: partyInstanceReference }],
     };
