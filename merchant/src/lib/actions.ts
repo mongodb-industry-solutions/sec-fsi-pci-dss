@@ -98,6 +98,7 @@ export async function previewTransfer(input: {
   bic?: string;
   beneficiaryName?: string;
   rail?: string;
+  fromAccountRef?: string; // accepted for form-payload reuse; preview has no side effects and ignores it
 }): Promise<ActionResult> {
   return toResult(async () => {
     const c = await client();
@@ -124,11 +125,13 @@ export async function sendToBeneficiary(input: {
   beneficiaryToken: string;
   amount: number;
   currency?: string;
+  fromAccountRef?: string;
+  note?: string;
 }): Promise<ActionResult> {
   return toResult(async () => {
     if (!(input.amount > 0)) return { ok: false, message: 'Amount must be greater than zero.' };
     const c = await client();
-    const data = await c.sendToBeneficiary(input.beneficiaryToken, input.amount, input.currency);
+    const data = await c.sendToBeneficiary(input.beneficiaryToken, input.amount, input.currency, input.fromAccountRef, input.note);
     if (data.status === 'failed') {
       return { ok: false, message: data.failureReason ?? 'Transfer failed.', data };
     }
@@ -151,6 +154,7 @@ export async function bankTransfer(input: {
   beneficiaryName?: string;
   rail?: string;
   reference?: string;
+  fromAccountRef?: string;
 }): Promise<ActionResult> {
   return toResult(async () => {
     const c = await client();
@@ -168,6 +172,7 @@ export async function bankTransfer(input: {
       },
       rail: input.rail,
       reference: input.reference,
+      fromAccountRef: input.fromAccountRef,
     });
     return { ok: true, data, message: 'Transfer submitted.' };
   });

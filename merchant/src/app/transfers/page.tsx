@@ -4,12 +4,16 @@ import { Send } from 'lucide-react';
 import { getSession, hasScope } from '@/lib/session';
 import { ScopeMissing } from '@/components/ScopeGate';
 import { InfoHint } from '@/components/ui/Bits';
+import { loadAccountOptions } from '@/lib/accounts';
 import TransferForm from './TransferForm';
 
 export default async function TransfersPage() {
   const session = await getSession();
   if (!session) redirect('/');
   if (!hasScope(session, 'write:transfers')) return <ScopeMissing scope="write:transfers" />;
+
+  // Source-account options fetched server-side (masked IBAN only). Empty when read:accounts is absent.
+  const accounts = await loadAccountOptions();
 
   return (
     <div>
@@ -18,7 +22,7 @@ export default async function TransfersPage() {
         <InfoHint label="Espresso Works asks Leafy Pay to move money on your behalf. The PSP holds all balances; the merchant never does." />
       </h1>
       <p className="mb-6 mt-1 text-sm text-muted">Preview fees and rail, then submit. The PSP holds all balances.</p>
-      <TransferForm />
+      <TransferForm accounts={accounts} />
     </div>
   );
 }

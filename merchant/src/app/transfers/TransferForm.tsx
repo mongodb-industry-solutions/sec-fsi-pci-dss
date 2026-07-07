@@ -5,6 +5,7 @@ import { CheckCircle2, Eye, Loader2, Send, TriangleAlert } from 'lucide-react';
 import { previewTransfer, bankTransfer, type ActionResult } from '@/lib/actions';
 import { InfoHint } from '@/components/ui/Bits';
 import { Tip } from '@/components/ui/Tooltip';
+import type { AccountOption } from '@/lib/accounts';
 
 const RAILS = ['sepa', 'ach', 'swift'] as const;
 
@@ -21,11 +22,12 @@ const HELP: Record<string, string> = {
   routingNumber: 'Bank routing (ABA) number, used for ACH.',
 };
 
-export default function TransferForm() {
+export default function TransferForm({ accounts = [] }: { accounts?: AccountOption[] }) {
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState({
     amount: '100', currency: 'EUR', countryCode: 'DE', rail: 'sepa',
     beneficiaryName: '', iban: '', accountNumber: '', routingNumber: '', bic: '', reference: '',
+    fromAccountRef: accounts[0]?.ref ?? '',
   });
   const [preview, setPreview] = useState<ActionResult | null>(null);
   const [result, setResult] = useState<ActionResult | null>(null);
@@ -38,6 +40,7 @@ export default function TransferForm() {
     beneficiaryName: form.beneficiaryName || undefined, iban: form.iban || undefined,
     accountNumber: form.accountNumber || undefined, routingNumber: form.routingNumber || undefined,
     bic: form.bic || undefined, reference: form.reference || undefined,
+    fromAccountRef: form.fromAccountRef || undefined,
   });
 
   function onPreview() {
@@ -70,6 +73,22 @@ export default function TransferForm() {
           {field('Currency', 'currency')}
           {field('Beneficiary name', 'beneficiaryName')}
           {field('Country code', 'countryCode')}
+          {accounts.length > 0 && (
+            <label className="block text-sm">
+              <span className="flex items-center gap-1 text-muted">
+                From account <InfoHint label="Your payout account the money leaves from. IBAN is masked; the merchant never sees it in clear." />
+              </span>
+              <select
+                value={form.fromAccountRef}
+                onChange={upd('fromAccountRef')}
+                className="mt-1 w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+              >
+                {accounts.map((a) => (
+                  <option key={a.ref} value={a.ref}>{a.label}{a.isDefault ? ' (default)' : ''}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="block text-sm">
             <span className="flex items-center gap-1 text-muted">
               Rail <InfoHint label="Payment network: SEPA (EU), ACH (US domestic), or SWIFT (international)." />

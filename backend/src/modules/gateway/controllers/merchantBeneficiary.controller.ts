@@ -196,8 +196,10 @@ export async function merchantBeneficiaryController(fastify: FastifyInstance) {
       summary: 'Send money to a beneficiary (SD-65)',
       description: 'Executes a P2P bank transfer to a saved beneficiary on behalf of the user. '
         + 'Requires authorization_code OAuth with scope write:transfers. '
-        + 'The source account is the user\'s default (or first active) payout account, resolved server-side. '
-        + 'The merchant supplies only the amount and the opaque beneficiary token (no CHD, no IBAN).',
+        + 'The source account may be chosen by the user (fromAccountRef, validated for ownership); '
+        + 'when omitted it defaults to the user\'s default (or first active) payout account, resolved server-side. '
+        + 'The merchant supplies only the amount, an opaque beneficiary token, an optional source account reference '
+        + 'and an optional description (no CHD, no IBAN).',
       params: {
         type: 'object',
         required: ['partyRef', 'beneficiaryToken'],
@@ -209,6 +211,8 @@ export async function merchantBeneficiaryController(fastify: FastifyInstance) {
         properties: {
           amount: { type: 'number', description: 'Amount to send, in the source account currency.' },
           currency: { type: 'string', description: 'Optional client hint; the server uses the source account currency.' },
+          fromAccountRef: { type: 'string', description: 'Optional chosen source payout account (SD-66); validated for ownership. Defaults to the user\'s default/first active account.' },
+          note: { type: 'string', maxLength: 140, description: 'Optional description / reference shown on the transfer.' },
         },
       },
     },
@@ -217,7 +221,7 @@ export async function merchantBeneficiaryController(fastify: FastifyInstance) {
     const authorized = await requireMerchantOnBehalfOf(req, reply, MERCHANT_BENEFICIARY_SCOPES.send, partyRef);
     if (!authorized) return;
 
-    const body = req.body as { amount: number; currency?: string };
+    const body = req.body as { amount: number; currency?: string; fromAccountRef?: string; note?: string };
     if (typeof body.amount !== 'number' || !Number.isFinite(body.amount) || body.amount <= 0) {
       return reply.status(422).send({ error: 'invalid_amount', error_description: 'Amount must be greater than zero.' });
     }
@@ -226,8 +230,9 @@ export async function merchantBeneficiaryController(fastify: FastifyInstance) {
     const ownerParty = await resolvePartyInstanceReference(fastify.db, partyRef);
     if (!ownerParty) return reply.status(404).send({ error: 'party_not_found' });
 
-    // Resolve the user's source account server-side — never trusted from the client.
-    const fromAccountRef = await resolveSourcePayoutAccountRef(fastify.db, ownerParty);
+    // Source account: use the user's chosen account if provided (executeP2PTransfer verifies it belongs to
+    // the initiator — a mismatch returns status 'failed' → 422). Otherwise resolve the default server-side.
+    const fromAccountRef = body.fromAccountRef ?? await resolveSourcePayoutAccountRef(fastify.db, ownerParty);
     if (!fromAccountRef) {
       return reply.status(422).send({ error: 'no_source_account', error_description: 'You have no active payout account to send from.' });
     }
@@ -237,6 +242,7 @@ export async function merchantBeneficiaryController(fastify: FastifyInstance) {
       counterpartyArrangementRef: beneficiaryToken,
       fromAccountRef,
       amount: body.amount,
+      note: body.note,
     });
 
     // Attribute the merchant-originated action (SD-16 audit, PCI DSS Req 10).

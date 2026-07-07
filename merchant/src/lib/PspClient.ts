@@ -222,12 +222,13 @@ export class PspClient {
     return this.bankTransfer(input);
   }
 
-  // Send money to a saved beneficiary (P2P transfer, SD-65). The merchant sends only the
-  // amount + opaque beneficiary token; the PSP resolves the source account + recipient server-side.
-  sendToBeneficiary(beneficiaryToken: string, amount: number, currency?: string) {
+  // Send money to a saved beneficiary (P2P transfer, SD-65). The merchant sends only the amount,
+  // opaque beneficiary token, an optional chosen source account reference and an optional description;
+  // the PSP resolves the recipient (and the default source account, if none chosen) server-side.
+  sendToBeneficiary(beneficiaryToken: string, amount: number, currency?: string, fromAccountRef?: string, note?: string) {
     return this.request<{ transferReference: string; amount: number; currency: string; status: string; failureReason?: string }>(
       `/api/v1/merchant/beneficiaries/${encodeURIComponent(this.sub)}/${encodeURIComponent(beneficiaryToken)}/send`,
-      { method: 'POST', body: { amount, ...(currency ? { currency } : {}) } },
+      { method: 'POST', body: { amount, ...(currency ? { currency } : {}), ...(fromAccountRef ? { fromAccountRef } : {}), ...(note ? { note } : {}) } },
     );
   }
 
@@ -243,7 +244,7 @@ export class PspClient {
     return this.request(`/api/v1/merchant/transfers/${encodeURIComponent(this.sub)}/preview`, { method: 'POST', body: input });
   }
 
-  bankTransfer(input: { amount: number; currency: string; destination: Record<string, unknown>; rail?: string; reference?: string; settlementSchedule?: string }) {
+  bankTransfer(input: { amount: number; currency: string; destination: Record<string, unknown>; rail?: string; reference?: string; fromAccountRef?: string; settlementSchedule?: string }) {
     return this.request(`/api/v1/merchant/transfers/${encodeURIComponent(this.sub)}/bank`, { method: 'POST', body: input });
   }
 

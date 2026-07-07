@@ -2548,11 +2548,11 @@ Marks a beneficiary entry as `'removed'` (soft delete). The resolved counterpart
 
 Sends money to a saved beneficiary on behalf of the user (P2P bank transfer, BIAN SD-65 execution + SD-54 counterparty). Mirrors the PSP's send-to-beneficiary flow but is driven from the merchant portal. `config: { skipAuth: true }`; guarded in-handler by `requireMerchantOnBehalfOf(scope = write:transfers, partyRef)` (sub-binding: `token.sub === :partyRef`). Delegates to `executeP2PTransfer` — no business logic duplicated.
 
-- Source account is resolved **server-side** from the user's payout accounts: the active default (`payoutAccountIsDefault === true`), otherwise the first active account. The client never supplies a source account.
-- The merchant supplies only the amount and the opaque `:beneficiaryToken`. No CHD, no IBAN/PAN. `currency` in the body is an optional hint only; the transfer uses the source account's native currency (server-authoritative).
-- Amount must be `> 0` (else `422 invalid_amount`). No active payout account → `422 no_source_account`.
+- Source account: the client MAY choose one via `fromAccountRef` (an opaque `payoutAccountInstanceReference` from `GET /merchant/accounts/:partyRef`). `executeP2PTransfer` verifies it belongs to the initiator party and is active; a mismatch returns `status: "failed"` → `422`. When `fromAccountRef` is omitted, the source is resolved **server-side** from the user's payout accounts: the active default (`payoutAccountIsDefault === true`), otherwise the first active account.
+- The merchant supplies only the amount, the opaque `:beneficiaryToken`, an optional source account reference and an optional `note` (description shown on the transfer). No CHD, no IBAN/PAN. `currency` in the body is an optional hint only; the transfer uses the source account's native currency (server-authoritative).
+- Amount must be `> 0` (else `422 invalid_amount`). No source account available → `422 no_source_account`.
 
-**Body:** `{ "amount": 25.00, "currency"?: "EUR" }`
+**Body:** `{ "amount": 25.00, "currency"?: "EUR", "fromAccountRef"?: "payoutacct-uuid", "note"?: "invoice 1042" }`
 
 **Response 202** (submitted/completed/exception) / **422** (failed): display-safe
 ```json
@@ -3226,7 +3226,9 @@ These live under the OAuth consent-grant controller (`/api/v1/auth/grants/*`) an
   | `GET` | `/merchant/accounts/:partyRef` | `read:accounts` | User's payout accounts; raw IBAN/routing stripped, `payoutAccountMaskedIban` only. |
   | `GET` | `/merchant/transactions/:partyRef` | `read:transactions` | User's SD-65 execution/operation history, display-safe projection. |
   | `POST` | `/merchant/transfers/:partyRef/preview` | `write:transfers` | Stateless rail derivation + fee quote (no side effects). |
-  | `POST` | `/merchant/transfers/:partyRef/bank` | `write:transfers` | Execute a bank transfer; emits attributed `businessProcessEvent` (`merchant.transfer.bank`). |
+  | `POST` | `/merchant/transfers/:partyRef/bank` | `write:transfers` | Execute a bank transfer; emits attributed `businessProcessEvent` (`merchant.transfer.bank`). Body accepts optional `fromAccountRef` (chosen source payout account, ownership-validated) and `reference` (description). |
+
+  > `POST /merchant/transfers/:partyRef/bank` body: `{ amount, currency, destination, rail?, reference?, fromAccountRef?, settlementSchedule? }`. `fromAccountRef` is an opaque `payoutAccountInstanceReference` (from `GET /merchant/accounts/:partyRef`); `executeBankTransfer` verifies it belongs to the initiator party and is active before setting `sourcePayoutAccountReference` on the SD-65 execution, else returns `status: "exception"`. When omitted, source selection is left to the payment-initiation provider (prior behavior). `reference` (ISO 20022 remittance info) is forwarded as the transfer description. No CHD; destination coordinates stay transaction-scoped; IBAN masked-only.
 
   > The pre-existing `/merchant/beneficiaries/*` (SD-54) and `/merchant/portal/*` routes were also switched to `config: { skipAuth: true }` in v18 so the RS256 OAuth token reaches their in-handler `validateMerchantToken` instead of being 401'd by the global HS256 middleware.
 

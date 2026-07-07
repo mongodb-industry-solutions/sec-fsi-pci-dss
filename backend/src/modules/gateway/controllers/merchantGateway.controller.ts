@@ -89,7 +89,8 @@ function safeMerchantAccount(doc: Record<string, unknown>) {
 interface PreviewBody { destination: RailDestination; amountCurrency?: string; rail?: BankRail }
 interface ExecuteBody {
   amount: number; currency: string; destination: RailDestination;
-  rail?: BankRail; reference?: string; settlementSchedule?: 'T+0' | 'T+1' | 'T+2' | 'T+3';
+  rail?: BankRail; reference?: string; fromAccountRef?: string;
+  settlementSchedule?: 'T+0' | 'T+1' | 'T+2' | 'T+3';
 }
 
 export async function merchantGatewayController(fastify: FastifyInstance) {
@@ -254,6 +255,7 @@ export async function merchantGatewayController(fastify: FastifyInstance) {
           destination: destinationSchema,
           rail: { type: 'string' },
           reference: { type: 'string', maxLength: 140 },
+          fromAccountRef: { type: 'string', description: 'Optional chosen source payout account (SD-66); validated for ownership. Defaults to provider selection when omitted.' },
           settlementSchedule: { type: 'string', enum: ['T+0', 'T+1', 'T+2', 'T+3'] },
         },
       },
@@ -278,6 +280,7 @@ export async function merchantGatewayController(fastify: FastifyInstance) {
       destination: body.destination,
       rail: body.rail,
       reference: body.reference,
+      fromAccountRef: body.fromAccountRef,
       settlementSchedule: body.settlementSchedule,
     });
 

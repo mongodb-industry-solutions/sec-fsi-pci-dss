@@ -7,6 +7,7 @@ import { getSession, hasScope } from '@/lib/session';
 import { ScopeMissing, PspUnavailable } from '@/components/ScopeGate';
 import { EmptyState, InfoHint } from '@/components/ui/Bits';
 import { Tip } from '@/components/ui/Tooltip';
+import { loadAccountOptions } from '@/lib/accounts';
 import BeneficiarySend from './BeneficiarySend';
 
 export default async function BeneficiariesPage() {
@@ -23,6 +24,10 @@ export default async function BeneficiariesPage() {
   } catch (e) {
     error = e instanceof PspError ? e.message : 'Failed to load beneficiaries';
   }
+
+  // Fetch the user's source accounts once (server-side) so each row's send control can offer a
+  // source picker without fetching per row. Empty when the scope is missing or on error.
+  const accounts = await loadAccountOptions();
 
   return (
     <div>
@@ -60,7 +65,7 @@ export default async function BeneficiariesPage() {
                 </div>
               </div>
               {hasScope(session, 'write:transfers') && (b.counterpartyArrangementReference ?? b.beneficiaryToken) && (
-                <BeneficiarySend beneficiaryToken={b.counterpartyArrangementReference ?? b.beneficiaryToken} />
+                <BeneficiarySend beneficiaryToken={b.counterpartyArrangementReference ?? b.beneficiaryToken} accounts={accounts} />
               )}
             </li>
           ))}

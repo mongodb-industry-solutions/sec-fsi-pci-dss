@@ -13,6 +13,12 @@ function money(a?: { amount: number; currency: string } | number, currency?: str
   return `${a.currency} ${a.amount.toFixed(2)}`;
 }
 
+// Shorten an internal reference for display while keeping the full value available (title/copy).
+function shortRef(id?: string): string {
+  if (!id) return 'n/a';
+  return id.length <= 12 ? id : `${id.slice(0, 8)}…${id.slice(-4)}`;
+}
+
 // Map a PSP status string to a chip tone.
 function statusTone(s?: string): 'ok' | 'warn' | 'err' | 'neutral' {
   const v = (s ?? '').toLowerCase();
@@ -41,8 +47,10 @@ export default async function HistoryPage() {
     const gross = t.grossAmount ?? t.paymentExecutionAmount?.amount;
     const commission = typeof gross === 'number' ? gross * MERCHANT_COMMISSION_RATE : undefined;
     const status = t.paymentExecutionStatus ?? t.status;
+    const txnId = t.paymentExecutionInstanceReference ?? t.transferReference ?? '';
     return {
       key: t.paymentExecutionInstanceReference ?? i,
+      txnId,
       date: (t.completedAt ?? t.initiatedAt ?? '').toString().slice(0, 10) || 'n/a',
       direction: t.direction ?? 'n/a',
       amount: money(gross, t.currency),
@@ -74,6 +82,7 @@ export default async function HistoryPage() {
               <thead className="bg-surface-alt text-left text-muted">
                 <tr>
                   <th className="p-3 font-medium">Date</th>
+                  <th className="p-3 font-medium">Transaction ID</th>
                   <th className="p-3 font-medium">Direction</th>
                   <th className="p-3 font-medium">Amount</th>
                   <th className="p-3 font-medium">Fee</th>
@@ -88,6 +97,7 @@ export default async function HistoryPage() {
                   return (
                     <tr key={r.key} className="border-t border-line text-ink">
                       <td className="p-3">{r.date}</td>
+                      <td className="p-3"><span className="font-mono text-xs text-muted" title={r.txnId || undefined}>{shortRef(r.txnId)}</span></td>
                       <td className="p-3"><span className="inline-flex items-center gap-1"><Icon className="h-3.5 w-3.5 text-muted" aria-hidden /> {r.direction}</span></td>
                       <td className="p-3 font-medium">{r.amount}</td>
                       <td className="p-3 text-muted">{r.fee}</td>
@@ -120,6 +130,9 @@ export default async function HistoryPage() {
                   <div className="mt-1 flex gap-4 text-xs text-muted">
                     <span>Fee {r.fee}</span>
                     <span>Commission {r.commission}</span>
+                  </div>
+                  <div className="mt-1 font-mono text-[11px] text-muted" title={r.txnId || undefined}>
+                    ID {shortRef(r.txnId)}
                   </div>
                 </div>
               );
