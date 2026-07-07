@@ -62,34 +62,21 @@ function savePaused(v: boolean): void {
   localStorage.setItem(PAUSED_KEY, v ? 'true' : 'false');
 }
 
-// The external merchant demo lives on its own origin (localhost:8082 / staging / prod), resolved from
-// the build-time MERCHANT_PUBLIC_URL. Its /health is CORS-open so this page can probe it directly.
-// Appended programmatically because the merchant URL is per-environment (not knowable in a static JSON).
-function merchantDefaultService(): MonitoringService {
-  return {
-    id: 'merchant-app',
-    name: 'Merchant App',
-    description: 'External merchant demo (Espresso Works) — Next.js SSO/API client',
-    type: 'http',
-    url: `${MERCHANT_PUBLIC_URL.replace(/\/+$/, '')}/health`,
-    method: 'GET',
-    enabled: true,
-    intervalMs: 30000,
-    timeoutMs: 10000,
-    expectedStatus: 200,
-    useApiBase: false,
-  };
+// monitoring-defaults.json declares every default resource, but a per-environment URL (e.g. the
+// external merchant on localhost:8082 / staging / prod) can't be hardcoded there. Such entries use
+// the {{MERCHANT_BASE_URL}} token, resolved here from the build-time MERCHANT_PUBLIC_URL.
+function resolveServiceTokens(s: MonitoringService): MonitoringService {
+  if (!s.url.includes('{{MERCHANT_BASE_URL}}')) return s;
+  return { ...s, url: s.url.replace('{{MERCHANT_BASE_URL}}', MERCHANT_PUBLIC_URL.replace(/\/+$/, '')) };
 }
 
 async function fetchDefaults(): Promise<MonitoringService[]> {
   try {
     const res = await fetch('/monitoring-defaults.json');
-    const services = res.ok ? ((await res.json()) as { services: MonitoringService[] }).services ?? [] : [];
-    // Ensure the merchant is monitored even though it is not in the static defaults file.
-    return services.some((s) => s.id === 'merchant-app') ? services : [...services, merchantDefaultService()];
-  } catch {
-    return [merchantDefaultService()];
-  }
+    if (!res.ok) return [];
+    const data = await res.json() as { services: MonitoringService[] };
+    return (data.services ?? []).map(resolveServiceTokens);
+  } catch { return []; }
 }
 
 // ── Check runner ───────────────────────────────────────────────────────────
