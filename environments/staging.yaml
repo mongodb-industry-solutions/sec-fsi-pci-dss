@@ -4,11 +4,27 @@ env:
   PSP_OAUTH_KEY_PROVIDER: aws
   PSP_CORS_ORIGIN: "https://sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com"
   PSP_URL_FRONTEND: "https://sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com"
-  # Merchant public URL — used by the merchant seeder to resolve OIDC branding (logo_uri/client_uri).
+  # Backend OIDC issuer + endpoints (discovery/token/jwks/userinfo) AND internal self-dispatch. Must be
+  # a URL reachable BOTH by the backend itself and by the merchant pod → the in-cluster service (same
+  # private path the frontend uses). It becomes the id_token `iss`; the merchant verifies against the
+  # discovery doc, so it only needs to be self-consistent, not public.
+  PSP_BASE_URL: "http://sec-fsi-pci-dss-backend-web-app:80"
+
+  # ── Merchant app (Espresso Works) config ──────────────────────────────────────────────────────
+  # Browser-facing consent page → PUBLIC PSP frontend (the user's browser navigates here).
+  PSP_MERCHANT_AUTHORIZE_URL: "https://sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com/auth/authorize"
+  # Server-to-server (OIDC discovery + token + userinfo + API) → PRIVATE in-cluster backend service.
+  PSP_MERCHANT_PSP_BASE_URL: "http://sec-fsi-pci-dss-backend-web-app:80"
+  # This app's own public URL (redirect_uri host + seeder branding).
   PSP_MERCHANT_BASE_URL: "https://sec-fsi-pci-dss-merchant.industrysolutions.staging.corp.mongodb.com"
 
 envSecrets:
   MONGODB_URI: sec-fsi-pci-dss-secrets-staging
+  # Merchant OAuth client id/secret + session cookie key — populate these keys in the
+  # sec-fsi-pci-dss-secrets-staging secret (values never live in this file).
+  PSP_MERCHANT_OAUTH_CLIENT_ID: sec-fsi-pci-dss-secrets-staging
+  PSP_MERCHANT_OAUTH_CLIENT_SECRET: sec-fsi-pci-dss-secrets-staging
+  PSP_MERCHANT_SESSION_SECRET: sec-fsi-pci-dss-secrets-staging
   MONGODB_DB_NAME: sec-fsi-pci-dss-secrets-staging
   PSP_KMS_LOCAL_MASTER_KEY: sec-fsi-pci-dss-secrets-staging
   PSP_KMS_KEY_VAULT_DATABASE: sec-fsi-pci-dss-secrets-staging

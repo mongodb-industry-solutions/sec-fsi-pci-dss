@@ -4,7 +4,7 @@
 // session alive and a checkout URL kept showing the "logged-in" viewer's cards (security gap).
 import { NextResponse } from 'next/server';
 import { revoke } from '@/lib/oauth';
-import { clearSession, getSession } from '@/lib/session';
+import { clearSessionOn, getSession } from '@/lib/session';
 import { ENV } from '@/lib/env';
 
 async function handle() {
@@ -17,13 +17,16 @@ async function handle() {
       await revoke(session.accessToken);
     } catch { /* ignore — proceed to clear local session regardless */ }
   }
-  await clearSession();
   // Front-channel: bounce the browser through the PSP logout page (clears demo_token same-origin),
   // which then redirects back here. Full navigation (the logout link is a plain <a>), so the PSP
   // page's JS runs.
   const back = new URL('/', ENV.baseUrl()).toString();
   const pspLogout = `${ENV.pspLogoutUrl()}?redirect=${encodeURIComponent(back)}`;
-  return NextResponse.redirect(pspLogout);
+  // Expire the session cookie ON the redirect response — cookies() mutation isn't reliably merged
+  // into a returned NextResponse.redirect across Next versions.
+  const res = NextResponse.redirect(pspLogout);
+  clearSessionOn(res);
+  return res;
 }
 
 export const GET = handle;

@@ -69,6 +69,17 @@ export async function GET(req: NextRequest) {
       localPart(email) ??
       undefined;
 
+    // Refuse to create a session without a subject: if the token response omitted the id_token (or it
+    // lacked a `sub` claim), `sub` is empty and a session with an empty identity would break downstream
+    // identity/attribution. (A malformed/invalid id_token throws in verifyIdToken and is handled by the
+    // catch below.) Treat the empty-subject case as an auth failure instead.
+    if (!sub) {
+      home.searchParams.set('auth_error', 'token_exchange_failed');
+      const res = NextResponse.redirect(home);
+      clearLoginStateOn(res);
+      return res;
+    }
+
     // Set session + expire the transient login cookie on the SAME redirect response.
     const res = NextResponse.redirect(new URL('/', ENV.baseUrl()));
     attachSession(res, {

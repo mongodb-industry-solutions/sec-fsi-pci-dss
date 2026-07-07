@@ -5,12 +5,16 @@ import { attachLoginState } from '@/lib/session';
 import { ENV, REQUESTED_SCOPES } from '@/lib/env';
 
 export async function GET(req: NextRequest) {
-  // Host consistency: the seeded redirect_uri points at a fixed host (localhost:8082).
-  // If the user started on a different host (e.g. 127.0.0.1), the ew_login cookie would be
-  // set on that host and never sent back to the callback host → spurious invalid_state.
-  // Bounce them to the canonical host first so login + callback share the same origin.
+  // Host consistency: only relevant for LOCAL dev, where the user might start on 127.0.0.1 while the
+  // seeded redirect_uri uses localhost:8082 (or vice-versa) — the ew_login cookie would then be set on
+  // one host and never sent back to the callback host → spurious invalid_state. Bounce to the canonical
+  // host ONLY when that canonical host is a localhost variant. Behind a real proxy/ingress (staging/
+  // prod) `req.nextUrl.host` reflects the internal hop, not the public host, so comparing it to the
+  // configured public host would never match and would loop forever (ERR_TOO_MANY_REDIRECTS). The
+  // ingress already guarantees the public host there, so the bounce is unnecessary and must be skipped.
   const canonical = new URL(ENV.redirectUri()); // <base>/api/auth/callback
-  if (req.nextUrl.host !== canonical.host) {
+  const canonicalIsLocal = canonical.hostname === 'localhost' || canonical.hostname === '127.0.0.1';
+  if (canonicalIsLocal && req.nextUrl.host !== canonical.host) {
     return NextResponse.redirect(new URL('/api/auth/login', canonical.origin));
   }
 

@@ -481,15 +481,16 @@ async function podLogs() {
     const entered = (await ask("Pod or deployment name: ")).trim();
     if (!entered) { warn("No name given."); return; }
     // kubectl logs needs a real POD name. Accept a deployment/release name too: if the entry isn't an
-    // exact pod, resolve the newest pod whose name starts with it (pod = <deployment>-<hash>-<hash>).
-    // `-o name` avoids braces/spaces so it is safe under the Windows shell.
-    const list = spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "-o", "name"], { shell: IS_WIN, encoding: "utf-8", env });
+    // exact pod, resolve the NEWEST pod whose name starts with it (pod = <deployment>-<hash>-<hash>).
+    // --sort-by=.metadata.creationTimestamp gives true chronological order (a lexicographic sort of the
+    // random hash suffix would NOT). `-o name` + that flag avoid braces/spaces → safe under the Windows shell.
+    const list = spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "--sort-by=.metadata.creationTimestamp", "-o", "name"], { shell: IS_WIN, encoding: "utf-8", env });
     const names = (list.stdout || "").split(/\r?\n/).map((l) => l.replace(/^pod\//, "").trim()).filter(Boolean);
     let pod = entered;
     if (!names.includes(entered)) {
-      const matches = names.filter((n) => n.startsWith(entered)).sort();
+      const matches = names.filter((n) => n.startsWith(entered)); // preserve creation order (oldest→newest)
       if (matches.length === 0) { warn(`No pod found matching "${entered}" in ${IST_NAMESPACE}.`); return; }
-      pod = matches[matches.length - 1];
+      pod = matches[matches.length - 1]; // newest
       console.log(`${DIM}[resolved] ${entered} -> ${pod}${NC}`);
     }
     // --previous shows the last crashed instance (useful for CrashLoopBackOff).
@@ -516,15 +517,14 @@ async function rolloutRestart() {
   console.log("\n  1. backend\n  2. frontend\n  3. merchant\n  4. all");
   const input = await ask("Restart which? ");
   if (!["1", "2", "3", "4"].includes(input)) { warn(`Invalid choice "${input}". Choose 1-4.`); return; }
-  if (input === "1" || input === "4") {
-    run(`kubectl rollout restart deployment ${RELEASE_BACKEND}-web-app -n ${IST_NAMESPACE}`);
-  }
-  if (input === "2" || input === "4") {
-    run(`kubectl rollout restart deployment ${RELEASE_FRONTEND}-web-app -n ${IST_NAMESPACE}`);
-  }
-  if (input === "3" || input === "4") {
-    run(`kubectl rollout restart deployment ${RELEASE_MERCHANT}-web-app -n ${IST_NAMESPACE}`);
-  }
+  // Must run with KUBECONFIG pointing at the staging/prod configs (kubeEnv), otherwise kubectl hits
+  // the default/wrong context. run()/execSync does not set it, so use spawnSync with env: kubeEnv().
+  const env = kubeEnv();
+  const restart = (release: string) =>
+    spawnSync("kubectl", ["rollout", "restart", "deployment", `${release}-web-app`, "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
+  if (input === "1" || input === "4") restart(RELEASE_BACKEND);
+  if (input === "2" || input === "4") restart(RELEASE_FRONTEND);
+  if (input === "3" || input === "4") restart(RELEASE_MERCHANT);
   ok("Rollout restart initiated.");
 }
 
@@ -719,6 +719,7 @@ async function describePod() {
 async function execIntoPod() {
   console.log("\n  1. backend\n  2. frontend\n  3. merchant");
   const input = await ask("Which service? ");
+  if (!["1", "2", "3"].includes(input)) { warn(`Invalid choice "${input}". Choose 1, 2 or 3.`); return; }
   const release = input === "2" ? RELEASE_FRONTEND : input === "3" ? RELEASE_MERCHANT : RELEASE_BACKEND;
   const deployment = `${release}-web-app`;
   console.log(`${DIM}[cmd]    kubectl exec -it deployment/${deployment} -n ${IST_NAMESPACE} -- sh${NC}`);
@@ -728,6 +729,7 @@ async function execIntoPod() {
 async function checkEnvVars() {
   console.log("\n  1. backend\n  2. frontend\n  3. merchant");
   const input = await ask("Which service? ");
+  if (!["1", "2", "3"].includes(input)) { warn(`Invalid choice "${input}". Choose 1, 2 or 3.`); return; }
   const release = input === "2" ? RELEASE_FRONTEND : input === "3" ? RELEASE_MERCHANT : RELEASE_BACKEND;
   const deployment = `${release}-web-app`;
   spawnSync("kubectl", ["exec", `deployment/${deployment}`, "-n", IST_NAMESPACE, "--", "env"], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
