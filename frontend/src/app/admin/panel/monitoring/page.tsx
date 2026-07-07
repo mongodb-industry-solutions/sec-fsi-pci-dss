@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { API_BASE_URL } from '../../../../lib/constants';
+import { API_BASE_URL, MERCHANT_PUBLIC_URL } from '../../../../lib/constants';
 import { JsonView } from '../../../../components/json/JsonView';
 import {
   Activity, Plus, PauseCircle, PlayCircle, Trash2,
@@ -62,12 +62,20 @@ function savePaused(v: boolean): void {
   localStorage.setItem(PAUSED_KEY, v ? 'true' : 'false');
 }
 
+// monitoring-defaults.json declares every default resource, but a per-environment URL (e.g. the
+// external merchant on localhost:8082 / staging / prod) can't be hardcoded there. Such entries use
+// the {{MERCHANT_BASE_URL}} token, resolved here from the build-time MERCHANT_PUBLIC_URL.
+function resolveServiceTokens(s: MonitoringService): MonitoringService {
+  if (!s.url.includes('{{MERCHANT_BASE_URL}}')) return s;
+  return { ...s, url: s.url.replace('{{MERCHANT_BASE_URL}}', MERCHANT_PUBLIC_URL.replace(/\/+$/, '')) };
+}
+
 async function fetchDefaults(): Promise<MonitoringService[]> {
   try {
     const res = await fetch('/monitoring-defaults.json');
     if (!res.ok) return [];
     const data = await res.json() as { services: MonitoringService[] };
-    return data.services ?? [];
+    return (data.services ?? []).map(resolveServiceTokens);
   } catch { return []; }
 }
 
