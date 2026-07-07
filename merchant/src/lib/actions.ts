@@ -12,6 +12,14 @@ export interface ActionResult {
   redirectUrl?: string;
   /** For payment-link method: shareable link. */
   paymentUrl?: string;
+  /** For payment-link method: short human-readable code for the link. */
+  linkCode?: string;
+  /** Primary reference to surface (order ref / payment link ref). */
+  reference?: string;
+  /** Card/payment transaction id, when the PSP returns one (API payment). */
+  transactionRef?: string;
+  /** PSP status string (e.g. "authorized"), for the confirmation chip. */
+  status?: string;
   data?: unknown;
 }
 
@@ -48,7 +56,13 @@ export async function payForProduct(productId: string): Promise<ActionResult> {
           currency: product.currency,
           description: product.name,
         });
-        return { ok: true, paymentUrl: link.paymentUrl, message: 'Payment link created. Share it with the buyer.' };
+        return {
+          ok: true,
+          paymentUrl: link.paymentUrl,
+          linkCode: link.paymentLinkCode,
+          reference: link.paymentLinkInstanceReference,
+          message: 'Payment link created. Share it with the buyer to complete payment.',
+        };
       }
       case 'redirect':
       case 'subscription': {
@@ -79,7 +93,14 @@ export async function payForProduct(productId: string): Promise<ActionResult> {
           },
           randomUUID(),
         );
-        return { ok: true, message: `API payment charged: ${order.paymentOrderReference} (status ${order.paymentOrderStatus}).`, data: order };
+        return {
+          ok: true,
+          reference: order.paymentOrderReference,
+          transactionRef: order.cardTransactionInstanceReference,
+          status: order.paymentOrderStatus,
+          message: 'Payment charged successfully.',
+          data: order,
+        };
       }
       default:
         return { ok: false, message: 'Unsupported method' };

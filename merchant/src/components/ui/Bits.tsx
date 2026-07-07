@@ -20,7 +20,10 @@ const TONES: Record<Tone, string> = {
   warn: 'text-[var(--warn)] bg-[var(--warn-bg)]',
   err: 'text-[var(--err)] bg-[var(--err-bg)]',
   neutral: 'text-muted bg-surface-alt',
-  accent: 'text-leaf-deep bg-[color-mix(in_srgb,var(--leaf)_18%,transparent)]',
+  // Fixed brand colors (not theme-flipped): dark ink text on the bright leaf green reads
+  // clearly in BOTH light and dark themes. The previous leaf-on-leaf tint was low-contrast
+  // (especially in dark mode).
+  accent: 'text-leaf-ink bg-leaf ring-1 ring-leaf-deep/20',
 };
 
 /** Status/label chip. */

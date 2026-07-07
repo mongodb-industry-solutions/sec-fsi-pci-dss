@@ -62,7 +62,7 @@ export default function ProfileMenu({ user }: { user: ProfileUser }) {
             </div>
           </div>
           <nav className="py-1 text-sm">
-            <Link href="/" role="menuitem" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-4 py-2 hover:bg-surface-alt">
+            <Link href="/profile" role="menuitem" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-4 py-2 hover:bg-surface-alt">
               <CircleUserRound className="h-4 w-4 text-muted" aria-hidden /> Profile &amp; permissions
             </Link>
             <Link href="/help" role="menuitem" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-4 py-2 hover:bg-surface-alt">
