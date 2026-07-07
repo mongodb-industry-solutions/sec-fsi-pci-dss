@@ -37,13 +37,15 @@ export default function CopyButton({
       document.body.removeChild(ta);
     }
     setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
   }
 
   return (
     <button
       type="button"
       onClick={copy}
+      // Reset the confirmation on interaction end (no timers → no unmount/stale-closure races).
+      onMouseLeave={() => setCopied(false)}
+      onBlur={() => setCopied(false)}
       aria-label={copied ? `Copied ${label}` : `Copy ${label}`}
       title={value}
       className={`inline-flex items-center gap-1 rounded-md p-1 text-muted transition hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${className}`}

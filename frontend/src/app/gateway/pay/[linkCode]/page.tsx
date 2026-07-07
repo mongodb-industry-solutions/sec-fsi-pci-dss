@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { api } from '../../../../lib/api';
 import { deriveCardToken } from '../../../../lib/cardTokenize';
-import { Lock, CreditCard, CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react';
+import { Lock, CreditCard, CheckCircle, XCircle, Eye, EyeOff, Copy, Check } from 'lucide-react';
 
 type LinkData = Awaited<ReturnType<typeof api.paymentLinks.resolve>>;
 type PageState = 'loading' | 'ready' | 'paying' | 'success' | 'declined' | 'unavailable' | 'error';
@@ -21,6 +21,7 @@ function PaymentLinkPageInner() {
   const [state, setState] = useState<PageState>('loading');
   const [txRef, setTxRef] = useState('');
   const [error, setError] = useState('');
+  const [copiedRef, setCopiedRef] = useState(false);
 
   const [cardholderName, setCardholderName] = useState('');
   const [cardNumber, setCardNumber] = useState('');
@@ -143,11 +144,27 @@ function PaymentLinkPageInner() {
             <strong>{link.merchantName}</strong> was completed.
           </p>
           {txRef && (
-            <div className="text-xs text-gray-400 bg-gray-50 rounded px-3 py-2 font-mono break-all">
-              Ref: {txRef.slice(0, 8)}...
+            <div className="text-xs text-gray-500 bg-gray-50 rounded px-3 py-2 font-mono break-all flex items-start justify-between gap-2 text-left">
+              <span><span className="text-gray-400">Ref:</span> {txRef}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(txRef)
+                    .then(() => setCopiedRef(true))
+                    .catch(() => {});
+                }}
+                // Reset the confirmation on interaction end (no timers → no unmount/stale-closure races).
+                onMouseLeave={() => setCopiedRef(false)}
+                onBlur={() => setCopiedRef(false)}
+                aria-label={copiedRef ? 'Reference copied' : 'Copy reference'}
+                title={copiedRef ? 'Copied' : 'Copy reference'}
+                className="shrink-0 text-gray-400 hover:text-green-600 focus:outline-none"
+              >
+                {copiedRef ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+              </button>
             </div>
           )}
-          <div className="mt-4 text-xs text-gray-400">Powered by MongoDB PSP Platform</div>
+          <div className="mt-4 text-xs text-gray-400">Powered by Leafy Pay (MongoDB PSP Platform)</div>
         </div>
       </div>
     );
