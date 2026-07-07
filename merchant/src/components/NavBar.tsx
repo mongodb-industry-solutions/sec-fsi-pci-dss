@@ -48,7 +48,11 @@ export default function NavBar({ links, user }: { links: NavLink[]; user: Profil
               const Icon = ICONS[l.icon];
               return (
                 <Tip key={l.href} label={l.tip}>
-                  <Link href={l.href} className={linkClass(l.href)}>
+                  {/* prefetch disabled: these routes are fully dynamic (cookies + slow PSP/QE
+                      backend). Auto-prefetch would re-render each target server-side, and dynamic
+                      prefetch entries expire (~30s) and re-fetch while the link stays in view,
+                      producing repeated backend GETs (notably the self-link on /history). */}
+                  <Link href={l.href} prefetch={false} className={linkClass(l.href)}>
                     <Icon className="h-4 w-4" aria-hidden />
                     {l.label}
                   </Link>
@@ -93,7 +97,7 @@ export default function NavBar({ links, user }: { links: NavLink[]; user: Profil
             {links.map((l) => {
               const Icon = ICONS[l.icon];
               return (
-                <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className={linkClass(l.href)}>
+                <Link key={l.href} href={l.href} prefetch={false} onClick={() => setOpen(false)} className={linkClass(l.href)}>
                   <Icon className="h-4 w-4" aria-hidden />
                   {l.label}
                 </Link>

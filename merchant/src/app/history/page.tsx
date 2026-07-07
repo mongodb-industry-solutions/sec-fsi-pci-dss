@@ -5,6 +5,7 @@ import { PspClient, PspError } from '@/lib/PspClient';
 import { getSession, hasScope } from '@/lib/session';
 import { ScopeMissing, PspUnavailable } from '@/components/ScopeGate';
 import { Chip, EmptyState, InfoHint } from '@/components/ui/Bits';
+import CopyButton from '@/components/ui/CopyButton';
 import { MERCHANT_COMMISSION_RATE } from '@/config/products';
 
 function money(a?: { amount: number; currency: string } | number, currency?: string) {
@@ -97,7 +98,12 @@ export default async function HistoryPage() {
                   return (
                     <tr key={r.key} className="border-t border-line text-ink">
                       <td className="p-3">{r.date}</td>
-                      <td className="p-3"><span className="font-mono text-xs text-muted" title={r.txnId || undefined}>{shortRef(r.txnId)}</span></td>
+                      <td className="p-3">
+                        <span className="inline-flex items-center gap-1">
+                          <span className="font-mono text-xs text-muted" title={r.txnId || undefined}>{shortRef(r.txnId)}</span>
+                          {r.txnId && <CopyButton value={r.txnId} label="transaction ID" />}
+                        </span>
+                      </td>
                       <td className="p-3"><span className="inline-flex items-center gap-1"><Icon className="h-3.5 w-3.5 text-muted" aria-hidden /> {r.direction}</span></td>
                       <td className="p-3 font-medium">{r.amount}</td>
                       <td className="p-3 text-muted">{r.fee}</td>
@@ -131,8 +137,9 @@ export default async function HistoryPage() {
                     <span>Fee {r.fee}</span>
                     <span>Commission {r.commission}</span>
                   </div>
-                  <div className="mt-1 font-mono text-[11px] text-muted" title={r.txnId || undefined}>
-                    ID {shortRef(r.txnId)}
+                  <div className="mt-1 flex items-center gap-1 text-[11px] text-muted">
+                    <span className="font-mono" title={r.txnId || undefined}>ID {shortRef(r.txnId)}</span>
+                    {r.txnId && <CopyButton value={r.txnId} label="transaction ID" />}
                   </div>
                 </div>
               );
