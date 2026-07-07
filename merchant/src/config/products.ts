@@ -62,7 +62,14 @@ export function findProduct(id: string): Product | undefined {
 }
 
 /** Merchant commission rate (Espresso Works seeded default = 0.025). Display-only in the merchant app. */
-export const MERCHANT_COMMISSION_RATE = Number(process.env.PSP_MERCHANT_COMMISSION_RATE ?? '0.025');
+const DEFAULT_COMMISSION_RATE = 0.025;
+function parseCommissionRate(raw: string | undefined): number {
+  const n = Number(raw);
+  // Fall back to the seeded default when unset / malformed / out of the valid 0..1 range,
+  // so the UI never renders NaN or a nonsensical commission figure.
+  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : DEFAULT_COMMISSION_RATE;
+}
+export const MERCHANT_COMMISSION_RATE = parseCommissionRate(process.env.PSP_MERCHANT_COMMISSION_RATE);
 
 export function computeCommission(amount: number, rate = MERCHANT_COMMISSION_RATE): number {
   return Math.round(amount * rate * 100) / 100;

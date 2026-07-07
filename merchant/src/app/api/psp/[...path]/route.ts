@@ -23,6 +23,18 @@ function isAllowed(method: string, joined: string): boolean {
 
 async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
   const { path } = await ctx.params;
+
+  // Reject dot-segments / embedded separators BEFORE the allowlist check. `[^/]+` in the patterns
+  // would otherwise match `..`, and `new URL()` normalizes dot-segments — so a path like
+  // `.../accounts/..` could pass the allowlist yet be forwarded to a different (non-allowlisted)
+  // endpoint after normalization. Decode each segment and forbid `.`, `..`, and any `/`\ inside it.
+  for (const seg of path) {
+    const decoded = (() => { try { return decodeURIComponent(seg); } catch { return seg; } })();
+    if (decoded === '.' || decoded === '..' || decoded.includes('/') || decoded.includes('\\')) {
+      return NextResponse.json({ error: 'forbidden_path' }, { status: 403 });
+    }
+  }
+
   const joined = path.join('/');
 
   if (!isAllowed(req.method, joined)) {
