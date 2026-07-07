@@ -19,13 +19,12 @@ env:
   PSP_MERCHANT_PSP_BASE_URL: "http://sec-fsi-pci-dss-backend-web-app:80"
   # This app's own public URL (redirect_uri host + seeder branding).
   PSP_MERCHANT_BASE_URL: "https://sec-fsi-pci-dss-merchant.industrysolutions.prod.corp.mongodb.com"
-  # Public OAuth client identifier (not a secret — appears in the seed and as the token `aud`).
-  PSP_MERCHANT_OAUTH_CLIENT_ID: "oauth001-0000-4000-8000-000000000001"
 
 envSecrets:
   MONGODB_URI: sec-fsi-pci-dss-secrets-prod
-  # Merchant confidential client secret + session cookie key — populate these keys in the
-  # sec-fsi-pci-dss-secrets-prod secret (never commit their values to this file).
+  # Merchant OAuth client id/secret + session cookie key — populate these keys in the
+  # sec-fsi-pci-dss-secrets-prod secret (values never live in this file).
+  PSP_MERCHANT_OAUTH_CLIENT_ID: sec-fsi-pci-dss-secrets-prod
   PSP_MERCHANT_OAUTH_CLIENT_SECRET: sec-fsi-pci-dss-secrets-prod
   PSP_MERCHANT_SESSION_SECRET: sec-fsi-pci-dss-secrets-prod
   MONGODB_DB_NAME: sec-fsi-pci-dss-secrets-prod
