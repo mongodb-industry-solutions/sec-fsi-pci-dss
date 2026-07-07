@@ -116,12 +116,16 @@ export class LocalKeyProvider implements OAuthKeyProvider {
 
   private loadActive(): void {
     if (!fs.existsSync(this.privateKeyPath)) {
-      if (process.env.NODE_ENV === 'development') {
+      // Auto-generate a signing key when missing in any NON-production environment (development,
+      // staging, demos) so the local provider works without mounting a key file or standing up KMS.
+      // PRODUCTION still fails closed: a real, persisted key (or KMS) must be provisioned there — an
+      // auto-generated ephemeral key would not survive restarts and would diverge across replicas.
+      if (process.env.NODE_ENV !== 'production') {
         this.generateAndPersist();
       } else {
         throw new Error(
           `OAuth private key not found at ${this.privateKeyPath}.\n` +
-          '  Run: npm run setup:key:rsa\n' +
+          '  Run: npm run setup:key:rsa (and mount/persist backend/keys)\n' +
           '  Or set OAUTH_KEY_PROVIDER=aws for KMS-backed signing.'
         );
       }
