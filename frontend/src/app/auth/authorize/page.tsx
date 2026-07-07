@@ -32,7 +32,16 @@ interface ConsentInfo {
 }
 
 async function fetchConsentInfo(searchParams: Record<string, string>): Promise<ConsentInfo | { error: string }> {
-  const backendUrl = process.env.PSP_URL_BACKEND_PRIVATE || process.env.NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC || 'http://localhost:8081';
+  // Server-side call: reach the backend via the in-cluster PRIVATE URL (same var the next.config
+  // rewrites use). PSP_URL_BACKEND_PRIVATE (unprefixed) is honoured if set, then the build-time
+  // NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE, then the public URL, then localhost. Without the private
+  // fallback the frontend pod tried the public backend host (often not egress-reachable) → the
+  // authorize consent fetch failed with "Failed to reach authorization server".
+  const backendUrl =
+    process.env.PSP_URL_BACKEND_PRIVATE ||
+    process.env.NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE ||
+    process.env.NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC ||
+    'http://localhost:8081';
   const qs = new URLSearchParams(searchParams as Record<string, string>).toString();
 
   try {
