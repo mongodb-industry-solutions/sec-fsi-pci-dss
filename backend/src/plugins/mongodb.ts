@@ -186,7 +186,11 @@ async function mongodbPlugin(fastify: FastifyInstance) {
     const reason = err instanceof Error ? err.message : String(err);
 
     console.error(`[mongodb] Connection failed: server=${server} database=${database}. ${reason}`);
-    fastify.dbError = `Connection failed: server=${server} database=${database}`;
+    // Surface the underlying reason, not just "Connection failed". A wrong/invalid
+    // MONGODB_CRYPT_SHARED_LIB_PATH makes the QE-enabled client fail to initialize and manifests here
+    // as a connection failure — without the reason it looks like a network/Atlas problem and is
+    // misdiagnosed. The reason is a driver/crypt_shared message (no credentials; the URI is sanitized).
+    fastify.dbError = `Connection failed: server=${server} database=${database}. ${reason}`;
     // Server continues to start; Swagger UI and /health remain accessible.
   }
 }

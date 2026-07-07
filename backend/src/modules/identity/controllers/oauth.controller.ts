@@ -171,15 +171,16 @@ export async function oauthController(fastify: FastifyInstance) {
         if (!body.code || !body.redirect_uri) {
           return reply.status(400).send({ error: 'invalid_request', error_description: 'code and redirect_uri required' });
         }
-        // Authenticate client unless it's a public client (PKCE only, no secret)
-        await resolveOAuthClient(db(), clientId, clientSecret || undefined);
+        // Authenticate the client. A confidential client (secret provisioned) must present it here;
+        // a public client (no secret) relies on PKCE. Enforced via requireClientAuthentication.
+        await resolveOAuthClient(db(), clientId, clientSecret || undefined, { requireClientAuthentication: true });
         result = await exchangeAuthorizationCode(db(), clientId, body.code, body.redirect_uri, body.code_verifier);
 
       } else if (grantType === 'client_credentials') {
         if (!clientSecret) {
           return reply.status(401).send({ error: 'invalid_client', error_description: 'client authentication required for client_credentials' });
         }
-        await resolveOAuthClient(db(), clientId, clientSecret);
+        await resolveOAuthClient(db(), clientId, clientSecret, { requireClientAuthentication: true });
         const scopes = body.scope?.split(' ').filter(Boolean) ?? [];
         result = await issueClientCredentialsToken(db(), clientId, scopes);
 
@@ -187,7 +188,8 @@ export async function oauthController(fastify: FastifyInstance) {
         if (!body.refresh_token) {
           return reply.status(400).send({ error: 'invalid_request', error_description: 'refresh_token required' });
         }
-        await resolveOAuthClient(db(), clientId, clientSecret || undefined);
+        // Confidential clients must re-authenticate to rotate tokens (previously the secret was optional).
+        await resolveOAuthClient(db(), clientId, clientSecret || undefined, { requireClientAuthentication: true });
         result = await refreshAccessToken(db(), clientId, body.refresh_token);
 
       } else {

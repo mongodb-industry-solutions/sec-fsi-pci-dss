@@ -47,6 +47,7 @@ export async function resolveOAuthClient(
   db: Db,
   clientId: string,
   clientSecret?: string,
+  opts?: { requireClientAuthentication?: boolean },
 ): Promise<OAuthClientInfo> {
   const merchant = await db
     .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
@@ -64,7 +65,17 @@ export async function resolveOAuthClient(
     throw oauth401('invalid_client', 'Merchant account is not active');
   }
 
-  if (clientSecret !== undefined) {
+  // A CONFIDENTIAL client (one provisioned with a secret) MUST authenticate at the token endpoint
+  // for every grant (RFC 6749 §3.2.1). Enforced only when the caller is authenticating the client
+  // (token/introspection endpoints, requireClientAuthentication=true) — not for internal metadata
+  // lookups (authorize page, post-auth token issuance). Previously the secret was validated only
+  // when it happened to be present, so omitting it bypassed authentication entirely on the
+  // authorization_code and refresh_token flows. Public clients (no secret hash) rely on PKCE.
+  const isConfidential = typeof cfg.oauthClientSecretHash === 'string' && cfg.oauthClientSecretHash.length > 0;
+  if (opts?.requireClientAuthentication && isConfidential && (clientSecret === undefined || clientSecret === '')) {
+    throw oauth401('invalid_client', 'client authentication required (confidential client)');
+  }
+  if (clientSecret !== undefined && clientSecret !== '') {
     const valid = await bcrypt.compare(clientSecret, cfg.oauthClientSecretHash);
     if (!valid) throw oauth401('invalid_client', 'Invalid client_secret');
   }

@@ -1,46 +1,93 @@
 // Server-only env accessors. Secrets NEVER reach the browser (no NEXT_PUBLIC_).
 // All merchant vars use the PSP_MERCHANT_ prefix.
+//
+// Resolution philosophy: the real process environment is the source of truth (exported vars, or
+// values injected by docker-compose / Kubernetes). The .env files are OPTIONAL conveniences for
+// temporarily customizing the environment — never a hard requirement. Precedence for every var:
+//   process.env (incl. merchant/.env.local loaded by Next)  >  repo-root .env  >  built-in default
+// Missing .env files never obstruct startup, and a missing value never throws here. Enforcement of
+// "the client must be registered and authorized" lives at the PSP authorization server, which
+// rejects an unknown / unauthenticated client — the merchant must not fabricate credentials, so an
+// unset client id/secret resolves to empty and the PSP declines the flow (invalid_client).
 import 'server-only';
+import * as fs from 'fs';
+import * as path from 'path';
+import { randomBytes } from 'crypto';
 
-function req(name: string, fallback?: string): string {
-  const v = process.env[name] ?? fallback;
-  if (!v) throw new Error(`Missing required env var: ${name}`);
-  return v;
+// Optional fallback: parse the repo-root .env (one level above the merchant package). Read-only,
+// loaded once, best-effort. In containers the parent .env usually doesn't exist and env comes from
+// process.env — this simply returns {} and nothing breaks.
+let globalEnvCache: Record<string, string> | undefined;
+function globalEnv(): Record<string, string> {
+  if (globalEnvCache) return globalEnvCache;
+  const cache: Record<string, string> = {};
+  const candidates = [
+    path.resolve(process.cwd(), '..', '.env'), // repo root when cwd = <root>/merchant
+    path.resolve(process.cwd(), '.env'),       // cwd already at the repo root
+  ];
+  for (const file of candidates) {
+    try {
+      if (!fs.existsSync(file)) continue;
+      for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+        const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
+        if (!m) continue; // skip blank lines and comments (# ...)
+        let val = m[2];
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        if (!(m[1] in cache)) cache[m[1]] = val; // first file wins
+      }
+    } catch { /* unreadable file — ignore, fall through to process.env only */ }
+  }
+  globalEnvCache = cache;
+  return cache;
 }
 
-// Dev-only defaults so `npm run dev` works out of the box without a .env file.
-// These match the seeded Espresso Works client (already public in seed/docs).
-// In production the real env vars are REQUIRED (no fallback).
-const isProd = process.env.NODE_ENV === 'production';
-function reqOrDev(name: string, devDefault: string): string {
-  const v = process.env[name];
-  if (v) return v;
-  if (isProd) throw new Error(`Missing required env var: ${name}`);
-  return devDefault;
+// Resolve a var: process environment first, then the optional global .env. Never throws.
+function envVar(name: string): string | undefined {
+  const v = process.env[name] ?? globalEnv()[name];
+  return v && v.length > 0 ? v : undefined;
+}
+
+// Ephemeral, per-process session key used ONLY when PSP_MERCHANT_SESSION_SECRET is unset. Random
+// (not a predictable/forgeable hardcoded value), so the app stays usable for local dev without any
+// config; sessions simply don't survive a restart / span replicas. Set the env var in real deploys.
+let ephemeralSessionSecret: string | undefined;
+function fallbackSessionSecret(): string {
+  if (!ephemeralSessionSecret) {
+    ephemeralSessionSecret = randomBytes(32).toString('base64');
+    console.warn('[env] PSP_MERCHANT_SESSION_SECRET not set — using an ephemeral per-process key. Set it for stable sessions.');
+  }
+  return ephemeralSessionSecret;
 }
 
 export const ENV = {
   // PSP API base — OIDC discovery + all API endpoints (backend, host port 8081).
-  pspBaseUrl: () => req('PSP_MERCHANT_PSP_BASE_URL', 'http://localhost:8081'),
+  pspBaseUrl: () => envVar('PSP_MERCHANT_PSP_BASE_URL') ?? 'http://localhost:8081',
   // Browser-facing PSP consent/login page (PSP frontend). Backend /authorize returns JSON, not UI.
-  pspAuthorizeUrl: () => req('PSP_MERCHANT_AUTHORIZE_URL', 'http://localhost:8080/auth/authorize'),
+  pspAuthorizeUrl: () => envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8080/auth/authorize',
   // Browser-facing PSP front-channel logout page (single sign-out): clears the PSP portal session
   // cookie same-origin, then bounces back to this app. Derived from the authorize URL by default.
   pspLogoutUrl: () =>
-    process.env.PSP_MERCHANT_LOGOUT_URL ??
-    req('PSP_MERCHANT_AUTHORIZE_URL', 'http://localhost:8080/auth/authorize').replace('/auth/authorize', '/auth/logout'),
-  clientId: () => reqOrDev('PSP_MERCHANT_OAUTH_CLIENT_ID', 'oauth001-0000-4000-8000-000000000001'),
-  clientSecret: () => reqOrDev('PSP_MERCHANT_OAUTH_CLIENT_SECRET', 'espresso-demo-secret-2026'),
+    envVar('PSP_MERCHANT_LOGOUT_URL') ??
+    (envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8080/auth/authorize').replace('/auth/authorize', '/auth/logout'),
+  // Client credentials have NO built-in default: the merchant must never fabricate a client identity.
+  // If unset they resolve to '' and the PSP declines the flow (invalid_client) — enforcement belongs
+  // to the authorization server, so an unconfigured merchant cannot authenticate, yet nothing crashes.
+  clientId: () => envVar('PSP_MERCHANT_OAUTH_CLIENT_ID') ?? '',
+  clientSecret: () => envVar('PSP_MERCHANT_OAUTH_CLIENT_SECRET') ?? '',
   // This app's public base URL (local default 8082; container listens on 8080 behind ingress).
-  baseUrl: () => req('PSP_MERCHANT_BASE_URL', 'http://localhost:8082'),
+  baseUrl: () => envVar('PSP_MERCHANT_BASE_URL') ?? 'http://localhost:8082',
   // Redirect URI defaults to <baseUrl>/api/auth/callback but can be overridden per env.
   redirectUri: () =>
-    process.env.PSP_MERCHANT_REDIRECT_URI ??
-    `${req('PSP_MERCHANT_BASE_URL', 'http://localhost:8082')}/api/auth/callback`,
-  sessionSecret: () => reqOrDev('PSP_MERCHANT_SESSION_SECRET', 'dev-merchant-session-secret-change-me-0123456789'),
+    envVar('PSP_MERCHANT_REDIRECT_URI') ??
+    `${envVar('PSP_MERCHANT_BASE_URL') ?? 'http://localhost:8082'}/api/auth/callback`,
+  // AES-256-GCM key for the session cookie. Falls back to an ephemeral per-process key when unset
+  // (dev convenience) rather than a predictable hardcoded value; set it explicitly in real deploys.
+  sessionSecret: () => envVar('PSP_MERCHANT_SESSION_SECRET') ?? fallbackSessionSecret(),
   // Espresso Works seeded SD-89 merchant agreement reference.
   merchantAgreementRef: () =>
-    process.env.PSP_MERCHANT_AGREEMENT_REF ?? 'm0000001-0000-4000-8000-000000000001',
+    envVar('PSP_MERCHANT_AGREEMENT_REF') ?? 'm0000001-0000-4000-8000-000000000001',
 };
 
 // Scopes requested by Espresso Works (must be a subset of the seeded client's scopes).
