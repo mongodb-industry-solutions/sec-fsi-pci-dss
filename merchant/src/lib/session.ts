@@ -85,6 +85,12 @@ export async function clearSession(): Promise<void> {
   (await cookies()).delete(COOKIE_NAME);
 }
 
+// Expire the session cookie directly on a NextResponse. Use in handlers that return a redirect —
+// mutating next/headers cookies() is not reliably merged into a returned NextResponse across Next versions.
+export function clearSessionOn(res: NextResponse): void {
+  res.cookies.set(COOKIE_NAME, '', { ...sessionCookieOpts(), maxAge: 0 });
+}
+
 // ── Transient login state (PKCE + CSRF) ─────────────────────────────────────────
 const LOGIN_COOKIE = 'ew_login';
 
