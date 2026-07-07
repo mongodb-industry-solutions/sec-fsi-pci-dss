@@ -22,6 +22,7 @@ export interface JwtPayload {
   name: string;
   domain: string;
   partyRef?: string; // Ch-05: partyInstanceReference (SD-13) — present for all users with a Party record
+  epoch?: number;    // session validity epoch current at sign time (server-side logout invalidation)
 }
 
 export async function loginUser(
@@ -54,6 +55,8 @@ export async function loginUser(
     name: user.customerAuthenticationUserName,
     domain: user.customerAuthenticationLoginDomain,
     ...(user.partyInstanceReference && { partyRef: user.partyInstanceReference }),
+    // Stamp the current session epoch so logout can invalidate this token server-side.
+    epoch: user.customerAuthenticationSessionEpoch ?? 0,
   };
 
   const secret = process.env.PSP_JWT_SECRET ?? 'demo-local-secret-change-in-production';
@@ -71,6 +74,37 @@ export async function loginUser(
       ...(payload.partyRef && { partyRef: payload.partyRef }),
     },
   };
+}
+
+/**
+ * Current session epoch for a user (by customerAuthenticationInstanceReference == JWT `sub`).
+ * Absent record or field means epoch 0. Read on each authenticated request by the auth middleware
+ * to reject tokens issued before the last logout. Projection touches no QE-encrypted fields.
+ */
+export async function getCurrentSessionEpoch(db: Db, sub: string): Promise<number> {
+  const rec = await db
+    .collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
+    .findOne(
+      { customerAuthenticationInstanceReference: sub },
+      { projection: { customerAuthenticationSessionEpoch: 1 } },
+    );
+  return rec?.customerAuthenticationSessionEpoch ?? 0;
+}
+
+/**
+ * Server-side logout: bump the user's session epoch so every outstanding session JWT they hold is
+ * immediately rejected by the middleware (stateless invalidation, no token store). Returns the new
+ * epoch. Idempotent-safe: a user with no prior field goes 0 -> 1.
+ */
+export async function bumpSessionEpoch(db: Db, sub: string): Promise<number> {
+  const res = await db
+    .collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
+    .findOneAndUpdate(
+      { customerAuthenticationInstanceReference: sub },
+      { $inc: { customerAuthenticationSessionEpoch: 1 } },
+      { returnDocument: 'after', projection: { customerAuthenticationSessionEpoch: 1 } },
+    );
+  return res?.customerAuthenticationSessionEpoch ?? 0;
 }
 
 /**

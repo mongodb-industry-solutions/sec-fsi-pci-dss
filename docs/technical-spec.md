@@ -90,6 +90,7 @@ export interface CustomerAuthenticationAssessmentRecord {
   customerAuthenticationLoginDomain: 'local' | 'msentra';
   customerAuthenticationAccountStatus: 'active' | 'suspended';
   customerAuthenticationLastLoginDateTime?: Date;
+  customerAuthenticationSessionEpoch?: number;        // Session validity counter; logout increments it to invalidate outstanding JWTs. Absent = epoch 0.
   bianServiceDomain: 'Customer Authentication';
   bianControlRecordType: 'CustomerAuthenticationAssessment';
   recordCreatedDateTime: Date;
@@ -2170,6 +2171,18 @@ Validates credentials against `customerAuthenticationAssessment` (SD-91, QE equa
 ```
 
 > `sub` is the canonical OIDC subject claim (equal to `customerAuthenticationInstanceReference`, retained for back-compat). The OAuth consent flow reads `user.sub` as the `_psp_sub` identity carried through `/auth/authorize`.
+
+> The JWT also carries an `epoch` claim: the value of `customerAuthenticationSessionEpoch` (default 0) at sign time. See `POST /auth/logout` for how it enables stateless server-side invalidation.
+
+#### `POST /auth/logout`
+
+Server-side logout for the session JWT. The PSP session token is a stateless HS256 JWT, so it cannot be individually revoked without a token store. Instead, logout advances the caller's `customerAuthenticationSessionEpoch` (SD-91). Every issued JWT stamps the epoch current at sign time; the auth middleware reads the user's current epoch on each authenticated request and rejects any token whose stamped `epoch` is behind. This invalidates **all** of that user's outstanding tokens at once, storing no token (neither valid nor revoked).
+
+- **Auth:** requires a valid session JWT (behind the global middleware).
+- **Effect:** `$inc` of `customerAuthenticationSessionEpoch` for the caller's `sub`.
+- **Response 200:** `{ "loggedOut": true }`
+- **Client:** the frontend calls this before clearing its `demo_token` cookie. The merchant (relying party) triggers it via front-channel single sign-out: its logout redirects the browser through the PSP `/auth/logout` page, which calls this endpoint and clears the cookie same-origin. This closes the gap where a hosted checkout kept recognising a "logged-in" payer (and surfacing their saved cards) after the payer logged out of the merchant.
+- **Failure posture:** the middleware epoch check fails **open** on a DB error (a transient outage must not lock out every user); production could fail closed.
 
 **Response 401:** `{ "error": "Invalid credentials" }`
 

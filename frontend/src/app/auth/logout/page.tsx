@@ -1,7 +1,7 @@
 'use client';
 import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { clearToken } from '../../../lib/auth';
+import { logoutSession } from '../../../lib/logout';
 
 // ---------------------------------------------------------------------------
 // PSP RP-initiated logout endpoint (OIDC-style front-channel logout).
@@ -19,13 +19,19 @@ function LogoutInner() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    // Terminate the PSP portal session (same origin: this JS-readable cookie is ours to clear).
-    clearToken();
-    // Bounce back to the RP's post-logout URL. Only same-scheme absolute http(s) URLs are honoured
-    // (avoids an open-redirect); anything else falls back to the PSP home.
-    const raw = searchParams.get('redirect');
-    const safe = raw && /^https?:\/\//i.test(raw) ? raw : '/';
-    window.location.replace(safe);
+    let cancelled = false;
+    (async () => {
+      // Terminate the PSP session: invalidate the token server-side (epoch bump), then clear the
+      // same-origin cookie. Both happen before we redirect back to the RP.
+      await logoutSession();
+      if (cancelled) return;
+      // Bounce back to the RP's post-logout URL. Only absolute http(s) URLs are honoured
+      // (avoids an open-redirect); anything else falls back to the PSP home.
+      const raw = searchParams.get('redirect');
+      const safe = raw && /^https?:\/\//i.test(raw) ? raw : '/';
+      window.location.replace(safe);
+    })();
+    return () => { cancelled = true; };
   }, [searchParams]);
 
   return (

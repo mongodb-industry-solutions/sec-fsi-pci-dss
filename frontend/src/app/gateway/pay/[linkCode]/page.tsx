@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { api } from '../../../../lib/api';
 import { deriveCardToken } from '../../../../lib/cardTokenize';
-import { useViewerSavedCards, SavedCardSelector, PayingWithSummary } from '../../../../components/gateway/SavedCardSelector';
+import { useViewerSavedCards, SavedCardSelector, PayingWithSummary, SignedInBadge } from '../../../../components/gateway/SavedCardSelector';
 import { Lock, CreditCard, CheckCircle, XCircle, Eye, EyeOff, Copy, Check } from 'lucide-react';
 
 type LinkData = Awaited<ReturnType<typeof api.paymentLinks.resolve>>;
@@ -39,7 +39,7 @@ function PaymentLinkPageInner() {
   // Choosing a saved card pays with its token (CVV only, no expiry); "Use a new card" shows the form.
   // Optional ?card=<cardToken|cardRef> preselects a card ONLY if the viewer owns it.
   const wantedCard = searchParams.get('card') ?? searchParams.get('cardToken');
-  const { savedCards, selectedCardId, setSelectedCardId, selectedCard, usingSavedCard } = useViewerSavedCards(wantedCard);
+  const { savedCards, selectedCardId, setSelectedCardId, selectedCard, usingSavedCard, viewerName } = useViewerSavedCards(wantedCard);
 
   const applyPrefillParams = useCallback((sp: ReturnType<typeof useSearchParams>) => {
     const get = (p: PrefillParam) => sp.get(p);
@@ -277,6 +277,10 @@ function PaymentLinkPageInner() {
               )}
             </div>
 
+            {/* Confirms the payer is recognised by the PSP (their session persists). Nothing when
+                not logged in. */}
+            <SignedInBadge name={viewerName} />
+
             {/* Saved-card selector: shown only when the AUTHENTICATED viewer of this browser has cards
                 on file. Choosing a saved card pays with its token (no PAN entry); "Use a new card"
                 reveals the full form. Identical UI on the redirect-checkout page. */}
@@ -377,7 +381,7 @@ function PaymentLinkPageInner() {
                   {cvvTouched && !cvvValid ? (
                     <p className="text-xs text-red-600 mt-0.5">Enter the 3 or 4 digit code.</p>
                   ) : (
-                    <p className="text-xs text-gray-400 mt-0.5">Validated locally, never stored (PCI DSS Req 3.2).</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Validated locally, never stored.</p>
                   )}
                 </div>
               </div>

@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { CreditCard, PlusCircle, Star } from 'lucide-react';
+import { CreditCard, PlusCircle, Star, UserCheck } from 'lucide-react';
 import { api, type SavedCardDisplay } from '../../lib/api';
-import { getToken, isTokenExpired } from '../../lib/auth';
+import { getToken, isTokenExpired, decodeToken } from '../../lib/auth';
 
 // Sentinel selection for "enter a new card" in the saved-card picker.
 export const NEW_CARD = 'new';
@@ -35,6 +35,10 @@ export const NEW_CARD = 'new';
 export function useViewerSavedCards(wantedCard?: string | null) {
   const [savedCards, setSavedCards] = useState<SavedCardDisplay[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<string>(NEW_CARD);
+  // Display name of the authenticated viewer (from their own session JWT), or null if not logged in.
+  // Own PII shown to the authenticated owner only: no card data, no BIAN/PCI/GDPR deviation. Lets the
+  // payer confirm the payment system recognises them (i.e. their PSP session persists).
+  const [viewerName, setViewerName] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,6 +47,8 @@ export function useViewerSavedCards(wantedCard?: string | null) {
         const token = getToken();
         // No authenticated viewer in this browser → never load cards (new-card-only).
         if (!token || isTokenExpired(token)) return;
+        const name = decodeToken(token)?.name ?? null;
+        if (!cancelled) setViewerName(name);
         // The viewer's OWN cards, caller-scoped by the backend from the token itself.
         const { results } = await api.customer.getMyCards(token);
         if (cancelled || results.length === 0) return;
@@ -67,7 +73,21 @@ export function useViewerSavedCards(wantedCard?: string | null) {
     [usingSavedCard, savedCards, selectedCardId],
   );
 
-  return { savedCards, selectedCardId, setSelectedCardId, selectedCard, usingSavedCard };
+  return { savedCards, selectedCardId, setSelectedCardId, selectedCard, usingSavedCard, viewerName };
+}
+
+// Small badge confirming the payer is recognised by the PSP (their session persists). Renders
+// nothing when there is no authenticated viewer. Shows only the viewer's OWN display name.
+export function SignedInBadge({ name }: { name: string | null }) {
+  if (!name) return null;
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-[#00ED64]/40 bg-[#00ED64]/5 px-3 py-2 mb-4">
+      <UserCheck size={15} className="text-[#00684A] shrink-0" />
+      <span className="text-xs text-gray-600">
+        Signed in as <span className="font-medium text-gray-800">{name}</span>
+      </span>
+    </div>
+  );
 }
 
 // The saved-card radio group. Shown only when the viewer has cards on file. Choosing a saved card

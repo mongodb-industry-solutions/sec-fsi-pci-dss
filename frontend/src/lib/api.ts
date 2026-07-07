@@ -546,6 +546,9 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+    // Server-side logout: invalidates all of the caller's session tokens (advances their epoch).
+    logout: (token: string) =>
+      apiFetch<{ loggedOut: boolean }>('/api/v1/auth/logout', { method: 'POST' }, token),
     users: (filters?: boolean | DemoUserFilters) =>
       apiFetch<{ users: AuthUser[] }>(`/api/v1/auth/users${demoRosterQuery(filters)}`),
     domains: () =>

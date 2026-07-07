@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '../../../../lib/api';
 import { deriveCardToken } from '../../../../lib/cardTokenize';
-import { useViewerSavedCards, SavedCardSelector, PayingWithSummary } from '../../../../components/gateway/SavedCardSelector';
+import { useViewerSavedCards, SavedCardSelector, PayingWithSummary, SignedInBadge } from '../../../../components/gateway/SavedCardSelector';
 import { Lock, CreditCard, CheckCircle, XCircle, Clock, Eye, EyeOff } from 'lucide-react';
 
 type SessionData = Awaited<ReturnType<typeof api.checkout.getSession>>;
@@ -56,7 +56,7 @@ function CheckoutPageInner() {
   // payer supplies only the CVV to authorize. `NEW_CARD` (or no cards) shows the full new-card form.
   // The optional ?card=<cardToken|cardRef> preselects a card ONLY within the shown set.
   const wantedCard = searchParams.get('card') ?? searchParams.get('cardToken');
-  const { savedCards, selectedCardId, setSelectedCardId, selectedCard, usingSavedCard } = useViewerSavedCards(wantedCard);
+  const { savedCards, selectedCardId, setSelectedCardId, selectedCard, usingSavedCard, viewerName } = useViewerSavedCards(wantedCard);
 
   // Apply GET params to form fields. Add more params here as the payment form grows.
   const applyPrefillParams = useCallback((sp: ReturnType<typeof useSearchParams>) => {
@@ -311,9 +311,13 @@ function CheckoutPageInner() {
               )}
             </div>
 
-            {/* Saved-card selector: shown when this browser's viewer OR (with no token) the session's
-                acting party has cards on file. Choosing a saved card pays with its token (no PAN entry);
-                "Use a new card" reveals the full form. Identical UI on the payment-link page. */}
+            {/* Confirms the payer is recognised by the PSP (their session persists). Nothing when
+                not logged in. */}
+            <SignedInBadge name={viewerName} />
+
+            {/* Saved-card selector: shown ONLY when this browser's authenticated viewer has cards on
+                file. Choosing a saved card pays with its token (no PAN entry); "Use a new card"
+                reveals the full form. Identical UI on the payment-link page. */}
             <SavedCardSelector savedCards={savedCards} selectedCardId={selectedCardId} onSelect={setSelectedCardId} />
 
             <form onSubmit={handlePay} className="space-y-3">
@@ -411,7 +415,7 @@ function CheckoutPageInner() {
                   {cvvTouched && !cvvValid ? (
                     <p className="text-xs text-red-600 mt-0.5">Enter the 3 or 4 digit code.</p>
                   ) : (
-                    <p className="text-xs text-gray-400 mt-0.5">Validated locally, never stored (PCI DSS Req 3.2).</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Validated locally, never stored.</p>
                   )}
                 </div>
               </div>

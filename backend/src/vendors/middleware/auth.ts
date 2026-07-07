@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import * as jwt from 'jsonwebtoken';
 import { attachRbacContext } from './rbac';
+import { getCurrentSessionEpoch } from '../../modules/identity/services/auth.service';
 
 // Route-level opt-out of the global HS256 auth preHandler (self-guarded / OAuth / internal routes).
 declare module 'fastify' {
@@ -94,6 +95,22 @@ function tryVerifyToken(authHeader: string | undefined): jwt.JwtPayload | null {
   }
 }
 
+// Server-side logout enforcement: a session JWT stamps the epoch current at sign time; if the user's
+// epoch has since advanced (they logged out), the token is stale and must be rejected. Tokens with no
+// `sub`/`epoch` (legacy) compare against epoch 0. Fails OPEN on a DB error so a transient outage does
+// not lock every user out (demo posture; production could fail closed).
+async function sessionEpochOk(request: FastifyRequest, payload: jwt.JwtPayload): Promise<boolean> {
+  const sub = (payload as { sub?: string }).sub;
+  if (!sub) return true;
+  const tokenEpoch = typeof (payload as { epoch?: unknown }).epoch === 'number' ? (payload as { epoch: number }).epoch : 0;
+  try {
+    const current = await getCurrentSessionEpoch(request.server.db, sub);
+    return tokenEpoch >= current;
+  } catch {
+    return true;
+  }
+}
+
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const { url, method } = request;
   // Match against the pathname only — query strings (e.g. ?featured=true) must
@@ -124,6 +141,9 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     // But if a Bearer token is present, validate it and enforce customer block.
     const payload = tryVerifyToken(request.headers.authorization);
     if (payload) {
+      if (!(await sessionEpochOk(request, payload))) {
+        return reply.status(401).send({ error: 'Session ended. Please sign in again.' });
+      }
       (request as FastifyRequest & { user: jwt.JwtPayload }).user = payload;
       const role = (payload as { role?: string }).role;
       if (isCustomerBlocked(role, url)) {
@@ -150,6 +170,11 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     (request as FastifyRequest & { user: jwt.JwtPayload }).user = payload;
   } catch {
     return reply.status(401).send({ error: 'Invalid or expired token' });
+  }
+
+  // Reject tokens invalidated by a logout (session epoch advanced past the token's stamp).
+  if (!(await sessionEpochOk(request, payload))) {
+    return reply.status(401).send({ error: 'Session ended. Please sign in again.' });
   }
 
   // Customers are blocked from investigation, customer-search, and audit endpoints (but may

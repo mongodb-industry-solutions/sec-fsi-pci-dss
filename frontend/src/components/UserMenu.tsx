@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { Bug, ChevronDown, HelpCircle, Layers, LogOut, UserCircle2 } from 'lucide-react';
 import { ROLE_LABELS } from '../lib/constants';
 import { useDebugMode } from '../lib/debugMode';
-import { clearToken, decodeToken } from '../lib/auth';
+import { decodeToken } from '../lib/auth';
+import { logoutSession } from '../lib/logout';
 
 export type DecodedUser = NonNullable<ReturnType<typeof decodeToken>>;
 
@@ -65,9 +66,10 @@ export function UserMenu({ user, onSignOut }: UserMenuProps) {
     };
   }, []);
 
-  function handleSignOut() {
+  async function handleSignOut() {
     setOpen(false);
-    clearToken();
+    // Invalidate server-side (epoch bump) then clear the cookie before navigating away.
+    await logoutSession();
     if (onSignOut) {
       onSignOut();
     } else {
