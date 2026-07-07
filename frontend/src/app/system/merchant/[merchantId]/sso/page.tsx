@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { SectionHeader } from '../../../../../components/SectionHeader';
+import { Tooltip } from '../../../../../components/Tooltip';
 import { useRequireActiveMerchant } from '../../../../../lib/merchantContext';
 import { useDebugMode } from '../../../../../lib/debugMode';
 import { api, type MerchantOAuthClient, type TypedWebhookConfig } from '../../../../../lib/api';
@@ -501,18 +502,25 @@ export default function MerchantSSOPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
           <div>
-            <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Client ID</p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1 flex items-center">
+              Client ID
+              <Tooltip text="The public OAuth 2.0 client identifier (client_id). Not a secret — the merchant app sends it on every authorize and token request. Safe to share." />
+            </p>
             <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
               <code className="text-xs text-gray-700 flex-1 break-all">{client.oauthClientId}</code>
               <CopyButton value={client.oauthClientId} small />
             </div>
           </div>
           <div>
-            <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Client Secret</p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1 flex items-center">
+              Secret Prefix
+              <Tooltip text="The first 8 characters of the client secret, kept for identification only (like the visible prefix of a GitHub/Stripe key). It is NOT the secret and cannot authenticate. The full secret is shown only once, at issuance or rotation." />
+            </p>
             <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
-              <code className="text-xs text-gray-500 flex-1">{client.oauthClientSecretPrefix}••••••••••••••••••••••••</code>
-              <span className="text-[10px] text-gray-400 bg-gray-200 px-1.5 py-0.5 rounded">prefix only</span>
+              <code className="text-xs text-gray-700 flex-1 break-all">{client.oauthClientSecretPrefix || '—'}</code>
+              {client.oauthClientSecretPrefix && <CopyButton value={client.oauthClientSecretPrefix} small />}
             </div>
+            <p className="text-[11px] text-gray-400 mt-1">The full secret is shown once, on issuance or rotation.</p>
           </div>
         </div>
 
@@ -538,6 +546,7 @@ export default function MerchantSSOPage() {
           <label className="block text-xs font-medium text-gray-700 mb-1.5">
             Redirect URIs
             <span className="text-gray-400 font-normal ml-1">(authorization_code callbacks)</span>
+            <Tooltip text="Exact URLs the PSP is allowed to redirect the browser back to after login, carrying the authorization code. A token request whose redirect_uri is not on this list is rejected (OAuth 2.0 open-redirect protection). Register one per environment." />
           </label>
           <UriListEditor uris={redirectUris} onChange={setRedirectUris} placeholder="https://your-app.com/auth/callback" />
         </div>
@@ -547,6 +556,7 @@ export default function MerchantSSOPage() {
           <label className="block text-xs font-medium text-gray-700 mb-1.5">
             Post-logout redirect URIs
             <span className="text-gray-400 font-normal ml-1">(optional)</span>
+            <Tooltip text="Allowed targets for RP-initiated (single) logout: after the PSP terminates the session it may redirect the browser back only to a URL on this list. Prevents the logout redirect from being abused as an open redirect. Usually your app's home or signed-out page, one per environment." />
           </label>
           <UriListEditor uris={postLogoutUris} onChange={setPostLogoutUris} placeholder="https://your-app.com/signed-out" />
         </div>
@@ -555,7 +565,8 @@ export default function MerchantSSOPage() {
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1.5">
             Logo URL
-            <span className="text-gray-400 font-normal ml-1">(OIDC logo_uri — shown on the consent page & app listings)</span>
+            <span className="text-gray-400 font-normal ml-1">(OIDC logo_uri)</span>
+            <Tooltip text="OIDC logo_uri (RFC 7591): the merchant logo shown on the PSP consent screen and in the user's authorized-apps list. Must be https (http allowed only for localhost) to avoid mixed-content on the https consent page. Leave empty to fall back to a generic avatar." />
           </label>
           <input
             type="url"
@@ -570,6 +581,7 @@ export default function MerchantSSOPage() {
           <label className="block text-xs font-medium text-gray-700 mb-1.5">
             Home page URL
             <span className="text-gray-400 font-normal ml-1">(OIDC client_uri)</span>
+            <Tooltip text="OIDC client_uri (RFC 7591): the merchant's home page, linked from the consent screen and app listings so users can identify the app. Must be https (http allowed only for localhost). Leave empty to omit the link." />
           </label>
           <input
             type="url"
@@ -583,7 +595,10 @@ export default function MerchantSSOPage() {
 
         {/* Grant types */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-2">Grant types</label>
+          <label className="block text-xs font-medium text-gray-700 mb-2">
+            Grant types
+            <Tooltip text="OAuth 2.0 flows this client may use. authorization_code (+ PKCE) for user SSO, refresh_token to rotate access tokens, client_credentials for server-to-server calls (the merchant's own machine identity). Grant only what the app needs (least privilege)." />
+          </label>
           <div className="space-y-2">
             {ALL_GRANT_TYPES.map((g) => (
               <label key={g} className="flex items-center gap-2 text-sm cursor-pointer">
@@ -601,7 +616,10 @@ export default function MerchantSSOPage() {
 
         {/* Scopes */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-2">Allowed scopes</label>
+          <label className="block text-xs font-medium text-gray-700 mb-2">
+            Allowed scopes
+            <Tooltip text="The maximum set of permissions this client can request. At consent time the user may grant a subset, but never more than what is enabled here. Keep to the minimum the integration requires (least privilege / data minimization)." />
+          </label>
           <div className="grid grid-cols-2 gap-1.5">
             {ALL_SCOPES.map((s) => (
               <label key={s} className="flex items-start gap-2 text-sm cursor-pointer">
@@ -626,10 +644,14 @@ export default function MerchantSSOPage() {
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input type="checkbox" checked={requirePkce} onChange={(e) => setRequirePkce(e.target.checked)} className="accent-[#001E2B]" />
               Require PKCE (S256), recommended for public clients
+              <Tooltip text="Proof Key for Code Exchange (RFC 7636): the client must send a code_challenge on /authorize and the matching code_verifier on /token. Defeats authorization-code interception. Mandatory for public clients; recommended even for confidential ones." />
             </label>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Access token lifetime (seconds)</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Access token lifetime (seconds)
+              <Tooltip text="How long an issued access token stays valid before it must be refreshed. Shorter = smaller window if a token leaks, but more refreshes. Range 300s–86400s (5 min–24 h)." />
+            </label>
             <input
               type="number" min={300} max={86400} value={tokenLifetime}
               onChange={(e) => setTokenLifetime(Number(e.target.value))}
@@ -638,7 +660,10 @@ export default function MerchantSSOPage() {
             <p className="text-[11px] text-gray-400 mt-0.5">{Math.round(tokenLifetime / 60)} min</p>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Refresh token lifetime (days)</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Refresh token lifetime (days)
+              <Tooltip text="How long a refresh token can be used to obtain new access tokens before the user must sign in again. Longer = fewer logins but a longer-lived credential to protect. Range 1–365 days." />
+            </label>
             <input
               type="number" min={1} max={365} value={refreshLifetime}
               onChange={(e) => setRefreshLifetime(Number(e.target.value))}
