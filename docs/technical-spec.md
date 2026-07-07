@@ -1069,6 +1069,11 @@ export interface PaymentExecutionProcedure {
   beneficiaryPartyReference?:    string;            // FK → party (SD-13) for user payouts
   beneficiaryArrangementReference?: string;         // FK → counterpartyArrangement (SD-54) — links the detail page to the saved beneficiary
   resolvedPayoutAccountReference?: string;          // FK → payoutAccountArrangement (SD-66)
+  // v18 (SD-89): the merchant that INITIATED this execution via the merchant portal (OAuth on-behalf-of).
+  // Set only for merchant-originated transfers; PSP-direct customer transfers leave it unset. Enables
+  // merchant data isolation on GET /merchant/transactions/:partyRef (a merchant sees only its own activity
+  // for the user, never other merchants' or direct-PSP activity). NOT CHD → NOT QE-encrypted.
+  merchantAgreementReference?: string;              // FK → merchantAgreementInstanceReference (SD-89)
 
   // Recipient identity for a bank transfer to an UNREGISTERED external account (SEPA/ACH/SWIFT).
   // Bank data under GDPR Art. 32 / PSD2 (NOT PCI DSS — that governs card data). destinationIban is
@@ -1646,6 +1651,8 @@ await ensureIndexes(db, 'paymentExecutionProcedure', [
   { key: { paymentExecutionStatus: 1, recordCreatedDateTime: -1 } },
   // v18: commission revenue aggregation (SD-89 dashboard). Sparse — only fee-bearing executions.
   { key: { 'fee.feeMerchantReference': 1, 'fee.feeCollectedDateTime': -1 }, sparse: true },
+  // v18: merchant-scoped transaction history (SD-89 data isolation). Sparse — only merchant-initiated execs.
+  { key: { merchantAgreementReference: 1, initiatorPartyReference: 1 }, sparse: true },
 ]);
 
 // ── counterpartyArrangement (SD-54) ─────────────────────────────────────────

@@ -243,6 +243,8 @@ export async function merchantBeneficiaryController(fastify: FastifyInstance) {
       fromAccountRef,
       amount: body.amount,
       note: body.note,
+      // SD-89: stamp the initiating merchant so this execution is visible ONLY in this merchant's history.
+      merchantAgreementReference: req.merchantContext?.merchantId,
     });
 
     // Attribute the merchant-originated action (SD-16 audit, PCI DSS Req 10).

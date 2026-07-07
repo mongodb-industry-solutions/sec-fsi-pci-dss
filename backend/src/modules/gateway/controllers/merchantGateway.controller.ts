@@ -155,9 +155,15 @@ export async function merchantGatewayController(fastify: FastifyInstance) {
     const partyInstanceReference = await resolvePartyInstanceReference(fastify.db, partyRef);
     if (!partyInstanceReference) return reply.send({ results: [], total: 0, page, limit });
 
-    // Source 1 — bank-transfer executions (SD-65) the party initiated or received.
+    // SD-89 data isolation: a merchant only ever sees the activity it originated for this user, never
+    // the user's transfers in other merchants or made directly in the PSP. merchantId is the SD-89
+    // merchantAgreementInstanceReference bound to the OAuth client on the token.
+    const merchantId = req.merchantContext!.merchantId;
+
+    // Source 1 — bank-transfer executions (SD-65) the party initiated THROUGH THIS merchant.
     const filter = {
       beneficiaryType: 'user' as const,
+      merchantAgreementReference: merchantId,
       $or: [{ initiatorPartyReference: partyInstanceReference }, { beneficiaryPartyReference: partyInstanceReference }],
     };
     const col = fastify.db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION);
@@ -184,7 +190,7 @@ export async function merchantGatewayController(fastify: FastifyInstance) {
     // Source 2 — the party's OWN card transactions (SD-254): purchases via redirect checkout, payment
     // link and API payment. Display-safe (masked PAN, no CVV/PAN, no raw payload).
     const accountReference = await resolveAccountReferenceForParty(fastify.db, partyInstanceReference);
-    const cardTxns = accountReference ? await getPartyCardTransactions(fastify.db, accountReference) : [];
+    const cardTxns = accountReference ? await getPartyCardTransactions(fastify.db, accountReference, 200, merchantId) : [];
     const cardRows = cardTxns.map((t) => ({
       kind: 'card' as const,
       paymentExecutionInstanceReference: t.cardTransactionInstanceReference,
@@ -282,6 +288,8 @@ export async function merchantGatewayController(fastify: FastifyInstance) {
       reference: body.reference,
       fromAccountRef: body.fromAccountRef,
       settlementSchedule: body.settlementSchedule,
+      // SD-89: stamp the initiating merchant so this execution is visible ONLY in this merchant's history.
+      merchantAgreementReference: req.merchantContext?.merchantId,
     });
 
     // Attribute the merchant-originated action (SD-16 audit, PCI DSS Req 10).

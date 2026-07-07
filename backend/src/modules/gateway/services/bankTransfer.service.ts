@@ -87,6 +87,7 @@ export interface ExecuteBankTransferInput {
   fromAccountRef?: string;         // optional chosen source payout account (SD-66); validated for ownership
   recurring?: RecurringMandate;
   settlementSchedule?: 'T+0' | 'T+1' | 'T+2' | 'T+3';
+  merchantAgreementReference?: string; // SD-89: set when initiated via a merchant portal (OAuth on-behalf-of)
 }
 
 export interface ExecuteBankTransferResult {
@@ -159,6 +160,7 @@ export async function executeBankTransfer(
     paymentOrderInstanceReference: executionRef,
     beneficiaryType: 'user',
     initiatorPartyReference: input.initiatorPartyRef,
+    ...(input.merchantAgreementReference ? { merchantAgreementReference: input.merchantAgreementReference } : {}),
     ...(input.fromAccountRef ? { sourcePayoutAccountReference: input.fromAccountRef } : {}),
     ...buildRecipientSnapshot(input.destination),
     grossAmount: input.amount,
@@ -243,6 +245,7 @@ async function recordException(
     paymentOrderInstanceReference: executionRef,
     beneficiaryType: 'user',
     initiatorPartyReference: input.initiatorPartyRef,
+    ...(input.merchantAgreementReference ? { merchantAgreementReference: input.merchantAgreementReference } : {}),
     ...buildRecipientSnapshot(input.destination),
     grossAmount: input.amount, netAmount: input.amount, feeAmount: 0, currency: input.currency,
     routingNote: 'Bank transfer blocked at rail validation',

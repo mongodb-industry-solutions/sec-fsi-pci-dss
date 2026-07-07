@@ -396,6 +396,8 @@ export async function createIndexes(client: MongoClient) {
     { key: { paymentExecutionStatus: 1, recordCreatedDateTime: -1 } },
     // v18: merchant commission revenue aggregation (SD-89 dashboard). Sparse — only fee-bearing execs.
     { key: { 'fee.feeMerchantReference': 1, 'fee.feeCollectedDateTime': -1 }, sparse: true },
+    // v18: merchant-scoped transaction history (SD-89 data isolation). Sparse — only merchant-initiated execs.
+    { key: { merchantAgreementReference: 1, initiatorPartyReference: 1 }, sparse: true },
   ]);
 
   // SD-54: Counterparty Arrangement / Beneficiary Registry (v17)

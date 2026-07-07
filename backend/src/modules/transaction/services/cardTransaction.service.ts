@@ -164,12 +164,19 @@ export async function getPartyCardTransactions(
   db: Db,
   accountReference: string,
   cap = 200,
+  merchantAgreementInstanceReference?: string,
 ): Promise<PartyCardTransactionRow[]> {
   if (!accountReference) return [];
   const qeDb = await getDbForRole('level1_analyst', false);
+  // When a merchant is supplied (merchant portal), scope to that merchant's own purchases only (SD-89
+  // data isolation): a merchant never sees the user's card purchases made in other merchants or the PSP.
+  const query = {
+    cardTransactionAccountReference: accountReference,
+    ...(merchantAgreementInstanceReference ? { merchantAgreementInstanceReference } : {}),
+  } as Partial<CardTransactionLogControlRecord>;
   const docs = await qeDb
     .collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION)
-    .find({ cardTransactionAccountReference: accountReference } as Partial<CardTransactionLogControlRecord>)
+    .find(query)
     .sort({ cardTransactionDateTime: -1 })
     .limit(cap)
     .toArray();
