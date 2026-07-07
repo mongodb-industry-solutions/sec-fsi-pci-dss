@@ -16,7 +16,9 @@ export interface ActionResult {
 }
 
 async function client(): Promise<PspClient> {
-  const c = await PspClient.fromSession();
+  // Server-action context: cookie writes are legal here, so use the mutating client
+  // which may persist a rotated refresh token.
+  const c = await PspClient.fromSessionForMutation();
   if (!c) throw new PspError(401, null, 'not authenticated');
   return c;
 }

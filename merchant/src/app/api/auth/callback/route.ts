@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exchangeCode, verifyIdToken, fetchUserinfo } from '@/lib/oauth';
 import { attachSession, clearLoginStateOn, readLoginState } from '@/lib/session';
+import { expiresAtFrom } from '@/lib/PspClient';
 import { ENV } from '@/lib/env';
 
 export async function GET(req: NextRequest) {
@@ -74,7 +75,7 @@ export async function GET(req: NextRequest) {
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
       idToken: tokens.id_token,
-      expiresAt: Date.now() + tokens.expires_in * 1000,
+      expiresAt: expiresAtFrom(tokens.expires_in),
       grantedScopes,
       sub,
       name,

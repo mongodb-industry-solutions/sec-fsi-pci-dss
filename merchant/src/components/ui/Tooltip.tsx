@@ -2,10 +2,10 @@
 // Accessible tooltip primitive (Radix). Wrap the app once in <TooltipProvider>,
 // then use <Tip label="…"> around any trigger. Keyboard + screen-reader friendly.
 import * as RT from '@radix-ui/react-tooltip';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 export function TooltipProvider({ children }: { children: ReactNode }) {
-  return <RT.Provider delayDuration={200} skipDelayDuration={300}>{children}</RT.Provider>;
+  return <RT.Provider delayDuration={150} skipDelayDuration={300}>{children}</RT.Provider>;
 }
 
 export function Tip({
@@ -19,9 +19,12 @@ export function Tip({
   side?: 'top' | 'bottom' | 'left' | 'right';
   asChild?: boolean;
 }) {
+  // Controlled so hover/focus AND click/tap all reveal the tooltip (better usability + touch).
+  // Radix closes on pointer-down by default, so we re-open on click right after that fires.
+  const [open, setOpen] = useState(false);
   return (
-    <RT.Root>
-      <RT.Trigger asChild={asChild}>{children}</RT.Trigger>
+    <RT.Root open={open} onOpenChange={setOpen}>
+      <RT.Trigger asChild={asChild} onClick={() => setOpen(true)}>{children}</RT.Trigger>
       <RT.Portal>
         <RT.Content
           side={side}

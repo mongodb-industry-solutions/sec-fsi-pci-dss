@@ -63,9 +63,9 @@ export default function TransferForm() {
   );
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="space-y-6">
       <div className="glass space-y-3 rounded-2xl p-5">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {field('Amount', 'amount', 'number')}
           {field('Currency', 'currency')}
           {field('Beneficiary name', 'beneficiaryName')}

@@ -25,13 +25,42 @@ interface RequestOpts {
   query?: Record<string, string | number | undefined>;
 }
 
-export class PspClient {
-  private constructor(private session: Session) {}
+// Default access-token lifetime (seconds) when the PSP omits/zeros `expires_in`.
+// Without this guard `expiresAt` becomes NaN/past, so the token reads as
+// perpetually "near expiry" and every render triggers a refresh (churn).
+const DEFAULT_TOKEN_TTL_SECONDS = 300;
 
-  /** Build a client from the current request's session, or null if not logged in. */
+/** Compute a sane epoch-ms expiry from an OAuth `expires_in` (seconds). */
+export function expiresAtFrom(expiresIn: unknown): number {
+  const s = Number(expiresIn);
+  const ttl = Number.isFinite(s) && s > 0 ? s : DEFAULT_TOKEN_TTL_SECONDS;
+  return Date.now() + ttl * 1000;
+}
+
+export class PspClient {
+  // `canPersist` gates writing the session cookie. It is FALSE on the render/read
+  // path (Server Components), where cookie writes are illegal. If a write ever
+  // leaked a Set-Cookie onto a document/RSC response, it would invalidate the Next.js
+  // client router cache and drive an infinite /history refetch loop. Only mutating
+  // contexts (server actions / route handlers) may persist a rotated token.
+  private constructor(private session: Session, private canPersist = false) {}
+
+  /**
+   * Build a client for the render/read path (Server Components). NEVER persists the
+   * session cookie. The current access token is used as-is (refreshed in memory only).
+   */
   static async fromSession(): Promise<PspClient | null> {
     const session = await getSession();
-    return session ? new PspClient(session) : null;
+    return session ? new PspClient(session, false) : null;
+  }
+
+  /**
+   * Build a client for a mutating context (server action / route handler) where
+   * writing the session cookie is legal, so a rotated refresh token can be persisted.
+   */
+  static async fromSessionForMutation(): Promise<PspClient | null> {
+    const session = await getSession();
+    return session ? new PspClient(session, true) : null;
   }
 
   get sub() {
@@ -59,14 +88,19 @@ export class PspClient {
         accessToken: t.access_token,
         refreshToken: t.refresh_token ?? this.session.refreshToken,
         grantedScopes: t.scope ? t.scope.split(' ').filter(Boolean) : this.session.grantedScopes,
-        expiresAt: Date.now() + t.expires_in * 1000,
+        expiresAt: expiresAtFrom(t.expires_in),
       };
-      // Persist rotated tokens. Only possible in a route handler / server action;
-      // in an RSC render this throws and is safely ignored (token still used for this request).
-      try {
-        await setSession(this.session);
-      } catch {
-        /* RSC render cannot mutate cookies — non-fatal */
+      // Persist rotated tokens ONLY in a mutating context (server action / route
+      // handler). On the render/read path we never write the cookie: a Set-Cookie
+      // on a GET document/RSC response invalidates the Next.js router cache and can
+      // trigger an infinite refetch loop. The refreshed token is still used in memory
+      // for this request either way.
+      if (this.canPersist) {
+        try {
+          await setSession(this.session);
+        } catch {
+          /* cookie mutation not available in this context (non-fatal) */
+        }
       }
     } catch {
       /* refresh failed → next request will surface 401 and the user re-logs in */
