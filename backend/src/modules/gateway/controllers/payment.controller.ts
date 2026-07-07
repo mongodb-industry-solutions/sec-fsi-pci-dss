@@ -85,6 +85,7 @@ initiated → confirmed → authorized → captured → settled
             paymentOrderReference: { type: 'string', description: 'Human-readable reference (PO-YYYY-NNNNNN).' },
             paymentOrderStatus: { type: 'string', enum: PAYMENT_STATUS_ENUM },
             paymentOrderExpiresAt: { type: 'string', format: 'date-time', description: 'Order auto-expires if not confirmed by this time.' },
+            cardTransactionInstanceReference: { type: 'string', description: 'SD-254 card transaction id created for this API payment (for tracking).' },
           },
         },
         400: { $ref: 'Error#' },
