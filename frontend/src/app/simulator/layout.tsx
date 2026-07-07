@@ -2,7 +2,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Building2, CreditCard, Search, ArrowLeftRight, Link2, Monitor, ChevronLeft, type LucideIcon } from 'lucide-react';
+import { Building2, CreditCard, Search, ArrowLeftRight, Link2, Monitor, ChevronLeft, Store, type LucideIcon } from 'lucide-react';
+import { MERCHANT_PUBLIC_URL } from '../../lib/constants';
 
 const METHOD_ICONS: Record<string, LucideIcon> = {
   'api-card': CreditCard,
@@ -42,11 +43,11 @@ export default function SimulatorLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen bg-gray-50">
       <header className="bg-[#001E2B] text-white px-3 sm:px-4 py-3 flex items-center justify-between shadow-lg gap-2">
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-          <div className="flex items-center gap-1.5 shrink-0">
+          <Link href="/simulator" className="flex items-center gap-1.5 shrink-0 hover:opacity-80 transition-opacity">
             <Building2 size={18} className="text-[#00ED64]" />
             <span className="font-bold text-[#00ED64] text-sm hidden md:block">PSP Simulator</span>
             <span className="font-bold text-[#00ED64] text-xs md:hidden">PCI DSS</span>
-          </div>
+          </Link>
           <nav className="flex gap-1">
             <Link
               href="/simulator/payment"
@@ -66,6 +67,13 @@ export default function SimulatorLayout({ children }: { children: React.ReactNod
               <Search size={14} />
               <span className="hidden sm:block">Investigation</span>
             </Link>
+            <a
+              href={MERCHANT_PUBLIC_URL}
+              className="px-2 sm:px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-1.5 text-gray-300 hover:bg-white/10"
+            >
+              <Store size={14} />
+              <span className="hidden sm:block">Merchant</span>
+            </a>
           </nav>
         </div>
         <div className="flex items-center gap-2 shrink-0">
