@@ -1304,7 +1304,21 @@ export const api = {
         checkoutSessionExpiresAt: string;
         checkoutSessionReturnUrl: string;
         checkoutSessionCancelUrl: string;
+        hasActingUser?: boolean;
       }>(`/api/v1/checkout/sessions/${sessionId}`),
+    // Saved cards of the logged-in user this session was created for (session-scoped, ownership
+    // enforced server-side). Display-safe: surrogate token + masked PAN only, never the full PAN/CVV.
+    getSavedCards: (sessionId: string) =>
+      apiFetch<{
+        results: Array<{
+          paymentCardInstanceReference: string;
+          cardToken: string;
+          paymentCardMaskedPanDisplay: string;
+          paymentCardNetwork?: string;
+          paymentCardAlias?: string;
+          paymentCardIsPreferred?: boolean;
+        }>;
+      }>(`/api/v1/checkout/sessions/${sessionId}/saved-cards`),
     pay: (sessionId: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth: string; cardExpiryYear: string; cardCvv?: string; cardholderEmail?: string; saveCard?: boolean }) =>
       apiFetch<{ success: boolean; declined?: boolean; cardTransactionInstanceReference?: string | null; responseCode?: string; declineReason?: string; redirectUrl?: string | null }>(
         `/api/v1/checkout/sessions/${sessionId}/pay`, { method: 'POST', body: JSON.stringify(body) }

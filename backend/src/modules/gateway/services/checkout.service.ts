@@ -9,6 +9,7 @@ import {
   CheckoutSessionStatus,
 } from '../models/checkoutSession.model';
 import { createTransaction, CardIssuerDeclinedError, resolveAccountReferenceForParty } from '../../transaction/services/cardTransaction.service';
+import { getOwnAgreementId, getCardsByCustomer } from '../../customer/services/paymentCard.service';
 import { authorizeCard, linkAuthToTransaction } from './cardAuthorization.service';
 import { sendMerchantPaymentCallback, DECLINE_REASONS } from './merchantCallback.service';
 import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
@@ -41,6 +42,23 @@ export interface CheckoutSessionPublic {
   checkoutSessionExpiresAt: string;
   checkoutSessionReturnUrl: string;
   checkoutSessionCancelUrl: string;
+  // v18: display-safe signal that this session was created on behalf of a logged-in user (the merchant
+  // app forwarded the payer's OAuth identity). The hosted page uses it to offer the payer's saved cards.
+  // The acting party reference itself is NOT surfaced here (identity minimization); saved cards are read
+  // via the session-scoped endpoint, which resolves the owner server-side.
+  hasActingUser: boolean;
+}
+
+// Display-safe saved card for the hosted checkout selector. Surrogate token + masked PAN only; never
+// the full PAN, never the CVV/PIN (PCI DSS Req 3.2 / 3.4). The expiry is NOT included: the payer
+// re-enters it (with the CVV) to authorize.
+export interface CheckoutSavedCard {
+  paymentCardInstanceReference: string;
+  cardToken: string;
+  paymentCardMaskedPanDisplay: string;
+  paymentCardNetwork?: string;
+  paymentCardAlias?: string;
+  paymentCardIsPreferred?: boolean;
 }
 
 export type ProcessPaymentResult =
@@ -120,7 +138,42 @@ export async function getCheckoutSession(
     checkoutSessionExpiresAt: session.checkoutSessionExpiresAt.toISOString(),
     checkoutSessionReturnUrl: session.checkoutSessionReturnUrl,
     checkoutSessionCancelUrl: session.checkoutSessionCancelUrl,
+    hasActingUser: !!session.checkoutSessionActingPartyReference,
   };
+}
+
+// v18: the acting user's saved cards for THIS session. Ownership is enforced entirely server-side:
+// we only ever read the cards of the party captured on the session (never a caller-supplied id), so a
+// checkout page can only see the cards of the logged-in user the session was created for. Returns
+// display-safe rows only (surrogate token + masked PAN + network/alias); no full PAN, no CVV, no expiry.
+export async function getCheckoutSavedCards(db: Db, sessionId: string): Promise<CheckoutSavedCard[]> {
+  const session = await db
+    .collection<CheckoutSessionRecord>(CHECKOUT_SESSION_COLLECTION)
+    .findOne(
+      { checkoutSessionInstanceReference: sessionId } as Partial<CheckoutSessionRecord>,
+      { projection: { checkoutSessionActingPartyReference: 1, checkoutSessionStatus: 1 } },
+    );
+
+  if (!session?.checkoutSessionActingPartyReference) return [];
+  // Do not offer saved cards on a closed session.
+  if (session.checkoutSessionStatus !== 'pending') return [];
+
+  const agreementId = await getOwnAgreementId(db, session.checkoutSessionActingPartyReference);
+  if (!agreementId) return [];
+
+  const { results } = await getCardsByCustomer(db, agreementId);
+  return (results as Array<Record<string, unknown>>)
+    // Only cards usable at authorization time: an active card-on-file. Suspended/expired cards would
+    // just decline, so we keep them out of the payer's quick-pick selector.
+    .filter((c) => c.paymentCardStatus === 'active')
+    .map((c) => ({
+      paymentCardInstanceReference: c.paymentCardInstanceReference as string,
+      cardToken: c.paymentCardReference as string,
+      paymentCardMaskedPanDisplay: c.paymentCardMaskedPanDisplay as string,
+      ...(c.paymentCardNetwork ? { paymentCardNetwork: c.paymentCardNetwork as string } : {}),
+      ...(c.paymentCardAlias ? { paymentCardAlias: c.paymentCardAlias as string } : {}),
+      ...(c.paymentCardIsPreferred ? { paymentCardIsPreferred: true } : {}),
+    }));
 }
 
 export interface ProcessCheckoutPaymentInput {
