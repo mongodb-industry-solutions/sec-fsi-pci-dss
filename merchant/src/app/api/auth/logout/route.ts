@@ -10,8 +10,12 @@ import { ENV } from '@/lib/env';
 async function handle() {
   const session = await getSession();
   if (session) {
-    if (session.refreshToken) await revoke(session.refreshToken);
-    await revoke(session.accessToken);
+    // Best-effort revoke: a PSP revoke failure (endpoint unreachable / error) must never block the
+    // local logout. Always fall through to clear the session cookie and redirect to single sign-out.
+    try {
+      if (session.refreshToken) await revoke(session.refreshToken);
+      await revoke(session.accessToken);
+    } catch { /* ignore — proceed to clear local session regardless */ }
   }
   await clearSession();
   // Front-channel: bounce the browser through the PSP logout page (clears demo_token same-origin),
