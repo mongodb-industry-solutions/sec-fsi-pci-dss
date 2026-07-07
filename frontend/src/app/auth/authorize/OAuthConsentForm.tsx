@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { BACKEND_PUBLIC_URL } from '../../../lib/constants';
+import { API_BASE_URL } from '../../../lib/constants';
 import { setToken } from '../../../lib/auth';
 
 interface ScopeDescriptor {
@@ -89,7 +89,7 @@ export default function OAuthConsentForm({
     setLoading(true);
 
     try {
-      const res = await fetch(`${BACKEND_PUBLIC_URL}/api/v1/auth/login`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, domain: 'local' }),
@@ -113,7 +113,7 @@ export default function OAuthConsentForm({
       // Only new/broader (ungranted) scopes require the user to decide, so we show the list only then.
       try {
         const qs = new URLSearchParams({ ...originalSearchParams, _psp_sub: s });
-        const r = await fetch(`${BACKEND_PUBLIC_URL}/api/v1/auth/authorize?${qs.toString()}`, { cache: 'no-store' });
+        const r = await fetch(`${API_BASE_URL}/api/v1/auth/authorize?${qs.toString()}`, { cache: 'no-store' });
         const d = await r.json();
         const prior: string[] = r.ok && Array.isArray(d.previously_granted_scopes) ? d.previously_granted_scopes : [];
         const requested = scopeDetails.map((sc) => sc.scope);
@@ -146,7 +146,7 @@ export default function OAuthConsentForm({
       _psp_sub: sub,
       _psp_scopes: scopes.join(' '), // E-09: send the user's granular selection
     });
-    return `${BACKEND_PUBLIC_URL}/api/v1/auth/authorize?${qs.toString()}`;
+    return `${API_BASE_URL}/api/v1/auth/authorize?${qs.toString()}`;
   }
 
   function buildDenyUrl() {
