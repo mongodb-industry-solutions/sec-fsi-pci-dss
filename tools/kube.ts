@@ -469,23 +469,25 @@ async function getAll() {
 }
 
 async function podLogs() {
-  console.log("\n  1. backend\n  2. frontend\n  3. merchant\n  4. custom (enter a pod name)");
+  // Custom covers anything not fixed here (e.g. the merchant, which isn't always deployed, or any
+  // pod visible under option 14) — enter its exact pod name.
+  console.log("\n  1. backend\n  2. frontend\n  3. custom (enter a pod name)");
   const input = await ask("Which service? ");
   const tail = (await ask("Lines to show (default: 50): ")) || "50";
   const env = kubeEnv();
 
-  if (input === "4") {
-    // Custom pod name — useful for CrashLoopBackOff (add --previous to see the last crash).
+  if (input === "3") {
     const pod = (await ask("Pod name: ")).trim();
     if (!pod) { warn("No pod name given."); return; }
+    // --previous shows the last crashed instance (useful for CrashLoopBackOff).
     const prev = (await ask("Previous (crashed) instance? [y/N]: ")).trim().toLowerCase() === "y";
-    const args = ["logs", pod, "-n", IST_NAMESPACE, `--tail=${tail}`];
+    const args = ["logs", pod, "-n", IST_NAMESPACE, `--tail=${tail}`, "--all-containers"];
     if (prev) args.push("--previous");
     spawnSync("kubectl", args, { shell: IS_WIN, stdio: "inherit", env });
     return;
   }
 
-  const release = input === "2" ? RELEASE_FRONTEND : input === "3" ? RELEASE_MERCHANT : RELEASE_BACKEND;
+  const release = input === "2" ? RELEASE_FRONTEND : RELEASE_BACKEND;
   spawnSync("kubectl", ["logs", "-l", `app.kubernetes.io/instance=${release}`, "-n", IST_NAMESPACE, `--tail=${tail}`, "--all-containers"], { shell: IS_WIN, stdio: "inherit", env });
 }
 
