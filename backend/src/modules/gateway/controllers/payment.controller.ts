@@ -12,8 +12,9 @@ import {
   getPaymentOrder,
 } from '../services/paymentOrder.service';
 import { validateMerchantToken } from '../../../vendors/middleware/validateMerchantToken';
-import { createTransaction, CardIssuerDeclinedError } from '../../transaction/services/cardTransaction.service';
+import { createTransaction, CardIssuerDeclinedError, resolveAccountReferenceForParty } from '../../transaction/services/cardTransaction.service';
 import { attributionFromMerchantContext, emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
+import { resolvePartyInstanceReference } from '../../identity/services/oauth.service';
 
 const PAYMENT_STATUS_ENUM = [
   'initiated', 'confirmed', 'authorized', 'captured',
@@ -70,6 +71,7 @@ initiated → confirmed → authorized → captured → settled
           amount: { type: 'number', description: 'Payment amount in the specified currency.' },
           currency: { type: 'string', description: 'ISO 4217 three-letter currency code.' },
           paymentOrderDescription: { type: 'string', description: 'Optional human-readable description.' },
+          actingSubjectReference: { type: 'string', description: 'v18: OAuth subject (SD-91 login id) of the user the merchant app is acting for. Attribution only — the charge stays merchant-authenticated. Enables buyer-side traceability (payment history + operations view).' },
         },
       },
       response: {
@@ -105,6 +107,7 @@ initiated → confirmed → authorized → captured → settled
       amount: number;
       currency: string;
       paymentOrderDescription?: string;
+      actingSubjectReference?: string;
     };
 
     if (body.amount == null || !body.currency || !body.paymentOrderMerchantReference) {
@@ -130,10 +133,19 @@ initiated → confirmed → authorized → captured → settled
     // token). The card transaction (SD-254) carries the acquiring merchant reference, so completeAuthorized
     // applies the commission fee (Item 1) and the merchant dashboard revenue reflects this API payment.
     const apiChargeToken = process.env.PSP_API_PAYMENT_TEST_TOKEN ?? 'pm_test_espresso_api';
+    // v18 attribution: if the merchant forwarded the acting user's subject, resolve it to the payer's
+    // party + canonical account so the charge lands in THEIR payment history. Falls back to the merchant
+    // account key when no acting user is supplied (pure machine charge).
+    const actingPartyReference = body.actingSubjectReference
+      ? await resolvePartyInstanceReference(fastify.db, body.actingSubjectReference) ?? undefined
+      : undefined;
+    const actingAccountReference = actingPartyReference
+      ? await resolveAccountReferenceForParty(fastify.db, actingPartyReference)
+      : undefined;
     try {
       const tx = await createTransaction(fastify.db, {
         cardToken: apiChargeToken,
-        accountReference: `${merchantId}:api`,
+        accountReference: actingAccountReference ?? `${merchantId}:api`,
         amount: body.amount,
         currency: body.currency,
         cardTransactionMerchantName: merchantName,
@@ -147,13 +159,19 @@ initiated → confirmed → authorized → captured → settled
         gatewayPayload: { source: 'api_payment', merchantReference: body.paymentOrderMerchantReference, paymentOrderInstanceReference: order.paymentOrderInstanceReference },
       });
       // Attribute the merchant-originated charge (SD-16 audit, PCI DSS Req 10).
+      // Base attribution from the machine token (clientId + merchant). When the merchant forwarded an
+      // acting user, override actingPartyReference with the user's OAuth subject so the charge lines up
+      // with the self-scoped operations view (which matches on the subject).
+      const baseAttribution = attributionFromMerchantContext(request.merchantContext);
       emitProcessEvent(fastify.db, {
         entityType: 'transaction', entityId: tx.cardTransactionInstanceReference,
         processType: 'payment_processing', processAction: 'merchant.payment.api', processOutcome: 'approved',
-        performedByPartyReference: null, performedByRole: null,
+        performedByPartyReference: actingPartyReference ?? null, performedByRole: actingPartyReference ? 'customer' : null,
         eventSummary: { amount: body.amount, currency: body.currency, paymentOrderInstanceReference: order.paymentOrderInstanceReference, merchantReference: body.paymentOrderMerchantReference },
         bianServiceDomain: 'Payment Order', bianControlRecordType: 'PaymentOrderProcedure',
-        attribution: attributionFromMerchantContext(request.merchantContext),
+        attribution: baseAttribution
+          ? { ...baseAttribution, ...(body.actingSubjectReference && { actingPartyReference: body.actingSubjectReference }) }
+          : undefined,
       });
       return reply.status(201).send({ ...order, paymentOrderStatus: 'authorized', cardTransactionInstanceReference: tx.cardTransactionInstanceReference });
     } catch (err) {

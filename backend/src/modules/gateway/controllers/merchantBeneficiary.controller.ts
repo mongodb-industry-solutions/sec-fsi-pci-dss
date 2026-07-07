@@ -12,6 +12,7 @@ import {
   listBeneficiaries,
   removeBeneficiary,
 } from '../../identity/services/counterpartyArrangement.service';
+import { resolvePartyInstanceReference } from '../../identity/services/oauth.service';
 
 // Scopes required for beneficiary operations (ADR-037 extension)
 export const MERCHANT_BENEFICIARY_SCOPES = {
@@ -73,11 +74,15 @@ export async function merchantBeneficiaryController(fastify: FastifyInstance) {
     const authorized = await requireMerchantOnBehalfOf(req, reply, MERCHANT_BENEFICIARY_SCOPES.lookup, partyRef);
     if (!authorized) return;
 
+    // Counterparties (SD-54) are keyed by the SD-13 party, not the OAuth subject — translate first.
+    const ownerParty = await resolvePartyInstanceReference(fastify.db, partyRef);
+    if (!ownerParty) return reply.status(404).send({ error: 'party_not_found' });
+
     const body = req.body as { lookupType: 'phone' | 'email'; lookupValue: string; label?: string };
 
     try {
       const result = await registerBeneficiary(fastify.db, {
-        ownerPartyReference: partyRef,
+        ownerPartyReference: ownerParty,
         lookupType: body.lookupType,
         lookupValue: body.lookupValue,
         label: body.label,
@@ -115,7 +120,9 @@ export async function merchantBeneficiaryController(fastify: FastifyInstance) {
     if (!authorized) return;
 
     const q = req.query as { page?: number; limit?: number };
-    const { results, total } = await listBeneficiaries(fastify.db, partyRef, q);
+    const ownerParty = await resolvePartyInstanceReference(fastify.db, partyRef);
+    if (!ownerParty) return reply.send({ results: [], total: 0, page: q.page ?? 1, limit: q.limit ?? 20 });
+    const { results, total } = await listBeneficiaries(fastify.db, ownerParty, q);
     return reply.send({ results, total, page: q.page ?? 1, limit: q.limit ?? 20 });
   });
 
@@ -138,7 +145,9 @@ export async function merchantBeneficiaryController(fastify: FastifyInstance) {
     const authorized = await requireMerchantOnBehalfOf(req, reply, MERCHANT_BENEFICIARY_SCOPES.remove, partyRef);
     if (!authorized) return;
 
-    const ok = await removeBeneficiary(fastify.db, partyRef, beneficiaryToken);
+    const ownerParty = await resolvePartyInstanceReference(fastify.db, partyRef);
+    if (!ownerParty) return reply.status(404).send({ error: 'Beneficiary not found' });
+    const ok = await removeBeneficiary(fastify.db, ownerParty, beneficiaryToken);
     if (!ok) return reply.status(404).send({ error: 'Beneficiary not found' });
     return reply.send({ counterpartyArrangementReference: beneficiaryToken, counterpartyArrangementStatus: 'removed' });
   });

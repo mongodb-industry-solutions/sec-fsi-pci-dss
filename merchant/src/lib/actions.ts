@@ -64,15 +64,16 @@ export async function payForProduct(productId: string): Promise<ActionResult> {
       }
       case 'api_payment': {
         // Server-to-server charge: the merchant's OWN client_credentials token (write:payments), NOT the
-        // user session token. No CHD in the merchant; the PSP charges a tokenised card. `c` (user session)
-        // is intentionally unused here — this is a machine action attributed to the merchant.
-        void c;
+        // user session token. No CHD in the merchant; the PSP charges a tokenised card. We forward the
+        // acting user's OAuth subject (from the session) purely for ATTRIBUTION so the charge is traceable
+        // to the buyer (payment history + operations view) — the charge itself stays merchant-authenticated.
         const order = await PspClient.apiPaymentServerToServer(
           {
             paymentOrderMerchantReference: `${product.id}-${Date.now()}`,
             amount: product.price,
             currency: product.currency,
             paymentOrderDescription: product.name,
+            actingSubjectReference: c.sub,
           },
           randomUUID(),
         );

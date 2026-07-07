@@ -33,6 +33,13 @@ export interface CheckoutSessionRecord {
   // Idempotency
   checkoutSessionMerchantReference: string;      // Merchant's own order/cart ID
 
+  // v18 attribution (on-behalf-of): when the merchant app created this session while acting for a
+  // logged-in user, we capture WHO so the resulting card transaction lands under the payer and the
+  // purchase is auditable. These are identity references only — never CHD/PAN, never PII beyond the id.
+  checkoutSessionActingSubjectReference?: string; // SD-91 OAuth subject (customerAuthenticationInstanceReference)
+  checkoutSessionActingPartyReference?: string;   // SD-13 partyInstanceReference (resolved from the subject)
+  checkoutSessionActingClientId?: string;         // OAuth client_id of the acting merchant app
+
   // Timing
   checkoutSessionCreatedDateTime: Date;
   checkoutSessionExpiresAt: Date;                // TTL index target (default: +30 min)

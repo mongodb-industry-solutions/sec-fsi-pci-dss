@@ -124,6 +124,67 @@ export async function resolveCustomerAgreement(db: Db, accountReference: string)
   }
 }
 
+/**
+ * Resolve a party's canonical account reference (customerAgreementReference, e.g. ACC-xxx) from its
+ * SD-13 partyInstanceReference. Used to (a) stamp a checkout/API payment with the payer's account so it
+ * lands under them in payment history, and (b) list a party's card transactions for the merchant history
+ * union. The reference is a plaintext business key (not CHD) — no QE decrypt needed for the read.
+ */
+export async function resolveAccountReferenceForParty(db: Db, partyInstanceReference: string): Promise<string | undefined> {
+  if (!partyInstanceReference) return undefined;
+  try {
+    const l1Db = await getDbForRole('level1_analyst', false);
+    const agreement = await l1Db
+      .collection<{ customerAgreementReference?: string }>(CUSTOMER_AGREEMENT_COLLECTION)
+      .findOne({ partyInstanceReference } as Record<string, unknown>);
+    return agreement?.customerAgreementReference;
+  } catch {
+    return undefined;
+  }
+}
+
+// Display-safe card transaction row for the merchant on-behalf-of history union (no CHD, no PAN/CVV).
+export interface PartyCardTransactionRow {
+  cardTransactionInstanceReference: string;
+  grossAmount: number;
+  currency: string;
+  status: string;
+  merchantName: string;
+  maskedPan: string;
+  channel: string;
+  initiatedAt: string | null;
+}
+
+/**
+ * List a party's OWN card transactions (SD-254) by canonical account reference (QE:equality), projected
+ * display-safe for the merchant portal history. PCI DSS: exposes only amount, currency, status, merchant
+ * name, the already-masked PAN, channel and date — never a full PAN/CVV or the raw gateway payload.
+ */
+export async function getPartyCardTransactions(
+  db: Db,
+  accountReference: string,
+  cap = 200,
+): Promise<PartyCardTransactionRow[]> {
+  if (!accountReference) return [];
+  const qeDb = await getDbForRole('level1_analyst', false);
+  const docs = await qeDb
+    .collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION)
+    .find({ cardTransactionAccountReference: accountReference } as Partial<CardTransactionLogControlRecord>)
+    .sort({ cardTransactionDateTime: -1 })
+    .limit(cap)
+    .toArray();
+  return docs.map((d) => ({
+    cardTransactionInstanceReference: d.cardTransactionInstanceReference,
+    grossAmount: d.cardTransactionAmount?.amount ?? 0,
+    currency: d.cardTransactionAmount?.currency ?? '',
+    status: d.cardTransactionStatus,
+    merchantName: d.cardTransactionMerchantName,
+    maskedPan: d.cardTransactionMaskedPanDisplay,
+    channel: d.cardTransactionChannel,
+    initiatedAt: d.cardTransactionDateTime ? new Date(d.cardTransactionDateTime).toISOString() : null,
+  }));
+}
+
 // Outcome of an authorization journey (resolved when the saga reaches a terminal payment event).
 export interface AuthorizationOutcome {
   cardTransactionInstanceReference: string;

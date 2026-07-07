@@ -365,6 +365,22 @@ export async function refreshAccessToken(
   });
 }
 
+// ── Subject → Party resolution (SD-91 → SD-13) ─────────────────────────────────
+// An OAuth/session token `sub` is the SD-91 login-record id (customerAuthenticationInstanceReference).
+// Domain data (payout accounts, counterparties, executions) is keyed by the SD-13 partyInstanceReference.
+// This bridges the two so merchant on-behalf-of endpoints (which bind on `sub`) can query domain data.
+// Returns null when the sub is unknown (handled gracefully by callers — empty results, no throw).
+export async function resolvePartyInstanceReference(db: Db, sub: string): Promise<string | null> {
+  if (!sub) return null;
+  const rec = await db
+    .collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
+    .findOne(
+      { customerAuthenticationInstanceReference: sub },
+      { projection: { _id: 0, partyInstanceReference: 1 } },
+    );
+  return rec?.partyInstanceReference ?? null;
+}
+
 // ── Userinfo ──────────────────────────────────────────────────────────────────
 
 export async function getUserinfo(db: Db, accessToken: string): Promise<Record<string, unknown>> {

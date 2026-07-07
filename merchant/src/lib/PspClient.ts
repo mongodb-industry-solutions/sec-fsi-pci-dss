@@ -148,7 +148,7 @@ export class PspClient {
   // CHD in the merchant: the PSP charges a tokenised card and returns the order + card-transaction ref.
   // Static because it needs no user session — it is the merchant's own identity.
   static async apiPaymentServerToServer(
-    input: { paymentOrderMerchantReference: string; amount: number; currency: string; paymentOrderDescription?: string },
+    input: { paymentOrderMerchantReference: string; amount: number; currency: string; paymentOrderDescription?: string; actingSubjectReference?: string },
     idempotencyKey: string,
   ): Promise<{ paymentOrderInstanceReference: string; paymentOrderReference: string; paymentOrderStatus: string; cardTransactionInstanceReference?: string }> {
     const token = await clientCredentialsToken('write:payments');

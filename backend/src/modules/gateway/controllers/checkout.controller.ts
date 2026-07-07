@@ -10,6 +10,8 @@ import {
 } from '../services/checkout.service';
 import { getMerchantById } from '../services/merchant.service';
 import { deliverWebhook } from '../services/webhook.service';
+import { tryMerchantContext } from '../../../vendors/middleware/validateMerchantToken';
+import { resolvePartyInstanceReference } from '../../identity/services/oauth.service';
 
 const SESSION_STATUS_ENUM = ['pending', 'completed', 'expired', 'cancelled'];
 
@@ -76,6 +78,15 @@ export async function checkoutController(fastify: FastifyInstance) {
 
     const baseUrl = process.env.PSP_URL_FRONTEND ?? 'http://localhost:8080';
 
+    // On-behalf-of attribution (best-effort, public endpoint): if the merchant app forwarded the acting
+    // user's OAuth Bearer, capture who created this session so the resulting purchase is attributed to the
+    // payer (visible in their payment history) and audited in the connected-apps operations view. A missing
+    // or invalid token simply leaves the session unattributed — the public flow is unchanged.
+    const merchantCtx = await tryMerchantContext(request);
+    const actingPartyReference = merchantCtx?.sub
+      ? await resolvePartyInstanceReference(fastify.db, merchantCtx.sub) ?? undefined
+      : undefined;
+
     const result = await createCheckoutSession(fastify.db, {
       merchantAgreementInstanceReference: body.merchantAgreementInstanceReference,
       merchantName: (merchant as Record<string, unknown>).merchantName as string,
@@ -86,6 +97,9 @@ export async function checkoutController(fastify: FastifyInstance) {
       returnUrl: body.returnUrl,
       cancelUrl: body.cancelUrl,
       merchantReference: body.merchantReference,
+      ...(merchantCtx?.sub && { actingSubjectReference: merchantCtx.sub }),
+      ...(actingPartyReference && { actingPartyReference }),
+      ...(merchantCtx?.clientId && { actingClientId: merchantCtx.clientId }),
     }, baseUrl);
 
     return reply.status(201).send({

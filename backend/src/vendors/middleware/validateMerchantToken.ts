@@ -70,3 +70,32 @@ export async function validateMerchantToken(
     sub: payload.sub as string,
   };
 }
+
+/**
+ * Best-effort variant for PUBLIC endpoints (e.g. the hosted-checkout create route) that still want to
+ * ATTRIBUTE an action to the merchant + acting user when a valid OAuth Bearer is present, but must not
+ * fail the request when it is absent/invalid. Never sends a reply; returns undefined on any problem.
+ */
+export async function tryMerchantContext(request: FastifyRequest): Promise<MerchantTokenContext | undefined> {
+  const bearer = request.headers.authorization?.replace('Bearer ', '');
+  if (!bearer) return undefined;
+  try {
+    const payload = await verifyAccessToken(bearer);
+    const db = (request.server as any).db;
+    const clientId = Array.isArray(payload.aud) ? payload.aud[0] : (payload.aud as string);
+    const scopes = ((payload.scope as string) ?? '').split(' ').filter(Boolean);
+    const merchant = await (db as any)
+      .collection(MERCHANT_AGREEMENT_COLLECTION)
+      .findOne({ 'merchantOAuthClient.oauthClientId': clientId }) as MerchantAgreementControlRecord | null;
+    if (!merchant || !merchant.merchantOAuthClient) return undefined;
+    return {
+      merchantId: merchant.merchantAgreementInstanceReference,
+      merchantName: merchant.merchantName,
+      clientId,
+      scopes,
+      sub: payload.sub as string,
+    };
+  } catch {
+    return undefined;
+  }
+}

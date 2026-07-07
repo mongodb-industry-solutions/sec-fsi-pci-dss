@@ -18,6 +18,8 @@ import {
 import type { BankRail, RailDestination } from '../../../shared/services/bankTransfer';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 import { emitProcessEvent, attributionFromMerchantContext } from '../../provider/services/businessProcessEvent.service';
+import { resolvePartyInstanceReference } from '../../identity/services/oauth.service';
+import { resolveAccountReferenceForParty, getPartyCardTransactions } from '../../transaction/services/cardTransaction.service';
 
 // Scopes required per operation (real PSP verb:resource convention, v18).
 export const MERCHANT_GATEWAY_SCOPES = {
@@ -113,8 +115,12 @@ export async function merchantGatewayController(fastify: FastifyInstance) {
     const ok = await requireMerchantOnBehalfOf(req, reply, MERCHANT_GATEWAY_SCOPES.accounts, partyRef);
     if (!ok) return;
 
+    // Bind on the OAuth subject (SD-91 login id), then translate it to the SD-13 party the domain data
+    // is keyed by. A missing mapping → empty results (never a cross-user leak, never a throw).
+    const partyInstanceReference = await resolvePartyInstanceReference(fastify.db, partyRef);
     const q = req.query as { page?: number; limit?: number };
-    const { results, total } = await listPayoutAccounts(fastify.db, partyRef, { page: q.page, limit: q.limit });
+    if (!partyInstanceReference) return reply.send({ results: [], total: 0, page: q.page ?? 1, limit: q.limit ?? 20 });
+    const { results, total } = await listPayoutAccounts(fastify.db, partyInstanceReference, { page: q.page, limit: q.limit });
     const safe = results.map((r) => safeMerchantAccount(r as unknown as Record<string, unknown>));
     return reply.send({ results: safe, total, page: q.page ?? 1, limit: q.limit ?? 20 });
   });
@@ -143,22 +149,24 @@ export async function merchantGatewayController(fastify: FastifyInstance) {
     const q = req.query as { page?: number; limit?: number };
     const page = Math.max(1, q.page ?? 1);
     const limit = Math.min(100, Math.max(1, q.limit ?? 20));
-    const skip = (page - 1) * limit;
 
+    // Translate the OAuth subject → SD-13 party the domain data is keyed by (empty history if unmapped).
+    const partyInstanceReference = await resolvePartyInstanceReference(fastify.db, partyRef);
+    if (!partyInstanceReference) return reply.send({ results: [], total: 0, page, limit });
+
+    // Source 1 — bank-transfer executions (SD-65) the party initiated or received.
     const filter = {
       beneficiaryType: 'user' as const,
-      $or: [{ initiatorPartyReference: partyRef }, { beneficiaryPartyReference: partyRef }],
+      $or: [{ initiatorPartyReference: partyInstanceReference }, { beneficiaryPartyReference: partyInstanceReference }],
     };
     const col = fastify.db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION);
-    const [docs, total] = await Promise.all([
-      col.find(filter).sort({ initiatedAt: -1 }).skip(skip).limit(limit).toArray(),
-      col.countDocuments(filter),
-    ]);
+    const execDocs = await col.find(filter).sort({ initiatedAt: -1 }).limit(200).toArray();
 
     // Display-safe projection: no CHD, destination shown masked only.
-    const results = docs.map((d) => ({
+    const execRows = execDocs.map((d) => ({
+      kind: 'transfer' as const,
       paymentExecutionInstanceReference: d.paymentExecutionInstanceReference,
-      direction: d.initiatorPartyReference === partyRef ? 'sent' : 'received',
+      direction: d.initiatorPartyReference === partyInstanceReference ? 'sent' : 'received',
       grossAmount: d.grossAmount,
       netAmount: d.netAmount,
       feeAmount: d.feeAmount,
@@ -169,7 +177,38 @@ export async function merchantGatewayController(fastify: FastifyInstance) {
       destinationAccountMasked: d.destinationAccountMasked ?? null,
       initiatedAt: d.initiatedAt?.toISOString() ?? null,
       completedAt: d.completedAt?.toISOString() ?? null,
+      _sortAt: d.completedAt ?? d.initiatedAt ?? null,
     }));
+
+    // Source 2 — the party's OWN card transactions (SD-254): purchases via redirect checkout, payment
+    // link and API payment. Display-safe (masked PAN, no CVV/PAN, no raw payload).
+    const accountReference = await resolveAccountReferenceForParty(fastify.db, partyInstanceReference);
+    const cardTxns = accountReference ? await getPartyCardTransactions(fastify.db, accountReference) : [];
+    const cardRows = cardTxns.map((t) => ({
+      kind: 'card' as const,
+      paymentExecutionInstanceReference: t.cardTransactionInstanceReference,
+      direction: 'sent',
+      grossAmount: t.grossAmount,
+      netAmount: undefined as number | undefined,
+      feeAmount: undefined as number | undefined,
+      currency: t.currency,
+      paymentExecutionRail: 'card',
+      paymentExecutionStatus: t.status,
+      beneficiaryName: t.merchantName,
+      destinationAccountMasked: t.maskedPan,
+      initiatedAt: t.initiatedAt,
+      completedAt: t.initiatedAt,
+      _sortAt: t.initiatedAt ? new Date(t.initiatedAt) : null,
+    }));
+
+    // Merge both sources, newest first, then paginate in memory (bounded demo volumes).
+    const merged = [...execRows, ...cardRows].sort((a, b) => {
+      const av = a._sortAt ? new Date(a._sortAt).getTime() : 0;
+      const bv = b._sortAt ? new Date(b._sortAt).getTime() : 0;
+      return bv - av;
+    });
+    const total = merged.length;
+    const results = merged.slice((page - 1) * limit, page * limit).map(({ _sortAt, ...row }) => { void _sortAt; return row; });
 
     return reply.send({ results, total, page, limit });
   });
@@ -224,9 +263,16 @@ export async function merchantGatewayController(fastify: FastifyInstance) {
     const ok = await requireMerchantOnBehalfOf(req, reply, MERCHANT_GATEWAY_SCOPES.transfers, partyRef);
     if (!ok) return;
 
+    // Money movement is keyed by the SD-13 party, not the OAuth subject — translate before executing so
+    // the execution lands under the party and appears in their history (SD-65).
+    const partyInstanceReference = await resolvePartyInstanceReference(fastify.db, partyRef);
+    if (!partyInstanceReference) {
+      return reply.status(404).send({ error: 'party_not_found', error_description: 'No party is linked to this token subject.' });
+    }
+
     const body = req.body as ExecuteBody;
     const result = await executeBankTransfer(fastify.db, {
-      initiatorPartyRef: partyRef,
+      initiatorPartyRef: partyInstanceReference,
       amount: body.amount,
       currency: body.currency,
       destination: body.destination,
@@ -240,7 +286,7 @@ export async function merchantGatewayController(fastify: FastifyInstance) {
       entityType: 'execution', entityId: result.executionReference,
       processType: 'payment_processing', processAction: 'merchant.transfer.bank',
       processOutcome: result.status === 'submitted' ? 'approved' : 'rejected',
-      performedByPartyReference: partyRef, performedByRole: 'customer',
+      performedByPartyReference: partyInstanceReference, performedByRole: 'customer',
       eventSummary: { amount: body.amount, currency: body.currency, rail: result.rail, status: result.status },
       bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
       attribution: attributionFromMerchantContext(req.merchantContext),

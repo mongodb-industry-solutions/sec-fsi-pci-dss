@@ -1,6 +1,6 @@
 env:
   NODE_ENV: staging
-  KMS_PROVIDER: local
+  PSP_KMS_PROVIDER: local
   PSP_OAUTH_KEY_PROVIDER: aws
   PSP_CORS_ORIGIN: "https://sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com"
   PSP_URL_FRONTEND: "https://sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com"
