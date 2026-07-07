@@ -118,6 +118,28 @@ export async function previewTransfer(input: {
   });
 }
 
+// Send money to a saved beneficiary (P2P, SD-65). The merchant supplies only the beneficiary
+// token + amount; the PSP resolves the source account and recipient server-side (no CHD/IBAN).
+export async function sendToBeneficiary(input: {
+  beneficiaryToken: string;
+  amount: number;
+  currency?: string;
+}): Promise<ActionResult> {
+  return toResult(async () => {
+    if (!(input.amount > 0)) return { ok: false, message: 'Amount must be greater than zero.' };
+    const c = await client();
+    const data = await c.sendToBeneficiary(input.beneficiaryToken, input.amount, input.currency);
+    if (data.status === 'failed') {
+      return { ok: false, message: data.failureReason ?? 'Transfer failed.', data };
+    }
+    return {
+      ok: true,
+      data,
+      message: `Sent ${data.amount} ${data.currency}. Reference ${data.transferReference} (${data.status}).`,
+    };
+  });
+}
+
 export async function bankTransfer(input: {
   amount: number;
   currency: string;

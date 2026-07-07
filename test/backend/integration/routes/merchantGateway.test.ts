@@ -144,4 +144,42 @@ describe('v18 merchant OAuth boundary + gateway', () => {
     expect(res.status).toBe(200);
     expect(typeof res.body.ok).toBe('boolean');
   });
+
+  // send-to-beneficiary (P2P from merchant portal) — scope + sub-binding + amount validation.
+  skip('beneficiaries/send: requires write:transfers (403 without it)', async () => {
+    const token = await mintToken(SUB, ['read:beneficiaries']);
+    const res = await supertest(app.server)
+      .post(`/api/v1/merchant/beneficiaries/${SUB}/btoken-does-not-matter/send`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amount: 10 });
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('insufficient_scope');
+  });
+
+  skip('beneficiaries/send: sub-binding — mismatched partyRef → 403', async () => {
+    const token = await mintToken(SUB, ['write:transfers']);
+    const res = await supertest(app.server)
+      .post(`/api/v1/merchant/beneficiaries/${OTHER_SUB}/btoken-x/send`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amount: 10 });
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('access_denied');
+  });
+
+  skip('beneficiaries/send: amount <= 0 → 422 invalid_amount', async () => {
+    const token = await mintToken(SUB, ['write:transfers']);
+    const res = await supertest(app.server)
+      .post(`/api/v1/merchant/beneficiaries/${SUB}/btoken-x/send`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amount: 0 });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe('invalid_amount');
+  });
+
+  skip('beneficiaries/send: no token → 401', async () => {
+    const res = await supertest(app.server)
+      .post(`/api/v1/merchant/beneficiaries/${SUB}/btoken-x/send`)
+      .send({ amount: 10 });
+    expect(res.status).toBe(401);
+  });
 });

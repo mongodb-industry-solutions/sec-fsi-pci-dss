@@ -222,6 +222,15 @@ export class PspClient {
     return this.bankTransfer(input);
   }
 
+  // Send money to a saved beneficiary (P2P transfer, SD-65). The merchant sends only the
+  // amount + opaque beneficiary token; the PSP resolves the source account + recipient server-side.
+  sendToBeneficiary(beneficiaryToken: string, amount: number, currency?: string) {
+    return this.request<{ transferReference: string; amount: number; currency: string; status: string; failureReason?: string }>(
+      `/api/v1/merchant/beneficiaries/${encodeURIComponent(this.sub)}/${encodeURIComponent(beneficiaryToken)}/send`,
+      { method: 'POST', body: { amount, ...(currency ? { currency } : {}) } },
+    );
+  }
+
   removeBeneficiary(beneficiaryToken: string) {
     return this.request(
       `/api/v1/merchant/beneficiaries/${encodeURIComponent(this.sub)}/${encodeURIComponent(beneficiaryToken)}`,

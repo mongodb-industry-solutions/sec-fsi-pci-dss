@@ -2544,6 +2544,22 @@ Marks a beneficiary entry as `'removed'` (soft delete). The resolved counterpart
 
 **Response 200:** `{ "removed": true, "counterpartyArrangementReference": "btoken-uuid" }`
 
+#### `POST /merchant/beneficiaries/:partyRef/:beneficiaryToken/send`
+
+Sends money to a saved beneficiary on behalf of the user (P2P bank transfer, BIAN SD-65 execution + SD-54 counterparty). Mirrors the PSP's send-to-beneficiary flow but is driven from the merchant portal. `config: { skipAuth: true }`; guarded in-handler by `requireMerchantOnBehalfOf(scope = write:transfers, partyRef)` (sub-binding: `token.sub === :partyRef`). Delegates to `executeP2PTransfer` — no business logic duplicated.
+
+- Source account is resolved **server-side** from the user's payout accounts: the active default (`payoutAccountIsDefault === true`), otherwise the first active account. The client never supplies a source account.
+- The merchant supplies only the amount and the opaque `:beneficiaryToken`. No CHD, no IBAN/PAN. `currency` in the body is an optional hint only; the transfer uses the source account's native currency (server-authoritative).
+- Amount must be `> 0` (else `422 invalid_amount`). No active payout account → `422 no_source_account`.
+
+**Body:** `{ "amount": 25.00, "currency"?: "EUR" }`
+
+**Response 202** (submitted/completed/exception) / **422** (failed): display-safe
+```json
+{ "transferReference": "uuid", "amount": 25.0, "currency": "EUR", "status": "submitted", "failureReason": "…?" }
+```
+Emits an attributed `businessProcessEvent` (`merchant.beneficiary.send`, `attributionFromMerchantContext`) for the connected-apps operations + activity views (SD-16 audit, PCI DSS Req 10).
+
 ---
 
 ## 7. Environment Variables Reference
@@ -3195,6 +3211,7 @@ These live under the OAuth consent-grant controller (`/api/v1/auth/grants/*`) an
   | `profile` | Read your name and username | — | userinfo |
   | `read:beneficiaries` | View your saved beneficiaries | — | `GET /merchant/beneficiaries/:partyRef` |
   | `write:beneficiaries` | Add and manage your beneficiaries | — | `POST/DELETE /merchant/beneficiaries/*` |
+  | `write:transfers` | Send money and bank transfers | — | `POST /merchant/beneficiaries/:partyRef/:beneficiaryToken/send`, `POST /merchant/transfers/*` |
   | `read:transactions` | View your transaction and operation history | — | `GET /merchant/portal/transactions`, `GET /merchant/transactions/:partyRef` |
   | `read:accounts` | View your bank accounts (masked IBAN) | — | `GET /merchant/accounts/:partyRef` |
   | `read:merchant_profile` | View the merchant profile | — | `GET /merchant/portal/me` |

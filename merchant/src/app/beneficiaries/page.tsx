@@ -1,12 +1,13 @@
 // Beneficiaries (C-14): list the user's saved beneficiaries (masked) + link to direct pay.
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Users, Send, ArrowRight } from 'lucide-react';
+import { Users, Send } from 'lucide-react';
 import { PspClient, PspError } from '@/lib/PspClient';
 import { getSession, hasScope } from '@/lib/session';
 import { ScopeMissing, PspUnavailable } from '@/components/ScopeGate';
 import { EmptyState, InfoHint } from '@/components/ui/Bits';
 import { Tip } from '@/components/ui/Tooltip';
+import BeneficiarySend from './BeneficiarySend';
 
 export default async function BeneficiariesPage() {
   const session = await getSession();
@@ -58,12 +59,8 @@ export default async function BeneficiariesPage() {
                   </div>
                 </div>
               </div>
-              {hasScope(session, 'write:transfers') && (
-                <Tip label="Pay this beneficiary.">
-                  <Link href="/transfers" className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-leaf-deep hover:underline">
-                    Pay <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-                  </Link>
-                </Tip>
+              {hasScope(session, 'write:transfers') && (b.counterpartyArrangementReference ?? b.beneficiaryToken) && (
+                <BeneficiarySend beneficiaryToken={b.counterpartyArrangementReference ?? b.beneficiaryToken} />
               )}
             </li>
           ))}
