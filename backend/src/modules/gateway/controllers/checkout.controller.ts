@@ -84,13 +84,15 @@ export async function checkoutController(fastify: FastifyInstance) {
     // or invalid token simply leaves the session unattributed — the public flow is unchanged.
     // Fully best-effort: neither token resolution nor the subject→party lookup may fail this PUBLIC
     // endpoint. A DB blip during the party lookup must leave the session unattributed, not return 500.
+    let merchantCtx: Awaited<ReturnType<typeof tryMerchantContext>>;
     let actingPartyReference: string | undefined;
     try {
-      const merchantCtx = await tryMerchantContext(request);
+      merchantCtx = await tryMerchantContext(request);
       if (merchantCtx?.sub) {
         actingPartyReference = await resolvePartyInstanceReference(fastify.db, merchantCtx.sub) ?? undefined;
       }
     } catch {
+      merchantCtx = undefined;
       actingPartyReference = undefined;
     }
 
