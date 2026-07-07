@@ -19,4 +19,6 @@ EXPOSE 8080
 ENV NODE_ENV=production
 ENV PSP_MERCHANT_PORT=8080
 
-CMD ["sh", "-c", "next start -p ${PSP_MERCHANT_PORT:-8080}"]
+# Invoke Next via its local bin path: a bare `next` is NOT on PATH under `sh -c` (only `npm run`
+# adds node_modules/.bin), which crashed the container with "sh: next: not found" → CrashLoopBackOff.
+CMD ["sh", "-c", "node_modules/.bin/next start -p ${PSP_MERCHANT_PORT:-8080}"]
