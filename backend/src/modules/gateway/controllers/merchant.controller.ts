@@ -615,6 +615,7 @@ Used by customers to detect their onboarding state: no application / under_revie
                   entityId:              { type: 'string' },
                   clientId:              { type: 'string' },
                   actingPartyReference:  { type: 'string' },
+                  actingUserName:        { type: 'string', description: 'Display-safe SD-13 name of the acting user (no CHD, no IBAN).' },
                   actingChannel:         { type: 'string' },
                   summary:               { type: 'object', additionalProperties: true },
                 },

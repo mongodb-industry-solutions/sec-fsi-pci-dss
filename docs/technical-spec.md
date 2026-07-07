@@ -2141,6 +2141,7 @@ Validates credentials against `customerAuthenticationAssessment` (SD-91, QE equa
 {
   "token": "<HS256 JWT>",
   "user": {
+    "sub": "uuid-v4",
     "customerAuthenticationInstanceReference": "uuid-v4",
     "name": "Sarah Chen",
     "email": "sarah.chen@back.es",
@@ -2148,6 +2149,8 @@ Validates credentials against `customerAuthenticationAssessment` (SD-91, QE equa
   }
 }
 ```
+
+> `sub` is the canonical OIDC subject claim (equal to `customerAuthenticationInstanceReference`, retained for back-compat). The OAuth consent flow reads `user.sub` as the `_psp_sub` identity carried through `/auth/authorize`.
 
 **Response 401:** `{ "error": "Invalid credentials" }`
 

@@ -66,9 +66,13 @@ Password for all demo users: \`demo-password\``,
               type: 'object',
               description: 'Authenticated user summary.',
               properties: {
+                sub: {
+                  type: 'string',
+                  description: 'User UUID (OIDC `sub`). Same value as customerAuthenticationInstanceReference; the canonical identity claim used by the OAuth consent flow.',
+                },
                 customerAuthenticationInstanceReference: {
                   type: 'string',
-                  description: 'Primary key UUID of the customerAuthenticationAssessment document (BIAN SD-91 Control Record identifier).',
+                  description: 'Primary key UUID of the customerAuthenticationAssessment document (BIAN SD-91 Control Record identifier). Kept for back-compat; equals `sub`.',
                 },
                 name: { type: 'string', description: 'Display name.' },
                 email: { type: 'string', format: 'email', description: 'Login email address.' },
@@ -102,6 +106,7 @@ Password for all demo users: \`demo-password\``,
       return reply.status(200).send({
         token,
         user: {
+          sub: user.sub,
           customerAuthenticationInstanceReference: user.sub,
           name: user.name,
           email: user.email,

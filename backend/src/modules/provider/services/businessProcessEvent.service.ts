@@ -18,6 +18,7 @@ import {
 import { sanitizeDeep } from '../../../vendors/eventbus/sanitize';
 export { sanitizeDeep };
 import { getEventBus, makeEvent, type BusinessProcess, type EventBus, type DomainEvent } from '../../../vendors/eventbus';
+import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../../identity/models/customerAuthentication.model';
 
 // Maps the per-event processType to the EDA business-process class used to group a journey (dev.v8).
 export const PROCESS_TO_BUSINESS: Record<string, BusinessProcess> = {
@@ -412,6 +413,7 @@ export interface MerchantActivityRow {
   entityId: string;
   clientId?: string;
   actingPartyReference?: string;
+  actingUserName?: string; // display-safe SD-13 name for the acting party (no CHD, no IBAN)
   actingChannel?: string;
   summary?: Record<string, unknown>;
 }
@@ -448,6 +450,15 @@ export async function listMerchantActivity(
     col.find(query).sort({ eventDateTime: -1 }).skip((page - 1) * limit).limit(limit).toArray(),
     col.countDocuments(query),
   ]);
+  // Resolve display-safe acting-user names (SD-13) in one batch — name only, no CHD, no IBAN.
+  const subs = [...new Set(docs.map((d) => d.actingPartyReference).filter((s): s is string => !!s))];
+  const users = subs.length
+    ? await db.collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
+        .find({ customerAuthenticationInstanceReference: { $in: subs } })
+        .toArray()
+    : [];
+  const nameBySub = new Map(users.map((u) => [u.customerAuthenticationInstanceReference, u.customerAuthenticationUserName]));
+
   const events: MerchantActivityRow[] = docs.map((d) => ({
     id: d.businessProcessEventInstanceReference,
     eventDateTime: d.eventDateTime,
@@ -458,6 +469,7 @@ export async function listMerchantActivity(
     entityId: d.entityId,
     clientId: d.clientId,
     actingPartyReference: d.actingPartyReference,
+    actingUserName: d.actingPartyReference ? nameBySub.get(d.actingPartyReference) : undefined,
     actingChannel: d.actingChannel,
     summary: d.eventSummary,
   }));

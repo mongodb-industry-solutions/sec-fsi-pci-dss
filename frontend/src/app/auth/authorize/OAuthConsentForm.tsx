@@ -95,14 +95,29 @@ export default function OAuthConsentForm({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Login failed');
-      setUserSub(data.user.sub);
+      // The /auth/login response exposes the OIDC subject as `sub`; older payloads only carried
+      // `customerAuthenticationInstanceReference`. Accept either so `_psp_sub` is always a real UUID.
+      const s = data.user.sub ?? data.user.customerAuthenticationInstanceReference;
+      setUserSub(s);
       setView('consent');
       // E-10: fetch scopes already granted to this client so we can highlight new permissions.
       try {
-        const qs = new URLSearchParams({ ...originalSearchParams, _psp_sub: data.user.sub });
+        const qs = new URLSearchParams({ ...originalSearchParams, _psp_sub: s });
         const r = await fetch(`${BACKEND_PUBLIC_URL}/api/v1/auth/authorize?${qs.toString()}`, { cache: 'no-store' });
         const d = await r.json();
-        if (r.ok && Array.isArray(d.previously_granted_scopes)) setPriorScopes(d.previously_granted_scopes);
+        const prior: string[] = r.ok && Array.isArray(d.previously_granted_scopes) ? d.previously_granted_scopes : [];
+        setPriorScopes(prior);
+        // OAuth2/OIDC (RFC 6749 §4.1 + OIDC Core §3.1.2.3): once an active consent grant already
+        // covers every requested scope, the authorization server SHOULD NOT re-prompt for consent —
+        // re-consent is only required for new/broader scopes (or an explicit prompt=consent). We
+        // therefore auto-approve here (equivalent to the user clicking "Allow") instead of showing
+        // the scope checkboxes again, so consent is asked once per grant rather than on every login.
+        const requested = scopeDetails.map((sc) => sc.scope);
+        const allCovered = prior.length > 0 && requested.every((sc) => prior.includes(sc));
+        if (allCovered) {
+          window.location.href = buildGrantUrl(s, requested);
+          return;
+        }
       } catch { /* non-fatal: fall back to first-time consent view */ }
     } catch (err: any) {
       setError(err.message ?? 'Login failed');
@@ -111,12 +126,14 @@ export default function OAuthConsentForm({
     }
   }
 
-  function buildGrantUrl() {
+  // Build the "grant" URL. `sub`/`scopes` can be passed explicitly (e.g. the auto-approve path,
+  // which runs before the userSub state has committed); otherwise the current form state is used.
+  function buildGrantUrl(sub: string = userSub, scopes: string[] = [...selected]) {
     const qs = new URLSearchParams({
       ...originalSearchParams,
       _psp_action: 'grant',
-      _psp_sub: userSub,
-      _psp_scopes: [...selected].join(' '), // E-09: send the user's granular selection
+      _psp_sub: sub,
+      _psp_scopes: scopes.join(' '), // E-09: send the user's granular selection
     });
     return `${BACKEND_PUBLIC_URL}/api/v1/auth/authorize?${qs.toString()}`;
   }

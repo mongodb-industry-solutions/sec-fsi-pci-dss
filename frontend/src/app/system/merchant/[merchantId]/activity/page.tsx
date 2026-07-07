@@ -20,11 +20,27 @@ type ActivityRow = {
   entityId: string;
   clientId?: string;
   actingPartyReference?: string;
+  actingUserName?: string;
   actingChannel?: string;
   summary?: Record<string, unknown>;
 };
 
 const LIMIT_OPTIONS = [10, 25, 50];
+
+// Turn a machine action id (e.g. "oauth.consent.granted") into a human-readable label.
+function humanizeAction(action: string): string {
+  return action
+    .split(/[._]/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+// Friendly label for the acting channel.
+const CHANNEL_LABELS: Record<string, string> = {
+  oauth_merchant: "Merchant app (SSO)",
+  session: "Direct session",
+};
 
 const OUTCOME_STYLES: Record<string, string> = {
   approved: 'bg-green-100 text-green-700', received: 'bg-green-100 text-green-700',
@@ -48,7 +64,9 @@ export default function MerchantActivityPage() {
   const [loading, setLoading] = useState(true);
 
   // Filters: user (party ref), free text, date range.
-  const [userFilter, setUserFilter] = useState(searchParams.get('user') ?? '');
+  // Ignore stale/empty values (a legacy "?user=undefined" must not filter everything out).
+  const initialUser = searchParams.get('user') ?? '';
+  const [userFilter, setUserFilter] = useState(initialUser === 'undefined' || initialUser === 'null' ? '' : initialUser);
   const [q, setQ] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -152,16 +170,16 @@ export default function MerchantActivityPage() {
                 <li key={row.id} className="px-5 py-3 flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-xs text-[#001E2B] font-semibold break-all">{row.processAction}</span>
+                      <span className="text-sm text-[#001E2B] font-semibold break-words" title={row.processAction}>{humanizeAction(row.processAction)}</span>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${OUTCOME_STYLES[row.processOutcome] ?? 'bg-gray-100 text-gray-600'}`}>{row.processOutcome}</span>
-                      <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">{row.processType}</span>
+                      <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">{humanizeAction(row.processType)}</span>
                       {row.actingChannel && (
-                        <span className="text-xs text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">{row.actingChannel}</span>
+                        <span className="text-xs text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">{CHANNEL_LABELS[row.actingChannel] ?? row.actingChannel}</span>
                       )}
                     </div>
                     <div className="text-xs text-gray-500 mt-0.5">
-                      {row.actingPartyReference && (
-                        <>user <span className="font-mono">{row.actingPartyReference.slice(0, 16)}…</span></>
+                      {(row.actingUserName || row.actingPartyReference) && (
+                        <>by <span className="font-medium text-gray-600">{row.actingUserName || `${row.actingPartyReference!.slice(0, 16)}…`}</span></>
                       )}
                       {row.entityId && <> · {row.entityType} <span className="font-mono">{row.entityId.slice(0, 16)}…</span></>}
                     </div>

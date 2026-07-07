@@ -109,7 +109,9 @@ export default function MerchantAuthorizationsPage() {
                   {row.lastUsedAt && <p className="mt-0.5">Last used {new Date(row.lastUsedAt).toLocaleString()}</p>}
                 </div>
                 <Link
-                  href={`/system/merchant/${merchantId}/activity?user=${encodeURIComponent(row.partyAuthenticationInstanceReference)}`}
+                  href={row.partyAuthenticationInstanceReference
+                    ? `/system/merchant/${merchantId}/activity?user=${encodeURIComponent(row.partyAuthenticationInstanceReference)}`
+                    : `/system/merchant/${merchantId}/activity`}
                   title="View this user's activity"
                   className="shrink-0 inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline mt-0.5">
                   Activity <ArrowRight size={12} />

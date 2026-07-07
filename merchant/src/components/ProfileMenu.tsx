@@ -14,7 +14,10 @@ export interface ProfileUser {
 export default function ProfileMenu({ user }: { user: ProfileUser }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const initials = user.name.trim().slice(0, 1).toUpperCase() || 'U';
+  // Never render the literal string "undefined": fall back to the email local-part, then "Account".
+  const localPart = user.email?.includes('@') ? user.email.split('@')[0] : user.email;
+  const displayName = user.name?.trim() || localPart?.trim() || 'Account';
+  const initials = displayName.slice(0, 1).toUpperCase() || 'U';
 
   useEffect(() => {
     if (!open) return;
@@ -39,7 +42,7 @@ export default function ProfileMenu({ user }: { user: ProfileUser }) {
         className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 text-white/90 transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-leaf"
       >
         <span className="grid h-8 w-8 place-items-center rounded-full bg-leaf font-semibold text-leaf-ink">{initials}</span>
-        <span className="hidden max-w-[9rem] truncate text-sm sm:block">{user.name}</span>
+        <span className="hidden max-w-[9rem] truncate text-sm sm:block">{displayName}</span>
         <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
       </button>
 
@@ -51,7 +54,7 @@ export default function ProfileMenu({ user }: { user: ProfileUser }) {
           <div className="flex items-center gap-3 border-b border-line bg-surface-alt px-4 py-3">
             <span className="grid h-10 w-10 place-items-center rounded-full bg-leaf font-semibold text-leaf-ink">{initials}</span>
             <div className="min-w-0">
-              <p className="truncate font-medium">{user.name}</p>
+              <p className="truncate font-medium">{displayName}</p>
               {user.email && <p className="truncate text-xs text-muted">{user.email}</p>}
               <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
                 <Store className="h-3 w-3" aria-hidden /> {user.merchant}

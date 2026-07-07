@@ -1028,6 +1028,7 @@ export const api = {
           entityId: string;
           clientId?: string;
           actingPartyReference?: string;
+          actingUserName?: string;
           actingChannel?: string;
           summary?: Record<string, unknown>;
         }>;
