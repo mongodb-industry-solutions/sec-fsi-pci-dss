@@ -4,8 +4,24 @@ env:
   PSP_OAUTH_KEY_PROVIDER: aws
   PSP_CORS_ORIGIN: "https://sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com"
   PSP_URL_FRONTEND: "https://sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com"
-  # Merchant public URL — used by the merchant seeder to resolve OIDC branding (logo_uri/client_uri).
+  # Backend OIDC issuer + endpoints (discovery/token/jwks/userinfo) AND internal self-dispatch. Must be
+  # a URL reachable BOTH by the backend itself and by the merchant pod → the in-cluster service (same
+  # private path the frontend uses). It becomes the id_token `iss`; the merchant verifies against the
+  # discovery doc, so it only needs to be self-consistent, not public.
+  PSP_BASE_URL: "http://sec-fsi-pci-dss-backend-web-app:80"
+
+  # ── Merchant app (Espresso Works) config ──────────────────────────────────────────────────────
+  # Browser-facing consent page → PUBLIC PSP frontend (the user's browser navigates here).
+  PSP_MERCHANT_AUTHORIZE_URL: "https://sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com/auth/authorize"
+  # Server-to-server (OIDC discovery + token + userinfo + API) → PRIVATE in-cluster backend service.
+  PSP_MERCHANT_PSP_BASE_URL: "http://sec-fsi-pci-dss-backend-web-app:80"
+  # This app's own public URL (redirect_uri host + seeder branding).
   PSP_MERCHANT_BASE_URL: "https://sec-fsi-pci-dss-merchant.industrysolutions.staging.corp.mongodb.com"
+  # Seeded confidential client (demo creds; public in backend/data/merchants.json). For a hardened
+  # deployment move the secret + session secret to envSecrets instead of inline env.
+  PSP_MERCHANT_OAUTH_CLIENT_ID: "oauth001-0000-4000-8000-000000000001"
+  PSP_MERCHANT_OAUTH_CLIENT_SECRET: "espresso-demo-secret-2026"
+  PSP_MERCHANT_SESSION_SECRET: "kZGR+xnsY2QDYkKjVdidsO/Mn60h7mnFX930ibQzX/0="
 
 envSecrets:
   MONGODB_URI: sec-fsi-pci-dss-secrets-staging

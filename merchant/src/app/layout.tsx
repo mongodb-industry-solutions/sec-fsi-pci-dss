@@ -10,9 +10,11 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // suppressHydrationWarning: browser extensions (e.g. LanguageTool → data-lt-installed) inject
+  // attributes on <html>/<body> before React hydrates, causing a benign hydration mismatch.
   return (
-    <html lang="en">
-      <body className="min-h-screen font-sans">
+    <html lang="en" suppressHydrationWarning>
+      <body className="min-h-screen font-sans" suppressHydrationWarning>
         <TooltipProvider>
           <Nav />
           <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
