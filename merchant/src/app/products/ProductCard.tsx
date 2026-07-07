@@ -39,13 +39,9 @@ const METHOD_HELP: Record<PaymentMethod, string> = {
   subscription: 'Redirects to Leafy Pay’s hosted checkout to set up a recurring subscription.',
 };
 
-// Button label per method, so the primary action reads true to what happens next.
-const PAY_LABEL: Record<PaymentMethod, string> = {
-  payment_link: 'Create payment link',
-  redirect: 'Pay at hosted checkout',
-  api_payment: 'Pay now',
-  subscription: 'Start subscription',
-};
+// Uniform primary-action label across ALL products for a homogeneous design.
+// What actually happens per method is explained in the button tooltip below.
+const PAY_LABEL = 'Pay';
 
 export default function ProductCard({ product, commission }: { product: Product; commission: number }) {
   const [pending, startTransition] = useTransition();
@@ -98,10 +94,10 @@ export default function ProductCard({ product, commission }: { product: Product;
         </div>
       </div>
 
-      <Tip label={`${PAY_LABEL[product.method]} for ${fmt(product.price)}.`}>
+      <Tip label={`${METHOD_HELP[product.method]} You will pay ${fmt(product.price)}.`}>
         <button onClick={onPay} disabled={pending} className="btn-primary mt-4 w-full">
           {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CreditCard className="h-4 w-4" aria-hidden />}
-          {pending ? 'Processing…' : PAY_LABEL[product.method]}
+          {pending ? 'Processing…' : PAY_LABEL}
         </button>
       </Tip>
 

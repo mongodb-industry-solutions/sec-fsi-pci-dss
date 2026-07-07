@@ -16,7 +16,9 @@ export function InfoHint({ label }: { label: ReactNode }) {
 
 type Tone = 'ok' | 'warn' | 'err' | 'neutral' | 'accent';
 const TONES: Record<Tone, string> = {
-  ok: 'text-[var(--ok)] bg-[var(--ok-bg)]',
+  // Light green bg (light mode) → near-black text for contrast; dark mode bg is dark green,
+  // so the green text is kept there (readable on dark). `dark:` follows prefers-color-scheme.
+  ok: 'text-leaf-ink bg-[var(--ok-bg)] dark:text-[var(--ok)]',
   warn: 'text-[var(--warn)] bg-[var(--warn-bg)]',
   err: 'text-[var(--err)] bg-[var(--err-bg)]',
   neutral: 'text-muted bg-surface-alt',
