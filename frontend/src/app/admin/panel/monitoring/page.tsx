@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { API_BASE_URL } from '../../../../lib/constants';
+import { API_BASE_URL, MERCHANT_PUBLIC_URL } from '../../../../lib/constants';
 import { JsonView } from '../../../../components/json/JsonView';
 import {
   Activity, Plus, PauseCircle, PlayCircle, Trash2,
@@ -62,13 +62,34 @@ function savePaused(v: boolean): void {
   localStorage.setItem(PAUSED_KEY, v ? 'true' : 'false');
 }
 
+// The external merchant demo lives on its own origin (localhost:8082 / staging / prod), resolved from
+// the build-time MERCHANT_PUBLIC_URL. Its /health is CORS-open so this page can probe it directly.
+// Appended programmatically because the merchant URL is per-environment (not knowable in a static JSON).
+function merchantDefaultService(): MonitoringService {
+  return {
+    id: 'merchant-app',
+    name: 'Merchant App',
+    description: 'External merchant demo (Espresso Works) — Next.js SSO/API client',
+    type: 'http',
+    url: `${MERCHANT_PUBLIC_URL.replace(/\/+$/, '')}/health`,
+    method: 'GET',
+    enabled: true,
+    intervalMs: 30000,
+    timeoutMs: 10000,
+    expectedStatus: 200,
+    useApiBase: false,
+  };
+}
+
 async function fetchDefaults(): Promise<MonitoringService[]> {
   try {
     const res = await fetch('/monitoring-defaults.json');
-    if (!res.ok) return [];
-    const data = await res.json() as { services: MonitoringService[] };
-    return data.services ?? [];
-  } catch { return []; }
+    const services = res.ok ? ((await res.json()) as { services: MonitoringService[] }).services ?? [] : [];
+    // Ensure the merchant is monitored even though it is not in the static defaults file.
+    return services.some((s) => s.id === 'merchant-app') ? services : [...services, merchantDefaultService()];
+  } catch {
+    return [merchantDefaultService()];
+  }
 }
 
 // ── Check runner ───────────────────────────────────────────────────────────
