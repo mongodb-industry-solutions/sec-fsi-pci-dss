@@ -21,14 +21,18 @@ export async function seedCards(db: Db) {
   const tokens = await rebuildCardRegistry(db);
   console.log(`  ${PAYMENT_CARD_COLLECTION}: ${records.length} upserted; registry rebuilt for ${tokens} cards`);
 
-  // Link each card to its owner's default active payout account (BIAN SD-88 §cardAccountReference).
-  // Idempotent: always overwrites to fix any stale or missing values from previous seeds.
-  // Accepts any account type (bank_account OR internal_ledger OR wallet) — bank_account preferred.
+  // Link each card to a payout account owned by its holder (BIAN SD-88 §cardAccountReference).
+  // A card funds from exactly one account; an account may back several cards. The seed data may
+  // spread a holder's cards across several of their own accounts (diversity for demo/testing), so
+  // we HONOUR an explicit fundingPayoutAccountInstanceReference when it points to an active account
+  // the same party owns. Only cards with a missing/stale/foreign reference are (re)linked to the
+  // holder's default active account (bank_account preferred). This keeps the invariant that a card
+  // never funds from an account belonging to another party.
   const { CUSTOMER_AGREEMENT_COLLECTION: AGR_COL } = await import('../../modules/customer/models/customerAgreement.model');
   const { PAYOUT_ACCOUNT_COLLECTION: PA_COL } = await import('../../modules/gateway/models/payoutAccount.model');
 
   const allCards = await db.collection(PAYMENT_CARD_COLLECTION).find({}).toArray();
-  let linked = 0, alreadyCorrect = 0, noAccount = 0;
+  let linked = 0, keptExplicit = 0, alreadyCorrect = 0, noAccount = 0;
 
   for (const card of allCards) {
     const agreement = await db.collection(AGR_COL).findOne(
@@ -36,6 +40,20 @@ export async function seedCards(db: Db) {
       { projection: { partyInstanceReference: 1 } }
     );
     if (!agreement?.partyInstanceReference) { noAccount++; continue; }
+
+    // Honour an explicit funding account when it is active and owned by this holder.
+    const explicitRef = card.fundingPayoutAccountInstanceReference as string | undefined;
+    if (explicitRef) {
+      const explicitAccount = await db.collection(PA_COL).findOne(
+        {
+          payoutAccountInstanceReference: explicitRef,
+          partyInstanceReference: agreement.partyInstanceReference,
+          payoutAccountStatus: 'active',
+        },
+        { projection: { _id: 1 } }
+      );
+      if (explicitAccount) { keptExplicit++; continue; }
+    }
 
     // Prefer bank_account as funding source; fall back to any default active account type.
     const account = await db.collection(PA_COL).findOne(
@@ -57,5 +75,5 @@ export async function seedCards(db: Db) {
     );
     linked++;
   }
-  console.log(`  ${PAYMENT_CARD_COLLECTION}: ${linked} linked, ${alreadyCorrect} already correct, ${noAccount} with no matching account`);
+  console.log(`  ${PAYMENT_CARD_COLLECTION}: ${linked} relinked, ${keptExplicit} kept explicit, ${alreadyCorrect} already correct, ${noAccount} with no matching account`);
 }
