@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { BACKEND_PUBLIC_URL } from '../../../lib/constants';
+import { setToken } from '../../../lib/auth';
 
 interface ScopeDescriptor {
   scope: string;
@@ -95,30 +96,40 @@ export default function OAuthConsentForm({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Login failed');
+      // The user just authenticated with their PSP credentials ON the PSP origin (this consent page).
+      // Establish the PSP portal session cookie (demo_token) for them: this is a legitimate IdP session
+      // (standard OIDC), and it lets the hosted checkout page (same origin) recognize the logged-in
+      // viewer and offer THEIR own saved cards. Cards remain strictly browser-token-scoped.
+      if (data.token) setToken(data.token);
       // The /auth/login response exposes the OIDC subject as `sub`; older payloads only carried
       // `customerAuthenticationInstanceReference`. Accept either so `_psp_sub` is always a real UUID.
       const s = data.user.sub ?? data.user.customerAuthenticationInstanceReference;
       setUserSub(s);
-      setView('consent');
-      // E-10: fetch scopes already granted to this client so we can highlight new permissions.
+      // E-10: check what this client was ALREADY granted BEFORE deciding what to show, so the consent
+      // list never flashes on screen when it is not needed.
+      // OAuth2/OIDC (RFC 6749 §4.1 + OIDC Core §3.1.2.3): once an active consent grant already covers
+      // every requested scope, the authorization server SHOULD NOT re-prompt — it auto-approves
+      // (equivalent to "Allow") and redirects, WITHOUT showing the permissions/Allow-Deny screen.
+      // Only new/broader (ungranted) scopes require the user to decide, so we show the list only then.
       try {
         const qs = new URLSearchParams({ ...originalSearchParams, _psp_sub: s });
         const r = await fetch(`${BACKEND_PUBLIC_URL}/api/v1/auth/authorize?${qs.toString()}`, { cache: 'no-store' });
         const d = await r.json();
         const prior: string[] = r.ok && Array.isArray(d.previously_granted_scopes) ? d.previously_granted_scopes : [];
-        setPriorScopes(prior);
-        // OAuth2/OIDC (RFC 6749 §4.1 + OIDC Core §3.1.2.3): once an active consent grant already
-        // covers every requested scope, the authorization server SHOULD NOT re-prompt for consent —
-        // re-consent is only required for new/broader scopes (or an explicit prompt=consent). We
-        // therefore auto-approve here (equivalent to the user clicking "Allow") instead of showing
-        // the scope checkboxes again, so consent is asked once per grant rather than on every login.
         const requested = scopeDetails.map((sc) => sc.scope);
         const allCovered = prior.length > 0 && requested.every((sc) => prior.includes(sc));
         if (allCovered) {
+          // Already consented → go straight through, no permissions screen shown.
           window.location.href = buildGrantUrl(s, requested);
           return;
         }
-      } catch { /* non-fatal: fall back to first-time consent view */ }
+        // New/broader scopes → show the consent screen so the user can decide (highlighting the new ones).
+        setPriorScopes(prior);
+        setView('consent');
+      } catch {
+        // Could not determine the prior grant → safe default is to ASK (show the consent screen).
+        setView('consent');
+      }
     } catch (err: any) {
       setError(err.message ?? 'Login failed');
     } finally {

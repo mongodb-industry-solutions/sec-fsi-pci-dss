@@ -24,6 +24,11 @@ export const ENV = {
   pspBaseUrl: () => req('PSP_MERCHANT_PSP_BASE_URL', 'http://localhost:8081'),
   // Browser-facing PSP consent/login page (PSP frontend). Backend /authorize returns JSON, not UI.
   pspAuthorizeUrl: () => req('PSP_MERCHANT_AUTHORIZE_URL', 'http://localhost:8080/auth/authorize'),
+  // Browser-facing PSP front-channel logout page (single sign-out): clears the PSP portal session
+  // cookie same-origin, then bounces back to this app. Derived from the authorize URL by default.
+  pspLogoutUrl: () =>
+    process.env.PSP_MERCHANT_LOGOUT_URL ??
+    req('PSP_MERCHANT_AUTHORIZE_URL', 'http://localhost:8080/auth/authorize').replace('/auth/authorize', '/auth/logout'),
   clientId: () => reqOrDev('PSP_MERCHANT_OAUTH_CLIENT_ID', 'oauth001-0000-4000-8000-000000000001'),
   clientSecret: () => reqOrDev('PSP_MERCHANT_OAUTH_CLIENT_SECRET', 'espresso-demo-secret-2026'),
   // This app's public base URL (local default 8082; container listens on 8080 behind ingress).

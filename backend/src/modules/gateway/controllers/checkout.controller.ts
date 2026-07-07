@@ -5,7 +5,6 @@ import { FastifyInstance } from 'fastify';
 import {
   createCheckoutSession,
   getCheckoutSession,
-  getCheckoutSavedCards,
   processCheckoutPayment,
   cancelCheckoutSession,
 } from '../services/checkout.service';
@@ -147,52 +146,11 @@ export async function checkoutController(fastify: FastifyInstance) {
     return reply.send(session);
   });
 
-  // GET /api/v1/checkout/sessions/:id/saved-cards
-  // Public (session-scoped): returns the SAVED CARDS of the logged-in user this session was created
-  // for, so the hosted page can offer a one-tap card pick. Ownership is enforced entirely server-side
-  // from the session's acting party — no caller-supplied id is trusted. Display-safe only: surrogate
-  // token + masked PAN + network/alias. Never the full PAN, never the CVV/PIN (PCI DSS Req 3.2 / 3.4).
-  // An anonymous session (no acting user) returns an empty list.
-  fastify.get('/sessions/:id/saved-cards', {
-    schema: {
-      tags: ['payment:checkout'],
-      summary: 'List the acting user\'s saved cards for this checkout session (public, session-scoped)',
-      description: 'When the checkout session was created on behalf of a logged-in user, returns that payer\'s display-safe saved cards (surrogate token + masked PAN only) so the hosted page can offer a saved-card pick. Ownership is resolved server-side from the session; no full PAN or CVV is ever returned. Anonymous sessions return an empty list.',
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'string', description: 'checkoutSessionInstanceReference UUID.' } },
-      },
-      response: {
-        200: {
-          type: 'object',
-          properties: {
-            results: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  paymentCardInstanceReference: { type: 'string' },
-                  cardToken: { type: 'string', description: 'PAN surrogate token (not CHD). Used to pay with the saved card.' },
-                  paymentCardMaskedPanDisplay: { type: 'string' },
-                  paymentCardNetwork: { type: 'string', nullable: true },
-                  paymentCardAlias: { type: 'string', nullable: true },
-                  paymentCardIsPreferred: { type: 'boolean', nullable: true },
-                },
-              },
-            },
-          },
-        },
-        404: { $ref: 'Error#' },
-      },
-    },
-  }, async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const session = await getCheckoutSession(fastify.db, id);
-    if (!session) return reply.status(404).send({ error: 'Checkout session not found' });
-    const results = await getCheckoutSavedCards(fastify.db, id);
-    return reply.send({ results });
-  });
+  // NOTE: there is deliberately NO session-scoped saved-cards endpoint. Cards are shown only for the
+  // AUTHENTICATED viewer of the browser (GET /customer/me/cards, resolved from the PSP portal token).
+  // Resolving cards from the session's stored acting party would reveal that user's cards to ANYONE who
+  // opens the checkout URL without being logged in — a security/PCI/GDPR leak. Both the redirect
+  // checkout and the payment link are browser-token-only: no logged-in viewer → new-card form only.
 
   // POST /api/v1/checkout/sessions/:id/pay
   fastify.post('/sessions/:id/pay', {

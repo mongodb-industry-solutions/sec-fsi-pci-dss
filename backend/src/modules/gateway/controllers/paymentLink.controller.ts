@@ -199,10 +199,12 @@ export async function paymentLinkController(fastify: FastifyInstance) {
       },
       body: {
         type: 'object',
-        required: ['cardToken', 'cardholderName', 'cardExpiryMonth', 'cardExpiryYear'],
+        required: ['cardToken', 'cardholderName'],
         properties: {
           cardToken: { type: 'string' },
           cardholderName: { type: 'string', minLength: 1, maxLength: 100 },
+          // Expiry is optional: a saved/tokenized card authorizes on the token (the issuer does not
+          // re-validate expiry for it), so the viewer supplies only the CVV. A new card sends both.
           cardExpiryMonth: { type: 'string', pattern: '^(0[1-9]|1[0-2])$' },
           cardExpiryYear: { type: 'string', pattern: '^20[2-9][0-9]$' },
           cardCvv: { type: 'string', pattern: '^[0-9]{3,4}$', description: 'Card verification value. Forwarded to the issuer for verification ONLY; never persisted (PCI DSS Req 3.2). A wrong/missing CVV declines.' },
@@ -231,8 +233,8 @@ export async function paymentLinkController(fastify: FastifyInstance) {
     const body = request.body as {
       cardToken: string;
       cardholderName: string;
-      cardExpiryMonth: string;
-      cardExpiryYear: string;
+      cardExpiryMonth?: string;
+      cardExpiryYear?: string;
       cardCvv?: string;
       customerEmail?: string;
       cardAuthOutcome?: 'approved' | 'declined' | 'challenge';

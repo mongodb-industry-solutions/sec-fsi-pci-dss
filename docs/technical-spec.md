@@ -1783,6 +1783,18 @@ QE equality search on the corresponding encrypted field.
 
 > Base path: `/api/v1/customer/:customerId/cards` — cards as sub-resource of Customer Agreement (SD-53)
 
+#### `GET /customer/me/cards`
+
+Returns the **authenticated caller's own** saved cards (SD-88), resolved server-side from the JWT (`request.user.partyRef` → own agreement via `getOwnAgreementId`). Takes **no id** from the client, so it cannot be used to read another party's cards. Used by the hosted checkout and payment-link pages to offer the *viewer's* saved cards, gated purely on the browser's PSP session token (never the session/link's stored acting party — that would leak the creator's cards on a shared link).
+
+**Response 200** (display-safe only — surrogate token + masked PAN; never full PAN, CVV or expiry):
+```json
+{ "results": [
+  { "paymentCardInstanceReference": "...", "cardToken": "pm_...", "paymentCardMaskedPanDisplay": "****-****-****-1234", "paymentCardNetwork": "VISA", "paymentCardAlias": "Personal", "paymentCardIsPreferred": true }
+] }
+```
+A caller with no customer agreement (e.g. staff) receives `{ "results": [] }`.
+
 #### `POST /customer/:customerId/cards`
 
 Registers a tokenized card linked to a customer agreement.

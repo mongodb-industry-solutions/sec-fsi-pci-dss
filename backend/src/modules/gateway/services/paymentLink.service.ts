@@ -131,8 +131,10 @@ export interface ProcessLinkPaymentInput {
   linkCode: string;
   cardToken: string;
   cardholderName: string;
-  cardExpiryMonth: string;
-  cardExpiryYear: string;
+  // Optional: a saved/tokenized card authorizes on the token (issuer does not validate expiry for it);
+  // only new-card entry supplies expiry.
+  cardExpiryMonth?: string;
+  cardExpiryYear?: string;
   customerEmail?: string;
   cardAuthOutcome?: 'approved' | 'declined' | 'challenge';
   // The CVV the buyer entered on the payment-link page. Forwarded to the issuer for verification ONLY

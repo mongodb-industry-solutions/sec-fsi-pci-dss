@@ -494,6 +494,17 @@ export interface RoleRecordDTO {
   recordUpdatedDateTime?: string;
 }
 
+// Display-safe saved card returned by GET /customer/me/cards and rendered by the hosted payment
+// pages' saved-card selector. Surrogate token + masked PAN only; never the full PAN, CVV or expiry.
+export interface SavedCardDisplay {
+  paymentCardInstanceReference: string;
+  cardToken: string;
+  paymentCardMaskedPanDisplay: string;
+  paymentCardNetwork?: string;
+  paymentCardAlias?: string;
+  paymentCardIsPreferred?: boolean;
+}
+
 export const api = {
   acl: {
     effective: (token: string) =>
@@ -669,6 +680,12 @@ export const api = {
       apiFetch<{ results: Record<string, unknown>[] }>(
         `/api/v1/customer/${encodeURIComponent(customerId)}/cards`, {}, token
       ),
+    // The AUTHENTICATED caller's OWN saved cards (display-safe). The agreement is resolved server-side
+    // from the token (partyRef) — never a client-supplied id — so a caller only ever sees their own
+    // cards. Used by the hosted payment pages to offer a saved-card pick to the signed-in viewer.
+    // Display-safe only: surrogate token + masked PAN + network + alias + preferred. No PAN/CVV/expiry.
+    getMyCards: (token: string) =>
+      apiFetch<{ results: SavedCardDisplay[] }>('/api/v1/customer/me/cards', {}, token),
     addCard: (
       customerId: string,
       body: {
@@ -1306,19 +1323,6 @@ export const api = {
         checkoutSessionCancelUrl: string;
         hasActingUser?: boolean;
       }>(`/api/v1/checkout/sessions/${sessionId}`),
-    // Saved cards of the logged-in user this session was created for (session-scoped, ownership
-    // enforced server-side). Display-safe: surrogate token + masked PAN only, never the full PAN/CVV.
-    getSavedCards: (sessionId: string) =>
-      apiFetch<{
-        results: Array<{
-          paymentCardInstanceReference: string;
-          cardToken: string;
-          paymentCardMaskedPanDisplay: string;
-          paymentCardNetwork?: string;
-          paymentCardAlias?: string;
-          paymentCardIsPreferred?: boolean;
-        }>;
-      }>(`/api/v1/checkout/sessions/${sessionId}/saved-cards`),
     pay: (sessionId: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth?: string; cardExpiryYear?: string; cardCvv?: string; cardholderEmail?: string; saveCard?: boolean }) =>
       apiFetch<{ success: boolean; declined?: boolean; cardTransactionInstanceReference?: string | null; responseCode?: string; declineReason?: string; redirectUrl?: string | null }>(
         `/api/v1/checkout/sessions/${sessionId}/pay`, { method: 'POST', body: JSON.stringify(body) }
@@ -1361,7 +1365,7 @@ export const api = {
         paymentLinkStatus: string;
         paymentLinkExpiresAt?: string;
       }>(`/api/v1/payment/links/${code}`),
-    pay: (code: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth: string; cardExpiryYear: string; cardCvv?: string; customerEmail?: string }) =>
+    pay: (code: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth?: string; cardExpiryYear?: string; cardCvv?: string; customerEmail?: string }) =>
       apiFetch<{ success: boolean; declined?: boolean; cardTransactionInstanceReference?: string | null; fraudDiagnosisInstanceReference?: string | null; responseCode?: string; declineReason?: string }>(
         `/api/v1/payment/links/${code}/pay`, { method: 'POST', body: JSON.stringify(body) }
       ),
