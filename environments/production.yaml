@@ -9,6 +9,8 @@ env:
   PSP_OAUTH_KEY_PROVIDER: aws
   PSP_CORS_ORIGIN: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com"
   PSP_URL_FRONTEND: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com"
+  # Merchant public URL — used by the merchant seeder to resolve OIDC branding (logo_uri/client_uri).
+  PSP_MERCHANT_BASE_URL: "https://sec-fsi-pci-dss-merchant.industrysolutions.prod.corp.mongodb.com"
 
 envSecrets:
   MONGODB_URI: sec-fsi-pci-dss-secrets-prod

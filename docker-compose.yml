@@ -31,6 +31,8 @@ services:
       PSP_PROJECT_ROOT: /app
       PSP_CORS_ORIGIN: "http://localhost:8080,http://127.0.0.1:8080"
       MONGODB_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
+      # Used by the merchant seeder to resolve the OIDC branding URLs (logo_uri/client_uri).
+      PSP_MERCHANT_BASE_URL: ${PSP_MERCHANT_BASE_URL:-http://localhost:8082}
     volumes:
       - ./backend/keys:/app/backend/keys:ro
     healthcheck:

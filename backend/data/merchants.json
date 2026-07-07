@@ -31,8 +31,8 @@
       "oauthTokenLifetimeSeconds": 3600,
       "oauthRefreshTokenLifetimeDays": 30,
       "oauthRequirePkce": true,
-      "oauthLogoUri": "http://localhost:8082/espresso-logo.svg",
-      "oauthClientUri": "http://localhost:8082"
+      "oauthLogoUri": "{{MERCHANT_BASE_URL}}/espresso-logo.svg",
+      "oauthClientUri": "{{MERCHANT_BASE_URL}}"
     },
     "merchantWebhooks": [
       {
