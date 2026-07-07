@@ -2,6 +2,25 @@
 import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { logoutSession } from '../../../lib/logout';
+import { MERCHANT_PUBLIC_URL } from '../../../lib/constants';
+
+// Resolve the post-logout redirect safely. Allowing any absolute http(s) URL is an open redirect
+// (?redirect=https://evil.example). Permit only: (1) a same-origin relative path (single leading '/',
+// not '//' or '/\' protocol-relative/backslash tricks), or (2) an absolute URL whose origin is on the
+// allowlist — the PSP itself plus known relying parties (the merchant demo app). Anything else → home.
+function safeRedirect(raw: string | null): string {
+  if (!raw) return '/';
+  if (/^\/(?![/\\])/.test(raw)) return raw; // same-origin relative path
+  try {
+    const url = new URL(raw);
+    const allowed = new Set<string>([window.location.origin]);
+    try { allowed.add(new URL(MERCHANT_PUBLIC_URL).origin); } catch { /* ignore bad config */ }
+    if ((url.protocol === 'https:' || url.protocol === 'http:') && allowed.has(url.origin)) {
+      return url.toString();
+    }
+  } catch { /* not a parseable URL */ }
+  return '/';
+}
 
 // ---------------------------------------------------------------------------
 // PSP RP-initiated logout endpoint (OIDC-style front-channel logout).
@@ -25,11 +44,9 @@ function LogoutInner() {
       // same-origin cookie. Both happen before we redirect back to the RP.
       await logoutSession();
       if (cancelled) return;
-      // Bounce back to the RP's post-logout URL. Only absolute http(s) URLs are honoured
-      // (avoids an open-redirect); anything else falls back to the PSP home.
-      const raw = searchParams.get('redirect');
-      const safe = raw && /^https?:\/\//i.test(raw) ? raw : '/';
-      window.location.replace(safe);
+      // Bounce back to the RP's post-logout URL, restricted to same-origin paths + an allowlist of
+      // known RP origins (see safeRedirect) so ?redirect= cannot be abused as an open redirect.
+      window.location.replace(safeRedirect(searchParams.get('redirect')));
     })();
     return () => { cancelled = true; };
   }, [searchParams]);
