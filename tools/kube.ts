@@ -473,6 +473,7 @@ async function podLogs() {
   // pod visible under option 14) — enter its exact pod name.
   console.log("\n  1. backend\n  2. frontend\n  3. custom (enter a pod name)");
   const input = await ask("Which service? ");
+  if (!["1", "2", "3"].includes(input)) { warn(`Invalid choice "${input}". Choose 1, 2 or 3.`); return; }
   const tail = (await ask("Lines to show (default: 50): ")) || "50";
   const env = kubeEnv();
 
@@ -514,6 +515,7 @@ async function helmStatus() {
 async function rolloutRestart() {
   console.log("\n  1. backend\n  2. frontend\n  3. merchant\n  4. all");
   const input = await ask("Restart which? ");
+  if (!["1", "2", "3", "4"].includes(input)) { warn(`Invalid choice "${input}". Choose 1-4.`); return; }
   if (input === "1" || input === "4") {
     run(`kubectl rollout restart deployment ${RELEASE_BACKEND}-web-app -n ${IST_NAMESPACE}`);
   }
