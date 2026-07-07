@@ -13,7 +13,7 @@ import { test, expect, Page } from '@playwright/test';
 
 const RUN = process.env.RUN_MERCHANT_E2E === '1';
 const EMAIL = process.env.MERCHANT_E2E_EMAIL ?? 'luis.fernandez@back.es';
-const PASSWORD = process.env.MERCHANT_E2E_PASSWORD ?? 'demo';
+const PASSWORD = process.env.MERCHANT_E2E_PASSWORD ?? 'demo-password';
 
 test.describe('Merchant ↔ Leafy Pay SSO + API', () => {
   test.skip(!RUN, 'Set RUN_MERCHANT_E2E=1 with the full PSP + merchant stack running.');

@@ -82,10 +82,17 @@ export async function checkoutController(fastify: FastifyInstance) {
     // user's OAuth Bearer, capture who created this session so the resulting purchase is attributed to the
     // payer (visible in their payment history) and audited in the connected-apps operations view. A missing
     // or invalid token simply leaves the session unattributed — the public flow is unchanged.
-    const merchantCtx = await tryMerchantContext(request);
-    const actingPartyReference = merchantCtx?.sub
-      ? await resolvePartyInstanceReference(fastify.db, merchantCtx.sub) ?? undefined
-      : undefined;
+    // Fully best-effort: neither token resolution nor the subject→party lookup may fail this PUBLIC
+    // endpoint. A DB blip during the party lookup must leave the session unattributed, not return 500.
+    let actingPartyReference: string | undefined;
+    try {
+      const merchantCtx = await tryMerchantContext(request);
+      if (merchantCtx?.sub) {
+        actingPartyReference = await resolvePartyInstanceReference(fastify.db, merchantCtx.sub) ?? undefined;
+      }
+    } catch {
+      actingPartyReference = undefined;
+    }
 
     const result = await createCheckoutSession(fastify.db, {
       merchantAgreementInstanceReference: body.merchantAgreementInstanceReference,
