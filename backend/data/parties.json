@@ -13,9 +13,9 @@
   },
   {
     "partyInstanceReference": "b0000002-0000-4000-8000-000000000002",
-    "partyEmailAddress": "sofia.santos@gmail.com",
+    "partyEmailAddress": "julia.santos@back.es",
     "partyMobilePhoneNumber": "+34 687 234 890",
-    "partyName": "Sofia Santos",
+    "partyName": "Julia Santos",
     "partyType": "customer",
     "bianServiceDomain": "Party Data Management",
     "bianControlRecordType": "Party",
@@ -746,7 +746,7 @@
   },
   {
     "partyInstanceReference": "b0000065-0000-4000-8000-000000000065",
-    "partyEmailAddress": "marco.rossi@bank.demo",
+    "partyEmailAddress": "marco.rossi@back.es",
     "partyMobilePhoneNumber": "+39 347 123 4567",
     "partyName": "Marco Rossi",
     "partyType": "employee",
@@ -768,6 +768,30 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "partyInstanceReference": "b0000071-0000-4000-8000-000000000071",
+    "partyEmailAddress": "maria.garcia@back.es",
+    "partyMobilePhoneNumber": "+34 691 234 567",
+    "partyName": "Maria Garcia",
+    "partyType": "customer",
+    "bianServiceDomain": "Party Data Management",
+    "bianControlRecordType": "Party",
+    "recordCreatedDateTime": "2026-01-01T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-11T10:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "partyInstanceReference": "b0000072-0000-4000-8000-000000000072",
+    "partyEmailAddress": "ahmed.hassan@back.es",
+    "partyMobilePhoneNumber": "+971 50 123 4567",
+    "partyName": "Ahmed Hassan",
+    "partyType": "customer",
+    "bianServiceDomain": "Party Data Management",
+    "bianControlRecordType": "Party",
+    "recordCreatedDateTime": "2026-02-01T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-11T10:00:00.000Z",
     "schemaVersion": 1
   }
 ]

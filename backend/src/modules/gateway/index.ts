@@ -19,6 +19,7 @@ import { paymentLinkController }          from './controllers/paymentLink.contro
 import { payoutAccountController }        from './controllers/payoutAccount.controller';
 import { paymentExecutionController }     from './controllers/paymentExecution.controller';
 import { merchantBeneficiaryController }  from './controllers/merchantBeneficiary.controller';
+import { merchantGatewayController }       from './controllers/merchantGateway.controller';
 import { beneficiaryController }          from './controllers/beneficiary.controller';
 import { transferController }             from './controllers/transfer.controller';
 
@@ -46,6 +47,9 @@ export async function gatewayModule(fastify: FastifyInstance) {
 
   // SD-54: Counterparty Admin — merchant OAuth on behalf of user  (v17)
   await fastify.register(merchantBeneficiaryController, { prefix: '/merchant/beneficiaries' });
+
+  // SD-65 + SD-66: Merchant OAuth on-behalf-of accounts/transactions/transfers  (v18)
+  await fastify.register(merchantGatewayController,     { prefix: '/merchant' });
 
   // SD-54: Counterparty Admin — staff-facing JWT view + management
   await fastify.register(beneficiaryController,         { prefix: '/beneficiaries' });

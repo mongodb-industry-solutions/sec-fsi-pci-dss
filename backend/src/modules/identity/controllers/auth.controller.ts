@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
-import { loginUser, getDemoUsers, getEnabledDomains, updateAuthProfile, JwtPayload } from '../services/auth.service';
+import { loginUser, getDemoUsers, getEnabledDomains, updateAuthProfile, bumpSessionEpoch, JwtPayload } from '../services/auth.service';
 import { getSelfProfile, updateSelfProfile } from '../../customer/services/customerAgreement.service';
 import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../models/party.model';
@@ -66,9 +66,13 @@ Password for all demo users: \`demo-password\``,
               type: 'object',
               description: 'Authenticated user summary.',
               properties: {
+                sub: {
+                  type: 'string',
+                  description: 'User UUID (OIDC `sub`). Same value as customerAuthenticationInstanceReference; the canonical identity claim used by the OAuth consent flow.',
+                },
                 customerAuthenticationInstanceReference: {
                   type: 'string',
-                  description: 'Primary key UUID of the customerAuthenticationAssessment document (BIAN SD-91 Control Record identifier).',
+                  description: 'Primary key UUID of the customerAuthenticationAssessment document (BIAN SD-91 Control Record identifier). Kept for back-compat; equals `sub`.',
                 },
                 name: { type: 'string', description: 'Display name.' },
                 email: { type: 'string', format: 'email', description: 'Login email address.' },
@@ -102,6 +106,7 @@ Password for all demo users: \`demo-password\``,
       return reply.status(200).send({
         token,
         user: {
+          sub: user.sub,
           customerAuthenticationInstanceReference: user.sub,
           name: user.name,
           email: user.email,
@@ -113,6 +118,29 @@ Password for all demo users: \`demo-password\``,
       const statusCode = (e.statusCode === 400 || e.statusCode === 401 ? e.statusCode : 500) as 400 | 401 | 500;
       return reply.status(statusCode).send({ error: e.message });
     }
+  });
+
+  // Server-side logout: invalidate every outstanding session token for the caller by advancing
+  // their SD-91 session epoch. Stateless (no token store): the auth middleware rejects any token
+  // whose stamped epoch is now behind. The client still clears its cookie, but this closes the gap
+  // where a stale/copied token stayed valid until natural expiry (e.g. a hosted checkout that reads
+  // the PSP session to surface saved cards). Behind the global middleware, so `request.user` is set.
+  fastify.post('/logout', {
+    schema: {
+      tags: ['auth'],
+      summary: 'Log out (invalidate the caller\'s session tokens)',
+      description: 'Advances the caller\'s SD-91 session epoch, immediately invalidating all of their outstanding session JWTs server-side. No token is stored.',
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: { type: 'object', properties: { loggedOut: { type: 'boolean' } } },
+        401: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const user = (request as FastifyRequest & { user?: JwtPayload }).user;
+    if (!user?.sub) return reply.status(401).send({ error: 'Unauthenticated' });
+    await bumpSessionEpoch(fastify.db, user.sub);
+    return reply.status(200).send({ loggedOut: true });
   });
 
   fastify.get('/users', {

@@ -461,6 +461,41 @@ async function main() {
     });
   }
 
+  // -- Consistency guard (prevents party/auth email drift) ----------─
+  // The self-profile lookup resolves a customer's agreement via QE:equality
+  // match of party.partyEmailAddress == login email (customerAgreement.service
+  // getSelfProfile). If any authentication's email has no party whose
+  // partyEmailAddress matches exactly — or its partyInstanceReference points
+  // to a non-existent party — /system/cards silently returns empty. Fail loud
+  // at generation time instead of shipping drifted seed data.
+  const partyByRef = new Map(parties.map((p) => [p.partyInstanceReference, p]));
+  const partyEmails = new Set(parties.map((p) => p.partyEmailAddress));
+  const drift: string[] = [];
+  for (const auth of customerAuthentications) {
+    const party = partyByRef.get(auth.partyInstanceReference);
+    if (!party) {
+      drift.push(
+        `login ${auth.customerAuthenticationEmailAddress} → partyInstanceReference ` +
+          `${auth.partyInstanceReference} has no matching party record`,
+      );
+      continue;
+    }
+    if (party.partyEmailAddress !== auth.customerAuthenticationEmailAddress) {
+      drift.push(
+        `login ${auth.customerAuthenticationEmailAddress} → party ` +
+          `${auth.partyInstanceReference} partyEmailAddress is ` +
+          `${party.partyEmailAddress} (must equal the login email)`,
+      );
+    } else if (!partyEmails.has(auth.customerAuthenticationEmailAddress)) {
+      drift.push(`login ${auth.customerAuthenticationEmailAddress} has no party with matching partyEmailAddress`);
+    }
+  }
+  if (drift.length > 0) {
+    throw new Error(
+      `Seed consistency check failed — party/authentication email drift:\n  - ${drift.join('\n  - ')}`,
+    );
+  }
+
   // -- Write files --------------------------------------------------─
   const write = (name: string, data: unknown[]) => {
     const filePath = path.join(OUT_DIR, name);

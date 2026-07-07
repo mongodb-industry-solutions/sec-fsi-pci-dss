@@ -146,6 +146,22 @@ export async function authorizePaymentOrder(db: Db, id: string) {
   };
 }
 
+// Terminal failure transition (e.g. issuer declined the tokenised charge). Persists so GET /:id
+// agrees with the POST response instead of remaining stuck at 'initiated'.
+export async function failPaymentOrder(db: Db, id: string) {
+  const now = new Date();
+  const result = await db.collection<PaymentOrderControlRecord>(PAYMENT_ORDER_COLLECTION).findOneAndUpdate(
+    { paymentOrderInstanceReference: id, paymentOrderStatus: { $in: ['initiated', 'confirmed'] } },
+    { $set: { paymentOrderStatus: 'failed' as PaymentOrderStatus, recordUpdatedDateTime: now } },
+    { returnDocument: 'after' },
+  );
+  if (!result) return null;
+  return {
+    paymentOrderInstanceReference: result.paymentOrderInstanceReference,
+    paymentOrderStatus: result.paymentOrderStatus,
+  };
+}
+
 export async function capturePaymentOrder(db: Db, id: string) {
   const now = new Date();
   const result = await db.collection<PaymentOrderControlRecord>(PAYMENT_ORDER_COLLECTION).findOneAndUpdate(

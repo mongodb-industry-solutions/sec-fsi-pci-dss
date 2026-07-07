@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '../../../../lib/api';
 import { deriveCardToken } from '../../../../lib/cardTokenize';
+import { useViewerSavedCards, SavedCardSelector, PayingWithSummary, SignedInBadge } from '../../../../components/gateway/SavedCardSelector';
 import { Lock, CreditCard, CheckCircle, XCircle, Clock, Eye, EyeOff } from 'lucide-react';
 
 type SessionData = Awaited<ReturnType<typeof api.checkout.getSession>>;
@@ -48,6 +49,15 @@ function CheckoutPageInner() {
   const [showCvv, setShowCvv] = useState(false);
   const cvvValid = /^\d{3,4}$/.test(cvv);
 
+  // HYBRID saved-card sourcing for the redirect checkout: PREFER this browser's PSP token (the
+  // viewer's own cards); if there is NO token (e.g. the payer authenticated via merchant SSO), FALL
+  // BACK to the session's acting-party cards, resolved server-side from the session id. When a saved
+  // card is selected we pay with its surrogate TOKEN and hide the name/number/expiry inputs; the
+  // payer supplies only the CVV to authorize. `NEW_CARD` (or no cards) shows the full new-card form.
+  // The optional ?card=<cardToken|cardRef> preselects a card ONLY within the shown set.
+  const wantedCard = searchParams.get('card') ?? searchParams.get('cardToken');
+  const { savedCards, selectedCardId, setSelectedCardId, selectedCard, usingSavedCard, viewerName } = useViewerSavedCards(wantedCard);
+
   // Apply GET params to form fields. Add more params here as the payment form grows.
   const applyPrefillParams = useCallback((sp: ReturnType<typeof useSearchParams>) => {
     const get = (p: PrefillParam) => sp.get(p);
@@ -87,6 +97,8 @@ function CheckoutPageInner() {
         // Initialise countdown
         const expiresAtMs = new Date(data.checkoutSessionExpiresAt).getTime();
         setSecondsLeft(Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000)));
+        // Saved cards are fetched separately by useViewerSavedCards: this browser's own token if
+        // present, else this session's acting-party cards (merchant-SSO payer). No source → no selector.
       }
     } catch {
       setState('error');
@@ -123,17 +135,30 @@ function CheckoutPageInner() {
     setState('paying');
     setError('');
 
-    const digits = cardNumber.replace(/\s/g, '');
-    // Deterministic token: the same card number always maps to the same token, so paying again
-    // with the same card never creates a duplicate card-on-file (it dedups in the registry).
-    const cardToken = await deriveCardToken(digits);
+    // Saved card: pay with the stored surrogate TOKEN (never a PAN — we never held it). New card:
+    // derive the deterministic token from the entered number (same PAN → same token, so re-paying
+    // never duplicates a card-on-file). The name is cosmetic (the issuer never validates it, PCI
+    // does not require it); for a saved card we send its alias/network as the display label.
+    let cardToken: string;
+    let payName: string;
+    if (usingSavedCard && selectedCard) {
+      cardToken = selectedCard.cardToken;
+      payName = selectedCard.paymentCardAlias || selectedCard.paymentCardNetwork || 'Saved card';
+    } else {
+      const digits = cardNumber.replace(/\s/g, '');
+      cardToken = await deriveCardToken(digits);
+      payName = cardholderName;
+    }
 
     try {
       const result = await api.checkout.pay(sessionId, {
         cardToken,
-        cardholderName,
-        cardExpiryMonth: expiryMonth.padStart(2, '0'),
-        cardExpiryYear: `20${expiryYear}`,
+        cardholderName: payName,
+        // Saved card: no expiry (the issuer authorizes on the token; only the CVV is re-checked).
+        // New card: send the entered expiry.
+        ...(usingSavedCard
+          ? {}
+          : { cardExpiryMonth: expiryMonth.padStart(2, '0'), cardExpiryYear: `20${expiryYear}` }),
         // Forward the entered CVV for issuer verification (never persisted; PCI Req 3.2). A wrong CVV declines.
         cardCvv: cvv,
         cardholderEmail: cardholderEmail || undefined,
@@ -242,19 +267,19 @@ function CheckoutPageInner() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-[#001E2B] text-white px-4 py-3 flex items-center gap-2">
-        <Lock size={16} className="text-[#00ED64]" />
-        <span className="font-semibold text-sm">Secure Payment</span>
-        <span className="ml-auto text-xs text-gray-400">Powered by MongoDB Gateway</span>
-      </header>
-
       <main className="flex-1 flex items-start justify-center py-8 px-4">
         <div className="w-full max-w-md space-y-4">
           {/* Order summary */}
           <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
             <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Payment to</div>
             <div className="font-semibold text-gray-800 text-lg">{session.merchantName}</div>
-            <div className="text-gray-500 text-sm mt-1">{session.checkoutSessionDescription}</div>
+            {/* Concept: clearly labeled so the payer sees exactly what they are being charged for. */}
+            {session.checkoutSessionDescription && (
+              <div className="mt-3">
+                <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Concept</div>
+                <div className="text-gray-700 text-sm">{session.checkoutSessionDescription}</div>
+              </div>
+            )}
             <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
               <span className="text-gray-500 text-sm">Total</span>
               <span className="text-2xl font-bold text-gray-900">
@@ -286,38 +311,59 @@ function CheckoutPageInner() {
               )}
             </div>
 
+            {/* Confirms the payer is recognised by the PSP (their session persists). Nothing when
+                not logged in. */}
+            <SignedInBadge name={viewerName} />
+
+            {/* Saved-card selector: shown ONLY when this browser's authenticated viewer has cards on
+                file. Choosing a saved card pays with its token (no PAN entry); "Use a new card"
+                reveals the full form. Identical UI on the payment-link page. */}
+            <SavedCardSelector savedCards={savedCards} selectedCardId={selectedCardId} onSelect={setSelectedCardId} />
+
             <form onSubmit={handlePay} className="space-y-3">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Cardholder Name</label>
-                <input
-                  required
-                  type="text"
-                  value={cardholderName}
-                  onChange={(e) => setCardholderName(e.target.value)}
-                  placeholder="Name on card"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 focus:border-[#00ED64]"
-                />
-              </div>
+              {usingSavedCard && selectedCard ? (
+                // Saved card chosen: name + number are on file, so they are neither shown nor
+                // re-entered. Only the masked PAN is displayed (PCI: never the full PAN). The payer
+                // still supplies only the CVV below to authorize (no expiry for a tokenized card).
+                <PayingWithSummary card={selectedCard} />
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Cardholder Name</label>
+                    <input
+                      required
+                      type="text"
+                      value={cardholderName}
+                      onChange={(e) => setCardholderName(e.target.value)}
+                      placeholder="Name on card"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 focus:border-[#00ED64]"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Card Number</label>
-                <input
-                  required
-                  type="text"
-                  value={cardNumber}
-                  onChange={(e) => setCardNumber(e.target.value.replace(/[^\d\s]/g, '').slice(0, 19))}
-                  placeholder="0000 0000 0000 0000"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 focus:border-[#00ED64]"
-                  inputMode="numeric"
-                />
-              </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Card Number</label>
+                    <input
+                      required
+                      type="text"
+                      value={cardNumber}
+                      onChange={(e) => setCardNumber(e.target.value.replace(/[^\d\s]/g, '').slice(0, 19))}
+                      placeholder="0000 0000 0000 0000"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 focus:border-[#00ED64]"
+                      inputMode="numeric"
+                    />
+                  </div>
+                </>
+              )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className={`grid gap-3 ${usingSavedCard ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                {/* Expiry is only entered for a NEW card. For a saved/tokenized card it is on file and
+                    the issuer authorizes on the token, so the payer re-enters only the CVV below. */}
+                {!usingSavedCard && (
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Expiry (MM / YY)</label>
                   <div className="flex gap-2">
                     <input
-                      required
+                      required={!usingSavedCard}
                       type="text"
                       value={expiryMonth}
                       onChange={(e) => setExpiryMonth(e.target.value.replace(/\D/g, '').slice(0, 2))}
@@ -326,7 +372,7 @@ function CheckoutPageInner() {
                       className="w-1/2 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 focus:border-[#00ED64]"
                     />
                     <input
-                      required
+                      required={!usingSavedCard}
                       type="text"
                       value={expiryYear}
                       onChange={(e) => setExpiryYear(e.target.value.replace(/\D/g, '').slice(0, 2))}
@@ -336,6 +382,7 @@ function CheckoutPageInner() {
                     />
                   </div>
                 </div>
+                )}
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">CVV</label>
                   <div className="relative">
@@ -368,7 +415,7 @@ function CheckoutPageInner() {
                   {cvvTouched && !cvvValid ? (
                     <p className="text-xs text-red-600 mt-0.5">Enter the 3 or 4 digit code.</p>
                   ) : (
-                    <p className="text-xs text-gray-400 mt-0.5">Validated locally, never stored (PCI DSS Req 3.2).</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Validated locally, never stored.</p>
                   )}
                 </div>
               </div>

@@ -16,6 +16,9 @@ import { getCardByToken, upsertCardByToken } from '../../customer/services/payme
 import { sendMerchantPaymentCallback } from '../../gateway/services/merchantCallback.service';
 import { createNotification } from '../../notification/notifications.service';
 import { getEventBus, makeEvent } from '../../../vendors/eventbus';
+import { PAYMENT_EXECUTION_COLLECTION } from '../../gateway/models/paymentExecution.model';
+import { computeFee } from '../../gateway/services/paymentExecution.service';
+import { MERCHANT_AGREEMENT_COLLECTION, MerchantAgreementControlRecord } from '../../gateway/models/merchantAgreement.model';
 
 export interface CreateTransactionInput {
   cardToken: string;
@@ -119,6 +122,76 @@ export async function resolveCustomerAgreement(db: Db, accountReference: string)
   } catch {
     return {};
   }
+}
+
+/**
+ * Resolve a party's canonical account reference (customerAgreementReference, e.g. ACC-xxx) from its
+ * SD-13 partyInstanceReference. Used to (a) stamp a checkout/API payment with the payer's account so it
+ * lands under them in payment history, and (b) list a party's card transactions for the merchant history
+ * union. The reference is a plaintext business key (not CHD) — no QE decrypt needed for the read.
+ */
+export async function resolveAccountReferenceForParty(db: Db, partyInstanceReference: string): Promise<string | undefined> {
+  if (!partyInstanceReference) return undefined;
+  try {
+    const l1Db = await getDbForRole('level1_analyst', false);
+    const agreement = await l1Db
+      .collection<{ customerAgreementReference?: string }>(CUSTOMER_AGREEMENT_COLLECTION)
+      .findOne({ partyInstanceReference } as Record<string, unknown>);
+    return agreement?.customerAgreementReference;
+  } catch {
+    return undefined;
+  }
+}
+
+// Display-safe card transaction row for the merchant on-behalf-of history union (no CHD, no PAN/CVV).
+export interface PartyCardTransactionRow {
+  cardTransactionInstanceReference: string;
+  grossAmount: number;
+  currency: string;
+  status: string;
+  merchantName: string;
+  maskedPan: string;
+  channel: string;
+  cardTransactionDescription: string;
+  initiatedAt: string | null;
+}
+
+/**
+ * List a party's OWN card transactions (SD-254) by canonical account reference (QE:equality), projected
+ * display-safe for the merchant portal history. PCI DSS: exposes only amount, currency, status, merchant
+ * name, the already-masked PAN, channel and date — never a full PAN/CVV or the raw gateway payload.
+ */
+export async function getPartyCardTransactions(
+  db: Db,
+  accountReference: string,
+  cap = 200,
+  merchantAgreementInstanceReference?: string,
+): Promise<PartyCardTransactionRow[]> {
+  if (!accountReference) return [];
+  const qeDb = await getDbForRole('level1_analyst', false);
+  // When a merchant is supplied (merchant portal), scope to that merchant's own purchases only (SD-89
+  // data isolation): a merchant never sees the user's card purchases made in other merchants or the PSP.
+  const query = {
+    cardTransactionAccountReference: accountReference,
+    ...(merchantAgreementInstanceReference ? { merchantAgreementInstanceReference } : {}),
+  } as Partial<CardTransactionLogControlRecord>;
+  const docs = await qeDb
+    .collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION)
+    .find(query)
+    .sort({ cardTransactionDateTime: -1 })
+    .limit(cap)
+    .toArray();
+  return docs.map((d) => ({
+    cardTransactionInstanceReference: d.cardTransactionInstanceReference,
+    grossAmount: d.cardTransactionAmount?.amount ?? 0,
+    currency: d.cardTransactionAmount?.currency ?? '',
+    status: d.cardTransactionStatus,
+    merchantName: d.cardTransactionMerchantName,
+    maskedPan: d.cardTransactionMaskedPanDisplay,
+    channel: d.cardTransactionChannel,
+    cardTransactionDescription: d.cardTransactionDescription,
+    initiatedAt: d.cardTransactionDateTime ? new Date(d.cardTransactionDateTime).toISOString() : null,
+  }));
 }
 
 // Outcome of an authorization journey (resolved when the saga reaches a terminal payment event).
@@ -297,6 +370,42 @@ export function publishIssuerValidationCompleted(txnId: string, decision: { appr
   }));
 }
 
+// v18 (A-06/A-07): apply the merchant's CURRENT commission (SD-89) to an authorized acquiring payment
+// (SD-254) and persist feeAmount + attribution on the cardTransactionLog. Idempotent — the `fee.$exists`
+// filter makes a re-run a no-op, so the same transaction is never charged twice. Emits an attributed
+// businessProcessEvent (SD-16, PCI DSS Req 10) so the collection is auditable and shows in the merchant
+// activity view. `fee` carries only amounts/attribution (no CHD) → not QE-encrypted.
+async function applyMerchantCommissionToCardTxn(
+  db: Db,
+  writeDb: Db,
+  txnId: string,
+  merchantReference: string,
+  amount: number,
+  currency: string,
+): Promise<void> {
+  const merchant = await db
+    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
+    .findOne({ merchantAgreementInstanceReference: merchantReference }, { projection: { merchantCommissionRate: 1 } });
+  const { feeAmount, fee } = computeFee(amount, merchant?.merchantCommissionRate, currency, merchantReference);
+  if (feeAmount <= 0) return; // no rate configured / zero fee → nothing to attribute
+  const res = await writeDb.collection(CARD_TRANSACTION_COLLECTION).updateOne(
+    { cardTransactionInstanceReference: txnId, fee: { $exists: false } },
+    { $set: { feeAmount, fee, recordUpdatedDateTime: new Date() } },
+  );
+  if (res.modifiedCount !== 1) return; // already attributed (idempotent) → do not double-emit
+  emitProcessEvent(db, {
+    entityType: 'transaction', entityId: txnId, processType: 'payment_processing',
+    processAction: 'merchant.commission.collected', processOutcome: 'approved',
+    performedByPartyReference: null, performedByRole: null,
+    eventSummary: {
+      cardTransactionInstanceReference: txnId, merchantAgreementInstanceReference: merchantReference,
+      feeAmount, feeCurrency: currency, feeRateApplied: fee.feeRateApplied, grossAmount: amount,
+    },
+    bianServiceDomain: 'Merchant Relations', bianControlRecordType: 'MerchantAgreementProcedure',
+    attribution: { merchantAgreementReference: merchantReference, actingChannel: 'oauth_merchant' },
+  });
+}
+
 // Finish an APPROVED payment: card-on-file, fraud case, audit event, merchant callback, status flip.
 // Idempotent on the pending context (a second call is a no-op). Returns the fraud-case outcome.
 export async function completeAuthorized(db: Db, txnId: string, fdsVerdict?: FdsVerdict): Promise<{ fraudCaseCreated: boolean; fraudDiagnosisInstanceReference?: string }> {
@@ -311,6 +420,16 @@ export async function completeAuthorized(db: Db, txnId: string, fdsVerdict?: Fds
     { cardTransactionInstanceReference: txnId },
     { $set: { cardTransactionStatus: 'authorized', recordUpdatedDateTime: now } },
   );
+
+  // v18 (A-06): merchant commission at RUNTIME. For a merchant-attributed acquiring payment, compute the
+  // fee from the merchant's CURRENT rate (SD-89) and persist it on this acquiring record (SD-254) so the
+  // merchant dashboard's commissionRevenue reflects newly-created payments — not only seed data. DRY:
+  // reuses computeFee (single source of the calc). Idempotent (fee.$exists guard); not CHD → no QE.
+  if (input.merchantAgreementInstanceReference) {
+    try {
+      await applyMerchantCommissionToCardTxn(db, txWriteDb, txnId, input.merchantAgreementInstanceReference, input.amount, input.currency);
+    } catch { /* commission accounting must never block the payment outcome */ }
+  }
 
   // Card-on-file auto-registration (SD-88): using a card to pay IS the registration. Idempotent.
   if (resolvedUuid) {
@@ -725,7 +844,13 @@ export async function getMerchantStats(db: Db, merchantId: string) {
   const coll = db.collection(CARD_TRANSACTION_COLLECTION);
   const match = { merchantAgreementInstanceReference: merchantId };
 
-  const [totalsAgg, byStatus, byMonth, byCurrency] = await Promise.all([
+  // v18: commission revenue (SD-89) is the UNION of two fee-attribution sources, keyed by
+  // fee.feeMerchantReference — so BOTH seeded payout executions (SD-65) and runtime acquiring card
+  // payments (SD-254, A-06) count, with no double-counting (a payment lives in exactly one source).
+  const execColl = db.collection(PAYMENT_EXECUTION_COLLECTION);
+  const commissionMatch = { 'fee.feeMerchantReference': merchantId };
+
+  const [totalsAgg, byStatus, byMonth, byCurrency, execCommissionAgg, execCommissionByMonth, cardCommissionAgg, cardCommissionByMonth] = await Promise.all([
     coll.aggregate([
       { $match: match },
       { $group: { _id: null, count: { $sum: 1 }, totalAmount: { $sum: '$cardTransactionAmount.amount' }, avgAmount: { $avg: '$cardTransactionAmount.amount' } } },
@@ -745,9 +870,40 @@ export async function getMerchantStats(db: Db, merchantId: string) {
       { $group: { _id: '$cardTransactionAmount.currency', count: { $sum: 1 }, amount: { $sum: '$cardTransactionAmount.amount' } } },
       { $sort: { amount: -1 } },
     ]).toArray(),
+    execColl.aggregate([
+      { $match: commissionMatch },
+      { $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$feeAmount' } } },
+    ]).toArray(),
+    execColl.aggregate([
+      { $match: commissionMatch },
+      { $group: { _id: { y: { $year: { $toDate: '$fee.feeCollectedDateTime' } }, m: { $month: { $toDate: '$fee.feeCollectedDateTime' } } }, amount: { $sum: '$feeAmount' }, count: { $sum: 1 } } },
+      { $sort: { '_id.y': 1, '_id.m': 1 } },
+    ]).toArray(),
+    // Runtime acquiring-side commission (SD-254, A-06): fee persisted on the card transaction itself.
+    coll.aggregate([
+      { $match: commissionMatch },
+      { $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$feeAmount' } } },
+    ]).toArray(),
+    coll.aggregate([
+      { $match: commissionMatch },
+      { $group: { _id: { y: { $year: { $toDate: '$fee.feeCollectedDateTime' } }, m: { $month: { $toDate: '$fee.feeCollectedDateTime' } } }, amount: { $sum: '$feeAmount' }, count: { $sum: 1 } } },
+      { $sort: { '_id.y': 1, '_id.m': 1 } },
+    ]).toArray(),
   ]);
 
   const totals = totalsAgg[0] ?? { count: 0, totalAmount: 0, avgAmount: 0 };
+  // Union the two commission sources (SD-65 executions + SD-254 acquiring payments) into one revenue view.
+  const execCommission = execCommissionAgg[0] ?? { count: 0, total: 0 };
+  const cardCommission = cardCommissionAgg[0] ?? { count: 0, total: 0 };
+  const commission = { count: (execCommission.count ?? 0) + (cardCommission.count ?? 0), total: (execCommission.total ?? 0) + (cardCommission.total ?? 0) };
+  const monthlyMap = new Map<string, { year: number; month: number; count: number; amount: number }>();
+  for (const s of [...execCommissionByMonth, ...cardCommissionByMonth]) {
+    const y = (s._id as { y: number }).y; const m = (s._id as { m: number }).m;
+    const key = `${y}-${m}`;
+    const prev = monthlyMap.get(key) ?? { year: y, month: m, count: 0, amount: 0 };
+    monthlyMap.set(key, { year: y, month: m, count: prev.count + (s.count as number), amount: prev.amount + (s.amount as number) });
+  }
+  const commissionByMonth = [...monthlyMap.values()].sort((a, b) => a.year - b.year || a.month - b.month);
   return {
     count: totals.count ?? 0,
     totalAmount: totals.totalAmount ?? 0,
@@ -755,5 +911,11 @@ export async function getMerchantStats(db: Db, merchantId: string) {
     byStatus:   byStatus.map((s) => ({ status: s._id as string, count: s.count as number, amount: s.amount as number })),
     byMonth:    byMonth.map((s) => ({ year: (s._id as { y: number }).y, month: (s._id as { m: number }).m, count: s.count as number, amount: s.amount as number })),
     byCurrency: byCurrency.map((s) => ({ currency: s._id as string, count: s.count as number, amount: s.amount as number })),
+    // v18: commission revenue (SD-89) — total + monthly breakdown.
+    commissionRevenue: {
+      total: commission.total ?? 0,
+      count: commission.count ?? 0,
+      byMonth: commissionByMonth,
+    },
   };
 }

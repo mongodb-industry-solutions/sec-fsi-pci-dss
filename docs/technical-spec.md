@@ -90,6 +90,7 @@ export interface CustomerAuthenticationAssessmentRecord {
   customerAuthenticationLoginDomain: 'local' | 'msentra';
   customerAuthenticationAccountStatus: 'active' | 'suspended';
   customerAuthenticationLastLoginDateTime?: Date;
+  customerAuthenticationSessionEpoch?: number;        // Session validity counter; logout increments it to invalidate outstanding JWTs. Absent = epoch 0.
   bianServiceDomain: 'Customer Authentication';
   bianControlRecordType: 'CustomerAuthenticationAssessment';
   recordCreatedDateTime: Date;
@@ -260,6 +261,15 @@ export interface CardTransactionLogControlRecord {
   // BIAN SD-254 statement descriptor fields (plaintext, not CHD, no QE)
   cardTransactionDescription: string;                 // Max 22 chars; visible on cardholder statement
   cardTransactionNarrative?: string;                  // Extended context for fraud investigation
+
+  merchantAgreementInstanceReference?: string;        // Acquiring-side FK → SD-89 (plaintext, indexed)
+
+  // v18 (A-06): merchant commission captured at RUNTIME on a merchant-attributed acquiring payment.
+  // feeAmount is the numeric source of truth; `fee` (= PaymentExecutionFee shape) records who the
+  // commission is attributed to and how it was derived. Set ONCE at authorization (idempotent).
+  // NOT CHD → NOT QE-encrypted. Aggregated into the merchant dashboard commissionRevenue (SD-89).
+  feeAmount?: number;
+  fee?: PaymentExecutionFee;                          // { feeMerchantReference, feeRateApplied, feeCollectedDateTime }
 
   bianServiceDomain: 'Card Transaction';
   bianControlRecordType: 'CardTransactionLog';
@@ -770,6 +780,14 @@ export interface BusinessProcessEvent {
 
   // Meta
   processMeta?: ProcessEventMeta;
+
+  // v18 (SD-16 audit attribution) — optional, backwards-compatible. Set when an action originates from
+  // a merchant OAuth request (request.merchantContext). Powers the "user × merchant × action" activity
+  // view without a new collection. Session (non-OAuth) actions leave these unset.
+  clientId?: string;                    // OAuth client_id that originated the action
+  merchantAgreementReference?: string;  // SD-89 merchant the action was performed through
+  actingPartyReference?: string;        // party of the acting user (token sub)
+  actingChannel?: 'session' | 'oauth_merchant';
 }
 
 // ── Typed Payload Contracts per Integration Category ─────────────────────────
@@ -997,6 +1015,10 @@ export interface PayoutAccountArrangement {
 
   payoutAccountAlias?:          string;  // phone or email alias for lookup
   payoutAccountBankName?:       string;
+  payoutAccountHolderName?:        string;  // account holder legal name (from party) — SD-66 (max 140)
+  payoutAccountBicSwift?:          string;  // ISO 9362 BIC/SWIFT: /^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/ (8 or 11 chars)
+  payoutAccountCorrespondentBic?:  string;  // correspondent bank BIC for international wires (8 or 11 chars, same pattern)
+  payoutAccountBankAddress?:       string;  // bank branch/HQ address (max 200)
   payoutAccountCurrency:        string;  // ISO 4217
   payoutAccountCountryCode:     string;  // ISO 3166-1 alpha-2
   payoutAccountPreferredRail:   PayoutRail;
@@ -1048,6 +1070,11 @@ export interface PaymentExecutionProcedure {
   beneficiaryPartyReference?:    string;            // FK → party (SD-13) for user payouts
   beneficiaryArrangementReference?: string;         // FK → counterpartyArrangement (SD-54) — links the detail page to the saved beneficiary
   resolvedPayoutAccountReference?: string;          // FK → payoutAccountArrangement (SD-66)
+  // v18 (SD-89): the merchant that INITIATED this execution via the merchant portal (OAuth on-behalf-of).
+  // Set only for merchant-originated transfers; PSP-direct customer transfers leave it unset. Enables
+  // merchant data isolation on GET /merchant/transactions/:partyRef (a merchant sees only its own activity
+  // for the user, never other merchants' or direct-PSP activity). NOT CHD → NOT QE-encrypted.
+  merchantAgreementReference?: string;              // FK → merchantAgreementInstanceReference (SD-89)
 
   // Recipient identity for a bank transfer to an UNREGISTERED external account (SEPA/ACH/SWIFT).
   // Bank data under GDPR Art. 32 / PSD2 (NOT PCI DSS — that governs card data). destinationIban is
@@ -1060,11 +1087,20 @@ export interface PaymentExecutionProcedure {
 
   grossAmount: number;
   netAmount:   number;
-  feeAmount:   number;
+  feeAmount:   number;  // commission/processing amount (numeric source of truth)
+  // v18 (SD-65 attribution / SD-89 pricing): merchant-commission ATTRIBUTION only. The numeric amount
+  // stays in feeAmount above (do NOT duplicate it). Records who the fee belongs to and how it was
+  // derived so the merchant dashboard aggregates commissionRevenue. NOT CHD → NOT QE-encrypted.
+  fee?: {
+    feeMerchantReference: string;   // FK → merchantAgreementInstanceReference (SD-89)
+    feeRateApplied:       number;   // commission rate 0..1 applied at capture
+    feeCollectedDateTime: Date;     // when the commission was collected
+  };
   currency:    string;  // ISO 4217
 
   paymentExecutionRail?: PayoutRail;
   routingNote?:          string;
+  paymentExecutionRemittanceInformation?: string; // ISO 20022 RemittanceInformation — payment concept/reference (bank transfer / P2P note); first-class + queryable for AML/FDS. Not CHD → NOT QE.
 
   paymentExecutionStatus: PaymentExecutionStatus;
   failureReason?:  string;
@@ -1463,6 +1499,8 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { cardTransactionStatus: 1 } },
     // Acquiring-side: list a merchant's received payments, newest first (SD-89). Plaintext id, not QE.
     { key: { merchantAgreementInstanceReference: 1, cardTransactionDateTime: -1 } },
+    // v18 (A-06): runtime merchant commission revenue aggregation (SD-89 dashboard). Sparse.
+    { key: { 'fee.feeMerchantReference': 1, 'fee.feeCollectedDateTime': -1 }, sparse: true },
   ]);
 
   // Note: cardTransactionLogSensitive collection removed in v2 (fields inline)
@@ -1543,6 +1581,8 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
     { key: { processType: 1, eventDateTime: -1 } },
     { key: { processAction: 1, processOutcome: 1 } },
+    // v18: "user × merchant × action" activity view (SD-16). Sparse — only OAuth-attributed events.
+    { key: { merchantAgreementReference: 1, actingPartyReference: 1, eventDateTime: -1 }, sparse: true },
   ]);
 
   // ── complianceProcessEvent (ADR-025) — TIMESERIES ────────────────────────
@@ -1611,6 +1651,10 @@ await ensureIndexes(db, 'paymentExecutionProcedure', [
   { key: { paymentOrderInstanceReference: 1 } },
   { key: { cardTransactionInstanceReference: 1 } },
   { key: { paymentExecutionStatus: 1, recordCreatedDateTime: -1 } },
+  // v18: commission revenue aggregation (SD-89 dashboard). Sparse — only fee-bearing executions.
+  { key: { 'fee.feeMerchantReference': 1, 'fee.feeCollectedDateTime': -1 }, sparse: true },
+  // v18: merchant-scoped transaction history (SD-89 data isolation). Sparse — only merchant-initiated execs.
+  { key: { merchantAgreementReference: 1, initiatorPartyReference: 1 }, sparse: true },
 ]);
 
 // ── counterpartyArrangement (SD-54) ─────────────────────────────────────────
@@ -1740,6 +1784,18 @@ QE equality search on the corresponding encrypted field.
 ### 6.3 Cards — `module: customer` (SD-88)
 
 > Base path: `/api/v1/customer/:customerId/cards` — cards as sub-resource of Customer Agreement (SD-53)
+
+#### `GET /customer/me/cards`
+
+Returns the **authenticated caller's own** saved cards (SD-88), resolved server-side from the JWT (`request.user.partyRef` → own agreement via `getOwnAgreementId`). Takes **no id** from the client, so it cannot be used to read another party's cards. Used by the hosted checkout and payment-link pages to offer the *viewer's* saved cards, gated purely on the browser's PSP session token (never the session/link's stored acting party — that would leak the creator's cards on a shared link).
+
+**Response 200** (display-safe only — surrogate token + masked PAN; never full PAN, CVV or expiry):
+```json
+{ "results": [
+  { "paymentCardInstanceReference": "...", "cardToken": "pm_...", "paymentCardMaskedPanDisplay": "****-****-****-1234", "paymentCardNetwork": "VISA", "paymentCardAlias": "Personal", "paymentCardIsPreferred": true }
+] }
+```
+A caller with no customer agreement (e.g. staff) receives `{ "results": [] }`.
 
 #### `POST /customer/:customerId/cards`
 
@@ -2106,6 +2162,7 @@ Validates credentials against `customerAuthenticationAssessment` (SD-91, QE equa
 {
   "token": "<HS256 JWT>",
   "user": {
+    "sub": "uuid-v4",
     "customerAuthenticationInstanceReference": "uuid-v4",
     "name": "Sarah Chen",
     "email": "sarah.chen@back.es",
@@ -2113,6 +2170,20 @@ Validates credentials against `customerAuthenticationAssessment` (SD-91, QE equa
   }
 }
 ```
+
+> `sub` is the canonical OIDC subject claim (equal to `customerAuthenticationInstanceReference`, retained for back-compat). The OAuth consent flow reads `user.sub` as the `_psp_sub` identity carried through `/auth/authorize`.
+
+> The JWT also carries an `epoch` claim: the value of `customerAuthenticationSessionEpoch` (default 0) at sign time. See `POST /auth/logout` for how it enables stateless server-side invalidation.
+
+#### `POST /auth/logout`
+
+Server-side logout for the session JWT. The PSP session token is a stateless HS256 JWT, so it cannot be individually revoked without a token store. Instead, logout advances the caller's `customerAuthenticationSessionEpoch` (SD-91). Every issued JWT stamps the epoch current at sign time; the auth middleware reads the user's current epoch on each authenticated request and rejects any token whose stamped `epoch` is behind. This invalidates **all** of that user's outstanding tokens at once, storing no token (neither valid nor revoked).
+
+- **Auth:** requires a valid session JWT (behind the global middleware).
+- **Effect:** `$inc` of `customerAuthenticationSessionEpoch` for the caller's `sub`.
+- **Response 200:** `{ "loggedOut": true }`
+- **Client:** the frontend calls this before clearing its `demo_token` cookie. The merchant (relying party) triggers it via front-channel single sign-out: its logout redirects the browser through the PSP `/auth/logout` page, which calls this endpoint and clears the cookie same-origin. This closes the gap where a hosted checkout kept recognising a "logged-in" payer (and surfacing their saved cards) after the payer logged out of the merchant.
+- **Failure posture:** the middleware epoch check fails **open** on a DB error (a transient outage must not lock out every user); production could fail closed.
 
 **Response 401:** `{ "error": "Invalid credentials" }`
 
@@ -2506,6 +2577,22 @@ Marks a beneficiary entry as `'removed'` (soft delete). The resolved counterpart
 
 **Response 200:** `{ "removed": true, "counterpartyArrangementReference": "btoken-uuid" }`
 
+#### `POST /merchant/beneficiaries/:partyRef/:beneficiaryToken/send`
+
+Sends money to a saved beneficiary on behalf of the user (P2P bank transfer, BIAN SD-65 execution + SD-54 counterparty). Mirrors the PSP's send-to-beneficiary flow but is driven from the merchant portal. `config: { skipAuth: true }`; guarded in-handler by `requireMerchantOnBehalfOf(scope = write:transfers, partyRef)` (sub-binding: `token.sub === :partyRef`). Delegates to `executeP2PTransfer` — no business logic duplicated.
+
+- Source account: the client MAY choose one via `fromAccountRef` (an opaque `payoutAccountInstanceReference` from `GET /merchant/accounts/:partyRef`). `executeP2PTransfer` verifies it belongs to the initiator party and is active; a mismatch returns `status: "failed"` → `422`. When `fromAccountRef` is omitted, the source is resolved **server-side** from the user's payout accounts: the active default (`payoutAccountIsDefault === true`), otherwise the first active account.
+- The merchant supplies only the amount, the opaque `:beneficiaryToken`, an optional source account reference and an optional `note` (description shown on the transfer). No CHD, no IBAN/PAN. `currency` in the body is an optional hint only; the transfer uses the source account's native currency (server-authoritative).
+- Amount must be `> 0` (else `422 invalid_amount`). No source account available → `422 no_source_account`.
+
+**Body:** `{ "amount": 25.00, "currency"?: "EUR", "fromAccountRef"?: "payoutacct-uuid", "note"?: "invoice 1042" }`
+
+**Response 202** (submitted/completed/exception) / **422** (failed): display-safe
+```json
+{ "transferReference": "uuid", "amount": 25.0, "currency": "EUR", "status": "submitted", "failureReason": "…?" }
+```
+Emits an attributed `businessProcessEvent` (`merchant.beneficiary.send`, `attributionFromMerchantContext`) for the connected-apps operations + activity views (SD-16 audit, PCI DSS Req 10).
+
 ---
 
 ## 7. Environment Variables Reference
@@ -2873,6 +2960,12 @@ export interface CheckoutSessionRecord {
   checkoutSessionReturnUrl: string;
   checkoutSessionCancelUrl: string;
   checkoutSessionMerchantReference: string;        // Merchant's own order ID
+  // v18 on-behalf-of attribution (optional): who the merchant app acted for when it created the session,
+  // so the resulting card transaction lands under the payer and the purchase is auditable. Identity refs
+  // only — never CHD/PAN, never PII beyond the id.
+  checkoutSessionActingSubjectReference?: string;  // SD-91 OAuth subject (customerAuthenticationInstanceReference)
+  checkoutSessionActingPartyReference?: string;    // SD-13 partyInstanceReference (resolved from the subject)
+  checkoutSessionActingClientId?: string;          // OAuth client_id of the acting merchant app
   checkoutSessionCreatedDateTime: Date;
   checkoutSessionExpiresAt: Date;                  // TTL index target — 30 min default
   checkoutSessionCompletedDateTime?: Date;
@@ -2952,6 +3045,16 @@ merchantReviewedDateTime?: Date;                 // When the review decision was
 // Authoritative KYB record. Status vocabulary: initiated | verified | rejected | expired.
 // All fields use BIAN-canonical BQ naming prefix: merchantAgreementKybCheck*.
 merchantAgreementKybCheck?: MerchantAgreementKybCheck;
+
+// v18 (SD-89 pricing): per-operation commission rate 0..1 (e.g. 0.025 = 2.5%). Editable from
+// merchant settings (PATCH /merchants/:id, RBAC merchants:manage); the seeder only sets an initial
+// default. Consumed by computeFee() to populate paymentExecution.feeAmount + fee attribution (SD-65).
+merchantCommissionRate?: number;
+
+// v18 (OIDC client metadata, RFC 7591) on MerchantOAuthClientConfig — branding on the consent/login
+// page and the user's "Authorized Applications" listing. Validated as https on the OAuth-client PATCH.
+// oauthLogoUri?: string;    // merchant logo/icon URL (OIDC logo_uri)
+// oauthClientUri?: string;  // merchant home page URL (OIDC client_uri)
 
 // Ch-05: Full BIAN SD-89 Agreement lifecycle including KYB review states.
 // BIAN Action Terms: Initiate (customer) → Control (merchant_officer) → Update (amend) → Terminate (close)
@@ -3103,8 +3206,11 @@ Error codes: 404 merchant not found, 410 link expired/deactivated/completed.
 | `GET` | `/merchants/me` | JWT | `customer` | Return the merchant agreement owned by the caller's `partyRef`. Returns `{ found: false }` when none exists. Enables role-based state machine in frontend. |
 | `GET` | `/merchants/:id` | JWT | `customer`, `merchant_officer`, `security_auditor` | Retrieve merchant agreement details. Response includes `merchantAgreementKybCheck` sub-document. |
 | `GET` | `/merchants/:id/transactions` | JWT | owner (`partyRef` = `merchantOwnerPartyReference`), `merchant_officer`, `security_auditor` | Acquiring-side view (SD-89): payments the merchant **received**, newest first. Query: `page`, `limit`, `status`, `search` (case-insensitive on masked PAN / descriptor / merchant name). PCI DSS Req 3/7 — payer PII (account ref, email, raw gateway payload) is **never** returned; only masked PAN, amount, status, type, channel, descriptor, timestamp. Non-owner customers get 403. |
-| `GET` | `/merchants/:id/stats` | JWT | owner, `merchant_officer`, `security_auditor` | Acquiring analytics (BIAN Merchant Activity Analysis): MongoDB aggregation returning totals, average ticket, breakdown by status, by currency, and operations per month. Aggregates only — no payer PII. Powers the merchant Overview dashboard. |
+| `GET` | `/merchants/:id/stats` | JWT | owner, `merchant_officer`, `security_auditor` | Acquiring analytics (BIAN Merchant Activity Analysis): MongoDB aggregation returning totals, average ticket, breakdown by status, by currency, and operations per month. **v18:** also returns `commissionRevenue { total, count, byMonth[] }` — the UNION of two fee-attribution sources filtered by `fee.feeMerchantReference`: seeded payout executions (`paymentExecutionProcedure.fee`, SD-65) **and** runtime acquiring card payments (`cardTransactionLog.fee`, SD-254, populated at authorization by A-06). No double-counting (a payment lives in exactly one source). Aggregates only — no payer PII. Powers the merchant Overview dashboard. |
+| `PATCH` | `/merchants/:id` | JWT | owner (own merchant), `merchant_officer`, `security_auditor` | Partial update of operational settings. Owner-editable: `merchantAllowedCurrencies`, `merchantSettlementSchedule`, `merchantWebhookEndpoint`, `merchantDefaultPayoutAccountReference`, **v18** `merchantCommissionRate` (SD-89, number 0..1, max 4 decimals; validated; change audited via `merchant.commission_rate.updated` event). Risk-governed fields (`merchantTransactionLimitAmount`, `merchantAgreementStatus`) are PSP staff only. |
 | `GET` | `/merchants/:id/events` | JWT | owner, `merchant_officer`, `security_auditor` | Merchant lifecycle **audit trail** (BIAN SD-89, PCI DSS Req 10): append-only `merchantAgreementEvents` log of `submitted` / `approved` / `rejected` / `updated` actions with actor and timestamp. Operational metadata only — no cardholder data. |
+| `GET` | `/merchants/:id/activity` | JWT | owner, `merchant_officer`, `security_auditor`, `level1_analyst`, `level2_investigator` | **v18 (B-01/B-12) — activity view "user × merchant × action".** Reads `businessProcessEvent` where `merchantAgreementReference == :id` (OAuth-originated actions tagged in the activity attribution). Query filters: `user` (`actingPartyReference` exact), `q` (free text on `processAction` / `entityId` / `processType` / user), `dateFrom` / `dateTo` (ISO 8601), `page` / `limit`. Response `{ events[{ id, eventDateTime, processType, processAction, processOutcome, entityType, entityId, clientId, actingPartyReference, actingChannel, summary }], total, page, limit }`. **Display-safe** — never returns CHD or raw IBAN (PCI DSS Req 3/7 · Req 10). |
+| `GET` | `/merchants/:id/authorizations` | JWT | owner, `merchant_officer`, `security_auditor`, `level1_analyst`, `level2_investigator` | **v18 (B-10) — users who authorized this merchant.** Reads `partyAuthConsent` filtered by `merchantAgreementInstanceReference` (SD-16 ConsentGrant), joined to the user's display-safe identity (SD-13). Query filters: `q` (search by user name / email / party ref), `page` / `limit`. Response `{ authorizations[{ consentId, partyAuthenticationInstanceReference, userName, userEmail, grantedScopes, consentStatus, consentGrantedAt, lastUsedAt }], total, page, limit }`. Display-safe — no CHD, no raw IBAN. |
 | `GET` | `/merchants` | JWT | `merchant_officer`, `security_auditor` | List all merchant applications (officer review queue) |
 | `PATCH` | `/merchants/:id/review` | JWT | `merchant_officer`, `security_auditor` | Approve or reject application (BIAN Action: Control). Transitions status to `agreed` or `rejected`. Writes `merchantAgreementKybCheck` BQ:Step. |
 | `POST` | `/merchants/:id/keys` | JWT | `customer` | Generate new API key (plaintext returned once; `keyOrigin: 'generated'`) |
@@ -3113,6 +3219,58 @@ Error codes: 404 merchant not found, 410 link expired/deactivated/completed.
 | `DELETE` | `/merchants/:id/keys/:keyId` | JWT | `customer` | Revoke API key |
 
 `MerchantApiKeyRecord` adds `keyOrigin?: 'generated' | 'imported'` (display only; absent = generated). Both generate and import store only the bcrypt hash + display prefix (PCI DSS Req 3).
+
+**v18 — OAuth client branding + consent grants payload (OIDC).**
+- `PATCH /merchants/:id/oauth-client` accepts `logo_uri` and `client_uri` (OIDC client metadata, RFC 7591); both validated as **https** URLs (empty string clears). Persisted as `merchantOAuthClient.oauthLogoUri` / `oauthClientUri`.
+- `GET /auth/grants` (self-scoped — the caller's own consent grants) payload now includes `merchantAgreementInstanceReference` and `oauthLogoUri` (nullable) alongside the existing `merchantName`, `grantedScopes`, `consentGrantedAt`, `lastUsedAt`. Used by the user's "Authorized Applications" listing.
+
+**v18 — Authorized Applications: connected-app detail + per-app operations (D-01…D-02, self-scoped).**
+These live under the OAuth consent-grant controller (`/api/v1/auth/grants/*`) and are **always scoped to the caller's own `sub`** (any PSP session token; no elevated role). A `consentId` that does not belong to the caller returns **404** (existence is never leaked). Display-safe — no CHD, no raw IBAN.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/auth/grants/:consentId` | JWT (own session) | **D-01 — one authorized app (detail).** Returns `{ consentId, oauthClientId, merchantAgreementInstanceReference, merchantName, oauthLogoUri, oauthClientUri, grantedScopes[{ scope, description, required }], consentStatus, consentGrantedAt, lastUsedAt }`. `grantedScopes` expands each scope with its human-readable description from `SCOPE_CATALOG`. Branding (`oauthLogoUri`/`oauthClientUri`) from the merchant's `merchantOAuthClient` (OIDC client metadata). 404 if the grant is not the caller's. |
+| `GET` | `/auth/grants/:consentId/operations` | JWT (own session) | **D-02 — operations the caller executed through this app.** Reads `businessProcessEvent` where `actingPartyReference == caller.sub` **AND** (`clientId == grant.oauthClientId` **OR** `merchantAgreementReference == grant.merchantAgreementInstanceReference`). Query filters: `q` (free text on `processAction`/`entityId`/`processType`), `dateFrom`/`dateTo` (ISO 8601), `page`/`limit`. Response `{ events[{ id, eventDateTime, processType, processAction, processOutcome, entityType, entityId, clientId, actingPartyReference, actingChannel, summary }], total, page, limit }`. Ownership of `:consentId` is verified first (404 otherwise). Display-safe (PCI DSS Req 3/7 · Req 10). |
+
+**v18 — Granular consent (OAuth scope selection, E-01…E-13).**
+- **Scope catalog** (`SCOPE_CATALOG`, single source of truth in `merchantOAuth.service.ts`): each scope maps to `{ description, required }`. `openid` is the only **required** scope; all others are optional/de-selectable (least-privilege, OAuth 2.0 Security BCP):
+
+  Scopes follow the PSP `verb:resource` convention enforced by the merchant controllers
+  (`merchantBeneficiary`, `merchantPortal`, `merchantGateway`). Final Espresso Works client set:
+
+  | Scope | Description | Required | Enforced by |
+  |---|---|---|---|
+  | `openid` | Verify your identity | ✅ | OIDC baseline |
+  | `profile` | Read your name and username | — | userinfo |
+  | `read:beneficiaries` | View your saved beneficiaries | — | `GET /merchant/beneficiaries/:partyRef` |
+  | `write:beneficiaries` | Add and manage your beneficiaries | — | `POST/DELETE /merchant/beneficiaries/*` |
+  | `write:transfers` | Send money and bank transfers | — | `POST /merchant/beneficiaries/:partyRef/:beneficiaryToken/send`, `POST /merchant/transfers/*` |
+  | `read:transactions` | View your transaction and operation history | — | `GET /merchant/portal/transactions`, `GET /merchant/transactions/:partyRef` |
+  | `read:accounts` | View your bank accounts (masked IBAN) | — | `GET /merchant/accounts/:partyRef` |
+  | `read:merchant_profile` | View the merchant profile | — | `GET /merchant/portal/me` |
+  | `read:notifications` | View your notifications | — | `GET /merchant/portal/notifications` |
+  | `write:transfers` | Preview and execute bank transfers on your behalf | — | `POST /merchant/transfers/:partyRef/{preview,bank}` |
+  | `write:payments` | Create payments (server-to-server merchant charge) | machine only (`client_credentials`) | `POST /gateway/payments` |
+
+- **v18 — Merchant on-behalf-of gateway endpoints (`merchantGateway.controller.ts`, mounted `/api/v1/merchant`).** All use `config: { skipAuth: true }` (opt out of the global HS256 preHandler) + `validateMerchantToken` + **sub-binding** (`token.sub === :partyRef`) + scope. Separation of duties: never combined with `requirePermission`. Reuse SD-66 `listPayoutAccounts` and SD-65 `bankTransfer.service`; display-safe, no CHD, IBAN masked-only (GDPR/PSD2).
+
+  | Method | Path | Scope | Description |
+  |---|---|---|---|
+  | `GET` | `/merchant/accounts/:partyRef` | `read:accounts` | User's payout accounts; raw IBAN/routing stripped, `payoutAccountMaskedIban` only. |
+  | `GET` | `/merchant/transactions/:partyRef` | `read:transactions` | User's SD-65 execution/operation history, display-safe projection. |
+  | `POST` | `/merchant/transfers/:partyRef/preview` | `write:transfers` | Stateless rail derivation + fee quote (no side effects). |
+  | `POST` | `/merchant/transfers/:partyRef/bank` | `write:transfers` | Execute a bank transfer; emits attributed `businessProcessEvent` (`merchant.transfer.bank`). Body accepts optional `fromAccountRef` (chosen source payout account, ownership-validated) and `reference` (description). |
+
+  > `POST /merchant/transfers/:partyRef/bank` body: `{ amount, currency, destination, rail?, reference?, fromAccountRef?, settlementSchedule? }`. `fromAccountRef` is an opaque `payoutAccountInstanceReference` (from `GET /merchant/accounts/:partyRef`); `executeBankTransfer` verifies it belongs to the initiator party and is active before setting `sourcePayoutAccountReference` on the SD-65 execution, else returns `status: "exception"`. When omitted, source selection is left to the payment-initiation provider (prior behavior). `reference` (ISO 20022 remittance info) is forwarded as the transfer description. No CHD; destination coordinates stay transaction-scoped; IBAN masked-only.
+
+  > The pre-existing `/merchant/beneficiaries/*` (SD-54) and `/merchant/portal/*` routes were also switched to `config: { skipAuth: true }` in v18 so the RS256 OAuth token reaches their in-handler `validateMerchantToken` instead of being 401'd by the global HS256 middleware.
+
+- **v18 Item 2 — Server-to-server API payment (`POST /api/v1/gateway/payments`, `payment.controller.ts`).** Authenticated with the merchant's OWN OAuth **`client_credentials`** token (RS256, scope `write:payments`) — NOT a user session (HS256) and NOT the user `authorization_code` token. `config: { skipAuth: true }` + in-handler `validateMerchantToken(req, reply, 'write:payments')`; the acquiring merchant is bound to the token (a body `merchantAgreementInstanceReference` must match or is rejected 403). The PSP charges a **tokenised** card (test token vault, `PSP_API_PAYMENT_TEST_TOKEN`) so no PAN/CVV ever reaches the merchant (PCI SAQ A). Persists the SD-64 order + drives an SD-254 card transaction attributed to the merchant, so the commission fee (A-06) is applied and the merchant dashboard revenue reflects the API payment. Emits attributed `businessProcessEvent` (`merchant.payment.api`). Rejects 401 when no credential is presented, 403 without `write:payments`.
+
+- `GET /auth/authorize` (consent render) now returns `scope_details` (array of `{ scope, description, required }`), `logo_uri`/`client_uri` (merchant branding), and — when called with `_psp_sub` — `previously_granted_scopes` (for re-consent highlighting).
+- `GET /auth/authorize` (grant) accepts `_psp_scopes` (space/comma-separated user selection). The effective grant = `userSelected ⊆ allowedScopes` with all `required` scopes force-included. A requested scope **outside the client allowlist** returns `invalid_scope` (RFC 6749 §4.1.2.1) rather than being silently dropped.
+- The authorization code and issued token scope derive from the user's selection (`grantedScopes`), not the raw request.
+- **Incremental consent:** on token exchange, if a prior active consent grant exists, the added/removed scope delta is computed and audited on `businessProcessEvent` (`processType: consent_management`, actions `oauth.consent.granted|updated|reused`, SD-16) with merchant attribution. `grantedScopes` always reflects the freshly-consented set. Downstream (`GET /auth/grants`, "Authorized Applications") consumes the real `grantedScopes`.
 
 **POST `/merchants` request (BIAN Action: Initiate):**
 ```json

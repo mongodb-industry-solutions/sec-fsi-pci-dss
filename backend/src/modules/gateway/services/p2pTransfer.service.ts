@@ -23,6 +23,7 @@ export interface P2PTransferInput {
   fromAccountRef: string;            // sender's payout account
   amount: number;
   note?: string;
+  merchantAgreementReference?: string; // SD-89: set when initiated via a merchant portal (OAuth on-behalf-of)
 }
 
 export interface P2PTransferResult {
@@ -95,6 +96,7 @@ export async function executeP2PTransfer(
       initiatorPartyReference: initiatorPartyRef,
       beneficiaryPartyReference: recipientPartyRef,
       beneficiaryArrangementReference: counterpartyArrangementRef,
+      ...(input.merchantAgreementReference ? { merchantAgreementReference: input.merchantAgreementReference } : {}),
       sourcePayoutAccountReference: fromAccountRef,
       resolvedPayoutAccountReference: recipientAccount.payoutAccountInstanceReference,
       grossAmount: amount, netAmount: amount, feeAmount: 0, currency: transferCurrency,
@@ -139,6 +141,7 @@ export async function executeP2PTransfer(
     initiatorPartyReference: initiatorPartyRef,
     beneficiaryPartyReference: recipientPartyRef,
     beneficiaryArrangementReference: counterpartyArrangementRef,
+    ...(input.merchantAgreementReference ? { merchantAgreementReference: input.merchantAgreementReference } : {}),
     sourcePayoutAccountReference: fromAccountRef,
     resolvedPayoutAccountReference: recipientAccount.payoutAccountInstanceReference,
     grossAmount: amount,
@@ -147,6 +150,8 @@ export async function executeP2PTransfer(
     currency: transferCurrency,
     paymentExecutionRail: rail,
     routingNote: input.note ? `${input.note}` : 'P2P transfer via beneficiary portal',
+    // ISO 20022 remittance info: the clean concept/note the user typed (queryable for AML/FDS).
+    ...(input.note ? { paymentExecutionRemittanceInformation: input.note } : {}),
     paymentExecutionStatus: 'routing',
     initiatedAt: now,
     resolutionLog: [

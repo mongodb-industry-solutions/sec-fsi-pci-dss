@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { SectionHeader } from '../../../../../components/SectionHeader';
+import { Tooltip } from '../../../../../components/Tooltip';
 import { useRequireActiveMerchant } from '../../../../../lib/merchantContext';
 import { useDebugMode } from '../../../../../lib/debugMode';
 import { api, type MerchantOAuthClient, type TypedWebhookConfig } from '../../../../../lib/api';
@@ -260,9 +261,20 @@ export default function MerchantSSOPage() {
   const [oauthWebhooks, setOauthWebhooks] = useState<TypedWebhookConfig[]>([]);
   const [loadError, setLoadError] = useState(false);
 
+  // Credential edit state (Client ID + secret)
+  const [credClientId, setCredClientId] = useState('');
+  const [credSecret, setCredSecret] = useState(''); // '' = leave the stored secret unchanged
+  const [credPrefix, setCredPrefix] = useState(''); // independent display label (not derived from secret)
+  const [showCredSecret, setShowCredSecret] = useState(false);
+  const [credSaving, setCredSaving] = useState(false);
+  const [credSaved, setCredSaved] = useState(false);
+  const [credError, setCredError] = useState<string | null>(null);
+
   // Config edit state (Authorization section)
   const [redirectUris, setRedirectUris] = useState<string[]>([]);
   const [postLogoutUris, setPostLogoutUris] = useState<string[]>([]);
+  const [logoUri, setLogoUri] = useState('');
+  const [clientUri, setClientUri] = useState('');
   const [grantTypes, setGrantTypes] = useState<string[]>([]);
   const [scopes, setScopes] = useState<string[]>([]);
   const [requirePkce, setRequirePkce] = useState(true);
@@ -290,6 +302,9 @@ export default function MerchantSSOPage() {
       ]);
       setClient(clientRes);
       if (clientRes) {
+        setCredClientId(clientRes.oauthClientId ?? '');
+        setCredSecret('');
+        setCredPrefix(clientRes.oauthClientSecretPrefix ?? '');
         setRedirectUris(clientRes.oauthRedirectUris ?? []);
         setPostLogoutUris(clientRes.oauthPostLogoutRedirectUris ?? []);
         setGrantTypes(clientRes.oauthGrantTypes ?? []);
@@ -298,6 +313,8 @@ export default function MerchantSSOPage() {
         setTokenLifetime(clientRes.oauthTokenLifetimeSeconds ?? 3600);
         setRefreshLifetime(clientRes.oauthRefreshTokenLifetimeDays ?? 30);
         setClaimMapping(clientRes.oauthClaimMapping ?? {});
+        setLogoUri(clientRes.oauthLogoUri ?? '');
+        setClientUri(clientRes.oauthClientUri ?? '');
       }
       const oauthHooks = (webhooksRes.webhooks ?? []).filter((w) =>
         w.webhookEventType === 'oauth.authorization_granted' || w.webhookEventType === 'oauth.authorization_revoked',
@@ -314,6 +331,9 @@ export default function MerchantSSOPage() {
 
   function syncToState(updated: MerchantOAuthClient) {
     setClient(updated);
+    setCredClientId(updated.oauthClientId ?? '');
+    setCredSecret('');
+    setCredPrefix(updated.oauthClientSecretPrefix ?? '');
     setRedirectUris(updated.oauthRedirectUris ?? []);
     setPostLogoutUris(updated.oauthPostLogoutRedirectUris ?? []);
     setGrantTypes(updated.oauthGrantTypes ?? []);
@@ -322,6 +342,29 @@ export default function MerchantSSOPage() {
     setTokenLifetime(updated.oauthTokenLifetimeSeconds ?? 3600);
     setRefreshLifetime(updated.oauthRefreshTokenLifetimeDays ?? 30);
     setClaimMapping(updated.oauthClaimMapping ?? {});
+    setLogoUri(updated.oauthLogoUri ?? '');
+    setClientUri(updated.oauthClientUri ?? '');
+  }
+
+  async function saveCredentials() {
+    if (!client) return;
+    setCredSaving(true);
+    setCredSaved(false);
+    setCredError(null);
+    try {
+      const updated = await api.merchants.updateOAuthClient(merchantId, token, {
+        client_id: credClientId.trim(),
+        client_secret_prefix: credPrefix.trim(), // independent label; sent every save
+        ...(credSecret ? { client_secret: credSecret } : {}), // only rotate the secret when one is entered
+      });
+      syncToState(updated); // resets the secret input; prefix re-derives from the new value
+      setCredSaved(true);
+      setTimeout(() => setCredSaved(false), 2500);
+    } catch (e) {
+      setCredError(e instanceof Error ? e.message : 'Failed to save credentials');
+    } finally {
+      setCredSaving(false);
+    }
   }
 
   async function saveConfig() {
@@ -337,6 +380,8 @@ export default function MerchantSSOPage() {
         token_lifetime_seconds: tokenLifetime,
         refresh_token_lifetime_days: refreshLifetime,
         claim_mapping: claimMapping,
+        logo_uri: logoUri.trim(),
+        client_uri: clientUri.trim(),
       });
       syncToState(updated);
       setConfigSaved(true);
@@ -491,21 +536,84 @@ export default function MerchantSSOPage() {
           </div>
         </div>
 
+        {/* Editable credentials. The seeder sets working defaults; change here only to sync with the
+            relying party or to rotate. Changing the client_id orphans existing tokens/consents. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
           <div>
-            <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Client ID</p>
-            <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
-              <code className="text-xs text-gray-700 flex-1 break-all">{client.oauthClientId}</code>
-              <CopyButton value={client.oauthClientId} small />
+            <label className="text-[10px] text-gray-400 uppercase tracking-wide mb-1 flex items-center">
+              Client ID
+              <Tooltip text="The public OAuth 2.0 client identifier (client_id) the merchant app sends on every authorize/token request. Editable here for full management, but changing it ORPHANS existing access tokens (aud) and consent grants and requires updating the relying party's config. Use Generate for a fresh UUID." />
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                value={credClientId}
+                onChange={(e) => setCredClientId(e.target.value)}
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 break-all"
+              />
+              <button type="button" onClick={() => setCredClientId(crypto.randomUUID())} title="Generate a new client_id"
+                className="flex items-center gap-1 text-xs border border-gray-300 text-gray-600 hover:bg-gray-50 px-2 py-2 rounded-lg transition-colors">
+                <RefreshCw size={12} /> Generate
+              </button>
+              <CopyButton value={credClientId} small />
             </div>
           </div>
           <div>
-            <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Client Secret</p>
-            <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
-              <code className="text-xs text-gray-500 flex-1">{client.oauthClientSecretPrefix}••••••••••••••••••••••••</code>
-              <span className="text-[10px] text-gray-400 bg-gray-200 px-1.5 py-0.5 rounded">prefix only</span>
+            <label className="text-[10px] text-gray-400 uppercase tracking-wide mb-1 flex items-center">
+              Client Secret
+              <Tooltip text="The confidential client secret. Stored only as a bcrypt hash — never returned — so this field is blank (unchanged) unless you set a new value. Type a custom secret or Generate one, then Save; copy it to the relying party's config. The Secret Prefix is a separate, independent label (not derived from this secret)." />
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type={showCredSecret ? 'text' : 'password'}
+                value={credSecret}
+                onChange={(e) => setCredSecret(e.target.value)}
+                placeholder="•••••••• (unchanged)"
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 break-all"
+              />
+              <button type="button" onClick={() => setShowCredSecret((s) => !s)} title={showCredSecret ? 'Hide' : 'Reveal'}
+                className="text-gray-400 hover:text-[#001E2B] px-1">
+                {showCredSecret ? <EyeOff size={13} /> : <Eye size={13} />}
+              </button>
+              <button type="button" onClick={() => { setCredSecret(crypto.randomUUID()); setShowCredSecret(true); }} title="Generate a new secret"
+                className="flex items-center gap-1 text-xs border border-gray-300 text-gray-600 hover:bg-gray-50 px-2 py-2 rounded-lg transition-colors">
+                <RefreshCw size={12} /> Generate
+              </button>
             </div>
           </div>
+          <div>
+            <label className="text-[10px] text-gray-400 uppercase tracking-wide mb-1 flex items-center">
+              Secret Prefix
+              <Tooltip text="An independent display/identification label for this credential (like a key nickname). It is NOT part of the secret and cannot authenticate — decoupling it means no byte of the real secret is ever exposed. Specify your own or Generate one." />
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                value={credPrefix}
+                onChange={(e) => setCredPrefix(e.target.value)}
+                maxLength={16}
+                placeholder="e.g. espresso"
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 break-all"
+              />
+              <button type="button" onClick={() => setCredPrefix(crypto.randomUUID().replace(/-/g, '').slice(0, 8))} title="Generate a prefix"
+                className="flex items-center gap-1 text-xs border border-gray-300 text-gray-600 hover:bg-gray-50 px-2 py-2 rounded-lg transition-colors">
+                <RefreshCw size={12} /> Generate
+              </button>
+              <CopyButton value={credPrefix} small />
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1">Display label only (max 16 chars); not derived from the secret.</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 mt-3">
+          <button
+            type="button" onClick={saveCredentials} disabled={credSaving}
+            className="flex items-center gap-2 bg-[#001E2B] hover:bg-[#001E2B]/80 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-60 text-sm"
+          >
+            {credSaving ? 'Saving...' : <><Check size={14} /> Save credentials</>}
+          </button>
+          {credSaved && <span className="text-sm text-green-700 flex items-center gap-1"><Check size={13} /> Saved.</span>}
+          {credError && <span className="text-sm text-red-600">{credError}</span>}
+          {credClientId.trim() !== client.oauthClientId && (
+            <span className="text-[11px] text-amber-700">⚠ Changing the Client ID orphans existing tokens &amp; consents.</span>
+          )}
         </div>
 
         {newSecret && (
@@ -530,6 +638,7 @@ export default function MerchantSSOPage() {
           <label className="block text-xs font-medium text-gray-700 mb-1.5">
             Redirect URIs
             <span className="text-gray-400 font-normal ml-1">(authorization_code callbacks)</span>
+            <Tooltip text="Exact URLs the PSP is allowed to redirect the browser back to after login, carrying the authorization code. A token request whose redirect_uri is not on this list is rejected (OAuth 2.0 open-redirect protection). Register one per environment." />
           </label>
           <UriListEditor uris={redirectUris} onChange={setRedirectUris} placeholder="https://your-app.com/auth/callback" />
         </div>
@@ -539,13 +648,49 @@ export default function MerchantSSOPage() {
           <label className="block text-xs font-medium text-gray-700 mb-1.5">
             Post-logout redirect URIs
             <span className="text-gray-400 font-normal ml-1">(optional)</span>
+            <Tooltip text="Allowed targets for RP-initiated (single) logout: after the PSP terminates the session it may redirect the browser back only to a URL on this list. Prevents the logout redirect from being abused as an open redirect. Usually your app's home or signed-out page, one per environment." />
           </label>
           <UriListEditor uris={postLogoutUris} onChange={setPostLogoutUris} placeholder="https://your-app.com/signed-out" />
         </div>
 
+        {/* Branding (OIDC logo_uri / client_uri) */}
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1.5">
+            Logo URL
+            <span className="text-gray-400 font-normal ml-1">(OIDC logo_uri)</span>
+            <Tooltip text="OIDC logo_uri (RFC 7591): the merchant logo shown on the PSP consent screen and in the user's authorized-apps list. Must be https (http allowed only for localhost) to avoid mixed-content on the https consent page. Leave empty to fall back to a generic avatar." />
+          </label>
+          <input
+            type="url"
+            value={logoUri}
+            onChange={(e) => setLogoUri(e.target.value)}
+            placeholder="https://your-app.com/logo.svg"
+            className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
+          />
+          <p className="text-xs text-gray-400 mt-1">https only (http allowed for localhost). Leave empty to clear.</p>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1.5">
+            Home page URL
+            <span className="text-gray-400 font-normal ml-1">(OIDC client_uri)</span>
+            <Tooltip text="OIDC client_uri (RFC 7591): the merchant's home page, linked from the consent screen and app listings so users can identify the app. Must be https (http allowed only for localhost). Leave empty to omit the link." />
+          </label>
+          <input
+            type="url"
+            value={clientUri}
+            onChange={(e) => setClientUri(e.target.value)}
+            placeholder="https://your-app.com"
+            className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40"
+          />
+          <p className="text-xs text-gray-400 mt-1">https only (http allowed for localhost). Leave empty to clear.</p>
+        </div>
+
         {/* Grant types */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-2">Grant types</label>
+          <label className="block text-xs font-medium text-gray-700 mb-2">
+            Grant types
+            <Tooltip text="OAuth 2.0 flows this client may use. authorization_code (+ PKCE) for user SSO, refresh_token to rotate access tokens, client_credentials for server-to-server calls (the merchant's own machine identity). Grant only what the app needs (least privilege)." />
+          </label>
           <div className="space-y-2">
             {ALL_GRANT_TYPES.map((g) => (
               <label key={g} className="flex items-center gap-2 text-sm cursor-pointer">
@@ -563,7 +708,10 @@ export default function MerchantSSOPage() {
 
         {/* Scopes */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-2">Allowed scopes</label>
+          <label className="block text-xs font-medium text-gray-700 mb-2">
+            Allowed scopes
+            <Tooltip text="The maximum set of permissions this client can request. At consent time the user may grant a subset, but never more than what is enabled here. Keep to the minimum the integration requires (least privilege / data minimization)." />
+          </label>
           <div className="grid grid-cols-2 gap-1.5">
             {ALL_SCOPES.map((s) => (
               <label key={s} className="flex items-start gap-2 text-sm cursor-pointer">
@@ -588,10 +736,14 @@ export default function MerchantSSOPage() {
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input type="checkbox" checked={requirePkce} onChange={(e) => setRequirePkce(e.target.checked)} className="accent-[#001E2B]" />
               Require PKCE (S256), recommended for public clients
+              <Tooltip text="Proof Key for Code Exchange (RFC 7636): the client must send a code_challenge on /authorize and the matching code_verifier on /token. Defeats authorization-code interception. Mandatory for public clients; recommended even for confidential ones." />
             </label>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Access token lifetime (seconds)</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Access token lifetime (seconds)
+              <Tooltip text="How long an issued access token stays valid before it must be refreshed. Shorter = smaller window if a token leaks, but more refreshes. Range 300s–86400s (5 min–24 h)." />
+            </label>
             <input
               type="number" min={300} max={86400} value={tokenLifetime}
               onChange={(e) => setTokenLifetime(Number(e.target.value))}
@@ -600,7 +752,10 @@ export default function MerchantSSOPage() {
             <p className="text-[11px] text-gray-400 mt-0.5">{Math.round(tokenLifetime / 60)} min</p>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Refresh token lifetime (days)</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Refresh token lifetime (days)
+              <Tooltip text="How long a refresh token can be used to obtain new access tokens before the user must sign in again. Longer = fewer logins but a longer-lived credential to protect. Range 1–365 days." />
+            </label>
             <input
               type="number" min={1} max={365} value={refreshLifetime}
               onChange={(e) => setRefreshLifetime(Number(e.target.value))}

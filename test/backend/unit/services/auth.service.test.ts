@@ -13,7 +13,7 @@ vi.mock('fs', async (importOriginal) => {
   return { ...actual, readFileSync: h.readFileSync };
 });
 
-import { loginUser, getDemoUsers } from '../../../../backend/src/modules/identity/services/auth.service';
+import { loginUser, getDemoUsers, getCurrentSessionEpoch, bumpSessionEpoch } from '../../../../backend/src/modules/identity/services/auth.service';
 
 function makeDb(user: Record<string, unknown> | null) {
   const findOneMock = vi.fn().mockResolvedValue(user);
@@ -100,6 +100,44 @@ describe('loginUser', () => {
     const db = makeDb(validUser);
     const { user } = await loginUser(db, 'sarah.chen@back.es', 'demo-password', 'local');
     expect((user as Record<string, unknown>).customerAuthenticationCredentialHash).toBeUndefined();
+  });
+
+  it('stamps epoch 0 when the record has no session epoch', async () => {
+    const db = makeDb(validUser);
+    const { token } = await loginUser(db, 'sarah.chen@back.es', 'demo-password', 'local');
+    const decoded = jwt.verify(token, 'test-secret-key') as Record<string, unknown>;
+    expect(decoded.epoch).toBe(0);
+  });
+
+  it('stamps the record\'s current session epoch into the JWT', async () => {
+    const db = makeDb({ ...validUser, customerAuthenticationSessionEpoch: 3 });
+    const { token } = await loginUser(db, 'sarah.chen@back.es', 'demo-password', 'local');
+    const decoded = jwt.verify(token, 'test-secret-key') as Record<string, unknown>;
+    expect(decoded.epoch).toBe(3);
+  });
+});
+
+describe('session epoch (server-side logout invalidation)', () => {
+  it('getCurrentSessionEpoch returns the stored epoch', async () => {
+    const db = makeDb({ customerAuthenticationSessionEpoch: 5 });
+    expect(await getCurrentSessionEpoch(db, 'usr-001')).toBe(5);
+  });
+
+  it('getCurrentSessionEpoch defaults to 0 when absent or record missing', async () => {
+    expect(await getCurrentSessionEpoch(makeDb({}), 'usr-001')).toBe(0);
+    expect(await getCurrentSessionEpoch(makeDb(null), 'nope')).toBe(0);
+  });
+
+  it('bumpSessionEpoch increments and returns the new epoch', async () => {
+    const findOneAndUpdate = vi.fn().mockResolvedValue({ customerAuthenticationSessionEpoch: 1 });
+    const db = { collection: vi.fn().mockReturnValue({ findOneAndUpdate }) } as any;
+    const next = await bumpSessionEpoch(db, 'usr-001');
+    expect(next).toBe(1);
+    expect(findOneAndUpdate).toHaveBeenCalledWith(
+      { customerAuthenticationInstanceReference: 'usr-001' },
+      { $inc: { customerAuthenticationSessionEpoch: 1 } },
+      expect.objectContaining({ returnDocument: 'after' }),
+    );
   });
 });
 

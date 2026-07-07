@@ -160,6 +160,74 @@ and must NOT be repeated in the request body.
     return reply.status(201).send(result);
   });
 
+  // GET /api/v1/customer/me/cards  — the AUTHENTICATED caller's own saved cards (display-safe).
+  //
+  // Caller-scoped by design: the customer agreement is resolved from the caller's JWT (partyRef)
+  // via getOwnAgreementId — never from a client-supplied id, never from a session/link's stored
+  // acting party. Used by the hosted payment pages (checkout + payment link) to offer the viewer a
+  // one-tap saved-card pick. A shared link opened in another browser (no/other token) resolves to a
+  // different caller (or 401), so it can never surface someone else's cards.
+  //
+  // PCI DSS: returns display-safe rows only — surrogate token (not CHD) + masked PAN (last 4) +
+  // network + alias + preferred flag. Never the full PAN, never the CVV/PIN (SAD, prohibited), and
+  // NOT the expiry (QE:none; owner-only via the per-card detail endpoint). Only `active` cards are
+  // returned (a suspended/expired card would only decline at authorization).
+  fastify.get('/me/cards', {
+    schema: {
+      tags: ['cards'],
+      summary: 'List the authenticated caller\'s own saved cards (display-safe)',
+      description: `Returns the caller's own saved cards (BIAN SD-88). The customer agreement is
+resolved server-side from the caller's session token (partyRef) — no id is accepted from the client,
+so a caller can only ever see their OWN cards (PCI DSS Req 7 least privilege). Display-safe fields
+only: surrogate token, masked PAN, network, alias, preferred flag. No full PAN, no CVV, no expiry.`,
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: {
+          description: 'The caller\'s own active saved cards.',
+          type: 'object',
+          properties: {
+            results: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  paymentCardInstanceReference: { type: 'string' },
+                  cardToken: { type: 'string', description: 'PAN surrogate token (not CHD). Used to pay with the saved card.' },
+                  paymentCardMaskedPanDisplay: { type: 'string' },
+                  paymentCardNetwork: { type: 'string', nullable: true },
+                  paymentCardAlias: { type: 'string', nullable: true },
+                  paymentCardIsPreferred: { type: 'boolean', nullable: true },
+                },
+              },
+            },
+          },
+        },
+        401: { description: 'Missing or invalid Bearer token.', $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    // Identity comes ONLY from the verified token; the caller cannot name another customer.
+    const user = (request as { user?: JwtUserPayload }).user;
+    const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
+    // No agreement for this caller (e.g. staff without a customer profile) → no saved cards.
+    if (!ownId) return reply.send({ results: [] });
+
+    const { results } = await getCardsByCustomer(fastify.db, ownId);
+    const displaySafe = (results as Array<Record<string, unknown>>)
+      // Only cards usable at authorization time (active card-on-file); a suspended/expired card
+      // would just decline, so keep it out of the quick-pick selector.
+      .filter((c) => c.paymentCardStatus === 'active')
+      .map((c) => ({
+        paymentCardInstanceReference: c.paymentCardInstanceReference as string,
+        cardToken: c.paymentCardReference as string,
+        paymentCardMaskedPanDisplay: c.paymentCardMaskedPanDisplay as string,
+        ...(c.paymentCardNetwork ? { paymentCardNetwork: c.paymentCardNetwork as string } : {}),
+        ...(c.paymentCardAlias ? { paymentCardAlias: c.paymentCardAlias as string } : {}),
+        ...(c.paymentCardIsPreferred ? { paymentCardIsPreferred: true } : {}),
+      }));
+    return reply.send({ results: displaySafe });
+  });
+
   // GET /api/v1/customer/:customerId/cards
   fastify.get('/:customerId/cards', {
     schema: {

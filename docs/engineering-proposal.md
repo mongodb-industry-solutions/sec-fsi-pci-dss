@@ -469,7 +469,7 @@ If a breaking schema change is needed (e.g., adding a QE range field), the colle
 | QE `$lookup` limitation breaks a planned join | Low | High | All joins are application-side sequential queries: no `$lookup` used. Documented in ADR-001 |
 | Seed data accidentally includes real PAN format | Medium | High | Seed generator always prefixes tokens with `pm_`; grep CI check rejects any string matching `\b\d{13,19}\b` |
 | Key vault DEK reference lost (collection dropped without DEK cleanup) | Low | High | `bin/setup.ts --reset` drops collections then recreates DEKs; order is enforced in script |
-| Demo breaks at conference due to AWS KMS unavailability | Low | High | Local KMS fallback is always available with `KMS_PROVIDER=local`; test it before travel |
+| Demo breaks at conference due to AWS KMS unavailability | Low | High | Local KMS fallback is always available with `PSP_KMS_PROVIDER=local`; test it before travel |
 
 ---
 
@@ -1896,3 +1896,41 @@ block always shows a navigable link or the full destination. Existing executions
 "Recipient not resolved" until reseeded.
 
 *Added 2026-07-04 (v17.2; doc + code together per repo rules).*
+
+## ADR-041: Merchant SSO Integration App + activity attribution + commission model (v18)
+
+**Status:** Accepted (2026-07-06)
+
+**Context:** v18 adds an external merchant experience: a standalone app where a merchant signs in with
+its PSP identity (SSO), views the PSP activity attributed to it, and configures its commission. This must
+not fork the PSP data model or bypass its regulated boundary. Three questions had to be resolved: how the
+merchant app relates to the PSP, how merchant commission is modelled BIAN-purely, and how per-merchant
+activity is attributed without a new collection.
+
+**Decision:**
+1. **Standalone external app.** `merchant/` is a separate Next.js app that owns **no database and no
+   Fastify layer**. Its route handlers act as a confidential OAuth client; it integrates with the PSP
+   exclusively via the PSP API + OAuth2/OIDC SSO (per ADR-033–037). Local port `8082` / container `8080`;
+   env prefix `PSP_MERCHANT_`. This keeps the PSP the single system of record and puts the merchant app
+   fully outside the CHD boundary (PCI SAQ A).
+2. **Commission model — no new collection.** The numeric commission reuses the existing
+   `paymentExecutionProcedure.feeAmount` (SD-65); a new attribution sub-doc `fee { feeMerchantReference,
+   feeRateApplied, feeCollectedDateTime }` records who was charged, at what rate, and when. The rate lives
+   on SD-89 as `merchantCommissionRate` (editable in merchant settings, audited). Aggregate
+   `commissionRevenue` is **derived**, not stored. *(Runtime fee-wiring — A-06 — is deferred; revenue is
+   seed-driven for now.)*
+3. **Activity attribution — no new collection.** The existing `businessProcessEvent` gains `clientId`,
+   `merchantAgreementReference`, `actingPartyReference`, and `actingChannel`, so PSP events can be filtered
+   per merchant / per connected app without a parallel event store.
+4. **OAuth: granular + incremental consent.** The user selects scopes; unknown scopes return
+   `invalid_scope` per RFC 6749; broadening scope forces re-consent. Merchant-facing PSP endpoints use
+   `skipAuth` + `validateMerchantToken` + sub-binding; scopes follow the PSP `verb:resource` convention.
+5. **Merchant branding** is driven by OIDC client metadata `logo_uri` / `client_uri`.
+
+**Consequences:** BIAN-pure (SD-65 fee, SD-89 agreement, SD-13 acting party) with no new collections. PCI
+SAQ A holds — no CHD ever reaches the merchant app; IBAN is masked-only in merchant views (GDPR Art. 32 /
+PSD2). Least-privilege scopes + separation of duties are enforced at the token boundary. Trade-off:
+commission revenue is not yet computed at authorization time (A-06 follow-up) and the API-driven payment
+OAuth path remains a follow-up.
+
+*Added 2026-07-06 (v18; doc + code together per repo rules).*

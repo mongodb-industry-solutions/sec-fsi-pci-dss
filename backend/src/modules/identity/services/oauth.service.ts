@@ -9,6 +9,8 @@ import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { MERCHANT_AGREEMENT_COLLECTION, MerchantAgreementControlRecord, OAuthGrantType } from '../../gateway/models/merchantAgreement.model';
+import { describeScope, requiredScopesIn, ScopeDescriptor } from '../../gateway/services/merchantOAuth.service';
+import { emitProcessEvent, attributionFromMerchantContext } from '../../provider/services/businessProcessEvent.service';
 import { PARTY_AUTH_CONSENT_COLLECTION, PartyAuthConsentRecord } from '../models/partyAuthConsent.model';
 import { WebhookService } from '../../gateway/services/merchantWebhook.service';
 import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
@@ -37,12 +39,15 @@ export interface OAuthClientInfo {
   requirePkce: boolean;
   tokenLifetimeSeconds: number;
   refreshTokenLifetimeDays: number;
+  oauthLogoUri?: string;    // v18: OIDC logo_uri — branding on the consent page (A-22)
+  oauthClientUri?: string;  // v18: OIDC client_uri — merchant home page link
 }
 
 export async function resolveOAuthClient(
   db: Db,
   clientId: string,
   clientSecret?: string,
+  opts?: { requireClientAuthentication?: boolean },
 ): Promise<OAuthClientInfo> {
   const merchant = await db
     .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
@@ -60,7 +65,17 @@ export async function resolveOAuthClient(
     throw oauth401('invalid_client', 'Merchant account is not active');
   }
 
-  if (clientSecret !== undefined) {
+  // A CONFIDENTIAL client (one provisioned with a secret) MUST authenticate at the token endpoint
+  // for every grant (RFC 6749 §3.2.1). Enforced only when the caller is authenticating the client
+  // (token/introspection endpoints, requireClientAuthentication=true) — not for internal metadata
+  // lookups (authorize page, post-auth token issuance). Previously the secret was validated only
+  // when it happened to be present, so omitting it bypassed authentication entirely on the
+  // authorization_code and refresh_token flows. Public clients (no secret hash) rely on PKCE.
+  const isConfidential = typeof cfg.oauthClientSecretHash === 'string' && cfg.oauthClientSecretHash.length > 0;
+  if (opts?.requireClientAuthentication && isConfidential && (clientSecret === undefined || clientSecret === '')) {
+    throw oauth401('invalid_client', 'client authentication required (confidential client)');
+  }
+  if (clientSecret !== undefined && clientSecret !== '') {
     const valid = await bcrypt.compare(clientSecret, cfg.oauthClientSecretHash);
     if (!valid) throw oauth401('invalid_client', 'Invalid client_secret');
   }
@@ -77,6 +92,8 @@ export async function resolveOAuthClient(
     requirePkce: cfg.oauthRequirePkce,
     tokenLifetimeSeconds: cfg.oauthTokenLifetimeSeconds ?? 3600,
     refreshTokenLifetimeDays: cfg.oauthRefreshTokenLifetimeDays ?? 30,
+    oauthLogoUri: cfg.oauthLogoUri,
+    oauthClientUri: cfg.oauthClientUri,
   };
 }
 
@@ -95,7 +112,8 @@ export interface AuthorizeParams {
 
 export interface AuthorizeValidated {
   client: OAuthClientInfo;
-  scopes: string[];
+  scopes: string[];              // scopes to be granted (after any user selection is applied)
+  scopeDescriptors: ScopeDescriptor[]; // v18 E-03: metadata for consent rendering
   redirectUri: string;
   state?: string;
   codeChallenge?: string;
@@ -117,9 +135,20 @@ export async function initiateAuthorization(
   }
 
   const requestedScopes = params.scope.split(' ').filter(Boolean);
-  const allowedScopes = requestedScopes.filter((s) => client.scopes.includes(s));
+  // v18 E-04: RFC 6749 §4.1.2.1 — reject any requested scope outside the client allowlist
+  // instead of silently dropping it (previous behaviour narrowed via intersection).
+  const invalid = requestedScopes.filter((s) => !client.scopes.includes(s));
+  if (invalid.length > 0) {
+    throw oauthError(400, 'invalid_scope', `Scope(s) not permitted for this client: ${invalid.join(' ')}`);
+  }
+  const allowedScopes = requestedScopes;
   if (!allowedScopes.includes('openid')) {
     throw oauthError(400, 'invalid_scope', 'scope must include openid');
+  }
+  // v18 E-03: a required scope must be requestable (present in the intersection) for the flow to proceed.
+  const missingRequired = requiredScopesIn(client.scopes).filter((s) => !allowedScopes.includes(s));
+  if (missingRequired.length > 0) {
+    throw oauthError(400, 'invalid_scope', `Required scope(s) missing from request: ${missingRequired.join(' ')}`);
   }
 
   if (client.requirePkce && !params.codeChallenge) {
@@ -132,11 +161,21 @@ export async function initiateAuthorization(
   return {
     client,
     scopes: allowedScopes,
+    scopeDescriptors: allowedScopes.map(describeScope),
     redirectUri: params.redirectUri,
     state: params.state,
     codeChallenge: params.codeChallenge,
     nonce: params.nonce,
   };
+}
+
+// v18 E-04: apply the user's granular selection to the allowlist. Keeps only user-selected
+// scopes that are actually allowed, and force-includes every required scope (openid) even if
+// the user tried to omit it. Returns the effective granted set (order-preserving vs allowed).
+export function applyUserScopeSelection(allowedScopes: string[], userSelected: string[]): string[] {
+  const selected = new Set(userSelected);
+  const required = new Set(requiredScopesIn(allowedScopes));
+  return allowedScopes.filter((s) => selected.has(s) || required.has(s));
 }
 
 // ── Issue Authorization Code ──────────────────────────────────────────────────
@@ -210,11 +249,34 @@ export async function exchangeAuthorizationCode(
   const consentCol = db.collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION);
   const existing = await consentCol.findOne({ partyAuthenticationInstanceReference: record.partyAuthenticationInstanceReference, oauthClientId: clientId });
   const now = new Date();
+  // v18 E-06/E-07: record.scopes carries the user's granular selection (applied at /authorize grant).
+  // Compute the delta vs the prior grant so a broadening (new scopes) is captured explicitly rather
+  // than being an opaque overwrite. Re-consent is enforced upstream (the consent page is always shown);
+  // here we persist the freshly-consented set and audit added/removed scopes.
+  const sub = record.partyAuthenticationInstanceReference;
+  const granted = record.scopes;
+  const prior = existing?.grantedScopes ?? [];
+  const added = granted.filter((s) => !prior.includes(s));
+  const removed = prior.filter((s) => !granted.includes(s));
   if (existing) {
     await consentCol.updateOne(
       { consentId: existing.consentId },
-      { $set: { grantedScopes: record.scopes, consentStatus: 'active', lastUsedAt: now, recordUpdatedDateTime: now } },
+      { $set: { grantedScopes: granted, consentStatus: 'active', lastUsedAt: now, recordUpdatedDateTime: now } },
     );
+    // Audit the (re)consent on the business ledger (SD-16). Attribution ties it to the merchant client.
+    emitProcessEvent(db, {
+      entityType: 'customer',
+      entityId: sub,
+      processType: 'consent_management',
+      processAction: added.length || removed.length ? 'oauth.consent.updated' : 'oauth.consent.reused',
+      processOutcome: 'approved',
+      performedByPartyReference: sub,
+      performedByRole: 'customer',
+      eventSummary: { clientId, consentId: existing.consentId, grantedScopes: granted, addedScopes: added, removedScopes: removed },
+      bianServiceDomain: 'PartyAuthentication',
+      bianControlRecordType: 'ConsentGrant',
+      attribution: attributionFromMerchantContext({ clientId, merchantId: client.merchantAgreementInstanceReference, sub }),
+    });
   } else {
     const consentId = uuidv4();
     await consentCol.insertOne({
@@ -241,9 +303,32 @@ export async function exchangeAuthorizationCode(
       scopes: record.scopes,
       grantedAt: now.toISOString(),
     }).catch(() => {});
+    // v18 E-07: audit the first-time consent grant on the business ledger (SD-16).
+    emitProcessEvent(db, {
+      entityType: 'customer',
+      entityId: sub,
+      processType: 'consent_management',
+      processAction: 'oauth.consent.granted',
+      processOutcome: 'approved',
+      performedByPartyReference: sub,
+      performedByRole: 'customer',
+      eventSummary: { clientId, consentId, grantedScopes: granted, addedScopes: granted, removedScopes: [] },
+      bianServiceDomain: 'PartyAuthentication',
+      bianControlRecordType: 'ConsentGrant',
+      attribution: attributionFromMerchantContext({ clientId, merchantId: client.merchantAgreementInstanceReference, sub }),
+    });
   }
 
   return tokens;
+}
+
+// v18 E-10: scopes already granted to this client by this user (for re-consent highlighting).
+// Empty array = no prior active grant → first-time consent (no "additional permissions" banner).
+export async function getPriorConsentScopes(db: Db, sub: string, clientId: string): Promise<string[]> {
+  const grant = await db
+    .collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION)
+    .findOne({ partyAuthenticationInstanceReference: sub, oauthClientId: clientId, consentStatus: 'active' });
+  return grant?.grantedScopes ?? [];
 }
 
 // ── Client Credentials ────────────────────────────────────────────────────────
@@ -289,6 +374,22 @@ export async function refreshAccessToken(
     tokenLifetimeSeconds: client.tokenLifetimeSeconds,
     refreshTokenLifetimeDays: client.refreshTokenLifetimeDays,
   });
+}
+
+// ── Subject → Party resolution (SD-91 → SD-13) ─────────────────────────────────
+// An OAuth/session token `sub` is the SD-91 login-record id (customerAuthenticationInstanceReference).
+// Domain data (payout accounts, counterparties, executions) is keyed by the SD-13 partyInstanceReference.
+// This bridges the two so merchant on-behalf-of endpoints (which bind on `sub`) can query domain data.
+// Returns null when the sub is unknown (handled gracefully by callers — empty results, no throw).
+export async function resolvePartyInstanceReference(db: Db, sub: string): Promise<string | null> {
+  if (!sub) return null;
+  const rec = await db
+    .collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
+    .findOne(
+      { customerAuthenticationInstanceReference: sub },
+      { projection: { _id: 0, partyInstanceReference: 1 } },
+    );
+  return rec?.partyInstanceReference ?? null;
 }
 
 // ── Userinfo ──────────────────────────────────────────────────────────────────
@@ -488,15 +589,144 @@ export async function verifyAccessToken(token: string): Promise<jwt.JwtPayload> 
 
 // ── Consent Grant Management (SD-16) ─────────────────────────────────────────
 
+// v18: consent grant enriched with the merchant's OIDC logo (branding on the "Authorized Apps" list).
+export type ConsentGrantWithBranding = PartyAuthConsentRecord & { oauthLogoUri?: string };
+
 export async function listUserConsentGrants(
   db: Db,
   sub: string,
-): Promise<PartyAuthConsentRecord[]> {
-  return db
+): Promise<ConsentGrantWithBranding[]> {
+  const grants = await db
     .collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION)
     .find({ partyAuthenticationInstanceReference: sub, consentStatus: 'active' })
     .sort({ consentGrantedAt: -1 })
     .toArray();
+  if (grants.length === 0) return [];
+
+  // Batch-fetch the merchants to attach oauthLogoUri (OIDC logo_uri) without a per-grant round-trip.
+  const clientIds = [...new Set(grants.map((g) => g.oauthClientId))];
+  const merchants = await db
+    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
+    .find({ 'merchantOAuthClient.oauthClientId': { $in: clientIds } }, { projection: { 'merchantOAuthClient.oauthClientId': 1, 'merchantOAuthClient.oauthLogoUri': 1 } })
+    .toArray();
+  const logoByClient = new Map(merchants.map((m) => [m.merchantOAuthClient?.oauthClientId, m.merchantOAuthClient?.oauthLogoUri]));
+
+  return grants.map((g) => ({ ...g, oauthLogoUri: logoByClient.get(g.oauthClientId) }));
+}
+
+// v18 D-01: detail of ONE consent grant owned by the calling user. Enriches the grant with the
+// merchant's OIDC branding (logo_uri/client_uri) and expands each granted scope into a human-readable
+// descriptor (SCOPE_CATALOG). Returns null when the grant does not belong to `sub` (the controller
+// maps this to 404 so a foreign consentId does not leak existence). Self-scoped by construction.
+export interface ConsentGrantDetail {
+  consentId: string;
+  oauthClientId: string;
+  merchantAgreementInstanceReference: string;
+  merchantName: string;
+  oauthLogoUri?: string;
+  oauthClientUri?: string;
+  grantedScopes: ScopeDescriptor[];
+  consentStatus: PartyAuthConsentRecord['consentStatus'];
+  consentGrantedAt: Date;
+  lastUsedAt?: Date;
+}
+
+export async function getUserConsentGrantDetail(
+  db: Db,
+  sub: string,
+  consentId: string,
+): Promise<ConsentGrantDetail | null> {
+  const grant = await db
+    .collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION)
+    .findOne({ consentId, partyAuthenticationInstanceReference: sub });
+  if (!grant) return null;
+
+  // Attach the merchant's OIDC branding (logo_uri/client_uri) — same source as the list view.
+  const merchant = await db
+    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
+    .findOne(
+      { 'merchantOAuthClient.oauthClientId': grant.oauthClientId },
+      { projection: { 'merchantOAuthClient.oauthLogoUri': 1, 'merchantOAuthClient.oauthClientUri': 1 } },
+    );
+  const cfg = merchant?.merchantOAuthClient;
+
+  return {
+    consentId: grant.consentId,
+    oauthClientId: grant.oauthClientId,
+    merchantAgreementInstanceReference: grant.merchantAgreementInstanceReference,
+    merchantName: grant.merchantName,
+    oauthLogoUri: cfg?.oauthLogoUri,
+    oauthClientUri: cfg?.oauthClientUri,
+    grantedScopes: grant.grantedScopes.map(describeScope),
+    consentStatus: grant.consentStatus,
+    consentGrantedAt: grant.consentGrantedAt,
+    lastUsedAt: grant.lastUsedAt,
+  };
+}
+
+// v18 B-10: users who authorized a given merchant (cross-merchant audit for L1/L2/auditor).
+// Reads partyAuthConsent filtered by merchantAgreementInstanceReference, joins the user's display
+// name/email (SD-13) for a display-safe row. Search matches the user name/email/party ref. Paginated.
+export interface MerchantAuthorizationRow {
+  consentId: string;
+  partyAuthenticationInstanceReference: string;
+  userName?: string;
+  userEmail?: string;
+  grantedScopes: string[];
+  consentStatus: ConsentGrantStatusLike;
+  consentGrantedAt: Date;
+  lastUsedAt?: Date;
+}
+type ConsentGrantStatusLike = PartyAuthConsentRecord['consentStatus'];
+
+export async function listMerchantAuthorizations(
+  db: Db,
+  merchantId: string,
+  opts: { q?: string; page?: number; limit?: number },
+): Promise<{ authorizations: MerchantAuthorizationRow[]; total: number; page: number; limit: number }> {
+  const page = Math.max(1, opts.page ?? 1);
+  const limit = Math.min(opts.limit ?? 20, 100);
+
+  const grants = await db
+    .collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION)
+    .find({ merchantAgreementInstanceReference: merchantId })
+    .sort({ consentGrantedAt: -1 })
+    .toArray();
+
+  // Resolve display-safe user identity (SD-13) in one batch — no CHD, no IBAN.
+  const subs = [...new Set(grants.map((g) => g.partyAuthenticationInstanceReference))];
+  const users = subs.length
+    ? await db.collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
+        .find({ customerAuthenticationInstanceReference: { $in: subs } })
+        .toArray()
+    : [];
+  const userById = new Map(users.map((u) => [u.customerAuthenticationInstanceReference, u]));
+
+  let rows: MerchantAuthorizationRow[] = grants.map((g) => {
+    const u = userById.get(g.partyAuthenticationInstanceReference);
+    return {
+      consentId: g.consentId,
+      partyAuthenticationInstanceReference: g.partyAuthenticationInstanceReference,
+      userName: u?.customerAuthenticationUserName,
+      userEmail: u?.customerAuthenticationEmailAddress,
+      grantedScopes: g.grantedScopes,
+      consentStatus: g.consentStatus,
+      consentGrantedAt: g.consentGrantedAt,
+      lastUsedAt: g.lastUsedAt,
+    };
+  });
+
+  if (opts.q) {
+    const q = opts.q.toLowerCase();
+    rows = rows.filter((r) =>
+      (r.userName ?? '').toLowerCase().includes(q) ||
+      (r.userEmail ?? '').toLowerCase().includes(q) ||
+      r.partyAuthenticationInstanceReference.toLowerCase().includes(q));
+  }
+
+  const total = rows.length;
+  const authorizations = rows.slice((page - 1) * limit, page * limit);
+  return { authorizations, total, page, limit };
 }
 
 export async function revokeConsentGrant(

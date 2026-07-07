@@ -1,16 +1,28 @@
 /**
- * E2E: SD-88 Card Management — Revoke + Set-as-Preferred in user profile
- * Route: /system/profile ("Saved Payment Methods" section)
- * Role: customer (JWT injected via demo_token cookie using loginAs helper)
+ * E2E: SD-88 Card Management — saved-card list, detail actions (remove + deactivate)
  *
- * Success criteria (dev.plan.md §C6):
- *   SC-1  Revoking a card → PATCH { paymentCardStatus: 'revoked' } called; card removed from list
- *   SC-2  Set as Preferred → PATCH { paymentCardIsPreferred: true } called; list refreshes
- *   SC-5  Remove + Set-as-Preferred buttons visible on active cards
- *   SC-6  Confirmation dialog shown before revoke; Cancel aborts the action
+ * The card-management UI was redesigned: management moved OFF /system/profile onto a
+ * dedicated route. The searchable list lives at /system/cards (SavedCardsPanel) and
+ * shows masked PANs + a preferred (star) badge; each row navigates to the detail page
+ * /system/cards/[cardId], where the lifecycle actions now live:
+ *   - "Remove card"          → DELETE /cards/{id}      (confirm dialog "Remove this card?")
+ *   - "Deactivate"/"Reactivate" → PATCH /cards/{id}/status { active } (confirm on deactivate)
+ * Alias/note edit → PATCH /cards/{id}. Actions use the programmatic useConfirm() modal
+ * from ConfirmProvider (title / message / Cancel + confirmLabel), not inline buttons.
+ *
+ * Success criteria (mapped to the current UI):
+ *   SC-5  List renders active cards with masked PAN + preferred badge; rows open detail.
+ *   SC-6  Removing a card shows a confirm dialog (Cancel + "Remove card"); Cancel aborts.
+ *   SC-1  Confirming remove → DELETE /cards/{id} sent; user returned to the card list.
+ *   SC-2  Deactivating a card → confirm dialog, then PATCH /cards/{id}/status { active:false }.
+ *
+ * NOTE on divergence from the original spec: the redesigned UI removes a card via DELETE
+ * (soft-delete, server-side audit) rather than PATCH {paymentCardStatus:'revoked'}, and there
+ * is no "set as preferred" toggle for an already-saved card (preferred is only chosen when a
+ * card is first added). The old SC-1 "PATCH revoked" and SC-2 "PATCH preferred" flows no longer
+ * exist in the product, so these tests assert the real replacement flows (DELETE + status PATCH).
  *
  * All backend calls are mocked with page.route — no live stack required for test correctness.
- * The test:e2e command in /admin/panel/setup does require the frontend dev server (:3000).
  */
 import { test, expect, Page } from '@playwright/test';
 import { loginAs, json } from './support/auth';
@@ -48,155 +60,169 @@ const CARD_B = {
   paymentCardIsPreferred: false,
 };
 
+// Full detail record for the detail page (no card token / funding account → no extra fetches).
+const CARD_B_DETAIL = {
+  ...CARD_B,
+  paymentCardExpirationDate: '12/29',
+  paymentCardAlias: '',
+  paymentCardCustomerNote: '',
+};
+
+/** Stub auth + merchants + the card LIST endpoint (used by /system/cards). */
 async function stubBase(page: Page, cards = [CARD_A, CARD_B]) {
   await page.route('**/api/v1/auth/me**', (r) => r.fulfill(json(PROFILE_ME)));
   await page.route('**/api/v1/merchants/me**', (r) => r.fulfill(json({ found: false })));
   await page.route(`**/api/v1/customer/${AGREEMENT_ID}/cards`, (r) => r.fulfill(json({ results: cards })));
 }
 
-// ─── SC-5: card list + action buttons ────────────────────────────────────────
+/** Stub the single-card GET (getCardById) for the detail page. */
+async function stubCardDetail(page: Page, detail = CARD_B_DETAIL) {
+  await page.route(`**/api/v1/customer/${AGREEMENT_ID}/cards/${detail.paymentCardInstanceReference}`, (route) => {
+    if (route.request().method() === 'GET') route.fulfill(json(detail));
+    else route.continue();
+  });
+}
 
-test.describe('SC-5: card list renders with action buttons', () => {
+// ─── SC-5: card list renders + navigation to detail ──────────────────────────
+
+test.describe('SC-5: saved-card list', () => {
   test.beforeEach(async ({ context }) => { await loginAs(context, 'customer'); });
 
-  test('5a shows both active card rows in the Saved Payment Methods section', async ({ page }) => {
+  test('5a shows both active card rows in the Saved Payment Methods list', async ({ page }) => {
     await stubBase(page);
-    await page.goto('/system/profile');
-    await expect(page.getByText('****-****-****-4242').first()).toBeVisible({ timeout: 12_000 });
+    await page.goto('/system/cards');
+    await expect(page.getByRole('heading', { name: /saved payment methods/i })).toBeVisible({ timeout: 12_000 });
+    await expect(page.getByText('****-****-****-4242').first()).toBeVisible();
     await expect(page.getByText('****-****-****-1111').first()).toBeVisible();
   });
 
-  test('5b Remove button visible on active cards', async ({ page }) => {
+  test('5b preferred badge (star) displayed on the preferred card row', async ({ page }) => {
     await stubBase(page);
-    await page.goto('/system/profile');
+    await page.goto('/system/cards');
     await expect(page.getByText('****-****-****-4242').first()).toBeVisible({ timeout: 12_000 });
-    await expect(page.getByRole('button', { name: /remove/i }).first()).toBeVisible();
+    // The preferred card (CARD_A) row carries the "Default card" star; the non-preferred one does not.
+    await expect(page.getByTitle('Default card')).toHaveCount(1);
   });
 
-  test('5c Set-as-Preferred button visible on non-preferred active card', async ({ page }) => {
+  test('5c clicking a card row navigates to its detail page with lifecycle actions', async ({ page }) => {
     await stubBase(page);
-    await page.goto('/system/profile');
+    await stubCardDetail(page);
+    await page.goto('/system/cards');
     await expect(page.getByText('****-****-****-1111').first()).toBeVisible({ timeout: 12_000 });
-    await expect(page.getByRole('button', { name: /preferred/i }).first()).toBeVisible();
+
+    await page.getByText('****-****-****-1111').first().click();
+    await expect(page).toHaveURL(/\/system\/cards\/CARD-002/, { timeout: 8_000 });
+    await expect(page.getByRole('button', { name: /remove card/i })).toBeVisible();
   });
 
-  test('5d preferred badge displayed on the preferred card (CARD_A)', async ({ page }) => {
+  test('5d detail page exposes Remove + Deactivate actions on an active card', async ({ page }) => {
     await stubBase(page);
-    await page.goto('/system/profile');
-    await expect(page.getByText('****-****-****-4242').first()).toBeVisible({ timeout: 12_000 });
-    await expect(page.getByText(/preferred/i).first()).toBeVisible();
+    await stubCardDetail(page);
+    await page.goto('/system/cards/CARD-002');
+    await expect(page.getByRole('button', { name: /remove card/i })).toBeVisible({ timeout: 12_000 });
+    await expect(page.getByRole('button', { name: /deactivate/i })).toBeVisible();
   });
 });
 
-// ─── SC-6: confirmation dialog before revoke ─────────────────────────────────
+// ─── SC-6: confirmation dialog before remove ─────────────────────────────────
 
-test.describe('SC-6: revoke confirmation dialog', () => {
+test.describe('SC-6: remove confirmation dialog', () => {
   test.beforeEach(async ({ context }) => { await loginAs(context, 'customer'); });
 
-  test('6a clicking Remove shows dialog with Cancel + Confirm', async ({ page }) => {
+  test('6a clicking Remove card shows dialog "Remove this card?" with Cancel + Remove card', async ({ page }) => {
     await stubBase(page);
-    await page.goto('/system/profile');
-    await expect(page.getByRole('button', { name: /remove/i }).first()).toBeVisible({ timeout: 12_000 });
-    await page.getByRole('button', { name: /remove/i }).first().click();
-    await expect(
-      page.getByText(/remove.*card|revoke.*card|cannot be undone/i).first()
-    ).toBeVisible({ timeout: 4_000 });
-    await expect(page.getByRole('button', { name: /cancel/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /confirm/i })).toBeVisible();
+    await stubCardDetail(page);
+    await page.goto('/system/cards/CARD-002');
+    await page.getByRole('button', { name: /remove card/i }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible({ timeout: 4_000 });
+    await expect(dialog.getByText(/remove this card\?/i)).toBeVisible();
+    await expect(dialog.getByText(/cannot be undone/i)).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /^cancel$/i })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /remove card/i })).toBeVisible();
   });
 
-  test('6b pressing Cancel dismisses dialog; card still in list', async ({ page }) => {
+  test('6b pressing Cancel dismisses the dialog without a DELETE; card stays', async ({ page }) => {
+    let deleteCalled = false;
     await stubBase(page);
-    await page.goto('/system/profile');
-    await expect(page.getByRole('button', { name: /remove/i }).first()).toBeVisible({ timeout: 12_000 });
-    await page.getByRole('button', { name: /remove/i }).first().click();
-    await page.getByRole('button', { name: /cancel/i }).click();
-    await expect(page.getByText('****-****-****-4242').first()).toBeVisible({ timeout: 2_000 });
-  });
-});
-
-// ─── SC-1: revoke card ────────────────────────────────────────────────────────
-
-test.describe('SC-1: revoke card end-to-end', () => {
-  test.beforeEach(async ({ context }) => { await loginAs(context, 'customer'); });
-
-  test('confirm revoke → PATCH {paymentCardStatus:revoked} sent; card removed from list', async ({ page }) => {
-    let patchPayload: Record<string, unknown> | null = null;
-    let getCount = 0;
-
-    await page.route('**/api/v1/auth/me**', (r) => r.fulfill(json(PROFILE_ME)));
-    await page.route('**/api/v1/merchants/me**', (r) => r.fulfill(json({ found: false })));
-
-    // GET /cards: first call returns both cards; second call (after revoke) omits CARD_A
-    await page.route(`**/api/v1/customer/${AGREEMENT_ID}/cards`, (r) => {
-      getCount++;
-      r.fulfill(json({ results: getCount === 1 ? [CARD_A, CARD_B] : [CARD_B] }));
-    });
-
-    // PATCH /cards/CARD-001 — specific card operation (registered after GET route → higher priority)
-    await page.route(`**/api/v1/customer/${AGREEMENT_ID}/cards/CARD-001`, (route) => {
-      if (route.request().method() === 'PATCH') {
-        patchPayload = JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown>;
-        route.fulfill(json({ paymentCardInstanceReference: 'CARD-001', paymentCardStatus: 'revoked', paymentCardIsPreferred: false }));
-      } else {
-        route.continue();
-      }
-    });
-
-    await page.goto('/system/profile');
-    await expect(page.getByText('****-****-****-4242').first()).toBeVisible({ timeout: 12_000 });
-
-    await page.getByRole('button', { name: /remove/i }).first().click();
-    await page.getByRole('button', { name: /confirm/i }).click();
-
-    // CARD_A gone; CARD_B still present
-    await expect(page.getByText('****-****-****-4242')).toHaveCount(0, { timeout: 8_000 });
-    await expect(page.getByText('****-****-****-1111').first()).toBeVisible();
-
-    expect(patchPayload?.paymentCardStatus).toBe('revoked');
-  });
-});
-
-// ─── SC-2: set preferred card ─────────────────────────────────────────────────
-
-test.describe('SC-2: set preferred card', () => {
-  test.beforeEach(async ({ context }) => { await loginAs(context, 'customer'); });
-
-  test('Set as Preferred → PATCH {paymentCardIsPreferred:true} sent; list refreshes', async ({ page }) => {
-    let patchPayload: Record<string, unknown> | null = null;
-    let getCount = 0;
-
-    await page.route('**/api/v1/auth/me**', (r) => r.fulfill(json(PROFILE_ME)));
-    await page.route('**/api/v1/merchants/me**', (r) => r.fulfill(json({ found: false })));
-
-    // GET /cards: second call returns CARD_B as preferred, CARD_A demoted
-    await page.route(`**/api/v1/customer/${AGREEMENT_ID}/cards`, (r) => {
-      getCount++;
-      r.fulfill(json({
-        results: getCount === 1
-          ? [CARD_A, CARD_B]
-          : [{ ...CARD_A, paymentCardIsPreferred: false }, { ...CARD_B, paymentCardIsPreferred: true }],
-      }));
-    });
-
-    // PATCH /cards/CARD-002 — set preferred on the non-preferred card
+    await stubCardDetail(page);
     await page.route(`**/api/v1/customer/${AGREEMENT_ID}/cards/CARD-002`, (route) => {
+      if (route.request().method() === 'DELETE') { deleteCalled = true; route.fulfill(json({ removed: true })); }
+      else if (route.request().method() === 'GET') route.fulfill(json(CARD_B_DETAIL));
+      else route.continue();
+    });
+    await page.goto('/system/cards/CARD-002');
+    await page.getByRole('button', { name: /remove card/i }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible({ timeout: 4_000 });
+    await dialog.getByRole('button', { name: /^cancel$/i }).click();
+
+    await expect(dialog).toBeHidden();
+    await expect(page).toHaveURL(/\/system\/cards\/CARD-002/);
+    expect(deleteCalled).toBe(false);
+  });
+});
+
+// ─── SC-1: remove card end-to-end ────────────────────────────────────────────
+
+test.describe('SC-1: remove card end-to-end', () => {
+  test.beforeEach(async ({ context }) => { await loginAs(context, 'customer'); });
+
+  test('confirm remove → DELETE /cards/CARD-002 sent; returns to the card list', async ({ page }) => {
+    let deleteCalled = false;
+    await stubBase(page);
+    await page.route(`**/api/v1/customer/${AGREEMENT_ID}/cards/CARD-002`, (route) => {
+      const m = route.request().method();
+      if (m === 'DELETE') { deleteCalled = true; route.fulfill(json({ removed: true })); }
+      else if (m === 'GET') route.fulfill(json(CARD_B_DETAIL));
+      else route.continue();
+    });
+
+    await page.goto('/system/cards/CARD-002');
+    await page.getByRole('button', { name: /remove card/i }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible({ timeout: 4_000 });
+    await dialog.getByRole('button', { name: /remove card/i }).click();
+
+    // On success the page routes back to the card list.
+    await expect(page).toHaveURL(/\/system\/cards$/, { timeout: 8_000 });
+    expect(deleteCalled).toBe(true);
+  });
+});
+
+// ─── SC-2: deactivate card (lifecycle) ───────────────────────────────────────
+
+test.describe('SC-2: deactivate card', () => {
+  test.beforeEach(async ({ context }) => { await loginAs(context, 'customer'); });
+
+  test('Deactivate → confirm dialog, then PATCH /cards/CARD-002/status { active:false }', async ({ page }) => {
+    let patchPayload: Record<string, unknown> | null = null;
+    await stubBase(page);
+    await stubCardDetail(page);
+
+    await page.route(`**/api/v1/customer/${AGREEMENT_ID}/cards/CARD-002/status`, (route) => {
       if (route.request().method() === 'PATCH') {
         patchPayload = JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown>;
-        route.fulfill(json({ paymentCardInstanceReference: 'CARD-002', paymentCardStatus: 'active', paymentCardIsPreferred: true }));
+        route.fulfill(json({ ...CARD_B_DETAIL, paymentCardStatus: 'suspended' }));
       } else {
         route.continue();
       }
     });
 
-    await page.goto('/system/profile');
-    await expect(page.getByText('****-****-****-1111').first()).toBeVisible({ timeout: 12_000 });
+    await page.goto('/system/cards/CARD-002');
+    await page.getByRole('button', { name: /deactivate/i }).click();
 
-    // CARD_B row has the "Set as Preferred" button (CARD_A's button is absent — it's already preferred)
-    await page.getByRole('button', { name: /preferred/i }).first().click();
+    // Deactivating an active card requires confirmation.
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible({ timeout: 4_000 });
+    await expect(dialog.getByText(/deactivate this card\?/i)).toBeVisible();
+    await dialog.getByRole('button', { name: /^deactivate$/i }).click();
 
     await expect(async () => {
-      expect(patchPayload?.paymentCardIsPreferred).toBe(true);
+      expect(patchPayload?.active).toBe(false);
     }).toPass({ timeout: 6_000 });
   });
 });

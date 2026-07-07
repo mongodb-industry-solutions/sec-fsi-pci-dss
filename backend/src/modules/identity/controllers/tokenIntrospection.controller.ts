@@ -34,8 +34,8 @@ export async function tokenIntrospectionController(fastify: FastifyInstance) {
     }
 
     try {
-      // Authenticate the requesting client
-      await resolveOAuthClient(db(), auth.id, auth.secret);
+      // Authenticate the requesting client (confidential clients must present a valid secret).
+      await resolveOAuthClient(db(), auth.id, auth.secret, { requireClientAuthentication: true });
     } catch {
       return reply.status(401).send({ error: 'invalid_client', error_description: 'Invalid client credentials' });
     }

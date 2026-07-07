@@ -151,7 +151,7 @@ function RegisteredAccountForm({ partyRef, token, onDone }: { partyRef: string; 
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState<{ label: string; amount: number; currency: string; ref: string; status: string } | null>(null);
+  const [success, setSuccess] = useState<{ label: string; amount: number; currency: string; ref: string; status: string; note?: string } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -205,7 +205,7 @@ function RegisteredAccountForm({ partyRef, token, onDone }: { partyRef: string; 
         token,
       );
       const contact = contacts.find(c => c.ref === toContactRef);
-      setSuccess({ label: contact?.label ?? 'contact', amount: parsed, currency: res.currency, ref: res.transferReference, status: res.status });
+      setSuccess({ label: contact?.label ?? 'contact', amount: parsed, currency: res.currency, ref: res.transferReference, status: res.status, note: note.trim() || undefined });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Transfer failed.');
     }
@@ -221,6 +221,7 @@ function RegisteredAccountForm({ partyRef, token, onDone }: { partyRef: string; 
           <p className="font-semibold text-gray-900">{fmtAmount(success.amount, success.currency)} sent</p>
           <p className="text-xs text-gray-500 mt-1">To: {success.label}</p>
           <p className="text-xs text-gray-400 mt-1">Status: {success.status === 'submitted' ? 'pending settlement' : success.status}</p>
+          {success.note && <p className="text-xs text-gray-500 mt-1">Concept: {success.note}</p>}
           <p className="text-xs font-mono text-gray-400 mt-1 break-all">Ref: {success.ref}</p>
         </div>
         <div className="flex gap-2">
@@ -380,7 +381,7 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
   const [preview, setPreview] = useState<{ ok: boolean; rail?: string; feeAmount?: number; errors: string[] } | null>(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState<{ rail: string; ref: string; mandate?: boolean } | null>(null);
+  const [success, setSuccess] = useState<{ rail: string; ref: string; mandate?: boolean; reference?: string } | null>(null);
   const [liveStatus, setLiveStatus] = useState<string>('');
 
   function set(field: keyof IbanFormState, value: string | boolean) {
@@ -443,7 +444,7 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
           { scheme, amount: parsed, currency: form.currency, destination: buildDestination(), frequency: form.frequency, reference: form.reference.trim() || undefined },
           token,
         );
-        setSuccess({ rail: preview.rail ?? '', ref: m.recurringMandateInstanceReference, mandate: true });
+        setSuccess({ rail: preview.rail ?? '', ref: m.recurringMandateInstanceReference, mandate: true, reference: form.reference.trim() || undefined });
         return;
       }
       const res = await api.transfers.bank(
@@ -453,7 +454,7 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
         (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
       );
       if (res.status === 'submitted') {
-        setSuccess({ rail: res.rail ?? preview.rail ?? '', ref: res.executionReference });
+        setSuccess({ rail: res.rail ?? preview.rail ?? '', ref: res.executionReference, reference: form.reference.trim() || undefined });
         setLiveStatus('in_flight');
         void pollStatus(res.executionReference);
       } else {
@@ -479,6 +480,7 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
               ? `Direct Debit · Ref: ${success.ref.slice(0, 8)}`
               : `Status: ${liveStatus || 'pending settlement'} · Ref: ${success.ref.slice(0, 8)}`}
           </p>
+          {success.reference && <p className="text-xs text-gray-500 mt-1">Concept: {success.reference}</p>}
         </div>
         <div className="flex gap-2">
           {!success.mandate && (

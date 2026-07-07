@@ -18,6 +18,7 @@ import {
 import { sanitizeDeep } from '../../../vendors/eventbus/sanitize';
 export { sanitizeDeep };
 import { getEventBus, makeEvent, type BusinessProcess, type EventBus, type DomainEvent } from '../../../vendors/eventbus';
+import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../../identity/models/customerAuthentication.model';
 
 // Maps the per-event processType to the EDA business-process class used to group a journey (dev.v8).
 export const PROCESS_TO_BUSINESS: Record<string, BusinessProcess> = {
@@ -60,6 +61,8 @@ function publishLedgerEvent(opts: EmitProcessEventOpts | EmitComplianceEventOpts
       processType: opts.processType,
       ledgerKind,
       ...(opts.processMeta ? { processMeta: opts.processMeta } : {}),
+      // v18: activity attribution (rides the payload; projected out of eventSummary in buildRow).
+      ...(opts.attribution ? { attribution: opts.attribution } : {}),
     },
     actor: { partyRef: opts.performedByPartyReference, role: opts.performedByRole },
     bian: { serviceDomain: opts.bianServiceDomain, controlRecord: opts.bianControlRecordType },
@@ -67,7 +70,7 @@ function publishLedgerEvent(opts: EmitProcessEventOpts | EmitComplianceEventOpts
 }
 
 // Payload keys that carry projection metadata (not part of the ledger eventSummary).
-const LEDGER_META_KEYS = new Set(['outcome', 'entityType', 'processType', 'ledgerKind', 'processMeta', 'chd']);
+const LEDGER_META_KEYS = new Set(['outcome', 'entityType', 'processType', 'ledgerKind', 'processMeta', 'chd', 'attribution']);
 
 // P13.4 (§5): canonical choreography milestones are published directly on the bus (not via emit*), so
 // they carry no `ledgerKind`. The projection ALSO writes them to the business ledger so the unified
@@ -120,6 +123,7 @@ export class LedgerProjection {
   ): BusinessProcessEvent {
     const eventSummary: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(p)) if (!LEDGER_META_KEYS.has(k)) eventSummary[k] = v;
+    const attr = (p.attribution ?? {}) as EventActivityAttribution;
     return {
       eventDateTime: new Date(e.occurredAt),
       processType,
@@ -134,8 +138,20 @@ export class LedgerProjection {
       bianServiceDomain,
       bianControlRecordType,
       processMeta: p.processMeta as ProcessEventMeta | undefined,
+      ...(attr.clientId && { clientId: attr.clientId }),
+      ...(attr.merchantAgreementReference && { merchantAgreementReference: attr.merchantAgreementReference }),
+      ...(attr.actingPartyReference && { actingPartyReference: attr.actingPartyReference }),
+      ...(attr.actingChannel && { actingChannel: attr.actingChannel }),
     };
   }
+}
+
+// v18: activity attribution passed to emit* when an action originates from a merchant OAuth request.
+export interface EventActivityAttribution {
+  clientId?: string;
+  merchantAgreementReference?: string;
+  actingPartyReference?: string;
+  actingChannel?: 'session' | 'oauth_merchant';
 }
 
 interface EmitProcessEventOpts {
@@ -150,6 +166,7 @@ interface EmitProcessEventOpts {
   bianServiceDomain: string;
   bianControlRecordType: string;
   processMeta?: ProcessEventMeta;
+  attribution?: EventActivityAttribution;
 }
 
 interface EmitComplianceEventOpts {
@@ -164,6 +181,7 @@ interface EmitComplianceEventOpts {
   bianServiceDomain: string;
   bianControlRecordType: string;
   processMeta?: ProcessEventMeta;
+  attribution?: EventActivityAttribution;
 }
 
 // §9.2 flip — publish-then-project. Business logic publishes the domain event; the LedgerProjection
@@ -172,6 +190,21 @@ interface EmitComplianceEventOpts {
 // `_db` is retained for call-site compatibility but unused — the projection owns the DB write.
 export function emitProcessEvent(_db: Db, opts: EmitProcessEventOpts): void {
   publishLedgerEvent(opts, 'business');
+}
+
+// v18: DRY helper — build the activity attribution from a merchant OAuth context (request.merchantContext).
+// Merchant endpoints pass the result as `attribution` to emit* so every OAuth-originated action is tagged
+// uniformly (SD-16 audit). Session (non-OAuth) actions omit it → default 'session' channel downstream.
+export function attributionFromMerchantContext(
+  ctx?: { clientId?: string; merchantId?: string; sub?: string },
+): EventActivityAttribution | undefined {
+  if (!ctx?.clientId) return undefined;
+  return {
+    clientId: ctx.clientId,
+    merchantAgreementReference: ctx.merchantId,
+    actingPartyReference: ctx.sub,
+    actingChannel: 'oauth_merchant',
+  };
 }
 
 export function emitComplianceEvent(_db: Db, opts: EmitComplianceEventOpts): void {
@@ -362,6 +395,145 @@ export async function listAuditEvents(
   const total = merged.length;
   const events = merged.slice((page - 1) * limit, page * limit);
   return { events, total, page, limit, capped };
+}
+
+// ── v18 B-01/B-12: Merchant activity view ────────────────────────────────────
+// "Which user did what action through which merchant/app." Reads businessProcessEvent
+// filtered by merchantAgreementReference (the OAuth-originated actions tagged in A-08/A-10),
+// with optional actingPartyReference (user) filter, free-text search and date range.
+// Display-safe: businessProcessEvent never carries CHD (stripped by the bus, PCI Req 3.2) and
+// no raw IBAN; we project a bounded, non-sensitive shape for the auditor view.
+export interface MerchantActivityRow {
+  id: string;
+  eventDateTime: Date;
+  processType: string;
+  processAction: string;
+  processOutcome: string;
+  entityType: string;
+  entityId: string;
+  clientId?: string;
+  actingPartyReference?: string;
+  actingUserName?: string; // display-safe SD-13 name for the acting party (no CHD, no IBAN)
+  actingChannel?: string;
+  summary?: Record<string, unknown>;
+}
+
+export async function listMerchantActivity(
+  db: Db,
+  merchantId: string,
+  opts: {
+    actingPartyReference?: string;
+    q?: string;
+    from?: Date;
+    to?: Date;
+    page?: number;
+    limit?: number;
+  },
+): Promise<{ events: MerchantActivityRow[]; total: number; page: number; limit: number }> {
+  const page = Math.max(1, opts.page ?? 1);
+  const limit = Math.min(opts.limit ?? 20, 100);
+  const query: Record<string, unknown> = { merchantAgreementReference: merchantId };
+  if (opts.actingPartyReference) query.actingPartyReference = opts.actingPartyReference;
+  if (opts.q) {
+    const rx = { $regex: opts.q, $options: 'i' };
+    query.$or = [{ processAction: rx }, { entityId: rx }, { processType: rx }, { actingPartyReference: rx }];
+  }
+  if (opts.from || opts.to) {
+    const dateFilter: Record<string, Date> = {};
+    if (opts.from) dateFilter.$gte = opts.from;
+    if (opts.to)   dateFilter.$lte = opts.to;
+    query.eventDateTime = dateFilter;
+  }
+
+  const col = db.collection<BusinessProcessEvent>(BUSINESS_PROCESS_EVENTS_COLLECTION);
+  const [docs, total] = await Promise.all([
+    col.find(query).sort({ eventDateTime: -1 }).skip((page - 1) * limit).limit(limit).toArray(),
+    col.countDocuments(query),
+  ]);
+  // Resolve display-safe acting-user names (SD-13) in one batch — name only, no CHD, no IBAN.
+  const subs = [...new Set(docs.map((d) => d.actingPartyReference).filter((s): s is string => !!s))];
+  const users = subs.length
+    ? await db.collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
+        .find({ customerAuthenticationInstanceReference: { $in: subs } })
+        .toArray()
+    : [];
+  const nameBySub = new Map(users.map((u) => [u.customerAuthenticationInstanceReference, u.customerAuthenticationUserName]));
+
+  const events: MerchantActivityRow[] = docs.map((d) => ({
+    id: d.businessProcessEventInstanceReference,
+    eventDateTime: d.eventDateTime,
+    processType: d.processType,
+    processAction: d.processAction,
+    processOutcome: d.processOutcome,
+    entityType: d.entityType,
+    entityId: d.entityId,
+    clientId: d.clientId,
+    actingPartyReference: d.actingPartyReference,
+    actingUserName: d.actingPartyReference ? nameBySub.get(d.actingPartyReference) : undefined,
+    actingChannel: d.actingChannel,
+    summary: d.eventSummary,
+  }));
+  return { events, total, page, limit };
+}
+
+// v18 D-02: operations the CALLING USER executed through a given app (self-scoped connected-apps view).
+// Filters businessProcessEvent by actingPartyReference === sub AND (clientId === app OR
+// merchantAgreementReference === app's merchant). Reuses MerchantActivityRow (same display-safe shape:
+// no CHD — stripped by the bus, PCI Req 3.2 — and no raw IBAN). Free-text search + date range + paging.
+export async function listPartyAppActivity(
+  db: Db,
+  opts: {
+    actingPartyReference: string;
+    clientId?: string;
+    merchantAgreementReference?: string;
+    q?: string;
+    from?: Date;
+    to?: Date;
+    page?: number;
+    limit?: number;
+  },
+): Promise<{ events: MerchantActivityRow[]; total: number; page: number; limit: number }> {
+  const page = Math.max(1, opts.page ?? 1);
+  const limit = Math.min(opts.limit ?? 20, 100);
+
+  // Self-scope: only the caller's own attributed activity.
+  const and: Record<string, unknown>[] = [{ actingPartyReference: opts.actingPartyReference }];
+  // App-scope: match either the OAuth client id or the merchant reference (whichever the events carry).
+  const appOr: Record<string, unknown>[] = [];
+  if (opts.clientId) appOr.push({ clientId: opts.clientId });
+  if (opts.merchantAgreementReference) appOr.push({ merchantAgreementReference: opts.merchantAgreementReference });
+  if (appOr.length) and.push({ $or: appOr });
+  if (opts.q) {
+    const rx = { $regex: opts.q, $options: 'i' };
+    and.push({ $or: [{ processAction: rx }, { entityId: rx }, { processType: rx }] });
+  }
+  if (opts.from || opts.to) {
+    const dateFilter: Record<string, Date> = {};
+    if (opts.from) dateFilter.$gte = opts.from;
+    if (opts.to)   dateFilter.$lte = opts.to;
+    and.push({ eventDateTime: dateFilter });
+  }
+  const query = { $and: and };
+
+  const col = db.collection<BusinessProcessEvent>(BUSINESS_PROCESS_EVENTS_COLLECTION);
+  const [docs, total] = await Promise.all([
+    col.find(query).sort({ eventDateTime: -1 }).skip((page - 1) * limit).limit(limit).toArray(),
+    col.countDocuments(query),
+  ]);
+  const events: MerchantActivityRow[] = docs.map((d) => ({
+    id: d.businessProcessEventInstanceReference,
+    eventDateTime: d.eventDateTime,
+    processType: d.processType,
+    processAction: d.processAction,
+    processOutcome: d.processOutcome,
+    entityType: d.entityType,
+    entityId: d.entityId,
+    clientId: d.clientId,
+    actingPartyReference: d.actingPartyReference,
+    actingChannel: d.actingChannel,
+    summary: d.eventSummary,
+  }));
+  return { events, total, page, limit };
 }
 
 export async function listComplianceEvents(

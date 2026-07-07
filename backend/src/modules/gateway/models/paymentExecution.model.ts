@@ -26,6 +26,16 @@ export interface PaymentExecutionResolutionStep {
   stepDateTime: Date;
 }
 
+// v18 (SD-65 / SD-89): merchant-commission ATTRIBUTION sub-doc. The numeric commission amount stays
+// in the flat `feeAmount` field (single source of truth — do NOT duplicate it here); this sub-doc only
+// records WHO the fee belongs to and HOW it was derived, so the merchant dashboard can aggregate
+// commission revenue (SD-89) from the execution record (SD-65). Not CHD → NOT QE-encrypted.
+export interface PaymentExecutionFee {
+  feeMerchantReference: string;   // FK → merchantAgreementInstanceReference (SD-89) the fee is attributed to
+  feeRateApplied: number;         // commission rate 0..1 applied at capture time
+  feeCollectedDateTime: Date;     // when the commission was collected
+}
+
 export interface PaymentExecutionProcedure {
   paymentExecutionInstanceReference: string;      // UUID, PK
   paymentOrderInstanceReference: string;          // FK → paymentOrderProcedure (SD-64)
@@ -39,6 +49,12 @@ export interface PaymentExecutionProcedure {
 
   beneficiaryArrangementReference?: string;       // FK → counterpartyArrangement (SD-54); set for P2P-to-beneficiary transfers → enables link to the beneficiary
 
+  // v18 (SD-89): the merchant that INITIATED this execution via the merchant portal (OAuth on-behalf-of).
+  // Set only when the operation originates from a merchant client; PSP-direct customer transfers leave it
+  // unset. Enables merchant data isolation: a merchant's transaction history shows only its own activity for
+  // the user, never the user's activity in other merchants or directly in the PSP. Not CHD → NOT QE-encrypted.
+  merchantAgreementReference?: string;            // FK → merchantAgreementInstanceReference (SD-89)
+
   // External bank-transfer recipient identity (SEPA/ACH/SWIFT to an unregistered account).
   // GDPR Art. 32 / PSD2 (NOT PCI DSS — that governs card data). destinationIban is QE:none
   // (encrypted at rest, L2-only), shown full to the account owner; the masked form stays
@@ -50,7 +66,8 @@ export interface PaymentExecutionProcedure {
 
   grossAmount: number;
   netAmount: number;
-  feeAmount: number;
+  feeAmount: number;                              // commission/processing amount (numeric source of truth)
+  fee?: PaymentExecutionFee;                      // v18: merchant-commission attribution (see PaymentExecutionFee)
   currency: string;                               // ISO 4217 — sender's currency
 
   // FX fields — populated only for cross-currency transfers
@@ -60,6 +77,11 @@ export interface PaymentExecutionProcedure {
 
   paymentExecutionRail?: PayoutRail;
   routingNote?: string;
+  // ISO 20022 RemittanceInformation — the payment concept/purpose/reference as entered by the
+  // initiator (bank-transfer reference, P2P note). First-class and queryable so AML/FDS narrative
+  // analysis and transaction history can read the clean concept (routingNote stays operational).
+  // Not CHD → NOT QE-encrypted.
+  paymentExecutionRemittanceInformation?: string;
 
   paymentExecutionStatus: PaymentExecutionStatus;
   failureReason?: string;

@@ -128,7 +128,7 @@ export function buildKmsKeyProvider(): KmsKeyProvider {
   if (provider === 'local') return new LocalKmsKeyProvider();
   // Door left open: an AWS/Azure/GCP/KMIP KmsKeyProvider implements GenerateDataKey/Decrypt here,
   // reusing the same CMK as Queryable Encryption (§7.8). Not enabled in the demo environment.
-  throw new Error(`CHD crypto KMS provider '${provider}' is not wired yet; set KMS_PROVIDER=local`);
+  throw new Error(`CHD crypto KMS provider '${provider}' is not wired yet; set PSP_KMS_PROVIDER=local`);
 }
 
 let instance: ChdCrypto | null = null;

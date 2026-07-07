@@ -40,6 +40,23 @@ steps:
       build_args:
         - NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC=https://sec-fsi-pci-dss-backend.industrysolutions.staging.corp.mongodb.com
         - NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=http://sec-fsi-pci-dss-backend-web-app:80
+        - NEXT_PUBLIC_PSP_URL_MERCHANT=https://sec-fsi-pci-dss-merchant.industrysolutions.staging.corp.mongodb.com
+      access_key:
+        from_secret: ecr_access_key
+      secret_key:
+        from_secret: ecr_secret_key
+
+  - name: publish-merchant
+    image: plugins/kaniko-ecr
+    settings:
+      create_repository: true
+      registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
+      repo: industrysolutions/sec-fsi-pci-dss-merchant
+      dockerfile: merchant/Dockerfile
+      context: merchant/
+      tags:
+        - git-${DRONE_COMMIT_SHA:0:7}
+        - latest
       access_key:
         from_secret: ecr_access_key
       secret_key:
@@ -60,6 +77,8 @@ steps:
         - ingress.enabled=true
         - ingress.hosts[0]=sec-fsi-pci-dss-backend.industrysolutions.staging.corp.mongodb.com
         - mesh.enabled=true
+      wait: true
+      timeout: 300s
       api_server: https://api.staging.corp.mongodb.com
       kubernetes_token:
         from_secret: staging_kubernetes_token
@@ -81,6 +100,31 @@ steps:
         - ingress.enabled=true
         - ingress.hosts[0]=sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com
         - mesh.enabled=true
+      wait: true
+      timeout: 300s
+      api_server: https://api.staging.corp.mongodb.com
+      kubernetes_token:
+        from_secret: staging_kubernetes_token
+      values_files:
+        - environments/staging.yaml
+
+  - name: deploy-merchant-staging
+    image: public.ecr.aws/kanopy/drone-helm:v3
+    settings:
+      chart: mongodb/web-app
+      chart_version: 4.25.0
+      add_repos:
+        - mongodb=https://10gen.github.io/helm-charts
+      namespace: industrysolutions
+      release: sec-fsi-pci-dss-merchant
+      values:
+        - image.tag=git-${DRONE_COMMIT_SHA:0:7}
+        - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-merchant
+        - ingress.enabled=true
+        - ingress.hosts[0]=sec-fsi-pci-dss-merchant.industrysolutions.staging.corp.mongodb.com
+        - mesh.enabled=true
+      wait: true
+      timeout: 300s
       api_server: https://api.staging.corp.mongodb.com
       kubernetes_token:
         from_secret: staging_kubernetes_token
@@ -129,6 +173,23 @@ steps:
       build_args:
         - NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC=https://sec-fsi-pci-dss-backend.industrysolutions.prod.corp.mongodb.com
         - NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=http://sec-fsi-pci-dss-backend-web-app:80
+        - NEXT_PUBLIC_PSP_URL_MERCHANT=https://sec-fsi-pci-dss-merchant.industrysolutions.prod.corp.mongodb.com
+      access_key:
+        from_secret: ecr_access_key
+      secret_key:
+        from_secret: ecr_secret_key
+
+  - name: publish-merchant
+    image: plugins/kaniko-ecr
+    settings:
+      create_repository: true
+      registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
+      repo: industrysolutions/sec-fsi-pci-dss-merchant
+      dockerfile: merchant/Dockerfile
+      context: merchant/
+      tags:
+        - git-${DRONE_COMMIT_SHA:0:7}
+        - latest
       access_key:
         from_secret: ecr_access_key
       secret_key:
@@ -149,6 +210,8 @@ steps:
         - ingress.enabled=true
         - ingress.hosts[0]=sec-fsi-pci-dss-backend.industrysolutions.prod.corp.mongodb.com
         - mesh.enabled=true
+      wait: true
+      timeout: 300s
       api_server: https://api.prod.corp.mongodb.com
       kubernetes_token:
         from_secret: prod_kubernetes_token
@@ -170,6 +233,31 @@ steps:
         - ingress.enabled=true
         - ingress.hosts[0]=sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com
         - mesh.enabled=true
+      wait: true
+      timeout: 300s
+      api_server: https://api.prod.corp.mongodb.com
+      kubernetes_token:
+        from_secret: prod_kubernetes_token
+      values_files:
+        - environments/production.yaml
+
+  - name: deploy-merchant-production
+    image: public.ecr.aws/kanopy/drone-helm:v3
+    settings:
+      chart: mongodb/web-app
+      chart_version: 4.25.0
+      add_repos:
+        - mongodb=https://10gen.github.io/helm-charts
+      namespace: industrysolutions
+      release: sec-fsi-pci-dss-merchant
+      values:
+        - image.tag=git-${DRONE_COMMIT_SHA:0:7}
+        - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-merchant
+        - ingress.enabled=true
+        - ingress.hosts[0]=sec-fsi-pci-dss-merchant.industrysolutions.prod.corp.mongodb.com
+        - mesh.enabled=true
+      wait: true
+      timeout: 300s
       api_server: https://api.prod.corp.mongodb.com
       kubernetes_token:
         from_secret: prod_kubernetes_token

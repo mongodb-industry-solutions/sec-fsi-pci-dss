@@ -14,6 +14,29 @@ const INITIATOR = 'b0000001-0000-4000-8000-000000000001';       // Luis
 const SOURCE_ACCOUNT = 'pao00001-0000-4000-8000-000000000001';  // Luis' default (EUR)
 const NOW = new Date('2026-07-01T10:00:00.000Z');
 
+// v18: Espresso Works Ltd (SD-89) — merchant the commission fee is attributed to.
+const ESPRESSO = 'm0000001-0000-4000-8000-000000000001';
+const COMMISSION_RATE = 0.025;
+
+// Build a merchant-commission execution (SD-65) with fee attribution (SD-89) so the merchant dashboard
+// shows commissionRevenue after reseed. Deterministic; no balance movement (no source/resolved account).
+function commissionExecution(ref: string, gross: number, collected: Date): PaymentExecutionProcedure {
+  const feeAmount = Math.round(gross * COMMISSION_RATE * 100) / 100;
+  return {
+    paymentExecutionInstanceReference: ref,
+    paymentOrderInstanceReference: ref,
+    beneficiaryType: 'merchant',
+    grossAmount: gross, netAmount: Math.round((gross - feeAmount) * 100) / 100, feeAmount, currency: 'EUR',
+    fee: { feeMerchantReference: ESPRESSO, feeRateApplied: COMMISSION_RATE, feeCollectedDateTime: collected },
+    paymentExecutionRail: 'sepa',
+    paymentExecutionStatus: 'completed',
+    initiatedAt: collected, completedAt: collected,
+    resolutionLog: [{ stepName: 'merchant.commission.collected', stepOutcome: 'found', stepNote: `merchant=${ESPRESSO} rate=${COMMISSION_RATE}`, stepDateTime: collected }],
+    bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+    recordCreatedDateTime: collected, recordUpdatedDateTime: collected, schemaVersion: 1,
+  };
+}
+
 const DEMO_EXECUTIONS: PaymentExecutionProcedure[] = [
   // 1. Beneficiary transfer — Carlos (cab00002 → party b0000003 → account pau00007)
   {
@@ -74,6 +97,10 @@ const DEMO_EXECUTIONS: PaymentExecutionProcedure[] = [
     bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
     recordCreatedDateTime: NOW, recordUpdatedDateTime: NOW, schemaVersion: 1,
   },
+  // v18: three Espresso Works commission executions across two months → dashboard revenue.
+  commissionExecution('e0000101-0000-4000-8000-000000000101', 48.0, new Date('2026-06-12T09:00:00.000Z')),
+  commissionExecution('e0000102-0000-4000-8000-000000000102', 120.0, new Date('2026-06-27T14:30:00.000Z')),
+  commissionExecution('e0000103-0000-4000-8000-000000000103', 32.5, new Date('2026-07-03T11:15:00.000Z')),
 ];
 
 export async function seedPaymentExecutions(db: Db) {

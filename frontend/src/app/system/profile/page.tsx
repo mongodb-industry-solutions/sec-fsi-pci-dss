@@ -1,11 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, type ConsentGrant } from '../../../lib/api';
-import { Store } from 'lucide-react';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { ROLE_LABELS } from '../../../lib/constants';
 import { useDebugMode } from '../../../lib/debugMode';
-import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, User, Layers, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, User, Layers, Trash2, Copy, Check } from 'lucide-react';
 import { RawMongoPanel } from '../../../components/RawMongoPanel';
 import { SectionHeader } from '../../../components/SectionHeader';
 
@@ -16,23 +15,6 @@ interface CustomerAgreementKycCheck {
   customerAgreementKycCheckCompletedDate?: string;
   customerAgreementKycCheckReference?: string;
   customerAgreementKycCheckNotes?: string;
-}
-
-type KybCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
-
-interface MerchantKybCheck {
-  merchantAgreementKybCheckStatus: KybCheckStatus;
-  merchantAgreementKybCheckCompletedDate?: string;
-  merchantAgreementKybCheckReference?: string;
-  merchantAgreementKybCheckNotes?: string;
-}
-
-interface MerchantProfileData {
-  merchantAgreementInstanceReference: string;
-  merchantAgreementStatus: string;
-  merchantAgreementName?: string;
-  merchantAgreementMerchantCategoryCode?: string;
-  merchantAgreementKybCheck?: MerchantKybCheck | null;
 }
 
 interface ProfileData {
@@ -90,16 +72,6 @@ const STATUS_LABELS: Record<string, string> = {
   closed:       'Closed',
 };
 
-const MERCHANT_STATUS_COLORS: Record<string, string> = {
-  active:       'bg-green-100 text-green-800',
-  agreed:       'bg-green-100 text-green-800',
-  under_review: 'bg-amber-100 text-amber-800',
-  initiated:    'bg-amber-100 text-amber-800',
-  rejected:     'bg-red-100 text-red-800',
-  suspended:    'bg-orange-100 text-orange-800',
-  closed:       'bg-gray-100 text-gray-600',
-};
-
 const KYC_STATUS_COLORS: Record<KycCheckStatus, string> = {
   verified: 'bg-green-100 text-green-800 border-green-200',
   initiated: 'bg-amber-100 text-amber-800 border-amber-200',
@@ -113,42 +85,6 @@ const KYC_STATUS_LABELS: Record<KycCheckStatus, string> = {
   rejected: 'KYC Rejected',
   expired: 'KYC Expired',
 };
-
-const KYB_STATUS_COLORS: Record<KybCheckStatus, string> = {
-  verified: 'bg-green-100 text-green-800 border-green-200',
-  initiated: 'bg-amber-100 text-amber-800 border-amber-200',
-  rejected: 'bg-red-100 text-red-800 border-red-200',
-  expired: 'bg-orange-100 text-orange-800 border-orange-200',
-};
-
-const KYB_STATUS_LABELS: Record<KybCheckStatus, string> = {
-  verified: 'KYB Verified',
-  initiated: 'KYB Pending',
-  rejected: 'KYB Rejected',
-  expired: 'KYB Expired',
-};
-
-function KybStatusBadge({ kyb, debugMode }: { kyb: MerchantKybCheck; debugMode: boolean }) {
-  const colorClass = KYB_STATUS_COLORS[kyb.merchantAgreementKybCheckStatus] ?? 'bg-gray-100 text-gray-700 border-gray-200';
-  const label = KYB_STATUS_LABELS[kyb.merchantAgreementKybCheckStatus] ?? kyb.merchantAgreementKybCheckStatus;
-  return (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      <span className={`text-xs px-2 py-0.5 rounded border font-medium ${colorClass}`}>
-        <Store size={10} className="inline mr-1 mb-0.5" />{label}
-      </span>
-      {debugMode && (
-        <>
-          <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-teal-50 text-teal-700 border-teal-200">
-            SD-89 · BQ:Step · KybCheck
-          </span>
-          <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-slate-50 text-slate-600 border-slate-200">
-            PCI Req 12.8
-          </span>
-        </>
-      )}
-    </div>
-  );
-}
 
 function KycStatusBadge({ kyc, debugMode }: { kyc: CustomerAgreementKycCheck; debugMode: boolean }) {
   const colorClass = KYC_STATUS_COLORS[kyc.customerAgreementKycCheckStatus] ?? 'bg-gray-100 text-gray-700 border-gray-200';
@@ -198,6 +134,32 @@ function CollectionChip({ name }: { name: string }) {
   );
 }
 
+// Copy-to-clipboard for a protected field's plaintext value. Mirrors the account-detail affordance.
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Clear any pending reset on unmount so the timer never fires setState after the component is gone.
+  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          timeoutRef.current = setTimeout(() => setCopied(false), 1200);
+        } catch { /* clipboard unavailable — no-op */ }
+      }}
+      title={copied ? 'Copied' : `Copy ${label}`}
+      aria-label={`Copy ${label}`}
+      className="text-gray-400 hover:text-[#001E2B] transition-colors shrink-0"
+    >
+      {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+    </button>
+  );
+}
+
 function RevealField({
   label,
   plainValue,
@@ -239,6 +201,9 @@ function RevealField({
         >
           {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
         </button>
+        {/* Only offer copy once the value is revealed — avoids copying/leaking the plaintext of a
+            still-masked field (e.g. during a screen share). Matches the account-detail IBAN behavior. */}
+        {revealed && <CopyButton value={plainValue} label={label} />}
       </div>
     </>
   );
@@ -263,7 +228,6 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState('');
-  const [merchant, setMerchant] = useState<MerchantProfileData | null>(null);
   const [grants, setGrants] = useState<ConsentGrant[]>([]);
   const [grantsLoading, setGrantsLoading] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);
@@ -309,9 +273,6 @@ export default function ProfilePage() {
 
     reload(t)
       .then(() => {
-        api.merchants.getMe(t)
-          .then(res => { if (res.found && res.merchant) setMerchant(res.merchant as unknown as MerchantProfileData); })
-          .catch(() => null);
         // Load OAuth consent grants (authorized apps)
         setGrantsLoading(true);
         api.consentGrants.list(t)
@@ -758,73 +719,6 @@ export default function ProfilePage() {
               )}
             </div>
           )}
-        </div>
-      )}
-
-      {/* Merchant Agreement & KYB, visible when customer has a merchant application */}
-      {merchant && (
-        <div className="bg-white rounded-xl border p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Store size={16} className="text-gray-500 shrink-0" />
-              <h2 className="font-semibold text-gray-800 text-sm">Merchant Agreement</h2>
-            </div>
-            {debugMode && (
-              <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-teal-50 text-teal-700 border-teal-200 shrink-0">
-                SD-89 · MerchantAgreementProcedure · PCI Req 12.8
-              </span>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm items-start">
-            {merchant.merchantAgreementName && (
-              <>
-                <span className="text-gray-500">Business name</span>
-                <span className="text-gray-800 font-medium">{merchant.merchantAgreementName}</span>
-              </>
-            )}
-            {merchant.merchantAgreementMerchantCategoryCode && (
-              <>
-                <span className="text-gray-500">MCC</span>
-                <span className="font-mono text-xs text-gray-700">{merchant.merchantAgreementMerchantCategoryCode}</span>
-              </>
-            )}
-            <>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-gray-500">Agreement status</span>
-                {debugMode && <CollectionChip name="merchantAgreementProcedure" />}
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className={`text-xs px-2 py-0.5 rounded font-medium w-fit ${MERCHANT_STATUS_COLORS[merchant.merchantAgreementStatus] ?? 'bg-gray-100 text-gray-600'}`}>
-                  {STATUS_LABELS[merchant.merchantAgreementStatus] ?? merchant.merchantAgreementStatus}
-                </span>
-                {debugMode && (
-                  <span className="font-mono text-gray-400 text-[10px]">{merchant.merchantAgreementStatus}</span>
-                )}
-              </div>
-            </>
-            {merchant.merchantAgreementKybCheck && (
-              <>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-gray-500">KYB Status</span>
-                </div>
-                <KybStatusBadge kyb={merchant.merchantAgreementKybCheck} debugMode={debugMode} />
-              </>
-            )}
-            {merchant.merchantAgreementKybCheck?.merchantAgreementKybCheckCompletedDate && (
-              <>
-                <span className="text-gray-500">KYB completed</span>
-                <span className="text-gray-800">
-                  {new Date(merchant.merchantAgreementKybCheck.merchantAgreementKybCheckCompletedDate).toLocaleDateString()}
-                </span>
-              </>
-            )}
-            {debugMode && merchant.merchantAgreementKybCheck?.merchantAgreementKybCheckReference && (
-              <>
-                <span className="text-gray-500">KYB reference</span>
-                <span className="font-mono text-xs text-gray-500">{merchant.merchantAgreementKybCheck.merchantAgreementKybCheckReference}</span>
-              </>
-            )}
-          </div>
         </div>
       )}
 

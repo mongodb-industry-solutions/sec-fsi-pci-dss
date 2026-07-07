@@ -87,6 +87,10 @@ export interface MerchantAgreementControlRecord {
   merchantWebhooks?: MerchantWebhookConfig[];       // v16: typed per-event webhook registry (ADR-038)
   merchantSettlementSchedule: SettlementSchedule;
 
+  // v18 (SD-89 pricing): commission rate charged per operation, 0..1 (e.g. 0.025 = 2.5%). Editable from
+  // merchant settings (RBAC merchants:manage). Seeder only sets an initial default. Used by computeFee.
+  merchantCommissionRate?: number;
+
   // Risk profile (derived, updated on settlement)
   merchantAverageTransactionAmount: number;
   merchantTransactionCount30d: number;
@@ -148,4 +152,7 @@ export interface MerchantOAuthClientConfig {
   oauthRequirePkce: boolean;                      // true for public clients (authorization_code)
   oauthPostLogoutRedirectUris?: string[];          // allowed post_logout_redirect_uris
   oauthClaimMapping?: Record<string, string>;      // PSP claim/scope → merchant role name
+  // v18: OIDC client metadata (RFC 7591) for branding on the consent/login page and app listings.
+  oauthLogoUri?: string;                           // https URL of the merchant logo/icon (OIDC logo_uri)
+  oauthClientUri?: string;                         // https URL of the merchant home page (OIDC client_uri)
 }

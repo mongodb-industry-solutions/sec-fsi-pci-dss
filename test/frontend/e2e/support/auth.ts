@@ -54,3 +54,26 @@ export async function loginAs(context: BrowserContext, role: DemoRole, extra: Re
 export function json(body: unknown, status = 200) {
   return { status, contentType: 'application/json', body: JSON.stringify(body) };
 }
+
+/**
+ * Stub GET /api/v1/acl/effective (ADR-030). Pages/sections gated by
+ * <RequirePermission> and useEffectivePermissions read the caller's permissions
+ * from this endpoint (never from the JWT), so E2E must provide them explicitly.
+ * `permissions` is a resource → actions map, e.g. { transactions: ['view'] }.
+ */
+export async function stubPermissions(
+  page: import('@playwright/test').Page,
+  permissions: Record<string, string[]>,
+  role = 'analyst',
+) {
+  await page.route('**/api/v1/acl/effective', (r) => r.fulfill(json({
+    role,
+    label: role,
+    description: null,
+    scope: 'all',
+    isBuiltin: true,
+    bianServiceDomain: null,
+    permissions,
+    catalog: { resources: Object.keys(permissions), actions: ['view', 'viewSensitive', 'manage', 'investigate'] },
+  })));
+}

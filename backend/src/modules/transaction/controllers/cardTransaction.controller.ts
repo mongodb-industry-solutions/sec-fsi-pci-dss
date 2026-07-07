@@ -519,6 +519,8 @@ Not accessible to the \`customer\` role (enforced by RBAC middleware).`,
                   cardTransactionMerchantCategoryCode: { type: 'string' },
                   cardTransactionChannel:            { type: 'string' },
                   cardTransactionMaskedPanDisplay:   { type: 'string' },
+                  // Payment concept (statement descriptor). Shown as the concept in history for AML/FDS context.
+                  cardTransactionDescription:        { type: 'string' },
                   // Fraud/risk status (BIAN SD-83), distinct from the payment authorization status above.
                   fraudCaseCreated:                  { type: 'boolean' },
                   fraudDiagnosisCaseStatus:          { type: ['string', 'null'] },

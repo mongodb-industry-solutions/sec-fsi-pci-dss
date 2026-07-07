@@ -16,9 +16,9 @@ describe('admin module-type labels (§2.6)', () => {
     for (const m of CORE_ADMIN_MODULES) expect(m.moduleType).toBe('core');
   });
 
-  it('labels every built-in provider engine as built-in-provider (the 8 capabilities)', () => {
+  it('labels every built-in provider engine as built-in-provider (the 10 capabilities)', () => {
     const providers = builtInProviderModules();
-    expect(providers).toHaveLength(8);
+    expect(providers).toHaveLength(10);
     for (const m of providers) expect(m.moduleType).toBe('built-in-provider');
     expect(providers.map((m) => m.key)).toContain('card-issuer');
     expect(providers.map((m) => m.key)).toContain('fds');

@@ -271,6 +271,19 @@ External systems such as Leafy Bank or Agentic ThreatSight360 **may** consume th
 | 20.6 | Mandate can be cancelled: `mandateStatus` updates to `'cancelled'` and the card is no longer offered | Cancelled card does not appear on next payment; `preferredPaymentCardReference` is cleared |
 | 20.7 | Explainer panel: "No card data is stored in your browser: only a token, encrypted in Atlas" | Panel is visible on the saved card selection screen |
 
+#### FR-v3-20b: SD-88 Self-Service Card Management (as implemented)
+
+Card-on-file management is its own section (`/system/cards` list + `/system/cards/[cardId]` detail), **not** part of `/system/profile`. This subsection records the API contract as implemented (BIAN SD-88, customer-only, ownership + audit enforced server-side), which supersedes the earlier assumption that a card was revoked via `PATCH {paymentCardStatus:'revoked'}` and that `paymentCardIsPreferred` was toggled via `PATCH` on an existing card.
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| 20b.1 | List saved cards | `GET /api/v1/customer/:customerId/cards` returns the customer's cards (masked PAN + status); rendered by `SavedCardsPanel` at `/system/cards` |
+| 20b.2 | Add a card, optionally marking it preferred | `POST /api/v1/customer/:customerId/cards` with `paymentCardIsPreferred?: boolean`. **Preferred is set only at add time** (checkbox on `/system/cards/new`); there is no toggle-preferred action on an existing card |
+| 20b.3 | View card detail | `GET /api/v1/customer/:customerId/cards/:cardId` (surrogate token, expiry QE:none, alias/note) |
+| 20b.4 | Edit alias/note only | `PATCH /api/v1/customer/:customerId/cards/:cardId` — alias/note are the only mutable attributes |
+| 20b.5 | Deactivate / reactivate a card | `PATCH /api/v1/customer/:customerId/cards/:cardId/status { active: boolean }`; a deactivated card is declined by the PSP on every operation regardless of issuer decision |
+| 20b.6 | Remove a card (soft-delete, replaces the old revoke-via-status) | `DELETE /api/v1/customer/:customerId/cards/:cardId`; confirmation dialog required; emits a compliance audit event server-side (PCI DSS Req 10) |
+
 #### FR-v3-21: Performance Visualization (Backend + Frontend)
 
 | # | Requirement | Acceptance Criteria |
@@ -621,6 +634,41 @@ Close the money-movement cycle so it is precise with no balance discrepancy at o
 - [ ] Σ movements (SD-66 ledger) == Δ balance per account.
 - [ ] Unit tests green (funds gate compensation, FX, checkFunds); `npm run build` exits 0.
 - [ ] (Pending infra) integration + E2E green.
+
+## v18 — Merchant SSO App + Commission & Activity Attribution
+
+> Delivered under **development plan v18** (`tmp/dev.v17.plan.md` lineage). "v18" is a development-plan
+> iteration, not a product release version (product themes are v1–v5). FR ids below carry the `v18` tag
+> for traceability only.
+
+### Objective
+Give merchants an external, SSO-authenticated experience: sign in with their PSP identity, view the PSP
+activity attributed to them, and configure their commission — without forking the PSP data model or
+crossing the CHD boundary. See [engineering-proposal.md ADR-041](engineering-proposal.md).
+
+### FR-v18: Functional Requirements
+
+| ID | Requirement | Acceptance criteria | Status |
+|---|---|---|---|
+| FR-v18-01 | Merchant SSO app | Standalone Next.js app `merchant/` (no DB, no Fastify) authenticates via OAuth2/OIDC SSO as a confidential client and reads PSP data via the PSP API only; local port `8082` / container `8080`; env prefix `PSP_MERCHANT_` | ✅ |
+| FR-v18-02 | Commission model | Numeric fee reuses `paymentExecutionProcedure.feeAmount` (SD-65) + attribution sub-doc `fee {feeMerchantReference, feeRateApplied, feeCollectedDateTime}`; rate `merchantCommissionRate` on SD-89, editable in merchant settings and audited; `commissionRevenue` derived. No new collection | ✅ |
+| FR-v18-03 | PSP merchant activity view | PSP staff can view activity attributed per merchant, driven by `businessProcessEvent` attribution fields (`clientId`, `merchantAgreementReference`, `actingPartyReference`, `actingChannel`) — no new collection | ✅ |
+| FR-v18-04 | Cross-merchant authorizations audit | L1 / L2 / auditor can audit authorizations across merchants (per-merchant filter, acting party, channel) | ✅ |
+| FR-v18-05 | Authorized Applications | End users see "Authorized Applications" (connected apps) with per-app operations (view / revoke) | ✅ |
+| FR-v18-06 | Granular + incremental consent | User selects scopes at consent; unknown scope → `invalid_scope` (RFC 6749); broadening scope forces re-consent; scopes use PSP `verb:resource` convention | ✅ |
+| FR-v18-07 | Merchant branding | Merchant app branding driven by OIDC client metadata `logo_uri` / `client_uri` | ✅ |
+| FR-v18-08 | Boundary & scopes | Merchant-facing PSP endpoints use `skipAuth` + `validateMerchantToken` + sub-binding; least-privilege scopes; no CHD in merchant app (PCI SAQ A); IBAN masked-only (GDPR/PSD2) | ✅ |
+
+### Definition of Done — v18
+- [x] Merchant app runs standalone (no DB/Fastify), SSO login, PSP-API-only integration.
+- [x] Commission modelled BIAN-purely (SD-65 fee + attribution sub-doc, SD-89 rate) with no new collection; rate configurable in merchant settings and audited.
+- [x] PSP merchant activity view + cross-merchant authorizations audit for L1/L2/auditor via `businessProcessEvent` attribution.
+- [x] User "Authorized Applications" with per-app operations; granular + incremental OAuth consent (`invalid_scope`, re-consent on broadening).
+- [x] Merchant branding via `logo_uri`; PCI SAQ A held, IBAN masked-only.
+- [x] `npm run build` exits 0 (backend + merchant app).
+- [ ] Follow-ups: A-06 runtime fee wiring (revenue currently seed-based); API-driven payment OAuth path.
+
+*Added 2026-07-06 (v18).*
 
 ## Cross-iteration NFRs
 

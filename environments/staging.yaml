@@ -1,16 +1,18 @@
 env:
   NODE_ENV: staging
-  KMS_PROVIDER: local
+  PSP_KMS_PROVIDER: local
   PSP_OAUTH_KEY_PROVIDER: aws
   PSP_CORS_ORIGIN: "https://sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com"
   PSP_URL_FRONTEND: "https://sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com"
+  # Merchant public URL — used by the merchant seeder to resolve OIDC branding (logo_uri/client_uri).
+  PSP_MERCHANT_BASE_URL: "https://sec-fsi-pci-dss-merchant.industrysolutions.staging.corp.mongodb.com"
 
 envSecrets:
   MONGODB_URI: sec-fsi-pci-dss-secrets-staging
   MONGODB_DB_NAME: sec-fsi-pci-dss-secrets-staging
-  KMS_LOCAL_MASTER_KEY: sec-fsi-pci-dss-secrets-staging
-  KMS_KEY_VAULT_DATABASE: sec-fsi-pci-dss-secrets-staging
-  KMS_KEY_VAULT_COLLECTION: sec-fsi-pci-dss-secrets-staging
+  PSP_KMS_LOCAL_MASTER_KEY: sec-fsi-pci-dss-secrets-staging
+  PSP_KMS_KEY_VAULT_DATABASE: sec-fsi-pci-dss-secrets-staging
+  PSP_KMS_KEY_VAULT_COLLECTION: sec-fsi-pci-dss-secrets-staging
   PSP_ADM_USER: sec-fsi-pci-dss-secrets-staging
   PSP_ADM_PASS: sec-fsi-pci-dss-secrets-staging
   PSP_OAUTH_AWS_KEY_ARN: sec-fsi-pci-dss-secrets-staging

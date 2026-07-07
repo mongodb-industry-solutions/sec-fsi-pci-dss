@@ -124,6 +124,9 @@ export async function createIndexes(client: MongoClient) {
     { key: { cardTransactionDateTime: -1 } },
     { key: { cardTransactionStatus: 1 } },
     { key: { merchantAgreementInstanceReference: 1, cardTransactionDateTime: -1 } },
+    // v18 (A-06): runtime merchant commission revenue aggregation (SD-89 dashboard). Sparse — only
+    // fee-bearing acquiring payments carry the attribution sub-doc.
+    { key: { 'fee.feeMerchantReference': 1, 'fee.feeCollectedDateTime': -1 }, sparse: true },
   ]);
 
   // SD-53: Customer Agreement Procedure
@@ -323,6 +326,8 @@ export async function createIndexes(client: MongoClient) {
     { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
     { key: { processType: 1, eventDateTime: -1 } },
     { key: { processAction: 1, processOutcome: 1 } },
+    // v18: "user × merchant × action" activity view (SD-16 audit). Sparse — only OAuth-attributed events.
+    { key: { merchantAgreementReference: 1, actingPartyReference: 1, eventDateTime: -1 }, sparse: true },
   ]).catch(() => { /* timeseries collection may not exist on the very first run */ });
 
   // ADR-025: Compliance Process Events — timeseries
@@ -389,6 +394,10 @@ export async function createIndexes(client: MongoClient) {
     { key: { paymentOrderInstanceReference: 1 } },
     { key: { cardTransactionInstanceReference: 1 }, sparse: true },
     { key: { paymentExecutionStatus: 1, recordCreatedDateTime: -1 } },
+    // v18: merchant commission revenue aggregation (SD-89 dashboard). Sparse — only fee-bearing execs.
+    { key: { 'fee.feeMerchantReference': 1, 'fee.feeCollectedDateTime': -1 }, sparse: true },
+    // v18: merchant-scoped transaction history (SD-89 data isolation). Sparse — only merchant-initiated execs.
+    { key: { merchantAgreementReference: 1, initiatorPartyReference: 1 }, sparse: true },
   ]);
 
   // SD-54: Counterparty Arrangement / Beneficiary Registry (v17)

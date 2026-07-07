@@ -35,6 +35,8 @@ async function stubFraud(page: Page) {
     const p = new URL(route.request().url()).pathname;
     if (p.endsWith('/events')) return route.fulfill(json({ caseId: 'FD-0001', events: [{ actionDateTime: '2026-06-01T10:00:00Z', actionType: 'case_opened', performedByRole: 'system', performedByInstanceReference: 'payment_service', actionDetails: {}, fraudDiagnosisInstanceReference: 'FD-0001' }] }));
     if (p.endsWith('/notes')) return route.fulfill(json({ notes: [] }));
+    if (p.endsWith('/questions')) return route.fulfill(json({ questions: [] }));
+    if (p.endsWith('/enrichment')) return route.fulfill(json({ caseId: 'FD-0001', asOf: '2026-06-01T10:00:00Z' }));
     if (p.includes('/hrpc/')) return route.fulfill(json({ match: false }));
     if (/\/fraud\/[^/]+$/.test(p)) return route.fulfill(json(CASE));
     return route.fulfill(json({ results: [CASE], total: 1, page: 1, limit: 20 }));
@@ -77,6 +79,8 @@ test.describe('FR-v2-11: case detail', () => {
       const p = new URL(route.request().url()).pathname;
       if (p.endsWith('/events')) return route.fulfill(json({ caseId: 'FD-0001', events: [] }));
       if (p.endsWith('/notes')) return route.fulfill(json({ notes: [] }));
+      if (p.endsWith('/questions')) return route.fulfill(json({ questions: [] }));
+      if (p.endsWith('/enrichment')) return route.fulfill(json({ caseId: 'FD-0001', asOf: '2026-06-01T10:00:00Z' }));
       if (p.includes('/hrpc/')) return route.fulfill(json({ match: false }));
       if (/\/fraud\/[^/]+$/.test(p)) return route.fulfill(json({ ...CASE, caseStatus: 'escalated', fraudDiagnosisCaseStatus: 'escalated', escalationAcceptedAt: null }));
       return route.fulfill(json({ results: [CASE], total: 1, page: 1, limit: 20 }));

@@ -4,7 +4,7 @@
  * Roles: analysts/auditor; customer is redirected to /system/payment/history.
  */
 import { test, expect, Page } from '@playwright/test';
-import { loginAs, json } from './support/auth';
+import { loginAs, json, stubPermissions } from './support/auth';
 
 const TXN = {
   cardTransactionInstanceReference: 'txn-9001',
@@ -20,6 +20,8 @@ const TXN = {
 };
 
 async function stub(page: Page) {
+  // Pages gate on ACL (ADR-030): analysts/auditor need transactions:view.
+  await stubPermissions(page, { transactions: ['view'] });
   await page.route('**/api/v1/fraud**', (r) => r.fulfill(json({ results: [], total: 0, page: 1, limit: 20 })));
   await page.route('**/api/v1/transactions**', (route) => {
     const p = new URL(route.request().url()).pathname;
@@ -51,7 +53,9 @@ test.describe('FR-v4-P3: transaction detail', () => {
     await stub(page);
     await loginAs(context, 'level2_investigator');
     await page.goto('/system/transactions/txn-9001');
-    await expect(page.getByText('TechGadgets Ltd.').first()).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText(/Back to transactions/i)).toBeVisible({ timeout: 8000 });
+    // Merchant name is the detail heading.
+    await expect(page.getByRole('heading', { name: 'TechGadgets Ltd.' })).toBeVisible({ timeout: 15000 });
+    // Breadcrumb provides the way back to the transactions list.
+    await expect(page.getByRole('link', { name: 'Transactions' }).first()).toBeVisible({ timeout: 8000 });
   });
 });

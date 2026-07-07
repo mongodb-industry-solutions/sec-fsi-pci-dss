@@ -8,7 +8,7 @@ import {
   User, PlusCircle, Store, ClipboardCheck,
   ChevronLeft, ChevronRight, Settings2, Plug,
   KeyRound, ShieldCheck, Activity, Network,
-  HelpCircle, LayoutGrid, Lock, Bell, Landmark, UserCheck, ArrowLeftRight,
+  HelpCircle, LayoutGrid, Lock, Bell, Landmark, UserCheck, ArrowLeftRight, Layers,
   type LucideIcon,
 } from 'lucide-react';
 import { getToken, decodeToken } from '../lib/auth';
@@ -78,6 +78,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
 // from the role-specific navigation above (profile + help, available to all roles).
 const ACCOUNT_ITEMS: NavItem[] = [
   { label: 'My Profile',   path: '/system/profile', icon: User },
+  { label: 'Authorized Apps', path: '/system/applications', icon: Layers, tooltip: 'Apps you authorized via OIDC (connected apps); review scopes and revoke access' },
   { label: 'Help & Guide', path: '/system/help',    icon: HelpCircle },
 ];
 
@@ -160,7 +161,7 @@ export function DemoSidebar() {
       transition-all duration-200
       ${collapsed ? 'w-12' : 'w-44'}
     `}>
-      <nav className="flex-1 py-3">
+      <nav className="flex-1 min-h-0 overflow-y-auto py-3">
         <div className="flex items-center justify-between px-3 pb-2">
           {!collapsed && (
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Menu</p>
@@ -251,9 +252,9 @@ export function DemoSidebar() {
 /** Mobile bottom tab bar (visible below md breakpoint only) */
 export function MobileBottomNav() {
   const role     = useRole();
-  // Append the account-level Profile link (pulled out of the per-role lists for
-  // the desktop sidebar) so it stays reachable on mobile.
-  const items    = role ? [...(NAV_BY_ROLE[role] ?? []), ACCOUNT_ITEMS[0]] : [];
+  // Append the account-level links (pulled out of the per-role lists for the desktop
+  // sidebar) so Profile and Authorized Apps stay reachable on mobile for every role.
+  const items    = role ? [...(NAV_BY_ROLE[role] ?? []), ACCOUNT_ITEMS[0], ACCOUNT_ITEMS[1]] : [];
   const isActive = useActiveItem(items);
 
   if (items.length === 0) return null;
