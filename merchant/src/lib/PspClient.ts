@@ -3,9 +3,14 @@
 // - On 401, transparently refreshes once and retries.
 // - Throws PspError so callers (pages) can degrade gracefully (E-12).
 import 'server-only';
-import { discover, refreshTokens, clientCredentialsToken } from './oauth';
+import { discover } from './oauth';
 import { ENV } from './env';
 import { getSession, setSession, Session } from './session';
+import { expiresAtFrom } from './expiry';
+import { getFreshUserToken, peekToken, primeToken, getClientCredentialsToken } from './tokenCache';
+
+// Re-exported for callers (e.g. the OAuth callback route) that compute expiry from `expires_in`.
+export { expiresAtFrom };
 
 export class PspError extends Error {
   constructor(public status: number, public body: unknown, msg?: string) {
@@ -23,18 +28,6 @@ interface RequestOpts {
   headers?: Record<string, string>;
   /** Extra query params. */
   query?: Record<string, string | number | undefined>;
-}
-
-// Default access-token lifetime (seconds) when the PSP omits/zeros `expires_in`.
-// Without this guard `expiresAt` becomes NaN/past, so the token reads as
-// perpetually "near expiry" and every render triggers a refresh (churn).
-const DEFAULT_TOKEN_TTL_SECONDS = 300;
-
-/** Compute a sane epoch-ms expiry from an OAuth `expires_in` (seconds). */
-export function expiresAtFrom(expiresIn: unknown): number {
-  const s = Number(expiresIn);
-  const ttl = Number.isFinite(s) && s > 0 ? s : DEFAULT_TOKEN_TTL_SECONDS;
-  return Date.now() + ttl * 1000;
 }
 
 export class PspClient {
@@ -75,26 +68,52 @@ export class PspClient {
 
   // ── Low-level request with refresh-on-401 ─────────────────────────────────────
   private async ensureFreshToken(): Promise<void> {
-    if (Date.now() < this.session.expiresAt - 5000) return; // still valid
+    // 1. Cookie token still comfortably valid → use it as-is (and seed the process cache
+    //    so concurrent/subsequent renders can reuse it without hitting the PSP).
+    if (Date.now() < this.session.expiresAt - 5000) {
+      if (this.session.refreshToken) {
+        primeToken(this.session.sub, {
+          accessToken: this.session.accessToken,
+          refreshToken: this.session.refreshToken,
+          grantedScopes: this.session.grantedScopes,
+          expiresAt: this.session.expiresAt,
+        });
+      }
+      return;
+    }
+    // 2. A newer token may already be cached in this process (refreshed by an earlier
+    //    render that could not persist the cookie). Adopt it instead of refreshing again.
+    const cached = peekToken(this.session.sub);
+    if (cached) {
+      this.adoptToken(cached);
+      return;
+    }
+    // 3. Otherwise refresh, coalescing concurrent refreshes into one POST /auth/token.
     await this.doRefresh();
+  }
+
+  private adoptToken(t: { accessToken: string; refreshToken: string; grantedScopes: string[]; expiresAt: number }): void {
+    this.session = {
+      ...this.session,
+      accessToken: t.accessToken,
+      refreshToken: t.refreshToken,
+      grantedScopes: t.grantedScopes,
+      expiresAt: t.expiresAt,
+    };
   }
 
   private async doRefresh(): Promise<void> {
     if (!this.session.refreshToken) return;
     try {
-      const t = await refreshTokens(this.session.refreshToken);
-      this.session = {
-        ...this.session,
-        accessToken: t.access_token,
-        refreshToken: t.refresh_token ?? this.session.refreshToken,
-        grantedScopes: t.scope ? t.scope.split(' ').filter(Boolean) : this.session.grantedScopes,
-        expiresAt: expiresAtFrom(t.expires_in),
-      };
+      // Single-flight, process-cached refresh: N concurrent callers share one token call,
+      // and the refreshed token is reused across renders/requests within its TTL.
+      const t = await getFreshUserToken(this.session.sub, this.session.refreshToken, this.session.grantedScopes);
+      this.adoptToken(t);
       // Persist rotated tokens ONLY in a mutating context (server action / route
       // handler). On the render/read path we never write the cookie: a Set-Cookie
       // on a GET document/RSC response invalidates the Next.js router cache and can
       // trigger an infinite refetch loop. The refreshed token is still used in memory
-      // for this request either way.
+      // (and via the process cache) for this request either way.
       if (this.canPersist) {
         try {
           await setSession(this.session);
@@ -185,12 +204,12 @@ export class PspClient {
     input: { paymentOrderMerchantReference: string; amount: number; currency: string; paymentOrderDescription?: string; actingSubjectReference?: string },
     idempotencyKey: string,
   ): Promise<{ paymentOrderInstanceReference: string; paymentOrderReference: string; paymentOrderStatus: string; cardTransactionInstanceReference?: string }> {
-    const token = await clientCredentialsToken('write:payments');
+    const accessToken = await getClientCredentialsToken('write:payments');
     const base = ENV.pspBaseUrl();
     const res = await fetch(`${base}/api/v1/gateway/payments`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token.access_token}`,
+        Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         'X-Idempotency-Key': idempotencyKey,
       },

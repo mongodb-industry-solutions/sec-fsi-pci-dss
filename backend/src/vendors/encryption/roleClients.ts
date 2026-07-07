@@ -34,6 +34,13 @@ const kmsConfig = getKmsConfig();
 
 let _l1Client: MongoClient | null = null;
 let _l2Client: MongoClient | null = null;
+// In-flight builds. Constructing a QE MongoClient is expensive (crypt_shared load, DEK
+// provisioning, connection) and takes seconds. Without single-flight, concurrent requests
+// arriving during cold start each see a null client and build their OWN encrypted client
+// (repeated "[crypt] Using library ..." logs + duplicate connections + 30 to 60s pile-ups).
+// Caching the in-flight promise ensures the client is built exactly once per process.
+let _l1Building: Promise<MongoClient> | null = null;
+let _l2Building: Promise<MongoClient> | null = null;
 
 async function buildQEClient(uri: string, tier: 'level1' | 'level2'): Promise<MongoClient> {
   const plainClient = new MongoClient(config.mongodb.uri, {
@@ -82,16 +89,24 @@ async function buildQEClient(uri: string, tier: 'level1' | 'level2'): Promise<Mo
 
 export async function getL1QEClient(): Promise<MongoClient> {
   if (_l1Client) return _l1Client;
-  const uri = config.mongodb.uriLevel1 ?? config.mongodb.uri;
-  _l1Client = await buildQEClient(uri, 'level1');
-  return _l1Client;
+  if (!_l1Building) {
+    const uri = config.mongodb.uriLevel1 ?? config.mongodb.uri;
+    _l1Building = buildQEClient(uri, 'level1')
+      .then((c) => { _l1Client = c; return c; })
+      .finally(() => { _l1Building = null; });
+  }
+  return _l1Building;
 }
 
 export async function getL2QEClient(): Promise<MongoClient> {
   if (_l2Client) return _l2Client;
-  const uri = config.mongodb.uriLevel2 ?? config.mongodb.uri;
-  _l2Client = await buildQEClient(uri, 'level2');
-  return _l2Client;
+  if (!_l2Building) {
+    const uri = config.mongodb.uriLevel2 ?? config.mongodb.uri;
+    _l2Building = buildQEClient(uri, 'level2')
+      .then((c) => { _l2Client = c; return c; })
+      .finally(() => { _l2Building = null; });
+  }
+  return _l2Building;
 }
 
 /**
@@ -106,6 +121,10 @@ export async function getDbForRole(role: UserRole, hasValidToken = false): Promi
 }
 
 export async function closeRoleClients(): Promise<void> {
+  // Wait for any in-flight build to settle so we don't leak a client that finishes
+  // constructing after teardown (hot-reload path rebuilds fresh clients afterwards).
+  _l1Building = null;
+  _l2Building = null;
   if (_l1Client) { await _l1Client.close(); _l1Client = null; }
   if (_l2Client) { await _l2Client.close(); _l2Client = null; }
 }
