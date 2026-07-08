@@ -140,6 +140,31 @@ export async function previewTransfer(input: {
   });
 }
 
+// Add (register) a beneficiary via the PSP (SD-54). The merchant sends only a phone/email + optional
+// label; the PSP resolves it to an opaque token (never revealing the recipient's identity). The PSP
+// is anti-enumeration: it returns { found: false } for a non-existent OR already-saved contact, so we
+// surface a neutral message either way.
+export async function addBeneficiary(input: {
+  lookupType: 'phone' | 'email';
+  lookupValue: string;
+  label?: string;
+}): Promise<ActionResult> {
+  return toResult(async () => {
+    const value = input.lookupValue?.trim();
+    if (!value) return { ok: false, message: 'Enter a phone number or email.' };
+    const c = await client();
+    const data = await c.addBeneficiary(input.lookupType, value, input.label?.trim() || undefined);
+    if (!data.found) {
+      return { ok: false, message: 'No matching Leafy Pay user was found (or they are already saved).' };
+    }
+    return {
+      ok: true,
+      data,
+      message: `Beneficiary added${data.counterpartyLabel ? `: ${data.counterpartyLabel}` : ''}.`,
+    };
+  });
+}
+
 // Send money to a saved beneficiary (P2P, SD-65). The merchant supplies only the beneficiary
 // token + amount; the PSP resolves the source account and recipient server-side (no CHD/IBAN).
 export async function sendToBeneficiary(input: {

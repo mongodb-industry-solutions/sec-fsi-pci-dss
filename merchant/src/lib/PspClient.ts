@@ -226,6 +226,16 @@ export class PspClient {
     );
   }
 
+  // Add (register) a beneficiary by resolving a phone/email to a saved payee (SD-54). The merchant
+  // never learns the recipient's identity — the PSP resolves it server-side and returns an opaque
+  // token. Anti-enumeration: the PSP returns { found: false } for a non-existent/duplicate contact.
+  addBeneficiary(lookupType: 'phone' | 'email', lookupValue: string, label?: string) {
+    return this.request<{ found: boolean; counterpartyArrangementReference?: string; counterpartyLabel?: string; counterpartyLookupHint?: string }>(
+      `/api/v1/merchant/beneficiaries/${encodeURIComponent(this.sub)}/lookup`,
+      { method: 'POST', body: { lookupType, lookupValue, ...(label ? { label } : {}) } },
+    );
+  }
+
   payBeneficiary(input: {
     amount: number;
     currency: string;

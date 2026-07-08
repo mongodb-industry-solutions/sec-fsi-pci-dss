@@ -9,6 +9,7 @@ import { EmptyState, InfoHint } from '@/components/ui/Bits';
 import { Tip } from '@/components/ui/Tooltip';
 import { loadAccountOptions } from '@/lib/accounts';
 import BeneficiarySend from './BeneficiarySend';
+import BeneficiaryAdd from './BeneficiaryAdd';
 
 export default async function BeneficiariesPage() {
   const session = await getSession();
@@ -44,6 +45,12 @@ export default async function BeneficiariesPage() {
           </Tip>
         )}
       </div>
+
+      {hasScope(session, 'write:beneficiaries') && (
+        <div className="mb-4">
+          <BeneficiaryAdd />
+        </div>
+      )}
 
       {error ? (
         <PspUnavailable message={error} />
