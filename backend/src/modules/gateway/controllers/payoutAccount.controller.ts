@@ -2,11 +2,13 @@
 // Routes mounted at /accounts → /api/v1/accounts/:partyRef
 // Scope: customer can only access own accounts; staff roles can view all.
 
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
 import type { PayoutAccountStatus } from '../models/payoutAccount.model';
 import { requirePermission } from '../../../vendors/middleware/acl';
+import { dualPermission, resolveOwner } from '../../../vendors/middleware/dualAuth';
+import { maskAccountIdentifier } from '../services/bankTransfer.service';
 import {
   listPayoutAccounts,
   getPayoutAccount,
@@ -44,43 +46,80 @@ function getUser(request: unknown): JwtUserPayload | undefined {
   return (request as { user?: JwtUserPayload }).user;
 }
 
+// Display-safe projection for the OAuth (merchant) channel: raw IBAN/routing stripped, masked IBAN
+// only (GDPR Art. 5/32, PSD2 minimisation). No QE plaintext ever reaches the merchant.
+function safeMerchantAccount(doc: Record<string, unknown>) {
+  const { payoutAccountIban, payoutAccountRoutingNumber, _id, ...rest } = doc as Record<string, unknown> & {
+    payoutAccountIban?: string; payoutAccountRoutingNumber?: string; _id?: unknown;
+  };
+  void payoutAccountRoutingNumber; void _id;
+  const hasIban = typeof payoutAccountIban === 'string' && payoutAccountIban.length > 0;
+  return {
+    ...rest,
+    payoutAccountMaskedIban: hasIban ? maskAccountIdentifier(payoutAccountIban as string) : undefined,
+    payoutAccountHasIban: hasIban,
+  };
+}
+
 export async function payoutAccountController(fastify: FastifyInstance) {
 
-  // GET /api/v1/accounts/:partyRef
-  fastify.get('/:partyRef', {
-    preHandler: requirePermission('accounts', 'view'),
-    schema: {
-      tags: ['accounts'],
-      summary: 'List payout accounts for a party (SD-66)',
-      security: [{ bearerAuth: [] }],
-      params: { type: 'object', required: ['partyRef'], properties: { partyRef: { type: 'string' } } },
-      querystring: {
-        type: 'object',
-        properties: {
-          status: { type: 'string' },
-          page: { type: 'number', default: 1 },
-          limit: { type: 'number', default: 20, maximum: 100 },
-        },
-      },
-    },
-  }, async (request, reply) => {
-    const { partyRef } = request.params as { partyRef: string };
-    const user = getUser(request);
+  // ── GET /accounts (+ /:partyRef) — list a party's payout accounts ─────────────────────────────
+  // Session: staff any party, customer own; QE-stripped with reveal hints.
+  // OAuth: owner from token.sub, masked-IBAN projection. Scope read:accounts.
+  const listHandler = async (request: FastifyRequest, reply: FastifyReply) => {
+    const { partyRef } = request.params as { partyRef?: string };
     const q = request.query as { status?: string; page?: number; limit?: number };
 
-    // Customers can only access their own accounts (scope: own)
+    if (request.merchantContext) {
+      const owner = await resolveOwner(request, reply, partyRef);
+      if (!owner) return;
+      if (!owner.ownerPartyRef) return reply.send({ results: [], total: 0, page: q.page ?? 1, limit: q.limit ?? 20 });
+      const { results, total } = await listPayoutAccounts(fastify.db, owner.ownerPartyRef, { page: q.page, limit: q.limit });
+      const safe = results.map((r) => safeMerchantAccount(r as unknown as Record<string, unknown>));
+      return reply.send({ results: safe, total, page: q.page ?? 1, limit: q.limit ?? 20 });
+    }
+
+    // Session channel: preserve existing staff/customer behavior.
+    const user = getUser(request);
+    if (!partyRef) {
+      return reply.status(400).send({ error: 'A party reference is required.' });
+    }
     if (user?.role === 'customer' && user.partyRef !== partyRef) {
       return reply.status(403).send({ error: 'Access denied: you can only view your own accounts' });
     }
-
     const opts: { status?: PayoutAccountStatus; page?: number; limit?: number } = {
-      status: q.status as PayoutAccountStatus | undefined,
-      page: q.page,
-      limit: q.limit,
+      status: q.status as PayoutAccountStatus | undefined, page: q.page, limit: q.limit,
     };
     const { results, total } = await listPayoutAccounts(fastify.db, partyRef, opts);
     return reply.send({ results: results.map(safeAccount), total, page: q.page ?? 1, limit: q.limit ?? 20 });
+  };
+
+  const listSchema = (withParty: boolean) => ({
+    tags: ['accounts'],
+    summary: 'List payout accounts for a party (SD-66, session RBAC or OAuth read:accounts)',
+    security: [{ bearerAuth: [] }],
+    ...(withParty ? { params: { type: 'object', required: ['partyRef'], properties: { partyRef: { type: 'string' } } } } : {}),
+    querystring: {
+      type: 'object',
+      properties: {
+        status: { type: 'string' },
+        page: { type: 'number', default: 1 },
+        limit: { type: 'number', default: 20, maximum: 100 },
+      },
+    },
   });
+
+  fastify.get('/', {
+    config: { dualAuth: true },
+    preHandler: dualPermission({ resource: 'accounts', action: 'view', scope: 'read:accounts' }),
+    schema: listSchema(false),
+  }, listHandler);
+
+  fastify.get('/:partyRef', {
+    config: { dualAuth: true },
+    preHandler: dualPermission({ resource: 'accounts', action: 'view', scope: 'read:accounts' }),
+    schema: listSchema(true),
+  }, listHandler);
 
   // POST /api/v1/accounts/:partyRef
   fastify.post('/:partyRef', {

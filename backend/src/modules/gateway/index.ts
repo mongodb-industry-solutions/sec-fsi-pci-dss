@@ -7,8 +7,7 @@
 //   /payment/links          → paymentLink.controller           (SD-64: Shareable Payment Links)
 //   /accounts               → payoutAccount.controller         (SD-66: Payout Account Arrangement)
 //   /executions             → paymentExecution.controller      (SD-65: Payment Execution Procedure)
-//   /merchant/beneficiaries → merchantBeneficiary.controller   (SD-54: Counterparty Admin — OAuth sub-binding)
-//   /beneficiaries          → beneficiary.controller           (SD-54: Counterparty Admin — staff JWT view)
+//   /beneficiaries          → beneficiary.controller           (SD-54: Counterparty Admin — dual-auth: staff JWT + merchant OAuth)
 
 import { FastifyInstance } from 'fastify';
 import { merchantController }             from './controllers/merchant.controller';
@@ -18,8 +17,6 @@ import { checkoutController }             from './controllers/checkout.controlle
 import { paymentLinkController }          from './controllers/paymentLink.controller';
 import { payoutAccountController }        from './controllers/payoutAccount.controller';
 import { paymentExecutionController }     from './controllers/paymentExecution.controller';
-import { merchantBeneficiaryController }  from './controllers/merchantBeneficiary.controller';
-import { merchantGatewayController }       from './controllers/merchantGateway.controller';
 import { beneficiaryController }          from './controllers/beneficiary.controller';
 import { transferController }             from './controllers/transfer.controller';
 
@@ -45,13 +42,9 @@ export async function gatewayModule(fastify: FastifyInstance) {
   // SD-65: Payment Execution Procedure  (v17)
   await fastify.register(paymentExecutionController,    { prefix: '/executions' });
 
-  // SD-54: Counterparty Admin — merchant OAuth on behalf of user  (v17)
-  await fastify.register(merchantBeneficiaryController, { prefix: '/merchant/beneficiaries' });
-
-  // SD-65 + SD-66: Merchant OAuth on-behalf-of accounts/transactions/transfers  (v18)
-  await fastify.register(merchantGatewayController,     { prefix: '/merchant' });
-
-  // SD-54: Counterparty Admin — staff-facing JWT view + management
+  // SD-54: Counterparty Admin — dual-auth capability surface (v23). One home for beneficiaries:
+  // first-party staff/customer (session JWT + RBAC) AND merchant OAuth on-behalf-of (scope + subject
+  // binding). No separate /merchant/* tree; auth is a cross-cutting concern, not a forked API.
   await fastify.register(beneficiaryController,         { prefix: '/beneficiaries' });
 
   // SD-65 + SD-66: Bank transfers (ACH/SEPA/SWIFT rail engine)  (v17.1)

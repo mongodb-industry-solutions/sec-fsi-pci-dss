@@ -23,7 +23,7 @@ export interface ScopeCatalogEntry {
   required: boolean;
 }
 
-// Real PSP `verb:resource` scope convention (enforced by merchantBeneficiary/merchantPortal/
+// Real PSP `verb:resource` scope convention (enforced by merchantBeneficiary/
 // merchantGateway controllers). `openid` is the only required scope (OIDC baseline).
 export const SCOPE_CATALOG: Record<string, ScopeCatalogEntry> = {
   openid: { description: 'Verify your identity', required: true },

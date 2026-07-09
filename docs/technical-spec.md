@@ -1072,7 +1072,7 @@ export interface PaymentExecutionProcedure {
   resolvedPayoutAccountReference?: string;          // FK → payoutAccountArrangement (SD-66)
   // v18 (SD-89): the merchant that INITIATED this execution via the merchant portal (OAuth on-behalf-of).
   // Set only for merchant-originated transfers; PSP-direct customer transfers leave it unset. Enables
-  // merchant data isolation on GET /merchant/transactions/:partyRef (a merchant sees only its own activity
+  // merchant data isolation on GET /transactions (OAuth channel: a merchant sees only its own activity
   // for the user, never other merchants' or direct-PSP activity). NOT CHD → NOT QE-encrypted.
   merchantAgreementReference?: string;              // FK → merchantAgreementInstanceReference (SD-89)
 
@@ -2516,82 +2516,26 @@ Returns a single execution by reference. Includes full `resolutionLog`.
 
 ---
 
-### 6.12 Merchant Beneficiary API — SD-54 (Merchant OAuth · v17)
+### 6.12 Merchant Beneficiary API — SD-54
 
-> Base path: `/api/v1/merchant/beneficiaries`  
-> Auth: Merchant Bearer token (`Authorization: Bearer <merchant-oauth-token>`)  
-> Required scope: see per-endpoint table below  
-> All endpoints enforce OAuth `sub` binding: `token.sub` must match the `partyRef` in the path.
+> **Superseded in v23.** The dedicated `/api/v1/merchant/beneficiaries/*` tree was removed. Merchant
+> beneficiary operations now use the SHARED `/api/v1/beneficiaries` capability endpoints on the OAuth
+> channel (owner derived from `token.sub`, never in the URL). See the **v23 dual-auth capability surface**
+> table under §Granular consent for the full endpoint/scope mapping. Behavior (phone/email lookup with
+> anti-enumeration, display-safe masked hints, server-side source-account resolution, `merchant.beneficiary.send`
+> attribution) is unchanged; only the path and auth wiring moved.
 
-| Endpoint | Scope | Description |
+Mapping from the removed routes to the shared surface:
+
+| Removed (`/api/v1/merchant/...`) | Shared endpoint (v23) | Scope |
 |---|---|---|
-| `POST /:partyRef/lookup` | `write:beneficiaries` | Resolve phone or email → beneficiary token |
-| `GET /:partyRef` | `read:beneficiaries` | List saved beneficiaries for the party |
-| `DELETE /:partyRef/:beneficiaryToken` | `write:beneficiaries` | Remove a beneficiary entry |
-
-#### `POST /merchant/beneficiaries/:partyRef/lookup`
-
-Resolves a phone number or email to a PSP user and returns an opaque beneficiary token. Anti-enumeration: returns `{ found: false }` for any non-success case (no diff between unknown user and other errors).
-
-**Body:**
-```json
-{ "lookupType": "phone", "lookupValue": "+34612345678" }
-```
-
-**Response 200 (found):**
-```json
-{
-  "found": true,
-  "beneficiaryToken": "btoken-uuid",
-  "maskedHint": "+34 6** *** 678",
-  "lookupType": "phone"
-}
-```
-
-**Response 200 (not found / error):** `{ "found": false }`
-
-#### `GET /merchant/beneficiaries/:partyRef`
-
-Lists the calling party's saved beneficiaries. Returns masked hints only — no raw phone/email.
-
-**Response 200:**
-```json
-{
-  "results": [
-    {
-      "counterpartyArrangementReference": "btoken-uuid",
-      "counterpartyLabel": "My Friend",
-      "counterpartyLookupType": "phone",
-      "counterpartyLookupHint": "+34 6** *** 678",
-      "counterpartyArrangementStatus": "active",
-      "recordCreatedDateTime": "2026-07-01T09:00:00Z"
-    }
-  ],
-  "total": 1
-}
-```
-
-#### `DELETE /merchant/beneficiaries/:partyRef/:beneficiaryToken`
-
-Marks a beneficiary entry as `'removed'` (soft delete). The resolved counterparty is not affected.
-
-**Response 200:** `{ "removed": true, "counterpartyArrangementReference": "btoken-uuid" }`
-
-#### `POST /merchant/beneficiaries/:partyRef/:beneficiaryToken/send`
-
-Sends money to a saved beneficiary on behalf of the user (P2P bank transfer, BIAN SD-65 execution + SD-54 counterparty). Mirrors the PSP's send-to-beneficiary flow but is driven from the merchant portal. `config: { skipAuth: true }`; guarded in-handler by `requireMerchantOnBehalfOf(scope = write:transfers, partyRef)` (sub-binding: `token.sub === :partyRef`). Delegates to `executeP2PTransfer` — no business logic duplicated.
-
-- Source account: the client MAY choose one via `fromAccountRef` (an opaque `payoutAccountInstanceReference` from `GET /merchant/accounts/:partyRef`). `executeP2PTransfer` verifies it belongs to the initiator party and is active; a mismatch returns `status: "failed"` → `422`. When `fromAccountRef` is omitted, the source is resolved **server-side** from the user's payout accounts: the active default (`payoutAccountIsDefault === true`), otherwise the first active account.
-- The merchant supplies only the amount, the opaque `:beneficiaryToken`, an optional source account reference and an optional `note` (description shown on the transfer). No CHD, no IBAN/PAN. `currency` in the body is an optional hint only; the transfer uses the source account's native currency (server-authoritative).
-- Amount must be `> 0` (else `422 invalid_amount`). No source account available → `422 no_source_account`.
-
-**Body:** `{ "amount": 25.00, "currency"?: "EUR", "fromAccountRef"?: "payoutacct-uuid", "note"?: "invoice 1042" }`
-
-**Response 202** (submitted/completed/exception) / **422** (failed): display-safe
-```json
-{ "transferReference": "uuid", "amount": 25.0, "currency": "EUR", "status": "submitted", "failureReason": "…?" }
-```
-Emits an attributed `businessProcessEvent` (`merchant.beneficiary.send`, `attributionFromMerchantContext`) for the connected-apps operations + activity views (SD-16 audit, PCI DSS Req 10).
+| `POST /beneficiaries/:partyRef/lookup` | `POST /beneficiaries` | `write:beneficiaries` |
+| `GET /beneficiaries/:partyRef` | `GET /beneficiaries` | `read:beneficiaries` |
+| `DELETE /beneficiaries/:partyRef/:beneficiaryToken` | `DELETE /beneficiaries/:beneficiaryRef` | `write:beneficiaries` |
+| `POST /beneficiaries/:partyRef/:beneficiaryToken/send` | `POST /beneficiaries/:beneficiaryRef/transfer` | `write:transfers` |
+| `GET /merchant/accounts/:partyRef` | `GET /accounts` | `read:accounts` |
+| `GET /merchant/transactions/:partyRef` | `GET /transactions` | `read:transactions` |
+| `POST /merchant/transfers/:partyRef/{preview,bank}` | `POST /gateway/transfers/{preview,bank}` | `write:transfers` |
 
 ---
 
@@ -3235,35 +3179,52 @@ These live under the OAuth consent-grant controller (`/api/v1/auth/grants/*`) an
 **v18 — Granular consent (OAuth scope selection, E-01…E-13).**
 - **Scope catalog** (`SCOPE_CATALOG`, single source of truth in `merchantOAuth.service.ts`): each scope maps to `{ description, required }`. `openid` is the only **required** scope; all others are optional/de-selectable (least-privilege, OAuth 2.0 Security BCP):
 
-  Scopes follow the PSP `verb:resource` convention enforced by the merchant controllers
-  (`merchantBeneficiary`, `merchantPortal`, `merchantGateway`). Final Espresso Works client set:
+  Scopes follow the PSP `verb:resource` convention. As of **v23** they are enforced on the SHARED
+  capability modules (no separate `/merchant/*` surface); the merchant is just another API client on
+  the OAuth channel. Final Espresso Works client set:
 
-  | Scope | Description | Required | Enforced by |
+  | Scope | Description | Required | Enforced by (shared module endpoint) |
   |---|---|---|---|
   | `openid` | Verify your identity | ✅ | OIDC baseline |
   | `profile` | Read your name and username | — | userinfo |
-  | `read:beneficiaries` | View your saved beneficiaries | — | `GET /merchant/beneficiaries/:partyRef` |
-  | `write:beneficiaries` | Add and manage your beneficiaries | — | `POST/DELETE /merchant/beneficiaries/*` |
-  | `write:transfers` | Send money and bank transfers | — | `POST /merchant/beneficiaries/:partyRef/:beneficiaryToken/send`, `POST /merchant/transfers/*` |
-  | `read:transactions` | View your transaction and operation history | — | `GET /merchant/portal/transactions`, `GET /merchant/transactions/:partyRef` |
-  | `read:accounts` | View your bank accounts (masked IBAN) | — | `GET /merchant/accounts/:partyRef` |
-  | `read:merchant_profile` | View the merchant profile | — | `GET /merchant/portal/me` |
-  | `read:notifications` | View your notifications | — | `GET /merchant/portal/notifications` |
-  | `write:transfers` | Preview and execute bank transfers on your behalf | — | `POST /merchant/transfers/:partyRef/{preview,bank}` |
+  | `read:beneficiaries` | View your saved beneficiaries | — | `GET /beneficiaries` |
+  | `write:beneficiaries` | Add and manage your beneficiaries | — | `POST /beneficiaries`, `DELETE /beneficiaries/:beneficiaryRef` |
+  | `write:transfers` | Send money and bank transfers | — | `POST /beneficiaries/:beneficiaryRef/transfer`, `POST /gateway/transfers/{preview,bank}` |
+  | `read:transactions` | View your transaction and operation history | — | `GET /transactions` |
+  | `read:accounts` | View your bank accounts (masked IBAN) | — | `GET /accounts` |
+  | `read:merchant_profile` | View the merchant profile | — | `GET /auth/userinfo` |
+  | `read:notifications` | View your notifications | — | `GET /notifications`, `POST /notifications/:id/read` |
   | `write:payments` | Create payments (server-to-server merchant charge) | machine only (`client_credentials`) | `POST /gateway/payments` |
 
-- **v18 — Merchant on-behalf-of gateway endpoints (`merchantGateway.controller.ts`, mounted `/api/v1/merchant`).** All use `config: { skipAuth: true }` (opt out of the global HS256 preHandler) + `validateMerchantToken` + **sub-binding** (`token.sub === :partyRef`) + scope. Separation of duties: never combined with `requirePermission`. Reuse SD-66 `listPayoutAccounts` and SD-65 `bankTransfer.service`; display-safe, no CHD, IBAN masked-only (GDPR/PSD2).
+- **v23 — Dual-auth capability surface (unify merchant onto the existing API).** The external merchant
+  app consumes the SAME endpoints as first-party callers. Auth is a cross-cutting concern, resolved by
+  `vendors/middleware/dualAuth.ts` (+ the `config: { dualAuth: true }` flag in the global `authMiddleware`):
+  a route accepts EITHER a PSP session JWT (HS256 → RBAC) OR a merchant OAuth Bearer (RS256 → scope +
+  subject binding). `dualPermission({ resource, action, scope })` authorizes; `resolveOwner()` derives the
+  owner (OAuth: `resolveParty(token.sub)`; a path owner, if present, MUST equal `token.sub`). Owner-derived
+  routes register both a paramless and a `:ownerRef`/`:partyRef` form sharing one handler (the path param
+  is optional/derived). OAuth responses are display-safe: no CHD (PCI SAQ A), IBAN masked-only (GDPR/PSD2),
+  never `counterpartyPartyReference`.
 
-  | Method | Path | Scope | Description |
+  | Capability | Endpoint(s) | Session RBAC | OAuth scope |
   |---|---|---|---|
-  | `GET` | `/merchant/accounts/:partyRef` | `read:accounts` | User's payout accounts; raw IBAN/routing stripped, `payoutAccountMaskedIban` only. |
-  | `GET` | `/merchant/transactions/:partyRef` | `read:transactions` | User's SD-65 execution/operation history, display-safe projection. |
-  | `POST` | `/merchant/transfers/:partyRef/preview` | `write:transfers` | Stateless rail derivation + fee quote (no side effects). |
-  | `POST` | `/merchant/transfers/:partyRef/bank` | `write:transfers` | Execute a bank transfer; emits attributed `businessProcessEvent` (`merchant.transfer.bank`). Body accepts optional `fromAccountRef` (chosen source payout account, ownership-validated) and `reference` (description). |
+  | List beneficiaries | `GET /beneficiaries` (+ `/:ownerRef`) | `beneficiaries:view` | `read:beneficiaries` |
+  | Add beneficiary (phone/email lookup, anti-enumeration) | `POST /beneficiaries` (+ `/:ownerRef`) | `beneficiaries:manage` | `write:beneficiaries` |
+  | Remove beneficiary | `DELETE /beneficiaries/:beneficiaryRef` (+ `/:ownerRef/:beneficiaryRef`) | `beneficiaries:manage` | `write:beneficiaries` |
+  | Send to beneficiary (P2P, SD-65) | `POST /beneficiaries/:beneficiaryRef/transfer` (+ `/:ownerRef/:beneficiaryRef/transfer`) | `beneficiaries:manage` | `write:transfers` |
+  | List payout accounts (masked IBAN) | `GET /accounts` (+ `/:partyRef`) | `accounts:view` | `read:accounts` |
+  | Operation history (merchant-isolated, SD-89) | `GET /transactions` | `transactions:view` | `read:transactions` |
+  | Preview bank transfer | `POST /gateway/transfers/preview` | `beneficiaries:view` | `write:transfers` |
+  | Execute bank transfer (attributed `merchant.transfer.bank`) | `POST /gateway/transfers/bank` | `beneficiaries:manage` | `write:transfers` |
+  | Notifications | `GET /notifications`, `POST /notifications/:id/read` | own session | `read:notifications` |
 
-  > `POST /merchant/transfers/:partyRef/bank` body: `{ amount, currency, destination, rail?, reference?, fromAccountRef?, settlementSchedule? }`. `fromAccountRef` is an opaque `payoutAccountInstanceReference` (from `GET /merchant/accounts/:partyRef`); `executeBankTransfer` verifies it belongs to the initiator party and is active before setting `sourcePayoutAccountReference` on the SD-65 execution, else returns `status: "exception"`. When omitted, source selection is left to the payment-initiation provider (prior behavior). `reference` (ISO 20022 remittance info) is forwarded as the transfer description. No CHD; destination coordinates stay transaction-scoped; IBAN masked-only.
-
-  > The pre-existing `/merchant/beneficiaries/*` (SD-54) and `/merchant/portal/*` routes were also switched to `config: { skipAuth: true }` in v18 so the RS256 OAuth token reaches their in-handler `validateMerchantToken` instead of being 401'd by the global HS256 middleware.
+  > `:beneficiaryRef` is an opaque `counterpartyArrangementReference` (a resource id like `/orders/:orderId`),
+  > NOT a credential; the owner is always derived from the Bearer token, never from the URL.
+  > `POST /gateway/transfers/bank` body: `{ amount, currency, destination, rail?, reference?, fromAccountRef?, settlementSchedule? }`.
+  > `fromAccountRef` is an opaque `payoutAccountInstanceReference`; `executeBankTransfer` verifies it belongs
+  > to the initiator. `GET /transactions` under OAuth returns the party's merchant-isolated merged history
+  > (SD-65 executions + own card transactions scoped by `merchantAgreementReference`); `/api/v1/transactions`
+  > is a PUBLIC_EXACT path (simulator), so it detects the OAuth Bearer best-effort rather than via `dualAuth`.
 
 - **v18 Item 2 — Server-to-server API payment (`POST /api/v1/gateway/payments`, `payment.controller.ts`).** Authenticated with the merchant's OWN OAuth **`client_credentials`** token (RS256, scope `write:payments`) — NOT a user session (HS256) and NOT the user `authorization_code` token. `config: { skipAuth: true }` + in-handler `validateMerchantToken(req, reply, 'write:payments')`; the acquiring merchant is bound to the token (a body `merchantAgreementInstanceReference` must match or is rejected 403). The PSP charges a **tokenised** card (test token vault, `PSP_API_PAYMENT_TEST_TOKEN`) so no PAN/CVV ever reaches the merchant (PCI SAQ A). Persists the SD-64 order + drives an SD-254 card transaction attributed to the merchant, so the commission fee (A-06) is applied and the merchant dashboard revenue reflects the API payment. Emits attributed `businessProcessEvent` (`merchant.payment.api`). Rejects 401 when no credential is presented, 403 without `write:payments`.
 
