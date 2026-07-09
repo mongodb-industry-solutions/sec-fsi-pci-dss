@@ -9,6 +9,8 @@ import type { PayoutAccountStatus } from '../models/payoutAccount.model';
 import { requirePermission } from '../../../vendors/middleware/acl';
 import { dualPermission, resolveOwner } from '../../../vendors/middleware/dualAuth';
 import { maskAccountIdentifier } from '../services/bankTransfer.service';
+import { PARTY_COLLECTION } from '../../identity/models/party.model';
+import { COUNTERPARTY_COLLECTION } from '../../identity/models/counterpartyArrangement.model';
 import {
   listPayoutAccounts,
   getPayoutAccount,
@@ -523,10 +525,13 @@ export async function payoutAccountController(fastify: FastifyInstance) {
           properties: {
             paymentExecutionInstanceReference:  { type: 'string' },
             initiatorPartyReference:            { type: 'string', nullable: true },
+            initiatorName:                      { type: 'string', nullable: true },
             beneficiaryPartyReference:          { type: 'string', nullable: true },
             sourcePayoutAccountReference:       { type: 'string', nullable: true },
+            sourceAccountMasked:                { type: 'string', nullable: true },
             resolvedPayoutAccountReference:     { type: 'string', nullable: true },
             beneficiaryArrangementReference:    { type: 'string', nullable: true },
+            beneficiaryAlias:                   { type: 'string', nullable: true },
             beneficiaryName:                    { type: 'string', nullable: true },
             destinationIban:                    { type: 'string', nullable: true },
             destinationAccountMasked:           { type: 'string', nullable: true },
@@ -623,14 +628,40 @@ export async function payoutAccountController(fastify: FastifyInstance) {
       }
     }
 
+    // Sender display fields (PSD2/SEPA: the payee legitimately sees the debtor name + a source account
+    // identifier). initiatorName from SD-13 party; sourceAccountMasked is the origin IBAN masked to
+    // last-4 (GDPR minimisation — the recipient never gets the full IBAN or an openable account link).
+    let initiatorName: string | null = null;
+    if (exec.initiatorPartyReference) {
+      const p = await db.collection<{ partyName?: string }>(PARTY_COLLECTION)
+        .findOne({ partyInstanceReference: exec.initiatorPartyReference }, { projection: { partyName: 1 } });
+      initiatorName = p?.partyName ?? null;
+    }
+    let sourceAccountMasked: string | null = null;
+    if (sourceAccountRef) {
+      const srcAcct = await getPayoutAccount(db, sourceAccountRef);
+      if (srcAcct?.payoutAccountIban) sourceAccountMasked = maskAccountIdentifier(srcAcct.payoutAccountIban);
+    }
+    // Beneficiary alias: the owner-defined label (SD-54 counterpartyLabel) of the saved payee, so the
+    // sender's Recipient block can show a friendly "To: <alias>" instead of only the opaque reference.
+    let beneficiaryAlias: string | null = null;
+    if (exec.beneficiaryArrangementReference) {
+      const arr = await db.collection<{ counterpartyLabel?: string }>(COUNTERPARTY_COLLECTION)
+        .findOne({ counterpartyArrangementReference: exec.beneficiaryArrangementReference }, { projection: { counterpartyLabel: 1 } });
+      beneficiaryAlias = arr?.counterpartyLabel ?? null;
+    }
+
     const execRecord = exec as Record<string, unknown>;
     return reply.send({
       paymentExecutionInstanceReference:  exec.paymentExecutionInstanceReference,
       initiatorPartyReference:            exec.initiatorPartyReference ?? null,
+      initiatorName,
       beneficiaryPartyReference:          exec.beneficiaryPartyReference ?? null,
       sourcePayoutAccountReference:       sourceAccountRef,
+      sourceAccountMasked,
       resolvedPayoutAccountReference:     exec.resolvedPayoutAccountReference ?? null,
       beneficiaryArrangementReference:    exec.beneficiaryArrangementReference ?? null,
+      beneficiaryAlias,
       beneficiaryName:                    exec.beneficiaryName ?? null,
       destinationIban:                    exec.destinationIban ?? null,
       destinationAccountMasked:           exec.destinationAccountMasked ?? null,

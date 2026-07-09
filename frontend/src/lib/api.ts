@@ -1596,10 +1596,13 @@ export const api = {
       apiFetch<{
         paymentExecutionInstanceReference: string;
         initiatorPartyReference: string | null;
+        initiatorName: string | null;
         beneficiaryPartyReference: string | null;
         sourcePayoutAccountReference: string | null;
+        sourceAccountMasked: string | null;
         resolvedPayoutAccountReference: string | null;
         beneficiaryArrangementReference: string | null;
+        beneficiaryAlias: string | null;
         beneficiaryName: string | null;
         destinationIban: string | null;
         destinationAccountMasked: string | null;
