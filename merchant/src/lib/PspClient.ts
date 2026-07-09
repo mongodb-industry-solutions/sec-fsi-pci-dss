@@ -218,11 +218,23 @@ export class PspClient {
     return data as { paymentOrderInstanceReference: string; paymentOrderReference: string; paymentOrderStatus: string; cardTransactionInstanceReference?: string };
   }
 
-  // ── Beneficiaries (OAuth on-behalf-of; sub-binding token.sub === partyRef) ─────
+  // ── Beneficiaries (OAuth on-behalf-of; owner derived from token.sub, never in the URL) ─────
+  // Same capability endpoints as first-party callers (/api/v1/beneficiaries): the ONLY difference is
+  // the auth channel (RS256 Bearer + scope), enforced server-side by the shared dual-auth resolver.
   listBeneficiaries(page = 1, limit = 20) {
     return this.request<{ results: any[]; total: number; page: number; limit: number }>(
-      `/api/v1/merchant/beneficiaries/${encodeURIComponent(this.sub)}`,
+      `/api/v1/beneficiaries`,
       { query: { page, limit } },
+    );
+  }
+
+  // Add (register) a beneficiary by resolving a phone/email to a saved payee (SD-54). The merchant
+  // never learns the recipient's identity — the PSP resolves it server-side and returns an opaque
+  // reference. Anti-enumeration: the PSP returns { found: false } for a non-existent/duplicate contact.
+  addBeneficiary(lookupType: 'phone' | 'email', lookupValue: string, label?: string) {
+    return this.request<{ found: boolean; counterpartyArrangementReference?: string; counterpartyLabel?: string; counterpartyLookupHint?: string }>(
+      `/api/v1/beneficiaries`,
+      { method: 'POST', body: { lookupType, lookupValue, ...(label ? { label } : {}) } },
     );
   }
 
@@ -238,43 +250,44 @@ export class PspClient {
   }
 
   // Send money to a saved beneficiary (P2P transfer, SD-65). The merchant sends only the amount,
-  // opaque beneficiary token, an optional chosen source account reference and an optional description;
-  // the PSP resolves the recipient (and the default source account, if none chosen) server-side.
-  sendToBeneficiary(beneficiaryToken: string, amount: number, currency?: string, fromAccountRef?: string, note?: string) {
+  // the opaque beneficiary reference, an optional chosen source account reference and an optional
+  // description; the PSP resolves the recipient (and the default source account, if none chosen)
+  // server-side. `:beneficiaryRef` is a resource id (like /orders/:orderId), NOT a credential.
+  sendToBeneficiary(beneficiaryRef: string, amount: number, currency?: string, fromAccountRef?: string, note?: string) {
     return this.request<{ transferReference: string; amount: number; currency: string; status: string; failureReason?: string }>(
-      `/api/v1/merchant/beneficiaries/${encodeURIComponent(this.sub)}/${encodeURIComponent(beneficiaryToken)}/send`,
+      `/api/v1/beneficiaries/${encodeURIComponent(beneficiaryRef)}/transfer`,
       { method: 'POST', body: { amount, ...(currency ? { currency } : {}), ...(fromAccountRef ? { fromAccountRef } : {}), ...(note ? { note } : {}) } },
     );
   }
 
-  removeBeneficiary(beneficiaryToken: string) {
+  removeBeneficiary(beneficiaryRef: string) {
     return this.request(
-      `/api/v1/merchant/beneficiaries/${encodeURIComponent(this.sub)}/${encodeURIComponent(beneficiaryToken)}`,
+      `/api/v1/beneficiaries/${encodeURIComponent(beneficiaryRef)}`,
       { method: 'DELETE' },
     );
   }
 
   // ── Bank transfers (ACH / SEPA / SWIFT) — merchant OAuth on-behalf-of (write:transfers) ──
   previewTransfer(input: { destination: Record<string, unknown>; amountCurrency?: { amount: number; currency: string }; rail?: string }) {
-    return this.request(`/api/v1/merchant/transfers/${encodeURIComponent(this.sub)}/preview`, { method: 'POST', body: input });
+    return this.request(`/api/v1/gateway/transfers/preview`, { method: 'POST', body: input });
   }
 
   bankTransfer(input: { amount: number; currency: string; destination: Record<string, unknown>; rail?: string; reference?: string; fromAccountRef?: string; settlementSchedule?: string }) {
-    return this.request(`/api/v1/merchant/transfers/${encodeURIComponent(this.sub)}/bank`, { method: 'POST', body: input });
+    return this.request(`/api/v1/gateway/transfers/bank`, { method: 'POST', body: input });
   }
 
   // ── Accounts (masked IBAN only; GDPR/PSD2 minimisation) — merchant OAuth (read:accounts) ──
   listAccounts(page = 1, limit = 20) {
     return this.request<{ results: any[]; total: number; page: number; limit: number }>(
-      `/api/v1/merchant/accounts/${encodeURIComponent(this.sub)}`,
+      `/api/v1/accounts`,
       { query: { page, limit } },
     );
   }
 
-  // ── History (payment executions for this party) — merchant OAuth (read:transactions) ──
+  // ── History (merchant-isolated operation history for this party) — merchant OAuth (read:transactions) ──
   listHistory(page = 1, limit = 20) {
     return this.request<{ results: any[]; total: number; page: number; limit: number }>(
-      `/api/v1/merchant/transactions/${encodeURIComponent(this.sub)}`,
+      `/api/v1/transactions`,
       { query: { page, limit } },
     );
   }

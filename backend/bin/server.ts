@@ -31,7 +31,6 @@ import { domainModule }       from '../src/modules/domain';
 import { notificationsModule } from '../src/modules/notification';
 import { oidcDiscoveryController } from '../src/modules/identity/controllers/oidcDiscovery.controller';
 import { initOidcKeys } from '../src/modules/identity/services/oidcKeys.service';
-import { merchantPortalController } from '../src/modules/gateway/controllers/merchantPortal.controller';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
@@ -187,8 +186,6 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(domainModule,  { prefix: '/api/v1' });
   // Customer notifications (pending fraud-investigation questions to answer).
   await fastify.register(notificationsModule, { prefix: '/api/v1' });
-  // v16: Merchant Portal — OAuth-authenticated programmatic access (ADR-037)
-  await fastify.register(merchantPortalController, { prefix: '/api/v1/merchant/portal' });
 
   return fastify;
 }

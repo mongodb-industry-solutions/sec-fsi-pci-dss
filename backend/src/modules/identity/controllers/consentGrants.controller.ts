@@ -9,7 +9,7 @@
  *   DELETE /api/v1/auth/grants/:consentId — revoke a grant (tokens immediately invalidated)
  */
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { listUserConsentGrants, getUserConsentGrantDetail, revokeConsentGrant } from '../services/oauth.service';
+import { listUserConsentGrants, getUserConsentGrantDetail, revokeConsentGrant, reactivateConsentGrant } from '../services/oauth.service';
 import { listPartyAppActivity } from '../../provider/services/businessProcessEvent.service';
 
 function getSubFromRequest(request: FastifyRequest): string | null {
@@ -23,8 +23,14 @@ export async function consentGrantsController(fastify: FastifyInstance) {
     schema: {
       tags: ['auth:oauth'],
       summary: 'List my authorized apps (OAuth consent grants)',
-      description: 'Returns all active OAuth consent grants for the authenticated user — the merchant apps the user has authorized via OIDC. Supports revocation per grant. Requires a valid PSP session token (any role).',
+      description: 'Returns the authenticated user\'s OAuth consent grants — the merchant apps authorized via OIDC. Revoked grants are kept (soft-revoke) so the user can review past apps/operations and re-approve; filter with `status` (active | revoked | all, default all). Requires a valid PSP session token (any role).',
       security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: ['active', 'revoked', 'all'], default: 'all', description: 'Filter by consent status. Default all (active + revoked).' },
+        },
+      },
       response: {
         200: {
           type: 'object',
@@ -42,6 +48,7 @@ export async function consentGrantsController(fastify: FastifyInstance) {
                   grantedScopes: { type: 'array', items: { type: 'string' } },
                   consentStatus: { type: 'string', enum: ['active', 'revoked'] },
                   consentGrantedAt: { type: 'string', format: 'date-time' },
+                  consentRevokedAt: { type: 'string', format: 'date-time', nullable: true, description: 'When the grant was revoked (soft-revoke); null while active.' },
                   lastUsedAt: { type: 'string', format: 'date-time', nullable: true },
                 },
               },
@@ -55,7 +62,8 @@ export async function consentGrantsController(fastify: FastifyInstance) {
     const sub = getSubFromRequest(request);
     if (!sub) return reply.status(401).send({ error: 'Unauthorized' });
 
-    const grants = await listUserConsentGrants(fastify.db, sub);
+    const { status } = request.query as { status?: 'active' | 'revoked' | 'all' };
+    const grants = await listUserConsentGrants(fastify.db, sub, status ?? 'all');
     return {
       grants: grants.map((g) => ({
         consentId: g.consentId,
@@ -66,6 +74,7 @@ export async function consentGrantsController(fastify: FastifyInstance) {
         grantedScopes: g.grantedScopes,
         consentStatus: g.consentStatus,
         consentGrantedAt: g.consentGrantedAt,
+        consentRevokedAt: g.consentRevokedAt ?? null,
         lastUsedAt: g.lastUsedAt ?? null,
       })),
     };
@@ -207,6 +216,43 @@ export async function consentGrantsController(fastify: FastifyInstance) {
     try {
       await revokeConsentGrant(fastify.db, sub, consentId, 'user');
       return { revoked: true, consentId };
+    } catch (err: any) {
+      return reply.status(err.statusCode ?? 500).send({ error: err.message });
+    }
+  });
+
+  // POST /api/v1/auth/grants/:consentId/reactivate — re-approve a previously revoked grant
+  fastify.post('/grants/:consentId/reactivate', {
+    schema: {
+      tags: ['auth:oauth'],
+      summary: 'Re-approve a revoked OAuth consent grant',
+      description: 'Reverts an earlier revocation from the Authorized Applications view: restores the consent record and its previously granted scopes. Mints NO tokens — the merchant must run the OAuth authorization_code flow again to obtain fresh tokens (the prior scopes now count as granted, so re-consent is smooth). Emits an oauth.authorization_granted webhook. Self-scoped; a foreign consentId returns 404. Idempotent when already active.',
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['consentId'],
+        properties: { consentId: { type: 'string' } },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            reactivated: { type: 'boolean' },
+            consentId: { type: 'string' },
+          },
+        },
+        401: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const sub = getSubFromRequest(request);
+    if (!sub) return reply.status(401).send({ error: 'Unauthorized' });
+
+    const { consentId } = request.params as { consentId: string };
+    try {
+      await reactivateConsentGrant(fastify.db, sub, consentId);
+      return { reactivated: true, consentId };
     } catch (err: any) {
       return reply.status(err.statusCode ?? 500).send({ error: err.message });
     }

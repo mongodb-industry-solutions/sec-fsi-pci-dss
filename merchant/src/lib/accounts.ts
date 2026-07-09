@@ -1,5 +1,5 @@
 // Display-safe source-account options for the money-movement pickers.
-// Built from GET /api/v1/merchant/accounts/:partyRef (masked IBAN only; GDPR/PSD2 minimisation).
+// Built from GET /api/v1/accounts (owner from token; masked IBAN only; GDPR/PSD2 minimisation).
 // The merchant only ever forwards the opaque payoutAccountInstanceReference, never the IBAN.
 
 export interface AccountOption {

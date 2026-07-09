@@ -83,6 +83,18 @@ function fmtAmount(amount: number, currency: string) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 }
 
+// ── Card money direction (SD-254) ─────────────────────────────────────────────
+// Any operation that debits the funding account is shown as a discount (−, red), mirroring the P2P
+// "sent" rows. refund / adjustment are credits (+, green). Statuses that never moved money (declined,
+// failed, voided, expired) render neutral (no sign) so we don't show −$X on an uncharged transaction.
+const CARD_CREDIT_TYPES = new Set(['refund', 'adjustment']);
+const CARD_NON_MOVEMENT_STATUS = new Set(['declined', 'failed', 'voided', 'expired']);
+function cardDirection(type: string | undefined, status: string): 'debit' | 'credit' | 'neutral' {
+  if (CARD_NON_MOVEMENT_STATUS.has(status)) return 'neutral';
+  if (type && CARD_CREDIT_TYPES.has(type)) return 'credit';
+  return 'debit';
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function TransactionHistoryPage() {
   const [rows, setRows] = useState<HistoryRow[]>([]);
@@ -316,7 +328,12 @@ export default function TransactionHistoryPage() {
                             </div>
                             <div className="flex items-start gap-3 shrink-0">
                               <div className="text-right">
-                                <p className="font-bold text-gray-900">{fmtAmount(row.amount, row.currency)}</p>
+                                {(() => {
+                                  const dir = cardDirection(row.cardTransactionType, row.status);
+                                  const cls = dir === 'debit' ? 'text-red-600' : dir === 'credit' ? 'text-green-700' : 'text-gray-900';
+                                  const sign = dir === 'debit' ? '−' : dir === 'credit' ? '+' : '';
+                                  return <p className={`font-bold ${cls}`}>{sign}{fmtAmount(row.amount, row.currency)}</p>;
+                                })()}
                                 <p className="text-xs text-gray-500 font-mono">{row.maskedPan}</p>
                               </div>
                               <span className="text-gray-300 group-hover:text-[#001E2B] transition-colors text-lg leading-none mt-0.5">›</span>

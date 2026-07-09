@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, ExternalLink, Layers, ListChecks, RefreshCw, Search, ShieldCheck, Trash2 } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Layers, ListChecks, RefreshCw, RotateCcw, Search, ShieldCheck, Trash2 } from 'lucide-react';
 import { SectionHeader } from '../../../../../components/SectionHeader';
 import { Pagination } from '../../../../../components/Pagination';
 import { api, type ConsentGrantDetail } from '../../../../../lib/api';
@@ -60,8 +60,9 @@ export default function AuthorizedApplicationDetailPage() {
   const [detail, setDetail] = useState<ConsentGrantDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [revoking, setRevoking] = useState(false);
-  const [revoked, setRevoked] = useState(false);
+  const [acting, setActing] = useState(false);
+  // Local overlay on top of the fetched status so an action reflects immediately without a refetch.
+  const [statusOverride, setStatusOverride] = useState<'active' | 'revoked' | null>(null);
 
   // Operations sub-list state.
   const [ops, setOps] = useState<OperationRow[]>([]);
@@ -102,25 +103,49 @@ export default function AuthorizedApplicationDetailPage() {
   useEffect(() => { setPage(1); }, [q, from, to, limit]);
   useEffect(() => { loadOps(); }, [loadOps]);
 
+  // Effective status = local action overlay, else the fetched value.
+  const status = statusOverride ?? detail?.consentStatus ?? 'active';
+
   async function revoke() {
     if (!detail) return;
     const ok = await confirm({
       title: `Revoke access for "${detail.merchantName}"?`,
-      // Soft-revoke (kept in the DB): the operations below stay attributable to this app for audit.
-      message: 'This immediately invalidates its tokens. Transactions already made through this app remain recorded and linked to it for audit.',
+      // Soft-revoke (kept in the DB): the app stays here so its operations remain attributable and it
+      // can be re-approved later.
+      message: 'This immediately invalidates its tokens. The app stays here as “Revoked”, so you can still review its past activity or re-approve it later.',
       confirmLabel: 'Revoke access',
       tone: 'danger',
     });
     if (!ok) return;
-    setRevoking(true);
+    setActing(true);
     try {
       await api.consentGrants.revoke(consentId, token);
-      setRevoked(true);
+      setStatusOverride('revoked');
       notify('Access revoked. This app can no longer access your account.', 'success');
     } catch {
       notify('Could not revoke access. Please try again.', 'error');
     }
-    setRevoking(false);
+    setActing(false);
+  }
+
+  async function reapprove() {
+    if (!detail) return;
+    const ok = await confirm({
+      title: `Re-approve "${detail.merchantName}"?`,
+      message: 'This restores your earlier authorization and its previously granted permissions. The app will be able to reconnect; you can revoke again at any time.',
+      confirmLabel: 'Re-approve',
+      tone: 'default',
+    });
+    if (!ok) return;
+    setActing(true);
+    try {
+      await api.consentGrants.reactivate(consentId, token);
+      setStatusOverride('active');
+      notify('Access re-approved. This app can connect again.', 'success');
+    } catch {
+      notify('Could not re-approve. Please try again.', 'error');
+    }
+    setActing(false);
   }
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(opsTotal / limit)), [opsTotal, limit]);
@@ -151,9 +176,14 @@ export default function AuthorizedApplicationDetailPage() {
         debugInfo="SD-16 · ConsentGrant · OAuth 2.0 / OIDC · self-scoped (sub)"
       />
 
-      {revoked && (
+      {statusOverride === 'revoked' && (
+        <div className="rounded-xl p-3 text-sm bg-gray-50 text-gray-600 border border-gray-200">
+          Access revoked. This app can no longer access your account, but its past activity stays here for your records.
+        </div>
+      )}
+      {statusOverride === 'active' && (
         <div className="rounded-xl p-3 text-sm bg-green-50 text-green-700 border border-green-200">
-          Access revoked. This app can no longer access your account.
+          Access re-approved. This app can connect to your account again.
         </div>
       )}
 
@@ -170,17 +200,22 @@ export default function AuthorizedApplicationDetailPage() {
               </a>
             )}
             <div className="flex items-center gap-2 flex-wrap mt-2 text-xs">
-              <span className={`px-2 py-0.5 rounded font-medium ${detail.consentStatus === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                {detail.consentStatus === 'active' && !revoked ? 'Active' : 'Revoked'}
+              <span className={`px-2 py-0.5 rounded font-medium ${status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                {status === 'active' ? 'Active' : 'Revoked'}
               </span>
               <span className="text-gray-500">Approved {new Date(detail.consentGrantedAt).toLocaleString()}</span>
               {detail.lastUsedAt && <span className="text-gray-400">· Last used {new Date(detail.lastUsedAt).toLocaleString()}</span>}
             </div>
           </div>
-          {!revoked && detail.consentStatus === 'active' && (
-            <button onClick={revoke} disabled={revoking}
+          {status === 'active' ? (
+            <button onClick={revoke} disabled={acting}
               className="flex items-center gap-1.5 text-sm text-red-600 hover:text-white hover:bg-red-600 border border-red-300 rounded-lg px-3 py-1.5 disabled:opacity-50 shrink-0 transition-colors">
-              <Trash2 size={14} />{revoking ? 'Revoking…' : 'Revoke access'}
+              <Trash2 size={14} />{acting ? 'Revoking…' : 'Revoke access'}
+            </button>
+          ) : (
+            <button onClick={reapprove} disabled={acting}
+              className="flex items-center gap-1.5 text-sm text-green-700 hover:text-white hover:bg-green-700 border border-green-300 rounded-lg px-3 py-1.5 disabled:opacity-50 shrink-0 transition-colors">
+              <RotateCcw size={14} />{acting ? 'Re-approving…' : 'Re-approve'}
             </button>
           )}
         </div>

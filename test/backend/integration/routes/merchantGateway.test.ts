@@ -1,15 +1,18 @@
 /**
- * Integration tests: v18 final integration fix — merchant OAuth boundary + on-behalf-of gateway.
- * Sources: merchantBeneficiary.controller.ts, merchantPortal.controller.ts, merchantGateway.controller.ts,
- *          vendors/middleware/{auth,validateMerchantToken}.ts
+ * Integration tests: v23 — merchant OAuth on-behalf-of channel on the SHARED capability modules.
+ * The merchant is just another API client: it hits the same endpoints as first-party callers
+ * (/beneficiaries, /accounts, /transactions, /gateway/transfers). The only difference is the auth
+ * channel (RS256 Bearer + scope + subject binding), resolved by vendors/middleware/dualAuth.ts.
  *
- * Requires TEST_MONGODB_URI env var — skips gracefully when not set (matches merchantActivity.test.ts).
+ * Sources: beneficiary.controller.ts, payoutAccount.controller.ts, cardTransaction.controller.ts,
+ *          transfer.controller.ts, vendors/middleware/{auth,dualAuth,validateMerchantToken}.ts
+ *
+ * Requires TEST_MONGODB_URI env var — skips gracefully when not set.
  *
  * Covers:
- *  (a) RS256 OAuth token is now ACCEPTED on merchant beneficiary/portal routes (was 401 by global HS256 mw).
- *  (b) new /merchant/{accounts,transactions,transfers} endpoints:
- *      scope enforcement (403 insufficient_scope), sub-binding (403 on mismatched partyRef),
- *      masked IBAN only (no raw payoutAccountIban), 401 without token.
+ *  (a) an RS256 OAuth token is accepted on the module endpoints (dualAuth flag, not the old HS256 401);
+ *  (b) scope enforcement (403 insufficient_scope), subject binding (403 on a mismatched owner in the
+ *      path), masked IBAN only (no raw payoutAccountIban), display-safe history (no CHD), 401 w/o token.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import supertest from 'supertest';
@@ -47,7 +50,7 @@ async function mintToken(sub: string, scopes: string[]): Promise<string> {
   return `${headerAndPayload}.${sig.toString('base64url')}`;
 }
 
-describe('v18 merchant OAuth boundary + gateway', () => {
+describe('v23 merchant OAuth channel on the shared modules', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
@@ -63,28 +66,20 @@ describe('v18 merchant OAuth boundary + gateway', () => {
     await app.close();
   });
 
-  // (a) Auth-boundary fix: the RS256 OAuth token reaches validateMerchantToken instead of being 401'd.
-  skip('beneficiaries: OAuth token is accepted (not 401 from global HS256 mw)', async () => {
+  // (a) Auth-boundary: the RS256 OAuth token is accepted on the module endpoint (owner from token).
+  skip('beneficiaries: OAuth token is accepted (owner derived from token.sub)', async () => {
     const token = await mintToken(SUB, ['read:beneficiaries']);
     const res = await supertest(app.server)
-      .get(`/api/v1/merchant/beneficiaries/${SUB}`)
+      .get('/api/v1/beneficiaries')
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
   });
 
-  skip('portal/me: OAuth token accepted with read:merchant_profile', async () => {
-    const token = await mintToken(SUB, ['read:merchant_profile']);
-    const res = await supertest(app.server)
-      .get('/api/v1/merchant/portal/me')
-      .set('Authorization', `Bearer ${token}`);
-    expect(res.status).toBe(200);
-  });
-
-  // (b) New on-behalf-of gateway endpoints.
+  // (b) Accounts — masked IBAN only, scope + subject binding + 401.
   skip('accounts: 200 + masked IBAN only (no raw payoutAccountIban)', async () => {
     const token = await mintToken(SUB, ['read:accounts']);
     const res = await supertest(app.server)
-      .get(`/api/v1/merchant/accounts/${SUB}`)
+      .get('/api/v1/accounts')
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.results)).toBe(true);
@@ -93,10 +88,10 @@ describe('v18 merchant OAuth boundary + gateway', () => {
     expect(raw).not.toMatch(/"payoutAccountRoutingNumber"/);
   });
 
-  skip('accounts: sub-binding — mismatched partyRef → 403', async () => {
+  skip('accounts: subject binding — path owner != token.sub → 403', async () => {
     const token = await mintToken(SUB, ['read:accounts']);
     const res = await supertest(app.server)
-      .get(`/api/v1/merchant/accounts/${OTHER_SUB}`)
+      .get(`/api/v1/accounts/${OTHER_SUB}`)
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
   });
@@ -104,21 +99,21 @@ describe('v18 merchant OAuth boundary + gateway', () => {
   skip('accounts: missing scope → 403 insufficient_scope', async () => {
     const token = await mintToken(SUB, ['read:beneficiaries']);
     const res = await supertest(app.server)
-      .get(`/api/v1/merchant/accounts/${SUB}`)
+      .get('/api/v1/accounts')
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
     expect(res.body.error).toBe('insufficient_scope');
   });
 
   skip('accounts: no token → 401', async () => {
-    const res = await supertest(app.server).get(`/api/v1/merchant/accounts/${SUB}`);
+    const res = await supertest(app.server).get('/api/v1/accounts');
     expect(res.status).toBe(401);
   });
 
   skip('transactions: 200 with paginated shape and no CHD', async () => {
     const token = await mintToken(SUB, ['read:transactions']);
     const res = await supertest(app.server)
-      .get(`/api/v1/merchant/transactions/${SUB}`)
+      .get('/api/v1/transactions')
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.results)).toBe(true);
@@ -129,7 +124,7 @@ describe('v18 merchant OAuth boundary + gateway', () => {
   skip('transfers/preview: requires write:transfers (403 without it)', async () => {
     const token = await mintToken(SUB, ['read:accounts']);
     const res = await supertest(app.server)
-      .post(`/api/v1/merchant/transfers/${SUB}/preview`)
+      .post('/api/v1/gateway/transfers/preview')
       .set('Authorization', `Bearer ${token}`)
       .send({ destination: { countryCode: 'DE', currency: 'EUR', iban: 'DE89370400440532013000' }, amountCurrency: 'EUR' });
     expect(res.status).toBe(403);
@@ -138,47 +133,48 @@ describe('v18 merchant OAuth boundary + gateway', () => {
   skip('transfers/preview: 200 with write:transfers', async () => {
     const token = await mintToken(SUB, ['write:transfers']);
     const res = await supertest(app.server)
-      .post(`/api/v1/merchant/transfers/${SUB}/preview`)
+      .post('/api/v1/gateway/transfers/preview')
       .set('Authorization', `Bearer ${token}`)
       .send({ destination: { countryCode: 'DE', currency: 'EUR', iban: 'DE89370400440532013000' }, amountCurrency: 'EUR' });
     expect(res.status).toBe(200);
     expect(typeof res.body.ok).toBe('boolean');
   });
 
-  // send-to-beneficiary (P2P from merchant portal) — scope + sub-binding + amount validation.
-  skip('beneficiaries/send: requires write:transfers (403 without it)', async () => {
+  // Send-to-beneficiary (P2P) — now POST /beneficiaries/:beneficiaryRef/transfer (owner from token).
+  skip('beneficiaries/transfer: requires write:transfers (403 without it)', async () => {
     const token = await mintToken(SUB, ['read:beneficiaries']);
     const res = await supertest(app.server)
-      .post(`/api/v1/merchant/beneficiaries/${SUB}/btoken-does-not-matter/send`)
+      .post('/api/v1/beneficiaries/btoken-does-not-matter/transfer')
       .set('Authorization', `Bearer ${token}`)
       .send({ amount: 10 });
     expect(res.status).toBe(403);
     expect(res.body.error).toBe('insufficient_scope');
   });
 
-  skip('beneficiaries/send: sub-binding — mismatched partyRef → 403', async () => {
+  // Subject binding on the two-segment (owner + ref) form: a path owner != token.sub → 403.
+  skip('beneficiaries/transfer: path owner != token.sub → 403 access_denied', async () => {
     const token = await mintToken(SUB, ['write:transfers']);
     const res = await supertest(app.server)
-      .post(`/api/v1/merchant/beneficiaries/${OTHER_SUB}/btoken-x/send`)
+      .post(`/api/v1/beneficiaries/${OTHER_SUB}/btoken-x/transfer`)
       .set('Authorization', `Bearer ${token}`)
       .send({ amount: 10 });
     expect(res.status).toBe(403);
     expect(res.body.error).toBe('access_denied');
   });
 
-  skip('beneficiaries/send: amount <= 0 → 422 invalid_amount', async () => {
+  skip('beneficiaries/transfer: amount <= 0 → 422 invalid_amount', async () => {
     const token = await mintToken(SUB, ['write:transfers']);
     const res = await supertest(app.server)
-      .post(`/api/v1/merchant/beneficiaries/${SUB}/btoken-x/send`)
+      .post('/api/v1/beneficiaries/btoken-x/transfer')
       .set('Authorization', `Bearer ${token}`)
       .send({ amount: 0 });
     expect(res.status).toBe(422);
     expect(res.body.error).toBe('invalid_amount');
   });
 
-  skip('beneficiaries/send: no token → 401', async () => {
+  skip('beneficiaries/transfer: no token → 401', async () => {
     const res = await supertest(app.server)
-      .post(`/api/v1/merchant/beneficiaries/${SUB}/btoken-x/send`)
+      .post('/api/v1/beneficiaries/btoken-x/transfer')
       .send({ amount: 10 });
     expect(res.status).toBe(401);
   });

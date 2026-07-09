@@ -2,11 +2,15 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import * as jwt from 'jsonwebtoken';
 import { attachRbacContext } from './rbac';
 import { getCurrentSessionEpoch } from '../../modules/identity/services/auth.service';
+import { tryMerchantContext } from './validateMerchantToken';
 
 // Route-level opt-out of the global HS256 auth preHandler (self-guarded / OAuth / internal routes).
+// `dualAuth` accepts EITHER the PSP session JWT (HS256) OR a merchant OAuth Bearer (RS256): the route's
+// own dualPermission() preHandler then authorizes by RBAC action (session) or scope (merchant) (v23).
 declare module 'fastify' {
   interface FastifyContextConfig {
     skipAuth?: boolean;
+    dualAuth?: boolean;
   }
 }
 
@@ -123,10 +127,33 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   // caller identity in-handler. The internal capability-module engines (ADR-029:
   // /api/v1/modules/<cap>/score|screen) use the X-Integration-Source header instead
   // of a Bearer token — the EDA dispatcher calls them server-to-server, not as a user.
-  const routeConfig = (request.routeOptions?.config ?? {}) as { skipAuth?: boolean };
+  const routeConfig = (request.routeOptions?.config ?? {}) as { skipAuth?: boolean; dualAuth?: boolean };
   if (routeConfig.skipAuth) {
     attachRbacContext(request);
     return;
+  }
+
+  // Dual-auth capability route (v23): accept a first-party session JWT OR a merchant OAuth Bearer.
+  // Authenticate here; the route's dualPermission() preHandler authorizes (RBAC action or scope).
+  if (routeConfig.dualAuth) {
+    const sessionPayload = tryVerifyToken(request.headers.authorization);
+    if (sessionPayload) {
+      if (!(await sessionEpochOk(request, sessionPayload))) {
+        return reply.status(401).send({ error: 'Session ended. Please sign in again.' });
+      }
+      (request as FastifyRequest & { user: jwt.JwtPayload }).user = sessionPayload;
+      attachRbacContext(request);
+      return;
+    }
+    // Not a valid session token → try the merchant OAuth channel (RS256). tryMerchantContext never
+    // throws and enforces client/merchant active status; scope is enforced per-route by dualPermission.
+    const merchant = await tryMerchantContext(request);
+    if (merchant) {
+      request.merchantContext = merchant;
+      attachRbacContext(request);
+      return;
+    }
+    return reply.status(401).send({ error: 'invalid_token', error_description: 'A valid session or OAuth token is required.' });
   }
 
   if (PUBLIC_EXACT.has(path)) {

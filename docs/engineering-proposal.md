@@ -1803,7 +1803,14 @@ The original design used the Atlas `partyAuthenticationKey` collection as the so
 
 ## ADR-037 — Merchant Portal API as OAuth-Authenticated Namespace (/api/v1/merchant/portal/)
 
-**Status:** Accepted (2026-07-01). Implements **v16**. Aligns **BIAN SD-89** (Merchant Relations), **PCI DSS Req 7** (least privilege), **Req 8.6** (system account lifecycle).
+**Status:** Superseded by **ADR-042 (v23)** (2026-07-09). Originally Accepted (2026-07-01), implemented **v16**. Aligns **BIAN SD-89** (Merchant Relations), **PCI DSS Req 7** (least privilege), **Req 8.6** (system account lifecycle).
+
+> **Superseded.** The dedicated `/api/v1/merchant/*` namespace was removed in v23. The merchant is now
+> just another API client on the SHARED capability modules (`/beneficiaries`, `/accounts`, `/transactions`,
+> `/gateway/transfers`, `/notifications`): a cross-cutting dual-auth resolver (`vendors/middleware/dualAuth.ts`
+> + the `config: { dualAuth: true }` route flag) accepts EITHER a PSP session JWT (RBAC) OR a merchant OAuth
+> Bearer (scope + subject binding). The OAuth token type, `validateMerchantToken`, scope catalog and subject
+> binding all remain; only the parallel `/merchant/*` route surface was retired (no separate merchant portal).
 
 **Context.** Merchants today access their data through the PSP application UI. To support programmatic integration, merchants need a machine-readable API. Reusing the internal PSP JWT (`role: merchant`) would conflate PSP-internal roles with external system accounts, violating PCI DSS Req 8.6's requirement for separate system account management.
 
@@ -1934,3 +1941,37 @@ commission revenue is not yet computed at authorization time (A-06 follow-up) an
 OAuth path remains a follow-up.
 
 *Added 2026-07-06 (v18; doc + code together per repo rules).*
+
+## ADR-042: Unify the merchant integration onto the existing API (dual-auth, no /merchant/* surface) (v23)
+
+**Status:** Accepted (2026-07-09). Supersedes the route-surface portion of **ADR-037**.
+
+**Context:** v16–v18 grew a parallel `/api/v1/merchant/*` route tree (portal, gateway, beneficiaries) that
+duplicated capabilities already owned by the PSP modules (`/beneficiaries`, `/accounts`, `/transactions`,
+`/gateway/transfers`, `/notifications`). The only genuine difference between a first-party call and a
+merchant call is the authentication channel; everything else (services, BIAN control records, display-safe
+projections) was identical. A forked surface violates the repo's no-duplication rule and drifts over time.
+
+**Decision:**
+1. **Auth is a cross-cutting concern, not a forked API.** A shared resolver `vendors/middleware/dualAuth.ts`
+   plus a `config: { dualAuth: true }` flag on the global `authMiddleware` lets one capability route accept
+   EITHER a PSP session JWT (HS256 → RBAC via `dualPermission`) OR a merchant OAuth Bearer (RS256 → scope +
+   subject binding, via the existing `tryMerchantContext`/`validateMerchantToken`).
+2. **Owner is derived, never in the URL for the OAuth channel.** `resolveOwner()` maps `token.sub` → SD-13
+   party; a path owner (if present) must equal `token.sub`. Owner-derived routes register both a paramless
+   and a `:ownerRef`/`:partyRef` form sharing one handler (path param optional/derived).
+3. **Delete the `/merchant/*` tree** (`merchantPortal`, `merchantGateway`, `merchantBeneficiary` controllers)
+   and repoint the merchant `PspClient` + browser proxy allowlist to the shared endpoints. Single-release
+   cutover (both apps deploy together); no `/merchant/*` aliases.
+4. **Notifications exposed to the merchant** (`read:notifications`) on the shared `/notifications` surface.
+5. **`/api/v1/transactions` special case.** It is a `PUBLIC_EXACT` path (simulator), so the OAuth Bearer is
+   detected best-effort (`tryMerchantContext` preHandler) rather than via the `dualAuth` flag, to avoid
+   401'ing anonymous simulator reads.
+
+**Consequences:** One capability = one endpoint = one schema, dual-authenticated. Display-safe guarantees
+(no CHD/PCI SAQ A, masked IBAN, no `counterpartyPartyReference`), subject binding, and SD-89 merchant
+isolation are all preserved. The OAuth token model, scope catalog and `validateMerchantToken` are unchanged;
+only the parallel route surface is gone. Trade-off: capability handlers now branch on channel, and the
+public-exact transactions route needs its bespoke OAuth detection.
+
+*Added 2026-07-09 (v23; doc + code together per repo rules).*

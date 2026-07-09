@@ -6,15 +6,15 @@ import { getSession } from '@/lib/session';
 import { ENV } from '@/lib/env';
 
 // Allowlisted PSP paths (regex over the joined [...path]). Only least-privilege reads/writes.
-// Paths must match the backend's merchant-portal routes (registered under /api/v1/merchant/...).
-// The backend enforces token.sub === :partyRef, so allowing any :partyRef here is safe (a caller
-// can only ever reach their own data).
+// Paths target the shared capability modules (v23: no separate /merchant/* surface). The owner is
+// derived server-side from the Bearer token (token.sub), never from the URL, so a caller can only
+// ever reach their own data. `:beneficiaryRef` is an opaque resource id, not a credential.
 const ALLOW: { method: string; pattern: RegExp }[] = [
   { method: 'GET', pattern: /^api\/v1\/auth\/userinfo$/ },
-  { method: 'GET', pattern: /^api\/v1\/merchant\/beneficiaries\/[^/]+$/ },
-  { method: 'GET', pattern: /^api\/v1\/merchant\/accounts\/[^/]+$/ },
-  { method: 'GET', pattern: /^api\/v1\/merchant\/transactions\/[^/]+$/ },
-  { method: 'POST', pattern: /^api\/v1\/merchant\/transfers\/[^/]+\/preview$/ },
+  { method: 'GET', pattern: /^api\/v1\/beneficiaries$/ },
+  { method: 'GET', pattern: /^api\/v1\/accounts$/ },
+  { method: 'GET', pattern: /^api\/v1\/transactions$/ },
+  { method: 'POST', pattern: /^api\/v1\/gateway\/transfers\/preview$/ },
 ];
 
 function isAllowed(method: string, joined: string): boolean {

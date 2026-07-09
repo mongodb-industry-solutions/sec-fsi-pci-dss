@@ -595,10 +595,14 @@ export type ConsentGrantWithBranding = PartyAuthConsentRecord & { oauthLogoUri?:
 export async function listUserConsentGrants(
   db: Db,
   sub: string,
+  status: 'active' | 'revoked' | 'all' = 'all',
 ): Promise<ConsentGrantWithBranding[]> {
+  // Revoked grants are kept (soft-revoke) so the user can review past apps/operations and re-approve.
+  const filter: Record<string, unknown> = { partyAuthenticationInstanceReference: sub };
+  if (status !== 'all') filter.consentStatus = status;
   const grants = await db
     .collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION)
-    .find({ partyAuthenticationInstanceReference: sub, consentStatus: 'active' })
+    .find(filter)
     .sort({ consentGrantedAt: -1 })
     .toArray();
   if (grants.length === 0) return [];
@@ -762,6 +766,43 @@ export async function revokeConsentGrant(
     scopes: consent.grantedScopes,
     revokedAt: now.toISOString(),
     revokedBy,
+  }).catch(() => {});
+}
+
+// Re-approve a previously revoked consent grant, reverting the user's earlier revocation from the
+// Authorized Applications view. Self-scoped (must belong to `sub`). Idempotent when already active.
+// This restores the CONSENT record + its prior scopes only; it mints NO tokens — the merchant still
+// runs the OAuth authorization_code flow to obtain fresh tokens (the prior scopes now count as granted,
+// so re-consent is smooth). Fires oauth.authorization_granted so the merchant learns access is back.
+export async function reactivateConsentGrant(
+  db: Db,
+  sub: string,
+  consentId: string,
+): Promise<void> {
+  const consent = await db
+    .collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION)
+    .findOne({ consentId, partyAuthenticationInstanceReference: sub });
+
+  if (!consent) throw Object.assign(new Error('Consent grant not found'), { statusCode: 404 });
+  if (consent.consentStatus === 'active') return; // already active — no-op
+
+  const now = new Date();
+  await db.collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION).updateOne(
+    { consentId },
+    {
+      $set: { consentStatus: 'active', recordUpdatedDateTime: now },
+      $unset: { consentRevokedAt: '', consentRevokedBy: '' },
+    },
+  );
+
+  // Fire oauth.authorization_granted webhook (non-blocking) so the merchant knows access was restored.
+  new WebhookService(db).dispatch(consent.merchantAgreementInstanceReference, 'oauth.authorization_granted', {
+    consentId,
+    clientId: consent.oauthClientId,
+    subject: sub,
+    scopes: consent.grantedScopes,
+    grantedAt: now.toISOString(),
+    reinstated: true,
   }).catch(() => {});
 }
 

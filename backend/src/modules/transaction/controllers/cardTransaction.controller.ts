@@ -7,14 +7,19 @@ import {
   getTransactionsByCardToken,
   getDistinctMerchants,
   getAllTransactions,
+  resolveAccountReferenceForParty,
+  getPartyCardTransactions,
   CardNotActiveError,
 } from '../services/cardTransaction.service';
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
 import { CARD_TRANSACTION_COLLECTION } from '../models/cardTransaction.model';
+import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../../gateway/models/paymentExecution.model';
 import { getEventBus } from '../../../vendors/eventbus';
 import { getCaseNotes } from '../../fraud/services/fraudDiagnosis.service';
 import { listQuestionsByTransaction, submitResponse } from '../../fraud/services/customerQuestion.service';
 import { requirePermission } from '../../../vendors/middleware/acl';
+import { resolveOwner } from '../../../vendors/middleware/dualAuth';
+import { tryMerchantContext } from '../../../vendors/middleware/validateMerchantToken';
 
 export async function cardTransactionController(fastify: FastifyInstance) {
   fastify.get('/merchants', {
@@ -255,11 +260,24 @@ the Merchant Name selector. No authentication required (public, simulator mode).
     request.raw.on('close', () => { clearInterval(keepAlive); sub.unsubscribe(); res.end(); });
   });
 
+  // Dual-auth without the `dualAuth` route flag: `/api/v1/transactions` is a PUBLIC_EXACT path
+  // (simulator reads without a session), so we must NOT 401 anonymous callers. Detect a merchant
+  // OAuth Bearer best-effort (scope-gated); otherwise fall back to the existing session/public RBAC.
   fastify.get('/', {
-    preHandler: requirePermission('transactions', 'view'),
+    preHandler: async (request, reply) => {
+      const mc = await tryMerchantContext(request);
+      if (mc) {
+        if (!mc.scopes.includes('read:transactions')) {
+          return reply.status(403).send({ error: 'insufficient_scope', error_description: 'Required scope: read:transactions' });
+        }
+        request.merchantContext = mc;
+        return; // merchant channel authorized
+      }
+      return requirePermission('transactions', 'view')(request, reply);
+    },
     schema: {
       tags: ['transactions'],
-      summary: 'List transactions by card token',
+      summary: 'List transactions by card token (session) or the merchant on-behalf-of operation history (OAuth)',
       description: `Returns all transactions associated with a card token, sorted by
 \`cardTransactionDateTime\` descending (most recent first).
 
@@ -268,50 +286,85 @@ token is a PAN surrogate and is NOT Cardholder Data under PCI DSS v4.0.`,
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
-        required: ['cardToken'],
         properties: {
           cardToken: {
             type: 'string',
-            description: 'Card surrogate token. Same value as `paymentCardReference` in the `paymentCard` collection.',
+            description: 'Card surrogate token (session channel). Same value as `paymentCardReference` in the `paymentCard` collection.',
           },
+          page: { type: 'number', default: 1 },
+          limit: { type: 'number', default: 20, maximum: 100 },
         },
       },
+      // No strict 200 response schema: this route now serves TWO shapes — the session card-token list
+      // (`{ results:[cardTransaction…], count }`) AND the OAuth merchant merged history
+      // (`{ results:[{ grossAmount, paymentExecutionStatus, … }], total, page, limit }`). A strict
+      // per-shape schema would make fast-json-stringify silently DROP the other shape's fields.
       response: {
-        200: {
-          description: 'Transaction list sorted by date descending.',
-          type: 'object',
-          properties: {
-            results: {
-              type: 'array',
-              description: 'All transactions for the given card token.',
-              items: {
-                type: 'object',
-                properties: {
-                  cardTransactionInstanceReference: { type: 'string', description: 'Transaction UUID.' },
-                  cardTransactionAmount: { $ref: 'MonetaryAmount#' },
-                  cardTransactionDateTime: { type: 'string', format: 'date-time', description: 'UTC timestamp of the transaction.' },
-                  cardTransactionStatus: {
-                    type: 'string',
-                    enum: ['authorized', 'declined', 'pending', 'settled', 'disputed'],
-                    description: 'Current transaction status.',
-                  },
-                  cardTransactionMerchantName: { type: 'string', description: 'Merchant display name.' },
-                  cardTransactionChannel: {
-                    type: 'string',
-                    enum: ['online', 'pos', 'contactless', 'atm'],
-                    description: 'Payment channel.',
-                  },
-                },
-              },
-            },
-            count: { type: 'number', description: 'Total number of transactions returned.' },
-          },
-        },
         400: { description: '`cardToken` query parameter missing.', $ref: 'Error#' },
         401: { description: 'Missing or invalid Bearer token.', $ref: 'Error#' },
+        403: { description: 'OAuth token missing the read:transactions scope.', $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
+    // OAuth (merchant on-behalf-of): owner-scoped, merchant-isolated operation history (SD-89).
+    // Merges SD-65 executions and the party's own card transactions, display-safe (no CHD).
+    if (request.merchantContext) {
+      const owner = await resolveOwner(request, reply);
+      if (!owner) return;
+      const q = request.query as { page?: number; limit?: number };
+      const page = Math.max(1, q.page ?? 1);
+      const limit = Math.min(100, Math.max(1, q.limit ?? 20));
+      if (!owner.ownerPartyRef) return reply.send({ results: [], total: 0, page, limit });
+
+      const merchantId = request.merchantContext.merchantId;
+      // Source 1 — SD-65 executions the party made THROUGH THIS merchant (isolation by SD-89 ref).
+      const filter = {
+        merchantAgreementReference: merchantId,
+        $or: [{ initiatorPartyReference: owner.ownerPartyRef }, { beneficiaryPartyReference: owner.ownerPartyRef }],
+      };
+      const execDocs = await fastify.db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION)
+        .find(filter).sort({ initiatedAt: -1 }).limit(200).toArray();
+      const execRows = execDocs.map((d) => ({
+        kind: 'transfer' as const,
+        paymentExecutionInstanceReference: d.paymentExecutionInstanceReference,
+        direction: d.initiatorPartyReference === owner.ownerPartyRef ? 'sent' : 'received',
+        grossAmount: d.grossAmount, netAmount: d.netAmount, feeAmount: d.feeAmount, currency: d.currency,
+        paymentExecutionRail: d.paymentExecutionRail ?? null,
+        paymentExecutionStatus: d.paymentExecutionStatus,
+        concept: d.paymentExecutionRemittanceInformation ?? d.routingNote ?? null,
+        beneficiaryName: d.beneficiaryName ?? null,
+        destinationAccountMasked: d.destinationAccountMasked ?? null,
+        initiatedAt: d.initiatedAt?.toISOString() ?? null,
+        completedAt: d.completedAt?.toISOString() ?? null,
+        _sortAt: d.completedAt ?? d.initiatedAt ?? null,
+      }));
+
+      // Source 2 — the party's OWN card transactions made in THIS merchant (masked PAN, no CHD).
+      const accountReference = await resolveAccountReferenceForParty(fastify.db, owner.ownerPartyRef);
+      const cardTxns = accountReference ? await getPartyCardTransactions(fastify.db, accountReference, 200, merchantId) : [];
+      const cardRows = cardTxns.map((t) => ({
+        kind: 'card' as const,
+        paymentExecutionInstanceReference: t.cardTransactionInstanceReference,
+        direction: 'sent',
+        grossAmount: t.grossAmount, netAmount: undefined as number | undefined, feeAmount: undefined as number | undefined,
+        currency: t.currency, paymentExecutionRail: 'card', paymentExecutionStatus: t.status,
+        concept: t.cardTransactionDescription ?? null,
+        beneficiaryName: t.merchantName, destinationAccountMasked: t.maskedPan,
+        initiatedAt: t.initiatedAt, completedAt: t.initiatedAt,
+        _sortAt: t.initiatedAt ? new Date(t.initiatedAt) : null,
+      }));
+
+      const merged = [...execRows, ...cardRows].sort((a, b) => {
+        const av = a._sortAt ? new Date(a._sortAt).getTime() : 0;
+        const bv = b._sortAt ? new Date(b._sortAt).getTime() : 0;
+        return bv - av;
+      });
+      const total = merged.length;
+      const results = merged.slice((page - 1) * limit, page * limit).map(({ _sortAt, ...row }) => { void _sortAt; return row; });
+      return reply.send({ results, total, page, limit });
+    }
+
+    // Session channel: list by card token (existing behavior).
     const { cardToken } = request.query as { cardToken?: string };
     if (!cardToken) {
       return reply.status(400).send({ error: 'cardToken query parameter is required' });

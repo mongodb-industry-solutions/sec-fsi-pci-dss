@@ -178,6 +178,7 @@ export interface ConsentGrant {
   grantedScopes: string[];
   consentStatus: 'active' | 'revoked';
   consentGrantedAt: string;
+  consentRevokedAt?: string | null;
   lastUsedAt?: string | null;
 }
 
@@ -1266,8 +1267,9 @@ export const api = {
   // v16: OAuth consent grants (user's authorized apps)
   // Self-scoped "Authorized Applications" (connected apps). All routes resolve the caller's own `sub`.
   consentGrants: {
-    list: (token: string) =>
-      apiFetch<{ grants: ConsentGrant[] }>('/api/v1/auth/grants', {}, token),
+    // Revoked grants are kept; filter with status (active | revoked | all, default all).
+    list: (token: string, status: 'active' | 'revoked' | 'all' = 'all') =>
+      apiFetch<{ grants: ConsentGrant[] }>(`/api/v1/auth/grants?status=${status}`, {}, token),
     // v18 D-01: detail of one authorized app (scopes with descriptions, approval date/time, branding).
     getDetail: (consentId: string, token: string) =>
       apiFetch<ConsentGrantDetail>(`/api/v1/auth/grants/${encodeURIComponent(consentId)}`, {}, token),
@@ -1303,6 +1305,13 @@ export const api = {
       apiFetch<{ revoked: boolean; consentId: string }>(
         `/api/v1/auth/grants/${encodeURIComponent(consentId)}`,
         { method: 'DELETE' },
+        token,
+      ),
+    // Re-approve a previously revoked grant (reverts the revocation; mints no tokens).
+    reactivate: (consentId: string, token: string) =>
+      apiFetch<{ reactivated: boolean; consentId: string }>(
+        `/api/v1/auth/grants/${encodeURIComponent(consentId)}/reactivate`,
+        { method: 'POST' },
         token,
       ),
   },
@@ -1596,10 +1605,13 @@ export const api = {
       apiFetch<{
         paymentExecutionInstanceReference: string;
         initiatorPartyReference: string | null;
+        initiatorName: string | null;
         beneficiaryPartyReference: string | null;
         sourcePayoutAccountReference: string | null;
+        sourceAccountMasked: string | null;
         resolvedPayoutAccountReference: string | null;
         beneficiaryArrangementReference: string | null;
+        beneficiaryAlias: string | null;
         beneficiaryName: string | null;
         destinationIban: string | null;
         destinationAccountMasked: string | null;
