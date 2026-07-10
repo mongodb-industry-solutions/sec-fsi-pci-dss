@@ -380,7 +380,10 @@ export async function adminController(fastify: FastifyInstance) {
       for (const step of sequence) {
         fs.mkdirSync(path.dirname(step.outputFile), { recursive: true });
         try { fs.rmSync(step.outputFile, { force: true }); } catch { /* none to remove */ }
-        const code = await spawnSSE(reply.raw, 'npm', step.npmArgs, PROJECT_ROOT, `npm:${command}`, {
+        // Label each step with its own npm script (e.g. npm:test:unit) so streamed lines and
+        // persisted logs identify which suite produced them in the combined run.
+        const stepScript = step.npmArgs[1] ?? command;
+        const code = await spawnSSE(reply.raw, 'npm', step.npmArgs, PROJECT_ROOT, `npm:${stepScript}`, {
           env: step.env,
           finalize: false,
         });

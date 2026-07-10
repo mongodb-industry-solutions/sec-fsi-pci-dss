@@ -140,8 +140,13 @@ export async function usersController(fastify: FastifyInstance) {
       });
       return reply.status(201).send(user);
     } catch (err) {
+      // Only map known outcomes: 409 for uniqueness conflicts (email/phone), 400 for explicit
+      // validation errors. Anything else is unexpected (Mongo/bcrypt/etc.) and must surface as a
+      // 500 via Fastify's error handler rather than being masked as a client error.
       const e = err as { statusCode?: number; message: string };
-      return reply.status(e.statusCode === 409 ? 409 : 400).send({ error: e.message });
+      if (e.statusCode === 409) return reply.status(409).send({ error: e.message });
+      if (e.statusCode === 400) return reply.status(400).send({ error: e.message });
+      throw err;
     }
   });
 

@@ -25,6 +25,8 @@ import {
   InitiateBackchannelInput,
 } from '../services/ciba.service';
 import { resolveOAuthClient } from '../services/oauth.service';
+import { getCurrentSessionEpoch } from '../services/auth.service';
+import { Db } from 'mongodb';
 
 function parseBasicAuth(header?: string): { id: string; secret: string } | null {
   if (!header?.startsWith('Basic ')) return null;
@@ -36,10 +38,10 @@ function parseBasicAuth(header?: string): { id: string; secret: string } | null 
   } catch { return null; }
 }
 
-function getSubFromRequest(request: FastifyRequest): string | null {
+async function getSubFromRequest(request: FastifyRequest, db: Db): Promise<string | null> {
   const user = (request as any).user as { sub?: string; partyAuthenticationInstanceReference?: string } | undefined;
   const fromMiddleware = user?.sub ?? user?.partyAuthenticationInstanceReference ?? null;
-  if (fromMiddleware) return fromMiddleware;
+  if (fromMiddleware) return fromMiddleware; // middleware already verified signature AND session epoch
   // The deny route uses skipAuth, so the global middleware does not populate request.user. Verify an
   // optional Bearer session JWT here so "deny via the owner's session" actually works.
   const auth = request.headers.authorization;
@@ -47,7 +49,14 @@ function getSubFromRequest(request: FastifyRequest): string | null {
   try {
     const secret = process.env.PSP_JWT_SECRET ?? 'demo-local-secret-change-in-production';
     const payload = jwt.verify(auth.slice(7), secret) as jwt.JwtPayload;
-    return (payload.sub as string) ?? null;
+    const sub = (payload.sub as string) ?? null;
+    if (!sub) return null;
+    // Enforce the same server-side logout / session-epoch invalidation the global middleware applies,
+    // so a token that is stale after logout (epoch bumped) cannot be used as the owner factor.
+    const currentEpoch = await getCurrentSessionEpoch(db, sub);
+    const tokenEpoch = typeof payload.epoch === 'number' ? payload.epoch : 0;
+    if (tokenEpoch < currentEpoch) return null;
+    return sub;
   } catch {
     return null;
   }
@@ -105,7 +114,7 @@ export async function cibaController(fastify: FastifyInstance) {
       security: [{ bearerAuth: [] }],
     },
   }, async (request, reply) => {
-    const sub = getSubFromRequest(request);
+    const sub = await getSubFromRequest(request, fastify.db);
     if (!sub) return reply.status(401).send({ error: 'Unauthorized' });
     try {
       return { pending: await listPending(fastify.db, sub) };
@@ -174,7 +183,7 @@ export async function cibaController(fastify: FastifyInstance) {
     const { credentialId, signature } = (request.body ?? {}) as { credentialId?: string; signature?: string };
     // A session token (if present) is honored as the owner factor. skipAuth means the global
     // middleware did not populate request.user, so re-read the optional bearer here.
-    const sessionSub = getSubFromRequest(request) ?? undefined;
+    const sessionSub = (await getSubFromRequest(request, fastify.db)) ?? undefined;
     try {
       return await recordDenial(fastify.db, authReqId, { credentialId, signature, sessionSub });
     } catch (err) { return replyError(reply, err); }
