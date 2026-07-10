@@ -252,7 +252,10 @@ function spawnSSE(
     child.stderr.on('data', (chunk: Buffer) => {
       chunk.toString().split('\n').filter(Boolean).forEach((l) => sendText('error', l));
     });
-    child.on('close', (code) => {
+    child.on('close', (code, signal) => {
+      // A process killed by a signal reports code === null; treat that as a failure (non-zero)
+      // so a signalled/aborted run is never reported as success by the SSE stream or aggregate runner.
+      const exitCode = code ?? (signal ? 1 : 0);
       if (opts.summarize) {
         try {
           const summary = opts.summarize();
@@ -262,10 +265,10 @@ function spawnSSE(
         }
       }
       if (finalize) {
-        sendText('done', `Process exited with code ${code ?? 0}`);
+        sendText('done', signal ? `Process terminated by signal ${signal}` : `Process exited with code ${exitCode}`);
         (raw as import('http').ServerResponse).end?.();
       }
-      resolve(code ?? 0);
+      resolve(exitCode);
     });
     child.on('error', (err) => {
       sendText('error', `Failed to start: ${err.message}`);

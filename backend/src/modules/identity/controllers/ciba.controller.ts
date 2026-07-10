@@ -15,6 +15,7 @@
  * session-gated by the global authMiddleware.
  */
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import * as jwt from 'jsonwebtoken';
 import {
   initiateBackchannelAuth,
   getChallenge,
@@ -37,7 +38,19 @@ function parseBasicAuth(header?: string): { id: string; secret: string } | null 
 
 function getSubFromRequest(request: FastifyRequest): string | null {
   const user = (request as any).user as { sub?: string; partyAuthenticationInstanceReference?: string } | undefined;
-  return user?.sub ?? user?.partyAuthenticationInstanceReference ?? null;
+  const fromMiddleware = user?.sub ?? user?.partyAuthenticationInstanceReference ?? null;
+  if (fromMiddleware) return fromMiddleware;
+  // The deny route uses skipAuth, so the global middleware does not populate request.user. Verify an
+  // optional Bearer session JWT here so "deny via the owner's session" actually works.
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) return null;
+  try {
+    const secret = process.env.PSP_JWT_SECRET ?? 'demo-local-secret-change-in-production';
+    const payload = jwt.verify(auth.slice(7), secret) as jwt.JwtPayload;
+    return (payload.sub as string) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function replyError(reply: FastifyReply, err: unknown) {

@@ -262,10 +262,17 @@ export async function recordApproval(db: Db, authReqId: string, input: ApprovalI
   }
 
   const now = new Date();
-  await db.collection<PartyBackchannelAuthenticationRecord>(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION).updateOne(
+  // Only a still-pending request may transition to approved. If it was already approved/denied/
+  // consumed/expired, matchedCount is 0: fail with invalid_grant and do NOT bump signCount, so an
+  // already-handled auth_req_id cannot be replayed to bump the counter.
+  const upd = await db.collection<PartyBackchannelAuthenticationRecord>(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION).updateOne(
     { authReqId, status: 'pending' },
     { $set: { status: 'approved', credentialIdUsed: cred.credentialId, signatureVerifiedAt: now } },
   );
+  if (upd.matchedCount === 0) {
+    emitCibaEvent(db, req.customerAuthenticationInstanceReference, req.clientId, 'auth.ciba.approve', 'rejected', { authReqId, reason: 'not_pending' });
+    throw oauthError(400, 'invalid_grant', 'Request is not pending (already handled or expired)');
+  }
   // Anti-clone: bump the monotonic signCount and record last use.
   await db.collection<PartyEnrolledCredentialRecord>(PARTY_ENROLLED_CREDENTIAL_COLLECTION).updateOne(
     { credentialId: cred.credentialId },
@@ -304,10 +311,14 @@ export async function recordDenial(
   }
   if (!authorized) throw oauth401('invalid_grant', 'Denial requires a valid assertion or the owner session');
 
-  await db.collection<PartyBackchannelAuthenticationRecord>(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION).updateOne(
+  const upd = await db.collection<PartyBackchannelAuthenticationRecord>(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION).updateOne(
     { authReqId, status: 'pending' },
     { $set: { status: 'denied' } },
   );
+  // A non-pending auth_req_id (already handled) must not report a fresh denial or emit an audit event.
+  if (upd.matchedCount === 0) {
+    throw oauthError(400, 'invalid_grant', 'Request is not pending (already handled or expired)');
+  }
   emitCibaEvent(db, req.customerAuthenticationInstanceReference, req.clientId, 'auth.ciba.deny', 'rejected', { authReqId });
   return { status: 'denied' };
 }

@@ -177,8 +177,13 @@ export async function updateUser(db: Db, id: string, patch: {
   if (!current) return null;
 
   // Contact PII (name/phone) is mirrored to the linked SD-13 party. Phone throws 409 on a clash.
+  // Pass the account email too so that, if the party has to be created (missing doc), it is complete.
   if (typeof patch.phone === 'string' || (typeof patch.name === 'string' && current.partyInstanceReference)) {
-    await writePartyContact(current.partyInstanceReference, { name: patch.name, phone: patch.phone });
+    await writePartyContact(current.partyInstanceReference, {
+      name: patch.name,
+      phone: patch.phone,
+      email: current.customerAuthenticationEmailAddress,
+    });
   }
 
   const set: Partial<CustomerAuthenticationAssessmentRecord> = {};

@@ -186,9 +186,11 @@ export function DomainAccessPanel({
             {pagedUsers.map((u) => (
               <div key={u.id}
                 onClick={editId === u.id ? undefined : () => router.push(`/system/admin/modules/domains/${domainId}/users/${u.id}`)}
+                onKeyDown={editId === u.id ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/system/admin/modules/domains/${domainId}/users/${u.id}`); } }}
                 role={editId === u.id ? undefined : 'button'}
+                tabIndex={editId === u.id ? undefined : 0}
                 title={editId === u.id ? undefined : 'Open account details'}
-                className={`flex items-center gap-2 flex-wrap bg-white border rounded-lg px-3 py-2 ${editId === u.id ? '' : 'cursor-pointer hover:border-gray-300 hover:bg-gray-50/60 transition-colors'}`}>
+                className={`flex items-center gap-2 flex-wrap bg-white border rounded-lg px-3 py-2 ${editId === u.id ? '' : 'cursor-pointer hover:border-gray-300 hover:bg-gray-50/60 transition-colors focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40'}`}>
                 {editId === u.id ? (
                   <>
                     <input value={editDraft.name} onChange={(e) => setEditDraft({ name: e.target.value })} placeholder="name"

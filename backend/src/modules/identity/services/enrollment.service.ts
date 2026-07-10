@@ -37,10 +37,19 @@ function verifyChallenge(challenge: string): { sub: string; nonce: string; exp: 
   const [body, mac] = challenge.split('.');
   if (!body || !mac) throw oauthError(400, 'invalid_request', 'Malformed enrollment challenge');
   const expected = crypto.createHmac('sha256', challengeSecret()).update(body).digest('base64url');
-  if (!crypto.timingSafeEqual(Buffer.from(mac), Buffer.from(expected))) {
+  const macBuf = Buffer.from(mac);
+  const expectedBuf = Buffer.from(expected);
+  // timingSafeEqual throws on unequal buffer lengths, so length-check first (a wrong-length MAC is a
+  // signature mismatch anyway) to keep a malformed challenge a clean 400 rather than a 500.
+  if (macBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(macBuf, expectedBuf)) {
     throw oauthError(400, 'invalid_request', 'Enrollment challenge signature invalid');
   }
-  const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
+  let payload: { sub: string; nonce: string; exp: number };
+  try {
+    payload = JSON.parse(Buffer.from(body, 'base64url').toString());
+  } catch {
+    throw oauthError(400, 'invalid_request', 'Malformed enrollment challenge');
+  }
   if (typeof payload.exp !== 'number' || payload.exp * 1000 < Date.now()) {
     throw oauthError(400, 'invalid_request', 'Enrollment challenge expired');
   }

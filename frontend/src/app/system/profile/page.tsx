@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { api, type ConsentGrant } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { ROLE_LABELS } from '../../../lib/constants';
@@ -723,7 +724,7 @@ export default function ProfilePage() {
       )}
 
       {/* Passwordless credentials link (full management at /system/profile/credentials). */}
-      <a href="/system/profile/credentials"
+      <Link href="/system/profile/credentials"
         className="bg-white rounded-xl border p-5 flex items-center justify-between hover:bg-gray-50 transition-colors">
         <div className="flex items-center gap-3">
           <span className="rounded-lg bg-[#00684A]/10 text-[#00684A] flex items-center justify-center shrink-0" style={{ width: 40, height: 40 }}>
@@ -738,7 +739,7 @@ export default function ProfilePage() {
           </div>
         </div>
         <ChevronRight size={18} className="text-gray-400 shrink-0" />
-      </a>
+      </Link>
 
       {/* Payment-card management lives in its own section: /system/cards (BIAN SD-88). */}
 

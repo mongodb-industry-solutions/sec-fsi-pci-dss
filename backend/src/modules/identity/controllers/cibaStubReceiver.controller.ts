@@ -65,7 +65,13 @@ export async function cibaStubReceiverController(fastify: FastifyInstance) {
       summary: 'List recently received CIBA ping/push notifications (demo)',
       description: 'Returns the in-memory ring buffer of notifications received by the demo stub receiver, for visualisation in the demo UI.',
     },
-  }, async () => {
+  }, async (request, reply) => {
+    // Same Bearer gate as the POST receiver: the buffer carries auth_req_id / event metadata, so it
+    // must not be world-readable in shared/staging environments even though tokens are redacted.
+    const auth = request.headers.authorization;
+    if (auth !== `Bearer ${expectedToken()}`) {
+      return reply.status(401).send({ error: 'invalid_token', error_description: 'notification token mismatch' });
+    }
     return { notifications: RECEIVED };
   });
 }
