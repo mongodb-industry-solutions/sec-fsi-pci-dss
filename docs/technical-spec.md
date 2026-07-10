@@ -3758,8 +3758,10 @@ Consent detail (`GET /api/v1/auth/grants/:consentId`) adds `cibaEnabled` (client
 
 The external merchant app (`merchant/`, DB-less) consumes the v24 PSP CIBA capability to offer redirect-free
 passwordless login, alongside the existing Authorization Code + PKCE SSO (SSO stays the default/fallback).
-No new PSP endpoints or data model: v25 is client-side only. Decisions: AD calls proxied server-side (no
-CORS), ES256 browser default, `login_hint_token` (opaque sub, no raw PII), profile hosts enroll + generator.
+Almost entirely client-side: no new PSP endpoint or data model, and the only PSP-side change is making the
+v24 enrollment routes `dualAuth` so a user-delegated merchant OAuth Bearer can enroll (see §13.1.1).
+Decisions: AD calls proxied server-side (no CORS), ES256 browser default, `login_hint_token` (opaque sub,
+no raw PII), profile hosts enroll + generator.
 
 ### 13.1 Client libraries (`merchant/src/lib`)
 - `authenticator.ts` (`use client`) — the LOGIN credential: ES256 (`ECDSA`/`P-256`), private key
@@ -3773,8 +3775,17 @@ CORS), ES256 browser default, `login_hint_token` (opaque sub, no raw PII), profi
   `backchannel_authentication_endpoint`) and `cibaTokenPoll()` (maps `authorization_pending`/`slow_down`/
   `access_denied`/`expired_token`). `env.ts` adds `pspCredentialsUrl` (link to the PSP keys page).
 
+### 13.1.1 PSP adjustment required by v25 (enrollment via OAuth)
+The v24 `/api/v1/auth/enroll*` routes were session-gated by the global HS256 `authMiddleware`, which rejects
+the merchant's RS256 OAuth Bearer (401). v25 makes all five enrollment routes `config: { dualAuth: true }`
+(the v23 pattern): they now accept EITHER a first-party portal session (HS256) OR a user-delegated merchant
+OAuth Bearer (RS256, via `tryMerchantContext`). `enrollment.controller.getSubFromRequest` also reads
+`request.merchantContext.sub`. Enrollment stays owner-scoped (bound to the resolved user sub); the PSP still
+stores public key material only. This is the single PSP-side change in v25.
+
 ### 13.2 Merchant route handlers (`merchant/src/app/api/auth/ciba/`, `server-only`)
-- `POST /api/auth/ciba/enroll/challenge` — session-gated relay to PSP `POST /enroll/challenge` (Bearer attached).
+- `POST /api/auth/ciba/enroll/challenge` — session-gated relay to PSP `POST /enroll/challenge` (Bearer attached;
+  sends `{}` body since the PSP derives the owner from the token, and Fastify rejects an empty JSON body).
 - `POST /api/auth/ciba/enroll` — session-gated relay to PSP `POST /enroll` (public key only).
 - `POST /api/auth/ciba/start` — session-LESS; confidential client → PSP `bc-authorize` with `login_hint_token`
   + REQUESTED_SCOPES; returns `{ auth_req_id, interval, expires_in, binding_message }`.

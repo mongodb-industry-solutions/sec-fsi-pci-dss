@@ -156,6 +156,15 @@ export interface BackchannelAuthResponse {
   interval: number;
 }
 
+// Carries the PSP's OAuth error code + description so callers can render clean UX instead of a raw
+// "bc-authorize failed: 400 {…}" string.
+export class OAuthUpstreamError extends Error {
+  constructor(public code: string, public description: string, public status: number) {
+    super(description || code);
+    this.name = 'OAuthUpstreamError';
+  }
+}
+
 function backchannelEndpoint(cfg: OidcConfig): string {
   // Prefer the discovered endpoint; fall back to deriving it from the token endpoint (…/token → …/bc-authorize).
   return cfg.backchannel_authentication_endpoint ?? cfg.token_endpoint.replace(/\/token$/, '/bc-authorize');
@@ -176,8 +185,8 @@ export async function backchannelAuthorize(input: BackchannelAuthorizeInput): Pr
     cache: 'no-store',
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`bc-authorize failed: ${res.status} ${JSON.stringify(err)}`);
+    const err = (await res.json().catch(() => ({}))) as { error?: string; error_description?: string };
+    throw new OAuthUpstreamError(err.error ?? 'bc_authorize_failed', err.error_description ?? '', res.status);
   }
   return (await res.json()) as BackchannelAuthResponse;
 }

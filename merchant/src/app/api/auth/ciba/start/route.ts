@@ -2,7 +2,7 @@
 // The merchant (confidential client) calls the PSP bc-authorize endpoint with the browser-supplied
 // login_hint_token (opaque sub, no raw PII). Returns { auth_req_id, interval, expires_in, binding_message }.
 import { NextRequest, NextResponse } from 'next/server';
-import { backchannelAuthorize } from '@/lib/oauth';
+import { backchannelAuthorize, OAuthUpstreamError } from '@/lib/oauth';
 import { REQUESTED_SCOPES } from '@/lib/env';
 import { randomInt } from 'crypto';
 
@@ -21,6 +21,9 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ ...r, binding_message: bindingMessage });
   } catch (e) {
-    return NextResponse.json({ error: 'bc_authorize_failed', error_description: (e as Error).message }, { status: 400 });
+    if (e instanceof OAuthUpstreamError) {
+      return NextResponse.json({ error: e.code, error_description: e.description }, { status: e.status });
+    }
+    return NextResponse.json({ error: 'bc_authorize_failed', error_description: 'Could not reach Leafy Pay' }, { status: 502 });
   }
 }

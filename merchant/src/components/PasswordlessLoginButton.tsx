@@ -9,6 +9,22 @@ import { hasCredential, getMeta, sign, loginHintToken, deleteCredential } from '
 
 type Phase = 'idle' | 'starting' | 'confirm' | 'approving' | 'polling' | 'error';
 
+// Friendly copy for the OAuth/CIBA error codes the PSP can return, so the UI never shows a raw
+// "bc-authorize failed: 400 {…}" string. Unknown codes fall back to the server's description.
+const FRIENDLY: Record<string, string> = {
+  unauthorized_client: 'Passwordless sign-in is not enabled for this store yet. Please use “Login with Leafy Pay”.',
+  unknown_user_id: 'This device is not enrolled for passwordless sign-in. Enable it from your profile after signing in.',
+  invalid_scope: 'This store is not allowed the permissions needed for passwordless sign-in.',
+  access_denied: 'The request was denied.',
+  expired_token: 'The request expired. Please try again.',
+  bc_authorize_failed: 'Could not reach Leafy Pay. Please try again.',
+  invalid_grant: 'This device is no longer enrolled. Please sign in with Leafy Pay and re-enable passwordless.',
+};
+
+function friendly(code?: string, fallback?: string): string {
+  return (code && FRIENDLY[code]) || fallback || 'Passwordless sign-in failed. Please try again.';
+}
+
 export default function PasswordlessLoginButton() {
   const [available, setAvailable] = useState(false);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -35,13 +51,13 @@ export default function PasswordlessLoginButton() {
         body: JSON.stringify({ login_hint_token: loginHintToken(meta.sub) }),
       });
       const start = await startRes.json();
-      if (!startRes.ok) return fail(start.error_description ?? 'Could not start passwordless login');
+      if (!startRes.ok) return fail(friendly(start.error, start.error_description));
       const authReqId: string = start.auth_req_id;
 
       // 2) Fetch the challenge + binding message (Authentication Device step).
       const chRes = await fetch(`/api/auth/ciba/challenge?auth_req_id=${encodeURIComponent(authReqId)}`);
       const ch = await chRes.json();
-      if (!chRes.ok) return fail(ch.error_description ?? ch.error ?? 'Could not fetch the challenge');
+      if (!chRes.ok) return fail(friendly(ch.error, ch.error_description));
       setBinding(ch.binding_message ?? '');
       setPhase('confirm');
 
@@ -61,7 +77,7 @@ export default function PasswordlessLoginButton() {
           setAvailable(false);
           return fail('This device is no longer enrolled. Please sign in with Leafy Pay and re-enable passwordless.');
         }
-        return fail(ap.error_description ?? 'Approval failed');
+        return fail(friendly(ap.error, ap.error_description));
       }
 
       // 4) Poll the token endpoint until the session is established, then redirect.
@@ -82,9 +98,9 @@ export default function PasswordlessLoginButton() {
           if (Date.now() > deadline) return fail('Login timed out. Please try again.');
           continue;
         }
-        if (p.status === 'denied') return fail('The request was denied.');
-        if (p.status === 'expired') return fail('The request expired. Please try again.');
-        return fail(p.error ?? 'Login failed.');
+        if (p.status === 'denied') return fail(friendly('access_denied'));
+        if (p.status === 'expired') return fail(friendly('expired_token'));
+        return fail(friendly(undefined, p.error));
       }
     } catch (e) {
       fail((e as Error).message || 'Passwordless login failed');
