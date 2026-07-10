@@ -12,7 +12,7 @@ import * as path from 'path';
 
 /** Normalized result contract emitted as the SSE `summary` event. */
 export interface NormalizedTestSummary {
-  tool: 'vitest' | 'playwright';
+  tool: 'vitest' | 'playwright' | 'all';
   total: number;
   passed: number;
   failed: number;
@@ -144,9 +144,9 @@ function playwrightStrategy(outFile: string): TestRunStrategy {
 }
 
 /**
- * Resolve a command id to its test-runner strategy, or null when the command is
- * not a single-tool test run (setup/seed/type-check, and the `test` aggregate that
- * chains all three tools — those stream logs only, with no structured summary).
+ * Resolve a command id to its single-tool test-runner strategy, or null when the
+ * command is not a single-tool test run (setup/seed/type-check stream logs only;
+ * the `test` aggregate is handled separately via `resolveTestSequence`).
  */
 export function resolveTestStrategy(command: string, projectRoot: string): TestRunStrategy | null {
   const dir = path.join(projectRoot, 'test-results');
@@ -156,4 +156,34 @@ export function resolveTestStrategy(command: string, projectRoot: string): TestR
     case 'test:e2e':         return playwrightStrategy(path.join(dir, 'e2e.json'));
     default:                 return null;
   }
+}
+
+/**
+ * The `test` aggregate ("All Tests") chains unit, integration, and E2E. Rather than
+ * stream logs only, we run each suite with its native JSON reporter and combine the
+ * parsed results into one summary (see `aggregateSummaries`), so the panel shows the
+ * same pass/fail/skip breakdown it shows for a single suite. Returns null for any
+ * command that is not the aggregate.
+ */
+export function resolveTestSequence(command: string, projectRoot: string): TestRunStrategy[] | null {
+  if (command !== 'test') return null;
+  const dir = path.join(projectRoot, 'test-results');
+  return [
+    vitestStrategy('test:unit', path.join(dir, 'unit.json')),
+    vitestStrategy('test:integration', path.join(dir, 'integration.json')),
+    playwrightStrategy(path.join(dir, 'e2e.json')),
+  ];
+}
+
+/** Combines per-suite summaries into one totalized `all` summary for the aggregate run. */
+export function aggregateSummaries(parts: NormalizedTestSummary[]): NormalizedTestSummary {
+  return parts.reduce<NormalizedTestSummary>((acc, p) => ({
+    tool: 'all',
+    total: acc.total + p.total,
+    passed: acc.passed + p.passed,
+    failed: acc.failed + p.failed,
+    skipped: acc.skipped + p.skipped,
+    durationMs: acc.durationMs + p.durationMs,
+    failures: [...acc.failures, ...p.failures],
+  }), { tool: 'all', total: 0, passed: 0, failed: 0, skipped: 0, durationMs: 0, failures: [] });
 }

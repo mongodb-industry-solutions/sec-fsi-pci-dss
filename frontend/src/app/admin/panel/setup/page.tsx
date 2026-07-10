@@ -525,7 +525,7 @@ function TestSummary({ summary, status }: {
             : <XCircle size={18} className="text-red-500" />}
           <h3 className="text-sm font-semibold text-white">Test Results</h3>
           <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500 border border-gray-700 rounded px-1.5 py-0.5">
-            {tool}
+            {tool === 'all' ? 'all suites' : tool}
           </span>
         </div>
         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${

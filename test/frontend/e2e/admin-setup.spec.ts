@@ -72,6 +72,17 @@ const SSE_E2E_PASS = sseBody([
   { type: 'done',  text: 'Process exited with code 0' },
 ]);
 
+/** All Tests aggregate: combined summary across suites + done(code 1 because one failed). */
+const SSE_ALL_TESTS = sseBody([
+  { type: 'start', text: 'npm run test:unit' },
+  { type: 'log',   text: 'RUN  v4.1.0' },
+  { type: 'summary', summary: {
+    tool: 'all', total: 13, passed: 12, failed: 1, skipped: 2, durationMs: 10600,
+    failures: [{ title: 'test/backend/unit/bar.test.ts > suite > it should work', reason: 'AssertionError: expected 1 to equal 2' }],
+  } },
+  { type: 'done',  text: 'Process exited with code 1' },
+]);
+
 test.describe('Admin Panel: Setup Page', () => {
   test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page);
@@ -135,6 +146,20 @@ test.describe('Admin Panel: Setup Page', () => {
 
     await expect(page.locator('text=Test Results').first()).toBeVisible({ timeout: 8_000 });
     await expect(page.locator('text=playwright').first()).toBeVisible();
+  });
+
+  test('All Tests: aggregate run shows a combined TestSummary with "all suites" badge', async ({ page }) => {
+    await page.route('**/api/v1/admin/run', (route) =>
+      route.fulfill({ status: 200, contentType: 'text/event-stream', body: SSE_ALL_TESTS }),
+    );
+
+    await page.goto('/admin/panel/setup');
+    await page.locator('button:has-text("All Tests")').first().click();
+
+    await expect(page.locator('text=Test Results').first()).toBeVisible({ timeout: 8_000 });
+    await expect(page.locator('text=all suites').first()).toBeVisible();
+    await expect(page.locator('text=/1 failed/').first()).toBeVisible();
+    await expect(page.locator('text=/bar.test.ts/').first()).toBeVisible();
   });
 
   // ── Non-test commands → NO summary event → NO TestSummary panel ──────────────
