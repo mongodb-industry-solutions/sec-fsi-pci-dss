@@ -20,6 +20,8 @@ env:
   PSP_MERCHANT_PSP_BASE_URL: "http://sec-fsi-pci-dss-backend-web-app:80"
   # This app's own public URL (redirect_uri host + seeder branding).
   PSP_MERCHANT_BASE_URL: "https://sec-fsi-pci-dss-merchant.industrysolutions.prod.corp.mongodb.com"
+  # Browser-facing Swagger UI (/help link) → PUBLIC backend URL (the API base above is in-cluster only).
+  PSP_MERCHANT_SWAGGER_URL: "https://sec-fsi-pci-dss-backend.industrysolutions.prod.corp.mongodb.com/doc"
 
 envSecrets:
   MONGODB_URI: sec-fsi-pci-dss-secrets-prod

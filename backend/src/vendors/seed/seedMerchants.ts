@@ -14,7 +14,13 @@ export async function seedMerchants(db: Db) {
   // URIs stay hardcoded as multi-env arrays. This keeps staging/prod from shipping localhost branding
   // (broken image + https mixed-content). Set PSP_MERCHANT_BASE_URL in the backend env per deploy.
   const merchantBaseUrl = (process.env.PSP_MERCHANT_BASE_URL || 'http://localhost:8082').replace(/\/+$/, '');
-  const raw = fs.readFileSync(filePath, 'utf-8').replaceAll('{{MERCHANT_BASE_URL}}', merchantBaseUrl);
+  // The OIDC logo is rendered on PSP pages (consent + authorized-apps). Serving it from the PSP
+  // FRONTEND origin (same origin as those pages, always browser-reachable) avoids depending on the
+  // merchant host being reachable from wherever the PSP UI runs, so the icon loads in every env.
+  const frontendBaseUrl = (process.env.PSP_URL_FRONTEND || 'http://localhost:8080').replace(/\/+$/, '');
+  const raw = fs.readFileSync(filePath, 'utf-8')
+    .replaceAll('{{FRONTEND_BASE_URL}}', frontendBaseUrl)
+    .replaceAll('{{MERCHANT_BASE_URL}}', merchantBaseUrl);
   const records = JSON.parse(raw);
 
   let upserted = 0;

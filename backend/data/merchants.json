@@ -32,7 +32,7 @@
       "oauthRefreshTokenLifetimeDays": 30,
       "oauthRequirePkce": true,
       "oauthBackchannelTokenDeliveryMode": "poll",
-      "oauthLogoUri": "{{MERCHANT_BASE_URL}}/espresso-logo.svg",
+      "oauthLogoUri": "{{FRONTEND_BASE_URL}}/espresso-logo.svg",
       "oauthClientUri": "{{MERCHANT_BASE_URL}}"
     },
     "merchantWebhooks": [

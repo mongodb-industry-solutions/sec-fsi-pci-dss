@@ -76,6 +76,19 @@ export const ENV = {
   pspLogoutUrl: () =>
     envVar('PSP_MERCHANT_LOGOUT_URL') ??
     (envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8080/auth/authorize').replace('/auth/authorize', '/auth/logout'),
+  // Browser-facing PSP simulator hub (same PSP frontend origin as authorize). Lets the merchant demo
+  // link back to the simulator. Derived from the authorize URL by default.
+  pspSimulatorUrl: () =>
+    envVar('PSP_MERCHANT_SIMULATOR_URL') ??
+    (envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8080/auth/authorize').replace('/auth/authorize', '/simulator'),
+  // Docs links shown in /help. Both must be BROWSER-reachable in every environment.
+  // Wiki: static public GitHub wiki. Swagger: the backend /doc UI — its PUBLIC URL (PSP_MERCHANT_PSP_BASE_URL
+  // is the in-cluster private URL, not browser-reachable), so set PSP_MERCHANT_SWAGGER_URL per deploy;
+  // the local default derives from the (locally public) API base.
+  wikiUrl: () => envVar('PSP_MERCHANT_WIKI_URL') ?? 'https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki',
+  apiDocsUrl: () =>
+    envVar('PSP_MERCHANT_SWAGGER_URL') ??
+    `${envVar('PSP_MERCHANT_PSP_BASE_URL') ?? 'http://localhost:8081'}/doc`,
   // Client credentials have NO built-in default: the merchant must never fabricate a client identity.
   // If unset they resolve to '' and the PSP declines the flow (invalid_client) — enforcement belongs
   // to the authorization server, so an unconfigured merchant cannot authenticate, yet nothing crashes.
