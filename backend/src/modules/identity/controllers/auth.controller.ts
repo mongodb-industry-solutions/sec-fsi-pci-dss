@@ -140,7 +140,7 @@ Password for all demo users: \`demo-password\``,
         properties: {
           email:    { type: 'string', format: 'email', description: 'Login email. Must be unique in the domain.' },
           name:     { type: 'string', description: 'Display name.' },
-          password: { type: 'string', minLength: 4, description: 'Password (min 4 chars).' },
+          password: { type: 'string', minLength: 8, description: 'Password (policy: min 8 chars, at least one letter and one number; enforced server-side).' },
           phone:    { type: 'string', description: 'Optional mobile phone (PII); enables beneficiary lookup.' },
           domain:   { type: 'string', default: 'local', description: 'Target local domain slug.' },
         },

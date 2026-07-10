@@ -267,10 +267,22 @@ export async function resolveSelfRegistrationDomain(db: Db, name: string): Promi
  * the SD-91 account + linked SD-13 party (reuses createUser), then publish a compliance event so the
  * onboarding is auditable (EDA / PCI DSS Req 10). No PII is placed in the event summary.
  */
+// Server-side password policy (mirrors the frontend PasswordFields checklist) so a direct API
+// caller cannot bypass the UI and create a weak account on this public route.
+function assertPasswordPolicy(password: string): void {
+  if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+    throw Object.assign(
+      new Error('Password must be at least 8 characters and include a letter and a number'),
+      { statusCode: 400 },
+    );
+  }
+}
+
 export async function registerSelfServiceUser(
   db: Db,
   input: { name: string; email: string; password: string; phone?: string; domain: string },
 ): Promise<{ status: 'active' | 'pending' }> {
+  assertPasswordPolicy(input.password);
   const { autoApprove } = await resolveSelfRegistrationDomain(db, input.domain);
   const status: 'active' | 'pending' = autoApprove ? 'active' : 'pending';
 

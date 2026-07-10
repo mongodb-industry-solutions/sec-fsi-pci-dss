@@ -19,11 +19,14 @@ import {
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import { verifySignature } from './signatureVerifier';
 import { oauth401, oauthError } from './oauth.service';
+import { jwtSecret } from '../../../vendors/encryption/digest';
 
 const CHALLENGE_TTL_SECONDS = 300; // 5 minutes
 
+// Reuse the shared JWT secret helper so the default + "change in production" messaging stays
+// consistent app-wide (avoids a second hardcoded fallback secret).
 function challengeSecret(): string {
-  return process.env.PSP_JWT_SECRET ?? 'dev-psp-jwt-secret';
+  return jwtSecret();
 }
 
 // Compact stateless challenge: base64url(JSON payload).base64url(HMAC-SHA256(payload)).

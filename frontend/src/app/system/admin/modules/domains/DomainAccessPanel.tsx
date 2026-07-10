@@ -186,7 +186,7 @@ export function DomainAccessPanel({
             {pagedUsers.map((u) => (
               <div key={u.id}
                 onClick={editId === u.id ? undefined : () => router.push(`/system/admin/modules/domains/${domainId}/users/${u.id}`)}
-                onKeyDown={editId === u.id ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/system/admin/modules/domains/${domainId}/users/${u.id}`); } }}
+                onKeyDown={editId === u.id ? undefined : (e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); router.push(`/system/admin/modules/domains/${domainId}/users/${u.id}`); } }}
                 role={editId === u.id ? undefined : 'button'}
                 tabIndex={editId === u.id ? undefined : 0}
                 title={editId === u.id ? undefined : 'Open account details'}
