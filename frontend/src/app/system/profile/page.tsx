@@ -4,7 +4,7 @@ import { api, type ConsentGrant } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { ROLE_LABELS } from '../../../lib/constants';
 import { useDebugMode } from '../../../lib/debugMode';
-import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, User, Layers, Trash2, Copy, Check } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, User, Layers, Trash2, Copy, Check, KeyRound, ChevronRight } from 'lucide-react';
 import { RawMongoPanel } from '../../../components/RawMongoPanel';
 import { SectionHeader } from '../../../components/SectionHeader';
 
@@ -721,6 +721,24 @@ export default function ProfilePage() {
           )}
         </div>
       )}
+
+      {/* Passwordless credentials link (full management at /system/profile/credentials). */}
+      <a href="/system/profile/credentials"
+        className="bg-white rounded-xl border p-5 flex items-center justify-between hover:bg-gray-50 transition-colors">
+        <div className="flex items-center gap-3">
+          <span className="rounded-lg bg-[#00684A]/10 text-[#00684A] flex items-center justify-center shrink-0" style={{ width: 40, height: 40 }}>
+            <KeyRound size={18} />
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="font-semibold text-gray-800 text-sm">Credentials</h2>
+              {debugMode && (<span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-teal-50 text-teal-700 border-teal-200 shrink-0">SD-91/SD-16 · partyEnrolledCredential · CIBA · PCI DSS Req 8</span>)}
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">Security keys for passwordless sign-in. Enroll, rotate and revoke your devices.</p>
+          </div>
+        </div>
+        <ChevronRight size={18} className="text-gray-400 shrink-0" />
+      </a>
 
       {/* Payment-card management lives in its own section: /system/cards (BIAN SD-88). */}
 

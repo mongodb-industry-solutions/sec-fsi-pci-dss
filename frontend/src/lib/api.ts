@@ -182,6 +182,17 @@ export interface ConsentGrant {
   lastUsedAt?: string | null;
 }
 
+// passwordless enrolled credential (WebAuthn-style). Public metadata only; keys never leave the device.
+export interface EnrolledCredential {
+  credentialId: string;
+  partyEnrolledCredentialInstanceReference: string;
+  alg: 'RS256' | 'ES256';
+  deviceName?: string;
+  status: 'active' | 'revoked';
+  createdAt: string;
+  lastUsedAt?: string | null;
+}
+
 // v18 D-01: detail of one authorized app — scopes expanded with human-readable descriptions + branding.
 export interface ConsentGrantScope {
   scope: string;
@@ -199,6 +210,7 @@ export interface ConsentGrantDetail {
   consentStatus: 'active' | 'revoked';
   consentGrantedAt: string;
   lastUsedAt?: string | null;
+  cibaEnabled?: boolean; // client may initiate CIBA (passwordless/backchannel) on the user's behalf
 }
 
 export interface Merchant {
@@ -1313,6 +1325,34 @@ export const api = {
         `/api/v1/auth/grants/${encodeURIComponent(consentId)}/reactivate`,
         { method: 'POST' },
         token,
+      ),
+  },
+
+  // passwordless credential management (SD-91/SD-16). Owner-scoped by the session token.
+  credentials: {
+    list: (token: string) =>
+      apiFetch<{ credentials: EnrolledCredential[] }>(`/api/v1/auth/enroll`, {}, token),
+    // Step 1 of the registration ceremony: get a challenge to sign with the freshly generated key.
+    challenge: (token: string) =>
+      apiFetch<{ challenge: string; expiresIn: number }>(
+        `/api/v1/auth/enroll/challenge`, { method: 'POST', body: '{}' }, token,
+      ),
+    // Step 2: register the public key + signed challenge (proof of possession).
+    register: (
+      body: { challenge: string; publicKeyPem: string; alg: 'RS256' | 'ES256'; signature: string; credentialId?: string; authenticatorMetadata?: { deviceName?: string; createdVia?: string } },
+      token: string,
+    ) => apiFetch<EnrolledCredential>(`/api/v1/auth/enroll`, { method: 'POST', body: JSON.stringify(body) }, token),
+    rotate: (
+      credentialId: string,
+      body: { challenge: string; publicKeyPem: string; alg: 'RS256' | 'ES256'; signature: string; credentialId?: string; authenticatorMetadata?: { deviceName?: string; createdVia?: string } },
+      token: string,
+    ) => apiFetch<EnrolledCredential>(
+      `/api/v1/auth/enroll/${encodeURIComponent(credentialId)}/rotate`,
+      { method: 'POST', body: JSON.stringify(body) }, token,
+    ),
+    revoke: (credentialId: string, token: string) =>
+      apiFetch<{ revoked: boolean; credentialId: string }>(
+        `/api/v1/auth/enroll/${encodeURIComponent(credentialId)}`, { method: 'DELETE' }, token,
       ),
   },
 

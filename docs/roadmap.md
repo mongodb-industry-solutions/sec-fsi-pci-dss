@@ -710,3 +710,41 @@ recurring mandates + scheduler; UI enabled; docs + wiki published. ⏳ Remaining
 `tmp/dev.v17.plan.md`.
 
 *Added 2026-07-04 (v17.1).*
+
+## CIBA + Passwordless Enrollment (SD-91/SD-16)
+
+> Delivered under **development plan v24** (`tmp/dev.v24.plan.md`). Development-plan iteration, not a
+> product release. FR ids carry the `v24` tag for traceability only. Authentication-only; payment
+> authorization via CIBA is deferred pending PSD2 RTS Art.5 dynamic linking.
+
+### Objective
+Add OIDC CIBA (Client-Initiated Backchannel Authentication) + WebAuthn-style passwordless credential
+enrollment to the existing OAuth 2.0/OIDC server. A third-party client starts authentication of a user
+with no browser redirect and no password; the user approves out-of-band by signing a server challenge
+with an enrolled device key. Real software authenticator (browser WebCrypto), no mocks. See
+[technical-spec.md §12](technical-spec.md#12-v24--ciba--passwordless-enrollment-sd-91sd-16).
+
+### FR-v24: Functional Requirements
+
+| ID | Requirement | Acceptance criteria | Status |
+|---|---|---|---|
+| FR-v24-01 | Passwordless enrollment | Session-gated register/list/rotate/revoke of asymmetric credentials; public key only stored; signed challenge proves possession; owner-scoped (never another user's) | ✅ |
+| FR-v24-02 | CIBA bc-authorize | Client-authenticated `POST /bc-authorize` accepts exactly one hint (`login_hint`/`login_hint_token`/`id_token_hint`); >1 → `invalid_request`; unauthorized client → `unauthorized_client`; returns `auth_req_id`/`expires_in`/`interval` | ✅ |
+| FR-v24-03 | Assertion-authenticated approval | `GET :authReqId` returns challenge without a session; approval verifies the signature vs stored public key + owner==hint sub + monotonic signCount; bad/absent signature rejected; no session required (passwordless) | ✅ |
+| FR-v24-04 | CIBA token grant | ciba grant on existing `/token`; poll returns `authorization_pending`/`slow_down`/`expired_token`/`access_denied`; approved → tokens via `issueTokens()`; cross-client redemption + replay → `invalid_grant` | ✅ |
+| FR-v24-05 | Delivery modes | poll (baseline) + ping + push via low-level `deliverWebhook` (Bearer = client_notification_token); ping/push without token → `invalid_request`; non-HTTPS notification endpoint rejected at registration; demo stub receiver | ✅ |
+| FR-v24-06 | Both signing algs | RS256 + ES256 supported (polymorphic verifier; ES256 accepts raw r\|\|s WebCrypto form); discovery advertises both | ✅ |
+| FR-v24-07 | Discovery | `/.well-known/openid-configuration` advertises `backchannel_authentication_endpoint`, delivery modes, signing algs, ciba grant | ✅ |
+| FR-v24-08 | PSP frontend | "Passwordless credentials" section (enroll/rotate/revoke, browser WebCrypto non-extractable + IndexedDB); Authorized Applications shows a "Passwordless (CIBA)" badge and revokes client authorization | ✅ |
+| FR-v24-09 | Setup/seed | `--reset` + reseed reproduces the two collections, indexes, the demo credential and the ciba-enabled client | ✅ |
+
+### Definition of Done — v24
+- [x] Enrollment + CIBA endpoints live under flat `/api/v1/auth/` (token endpoint unchanged, new grant branch).
+- [x] Public keys only stored (PCI Req.3); anti-replay via one-time auth_req_id + monotonic signCount (Req.8); audit via `emitComplianceEvent` (Req.10); HTTPS notification endpoint for ping/push (Req.4).
+- [x] AAL1 stated precisely (real software authenticator + user-presence); AAL2 deferred to platform UV with no contract change; no mock authenticator.
+- [x] PSP frontend credentials section + Authorized-Apps CIBA badge; browser key non-extractable in IndexedDB.
+- [x] setup/seed updated (collections, indexes, demo credential, ciba client); technical-spec §12 + this roadmap updated in the same change.
+- [x] Backend + frontend `tsc --noEmit` clean; signature-verifier unit tests pass (7/7, incl. seed fixture round-trip); CIBA integration tests authored (run with `TEST_MONGODB_URI`).
+- [ ] Follow-ups: downstream v25 merchant-app passwordless UX; AAL2 platform UV; CIBA payment authorization + PSD2 dynamic linking.
+
+*Added 2026-07-09 (v24).*

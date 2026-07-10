@@ -78,7 +78,8 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
 // from the role-specific navigation above (profile + help, available to all roles).
 const ACCOUNT_ITEMS: NavItem[] = [
   { label: 'My Profile',   path: '/system/profile', icon: User },
-  { label: 'Authorized Apps', path: '/system/applications', icon: Layers, tooltip: 'Apps you authorized via OIDC (connected apps); review scopes and revoke access' },
+  { label: 'Applications', path: '/system/applications', icon: Layers, tooltip: 'Apps you authorized via OIDC (connected apps); review scopes and revoke access' },
+  { label: 'Credentials', path: '/system/profile/credentials', icon: KeyRound, tooltip: 'Security keys for passwordless (CIBA) sign-in; enroll, rotate and revoke' },
   { label: 'Help & Guide', path: '/system/help',    icon: HelpCircle },
 ];
 

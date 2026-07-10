@@ -130,6 +130,8 @@ Obtain a token via \`POST /api/v1/auth/login\`.
         { name: 'auth:oauth',   description: 'module:identity · OAuth 2.0 Authorization Server (ADR-031). /api/v1/oauth. Authorization code + PKCE, client credentials, token exchange, consent grants.' },
         { name: 'auth:oidc',    description: 'module:identity · OpenID Connect layer (ADR-031). /api/v1/.well-known · /api/v1/oauth/userinfo · token introspection. Discovery, ID token issuance, UserInfo endpoint.' },
         { name: 'auth:kms',     description: 'module:identity · Key Management Service (ADR-035). /api/v1/keys. DEK provisioning, rotation, and tenant key-set administration (PCI DSS Req 3.6).' },
+        { name: 'auth:enrollment', description: 'module:identity · SD-91/SD-16 passwordless credential enrollment (WebAuthn-style). /api/v1/auth/enroll. Register/list/rotate/revoke public-key authenticators. Session-gated, owner-scoped.' },
+        { name: 'auth:ciba',    description: 'module:identity · OIDC Client-Initiated Backchannel Authentication. /api/v1/auth/bc-authorize + ciba grant on /token. Passwordless, no browser redirect; assertion-authenticated approval.' },
         { name: 'customer',     description: 'module:customer · SD-53 Customer Agreement. /api/v1/customer. QE:equality search on email, phone, account reference.' },
         { name: 'cards',        description: 'module:customer · SD-88 Payment Card. /api/v1/customer/:customerId/cards. Cards as sub-resource of Customer Agreement.' },
         { name: 'transactions', description: 'module:transactions · SD-254 Card Transaction. /api/v1/transactions. QE:equality on account reference. Auto-triggers fraud case.' },

@@ -340,7 +340,8 @@ export type ComplianceProcessType =
   | 'merchant_onboarding'
   | 'customer_onboarding'
   | 'card_management'       // SD-88 stored-card lifecycle (register / remove) — PCI DSS Req 10
-  | 'payment_processing';   // SD-65/SD-36 payout execution + AIS/PISP audit trail (v17)
+  | 'payment_processing'    // SD-65/SD-36 payout execution + AIS/PISP audit trail (v17)
+  | 'authentication';       // SD-91 CIBA + passwordless enrollment audit trail (PCI DSS Req 8/10)
 
 export type ProcessEventOutcome = 'approved' | 'rejected' | 'pending' | 'failed' | 'escalated'
   | 'in_flight' | 'settled' | 'verified' | 'submitted'; // SD-65 payout execution outcomes (v17)

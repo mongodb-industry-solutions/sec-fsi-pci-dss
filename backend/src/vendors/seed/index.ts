@@ -22,6 +22,7 @@ import { seedPayoutAccounts } from './seedPayoutAccounts';
 import { seedPaymentExecutions } from './seedPaymentExecutions';
 import { seedCounterpartyArrangements } from './seedCounterpartyArrangements';
 import { seedBalanceCredits } from './seedBalanceCredits';
+import { seedEnrolledCredentials } from './seedEnrolledCredentials';
 
 // Load .env from project root  -  works regardless of CWD (npm --prefix changes CWD to backend/)
 dotenv.config({ path: resolve(__dirname, '../../../../.env') });
@@ -87,6 +88,9 @@ export async function runSeed() {
 
     console.log('Seeding authenticationDomain...');
     await seedAuthDomains(db);
+
+    console.log('Seeding partyEnrolledCredential (SD-91/SD-16 passwordless)...');
+    await seedEnrolledCredentials(db);
 
     console.log('Seeding customerAgreementProcedure (v2: sensitive fields inline)...');
     await seedCustomers(db);

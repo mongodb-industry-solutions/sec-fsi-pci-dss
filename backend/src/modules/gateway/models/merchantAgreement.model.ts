@@ -136,7 +136,15 @@ export type MerchantRiskCategory = 'low' | 'medium' | 'high';
 export type SettlementSchedule = 'T+1' | 'T+2' | 'T+3';
 
 // v16: OAuth 2.0 client config (BIAN SD-89 BQ:Grant — OAuth Client Authorization, ADR-037)
-export type OAuthGrantType = 'authorization_code' | 'client_credentials' | 'refresh_token';
+// added the CIBA grant (OIDC Client-Initiated Backchannel Authentication). Full URN, spec-faithful.
+export type OAuthGrantType =
+  | 'authorization_code'
+  | 'client_credentials'
+  | 'refresh_token'
+  | 'urn:openid:params:grant-type:ciba';
+
+// CIBA token delivery mode. poll is the mandatory baseline; ping/push add client notification.
+export type OAuthBackchannelDeliveryMode = 'poll' | 'ping' | 'push';
 
 export interface MerchantOAuthClientConfig {
   oauthClientId: string;                          // UUID, assigned by PSP
@@ -155,4 +163,8 @@ export interface MerchantOAuthClientConfig {
   // v18: OIDC client metadata (RFC 7591) for branding on the consent/login page and app listings.
   oauthLogoUri?: string;                           // https URL of the merchant logo/icon (OIDC logo_uri)
   oauthClientUri?: string;                         // https URL of the merchant home page (OIDC client_uri)
+  // CIBA delivery config. Only meaningful when oauthGrantTypes includes the ciba grant.
+  oauthBackchannelTokenDeliveryMode?: OAuthBackchannelDeliveryMode;
+  // HTTPS-only (PCI Req.4 + CIBA spec); required when delivery mode is ping/push. Rejected if non-HTTPS.
+  oauthBackchannelClientNotificationEndpoint?: string;
 }

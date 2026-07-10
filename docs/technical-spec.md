@@ -3659,3 +3659,89 @@ Collection `recurringMandateProcedure` (SD-66). Endpoints:
 - `POST /api/v1/gateway/transfers/mandates/run-due` — scheduler hook: runs all mandates with nextRunAt <= now, each via executeBankTransfer (rail engine + provider dispatch + risk gate), advancing nextRunAt (UTC) and completing at maxRuns.
 
 *Added 2026-07-04 (v17.1).*
+
+## 12. v24 — CIBA + Passwordless Enrollment (SD-91/SD-16)
+
+CIBA (OIDC Client-Initiated Backchannel Authentication, Core 1.0) + WebAuthn-style passwordless
+credential enrollment. Extends the existing OAuth 2.0 / OIDC server in `module: identity`. No browser
+redirect, no password. The user approves out-of-band on an Authentication Device by signing a server
+challenge with an enrolled private key; the server verifies against the stored public key.
+
+### 12.1 Data models (§1 addendum)
+
+`partyEnrolledCredential.model.ts` (SD-91/SD-16 — new, PLAINTEXT: public keys only, no CHD/PII):
+- `partyEnrolledCredentialInstanceReference` (PK), `customerAuthenticationInstanceReference` (owner sub),
+  `credentialId` (unique), `publicKeyPem` (SPKI, public only), `alg` (`RS256`|`ES256`), `signCount`
+  (monotonic anti-replay), `authenticatorMetadata` { deviceName?, aaguid?, transports?, createdVia? },
+  `status` (`active`|`revoked`), `createdAt`, `lastUsedAt?`, `revokedAt?`, BIAN meta + `schemaVersion`.
+
+`partyBackchannelAuthentication.model.ts` (SD-91 — new, TTL-expiring, patterned on partyAuthorizationCode):
+- `authReqId` (PK, unique), `clientId` (BOUND: only this client redeems), `customerAuthenticationInstanceReference`
+  (sub from hint), `scopes`, `challenge` (server nonce), `bindingMessage?`, `deliveryMode`
+  (`poll`|`ping`|`push`), `clientNotificationToken?`, `status`
+  (`pending`|`approved`|`denied`|`expired`|`consumed`), `interval`, `expiresAt` (TTL), `lastPolledAt?`,
+  `credentialIdUsed?`, `signatureVerifiedAt?`, BIAN meta.
+
+`merchantAgreement.model.ts` extend: `OAuthGrantType` += `urn:openid:params:grant-type:ciba`; new type
+`OAuthBackchannelDeliveryMode`; `MerchantOAuthClientConfig` += `oauthBackchannelTokenDeliveryMode?`,
+`oauthBackchannelClientNotificationEndpoint?` (HTTPS-only, required for ping/push).
+
+`externalProviderArrangement.model.ts` extend: `ComplianceProcessType` += `authentication` (CIBA +
+enrollment audit, PCI Req.8/10, timeseries 365d via `emitComplianceEvent`).
+
+### 12.2 Indexes (§5 addendum)
+- `partyEnrolledCredential`: unique `partyEnrolledCredentialInstanceReference`; unique `credentialId`;
+  `{ customerAuthenticationInstanceReference: 1, status: 1 }`.
+- `partyBackchannelAuthentication`: unique `authReqId`; TTL `{ expiresAt: 1 }, expireAfterSeconds: 0`;
+  `{ clientId: 1, status: 1 }`; `{ customerAuthenticationInstanceReference: 1, status: 1 }`.
+
+### 12.3 API contracts (§6 addendum)
+
+Enrollment (tag `auth:enrollment`, SESSION-gated, owner-scoped):
+- `POST /api/v1/auth/enroll/challenge` — issue a stateless HMAC-bound registration challenge.
+- `POST /api/v1/auth/enroll` — register a public key + signed challenge (proof of possession). Returns credential.
+- `GET  /api/v1/auth/enroll` — list the caller's credentials (owner-scoped; never another user's).
+- `POST /api/v1/auth/enroll/:credentialId/rotate` — register replacement, revoke old.
+- `DELETE /api/v1/auth/enroll/:credentialId` — revoke (foreign id 404s).
+
+CIBA (tag `auth:ciba`):
+- `POST /api/v1/auth/bc-authorize` — client-authenticated (client_secret_basic). Body: exactly one of
+  `login_hint`/`login_hint_token`/`id_token_hint`, `scope`, optional `binding_message`/`requested_expiry`;
+  `client_notification_token` required for ping/push. Returns `{ auth_req_id, expires_in, interval }`.
+- `GET  /api/v1/auth/bc-authorize/pending` — SESSION-gated decoupled in-app AD list (owner-scoped).
+- `GET  /api/v1/auth/bc-authorize/:authReqId` — fetch challenge + binding_message + client name (public by
+  reference; approval still needs the signature).
+- `POST /api/v1/auth/bc-authorize/:authReqId/approve` — assertion-authenticated (signature over challenge IS
+  the auth). Verifies signature vs stored public key, owner==hint sub, bumps signCount.
+- `POST /api/v1/auth/bc-authorize/:authReqId/deny` — assertion or owner session (anti-DoS).
+- `POST /api/v1/auth/token` (existing route, new grant branch) — `grant_type=urn:openid:params:grant-type:ciba`,
+  `auth_req_id`. Verifies the client owns the auth_req_id (else `invalid_grant`). Errors:
+  `authorization_pending`, `slow_down`, `expired_token`, `access_denied`, `invalid_grant`. Mints tokens via
+  `issueTokens()`, marks `consumed`.
+- `GET/POST /api/v1/auth/ciba/notify` — DEMO-ONLY ping/push stub receiver (Bearer = client_notification_token),
+  in-memory ring buffer for demo visualisation. Not part of the CIBA protocol; not for production.
+
+Discovery (`/.well-known/openid-configuration`) adds: `backchannel_authentication_endpoint`,
+`backchannel_token_delivery_modes_supported: [poll,ping,push]`, `backchannel_user_code_parameter_supported: false`,
+`backchannel_authentication_request_signing_alg_values_supported: [RS256,ES256]`, and the ciba grant in
+`grant_types_supported`.
+
+Consent detail (`GET /api/v1/auth/grants/:consentId`) adds `cibaEnabled` (client may initiate CIBA).
+
+### 12.4 Seed / setup (source of truth)
+- `createCollections.ts` + `createIndexes.ts`: the two new collections + indexes (plaintext; no new DEK/QE).
+- `data/enrolledCredentials.json` + `seedEnrolledCredentials.ts` (registered in seed `index.ts`): the demo
+  user (Luis) gets one active ES256 credential (public key). The matching private key is a test/demo fixture
+  (`backend/test/fixtures/demoAuthenticatorKey.ts`), never stored server-side.
+- `data/merchants.json`: the Espresso client gains the ciba grant + `oauthBackchannelTokenDeliveryMode: poll`.
+
+### 12.5 Compliance posture
+- PCI DSS v4.0: auth server is in-scope by connectivity. Stores public keys only (Req.3); TLS 1.2+ + HTTPS
+  notification endpoint for ping/push (Req.4); audit via `emitComplianceEvent` -> `complianceProcessEvent`
+  (365d, Req.10); anti-replay via one-time auth_req_id + monotonic signCount (Req.8).
+- NIST SP 800-63B: software authenticator + user-presence = AAL1. AAL2 (platform biometric/PIN UV) is a later
+  upgrade with NO contract change. Do NOT claim AAL2 until UV is enforced.
+- PSD2: authentication-only in v24; payment authorization deferred pending RTS Art.5 dynamic linking.
+- Browser key storage: WebCrypto `extractable:false` + IndexedDB (never localStorage).
+
+*Added 2026-07-09 (v24; doc + code together per repo rules).*

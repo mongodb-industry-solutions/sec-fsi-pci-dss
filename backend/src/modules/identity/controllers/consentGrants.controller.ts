@@ -116,6 +116,7 @@ export async function consentGrantsController(fastify: FastifyInstance) {
             consentStatus: { type: 'string', enum: ['active', 'revoked'] },
             consentGrantedAt: { type: 'string', format: 'date-time' },
             lastUsedAt: { type: 'string', format: 'date-time', nullable: true },
+            cibaEnabled: { type: 'boolean', description: 'this client may initiate CIBA (passwordless) on the user\'s behalf.' },
           },
         },
         401: { $ref: 'Error#' },
