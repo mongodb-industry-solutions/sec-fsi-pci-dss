@@ -1,6 +1,5 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
-import { loginUser, getDemoUsers, getEnabledDomains, resolveSelfRegistrationDomain, updateAuthProfile, bumpSessionEpoch, JwtPayload } from '../services/auth.service';
-import { createUser } from '../services/user.service';
+import { loginUser, getDemoUsers, getEnabledDomains, registerSelfServiceUser, updateAuthProfile, bumpSessionEpoch, JwtPayload } from '../services/auth.service';
 import { getSelfProfile, updateSelfProfile } from '../../customer/services/customerAgreement.service';
 import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../models/party.model';
@@ -162,19 +161,13 @@ Password for all demo users: \`demo-password\``,
     const { email, name, password, phone, domain } = request.body as {
       email: string; name: string; password: string; phone?: string; domain?: string;
     };
-    const domainName = domain ?? 'local';
     try {
-      const { autoApprove } = await resolveSelfRegistrationDomain(fastify.db, domainName);
-      const status = autoApprove ? 'active' : 'pending';
-      await createUser(fastify.db, {
-        email, name, password, phone,
-        domain: domainName,
-        role: 'customer', // enforced: never client-selectable
-        status,
+      const { status } = await registerSelfServiceUser(fastify.db, {
+        email, name, password, phone, domain: domain ?? 'local',
       });
       return reply.status(201).send({
         status,
-        message: autoApprove
+        message: status === 'active'
           ? 'Account created. You can now sign in.'
           : 'Account created and awaiting approval. You can sign in once a manager approves it.',
       });

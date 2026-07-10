@@ -4,6 +4,8 @@ import * as jwt from 'jsonwebtoken';
 import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
 import { AUTHENTICATION_DOMAIN_COLLECTION, AuthenticationDomainRecord } from '../models/authenticationDomain.model';
 import { MERCHANT_AGREEMENT_COLLECTION, MerchantAgreementControlRecord } from '../../gateway/models/merchantAgreement.model';
+import { createUser } from './user.service';
+import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 
 // Deterministic role ordering for the demo roster (login picker + simulator share this order).
 const ROLE_RANK: Record<string, number> = {
@@ -257,4 +259,43 @@ export async function resolveSelfRegistrationDomain(db: Db, name: string): Promi
     && d.partyAuthenticationDomainSelfRegistrationEnabled === true;
   if (!ok) throw Object.assign(new Error('Self-registration is not available for this domain'), { statusCode: 400 });
   return { autoApprove: d.partyAuthenticationDomainSelfRegistrationAutoApprove === true };
+}
+
+/**
+ * Self-service account registration (public). Domain logic lives here (Hexagonal): validate the
+ * domain policy, force the lowest-privilege role, derive status from the auto-approve policy, create
+ * the SD-91 account + linked SD-13 party (reuses createUser), then publish a compliance event so the
+ * onboarding is auditable (EDA / PCI DSS Req 10). No PII is placed in the event summary.
+ */
+export async function registerSelfServiceUser(
+  db: Db,
+  input: { name: string; email: string; password: string; phone?: string; domain: string },
+): Promise<{ status: 'active' | 'pending' }> {
+  const { autoApprove } = await resolveSelfRegistrationDomain(db, input.domain);
+  const status: 'active' | 'pending' = autoApprove ? 'active' : 'pending';
+
+  const user = await createUser(db, {
+    email: input.email,
+    name: input.name,
+    password: input.password,
+    phone: input.phone,
+    domain: input.domain,
+    role: 'customer', // enforced: never client-selectable
+    status,
+  });
+
+  emitComplianceEvent(db, {
+    entityType: 'customer',
+    entityId: user.id,
+    processType: 'authentication',
+    processAction: 'auth.register',
+    processOutcome: autoApprove ? 'approved' : 'pending',
+    performedByPartyReference: user.partyReference ?? user.id,
+    performedByRole: 'customer',
+    eventSummary: { domain: input.domain, selfRegistered: true, autoApprove }, // no PII
+    bianServiceDomain: 'PartyAuthentication',
+    bianControlRecordType: 'CustomerAuthenticationAssessment',
+  });
+
+  return { status };
 }
