@@ -21,7 +21,9 @@ export function passwordPolicyOk(pw: string): boolean {
  * as valid; a non-empty password must still satisfy the policy and match its confirmation.
  */
 export function passwordFieldsValid(pw: string, confirm: string, optional = false): boolean {
-  if (optional && pw.length === 0) return true;
+  // Optional/blank means "no change" only when BOTH fields are empty; a stray confirmation value
+  // must not slip through as valid.
+  if (optional && pw.length === 0) return confirm.length === 0;
   return passwordPolicyOk(pw) && pw === confirm;
 }
 

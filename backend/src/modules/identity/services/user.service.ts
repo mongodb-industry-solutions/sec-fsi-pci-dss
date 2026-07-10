@@ -49,8 +49,11 @@ async function writePartyContact(
   await col.insertOne({
     partyInstanceReference: partyRef,
     partyEmailAddress: (set.partyEmailAddress as string) ?? '',
-    partyMobilePhoneNumber: (set.partyMobilePhoneNumber as string) ?? '',
-    ...(set.partyMobilePhoneNumberDigest ? { partyMobilePhoneNumberDigest: set.partyMobilePhoneNumberDigest as string } : {}),
+    // Omit the phone (and its digest) entirely when none was given, so a phone-less party leaves the
+    // field ABSENT (matches the model + partial unique index) rather than storing an empty string.
+    ...(set.partyMobilePhoneNumber
+      ? { partyMobilePhoneNumber: set.partyMobilePhoneNumber as string, partyMobilePhoneNumberDigest: set.partyMobilePhoneNumberDigest as string }
+      : {}),
     partyName: (set.partyName as string) ?? '',
     partyType: 'customer',
     bianServiceDomain: 'Party Data Management',

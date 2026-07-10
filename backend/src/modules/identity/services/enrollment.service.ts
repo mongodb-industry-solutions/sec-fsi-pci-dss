@@ -183,7 +183,12 @@ export async function rotateCredential(
   credentialId: string,
   input: RegisterCredentialInput,
 ): Promise<EnrolledCredentialView> {
-  // Register the replacement first (validates possession), then revoke the old one.
+  // Verify the credential being rotated exists, is active and belongs to the caller BEFORE creating a
+  // replacement, so a wrong/already-revoked credentialId cannot leave an orphaned new credential.
+  const existing = await db.collection<PartyEnrolledCredentialRecord>(PARTY_ENROLLED_CREDENTIAL_COLLECTION)
+    .findOne({ credentialId, customerAuthenticationInstanceReference: sub, status: 'active' });
+  if (!existing) throw oauthError(404, 'invalid_request', 'Credential not found');
+  // Register the replacement (validates possession), then revoke the old one.
   const replacement = await registerCredential(db, sub, input);
   await revokeCredential(db, sub, credentialId);
   emitEnrollmentEvent(db, sub, 'auth.enrollment.rotated', 'approved', {
