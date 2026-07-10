@@ -1,7 +1,14 @@
 /** @type {import('next').NextConfig} */
 const { version: FRONTEND_VERSION } = require('./package.json');
-// The canonical project version lives in the repo-root package.json.
-const { version: APP_VERSION } = require('../package.json');
+// The canonical project version lives in the repo-root package.json. In Docker (Kaniko) the build
+// context is the frontend/ dir only, so the repo root is not present: fall back to a build-arg env
+// or the frontend version instead of crashing on a missing module.
+let APP_VERSION;
+try {
+    APP_VERSION = require('../package.json').version;
+} catch {
+    APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || FRONTEND_VERSION;
+}
 const nextConfig = {
     env: {
         NEXT_PUBLIC_FRONTEND_VERSION: FRONTEND_VERSION,
