@@ -19,6 +19,17 @@ export interface AuthenticationDomainRecord {
   partyAuthenticationDomainFlowType?: AuthDomainFlowType;
   /** Only enabled domains are surfaced to the UI */
   partyAuthenticationDomainEnabled: boolean;
+  /**
+   * Self-registration (local domains only): when true, the login screen shows a "Register" link
+   * that opens the public account-registration form for this domain. Absent/false = disabled.
+   */
+  partyAuthenticationDomainSelfRegistrationEnabled?: boolean;
+  /**
+   * Auto-approval policy for self-registration: when true, a self-registered account is created
+   * `active` and can log in immediately; when false/absent it is created `pending` and a manager
+   * must approve it. Note: this only gates login access, NOT KYC (a separate process).
+   */
+  partyAuthenticationDomainSelfRegistrationAutoApprove?: boolean;
   /** Optional banner shown in the login UI for this domain (e.g. "not yet active in this build") */
   partyAuthenticationDomainAlertMessage?: string;
   /** Provider-specific configuration (tenant, client ID, scopes, etc.) */

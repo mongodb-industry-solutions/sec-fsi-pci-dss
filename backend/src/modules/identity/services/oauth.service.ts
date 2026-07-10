@@ -452,7 +452,8 @@ interface IssueOptions {
   isClientCredentials?: boolean;
 }
 
-async function issueTokens(
+// Exported for reuse by the CIBA grant, which mints tokens on an approved backchannel request.
+export async function issueTokens(
   db: Db,
   sub: string,
   clientId: string,
@@ -633,6 +634,7 @@ export interface ConsentGrantDetail {
   consentStatus: PartyAuthConsentRecord['consentStatus'];
   consentGrantedAt: Date;
   lastUsedAt?: Date;
+  cibaEnabled?: boolean; // this client may initiate CIBA (passwordless/backchannel) on the user's behalf
 }
 
 export async function getUserConsentGrantDetail(
@@ -650,9 +652,10 @@ export async function getUserConsentGrantDetail(
     .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
     .findOne(
       { 'merchantOAuthClient.oauthClientId': grant.oauthClientId },
-      { projection: { 'merchantOAuthClient.oauthLogoUri': 1, 'merchantOAuthClient.oauthClientUri': 1 } },
+      { projection: { 'merchantOAuthClient.oauthLogoUri': 1, 'merchantOAuthClient.oauthClientUri': 1, 'merchantOAuthClient.oauthGrantTypes': 1 } },
     );
   const cfg = merchant?.merchantOAuthClient;
+  const cibaEnabled = (cfg?.oauthGrantTypes ?? []).includes('urn:openid:params:grant-type:ciba');
 
   return {
     consentId: grant.consentId,
@@ -665,6 +668,7 @@ export async function getUserConsentGrantDetail(
     consentStatus: grant.consentStatus,
     consentGrantedAt: grant.consentGrantedAt,
     lastUsedAt: grant.lastUsedAt,
+    cibaEnabled,
   };
 }
 
@@ -808,10 +812,12 @@ export async function reactivateConsentGrant(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function oauth401(error: string, description: string): Error {
+export function oauth401(error: string, description: string): Error {
   return Object.assign(new Error(description), { statusCode: 401, oauthError: error });
 }
 
-function oauthError(status: number, error: string, description: string): Error {
+export function oauthError(status: number, error: string, description: string): Error {
   return Object.assign(new Error(description), { statusCode: status, oauthError: error });
 }
+
+export interface IssueTokenOptions extends IssueOptions {}

@@ -122,7 +122,8 @@ async function main() {
     const partyId = uuid();
     const email = i < 2 ? demoCustomerEmails[i] : faker.internet.email().toLowerCase();
     const name = i < 2 ? demoCustomerNames[i] : faker.person.fullName();
-    const phone = i < 2 ? demoCustomerPhones[i] : faker.phone.number('+44 7### ######');
+    // faker v10 dropped the format-string overload of phone.number(); build the UK mobile shape explicitly.
+    const phone = i < 2 ? demoCustomerPhones[i] : `+44 7${faker.string.numeric(3)} ${faker.string.numeric(6)}`;
 
     customerPartyIds.push(partyId);
     customerEmails.push(email);

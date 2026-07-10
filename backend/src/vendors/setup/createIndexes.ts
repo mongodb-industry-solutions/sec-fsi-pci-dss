@@ -6,6 +6,8 @@ import { PAYMENT_EXECUTION_COLLECTION } from '../../modules/gateway/models/payme
 import { COUNTERPARTY_COLLECTION } from '../../modules/identity/models/counterpartyArrangement.model';
 import { RECURRING_MANDATE_COLLECTION } from '../../modules/gateway/models/recurringMandate.model';
 import { IDEMPOTENCY_COLLECTION } from '../../modules/gateway/services/idempotency.service';
+import { PARTY_ENROLLED_CREDENTIAL_COLLECTION } from '../../modules/identity/models/partyEnrolledCredential.model';
+import { PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION } from '../../modules/identity/models/partyBackchannelAuthentication.model';
 import { config } from '../../config';
 
 // ── Self-healing index helpers ────────────────────────────────────────────────
@@ -114,7 +116,9 @@ export async function createIndexes(client: MongoClient) {
   // enforced on its blind-index digest — a keyed HMAC stored in plaintext. See digest.ts.
   await ensureIndexes(db, 'party', [
     { key: { partyInstanceReference: 1 }, unique: true },
-    { key: { partyMobilePhoneNumberDigest: 1 }, unique: true },
+    // Partial: phone is optional (self-registered parties may omit it). Only documents that
+    // actually carry a digest participate in the uniqueness constraint.
+    { key: { partyMobilePhoneNumberDigest: 1 }, unique: true, partialFilterExpression: { partyMobilePhoneNumberDigest: { $exists: true } } },
   ]);
 
   // SD-254: Card Transaction Log
@@ -371,6 +375,21 @@ export async function createIndexes(client: MongoClient) {
     { key: { partyAuthenticationInstanceReference: 1, oauthClientId: 1 }, unique: true },
     { key: { partyAuthenticationInstanceReference: 1, consentStatus: 1 } },
     { key: { oauthClientId: 1, consentStatus: 1 } },
+  ]);
+
+  // SD-91/SD-16: PartyEnrolledCredential — unique credentialId, owner+status lookup
+  await ensureIndexes(db, PARTY_ENROLLED_CREDENTIAL_COLLECTION, [
+    { key: { partyEnrolledCredentialInstanceReference: 1 }, unique: true },
+    { key: { credentialId: 1 }, unique: true },
+    { key: { customerAuthenticationInstanceReference: 1, status: 1 } },
+  ]);
+
+  // SD-91: PartyBackchannelAuthentication — unique authReqId, TTL on expiresAt, client+status lookup
+  await ensureIndexes(db, PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION, [
+    { key: { authReqId: 1 }, unique: true },
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
+    { key: { clientId: 1, status: 1 } },
+    { key: { customerAuthenticationInstanceReference: 1, status: 1 } },
   ]);
 
   // merchantWebhookDeliveryLog indexes (ADR-038)

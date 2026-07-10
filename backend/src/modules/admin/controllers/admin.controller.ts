@@ -7,7 +7,7 @@ import * as path from 'path';
 import { reloadDbRuntime } from '../../../plugins/mongodb';
 import { logBuffer, appendLog, writeCount } from '../../../shared/services/logBuffer';
 import { beginSSE } from '../../../shared/services/sse';
-import { resolveTestStrategy, NormalizedTestSummary } from '../services/testRunners';
+import { resolveTestStrategy, resolveTestSequence, aggregateSummaries, NormalizedTestSummary } from '../services/testRunners';
 import { jwtSecret, sha256 } from '../../../vendors/encryption/digest';
 
 // In Docker (compiled dist/), __dirname gains an extra /dist/ level that breaks
@@ -220,8 +220,14 @@ function spawnSSE(
     env?: NodeJS.ProcessEnv;
     /** Called once on process close; a non-null return is emitted as a `summary` event. */
     summarize?: () => NormalizedTestSummary | null;
+    /**
+     * When false, this run is one step of a larger sequence: the `done` event is not
+     * emitted and the response stream is left open for the next step. Defaults to true.
+     */
+    finalize?: boolean;
   } = {},
-): Promise<void> {
+): Promise<number> {
+  const finalize = opts.finalize !== false;
   const sendText = (type: string, text: string) => {
     raw.write(`event: ${type}\ndata: ${JSON.stringify({ text })}\n\n`);
     appendLog(`[${label}] ${text}`);
@@ -246,7 +252,10 @@ function spawnSSE(
     child.stderr.on('data', (chunk: Buffer) => {
       chunk.toString().split('\n').filter(Boolean).forEach((l) => sendText('error', l));
     });
-    child.on('close', (code) => {
+    child.on('close', (code, signal) => {
+      // A process killed by a signal reports code === null; treat that as a failure (non-zero)
+      // so a signalled/aborted run is never reported as success by the SSE stream or aggregate runner.
+      const exitCode = code ?? (signal ? 1 : 0);
       if (opts.summarize) {
         try {
           const summary = opts.summarize();
@@ -255,14 +264,16 @@ function spawnSSE(
           sendText('error', `Could not parse test results: ${(err as Error).message}`);
         }
       }
-      sendText('done', `Process exited with code ${code ?? 0}`);
-      (raw as import('http').ServerResponse).end?.();
-      resolve();
+      if (finalize) {
+        sendText('done', signal ? `Process terminated by signal ${signal}` : `Process exited with code ${exitCode}`);
+        (raw as import('http').ServerResponse).end?.();
+      }
+      resolve(exitCode);
     });
     child.on('error', (err) => {
       sendText('error', `Failed to start: ${err.message}`);
-      (raw as import('http').ServerResponse).end?.();
-      resolve();
+      if (finalize) (raw as import('http').ServerResponse).end?.();
+      resolve(-1);
     });
   });
 }
@@ -358,10 +369,39 @@ export async function adminController(fastify: FastifyInstance) {
     // Single-tool test commands run with their tool's native JSON reporter so the
     // result summary is parsed from structured output, not scraped from log text.
     const strategy = resolveTestStrategy(command, PROJECT_ROOT);
+    // The `test` aggregate runs each suite in turn and combines the parsed results.
+    const sequence = resolveTestSequence(command, PROJECT_ROOT);
 
     beginSSE(reply, request);
 
-    if (strategy) {
+    if (sequence) {
+      const summaries: NormalizedTestSummary[] = [];
+      let anyFail = false;
+      for (const step of sequence) {
+        fs.mkdirSync(path.dirname(step.outputFile), { recursive: true });
+        try { fs.rmSync(step.outputFile, { force: true }); } catch { /* none to remove */ }
+        // Label each step with its own npm script (e.g. npm:test:unit) so streamed lines and
+        // persisted logs identify which suite produced them in the combined run.
+        const stepScript = step.npmArgs[1] ?? command;
+        const code = await spawnSSE(reply.raw, 'npm', step.npmArgs, PROJECT_ROOT, `npm:${stepScript}`, {
+          env: step.env,
+          finalize: false,
+        });
+        if (code !== 0) anyFail = true;
+        try {
+          summaries.push(step.parse(fs.readFileSync(step.outputFile, 'utf-8')));
+        } catch {
+          // Suite crashed before writing its JSON; the exit code already flags failure.
+        }
+      }
+      const agg = aggregateSummaries(summaries);
+      if (summaries.length > 0) {
+        reply.raw.write(`event: summary\ndata: ${JSON.stringify(agg)}\n\n`);
+      }
+      if (agg.failed > 0) anyFail = true;
+      reply.raw.write(`event: done\ndata: ${JSON.stringify({ text: `Process exited with code ${anyFail ? 1 : 0}` })}\n\n`);
+      (reply.raw as import('http').ServerResponse).end?.();
+    } else if (strategy) {
       fs.mkdirSync(path.dirname(strategy.outputFile), { recursive: true });
       // Drop a stale results file so a crash before write can't surface an old summary.
       try { fs.rmSync(strategy.outputFile, { force: true }); } catch { /* none to remove */ }

@@ -30,11 +30,13 @@ export interface PartyControlRecord {
   partyInstanceReference: string;           // PK, UUID
   // QE equality: searched by analysts (email/phone are PII)
   partyEmailAddress: string;
-  partyMobilePhoneNumber: string;
+  // Optional: a self-registered party may omit the phone. When absent, the uniqueness digest
+  // is also absent and the (partial) unique index skips the document. See createIndexes.ts.
+  partyMobilePhoneNumber?: string;
   // Blind index: keyed HMAC of the normalized phone (NOT encrypted). Enforces phone
-  // uniqueness via a plaintext unique index — QE fields cannot have unique indexes.
+  // uniqueness via a plaintext partial unique index — QE fields cannot have unique indexes.
   // Derived from partyMobilePhoneNumber; never set by clients directly. See digest.ts.
-  partyMobilePhoneNumberDigest: string;
+  partyMobilePhoneNumberDigest?: string;
   // Plaintext display fields
   partyName: string;
   partyType: PartyType;

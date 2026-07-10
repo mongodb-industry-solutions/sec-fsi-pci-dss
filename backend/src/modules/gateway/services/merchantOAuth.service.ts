@@ -10,6 +10,7 @@ import {
   MerchantAgreementControlRecord,
   MerchantOAuthClientConfig,
   OAuthGrantType,
+  OAuthBackchannelDeliveryMode,
 } from '../models/merchantAgreement.model';
 
 // ── Scope Catalog (v18 E-01) ────────────────────────────────────────────────
@@ -157,6 +158,10 @@ export interface UpdateMerchantOAuthClientInput {
   claim_mapping?: Record<string, string>;
   logo_uri?: string;    // v18: OIDC client logo_uri (https)
   client_uri?: string;  // v18: OIDC client_uri home page (https)
+  // CIBA delivery config. Notification endpoint must be HTTPS (PCI Req.4 + CIBA spec); required
+  // when the delivery mode is ping/push.
+  backchannel_token_delivery_mode?: OAuthBackchannelDeliveryMode;
+  backchannel_client_notification_endpoint?: string;
   // Full credential management from the admin UI. Changing client_id ROTATES the client identity:
   // existing access tokens (aud) and consent grants that reference the old id are orphaned and the
   // relying party's configured client_id must be updated too. Setting client_secret re-hashes it.
@@ -200,6 +205,21 @@ export async function updateMerchantOAuthClient(
 
   assertHttpsOrEmpty(patch.logo_uri, 'logo_uri');
   assertHttpsOrEmpty(patch.client_uri, 'client_uri');
+
+  // CIBA: resolve the effective delivery mode + notification endpoint (patch overlaid on existing),
+  // then enforce HTTPS + presence for ping/push (PCI Req.4 + CIBA spec).
+  const effectiveGrants = patch.grant_types ?? merchant.merchantOAuthClient.oauthGrantTypes;
+  const effectiveDeliveryMode = patch.backchannel_token_delivery_mode
+    ?? merchant.merchantOAuthClient.oauthBackchannelTokenDeliveryMode;
+  const effectiveNotifyEndpoint = patch.backchannel_client_notification_endpoint
+    ?? merchant.merchantOAuthClient.oauthBackchannelClientNotificationEndpoint;
+  if (effectiveGrants.includes('urn:openid:params:grant-type:ciba')
+    && (effectiveDeliveryMode === 'ping' || effectiveDeliveryMode === 'push')) {
+    if (!effectiveNotifyEndpoint) {
+      throw Object.assign(new Error('backchannel_client_notification_endpoint is required for ping/push delivery'), { statusCode: 400 });
+    }
+    assertHttpsOrEmpty(effectiveNotifyEndpoint, 'backchannel_client_notification_endpoint');
+  }
 
   // Credential rotation from the admin UI.
   let credentialPatch: Partial<MerchantOAuthClientConfig> = {};
@@ -246,6 +266,8 @@ export async function updateMerchantOAuthClient(
     ...(patch.token_lifetime_seconds !== undefined && { oauthTokenLifetimeSeconds: patch.token_lifetime_seconds }),
     ...(patch.refresh_token_lifetime_days !== undefined && { oauthRefreshTokenLifetimeDays: patch.refresh_token_lifetime_days }),
     ...(patch.claim_mapping !== undefined && { oauthClaimMapping: patch.claim_mapping }),
+    ...(patch.backchannel_token_delivery_mode !== undefined && { oauthBackchannelTokenDeliveryMode: patch.backchannel_token_delivery_mode }),
+    ...(patch.backchannel_client_notification_endpoint !== undefined && { oauthBackchannelClientNotificationEndpoint: patch.backchannel_client_notification_endpoint }),
   };
 
   await col.updateOne(

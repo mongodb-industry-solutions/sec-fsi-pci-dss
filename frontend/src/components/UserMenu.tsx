@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Bug, ChevronDown, HelpCircle, Layers, LogOut, UserCircle2 } from 'lucide-react';
+import { Bug, ChevronDown, HelpCircle, KeyRound, Layers, LogOut, UserCircle2 } from 'lucide-react';
 import { ROLE_LABELS } from '../lib/constants';
 import { useDebugMode } from '../lib/debugMode';
 import { decodeToken } from '../lib/auth';
@@ -143,7 +143,17 @@ export function UserMenu({ user, onSignOut }: UserMenuProps) {
               className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-white/8 hover:text-white transition-colors"
             >
               <Layers size={15} className="text-gray-400 shrink-0" />
-              <span>Authorized Apps</span>
+              <span>Applications</span>
+            </Link>
+
+            <Link
+              href="/system/profile/credentials"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-white/8 hover:text-white transition-colors"
+            >
+              <KeyRound size={15} className="text-gray-400 shrink-0" />
+              <span>Credentials</span>
             </Link>
 
             <Link

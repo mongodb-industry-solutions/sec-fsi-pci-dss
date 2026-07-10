@@ -32,25 +32,23 @@ export default async function BeneficiariesPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between gap-3">
+      <div className="mb-6 flex items-start justify-between gap-3">
         <h1 className="flex items-center gap-2 text-2xl font-bold">
           <Users className="h-6 w-6 text-leaf-deep" aria-hidden /> Beneficiaries
           <InfoHint label="People and accounts you can pay. Identifiers are masked, so the merchant never sees them in clear." />
         </h1>
-        {hasScope(session, 'write:transfers') && (
-          <Tip label="Send a bank transfer to a beneficiary.">
-            <Link href="/transfers" className="btn-primary text-sm">
-              <Send className="h-4 w-4" aria-hidden /> Send money
-            </Link>
-          </Tip>
-        )}
-      </div>
-
-      {hasScope(session, 'write:beneficiaries') && (
-        <div className="mb-4">
-          <BeneficiaryAdd />
+        {/* Primary actions aligned on one row. */}
+        <div className="flex items-center gap-2">
+          {hasScope(session, 'write:beneficiaries') && <BeneficiaryAdd />}
+          {hasScope(session, 'write:transfers') && (
+            <Tip label="Send a bank transfer to a beneficiary.">
+              <Link href="/transfers" className="btn-primary text-sm">
+                <Send className="h-4 w-4" aria-hidden /> Send money
+              </Link>
+            </Tip>
+          )}
         </div>
-      )}
+      </div>
 
       {error ? (
         <PspUnavailable message={error} />

@@ -290,6 +290,15 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
           )}
         </form>
 
+        {currentDomain?.selfRegistration && (
+          <p className="mt-3 text-xs text-gray-500 text-center">
+            Don&apos;t have an account?{' '}
+            <Link href={`/auth/register?domain=${encodeURIComponent(selectedDomain)}`} className="font-semibold text-[#001E2B] hover:text-[#00684A] underline">
+              Register
+            </Link>
+          </p>
+        )}
+
         <p className="mt-4 text-xs text-gray-400 text-center">
           {isLocalDomain && debugMode ? 'Select a user to auto-fill credentials. All local demo accounts share the same demo password.'
             : isLocalDomain ? 'Enter your credentials to sign in.'

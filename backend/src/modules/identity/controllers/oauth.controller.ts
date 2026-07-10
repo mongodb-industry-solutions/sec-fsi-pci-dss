@@ -16,6 +16,7 @@ import {
   applyUserScopeSelection,
   getPriorConsentScopes,
 } from '../services/oauth.service';
+import { redeemCibaGrant } from '../services/ciba.service';
 
 function parseBasicAuth(header: string | undefined): { id: string; secret: string } | null {
   if (!header?.startsWith('Basic ')) return null;
@@ -191,6 +192,15 @@ export async function oauthController(fastify: FastifyInstance) {
         // Confidential clients must re-authenticate to rotate tokens (previously the secret was optional).
         await resolveOAuthClient(db(), clientId, clientSecret || undefined, { requireClientAuthentication: true });
         result = await refreshAccessToken(db(), clientId, body.refresh_token);
+
+      } else if (grantType === 'urn:openid:params:grant-type:ciba') {
+        // CIBA: redeem an approved backchannel request. The client must re-authenticate and
+        // redeemCibaGrant additionally verifies this client OWNS the auth_req_id (rejects cross-client).
+        if (!body.auth_req_id) {
+          return reply.status(400).send({ error: 'invalid_request', error_description: 'auth_req_id required' });
+        }
+        await resolveOAuthClient(db(), clientId, clientSecret || undefined, { requireClientAuthentication: true });
+        result = await redeemCibaGrant(db(), clientId, body.auth_req_id);
 
       } else {
         return reply.status(400).send({ error: 'unsupported_grant_type', error_description: `grant_type '${grantType}' not supported` });

@@ -1,8 +1,11 @@
 /** @type {import('next').NextConfig} */
 const { version: FRONTEND_VERSION } = require('./package.json');
+// The canonical project version lives in the repo-root package.json.
+const { version: APP_VERSION } = require('../package.json');
 const nextConfig = {
     env: {
         NEXT_PUBLIC_FRONTEND_VERSION: FRONTEND_VERSION,
+        NEXT_PUBLIC_APP_VERSION: APP_VERSION,
     },
     allowedDevOrigins: ['127.0.0.1', 'localhost'],
     async rewrites() {

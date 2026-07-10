@@ -203,6 +203,12 @@ export default function AuthorizedApplicationDetailPage() {
               <span className={`px-2 py-0.5 rounded font-medium ${status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
                 {status === 'active' ? 'Active' : 'Revoked'}
               </span>
+              {detail.cibaEnabled && (
+                <span title="This app can initiate passwordless (CIBA) sign-in on your behalf. Revoking access here removes that authorization."
+                  className="px-2 py-0.5 rounded font-medium bg-teal-50 text-teal-700 border border-teal-200">
+                  Passwordless (CIBA)
+                </span>
+              )}
               <span className="text-gray-500">Approved {new Date(detail.consentGrantedAt).toLocaleString()}</span>
               {detail.lastUsedAt && <span className="text-gray-400">· Last used {new Date(detail.lastUsedAt).toLocaleString()}</span>}
             </div>

@@ -18,7 +18,7 @@ export type LogEntry = { type: 'log' | 'error' | 'start' | 'done'; text: string 
  * so the frontend renders it directly instead of parsing log text.
  */
 export interface TestSummary {
-  tool: 'vitest' | 'playwright';
+  tool: 'vitest' | 'playwright' | 'all';
   total: number;
   passed: number;
   failed: number;
