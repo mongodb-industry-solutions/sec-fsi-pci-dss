@@ -2,10 +2,11 @@
 import Link from 'next/link';
 import {
   KeyRound, ShieldCheck, Database, Zap, Store, ServerCog, Link2, CreditCard, Repeat, UserCheck,
-  Percent, Lock, Search, ArrowRight, LifeBuoy,
+  Percent, Lock, Search, ArrowRight, LifeBuoy, BookOpen, FileCode, ExternalLink,
 } from 'lucide-react';
 import { Chip } from '@/components/ui/Bits';
 import { Tip } from '@/components/ui/Tooltip';
+import { ENV } from '@/lib/env';
 
 function Card({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
@@ -20,6 +21,8 @@ function Card({ icon, title, children }: { icon: React.ReactNode; title: string;
 }
 
 export default function HelpPage() {
+  const wikiUrl = ENV.wikiUrl();
+  const apiDocsUrl = ENV.apiDocsUrl();
   return (
     <div className="space-y-10">
       <header>
@@ -123,6 +126,29 @@ export default function HelpPage() {
             A brand-new external app like this one talks to the PSP with standard OAuth + REST, so the whole storefront is
             a thin, database-free client.
           </Card>
+        </div>
+      </section>
+
+      {/* Documentation & references */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">Documentation &amp; references</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <a href={wikiUrl} target="_blank" rel="noopener noreferrer"
+            className="glass rounded-2xl p-5 transition duration-200 hover:-translate-y-0.5 hover:border-leaf/40 block">
+            <div className="flex items-center gap-2">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-leaf/10 text-leaf-deep ring-1 ring-leaf/20"><BookOpen className="h-5 w-5" aria-hidden /></span>
+              <h3 className="font-semibold text-ink flex items-center gap-1.5">Wiki <ExternalLink className="h-3.5 w-3.5 text-muted" aria-hidden /></h3>
+            </div>
+            <p className="mt-3 text-sm text-muted">Architecture, BIAN mapping, datasets and end-user guides for the whole demo.</p>
+          </a>
+          <a href={apiDocsUrl} target="_blank" rel="noopener noreferrer"
+            className="glass rounded-2xl p-5 transition duration-200 hover:-translate-y-0.5 hover:border-leaf/40 block">
+            <div className="flex items-center gap-2">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-leaf/10 text-leaf-deep ring-1 ring-leaf/20"><FileCode className="h-5 w-5" aria-hidden /></span>
+              <h3 className="font-semibold text-ink flex items-center gap-1.5">API (Swagger) <ExternalLink className="h-3.5 w-3.5 text-muted" aria-hidden /></h3>
+            </div>
+            <p className="mt-3 text-sm text-muted">Interactive OpenAPI docs for the Leafy Pay PSP API this storefront integrates with.</p>
+          </a>
         </div>
       </section>
 

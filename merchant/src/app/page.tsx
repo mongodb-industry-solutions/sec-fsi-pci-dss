@@ -1,8 +1,9 @@
 // Landing (C-12). SSO login, or the logged-in user (verified via PSP userinfo) + granted scopes.
 import Link from 'next/link';
-import { ArrowRight, BadgeCheck, LogIn, RefreshCw, ShieldCheck, ShoppingBag, TriangleAlert } from 'lucide-react';
+import { ArrowRight, BadgeCheck, LogIn, RefreshCw, ShieldCheck, ShoppingBag, TriangleAlert, Clapperboard, CreditCard, Search, Lock } from 'lucide-react';
 import { PspClient } from '@/lib/PspClient';
 import { getSession } from '@/lib/session';
+import { ENV } from '@/lib/env';
 import { Chip } from '@/components/ui/Bits';
 import { Tip } from '@/components/ui/Tooltip';
 
@@ -37,6 +38,7 @@ const AUTH_ERROR_INFO: Record<string, { title: string; hint: string }> = {
 export default async function Home({ searchParams }: { searchParams: Promise<{ auth_error?: string }> }) {
   const { auth_error } = await searchParams;
   const session = await getSession();
+  const simulatorUrl = ENV.pspSimulatorUrl();
 
   // Confirm the session against the PSP userinfo endpoint (openid scope).
   let displayName = session?.name ?? session?.email ?? session?.sub;
@@ -100,6 +102,44 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
             </a>
           </Tip>
         )}
+      </section>
+
+      {/* Marketing: what the Leafy Pay PSP offers, with a CTA into the full demo simulator. */}
+      <section className="glass rounded-2xl p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 font-semibold text-ink">
+              <Clapperboard className="h-5 w-5 text-leaf-deep" aria-hidden /> One PSP, the whole payment story
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-muted">
+              Espresso Works is just one way in. Behind it, <b>Leafy Pay</b> powers the end-to-end PCI DSS journey on a
+              single MongoDB data layer, from checkout to investigation, with sensitive data encrypted yet still searchable.
+            </p>
+          </div>
+          <a
+            href={simulatorUrl}
+            className="btn-primary shrink-0 text-sm"
+          >
+            <Clapperboard className="h-4 w-4" aria-hidden /> Go to the demo simulator <ArrowRight className="h-4 w-4" aria-hidden />
+          </a>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-line bg-surface-alt p-4">
+            <CreditCard className="h-5 w-5 text-leaf-deep" aria-hidden />
+            <p className="mt-2 text-sm font-semibold text-ink">Pay any way</p>
+            <p className="text-xs text-muted">API card, redirection, payment link and in-site, one flow per method.</p>
+          </div>
+          <div className="rounded-xl border border-line bg-surface-alt p-4">
+            <Search className="h-5 w-5 text-leaf-deep" aria-hidden />
+            <p className="mt-2 text-sm font-semibold text-ink">Investigate fraud</p>
+            <p className="text-xs text-muted">Search cases, transactions and masked PII from one analyst dashboard.</p>
+          </div>
+          <div className="rounded-xl border border-line bg-surface-alt p-4">
+            <Lock className="h-5 w-5 text-leaf-deep" aria-hidden />
+            <p className="mt-2 text-sm font-semibold text-ink">Encrypted &amp; queryable</p>
+            <p className="text-xs text-muted">Queryable Encryption keeps PAN/IBAN private yet searchable at rest.</p>
+          </div>
+        </div>
       </section>
 
       {session && (
