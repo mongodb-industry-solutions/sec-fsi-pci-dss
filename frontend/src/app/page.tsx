@@ -69,7 +69,7 @@ export default function LandingPage() {
         </div>
 
         <p className="mt-3 text-gray-600 text-xs">
-          v1 · Security Foundation · MongoDB Atlas · QE equality search · Local KMS fallback
+          v{process.env.NEXT_PUBLIC_APP_VERSION} · Security Foundation · MongoDB Atlas · QE equality search · KMS fallback
         </p>
         <Link
           href="/admin"

@@ -1,6 +1,6 @@
 {
   "name": "fsi-pci-dss-frontend",
-  "version": "1.0.23",
+  "version": "1.0.24",
   "private": true,
   "scripts": {
     "dev": "next dev -p 8080",
