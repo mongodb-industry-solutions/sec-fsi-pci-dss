@@ -16,7 +16,7 @@ export interface EnrolledCredentialAuthenticatorMetadata {
 }
 
 export interface PartyEnrolledCredentialRecord {
-  partyEnrolledCredentialInstanceReference: string; // PK, deterministic
+  partyEnrolledCredentialInstanceReference: string; // PK, random UUID (uuidv4) assigned at enrollment
   // Owner. The SD-91 login id (customerAuthenticationInstanceReference), i.e. the OAuth `sub`.
   customerAuthenticationInstanceReference: string;
   credentialId: string;             // opaque, unique per credential

@@ -25,12 +25,15 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
+// Each helper closes its IndexedDB connection once the transaction settles, so repeated
+// enroll/rotate/sign operations don't accumulate open connections (notably on Safari, where
+// leaked connections can block upgrades / fail transactions).
 function idbPut(key: string, value: CryptoKey): Promise<void> {
   return openDb().then((db) => new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).put(value, key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
   }));
 }
 
@@ -38,8 +41,8 @@ function idbGet(key: string): Promise<CryptoKey | undefined> {
   return openDb().then((db) => new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readonly');
     const req = tx.objectStore(STORE).get(key);
-    req.onsuccess = () => resolve(req.result as CryptoKey | undefined);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => { db.close(); resolve(req.result as CryptoKey | undefined); };
+    req.onerror = () => { db.close(); reject(req.error); };
   }));
 }
 
@@ -47,8 +50,8 @@ function idbDelete(key: string): Promise<void> {
   return openDb().then((db) => new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).delete(key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
   }));
 }
 
