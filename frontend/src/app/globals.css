@@ -1,6 +1,25 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* Tailwind v4 reads theme tokens from CSS. These expose the MongoDB brand palette
+   as utilities (e.g. bg-mongodb-green) and CSS variables (--color-mongodb-green). */
+@theme {
+  --color-mongodb-green: #00ED64;
+  --color-mongodb-dark: #001E2B;
+  --color-mongodb-gray: #3D4F58;
+}
+
+/* Tailwind v4 changed the default border/divide color from gray-200 to
+   currentColor. This restores the v3 default so bare `border` utilities keep
+   their soft light-gray line instead of rendering as hard dark borders. */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
 
 :root {
   --mongodb-green: #00ED64;
