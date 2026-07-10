@@ -47,37 +47,40 @@ export function PasswordFields({
   const matches = password.length > 0 && password === confirm;
 
   return (
-    <div className="space-y-2">
-      <div>
-        <label htmlFor={`${idPrefix}-pw`} className="block text-xs text-gray-500 mb-1">
-          {label}{optional && <span className="text-gray-400"> (optional)</span>}
-        </label>
-        <div className="relative">
-          <input
-            id={`${idPrefix}-pw`}
-            type={show ? 'text' : 'password'}
-            value={password}
-            onChange={(e) => onPasswordChange(e.target.value)}
-            placeholder={optional ? 'Leave blank to keep current' : 'Enter a password'}
-            className={`${inputCls} pr-9`}
-          />
-          <button type="button" onClick={() => setShow((v) => !v)} title={show ? 'Hide' : 'Show'}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-            {show ? <EyeOff size={15} /> : <Eye size={15} />}
-          </button>
+    <div className="space-y-2 @container">
+      {/* Password + confirm sit side by side when the container is wide enough, stacked otherwise. */}
+      <div className="grid grid-cols-1 @md:grid-cols-2 gap-3">
+        <div>
+          <label htmlFor={`${idPrefix}-pw`} className="block text-xs text-gray-500 mb-1">
+            {label}{optional && <span className="text-gray-400"> (optional)</span>}
+          </label>
+          <div className="relative">
+            <input
+              id={`${idPrefix}-pw`}
+              type={show ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => onPasswordChange(e.target.value)}
+              placeholder={optional ? 'Leave blank to keep current' : 'Enter a password'}
+              className={`${inputCls} pr-9`}
+            />
+            <button type="button" onClick={() => setShow((v) => !v)} title={show ? 'Hide' : 'Show'}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              {show ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div>
-        <label htmlFor={`${idPrefix}-confirm`} className="block text-xs text-gray-500 mb-1">Repeat {label.toLowerCase()}</label>
-        <input
-          id={`${idPrefix}-confirm`}
-          type={show ? 'text' : 'password'}
-          value={confirm}
-          onChange={(e) => onConfirmChange(e.target.value)}
-          placeholder="Re-enter to confirm"
-          className={inputCls}
-        />
+        <div>
+          <label htmlFor={`${idPrefix}-confirm`} className="block text-xs text-gray-500 mb-1">Repeat {label.toLowerCase()}</label>
+          <input
+            id={`${idPrefix}-confirm`}
+            type={show ? 'text' : 'password'}
+            value={confirm}
+            onChange={(e) => onConfirmChange(e.target.value)}
+            placeholder="Re-enter to confirm"
+            className={inputCls}
+          />
+        </div>
       </div>
 
       {showChecklist && (

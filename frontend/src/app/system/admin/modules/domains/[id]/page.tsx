@@ -133,7 +133,7 @@ function DomainDetail() {
               <button onClick={() => setEditing(false)} className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border text-gray-500 hover:bg-gray-50"><X size={14} /> Cancel</button>
             </div>
           ) : (
-            <button onClick={startEdit} className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"><Pencil size={13} /> Edit</button>
+            <button onClick={startEdit} className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"><Pencil size={13} /> Edit</button>
           )}
         </div>
 

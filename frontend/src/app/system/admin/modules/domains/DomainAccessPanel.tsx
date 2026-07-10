@@ -54,6 +54,7 @@ export function DomainAccessPanel({
   // Standard list controls (search + role filter + pagination)
   const [userQuery, setUserQuery] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('');
+  const [userStatusFilter, setUserStatusFilter] = useState('');
   const [userPage, setUserPage] = useState(1);
 
   const loadUsers = useCallback(async () => {
@@ -139,6 +140,7 @@ export function DomainAccessPanel({
   // Standard filter + search + pagination over the loaded users (PII-minimized list).
   const filteredUsers = users.filter((u) => {
     if (userRoleFilter && u.role !== userRoleFilter) return false;
+    if (userStatusFilter && u.status !== userStatusFilter) return false;
     const q = userQuery.trim().toLowerCase();
     if (!q) return true;
     return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.role.toLowerCase().includes(q);
@@ -166,6 +168,13 @@ export function DomainAccessPanel({
             className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm bg-white">
             <option value="">All roles</option>
             {roleOptions.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
+          </select>
+          <select value={userStatusFilter} onChange={(e) => { setUserStatusFilter(e.target.value); setUserPage(1); }}
+            className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm bg-white">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="suspended">Suspended</option>
           </select>
         </div>
 
@@ -255,7 +264,7 @@ export function DomainAccessPanel({
             <input value={newUser.phone} onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })} placeholder="phone (optional)"
               className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm" />
           </div>
-          <div className="max-w-sm">
+          <div className="max-w-xl">
             <PasswordFields
               optional label="Password" idPrefix="newuser"
               password={newUser.password} confirm={newConfirm}
@@ -265,7 +274,7 @@ export function DomainAccessPanel({
             <p className="text-[10px] text-gray-400 mt-1">Leave blank to use the default demo password.</p>
           </div>
           <button onClick={addUser} disabled={busy === 'new' || !passwordFieldsValid(newUser.password, newConfirm, true)}
-            className="inline-flex items-center gap-1.5 bg-[#001E2B] text-white text-sm px-3 py-1.5 rounded-lg disabled:opacity-50">
+            className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[#001E2B]">
             <Plus size={14} /> Add
           </button>
         </div>

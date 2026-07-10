@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { UserCog, Save, Trash2, Lock, Eye, EyeOff, Power } from 'lucide-react';
+import { UserCog, Save, Trash2, Lock, Eye, EyeOff, Power, KeyRound } from 'lucide-react';
 import { api, type ManagedUserDTO, type RoleRecordDTO } from '../../../../../../../../lib/api';
 import { getToken } from '../../../../../../../../lib/auth';
 import { SectionHeader } from '../../../../../../../../components/SectionHeader';
@@ -201,9 +201,14 @@ function UserDetail() {
               <option value="pending">pending</option>
             </select>
           </div>
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-2 border-t border-gray-100 pt-4">
+            <div className="flex items-center gap-1.5 mb-1">
+              <KeyRound size={13} className="text-gray-500" />
+              <h3 className="text-xs font-semibold text-gray-700">Set a new password</h3>
+            </div>
+            <p className="text-[11px] text-gray-400 mb-2">As an administrator you can set a new password directly, without knowing the current one. Leave blank to keep it unchanged.</p>
             <PasswordFields
-              optional label="Reset password" idPrefix="reset"
+              optional label="New password" idPrefix="reset"
               password={draft.password} confirm={confirmPw}
               onPasswordChange={(v) => setDraft({ ...draft, password: v })}
               onConfirmChange={setConfirmPw}
