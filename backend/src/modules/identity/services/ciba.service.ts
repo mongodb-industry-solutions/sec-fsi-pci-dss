@@ -349,13 +349,16 @@ export async function redeemCibaGrant(db: Db, clientId: string, authReqId: strin
     throw oauthError(400, 'authorization_pending', 'The user has not yet approved the request');
   }
 
-  // status === 'approved': mint tokens and consume the request.
+  // status === 'approved': atomically claim the request (approved -> consumed) BEFORE minting so
+  // concurrent /token polls cannot each mint a token set from a single auth_req_id. Only the poll
+  // that wins the transition issues tokens; the rest see it already redeemed.
+  const claim = await col.updateOne({ authReqId, status: 'approved' }, { $set: { status: 'consumed' } });
+  if (claim.matchedCount === 0) throw oauthError(400, 'invalid_grant', 'auth_req_id already redeemed');
   const client = await resolveOAuthClient(db, clientId);
   const tokens = await issueTokens(db, req.customerAuthenticationInstanceReference, clientId, req.scopes, CIBA_GRANT, {
     tokenLifetimeSeconds: client.tokenLifetimeSeconds,
     refreshTokenLifetimeDays: client.refreshTokenLifetimeDays,
   });
-  await col.updateOne({ authReqId, status: 'approved' }, { $set: { status: 'consumed' } });
   emitCibaEvent(db, req.customerAuthenticationInstanceReference, clientId, 'auth.ciba.token_issued', 'approved', { authReqId, scopes: req.scopes });
   return tokens;
 }
@@ -374,13 +377,16 @@ export async function deliverBackchannelNotification(
   const data: Record<string, unknown> = { auth_req_id: req.authReqId };
   if (req.deliveryMode === 'push') {
     // push carries the tokens in the (TLS) notification body. Recommend poll/ping over push.
+    // Claim the request (approved -> consumed) BEFORE minting, same race guard as redeemCibaGrant:
+    // if a concurrent /token poll already consumed it, skip so we never mint a second token set.
+    const claim = await db.collection<PartyBackchannelAuthenticationRecord>(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION)
+      .updateOne({ authReqId: req.authReqId, status: 'approved' }, { $set: { status: 'consumed' } });
+    if (claim.matchedCount === 0) return;
     const client = await resolveOAuthClient(db, req.clientId);
     const tokens = await issueTokens(db, req.customerAuthenticationInstanceReference, req.clientId, req.scopes, CIBA_GRANT, {
       tokenLifetimeSeconds: client.tokenLifetimeSeconds,
       refreshTokenLifetimeDays: client.refreshTokenLifetimeDays,
     });
-    await db.collection<PartyBackchannelAuthenticationRecord>(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION)
-      .updateOne({ authReqId: req.authReqId, status: 'approved' }, { $set: { status: 'consumed' } });
     Object.assign(data, tokens);
   }
 

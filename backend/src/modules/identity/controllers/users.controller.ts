@@ -13,7 +13,7 @@ const UserObject = {
     name:   { type: 'string',  description: 'Display name.' },
     role:   { type: 'string',  description: 'Assigned RBAC role name (e.g. level1_analyst, manager).' },
     domain: { type: 'string',  description: 'Authentication domain the user belongs to.' },
-    status: { type: 'string',  enum: ['active', 'suspended'], description: 'Account status.' },
+    status: { type: 'string',  enum: ['active', 'suspended', 'pending'], description: 'Account status. `pending` = self-registered, awaiting manager approval.' },
   },
 };
 
@@ -100,7 +100,7 @@ export async function usersController(fastify: FastifyInstance) {
   });
 
   // POST /api/v1/users
-  fastify.post<{ Body: { email: string; name: string; role: string; domain?: string; password?: string; status?: 'active' | 'suspended' } }>('/', {
+  fastify.post<{ Body: { email: string; name: string; role: string; domain?: string; password?: string; status?: 'active' | 'suspended'; phone?: string } }>('/', {
     preHandler: canManage,
     schema: {
       tags,
@@ -120,6 +120,7 @@ export async function usersController(fastify: FastifyInstance) {
           domain:   { type: 'string', description: 'Target authentication domain. Defaults to the default local domain.' },
           password: { type: 'string', description: 'Initial password. Defaults to `demo1234` if shorter than 4 characters.' },
           status:   { type: 'string', enum: ['active', 'suspended'], description: 'Initial account status. Defaults to `active`.' },
+          phone:    { type: 'string', description: 'Optional mobile phone (party SD-13, PII). Must be unique across parties.' },
         },
       },
       response: {
@@ -135,11 +136,12 @@ export async function usersController(fastify: FastifyInstance) {
       const user = await createUser(fastify.db, {
         email: b.email, name: b.name, role: b.role, domain: b.domain,
         password: b.password && b.password.length >= 4 ? b.password : 'demo1234',
-        status: b.status,
+        status: b.status, phone: b.phone,
       });
       return reply.status(201).send(user);
     } catch (err) {
-      return reply.status(409).send({ error: (err as Error).message });
+      const e = err as { statusCode?: number; message: string };
+      return reply.status(e.statusCode === 409 ? 409 : 400).send({ error: e.message });
     }
   });
 
