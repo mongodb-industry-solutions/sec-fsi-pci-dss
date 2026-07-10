@@ -21,7 +21,8 @@ const METHOD_LABELS: Record<string, string> = {
 
 export default function SimulatorLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isPayment = pathname?.includes('/payment');
+  // Setup is the first step of the payment flow, so it keeps the Payment tab marked.
+  const isPayment = pathname?.includes('/payment') || pathname?.includes('/setup');
   const isInvestigation = pathname?.includes('/investigation');
   const [activeMethod, setActiveMethod] = useState<string | null>(null);
 
