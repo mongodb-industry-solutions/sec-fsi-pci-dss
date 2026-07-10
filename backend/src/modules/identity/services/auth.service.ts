@@ -48,6 +48,16 @@ export async function loginUser(
     throw Object.assign(new Error('Invalid credentials'), { statusCode: 401 });
   }
 
+  // Block non-active accounts with a distinct 403 so the UI can explain why (not a wrong-password
+  // case). Only `pending` (self-registered, awaiting approval) and `suspended` are rejected; an
+  // absent status is treated as active for backward compatibility with legacy records.
+  if (user.customerAuthenticationAccountStatus === 'pending' || user.customerAuthenticationAccountStatus === 'suspended') {
+    const reason = user.customerAuthenticationAccountStatus === 'pending'
+      ? 'Account pending approval'
+      : 'Account suspended';
+    throw Object.assign(new Error(reason), { statusCode: 403 });
+  }
+
   const payload: JwtPayload = {
     sub: user.customerAuthenticationInstanceReference,
     email: user.customerAuthenticationEmailAddress,
@@ -229,5 +239,22 @@ export async function getEnabledDomains(db: Db) {
     flowType: d.partyAuthenticationDomainFlowType
       ?? (d.partyAuthenticationDomainType === 'local' ? 'client_credentials' : d.partyAuthenticationDomainType),
     alertMessage: d.partyAuthenticationDomainAlertMessage,
+    // Self-registration is only meaningful for local domains (remote users come from the IdP).
+    selfRegistration: d.partyAuthenticationDomainType === 'local' && d.partyAuthenticationDomainSelfRegistrationEnabled === true,
   }));
+}
+
+/**
+ * Validates that a domain accepts self-registration and returns its auto-approve policy.
+ * Throws 400 if the domain is unknown, not local, disabled, or has self-registration off.
+ */
+export async function resolveSelfRegistrationDomain(db: Db, name: string): Promise<{ autoApprove: boolean }> {
+  const d = await db.collection<AuthenticationDomainRecord>(AUTHENTICATION_DOMAIN_COLLECTION)
+    .findOne({ partyAuthenticationDomainName: name as AuthenticationDomainRecord['partyAuthenticationDomainName'] });
+  const ok = d
+    && d.partyAuthenticationDomainEnabled
+    && d.partyAuthenticationDomainType === 'local'
+    && d.partyAuthenticationDomainSelfRegistrationEnabled === true;
+  if (!ok) throw Object.assign(new Error('Self-registration is not available for this domain'), { statusCode: 400 });
+  return { autoApprove: d.partyAuthenticationDomainSelfRegistrationAutoApprove === true };
 }

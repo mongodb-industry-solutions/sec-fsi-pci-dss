@@ -94,7 +94,7 @@ export default function BeneficiaryAdd() {
             maxLength={60}
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder="e.g. Supplier — Acme"
+            placeholder="e.g. Supplier, Acme"
             className="w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
           />
         </label>

@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
-import { loginUser, getDemoUsers, getEnabledDomains, updateAuthProfile, bumpSessionEpoch, JwtPayload } from '../services/auth.service';
+import { loginUser, getDemoUsers, getEnabledDomains, resolveSelfRegistrationDomain, updateAuthProfile, bumpSessionEpoch, JwtPayload } from '../services/auth.service';
+import { createUser } from '../services/user.service';
 import { getSelfProfile, updateSelfProfile } from '../../customer/services/customerAgreement.service';
 import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../models/party.model';
@@ -87,6 +88,7 @@ Password for all demo users: \`demo-password\``,
         },
         400: { description: 'Missing or invalid request fields.', $ref: 'Error#' },
         401: { description: 'Wrong email or password.', $ref: 'Error#' },
+        403: { description: 'Account not active (pending approval or suspended).', $ref: 'Error#' },
         500: { description: 'Unexpected server error.', $ref: 'Error#' },
       },
     },
@@ -115,7 +117,70 @@ Password for all demo users: \`demo-password\``,
       });
     } catch (err: unknown) {
       const e = err as { statusCode?: number; message: string };
-      const statusCode = (e.statusCode === 400 || e.statusCode === 401 ? e.statusCode : 500) as 400 | 401 | 500;
+      const allowed = [400, 401, 403];
+      const statusCode = (allowed.includes(e.statusCode ?? 0) ? e.statusCode : 500) as 400 | 401 | 403 | 500;
+      return reply.status(statusCode).send({ error: e.message });
+    }
+  });
+
+  // POST /api/v1/auth/register — public self-registration for local domains that enable it.
+  // Reuses createUser (SD-91 + linked SD-13 party). Role is always the lowest-privilege `customer`
+  // (never client-selectable). Status is `pending` unless the domain auto-approves, in which case
+  // it is `active`. This gates login only; it does NOT imply KYC approval (a separate process).
+  fastify.post('/register', {
+    schema: {
+      tags: ['auth'],
+      summary: 'Self-register a local account',
+      description: 'Creates a `customer` account in a local domain that has self-registration enabled. '
+        + 'If the domain auto-approves, the account is `active` (can log in immediately); otherwise it is '
+        + '`pending` until a manager approves it. Email/phone are PII (party SD-13, QE-encrypted). '
+        + 'Does NOT perform or imply KYC.',
+      body: {
+        type: 'object',
+        required: ['email', 'name', 'password'],
+        properties: {
+          email:    { type: 'string', format: 'email', description: 'Login email. Must be unique in the domain.' },
+          name:     { type: 'string', description: 'Display name.' },
+          password: { type: 'string', minLength: 4, description: 'Password (min 4 chars).' },
+          phone:    { type: 'string', description: 'Optional mobile phone (PII); enables beneficiary lookup.' },
+          domain:   { type: 'string', default: 'local', description: 'Target local domain slug.' },
+        },
+      },
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            status:  { type: 'string', enum: ['active', 'pending'], description: 'Resulting account status.' },
+            message: { type: 'string' },
+          },
+        },
+        400: { $ref: 'Error#', description: 'Self-registration unavailable, or invalid input.' },
+        409: { $ref: 'Error#', description: 'Email or phone already in use.' },
+      },
+    },
+  }, async (request, reply) => {
+    const { email, name, password, phone, domain } = request.body as {
+      email: string; name: string; password: string; phone?: string; domain?: string;
+    };
+    const domainName = domain ?? 'local';
+    try {
+      const { autoApprove } = await resolveSelfRegistrationDomain(fastify.db, domainName);
+      const status = autoApprove ? 'active' : 'pending';
+      await createUser(fastify.db, {
+        email, name, password, phone,
+        domain: domainName,
+        role: 'customer', // enforced: never client-selectable
+        status,
+      });
+      return reply.status(201).send({
+        status,
+        message: autoApprove
+          ? 'Account created. You can now sign in.'
+          : 'Account created and awaiting approval. You can sign in once a manager approves it.',
+      });
+    } catch (err: unknown) {
+      const e = err as { statusCode?: number; message: string };
+      const statusCode = (e.statusCode === 400 || e.statusCode === 409 ? e.statusCode : 400) as 400 | 409;
       return reply.status(statusCode).send({ error: e.message });
     }
   });
@@ -231,6 +296,7 @@ The UI uses this to populate the domain selector on the login screen.`,
                   name: { type: 'string', description: 'Domain slug used in login requests (e.g. "local", "msentra", "bigid").' },
                   displayName: { type: 'string', description: 'Human-readable label shown in the UI.' },
                   type: { type: 'string', enum: ['local', 'oidc', 'saml'], description: 'Authentication protocol.' },
+                  selfRegistration: { type: 'boolean', description: 'True when this local domain accepts public self-registration (login screen shows a Register link).' },
                 },
               },
             },

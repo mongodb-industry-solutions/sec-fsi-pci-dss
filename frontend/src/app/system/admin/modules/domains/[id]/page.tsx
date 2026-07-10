@@ -18,7 +18,7 @@ const FLOW_LABELS: Record<string, string> = {
 const DOMAIN_TYPES = ['local', 'oidc', 'saml'];
 const FLOW_TYPES = ['client_credentials', 'authorization_code', 'saml', 'oidc'];
 
-interface DomainDraft { display: string; type: string; flow: string; enabled: boolean; alert: string; }
+interface DomainDraft { display: string; type: string; flow: string; enabled: boolean; alert: string; selfReg: boolean; autoApprove: boolean; }
 
 function DomainDetail() {
   const { id } = useParams<{ id: string }>();
@@ -67,7 +67,12 @@ function DomainDetail() {
   }
 
   function startEdit() {
-    setDraft({ display, type, flow, enabled, alert: String(domain?.partyAuthenticationDomainAlertMessage ?? '') });
+    setDraft({
+      display, type, flow, enabled,
+      alert: String(domain?.partyAuthenticationDomainAlertMessage ?? ''),
+      selfReg: Boolean(domain?.partyAuthenticationDomainSelfRegistrationEnabled),
+      autoApprove: Boolean(domain?.partyAuthenticationDomainSelfRegistrationAutoApprove),
+    });
     setEditing(true);
   }
 
@@ -81,6 +86,9 @@ function DomainDetail() {
         partyAuthenticationDomainFlowType: draft.flow,
         partyAuthenticationDomainEnabled: draft.enabled,
         partyAuthenticationDomainAlertMessage: draft.alert.trim() || undefined,
+        // Self-registration only applies to local domains; auto-approve is meaningless without it.
+        partyAuthenticationDomainSelfRegistrationEnabled: draft.type === 'local' ? draft.selfReg : false,
+        partyAuthenticationDomainSelfRegistrationAutoApprove: draft.type === 'local' && draft.selfReg ? draft.autoApprove : false,
       } as Record<string, unknown>, token);
       notify('Domain updated.', 'success'); setEditing(false); load();
     } catch (err) { notify((err as Error).message, 'error'); }
@@ -156,6 +164,19 @@ function DomainDetail() {
               <input id="dom-enabled" type="checkbox" checked={draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} className="w-4 h-4 accent-[#00ED64]" />
               <label htmlFor="dom-enabled" className="text-sm text-gray-700">Enabled (shown in login selector)</label>
             </div>
+            {/* Self-registration (local domains only) */}
+            {draft.type === 'local' && (
+              <div className="sm:col-span-2 rounded-lg border border-gray-200 bg-gray-50/60 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <input id="dom-selfreg" type="checkbox" checked={draft.selfReg} onChange={(e) => setDraft({ ...draft, selfReg: e.target.checked })} className="w-4 h-4 accent-[#00ED64]" />
+                  <label htmlFor="dom-selfreg" className="text-sm text-gray-700">Allow self-registration (shows a Register link on login)</label>
+                </div>
+                <div className={`flex items-center gap-2 pl-6 ${draft.selfReg ? '' : 'opacity-40 pointer-events-none'}`}>
+                  <input id="dom-autoapprove" type="checkbox" checked={draft.autoApprove} disabled={!draft.selfReg} onChange={(e) => setDraft({ ...draft, autoApprove: e.target.checked })} className="w-4 h-4 accent-[#00ED64]" />
+                  <label htmlFor="dom-autoapprove" className="text-sm text-gray-700">Auto-approve new accounts (skip manager approval; does not imply KYC)</label>
+                </div>
+              </div>
+            )}
             <div className="sm:col-span-2">
               <label className="block text-xs text-gray-500 mb-1">Login banner (optional)</label>
               <input value={draft.alert} onChange={(e) => setDraft({ ...draft, alert: e.target.value })} placeholder="e.g. SSO not active in this build" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
@@ -169,6 +190,13 @@ function DomainDetail() {
             <div><p className="text-xs text-gray-500">Status</p>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${enabled ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>{enabled ? 'enabled' : 'disabled'}</span>
             </div>
+            {isLocal && (
+              <div><p className="text-xs text-gray-500">Self-registration</p>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${domain.partyAuthenticationDomainSelfRegistrationEnabled ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>
+                  {domain.partyAuthenticationDomainSelfRegistrationEnabled ? (domain.partyAuthenticationDomainSelfRegistrationAutoApprove ? 'on · auto-approve' : 'on · manual approval') : 'off'}
+                </span>
+              </div>
+            )}
             {Boolean(domain.partyAuthenticationDomainAlertMessage) && (
               <div className="col-span-2 sm:col-span-4 flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
                 <Info size={14} className="mt-0.5 shrink-0" /> {String(domain.partyAuthenticationDomainAlertMessage)}

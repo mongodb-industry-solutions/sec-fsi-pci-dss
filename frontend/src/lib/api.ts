@@ -81,6 +81,8 @@ export interface AuthDomain {
   flowType?: 'client_credentials' | 'authorization_code' | 'saml' | 'oidc';
   /** Optional banner text shown below the domain selector (sourced from DB) */
   alertMessage?: string;
+  /** True when this local domain accepts public self-registration (show a Register link). */
+  selfRegistration?: boolean;
 }
 
 // v16: Typed webhook types (ADR-038)
@@ -493,8 +495,12 @@ export interface ManagedUserDTO {
   name: string;
   role: string;
   domain: string;
-  status: 'active' | 'suspended';
+  status: 'active' | 'suspended' | 'pending';
   featured?: boolean;
+  partyReference?: string;
+  lastLoginAt?: string;
+  createdAt?: string;
+  phone?: string;
 }
 export interface RoleRecordDTO {
   roleName: string;
@@ -547,9 +553,11 @@ export const api = {
       const s = qs.toString();
       return apiFetch<{ users: ManagedUserDTO[] }>(`/api/v1/users${s ? `?${s}` : ''}`, {}, token);
     },
-    create: (body: { email: string; name: string; role: string; domain?: string; password?: string; status?: 'active' | 'suspended' }, token: string) =>
+    get: (id: string, token: string) =>
+      apiFetch<ManagedUserDTO>(`/api/v1/users/${encodeURIComponent(id)}`, {}, token),
+    create: (body: { email: string; name: string; role: string; domain?: string; password?: string; status?: 'active' | 'suspended'; phone?: string }, token: string) =>
       apiFetch<ManagedUserDTO>('/api/v1/users', { method: 'POST', body: JSON.stringify(body) }, token),
-    update: (id: string, body: { name?: string; role?: string; status?: 'active' | 'suspended'; password?: string }, token: string) =>
+    update: (id: string, body: { name?: string; role?: string; status?: 'active' | 'suspended' | 'pending'; password?: string; phone?: string }, token: string) =>
       apiFetch<ManagedUserDTO>(`/api/v1/users/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }, token),
     remove: (id: string, token: string) =>
       apiFetch<{ deleted: boolean; id: string }>(`/api/v1/users/${encodeURIComponent(id)}`, { method: 'DELETE' }, token),
@@ -568,6 +576,13 @@ export const api = {
       apiFetch<{ users: AuthUser[] }>(`/api/v1/auth/users${demoRosterQuery(filters)}`),
     domains: () =>
       apiFetch<{ domains: AuthDomain[] }>('/api/v1/auth/domains'),
+    // Public self-registration for local domains that enable it. Role is always `customer`
+    // (server-enforced). Returns the resulting status: 'active' (auto-approved) or 'pending'.
+    register: (body: { email: string; name: string; password: string; phone?: string; domain?: string }) =>
+      apiFetch<{ status: 'active' | 'pending'; message: string }>('/api/v1/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
     updateMe: (
       body: {
         customerName?: string;

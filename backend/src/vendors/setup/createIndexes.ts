@@ -116,7 +116,9 @@ export async function createIndexes(client: MongoClient) {
   // enforced on its blind-index digest — a keyed HMAC stored in plaintext. See digest.ts.
   await ensureIndexes(db, 'party', [
     { key: { partyInstanceReference: 1 }, unique: true },
-    { key: { partyMobilePhoneNumberDigest: 1 }, unique: true },
+    // Partial: phone is optional (self-registered parties may omit it). Only documents that
+    // actually carry a digest participate in the uniqueness constraint.
+    { key: { partyMobilePhoneNumberDigest: 1 }, unique: true, partialFilterExpression: { partyMobilePhoneNumberDigest: { $exists: true } } },
   ]);
 
   // SD-254: Card Transaction Log

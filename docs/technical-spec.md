@@ -38,8 +38,8 @@ export const PARTY_COLLECTION = 'party';
 export interface PartyControlRecord {
   partyInstanceReference: string;        // PK, UUID; referenced as FK by SD-53, SD-91
   partyEmailAddress: string;             // QE:equality — primary investigation search key
-  partyMobilePhoneNumber: string;        // QE:equality — secondary investigation search key
-  partyMobilePhoneNumberDigest: string;  // Blind index (keyed HMAC, NOT encrypted) — unique key for the phone
+  partyMobilePhoneNumber?: string;       // QE:equality — secondary investigation search key (optional: self-registered parties may omit it)
+  partyMobilePhoneNumberDigest?: string; // Blind index (keyed HMAC, NOT encrypted) — unique key for the phone (absent when no phone; partial unique index)
   partyName: string;                     // Becomes QE:equality in v2
   partyType: PartyType;
   partyDateOfBirth?: string;             // ISO 8601 date — GDPR PII, QE:none (DEK-party-dob, L2 only)
@@ -88,7 +88,7 @@ export interface CustomerAuthenticationAssessmentRecord {
   customerAuthenticationUserRole: CustomerAuthRole;
   customerAuthenticationUserName: string;             // Denormalized from party for JWT name claim
   customerAuthenticationLoginDomain: 'local' | 'msentra';
-  customerAuthenticationAccountStatus: 'active' | 'suspended';
+  customerAuthenticationAccountStatus: 'active' | 'suspended' | 'pending'; // pending = self-registered, awaiting manager approval (cannot log in)
   customerAuthenticationLastLoginDateTime?: Date;
   customerAuthenticationSessionEpoch?: number;        // Session validity counter; logout increments it to invalidate outstanding JWTs. Absent = epoch 0.
   bianServiceDomain: 'Customer Authentication';
@@ -481,6 +481,8 @@ export interface AuthenticationDomainRecord {
   partyAuthenticationDomainDisplayName: string;        // UI label (e.g. "Microsoft Entra ID")
   partyAuthenticationDomainType: AuthDomainType;       // Protocol: local | oidc | saml
   partyAuthenticationDomainEnabled: boolean;           // Only enabled domains appear in UI
+  partyAuthenticationDomainSelfRegistrationEnabled?: boolean;   // Local domains: show a Register link on login (absent = off)
+  partyAuthenticationDomainSelfRegistrationAutoApprove?: boolean; // If self-reg on: create accounts active (skip manager approval). Gates login only, NOT KYC.
   partyAuthenticationDomainConfiguration: Record<string, unknown>; // Provider-specific config
   bianServiceDomain: 'PartyAuthentication';
   bianControlRecordType: 'AuthenticationDomain';
@@ -491,7 +493,11 @@ export interface AuthenticationDomainRecord {
 
 **Collection:** `authenticationDomain` — plaintext, no QE (domain config contains no CHD or PII).
 **Seed file:** `backend/data/authDomains.json` — 3 pre-seeded domains: `local` (enabled), `msentra` (disabled), `bigid` (disabled).
-**API:** `GET /api/v1/auth/domains` (public) — returns only domains with `partyAuthenticationDomainEnabled: true`.
+**API:** `GET /api/v1/auth/domains` (public) — returns only domains with `partyAuthenticationDomainEnabled: true` (each item includes `selfRegistration` for local domains).
+
+**Self-registration (local domains).** When `partyAuthenticationDomainSelfRegistrationEnabled` is true, the login screen shows a Register link and `POST /api/v1/auth/register` (public) accepts `{ name, email, password, phone?, domain }`. The account is always created with role `customer` (server-enforced, never client-selectable) and a linked SD-13 party (name/email, plus phone when given). Status is `active` when the domain auto-approves, otherwise `pending`; a manager approves (`pending → active`) or rejects (`→ suspended`) it from the domain's Users panel. Non-active accounts are blocked at login with a 403. This gates login only and does NOT perform or imply KYC (a separate process).
+
+**User admin API (SD-91, manager-only, `authDomains` permission):** `GET /api/v1/users`, `GET /api/v1/users/:id` (full detail incl. masked phone from the party), `POST /api/v1/users`, `PUT /api/v1/users/:id` (name/role/status/password/phone; phone is written to the SD-13 party and is unique), `DELETE /api/v1/users/:id`.
 
 ---
 
@@ -1451,8 +1457,10 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { partyInstanceReference: 1 }, unique: true },
     // Note: partyEmailAddress and partyMobilePhoneNumber are QE:equality —
     // QE manages its own __safeContent__ index; do NOT add manual indexes on these fields
-    // Uniqueness on the (encrypted) phone is enforced via its blind-index digest instead:
-    { key: { partyMobilePhoneNumberDigest: 1 }, unique: true },
+    // Uniqueness on the (encrypted) phone is enforced via its blind-index digest instead.
+    // Partial: phone is optional (self-registered parties may omit it), so only documents that
+    // carry a digest participate in the uniqueness constraint.
+    { key: { partyMobilePhoneNumberDigest: 1 }, unique: true, partialFilterExpression: { partyMobilePhoneNumberDigest: { $exists: true } } },
   ]);
 
   // ── customerAuthenticationAssessment (SD-91) ──────────────────────
