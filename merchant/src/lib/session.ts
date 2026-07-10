@@ -88,7 +88,9 @@ export async function clearSession(): Promise<void> {
 // Expire the session cookie directly on a NextResponse. Use in handlers that return a redirect —
 // mutating next/headers cookies() is not reliably merged into a returned NextResponse across Next versions.
 export function clearSessionOn(res: NextResponse): void {
-  res.cookies.set(COOKIE_NAME, '', { ...sessionCookieOpts(), maxAge: 0 });
+  // sameSite is restated explicitly (in addition to the spread) so static
+  // analysis can see it on the clear path; behaviour is unchanged.
+  res.cookies.set(COOKIE_NAME, '', { ...sessionCookieOpts(), sameSite: 'lax', maxAge: 0 });
 }
 
 // ── Transient login state (PKCE + CSRF) ─────────────────────────────────────────
@@ -120,7 +122,9 @@ export function readLoginState(req: NextRequest): LoginState | null {
 }
 
 export function clearLoginStateOn(res: NextResponse): void {
-  res.cookies.set(LOGIN_COOKIE, '', { ...loginCookieOpts(), maxAge: 0 });
+  // sameSite is restated explicitly (in addition to the spread) so static
+  // analysis can see it on the clear path; behaviour is unchanged.
+  res.cookies.set(LOGIN_COOKIE, '', { ...loginCookieOpts(), sameSite: 'lax', maxAge: 0 });
 }
 
 export function hasScope(session: Session | null, scope: string): boolean {

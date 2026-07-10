@@ -23,7 +23,10 @@ import {
 
 function getSubFromRequest(request: FastifyRequest): string | null {
   const user = (request as any).user as { sub?: string; partyAuthenticationInstanceReference?: string } | undefined;
-  return user?.sub ?? user?.partyAuthenticationInstanceReference ?? null;
+  // dualAuth (v25): a first-party portal session populates request.user; a third-party merchant OAuth
+  // Bearer (user-delegated authorization_code token) populates request.merchantContext with the acting
+  // user's sub. Enrollment stays owner-scoped either way (bound to the resolved sub).
+  return user?.sub ?? user?.partyAuthenticationInstanceReference ?? request.merchantContext?.sub ?? null;
 }
 
 function replyError(reply: FastifyReply, err: unknown) {
@@ -54,10 +57,11 @@ const registerBody = {
 
 export async function enrollmentController(fastify: FastifyInstance) {
   fastify.post('/enroll/challenge', {
+    config: { dualAuth: true },
     schema: {
       tags: ['auth:enrollment'],
       summary: 'Issue a passwordless registration challenge',
-      description: 'Returns a short-lived, HMAC-bound challenge the device signs during registration. Session-gated.',
+      description: 'Returns a short-lived, HMAC-bound challenge the device signs during registration. Authenticated by a first-party portal session OR a user-delegated merchant OAuth Bearer (dualAuth).',
       security: [{ bearerAuth: [] }],
     },
   }, async (request, reply) => {
@@ -69,10 +73,11 @@ export async function enrollmentController(fastify: FastifyInstance) {
   });
 
   fastify.post('/enroll', {
+    config: { dualAuth: true },
     schema: {
       tags: ['auth:enrollment'],
       summary: 'Register a passwordless credential (public key)',
-      description: 'Stores the public key + credential metadata after verifying the signed challenge (proof of possession). Public material only (PCI Req.3). Session-gated.',
+      description: 'Stores the public key + credential metadata after verifying the signed challenge (proof of possession). Public material only (PCI Req.3). Portal session OR user-delegated merchant OAuth Bearer (dualAuth).',
       security: [{ bearerAuth: [] }],
       body: registerBody,
     },
@@ -85,10 +90,11 @@ export async function enrollmentController(fastify: FastifyInstance) {
   });
 
   fastify.get('/enroll', {
+    config: { dualAuth: true },
     schema: {
       tags: ['auth:enrollment'],
       summary: 'List my passwordless credentials',
-      description: 'Returns the calling user\'s enrolled credentials (owner-scoped). Never returns another user\'s credentials.',
+      description: 'Returns the calling user\'s enrolled credentials (owner-scoped). Never returns another user\'s credentials. Portal session OR user-delegated merchant OAuth Bearer (dualAuth).',
       security: [{ bearerAuth: [] }],
     },
   }, async (request, reply) => {
@@ -100,10 +106,11 @@ export async function enrollmentController(fastify: FastifyInstance) {
   });
 
   fastify.post('/enroll/:credentialId/rotate', {
+    config: { dualAuth: true },
     schema: {
       tags: ['auth:enrollment'],
       summary: 'Rotate a passwordless credential',
-      description: 'Registers a replacement key (validates possession) then revokes the old credential. Session-gated, owner-scoped.',
+      description: 'Registers a replacement key (validates possession) then revokes the old credential. Owner-scoped. Portal session OR user-delegated merchant OAuth Bearer (dualAuth).',
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['credentialId'], properties: { credentialId: { type: 'string' } } },
       body: registerBody,
@@ -118,10 +125,11 @@ export async function enrollmentController(fastify: FastifyInstance) {
   });
 
   fastify.delete('/enroll/:credentialId', {
+    config: { dualAuth: true },
     schema: {
       tags: ['auth:enrollment'],
       summary: 'Revoke a passwordless credential',
-      description: 'Revokes an enrolled credential (forces re-enroll). Session-gated, owner-scoped (a foreign credentialId 404s).',
+      description: 'Revokes an enrolled credential (forces re-enroll). Owner-scoped (a foreign credentialId 404s). Portal session OR user-delegated merchant OAuth Bearer (dualAuth).',
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['credentialId'], properties: { credentialId: { type: 'string' } } },
     },

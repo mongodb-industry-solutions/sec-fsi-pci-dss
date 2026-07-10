@@ -315,6 +315,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
   const [reqMapOpen, setReqMapOpen]       = useState(true);
   const [refArchOpen, setRefArchOpen]     = useState(true);
   const [valuePropOpen, setValuePropOpen] = useState(true);
+  const [standardsOpen, setStandardsOpen] = useState(false);
 
   // Resolve the logged-in role from the demo JWT (client-side; cookie-based).
   useEffect(() => {
@@ -625,14 +626,18 @@ export function HelpContent({ tab }: { tab: Tab }) {
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <div className="flex items-center gap-2 mb-4">
               <FileText size={15} className="text-[#00ED64] shrink-0" />
-              <p className="text-sm font-semibold text-white">Standards alignment demonstrated (PCI DSS + BIAN)</p>
+              <p className="text-sm font-semibold text-white">Standards alignment demonstrated (PCI DSS, BIAN, identity, open banking)</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {[
                 { req: 'Req 3',    title: 'Stored Data Protection', desc: 'PAN encrypted via Queryable Encryption; CVV never stored after auth.' },
                 { req: 'Req 7, 8', title: 'Access Control and Auth', desc: 'Data-driven RBAC (ADR-030); each role gets the minimum data access.' },
                 { req: 'Req 10',   title: 'Audit Logging',           desc: 'Every case action logged with user, timestamp, and action type.' },
-                { req: 'BIAN',     title: 'Service Domain Model',    desc: 'SD-254, SD-83, SD-53, SD-193; standard banking data structure.' },
+                { req: 'BIAN',     title: 'Service Domain Model',    desc: 'SD-53/91 identity, SD-64/65/66 payments, SD-83 fraud, SD-88/89, SD-193.' },
+                { req: 'OAuth/OIDC', title: 'Identity and SSO',      desc: 'OAuth 2.0 + PKCE, OpenID Connect, CIBA passwordless, FIDO2/WebAuthn, NIST 800-63B.' },
+                { req: 'PSD2',     title: 'Open Banking (AIS/PIS)',  desc: 'AISP account validation and PISP payment initiation as pluggable providers.' },
+                { req: 'GDPR',     title: 'Data Protection',         desc: 'Art. 5 minimization and masking; Art. 32 encryption at rest and access control.' },
+                { req: 'ISO 20022', title: 'Payment Messaging',      desc: 'pacs.002, RemittanceInformation and mandate ids across ACH/SEPA/SWIFT rails.' },
               ].map(a => (
                 <div key={a.req} className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-3.5">
                   <p className="text-[#00ED64] text-xs font-bold mb-1">{a.req}</p>
@@ -1176,6 +1181,77 @@ export function HelpContent({ tab }: { tab: Tab }) {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* Other standards & regulations (collapsible) */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setStandardsOpen(v => !v)}
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-800/40 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest">Other Standards &amp; Regulations Implemented</span>
+                <span className="text-[10px] text-gray-600 border border-gray-700 rounded-full px-2 py-0.5">5 domains</span>
+              </div>
+              {standardsOpen ? <ChevronUp size={14} className="text-gray-500 shrink-0" /> : <ChevronDown size={14} className="text-gray-500 shrink-0" />}
+            </button>
+
+            {standardsOpen && (
+              <div className="border-t border-gray-800 px-5 pb-5 pt-4 space-y-3">
+                <p className="text-gray-600 text-xs mb-1">
+                  Beyond PCI DSS, this demo implements a stack of banking, identity and open-banking standards end to end.
+                  PCI DSS governs card data; the standards below govern identity, bank data and money movement.
+                </p>
+                {[
+                  { label: 'Banking domain model', color: GOAL_COLORS['1'], items: [
+                    { name: 'BIAN v12 (Banking Industry Architecture Network)', desc: 'The whole data model is BIAN control records: SD-13/16/53/54 (party identity and authentication), SD-64/65/66 (payment order, execution, initiation), SD-83 (fraud diagnosis), SD-88 (card-on-file), SD-89 (merchant / OAuth client agreement), SD-91 (party authentication), SD-193 (integration hub).', link: 'https://bian.org/' },
+                  ] },
+                  { label: 'Identity, authentication and authorization', color: GOAL_COLORS['2'], items: [
+                    { name: 'OAuth 2.0 (RFC 6749)', desc: 'authorization_code, client_credentials and refresh_token grants power the merchant SSO and service-to-service calls.', link: 'https://datatracker.ietf.org/doc/html/rfc6749' },
+                    { name: 'PKCE (RFC 7636)', desc: 'The S256 code challenge protects the merchant authorization-code flow.', link: 'https://datatracker.ietf.org/doc/html/rfc7636' },
+                    { name: 'Token Revocation and Introspection (RFC 7009, RFC 7662)', desc: 'Sessions can be revoked, and tokens validated server-side.', link: 'https://datatracker.ietf.org/doc/html/rfc7662' },
+                    { name: 'JWT, JWS and JWKS (RFC 7519, 7515, 7517)', desc: 'RS256 access and id tokens are issued against a published, rotating key set.', link: 'https://datatracker.ietf.org/doc/html/rfc7519' },
+                    { name: 'OpenID Connect Core 1.0 and Discovery', desc: 'id_token, userinfo and the .well-known configuration document.', link: 'https://openid.net/specs/openid-connect-core-1_0.html' },
+                    { name: 'CIBA (Client-Initiated Backchannel Authentication)', desc: 'Redirect-free passwordless login: the client initiates, the device approves out of band.', link: 'https://openid.net/specs/openid-client-initiated-backchannel-authentication-core-1_0.html' },
+                    { name: 'FIDO2 / WebAuthn', desc: 'A real software authenticator signs a server challenge with a non-extractable key. Only the public key is stored server-side.', link: 'https://www.w3.org/TR/webauthn-2/' },
+                    { name: 'NIST SP 800-63B', desc: 'Authentication assurance: AAL1 today (software authenticator plus user presence), AAL2 once platform user verification is enabled.', link: 'https://pages.nist.gov/800-63-3/sp800-63b.html' },
+                  ] },
+                  { label: 'Open banking and data protection (PSD2, GDPR)', color: GOAL_COLORS['3'], items: [
+                    { name: 'PSD2 AISP (Account Information Service, BIAN SD-36)', desc: 'A pluggable account-information provider validates the payout account before any transfer (ADR-039).', link: 'https://www.eba.europa.eu/regulation-and-policy/payment-services-and-electronic-money' },
+                    { name: 'PSD2 PISP (Payment Initiation Service, BIAN SD-66)', desc: 'A pluggable PISP provider initiates bank transfers. The PSP holds no balances, so every transfer is external.', link: 'https://www.eba.europa.eu/regulation-and-policy/payment-services-and-electronic-money' },
+                    { name: 'PSD2 SCA (Strong Customer Authentication)', desc: 'Aligned at the authentication layer. Dynamic linking for payment authorization is deferred (the flow authenticates identity, it does not yet authorize a specific payment).', link: 'https://www.eba.europa.eu/regulation-and-policy/payment-services-and-electronic-money' },
+                    { name: 'GDPR (Art. 5 and Art. 32)', desc: 'Data minimization and masking, encryption at rest, access control and erasure. Bank data (IBAN, BIC) sits under GDPR and PSD2, outside PCI scope.', link: 'https://gdpr-info.eu/' },
+                  ] },
+                  { label: 'Payment messaging and schemes', color: GOAL_COLORS['4'], items: [
+                    { name: 'ISO 20022', desc: 'pacs.002 alignment on payment events, RemittanceInformation on executions, and MndtId on recurring mandates.', link: 'https://www.iso20022.org/' },
+                    { name: 'ACH, SEPA and SWIFT rails', desc: 'Transfers are routed per scheme, forming the execution arm of the PISP flow.', link: 'https://www.iso20022.org/' },
+                  ] },
+                  { label: 'API and integration patterns', color: GOAL_COLORS['5'], items: [
+                    { name: 'REST and signed webhooks (HMAC)', desc: 'Outbound notifications, including CIBA ping and push, are HMAC-signed for integrity.', link: '' },
+                    { name: 'Event-Driven Architecture and Hexagonal (ports and adapters)', desc: 'Architectural patterns, not regulations. Each capability is a port with swappable adapters, so builtin modules and external providers are interchangeable.', link: '' },
+                  ] },
+                ].map(cat => (
+                  <div key={cat.label} className={`rounded-lg border border-gray-700/50 bg-gray-800/30 border-l-4 ${cat.color.border} p-4`}>
+                    <p className={`text-sm font-semibold ${cat.color.text} mb-3`}>{cat.label}</p>
+                    <div className="space-y-2.5">
+                      {cat.items.map(it => (
+                        <div key={it.name} className="bg-gray-800/40 border border-gray-700/40 rounded-lg p-3">
+                          <p className="text-gray-200 text-xs font-semibold mb-1">{it.name}</p>
+                          <p className="text-gray-500 text-xs leading-relaxed">{it.desc}</p>
+                          {it.link && (
+                            <a href={it.link} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors mt-2">
+                              <ExternalLink size={10} /> Reference
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
