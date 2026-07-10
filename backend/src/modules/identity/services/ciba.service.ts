@@ -29,7 +29,7 @@ import {
   MERCHANT_AGREEMENT_COLLECTION,
   MerchantAgreementControlRecord,
 } from '../../gateway/models/merchantAgreement.model';
-import { issueTokens, resolveOAuthClient, oauth401, oauthError, TokenResponse } from './oauth.service';
+import { issueTokens, resolveOAuthClient, verifyAccessToken, oauth401, oauthError, TokenResponse } from './oauth.service';
 import { verifySignature } from './signatureVerifier';
 import { deliverWebhook } from '../../gateway/services/webhook.service';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
@@ -91,18 +91,30 @@ export async function resolveHint(db: Db, hints: CibaHints): Promise<string> {
     return user.customerAuthenticationInstanceReference;
   }
 
-  // login_hint_token / id_token_hint: decode a `sub` claim. For id_token_hint we accept a token we
-  // previously issued; for login_hint_token we accept a compact { sub } payload. Both are validated
-  // for a resolvable user below. (Full signature verification of foreign IdP hints is out of scope.)
-  const token = (hints.id_token_hint ?? hints.login_hint_token)!;
+  // id_token_hint: per OIDC an ID Token MUST be signature-verified before its claims are trusted.
+  // We only accept an ID token this provider issued, so verify it (RS256 + exp, by kid) via
+  // verifyAccessToken and take `sub` from the verified payload — never from an unverified blob.
   let sub: string | undefined;
-  try {
-    const parts = token.split('.');
-    const payloadB64 = parts.length >= 2 ? parts[1] : parts[0];
-    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
-    sub = payload.sub ?? payload.customerAuthenticationInstanceReference;
-  } catch {
-    throw oauthError(400, 'invalid_request', 'Malformed login hint token');
+  if (hints.id_token_hint) {
+    let payload: { sub?: string };
+    try {
+      payload = await verifyAccessToken(hints.id_token_hint);
+    } catch {
+      throw oauthError(400, 'invalid_request', 'id_token_hint failed verification (bad signature or expired)');
+    }
+    sub = payload.sub;
+  } else {
+    // login_hint_token: a provider-specific compact { sub } hint (not an OIDC ID Token). Decode only;
+    // the resolved user is validated below and the user must still explicitly approve the request.
+    const token = hints.login_hint_token!;
+    try {
+      const parts = token.split('.');
+      const payloadB64 = parts.length >= 2 ? parts[1] : parts[0];
+      const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
+      sub = payload.sub ?? payload.customerAuthenticationInstanceReference;
+    } catch {
+      throw oauthError(400, 'invalid_request', 'Malformed login_hint_token');
+    }
   }
   if (!sub) throw oauthError(400, 'invalid_request', 'Login hint token missing sub');
   const user = await col.findOne({ customerAuthenticationInstanceReference: sub });
