@@ -3,8 +3,11 @@
 import { redirect } from 'next/navigation';
 import { CircleUserRound, Store, ShieldCheck, KeyRound, RefreshCw, LogOut, Info } from 'lucide-react';
 import { getSession } from '@/lib/session';
+import { ENV } from '@/lib/env';
 import { Chip, InfoHint } from '@/components/ui/Bits';
 import CopyButton from '@/components/ui/CopyButton';
+import EnrollPasswordless from '@/components/EnrollPasswordless';
+import Es256KeyTool from '@/components/Es256KeyTool';
 
 // Human-readable meaning of each scope (display only; source of truth is the PSP catalog).
 const SCOPE_INFO: Record<string, { label: string; desc: string }> = {
@@ -94,6 +97,12 @@ export default async function ProfilePage() {
           })}
         </ul>
       </section>
+
+      {/* Passwordless login (v25): enroll a browser credential + manage it at Leafy Pay */}
+      <EnrollPasswordless sub={session.sub} email={session.email} credentialsUrl={ENV.pspCredentialsUrl()} />
+
+      {/* Standalone ES256 key generator (throwaway keys, distinct from the login credential) */}
+      <Es256KeyTool />
 
       {/* Manage */}
       <section className="rounded-2xl border border-line p-5">

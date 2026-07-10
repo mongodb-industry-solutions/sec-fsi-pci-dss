@@ -6,6 +6,7 @@ import { getSession } from '@/lib/session';
 import { ENV } from '@/lib/env';
 import { Chip } from '@/components/ui/Bits';
 import { Tip } from '@/components/ui/Tooltip';
+import PasswordlessLoginButton from '@/components/PasswordlessLoginButton';
 
 // Human-readable meaning for each OAuth scope (shown as tooltips).
 const SCOPE_HELP: Record<string, string> = {
@@ -93,14 +94,18 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
             </Link>
           </div>
         ) : (
-          <Tip label="OAuth2 / OIDC single sign-on with PKCE. Card and password stay with the PSP.">
-            <a
-              href="/api/auth/login"
-              className="relative mt-6 inline-flex items-center gap-2 rounded-xl bg-leaf px-5 py-2.5 font-semibold text-leaf-ink transition duration-200 hover:shadow-glow hover:brightness-105 active:scale-[.98]"
-            >
-              <LogIn className="h-4 w-4" aria-hidden /> Login with Leafy Pay
-            </a>
-          </Tip>
+          <div className="relative mt-6">
+            <Tip label="OAuth2 / OIDC single sign-on with PKCE. Card and password stay with the PSP.">
+              <a
+                href="/api/auth/login"
+                className="inline-flex items-center gap-2 rounded-xl bg-leaf px-5 py-2.5 font-semibold text-leaf-ink transition duration-200 hover:shadow-glow hover:brightness-105 active:scale-[.98]"
+              >
+                <LogIn className="h-4 w-4" aria-hidden /> Login with Leafy Pay
+              </a>
+            </Tip>
+            {/* CIBA passwordless (v25): renders only when a credential exists in this browser. */}
+            <PasswordlessLoginButton />
+          </div>
         )}
       </section>
 

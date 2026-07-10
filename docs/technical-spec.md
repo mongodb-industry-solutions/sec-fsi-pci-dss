@@ -3753,3 +3753,51 @@ Consent detail (`GET /api/v1/auth/grants/:consentId`) adds `cibaEnabled` (client
 - Browser key storage: WebCrypto `extractable:false` + IndexedDB (never localStorage).
 
 *Added 2026-07-09 (v24; doc + code together per repo rules).*
+
+## 13. v25 — Merchant app passwordless login (CIBA client, browser authenticator)
+
+The external merchant app (`merchant/`, DB-less) consumes the v24 PSP CIBA capability to offer redirect-free
+passwordless login, alongside the existing Authorization Code + PKCE SSO (SSO stays the default/fallback).
+No new PSP endpoints or data model: v25 is client-side only. Decisions: AD calls proxied server-side (no
+CORS), ES256 browser default, `login_hint_token` (opaque sub, no raw PII), profile hosts enroll + generator.
+
+### 13.1 Client libraries (`merchant/src/lib`)
+- `authenticator.ts` (`use client`) — the LOGIN credential: ES256 (`ECDSA`/`P-256`), private key
+  `extractable:false` in IndexedDB (`ew-merchant-passwordless`), plus a metadata record (`credentialId`,
+  `alg`, `sub`, `email`, `createdAt`). Exposes `hasCredential`/`createCredential`/`saveMeta`/`sign`/
+  `signWithCredential`/`getMeta`/`loginHintToken`/`deleteCredential`. Raw r||s signatures (PSP verifier
+  normalizes raw→DER). Never exported, never in localStorage.
+- `keygen.ts` (`use client`) — standalone THROWAWAY ES256 generator (extractable, downloadable JWK/PEM),
+  NOT stored in the login store, NOT enrolled, NOT used for auth. Distinct from the login credential.
+- `oauth.ts` (server) — adds `backchannelAuthorize()` (confidential client → PSP `bc-authorize`, discovers
+  `backchannel_authentication_endpoint`) and `cibaTokenPoll()` (maps `authorization_pending`/`slow_down`/
+  `access_denied`/`expired_token`). `env.ts` adds `pspCredentialsUrl` (link to the PSP keys page).
+
+### 13.2 Merchant route handlers (`merchant/src/app/api/auth/ciba/`, `server-only`)
+- `POST /api/auth/ciba/enroll/challenge` — session-gated relay to PSP `POST /enroll/challenge` (Bearer attached).
+- `POST /api/auth/ciba/enroll` — session-gated relay to PSP `POST /enroll` (public key only).
+- `POST /api/auth/ciba/start` — session-LESS; confidential client → PSP `bc-authorize` with `login_hint_token`
+  + REQUESTED_SCOPES; returns `{ auth_req_id, interval, expires_in, binding_message }`.
+- `POST /api/auth/ciba/poll` — session-LESS; polls PSP `/token` (ciba grant); on approval verifies id_token,
+  builds the same `ew_session` cookie as SSO callback, returns `{ status }`.
+- `GET  /api/auth/ciba/challenge?auth_req_id=` — session-LESS relay to PSP `GET /bc-authorize/:id` (AD step).
+- `POST /api/auth/ciba/approve` — session-LESS relay to PSP `POST /bc-authorize/:id/approve` (assertion auth).
+
+NOTE: the AD relays are session-less because passwordless login happens when logged out; the shared
+allowlist proxy `api/psp/[...path]` requires a session and is unsuitable for the login path. Approval is
+gated by the signature at the PSP, so serving the challenge to the `auth_req_id` holder is safe.
+
+### 13.3 UI (`merchant/src/components`, `merchant/src/app`)
+- `PasswordlessLoginButton.tsx` — on landing, renders ONLY when a credential exists (else SSO only); runs
+  start → challenge → sign → approve → poll → redirect; on revoked credential clears IndexedDB + falls back.
+- `EnrollPasswordless.tsx` + `Es256KeyTool.tsx` — hosted on `app/profile/page.tsx` (enroll/status + Leafy
+  Pay keys link + throwaway generator). `app/page.tsx` renders the login button in the logged-out branch.
+
+### 13.4 Seed / compliance
+- No seed change: the Espresso client (`oauth001-...`) already carries the ciba grant + `poll` delivery (v24).
+- PCI DSS v4.0: merchant is NOT in the CDE (no CHD). Req.4 (TLS merchant↔PSP), Req.6 (secure SDLC), Req.8
+  (no shared secrets in the browser; only a non-extractable private key). Tokens stay in the encrypted
+  server-side `ew_session` cookie, never in the browser. NIST AAL1 (AAL2 later via platform UV, no contract
+  change). GDPR: `login_hint_token` avoids raw email in the hint.
+
+*Added 2026-07-10 (v25; doc + code together per repo rules).*

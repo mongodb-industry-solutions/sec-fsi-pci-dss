@@ -11,6 +11,7 @@ export interface OidcConfig {
   userinfo_endpoint: string;
   revocation_endpoint: string;
   jwks_uri: string;
+  backchannel_authentication_endpoint?: string;
 }
 
 // Cache the discovery doc + JWKS for the process lifetime (they rarely change).
@@ -136,6 +137,80 @@ export async function clientCredentialsToken(scope = 'write:payments'): Promise<
     throw new Error(`client_credentials token failed: ${res.status} ${JSON.stringify(err)}`);
   }
   return (await res.json()) as TokenResponse;
+}
+
+// ── CIBA (OIDC Client-Initiated Backchannel Authentication) — v25 passwordless login ──────────────
+// The merchant is a confidential CIBA client. It initiates the backchannel request (bc-authorize) and
+// polls the token endpoint with the ciba grant. The browser (Authentication Device) fetches + signs the
+// challenge out-of-band; the merchant server never sees the private key.
+
+export interface BackchannelAuthorizeInput {
+  loginHintToken: string;
+  scope: string;
+  bindingMessage?: string;
+}
+
+export interface BackchannelAuthResponse {
+  auth_req_id: string;
+  expires_in: number;
+  interval: number;
+}
+
+function backchannelEndpoint(cfg: OidcConfig): string {
+  // Prefer the discovered endpoint; fall back to deriving it from the token endpoint (…/token → …/bc-authorize).
+  return cfg.backchannel_authentication_endpoint ?? cfg.token_endpoint.replace(/\/token$/, '/bc-authorize');
+}
+
+export async function backchannelAuthorize(input: BackchannelAuthorizeInput): Promise<BackchannelAuthResponse> {
+  const cfg = await discover();
+  const body = new URLSearchParams({
+    login_hint_token: input.loginHintToken,
+    scope: input.scope,
+    client_id: ENV.clientId(),
+  });
+  if (input.bindingMessage) body.set('binding_message', input.bindingMessage);
+  const res = await fetch(backchannelEndpoint(cfg), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: basicAuthHeader() },
+    body,
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`bc-authorize failed: ${res.status} ${JSON.stringify(err)}`);
+  }
+  return (await res.json()) as BackchannelAuthResponse;
+}
+
+export interface CibaPollResult {
+  status: 'done' | 'pending' | 'slow_down' | 'denied' | 'expired' | 'error';
+  tokens?: TokenResponse;
+  error?: string;
+}
+
+// Poll the token endpoint once with the ciba grant. Maps the OAuth error codes CIBA returns while the user
+// has not yet approved (authorization_pending/slow_down) or terminal outcomes (access_denied/expired_token).
+export async function cibaTokenPoll(authReqId: string): Promise<CibaPollResult> {
+  const cfg = await discover();
+  const res = await fetch(cfg.token_endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: basicAuthHeader() },
+    body: new URLSearchParams({
+      grant_type: 'urn:openid:params:grant-type:ciba',
+      auth_req_id: authReqId,
+      client_id: ENV.clientId(),
+    }),
+    cache: 'no-store',
+  });
+  if (res.ok) return { status: 'done', tokens: (await res.json()) as TokenResponse };
+  const err = (await res.json().catch(() => ({}))) as { error?: string; error_description?: string };
+  switch (err.error) {
+    case 'authorization_pending': return { status: 'pending' };
+    case 'slow_down': return { status: 'slow_down' };
+    case 'access_denied': return { status: 'denied' };
+    case 'expired_token': return { status: 'expired' };
+    default: return { status: 'error', error: err.error_description ?? err.error ?? `token poll failed: ${res.status}` };
+  }
 }
 
 export async function revoke(token: string): Promise<void> {

@@ -81,6 +81,11 @@ export const ENV = {
   pspSimulatorUrl: () =>
     envVar('PSP_MERCHANT_SIMULATOR_URL') ??
     (envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8080/auth/authorize').replace('/auth/authorize', '/simulator'),
+  // Browser-facing PSP passwordless credentials management page (PSP frontend). Lets the merchant link the
+  // user to Leafy Pay to manage/revoke their enrolled keys. Derived from the authorize URL by default.
+  pspCredentialsUrl: () =>
+    envVar('PSP_MERCHANT_CREDENTIALS_URL') ??
+    (envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8080/auth/authorize').replace('/auth/authorize', '/system/profile/credentials'),
   // Docs links shown in /help. Both must be BROWSER-reachable in every environment.
   // Wiki: static public GitHub wiki. Swagger: the backend /doc UI — its PUBLIC URL (PSP_MERCHANT_PSP_BASE_URL
   // is the in-cluster private URL, not browser-reachable), so set PSP_MERCHANT_SWAGGER_URL per deploy;
