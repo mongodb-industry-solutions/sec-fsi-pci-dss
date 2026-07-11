@@ -605,12 +605,10 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
         </div>
       </div>
 
-      <label className="flex items-center gap-2 cursor-pointer select-none">
-        <input type="checkbox" checked={form.save} onChange={e => set('save', e.target.checked)}
-          className="rounded border-gray-300 text-[#00ED64] focus:ring-[#00ED64]/40" />
-        <span className="text-xs text-gray-600">Save this account for future transfers</span>
-        <FieldTip text="If checked, the IBAN and BIC are stored as a new registered account in your profile. The IBAN is encrypted at rest. Otherwise the destination is transaction-scoped: bound only to this transfer." />
-      </label>
+      {/* NOTE: a "Save this account" option previously appeared here but was never wired to a persist
+          endpoint (form.save was set but never read). Saving an arbitrary external destination is not
+          supported yet: destinations entered here are transaction-scoped. To reuse a destination, add it
+          under Beneficiaries. Removed to avoid promising an unimplemented action. */}
 
       <div className="space-y-2">
         <label className="flex items-center gap-2 cursor-pointer select-none">
