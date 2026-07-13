@@ -3,7 +3,9 @@
 
 import { FastifyInstance } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
-import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, sendTestWebhook, generateApiKey, importApiKey, updateApiKeyLabel, revokeApiKey, reviewMerchantApplication, getMerchantEvents, getMerchantApiKeys } from '../services/merchant.service';
+import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, sendTestWebhook, generateApiKey, importApiKey, updateApiKeyLabel, revokeApiKey, reviewMerchantApplication, getMerchantEvents, getMerchantApiKeys, appendMerchantEvent } from '../services/merchant.service';
+import { emitComplianceEvent, listMerchantActivity } from '../../provider/services/businessProcessEvent.service';
+import { listMerchantAuthorizations } from '../../identity/services/oauth.service';
 import { getPayoutAccount } from '../services/payoutAccount.service';
 import { issueMerchantOAuthClient, revokeMerchantOAuthClient, rotateMerchantOAuthClientSecret, updateMerchantOAuthClient } from '../services/merchantOAuth.service';
 import { WebhookService } from '../services/merchantWebhook.service';
@@ -484,6 +486,15 @@ Used by customers to detect their onboarding state: no application / under_revie
             byStatus:    { type: 'array', items: { type: 'object', properties: { status: { type: 'string' }, count: { type: 'number' }, amount: { type: 'number' } } } },
             byMonth:     { type: 'array', items: { type: 'object', properties: { year: { type: 'number' }, month: { type: 'number' }, count: { type: 'number' }, amount: { type: 'number' } } } },
             byCurrency:  { type: 'array', items: { type: 'object', properties: { currency: { type: 'string' }, count: { type: 'number' }, amount: { type: 'number' } } } },
+            commissionRevenue: {
+              type: 'object',
+              description: 'v18: merchant commission revenue (SD-89) aggregated from paymentExecution fee attribution (SD-65).',
+              properties: {
+                total:   { type: 'number' },
+                count:   { type: 'number' },
+                byMonth: { type: 'array', items: { type: 'object', properties: { year: { type: 'number' }, month: { type: 'number' }, count: { type: 'number' }, amount: { type: 'number' } } } },
+              },
+            },
           },
         },
         401: { $ref: 'Error#' },
@@ -554,6 +565,165 @@ Used by customers to detect their onboarding state: no application / under_revie
     }
     const events = await getMerchantEvents(fastify.db, id);
     return reply.send({ events });
+  });
+
+  // GET /api/v1/merchants/:id/activity  — v18 B-01/B-12: "user × merchant × action" audit view.
+  // Reads businessProcessEvent tagged with merchantAgreementReference (OAuth-originated actions).
+  // Filter by user (actingPartyReference) + free-text + date range, paginated. Display-safe
+  // (no CHD, no raw IBAN). Same authorization as /:id/events (owner / officer / auditor / L1 / L2).
+  fastify.get('/:id/activity', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Merchant activity view — who did what through this merchant (SD-89 / SD-16 audit)',
+      description: `Lists \`businessProcessEvent\` records attributed to this merchant's OAuth client
+(v18 activity attribution). Shows the acting user (party display-safe), action/event, channel
+(\`oauth_merchant\`), timestamp and the related operation reference.
+
+**Filters:** \`user\` (actingPartyReference exact), \`q\` (free text on action/entity/user), \`dateFrom\`/\`dateTo\` (ISO 8601), \`page\`/\`limit\`.
+
+**Authorization:** merchant owner, \`merchant_officer\`, \`security_auditor\`, \`level1_analyst\`, \`level2_investigator\`.
+
+**PCI DSS Req 3/7 (data minimization):** never returns CHD or raw IBAN.`,
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      querystring: {
+        type: 'object',
+        properties: {
+          user:     { type: 'string', description: 'Filter by acting party reference (the user sub).' },
+          q:        { type: 'string', description: 'Free-text match on action, entity id, process type or user.' },
+          dateFrom: { type: 'string', format: 'date-time' },
+          dateTo:   { type: 'string', format: 'date-time' },
+          page:     { type: 'integer', minimum: 1, default: 1 },
+          limit:    { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            events: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id:                    { type: 'string' },
+                  eventDateTime:         { type: 'string', format: 'date-time' },
+                  processType:           { type: 'string' },
+                  processAction:         { type: 'string' },
+                  processOutcome:        { type: 'string' },
+                  entityType:            { type: 'string' },
+                  entityId:              { type: 'string' },
+                  clientId:              { type: 'string' },
+                  actingPartyReference:  { type: 'string' },
+                  actingUserName:        { type: 'string', description: 'Display-safe SD-13 name of the acting user (no CHD, no IBAN).' },
+                  actingChannel:         { type: 'string' },
+                  summary:               { type: 'object', additionalProperties: true },
+                },
+              },
+            },
+            total: { type: 'number' },
+            page:  { type: 'number' },
+            limit: { type: 'number' },
+          },
+        },
+        401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { user: actingUser, q, dateFrom, dateTo, page = 1, limit = 20 } = request.query as {
+      user?: string; q?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number;
+    };
+    const user = (request as { user?: JwtUserPayload }).user;
+    const merchant = await getMerchantById(fastify.db, id);
+    if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
+    const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
+    const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
+    const isStaff = MERCHANT_DETAIL_READ_ROLES.has(user?.role ?? '');
+    if (!isOwner && !isStaff) {
+      return reply.status(403).send({ error: 'Access denied: only the merchant owner, PSP staff, or a fraud investigator can view merchant activity.' });
+    }
+    const result = await listMerchantActivity(fastify.db, id, {
+      actingPartyReference: actingUser,
+      q,
+      from: dateFrom ? new Date(dateFrom) : undefined,
+      to: dateTo ? new Date(dateTo) : undefined,
+      page: Number(page),
+      limit: Number(limit),
+    });
+    return reply.send(result);
+  });
+
+  // GET /api/v1/merchants/:id/authorizations  — v18 B-10: users who granted consent to this merchant.
+  // Reads partyAuthConsent filtered by merchantAgreementInstanceReference. Display-safe user identity
+  // (SD-13), scopes, status, grant/last-used timestamps. Search by user, paginated. Same authorization.
+  fastify.get('/:id/authorizations', {
+    schema: {
+      tags: ['merchants'],
+      summary: 'Users who authorized this merchant (OAuth consent grants, SD-16)',
+      description: `Lists the users who granted OAuth consent to this merchant's app.
+
+**Filters:** \`q\` (search by user name / email / party ref), \`page\`/\`limit\`.
+
+**Authorization:** merchant owner, \`merchant_officer\`, \`security_auditor\`, \`level1_analyst\`, \`level2_investigator\`.
+
+Display-safe — no CHD, no raw IBAN.`,
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+      querystring: {
+        type: 'object',
+        properties: {
+          q:     { type: 'string', description: 'Search by user name, email or party reference.' },
+          page:  { type: 'integer', minimum: 1, default: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            authorizations: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  consentId:                            { type: 'string' },
+                  partyAuthenticationInstanceReference: { type: 'string' },
+                  userName:                             { type: 'string' },
+                  userEmail:                            { type: 'string' },
+                  grantedScopes:                        { type: 'array', items: { type: 'string' } },
+                  consentStatus:                        { type: 'string', enum: ['active', 'revoked'] },
+                  consentGrantedAt:                     { type: 'string', format: 'date-time' },
+                  lastUsedAt:                           { type: 'string', format: 'date-time', nullable: true },
+                },
+              },
+            },
+            total: { type: 'number' },
+            page:  { type: 'number' },
+            limit: { type: 'number' },
+          },
+        },
+        401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
+        404: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { q, page = 1, limit = 20 } = request.query as { q?: string; page?: number; limit?: number };
+    const user = (request as { user?: JwtUserPayload }).user;
+    const merchant = await getMerchantById(fastify.db, id);
+    if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
+    const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
+    const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
+    const isStaff = MERCHANT_DETAIL_READ_ROLES.has(user?.role ?? '');
+    if (!isOwner && !isStaff) {
+      return reply.status(403).send({ error: 'Access denied: only the merchant owner, PSP staff, or a fraud investigator can view merchant authorizations.' });
+    }
+    const result = await listMerchantAuthorizations(fastify.db, id, { q, page: Number(page), limit: Number(limit) });
+    return reply.send(result);
   });
 
   // PATCH /api/v1/merchants/:id/review  (Ch-05 — BIAN Action Term: Control)
@@ -646,6 +816,7 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
           merchantAgreementStatus: { type: 'string', enum: ['active', 'suspended', 'closed'] },
           merchantAllowedCurrencies: { type: 'array', items: { type: 'string' } },
           merchantDefaultPayoutAccountReference: { type: 'string', description: 'FK → payoutAccountArrangement. Must belong to merchant owner party (E4 guard).' },
+          merchantCommissionRate: { type: 'number', minimum: 0, maximum: 1, description: 'v18: SD-89 commission rate 0..1 (max 4 decimals). Editable by merchant owner or merchant_officer.' },
         },
       },
       response: {
@@ -662,9 +833,24 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
     const patch = request.body as Record<string, unknown>;
     const isStaff = user?.role === 'merchant_officer' || user?.role === 'security_auditor';
 
+    // v18: validate the commission rate (SD-89). number, 0 ≤ rate ≤ 1, max 4 decimals.
+    if (patch.merchantCommissionRate !== undefined) {
+      const rate = patch.merchantCommissionRate;
+      if (typeof rate !== 'number' || !isFinite(rate) || rate < 0 || rate > 1) {
+        return reply.status(400).send({ error: 'merchantCommissionRate must be a number between 0 and 1.' });
+      }
+      // At most 4 decimal places. Compare the rounded value back to the original rate (tolerating
+      // binary-float error) instead of comparing scaled integers directly — `rate * 10000` is not
+      // guaranteed to be an exact integer even for valid inputs (e.g. 0.1 * 10000 = 1000.0000000001).
+      const rounded = Math.round(rate * 10000) / 10000;
+      if (Math.abs(rounded - rate) > 1e-9) {
+        return reply.status(400).send({ error: 'merchantCommissionRate supports at most 4 decimal places.' });
+      }
+    }
+
     if (!isStaff) {
       // Merchant owner self-service: must own this merchant and may only touch operational fields.
-      const OWNER_FIELDS = ['merchantAllowedCurrencies', 'merchantSettlementSchedule', 'merchantWebhookEndpoint', 'merchantDefaultPayoutAccountReference'];
+      const OWNER_FIELDS = ['merchantAllowedCurrencies', 'merchantSettlementSchedule', 'merchantWebhookEndpoint', 'merchantDefaultPayoutAccountReference', 'merchantCommissionRate'];
       if (user?.role !== 'customer' || !user?.partyRef) {
         return reply.status(403).send({ error: 'Access denied: merchant configuration update requires merchant_officer, security_auditor or the merchant owner.' });
       }
@@ -692,6 +878,28 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
 
     const result = await updateMerchant(fastify.db, id, patch as never);
     if (!result) return reply.status(404).send({ error: 'Merchant not found' });
+
+    // v18: audit the commission-rate change explicitly (SD-89, PCI DSS Req 10).
+    if (patch.merchantCommissionRate !== undefined) {
+      const actor = user?.partyRef ?? user?.sub ?? 'unknown';
+      await appendMerchantEvent(fastify.db, id, 'merchant.commission_rate.updated', {
+        performedByPartyReference: actor,
+        performedByRole: user?.role,
+        details: { merchantCommissionRate: patch.merchantCommissionRate },
+      }).catch(() => { /* non-blocking */ });
+      emitComplianceEvent(fastify.db, {
+        entityType: 'merchant',
+        entityId: id,
+        processType: 'merchant_onboarding',
+        processAction: 'merchant.commission_rate.updated',
+        processOutcome: 'approved',
+        performedByPartyReference: actor,
+        performedByRole: user?.role ?? null,
+        eventSummary: { merchantCommissionRate: patch.merchantCommissionRate },
+        bianServiceDomain: 'Merchant Relations',
+        bianControlRecordType: 'MerchantAgreementProcedure',
+      });
+    }
     return reply.send(result);
   });
 
@@ -1143,6 +1351,11 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
           token_lifetime_seconds: { type: 'number', minimum: 300, maximum: 86400 },
           refresh_token_lifetime_days: { type: 'number', minimum: 1, maximum: 365 },
           claim_mapping: { type: 'object', additionalProperties: { type: 'string' } },
+          logo_uri: { type: 'string', description: 'v18: OIDC client logo_uri (https). Shown on the consent page and app listings.' },
+          client_uri: { type: 'string', description: 'v18: OIDC client_uri (https) — merchant home page.' },
+          client_id: { type: 'string', minLength: 1, description: 'Set a custom client_id. Changing it orphans existing tokens/consents (aud mismatch) and requires updating the relying party config.' },
+          client_secret: { type: 'string', minLength: 8, description: 'Set a custom client secret (re-hashed). The plaintext is never returned; store it now.' },
+          client_secret_prefix: { type: 'string', maxLength: 16, description: 'Independent display/identification label (not derived from the secret). Set or generate on its own.' },
         },
       },
       response: {

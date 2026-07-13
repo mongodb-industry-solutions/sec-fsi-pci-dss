@@ -2,17 +2,38 @@ replicaCount: 2
 
 env:
   NODE_ENV: production
-  KMS_PROVIDER: local
+  PSP_KMS_PROVIDER: local
+  # KMS-backed RS256 signing (correct for prod: multi-replica-safe, no key files). Requires the now-
+  # added @aws-sdk/client-kms dependency + a REAL PSP_OAUTH_AWS_KEY_ARN (below) + IRSA permissions on
+  # that key. `local` is NOT viable in prod: it would need a persisted key shared across replicas
+  # (the non-prod auto-generate path would diverge per replica → JWKS mismatch).
   PSP_OAUTH_KEY_PROVIDER: aws
   PSP_CORS_ORIGIN: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com"
   PSP_URL_FRONTEND: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com"
+  # Backend OIDC issuer + endpoints AND internal self-dispatch — in-cluster service (see staging notes).
+  PSP_BASE_URL: "http://sec-fsi-pci-dss-backend-web-app:80"
+
+  # ── Merchant app (Espresso Works) config ──────────────────────────────────────────────────────
+  # Browser-facing consent page → PUBLIC PSP frontend.
+  PSP_MERCHANT_AUTHORIZE_URL: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com/auth/authorize"
+  # Server-to-server (OIDC discovery + token + userinfo + API) → PRIVATE in-cluster backend service.
+  PSP_MERCHANT_PSP_BASE_URL: "http://sec-fsi-pci-dss-backend-web-app:80"
+  # This app's own public URL (redirect_uri host + seeder branding).
+  PSP_MERCHANT_BASE_URL: "https://sec-fsi-pci-dss-merchant.industrysolutions.prod.corp.mongodb.com"
+  # Browser-facing Swagger UI (/help link) → PUBLIC backend URL (the API base above is in-cluster only).
+  PSP_MERCHANT_SWAGGER_URL: "https://sec-fsi-pci-dss-backend.industrysolutions.prod.corp.mongodb.com/doc"
 
 envSecrets:
   MONGODB_URI: sec-fsi-pci-dss-secrets-prod
+  # Merchant OAuth client id/secret + session cookie key — populate these keys in the
+  # sec-fsi-pci-dss-secrets-prod secret (values never live in this file).
+  PSP_MERCHANT_OAUTH_CLIENT_ID: sec-fsi-pci-dss-secrets-prod
+  PSP_MERCHANT_OAUTH_CLIENT_SECRET: sec-fsi-pci-dss-secrets-prod
+  PSP_MERCHANT_SESSION_SECRET: sec-fsi-pci-dss-secrets-prod
   MONGODB_DB_NAME: sec-fsi-pci-dss-secrets-prod
-  KMS_LOCAL_MASTER_KEY: sec-fsi-pci-dss-secrets-prod
-  KMS_KEY_VAULT_DATABASE: sec-fsi-pci-dss-secrets-prod
-  KMS_KEY_VAULT_COLLECTION: sec-fsi-pci-dss-secrets-prod
+  PSP_KMS_LOCAL_MASTER_KEY: sec-fsi-pci-dss-secrets-prod
+  PSP_KMS_KEY_VAULT_DATABASE: sec-fsi-pci-dss-secrets-prod
+  PSP_KMS_KEY_VAULT_COLLECTION: sec-fsi-pci-dss-secrets-prod
   PSP_ADM_USER: sec-fsi-pci-dss-secrets-prod
   PSP_ADM_PASS: sec-fsi-pci-dss-secrets-prod
   PSP_OAUTH_AWS_KEY_ARN: sec-fsi-pci-dss-secrets-prod

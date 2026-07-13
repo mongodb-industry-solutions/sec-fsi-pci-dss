@@ -6,6 +6,8 @@ import { PAYMENT_EXECUTION_COLLECTION } from '../../modules/gateway/models/payme
 import { COUNTERPARTY_COLLECTION } from '../../modules/identity/models/counterpartyArrangement.model';
 import { RECURRING_MANDATE_COLLECTION } from '../../modules/gateway/models/recurringMandate.model';
 import { IDEMPOTENCY_COLLECTION } from '../../modules/gateway/services/idempotency.service';
+import { PARTY_ENROLLED_CREDENTIAL_COLLECTION } from '../../modules/identity/models/partyEnrolledCredential.model';
+import { PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION } from '../../modules/identity/models/partyBackchannelAuthentication.model';
 import { config } from '../../config';
 
 // ── Self-healing index helpers ────────────────────────────────────────────────
@@ -114,7 +116,9 @@ export async function createIndexes(client: MongoClient) {
   // enforced on its blind-index digest — a keyed HMAC stored in plaintext. See digest.ts.
   await ensureIndexes(db, 'party', [
     { key: { partyInstanceReference: 1 }, unique: true },
-    { key: { partyMobilePhoneNumberDigest: 1 }, unique: true },
+    // Partial: phone is optional (self-registered parties may omit it). Only documents that
+    // actually carry a digest participate in the uniqueness constraint.
+    { key: { partyMobilePhoneNumberDigest: 1 }, unique: true, partialFilterExpression: { partyMobilePhoneNumberDigest: { $exists: true } } },
   ]);
 
   // SD-254: Card Transaction Log
@@ -124,6 +128,9 @@ export async function createIndexes(client: MongoClient) {
     { key: { cardTransactionDateTime: -1 } },
     { key: { cardTransactionStatus: 1 } },
     { key: { merchantAgreementInstanceReference: 1, cardTransactionDateTime: -1 } },
+    // v18 (A-06): runtime merchant commission revenue aggregation (SD-89 dashboard). Sparse — only
+    // fee-bearing acquiring payments carry the attribution sub-doc.
+    { key: { 'fee.feeMerchantReference': 1, 'fee.feeCollectedDateTime': -1 }, sparse: true },
   ]);
 
   // SD-53: Customer Agreement Procedure
@@ -323,6 +330,8 @@ export async function createIndexes(client: MongoClient) {
     { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
     { key: { processType: 1, eventDateTime: -1 } },
     { key: { processAction: 1, processOutcome: 1 } },
+    // v18: "user × merchant × action" activity view (SD-16 audit). Sparse — only OAuth-attributed events.
+    { key: { merchantAgreementReference: 1, actingPartyReference: 1, eventDateTime: -1 }, sparse: true },
   ]).catch(() => { /* timeseries collection may not exist on the very first run */ });
 
   // ADR-025: Compliance Process Events — timeseries
@@ -368,6 +377,21 @@ export async function createIndexes(client: MongoClient) {
     { key: { oauthClientId: 1, consentStatus: 1 } },
   ]);
 
+  // SD-91/SD-16: PartyEnrolledCredential — unique credentialId, owner+status lookup
+  await ensureIndexes(db, PARTY_ENROLLED_CREDENTIAL_COLLECTION, [
+    { key: { partyEnrolledCredentialInstanceReference: 1 }, unique: true },
+    { key: { credentialId: 1 }, unique: true },
+    { key: { customerAuthenticationInstanceReference: 1, status: 1 } },
+  ]);
+
+  // SD-91: PartyBackchannelAuthentication — unique authReqId, TTL on expiresAt, client+status lookup
+  await ensureIndexes(db, PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION, [
+    { key: { authReqId: 1 }, unique: true },
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
+    { key: { clientId: 1, status: 1 } },
+    { key: { customerAuthenticationInstanceReference: 1, status: 1 } },
+  ]);
+
   // merchantWebhookDeliveryLog indexes (ADR-038)
   await ensureIndexes(db, MERCHANT_WEBHOOK_LOG_COLLECTION, [
     { key: { logId: 1 }, unique: true },
@@ -389,6 +413,10 @@ export async function createIndexes(client: MongoClient) {
     { key: { paymentOrderInstanceReference: 1 } },
     { key: { cardTransactionInstanceReference: 1 }, sparse: true },
     { key: { paymentExecutionStatus: 1, recordCreatedDateTime: -1 } },
+    // v18: merchant commission revenue aggregation (SD-89 dashboard). Sparse — only fee-bearing execs.
+    { key: { 'fee.feeMerchantReference': 1, 'fee.feeCollectedDateTime': -1 }, sparse: true },
+    // v18: merchant-scoped transaction history (SD-89 data isolation). Sparse — only merchant-initiated execs.
+    { key: { merchantAgreementReference: 1, initiatorPartyReference: 1 }, sparse: true },
   ]);
 
   // SD-54: Counterparty Arrangement / Beneficiary Registry (v17)

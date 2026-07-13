@@ -10,6 +10,8 @@ import {
 } from '../services/checkout.service';
 import { getMerchantById } from '../services/merchant.service';
 import { deliverWebhook } from '../services/webhook.service';
+import { tryMerchantContext } from '../../../vendors/middleware/validateMerchantToken';
+import { resolvePartyInstanceReference } from '../../identity/services/oauth.service';
 
 const SESSION_STATUS_ENUM = ['pending', 'completed', 'expired', 'cancelled'];
 
@@ -76,6 +78,24 @@ export async function checkoutController(fastify: FastifyInstance) {
 
     const baseUrl = process.env.PSP_URL_FRONTEND ?? 'http://localhost:8080';
 
+    // On-behalf-of attribution (best-effort, public endpoint): if the merchant app forwarded the acting
+    // user's OAuth Bearer, capture who created this session so the resulting purchase is attributed to the
+    // payer (visible in their payment history) and audited in the connected-apps operations view. A missing
+    // or invalid token simply leaves the session unattributed — the public flow is unchanged.
+    // Fully best-effort: neither token resolution nor the subject→party lookup may fail this PUBLIC
+    // endpoint. A DB blip during the party lookup must leave the session unattributed, not return 500.
+    let merchantCtx: Awaited<ReturnType<typeof tryMerchantContext>>;
+    let actingPartyReference: string | undefined;
+    try {
+      merchantCtx = await tryMerchantContext(request);
+      if (merchantCtx?.sub) {
+        actingPartyReference = await resolvePartyInstanceReference(fastify.db, merchantCtx.sub) ?? undefined;
+      }
+    } catch {
+      merchantCtx = undefined;
+      actingPartyReference = undefined;
+    }
+
     const result = await createCheckoutSession(fastify.db, {
       merchantAgreementInstanceReference: body.merchantAgreementInstanceReference,
       merchantName: (merchant as Record<string, unknown>).merchantName as string,
@@ -86,6 +106,9 @@ export async function checkoutController(fastify: FastifyInstance) {
       returnUrl: body.returnUrl,
       cancelUrl: body.cancelUrl,
       merchantReference: body.merchantReference,
+      ...(merchantCtx?.sub && { actingSubjectReference: merchantCtx.sub }),
+      ...(actingPartyReference && { actingPartyReference }),
+      ...(merchantCtx?.clientId && { actingClientId: merchantCtx.clientId }),
     }, baseUrl);
 
     return reply.status(201).send({
@@ -119,6 +142,7 @@ export async function checkoutController(fastify: FastifyInstance) {
             checkoutSessionExpiresAt: { type: 'string', format: 'date-time' },
             checkoutSessionReturnUrl: { type: 'string' },
             checkoutSessionCancelUrl: { type: 'string' },
+            hasActingUser: { type: 'boolean', description: 'True when the session was created on behalf of a logged-in user; the hosted page may then offer that payer\'s saved cards.' },
           },
         },
         404: { $ref: 'Error#' },
@@ -130,6 +154,12 @@ export async function checkoutController(fastify: FastifyInstance) {
     if (!session) return reply.status(404).send({ error: 'Checkout session not found' });
     return reply.send(session);
   });
+
+  // NOTE: there is deliberately NO session-scoped saved-cards endpoint. Cards are shown only for the
+  // AUTHENTICATED viewer of the browser (GET /customer/me/cards, resolved from the PSP portal token).
+  // Resolving cards from the session's stored acting party would reveal that user's cards to ANYONE who
+  // opens the checkout URL without being logged in — a security/PCI/GDPR leak. Both the redirect
+  // checkout and the payment link are browser-token-only: no logged-in viewer → new-card form only.
 
   // POST /api/v1/checkout/sessions/:id/pay
   fastify.post('/sessions/:id/pay', {
@@ -148,7 +178,10 @@ export async function checkoutController(fastify: FastifyInstance) {
       },
       body: {
         type: 'object',
-        required: ['cardToken', 'cardholderName', 'cardExpiryMonth', 'cardExpiryYear'],
+        // Expiry is OPTIONAL: a saved/tokenized card pays by token and the issuer authorizes on the
+        // token (not the expiry), so the payer only re-enters the CVV. New-card entry still sends expiry
+        // (the patterns below validate it when present).
+        required: ['cardToken', 'cardholderName'],
         properties: {
           cardToken: { type: 'string', description: 'Client-side generated card token (not the raw PAN).' },
           cardholderName: { type: 'string', minLength: 1, maxLength: 100 },
@@ -184,8 +217,8 @@ export async function checkoutController(fastify: FastifyInstance) {
     const body = request.body as {
       cardToken: string;
       cardholderName: string;
-      cardExpiryMonth: string;
-      cardExpiryYear: string;
+      cardExpiryMonth?: string;
+      cardExpiryYear?: string;
       cardCvv?: string;
       cardholderEmail?: string;
       saveCard?: boolean;

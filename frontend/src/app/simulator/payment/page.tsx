@@ -303,8 +303,8 @@ export default function PaymentPage() {
     }
 
     if (!method) {
-      // No method selected; guard: redirect to landing
-      router.replace('/simulator');
+      // No method selected; guard: redirect to the payment setup form
+      router.replace('/simulator/setup');
       return;
     }
     setMethodReady(true);
@@ -476,7 +476,7 @@ export default function PaymentPage() {
     setValidationErrors({});
     setVaryNote(null);
     cardTokenRef.current = generateToken();
-    router.push('/simulator');
+    router.push('/simulator/setup');
   }
 
   // -- Step indicator ----------------------------------------------------------

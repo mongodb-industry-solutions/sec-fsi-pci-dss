@@ -31,7 +31,6 @@ import { domainModule }       from '../src/modules/domain';
 import { notificationsModule } from '../src/modules/notification';
 import { oidcDiscoveryController } from '../src/modules/identity/controllers/oidcDiscovery.controller';
 import { initOidcKeys } from '../src/modules/identity/services/oidcKeys.service';
-import { merchantPortalController } from '../src/modules/gateway/controllers/merchantPortal.controller';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
@@ -50,6 +49,21 @@ export async function buildApp(): Promise<FastifyInstance> {
   fastify.addSchema({ $id: 'MonetaryAmount', type: 'object', properties: { amount: { type: 'number' }, currency: { type: 'string' } }, required: ['amount', 'currency'] });
   fastify.addSchema({ $id: 'TransactionSnapshot', type: 'object', properties: { cardTransactionAmount: { $ref: 'MonetaryAmount#' }, cardTransactionMerchantName: { type: 'string' }, cardTransactionDateTime: { type: 'string', format: 'date-time' }, cardTransactionStatus: { type: 'string' }, cardTransactionMaskedPanDisplay: { type: 'string' } }, required: ['cardTransactionAmount', 'cardTransactionMerchantName', 'cardTransactionDateTime', 'cardTransactionStatus', 'cardTransactionMaskedPanDisplay'] });
   fastify.addSchema({ $id: 'FraudDiagnosisAssessment', type: 'object', properties: { riskIndicators: { type: 'array', items: { type: 'string' } }, fraudDiagnosisScore: { type: 'number' }, fraudDiagnosisConclusion: { type: 'string' } }, required: ['riskIndicators'] });
+
+  // OAuth2/OIDC token, introspection and revocation endpoints receive
+  // application/x-www-form-urlencoded bodies (RFC 6749). Fastify only parses JSON by
+  // default, so without this parser those POSTs fail with 415. Parse into a plain object.
+  fastify.addContentTypeParser(
+    'application/x-www-form-urlencoded',
+    { parseAs: 'string' },
+    (_req, body, done) => {
+      try {
+        done(null, Object.fromEntries(new URLSearchParams(body as string)));
+      } catch (err) {
+        done(err as Error);
+      }
+    },
+  );
 
   // Swagger must be registered before routes so schemas are captured in the spec
   await fastify.register(swaggerPlugin);
@@ -172,8 +186,6 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(domainModule,  { prefix: '/api/v1' });
   // Customer notifications (pending fraud-investigation questions to answer).
   await fastify.register(notificationsModule, { prefix: '/api/v1' });
-  // v16: Merchant Portal — OAuth-authenticated programmatic access (ADR-037)
-  await fastify.register(merchantPortalController, { prefix: '/api/v1/merchant/portal' });
 
   return fastify;
 }

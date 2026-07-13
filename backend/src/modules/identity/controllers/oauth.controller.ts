@@ -13,7 +13,10 @@ import {
   revokeToken,
   resolveOAuthClient,
   verifyAccessToken,
+  applyUserScopeSelection,
+  getPriorConsentScopes,
 } from '../services/oauth.service';
+import { redeemCibaGrant } from '../services/ciba.service';
 
 function parseBasicAuth(header: string | undefined): { id: string; secret: string } | null {
   if (!header?.startsWith('Basic ')) return null;
@@ -53,6 +56,7 @@ export async function oauthController(fastify: FastifyInstance) {
           // Internal: consent form submission flags
           _psp_action: { type: 'string', enum: ['grant', 'deny'] },
           _psp_sub: { type: 'string' }, // user sub after login
+          _psp_scopes: { type: 'string' }, // v18: user's granular scope selection (space/comma separated)
         },
       },
     },
@@ -82,6 +86,12 @@ export async function oauthController(fastify: FastifyInstance) {
       }
 
       if (q._psp_action === 'grant' && q._psp_sub) {
+        // v18 E-04/E-05: apply the user's granular selection (force-including required scopes).
+        // Falls back to the full allowed set if no selection was submitted (backward compatible).
+        if (q._psp_scopes !== undefined) {
+          const userSelected = q._psp_scopes.split(/[\s,]+/).filter(Boolean);
+          validated.scopes = applyUserScopeSelection(validated.scopes, userSelected);
+        }
         const { code, state } = await issueAuthorizationCode(db(), q.client_id, q._psp_sub, validated);
         const redirectUrl = new URL(validated.redirectUri);
         redirectUrl.searchParams.set('code', code);
@@ -89,11 +99,20 @@ export async function oauthController(fastify: FastifyInstance) {
         return reply.redirect(redirectUrl.toString());
       }
 
-      // No action yet — return validated params so frontend can render consent page
+      // No action yet — return validated params so frontend can render consent page.
+      // v18 E-03/E-10: include scope metadata, merchant branding, and (post-login) the scopes
+      // already granted to this client so the UI can highlight newly-requested permissions.
+      const previouslyGranted = q._psp_sub
+        ? await getPriorConsentScopes(db(), q._psp_sub, q.client_id)
+        : [];
       return {
         client_name: validated.client.merchantName,
         client_id: validated.client.clientId,
         scopes: validated.scopes,
+        scope_details: validated.scopeDescriptors,
+        logo_uri: validated.client.oauthLogoUri,
+        client_uri: validated.client.oauthClientUri,
+        previously_granted_scopes: previouslyGranted,
         redirect_uri: q.redirect_uri,
         state: q.state,
         code_challenge: q.code_challenge,
@@ -153,15 +172,16 @@ export async function oauthController(fastify: FastifyInstance) {
         if (!body.code || !body.redirect_uri) {
           return reply.status(400).send({ error: 'invalid_request', error_description: 'code and redirect_uri required' });
         }
-        // Authenticate client unless it's a public client (PKCE only, no secret)
-        await resolveOAuthClient(db(), clientId, clientSecret || undefined);
+        // Authenticate the client. A confidential client (secret provisioned) must present it here;
+        // a public client (no secret) relies on PKCE. Enforced via requireClientAuthentication.
+        await resolveOAuthClient(db(), clientId, clientSecret || undefined, { requireClientAuthentication: true });
         result = await exchangeAuthorizationCode(db(), clientId, body.code, body.redirect_uri, body.code_verifier);
 
       } else if (grantType === 'client_credentials') {
         if (!clientSecret) {
           return reply.status(401).send({ error: 'invalid_client', error_description: 'client authentication required for client_credentials' });
         }
-        await resolveOAuthClient(db(), clientId, clientSecret);
+        await resolveOAuthClient(db(), clientId, clientSecret, { requireClientAuthentication: true });
         const scopes = body.scope?.split(' ').filter(Boolean) ?? [];
         result = await issueClientCredentialsToken(db(), clientId, scopes);
 
@@ -169,8 +189,18 @@ export async function oauthController(fastify: FastifyInstance) {
         if (!body.refresh_token) {
           return reply.status(400).send({ error: 'invalid_request', error_description: 'refresh_token required' });
         }
-        await resolveOAuthClient(db(), clientId, clientSecret || undefined);
+        // Confidential clients must re-authenticate to rotate tokens (previously the secret was optional).
+        await resolveOAuthClient(db(), clientId, clientSecret || undefined, { requireClientAuthentication: true });
         result = await refreshAccessToken(db(), clientId, body.refresh_token);
+
+      } else if (grantType === 'urn:openid:params:grant-type:ciba') {
+        // CIBA: redeem an approved backchannel request. The client must re-authenticate and
+        // redeemCibaGrant additionally verifies this client OWNS the auth_req_id (rejects cross-client).
+        if (!body.auth_req_id) {
+          return reply.status(400).send({ error: 'invalid_request', error_description: 'auth_req_id required' });
+        }
+        await resolveOAuthClient(db(), clientId, clientSecret || undefined, { requireClientAuthentication: true });
+        result = await redeemCibaGrant(db(), clientId, body.auth_req_id);
 
       } else {
         return reply.status(400).send({ error: 'unsupported_grant_type', error_description: `grant_type '${grantType}' not supported` });

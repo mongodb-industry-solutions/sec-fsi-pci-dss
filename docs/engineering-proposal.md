@@ -469,7 +469,7 @@ If a breaking schema change is needed (e.g., adding a QE range field), the colle
 | QE `$lookup` limitation breaks a planned join | Low | High | All joins are application-side sequential queries: no `$lookup` used. Documented in ADR-001 |
 | Seed data accidentally includes real PAN format | Medium | High | Seed generator always prefixes tokens with `pm_`; grep CI check rejects any string matching `\b\d{13,19}\b` |
 | Key vault DEK reference lost (collection dropped without DEK cleanup) | Low | High | `bin/setup.ts --reset` drops collections then recreates DEKs; order is enforced in script |
-| Demo breaks at conference due to AWS KMS unavailability | Low | High | Local KMS fallback is always available with `KMS_PROVIDER=local`; test it before travel |
+| Demo breaks at conference due to AWS KMS unavailability | Low | High | Local KMS fallback is always available with `PSP_KMS_PROVIDER=local`; test it before travel |
 
 ---
 
@@ -1803,7 +1803,14 @@ The original design used the Atlas `partyAuthenticationKey` collection as the so
 
 ## ADR-037 — Merchant Portal API as OAuth-Authenticated Namespace (/api/v1/merchant/portal/)
 
-**Status:** Accepted (2026-07-01). Implements **v16**. Aligns **BIAN SD-89** (Merchant Relations), **PCI DSS Req 7** (least privilege), **Req 8.6** (system account lifecycle).
+**Status:** Superseded by **ADR-042 (v23)** (2026-07-09). Originally Accepted (2026-07-01), implemented **v16**. Aligns **BIAN SD-89** (Merchant Relations), **PCI DSS Req 7** (least privilege), **Req 8.6** (system account lifecycle).
+
+> **Superseded.** The dedicated `/api/v1/merchant/*` namespace was removed in v23. The merchant is now
+> just another API client on the SHARED capability modules (`/beneficiaries`, `/accounts`, `/transactions`,
+> `/gateway/transfers`, `/notifications`): a cross-cutting dual-auth resolver (`vendors/middleware/dualAuth.ts`
+> + the `config: { dualAuth: true }` route flag) accepts EITHER a PSP session JWT (RBAC) OR a merchant OAuth
+> Bearer (scope + subject binding). The OAuth token type, `validateMerchantToken`, scope catalog and subject
+> binding all remain; only the parallel `/merchant/*` route surface was retired (no separate merchant portal).
 
 **Context.** Merchants today access their data through the PSP application UI. To support programmatic integration, merchants need a machine-readable API. Reusing the internal PSP JWT (`role: merchant`) would conflate PSP-internal roles with external system accounts, violating PCI DSS Req 8.6's requirement for separate system account management.
 
@@ -1896,3 +1903,75 @@ block always shows a navigable link or the full destination. Existing executions
 "Recipient not resolved" until reseeded.
 
 *Added 2026-07-04 (v17.2; doc + code together per repo rules).*
+
+## ADR-041: Merchant SSO Integration App + activity attribution + commission model (v18)
+
+**Status:** Accepted (2026-07-06)
+
+**Context:** v18 adds an external merchant experience: a standalone app where a merchant signs in with
+its PSP identity (SSO), views the PSP activity attributed to it, and configures its commission. This must
+not fork the PSP data model or bypass its regulated boundary. Three questions had to be resolved: how the
+merchant app relates to the PSP, how merchant commission is modelled BIAN-purely, and how per-merchant
+activity is attributed without a new collection.
+
+**Decision:**
+1. **Standalone external app.** `merchant/` is a separate Next.js app that owns **no database and no
+   Fastify layer**. Its route handlers act as a confidential OAuth client; it integrates with the PSP
+   exclusively via the PSP API + OAuth2/OIDC SSO (per ADR-033–037). Local port `8082` / container `8080`;
+   env prefix `PSP_MERCHANT_`. This keeps the PSP the single system of record and puts the merchant app
+   fully outside the CHD boundary (PCI SAQ A).
+2. **Commission model — no new collection.** The numeric commission reuses the existing
+   `paymentExecutionProcedure.feeAmount` (SD-65); a new attribution sub-doc `fee { feeMerchantReference,
+   feeRateApplied, feeCollectedDateTime }` records who was charged, at what rate, and when. The rate lives
+   on SD-89 as `merchantCommissionRate` (editable in merchant settings, audited). Aggregate
+   `commissionRevenue` is **derived**, not stored. *(Runtime fee-wiring — A-06 — is deferred; revenue is
+   seed-driven for now.)*
+3. **Activity attribution — no new collection.** The existing `businessProcessEvent` gains `clientId`,
+   `merchantAgreementReference`, `actingPartyReference`, and `actingChannel`, so PSP events can be filtered
+   per merchant / per connected app without a parallel event store.
+4. **OAuth: granular + incremental consent.** The user selects scopes; unknown scopes return
+   `invalid_scope` per RFC 6749; broadening scope forces re-consent. Merchant-facing PSP endpoints use
+   `skipAuth` + `validateMerchantToken` + sub-binding; scopes follow the PSP `verb:resource` convention.
+5. **Merchant branding** is driven by OIDC client metadata `logo_uri` / `client_uri`.
+
+**Consequences:** BIAN-pure (SD-65 fee, SD-89 agreement, SD-13 acting party) with no new collections. PCI
+SAQ A holds — no CHD ever reaches the merchant app; IBAN is masked-only in merchant views (GDPR Art. 32 /
+PSD2). Least-privilege scopes + separation of duties are enforced at the token boundary. Trade-off:
+commission revenue is not yet computed at authorization time (A-06 follow-up) and the API-driven payment
+OAuth path remains a follow-up.
+
+*Added 2026-07-06 (v18; doc + code together per repo rules).*
+
+## ADR-042: Unify the merchant integration onto the existing API (dual-auth, no /merchant/* surface) (v23)
+
+**Status:** Accepted (2026-07-09). Supersedes the route-surface portion of **ADR-037**.
+
+**Context:** v16–v18 grew a parallel `/api/v1/merchant/*` route tree (portal, gateway, beneficiaries) that
+duplicated capabilities already owned by the PSP modules (`/beneficiaries`, `/accounts`, `/transactions`,
+`/gateway/transfers`, `/notifications`). The only genuine difference between a first-party call and a
+merchant call is the authentication channel; everything else (services, BIAN control records, display-safe
+projections) was identical. A forked surface violates the repo's no-duplication rule and drifts over time.
+
+**Decision:**
+1. **Auth is a cross-cutting concern, not a forked API.** A shared resolver `vendors/middleware/dualAuth.ts`
+   plus a `config: { dualAuth: true }` flag on the global `authMiddleware` lets one capability route accept
+   EITHER a PSP session JWT (HS256 → RBAC via `dualPermission`) OR a merchant OAuth Bearer (RS256 → scope +
+   subject binding, via the existing `tryMerchantContext`/`validateMerchantToken`).
+2. **Owner is derived, never in the URL for the OAuth channel.** `resolveOwner()` maps `token.sub` → SD-13
+   party; a path owner (if present) must equal `token.sub`. Owner-derived routes register both a paramless
+   and a `:ownerRef`/`:partyRef` form sharing one handler (path param optional/derived).
+3. **Delete the `/merchant/*` tree** (`merchantPortal`, `merchantGateway`, `merchantBeneficiary` controllers)
+   and repoint the merchant `PspClient` + browser proxy allowlist to the shared endpoints. Single-release
+   cutover (both apps deploy together); no `/merchant/*` aliases.
+4. **Notifications exposed to the merchant** (`read:notifications`) on the shared `/notifications` surface.
+5. **`/api/v1/transactions` special case.** It is a `PUBLIC_EXACT` path (simulator), so the OAuth Bearer is
+   detected best-effort (`tryMerchantContext` preHandler) rather than via the `dualAuth` flag, to avoid
+   401'ing anonymous simulator reads.
+
+**Consequences:** One capability = one endpoint = one schema, dual-authenticated. Display-safe guarantees
+(no CHD/PCI SAQ A, masked IBAN, no `counterpartyPartyReference`), subject binding, and SD-89 merchant
+isolation are all preserved. The OAuth token model, scope catalog and `validateMerchantToken` are unchanged;
+only the parallel route surface is gone. Trade-off: capability handlers now branch on channel, and the
+public-exact transactions route needs its bespoke OAuth detection.
+
+*Added 2026-07-09 (v23; doc + code together per repo rules).*

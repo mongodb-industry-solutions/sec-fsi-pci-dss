@@ -1,0 +1,14 @@
+/node_modules
+/.next
+/out
+.env
+.env.local
+.env*.local
+/playwright-report
+/test-results
+*.tsbuildinfo
+# next-env.d.ts is auto-generated and its content differs between `next dev` and
+# `next build`. Tracking it caused a dev↔build rewrite that triggered Fast Refresh
+# full-page reloads (the /history reload loop). Standard Next.js: keep it untracked.
+next-env.d.ts
+next-env.d.ts.timestamp

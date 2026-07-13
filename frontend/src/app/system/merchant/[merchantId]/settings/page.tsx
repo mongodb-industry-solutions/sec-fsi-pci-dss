@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Check, Lock, AlertTriangle, X, Landmark } from 'lucide-react';
+import { Settings as SettingsIcon, Check, Lock, AlertTriangle, X, Landmark, ShieldCheck } from 'lucide-react';
 import { SectionHeader } from '../../../../../components/SectionHeader';
 import { useRequireActiveMerchant } from '../../../../../lib/merchantContext';
 import { useDebugMode } from '../../../../../lib/debugMode';
@@ -18,14 +18,24 @@ interface PayoutAccountOption {
 }
 
 export default function SettingsSectionPage() {
-  const { token, merchant, refresh } = useRequireActiveMerchant();
+  const { token, role, merchant, refresh } = useRequireActiveMerchant();
   const { debugMode } = useDebugMode();
   const merchantId = merchant?.merchantAgreementInstanceReference ?? '';
   const ownerPartyRef = (merchant as unknown as Record<string, unknown> | null)?.merchantOwnerPartyReference as string | undefined;
 
+  // v18 B-09: commission rate is editable only for roles with merchants:manage — the merchant
+  // owner (customer) or PSP staff (merchant_officer / security_auditor). Others see it read-only.
+  const canManageCommission = role === 'customer' || role === 'merchant_officer' || role === 'security_auditor';
+
   const initialCurrencies = merchant?.merchantAllowedCurrencies ?? ['USD'];
   const [currencies, setCurrencies] = useState<string[]>(initialCurrencies);
   const [settlement, setSettlement] = useState<string>(merchant?.merchantSettlementSchedule ?? 'T+2');
+  // v18 B-07: commission per operation, stored 0..1, displayed as %.
+  const initialCommissionPct = merchant?.merchantCommissionRate !== undefined
+    ? String(Number((merchant.merchantCommissionRate * 100).toFixed(2)))
+    : '';
+  const [commissionPct, setCommissionPct] = useState<string>(initialCommissionPct);
+  const [commissionError, setCommissionError] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -78,7 +88,8 @@ export default function SettingsSectionPage() {
   const dirty =
     JSON.stringify([...currencies].sort()) !== JSON.stringify([...initialCurrencies].sort()) ||
     settlement !== (merchant.merchantSettlementSchedule ?? 'T+2') ||
-    defaultPayoutRef !== initialDefaultPayoutRef;
+    defaultPayoutRef !== initialDefaultPayoutRef ||
+    commissionPct.trim() !== initialCommissionPct;
 
   function toggleCurrency(c: string) {
     setSaved(false);
@@ -87,6 +98,17 @@ export default function SettingsSectionPage() {
 
   async function save() {
     if (currencies.length === 0) { setError('Select at least one currency.'); return; }
+    // v18 B-08: validate commission rate client-side (stored 0..1, entered as %).
+    let commissionRate: number | undefined;
+    if (canManageCommission && commissionPct.trim() !== '') {
+      const pct = Number(commissionPct);
+      if (!isFinite(pct) || pct < 0 || pct > 100) {
+        setCommissionError('Commission must be a percentage between 0 and 100.');
+        return;
+      }
+      commissionRate = Number((pct / 100).toFixed(4)); // 0..1, max 4 decimals
+    }
+    setCommissionError('');
     setSaving(true); setError(''); setSaved(false);
     try {
       await api.merchants.update(
@@ -95,6 +117,7 @@ export default function SettingsSectionPage() {
           merchantAllowedCurrencies: currencies,
           merchantSettlementSchedule: settlement,
           ...(defaultPayoutRef ? { merchantDefaultPayoutAccountReference: defaultPayoutRef } : {}),
+          ...(commissionRate !== undefined ? { merchantCommissionRate: commissionRate } : {}),
         },
         token,
       );
@@ -159,6 +182,43 @@ export default function SettingsSectionPage() {
           >
             {SETTLEMENT_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
+        </div>
+
+        {/* Commission per operation (v18 B-07 — BIAN SD-89) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Commission per operation</label>
+          <p className="text-xs text-gray-500 mb-2">
+            The fee this merchant charges per operation, recognized as commission revenue (BIAN SD-89 · SD-65 fee).
+          </p>
+          {canManageCommission ? (
+            <>
+              <div className="flex items-center gap-2 max-w-[200px]">
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.01}
+                  value={commissionPct}
+                  onChange={(e) => { setCommissionPct(e.target.value); setSaved(false); setCommissionError(''); }}
+                  placeholder="e.g. 2.5"
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <span className="text-sm text-gray-500">%</span>
+              </div>
+              {commissionError && <p className="text-xs text-red-600 mt-1">{commissionError}</p>}
+            </>
+          ) : (
+            <p className="text-sm font-medium text-gray-800">
+              {merchant.merchantCommissionRate !== undefined
+                ? `${Number((merchant.merchantCommissionRate * 100).toFixed(2))}%`
+                : 'Not set'}
+            </p>
+          )}
+          {debugMode && (
+            <p className="text-[10px] font-mono text-gray-400 mt-1">
+              merchantCommissionRate (0..1, ≤4 decimals) · editable: merchants:manage · audited on change
+            </p>
+          )}
         </div>
 
         {/* Default Payout Account (E3 — BIAN SD-89 / SD-66) */}
@@ -273,6 +333,68 @@ export default function SettingsSectionPage() {
           </p>
         )}
       </div>
+
+      {/* Business verification (KYB) — read-only, active merchants */}
+      {merchant.merchantAgreementKybCheck && (() => {
+        const kyb = merchant.merchantAgreementKybCheck;
+        const KYB_COLORS: Record<string, string> = {
+          verified: 'bg-green-100 text-green-800 border-green-200',
+          initiated: 'bg-amber-100 text-amber-800 border-amber-200',
+          rejected: 'bg-red-100 text-red-800 border-red-200',
+          expired: 'bg-orange-100 text-orange-800 border-orange-200',
+        };
+        const KYB_LABELS: Record<string, string> = {
+          verified: 'Verified',
+          initiated: 'Pending',
+          rejected: 'Rejected',
+          expired: 'Expired',
+        };
+        const status = kyb.merchantAgreementKybCheckStatus;
+        return (
+          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={14} className="text-gray-400" />
+              <h2 className="font-semibold text-gray-800 text-sm">Business verification (KYB)</h2>
+            </div>
+            <p className="text-xs text-gray-500">
+              Know Your Business identity verification performed by the PSP during onboarding (PCI DSS Req 12.8).
+            </p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+              <div className="text-gray-500">KYB status</div>
+              <div>
+                <span className={`text-xs px-2 py-0.5 rounded border font-medium ${KYB_COLORS[status] ?? 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                  {KYB_LABELS[status] ?? status}
+                </span>
+              </div>
+              {kyb.merchantAgreementKybCheckCompletedDate && (
+                <>
+                  <div className="text-gray-500">Completed on</div>
+                  <div className="text-gray-800">
+                    {new Date(kyb.merchantAgreementKybCheckCompletedDate).toLocaleDateString()}
+                  </div>
+                </>
+              )}
+              {debugMode && kyb.merchantAgreementKybCheckReference && (
+                <>
+                  <div className="text-gray-500">Reference</div>
+                  <div className="font-mono text-xs text-gray-500">{kyb.merchantAgreementKybCheckReference}</div>
+                </>
+              )}
+              {debugMode && kyb.merchantAgreementKybCheckNotes && (
+                <>
+                  <div className="text-gray-500">Notes</div>
+                  <div className="text-xs text-gray-500">{kyb.merchantAgreementKybCheckNotes}</div>
+                </>
+              )}
+            </div>
+            {debugMode && (
+              <p className="text-[10px] font-mono text-gray-400 pt-1">
+                SD-89 · KybCheck · PCI Req 12.8
+              </p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Danger zone */}
       {merchant.merchantAgreementStatus !== 'suspended' && (

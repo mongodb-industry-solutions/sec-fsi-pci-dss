@@ -15,6 +15,7 @@ import {
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import { screenTransfer, openTransferFraudCase } from './transferRiskGate';
+import { getPayoutAccount } from './payoutAccount.service';
 import { config as appConfig } from '../../../config';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 
@@ -83,8 +84,10 @@ export interface ExecuteBankTransferInput {
   destination: RailDestination;
   rail?: BankRail;                 // user override
   reference?: string;              // ISO 20022 remittance info
+  fromAccountRef?: string;         // optional chosen source payout account (SD-66); validated for ownership
   recurring?: RecurringMandate;
   settlementSchedule?: 'T+0' | 'T+1' | 'T+2' | 'T+3';
+  merchantAgreementReference?: string; // SD-89: set when initiated via a merchant portal (OAuth on-behalf-of)
 }
 
 export interface ExecuteBankTransferResult {
@@ -117,6 +120,17 @@ export async function executeBankTransfer(
   }
   const rail = preview.rail;
 
+  // 1a. If the user chose a source account, verify it belongs to the initiator and is active
+  //     (mirrors the P2P ownership check). A mismatch is a client error, not a rail exception.
+  if (input.fromAccountRef) {
+    const src = await getPayoutAccount(db, input.fromAccountRef);
+    if (!src || src.partyInstanceReference !== input.initiatorPartyRef || src.payoutAccountStatus !== 'active') {
+      const errors = ['Source account not found or not active.'];
+      await recordException(db, executionRef, input, errors, now);
+      return { executionReference: executionRef, status: 'exception', rail, currency: input.currency, errors };
+    }
+  }
+
   // 1b. Pre-initiation risk gate (G4c): FDS + HRP + AML via providers, before any funds move.
   const screen = await screenTransfer(db, {
     transferRef: executionRef,
@@ -146,6 +160,8 @@ export async function executeBankTransfer(
     paymentOrderInstanceReference: executionRef,
     beneficiaryType: 'user',
     initiatorPartyReference: input.initiatorPartyRef,
+    ...(input.merchantAgreementReference ? { merchantAgreementReference: input.merchantAgreementReference } : {}),
+    ...(input.fromAccountRef ? { sourcePayoutAccountReference: input.fromAccountRef } : {}),
     ...buildRecipientSnapshot(input.destination),
     grossAmount: input.amount,
     netAmount: input.amount,
@@ -153,6 +169,8 @@ export async function executeBankTransfer(
     currency: input.currency,
     paymentExecutionRail: rail,
     routingNote: `${appConfig.payout.sandbox ? '[sandbox] ' : ''}${input.reference ? `Bank transfer: ${input.reference}` : `Bank transfer via ${rail.toUpperCase()}`}`,
+    // ISO 20022 remittance info: the clean concept/reference the user typed (queryable for AML/FDS).
+    ...(input.reference ? { paymentExecutionRemittanceInformation: input.reference } : {}),
     paymentExecutionStatus: 'routing',
     initiatedAt: now,
     resolutionLog: [
@@ -229,6 +247,7 @@ async function recordException(
     paymentOrderInstanceReference: executionRef,
     beneficiaryType: 'user',
     initiatorPartyReference: input.initiatorPartyRef,
+    ...(input.merchantAgreementReference ? { merchantAgreementReference: input.merchantAgreementReference } : {}),
     ...buildRecipientSnapshot(input.destination),
     grossAmount: input.amount, netAmount: input.amount, feeAmount: 0, currency: input.currency,
     routingNote: 'Bank transfer blocked at rail validation',

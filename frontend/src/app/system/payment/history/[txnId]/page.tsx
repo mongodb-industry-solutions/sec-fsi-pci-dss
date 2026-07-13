@@ -186,10 +186,13 @@ export default function TransactionDetailPage() {
   const [p2pTransfer, setP2pTransfer] = useState<{
     paymentExecutionInstanceReference: string;
     initiatorPartyReference: string | null;
+    initiatorName: string | null;
     beneficiaryPartyReference: string | null;
     sourcePayoutAccountReference: string | null;
+    sourceAccountMasked: string | null;
     resolvedPayoutAccountReference: string | null;
     beneficiaryArrangementReference: string | null;
+    beneficiaryAlias: string | null;
     beneficiaryName: string | null;
     destinationIban: string | null;
     destinationAccountMasked: string | null;
@@ -380,6 +383,11 @@ export default function TransactionDetailPage() {
             // both involved parties; only the Sender block is hidden from the recipient.
             const canSeeSource = !isCustomer || isSent;
             const canSeeDest   = !isCustomer || isSent || isReceived;
+            // The beneficiary arrangement (SD-54) belongs to the SENDER (it is their saved contact),
+            // so only the sender or staff may open it. For the RECIPIENT the arrangement is a foreign
+            // record (access denied), and it is also redundant — they are the beneficiary. Show them
+            // their own credited payout account (SD-66) instead, so they can verify the funds landed.
+            const showBeneficiaryLink = !!p2pTransfer.beneficiaryArrangementReference && (isSent || !isCustomer);
             return (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm border-t pt-4 mb-4">
                 <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
@@ -387,19 +395,35 @@ export default function TransactionDetailPage() {
                     Sender
                     <FieldInfo label="Sender" description="The party who initiated and funded this P2P transfer (BIAN SD-65 initiator). Their payout account (SD-66) is debited atomically." />
                   </div>
-                  {canSeeSource ? (
+                  {(p2pTransfer.initiatorName || canSeeSource || p2pTransfer.sourceAccountMasked) ? (
                     <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-                      <BlockRow label="Payout account" info="SD-66 Payout Account Arrangement debited for this transfer. Per GDPR, only the account holder and authorised staff can see this reference.">
-                        {p2pTransfer.sourcePayoutAccountReference ? (
-                          <Link href={`/system/accounts/${p2pTransfer.sourcePayoutAccountReference}`}
-                            className="font-mono text-blue-600 hover:underline">
-                            {p2pTransfer.sourcePayoutAccountReference} ↗
-                          </Link>
-                        ) : <span className="text-gray-400">—</span>}
-                      </BlockRow>
+                      {/* Payer name: shown to both parties, as on a SEPA/PSD2 statement (debtor name to payee). */}
+                      {p2pTransfer.initiatorName && (
+                        <BlockRow label="From" info="Name of the party who initiated and funded this transfer (BIAN SD-65 initiator, SD-13 party). Disclosed to the recipient the same way a SEPA/PSD2 credit transfer shows the payer name on the payee's statement.">
+                          <span className="text-gray-800">{p2pTransfer.initiatorName}</span>
+                        </BlockRow>
+                      )}
+                      {canSeeSource ? (
+                        // Account owner (sender) or authorised staff: full reference + link to the account.
+                        <BlockRow label="Payout account" info="SD-66 Payout Account Arrangement debited for this transfer. Only the account holder and authorised staff see the full reference and can open the account.">
+                          {p2pTransfer.sourcePayoutAccountReference ? (
+                            <Link href={`/system/accounts/${p2pTransfer.sourcePayoutAccountReference}`}
+                              className="font-mono text-blue-600 hover:underline">
+                              {p2pTransfer.sourcePayoutAccountReference} ↗
+                            </Link>
+                          ) : <span className="text-gray-400">—</span>}
+                        </BlockRow>
+                      ) : p2pTransfer.sourceAccountMasked ? (
+                        // Recipient: origin account masked to last-4 (GDPR minimisation). No full IBAN,
+                        // no openable link to the sender's account (a foreign SD-66 record). Not PCI-scoped
+                        // (a bank account/IBAN is not card data), so no PAN is involved.
+                        <BlockRow label="Source account" info="Origin account masked to the last 4 digits (GDPR data minimisation). Enough to reconcile the incoming payment without exposing the sender's full IBAN or their account record.">
+                          <span className="font-mono text-gray-700">{p2pTransfer.sourceAccountMasked}</span>
+                        </BlockRow>
+                      ) : null}
                     </dl>
                   ) : (
-                    <p className="text-xs text-gray-400 italic">Account details not disclosed (privacy)</p>
+                    <p className="text-xs text-gray-400 italic">Sender details not available</p>
                   )}
                 </div>
 
@@ -410,15 +434,22 @@ export default function TransactionDetailPage() {
                   </div>
                   {canSeeDest ? (
                     // One link per known resource, no duplication (priority order):
-                    //  1. saved beneficiary (SD-54)  → link the contact only (its payout account is
-                    //     the beneficiary's private account — a third party — so we don't also expose it)
-                    //  2. registered payout account (SD-66) → link the destination account
+                    //  1. saved beneficiary (SD-54)  → link the contact only, and ONLY for the sender
+                    //     or staff (the recipient does not own this arrangement — see showBeneficiaryLink)
+                    //  2. registered payout account (SD-66) → link the destination account (the
+                    //     recipient's own credited account when they are viewing a received transfer)
                     //  3. unregistered external → full IBAN the user typed (GDPR Art. 32 / PSD2:
                     //     QE-encrypted at rest, shown to the owner; not PCI-scoped card data)
-                    p2pTransfer.beneficiaryArrangementReference ? (
+                    showBeneficiaryLink ? (
                       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
+                        {/* Friendly alias first (owner-defined SD-54 label), then the opaque reference link. */}
+                        {(p2pTransfer.beneficiaryAlias || p2pTransfer.beneficiaryName) && (
+                          <BlockRow label="To" info="The saved payee this transfer was sent to: your own label for the beneficiary (SD-54 counterpartyLabel), or the account holder name.">
+                            <span className="text-gray-800">{p2pTransfer.beneficiaryAlias ?? p2pTransfer.beneficiaryName}</span>
+                          </BlockRow>
+                        )}
                         <BlockRow label="Beneficiary" info="SD-54 Counterparty Administration — the saved contact this transfer was sent to. Open it to see the beneficiary's details.">
-                          <Link href={`/system/beneficiaries/${encodeURIComponent(p2pTransfer.beneficiaryArrangementReference)}`}
+                          <Link href={`/system/beneficiaries/${encodeURIComponent(p2pTransfer.beneficiaryArrangementReference!)}`}
                             className="font-mono text-green-600 hover:underline">
                             {p2pTransfer.beneficiaryArrangementReference} ↗
                           </Link>

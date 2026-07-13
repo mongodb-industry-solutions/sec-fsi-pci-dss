@@ -30,6 +30,7 @@ interface HistoryRow {
   caseRef?: string;
   customerNote?: string | null;
   paymentReference?: string | null;
+  concept?: string | null;
   // P2P-specific
   p2pDirection?: 'sent' | 'received';
   p2pRail?: string | null;
@@ -82,6 +83,18 @@ function fmtAmount(amount: number, currency: string) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 }
 
+// ── Card money direction (SD-254) ─────────────────────────────────────────────
+// Any operation that debits the funding account is shown as a discount (−, red), mirroring the P2P
+// "sent" rows. refund / adjustment are credits (+, green). Statuses that never moved money (declined,
+// failed, voided, expired) render neutral (no sign) so we don't show −$X on an uncharged transaction.
+const CARD_CREDIT_TYPES = new Set(['refund', 'adjustment']);
+const CARD_NON_MOVEMENT_STATUS = new Set(['declined', 'failed', 'voided', 'expired']);
+function cardDirection(type: string | undefined, status: string): 'debit' | 'credit' | 'neutral' {
+  if (CARD_NON_MOVEMENT_STATUS.has(status)) return 'neutral';
+  if (type && CARD_CREDIT_TYPES.has(type)) return 'credit';
+  return 'debit';
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function TransactionHistoryPage() {
   const [rows, setRows] = useState<HistoryRow[]>([]);
@@ -118,6 +131,7 @@ export default function TransactionHistoryPage() {
             cardTransactionMerchantCategoryCode?: string;
             cardTransactionChannel?: string;
             cardTransactionMaskedPanDisplay: string;
+            cardTransactionDescription?: string;
             fraudCaseCreated?: boolean;
             fraudDiagnosisCaseStatus?: string | null;
             fraudDiagnosisCaseReference?: string | null;
@@ -134,6 +148,7 @@ export default function TransactionHistoryPage() {
             channel:             row.cardTransactionChannel ?? '',
             cardTransactionType: row.cardTransactionType,
             maskedPan:           row.cardTransactionMaskedPanDisplay,
+            concept:             row.cardTransactionDescription ?? null,
             fraudCaseCreated:    !!row.fraudCaseCreated,
             caseStatus:          row.fraudDiagnosisCaseStatus ?? undefined,
             caseRef:             row.fraudDiagnosisCaseReference ?? undefined,
@@ -152,7 +167,7 @@ export default function TransactionHistoryPage() {
               status:       r.paymentExecutionStatus,
               p2pDirection: r.direction,
               p2pRail:      r.paymentExecutionRail,
-              p2pNote:      r.routingNote,
+              p2pNote:      r.paymentExecutionRemittanceInformation ?? r.routingNote,
             } satisfies HistoryRow))
           ).catch(() => [] as HistoryRow[])
         : Promise.resolve([] as HistoryRow[]);
@@ -185,6 +200,7 @@ export default function TransactionHistoryPage() {
       return (
         (r.merchant ?? '').toLowerCase().includes(ql) ||
         (r.maskedPan ?? '').toLowerCase().includes(ql) ||
+        (r.concept ?? '').toLowerCase().includes(ql) ||
         (r.paymentReference ?? '').toLowerCase().includes(ql) ||
         (r.caseRef ?? '').toLowerCase().includes(ql) ||
         r.id.toLowerCase().includes(ql) ||
@@ -303,13 +319,21 @@ export default function TransactionHistoryPage() {
                             <div className="min-w-0">
                               <p className="font-semibold text-gray-900 truncate">{row.merchant}</p>
                               <p className="text-xs text-gray-500">{new Date(row.createdAt).toLocaleString()}</p>
+                              {row.concept && (
+                                <p className="text-xs text-gray-500 mt-0.5 truncate">Concept: {row.concept}</p>
+                              )}
                               {row.paymentReference && (
                                 <p className="text-xs text-gray-400 mt-0.5">Ref: {row.paymentReference}</p>
                               )}
                             </div>
                             <div className="flex items-start gap-3 shrink-0">
                               <div className="text-right">
-                                <p className="font-bold text-gray-900">{fmtAmount(row.amount, row.currency)}</p>
+                                {(() => {
+                                  const dir = cardDirection(row.cardTransactionType, row.status);
+                                  const cls = dir === 'debit' ? 'text-red-600' : dir === 'credit' ? 'text-green-700' : 'text-gray-900';
+                                  const sign = dir === 'debit' ? '−' : dir === 'credit' ? '+' : '';
+                                  return <p className={`font-bold ${cls}`}>{sign}{fmtAmount(row.amount, row.currency)}</p>;
+                                })()}
                                 <p className="text-xs text-gray-500 font-mono">{row.maskedPan}</p>
                               </div>
                               <span className="text-gray-300 group-hover:text-[#001E2B] transition-colors text-lg leading-none mt-0.5">›</span>

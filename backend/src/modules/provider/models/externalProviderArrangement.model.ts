@@ -331,6 +331,7 @@ export type BusinessProcessType =
   | 'card_authorization'
   | 'credit_assessment'
   | 'sanctions_check'
+  | 'consent_management'   // v18: OAuth consent grant/update/reuse audit (SD-16)
   | 'checkout';
 
 export type ComplianceProcessType =
@@ -339,7 +340,8 @@ export type ComplianceProcessType =
   | 'merchant_onboarding'
   | 'customer_onboarding'
   | 'card_management'       // SD-88 stored-card lifecycle (register / remove) — PCI DSS Req 10
-  | 'payment_processing';   // SD-65/SD-36 payout execution + AIS/PISP audit trail (v17)
+  | 'payment_processing'    // SD-65/SD-36 payout execution + AIS/PISP audit trail (v17)
+  | 'authentication';       // SD-91 CIBA + passwordless enrollment audit trail (PCI DSS Req 8/10)
 
 export type ProcessEventOutcome = 'approved' | 'rejected' | 'pending' | 'failed' | 'escalated'
   | 'in_flight' | 'settled' | 'verified' | 'submitted'; // SD-65 payout execution outcomes (v17)
@@ -371,6 +373,13 @@ export interface BusinessProcessEvent {
   bianServiceDomain: string;
   bianControlRecordType: string;
   processMeta?: ProcessEventMeta;
+  // v18 (SD-16 audit attribution): optional, backwards-compatible. Populated when an action originates
+  // from a merchant OAuth-authenticated request (request.merchantContext). Enables the "user × merchant
+  // × action" activity view without a new collection.
+  clientId?: string;                    // OAuth client_id that originated the action
+  merchantAgreementReference?: string;  // SD-89 merchant the action was performed through
+  actingPartyReference?: string;        // OAuth subject of the acting user (token.sub = customerAuthenticationInstanceReference, NOT an SD-13 Party ref); matched as such in businessProcessEvent joins
+  actingChannel?: 'session' | 'oauth_merchant';
 }
 
 // ── Typed Payload Contracts per Integration Category (ADR-025) ────────────────

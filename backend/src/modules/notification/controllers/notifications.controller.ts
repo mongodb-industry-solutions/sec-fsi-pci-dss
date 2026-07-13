@@ -1,7 +1,25 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { listForParty, unreadCount, markRead, markAllRead } from '../notifications.service';
 import { subscribePartyNotifications } from '../../../vendors/eventbus';
 import { beginSSE } from '../../../shared/services/sse';
+import { resolvePartyInstanceReference } from '../../identity/services/oauth.service';
+
+// Resolve the caller's own party across BOTH auth channels (v23):
+//  · OAuth (merchant on-behalf-of): require scope read:notifications, party = resolveParty(token.sub).
+//  · Session: the JWT partyRef (existing behavior).
+// Returns null when a reply has already been sent (missing scope / unmapped subject).
+async function resolveNotificationParty(request: FastifyRequest, reply: FastifyReply): Promise<string | null> {
+  const merchant = request.merchantContext;
+  if (merchant) {
+    if (!merchant.scopes.includes('read:notifications')) {
+      reply.status(403).send({ error: 'insufficient_scope', error_description: 'Required scope: read:notifications' });
+      return null;
+    }
+    // Unmapped subject → empty string; downstream lookups yield an empty list / 404 (never a leak).
+    return (await resolvePartyInstanceReference(request.server.db, merchant.sub)) ?? '';
+  }
+  return (request as { user?: { partyRef?: string } }).user?.partyRef ?? '';
+}
 
 function partyOf(request: unknown): string {
   return (request as { user?: { partyRef?: string } }).user?.partyRef ?? '';
@@ -12,6 +30,7 @@ function partyOf(request: unknown): string {
 // are not exposed to fraud-case internals here, only the item and a link to the related transaction.
 export async function notificationsController(fastify: FastifyInstance) {
   fastify.get('/', {
+    config: { dualAuth: true },
     schema: {
       tags: ['notifications'],
       summary: 'Notifications for the current user',
@@ -49,8 +68,9 @@ export async function notificationsController(fastify: FastifyInstance) {
         401: { type: 'object', properties: { error: { type: 'string' } } },
       },
     },
-  }, async (request) => {
-    const partyRef = partyOf(request);
+  }, async (request, reply) => {
+    const partyRef = await resolveNotificationParty(request, reply);
+    if (partyRef === null) return; // reply already sent (missing scope)
     const [items, count] = await Promise.all([
       listForParty(fastify.db, partyRef),
       unreadCount(fastify.db, partyRef),
@@ -60,6 +80,7 @@ export async function notificationsController(fastify: FastifyInstance) {
 
   // POST /api/v1/notifications/:id/read  -  mark one notification read (own only).
   fastify.post<{ Params: { id: string } }>('/:id/read', {
+    config: { dualAuth: true },
     schema: {
       tags: ['notifications'],
       summary: 'Mark a notification read',
@@ -73,7 +94,9 @@ export async function notificationsController(fastify: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
-    const ok = await markRead(fastify.db, request.params.id, partyOf(request));
+    const partyRef = await resolveNotificationParty(request, reply);
+    if (partyRef === null) return; // reply already sent (missing scope)
+    const ok = await markRead(fastify.db, request.params.id, partyRef);
     if (!ok) return reply.status(404).send({ error: 'Notification not found' });
     return { ok: true };
   });

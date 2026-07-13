@@ -3,7 +3,8 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { api } from '../../../../lib/api';
 import { deriveCardToken } from '../../../../lib/cardTokenize';
-import { Lock, CreditCard, CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react';
+import { useViewerSavedCards, SavedCardSelector, PayingWithSummary, SignedInBadge } from '../../../../components/gateway/SavedCardSelector';
+import { Lock, CreditCard, CheckCircle, XCircle, Eye, EyeOff, Copy, Check } from 'lucide-react';
 
 type LinkData = Awaited<ReturnType<typeof api.paymentLinks.resolve>>;
 type PageState = 'loading' | 'ready' | 'paying' | 'success' | 'declined' | 'unavailable' | 'error';
@@ -21,6 +22,7 @@ function PaymentLinkPageInner() {
   const [state, setState] = useState<PageState>('loading');
   const [txRef, setTxRef] = useState('');
   const [error, setError] = useState('');
+  const [copiedRef, setCopiedRef] = useState(false);
 
   const [cardholderName, setCardholderName] = useState('');
   const [cardNumber, setCardNumber] = useState('');
@@ -31,6 +33,13 @@ function PaymentLinkPageInner() {
   const [cvvTouched, setCvvTouched] = useState(false);
   const [showCvv, setShowCvv] = useState(false);
   const cvvValid = /^\d{3,4}$/.test(cvv);
+
+  // Saved cards belong to the AUTHENTICATED viewer of THIS browser (resolved from the PSP session
+  // token, never from the link's creator). A shared link opened without a token shows no selector.
+  // Choosing a saved card pays with its token (CVV only, no expiry); "Use a new card" shows the form.
+  // Optional ?card=<cardToken|cardRef> preselects a card ONLY if the viewer owns it.
+  const wantedCard = searchParams.get('card') ?? searchParams.get('cardToken');
+  const { savedCards, selectedCardId, setSelectedCardId, selectedCard, usingSavedCard, viewerName } = useViewerSavedCards(wantedCard);
 
   const applyPrefillParams = useCallback((sp: ReturnType<typeof useSearchParams>) => {
     const get = (p: PrefillParam) => sp.get(p);
@@ -79,15 +88,28 @@ function PaymentLinkPageInner() {
     setState('paying');
     setError('');
 
-    // Deterministic token (same card → same token) so repeat payments never duplicate the card.
-    const cardToken = await deriveCardToken(cardNumber.replace(/\s/g, ''));
+    // Saved card: pay with its stored surrogate TOKEN (never a PAN — we never held it) and omit
+    // expiry (the issuer authorizes on the token; only the CVV is re-checked). New card: derive the
+    // deterministic token from the entered number (same PAN → same token, so re-paying never
+    // duplicates a card-on-file). The name is cosmetic; for a saved card we send its alias/network.
+    let cardToken: string;
+    let payName: string;
+    if (usingSavedCard && selectedCard) {
+      cardToken = selectedCard.cardToken;
+      payName = selectedCard.paymentCardAlias || selectedCard.paymentCardNetwork || 'Saved card';
+    } else {
+      cardToken = await deriveCardToken(cardNumber.replace(/\s/g, ''));
+      payName = cardholderName;
+    }
 
     try {
       const result = await api.paymentLinks.pay(linkCode, {
         cardToken,
-        cardholderName,
-        cardExpiryMonth: expiryMonth.padStart(2, '0'),
-        cardExpiryYear: `20${expiryYear}`,
+        cardholderName: payName,
+        // Saved card: no expiry (issuer authorizes on the token). New card: send the entered expiry.
+        ...(usingSavedCard
+          ? {}
+          : { cardExpiryMonth: expiryMonth.padStart(2, '0'), cardExpiryYear: `20${expiryYear}` }),
         // Forward the entered CVV for issuer verification (never persisted; PCI Req 3.2). A wrong CVV declines.
         cardCvv: cvv,
         customerEmail: customerEmail || undefined,
@@ -143,11 +165,27 @@ function PaymentLinkPageInner() {
             <strong>{link.merchantName}</strong> was completed.
           </p>
           {txRef && (
-            <div className="text-xs text-gray-400 bg-gray-50 rounded px-3 py-2 font-mono break-all">
-              Ref: {txRef.slice(0, 8)}...
+            <div className="text-xs text-gray-500 bg-gray-50 rounded px-3 py-2 font-mono break-all flex items-start justify-between gap-2 text-left">
+              <span><span className="text-gray-400">Ref:</span> {txRef}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(txRef)
+                    .then(() => setCopiedRef(true))
+                    .catch(() => {});
+                }}
+                // Reset the confirmation on interaction end (no timers → no unmount/stale-closure races).
+                onMouseLeave={() => setCopiedRef(false)}
+                onBlur={() => setCopiedRef(false)}
+                aria-label={copiedRef ? 'Reference copied' : 'Copy reference'}
+                title={copiedRef ? 'Copied' : 'Copy reference'}
+                className="shrink-0 text-gray-400 hover:text-green-600 focus:outline-none"
+              >
+                {copiedRef ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+              </button>
             </div>
           )}
-          <div className="mt-4 text-xs text-gray-400">Powered by MongoDB PSP Platform</div>
+          <div className="mt-4 text-xs text-gray-400">Powered by Leafy Pay (MongoDB PSP Platform)</div>
         </div>
       </div>
     );
@@ -198,18 +236,18 @@ function PaymentLinkPageInner() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-[#001E2B] text-white px-4 py-3 flex items-center gap-2">
-        <Lock size={16} className="text-[#00ED64]" />
-        <span className="font-semibold text-sm">Secure Payment</span>
-        <span className="ml-auto text-xs text-gray-400">Powered by MongoDB Gateway</span>
-      </header>
-
       <main className="flex-1 flex items-start justify-center py-8 px-4">
         <div className="w-full max-w-md space-y-4">
           <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
             <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Payment to</div>
             <div className="font-semibold text-gray-800 text-lg">{link.merchantName}</div>
-            <div className="text-gray-500 text-sm mt-1">{link.paymentLinkDescription}</div>
+            {/* Concept: clearly labeled so the payer sees exactly what they are being charged for. */}
+            {link.paymentLinkDescription && (
+              <div className="mt-3">
+                <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Concept</div>
+                <div className="text-gray-700 text-sm">{link.paymentLinkDescription}</div>
+              </div>
+            )}
             {link.paymentLinkCustomerMessage && (
               <div className="mt-2 text-sm text-gray-600 italic bg-gray-50 rounded-lg px-3 py-2">
                 {link.paymentLinkCustomerMessage}
@@ -239,38 +277,59 @@ function PaymentLinkPageInner() {
               )}
             </div>
 
+            {/* Confirms the payer is recognised by the PSP (their session persists). Nothing when
+                not logged in. */}
+            <SignedInBadge name={viewerName} />
+
+            {/* Saved-card selector: shown only when the AUTHENTICATED viewer of this browser has cards
+                on file. Choosing a saved card pays with its token (no PAN entry); "Use a new card"
+                reveals the full form. Identical UI on the redirect-checkout page. */}
+            <SavedCardSelector savedCards={savedCards} selectedCardId={selectedCardId} onSelect={setSelectedCardId} />
+
             <form onSubmit={handlePay} className="space-y-3">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Cardholder Name</label>
-                <input
-                  required
-                  type="text"
-                  value={cardholderName}
-                  onChange={(e) => setCardholderName(e.target.value)}
-                  placeholder="Name on card"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 focus:border-[#00ED64]"
-                />
-              </div>
+              {usingSavedCard && selectedCard ? (
+                // Saved card chosen: name + number are on file, so they are neither shown nor
+                // re-entered. Only the masked PAN is displayed (PCI: never the full PAN). The viewer
+                // supplies only the CVV below to authorize (no expiry for a tokenized card).
+                <PayingWithSummary card={selectedCard} />
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Cardholder Name</label>
+                    <input
+                      required
+                      type="text"
+                      value={cardholderName}
+                      onChange={(e) => setCardholderName(e.target.value)}
+                      placeholder="Name on card"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 focus:border-[#00ED64]"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Card Number</label>
-                <input
-                  required
-                  type="text"
-                  value={cardNumber}
-                  onChange={(e) => setCardNumber(e.target.value.replace(/[^\d\s]/g, '').slice(0, 19))}
-                  placeholder="0000 0000 0000 0000"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 focus:border-[#00ED64]"
-                  inputMode="numeric"
-                />
-              </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Card Number</label>
+                    <input
+                      required
+                      type="text"
+                      value={cardNumber}
+                      onChange={(e) => setCardNumber(e.target.value.replace(/[^\d\s]/g, '').slice(0, 19))}
+                      placeholder="0000 0000 0000 0000"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 focus:border-[#00ED64]"
+                      inputMode="numeric"
+                    />
+                  </div>
+                </>
+              )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className={`grid gap-3 ${usingSavedCard ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                {/* Expiry only for a NEW card; a saved/tokenized card authorizes on the token, so the
+                    viewer re-enters only the CVV. */}
+                {!usingSavedCard && (
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Expiry (MM / YY)</label>
                   <div className="flex gap-2">
                     <input
-                      required
+                      required={!usingSavedCard}
                       type="text"
                       value={expiryMonth}
                       onChange={(e) => setExpiryMonth(e.target.value.replace(/\D/g, '').slice(0, 2))}
@@ -279,7 +338,7 @@ function PaymentLinkPageInner() {
                       className="w-1/2 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 focus:border-[#00ED64]"
                     />
                     <input
-                      required
+                      required={!usingSavedCard}
                       type="text"
                       value={expiryYear}
                       onChange={(e) => setExpiryYear(e.target.value.replace(/\D/g, '').slice(0, 2))}
@@ -289,6 +348,7 @@ function PaymentLinkPageInner() {
                     />
                   </div>
                 </div>
+                )}
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">CVV</label>
                   <div className="relative">
@@ -321,7 +381,7 @@ function PaymentLinkPageInner() {
                   {cvvTouched && !cvvValid ? (
                     <p className="text-xs text-red-600 mt-0.5">Enter the 3 or 4 digit code.</p>
                   ) : (
-                    <p className="text-xs text-gray-400 mt-0.5">Validated locally, never stored (PCI DSS Req 3.2).</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Validated locally, never stored.</p>
                   )}
                 </div>
               </div>

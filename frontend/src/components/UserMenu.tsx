@@ -2,10 +2,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Bug, ChevronDown, HelpCircle, LogOut, UserCircle2 } from 'lucide-react';
+import { Bug, ChevronDown, HelpCircle, KeyRound, Layers, LogOut, UserCircle2 } from 'lucide-react';
 import { ROLE_LABELS } from '../lib/constants';
 import { useDebugMode } from '../lib/debugMode';
-import { clearToken, decodeToken } from '../lib/auth';
+import { decodeToken } from '../lib/auth';
+import { logoutSession } from '../lib/logout';
 
 export type DecodedUser = NonNullable<ReturnType<typeof decodeToken>>;
 
@@ -65,9 +66,10 @@ export function UserMenu({ user, onSignOut }: UserMenuProps) {
     };
   }, []);
 
-  function handleSignOut() {
+  async function handleSignOut() {
     setOpen(false);
-    clearToken();
+    // Invalidate server-side (epoch bump) then clear the cookie before navigating away.
+    await logoutSession();
     if (onSignOut) {
       onSignOut();
     } else {
@@ -132,6 +134,26 @@ export function UserMenu({ user, onSignOut }: UserMenuProps) {
             >
               <UserCircle2 size={15} className="text-gray-400 shrink-0" />
               <span>My Profile</span>
+            </Link>
+
+            <Link
+              href="/system/applications"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-white/8 hover:text-white transition-colors"
+            >
+              <Layers size={15} className="text-gray-400 shrink-0" />
+              <span>Applications</span>
+            </Link>
+
+            <Link
+              href="/system/profile/credentials"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-white/8 hover:text-white transition-colors"
+            >
+              <KeyRound size={15} className="text-gray-400 shrink-0" />
+              <span>Credentials</span>
             </Link>
 
             <Link

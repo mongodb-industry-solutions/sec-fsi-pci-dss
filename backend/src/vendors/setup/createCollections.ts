@@ -9,6 +9,8 @@ import { PAYOUT_ACCOUNT_COLLECTION } from '../../modules/gateway/models/payoutAc
 import { PAYMENT_EXECUTION_COLLECTION } from '../../modules/gateway/models/paymentExecution.model';
 import { COUNTERPARTY_COLLECTION } from '../../modules/identity/models/counterpartyArrangement.model';
 import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/gateway/models/balanceCreditLog.model';
+import { PARTY_ENROLLED_CREDENTIAL_COLLECTION } from '../../modules/identity/models/partyEnrolledCredential.model';
+import { PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION } from '../../modules/identity/models/partyBackchannelAuthentication.model';
 
 const kmsConfig = getKmsConfig();
 
@@ -388,6 +390,30 @@ export async function createCollections(
     console.log(`  created: ${PARTY_AUTH_CONSENT_COLLECTION} (consent grants; user-authorized apps registry)`);
   } else {
     console.log(`  skip:    ${PARTY_AUTH_CONSENT_COLLECTION} (already exists)`);
+  }
+
+  // SD-91/SD-16: PartyEnrolledCredential — user authenticator registry (public keys only, no CHD).
+  if (!existingNames.has(PARTY_ENROLLED_CREDENTIAL_COLLECTION) || reset) {
+    if (existingNames.has(PARTY_ENROLLED_CREDENTIAL_COLLECTION) && reset) {
+      await db.collection(PARTY_ENROLLED_CREDENTIAL_COLLECTION).drop();
+      console.log(`  dropped: ${PARTY_ENROLLED_CREDENTIAL_COLLECTION}`);
+    }
+    await db.createCollection(PARTY_ENROLLED_CREDENTIAL_COLLECTION);
+    console.log(`  created: ${PARTY_ENROLLED_CREDENTIAL_COLLECTION} (passwordless credentials, public keys only)`);
+  } else {
+    console.log(`  skip:    ${PARTY_ENROLLED_CREDENTIAL_COLLECTION} (already exists)`);
+  }
+
+  // SD-91: PartyBackchannelAuthentication — CIBA auth_req_id lifecycle (TTL-expiring, one-time).
+  if (!existingNames.has(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION) || reset) {
+    if (existingNames.has(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION) && reset) {
+      await db.collection(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION).drop();
+      console.log(`  dropped: ${PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION}`);
+    }
+    await db.createCollection(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION);
+    console.log(`  created: ${PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION} (CIBA backchannel requests, TTL)`);
+  } else {
+    console.log(`  skip:    ${PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION} (already exists)`);
   }
 
   // merchantWebhookDeliveryLog — persisted delivery attempt records (ADR-038)

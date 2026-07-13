@@ -5,5 +5,5 @@ const key = randomBytes(96).toString('base64');
 
 console.log('\n🔑  Local Master Key generated (96 bytes, base64)\n');
 console.log('Add the following line to your .env file:\n');
-console.log(`KMS_LOCAL_MASTER_KEY=${key}`);
-console.log('\nAlso ensure:\n  KMS_PROVIDER=local\n');
+console.log(`PSP_KMS_LOCAL_MASTER_KEY=${key}`);
+console.log('\nAlso ensure:\n  PSP_KMS_PROVIDER=local\n');

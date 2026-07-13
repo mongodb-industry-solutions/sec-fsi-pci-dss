@@ -271,6 +271,19 @@ External systems such as Leafy Bank or Agentic ThreatSight360 **may** consume th
 | 20.6 | Mandate can be cancelled: `mandateStatus` updates to `'cancelled'` and the card is no longer offered | Cancelled card does not appear on next payment; `preferredPaymentCardReference` is cleared |
 | 20.7 | Explainer panel: "No card data is stored in your browser: only a token, encrypted in Atlas" | Panel is visible on the saved card selection screen |
 
+#### FR-v3-20b: SD-88 Self-Service Card Management (as implemented)
+
+Card-on-file management is its own section (`/system/cards` list + `/system/cards/[cardId]` detail), **not** part of `/system/profile`. This subsection records the API contract as implemented (BIAN SD-88, customer-only, ownership + audit enforced server-side), which supersedes the earlier assumption that a card was revoked via `PATCH {paymentCardStatus:'revoked'}` and that `paymentCardIsPreferred` was toggled via `PATCH` on an existing card.
+
+| # | Requirement | Acceptance Criteria |
+|---|---|---|
+| 20b.1 | List saved cards | `GET /api/v1/customer/:customerId/cards` returns the customer's cards (masked PAN + status); rendered by `SavedCardsPanel` at `/system/cards` |
+| 20b.2 | Add a card, optionally marking it preferred | `POST /api/v1/customer/:customerId/cards` with `paymentCardIsPreferred?: boolean`. **Preferred is set only at add time** (checkbox on `/system/cards/new`); there is no toggle-preferred action on an existing card |
+| 20b.3 | View card detail | `GET /api/v1/customer/:customerId/cards/:cardId` (surrogate token, expiry QE:none, alias/note) |
+| 20b.4 | Edit alias/note only | `PATCH /api/v1/customer/:customerId/cards/:cardId` — alias/note are the only mutable attributes |
+| 20b.5 | Deactivate / reactivate a card | `PATCH /api/v1/customer/:customerId/cards/:cardId/status { active: boolean }`; a deactivated card is declined by the PSP on every operation regardless of issuer decision |
+| 20b.6 | Remove a card (soft-delete, replaces the old revoke-via-status) | `DELETE /api/v1/customer/:customerId/cards/:cardId`; confirmation dialog required; emits a compliance audit event server-side (PCI DSS Req 10) |
+
 #### FR-v3-21: Performance Visualization (Backend + Frontend)
 
 | # | Requirement | Acceptance Criteria |
@@ -622,6 +635,41 @@ Close the money-movement cycle so it is precise with no balance discrepancy at o
 - [ ] Unit tests green (funds gate compensation, FX, checkFunds); `npm run build` exits 0.
 - [ ] (Pending infra) integration + E2E green.
 
+## v18 — Merchant SSO App + Commission & Activity Attribution
+
+> Delivered under **development plan v18** (`tmp/dev.v17.plan.md` lineage). "v18" is a development-plan
+> iteration, not a product release version (product themes are v1–v5). FR ids below carry the `v18` tag
+> for traceability only.
+
+### Objective
+Give merchants an external, SSO-authenticated experience: sign in with their PSP identity, view the PSP
+activity attributed to them, and configure their commission — without forking the PSP data model or
+crossing the CHD boundary. See [engineering-proposal.md ADR-041](engineering-proposal.md).
+
+### FR-v18: Functional Requirements
+
+| ID | Requirement | Acceptance criteria | Status |
+|---|---|---|---|
+| FR-v18-01 | Merchant SSO app | Standalone Next.js app `merchant/` (no DB, no Fastify) authenticates via OAuth2/OIDC SSO as a confidential client and reads PSP data via the PSP API only; local port `8082` / container `8080`; env prefix `PSP_MERCHANT_` | ✅ |
+| FR-v18-02 | Commission model | Numeric fee reuses `paymentExecutionProcedure.feeAmount` (SD-65) + attribution sub-doc `fee {feeMerchantReference, feeRateApplied, feeCollectedDateTime}`; rate `merchantCommissionRate` on SD-89, editable in merchant settings and audited; `commissionRevenue` derived. No new collection | ✅ |
+| FR-v18-03 | PSP merchant activity view | PSP staff can view activity attributed per merchant, driven by `businessProcessEvent` attribution fields (`clientId`, `merchantAgreementReference`, `actingPartyReference`, `actingChannel`) — no new collection | ✅ |
+| FR-v18-04 | Cross-merchant authorizations audit | L1 / L2 / auditor can audit authorizations across merchants (per-merchant filter, acting party, channel) | ✅ |
+| FR-v18-05 | Authorized Applications | End users see "Authorized Applications" (connected apps) with per-app operations (view / revoke) | ✅ |
+| FR-v18-06 | Granular + incremental consent | User selects scopes at consent; unknown scope → `invalid_scope` (RFC 6749); broadening scope forces re-consent; scopes use PSP `verb:resource` convention | ✅ |
+| FR-v18-07 | Merchant branding | Merchant app branding driven by OIDC client metadata `logo_uri` / `client_uri` | ✅ |
+| FR-v18-08 | Boundary & scopes | Merchant-facing PSP endpoints use `skipAuth` + `validateMerchantToken` + sub-binding; least-privilege scopes; no CHD in merchant app (PCI SAQ A); IBAN masked-only (GDPR/PSD2) | ✅ |
+
+### Definition of Done — v18
+- [x] Merchant app runs standalone (no DB/Fastify), SSO login, PSP-API-only integration.
+- [x] Commission modelled BIAN-purely (SD-65 fee + attribution sub-doc, SD-89 rate) with no new collection; rate configurable in merchant settings and audited.
+- [x] PSP merchant activity view + cross-merchant authorizations audit for L1/L2/auditor via `businessProcessEvent` attribution.
+- [x] User "Authorized Applications" with per-app operations; granular + incremental OAuth consent (`invalid_scope`, re-consent on broadening).
+- [x] Merchant branding via `logo_uri`; PCI SAQ A held, IBAN masked-only.
+- [x] `npm run build` exits 0 (backend + merchant app).
+- [ ] Follow-ups: A-06 runtime fee wiring (revenue currently seed-based); API-driven payment OAuth path.
+
+*Added 2026-07-06 (v18).*
+
 ## Cross-iteration NFRs
 
 These requirements apply to all versions from v1 onward:
@@ -662,3 +710,41 @@ recurring mandates + scheduler; UI enabled; docs + wiki published. ⏳ Remaining
 `tmp/dev.v17.plan.md`.
 
 *Added 2026-07-04 (v17.1).*
+
+## CIBA + Passwordless Enrollment (SD-91/SD-16)
+
+> Delivered under **development plan v24** (`tmp/dev.v24.plan.md`). Development-plan iteration, not a
+> product release. FR ids carry the `v24` tag for traceability only. Authentication-only; payment
+> authorization via CIBA is deferred pending PSD2 RTS Art.5 dynamic linking.
+
+### Objective
+Add OIDC CIBA (Client-Initiated Backchannel Authentication) + WebAuthn-style passwordless credential
+enrollment to the existing OAuth 2.0/OIDC server. A third-party client starts authentication of a user
+with no browser redirect and no password; the user approves out-of-band by signing a server challenge
+with an enrolled device key. Real software authenticator (browser WebCrypto), no mocks. See
+[technical-spec.md §12](technical-spec.md#12-v24--ciba--passwordless-enrollment-sd-91sd-16).
+
+### FR-v24: Functional Requirements
+
+| ID | Requirement | Acceptance criteria | Status |
+|---|---|---|---|
+| FR-v24-01 | Passwordless enrollment | Session-gated register/list/rotate/revoke of asymmetric credentials; public key only stored; signed challenge proves possession; owner-scoped (never another user's) | ✅ |
+| FR-v24-02 | CIBA bc-authorize | Client-authenticated `POST /bc-authorize` accepts exactly one hint (`login_hint`/`login_hint_token`/`id_token_hint`); >1 → `invalid_request`; unauthorized client → `unauthorized_client`; returns `auth_req_id`/`expires_in`/`interval` | ✅ |
+| FR-v24-03 | Assertion-authenticated approval | `GET :authReqId` returns challenge without a session; approval verifies the signature vs stored public key + owner==hint sub + monotonic signCount; bad/absent signature rejected; no session required (passwordless) | ✅ |
+| FR-v24-04 | CIBA token grant | ciba grant on existing `/token`; poll returns `authorization_pending`/`slow_down`/`expired_token`/`access_denied`; approved → tokens via `issueTokens()`; cross-client redemption + replay → `invalid_grant` | ✅ |
+| FR-v24-05 | Delivery modes | poll (baseline) + ping + push via low-level `deliverWebhook` (Bearer = client_notification_token); ping/push without token → `invalid_request`; non-HTTPS notification endpoint rejected at registration; demo stub receiver | ✅ |
+| FR-v24-06 | Both signing algs | RS256 + ES256 supported (polymorphic verifier; ES256 accepts raw r\|\|s WebCrypto form); discovery advertises both | ✅ |
+| FR-v24-07 | Discovery | `/.well-known/openid-configuration` advertises `backchannel_authentication_endpoint`, delivery modes, signing algs, ciba grant | ✅ |
+| FR-v24-08 | PSP frontend | "Passwordless credentials" section (enroll/rotate/revoke, browser WebCrypto non-extractable + IndexedDB); Authorized Applications shows a "Passwordless (CIBA)" badge and revokes client authorization | ✅ |
+| FR-v24-09 | Setup/seed | `--reset` + reseed reproduces the two collections, indexes, the demo credential and the ciba-enabled client | ✅ |
+
+### Definition of Done — v24
+- [x] Enrollment + CIBA endpoints live under flat `/api/v1/auth/` (token endpoint unchanged, new grant branch).
+- [x] Public keys only stored (PCI Req.3); anti-replay via one-time auth_req_id + monotonic signCount (Req.8); audit via `emitComplianceEvent` (Req.10); HTTPS notification endpoint for ping/push (Req.4).
+- [x] AAL1 stated precisely (real software authenticator + user-presence); AAL2 deferred to platform UV with no contract change; no mock authenticator.
+- [x] PSP frontend credentials section + Authorized-Apps CIBA badge; browser key non-extractable in IndexedDB.
+- [x] setup/seed updated (collections, indexes, demo credential, ciba client); technical-spec §12 + this roadmap updated in the same change.
+- [x] Backend + frontend `tsc --noEmit` clean; signature-verifier unit tests pass (7/7, incl. seed fixture round-trip); CIBA integration tests authored (run with `TEST_MONGODB_URI`).
+- [ ] Follow-ups: downstream v25 merchant-app passwordless UX; AAL2 platform UV; CIBA payment authorization + PSD2 dynamic linking.
+
+*Added 2026-07-09 (v24).*

@@ -122,7 +122,8 @@ async function main() {
     const partyId = uuid();
     const email = i < 2 ? demoCustomerEmails[i] : faker.internet.email().toLowerCase();
     const name = i < 2 ? demoCustomerNames[i] : faker.person.fullName();
-    const phone = i < 2 ? demoCustomerPhones[i] : faker.phone.number('+44 7### ######');
+    // faker v10 dropped the format-string overload of phone.number(); build the UK mobile shape explicitly.
+    const phone = i < 2 ? demoCustomerPhones[i] : `+44 7${faker.string.numeric(3)} ${faker.string.numeric(6)}`;
 
     customerPartyIds.push(partyId);
     customerEmails.push(email);
@@ -459,6 +460,41 @@ async function main() {
       actionDetails: { trigger: riskIndicators[0] ?? 'manual' },
       schemaVersion: 1,
     });
+  }
+
+  // -- Consistency guard (prevents party/auth email drift) ----------─
+  // The self-profile lookup resolves a customer's agreement via QE:equality
+  // match of party.partyEmailAddress == login email (customerAgreement.service
+  // getSelfProfile). If any authentication's email has no party whose
+  // partyEmailAddress matches exactly — or its partyInstanceReference points
+  // to a non-existent party — /system/cards silently returns empty. Fail loud
+  // at generation time instead of shipping drifted seed data.
+  const partyByRef = new Map(parties.map((p) => [p.partyInstanceReference, p]));
+  const partyEmails = new Set(parties.map((p) => p.partyEmailAddress));
+  const drift: string[] = [];
+  for (const auth of customerAuthentications) {
+    const party = partyByRef.get(auth.partyInstanceReference);
+    if (!party) {
+      drift.push(
+        `login ${auth.customerAuthenticationEmailAddress} → partyInstanceReference ` +
+          `${auth.partyInstanceReference} has no matching party record`,
+      );
+      continue;
+    }
+    if (party.partyEmailAddress !== auth.customerAuthenticationEmailAddress) {
+      drift.push(
+        `login ${auth.customerAuthenticationEmailAddress} → party ` +
+          `${auth.partyInstanceReference} partyEmailAddress is ` +
+          `${party.partyEmailAddress} (must equal the login email)`,
+      );
+    } else if (!partyEmails.has(auth.customerAuthenticationEmailAddress)) {
+      drift.push(`login ${auth.customerAuthenticationEmailAddress} has no party with matching partyEmailAddress`);
+    }
+  }
+  if (drift.length > 0) {
+    throw new Error(
+      `Seed consistency check failed — party/authentication email drift:\n  - ${drift.join('\n  - ')}`,
+    );
   }
 
   // -- Write files --------------------------------------------------─

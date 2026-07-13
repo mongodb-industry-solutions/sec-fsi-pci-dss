@@ -31,6 +31,8 @@ services:
       PSP_PROJECT_ROOT: /app
       PSP_CORS_ORIGIN: "http://localhost:8080,http://127.0.0.1:8080"
       MONGODB_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
+      # Used by the merchant seeder to resolve the OIDC branding URLs (logo_uri/client_uri).
+      PSP_MERCHANT_BASE_URL: ${PSP_MERCHANT_BASE_URL:-http://localhost:8082}
     volumes:
       - ./backend/keys:/app/backend/keys:ro
     healthcheck:
@@ -46,12 +48,43 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC: ${NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC:-http://localhost:8081}
+        NEXT_PUBLIC_PSP_URL_MERCHANT: ${PSP_MERCHANT_BASE_URL:-http://localhost:8082}
     ports:
       - "8080:8080"
     env_file:
       - .env
     environment:
       NODE_ENV: ${NODE_ENV:-development}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # External merchant demo (Espresso Works). Autonomous Next.js app, NO database.
+  # Integrates with the PSP purely via OAuth2/OIDC SSO + API. Container on 8080, host 8082.
+  merchant:
+    build:
+      context: ./merchant
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8080"  # host:container — mirrors the frontend convention
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PSP_MERCHANT_PORT: 8080
+      PSP_MERCHANT_BASE_URL: ${PSP_MERCHANT_BASE_URL:-http://localhost:8082}
+      # Inside the compose network the PSP API is reachable as the backend service on 8080.
+      PSP_MERCHANT_PSP_BASE_URL: ${PSP_MERCHANT_PSP_BASE_URL:-http://backend:8080}
+      PSP_MERCHANT_AUTHORIZE_URL: ${PSP_MERCHANT_AUTHORIZE_URL:-http://localhost:8080/auth/authorize}
+      PSP_MERCHANT_OAUTH_CLIENT_ID: ${PSP_MERCHANT_OAUTH_CLIENT_ID:-oauth001-0000-4000-8000-000000000001}
+      PSP_MERCHANT_OAUTH_CLIENT_SECRET: ${PSP_MERCHANT_OAUTH_CLIENT_SECRET:-espresso-demo-secret-2026}
+      PSP_MERCHANT_SESSION_SECRET: ${PSP_MERCHANT_SESSION_SECRET:-change-me-to-a-32-byte-random-secret-value}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
     depends_on:
       backend:
         condition: service_healthy

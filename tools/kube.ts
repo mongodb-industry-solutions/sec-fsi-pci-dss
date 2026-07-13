@@ -41,6 +41,7 @@ function contextName(apiUrl: string): string {
 const DEMO_NAME = process.env.KUBE_DEMO_NAME ?? "sec-fsi-pci-dss";
 const RELEASE_BACKEND = process.env.KUBE_RELEASE_BACKEND ?? `${DEMO_NAME}-backend`;
 const RELEASE_FRONTEND = process.env.KUBE_RELEASE_FRONTEND ?? `${DEMO_NAME}-frontend`;
+const RELEASE_MERCHANT = process.env.KUBE_RELEASE_MERCHANT ?? `${DEMO_NAME}-merchant`;
 const KSEC_SECRET_STAGING = process.env.KUBE_KSEC_SECRET_STAGING ?? `${DEMO_NAME}-secrets-staging`;
 const KSEC_SECRET_PROD = process.env.KUBE_KSEC_SECRET_PROD ?? `${DEMO_NAME}-secrets-prod`;
 
@@ -175,7 +176,7 @@ async function installKsecPlugin() {
     ? { ...process.env, PATH: `C:\\Program Files\\Git\\usr\\bin;${process.env.PATH}` }
     : process.env;
   spawnSync("helm", ["plugin", "install", "https://github.com/kanopy-platform/ksec", "--verify=false"], {
-    shell: true, stdio: "inherit", env: shellEnv,
+    shell: IS_WIN, stdio: "inherit", env: shellEnv,
   });
   runCapture("helm plugin list").stdout.includes("ksec")
     ? ok("ksec plugin installed.")
@@ -256,15 +257,20 @@ async function generateKubeconfig() {
     }
 
     const loginEnv = { ...process.env, KUBECONFIG: configFile };
+    const ctx = contextName(cluster === "prod" ? PROD_API : STAGING_API);
+    const ctxResult = spawnSync("kubectl", ["config", "use-context", ctx], { shell: IS_WIN, stdio: "pipe", env: loginEnv });
+    if (ctxResult.status !== 0) {
+      warn(`Could not select context "${ctx}" (it may not exist yet). Continuing to login, which can create it.`);
+    }
     console.log(`${DIM}[cmd]    kanopy-oidc kube login${NC}`);
-    const loginResult = spawnSync("kanopy-oidc", ["kube", "login"], { shell: true, stdio: "inherit", env: loginEnv });
+    const loginResult = spawnSync("kanopy-oidc", ["kube", "login"], { shell: IS_WIN, stdio: "inherit", env: loginEnv });
     if (loginResult.status !== 0) {
       warn(`Login failed for ${cluster}. You can retry with option 7 later.`);
     }
 
     console.log(`${DIM}[cmd]    kubectl config set-context ... --namespace=${IST_NAMESPACE}${NC}`);
     spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], {
-      shell: true, stdio: "inherit", env: loginEnv,
+      shell: IS_WIN, stdio: "inherit", env: loginEnv,
     });
 
     ok(`Kubeconfig for '${cluster}' saved at ${configFile}`);
@@ -284,10 +290,22 @@ async function kanopyLogin() {
   for (const cluster of clusters) {
     const cfg = join(KUBE_DIR, `config.${cluster}`);
     if (!existsSync(cfg)) { fail(`Kubeconfig not found: ${cfg}. Run option 6 first.`); continue; }
+    const env = { ...process.env, KUBECONFIG: cfg };
+    const apiServer = cluster === "prod" ? PROD_API : STAGING_API;
+    const ctx = contextName(apiServer);
+
+    // kanopy-oidc kube login authenticates the kubeconfig's current-context.
+    // If the file's current-context points at another cluster (e.g. prod),
+    // login fails with "context ... does not exist". Pin it first.
+    action(`Selecting context '${ctx}' in ${cfg}`);
+    const setCtx = spawnSync("kubectl", ["config", "use-context", ctx], { shell: IS_WIN, stdio: "pipe", env });
+    if (setCtx.status !== 0) {
+      warn(`Context '${ctx}' not found in ${cfg}. Regenerate it with option 6.`);
+      continue;
+    }
+
     action(`Logging in with config: ${cfg}`);
-    const result = spawnSync("kanopy-oidc", ["kube", "login"], {
-      shell: true, stdio: "inherit", env: { ...process.env, KUBECONFIG: cfg },
-    });
+    const result = spawnSync("kanopy-oidc", ["kube", "login"], { shell: IS_WIN, stdio: "inherit", env });
     result.status === 0 ? ok(`Login successful for ${cluster}`) : fail(`Login failed for ${cluster}`);
   }
 }
@@ -298,8 +316,8 @@ async function switchContext() {
   const target = input === "2" ? PROD_API : STAGING_API;
   const kubeconfig = `${join(KUBE_DIR, "config.staging")}${IS_WIN ? ";" : ":"}${join(KUBE_DIR, "config.prod")}`;
   const env = { ...process.env, KUBECONFIG: kubeconfig };
-  spawnSync("kubectl", ["config", "use-context", contextName(target)], { shell: true, stdio: "inherit", env });
-  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "inherit", env });
+  spawnSync("kubectl", ["config", "use-context", contextName(target)], { shell: IS_WIN, stdio: "inherit", env });
+  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: IS_WIN, stdio: "inherit", env });
   ok(`Switched to ${target} / ${IST_NAMESPACE}`);
 }
 
@@ -307,7 +325,7 @@ async function verifyAccess() {
   action("Verifying cluster access...");
   const kubeconfig = `${join(KUBE_DIR, "config.staging")}${IS_WIN ? ";" : ":"}${join(KUBE_DIR, "config.prod")}`;
   const env = { ...process.env, KUBECONFIG: kubeconfig };
-  const result = spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env });
+  const result = spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
   result.status === 0 ? ok("Access verified.") : fail("Access failed. Try: kanopy-oidc kube login");
 }
 
@@ -331,8 +349,8 @@ async function createSecrets() {
 
   action(`Switching context to ${apiServer}...`);
   const env = kubeEnv();
-  spawnSync("kubectl", ["config", "use-context", contextName(apiServer)], { shell: true, stdio: "pipe", env });
-  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "use-context", contextName(apiServer)], { shell: IS_WIN, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: IS_WIN, stdio: "pipe", env });
 
   if (!existsSync(ENV_PATH)) { fail(`.env not found at ${ENV_PATH}`); return; }
 
@@ -367,7 +385,7 @@ async function createSecrets() {
 
 async function listSecrets() {
   action("Listing ksec secrets in current context...");
-  spawnSync("helm", ["ksec", "list"], { shell: true, stdio: "inherit", env: kubeEnv() });
+  spawnSync("helm", ["ksec", "list"], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
 }
 
 async function getSecret() {
@@ -375,7 +393,7 @@ async function getSecret() {
   console.log(`    - ${KSEC_SECRET_STAGING} (staging)`);
   console.log(`    - ${KSEC_SECRET_PROD} (production)\n`);
   const name = (await ask(`Secret name (default: ${KSEC_SECRET_STAGING}): `)) || KSEC_SECRET_STAGING;
-  spawnSync("helm", ["ksec", "get", name], { shell: true, stdio: "inherit", env: kubeEnv() });
+  spawnSync("helm", ["ksec", "get", name], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
 }
 
 async function manageSecretKeys() {
@@ -388,8 +406,8 @@ async function manageSecretKeys() {
   const env = kubeEnv();
 
   action(`Switching context to ${apiServer}...`);
-  spawnSync("kubectl", ["config", "use-context", contextName(apiServer)], { shell: true, stdio: "pipe", env });
-  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "use-context", contextName(apiServer)], { shell: IS_WIN, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: IS_WIN, stdio: "pipe", env });
 
   console.log(`\n  Secret: ${CYAN}${secretName}${NC}\n`);
   console.log("  1. Set/overwrite a key");
@@ -431,53 +449,87 @@ async function manageSecretKeys() {
 //  4. DEPLOYMENT
 // ============================================================
 
+// List all pods in the namespace (backend, frontend AND merchant). A label selector like
+// `app.kubernetes.io/instance in (a,b)` contains spaces/parens that the Windows shell mangles under
+// spawnSync (shell: IS_WIN) and it also silently excluded the merchant — so list them all with -o wide.
 async function getPods() {
-  spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "-l", `app.kubernetes.io/instance in (${RELEASE_BACKEND},${RELEASE_FRONTEND})`], { shell: true, stdio: "inherit", env: kubeEnv() });
+  spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "-o", "wide"], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
 }
 
 async function getAll() {
   const env = kubeEnv();
   console.log("--- Pods ---");
-  spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "-l", `app.kubernetes.io/instance in (${RELEASE_BACKEND},${RELEASE_FRONTEND})`], { shell: true, stdio: "inherit", env });
+  spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "-o", "wide"], { shell: IS_WIN, stdio: "inherit", env });
   console.log("\n--- Deployments ---");
-  spawnSync("kubectl", ["get", "deployments", "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env });
+  spawnSync("kubectl", ["get", "deployments", "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
   console.log("\n--- Services ---");
-  spawnSync("kubectl", ["get", "services", "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env });
+  spawnSync("kubectl", ["get", "services", "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
   console.log("\n--- Ingress ---");
-  spawnSync("kubectl", ["get", "ingress", "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env });
+  spawnSync("kubectl", ["get", "ingress", "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
 }
 
 async function podLogs() {
-  console.log("\n  1. backend\n  2. frontend");
+  // Custom covers anything not fixed here (e.g. the merchant, which isn't always deployed, or any
+  // pod visible under option 14) — enter its exact pod name.
+  console.log("\n  1. backend\n  2. frontend\n  3. custom (enter a pod name)");
   const input = await ask("Which service? ");
-  const release = input === "2" ? RELEASE_FRONTEND : RELEASE_BACKEND;
+  if (!["1", "2", "3"].includes(input)) { warn(`Invalid choice "${input}". Choose 1, 2 or 3.`); return; }
   const tail = (await ask("Lines to show (default: 50): ")) || "50";
-  spawnSync("kubectl", ["logs", "-l", `app.kubernetes.io/instance=${release}`, "-n", IST_NAMESPACE, `--tail=${tail}`], { shell: true, stdio: "inherit", env: kubeEnv() });
+  const env = kubeEnv();
+
+  if (input === "3") {
+    const entered = (await ask("Pod or deployment name: ")).trim();
+    if (!entered) { warn("No name given."); return; }
+    // kubectl logs needs a real POD name. Accept a deployment/release name too: if the entry isn't an
+    // exact pod, resolve the NEWEST pod whose name starts with it (pod = <deployment>-<hash>-<hash>).
+    // --sort-by=.metadata.creationTimestamp gives true chronological order (a lexicographic sort of the
+    // random hash suffix would NOT). `-o name` + that flag avoid braces/spaces → safe under the Windows shell.
+    const list = spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "--sort-by=.metadata.creationTimestamp", "-o", "name"], { shell: IS_WIN, encoding: "utf-8", env });
+    const names = (list.stdout || "").split(/\r?\n/).map((l) => l.replace(/^pod\//, "").trim()).filter(Boolean);
+    let pod = entered;
+    if (!names.includes(entered)) {
+      const matches = names.filter((n) => n.startsWith(entered)); // preserve creation order (oldest→newest)
+      if (matches.length === 0) { warn(`No pod found matching "${entered}" in ${IST_NAMESPACE}.`); return; }
+      pod = matches[matches.length - 1]; // newest
+      console.log(`${DIM}[resolved] ${entered} -> ${pod}${NC}`);
+    }
+    // --previous shows the last crashed instance (useful for CrashLoopBackOff).
+    const prev = (await ask("Show the CRASHED (previous) container's logs instead of the current one? Use this for CrashLoopBackOff. [y/N]: ")).trim().toLowerCase() === "y";
+    const args = ["logs", pod, "-n", IST_NAMESPACE, `--tail=${tail}`, "--all-containers"];
+    if (prev) args.push("--previous");
+    spawnSync("kubectl", args, { shell: IS_WIN, stdio: "inherit", env });
+    return;
+  }
+
+  const release = input === "2" ? RELEASE_FRONTEND : RELEASE_BACKEND;
+  spawnSync("kubectl", ["logs", "-l", `app.kubernetes.io/instance=${release}`, "-n", IST_NAMESPACE, `--tail=${tail}`, "--all-containers"], { shell: IS_WIN, stdio: "inherit", env });
 }
 
 async function helmStatus() {
   const env = kubeEnv();
   console.log("--- Backend ---");
-  spawnSync("helm", ["status", RELEASE_BACKEND, "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env });
+  spawnSync("helm", ["status", RELEASE_BACKEND, "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
   console.log("\n--- Frontend ---");
-  spawnSync("helm", ["status", RELEASE_FRONTEND, "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env });
+  spawnSync("helm", ["status", RELEASE_FRONTEND, "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
 }
 
 async function rolloutRestart() {
-  console.log("\n  1. backend\n  2. frontend\n  3. both");
+  console.log("\n  1. backend\n  2. frontend\n  3. merchant\n  4. all");
   const input = await ask("Restart which? ");
+  if (!["1", "2", "3", "4"].includes(input)) { warn(`Invalid choice "${input}". Choose 1-4.`); return; }
+  // Must run with KUBECONFIG pointing at the staging/prod configs (kubeEnv), otherwise kubectl hits
+  // the default/wrong context. run()/execSync does not set it, so use spawnSync with env: kubeEnv().
   const env = kubeEnv();
-  if (input === "1" || input === "3") {
-    run(`kubectl rollout restart deployment ${RELEASE_BACKEND}-web-app -n ${IST_NAMESPACE}`);
-  }
-  if (input === "2" || input === "3") {
-    run(`kubectl rollout restart deployment ${RELEASE_FRONTEND}-web-app -n ${IST_NAMESPACE}`);
-  }
+  const restart = (release: string) =>
+    spawnSync("kubectl", ["rollout", "restart", "deployment", `${release}-web-app`, "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
+  if (input === "1" || input === "4") restart(RELEASE_BACKEND);
+  if (input === "2" || input === "4") restart(RELEASE_FRONTEND);
+  if (input === "3" || input === "4") restart(RELEASE_MERCHANT);
   ok("Rollout restart initiated.");
 }
 
 async function resourceUsage() {
-  spawnSync("kubectl", ["top", "pods", "-n", IST_NAMESPACE, "--containers"], { shell: true, stdio: "inherit", env: kubeEnv() });
+  spawnSync("kubectl", ["top", "pods", "-n", IST_NAMESPACE, "--containers"], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
 }
 
 // ============================================================
@@ -504,8 +556,8 @@ async function extractDroneSecrets() {
   const env = kubeEnv();
 
   action("Switching to staging context...");
-  spawnSync("kubectl", ["config", "use-context", contextName(STAGING_API)], { shell: true, stdio: "pipe", env });
-  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "use-context", contextName(STAGING_API)], { shell: IS_WIN, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: IS_WIN, stdio: "pipe", env });
 
   console.log("\n--- staging_kubernetes_token ---");
   const stagingToken = runCapture(`kubectl get secret ${CICD_TOKEN_SECRET} -o jsonpath="{.data.token}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`);
@@ -558,8 +610,8 @@ async function configureDroneSecrets() {
   const env = kubeEnv();
   const clusterSecrets: Array<{ name: string; value: string }> = [];
 
-  spawnSync("kubectl", ["config", "use-context", contextName(STAGING_API)], { shell: true, stdio: "pipe", env });
-  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "use-context", contextName(STAGING_API)], { shell: IS_WIN, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: IS_WIN, stdio: "pipe", env });
 
   const stagingToken = decodeB64(runCapture(`kubectl get secret ${CICD_TOKEN_SECRET} -o jsonpath="{.data.token}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`).stdout);
   if (stagingToken) clusterSecrets.push({ name: "staging_kubernetes_token", value: stagingToken });
@@ -597,7 +649,7 @@ async function configureDroneSecrets() {
 
   for (const s of clusterSecrets) {
     const result = spawnSync("drone", ["secret", "add", "--repository", repo, "--name", s.name, "--data", s.value], {
-      shell: true, encoding: "utf-8", stdio: "pipe", env: droneEnv,
+      shell: IS_WIN, encoding: "utf-8", stdio: "pipe", env: droneEnv,
     });
     if (result.status === 0) {
       console.log(`  ${GREEN}[ok]${NC} ${s.name}`);
@@ -607,7 +659,7 @@ async function configureDroneSecrets() {
       // "update" means the secret exists — try drone secret update instead
       if (err.includes("exists") || err.includes("update")) {
         const upd = spawnSync("drone", ["secret", "update", "--repository", repo, "--name", s.name, "--data", s.value], {
-          shell: true, encoding: "utf-8", stdio: "pipe", env: droneEnv,
+          shell: IS_WIN, encoding: "utf-8", stdio: "pipe", env: droneEnv,
         });
         if (upd.status === 0) {
           console.log(`  ${GREEN}[ok]${NC} ${s.name} (updated)`);
@@ -658,36 +710,38 @@ async function describePod() {
   const env = kubeEnv();
   let podName = await ask("Pod name (Enter to list): ");
   if (!podName) {
-    spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "-o", "name"], { shell: true, stdio: "inherit", env });
+    spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "-o", "name"], { shell: IS_WIN, stdio: "inherit", env });
     podName = await ask("\nPod name: ");
   }
-  if (podName) spawnSync("kubectl", ["describe", "pod", podName, "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env });
+  if (podName) spawnSync("kubectl", ["describe", "pod", podName, "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
 }
 
 async function execIntoPod() {
-  console.log("\n  1. backend\n  2. frontend");
+  console.log("\n  1. backend\n  2. frontend\n  3. merchant");
   const input = await ask("Which service? ");
-  const release = input === "2" ? RELEASE_FRONTEND : RELEASE_BACKEND;
+  if (!["1", "2", "3"].includes(input)) { warn(`Invalid choice "${input}". Choose 1, 2 or 3.`); return; }
+  const release = input === "2" ? RELEASE_FRONTEND : input === "3" ? RELEASE_MERCHANT : RELEASE_BACKEND;
   const deployment = `${release}-web-app`;
   console.log(`${DIM}[cmd]    kubectl exec -it deployment/${deployment} -n ${IST_NAMESPACE} -- sh${NC}`);
-  spawnSync("kubectl", ["exec", "-it", `deployment/${deployment}`, "-n", IST_NAMESPACE, "--", "sh"], { shell: true, stdio: "inherit", env: kubeEnv() });
+  spawnSync("kubectl", ["exec", "-it", `deployment/${deployment}`, "-n", IST_NAMESPACE, "--", "sh"], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
 }
 
 async function checkEnvVars() {
-  console.log("\n  1. backend\n  2. frontend");
+  console.log("\n  1. backend\n  2. frontend\n  3. merchant");
   const input = await ask("Which service? ");
-  const release = input === "2" ? RELEASE_FRONTEND : RELEASE_BACKEND;
+  if (!["1", "2", "3"].includes(input)) { warn(`Invalid choice "${input}". Choose 1, 2 or 3.`); return; }
+  const release = input === "2" ? RELEASE_FRONTEND : input === "3" ? RELEASE_MERCHANT : RELEASE_BACKEND;
   const deployment = `${release}-web-app`;
-  spawnSync("kubectl", ["exec", `deployment/${deployment}`, "-n", IST_NAMESPACE, "--", "env"], { shell: true, stdio: "inherit", env: kubeEnv() });
+  spawnSync("kubectl", ["exec", `deployment/${deployment}`, "-n", IST_NAMESPACE, "--", "env"], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
 }
 
 async function getIngress() {
-  spawnSync("kubectl", ["get", "ingress", "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env: kubeEnv() });
+  spawnSync("kubectl", ["get", "ingress", "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
 }
 
 async function describeIngress() {
   const env = kubeEnv();
-  const result = spawnSync("kubectl", ["get", "ingress", "-n", IST_NAMESPACE, "-o", "name"], { shell: true, encoding: "utf-8", env });
+  const result = spawnSync("kubectl", ["get", "ingress", "-n", IST_NAMESPACE, "-o", "name"], { shell: IS_WIN, encoding: "utf-8", env });
   const names = (result.stdout || "").split(/\r?\n/).filter(Boolean);
   if (names.length === 0) { warn("No ingress resources found."); return; }
 
@@ -701,10 +755,10 @@ async function describeIngress() {
   if (input === String(names.length + 1) || input.toLowerCase() === "all") {
     for (const n of names) {
       console.log(`\n--- ${n} ---`);
-      spawnSync("kubectl", ["describe", n, "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env });
+      spawnSync("kubectl", ["describe", n, "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
     }
   } else if (idx >= 0 && idx < names.length) {
-    spawnSync("kubectl", ["describe", names[idx], "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env });
+    spawnSync("kubectl", ["describe", names[idx], "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
   } else {
     warn("Invalid selection.");
   }
@@ -721,13 +775,13 @@ async function helmGetValues() {
 
   for (const release of releases) {
     console.log(`\n${CYAN}--- ${release} ---${NC}`);
-    spawnSync("helm", ["get", "values", release, "-n", IST_NAMESPACE], { shell: true, stdio: "inherit", env });
+    spawnSync("helm", ["get", "values", release, "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
   }
 }
 
 async function testUrls() {
   const env = kubeEnv();
-  const ctx = spawnSync("kubectl", ["config", "current-context"], { shell: true, encoding: "utf-8", env }).stdout.trim();
+  const ctx = spawnSync("kubectl", ["config", "current-context"], { shell: IS_WIN, encoding: "utf-8", env }).stdout.trim();
   const isStaging = ctx.includes("staging");
   const bUrl = `https://${isStaging ? STAGING_HOST_BE : PROD_HOST_BE}/health`;
   const fUrl = `https://${isStaging ? STAGING_HOST_FE : PROD_HOST_FE}`;
@@ -850,8 +904,13 @@ async function deployEnvSetup() {
 
   // Login
   action(`Authenticating to ${envLabel}...`);
+  const loginEnv = { ...process.env, KUBECONFIG: configFile };
+  const ctxResult = spawnSync("kubectl", ["config", "use-context", contextName(apiServer)], { shell: IS_WIN, stdio: "pipe", env: loginEnv });
+  if (ctxResult.status !== 0) {
+    warn(`Could not select context "${contextName(apiServer)}" (it may not exist yet). Continuing to login, which can create it.`);
+  }
   const loginResult = spawnSync("kanopy-oidc", ["kube", "login"], {
-    shell: true, stdio: "inherit", env: { ...process.env, KUBECONFIG: configFile },
+    shell: IS_WIN, stdio: "inherit", env: loginEnv,
   });
   step(`Login to ${envLabel}`, loginResult.status === 0);
   if (loginResult.status !== 0) {
@@ -861,14 +920,14 @@ async function deployEnvSetup() {
 
   // Switch context
   const env = kubeEnv();
-  spawnSync("kubectl", ["config", "use-context", contextName(apiServer)], { shell: true, stdio: "pipe", env });
-  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: true, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "use-context", contextName(apiServer)], { shell: IS_WIN, stdio: "pipe", env });
+  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: IS_WIN, stdio: "pipe", env });
 
   // ── Phase 4: Verify cluster access ────────────────────────
   console.log(`\n${CYAN}── 4. Cluster access ──${NC}\n`);
 
   const accessResult = spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "--no-headers"], {
-    shell: true, stdio: "pipe", env, encoding: "utf-8",
+    shell: IS_WIN, stdio: "pipe", env, encoding: "utf-8",
   });
   step(`Access to namespace '${IST_NAMESPACE}'`, accessResult.status === 0);
   if (accessResult.status !== 0) {
@@ -880,7 +939,7 @@ async function deployEnvSetup() {
   console.log(`\n${CYAN}── 5. Secrets (${secretName}) ──${NC}\n`);
 
   const secretCheck = spawnSync("helm", ["ksec", "get", secretName], {
-    shell: true, stdio: "pipe", env, encoding: "utf-8",
+    shell: IS_WIN, stdio: "pipe", env, encoding: "utf-8",
   });
   const secretExists = secretCheck.status === 0 && (secretCheck.stdout as string).trim().length > 0;
 

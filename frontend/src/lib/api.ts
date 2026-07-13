@@ -81,6 +81,8 @@ export interface AuthDomain {
   flowType?: 'client_credentials' | 'authorization_code' | 'saml' | 'oidc';
   /** Optional banner text shown below the domain selector (sourced from DB) */
   alertMessage?: string;
+  /** True when this local domain accepts public self-registration (show a Register link). */
+  selfRegistration?: boolean;
 }
 
 // v16: Typed webhook types (ADR-038)
@@ -96,8 +98,8 @@ export type WebhookEventType =
 export const WEBHOOK_EVENT_LABELS: Record<WebhookEventType, string> = {
   'payment.completed': 'Payment Completed',
   'payment.failed': 'Payment Failed',
-  'oauth.authorization_granted': 'OAuth Authorization Granted',
-  'oauth.authorization_revoked': 'OAuth Authorization Revoked',
+  'oauth.authorization_granted': 'App Access Granted',
+  'oauth.authorization_revoked': 'App Access Revoked',
   'user.notification': 'User Notification (delegation)',
   'dispute.opened': 'Dispute Opened',
   'kyb.status_changed': 'KYB Status Changed',
@@ -164,6 +166,8 @@ export interface MerchantOAuthClient {
   oauthRequirePkce: boolean;
   oauthPostLogoutRedirectUris?: string[];
   oauthClaimMapping?: Record<string, string>;
+  oauthLogoUri?: string;   // v18: OIDC logo_uri (https) — branding on the consent page + app listings
+  oauthClientUri?: string; // v18: OIDC client_uri (https) — merchant home page link
 }
 
 // v16: OAuth consent grants (user-authorized apps)
@@ -172,10 +176,43 @@ export interface ConsentGrant {
   oauthClientId: string;
   merchantAgreementInstanceReference: string;
   merchantName: string;
+  oauthLogoUri?: string | null; // v18: OIDC logo_uri (branding) for the authorized-apps list
   grantedScopes: string[];
   consentStatus: 'active' | 'revoked';
   consentGrantedAt: string;
+  consentRevokedAt?: string | null;
   lastUsedAt?: string | null;
+}
+
+// passwordless enrolled credential (WebAuthn-style). Public metadata only; keys never leave the device.
+export interface EnrolledCredential {
+  credentialId: string;
+  partyEnrolledCredentialInstanceReference: string;
+  alg: 'RS256' | 'ES256';
+  deviceName?: string;
+  status: 'active' | 'revoked';
+  createdAt: string;
+  lastUsedAt?: string | null;
+}
+
+// v18 D-01: detail of one authorized app — scopes expanded with human-readable descriptions + branding.
+export interface ConsentGrantScope {
+  scope: string;
+  description: string;
+  required: boolean;
+}
+export interface ConsentGrantDetail {
+  consentId: string;
+  oauthClientId: string;
+  merchantAgreementInstanceReference: string;
+  merchantName: string;
+  oauthLogoUri?: string | null;
+  oauthClientUri?: string | null;
+  grantedScopes: ConsentGrantScope[];
+  consentStatus: 'active' | 'revoked';
+  consentGrantedAt: string;
+  lastUsedAt?: string | null;
+  cibaEnabled?: boolean; // client may initiate CIBA (passwordless/backchannel) on the user's behalf
 }
 
 export interface Merchant {
@@ -458,8 +495,12 @@ export interface ManagedUserDTO {
   name: string;
   role: string;
   domain: string;
-  status: 'active' | 'suspended';
+  status: 'active' | 'suspended' | 'pending';
   featured?: boolean;
+  partyReference?: string;
+  lastLoginAt?: string;
+  createdAt?: string;
+  phone?: string;
 }
 export interface RoleRecordDTO {
   roleName: string;
@@ -472,6 +513,17 @@ export interface RoleRecordDTO {
   bianControlRecordType: string;
   recordCreatedDateTime?: string;
   recordUpdatedDateTime?: string;
+}
+
+// Display-safe saved card returned by GET /customer/me/cards and rendered by the hosted payment
+// pages' saved-card selector. Surrogate token + masked PAN only; never the full PAN, CVV or expiry.
+export interface SavedCardDisplay {
+  paymentCardInstanceReference: string;
+  cardToken: string;
+  paymentCardMaskedPanDisplay: string;
+  paymentCardNetwork?: string;
+  paymentCardAlias?: string;
+  paymentCardIsPreferred?: boolean;
 }
 
 export const api = {
@@ -501,9 +553,11 @@ export const api = {
       const s = qs.toString();
       return apiFetch<{ users: ManagedUserDTO[] }>(`/api/v1/users${s ? `?${s}` : ''}`, {}, token);
     },
-    create: (body: { email: string; name: string; role: string; domain?: string; password?: string; status?: 'active' | 'suspended' }, token: string) =>
+    get: (id: string, token: string) =>
+      apiFetch<ManagedUserDTO>(`/api/v1/users/${encodeURIComponent(id)}`, {}, token),
+    create: (body: { email: string; name: string; role: string; domain?: string; password: string; status?: 'active' | 'suspended'; phone?: string }, token: string) =>
       apiFetch<ManagedUserDTO>('/api/v1/users', { method: 'POST', body: JSON.stringify(body) }, token),
-    update: (id: string, body: { name?: string; role?: string; status?: 'active' | 'suspended'; password?: string }, token: string) =>
+    update: (id: string, body: { name?: string; role?: string; status?: 'active' | 'suspended' | 'pending'; password?: string; phone?: string }, token: string) =>
       apiFetch<ManagedUserDTO>(`/api/v1/users/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }, token),
     remove: (id: string, token: string) =>
       apiFetch<{ deleted: boolean; id: string }>(`/api/v1/users/${encodeURIComponent(id)}`, { method: 'DELETE' }, token),
@@ -515,10 +569,20 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+    // Server-side logout: invalidates all of the caller's session tokens (advances their epoch).
+    logout: (token: string) =>
+      apiFetch<{ loggedOut: boolean }>('/api/v1/auth/logout', { method: 'POST' }, token),
     users: (filters?: boolean | DemoUserFilters) =>
       apiFetch<{ users: AuthUser[] }>(`/api/v1/auth/users${demoRosterQuery(filters)}`),
     domains: () =>
       apiFetch<{ domains: AuthDomain[] }>('/api/v1/auth/domains'),
+    // Public self-registration for local domains that enable it. Role is always `customer`
+    // (server-enforced). Returns the resulting status: 'active' (auto-approved) or 'pending'.
+    register: (body: { email: string; name: string; password: string; phone?: string; domain?: string }) =>
+      apiFetch<{ status: 'active' | 'pending'; message: string }>('/api/v1/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
     updateMe: (
       body: {
         customerName?: string;
@@ -649,6 +713,12 @@ export const api = {
       apiFetch<{ results: Record<string, unknown>[] }>(
         `/api/v1/customer/${encodeURIComponent(customerId)}/cards`, {}, token
       ),
+    // The AUTHENTICATED caller's OWN saved cards (display-safe). The agreement is resolved server-side
+    // from the token (partyRef) — never a client-supplied id — so a caller only ever sees their own
+    // cards. Used by the hosted payment pages to offer a saved-card pick to the signed-in viewer.
+    // Display-safe only: surrogate token + masked PAN + network + alias + preferred. No PAN/CVV/expiry.
+    getMyCards: (token: string) =>
+      apiFetch<{ results: SavedCardDisplay[] }>('/api/v1/customer/me/cards', {}, token),
     addCard: (
       customerId: string,
       body: {
@@ -914,6 +984,8 @@ export const api = {
         merchantWebhookEndpoint: string;
         merchantTransactionLimitAmount: number;
         merchantAgreementStatus: string;
+        merchantDefaultPayoutAccountReference: string;
+        merchantCommissionRate: number; // v18 B-08: SD-89 commission rate 0..1
       }>,
       token: string,
     ) =>
@@ -979,7 +1051,67 @@ export const api = {
         byStatus: Array<{ status: string; count: number; amount: number }>;
         byMonth: Array<{ year: number; month: number; count: number; amount: number }>;
         byCurrency: Array<{ currency: string; count: number; amount: number }>;
+        // v18 B-06: commission revenue (SD-89) aggregated from paymentExecution fee (SD-65).
+        commissionRevenue?: {
+          total: number;
+          count: number;
+          byMonth: Array<{ year: number; month: number; count: number; amount: number }>;
+        };
       }>(`/api/v1/merchants/${merchantId}/stats`, {}, token),
+    // v18 B-03: merchant activity view — who did what through this merchant (SD-16 audit). Display-safe.
+    activity: (
+      merchantId: string,
+      filters: { user?: string; q?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number },
+      token: string,
+    ) => {
+      const qs = new URLSearchParams(
+        Object.entries(filters).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+      ).toString();
+      return apiFetch<{
+        events: Array<{
+          id: string;
+          eventDateTime: string;
+          processType: string;
+          processAction: string;
+          processOutcome: string;
+          entityType: string;
+          entityId: string;
+          clientId?: string;
+          actingPartyReference?: string;
+          actingUserName?: string;
+          actingChannel?: string;
+          summary?: Record<string, unknown>;
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/merchants/${merchantId}/activity${qs ? `?${qs}` : ''}`, {}, token);
+    },
+    // v18 B-08: users who authorized this merchant (OAuth consent grants, SD-16). Display-safe.
+    authorizations: (
+      merchantId: string,
+      filters: { q?: string; page?: number; limit?: number },
+      token: string,
+    ) => {
+      const qs = new URLSearchParams(
+        Object.entries(filters).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+      ).toString();
+      return apiFetch<{
+        authorizations: Array<{
+          consentId: string;
+          partyAuthenticationInstanceReference: string;
+          userName?: string;
+          userEmail?: string;
+          grantedScopes: string[];
+          consentStatus: 'active' | 'revoked';
+          consentGrantedAt: string;
+          lastUsedAt?: string | null;
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/merchants/${merchantId}/authorizations${qs ? `?${qs}` : ''}`, {}, token);
+    },
     // Merchant lifecycle audit trail (SD-89, PCI DSS Req 10).
     events: (merchantId: string, token: string) =>
       apiFetch<{
@@ -1052,6 +1184,11 @@ export const api = {
       token_lifetime_seconds?: number;
       refresh_token_lifetime_days?: number;
       claim_mapping?: Record<string, string>;
+      logo_uri?: string;    // https URL (or '' to clear); http allowed only for localhost
+      client_uri?: string;  // https URL (or '' to clear); http allowed only for localhost
+      client_id?: string;     // set a custom client_id (changing it orphans existing tokens/consents)
+      client_secret?: string; // set a custom secret (re-hashed; plaintext never returned)
+      client_secret_prefix?: string; // independent display label (not derived from the secret)
     }) =>
       apiFetch<MerchantOAuthClient>(
         `/api/v1/merchants/${merchantId}/oauth-client`,
@@ -1155,14 +1292,82 @@ export const api = {
   },
 
   // v16: OAuth consent grants (user's authorized apps)
+  // Self-scoped "Authorized Applications" (connected apps). All routes resolve the caller's own `sub`.
   consentGrants: {
-    list: (token: string) =>
-      apiFetch<{ grants: ConsentGrant[] }>('/api/v1/auth/grants', {}, token),
+    // Revoked grants are kept; filter with status (active | revoked | all, default all).
+    list: (token: string, status: 'active' | 'revoked' | 'all' = 'all') =>
+      apiFetch<{ grants: ConsentGrant[] }>(`/api/v1/auth/grants?status=${status}`, {}, token),
+    // v18 D-01: detail of one authorized app (scopes with descriptions, approval date/time, branding).
+    getDetail: (consentId: string, token: string) =>
+      apiFetch<ConsentGrantDetail>(`/api/v1/auth/grants/${encodeURIComponent(consentId)}`, {}, token),
+    // v18 D-02: operations the caller executed through this app (display-safe). Filter + paginate.
+    getOperations: (
+      consentId: string,
+      filters: { q?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number },
+      token: string,
+    ) => {
+      const qs = new URLSearchParams(
+        Object.entries(filters).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+      ).toString();
+      return apiFetch<{
+        events: Array<{
+          id: string;
+          eventDateTime: string;
+          processType: string;
+          processAction: string;
+          processOutcome: string;
+          entityType: string;
+          entityId: string;
+          clientId?: string;
+          actingPartyReference?: string;
+          actingChannel?: string;
+          summary?: Record<string, unknown>;
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/auth/grants/${encodeURIComponent(consentId)}/operations${qs ? `?${qs}` : ''}`, {}, token);
+    },
     revoke: (consentId: string, token: string) =>
       apiFetch<{ revoked: boolean; consentId: string }>(
-        `/api/v1/auth/grants/${consentId}`,
+        `/api/v1/auth/grants/${encodeURIComponent(consentId)}`,
         { method: 'DELETE' },
         token,
+      ),
+    // Re-approve a previously revoked grant (reverts the revocation; mints no tokens).
+    reactivate: (consentId: string, token: string) =>
+      apiFetch<{ reactivated: boolean; consentId: string }>(
+        `/api/v1/auth/grants/${encodeURIComponent(consentId)}/reactivate`,
+        { method: 'POST' },
+        token,
+      ),
+  },
+
+  // passwordless credential management (SD-91/SD-16). Owner-scoped by the session token.
+  credentials: {
+    list: (token: string) =>
+      apiFetch<{ credentials: EnrolledCredential[] }>(`/api/v1/auth/enroll`, {}, token),
+    // Step 1 of the registration ceremony: get a challenge to sign with the freshly generated key.
+    challenge: (token: string) =>
+      apiFetch<{ challenge: string; expiresIn: number }>(
+        `/api/v1/auth/enroll/challenge`, { method: 'POST', body: '{}' }, token,
+      ),
+    // Step 2: register the public key + signed challenge (proof of possession).
+    register: (
+      body: { challenge: string; publicKeyPem: string; alg: 'RS256' | 'ES256'; signature: string; credentialId?: string; authenticatorMetadata?: { deviceName?: string; createdVia?: string } },
+      token: string,
+    ) => apiFetch<EnrolledCredential>(`/api/v1/auth/enroll`, { method: 'POST', body: JSON.stringify(body) }, token),
+    rotate: (
+      credentialId: string,
+      body: { challenge: string; publicKeyPem: string; alg: 'RS256' | 'ES256'; signature: string; credentialId?: string; authenticatorMetadata?: { deviceName?: string; createdVia?: string } },
+      token: string,
+    ) => apiFetch<EnrolledCredential>(
+      `/api/v1/auth/enroll/${encodeURIComponent(credentialId)}/rotate`,
+      { method: 'POST', body: JSON.stringify(body) }, token,
+    ),
+    revoke: (credentialId: string, token: string) =>
+      apiFetch<{ revoked: boolean; credentialId: string }>(
+        `/api/v1/auth/enroll/${encodeURIComponent(credentialId)}`, { method: 'DELETE' }, token,
       ),
   },
 
@@ -1190,8 +1395,9 @@ export const api = {
         checkoutSessionExpiresAt: string;
         checkoutSessionReturnUrl: string;
         checkoutSessionCancelUrl: string;
+        hasActingUser?: boolean;
       }>(`/api/v1/checkout/sessions/${sessionId}`),
-    pay: (sessionId: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth: string; cardExpiryYear: string; cardCvv?: string; cardholderEmail?: string; saveCard?: boolean }) =>
+    pay: (sessionId: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth?: string; cardExpiryYear?: string; cardCvv?: string; cardholderEmail?: string; saveCard?: boolean }) =>
       apiFetch<{ success: boolean; declined?: boolean; cardTransactionInstanceReference?: string | null; responseCode?: string; declineReason?: string; redirectUrl?: string | null }>(
         `/api/v1/checkout/sessions/${sessionId}/pay`, { method: 'POST', body: JSON.stringify(body) }
       ),
@@ -1233,7 +1439,7 @@ export const api = {
         paymentLinkStatus: string;
         paymentLinkExpiresAt?: string;
       }>(`/api/v1/payment/links/${code}`),
-    pay: (code: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth: string; cardExpiryYear: string; cardCvv?: string; customerEmail?: string }) =>
+    pay: (code: string, body: { cardToken: string; cardholderName: string; cardExpiryMonth?: string; cardExpiryYear?: string; cardCvv?: string; customerEmail?: string }) =>
       apiFetch<{ success: boolean; declined?: boolean; cardTransactionInstanceReference?: string | null; fraudDiagnosisInstanceReference?: string | null; responseCode?: string; declineReason?: string }>(
         `/api/v1/payment/links/${code}/pay`, { method: 'POST', body: JSON.stringify(body) }
       ),
@@ -1454,10 +1660,13 @@ export const api = {
       apiFetch<{
         paymentExecutionInstanceReference: string;
         initiatorPartyReference: string | null;
+        initiatorName: string | null;
         beneficiaryPartyReference: string | null;
         sourcePayoutAccountReference: string | null;
+        sourceAccountMasked: string | null;
         resolvedPayoutAccountReference: string | null;
         beneficiaryArrangementReference: string | null;
+        beneficiaryAlias: string | null;
         beneficiaryName: string | null;
         destinationIban: string | null;
         destinationAccountMasked: string | null;
@@ -1506,6 +1715,7 @@ export const api = {
           currency: string;
           paymentExecutionRail: string | null;
           routingNote: string | null;
+          paymentExecutionRemittanceInformation: string | null;
           paymentExecutionStatus: string;
           direction: 'sent' | 'received';
           initiatedAt: string | null;

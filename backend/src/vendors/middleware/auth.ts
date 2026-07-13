@@ -1,6 +1,18 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import * as jwt from 'jsonwebtoken';
 import { attachRbacContext } from './rbac';
+import { getCurrentSessionEpoch } from '../../modules/identity/services/auth.service';
+import { tryMerchantContext } from './validateMerchantToken';
+
+// Route-level opt-out of the global HS256 auth preHandler (self-guarded / OAuth / internal routes).
+// `dualAuth` accepts EITHER the PSP session JWT (HS256) OR a merchant OAuth Bearer (RS256): the route's
+// own dualPermission() preHandler then authorizes by RBAC action (session) or scope (merchant) (v23).
+declare module 'fastify' {
+  interface FastifyContextConfig {
+    skipAuth?: boolean;
+    dualAuth?: boolean;
+  }
+}
 
 const JWT_SECRET = process.env.PSP_JWT_SECRET ?? 'demo-local-secret-change-in-production';
 
@@ -11,8 +23,19 @@ const PUBLIC_EXACT: Set<string> = new Set([
   '/api/v1/system/health',
   '/api/v1/system/users',
   '/api/v1/auth/login',
+  '/api/v1/auth/register',
   '/api/v1/auth/users',
   '/api/v1/auth/domains',
+  // OAuth2/OIDC authorization-server endpoints: authenticated by client credentials, PKCE,
+  // or their own RS256 access token — NOT the PSP session JWT. Exact paths only, so the
+  // session-protected /auth/me, /auth/grants and /auth/keys stay behind the middleware.
+  '/.well-known/openid-configuration',
+  '/api/v1/auth/jwks',
+  '/api/v1/auth/authorize',
+  '/api/v1/auth/token',
+  '/api/v1/auth/userinfo',
+  '/api/v1/auth/introspect',
+  '/api/v1/auth/revoke',
   '/api/v1/transactions/merchants',
   // Simulator mode: transaction creation without a user session
   '/api/v1/transactions',
@@ -77,6 +100,24 @@ function tryVerifyToken(authHeader: string | undefined): jwt.JwtPayload | null {
   }
 }
 
+// Server-side logout enforcement: a session JWT stamps the epoch current at sign time; if the user's
+// epoch has since advanced (they logged out), the token is stale and must be rejected. Tokens with no
+// `sub`/`epoch` (legacy) compare against epoch 0. On a DB error the posture is environment-dependent:
+// PRODUCTION fails CLOSED (reject) so a logged-out token cannot be accepted during a DB blip and
+// server-side logout semantics hold; non-prod fails OPEN so a transient outage doesn't lock every
+// user out mid-demo.
+async function sessionEpochOk(request: FastifyRequest, payload: jwt.JwtPayload): Promise<boolean> {
+  const sub = (payload as { sub?: string }).sub;
+  if (!sub) return true;
+  const tokenEpoch = typeof (payload as { epoch?: unknown }).epoch === 'number' ? (payload as { epoch: number }).epoch : 0;
+  try {
+    const current = await getCurrentSessionEpoch(request.server.db, sub);
+    return tokenEpoch >= current;
+  } catch {
+    return process.env.NODE_ENV !== 'production'; // prod: fail closed; else fail open
+  }
+}
+
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const { url, method } = request;
   // Match against the pathname only — query strings (e.g. ?featured=true) must
@@ -87,10 +128,33 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   // caller identity in-handler. The internal capability-module engines (ADR-029:
   // /api/v1/modules/<cap>/score|screen) use the X-Integration-Source header instead
   // of a Bearer token — the EDA dispatcher calls them server-to-server, not as a user.
-  const routeConfig = (request.routeOptions?.config ?? {}) as { skipAuth?: boolean };
+  const routeConfig = (request.routeOptions?.config ?? {}) as { skipAuth?: boolean; dualAuth?: boolean };
   if (routeConfig.skipAuth) {
     attachRbacContext(request);
     return;
+  }
+
+  // Dual-auth capability route (v23): accept a first-party session JWT OR a merchant OAuth Bearer.
+  // Authenticate here; the route's dualPermission() preHandler authorizes (RBAC action or scope).
+  if (routeConfig.dualAuth) {
+    const sessionPayload = tryVerifyToken(request.headers.authorization);
+    if (sessionPayload) {
+      if (!(await sessionEpochOk(request, sessionPayload))) {
+        return reply.status(401).send({ error: 'Session ended. Please sign in again.' });
+      }
+      (request as FastifyRequest & { user: jwt.JwtPayload }).user = sessionPayload;
+      attachRbacContext(request);
+      return;
+    }
+    // Not a valid session token → try the merchant OAuth channel (RS256). tryMerchantContext never
+    // throws and enforces client/merchant active status; scope is enforced per-route by dualPermission.
+    const merchant = await tryMerchantContext(request);
+    if (merchant) {
+      request.merchantContext = merchant;
+      attachRbacContext(request);
+      return;
+    }
+    return reply.status(401).send({ error: 'invalid_token', error_description: 'A valid session or OAuth token is required.' });
   }
 
   if (PUBLIC_EXACT.has(path)) {
@@ -107,6 +171,9 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     // But if a Bearer token is present, validate it and enforce customer block.
     const payload = tryVerifyToken(request.headers.authorization);
     if (payload) {
+      if (!(await sessionEpochOk(request, payload))) {
+        return reply.status(401).send({ error: 'Session ended. Please sign in again.' });
+      }
       (request as FastifyRequest & { user: jwt.JwtPayload }).user = payload;
       const role = (payload as { role?: string }).role;
       if (isCustomerBlocked(role, url)) {
@@ -133,6 +200,11 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     (request as FastifyRequest & { user: jwt.JwtPayload }).user = payload;
   } catch {
     return reply.status(401).send({ error: 'Invalid or expired token' });
+  }
+
+  // Reject tokens invalidated by a logout (session epoch advanced past the token's stamp).
+  if (!(await sessionEpochOk(request, payload))) {
+    return reply.status(401).send({ error: 'Session ended. Please sign in again.' });
   }
 
   // Customers are blocked from investigation, customer-search, and audit endpoints (but may

@@ -87,6 +87,10 @@ export interface MerchantAgreementControlRecord {
   merchantWebhooks?: MerchantWebhookConfig[];       // v16: typed per-event webhook registry (ADR-038)
   merchantSettlementSchedule: SettlementSchedule;
 
+  // v18 (SD-89 pricing): commission rate charged per operation, 0..1 (e.g. 0.025 = 2.5%). Editable from
+  // merchant settings (RBAC merchants:manage). Seeder only sets an initial default. Used by computeFee.
+  merchantCommissionRate?: number;
+
   // Risk profile (derived, updated on settlement)
   merchantAverageTransactionAmount: number;
   merchantTransactionCount30d: number;
@@ -132,7 +136,15 @@ export type MerchantRiskCategory = 'low' | 'medium' | 'high';
 export type SettlementSchedule = 'T+1' | 'T+2' | 'T+3';
 
 // v16: OAuth 2.0 client config (BIAN SD-89 BQ:Grant — OAuth Client Authorization, ADR-037)
-export type OAuthGrantType = 'authorization_code' | 'client_credentials' | 'refresh_token';
+// added the CIBA grant (OIDC Client-Initiated Backchannel Authentication). Full URN, spec-faithful.
+export type OAuthGrantType =
+  | 'authorization_code'
+  | 'client_credentials'
+  | 'refresh_token'
+  | 'urn:openid:params:grant-type:ciba';
+
+// CIBA token delivery mode. poll is the mandatory baseline; ping/push add client notification.
+export type OAuthBackchannelDeliveryMode = 'poll' | 'ping' | 'push';
 
 export interface MerchantOAuthClientConfig {
   oauthClientId: string;                          // UUID, assigned by PSP
@@ -148,4 +160,11 @@ export interface MerchantOAuthClientConfig {
   oauthRequirePkce: boolean;                      // true for public clients (authorization_code)
   oauthPostLogoutRedirectUris?: string[];          // allowed post_logout_redirect_uris
   oauthClaimMapping?: Record<string, string>;      // PSP claim/scope → merchant role name
+  // v18: OIDC client metadata (RFC 7591) for branding on the consent/login page and app listings.
+  oauthLogoUri?: string;                           // https URL of the merchant logo/icon (OIDC logo_uri)
+  oauthClientUri?: string;                         // https URL of the merchant home page (OIDC client_uri)
+  // CIBA delivery config. Only meaningful when oauthGrantTypes includes the ciba grant.
+  oauthBackchannelTokenDeliveryMode?: OAuthBackchannelDeliveryMode;
+  // HTTPS-only (PCI Req.4 + CIBA spec); required when delivery mode is ping/push. Rejected if non-HTTPS.
+  oauthBackchannelClientNotificationEndpoint?: string;
 }

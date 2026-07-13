@@ -20,12 +20,21 @@ declare module 'fastify' {
   }
 }
 
+// Defensive Authorization-header parse: case-insensitive "Bearer" prefix + trimmed token, so
+// odd casing / extra whitespace does not leak the scheme into the token or mis-parse the header.
+// A naive `replace('Bearer ', '')` would mishandle those and could pick up a later substring match.
+export function extractBearerToken(authorization: string | undefined): string | undefined {
+  if (!authorization) return undefined;
+  const match = /^\s*Bearer\s+(.+?)\s*$/i.exec(authorization);
+  return match ? match[1] : undefined;
+}
+
 export async function validateMerchantToken(
   request: FastifyRequest,
   reply: FastifyReply,
   requiredScope?: string,
 ): Promise<void> {
-  const bearer = request.headers.authorization?.replace('Bearer ', '');
+  const bearer = extractBearerToken(request.headers.authorization);
   if (!bearer) {
     return reply.status(401).send({ error: 'invalid_token', error_description: 'Missing Bearer token' }) as any;
   }
@@ -69,4 +78,37 @@ export async function validateMerchantToken(
     scopes,
     sub: payload.sub as string,
   };
+}
+
+/**
+ * Best-effort variant for PUBLIC endpoints (e.g. the hosted-checkout create route) that still want to
+ * ATTRIBUTE an action to the merchant + acting user when a valid OAuth Bearer is present, but must not
+ * fail the request when it is absent/invalid. Never sends a reply; returns undefined on any problem.
+ */
+export async function tryMerchantContext(request: FastifyRequest): Promise<MerchantTokenContext | undefined> {
+  const bearer = extractBearerToken(request.headers.authorization);
+  if (!bearer) return undefined;
+  try {
+    const payload = await verifyAccessToken(bearer);
+    const db = (request.server as any).db;
+    const clientId = Array.isArray(payload.aud) ? payload.aud[0] : (payload.aud as string);
+    const scopes = ((payload.scope as string) ?? '').split(' ').filter(Boolean);
+    const merchant = await (db as any)
+      .collection(MERCHANT_AGREEMENT_COLLECTION)
+      .findOne({ 'merchantOAuthClient.oauthClientId': clientId }) as MerchantAgreementControlRecord | null;
+    if (!merchant || !merchant.merchantOAuthClient) return undefined;
+    // Same eligibility as validateMerchantToken: never attribute actions to an inactive client or a
+    // non-active merchant (would pollute audit/activity data with suspended/revoked principals).
+    if (merchant.merchantOAuthClient.oauthClientStatus !== 'active') return undefined;
+    if (merchant.merchantAgreementStatus !== 'active') return undefined;
+    return {
+      merchantId: merchant.merchantAgreementInstanceReference,
+      merchantName: merchant.merchantName,
+      clientId,
+      scopes,
+      sub: payload.sub as string,
+    };
+  } catch {
+    return undefined;
+  }
 }

@@ -8,9 +8,10 @@ import {
   CheckoutSessionRecord,
   CheckoutSessionStatus,
 } from '../models/checkoutSession.model';
-import { createTransaction, CardIssuerDeclinedError } from '../../transaction/services/cardTransaction.service';
+import { createTransaction, CardIssuerDeclinedError, resolveAccountReferenceForParty } from '../../transaction/services/cardTransaction.service';
 import { authorizeCard, linkAuthToTransaction } from './cardAuthorization.service';
 import { sendMerchantPaymentCallback, DECLINE_REASONS } from './merchantCallback.service';
+import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
 
 const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -24,6 +25,10 @@ export interface CreateCheckoutSessionInput {
   returnUrl: string;
   cancelUrl: string;
   merchantReference: string;
+  // v18 on-behalf-of attribution (optional): who the merchant app is acting for.
+  actingSubjectReference?: string;
+  actingPartyReference?: string;
+  actingClientId?: string;
 }
 
 export interface CheckoutSessionPublic {
@@ -36,6 +41,11 @@ export interface CheckoutSessionPublic {
   checkoutSessionExpiresAt: string;
   checkoutSessionReturnUrl: string;
   checkoutSessionCancelUrl: string;
+  // v18: display-safe signal that this session was created on behalf of a logged-in user (the merchant
+  // app forwarded the payer's OAuth identity). The hosted page uses it to offer the payer's saved cards.
+  // The acting party reference itself is NOT surfaced here (identity minimization); saved cards are read
+  // via the session-scoped endpoint, which resolves the owner server-side.
+  hasActingUser: boolean;
 }
 
 export type ProcessPaymentResult =
@@ -77,6 +87,9 @@ export async function createCheckoutSession(
     checkoutSessionReturnUrl: input.returnUrl,
     checkoutSessionCancelUrl: input.cancelUrl,
     checkoutSessionMerchantReference: input.merchantReference,
+    ...(input.actingSubjectReference && { checkoutSessionActingSubjectReference: input.actingSubjectReference }),
+    ...(input.actingPartyReference && { checkoutSessionActingPartyReference: input.actingPartyReference }),
+    ...(input.actingClientId && { checkoutSessionActingClientId: input.actingClientId }),
     checkoutSessionCreatedDateTime: now,
     checkoutSessionExpiresAt: expiresAt,
     recordCreatedDateTime: now,
@@ -112,15 +125,22 @@ export async function getCheckoutSession(
     checkoutSessionExpiresAt: session.checkoutSessionExpiresAt.toISOString(),
     checkoutSessionReturnUrl: session.checkoutSessionReturnUrl,
     checkoutSessionCancelUrl: session.checkoutSessionCancelUrl,
+    hasActingUser: !!session.checkoutSessionActingPartyReference,
   };
 }
+
+// NOTE: saved cards are never resolved from the session's acting party. Showing that user's cards to
+// anyone who opens the checkout/link URL (without being logged in) would be a PCI/GDPR leak. The hosted
+// pages show cards ONLY for the authenticated browser viewer, via GET /customer/me/cards.
 
 export interface ProcessCheckoutPaymentInput {
   sessionId: string;
   cardToken: string;
   cardholderName: string;
-  cardExpiryMonth: string;
-  cardExpiryYear: string;
+  // Optional: a saved/tokenized card authorizes on the token (issuer does not validate expiry for it);
+  // only new-card entry supplies expiry.
+  cardExpiryMonth?: string;
+  cardExpiryYear?: string;
   merchantCategoryCode?: string;
   customerEmail?: string;
   saveCard?: boolean;
@@ -153,6 +173,13 @@ export async function processCheckoutPayment(
 
   // Build masked PAN from token: show last 4 chars of token as display
   const maskedPan = `****-****-****-${input.cardToken.slice(-4).padStart(4, '0')}`;
+
+  // v18 on-behalf-of: if the merchant app created this session while acting for a logged-in user, stamp
+  // the resulting card transaction with THAT payer's canonical account reference so the purchase lands
+  // in their payment history — even when no email is typed on the hosted page. Identity ref only, no PII.
+  const actingAccountReference = session.checkoutSessionActingPartyReference
+    ? await resolveAccountReferenceForParty(db, session.checkoutSessionActingPartyReference)
+    : undefined;
 
   // SD-15: Card Authorization — run before creating the transaction
   const mcc = input.merchantCategoryCode ?? '5999';
@@ -199,7 +226,7 @@ export async function processCheckoutPayment(
   try {
     txResult = await createTransaction(db, {
       cardToken: input.cardToken,
-      accountReference: input.customerEmail ?? input.cardToken,
+      accountReference: input.customerEmail ?? actingAccountReference ?? input.cardToken,
       amount: session.checkoutSessionAmount,
       currency: session.checkoutSessionCurrency,
       cardTransactionMerchantName: session.merchantName,
@@ -274,6 +301,32 @@ export async function processCheckoutPayment(
       },
     }
   );
+
+  // v18 (B-02): attribute the completed purchase to the acting merchant app + user, so it appears in the
+  // connected-apps operations view (`/system/applications/{consentId}/operations`, self-scoped by the
+  // OAuth subject). Display-safe: no CHD (the bus strips it), masked PAN only. `actingPartyReference` is
+  // the OAuth SUBJECT (SD-91 login id) so it lines up with the operations query, which matches on `sub`.
+  if (session.checkoutSessionActingSubjectReference || session.checkoutSessionActingClientId) {
+    emitProcessEvent(db, {
+      entityType: 'transaction', entityId: txResult.cardTransactionInstanceReference,
+      processType: 'payment_processing', processAction: 'merchant.payment.checkout', processOutcome: 'approved',
+      performedByPartyReference: session.checkoutSessionActingPartyReference ?? null, performedByRole: 'customer',
+      eventSummary: {
+        amount: session.checkoutSessionAmount, currency: session.checkoutSessionCurrency,
+        merchantName: session.merchantName, maskedPan,
+        cardTransactionInstanceReference: txResult.cardTransactionInstanceReference,
+        checkoutSessionInstanceReference: session.checkoutSessionInstanceReference,
+        merchantAgreementInstanceReference: session.merchantAgreementInstanceReference,
+      },
+      bianServiceDomain: 'Payment Order', bianControlRecordType: 'CheckoutSessionLog',
+      attribution: {
+        clientId: session.checkoutSessionActingClientId,
+        merchantAgreementReference: session.merchantAgreementInstanceReference,
+        actingPartyReference: session.checkoutSessionActingSubjectReference,
+        actingChannel: 'oauth_merchant',
+      },
+    });
+  }
 
   // The APPROVED merchant callback is fired centrally inside createTransaction (covers all flows).
   // Here we only build the redirect; the decline callback (above) is handled per-flow because a

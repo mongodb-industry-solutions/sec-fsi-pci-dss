@@ -56,7 +56,7 @@ function FieldLabel({ children, tip }: { children: React.ReactNode; tip: string 
 
 const TAB_INFO: Record<'registered' | 'new', string> = {
   registered: 'Transfer to an account already saved in your profile: your own payout accounts or a saved contact. No need to enter account details; just select the source, the destination and the amount.',
-  new: 'Transfer to a bank account not yet saved in your profile. You need to enter the IBAN and other banking details manually. You can optionally save the account for future use.',
+  new: 'Transfer to a bank account not yet saved in your profile. You need to enter the IBAN and other banking details manually. To reuse a destination later, add it under Beneficiaries.',
 };
 
 type Tab = 'registered' | 'new';
@@ -151,7 +151,7 @@ function RegisteredAccountForm({ partyRef, token, onDone }: { partyRef: string; 
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState<{ label: string; amount: number; currency: string; ref: string; status: string } | null>(null);
+  const [success, setSuccess] = useState<{ label: string; amount: number; currency: string; ref: string; status: string; note?: string } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -205,7 +205,7 @@ function RegisteredAccountForm({ partyRef, token, onDone }: { partyRef: string; 
         token,
       );
       const contact = contacts.find(c => c.ref === toContactRef);
-      setSuccess({ label: contact?.label ?? 'contact', amount: parsed, currency: res.currency, ref: res.transferReference, status: res.status });
+      setSuccess({ label: contact?.label ?? 'contact', amount: parsed, currency: res.currency, ref: res.transferReference, status: res.status, note: note.trim() || undefined });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Transfer failed.');
     }
@@ -221,6 +221,7 @@ function RegisteredAccountForm({ partyRef, token, onDone }: { partyRef: string; 
           <p className="font-semibold text-gray-900">{fmtAmount(success.amount, success.currency)} sent</p>
           <p className="text-xs text-gray-500 mt-1">To: {success.label}</p>
           <p className="text-xs text-gray-400 mt-1">Status: {success.status === 'submitted' ? 'pending settlement' : success.status}</p>
+          {success.note && <p className="text-xs text-gray-500 mt-1">Concept: {success.note}</p>}
           <p className="text-xs font-mono text-gray-400 mt-1 break-all">Ref: {success.ref}</p>
         </div>
         <div className="flex gap-2">
@@ -366,7 +367,7 @@ function RegisteredAccountForm({ partyRef, token, onDone }: { partyRef: string; 
 interface IbanFormState {
   iban: string; bic: string; holderName: string; bankName: string;
   countryCode: string; accountNumber: string; routingNumber: string; correspondentBic: string;
-  amount: string; currency: string; reference: string; save: boolean;
+  amount: string; currency: string; reference: string;
   recurring: boolean; frequency: string;
 }
 
@@ -374,13 +375,13 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
   const [form, setForm] = useState<IbanFormState>({
     iban: '', bic: '', holderName: '', bankName: '',
     countryCode: 'DE', accountNumber: '', routingNumber: '', correspondentBic: '',
-    amount: '', currency: 'EUR', reference: '', save: false,
+    amount: '', currency: 'EUR', reference: '',
     recurring: false, frequency: 'monthly',
   });
   const [preview, setPreview] = useState<{ ok: boolean; rail?: string; feeAmount?: number; errors: string[] } | null>(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState<{ rail: string; ref: string; mandate?: boolean } | null>(null);
+  const [success, setSuccess] = useState<{ rail: string; ref: string; mandate?: boolean; reference?: string } | null>(null);
   const [liveStatus, setLiveStatus] = useState<string>('');
 
   function set(field: keyof IbanFormState, value: string | boolean) {
@@ -443,7 +444,7 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
           { scheme, amount: parsed, currency: form.currency, destination: buildDestination(), frequency: form.frequency, reference: form.reference.trim() || undefined },
           token,
         );
-        setSuccess({ rail: preview.rail ?? '', ref: m.recurringMandateInstanceReference, mandate: true });
+        setSuccess({ rail: preview.rail ?? '', ref: m.recurringMandateInstanceReference, mandate: true, reference: form.reference.trim() || undefined });
         return;
       }
       const res = await api.transfers.bank(
@@ -453,7 +454,7 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
         (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
       );
       if (res.status === 'submitted') {
-        setSuccess({ rail: res.rail ?? preview.rail ?? '', ref: res.executionReference });
+        setSuccess({ rail: res.rail ?? preview.rail ?? '', ref: res.executionReference, reference: form.reference.trim() || undefined });
         setLiveStatus('in_flight');
         void pollStatus(res.executionReference);
       } else {
@@ -479,6 +480,7 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
               ? `Direct Debit · Ref: ${success.ref.slice(0, 8)}`
               : `Status: ${liveStatus || 'pending settlement'} · Ref: ${success.ref.slice(0, 8)}`}
           </p>
+          {success.reference && <p className="text-xs text-gray-500 mt-1">Concept: {success.reference}</p>}
         </div>
         <div className="flex gap-2">
           {!success.mandate && (
@@ -603,12 +605,10 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
         </div>
       </div>
 
-      <label className="flex items-center gap-2 cursor-pointer select-none">
-        <input type="checkbox" checked={form.save} onChange={e => set('save', e.target.checked)}
-          className="rounded border-gray-300 text-[#00ED64] focus:ring-[#00ED64]/40" />
-        <span className="text-xs text-gray-600">Save this account for future transfers</span>
-        <FieldTip text="If checked, the IBAN and BIC are stored as a new registered account in your profile. The IBAN is encrypted at rest. Otherwise the destination is transaction-scoped: bound only to this transfer." />
-      </label>
+      {/* NOTE: a "Save this account" option previously appeared here but was never wired to a persist
+          endpoint (form.save was set but never read). Saving an arbitrary external destination is not
+          supported yet: destinations entered here are transaction-scoped. To reuse a destination, add it
+          under Beneficiaries. Removed to avoid promising an unimplemented action. */}
 
       <div className="space-y-2">
         <label className="flex items-center gap-2 cursor-pointer select-none">

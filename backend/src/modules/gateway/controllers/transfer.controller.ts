@@ -7,10 +7,12 @@
 import { FastifyInstance } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { requirePermission } from '../../../vendors/middleware/acl';
+import { dualPermission, resolveOwner } from '../../../vendors/middleware/dualAuth';
 import { previewBankTransfer, executeBankTransfer, type ExecuteBankTransferResult } from '../services/bankTransfer.service';
 import { createMandate, listMandates, cancelMandate, runDueMandates } from '../services/recurringMandate.service';
 import { getExecution } from '../services/paymentExecution.service';
 import { getIdempotent, saveIdempotent } from '../services/idempotency.service';
+import { emitProcessEvent, attributionFromMerchantContext } from '../../provider/services/businessProcessEvent.service';
 import type { BankRail, RailDestination, RecurringScheme } from '../../../shared/services/bankTransfer';
 import type { MandateFrequency } from '../models/recurringMandate.model';
 
@@ -34,17 +36,28 @@ const destinationSchema = {
   },
 } as const;
 
-interface PreviewBody { destination: RailDestination; amountCurrency?: string; rail?: BankRail }
+// The merchant client sends amountCurrency as an { amount, currency } object; direct/staff callers
+// send a bare currency-code string. Accept both and normalise to the ISO currency code.
+type AmountCurrency = string | { amount?: number; currency: string };
+interface PreviewBody { destination: RailDestination; amountCurrency?: AmountCurrency; rail?: BankRail }
 interface ExecuteBody {
   amount: number; currency: string; destination: RailDestination;
-  rail?: BankRail; reference?: string; settlementSchedule?: 'T+0' | 'T+1' | 'T+2' | 'T+3';
+  rail?: BankRail; reference?: string; fromAccountRef?: string; settlementSchedule?: 'T+0' | 'T+1' | 'T+2' | 'T+3';
+}
+function resolvePreviewCurrency(body: PreviewBody): string {
+  const ac = body.amountCurrency;
+  if (ac && typeof ac === 'object' && typeof ac.currency === 'string' && ac.currency) return ac.currency;
+  if (typeof ac === 'string' && ac) return ac;
+  return body.destination.currency;
 }
 
 export async function transferController(fastify: FastifyInstance) {
 
-  // POST /api/v1/gateway/transfers/preview — derive rail, validate, quote fee.
+  // POST /api/v1/gateway/transfers/preview — derive rail, validate, quote fee (stateless, no side effects).
+  // Session RBAC (beneficiaries:view) OR OAuth write:transfers (merchant on-behalf-of).
   fastify.post('/preview', {
-    preHandler: requirePermission('beneficiaries', 'view'),
+    config: { dualAuth: true },
+    preHandler: dualPermission({ resource: 'beneficiaries', action: 'view', scope: 'write:transfers' }),
     schema: {
       tags: ['transfers'],
       summary: 'Preview a bank transfer: derive rail, validate details, quote fee (SD-65/66)',
@@ -52,18 +65,29 @@ export async function transferController(fastify: FastifyInstance) {
       body: {
         type: 'object',
         required: ['destination'],
-        properties: { destination: destinationSchema, amountCurrency: { type: 'string' }, rail: { type: 'string' } },
+        properties: {
+          destination: destinationSchema,
+          amountCurrency: {
+            oneOf: [
+              { type: 'string' },
+              { type: 'object', properties: { amount: { type: 'number' }, currency: { type: 'string' } }, required: ['currency'] },
+            ],
+          },
+          rail: { type: 'string' },
+        },
       },
     },
   }, async (request, reply) => {
     const body = request.body as PreviewBody;
-    const result = previewBankTransfer(body.destination, body.amountCurrency ?? body.destination.currency, body.rail);
+    const result = previewBankTransfer(body.destination, resolvePreviewCurrency(body), body.rail);
     return reply.send(result);
   });
 
   // POST /api/v1/gateway/transfers/bank — execute the transfer via the payment_initiation provider.
+  // Session RBAC (beneficiaries:manage) OR OAuth write:transfers (owner from token.sub).
   fastify.post('/bank', {
-    preHandler: requirePermission('beneficiaries', 'manage'),
+    config: { dualAuth: true },
+    preHandler: dualPermission({ resource: 'beneficiaries', action: 'manage', scope: 'write:transfers' }),
     schema: {
       tags: ['transfers'],
       summary: 'Execute a bank transfer to an external account (ACH/SEPA/SWIFT) (SD-65/66)',
@@ -77,16 +101,49 @@ export async function transferController(fastify: FastifyInstance) {
           destination: destinationSchema,
           rail: { type: 'string' },
           reference: { type: 'string', maxLength: 140 },
+          fromAccountRef: { type: 'string' },
           settlementSchedule: { type: 'string', enum: ['T+0', 'T+1', 'T+2', 'T+3'] },
         },
       },
     },
   }, async (request, reply) => {
-    const user = getUser(request);
-    if (!user?.partyRef) return reply.code(401).send({ error: 'Unauthenticated' });
     const body = request.body as ExecuteBody;
 
-    // Idempotency: replaying the same Idempotency-Key returns the original outcome (no double send).
+    if (request.merchantContext) {
+      // OAuth on-behalf-of: owner from token.sub (translate to SD-13 party); attribute the action.
+      const owner = await resolveOwner(request, reply);
+      if (!owner) return;
+      if (!owner.ownerPartyRef) {
+        return reply.status(404).send({ error: 'party_not_found', error_description: 'No party is linked to this token subject.' });
+      }
+      const result = await executeBankTransfer(fastify.db, {
+        initiatorPartyRef: owner.ownerPartyRef,
+        amount: body.amount,
+        currency: body.currency,
+        destination: body.destination,
+        rail: body.rail,
+        reference: body.reference,
+        fromAccountRef: body.fromAccountRef,
+        settlementSchedule: body.settlementSchedule,
+        // SD-89: stamp the initiating merchant so this execution is visible only in its history.
+        merchantAgreementReference: request.merchantContext.merchantId,
+      });
+      emitProcessEvent(fastify.db, {
+        entityType: 'execution', entityId: result.executionReference,
+        processType: 'payment_processing', processAction: 'merchant.transfer.bank',
+        processOutcome: result.status === 'submitted' ? 'approved' : 'rejected',
+        performedByPartyReference: owner.ownerPartyRef, performedByRole: 'customer',
+        eventSummary: { amount: body.amount, currency: body.currency, rail: result.rail, status: result.status },
+        bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+        attribution: attributionFromMerchantContext(request.merchantContext),
+      });
+      return reply.code(result.status === 'submitted' ? 202 : 422).send(result);
+    }
+
+    // Session channel: initiator from the JWT + idempotency (existing behavior).
+    const user = getUser(request);
+    if (!user?.partyRef) return reply.code(401).send({ error: 'Unauthenticated' });
+
     const idemKey = request.headers['idempotency-key'] as string | undefined;
     if (idemKey) {
       const prior = await getIdempotent<ExecuteBankTransferResult>(fastify.db, 'transfer.bank', user.partyRef, idemKey);
@@ -100,11 +157,11 @@ export async function transferController(fastify: FastifyInstance) {
       destination: body.destination,
       rail: body.rail,
       reference: body.reference,
+      fromAccountRef: body.fromAccountRef,
       settlementSchedule: body.settlementSchedule,
     });
     if (idemKey) await saveIdempotent(fastify.db, 'transfer.bank', user.partyRef, idemKey, result);
-    const code = result.status === 'submitted' ? 202 : 422;
-    return reply.code(code).send(result);
+    return reply.code(result.status === 'submitted' ? 202 : 422).send(result);
   });
 
   // GET /api/v1/gateway/transfers/:ref/status — real-time execution status (customer-scoped).
