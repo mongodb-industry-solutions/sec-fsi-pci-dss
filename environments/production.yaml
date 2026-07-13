@@ -1,4 +1,6 @@
-replicaCount: 2
+replicaCount: 1
+# Temporary: PSP_OAUTH_KEY_PROVIDER=local below generates a per-pod signing key, which would
+# diverge across replicas (JWKS mismatch). Restore to 2 once PSP_OAUTH_KEY_PROVIDER=aws is back.
 
 env:
   NODE_ENV: production
@@ -7,7 +9,7 @@ env:
   # added @aws-sdk/client-kms dependency + a REAL PSP_OAUTH_AWS_KEY_ARN (below) + IRSA permissions on
   # that key. `local` is NOT viable in prod: it would need a persisted key shared across replicas
   # (the non-prod auto-generate path would diverge per replica → JWKS mismatch).
-  PSP_OAUTH_KEY_PROVIDER: aws
+  PSP_OAUTH_KEY_PROVIDER: local
   PSP_CORS_ORIGIN: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com"
   PSP_URL_FRONTEND: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com"
   # Backend OIDC issuer + endpoints AND internal self-dispatch — in-cluster service (see staging notes).
