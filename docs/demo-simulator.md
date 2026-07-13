@@ -1759,7 +1759,7 @@ When `mockMode: false` and a valid URL is configured, the dispatch service sends
 
 David Chen (`david.chen@demo.com`) is the owner of **Fischer Web Studio** (`m0000003`), an active merchant in the system with KYB verified. He represents the merchant perspective in the demo.
 
-**Login:** `david.chen@demo.com` / `demo-password`  
+**Login:** `david.chen@demo.com` / *(password redacted)*  
 **Role:** `merchant_officer`  
 **Post-login redirect:** `/system/merchant` — Fischer Web Studio merchant portal pre-selected.
 
