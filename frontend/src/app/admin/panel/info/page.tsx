@@ -26,7 +26,7 @@ interface SystemInfo {
 // Known prefixes / exact names for this project's app vars.
 // Used as a fallback when dotenvKeys is not yet available (server not restarted).
 const APP_VAR_PREFIXES = [
-  'MONGODB_', 'ATLAS_', 'JWT_', 'KMS_', 'AWS_',
+  'PSP_', 'MONGODB_', 'ATLAS_', 'JWT_', 'KMS_', 'AWS_',
   'API_', 'CORS_', 'LOCAL_', 'NEXT_PUBLIC_', 'SEED_',
 ];
 const APP_VAR_EXACT = new Set(['NODE_ENV']);
