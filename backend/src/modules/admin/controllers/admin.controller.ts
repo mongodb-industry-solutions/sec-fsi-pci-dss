@@ -25,6 +25,7 @@ const SENSITIVE_KEY_PATTERNS = [
 const SAFE_KEYS = new Set([
   'MONGODB_DB_NAME',
   'MONGODB_CRYPT_SHARED_LIB_PATH',
+  'PSP_OAUTH_KEY_PROVIDER',
 ]);
 
 function isSensitiveKey(key: string): boolean {
