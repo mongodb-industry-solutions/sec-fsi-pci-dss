@@ -555,7 +555,7 @@ export const api = {
     },
     get: (id: string, token: string) =>
       apiFetch<ManagedUserDTO>(`/api/v1/users/${encodeURIComponent(id)}`, {}, token),
-    create: (body: { email: string; name: string; role: string; domain?: string; password?: string; status?: 'active' | 'suspended'; phone?: string }, token: string) =>
+    create: (body: { email: string; name: string; role: string; domain?: string; password: string; status?: 'active' | 'suspended'; phone?: string }, token: string) =>
       apiFetch<ManagedUserDTO>('/api/v1/users', { method: 'POST', body: JSON.stringify(body) }, token),
     update: (id: string, body: { name?: string; role?: string; status?: 'active' | 'suspended' | 'pending'; password?: string; phone?: string }, token: string) =>
       apiFetch<ManagedUserDTO>(`/api/v1/users/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }, token),

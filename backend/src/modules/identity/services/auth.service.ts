@@ -272,8 +272,9 @@ export async function resolveSelfRegistrationDomain(db: Db, name: string): Promi
  * onboarding is auditable (EDA / PCI DSS Req 10). No PII is placed in the event summary.
  */
 // Server-side password policy (mirrors the frontend PasswordFields checklist) so a direct API
-// caller cannot bypass the UI and create a weak account on this public route.
-function assertPasswordPolicy(password: string): void {
+// caller cannot bypass the UI and create a weak account. Shared by self-service registration
+// and admin-created local users.
+export function assertPasswordPolicy(password: string): void {
   if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
     throw Object.assign(
       new Error('Password must be at least 8 characters and include a letter and a number'),

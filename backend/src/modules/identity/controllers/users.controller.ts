@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { listManagedUsers, getManagedUser, createUser, updateUser, deleteUser } from '../services/user.service';
+import { assertPasswordPolicy } from '../services/auth.service';
 import { requirePermission } from '../../../vendors/middleware/acl';
 
 const E = { type: 'object', properties: { error: { type: 'string' } } };
@@ -100,7 +101,7 @@ export async function usersController(fastify: FastifyInstance) {
   });
 
   // POST /api/v1/users
-  fastify.post<{ Body: { email: string; name: string; role: string; domain?: string; password?: string; status?: 'active' | 'suspended'; phone?: string } }>('/', {
+  fastify.post<{ Body: { email: string; name: string; role: string; domain?: string; password: string; status?: 'active' | 'suspended'; phone?: string } }>('/', {
     preHandler: canManage,
     schema: {
       tags,
@@ -111,13 +112,13 @@ export async function usersController(fastify: FastifyInstance) {
       security: [{ bearerAuth: [] }],
       body: {
         type: 'object',
-        required: ['email', 'name', 'role'],
+        required: ['email', 'name', 'role', 'password'],
         properties: {
           email:    { type: 'string', description: 'User email address (used for login). Must be unique in the domain.' },
           name:     { type: 'string', description: 'Display name.' },
           role:     { type: 'string', description: 'RBAC role to assign (must exist in the roles collection).' },
           domain:   { type: 'string', description: 'Target authentication domain. Defaults to the default local domain.' },
-          password: { type: 'string', description: 'Initial password.' },
+          password: { type: 'string', minLength: 8, description: 'Initial password (policy: min 8 chars, at least one letter and one number; enforced server-side).' },
           status:   { type: 'string', enum: ['active', 'suspended'], description: 'Initial account status. Defaults to `active`.' },
           phone:    { type: 'string', description: 'Optional mobile phone (party SD-13, PII). Must be unique across parties.' },
         },
@@ -132,10 +133,10 @@ export async function usersController(fastify: FastifyInstance) {
   }, async (request, reply) => {
     const b = request.body;
     try {
+      assertPasswordPolicy(b.password);
       const user = await createUser(fastify.db, {
         email: b.email, name: b.name, role: b.role, domain: b.domain,
-        password: b.password && b.password.length >= 4 ? b.password : '********',
-        status: b.status, phone: b.phone,
+        password: b.password, status: b.status, phone: b.phone,
       });
       return reply.status(201).send(user);
     } catch (err) {
