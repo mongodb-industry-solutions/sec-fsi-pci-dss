@@ -125,6 +125,7 @@ export async function usersController(fastify: FastifyInstance) {
       },
       response: {
         201: UserObject,
+        400: { ...E, description: 'Password does not meet the policy (min 8 chars, letter + number).' },
         401: E,
         403: E,
         409: { ...E, description: 'A user with this email already exists in the domain.' },
