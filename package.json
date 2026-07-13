@@ -40,7 +40,7 @@
     "tsx": "^4.22.3",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.6",
-    "@vitejs/plugin-react": "^4.3.0",
+    "@vitejs/plugin-react": "^6.0.3",
     "@vitest/coverage-v8": "^4.1.0",
     "bcryptjs": "^2.4.3",
     "concurrently": "^10.0.3",
