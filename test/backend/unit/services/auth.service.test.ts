@@ -129,14 +129,16 @@ describe('session epoch (server-side logout invalidation)', () => {
   });
 
   it('bumpSessionEpoch increments and returns the new epoch', async () => {
+    // QE rejects findAndModify returnDocument:'after' on an encrypted collection, so the impl reads
+    // the PRE-update document (epoch 1) and returns prev+1 - the $inc already stored 2 server-side.
     const findOneAndUpdate = vi.fn().mockResolvedValue({ customerAuthenticationSessionEpoch: 1 });
     const db = { collection: vi.fn().mockReturnValue({ findOneAndUpdate }) } as any;
     const next = await bumpSessionEpoch(db, 'usr-001');
-    expect(next).toBe(1);
+    expect(next).toBe(2);
     expect(findOneAndUpdate).toHaveBeenCalledWith(
       { customerAuthenticationInstanceReference: 'usr-001' },
       { $inc: { customerAuthenticationSessionEpoch: 1 } },
-      expect.objectContaining({ returnDocument: 'after' }),
+      expect.objectContaining({ returnDocument: 'before' }),
     );
   });
 });
