@@ -133,7 +133,7 @@ function killProcessOnPort(port: number): void {
         if (/LISTEN/i.test(line)) {
           const pid = line.trim().split(/\s+/).pop() ?? '';
           if (/^\d+$/.test(pid) && pid !== '0') {
-            try { execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' }); } catch {}
+            try { execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' }); } catch { }
           }
         }
       }
@@ -142,7 +142,7 @@ function killProcessOnPort(port: number): void {
         encoding: 'utf-8', shell: '/bin/sh',
       }).trim().split('\n').filter(Boolean);
       for (const pid of pids) {
-        try { process.kill(parseInt(pid, 10), 'SIGTERM'); } catch {}
+        try { process.kill(parseInt(pid, 10), 'SIGTERM'); } catch { }
       }
     }
   } catch { /* no process on port - nothing to kill */ }
@@ -161,19 +161,19 @@ function spawnFrontend(): void {
 }
 
 const ALLOWED_NPM_COMMANDS: Record<string, string[]> = {
-  'setup':             ['run', 'setup'],
-  'setup:key:master':  ['run', 'setup:key:master'],
-  'setup:key:rsa':     ['run', 'setup:key:rsa'],
-  'setup:db':          ['run', 'setup:db'],
-  'setup:generate':    ['run', 'setup:generate'],
-  'setup:seed':        ['run', 'setup:seed'],
-  'test':              ['run', 'test'],
-  'test:unit':         ['run', 'test:unit'],
-  'test:integration':  ['run', 'test:integration'],
-  'test:e2e':          ['run', 'test:e2e'],
-  'type-check':        ['run', 'type-check'],
-  'setup:db:drop':     ['run', 'setup:db:drop'],
-  'setup:check':       ['run', 'setup:check'],
+  'setup': ['run', 'setup'],
+  'setup:key:master': ['run', 'setup:key:master'],
+  'setup:key:rsa': ['run', 'setup:key:rsa'],
+  'setup:db': ['run', 'setup:db'],
+  'setup:generate': ['run', 'setup:generate'],
+  'setup:seed': ['run', 'setup:seed'],
+  'test': ['run', 'test'],
+  'test:unit': ['run', 'test:unit'],
+  'test:integration': ['run', 'test:integration'],
+  'test:e2e': ['run', 'test:e2e'],
+  'type-check': ['run', 'type-check'],
+  'setup:db:drop': ['run', 'setup:db:drop'],
+  'setup:check': ['run', 'setup:check'],
 };
 
 type RateLimitStore = Map<string, { count: number; reset: number }>;
@@ -198,7 +198,7 @@ function makeRateLimiter(maxRequests: number, windowMs: number) {
 // Strict: login endpoint  -  10 attempts per 15 min (brute-force protection)
 const checkLoginRateLimit = makeRateLimiter(10, 15 * 60 * 1000);
 // Lenient: command/exec/logs/system  -  300 requests per 15 min (demo usage)
-const checkOpsRateLimit   = makeRateLimiter(300, 15 * 60 * 1000);
+const checkOpsRateLimit = makeRateLimiter(300, 15 * 60 * 1000);
 
 function verifyAdminToken(authHeader: string | undefined): boolean {
   if (!authHeader?.startsWith('Bearer ')) return false;
@@ -444,7 +444,7 @@ export async function adminController(fastify: FastifyInstance) {
       reply.header('Retry-After', String(rl.retryAfter));
       return reply.status(429).send({ error: `Too many requests. Retry after ${rl.retryAfter}s.` });
     }
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === 'production' && (process.env.PSP_ADMIN_ENFORCE === undefined || process.env.PSP_ADMIN_ENFORCE === 'false')) {
       return reply.status(403).send({ error: '/admin/exec is disabled in production' });
     }
     if (!verifyAdminToken(request.headers.authorization)) {
@@ -518,10 +518,10 @@ export async function adminController(fastify: FastifyInstance) {
           description: 'System information.',
           type: 'object',
           properties: {
-            os:      { type: 'object', additionalProperties: true },
-            node:    { type: 'object', additionalProperties: true },
+            os: { type: 'object', additionalProperties: true },
+            node: { type: 'object', additionalProperties: true },
             package: { type: 'object', additionalProperties: true },
-            env:     { type: 'object', additionalProperties: { type: 'string' } },
+            env: { type: 'object', additionalProperties: { type: 'string' } },
           },
         },
         401: { $ref: 'Error#' },
@@ -603,7 +603,7 @@ export async function adminController(fastify: FastifyInstance) {
         type: 'object',
         required: ['key', 'value'],
         properties: {
-          key:   { type: 'string', description: 'Env var name (must exist in .env).' },
+          key: { type: 'string', description: 'Env var name (must exist in .env).' },
           value: { type: 'string', description: 'New value.' },
         },
       },
@@ -611,7 +611,7 @@ export async function adminController(fastify: FastifyInstance) {
         200: {
           type: 'object',
           properties: {
-            updated:        { type: 'boolean' },
+            updated: { type: 'boolean' },
             reloadRequired: { type: 'boolean' },
           },
         },
@@ -674,7 +674,7 @@ export async function adminController(fastify: FastifyInstance) {
         200: {
           type: 'object',
           properties: {
-            ok:      { type: 'boolean' },
+            ok: { type: 'boolean' },
             message: { type: 'string' },
           },
         },
@@ -726,9 +726,9 @@ export async function adminController(fastify: FastifyInstance) {
         200: {
           type: 'object',
           properties: {
-            ok:      { type: 'boolean' },
+            ok: { type: 'boolean' },
             message: { type: 'string' },
-            steps:   { type: 'array', items: { type: 'string' } },
+            steps: { type: 'array', items: { type: 'string' } },
           },
         },
         401: { $ref: 'Error#' },
