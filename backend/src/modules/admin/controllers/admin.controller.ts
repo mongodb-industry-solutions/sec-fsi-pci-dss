@@ -444,7 +444,7 @@ export async function adminController(fastify: FastifyInstance) {
       reply.header('Retry-After', String(rl.retryAfter));
       return reply.status(429).send({ error: `Too many requests. Retry after ${rl.retryAfter}s.` });
     }
-    if (process.env.NODE_ENV === 'production' && (process.env.PSP_ADMIN_ENFORCE === undefined || process.env.PSP_ADMIN_ENFORCE === 'false')) {
+    if (process.env.NODE_ENV === 'production' && process.env.PSP_ADMIN_ENFORCE !== 'true') {
       return reply.status(403).send({ error: '/admin/exec is disabled in production' });
     }
     if (!verifyAdminToken(request.headers.authorization)) {
