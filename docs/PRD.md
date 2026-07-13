@@ -1034,8 +1034,6 @@ Every UI element in the application gains technical context overlays:
 | Security Auditor | `auditor@bank.demo` | security_auditor | Compliance | — |
 | Rachel Torres | `officer@bank.demo` | merchant_officer | Merchant Acquiring | PTY-056 |
 
-Password for all demo users: `demo1234`
-
 ---
 
 ## 11. PCI DSS Alignment

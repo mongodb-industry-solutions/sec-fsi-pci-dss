@@ -56,7 +56,7 @@ function FieldLabel({ children, tip }: { children: React.ReactNode; tip: string 
 
 const TAB_INFO: Record<'registered' | 'new', string> = {
   registered: 'Transfer to an account already saved in your profile: your own payout accounts or a saved contact. No need to enter account details; just select the source, the destination and the amount.',
-  new: 'Transfer to a bank account not yet saved in your profile. You need to enter the IBAN and other banking details manually. You can optionally save the account for future use.',
+  new: 'Transfer to a bank account not yet saved in your profile. You need to enter the IBAN and other banking details manually. To reuse a destination later, add it under Beneficiaries.',
 };
 
 type Tab = 'registered' | 'new';
@@ -367,7 +367,7 @@ function RegisteredAccountForm({ partyRef, token, onDone }: { partyRef: string; 
 interface IbanFormState {
   iban: string; bic: string; holderName: string; bankName: string;
   countryCode: string; accountNumber: string; routingNumber: string; correspondentBic: string;
-  amount: string; currency: string; reference: string; save: boolean;
+  amount: string; currency: string; reference: string;
   recurring: boolean; frequency: string;
 }
 
@@ -375,7 +375,7 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
   const [form, setForm] = useState<IbanFormState>({
     iban: '', bic: '', holderName: '', bankName: '',
     countryCode: 'DE', accountNumber: '', routingNumber: '', correspondentBic: '',
-    amount: '', currency: 'EUR', reference: '', save: false,
+    amount: '', currency: 'EUR', reference: '',
     recurring: false, frequency: 'monthly',
   });
   const [preview, setPreview] = useState<{ ok: boolean; rail?: string; feeAmount?: number; errors: string[] } | null>(null);
@@ -605,12 +605,10 @@ function NewIbanForm({ token, onDone }: { token: string; onDone: () => void }) {
         </div>
       </div>
 
-      <label className="flex items-center gap-2 cursor-pointer select-none">
-        <input type="checkbox" checked={form.save} onChange={e => set('save', e.target.checked)}
-          className="rounded border-gray-300 text-[#00ED64] focus:ring-[#00ED64]/40" />
-        <span className="text-xs text-gray-600">Save this account for future transfers</span>
-        <FieldTip text="If checked, the IBAN and BIC are stored as a new registered account in your profile. The IBAN is encrypted at rest. Otherwise the destination is transaction-scoped: bound only to this transfer." />
-      </label>
+      {/* NOTE: a "Save this account" option previously appeared here but was never wired to a persist
+          endpoint (form.save was set but never read). Saving an arbitrary external destination is not
+          supported yet: destinations entered here are transaction-scoped. To reuse a destination, add it
+          under Beneficiaries. Removed to avoid promising an unimplemented action. */}
 
       <div className="space-y-2">
         <label className="flex items-center gap-2 cursor-pointer select-none">

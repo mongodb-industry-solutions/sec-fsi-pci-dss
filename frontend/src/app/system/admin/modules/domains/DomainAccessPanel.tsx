@@ -68,10 +68,10 @@ export function DomainAccessPanel({
 
   async function addUser() {
     if (!newUser.email.trim() || !newUser.name.trim()) { notify('Email and name are required.', 'error'); return; }
-    if (!passwordFieldsValid(newUser.password, newConfirm, true)) { notify('Password does not meet the policy or does not match its confirmation.', 'error'); return; }
+    if (!passwordFieldsValid(newUser.password, newConfirm)) { notify('Password does not meet the policy or does not match its confirmation.', 'error'); return; }
     setBusy('new');
     try {
-      await api.users.create({ ...newUser, domain: domainName, password: newUser.password || undefined, phone: newUser.phone.trim() || undefined }, token);
+      await api.users.create({ ...newUser, domain: domainName, phone: newUser.phone.trim() || undefined }, token);
       setNewUser({ email: '', name: '', role: 'level1_analyst', password: '', phone: '' });
       setNewConfirm('');
       notify('User created.', 'success'); loadUsers();
@@ -268,14 +268,13 @@ export function DomainAccessPanel({
           </div>
           <div className="max-w-xl">
             <PasswordFields
-              optional label="Password" idPrefix="newuser"
+              label="Password" idPrefix="newuser"
               password={newUser.password} confirm={newConfirm}
               onPasswordChange={(v) => setNewUser({ ...newUser, password: v })}
               onConfirmChange={setNewConfirm}
             />
-            <p className="text-[10px] text-gray-400 mt-1">Leave blank to use the default demo password.</p>
           </div>
-          <button onClick={addUser} disabled={busy === 'new' || !passwordFieldsValid(newUser.password, newConfirm, true)}
+          <button onClick={addUser} disabled={busy === 'new' || !passwordFieldsValid(newUser.password, newConfirm)}
             className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[#001E2B]">
             <Plus size={14} /> Add
           </button>
