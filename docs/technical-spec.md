@@ -3326,10 +3326,10 @@ New seed files required for the merchant onboarding + debug mode features.
 
 | login | role | linkedPartyRef | Notes |
 |---|---|---|---|
-| `officer@bank.demo` / `demo1234` | `merchant_officer` | `PTY-056` | Merchant Acquiring officer |
-| `customer2@demo.com` / `demo1234` | `customer` | `PTY-057` | Simple customer, no merchant |
-| `customer3@demo.com` / `demo1234` | `customer` | `PTY-058` | Customer with pending merchant app |
-| `customer4@demo.com` / `demo1234` | `customer` | `PTY-059` | Dual-role customer + merchant |
+| `officer@bank.demo` / `********` | `merchant_officer` | `PTY-056` | Merchant Acquiring officer |
+| `customer2@demo.com` / `********` | `customer` | `PTY-057` | Simple customer, no merchant |
+| `customer3@demo.com` / `********` | `customer` | `PTY-058` | Customer with pending merchant app |
+| `customer4@demo.com` / `********` | `customer` | `PTY-059` | Dual-role customer + merchant |
 
 #### `backend/data/merchants.json` — Demo merchant records (`schemaVersion: 2`)
 

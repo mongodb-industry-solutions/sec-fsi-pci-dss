@@ -107,7 +107,6 @@ export async function usersController(fastify: FastifyInstance) {
       summary: 'Create a local user',
       description: 'Creates a new user in a local authentication domain. '
         + 'Requires `authDomains:manage` permission (manager role). '
-        + 'If `password` is omitted or shorter than 4 characters it defaults to `demo1234`. '
         + 'Email must be unique within the domain; returns 409 on conflict.',
       security: [{ bearerAuth: [] }],
       body: {
@@ -118,7 +117,7 @@ export async function usersController(fastify: FastifyInstance) {
           name:     { type: 'string', description: 'Display name.' },
           role:     { type: 'string', description: 'RBAC role to assign (must exist in the roles collection).' },
           domain:   { type: 'string', description: 'Target authentication domain. Defaults to the default local domain.' },
-          password: { type: 'string', description: 'Initial password. Defaults to `demo1234` if shorter than 4 characters.' },
+          password: { type: 'string', description: 'Initial password.' },
           status:   { type: 'string', enum: ['active', 'suspended'], description: 'Initial account status. Defaults to `active`.' },
           phone:    { type: 'string', description: 'Optional mobile phone (party SD-13, PII). Must be unique across parties.' },
         },
@@ -135,7 +134,7 @@ export async function usersController(fastify: FastifyInstance) {
     try {
       const user = await createUser(fastify.db, {
         email: b.email, name: b.name, role: b.role, domain: b.domain,
-        password: b.password && b.password.length >= 4 ? b.password : 'demo1234',
+        password: b.password && b.password.length >= 4 ? b.password : '********',
         status: b.status, phone: b.phone,
       });
       return reply.status(201).send(user);
