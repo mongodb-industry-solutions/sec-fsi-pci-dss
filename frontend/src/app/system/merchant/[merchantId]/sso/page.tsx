@@ -296,6 +296,12 @@ export default function MerchantSSOPage() {
   const [rotating, setRotating] = useState(false);
   const [revoking, setRevoking] = useState(false);
 
+  // Frontend origin for the browser-facing Authorize/Logout endpoints. Set post-mount (not derived
+  // during render) so SSR and the first client render both output '' — reading window.location at
+  // render time would differ between them and trigger a hydration mismatch.
+  const [frontendBase, setFrontendBase] = useState('');
+  useEffect(() => { setFrontendBase(window.location.origin); }, []);
+
   const load = useCallback(async () => {
     if (!merchantId || !token) return;
     try {
@@ -447,9 +453,9 @@ export default function MerchantSSOPage() {
   // OIDC endpoints. Discovery/token/jwks/userinfo/introspect/revoke are server-to-server — the
   // backend's actual public base URL (never derive it from window.location: frontend and backend
   // are different hosts in staging/prod). Authorize/logout are browser-facing PSP frontend PAGES
-  // (the backend's /api/v1/auth/authorize returns JSON, not UI) — this page's own origin.
+  // (the backend's /api/v1/auth/authorize returns JSON, not UI) — this page's own origin
+  // (frontendBase state above, set post-mount to avoid a hydration mismatch).
   const issuerBase = BACKEND_PUBLIC_URL;
-  const frontendBase = typeof window !== 'undefined' ? window.location.origin : '';
   const endpoints = [
     { label: 'Discovery', value: `${issuerBase}/.well-known/openid-configuration` },
     { label: 'Authorize', value: `${frontendBase}/auth/authorize` },

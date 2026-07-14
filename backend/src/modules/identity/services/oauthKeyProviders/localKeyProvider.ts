@@ -144,7 +144,7 @@ export class LocalKeyProvider implements OAuthKeyProvider {
           `OAuth private key not found at ${this.privateKeyPath}.\n` +
           '  Run: npm run setup:key:rsa (and mount/persist backend/keys)\n' +
           '  Or set PSP_OAUTH_KEY_AUTO_GENERATE=true to auto-generate anyway.\n' +
-          '  Or set OAUTH_KEY_PROVIDER=aws for KMS-backed signing.'
+          '  Or set PSP_OAUTH_KEY_PROVIDER=aws for KMS-backed signing.'
         );
       }
     }
