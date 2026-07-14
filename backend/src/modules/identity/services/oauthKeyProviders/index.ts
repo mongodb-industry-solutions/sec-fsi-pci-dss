@@ -36,7 +36,7 @@ export interface OAuthKeyProvider {
   revoke(kid: string): Promise<void>;
 }
 
-export function createOAuthKeyProvider(): OAuthKeyProvider {
+export async function createOAuthKeyProvider(): Promise<OAuthKeyProvider> {
   const provider = config.oauth.keyProvider;
   if (provider === 'aws') {
     const keyArn = config.oauth.awsKeyArn;
@@ -46,5 +46,5 @@ export function createOAuthKeyProvider(): OAuthKeyProvider {
     return new AwsKmsKeyProvider(keyArn, config.oauth.awsRegion);
   }
   const storeDir = config.oauth.keyStoreDir;
-  return new LocalKeyProvider(storeDir);
+  return LocalKeyProvider.create(storeDir);
 }
