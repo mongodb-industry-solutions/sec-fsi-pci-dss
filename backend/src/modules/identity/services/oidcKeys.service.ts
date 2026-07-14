@@ -79,7 +79,7 @@ async function syncAuditMirror(db: Db, createdByPartyReference?: string): Promis
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 
 export async function initOidcKeys(db: Db): Promise<void> {
-  _provider = createOAuthKeyProvider();
+  _provider = await createOAuthKeyProvider();
   // Warm the KMS provider so getKid() is available, then mirror to the audit collection.
   await _provider.getPublicKeyJwk();
   await syncAuditMirror(db);

@@ -109,18 +109,18 @@ export async function getCurrentSessionEpoch(db: Db, sub: string): Promise<numbe
  * epoch. Idempotent-safe: a user with no prior field goes 0 -> 1.
  */
 export async function bumpSessionEpoch(db: Db, sub: string): Promise<number> {
-  // Queryable Encryption rejects findAndModify with returnDocument:'after' (new:true) on an encrypted
-  // collection (EncryptedFindAndModifyNewNotSupported). Read the PRE-update epoch and return prev+1: the
-  // $inc has already stored prev+1 server-side, so this is the correct new value.
-  const res = await db
+  // Queryable Encryption rejects findAndModify with a projection/fields option on an encrypted
+  // collection ("findAndModify fields must be empty") but not returnDocument itself, so this stays
+  // atomic (single findOneAndUpdate) by reading the full pre-update document instead of a projection.
+  const before = await db
     .collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
     .findOneAndUpdate(
       { customerAuthenticationInstanceReference: sub },
       { $inc: { customerAuthenticationSessionEpoch: 1 } },
-      { returnDocument: 'before', projection: { customerAuthenticationSessionEpoch: 1 } },
+      { returnDocument: 'before' },
     );
-  if (!res) return 0; // no matching user, nothing incremented
-  return (res.customerAuthenticationSessionEpoch ?? 0) + 1;
+  if (!before) return 0; // no matching user, nothing incremented
+  return (before.customerAuthenticationSessionEpoch ?? 0) + 1;
 }
 
 /**

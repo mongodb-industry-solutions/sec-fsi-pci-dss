@@ -10,6 +10,10 @@ env:
   # that key. `local` is NOT viable in prod: it would need a persisted key shared across replicas
   # (the non-prod auto-generate path would diverge per replica → JWKS mismatch).
   PSP_OAUTH_KEY_PROVIDER: local
+  # Explicit opt-in: without this, LocalKeyProvider fails closed in production (no persisted
+  # backend/keys volume yet). Accepted here because replicaCount=1 (no cross-replica JWKS
+  # mismatch risk). Remove once PSP_OAUTH_KEY_PROVIDER=aws is back or backend/keys is persisted.
+  PSP_OAUTH_KEY_AUTO_GENERATE: "true"
   PSP_CORS_ORIGIN: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com"
   PSP_URL_FRONTEND: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com"
   # Backend OIDC issuer + endpoints AND internal self-dispatch — in-cluster service (see staging notes).

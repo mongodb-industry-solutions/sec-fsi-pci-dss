@@ -10,6 +10,7 @@ import { Tooltip } from '../../../../../components/Tooltip';
 import { useRequireActiveMerchant } from '../../../../../lib/merchantContext';
 import { useDebugMode } from '../../../../../lib/debugMode';
 import { api, type MerchantOAuthClient, type TypedWebhookConfig } from '../../../../../lib/api';
+import { BACKEND_PUBLIC_URL } from '../../../../../lib/constants';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -22,11 +23,12 @@ const SCOPE_DESCRIPTIONS: Record<string, string> = {
   'read:transactions': 'Access to transaction data (PCI DSS Req 7)',
   'read:userinfo': 'Full userinfo profile',
 };
-const ALL_GRANT_TYPES = ['authorization_code', 'client_credentials', 'refresh_token'] as const;
+const ALL_GRANT_TYPES = ['authorization_code', 'client_credentials', 'refresh_token', 'urn:openid:params:grant-type:ciba'] as const;
 const GRANT_LABELS: Record<string, string> = {
   authorization_code: 'Authorization Code (+ PKCE)',
   client_credentials: 'Client Credentials (server-to-server)',
   refresh_token: 'Refresh Token',
+  'urn:openid:params:grant-type:ciba': 'CIBA (passwordless backchannel login)',
 };
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
@@ -283,15 +285,23 @@ export default function MerchantSSOPage() {
   const [claimMapping, setClaimMapping] = useState<Record<string, string>>({});
   const [configSaving, setConfigSaving] = useState(false);
   const [configSaved, setConfigSaved] = useState(false);
+  const [configError, setConfigError] = useState<string | null>(null);
 
   // OAuth event callbacks state
   const [grantedCallbackUrl, setGrantedCallbackUrl] = useState('');
   const [revokedCallbackUrl, setRevokedCallbackUrl] = useState('');
   const [callbackSaving, setCallbackSaving] = useState(false);
   const [callbackSaved, setCallbackSaved] = useState(false);
+  const [callbackError, setCallbackError] = useState<string | null>(null);
 
   const [rotating, setRotating] = useState(false);
   const [revoking, setRevoking] = useState(false);
+
+  // Frontend origin for the browser-facing Authorize/Logout endpoints. Set post-mount (not derived
+  // during render) so SSR and the first client render both output '' — reading window.location at
+  // render time would differ between them and trigger a hydration mismatch.
+  const [frontendBase, setFrontendBase] = useState('');
+  useEffect(() => { setFrontendBase(window.location.origin); }, []);
 
   const load = useCallback(async () => {
     if (!merchantId || !token) return;
@@ -370,6 +380,7 @@ export default function MerchantSSOPage() {
   async function saveConfig() {
     if (!client) return;
     setConfigSaving(true);
+    setConfigError(null);
     try {
       const updated = await api.merchants.updateOAuthClient(merchantId, token, {
         redirect_uris: redirectUris.filter(Boolean),
@@ -386,12 +397,15 @@ export default function MerchantSSOPage() {
       syncToState(updated);
       setConfigSaved(true);
       setTimeout(() => setConfigSaved(false), 3000);
-    } catch { /* ignore */ }
+    } catch (e) {
+      setConfigError(e instanceof Error ? e.message : 'Failed to save settings');
+    }
     setConfigSaving(false);
   }
 
   async function saveCallbacks() {
     setCallbackSaving(true);
+    setCallbackError(null);
     try {
       async function upsertCallback(eventType: 'oauth.authorization_granted' | 'oauth.authorization_revoked', url: string) {
         if (!url.trim()) return;
@@ -409,7 +423,9 @@ export default function MerchantSSOPage() {
       await load();
       setCallbackSaved(true);
       setTimeout(() => setCallbackSaved(false), 3000);
-    } catch { /* ignore */ }
+    } catch (e) {
+      setCallbackError(e instanceof Error ? e.message : 'Failed to save callbacks');
+    }
     setCallbackSaving(false);
   }
 
@@ -435,17 +451,21 @@ export default function MerchantSSOPage() {
     setRevoking(false);
   }
 
-  // OIDC endpoints (relative paths, prepend backend base URL)
-  const issuerBase = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8081` : '';
+  // OIDC endpoints. Discovery/token/jwks/userinfo/introspect/revoke are server-to-server — the
+  // backend's actual public base URL (never derive it from window.location: frontend and backend
+  // are different hosts in staging/prod). Authorize/logout are browser-facing PSP frontend PAGES
+  // (the backend's /api/v1/auth/authorize returns JSON, not UI) — this page's own origin
+  // (frontendBase state above, set post-mount to avoid a hydration mismatch).
+  const issuerBase = BACKEND_PUBLIC_URL;
   const endpoints = [
     { label: 'Discovery', value: `${issuerBase}/.well-known/openid-configuration` },
-    { label: 'Authorize', value: `${issuerBase}/api/v1/auth/authorize` },
+    { label: 'Authorize', value: `${frontendBase}/auth/authorize` },
     { label: 'Token', value: `${issuerBase}/api/v1/auth/token` },
     { label: 'JWKS', value: `${issuerBase}/api/v1/auth/jwks` },
     { label: 'Userinfo', value: `${issuerBase}/api/v1/auth/userinfo` },
     { label: 'Introspect', value: `${issuerBase}/api/v1/auth/introspect` },
     { label: 'Revoke token', value: `${issuerBase}/api/v1/auth/revoke` },
-    { label: 'Logout', value: `${issuerBase}/api/v1/auth/logout` },
+    { label: 'Logout', value: `${frontendBase}/auth/logout` },
   ];
 
   if (!merchant) return null;
@@ -689,7 +709,7 @@ export default function MerchantSSOPage() {
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-2">
             Grant types
-            <Tooltip text="OAuth 2.0 flows this client may use. authorization_code (+ PKCE) for user SSO, refresh_token to rotate access tokens, client_credentials for server-to-server calls (the merchant's own machine identity). Grant only what the app needs (least privilege)." />
+            <Tooltip text="OAuth 2.0 flows this client may use. authorization_code (+ PKCE) for user SSO, refresh_token to rotate access tokens, client_credentials for server-to-server calls (the merchant's own machine identity), CIBA for passwordless backchannel login. Grant only what the app needs (least privilege). CIBA's delivery mode (poll/ping/push) and notification endpoint are not configurable from this page." />
           </label>
           <div className="space-y-2">
             {ALL_GRANT_TYPES.map((g) => (
@@ -775,6 +795,7 @@ export default function MerchantSSOPage() {
             {configSaving ? 'Saving...' : <><Check size={14} /> Save settings</>}
           </button>
           {configSaved && <span className="text-sm text-green-700 flex items-center gap-1"><Check size={13} /> Saved.</span>}
+          {configError && <span className="text-sm text-red-600">{configError}</span>}
         </div>
       </div>
 
@@ -827,6 +848,7 @@ export default function MerchantSSOPage() {
             {callbackSaving ? 'Saving...' : <><Check size={14} /> Save callbacks</>}
           </button>
           {callbackSaved && <span className="text-sm text-green-700 flex items-center gap-1"><Check size={13} /> Saved.</span>}
+          {callbackError && <span className="text-sm text-red-600">{callbackError}</span>}
         </div>
       </div>
 
@@ -847,7 +869,7 @@ export default function MerchantSSOPage() {
         {debugMode && (
           <div className="mt-4 border-t border-gray-100 pt-4">
             <p className="text-xs font-medium text-gray-600 mb-2">Example authorization request (PKCE)</p>
-            <pre className="text-[11px] font-mono text-gray-600 bg-gray-50 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-all">{`GET ${issuerBase}/api/v1/auth/authorize
+            <pre className="text-[11px] font-mono text-gray-600 bg-gray-50 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-all">{`GET ${frontendBase}/auth/authorize
   ?response_type=code
   &client_id=${client.oauthClientId}
   &redirect_uri=<your_redirect_uri>

@@ -1,7 +1,16 @@
 import * as crypto from 'crypto';
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
 import * as path from 'path';
 import { OAuthKeyProvider, OAuthPublicKeyEntry } from './index';
+
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Filesystem-backed OAuth signing key provider (ADR-036).
@@ -25,12 +34,18 @@ export class LocalKeyProvider implements OAuthKeyProvider {
   private activeKid!: string;
   private activePublicPem!: string;
 
-  constructor(storeDir: string) {
+  private constructor(storeDir: string) {
     this.storeDir = path.resolve(storeDir);
     this.privateKeyPath = path.join(this.storeDir, 'private.pem');
     this.publicKeyPath = path.join(this.storeDir, 'public.pem');
     this.retiredDir = path.join(this.storeDir, 'retired');
-    this.loadActive();
+  }
+
+  /** Async factory: a constructor can't await, so key loading (fs I/O) happens here before the instance is handed out. */
+  static async create(storeDir: string): Promise<LocalKeyProvider> {
+    const provider = new LocalKeyProvider(storeDir);
+    await provider.loadActive();
+    return provider;
   }
 
   // ── Signing / active key ──────────────────────────────────────────────────
@@ -58,7 +73,7 @@ export class LocalKeyProvider implements OAuthKeyProvider {
     const entries: OAuthPublicKeyEntry[] = [
       { kid: this.activeKid, publicKeyPem: this.activePublicPem, status: 'active' },
     ];
-    for (const [kid, pem] of this.readRetired()) {
+    for (const [kid, pem] of await this.readRetired()) {
       entries.push({ kid, publicKeyPem: pem, status: 'deprecated' });
     }
     return entries;
@@ -66,7 +81,7 @@ export class LocalKeyProvider implements OAuthKeyProvider {
 
   async getPublicPemByKid(kid: string): Promise<string | null> {
     if (kid === this.activeKid) return this.activePublicPem;
-    return this.readRetired().get(kid) ?? null;
+    return (await this.readRetired()).get(kid) ?? null;
   }
 
   supportsRotation(): boolean {
@@ -76,14 +91,14 @@ export class LocalKeyProvider implements OAuthKeyProvider {
   // ── Management operations ────────────────────────────────────────────────────
 
   async rotate(): Promise<{ kid: string; publicKeyPem: string }> {
-    this.retireActive();
+    await this.retireActive();
     const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
       modulusLength: 2048,
       publicKeyEncoding: { type: 'spki', format: 'pem' },
       privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
     });
-    this.writeActive(privateKey as string, publicKey as string);
-    this.loadActive();
+    await this.writeActive(privateKey as string, publicKey as string);
+    await this.loadActive();
     return { kid: this.activeKid, publicKeyPem: this.activePublicPem };
   }
 
@@ -95,9 +110,9 @@ export class LocalKeyProvider implements OAuthKeyProvider {
     if (derivedPub.trim() !== suppliedPub.trim()) {
       throw Object.assign(new Error('Public key does not match the provided private key'), { statusCode: 400 });
     }
-    this.retireActive();
-    this.writeActive(privateKeyPem, derivedPub);
-    this.loadActive();
+    await this.retireActive();
+    await this.writeActive(privateKeyPem, derivedPub);
+    await this.loadActive();
     return { kid: this.activeKid, publicKeyPem: this.activePublicPem };
   }
 
@@ -106,75 +121,81 @@ export class LocalKeyProvider implements OAuthKeyProvider {
       throw Object.assign(new Error('Cannot revoke the active signing key — rotate first'), { statusCode: 400 });
     }
     const file = path.join(this.retiredDir, `${kid}.pub.pem`);
-    if (!fs.existsSync(file)) {
+    if (!(await pathExists(file))) {
       throw Object.assign(new Error(`Key ${kid} not found`), { statusCode: 404 });
     }
-    fs.rmSync(file);
+    await fs.rm(file);
   }
 
   // ── Internals ────────────────────────────────────────────────────────────────
 
-  private loadActive(): void {
-    if (!fs.existsSync(this.privateKeyPath)) {
+  private async loadActive(): Promise<void> {
+    if (!(await pathExists(this.privateKeyPath))) {
       // Auto-generate a signing key when missing in any NON-production environment (development,
       // staging, demos) so the local provider works without mounting a key file or standing up KMS.
-      // PRODUCTION still fails closed: a real, persisted key (or KMS) must be provisioned there — an
-      // auto-generated ephemeral key would not survive restarts and would diverge across replicas.
-      if (process.env.NODE_ENV !== 'production') {
-        this.generateAndPersist();
+      // PRODUCTION still fails closed by default: a real, persisted key (or KMS) must be provisioned
+      // there — an auto-generated ephemeral key would not survive restarts and would diverge across
+      // replicas. Set PSP_OAUTH_KEY_AUTO_GENERATE=true to explicitly opt into ephemeral generation in
+      // production anyway (e.g. single-replica deployments without KMS available yet).
+      if (process.env.NODE_ENV !== 'production' || process.env.PSP_OAUTH_KEY_AUTO_GENERATE === 'true') {
+        await this.generateAndPersist();
       } else {
         throw new Error(
           `OAuth private key not found at ${this.privateKeyPath}.\n` +
           '  Run: npm run setup:key:rsa (and mount/persist backend/keys)\n' +
-          '  Or set OAUTH_KEY_PROVIDER=aws for KMS-backed signing.'
+          '  Or set PSP_OAUTH_KEY_AUTO_GENERATE=true to auto-generate anyway.\n' +
+          '  Or set PSP_OAUTH_KEY_PROVIDER=aws for KMS-backed signing.'
         );
       }
     }
-    const pem = fs.readFileSync(this.privateKeyPath, 'utf8');
+    const pem = await fs.readFile(this.privateKeyPath, 'utf8');
     this.privateKey = crypto.createPrivateKey(pem);
     const pubObj = crypto.createPublicKey(this.privateKey);
     this.activePublicPem = pubObj.export({ type: 'spki', format: 'pem' }) as string;
     this.activeKid = this.deriveKid(pubObj);
     // Ensure public.pem on disk stays in sync with the private key.
-    if (!fs.existsSync(this.publicKeyPath)) {
-      fs.writeFileSync(this.publicKeyPath, this.activePublicPem, { mode: 0o644 });
+    if (!(await pathExists(this.publicKeyPath))) {
+      await fs.writeFile(this.publicKeyPath, this.activePublicPem, { mode: 0o644 });
     }
   }
 
   /** Move the current active public key into the retired/ grace store. Private material is dropped. */
-  private retireActive(): void {
+  private async retireActive(): Promise<void> {
     if (!this.activeKid || !this.activePublicPem) return;
-    fs.mkdirSync(this.retiredDir, { recursive: true });
-    fs.writeFileSync(path.join(this.retiredDir, `${this.activeKid}.pub.pem`), this.activePublicPem, { mode: 0o644 });
+    await fs.mkdir(this.retiredDir, { recursive: true });
+    await fs.writeFile(path.join(this.retiredDir, `${this.activeKid}.pub.pem`), this.activePublicPem, { mode: 0o644 });
   }
 
-  private writeActive(privateKeyPem: string, publicKeyPem: string): void {
-    fs.mkdirSync(this.storeDir, { recursive: true });
-    fs.writeFileSync(this.privateKeyPath, privateKeyPem, { mode: 0o600 });
-    fs.writeFileSync(this.publicKeyPath, publicKeyPem, { mode: 0o644 });
+  private async writeActive(privateKeyPem: string, publicKeyPem: string): Promise<void> {
+    await fs.mkdir(this.storeDir, { recursive: true });
+    await fs.writeFile(this.privateKeyPath, privateKeyPem, { mode: 0o600 });
+    await fs.writeFile(this.publicKeyPath, publicKeyPem, { mode: 0o644 });
   }
 
-  private readRetired(): Map<string, string> {
+  private async readRetired(): Promise<Map<string, string>> {
     const map = new Map<string, string>();
-    if (!fs.existsSync(this.retiredDir)) return map;
-    for (const f of fs.readdirSync(this.retiredDir)) {
+    if (!(await pathExists(this.retiredDir))) return map;
+    for (const f of await fs.readdir(this.retiredDir)) {
       if (!f.endsWith('.pub.pem')) continue;
       const kid = f.slice(0, -'.pub.pem'.length);
       if (kid === this.activeKid) continue; // active key is never also "deprecated"
-      map.set(kid, fs.readFileSync(path.join(this.retiredDir, f), 'utf8'));
+      map.set(kid, await fs.readFile(path.join(this.retiredDir, f), 'utf8'));
     }
     return map;
   }
 
-  private generateAndPersist(): void {
-    fs.mkdirSync(this.storeDir, { recursive: true });
+  private async generateAndPersist(): Promise<void> {
+    // Defensive: loadActive() already gates this call on the key being absent, but guard here too so
+    // a direct/future call never clobbers an existing active key.
+    if (await pathExists(this.privateKeyPath)) return;
+    await fs.mkdir(this.storeDir, { recursive: true });
     const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
       modulusLength: 2048,
       publicKeyEncoding: { type: 'spki', format: 'pem' },
       privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
     });
-    fs.writeFileSync(this.privateKeyPath, privateKey as string, { mode: 0o600 });
-    fs.writeFileSync(this.publicKeyPath, publicKey as string, { mode: 0o644 });
+    await fs.writeFile(this.privateKeyPath, privateKey as string, { mode: 0o600 });
+    await fs.writeFile(this.publicKeyPath, publicKey as string, { mode: 0o644 });
     console.log(`[oauth-keys] Generated new RSA-2048 keypair at ${this.privateKeyPath} (+ public.pem)`);
   }
 
