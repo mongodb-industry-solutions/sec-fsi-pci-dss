@@ -1344,7 +1344,7 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
           post_logout_redirect_uris: { type: 'array', items: { type: 'string' } },
           grant_types: {
             type: 'array',
-            items: { type: 'string', enum: ['authorization_code', 'client_credentials', 'refresh_token'] },
+            items: { type: 'string', enum: ['authorization_code', 'client_credentials', 'refresh_token', 'urn:openid:params:grant-type:ciba'] },
           },
           scopes: { type: 'array', items: { type: 'string' } },
           require_pkce: { type: 'boolean' },

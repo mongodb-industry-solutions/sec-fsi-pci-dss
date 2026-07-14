@@ -3,6 +3,10 @@ import { getJwks } from '../services/oidcKeys.service';
 
 export async function oidcDiscoveryController(fastify: FastifyInstance) {
   const issuer = () => process.env.PSP_BASE_URL ?? 'http://localhost:8081';
+  // authorization_endpoint / end_session_endpoint are browser-facing PAGES rendered by the PSP
+  // frontend (login/consent UI, session cookie) — the backend's own /api/v1/auth/authorize returns
+  // JSON, not UI, so it must NOT be advertised here as the endpoint to redirect the user-agent to.
+  const frontendBase = () => process.env.PSP_URL_FRONTEND ?? 'http://localhost:8080';
 
   // OIDC Discovery 1.0 §4 — path fixed by spec, must be at root (no /api/v1 prefix)
   fastify.get('/.well-known/openid-configuration', {
@@ -13,14 +17,16 @@ export async function oidcDiscoveryController(fastify: FastifyInstance) {
     },
   }, async (_req, _reply) => {
     const base = issuer();
+    const feBase = frontendBase();
     return {
       issuer: base,
-      authorization_endpoint: `${base}/api/v1/auth/authorize`,
+      authorization_endpoint: `${feBase}/auth/authorize`,
       token_endpoint: `${base}/api/v1/auth/token`,
       userinfo_endpoint: `${base}/api/v1/auth/userinfo`,
       revocation_endpoint: `${base}/api/v1/auth/revoke`,
       introspection_endpoint: `${base}/api/v1/auth/introspect`,
       jwks_uri: `${base}/api/v1/auth/jwks`,
+      end_session_endpoint: `${feBase}/auth/logout`,
       // CIBA: backchannel authentication endpoint + supported delivery modes / signing algs.
       backchannel_authentication_endpoint: `${base}/api/v1/auth/bc-authorize`,
       backchannel_token_delivery_modes_supported: ['poll', 'ping', 'push'],

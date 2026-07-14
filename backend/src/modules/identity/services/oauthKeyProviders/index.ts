@@ -36,15 +36,15 @@ export interface OAuthKeyProvider {
   revoke(kid: string): Promise<void>;
 }
 
-export function createOAuthKeyProvider(): OAuthKeyProvider {
+export async function createOAuthKeyProvider(): Promise<OAuthKeyProvider> {
   const provider = config.oauth.keyProvider;
   if (provider === 'aws') {
     const keyArn = config.oauth.awsKeyArn;
     if (!keyArn) {
-      throw new Error('OAUTH_AWS_KEY_ARN is required when OAUTH_KEY_PROVIDER=aws');
+      throw new Error('PSP_OAUTH_AWS_KEY_ARN is required when PSP_OAUTH_KEY_PROVIDER=aws');
     }
     return new AwsKmsKeyProvider(keyArn, config.oauth.awsRegion);
   }
   const storeDir = config.oauth.keyStoreDir;
-  return new LocalKeyProvider(storeDir);
+  return LocalKeyProvider.create(storeDir);
 }

@@ -38,7 +38,7 @@ afterEach(() => {
 
 describe('LocalKeyProvider', () => {
   it('auto-generates private.pem + public.pem and signs verifiably', async () => {
-    const p = new LocalKeyProvider(storeDir);
+    const p = await LocalKeyProvider.create(storeDir);
     expect(fs.existsSync(path.join(storeDir, 'private.pem'))).toBe(true);
     expect(fs.existsSync(path.join(storeDir, 'public.pem'))).toBe(true);
 
@@ -48,8 +48,8 @@ describe('LocalKeyProvider', () => {
     expect(verify(pubPem!, token)).toBe(true);
   });
 
-  it('derives kid deterministically from the public key', () => {
-    const p = new LocalKeyProvider(storeDir);
+  it('derives kid deterministically from the public key', async () => {
+    const p = await LocalKeyProvider.create(storeDir);
     const pem = fs.readFileSync(path.join(storeDir, 'public.pem'), 'utf8');
     const der = crypto.createPublicKey(pem).export({ type: 'spki', format: 'der' }) as Buffer;
     const expected = crypto.createHash('sha256').update(der).digest('hex').slice(0, 16);
@@ -57,7 +57,7 @@ describe('LocalKeyProvider', () => {
   });
 
   it('rotate() activates a new key and keeps the old one verifiable during grace', async () => {
-    const p = new LocalKeyProvider(storeDir);
+    const p = await LocalKeyProvider.create(storeDir);
     const old = await signVerifiable(p);
 
     const { kid: newKid } = await p.rotate();
@@ -82,7 +82,7 @@ describe('LocalKeyProvider', () => {
   });
 
   it('revoke() removes a deprecated key but refuses the active key', async () => {
-    const p = new LocalKeyProvider(storeDir);
+    const p = await LocalKeyProvider.create(storeDir);
     const old = await signVerifiable(p);
     await p.rotate();
 
@@ -95,7 +95,7 @@ describe('LocalKeyProvider', () => {
   });
 
   it('importKeypair() rejects a mismatched public/private pair', async () => {
-    const p = new LocalKeyProvider(storeDir);
+    const p = await LocalKeyProvider.create(storeDir);
     const a = crypto.generateKeyPairSync('rsa', {
       modulusLength: 2048,
       publicKeyEncoding: { type: 'spki', format: 'pem' },
@@ -110,7 +110,7 @@ describe('LocalKeyProvider', () => {
   });
 
   it('importKeypair() activates a valid external pair and deprecates the previous key', async () => {
-    const p = new LocalKeyProvider(storeDir);
+    const p = await LocalKeyProvider.create(storeDir);
     const prev = await signVerifiable(p);
 
     const kp = crypto.generateKeyPairSync('rsa', {
