@@ -3,6 +3,7 @@ import 'server-only';
 import { createHash, randomBytes } from 'crypto';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { ENV } from './env';
+import { oauthLog } from './logger';
 
 export interface OidcConfig {
   issuer: string;
@@ -20,8 +21,19 @@ let jwksCache: ReturnType<typeof createRemoteJWKSet> | null = null;
 
 export async function discover(): Promise<OidcConfig> {
   if (discoveryCache) return discoveryCache;
-  const res = await fetch(`${ENV.pspBaseUrl()}/.well-known/openid-configuration`, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`OIDC discovery failed: ${res.status}`);
+  const url = `${ENV.pspBaseUrl()}/.well-known/openid-configuration`;
+  let res: Response;
+  try {
+    res = await fetch(url, { cache: 'no-store' });
+  } catch (e) {
+    // The merchant process cannot reach the PSP base URL (wrong host/port, container networking, …).
+    oauthLog.error('discover.unreachable', { url, error: (e as Error).message });
+    throw new Error(`OIDC discovery unreachable at ${url}: ${(e as Error).message}`);
+  }
+  if (!res.ok) {
+    oauthLog.error('discover.failed', { url, status: res.status });
+    throw new Error(`OIDC discovery failed: ${res.status}`);
+  }
   discoveryCache = (await res.json()) as OidcConfig;
   return discoveryCache;
 }
@@ -98,8 +110,13 @@ export async function exchangeCode(code: string, codeVerifier: string): Promise<
     cache: 'no-store',
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`token exchange failed: ${res.status} ${JSON.stringify(err)}`);
+    const err = (await res.json().catch(() => ({}))) as { error?: string; error_description?: string };
+    // Surface the PSP's own error code + description (no secret) so the callback can log the real cause
+    // (invalid_grant / invalid_client / redirect_uri mismatch / PKCE) instead of a bare failure.
+    oauthLog.error('token.exchange.failed', {
+      endpoint: cfg.token_endpoint, status: res.status, error: err.error, error_description: err.error_description,
+    });
+    throw new OAuthUpstreamError(err.error ?? 'token_exchange_failed', err.error_description ?? '', res.status);
   }
   return (await res.json()) as TokenResponse;
 }
@@ -186,9 +203,12 @@ export async function backchannelAuthorize(input: BackchannelAuthorizeInput): Pr
   });
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { error?: string; error_description?: string };
+    oauthLog.error('ciba.bc_authorize.failed', { status: res.status, error: err.error, error_description: err.error_description });
     throw new OAuthUpstreamError(err.error ?? 'bc_authorize_failed', err.error_description ?? '', res.status);
   }
-  return (await res.json()) as BackchannelAuthResponse;
+  const out = (await res.json()) as BackchannelAuthResponse;
+  oauthLog.info('ciba.bc_authorize.ok', { authReqId: out.auth_req_id, expiresIn: out.expires_in, interval: out.interval });
+  return out;
 }
 
 export interface CibaPollResult {
@@ -211,14 +231,23 @@ export async function cibaTokenPoll(authReqId: string): Promise<CibaPollResult> 
     }),
     cache: 'no-store',
   });
-  if (res.ok) return { status: 'done', tokens: (await res.json()) as TokenResponse };
+  if (res.ok) {
+    oauthLog.info('ciba.poll.done', { authReqId });
+    return { status: 'done', tokens: (await res.json()) as TokenResponse };
+  }
   const err = (await res.json().catch(() => ({}))) as { error?: string; error_description?: string };
   switch (err.error) {
     case 'authorization_pending': return { status: 'pending' };
     case 'slow_down': return { status: 'slow_down' };
-    case 'access_denied': return { status: 'denied' };
-    case 'expired_token': return { status: 'expired' };
-    default: return { status: 'error', error: err.error_description ?? err.error ?? `token poll failed: ${res.status}` };
+    case 'access_denied':
+      oauthLog.warn('ciba.poll.denied', { authReqId });
+      return { status: 'denied' };
+    case 'expired_token':
+      oauthLog.warn('ciba.poll.expired', { authReqId });
+      return { status: 'expired' };
+    default:
+      oauthLog.error('ciba.poll.error', { authReqId, status: res.status, error: err.error, error_description: err.error_description });
+      return { status: 'error', error: err.error_description ?? err.error ?? `token poll failed: ${res.status}` };
   }
 }
 
@@ -245,9 +274,13 @@ export async function fetchUserinfo(
       headers: { Authorization: `Bearer ${accessToken}` },
       cache: 'no-store',
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      oauthLog.warn('userinfo.failed', { status: res.status });
+      return null;
+    }
     return (await res.json()) as { sub: string; name?: string; preferred_username?: string; email?: string };
-  } catch {
+  } catch (e) {
+    oauthLog.warn('userinfo.error', { error: (e as Error).message });
     return null;
   }
 }

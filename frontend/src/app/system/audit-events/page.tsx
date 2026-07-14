@@ -217,11 +217,11 @@ export default function AuditEventsPage() {
           </div>
         </div>
         <div className="lg:col-span-2">
-          <label className="block text-xs text-gray-500 mb-1">Related reference (txn · case · merchant · customer · card token)</label>
+          <label className="block text-xs text-gray-500 mb-1">Related reference (txn · case · merchant · customer · card token · login flow id)</label>
           <div className="relative">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
             <input value={ref} onChange={(e) => { setRef(e.target.value); resetToFirst(); }}
-              placeholder="Paste a transaction id, case id, merchant id, account ref or card token…"
+              placeholder="Paste a transaction id, case id, merchant id, account ref, card token or login flow id (flow:…)…"
               className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
           </div>
         </div>

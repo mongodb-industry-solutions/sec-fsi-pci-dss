@@ -3590,6 +3590,63 @@ list-filter realism.
 
 ---
 
+## 10.6 OIDC/OAuth flow audit trail (v26)
+
+Every step of the OIDC/OAuth flow (PSP authorization server + merchant client + CIBA) is auditable
+end-to-end so an integration failure can be pinpointed to the exact step and cause. Reuses the v7/v8
+compliance ledger (`emitComplianceEvent` + `LedgerProjection`); no new store. Visible in the unified
+audit (`/system/audit-events`), which is gated to **`security_auditor` or `manager`**
+(`processEvent.controller.ts`).
+
+**Helper.** `modules/identity/services/oauthAudit.service.ts` — `auditOAuth(db, action, opts)` emits a
+`complianceProcessEvent` with `processType: 'authentication'`, `bianServiceDomain: 'SD-16 Party
+Authentication'`, `bianControlRecordType: 'AuthenticationSession'`. `classifyOAuthFailure(err, msg)`
+maps a raw OAuth error to a human cause (`bad_client_secret`, `missing_client_secret`,
+`unknown_client`, `client_inactive`, `merchant_inactive`, `pkce_mismatch`, `pkce_missing`,
+`redirect_uri_mismatch`, `code_expired`, `code_replayed`, `code_not_found`, `invalid_scope`,
+`unsupported_grant_type`, `invalid_token`). `auditOAuthWithMerchantLookup` resolves the merchant name
+from the `clientId` for failure events (so an auditor sees WHO attempted).
+
+**Correlation.** Anchored on `hash(state)` (a SHA-256 prefix, `flow:…`): `state` is persisted on
+`partyAuthorizationCode` and present on both the authorize and token halves, so events of one flow
+share it as the ledger `correlationId` **without any schema change**. The merchant logs the same
+`state` hash as `flowId`, joining merchant logs to the PSP ledger. Refresh/userinfo/revoke (no state)
+correlate on `sub`/`clientId`.
+
+**Events emitted.**
+
+| Action | When | Key `eventSummary` fields |
+|---|---|---|
+| `oauth.authorize.initiated` | `/authorize` validated | clientId, merchantName, flowId, scopes |
+| `oauth.authorize.denied` | user denies consent | clientId, flowId, reason=access_denied |
+| `oauth.code.issued` | grant → code minted | clientId, sub, flowId, scopes |
+| `oauth.token.issued` | authz_code / client_credentials | clientId, merchantName, sub?, grantType |
+| `oauth.token.refreshed` | refresh_token grant | clientId, merchantName, sub |
+| `oauth.token.failed` | any `/token` error | clientId, merchantName, grantType, **failureCause** |
+| `oauth.userinfo.accessed` | userinfo (ok/failed) | clientId, sub, scopes / reason |
+| `oauth.token.revoked` | RFC 7009 revoke | clientId, sub |
+| `auth.login` / `auth.login.failed` / `auth.login.blocked` | PSP portal login | sub, role, domain, failureCause (invalid_password / account_pending / account_suspended) |
+| `oauth.callback.delivered` / `oauth.callback.failed` | OAuth webhook delivery to the merchant | eventType, targetHost, responseStatus, attempts, failureCause |
+
+The webhook (callback) delivery also keeps its detailed `merchantWebhookLog` row (`delivered`,
+`responseStatus`, `attempts`, `error`, `requestUrl`) shown in the merchant Events view.
+
+**Secret redaction (PCI DSS Req 10 / GDPR).** `vendors/eventbus/sanitize.ts` adds `SECRET_BLOCKLIST`
+(access/refresh/id token, code, code_verifier, client_secret, Authorization, cookie, email, phone) and
+`redactSecrets(value)` used by the audit helper and the merchant logger. `state`/`nonce` are logged
+only as a hash, never raw. CHD stays under the separate `CHD_BLOCKLIST` (Req 3.2).
+
+**Merchant logging.** `merchant/src/lib/logger.ts` — server-only structured JSON logger with the same
+redaction and a `flowId` field. Instruments `login.initiated`, `callback.received`,
+`callback.token_exchanged`, `callback.login_success`, `callback.invalid_state`, `callback.no_subject`,
+`callback.psp_error`, `callback.failed`, `discover.unreachable/failed`, `token.exchange.failed`,
+`userinfo.failed/error`, and CIBA (`ciba.bc_authorize.*`, `ciba.poll.*`). All emission is
+fire-and-forget and never blocks the auth response (Req 10.2.1).
+
+*Added 2026-07-14 (v26; doc + code together per repo rules).*
+
+---
+
 ## 11. Event-Driven Architecture (dev.v8)
 
 **EventBus vendor** (`backend/src/vendors/eventbus`). One bus for all events behind the `EventBus` port (`publish`/`subscribe`); default adapter `EventBusInProcess` (Node `EventEmitter`). Swap to Kafka/RabbitMQ = change the adapter in `initEventBus` only. `DomainEvent` envelope: `eventId` (idempotency), `eventType` (dotted, module-prefixed), `occurredAt`, `correlationId` (the journey; = `cardTransactionInstanceReference` for a payment), `causationId`, `businessProcess`, `partitionKey`, `source`, `actor?`, `bian?`, `payload` (CHD stripped on publish), `schemaVersion`, `transient?` (delivered, not persisted).

@@ -17,6 +17,7 @@ import {
   getPriorConsentScopes,
 } from '../services/oauth.service';
 import { redeemCibaGrant } from '../services/ciba.service';
+import { auditOAuth, auditOAuthWithMerchantLookup, classifyOAuthFailure, stateForCode } from '../services/oauthAudit.service';
 
 function parseBasicAuth(header: string | undefined): { id: string; secret: string } | null {
   if (!header?.startsWith('Basic ')) return null;
@@ -79,6 +80,9 @@ export async function oauthController(fastify: FastifyInstance) {
       // Always redirect to the registered redirect_uri returned by initiateAuthorization
       // (validated.redirectUri), never the raw query value — prevents open redirect.
       if (q._psp_action === 'deny') {
+        auditOAuth(db(), 'oauth.authorize.denied', {
+          clientId: q.client_id, sub: q._psp_sub, state: q.state, outcome: 'rejected', reason: 'access_denied',
+        });
         const redirectUrl = new URL(validated.redirectUri);
         redirectUrl.searchParams.set('error', 'access_denied');
         if (q.state) redirectUrl.searchParams.set('state', q.state);
@@ -209,6 +213,23 @@ export async function oauthController(fastify: FastifyInstance) {
       reply.header('Cache-Control', 'no-store');
       return result;
     } catch (err: any) {
+      // Audit the failed token exchange with the classified CAUSE (bad secret / PKCE / redirect_uri /
+      // expired code, …) and the merchant behind the clientId, so an auditor/manager can pinpoint the
+      // failure — the merchant only sees a generic token_exchange_failed. No secret is emitted.
+      const { cause, explanation } = classifyOAuthFailure(err.oauthError, err.message);
+      // Recover the flow's `state` from the code (for authorization_code grants) so the failure shares
+      // the SAME flowId as the rest of the flow and is filterable by it. Fully fire-and-forget.
+      void (async () => {
+        const state = await stateForCode(db(), body.code);
+        await auditOAuthWithMerchantLookup(db(), 'oauth.token.failed', {
+          clientId: auth?.id ?? body.client_id,
+          grantType: body.grant_type,
+          state,
+          outcome: 'failed',
+          reason: err.oauthError ?? err.message ?? 'server_error',
+          failureCause: `${cause}: ${explanation}`,
+        });
+      })();
       return oauthErrorReply(reply, err);
     }
   });
@@ -229,6 +250,7 @@ export async function oauthController(fastify: FastifyInstance) {
       const info = await getUserinfo(db(), bearer);
       return info;
     } catch (err: any) {
+      auditOAuth(db(), 'oauth.userinfo.accessed', { outcome: 'failed', reason: err.oauthError ?? 'invalid_token' });
       return oauthErrorReply(reply, err);
     }
   });
