@@ -47,6 +47,19 @@ export async function loginUser(
 
   const valid = await bcrypt.compare(password, user.customerAuthenticationCredentialHash);
   if (!valid) {
+    // Wrong password for a known account. Identify the user so an auditor/manager can see WHO failed.
+    emitComplianceEvent(db, {
+      entityType: 'customer',
+      entityId: user.customerAuthenticationInstanceReference,
+      processType: 'authentication',
+      processAction: 'auth.login.failed',
+      processOutcome: 'rejected',
+      performedByPartyReference: user.partyInstanceReference ?? user.customerAuthenticationInstanceReference,
+      performedByRole: user.customerAuthenticationUserRole ?? 'customer',
+      eventSummary: { domain, failureCause: 'invalid_password', accountStatus: user.customerAuthenticationAccountStatus ?? 'active' },
+      bianServiceDomain: 'PartyAuthentication',
+      bianControlRecordType: 'CustomerAuthenticationAssessment',
+    });
     throw Object.assign(new Error('Invalid credentials'), { statusCode: 401 });
   }
 
@@ -57,6 +70,19 @@ export async function loginUser(
     const reason = user.customerAuthenticationAccountStatus === 'pending'
       ? 'Account pending approval'
       : 'Account suspended';
+    // Blocked-user case (distinct from wrong password), clearly labelled for the audit trail.
+    emitComplianceEvent(db, {
+      entityType: 'customer',
+      entityId: user.customerAuthenticationInstanceReference,
+      processType: 'authentication',
+      processAction: 'auth.login.blocked',
+      processOutcome: 'rejected',
+      performedByPartyReference: user.partyInstanceReference ?? user.customerAuthenticationInstanceReference,
+      performedByRole: user.customerAuthenticationUserRole ?? 'customer',
+      eventSummary: { domain, failureCause: `account_${user.customerAuthenticationAccountStatus}`, reason },
+      bianServiceDomain: 'PartyAuthentication',
+      bianControlRecordType: 'CustomerAuthenticationAssessment',
+    });
     throw Object.assign(new Error(reason), { statusCode: 403 });
   }
 
@@ -74,6 +100,21 @@ export async function loginUser(
   const secret = process.env.PSP_JWT_SECRET ?? 'demo-local-secret-change-in-production';
   const expiresIn = process.env.PSP_JWT_EXPIRES_IN ?? '24h';
   const token = jwt.sign(payload, secret, { expiresIn } as jwt.SignOptions);
+
+  // Successful authentication: identify the user + role/domain (no PII) so the full login flow is
+  // trackable, and the correct-login case is distinguishable from failed/blocked in the audit trail.
+  emitComplianceEvent(db, {
+    entityType: 'customer',
+    entityId: user.customerAuthenticationInstanceReference,
+    processType: 'authentication',
+    processAction: 'auth.login',
+    processOutcome: 'verified',
+    performedByPartyReference: user.partyInstanceReference ?? user.customerAuthenticationInstanceReference,
+    performedByRole: user.customerAuthenticationUserRole ?? 'customer',
+    eventSummary: { domain, role: user.customerAuthenticationUserRole },
+    bianServiceDomain: 'PartyAuthentication',
+    bianControlRecordType: 'CustomerAuthenticationAssessment',
+  });
 
   return {
     token,

@@ -16,6 +16,7 @@ import {
 } from '../models/merchantAgreement.model';
 import { MERCHANT_WEBHOOK_LOG_COLLECTION, MerchantWebhookDeliveryLog } from '../models/merchantWebhookLog.model';
 import { deliverWebhook, signWebhookPayload } from './webhook.service';
+import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 
 // ── Payload type definitions (ISO 20022 pacs.002 + OIDC/RFC 7519) ────────────
 
@@ -457,6 +458,29 @@ export class WebhookService {
             error: result.error,
             signature: sig,
           });
+
+          // Surface OAuth-flow callback delivery on the unified audit ledger (visible to
+          // security_auditor/manager) so "did the callback reach the merchant, and if not why" is
+          // answerable alongside the login flow. Other webhook types keep only the delivery log above.
+          if (eventType.startsWith('oauth.')) {
+            const host = (() => { try { return new URL(cfg.webhookUrl).host; } catch { return cfg.webhookUrl; } })();
+            emitComplianceEvent(this.db, {
+              entityType: 'merchant',
+              entityId: merchantId,
+              processType: 'authentication',
+              processAction: result.delivered ? 'oauth.callback.delivered' : 'oauth.callback.failed',
+              processOutcome: result.delivered ? 'verified' : 'failed',
+              performedByPartyReference: merchantId,
+              performedByRole: 'client',
+              eventSummary: {
+                eventType, targetHost: host, delivered: result.delivered,
+                responseStatus: result.statusCode, attempts: result.attempts,
+                ...(result.error ? { failureCause: result.error } : {}),
+              },
+              bianServiceDomain: 'SD-89 Merchant Notification',
+              bianControlRecordType: 'WebhookDelivery',
+            });
+          }
         })
         .catch(() => { /* never block on delivery failure */ });
     }

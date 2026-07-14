@@ -26,3 +26,28 @@ export function sanitizeDeep(value: unknown): unknown {
   }
   return value;
 }
+
+// OAuth/OIDC secrets and PII that must never reach a log or an audit event (PCI DSS Req 10, GDPR).
+// Distinct from CHD (Req 3.2, above): these are credentials/tokens, not cardholder data. Keys are
+// matched case-insensitively. `state`/`nonce` are intentionally NOT blocklisted (callers must hash
+// them before logging, never log the raw value).
+export const SECRET_BLOCKLIST = new Set([
+  'access_token', 'refresh_token', 'id_token', 'token',
+  'code', 'code_verifier', 'authorization_code',
+  'client_secret', 'secret', 'password',
+  'authorization', 'cookie', 'set-cookie',
+  'email', 'phone', 'phone_number',
+]);
+
+/** Deep scrub for logs/audit: strips CHD AND OAuth secrets/PII at any depth. */
+export function redactSecrets(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactSecrets);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([k]) => !CHD_BLOCKLIST.has(k) && !SECRET_BLOCKLIST.has(k.toLowerCase()))
+        .map(([k, v]) => [k, redactSecrets(v)]),
+    );
+  }
+  return value;
+}
