@@ -23,11 +23,12 @@ const SCOPE_DESCRIPTIONS: Record<string, string> = {
   'read:transactions': 'Access to transaction data (PCI DSS Req 7)',
   'read:userinfo': 'Full userinfo profile',
 };
-const ALL_GRANT_TYPES = ['authorization_code', 'client_credentials', 'refresh_token'] as const;
+const ALL_GRANT_TYPES = ['authorization_code', 'client_credentials', 'refresh_token', 'urn:openid:params:grant-type:ciba'] as const;
 const GRANT_LABELS: Record<string, string> = {
   authorization_code: 'Authorization Code (+ PKCE)',
   client_credentials: 'Client Credentials (server-to-server)',
   refresh_token: 'Refresh Token',
+  'urn:openid:params:grant-type:ciba': 'CIBA (passwordless backchannel login)',
 };
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
@@ -708,7 +709,7 @@ export default function MerchantSSOPage() {
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-2">
             Grant types
-            <Tooltip text="OAuth 2.0 flows this client may use. authorization_code (+ PKCE) for user SSO, refresh_token to rotate access tokens, client_credentials for server-to-server calls (the merchant's own machine identity). Grant only what the app needs (least privilege)." />
+            <Tooltip text="OAuth 2.0 flows this client may use. authorization_code (+ PKCE) for user SSO, refresh_token to rotate access tokens, client_credentials for server-to-server calls (the merchant's own machine identity), CIBA for passwordless backchannel login. Grant only what the app needs (least privilege). CIBA's delivery mode (poll/ping/push) and notification endpoint are not configurable from this page." />
           </label>
           <div className="space-y-2">
             {ALL_GRANT_TYPES.map((g) => (
