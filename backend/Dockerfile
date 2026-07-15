@@ -17,7 +17,7 @@ WORKDIR /app
 
 # Download MongoDB Automatic Encryption Shared Library (mongo_crypt_v1.so)
 # Requires glibc, this is why we use node:22-slim (Debian) instead of Alpine.
-# crypt_shared 8.0.5 is compatible with the mongodb / mongodb-client-encryption 7.x driver in use.
+# crypt_shared 8.0.5 is compatible with the mongodb + mongodb-client-encryption versions pinned in backend/package.json.
 RUN ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "arm64" ]; then \
         wget -q https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-aarch64-enterprise-ubuntu2204-8.0.5.tgz -O crypt.tgz; \
