@@ -76,6 +76,10 @@ const out = {
 };
 
 function waitForEnter(msg) {
+  // Fail fast when stdin isn't a TTY (piped/CI), otherwise this would hang forever waiting for Enter.
+  if (!process.stdin.isTTY) {
+    throw new Error('Interactive Okta login required, but stdin is not a TTY. Run this in a terminal.');
+  }
   return new Promise((resolve) => {
     process.stdout.write(msg);
     process.stdin.resume();
@@ -114,7 +118,8 @@ try {
 
   const header = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
   fs.writeFileSync(out.header, header);
-  fs.writeFileSync(out.env, `COOKIE=${header}\n`);
+  // The header contains spaces and semicolons, so single-quote it to survive `source .corp/cookie.env`.
+  fs.writeFileSync(out.env, `COOKIE='${header.replaceAll("'", `'\\''`)}'\n`);
   fs.writeFileSync(
     out.postman,
     JSON.stringify(

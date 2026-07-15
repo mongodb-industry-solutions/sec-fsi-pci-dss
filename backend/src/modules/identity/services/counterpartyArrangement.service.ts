@@ -50,15 +50,6 @@ export async function registerBeneficiary(
 ): Promise<BeneficiaryLookupResult> {
   const col = db.collection<CounterpartyArrangement>(COUNTERPARTY_COLLECTION);
 
-  // Enforce max beneficiary limit
-  const count = await col.countDocuments({
-    ownerPartyReference: input.ownerPartyReference,
-    counterpartyArrangementStatus: 'active',
-  });
-  if (count >= COUNTERPARTY_MAX_PER_USER) {
-    throw Object.assign(new Error('Beneficiary limit reached'), { statusCode: 422 });
-  }
-
   // QE equality search — resolve raw phone/email to a party reference
   const counterpartyParty = await resolvePartyByLookup(input.lookupType, input.lookupValue);
 
@@ -83,11 +74,23 @@ export async function registerBeneficiary(
     ownerPartyReference: input.ownerPartyReference,
     counterpartyPartyReference: counterpartyParty.partyInstanceReference,
   });
+  if (existing && existing.counterpartyArrangementStatus === 'active') {
+    // Return found:false to prevent confirmation of existing relationship (anti-enumeration).
+    // Checked before the limit so an at-limit re-add stays idempotent instead of leaking a 422.
+    return { found: false };
+  }
+
+  // Enforce max beneficiary limit only on paths that add an active arrangement
+  // (fresh insert or reactivation of a soft-deleted one).
+  const count = await col.countDocuments({
+    ownerPartyReference: input.ownerPartyReference,
+    counterpartyArrangementStatus: 'active',
+  });
+  if (count >= COUNTERPARTY_MAX_PER_USER) {
+    throw Object.assign(new Error('Beneficiary limit reached'), { statusCode: 422 });
+  }
+
   if (existing) {
-    if (existing.counterpartyArrangementStatus === 'active') {
-      // Return found:false to prevent confirmation of existing relationship (anti-enumeration)
-      return { found: false };
-    }
     // Reactivate the soft-deleted arrangement, refreshing label/hint/type.
     await col.updateOne(
       { counterpartyArrangementReference: existing.counterpartyArrangementReference },
