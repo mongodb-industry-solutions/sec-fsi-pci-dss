@@ -36,6 +36,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const TOOLS_DIR = path.dirname(fileURLToPath(import.meta.url));
+// These outputs are your session credentials. Restrict new files/dirs to owner-only
+// (no group/world read) in case the repo lives on a shared machine. No-op on Windows.
+try { process.umask(0o077); } catch { /* umask unsupported on this platform */ }
 const CORP_DIR = path.join(TOOLS_DIR, '..', '.corp'); // repo-root .corp/ (gitignored)
 fs.mkdirSync(CORP_DIR, { recursive: true });
 const PROFILE_DIR = path.join(CORP_DIR, 'profile'); // persistent browser profile (remembers device/MFA)
@@ -96,8 +99,14 @@ try {
     await page.waitForTimeout(1500).catch(() => {});
   }
 
+  // Strict suffix match on the domain so lookalikes (e.g. corp.mongodb.com.evil.tld) can't
+  // slip through; the leading-dot form used by cookie jars is matched via the '.corp…' suffix.
+  const isCorpDomain = (d) => {
+    const bare = d.replace(/^\./, '');
+    return bare === 'corp.mongodb.com' || bare.endsWith('.corp.mongodb.com');
+  };
   const cookies = (await ctx.cookies()).filter(
-    (c) => c.domain.includes('corp.mongodb.com') && c.name.toLowerCase().startsWith('auth'),
+    (c) => isCorpDomain(c.domain) && c.name.toLowerCase().startsWith('auth'),
   );
   if (cookies.length === 0) {
     throw new Error('No auth* cookies found for *.corp.mongodb.com. Is the login complete?');
