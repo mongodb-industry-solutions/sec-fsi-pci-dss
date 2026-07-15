@@ -72,20 +72,42 @@ export async function registerBeneficiary(
     return { found: false };
   }
 
-  // Check for duplicate (owner already has this party as beneficiary)
-  const existing = await col.findOne({
-    ownerPartyReference: input.ownerPartyReference,
-    counterpartyPartyReference: counterpartyParty.partyInstanceReference,
-    counterpartyArrangementStatus: 'active',
-  });
-  if (existing) {
-    // Return found:false to prevent confirmation of existing relationship (anti-enumeration)
-    return { found: false };
-  }
-
   const maskedHint = maskLookupValue(input.lookupType, input.lookupValue);
   const label = input.label?.trim() || maskedHint;
   const now = new Date();
+
+  // Check for an existing arrangement (any status) for this (owner, counterparty) pair.
+  // The unique index on (ownerPartyReference, counterpartyPartyReference) covers soft-deleted
+  // records too, so a plain insert would collide. Reactivate a removed one instead.
+  const existing = await col.findOne({
+    ownerPartyReference: input.ownerPartyReference,
+    counterpartyPartyReference: counterpartyParty.partyInstanceReference,
+  });
+  if (existing) {
+    if (existing.counterpartyArrangementStatus === 'active') {
+      // Return found:false to prevent confirmation of existing relationship (anti-enumeration)
+      return { found: false };
+    }
+    // Reactivate the soft-deleted arrangement, refreshing label/hint/type.
+    await col.updateOne(
+      { counterpartyArrangementReference: existing.counterpartyArrangementReference },
+      {
+        $set: {
+          counterpartyArrangementStatus: 'active',
+          counterpartyLabel: label,
+          counterpartyLookupType: input.lookupType,
+          counterpartyLookupHint: maskedHint,
+          recordUpdatedDateTime: now,
+        },
+      },
+    );
+    return {
+      found: true,
+      counterpartyArrangementReference: existing.counterpartyArrangementReference,
+      counterpartyLabel: label,
+      counterpartyLookupHint: maskedHint,
+    };
+  }
 
   const record: CounterpartyArrangement = {
     counterpartyArrangementReference: uuidv4(),
