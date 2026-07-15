@@ -1,6 +1,6 @@
 {
   "name": "leafy-merchant-demo",
-  "version": "2.0.7",
+  "version": "2.1.1",
   "private": true,
   "description": "Espresso Works Ltd — external merchant demo app integrating with Leafy Pay PSP via OAuth2/OIDC SSO + API. No database.",
   "scripts": {
