@@ -10,6 +10,7 @@ import { Tip } from '@/components/ui/Tooltip';
 import { loadAccountOptions } from '@/lib/accounts';
 import BeneficiarySend from './BeneficiarySend';
 import BeneficiaryAdd from './BeneficiaryAdd';
+import BeneficiaryRemove from './BeneficiaryRemove';
 
 export default async function BeneficiariesPage() {
   const session = await getSession();
@@ -69,9 +70,17 @@ export default async function BeneficiariesPage() {
                   </div>
                 </div>
               </div>
-              {hasScope(session, 'write:transfers') && (b.counterpartyArrangementReference ?? b.beneficiaryToken) && (
-                <BeneficiarySend beneficiaryToken={b.counterpartyArrangementReference ?? b.beneficiaryToken} accounts={accounts} />
-              )}
+              <div className="flex items-center gap-2">
+                {hasScope(session, 'write:transfers') && (b.counterpartyArrangementReference ?? b.beneficiaryToken) && (
+                  <BeneficiarySend beneficiaryToken={b.counterpartyArrangementReference ?? b.beneficiaryToken} accounts={accounts} />
+                )}
+                {hasScope(session, 'write:beneficiaries') && (b.counterpartyArrangementReference ?? b.beneficiaryToken) && (
+                  <BeneficiaryRemove
+                    beneficiaryToken={b.counterpartyArrangementReference ?? b.beneficiaryToken}
+                    label={b.counterpartyLabel ?? b.counterpartyName ?? b.label}
+                  />
+                )}
+              </div>
             </li>
           ))}
         </ul>
