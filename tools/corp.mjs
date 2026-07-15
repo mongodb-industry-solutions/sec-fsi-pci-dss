@@ -29,8 +29,8 @@
 //   curl -b .corp/cookies.jar https://<any-corp-host>/
 //   curl -H "Cookie: $(cat .corp/cookie.txt)" https://<any-corp-host>/
 //
-// Setup once: npm i -D playwright && npx playwright install chromium
-import { chromium } from 'playwright';
+// Setup once: npm i -D @playwright/test && npx playwright install chromium
+import { chromium } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
