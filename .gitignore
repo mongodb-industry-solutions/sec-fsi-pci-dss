@@ -30,7 +30,7 @@ lib-cov
 # Coverage directory used by tools like istanbul
 coverage
 *.lcov
-
+*graphify*
 # nyc test coverage
 .nyc_output
 
