@@ -134,11 +134,16 @@ try {
     a.name.localeCompare(b.name),
   );
 
+  // umask covers files created fresh, but a rerun overwrites pre-existing files without changing
+  // their mode. Write with an explicit owner-only mode so credentials never stay group/world-readable.
+  const SECRET_MODE = 0o600;
+  const writeSecret = (file, data) => fs.writeFileSync(file, data, { mode: SECRET_MODE });
+
   const header = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
-  fs.writeFileSync(out.header, header);
+  writeSecret(out.header, header);
   // The header contains spaces and semicolons, so single-quote it to survive `source .corp/cookie.env`.
-  fs.writeFileSync(out.env, `COOKIE='${header.replaceAll("'", `'\\''`)}'\n`);
-  fs.writeFileSync(
+  writeSecret(out.env, `COOKIE='${header.replaceAll("'", `'\\''`)}'\n`);
+  writeSecret(
     out.postman,
     JSON.stringify(
       {
@@ -160,10 +165,10 @@ try {
     const expiry = c.expires && c.expires > 0 ? Math.floor(c.expires) : 0;
     jarLines.push([c.domain, includeSub, c.path || '/', c.secure ? 'TRUE' : 'FALSE', expiry, c.name, c.value].join('\t'));
   }
-  fs.writeFileSync(out.jar, jarLines.join('\n') + '\n');
+  writeSecret(out.jar, jarLines.join('\n') + '\n');
 
   // Cookie-Editor import format (browser extension): array of {name,value,domain,path,httpOnly,...}.
-  fs.writeFileSync(
+  writeSecret(
     out.editor,
     JSON.stringify(
       cookies.map((c) => ({
@@ -180,6 +185,15 @@ try {
       2,
     ),
   );
+
+  // writeFileSync's mode only applies when a file is created, so chmod existing outputs (and the
+  // persistent browser profile) explicitly to strip any broader permissions left by earlier runs.
+  if (process.platform !== 'win32') {
+    for (const file of Object.values(out)) {
+      try { fs.chmodSync(file, SECRET_MODE); } catch { /* best effort */ }
+    }
+    try { fs.chmodSync(PROFILE_DIR, 0o700); } catch { /* best effort */ }
+  }
 
   // Surface an expiry hint so the user knows when to re-run (auth_token is a JWT with exp).
   const authToken = cookies.find((c) => c.name.toLowerCase() === 'auth_token');

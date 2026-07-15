@@ -92,7 +92,7 @@ export async function registerBeneficiary(
 
   if (existing) {
     // Reactivate the soft-deleted arrangement, refreshing label/hint/type.
-    await col.updateOne(
+    const res = await col.updateOne(
       {
         counterpartyArrangementReference: existing.counterpartyArrangementReference,
         ownerPartyReference: input.ownerPartyReference,
@@ -108,6 +108,12 @@ export async function registerBeneficiary(
         },
       },
     );
+    // If the record changed status between findOne and updateOne (concurrent reactivation),
+    // the filter no longer matches. Treat it like an already-active arrangement (anti-enumeration)
+    // rather than reporting a reactivation that did not actually happen.
+    if (res.modifiedCount !== 1) {
+      return { found: false };
+    }
     return {
       found: true,
       counterpartyArrangementReference: existing.counterpartyArrangementReference,
