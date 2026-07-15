@@ -30,7 +30,7 @@ lib-cov
 # Coverage directory used by tools like istanbul
 coverage
 *.lcov
-
+*graphify*
 # nyc test coverage
 .nyc_output
 
@@ -157,3 +157,6 @@ vite.config.ts.timestamp-*
 .vite/
 
 frontend/next-env.d.ts
+
+# corp SSO session harvest (tools/corp.mjs) — personal session credentials, never commit
+.corp/

@@ -165,6 +165,18 @@ export async function addBeneficiary(input: {
   });
 }
 
+// Remove (soft-delete) a saved beneficiary via the PSP (SD-54). The merchant sends only the opaque
+// arrangement reference; the PSP scopes the delete to the acting user (token.sub). The arrangement is
+// soft-deleted server-side and can be re-added later (which reactivates it).
+export async function removeBeneficiary(input: { beneficiaryToken: string }): Promise<ActionResult> {
+  return toResult(async () => {
+    if (!input.beneficiaryToken) return { ok: false, message: 'Missing beneficiary reference.' };
+    const c = await client();
+    await c.removeBeneficiary(input.beneficiaryToken);
+    return { ok: true, message: 'Beneficiary removed.' };
+  });
+}
+
 // Send money to a saved beneficiary (P2P, SD-65). The merchant supplies only the beneficiary
 // token + amount; the PSP resolves the source account and recipient server-side (no CHD/IBAN).
 export async function sendToBeneficiary(input: {
