@@ -41,6 +41,10 @@ const TOOLS_DIR = path.dirname(fileURLToPath(import.meta.url));
 try { process.umask(0o077); } catch { /* umask unsupported on this platform */ }
 const CORP_DIR = path.join(TOOLS_DIR, '..', '.corp'); // repo-root .corp/ (gitignored)
 fs.mkdirSync(CORP_DIR, { recursive: true });
+// umask only guards newly created files; harden .corp/ itself in case it predates this (non-Windows).
+if (process.platform !== 'win32') {
+  try { fs.chmodSync(CORP_DIR, 0o700); } catch { /* best effort */ }
+}
 const PROFILE_DIR = path.join(CORP_DIR, 'profile'); // persistent browser profile (remembers device/MFA)
 
 // ── Args ────────────────────────────────────────────────────────────────────
@@ -109,12 +113,26 @@ try {
     const bare = d.replace(/^\./, '');
     return bare === 'corp.mongodb.com' || bare.endsWith('.corp.mongodb.com');
   };
-  const cookies = (await ctx.cookies()).filter(
+  const authCookies = (await ctx.cookies()).filter(
     (c) => isCorpDomain(c.domain) && c.name.toLowerCase().startsWith('auth'),
   );
-  if (cookies.length === 0) {
+  if (authCookies.length === 0) {
     throw new Error('No auth* cookies found for *.corp.mongodb.com. Is the login complete?');
   }
+
+  // Prefer root-domain cookies (.corp.mongodb.com / corp.mongodb.com) so the exported header
+  // authenticates against any corp host. Host-scoped cookies (e.g. login.corp.mongodb.com) would
+  // leak to unrelated hosts and cause duplicate-name parsing issues, so drop them when a root
+  // cookie exists; fall back to whatever we have (with a warning) if none are root-scoped.
+  const isRootDomain = (d) => d.replace(/^\./, '') === 'corp.mongodb.com';
+  const rootCookies = authCookies.filter((c) => isRootDomain(c.domain));
+  if (rootCookies.length === 0) {
+    console.warn('⚠ No root-domain (.corp.mongodb.com) auth cookies found; using host-scoped cookies, which may not authenticate against every corp host.');
+  }
+  // Sort by name for deterministic output across runs.
+  const cookies = (rootCookies.length > 0 ? rootCookies : authCookies).sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
 
   const header = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
   fs.writeFileSync(out.header, header);

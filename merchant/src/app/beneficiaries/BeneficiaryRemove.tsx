@@ -19,6 +19,7 @@ export default function BeneficiaryRemove({ beneficiaryToken, label }: { benefic
     startTransition(async () => {
       const res = await removeBeneficiary({ beneficiaryToken });
       if (res.ok) {
+        setConfirming(false);
         router.refresh();
       } else {
         setErr(res.message ?? 'Failed to remove.');
@@ -55,7 +56,7 @@ export default function BeneficiaryRemove({ beneficiaryToken, label }: { benefic
         </button>
       </Tip>
       {err && (
-        <span className="flex items-center gap-1 text-xs text-red-600">
+        <span role="alert" aria-live="assertive" className="flex items-center gap-1 text-xs text-red-600">
           <TriangleAlert className="h-3.5 w-3.5" aria-hidden /> {err}
         </span>
       )}

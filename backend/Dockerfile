@@ -16,7 +16,7 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Download MongoDB Automatic Encryption Shared Library (mongo_crypt_v1.so)
-# Requires glibc — this is why we use node:20-slim (Debian) instead of Alpine.
+# Requires glibc, this is why we use node:22-slim (Debian) instead of Alpine.
 # Version 8.0.5 is compatible with MongoDB Driver 6.x
 RUN ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "arm64" ]; then \

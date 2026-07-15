@@ -93,7 +93,11 @@ export async function registerBeneficiary(
   if (existing) {
     // Reactivate the soft-deleted arrangement, refreshing label/hint/type.
     await col.updateOne(
-      { counterpartyArrangementReference: existing.counterpartyArrangementReference },
+      {
+        counterpartyArrangementReference: existing.counterpartyArrangementReference,
+        ownerPartyReference: input.ownerPartyReference,
+        counterpartyArrangementStatus: existing.counterpartyArrangementStatus,
+      },
       {
         $set: {
           counterpartyArrangementStatus: 'active',
