@@ -63,7 +63,11 @@ describe('registerBeneficiary — re-add after soft-delete (SD-54)', () => {
     expect(col.insertOne).not.toHaveBeenCalled();
     expect(col.updateOne).toHaveBeenCalledTimes(1);
     const [filter, update] = col.updateOne.mock.calls[0];
-    expect(filter).toEqual({ counterpartyArrangementReference: 'arr-1' });
+    expect(filter).toEqual({
+      counterpartyArrangementReference: 'arr-1',
+      ownerPartyReference: OWNER,
+      counterpartyArrangementStatus: 'removed',
+    });
     expect((update as { $set: Record<string, unknown> }).$set).toMatchObject({
       counterpartyArrangementStatus: 'active',
       counterpartyLabel: 'Jane',
