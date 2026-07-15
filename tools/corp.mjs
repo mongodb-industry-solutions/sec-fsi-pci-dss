@@ -22,8 +22,11 @@
 //   .corp/cookie.txt   the `Cookie:` header value
 //   .corp/cookie.env   COOKIE=... (source it in a shell)
 //   .corp/cookie.postman_environment.json   import into Postman (variable: corpCookie)
+//   .corp/cookies.jar  Netscape cookie jar for curl -b (no string munging)
+//   .corp/cookies.cookie-editor.json  import into the Cookie-Editor browser extension
 //
 // Consume (one cookie is valid for any *.corp.mongodb.com host):
+//   curl -b .corp/cookies.jar https://<any-corp-host>/
 //   curl -H "Cookie: $(cat .corp/cookie.txt)" https://<any-corp-host>/
 //
 // Setup once: npm i -D playwright && npx playwright install chromium
@@ -65,6 +68,8 @@ const out = {
   header: path.join(CORP_DIR, 'cookie.txt'),
   env: path.join(CORP_DIR, 'cookie.env'),
   postman: path.join(CORP_DIR, 'cookie.postman_environment.json'),
+  jar: path.join(CORP_DIR, 'cookies.jar'),
+  editor: path.join(CORP_DIR, 'cookies.cookie-editor.json'),
 };
 
 function waitForEnter(msg) {
@@ -115,6 +120,35 @@ try {
     ),
   );
 
+  // Netscape cookie jar (curl -b). Tab-separated: domain, includeSubdomains, path, secure, expiry,
+  // name, value. Playwright uses expires=-1 for session cookies → 0 (session) in the jar.
+  const jarLines = ['# Netscape HTTP Cookie File'];
+  for (const c of cookies) {
+    const includeSub = c.domain.startsWith('.') ? 'TRUE' : 'FALSE';
+    const expiry = c.expires && c.expires > 0 ? Math.floor(c.expires) : 0;
+    jarLines.push([c.domain, includeSub, c.path || '/', c.secure ? 'TRUE' : 'FALSE', expiry, c.name, c.value].join('\t'));
+  }
+  fs.writeFileSync(out.jar, jarLines.join('\n') + '\n');
+
+  // Cookie-Editor import format (browser extension): array of {name,value,domain,path,httpOnly,...}.
+  fs.writeFileSync(
+    out.editor,
+    JSON.stringify(
+      cookies.map((c) => ({
+        name: c.name,
+        value: c.value,
+        domain: c.domain,
+        path: c.path || '/',
+        httpOnly: !!c.httpOnly,
+        secure: !!c.secure,
+        sameSite: c.sameSite ?? 'Lax',
+        ...(c.expires && c.expires > 0 ? { expirationDate: c.expires } : {}),
+      })),
+      null,
+      2,
+    ),
+  );
+
   // Surface an expiry hint so the user knows when to re-run (auth_token is a JWT with exp).
   const authToken = cookies.find((c) => c.name.toLowerCase() === 'auth_token');
   let expiryNote = '';
@@ -126,13 +160,10 @@ try {
   } catch { /* non-JWT cookie — skip */ }
 
   console.log(`\n✓ Harvested ${cookies.length} corp SSO cookie(s) for ${host}${expiryNote}`);
-  console.log(`  ${out.header}`);
-  console.log(`  ${out.env}`);
-  console.log(`  ${out.postman}`);
+  for (const p of Object.values(out)) console.log(`  ${p}`);
   // Example against the resolved host (the cookie is valid for every *.corp.mongodb.com host).
   const sampleOrigin = (() => { try { return new URL(url).origin; } catch { return url; } })();
-  console.log('\n  curl -H "Cookie: $(cat .corp/cookie.txt)" \\');
-  console.log(`    ${sampleOrigin}/\n`);
+  console.log(`\n  curl -b .corp/cookies.jar ${sampleOrigin}/\n`);
 } finally {
   await ctx.close();
 }
