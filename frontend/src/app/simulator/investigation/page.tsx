@@ -4,6 +4,9 @@ import { useRouter } from 'next/navigation';
 import { api, FraudCase } from '../../../lib/api';
 import { CaseTable } from '../../../components/CaseTable';
 import { Pagination } from '../../../components/Pagination';
+import { EncryptedKycSearch } from '../../../components/EncryptedKycSearch';
+import { getSimTokenForRole } from '../../../lib/simulatorAuth';
+import { ROLE_LABELS } from '../../../lib/constants';
 
 type SearchField = 'caseRef' | 'email' | 'phone' | 'accountRef' | 'cardToken';
 
@@ -328,7 +331,72 @@ export default function SimulatorInvestigationPage() {
           />
         </>
       )}
+
+      {/* ── Encrypted KYC search (Queryable Encryption showcase) ─────── */}
+      <SimulatorKycSearchPanel />
     </div>
+  );
+}
+
+const KYC_ROLES = ['level1_analyst', 'level2_investigator', 'security_auditor'] as const;
+type KycRole = (typeof KYC_ROLES)[number];
+
+// Simulator wrapper around the SHARED EncryptedKycSearch component. It adds the presenter
+// narrative and a role switcher (there is no login in the simulator, so it obtains a real
+// per-role JWT via the same login endpoint application mode uses). The search UI itself is
+// not forked: it is the identical component mounted in the production investigation view.
+function SimulatorKycSearchPanel() {
+  const [role, setRole] = useState<KycRole>('level1_analyst');
+  const [token, setToken] = useState('');
+  const [tokenError, setTokenError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setTokenError(null);
+    setToken('');
+    getSimTokenForRole(role)
+      .then((t) => { if (!cancelled) setToken(t); })
+      .catch((e) => { if (!cancelled) setTokenError((e as Error).message || 'Could not obtain a demo token'); });
+    return () => { cancelled = true; };
+  }, [role]);
+
+  return (
+    <section className="space-y-4 pt-2">
+      <div className="rounded-xl border border-[#00ED64]/30 bg-[#001E2B] p-4 text-white">
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
+          <span className="text-[#00ED64]">🔐</span> Search over encrypted data
+        </h2>
+        <p className="mt-1 text-sm text-gray-300">
+          Every query below runs over <strong className="text-white">Queryable Encryption</strong> fields.
+          MongoDB matches ciphertext-to-ciphertext and never sees the plaintext. Switch the analyst tier to
+          see how the <em>same</em> search returns different fields: Level 1 triages on non-identifying
+          attributes, Level 2 (with an approved escalation) and the auditor can also see contact and
+          sensitive PII.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-gray-400">Acting as:</span>
+          {KYC_ROLES.map((r) => (
+            <button
+              key={r}
+              onClick={() => setRole(r)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                role === r ? 'bg-[#00ED64] text-[#001E2B]' : 'bg-white/10 text-gray-200 hover:bg-white/20'
+              }`}
+            >
+              {ROLE_LABELS[r] ?? r}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tokenError ? (
+        <div className="text-sm text-red-600">{tokenError}</div>
+      ) : !token ? (
+        <div className="text-sm text-gray-400">Preparing {ROLE_LABELS[role] ?? role} session…</div>
+      ) : (
+        <EncryptedKycSearch token={token} role={role} />
+      )}
+    </section>
   );
 }
 

@@ -172,7 +172,8 @@
     "externalProviderInternalHandler": "customerAgreement.internalKycCheck",
     "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
-      "kyc.validation.requested"
+      "kyc.validation.requested",
+      "kyc.screening.requested"
     ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 1000,
@@ -213,7 +214,31 @@
     ],
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 2,
+    "externalProviderEvents": [
+      {
+        "event": "kyc.validation.requested",
+        "outbound": {
+          "url": "/api/v1/modules/kyc/score",
+          "httpMethod": "POST",
+          "mapping": []
+        },
+        "inbound": {
+          "mapping": []
+        }
+      },
+      {
+        "event": "kyc.screening.requested",
+        "outbound": {
+          "url": "/api/v1/modules/kyc/screen",
+          "httpMethod": "POST",
+          "mapping": []
+        },
+        "inbound": {
+          "mapping": []
+        }
+      }
+    ]
   },
   {
     "externalProviderArrangementInstanceReference": "int-internal-kyb-001",

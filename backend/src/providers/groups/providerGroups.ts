@@ -8,6 +8,8 @@ import { PAYMENT_CARD_COLLECTION } from '../../modules/customer/models/paymentCa
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../../modules/gateway/models/payoutAccount.model';
 import { holdCardFunds } from '../../modules/gateway/services/payoutAccountBalance.service';
 import { resolveAndConvert } from '../currency-exchange/services/currencyExchange.service';
+import { applyKycScreeningVerdict } from '../../modules/customer/services/customerAgreement.service';
+import type { HrpScreeningVerdict } from '../kyc/services/hrpScreening.service';
 import {
   RESPONSE_CODE_APPROVED,
   RESPONSE_CODE_INSUFFICIENT_FUNDS,
@@ -35,6 +37,58 @@ export class ProviderGroups {
     this.bus.subscribe('fds.scoring.requested', (e) => this.onFds(e));
     this.bus.subscribe('hrp.screening.requested', (e) => this.onHrp(e));
     this.bus.subscribe('funds.check.requested', (e) => this.onFunds(e));
+    // v27 Phase 6: KYC/HRP customer screening (SD-13 -> SD-53). A customer profile validation
+    // completing triggers a re-screen; the request event is a first-class Integration Hub gate.
+    this.bus.subscribe('profile.validation.completed', (e) => this.onProfileValidated(e));
+    this.bus.subscribe('kyc.screening.requested', (e) => this.onKycScreening(e));
+  }
+
+  // Bridge: a completed customer-profile validation requests a KYC/HRP re-screen. Keeps the trigger
+  // bus-driven (the onboarding service only emits its compliance milestone; screening is a reaction),
+  // so updateSelfProfile stays untouched. correlationId = partyInstanceReference throughout.
+  private onProfileValidated(e: DomainEvent): void {
+    const p = e.payload as { entityType?: string };
+    if (p.entityType && p.entityType !== 'customer') return;
+    void this.bus.publish(makeEvent({
+      eventType: 'kyc.screening.requested', correlationId: e.correlationId,
+      businessProcess: 'customer_onboarding', source: 'psp.core', causationId: e.eventId,
+      payload: { partyInstanceReference: e.correlationId },
+      bian: { serviceDomain: 'SD-13 Party Data Management', controlRecord: 'PartyReferenceDataDirectoryEntry' },
+    }));
+  }
+
+  // KYC/HRP screening reactor. Dispatches the screening provider through the Integration Hub
+  // (kyc_identity capability, internal stub Module engine loopback), then persists the structured
+  // verdict onto the KYC check sub-doc via the owning customer service (L2 QE write). Fail-open:
+  // a transport error leaves the existing (seeded) verdicts in place.
+  private async onKycScreening(e: DomainEvent): Promise<void> {
+    const p = e.payload as { partyInstanceReference?: string };
+    const partyRef = p.partyInstanceReference ?? e.correlationId;
+
+    let verdict: HrpScreeningVerdict | undefined;
+    try {
+      const r = await dispatchProvider(this.db, 'kyc_identity', 'kyc.screening.requested', {
+        partyInstanceReference: partyRef, clientReference: partyRef,
+      }, { entityType: 'customer', entityId: partyRef, processType: 'kyc_verification' });
+      verdict = r.responseBody as HrpScreeningVerdict | undefined;
+    } catch { /* fail-open: leave existing verdicts */ }
+
+    let outcome: 'completed' | 'error' = 'error';
+    if (verdict && typeof verdict.riskScore === 'number') {
+      const persisted = await applyKycScreeningVerdict(partyRef, verdict).catch(() => false);
+      if (persisted) outcome = 'completed';
+    }
+
+    void this.bus.publish(makeEvent({
+      eventType: 'kyc.screening.completed', correlationId: e.correlationId,
+      businessProcess: 'customer_onboarding', source: 'callback.kyc', causationId: e.eventId,
+      payload: {
+        partyInstanceReference: partyRef, outcome,
+        riskScore: verdict?.riskScore, riskRating: verdict?.riskRating, pepStatus: verdict?.pepStatus,
+        sanctionsResult: verdict?.sanctionsResult, screeningProviderRef: verdict?.screeningProviderRef,
+      },
+      bian: { serviceDomain: 'SD-53 Customer Agreement', controlRecord: 'CustomerAgreementProcedure' },
+    }));
   }
 
   // v17 funds-availability gate (SD-36 AIS). Resolves the funding account from the card token, reads

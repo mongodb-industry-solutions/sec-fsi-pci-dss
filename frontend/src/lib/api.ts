@@ -526,6 +526,59 @@ export interface SavedCardDisplay {
   paymentCardIsPreferred?: boolean;
 }
 
+// v27: Encrypted-KYC search (Queryable Encryption showcase). Field registry + tier-shaped results.
+export type KycSearchMode = 'substring' | 'prefix' | 'suffix' | 'range' | 'equality';
+
+export interface KycSearchFieldDef {
+  key: string;
+  label: string;
+  mode: KycSearchMode;                     // effective mode (text modes degrade to equality pre-8.2)
+  bsonType: 'string' | 'date' | 'int' | 'bool';
+  minQueryLength?: number;
+  maxQueryLength?: number;
+  rangeMin?: number | string;
+  rangeMax?: number | string;
+  enumValues?: Array<string | boolean>;
+}
+
+export interface KycSearchFieldsResponse {
+  textSearchEnabled: boolean;
+  fields: KycSearchFieldDef[];
+  sensitiveResultFields: string[];
+}
+
+export interface KycSearchResult {
+  customerAgreementInstanceReference: string;
+  partyInstanceReference: string;
+  customerName: string;
+  customerEmailAddress?: string;           // L2 (with token) / auditor only
+  customerMobilePhoneNumber?: string;      // L2 (with token) / auditor only
+  customerAgreementReference: string;
+  customerSegment?: string;
+  customerAgreementStatus?: string;
+  customerAgreementKycCheck?: Record<string, unknown> | null;
+  contactPiiRestricted: boolean;
+  sensitive?: {
+    customerAgreementResidentialAddress?: unknown;
+    governmentIdentificationReference?: unknown;
+    customerAgreementRiskNotes?: unknown;
+  };
+}
+
+export interface KycSearchResponse {
+  field: string;
+  count: number;
+  results: KycSearchResult[];
+}
+
+export interface KycSearchBody {
+  field: string;
+  value?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
 export const api = {
   acl: {
     effective: (token: string) =>
@@ -688,6 +741,21 @@ export const api = {
   },
 
   customer: {
+    // v27: encrypted-KYC search. The field registry drives which controls the UI renders;
+    // the search runs QE over ciphertext server-side. Sensitive result fields are returned
+    // only to L2 (with a valid escalation token) / auditor — the server is the boundary.
+    searchFields: (token: string) =>
+      apiFetch<KycSearchFieldsResponse>('/api/v1/customer/search/fields', {}, token),
+    search: (body: KycSearchBody, token: string, escalationToken?: string) =>
+      apiFetch<KycSearchResponse>(
+        '/api/v1/customer/search',
+        {
+          method: 'POST',
+          body: JSON.stringify(body),
+          ...(escalationToken ? { headers: { 'X-Escalation-Token': escalationToken } } : {}),
+        },
+        token,
+      ),
     getByEmail: (email: string, token: string) =>
       apiFetch<Record<string, unknown>>(
         `/api/v1/customer?email=${encodeURIComponent(email)}`, {}, token

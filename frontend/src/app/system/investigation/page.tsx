@@ -7,7 +7,8 @@ import { CaseTable } from '../../../components/CaseTable';
 import { Pagination } from '../../../components/Pagination';
 import { useDebugMode } from '../../../lib/debugMode';
 import { SectionHeader } from '../../../components/SectionHeader';
-import { BriefcaseMedical } from 'lucide-react';
+import { EncryptedKycSearch } from '../../../components/EncryptedKycSearch';
+import { BriefcaseMedical, ShieldCheck } from 'lucide-react';
 
 type SearchField = 'caseRef' | 'email' | 'phone' | 'accountRef' | 'cardToken' | 'customerId';
 
@@ -355,6 +356,21 @@ export default function InvestigationPage() {
               noun="cases"
             />
           </>
+        )}
+
+        {/* v27: encrypted-KYC search over Queryable Encryption. Same shared component used in the
+            simulator. Result columns adapt to the acting role (from the JWT); the server is the
+            security boundary. */}
+        {token && user && (
+          <section className="pt-2 space-y-4">
+            <SectionHeader
+              icon={ShieldCheck}
+              title="Encrypted KYC search"
+              description="Query encrypted KYC records with Queryable Encryption. The server matches ciphertext-to-ciphertext; visible fields follow your role."
+              debugInfo="BIAN SD-53 Customer Agreement · PCI DSS Req 3/7 · MongoDB Queryable Encryption"
+            />
+            <EncryptedKycSearch token={token} role={user.role} />
+          </section>
         )}
       </main>
     </div>

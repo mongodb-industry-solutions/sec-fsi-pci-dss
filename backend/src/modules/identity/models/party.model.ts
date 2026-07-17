@@ -37,11 +37,15 @@ export interface PartyControlRecord {
   // uniqueness via a plaintext partial unique index — QE fields cannot have unique indexes.
   // Derived from partyMobilePhoneNumber; never set by clients directly. See digest.ts.
   partyMobilePhoneNumberDigest?: string;
-  // Plaintext display fields
+  // QE:substring (v27): analysts run "contains" searches over the encrypted name.
   partyName: string;
   partyType: PartyType;
-  partyDateOfBirth?: string;                // ISO 8601 date string, QE:none in v2
-  partyNationality?: string;                // ISO 3166-1 alpha-2
+  // QE:range (v27): stored as a BSON Date (changed from ISO string) so range queries work.
+  partyDateOfBirth?: Date;
+  // QE:equality (v27, contention): searchable nationality. ISO 3166-1 alpha-2.
+  partyNationality?: string;
+  // QE:equality (v27, contention): searchable place of birth (city).
+  partyPlaceOfBirth?: string;
   partyPostalAddress?: PartyPostalAddress;  // SD-13 postal contact point (customer + employee)
   // v17: inbound transfer preferences and sender block list
   partyTransferPreferences?: PartyTransferPreferences;

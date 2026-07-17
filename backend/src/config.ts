@@ -35,6 +35,14 @@ export const config = {
     cryptSharedLibPath: env('MONGODB_CRYPT_SHARED_LIB_PATH', '')!,
   },
 
+  qe: {
+    // QE text search (substring/prefix/suffix) needs MongoDB 8.2+ and mongodb-client-encryption 7.2.
+    // Default TRUE (assume a recent Atlas). Set PSP_QE_TEXT_SEARCH=false for pre-8.2 clusters:
+    // text-search fields degrade to QE:equality (still encrypted + searchable exactly, still lookup-tier)
+    // so setup never fails and L1 keeps decrypting them.
+    textSearch: pspEnv('QE_TEXT_SEARCH', 'true') !== 'false',
+  },
+
   kms: {
     provider: (pspEnv('KMS_PROVIDER', 'local')!) as 'local' | 'aws',
     localMasterKey: pspEnv('KMS_LOCAL_MASTER_KEY') ?? pspEnv('LOCAL_MASTER_KEY'),

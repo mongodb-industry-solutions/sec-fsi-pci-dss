@@ -21,8 +21,19 @@ export interface CustomerAgreementControlRecord {
   // QE:none (DEK-sensitive tier) - non-searchable, Level 2+ only
   // Present as decrypted value with L2 QE client; Binary ciphertext with L1 client.
   customerAgreementResidentialAddress?: ResidentialAddress;
+  /** @deprecated v27: replaced by structured customerAgreementGovernmentID. Kept for back-compat; stop writing. */
   governmentIdentificationReference?: string;
+  /** @deprecated v27: replaced by structured KYC verdict fields. Kept for back-compat; stop writing. */
   customerAgreementRiskNotes?: string;
+
+  // v27 KYC identity (user-supplied at onboarding, SD-53).
+  // customerAgreementGovernmentID sub-doc is plaintext; its scalar leaves are QE-encrypted:
+  //   .number QE:suffix, .type/.issuingCountry QE:equality, .expiryDate QE:range.
+  customerAgreementGovernmentID?: GovernmentID;
+  customerAgreementTaxIDNumber?: string;          // QE:prefix (v27)
+  customerAgreementOccupation?: string;           // QE:equality (v27, contention)
+  customerAgreementSourceOfFunds?: string;        // QE:none L2 (v27)
+  customerAgreementPurposeOfRelationship?: string; // QE:none L2 (v27)
 
   // Plaintext fields
   customerSegment: CustomerSegment;
@@ -49,6 +60,15 @@ export interface ResidentialAddress {
   countryCode: string;
 }
 
+// v27: structured government identity document (SD-53). Parent sub-doc is plaintext;
+// individual scalar leaves are QE-encrypted (see encryptedFieldsMaps.ts).
+export interface GovernmentID {
+  type: string;              // QE:equality (e.g. passport, national_id, driver_license)
+  number: string;            // QE:suffix
+  issuingCountry: string;    // QE:equality (ISO 3166-1 alpha-2)
+  expiryDate: Date;          // QE:range
+}
+
 /** Returns true only when a QE:none field has been decrypted (i.e. not a Binary blob). */
 export function isSensitiveDecrypted(field: unknown): boolean {
   if (field === undefined || field === null) return false;
@@ -64,7 +84,15 @@ export interface CustomerAgreementKycCheck {
   customerAgreementKycCheckStatus: KycCheckStatus;
   customerAgreementKycCheckCompletedDate?: Date;
   customerAgreementKycCheckReference?: string;  // external provider ref (e.g. Jumio, Onfido)
+  /** @deprecated v27: replaced by structured verdict fields below. Kept for back-compat; stop writing. */
   customerAgreementKycCheckNotes?: string;
+
+  // v27 provider-produced (HRP screening) verdicts, structured + auditable.
+  customerAgreementKycCheckRiskScore?: number;                        // 0-100, QE:range
+  customerAgreementKycCheckRiskRating?: 'low' | 'medium' | 'high';    // QE:equality (contention)
+  customerAgreementKycCheckPepStatus?: boolean;                       // QE:equality (contention)
+  customerAgreementKycCheckSanctionsResult?: 'clear' | 'hit' | 'pending'; // QE:equality (contention)
+  customerAgreementKycCheckScreeningProviderRef?: string;             // QE:none L2
 }
 
 export type CustomerSegment = 'retail' | 'premium' | 'corporate' | 'sme';

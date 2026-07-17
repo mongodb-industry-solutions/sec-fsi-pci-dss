@@ -40,10 +40,11 @@ export interface PartyControlRecord {
   partyEmailAddress: string;             // QE:equality — primary investigation search key
   partyMobilePhoneNumber?: string;       // QE:equality — secondary investigation search key (optional: self-registered parties may omit it)
   partyMobilePhoneNumberDigest?: string; // Blind index (keyed HMAC, NOT encrypted) — unique key for the phone (absent when no phone; partial unique index)
-  partyName: string;                     // Becomes QE:equality in v2
+  partyName: string;                     // v27: QE:substring (DEK-party-name) — "contains" search over ciphertext
   partyType: PartyType;
-  partyDateOfBirth?: string;             // ISO 8601 date — GDPR PII, QE:none (DEK-party-dob, L2 only)
-  partyNationality?: string;             // ISO 3166-1 alpha-2 (plaintext — low sensitivity)
+  partyDateOfBirth?: Date;               // v27: BSON Date, QE:range (DEK-party-dob) — was ISO string / QE:none
+  partyNationality?: string;             // v27: QE:equality contention 8 (DEK-party-nationality). ISO 3166-1 alpha-2
+  partyPlaceOfBirth?: string;            // v27: QE:equality contention 8 (DEK-party-place-of-birth) — city
   partyPostalAddress?: PartyPostalAddress; // SD-13 postal contact point — GDPR PII, QE:none (DEK-party-address, L2 only)
                                          // KYC-typical demographics apply to EVERY party (customer + employee),
                                          // so staff profiles are as complete as customers'. Address + DOB are
@@ -128,7 +129,21 @@ export interface CustomerAgreementKycCheck {
   customerAgreementKycCheckStatus: KycCheckStatus;
   customerAgreementKycCheckCompletedDate?: Date;
   customerAgreementKycCheckReference?: string;  // External AML/ID verification reference
-  customerAgreementKycCheckNotes?: string;
+  customerAgreementKycCheckNotes?: string;      // @deprecated v27 — replaced by structured verdicts
+  // v27 provider (HRP) verdicts, structured + auditable. Nested scalar leaves (parent sub-doc plaintext):
+  customerAgreementKycCheckRiskScore?: number;                        // QE:range int 0-100 (DEK-kyc-risk-score)
+  customerAgreementKycCheckRiskRating?: 'low' | 'medium' | 'high';    // QE:equality c8 (DEK-kyc-risk-rating)
+  customerAgreementKycCheckPepStatus?: boolean;                       // QE:equality c8 (DEK-kyc-pep-status)
+  customerAgreementKycCheckSanctionsResult?: 'clear' | 'hit' | 'pending'; // QE:equality c8 (DEK-kyc-sanctions-result)
+  customerAgreementKycCheckScreeningProviderRef?: string;             // QE:none L2 (DEK-kyc-screening-ref)
+}
+
+// v27: structured government ID (SD-53). Parent sub-doc plaintext; leaves QE-encrypted.
+export interface GovernmentID {
+  type: string;              // QE:equality c6 (DEK-ca-govid-type)
+  number: string;            // QE:suffix (DEK-ca-govid-number)
+  issuingCountry: string;    // QE:equality c6 (DEK-ca-govid-issuing-country); ISO 3166-1 alpha-2
+  expiryDate: Date;          // QE:range (DEK-ca-govid-expiry)
 }
 
 export interface CustomerAgreementControlRecord {
@@ -140,8 +155,15 @@ export interface CustomerAgreementControlRecord {
 
   // QE:none (DEK-sensitive tier) — returned as Binary by L1 client; decrypted by L2
   customerAgreementResidentialAddress?: ResidentialAddress;
-  governmentIdentificationReference?: string;
-  customerAgreementRiskNotes?: string;
+  governmentIdentificationReference?: string;  // @deprecated v27 — use customerAgreementGovernmentID
+  customerAgreementRiskNotes?: string;         // @deprecated v27 — use structured KYC verdicts
+
+  // v27 KYC identity (user-supplied). Structured gov ID leaves are QE-searchable (see GovernmentID).
+  customerAgreementGovernmentID?: GovernmentID;
+  customerAgreementTaxIDNumber?: string;           // QE:prefix (DEK-ca-tax-id)
+  customerAgreementOccupation?: string;            // QE:equality c6 (DEK-ca-occupation)
+  customerAgreementSourceOfFunds?: string;         // QE:none L2 (DEK-ca-source-of-funds)
+  customerAgreementPurposeOfRelationship?: string; // QE:none L2 (DEK-ca-purpose)
 
   // Plaintext operational fields
   customerSegment: CustomerSegment;
@@ -1188,8 +1210,63 @@ All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `k
 | `deks.payoutIban` | `DEK-payout-iban` | `payoutAccountArrangement.payoutAccountIban` (QE:none — GDPR Art. 32 / PSD2) |
 | `deks.payoutRouting` | `DEK-payout-routing` | `payoutAccountArrangement.payoutAccountRoutingNumber` (QE:none — GDPR Art. 32 / PSD2) |
 | `deks.execDestIban` | `DEK-exec-dest-iban` | `paymentExecutionProcedure.destinationIban` — unregistered external destination (QE:none — GDPR Art. 32 / PSD2) |
+| `deks.partyName` | `DEK-party-name` | `party.partyName` (v27, QE:substring — lookup tier) |
+| `deks.partyNationality` | `DEK-party-nationality` | `party.partyNationality` (v27, QE:equality c8) |
+| `deks.partyPlaceOfBirth` | `DEK-party-place-of-birth` | `party.partyPlaceOfBirth` (v27, QE:equality c8) |
+| `deks.caGovIdNumber` | `DEK-ca-govid-number` | `customerAgreementGovernmentID.number` (v27, QE:suffix) |
+| `deks.caGovIdType` | `DEK-ca-govid-type` | `customerAgreementGovernmentID.type` (v27, QE:equality c6) |
+| `deks.caGovIdIssuingCountry` | `DEK-ca-govid-issuing-country` | `customerAgreementGovernmentID.issuingCountry` (v27, QE:equality c6) |
+| `deks.caGovIdExpiry` | `DEK-ca-govid-expiry` | `customerAgreementGovernmentID.expiryDate` (v27, QE:range date) |
+| `deks.caTaxId` | `DEK-ca-tax-id` | `customerAgreementTaxIDNumber` (v27, QE:prefix) |
+| `deks.caOccupation` | `DEK-ca-occupation` | `customerAgreementOccupation` (v27, QE:equality c6) |
+| `deks.kycRiskScore` | `DEK-kyc-risk-score` | `customerAgreementKycCheck.customerAgreementKycCheckRiskScore` (v27, QE:range int) |
+| `deks.kycRiskRating` | `DEK-kyc-risk-rating` | `...customerAgreementKycCheckRiskRating` (v27, QE:equality c8) |
+| `deks.kycPepStatus` | `DEK-kyc-pep-status` | `...customerAgreementKycCheckPepStatus` (v27, QE:equality c8) |
+| `deks.kycSanctionsResult` | `DEK-kyc-sanctions-result` | `...customerAgreementKycCheckSanctionsResult` (v27, QE:equality c8) |
+| `deks.caSourceOfFunds` | `DEK-ca-source-of-funds` | `customerAgreementSourceOfFunds` (v27, QE:none L2) |
+| `deks.caPurpose` | `DEK-ca-purpose` | `customerAgreementPurposeOfRelationship` (v27, QE:none L2) |
+| `deks.kycScreeningRef` | `DEK-kyc-screening-ref` | `...customerAgreementKycCheckScreeningProviderRef` (v27, QE:none L2) |
 
 > **Regulatory note:** IBAN / routing / BIC are **bank account data → GDPR Art. 32 + PSD2**, not PCI DSS. PCI DSS scope is card data (PAN / CHD). Both are QE-encrypted at rest here, but for distinct regulatory drivers.
+
+### 2.1 v27 — QE search showcase (equality / range / substring / prefix / suffix)
+
+v27 adds searchable KYC fields to demonstrate every QE query type over encrypted GDPR PII (never
+card data). These fields are **lookup-tier** (present in both L1 and L2 maps), so L1 analysts can
+search and decrypt them. `QE:none` v27 fields (source of funds, purpose, screening provider ref)
+stay L2-only. `partyName` moves from plaintext to `QE:substring`; `partyDateOfBirth` changes from
+an ISO string (`QE:none`) to a **BSON Date** with `QE:range`. Auth fields
+(`partyEmailAddress`, `partyMobilePhoneNumber`) are unchanged `QE:equality` (one query type per
+field; auth depends on equality).
+
+**Text-search gating.** `buildEncryptedFieldsMaps(deks, tier, textSearch = config.qe.textSearch)`.
+Text-search query types are single-sourced as constants: `QT_SUBSTRING = 'substringPreview'`,
+`QT_PREFIX = 'prefixPreview'`, `QT_SUFFIX = 'suffixPreview'` (MongoDB 8.2 preview /
+mongodb-client-encryption 7.2). Env var `PSP_QE_TEXT_SEARCH=false` degrades all text fields to
+`QE:equality` (contention 8) so setup never fails on pre-8.2 clusters while keeping the fields
+encrypted, lookup-tier and exact-searchable.
+
+| Field | bsonType | Query type | Params |
+|---|---|---|---|
+| `party.partyName` | string | substring | strMaxLength 64, strMinQueryLength 3, strMaxQueryLength 30, caseSensitive false, diacriticSensitive false |
+| `party.partyDateOfBirth` | date | range | min 1900-01-01, max 2020-01-01, sparsity 1, trimFactor 4 |
+| `party.partyNationality` | string | equality | contention 8 |
+| `party.partyPlaceOfBirth` | string | equality | contention 8 |
+| `customerAgreementGovernmentID.number` | string | suffix | strMaxLength 32, strMinQueryLength 3, strMaxQueryLength 16, caseSensitive true, diacriticSensitive true |
+| `customerAgreementGovernmentID.type` | string | equality | contention 6 |
+| `customerAgreementGovernmentID.issuingCountry` | string | equality | contention 6 |
+| `customerAgreementGovernmentID.expiryDate` | date | range | min 2000-01-01, max 2040-01-01, sparsity 1, trimFactor 4 |
+| `customerAgreementTaxIDNumber` | string | prefix | strMaxLength 32, strMinQueryLength 2, strMaxQueryLength 16, caseSensitive true, diacriticSensitive true |
+| `customerAgreementOccupation` | string | equality | contention 6 |
+| `customerAgreementKycCheck.customerAgreementKycCheckRiskScore` | int | range | min 0, max 100, sparsity 1, trimFactor 4 |
+| `customerAgreementKycCheck.customerAgreementKycCheckRiskRating` | string | equality | contention 8 |
+| `customerAgreementKycCheck.customerAgreementKycCheckPepStatus` | bool | equality | contention 8 |
+| `customerAgreementKycCheck.customerAgreementKycCheckSanctionsResult` | string | equality | contention 8 |
+| `customerAgreementSourceOfFunds` / `customerAgreementPurposeOfRelationship` / `...ScreeningProviderRef` | string | none (L2) | not searchable, retrieval only |
+
+> **Nested QE paths.** Encrypting `customerAgreementGovernmentID.number` and
+> `customerAgreementKycCheck.*` is allowed because each parent sub-document stays plaintext; only
+> the scalar leaves are QE fields, each with its own unique DEK.
 
 ```typescript
 // backend/src/vendors/encryption/encryptedFieldsMaps.ts
@@ -1488,9 +1565,15 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { customerAgreementInstanceReference: 1 }, unique: true },
     { key: { partyInstanceReference: 1 } },               // two-step lookup join key
     { key: { customerAgreementStatus: 1 } },
+    // v27: plaintext helper on the KYC lifecycle status. NOT a QE field.
+    { key: { 'customerAgreementKycCheck.customerAgreementKycCheckStatus': 1 } },
   ]);
 
   // Note: customerAgreementProcedureSensitive collection removed in v2 (fields inline)
+  // v27: the QE-encrypted KYC leaves (riskScore, riskRating, pepStatus, sanctionsResult,
+  // govID.number/type/issuingCountry/expiryDate, taxID, occupation, partyName, partyDateOfBirth)
+  // are searched via QE queries only. They take NO btree indexes and NO unique index
+  // (QE fields cannot be unique — use the blind-index HMAC pattern if uniqueness is ever needed).
 
   // ── paymentCardManagement (SD-88) ─────────────────────────────────
   await db.collection('paymentCardManagement').createIndexes([
