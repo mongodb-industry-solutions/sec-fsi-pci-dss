@@ -1,5 +1,50 @@
 [
   {
+    "externalProviderArrangementInstanceReference": "int-internal-vop-001",
+    "externalProviderArrangementName": "Internal Verification of Payee Engine",
+    "externalProviderArrangementType": "vop_verification",
+    "externalProviderArrangementStatus": "active",
+    "externalProviderIsInternal": true,
+    "externalProviderApiEndpoint": "/api/v1/modules/vop/verify",
+    "externalProviderInternalHandler": "vop.verifyPayee",
+    "externalProviderCallbackEnabled": true,
+    "externalProviderTriggerEvents": [
+      "vop.verification.requested"
+    ],
+    "externalProviderMode": "sync",
+    "externalProviderTimeoutMs": 500,
+    "externalProviderRetryPolicy": {
+      "maxAttempts": 1,
+      "backoffMs": 0
+    },
+    "externalProviderHealthStatus": "ok",
+    "externalProviderLastHealthCheckAt": "2026-07-17T10:00:00.000Z",
+    "categoryConfig": {
+      "matchResultField": "matchResult",
+      "scoreField": "matchScore",
+      "recommendationField": "recommendation",
+      "realTimeRequired": true,
+      "batchSupported": false,
+      "modelVersion": "internal-v1",
+      "scoreScaleMax": 100
+    },
+    "fieldMappingConfig": {
+      "outbound": [],
+      "inbound": [],
+      "schemaVersion": 1
+    },
+    "routingPriority": 999,
+    "bianServiceDomain": "Party Data Management",
+    "bianControlRecordType": "PartyReferenceDataDirectoryEntry",
+    "pciDssRequirements": [
+      "Req 10.2.1",
+      "Req 12.3.1"
+    ],
+    "recordCreatedDateTime": "2026-07-17T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-07-17T10:00:00.000Z",
+    "schemaVersion": 2
+  },
+  {
     "externalProviderArrangementInstanceReference": "int-internal-fds-001",
     "externalProviderArrangementName": "Internal Fraud Scoring Engine",
     "externalProviderArrangementType": "fraud_detection",

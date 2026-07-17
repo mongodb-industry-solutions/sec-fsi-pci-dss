@@ -1798,3 +1798,23 @@ Two tabs:
   Debit)" option creates a SEPA SDD / ACH SDD mandate with a chosen frequency.
 
 *Added 2026-07-04 (v17.1).*
+
+## v28 — Request to Pay (RTP), shared QR, and VoP admin
+
+**Real system (`/system/**`):** RTP is "a transfer that needs the payer's approval", so it lives inside
+the Transfer area (no separate silo). Transfer hub gains a **Request to Pay** card → `/system/transfer/rtp`
+(payee creates a request; on create it is presented to the payer and a shared QR is offered). The payer sees
+**"Requests awaiting your approval"** directly on the Transfer hub (`RtpPendingInbox`): approve (with a
+funding-account selector) runs funds check + FDS/HRP/AML + VoP then creates the linked P2P transfer, or
+reject. Notifications fire on delivery (payer) and approval/settlement (payee); the alert clears on approve/reject.
+
+**VoP admin (`/system/admin/modules/vop`):** dedicated data-driven config dashboard (match thresholds,
+matching strategy toggles, decision policy, market gating), editable by admin/manager like FDS. VoP also
+appears under `/system/admin/providers/groups` and its `vop.verification.completed` events + dispatch logs
+are queryable in `/system/audit-events`.
+
+**Merchant app (`merchant/`):** `/request-to-pay` (scope-gated `read:rtp`/`write:rtp`) shows incoming
+requests to approve/reject and sent requests with status; Nav link gated by scope. Approve/reject reuse the
+authenticated OAuth session (no CIBA).
+
+*Added 2026-07-17 (v28).*

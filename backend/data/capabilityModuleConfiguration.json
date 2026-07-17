@@ -27,6 +27,26 @@
     "recordUpdatedDateTime": "2026-06-14T00:00:00.000Z"
   },
   {
+    "capabilityModuleInstanceReference": "vop",
+    "capability": "vop",
+    "moduleDomain": "fraud",
+    "capabilityModuleStatus": "active",
+    "moduleConfig": {
+      "thresholds": { "match": 95, "closeMatch": 80 },
+      "strategy": { "exact": true, "normalized": true, "tokenOrderInsensitive": true, "fuzzy": true, "maxEditDistance": 2, "aliasMatch": false },
+      "policy": { "closeMatch": "warn", "noMatch": "warn", "mandatoryAboveAmount": 0 },
+      "markets": ["ES", "FR", "DE", "IT", "NL", "IE", "PT", "BE", "AT", "FI", "GB"]
+    },
+    "moduleCallbackEndpoints": [
+      { "event": "vop.verified", "path": "/api/v1/providers/callback/vop/int-internal-vop-001" }
+    ],
+    "bianServiceDomain": "SD-13 Party Data Management",
+    "bianControlRecordType": "PartyReferenceDataDirectoryEntry",
+    "pciDssRequirements": ["Req 10.2.1", "Req 12.3.1"],
+    "recordCreatedDateTime": "2026-07-17T00:00:00.000Z",
+    "recordUpdatedDateTime": "2026-07-17T00:00:00.000Z"
+  },
+  {
     "capabilityModuleInstanceReference": "hrp",
     "capability": "hrp",
     "moduleDomain": "fraud",

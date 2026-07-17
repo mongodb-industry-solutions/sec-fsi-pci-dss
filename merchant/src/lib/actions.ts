@@ -235,3 +235,31 @@ export async function bankTransfer(input: {
     return { ok: true, data, message: 'Transfer submitted.' };
   });
 }
+
+// ── Request to Pay (RTP) — merchant requests / approves money (v28) ─────────────
+export async function requestMoney(input: { amount: number; currency?: string; purpose?: string; payerPartyReference?: string }): Promise<ActionResult> {
+  return toResult(async () => {
+    const c = await client();
+    if (!(input.amount > 0)) return { ok: false, message: 'Amount must be greater than zero.' };
+    const req = await c.createRtpRequest(input);
+    let paymentUrl: string | undefined;
+    try { paymentUrl = (await c.getRtpQr(req.paymentRequestInstanceReference)).encodedPayload; } catch { /* optional */ }
+    return { ok: true, reference: req.paymentRequestInstanceReference, status: req.status, paymentUrl, data: req };
+  });
+}
+
+export async function approveRtp(ref: string, fundingAccountRef?: string): Promise<ActionResult> {
+  return toResult(async () => {
+    const c = await client();
+    const res = await c.approveRtpRequest(ref, fundingAccountRef);
+    return { ok: res.status === 'accepted', message: res.reason, status: res.status, reference: res.executionReference, data: res };
+  });
+}
+
+export async function rejectRtp(ref: string): Promise<ActionResult> {
+  return toResult(async () => { await (await client()).rejectRtpRequest(ref); return { ok: true, reference: ref }; });
+}
+
+export async function cancelRtp(ref: string): Promise<ActionResult> {
+  return toResult(async () => { await (await client()).cancelRtpRequest(ref); return { ok: true, reference: ref }; });
+}

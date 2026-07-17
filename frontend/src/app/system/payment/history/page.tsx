@@ -10,7 +10,7 @@ import { useDebugMode } from '../../../../lib/debugMode';
 
 // ── Unified history row ───────────────────────────────────────────────────────
 // Each row is either a card transaction (SD-254) or a P2P transfer (SD-65).
-type RowCategory = 'card' | 'p2p';
+type RowCategory = 'card' | 'p2p' | 'rtp';
 
 interface HistoryRow {
   id: string;
@@ -35,6 +35,10 @@ interface HistoryRow {
   p2pDirection?: 'sent' | 'received';
   p2pRail?: string | null;
   p2pNote?: string | null;
+  // RTP-specific (Request to Pay). rtpRole: 'requested' = I requested money (incoming to me);
+  // 'to_approve' = someone requested money from me (I must approve to pay, outgoing).
+  rtpRole?: 'requested' | 'to_approve';
+  rtpRequestRef?: string;
 }
 
 // ── Card transaction type badges ──────────────────────────────────────────────
@@ -104,7 +108,7 @@ export default function TransactionHistoryPage() {
 
   const [qInput, setQInput] = useState('');
   const [q, setQ] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<'' | 'card' | 'p2p'>('');
+  const [categoryFilter, setCategoryFilter] = useState<'' | 'card' | 'p2p' | 'rtp'>('');
   const [statusFilter, setStatusFilter] = useState('');
   const [fraudFilter, setFraudFilter] = useState('');
 
@@ -172,8 +176,32 @@ export default function TransactionHistoryPage() {
           ).catch(() => [] as HistoryRow[])
         : Promise.resolve([] as HistoryRow[]);
 
-      const [cards, p2p] = await Promise.all([cardPromise, p2pPromise]);
-      const merged = [...cards, ...p2p].sort(
+      // RTP (Request to Pay): both what I requested (outbox) and what I must approve (inbox).
+      const rtpPromise = t
+        ? Promise.all([
+            api.rtp.list({ box: 'outbox' }, t).then(r => (r.results ?? []).map(x => ({ x, role: 'requested' as const }))).catch(() => []),
+            api.rtp.list({ box: 'inbox' }, t).then(r => (r.results ?? []).map(x => ({ x, role: 'to_approve' as const }))).catch(() => []),
+          ]).then(([out, inb]) => {
+            const seen = new Set<string>();
+            return [...out, ...inb].filter(({ x }) => {
+              if (seen.has(x.paymentRequestInstanceReference)) return false;
+              seen.add(x.paymentRequestInstanceReference); return true;
+            }).map(({ x, role }) => ({
+              id:            x.paymentRequestInstanceReference,
+              category:      'rtp' as RowCategory,
+              createdAt:     x.recordCreatedDateTime ?? new Date().toISOString(),
+              amount:        x.amount,
+              currency:      x.currency,
+              status:        x.status,
+              rtpRole:       role,
+              rtpRequestRef: x.paymentRequestInstanceReference,
+              concept:       x.purpose ?? null,
+            } satisfies HistoryRow));
+          })
+        : Promise.resolve([] as HistoryRow[]);
+
+      const [cards, p2p, rtp] = await Promise.all([cardPromise, p2pPromise, rtpPromise]);
+      const merged = [...cards, ...p2p, ...rtp].sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
       setRows(merged);
@@ -191,7 +219,10 @@ export default function TransactionHistoryPage() {
 
   const filtered = rows.filter((r) => {
     if (categoryFilter && r.category !== categoryFilter) return false;
-    if (statusFilter && r.status !== statusFilter) return false;
+    // 'pending_approval' is an RTP quick-filter spanning the pre-acceptance statuses.
+    if (statusFilter === 'pending_approval') {
+      if (!(r.category === 'rtp' && ['presented', 'delivered', 'viewed', 'created', 'validated'].includes(r.status))) return false;
+    } else if (statusFilter && r.status !== statusFilter) return false;
     if (fraudFilter === 'none' && r.fraudCaseCreated) return false;
     if (fraudFilter === 'any' && !r.fraudCaseCreated) return false;
     if (fraudFilter && fraudFilter !== 'none' && fraudFilter !== 'any' && r.caseStatus !== fraudFilter) return false;
@@ -207,12 +238,14 @@ export default function TransactionHistoryPage() {
         String(r.amount).includes(ql)
       );
     }
-    // p2p
+    // p2p + rtp
     return (
       (r.p2pNote ?? '').toLowerCase().includes(ql) ||
+      (r.concept ?? '').toLowerCase().includes(ql) ||
       r.id.toLowerCase().includes(ql) ||
       String(r.amount).includes(ql) ||
-      (r.p2pDirection ?? '').includes(ql)
+      (r.p2pDirection ?? '').includes(ql) ||
+      (r.rtpRole ?? '').includes(ql)
     );
   });
 
@@ -266,9 +299,25 @@ export default function TransactionHistoryPage() {
                 <option value="">All types</option>
                 <option value="card">💳 Card transactions</option>
                 <option value="p2p">↕ P2P transfers</option>
+                <option value="rtp">🧾 Request to Pay (RTP)</option>
               </select>
+              {/* RTP status filter (incl. a quick "Pending approval" filter). Shown for RTP or All. */}
+              {(categoryFilter === 'rtp' || categoryFilter === '') && (
+                <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                  className="border rounded-lg px-3 py-2 text-sm bg-white" title="Request to Pay status">
+                  <option value="">All RTP statuses</option>
+                  <option value="pending_approval">⏳ Pending approval</option>
+                  <option value="accepted">Accepted</option>
+                  <option value="payment_initiated">Payment initiated</option>
+                  <option value="payment_settled">Settled</option>
+                  <option value="payment_failed">Failed</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="expired">Expired</option>
+                </select>
+              )}
               {/* Payment status only meaningful for card transactions */}
-              {showCardFilters && (
+              {showCardFilters && categoryFilter === 'card' && (
                 <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
                   className="border rounded-lg px-3 py-2 text-sm bg-white" title="Payment authorization status">
                   <option value="">All statuses</option>
@@ -357,6 +406,45 @@ export default function TransactionHistoryPage() {
                               <span className="font-semibold">✉ Security team: </span>{row.customerNote}
                             </div>
                           )}
+                          {debugMode && <p className="mt-1.5 text-xs font-mono text-gray-400 truncate">id: {row.id}</p>}
+                        </Link>
+                      );
+                    }
+
+                    if (row.category === 'rtp') {
+                      const pendingApproval = ['created', 'validated', 'presented', 'delivered', 'viewed'].includes(row.status);
+                      const isIncoming = row.rtpRole === 'requested'; // I requested → money comes to me
+                      const rtpStatusColor = pendingApproval ? 'bg-amber-100 text-amber-800'
+                        : row.status === 'payment_settled' ? 'bg-green-100 text-green-800'
+                        : ['rejected', 'cancelled', 'expired', 'payment_failed'].includes(row.status) ? 'bg-red-100 text-red-700'
+                        : 'bg-blue-100 text-blue-800';
+                      const rtpStatusLabel = pendingApproval
+                        ? (isIncoming ? 'Awaiting payer approval' : 'Pending your approval')
+                        : row.status.replace(/_/g, ' ');
+                      return (
+                        <Link key={row.id} href={`/system/transfer?request=${encodeURIComponent(row.rtpRequestRef ?? row.id)}`}
+                          className="group block bg-white rounded-xl border p-4 hover:border-[#001E2B]/30 hover:shadow-md transition-all cursor-pointer">
+                          <div className="flex items-start justify-between gap-3 mb-2">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-gray-900 truncate">
+                                {isIncoming ? '↓ Money requested (you receive)' : '↑ Request to approve (you pay)'}
+                              </p>
+                              <p className="text-xs text-gray-500">{new Date(row.createdAt).toLocaleString()}</p>
+                              {row.concept && <p className="text-xs text-gray-400 mt-0.5 truncate">{row.concept}</p>}
+                            </div>
+                            <div className="flex items-start gap-3 shrink-0">
+                              <div className="text-right">
+                                <p className={`font-bold ${isIncoming ? 'text-green-700' : 'text-red-600'}`}>
+                                  {isIncoming ? '+' : '−'}{fmtAmount(row.amount, row.currency)}
+                                </p>
+                              </div>
+                              <span className="text-gray-300 group-hover:text-[#001E2B] transition-colors text-lg leading-none mt-0.5">›</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs px-2 py-0.5 rounded font-medium bg-purple-50 text-purple-700 border border-purple-200">🧾 Request to Pay</span>
+                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${rtpStatusColor}`}>{rtpStatusLabel}</span>
+                          </div>
                           {debugMode && <p className="mt-1.5 text-xs font-mono text-gray-400 truncate">id: {row.id}</p>}
                         </Link>
                       );

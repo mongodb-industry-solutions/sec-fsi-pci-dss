@@ -19,6 +19,9 @@ import { payoutAccountController }        from './controllers/payoutAccount.cont
 import { paymentExecutionController }     from './controllers/paymentExecution.controller';
 import { beneficiaryController }          from './controllers/beneficiary.controller';
 import { transferController }             from './controllers/transfer.controller';
+import { rtpController }                  from './controllers/rtp.controller';
+import { qrController }                   from './controllers/qr.controller';
+import { config }                         from '../../config';
 
 export async function gatewayModule(fastify: FastifyInstance) {
   // SD-89: Merchant Relations  -  top-level resource
@@ -49,4 +52,10 @@ export async function gatewayModule(fastify: FastifyInstance) {
 
   // SD-65 + SD-66: Bank transfers (ACH/SEPA/SWIFT rail engine)  (v17.1)
   await fastify.register(transferController,            { prefix: '/gateway/transfers' });
+
+  // SD-65: Request to Pay (RTP) intent domain + shared QR capability (v28). Gated by config.rtp.enabled.
+  if (config.rtp.enabled) {
+    await fastify.register(rtpController,               { prefix: '/gateway/rtp' });
+    await fastify.register(qrController,                { prefix: '/gateway/qr' });
+  }
 }

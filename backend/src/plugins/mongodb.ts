@@ -79,6 +79,12 @@ async function connectAndWire(fastify: FastifyInstance): Promise<void> {
   const { P2PComplianceProcess } = await import('../modules/gateway/services/p2pCompliance.process');
   new P2PComplianceProcess(db, getEventBus()).register();
 
+  // v28 RTP lifecycle: project execution settlement onto the linked request + expiry sweeper (SD-65).
+  if (config.rtp.enabled) {
+    const { RtpLifecycleProcess } = await import('../modules/gateway/services/rtpLifecycle.process');
+    new RtpLifecycleProcess(db, getEventBus()).register();
+  }
+
   // dev.v8 P5 (§7.7): periodic sweep of lapsed pending-correlation entries.
   const { sweepExpiredCorrelations } = await import('../modules/provider/services/pendingCorrelation.service');
   const sweepTimer = setInterval(() => { sweepExpiredCorrelations(); }, 5 * 60 * 1000);

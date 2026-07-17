@@ -320,6 +320,24 @@ export function buildEncryptedFieldsMaps(
         ],
       },
     } : {}),
+
+    // -- SD-65 (v28): Request to Pay canonical record ------------------------─
+    // RTP is account/alias-based → OUTSIDE PCI scope (no PAN/CHD). Sensitive request PII is
+    // GDPR-minimized: aliases are indexed by a non-reversible SHA-256 hash (payeeAliasHash/
+    // payerAliasHash, plaintext) while the plaintext alias, free-text remittance, structured
+    // address and payee name are QE:none (L2 only). All retrieval-only, no searchable QE index
+    // (avoids QE index blow-up; directory lookups use the hash).
+    ...(includeSensitive ? {
+      paymentRequestProcedure: {
+        fields: [
+          { keyId: deks.rtpPayeeAlias, path: 'payeeAlias', bsonType: 'string' },
+          { keyId: deks.rtpPayerAlias, path: 'payerAlias', bsonType: 'string' },
+          { keyId: deks.rtpRemittance, path: 'unstructuredRemittance', bsonType: 'string' },
+          { keyId: deks.rtpAddress, path: 'structuredAddress', bsonType: 'object' },
+          { keyId: deks.rtpPayeeName, path: 'payeeName', bsonType: 'string' },
+        ],
+      },
+    } : {}),
   };
 }
 

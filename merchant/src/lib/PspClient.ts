@@ -267,6 +267,39 @@ export class PspClient {
     );
   }
 
+  // ── Request to Pay (RTP) — merchant OAuth on-behalf-of (read:rtp / write:rtp) ──────────
+  // RTP is a transfer that requires the payer's approval. The merchant can request money from a
+  // payer, review requests awaiting its own approval, and issue a QR. No CIBA (authenticated session).
+  createRtpRequest(body: { amount: number; currency?: string; purpose?: string; payerPartyReference?: string; payeeReceivingAccountReference?: string }) {
+    return this.request<{ paymentRequestInstanceReference: string; status: string; amount: number; currency: string }>(
+      `/api/v1/gateway/rtp/requests`, { method: 'POST', body },
+    );
+  }
+  listRtpRequests(box: 'inbox' | 'outbox' = 'outbox') {
+    return this.request<{ results: Array<{ paymentRequestInstanceReference: string; status: string; amount: number; currency: string; purpose?: string; payeeName?: string }> }>(
+      `/api/v1/gateway/rtp/requests?box=${box}`,
+    );
+  }
+  getRtpRequest(ref: string) {
+    return this.request<Record<string, unknown>>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}`);
+  }
+  approveRtpRequest(ref: string, fundingAccountRef?: string) {
+    return this.request<{ status: string; executionReference?: string; reason?: string }>(
+      `/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/accept`, { method: 'POST', body: { ...(fundingAccountRef ? { fundingAccountRef } : {}) } },
+    );
+  }
+  rejectRtpRequest(ref: string) {
+    return this.request(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/reject`, { method: 'POST', body: {} });
+  }
+  cancelRtpRequest(ref: string) {
+    return this.request(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/cancel`, { method: 'POST', body: {} });
+  }
+  getRtpQr(ref: string) {
+    return this.request<{ qrRepresentationInstanceReference: string; encodedPayload: string; payloadFormat: string }>(
+      `/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/qr`, { method: 'POST', body: {} },
+    );
+  }
+
   // ── Bank transfers (ACH / SEPA / SWIFT) — merchant OAuth on-behalf-of (write:transfers) ──
   previewTransfer(input: { destination: Record<string, unknown>; amountCurrency?: { amount: number; currency: string }; rail?: string }) {
     return this.request(`/api/v1/gateway/transfers/preview`, { method: 'POST', body: input });

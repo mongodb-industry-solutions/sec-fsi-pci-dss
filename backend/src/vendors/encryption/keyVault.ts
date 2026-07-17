@@ -52,6 +52,12 @@ export interface DEKs {
   execDestIban: Binary;           // paymentExecutionProcedure.destinationIban (SD-65) — unregistered destination
   partyAddress: Binary;           // party.partyPostalAddress (SD-13) — GDPR PII
   partyDob: Binary;               // party.partyDateOfBirth (SD-13) — GDPR PII
+  // v28 RTP QE:none fields (sensitive tier, L2 only) — one DEK per field per collection
+  rtpPayeeAlias: Binary;          // paymentRequestProcedure.payeeAlias
+  rtpPayerAlias: Binary;          // paymentRequestProcedure.payerAlias
+  rtpRemittance: Binary;          // paymentRequestProcedure.unstructuredRemittance
+  rtpAddress: Binary;             // paymentRequestProcedure.structuredAddress
+  rtpPayeeName: Binary;           // paymentRequestProcedure.payeeName
 }
 
 export async function provisionDataEncryptionKeys(client: MongoClient): Promise<DEKs> {
@@ -116,6 +122,12 @@ export async function provisionDataEncryptionKeys(client: MongoClient): Promise<
   const caSourceOfFunds = await getOrCreate('DEK-ca-source-of-funds');
   const caPurpose = await getOrCreate('DEK-ca-purpose');
   const kycScreeningRef = await getOrCreate('DEK-kyc-screening-ref');
+  // v28 RTP QE:none (sensitive tier)
+  const rtpPayeeAlias = await getOrCreate('DEK-rtp-payee-alias');
+  const rtpPayerAlias = await getOrCreate('DEK-rtp-payer-alias');
+  const rtpRemittance = await getOrCreate('DEK-rtp-remittance');
+  const rtpAddress = await getOrCreate('DEK-rtp-address');
+  const rtpPayeeName = await getOrCreate('DEK-rtp-payee-name');
 
   return {
     txAccountRef, partyEmail, partyPhone, customerAccountRef, authEmail,
@@ -125,5 +137,6 @@ export async function provisionDataEncryptionKeys(client: MongoClient): Promise<
     txRawPayload, txProcessorMeta, customerAddress, customerGovId, customerRiskNotes, cardExpiry,
     payoutIban, payoutRouting, execDestIban, partyAddress, partyDob,
     caSourceOfFunds, caPurpose, kycScreeningRef,
+    rtpPayeeAlias, rtpPayerAlias, rtpRemittance, rtpAddress, rtpPayeeName,
   };
 }

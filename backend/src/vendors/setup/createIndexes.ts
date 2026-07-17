@@ -8,6 +8,9 @@ import { RECURRING_MANDATE_COLLECTION } from '../../modules/gateway/models/recur
 import { IDEMPOTENCY_COLLECTION } from '../../modules/gateway/services/idempotency.service';
 import { PARTY_ENROLLED_CREDENTIAL_COLLECTION } from '../../modules/identity/models/partyEnrolledCredential.model';
 import { PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION } from '../../modules/identity/models/partyBackchannelAuthentication.model';
+import { PAYMENT_REQUEST_COLLECTION } from '../../modules/gateway/models/paymentRequest.model';
+import { QR_REPRESENTATION_COLLECTION } from '../../modules/gateway/models/qrRepresentation.model';
+import { RTP_ALIAS_DIRECTORY_CACHE_COLLECTION } from '../../modules/gateway/models/rtpAliasDirectoryCache.model';
 import { config } from '../../config';
 
 // ── Self-healing index helpers ────────────────────────────────────────────────
@@ -441,4 +444,30 @@ export async function createIndexes(client: MongoClient) {
   await ensureIndexes(db, IDEMPOTENCY_COLLECTION, [
     { key: { idempotencyKey: 1 }, unique: true },
   ]);
+
+  // SD-65 (v28): Request to Pay canonical record. Inbox/outbox + expiry-sweeper + linkage queries.
+  await ensureIndexes(db, PAYMENT_REQUEST_COLLECTION, [
+    { key: { paymentRequestInstanceReference: 1 }, unique: true },
+    { key: { requesterPartyReference: 1, recordCreatedDateTime: -1 } },
+    { key: { payerPartyReference: 1, status: 1, expiresAt: 1 } },
+    { key: { status: 1, expiresAt: 1 } },
+    { key: { invoiceReference: 1 }, sparse: true },
+    { key: { linkedPaymentExecutionReference: 1 }, sparse: true },
+    { key: { idempotencyKey: 1 }, unique: true, partialFilterExpression: { idempotencyKey: { $exists: true } } },
+  ]);
+
+  // Directory Entry (v28): RTP alias resolution cache — hashed alias PK + TTL.
+  await ensureIndexes(db, RTP_ALIAS_DIRECTORY_CACHE_COLLECTION, [
+    { key: { aliasHash: 1 }, unique: true },
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
+  ]);
+
+  // SD-65 (v28): shared QR representation — PK, subject lookup, TTL.
+  await ensureIndexes(db, QR_REPRESENTATION_COLLECTION, [
+    { key: { qrRepresentationInstanceReference: 1 }, unique: true },
+    { key: { subjectType: 1, subjectReference: 1 } },
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
+  ]);
+  // Note: paymentRequestEvent is a timeseries collection; its meta index is defined on the
+  // collection itself (createCollections.ts), not here.
 }

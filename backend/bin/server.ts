@@ -20,6 +20,7 @@ import { providersModule } from '../src/modules/provider';
 import { fdsModule }       from '../src/providers/fds';
 import { hrpModule }       from '../src/providers/hrp';
 import { amlModule }       from '../src/providers/aml';
+import { vopModule }       from '../src/providers/vop';
 import { kycModule }       from '../src/providers/kyc';
 import { kybModule }       from '../src/providers/kyb';
 import { creditBureauModule }      from '../src/providers/credit-bureau';
@@ -175,6 +176,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(fdsModule,          { prefix: '/api/v1' });
   await fastify.register(hrpModule,          { prefix: '/api/v1' });
   await fastify.register(amlModule,          { prefix: '/api/v1' });
+  await fastify.register(vopModule,          { prefix: '/api/v1' });
   await fastify.register(kycModule,          { prefix: '/api/v1' });
   await fastify.register(kybModule,          { prefix: '/api/v1' });
   await fastify.register(creditBureauModule, { prefix: '/api/v1' });

@@ -3961,3 +3961,57 @@ gated by the signature at the PSP, so serving the challenge to the `auth_req_id`
   change). GDPR: `login_hint_token` avoids raw email in the hint.
 
 *Added 2026-07-10 (v25; doc + code together per repo rules).*
+
+## 14. v28 — Request to Pay (RTP) + shared QR + Verification of Payee (VoP)
+
+> Delivered under development plan `tmp/dev.v28.plan.md`. RTP is a BIAN-aligned **intent domain**
+> (SD-65) kept strictly separate from payment execution. Model: a transfer that requires the payer's
+> **in-app approval** (no CIBA). On approval a distinct `paymentExecutionProcedure` is created and
+> linked by immutable reference, then routed via the `payment_initiation` provider using the same
+> balance-aware hold→settle→credit sequence as P2P. RTP is account/alias-based → **outside PCI scope**.
+
+### 14.1 Data model (setup + seed are the single source of truth)
+- **`paymentRequestProcedure`** (QE-encrypted): canonical rail-agnostic request. QE:none (L2 only)
+  fields: `payeeName`, `payeeAlias`, `payerAlias`, `unstructuredRemittance`, `structuredAddress`
+  (5 DEKs: `DEK-rtp-payee-name/-payee-alias/-payer-alias/-rtp-remittance/-rtp-address`). Aliases also
+  stored as a non-reversible SHA-256 `*AliasHash` (plaintext, indexed) for directory lookups (GDPR
+  minimization). QE cannot encrypt `null` (err 31041): omitted encrypted fields are stripped before insert.
+- **`paymentRequestEvent`** (timeseries, TTL 365d, meta=`paymentRequestInstanceReference`): per-request trail.
+- **`qrPaymentRepresentation`** (plaintext): shared QR capability (RTP / payment_link / checkout). Stores
+  only the encoded payload (signed deep link / EPC / EMVCo), never the image. Single-use + TTL.
+- **`rtpAliasDirectoryCache`** (plaintext): `aliasHash` (unique) → party/counterparty, TTL.
+- Indexes: see `createIndexes.ts` (inbox/outbox, expiry sweeper `{status,expiresAt}`, linkage, idempotency).
+- `BusinessEntityType` gains `'payment_request'`; `NotificationType` gains `'payment_request'`.
+
+### 14.2 Lifecycle (monotonic, validated by `rtpStateMachine.ts`)
+`draft→created→validated→presented→delivered→viewed→accepted|rejected|cancelled|expired`,
+`accepted→payment_initiated→payment_processing|payment_settled|payment_failed`, `payment_settled→reversed|disputed`.
+Expiry sweeper (`RtpLifecycleProcess`, 60s interval) transitions lapsed pre-acceptance requests to
+`expired` with an auditable event (not TTL-only). Settlement (`bank.transfer.settled/failed`) is projected
+back onto the linked request by `RtpLifecycleProcess`.
+
+### 14.3 Approval (balance-aware, `rtpApproval.service.ts`)
+Funds check (AIS) → screening (`screenRtpRequest`: FDS+HRP+AML via `transferRiskGate` **plus VoP**, additive)
+→ `holdCardFunds` on the payer funding account → create SD-65 execution (`sourcePayoutAccountReference`=payer,
+`resolvedPayoutAccountReference`=payee) → dispatch `payment_initiation`. `PayoutOrchestrationProcess`
+settles (`settleCardDebit` + `creditDirect`). Preconditions: payee needs an active receiving account to
+request (`422 no_payout_account`); payer needs an active funding account to approve (`422 no_funding_account`).
+Durable `authorizationContext` (session/subject/device/timestamp/result) persisted immutably.
+
+### 14.4 VoP capability (`vop` / `vop_verification`) — additional, independent (ADR-v28-01)
+First-class provider capability mirroring FDS/AML/HRP: registry (`capabilities.ts`), built-in module
+(`providers/vop/*`, engine `verifyPayee`: exact / normalized / token-order / Levenshtein + thresholds +
+decision policy + market gate → `match|close_match|no_match|not_supported`), provider-group reactor
+(`vop.verification.requested`→`.completed`), canonical ledger event, seed (provider `int-internal-vop-001`,
+capability config, routing group). NOT a replacement for FDS/AML/HRP; blocks only when policy makes it
+mandatory. Stub swappable for the real EPC VoP inter-PSP API / UK CoP / AI-agent matcher without changing
+the wire contract. Admin dashboard `/system/admin/modules/vop`. Config: `PSP_RTP_VOP` + `PSP_RTP_VOP_MARKETS`.
+
+### 14.5 API (`/api/v1/gateway/rtp/*`, `/api/v1/gateway/qr/*`)
+`POST/GET /requests`, `GET /requests/:ref`, `/present`, `/view`, `/verify-payee`, `/accept`, `/reject`,
+`/cancel`, `/events`, `/qr`; shared `POST /gateway/qr/represent`, `GET /gateway/qr/:ref`. All mutating routes
+use `dualPermission` (session RBAC `paymentRequests:view/manage` OR merchant OAuth `read:rtp`/`write:rtp`)
++ idempotency keys. ACL resource `paymentRequests` (SD-65); OAuth scopes `read:rtp`/`write:rtp` (SCOPE_CATALOG
++ merchant client seed + REQUESTED_SCOPES). Config gate `PSP_RTP_ENABLED`. ISO 20022 mapper: `rtpIso20022.mapper.ts`.
+
+*Added 2026-07-17 (v28).*

@@ -124,4 +124,6 @@ export const REQUESTED_SCOPES = [
   'read:merchant_profile',
   'read:notifications',
   'write:transfers',
+  'read:rtp',
+  'write:rtp',
 ];

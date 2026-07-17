@@ -21,6 +21,7 @@ export type IntegrationProviderType =
   | 'account_information'    // SD-36 Open Banking AIS — external bank account identity/balance (PSD2)
   | 'payment_initiation'     // SD-66 PISP — executes bank transfers (PSD2)
   | 'currency_exchange'      // v17 FX — converts amounts between ISO-4217 currencies (mid rate + spread)
+  | 'vop_verification'       // v28 Verification of Payee — name-vs-account confirmation (EPC VoP / UK CoP)
   | 'generic';
 
 export type IntegrationStatus  = 'active' | 'inactive' | 'test' | 'suspended';
@@ -322,7 +323,7 @@ export interface ExternalProviderArrangement {
 
 // ── Business Context Correlation (ADR-025) ────────────────────────────────────
 
-export type BusinessEntityType = 'transaction' | 'p2p_transfer' | 'fraud_case' | 'customer' | 'merchant' | 'payment_link' | 'card' | 'execution' | 'account';
+export type BusinessEntityType = 'transaction' | 'p2p_transfer' | 'fraud_case' | 'customer' | 'merchant' | 'payment_link' | 'card' | 'execution' | 'account' | 'payment_request';
 
 export type BusinessProcessType =
   | 'payment_processing'

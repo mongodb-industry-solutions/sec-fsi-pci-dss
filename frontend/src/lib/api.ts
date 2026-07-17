@@ -638,6 +638,33 @@ export interface KycSearchBody {
   limit?: number;
 }
 
+// v28 Request to Pay DTOs (mirror backend PaymentRequestProcedure / QrPaymentRepresentation).
+export interface RtpRequestDTO {
+  paymentRequestInstanceReference: string;
+  requesterPartyReference: string;
+  payerPartyReference?: string;
+  payeeName?: string;
+  payeeReceivingAccountReference: string;
+  payerFundingAccountReference?: string;
+  amount: number;
+  currency: string;
+  purpose?: string;
+  status: string;
+  expiresAt?: string;
+  qrRepresentationReference?: string;
+  linkedPaymentExecutionReference?: string;
+  recordCreatedDateTime?: string;
+}
+
+export interface QrRepresentationDTO {
+  qrRepresentationInstanceReference: string;
+  subjectType: string;
+  subjectReference: string;
+  payloadFormat: string;
+  encodedPayload: string;
+  expiresAt?: string;
+}
+
 export const api = {
   acl: {
     effective: (token: string) =>
@@ -2055,6 +2082,40 @@ export const api = {
         { method: 'POST', body: JSON.stringify(body) },
         token,
       ),
+  },
+
+  // v28: Request to Pay (RTP) — a transfer that requires the payer's in-app approval + shared QR.
+  rtp: {
+    create: (
+      body: {
+        amount: number; currency?: string; purpose?: string; payeeName?: string;
+        payeeReceivingAccountReference?: string; payerPartyReference?: string; expiresAt?: string;
+        structuredRemittance?: { referenceType?: string; reference?: string };
+      },
+      token: string,
+      idempotencyKey?: string,
+    ) =>
+      apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests`, { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }, token),
+    list: (params: { box?: 'inbox' | 'outbox'; status?: string }, token: string) => {
+      const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString();
+      return apiFetch<{ results: RtpRequestDTO[] }>(`/api/v1/gateway/rtp/requests${qs ? `?${qs}` : ''}`, {}, token);
+    },
+    getById: (ref: string, token: string) => apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}`, {}, token),
+    events: (ref: string, token: string) => apiFetch<{ events: Array<Record<string, unknown>> }>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/events`, {}, token),
+    present: (ref: string, token: string) => apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/present`, { method: 'POST', body: JSON.stringify({}) }, token),
+    view: (ref: string, token: string) => apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/view`, { method: 'POST', body: JSON.stringify({}) }, token),
+    verifyPayee: (ref: string, token: string) => apiFetch<{ matchResult: string; matchScore: number; recommendation: string }>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/verify-payee`, { method: 'POST', body: JSON.stringify({}) }, token),
+    accept: (ref: string, body: { fundingAccountRef?: string }, token: string, idempotencyKey?: string) =>
+      apiFetch<{ status: string; executionReference?: string; reason?: string; request: RtpRequestDTO }>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/accept`, { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }, token),
+    reject: (ref: string, token: string) => apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/reject`, { method: 'POST', body: JSON.stringify({}) }, token),
+    cancel: (ref: string, token: string) => apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/cancel`, { method: 'POST', body: JSON.stringify({}) }, token),
+    qr: (ref: string, token: string) => apiFetch<QrRepresentationDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/qr`, { method: 'POST', body: JSON.stringify({}) }, token),
+  },
+
+  qr: {
+    represent: (body: { subjectType: string; subjectReference: string; payloadFormat?: string; amount?: number; currency?: string; payeeName?: string; iban?: string }, token: string) =>
+      apiFetch<QrRepresentationDTO>(`/api/v1/gateway/qr/represent`, { method: 'POST', body: JSON.stringify(body) }, token),
+    resolve: (ref: string, token: string) => apiFetch<QrRepresentationDTO>(`/api/v1/gateway/qr/${encodeURIComponent(ref)}`, {}, token),
   },
 
   executions: {

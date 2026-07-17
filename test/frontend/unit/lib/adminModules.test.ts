@@ -16,12 +16,13 @@ describe('admin module-type labels (§2.6)', () => {
     for (const m of CORE_ADMIN_MODULES) expect(m.moduleType).toBe('core');
   });
 
-  it('labels every built-in provider engine as built-in-provider (the 10 capabilities)', () => {
+  it('labels every built-in provider engine as built-in-provider (the 11 capabilities incl. VoP)', () => {
     const providers = builtInProviderModules();
-    expect(providers).toHaveLength(10);
+    expect(providers).toHaveLength(11); // v28: + Verification of Payee (vop)
     for (const m of providers) expect(m.moduleType).toBe('built-in-provider');
     expect(providers.map((m) => m.key)).toContain('card-issuer');
     expect(providers.map((m) => m.key)).toContain('fds');
+    expect(providers.map((m) => m.key)).toContain('vop');
   });
 
   it('every entry in the combined list has a renderable type label', () => {
