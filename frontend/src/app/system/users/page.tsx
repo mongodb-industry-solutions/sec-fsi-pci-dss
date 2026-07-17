@@ -241,25 +241,6 @@ export default function UsersPage() {
         {searchError && <p className="text-sm text-red-600">{searchError}</p>}
       </div>
 
-      {/* v27: advanced encrypted-attribute search (Queryable Encryption). Discovery capability that
-          returns a list, so it is gated to Level 2 investigator / auditor (least-privilege, PCI DSS
-          Req 7). Level 1 keeps only the blind single-record lookup above. Server enforces the gate. */}
-      {(role === 'level2_investigator' || role === 'security_auditor') && (
-        <div className="space-y-4">
-          <SectionHeader
-            icon={ShieldCheck}
-            title="Advanced search"
-            description="Investigate over encrypted KYC attributes (name, DOB, government ID, TIN, nationality, risk verdicts) with Queryable Encryption. The server matches ciphertext-to-ciphertext; visible fields follow your role."
-            debugInfo="BIAN SD-53 · PCI DSS Req 3/7 · MongoDB Queryable Encryption (equality/range/substring/prefix/suffix)"
-          />
-          <EncryptedKycSearch
-            token={token}
-            role={role}
-            resultHref={(r) => `/system/users/${r.customerAgreementInstanceReference}`}
-          />
-        </div>
-      )}
-
       {/* Customer profile result */}
       {customer && (
         <div className="bg-white rounded-xl border p-5 space-y-4">
@@ -405,6 +386,26 @@ export default function UsersPage() {
       {transactions.length === 0 && customer && cardToken && !txnLoading && (
         <div className="bg-white rounded-xl border p-5 text-center text-sm text-gray-500">
           No transactions found for this card token.
+        </div>
+      )}
+
+      {/* v27: advanced encrypted-attribute search (Queryable Encryption). Placed after the blind
+          lookup so each flow stays contiguous (blind lookup + its result above; the attribute
+          search + its own list here). Discovery capability that returns a list, so it is gated to
+          Level 2 investigator / auditor (least-privilege, PCI DSS Req 7). Server enforces the gate. */}
+      {(role === 'level2_investigator' || role === 'security_auditor') && (
+        <div className="space-y-4 border-t pt-6">
+          <SectionHeader
+            icon={ShieldCheck}
+            title="Advanced search"
+            description="Investigate over encrypted KYC attributes (name, DOB, government ID, TIN, nationality, risk verdicts) with Queryable Encryption. The server matches ciphertext-to-ciphertext; visible fields follow your role."
+            debugInfo="BIAN SD-53 · PCI DSS Req 3/7 · MongoDB Queryable Encryption (equality/range/substring/prefix/suffix)"
+          />
+          <EncryptedKycSearch
+            token={token}
+            role={role}
+            resultHref={(r) => `/system/users/${r.customerAgreementInstanceReference}`}
+          />
         </div>
       )}
     </div>
