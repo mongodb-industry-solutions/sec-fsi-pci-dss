@@ -30,11 +30,6 @@ const CASE = {
 
 async function stubFraud(page: Page) {
   await page.route('**/api/v1/fraud/stats**', (r) => r.fulfill(json({ total: 1, byStatus: [], bySeverity: [] })));
-  // v27: the encrypted-KYC search panel (mounted on the investigation view) reads its field
-  // registry and runs searches. Stub these BEFORE the generic /customer route (more specific
-  // first) so the panel gets a valid registry shape instead of the customer-lookup object.
-  await page.route('**/api/v1/customer/search/fields**', (r) => r.fulfill(json({ textSearchEnabled: true, fields: [], sensitiveResultFields: [] })));
-  await page.route('**/api/v1/customer/search**', (r) => r.fulfill(json({ field: 'partyName', count: 0, results: [] })));
   await page.route('**/api/v1/customer**', (r) => r.fulfill(json({ customerAgreementInstanceReference: 'CA-1', customerName: 'Jane Doe', customerSegment: 'retail', customerAgreementStatus: 'active' })));
   await page.route('**/api/v1/fraud**', (route) => {
     const p = new URL(route.request().url()).pathname;

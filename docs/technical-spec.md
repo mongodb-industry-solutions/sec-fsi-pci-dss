@@ -1268,6 +1268,15 @@ encrypted, lookup-tier and exact-searchable.
 > `customerAgreementKycCheck.*` is allowed because each parent sub-document stays plaintext; only
 > the scalar leaves are QE fields, each with its own unique DEK.
 
+**Role gate (least-privilege, PCI DSS Req 7).** The multi-result KYC attribute search
+(`GET /api/v1/customer/search/fields`, `POST /api/v1/customer/search`) is a discovery capability
+that returns lists, so it is restricted server-side to `level2_investigator` and `security_auditor`
+(`KYC_SEARCH_ROLES` / `canRunKycSearch`); unauthorized roles get 403. Level 1 analysts keep only the
+blind single-record lookup (`GET /api/v1/customer?email|phone|accountRef`) and cannot enumerate the
+customer base by attribute. In the UI the search lives as an "Advanced search" section on
+`/system/users`, rendered only for L2/auditor; the shared `EncryptedKycSearch` component is reused in
+the demo simulator. Sensitive `QE:none` result fields remain gated by escalation (L2 token) / auditor.
+
 ```typescript
 // backend/src/vendors/encryption/encryptedFieldsMaps.ts
 // v2: tier parameter selects which QE:none fields are included in the map.

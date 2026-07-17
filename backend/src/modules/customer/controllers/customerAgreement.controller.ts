@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { getByEmail, getByPhone, getByAccountRef, getByInstanceReference, getKycSearchRegistry, searchKyc } from '../services/customerAgreement.service';
+import { getByEmail, getByPhone, getByAccountRef, getByInstanceReference, getKycSearchRegistry, searchKyc, canRunKycSearch } from '../services/customerAgreement.service';
 import type { AuthenticatedRequest, JwtUserPayload } from '../../../shared/models/identity.model';
 
 // Acting user (unique id + name) from the JWT — recorded in the sensitive-access audit event
@@ -164,10 +164,19 @@ caller has the DEK-sensitive key, i.e. \`level2_investigator\` role.`,
     schema: {
       tags: ['customer'],
       summary: 'List QE-searchable KYC fields and their query modes',
+      description: 'Restricted to level2_investigator and security_auditor (least-privilege, PCI DSS Req 7). Level 1 analysts use the blind single-record lookup only.',
       security: [{ bearerAuth: [] }],
-      response: { 200: { type: 'object', additionalProperties: true } },
+      response: {
+        200: { type: 'object', additionalProperties: true },
+        401: { $ref: 'Error#' },
+        403: { description: 'KYC attribute search is restricted to investigator and auditor roles.', $ref: 'Error#' },
+      },
     },
-  }, async (_request, reply) => {
+  }, async (request, reply) => {
+    const { userRole } = request as unknown as AuthenticatedRequest;
+    if (!canRunKycSearch(userRole)) {
+      return reply.status(403).send({ error: 'KYC attribute search is restricted to investigator and auditor roles' });
+    }
     return reply.send(getKycSearchRegistry());
   });
 

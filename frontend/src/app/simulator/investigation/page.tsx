@@ -346,7 +346,9 @@ type KycRole = (typeof KYC_ROLES)[number];
 // per-role JWT via the same login endpoint application mode uses). The search UI itself is
 // not forked: it is the identical component mounted in the production investigation view.
 function SimulatorKycSearchPanel() {
-  const [role, setRole] = useState<KycRole>('level1_analyst');
+  // Default to L2 so the search is demoable immediately; switching to L1 shows the
+  // least-privilege gate (blind lookup only), which is itself part of the narrative.
+  const [role, setRole] = useState<KycRole>('level2_investigator');
   const [token, setToken] = useState('');
   const [tokenError, setTokenError] = useState<string | null>(null);
 

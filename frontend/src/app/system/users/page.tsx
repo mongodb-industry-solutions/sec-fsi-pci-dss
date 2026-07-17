@@ -6,7 +6,8 @@ import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { Breadcrumb, type Crumb } from '../../../components/Breadcrumb';
-import { Users } from 'lucide-react';
+import { EncryptedKycSearch } from '../../../components/EncryptedKycSearch';
+import { Users, ShieldCheck } from 'lucide-react';
 
 type SearchField = 'email' | 'phone' | 'accountRef';
 
@@ -239,6 +240,25 @@ export default function UsersPage() {
         </div>
         {searchError && <p className="text-sm text-red-600">{searchError}</p>}
       </div>
+
+      {/* v27: advanced encrypted-attribute search (Queryable Encryption). Discovery capability that
+          returns a list, so it is gated to Level 2 investigator / auditor (least-privilege, PCI DSS
+          Req 7). Level 1 keeps only the blind single-record lookup above. Server enforces the gate. */}
+      {(role === 'level2_investigator' || role === 'security_auditor') && (
+        <div className="space-y-4">
+          <SectionHeader
+            icon={ShieldCheck}
+            title="Advanced search"
+            description="Investigate over encrypted KYC attributes (name, DOB, government ID, TIN, nationality, risk verdicts) with Queryable Encryption. The server matches ciphertext-to-ciphertext; visible fields follow your role."
+            debugInfo="BIAN SD-53 · PCI DSS Req 3/7 · MongoDB Queryable Encryption (equality/range/substring/prefix/suffix)"
+          />
+          <EncryptedKycSearch
+            token={token}
+            role={role}
+            resultHref={(r) => `/system/users/${r.customerAgreementInstanceReference}`}
+          />
+        </div>
+      )}
 
       {/* Customer profile result */}
       {customer && (

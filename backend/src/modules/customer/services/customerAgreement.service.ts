@@ -276,11 +276,21 @@ export async function updateSelfProfile(
 }
 
 // -- v27: Queryable Encryption search showcase -------------------------------─
-// Analysts search encrypted KYC fields (name, gov ID, TIN, DOB, verdicts) directly over
-// ciphertext. The server encrypts the search value locally; Atlas never sees plaintext.
-// API-first: this service is the single source of truth for which field maps to which QE
-// query type, the validation rules, and the tier gate. The frontend renders only what the
-// field registry exposes and enforces nothing the server does not (project CLAUDE.md).
+// Investigators/auditors search encrypted KYC fields (name, gov ID, TIN, DOB, verdicts)
+// directly over ciphertext. The server encrypts the search value locally; Atlas never sees
+// plaintext. API-first: this service is the single source of truth for which field maps to
+// which QE query type, the validation rules, the role gate and the tier gate. The frontend
+// renders only what the field registry exposes and enforces nothing the server does not.
+//
+// ROLE GATE (least-privilege, PCI DSS Req 7): this is a discovery capability that returns
+// LISTS of customers, so it is restricted to investigator and auditor roles. Level 1 analysts
+// keep only the blind single-record lookup (getByEmail/Phone/AccountRef); they must not be able
+// to enumerate the customer base by attribute. The gate is enforced here (server-side), not in
+// the client.
+export const KYC_SEARCH_ROLES: ReadonlySet<UserRole> = new Set(['level2_investigator', 'security_auditor']);
+export function canRunKycSearch(role: UserRole): boolean {
+  return KYC_SEARCH_ROLES.has(role);
+}
 
 export type KycSearchMode = 'substring' | 'prefix' | 'suffix' | 'range' | 'equality';
 
@@ -422,6 +432,9 @@ export async function searchKyc(
   actor?: { ref?: string; name?: string },
   limit = 50,
 ): Promise<Record<string, unknown>[]> {
+  if (!canRunKycSearch(role)) {
+    throw Object.assign(new Error('KYC attribute search is restricted to investigator and auditor roles'), { statusCode: 403 });
+  }
   const def = KYC_SEARCH_FIELDS.find((f) => f.key === req.field);
   if (!def) badRequest(`Unknown or non-searchable field: ${req.field}`);
   const mode = effectiveMode(def);

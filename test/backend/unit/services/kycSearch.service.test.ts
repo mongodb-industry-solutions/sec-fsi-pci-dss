@@ -81,13 +81,16 @@ describe('getKycSearchRegistry', () => {
   });
 });
 
+// All shape/validation tests run as an authorized role (security_auditor); L1 is forbidden.
+const AUTH = 'security_auditor';
+
 describe('searchKyc filter shapes', () => {
   it('substring on partyName uses the QE contains operator over $partyName (when text search enabled)', async () => {
     const reg = getKycSearchRegistry();
     if (reg.fields.find((f) => f.key === 'partyName')!.mode !== 'substring') return; // gated off: skip
     const db = makeDb();
     h.getDbForRole.mockResolvedValue(db);
-    await searchKyc({ field: 'partyName', value: 'garcia' });
+    await searchKyc({ field: 'partyName', value: 'garcia' }, AUTH);
     expect(JSON.stringify(db.calls[PARTY_COLLECTION])).toContain('$encStrContains');
     expect(JSON.stringify(db.calls[PARTY_COLLECTION])).toContain('$partyName');
   });
@@ -97,11 +100,11 @@ describe('searchKyc filter shapes', () => {
     const db = makeDb();
     h.getDbForRole.mockResolvedValue(db);
     if (reg.fields.find((f) => f.key === 'taxId')!.mode === 'prefix') {
-      await searchKyc({ field: 'taxId', value: 'ES' });
+      await searchKyc({ field: 'taxId', value: 'ES' }, AUTH);
       expect(JSON.stringify(db.calls[CUSTOMER_AGREEMENT_COLLECTION])).toContain('$encStrStartsWith');
     }
     if (reg.fields.find((f) => f.key === 'govIdNumber')!.mode === 'suffix') {
-      await searchKyc({ field: 'govIdNumber', value: '4821' });
+      await searchKyc({ field: 'govIdNumber', value: '4821' }, AUTH);
       expect(JSON.stringify(db.calls[CUSTOMER_AGREEMENT_COLLECTION])).toContain('$encStrEndsWith');
     }
   });
@@ -109,7 +112,7 @@ describe('searchKyc filter shapes', () => {
   it('range on riskScore builds a $gte/$lte filter on the nested path', async () => {
     const db = makeDb();
     h.getDbForRole.mockResolvedValue(db);
-    await searchKyc({ field: 'riskScore', from: '70', to: '100' });
+    await searchKyc({ field: 'riskScore', from: '70', to: '100' }, AUTH);
     const f = db.calls[CUSTOMER_AGREEMENT_COLLECTION] as Record<string, any>;
     const cond = f['customerAgreementKycCheck.customerAgreementKycCheckRiskScore'];
     expect(cond.$gte).toBe(70);
@@ -119,7 +122,7 @@ describe('searchKyc filter shapes', () => {
   it('range on partyDateOfBirth coerces ISO strings to Date bounds', async () => {
     const db = makeDb();
     h.getDbForRole.mockResolvedValue(db);
-    await searchKyc({ field: 'partyDateOfBirth', from: '1990-01-01', to: '2000-01-01' });
+    await searchKyc({ field: 'partyDateOfBirth', from: '1990-01-01', to: '2000-01-01' }, AUTH);
     const cond = (db.calls[PARTY_COLLECTION] as Record<string, any>)['partyDateOfBirth'];
     expect(cond.$gte).toBeInstanceOf(Date);
     expect(cond.$lte).toBeInstanceOf(Date);
@@ -128,8 +131,27 @@ describe('searchKyc filter shapes', () => {
   it('equality on nationality builds an exact-match filter', async () => {
     const db = makeDb();
     h.getDbForRole.mockResolvedValue(db);
-    await searchKyc({ field: 'partyNationality', value: 'ES' });
+    await searchKyc({ field: 'partyNationality', value: 'ES' }, AUTH);
     expect((db.calls[PARTY_COLLECTION] as Record<string, unknown>)['partyNationality']).toBe('ES');
+  });
+});
+
+describe('searchKyc role gate (least-privilege, PCI DSS Req 7)', () => {
+  beforeEach(() => h.getDbForRole.mockResolvedValue(makeDb()));
+
+  it('forbids Level 1 analyst (blind lookup only) with 403', async () => {
+    await expect(searchKyc({ field: 'partyNationality', value: 'ES' }, 'level1_analyst'))
+      .rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it('forbids customer with 403', async () => {
+    await expect(searchKyc({ field: 'partyNationality', value: 'ES' }, 'customer'))
+      .rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it('allows level2 investigator and security auditor', async () => {
+    await expect(searchKyc({ field: 'partyNationality', value: 'ES' }, 'level2_investigator')).resolves.toBeDefined();
+    await expect(searchKyc({ field: 'partyNationality', value: 'ES' }, 'security_auditor')).resolves.toBeDefined();
   });
 });
 
@@ -137,35 +159,26 @@ describe('searchKyc validation (reject, not silently drop)', () => {
   beforeEach(() => h.getDbForRole.mockResolvedValue(makeDb()));
 
   it('rejects an unknown / non-searchable field with 400', async () => {
-    await expect(searchKyc({ field: 'customerAgreementSourceOfFunds', value: 'salary' }))
+    await expect(searchKyc({ field: 'customerAgreementSourceOfFunds', value: 'salary' }, AUTH))
       .rejects.toMatchObject({ statusCode: 400 });
   });
 
   it('rejects a substring shorter than the min query length', async () => {
     const reg = getKycSearchRegistry();
     if (reg.fields.find((f) => f.key === 'partyName')!.mode !== 'substring') return;
-    await expect(searchKyc({ field: 'partyName', value: 'ab' })).rejects.toMatchObject({ statusCode: 400 });
+    await expect(searchKyc({ field: 'partyName', value: 'ab' }, AUTH)).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it('rejects an out-of-enum equality value', async () => {
-    await expect(searchKyc({ field: 'riskRating', value: 'extreme' })).rejects.toMatchObject({ statusCode: 400 });
+    await expect(searchKyc({ field: 'riskRating', value: 'extreme' }, AUTH)).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it('rejects a range with neither from nor to', async () => {
-    await expect(searchKyc({ field: 'riskScore' })).rejects.toMatchObject({ statusCode: 400 });
+    await expect(searchKyc({ field: 'riskScore' }, AUTH)).rejects.toMatchObject({ statusCode: 400 });
   });
 });
 
 describe('searchKyc tier gate on result fields', () => {
-  it('L1 analyst gets rows without the sensitive block or contact PII', async () => {
-    h.getDbForRole.mockResolvedValue(makeDb());
-    const rows = await searchKyc({ field: 'partyNationality', value: 'ES' }, 'level1_analyst');
-    expect(rows).toHaveLength(1);
-    expect(rows[0].sensitive).toBeUndefined();
-    expect(rows[0].customerEmailAddress).toBeUndefined();
-    expect(rows[0].contactPiiRestricted).toBe(true);
-  });
-
   it('security auditor gets the sensitive block and contact PII', async () => {
     h.getDbForRole.mockResolvedValue(makeDb());
     const rows = await searchKyc({ field: 'partyNationality', value: 'ES' }, 'security_auditor');
