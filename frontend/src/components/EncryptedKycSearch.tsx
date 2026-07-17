@@ -98,9 +98,11 @@ export function EncryptedKycSearch({ token, role, escalationToken }: Props) {
     api.customer.searchFields(token)
       .then((res) => {
         if (cancelled) return;
-        setTextSearchEnabled(res.textSearchEnabled);
-        setFields(res.fields);
-        setSelectedKey((prev) => prev || res.fields[0]?.key || '');
+        // Defensive: tolerate a malformed/absent registry (never throw during render).
+        const list = Array.isArray(res?.fields) ? res.fields : [];
+        setTextSearchEnabled(res?.textSearchEnabled ?? true);
+        setFields(list);
+        setSelectedKey((prev) => prev || list[0]?.key || '');
       })
       .catch((e) => { if (!cancelled) setRegistryError((e as Error).message || 'Failed to load search fields'); });
     return () => { cancelled = true; };
