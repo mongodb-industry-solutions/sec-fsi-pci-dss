@@ -9,7 +9,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2024-01-15T09:00:00.000Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "ES",
+    "partyPlaceOfBirth": "Madrid",
+    "partyDateOfBirth": "1991-12-20",
+    "partyPostalAddress": {
+      "line1": "Avenida de la Constitución 12",
+      "city": "Sevilla",
+      "postalCode": "41004",
+      "countryCode": "ES"
+    }
   },
   {
     "partyInstanceReference": "b0000002-0000-4000-8000-000000000002",
@@ -21,7 +30,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2023-12-01T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "ES",
+    "partyDateOfBirth": "1984-11-24",
+    "partyPostalAddress": {
+      "line1": "Avenida de la Constitución 12",
+      "city": "Sevilla",
+      "postalCode": "41004",
+      "countryCode": "ES"
+    },
+    "partyPlaceOfBirth": "Sevilla"
   },
   {
     "partyInstanceReference": "b0000003-0000-4000-8000-000000000003",
@@ -33,7 +51,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-02-27T20:23:42.734Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "2002-11-26",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "London"
   },
   {
     "partyInstanceReference": "b0000004-0000-4000-8000-000000000004",
@@ -45,7 +72,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-05-19T12:53:01.516Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1964-11-28",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "Manchester"
   },
   {
     "partyInstanceReference": "b0000005-0000-4000-8000-000000000005",
@@ -57,7 +93,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-04-24T23:06:37.993Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "FR",
+    "partyPlaceOfBirth": "Paris",
+    "partyDateOfBirth": "1983-09-05",
+    "partyPostalAddress": {
+      "line1": "18 Rue de Rivoli",
+      "city": "Paris",
+      "postalCode": "75004",
+      "countryCode": "FR"
+    }
   },
   {
     "partyInstanceReference": "b0000006-0000-4000-8000-000000000006",
@@ -69,7 +114,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-02-23T13:08:54.280Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "Bristol",
+    "partyDateOfBirth": "2001-09-07",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000007-0000-4000-8000-000000000007",
@@ -81,7 +135,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2024-11-07T10:14:48.834Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "London",
+    "partyDateOfBirth": "1963-09-09",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000008-0000-4000-8000-000000000008",
@@ -93,7 +156,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2024-07-23T21:28:19.824Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1956-08-14",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "London"
   },
   {
     "partyInstanceReference": "b0000009-0000-4000-8000-000000000009",
@@ -105,7 +177,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-05-07T02:55:04.426Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1974-09-15",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "Manchester"
   },
   {
     "partyInstanceReference": "b0000010-0000-4000-8000-000000000010",
@@ -117,7 +198,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-04-05T09:02:39.278Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1974-11-23",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "London"
   },
   {
     "partyInstanceReference": "b0000011-0000-4000-8000-000000000011",
@@ -129,7 +219,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2024-08-22T07:59:47.379Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1992-11-25",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "London"
   },
   {
     "partyInstanceReference": "b0000012-0000-4000-8000-000000000012",
@@ -141,7 +240,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2024-12-09T08:42:10.132Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1954-11-27",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "Manchester"
   },
   {
     "partyInstanceReference": "b0000013-0000-4000-8000-000000000013",
@@ -153,7 +261,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2024-06-15T18:10:05.907Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "Bristol",
+    "partyDateOfBirth": "1973-08-03",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000014-0000-4000-8000-000000000014",
@@ -165,7 +282,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-06-05T16:54:52.169Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "London",
+    "partyDateOfBirth": "1991-09-06",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000015-0000-4000-8000-000000000015",
@@ -177,7 +303,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-06-10T20:50:24.903Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "London",
+    "partyDateOfBirth": "1953-09-08",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000016-0000-4000-8000-000000000016",
@@ -189,7 +324,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-09-03T12:25:53.055Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "2002-08-13",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "London"
   },
   {
     "partyInstanceReference": "b0000017-0000-4000-8000-000000000017",
@@ -201,7 +345,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-04-28T01:47:32.449Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1964-08-15",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "Manchester"
   },
   {
     "partyInstanceReference": "b0000018-0000-4000-8000-000000000018",
@@ -213,7 +366,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-03-12T10:58:23.295Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "London",
+    "partyDateOfBirth": "1982-09-16",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000019-0000-4000-8000-000000000019",
@@ -225,7 +387,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-04-17T22:38:01.405Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "Bristol",
+    "partyDateOfBirth": "2001-06-20",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000020-0000-4000-8000-000000000020",
@@ -237,7 +408,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-05-09T01:31:49.941Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "Manchester",
+    "partyDateOfBirth": "2001-08-28",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000021-0000-4000-8000-000000000021",
@@ -249,7 +429,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-01-05T11:28:55.773Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "Bristol",
+    "partyDateOfBirth": "1963-08-02",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000022-0000-4000-8000-000000000022",
@@ -261,7 +450,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-01-20T09:46:31.044Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "London",
+    "partyDateOfBirth": "1981-08-04",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000023-0000-4000-8000-000000000023",
@@ -273,7 +471,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-01-18T17:11:29.938Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1974-08-10",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "London"
   },
   {
     "partyInstanceReference": "b0000024-0000-4000-8000-000000000024",
@@ -285,7 +492,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-05-04T16:32:46.767Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1992-08-12",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "Manchester"
   },
   {
     "partyInstanceReference": "b0000025-0000-4000-8000-000000000025",
@@ -297,7 +513,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2024-11-23T17:21:11.931Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1954-08-14",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "Manchester"
   },
   {
     "partyInstanceReference": "b0000026-0000-4000-8000-000000000026",
@@ -309,7 +534,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-01-15T11:58:33.883Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "Bristol",
+    "partyDateOfBirth": "1973-05-17",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000027-0000-4000-8000-000000000027",
@@ -321,7 +555,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-01-04T07:30:25.500Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "London",
+    "partyDateOfBirth": "1991-06-19",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000028-0000-4000-8000-000000000028",
@@ -333,7 +576,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-12-28T06:14:42.470Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "Manchester",
+    "partyDateOfBirth": "1953-06-21",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000029-0000-4000-8000-000000000029",
@@ -345,7 +597,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-08-13T09:36:17.354Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "2002-05-26",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "London"
   },
   {
     "partyInstanceReference": "b0000030-0000-4000-8000-000000000030",
@@ -357,7 +618,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-11-05T16:32:48.437Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "London",
+    "partyDateOfBirth": "1971-08-03",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000031-0000-4000-8000-000000000031",
@@ -369,7 +639,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-05-25T10:49:47.008Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1964-07-08",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "London"
   },
   {
     "partyInstanceReference": "b0000032-0000-4000-8000-000000000032",
@@ -381,7 +660,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2024-11-20T11:20:15.424Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1982-08-11",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "Manchester"
   },
   {
     "partyInstanceReference": "b0000033-0000-4000-8000-000000000033",
@@ -393,7 +681,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-03-03T15:44:52.089Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "London",
+    "partyDateOfBirth": "2000-08-13",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000034-0000-4000-8000-000000000034",
@@ -405,7 +702,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-12-03T14:49:29.576Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "Bristol",
+    "partyDateOfBirth": "1963-05-16",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000035-0000-4000-8000-000000000035",
@@ -417,7 +723,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-08-07T16:28:28.192Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "London",
+    "partyDateOfBirth": "1981-05-18",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000036-0000-4000-8000-000000000036",
@@ -429,7 +744,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-05-14T02:55:49.342Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "Manchester",
+    "partyDateOfBirth": "1999-06-20",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000037-0000-4000-8000-000000000037",
@@ -441,7 +765,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2024-11-25T08:00:59.691Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1992-05-25",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "Manchester"
   },
   {
     "partyInstanceReference": "b0000038-0000-4000-8000-000000000038",
@@ -453,7 +786,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-03-02T19:20:43.460Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1954-05-27",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "Manchester"
   },
   {
     "partyInstanceReference": "b0000039-0000-4000-8000-000000000039",
@@ -465,7 +807,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-03-29T00:57:27.031Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "London",
+    "partyDateOfBirth": "1972-05-29",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000040-0000-4000-8000-000000000040",
@@ -477,7 +828,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-11-26T15:42:33.402Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1972-07-09",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "Manchester"
   },
   {
     "partyInstanceReference": "b0000041-0000-4000-8000-000000000041",
@@ -489,7 +849,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-02-08T15:51:30.768Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "Bristol",
+    "partyDateOfBirth": "1991-05-13",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000042-0000-4000-8000-000000000042",
@@ -501,7 +870,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2024-12-16T03:00:30.499Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "London",
+    "partyDateOfBirth": "1953-05-15",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000043-0000-4000-8000-000000000043",
@@ -513,7 +891,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-08-15T06:23:06.412Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "Manchester",
+    "partyDateOfBirth": "1971-05-17",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000044-0000-4000-8000-000000000044",
@@ -525,7 +912,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2024-06-09T05:56:53.738Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1964-04-21",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "London"
   },
   {
     "partyInstanceReference": "b0000045-0000-4000-8000-000000000045",
@@ -537,7 +933,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-01-15T08:27:19.533Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1982-05-24",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "Manchester"
   },
   {
     "partyInstanceReference": "b0000046-0000-4000-8000-000000000046",
@@ -549,7 +954,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-04-07T07:43:36.851Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "London",
+    "partyDateOfBirth": "2000-05-26",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000047-0000-4000-8000-000000000047",
@@ -561,7 +975,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-10-24T00:26:03.979Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyDateOfBirth": "1962-05-28",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    },
+    "partyPlaceOfBirth": "London"
   },
   {
     "partyInstanceReference": "b0000048-0000-4000-8000-000000000048",
@@ -573,7 +996,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-09-12T07:39:41.683Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "London",
+    "partyDateOfBirth": "1981-02-03",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000049-0000-4000-8000-000000000049",
@@ -585,7 +1017,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2025-04-25T21:26:49.169Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "Manchester",
+    "partyDateOfBirth": "1999-03-05",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000050-0000-4000-8000-000000000050",
@@ -597,7 +1038,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2024-06-04T17:19:53.665Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "London",
+    "partyDateOfBirth": "1999-05-14",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000051-0000-4000-8000-000000000051",
@@ -609,7 +1059,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-05-27T14:00:00.000Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "US",
+    "partyPlaceOfBirth": "San Francisco",
+    "partyDateOfBirth": "1961-05-16",
+    "partyPostalAddress": {
+      "line1": "1600 Market Street",
+      "city": "San Francisco",
+      "postalCode": "94102",
+      "countryCode": "US"
+    }
   },
   {
     "partyInstanceReference": "b0000052-0000-4000-8000-000000000052",
@@ -621,7 +1080,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-05-27T14:00:00.000Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "NG",
+    "partyPlaceOfBirth": "Lagos",
+    "partyDateOfBirth": "1954-04-20",
+    "partyPostalAddress": {
+      "line1": "15 Adeola Odeku Street",
+      "city": "Lagos",
+      "postalCode": "101241",
+      "countryCode": "NG"
+    }
   },
   {
     "partyInstanceReference": "b0000053-0000-4000-8000-000000000053",
@@ -633,7 +1101,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-05-27T14:00:00.000Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "MX",
+    "partyDateOfBirth": "1972-04-22",
+    "partyPostalAddress": {
+      "line1": "Av. Paseo de la Reforma 222",
+      "city": "Ciudad de México",
+      "postalCode": "06600",
+      "countryCode": "MX"
+    },
+    "partyPlaceOfBirth": "Guadalajara"
   },
   {
     "partyInstanceReference": "b0000056-0000-4000-8000-000000000056",
@@ -646,7 +1123,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "US",
+    "partyPlaceOfBirth": "San Francisco",
+    "partyDateOfBirth": "1971-02-02",
+    "partyPostalAddress": {
+      "line1": "1600 Market Street",
+      "city": "San Francisco",
+      "postalCode": "94102",
+      "countryCode": "US"
+    }
   },
   {
     "partyInstanceReference": "b0000057-0000-4000-8000-000000000057",
@@ -658,7 +1144,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "ES",
+    "partyPlaceOfBirth": "Madrid",
+    "partyDateOfBirth": "1989-02-04",
+    "partyPostalAddress": {
+      "line1": "Calle de Alcalá 128",
+      "city": "Madrid",
+      "postalCode": "28009",
+      "countryCode": "ES"
+    }
   },
   {
     "partyInstanceReference": "b0000058-0000-4000-8000-000000000058",
@@ -670,7 +1165,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "NG",
+    "partyPlaceOfBirth": "Lagos",
+    "partyDateOfBirth": "1982-02-06",
+    "partyPostalAddress": {
+      "line1": "15 Adeola Odeku Street",
+      "city": "Lagos",
+      "postalCode": "101241",
+      "countryCode": "NG"
+    }
   },
   {
     "partyInstanceReference": "b0000059-0000-4000-8000-000000000059",
@@ -682,7 +1186,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "DE",
+    "partyPlaceOfBirth": "Berlin",
+    "partyDateOfBirth": "2000-02-09",
+    "partyPostalAddress": {
+      "line1": "Friedrichstraße 43",
+      "city": "Berlin",
+      "postalCode": "10117",
+      "countryCode": "DE"
+    }
   },
   {
     "partyInstanceReference": "b0000060-0000-4000-8000-000000000060",
@@ -694,7 +1207,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "ES",
+    "partyDateOfBirth": "2000-04-19",
+    "partyPostalAddress": {
+      "line1": "Calle de Alcalá 128",
+      "city": "Madrid",
+      "postalCode": "28009",
+      "countryCode": "ES"
+    },
+    "partyPlaceOfBirth": "Sevilla"
   },
   {
     "partyInstanceReference": "b0000061-0000-4000-8000-000000000061",
@@ -706,7 +1228,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "London",
+    "partyDateOfBirth": "1962-04-21",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000062-0000-4000-8000-000000000062",
@@ -718,7 +1249,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "PL",
+    "partyPlaceOfBirth": "Warszawa",
+    "partyDateOfBirth": "1980-04-23",
+    "partyPostalAddress": {
+      "line1": "ul. Nowy Świat 22",
+      "city": "Warszawa",
+      "postalCode": "00-029",
+      "countryCode": "PL"
+    }
   },
   {
     "partyInstanceReference": "b0000063-0000-4000-8000-000000000063",
@@ -730,7 +1270,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "GB",
+    "partyPlaceOfBirth": "London",
+    "partyDateOfBirth": "1999-02-27",
+    "partyPostalAddress": {
+      "line1": "14 King Street",
+      "city": "Manchester",
+      "postalCode": "M2 6AG",
+      "countryCode": "GB"
+    }
   },
   {
     "partyInstanceReference": "b0000064-0000-4000-8000-000000000064",
@@ -742,7 +1291,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "FR",
+    "partyPlaceOfBirth": "Lyon",
+    "partyDateOfBirth": "1961-02-01",
+    "partyPostalAddress": {
+      "line1": "18 Rue de Rivoli",
+      "city": "Paris",
+      "postalCode": "75004",
+      "countryCode": "FR"
+    }
   },
   {
     "partyInstanceReference": "b0000065-0000-4000-8000-000000000065",
@@ -755,7 +1313,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "IT",
+    "partyPlaceOfBirth": "Milano",
+    "partyDateOfBirth": "1979-02-03",
+    "partyPostalAddress": {
+      "line1": "Via del Corso 200",
+      "city": "Roma",
+      "postalCode": "00186",
+      "countryCode": "IT"
+    }
   },
   {
     "partyInstanceReference": "b0000070-0000-4000-8000-000000000070",
@@ -768,7 +1335,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "US",
+    "partyPlaceOfBirth": "New York",
+    "partyDateOfBirth": "1971-01-24",
+    "partyPostalAddress": {
+      "line1": "1600 Market Street",
+      "city": "San Francisco",
+      "postalCode": "94102",
+      "countryCode": "US"
+    }
   },
   {
     "partyInstanceReference": "b0000071-0000-4000-8000-000000000071",
@@ -780,7 +1356,16 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-01-01T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-11T10:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "ES",
+    "partyPlaceOfBirth": "Sevilla",
+    "partyDateOfBirth": "1989-01-26",
+    "partyPostalAddress": {
+      "line1": "Carrer de Balmes 45",
+      "city": "Barcelona",
+      "postalCode": "08007",
+      "countryCode": "ES"
+    }
   },
   {
     "partyInstanceReference": "b0000072-0000-4000-8000-000000000072",
@@ -792,6 +1377,15 @@
     "bianControlRecordType": "Party",
     "recordCreatedDateTime": "2026-02-01T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-11T10:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "partyNationality": "ES",
+    "partyPlaceOfBirth": "Valencia",
+    "partyDateOfBirth": "1951-02-28",
+    "partyPostalAddress": {
+      "line1": "Calle de Alcalá 128",
+      "city": "Madrid",
+      "postalCode": "28009",
+      "countryCode": "ES"
+    }
   }
 ]

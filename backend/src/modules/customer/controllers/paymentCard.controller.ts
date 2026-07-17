@@ -3,6 +3,8 @@ import { registerCardForCustomer, getCardsByCustomer, getCardById, getCardHolder
 import type { PaymentCardManagementControlRecord } from '../models/paymentCard.model';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
+import { canStaffMutate, canStaffInvestigate } from '../../../vendors/middleware/rbac';
+import type { UserRole } from '../../../shared/models/identity.model';
 
 const STAFF_READ_ROLES = ['level1_analyst', 'level2_investigator', 'security_auditor'];
 
@@ -350,9 +352,10 @@ shared-card / money-mule indicator. Restricted to fraud analyst / investigator /
     return reply.send(reg);
   });
 
-  // GET /api/v1/customer/:customerId/cards/:cardId  — owner self-service card detail.
-  // Returns the full card-on-file (surrogate token, QE:none expiry, lifecycle dates, alias/note).
-  // Owner-only: the cardholder may inspect their own card. CVV/PIN are never stored, never returned.
+  // GET /api/v1/customer/:customerId/cards/:cardId  — card detail.
+  // Returns the card-on-file (surrogate token, lifecycle dates, alias/note). The owner also sees the
+  // QE:none expiry; staff (investigator/auditor) get a READ without the expiry (owner-only reveal,
+  // PCI DSS Req 3.3). CVV/PIN are never stored, never returned.
   fastify.get('/:customerId/cards/:cardId', {
     schema: {
       tags: ['cards'],
@@ -405,11 +408,17 @@ audited (Req 10).`,
     const { customerId, cardId } = request.params as { customerId: string; cardId: string };
     const user = (request as { user?: JwtUserPayload }).user;
     const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
-    if (!ownId || ownId !== customerId) {
+    const isOwner = !!ownId && ownId === customerId;
+    const isStaff = canStaffInvestigate((user?.role ?? '') as UserRole);
+    if (!isOwner && !isStaff) {
       return reply.status(403).send({ error: 'You can only view your own saved cards.' });
     }
     const card = await getCardById(fastify.db, customerId, cardId);
     if (!card) return reply.status(404).send({ error: 'Card not found' });
+
+    // The QE:none expiry is disclosed to the cardholder only (PCI DSS Req 3.3). A staff investigation
+    // READ never reveals it; strip it so the drill-down stays display-safe.
+    if (!isOwner) delete (card as Record<string, unknown>).paymentCardExpirationDate;
 
     // FDS/AML shared-card signal: how many customers hold this same physical card (the number only,
     // never the other holders' identities — PCI/PII minimization for the cardholder's own view).
@@ -563,9 +572,12 @@ audit event (Req 10).`,
     const { customerId, cardId } = request.params as { customerId: string; cardId: string };
     const { active } = request.body as { active: boolean };
 
+    // Owner (self-service) OR an L2 investigator acting as staff (BIAN SD-15 control). The auditor is
+    // read-only and L1 has no card-mutation reach, so both are blocked here (PCI DSS Req 7).
     const user = (request as { user?: JwtUserPayload }).user;
     const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
-    if (!ownId || ownId !== customerId) {
+    const isOwner = !!ownId && ownId === customerId;
+    if (!isOwner && !canStaffMutate((user?.role ?? '') as UserRole)) {
       return reply.status(403).send({ error: 'You can only change the status of your own saved cards.' });
     }
 
@@ -615,9 +627,11 @@ audit event (\`card.removed\`) is emitted. CVV/PIN are never involved.`,
     },
   }, async (request, reply) => {
     const { customerId, cardId } = request.params as { customerId: string; cardId: string };
+    // Owner (self-service) OR an L2 investigator acting as staff. Auditor (read-only) and L1 blocked.
     const user = (request as { user?: JwtUserPayload }).user;
     const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
-    if (!ownId || ownId !== customerId) {
+    const isOwner = !!ownId && ownId === customerId;
+    if (!isOwner && !canStaffMutate((user?.role ?? '') as UserRole)) {
       return reply.status(403).send({ error: 'You can only remove cards from your own account.' });
     }
     const removed = await revokeCard(fastify.db, customerId, cardId);

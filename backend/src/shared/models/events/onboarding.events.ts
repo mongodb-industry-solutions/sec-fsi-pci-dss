@@ -41,6 +41,30 @@ export interface ProfileValidationCompleted {
   reason?: string;
 }
 
+/**
+ * @event    kyc.screening.requested
+ * @producer psp.core (bridge from profile.validation.completed)  @consumer HRP Screening Provider
+ * v27: high-risk-party screening for a customer, dispatched through the Integration Hub (SD-193).
+ */
+export interface KycScreeningRequested {
+  partyInstanceReference: string;
+}
+
+/**
+ * @event    kyc.screening.completed
+ * @producer callback.kyc  @consumer Onboarding UI, compliance/audit
+ * Carries the provider-produced KYC verdict persisted on customerAgreementKycCheck.
+ */
+export interface KycScreeningCompleted {
+  partyInstanceReference: string;
+  outcome: 'completed' | 'error';
+  riskScore?: number;
+  riskRating?: 'low' | 'medium' | 'high';
+  pepStatus?: boolean;
+  sanctionsResult?: 'clear' | 'hit' | 'pending';
+  screeningProviderRef?: string;
+}
+
 // ── merchant_onboarding (KYB) ─────────────────────────────────────────────────
 
 /**

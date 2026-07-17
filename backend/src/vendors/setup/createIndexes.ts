@@ -134,10 +134,13 @@ export async function createIndexes(client: MongoClient) {
   ]);
 
   // SD-53: Customer Agreement Procedure
+  // v27: helper index on the plaintext KYC status (NOT a QE field). QE-encrypted KYC leaves
+  // (riskScore, riskRating, etc.) are searched via QE and must NOT carry btree/unique indexes.
   await ensureIndexes(db, 'customerAgreementProcedure', [
     { key: { customerAgreementInstanceReference: 1 }, unique: true },
     { key: { partyInstanceReference: 1 } },
     { key: { customerAgreementStatus: 1 } },
+    { key: { 'customerAgreementKycCheck.customerAgreementKycCheckStatus': 1 } },
   ]);
 
   // SD-88: Payment Card Management (the per-customer card-on-file arrangement).

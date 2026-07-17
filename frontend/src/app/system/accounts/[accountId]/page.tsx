@@ -171,6 +171,10 @@ export default function AccountDetailPage() {
   const [account, setAccount] = useState<PayoutAccount | null>(null);
   const [ready, setReady] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  // v27 staff-target mode: an investigator/auditor inspecting a found customer's account. Read-only
+  // (no account mutations); partyRef comes from the query, not the caller's JWT. Server re-enforces.
+  const [staffMode, setStaffMode] = useState(false);
+  const [staffCustomerId, setStaffCustomerId] = useState<string | null>(null);
 
   // Edit state
   const [editOpen, setEditOpen] = useState(false);
@@ -248,8 +252,27 @@ export default function AccountDetailPage() {
   }, [accountId, loadMovements]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const t = getToken() ?? '';
     const decoded = t ? decodeToken(t) : null;
+    const role = decoded?.role;
+    const sp = new URLSearchParams(window.location.search);
+    const isStaffCtx = sp.get('ctx') === 'staff'
+      && (role === 'level2_investigator' || role === 'security_auditor');
+
+    if (isStaffCtx) {
+      // Staff read the target party's account (partyRef supplied by the profile drill-down).
+      const pRef = sp.get('partyRef') ?? '';
+      if (!t || !pRef) { router.replace('/system'); return; }
+      setToken(t);
+      setPartyRef(pRef);
+      setStaffMode(true);
+      setStaffCustomerId(sp.get('customerId'));
+      load(t, pRef).finally(() => setReady(true));
+      return;
+    }
+
+    // Self-service is unchanged: partyRef from the caller's JWT.
     const pRef = decoded?.partyRef ?? '';
     if (!t || !pRef) { router.replace('/system'); return; }
     setToken(t);
@@ -397,11 +420,18 @@ export default function AccountDetailPage() {
   const cardStatusKeys = Array.from(new Set(linkedCards.map((c) => c.paymentCardStatus)));
 
   const accountLabel = account?.payoutAccountAlias || account?.payoutAccountBankName || 'Account';
-  const crumbs: Crumb[] = [
-    { label: 'Home', href: '/system' },
-    { label: 'Accounts', href: '/system/accounts' },
-    { label: accountLabel },
-  ];
+  const crumbs: Crumb[] = staffMode
+    ? [
+        { label: 'Home', href: '/system' },
+        { label: 'Users', href: '/system/users' },
+        { label: 'Customer', href: staffCustomerId ? `/system/users/${staffCustomerId}` : '/system/users' },
+        { label: accountLabel },
+      ]
+    : [
+        { label: 'Home', href: '/system' },
+        { label: 'Accounts', href: '/system/accounts' },
+        { label: accountLabel },
+      ];
 
   const dirty =
     alias !== (account?.payoutAccountAlias ?? '') ||
@@ -519,7 +549,7 @@ export default function AccountDetailPage() {
               <div className="bg-white rounded-xl border p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Bank details</h2>
-                  {!editOpen ? (
+                  {staffMode ? null : !editOpen ? (
                     <button
                       onClick={() => setEditOpen(true)}
                       className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors"
@@ -754,7 +784,9 @@ export default function AccountDetailPage() {
               ) : (
                 <div className="divide-y">
                   {movPaginated.map((m) => {
-                    const linkable = LINKABLE_MOVEMENT_TYPES.has(m.movementType);
+                    // Movement detail resolves at a self-service route, so it is non-linkable in
+                    // staff-target mode (staff account view stays read-only within the profile flow).
+                    const linkable = !staffMode && LINKABLE_MOVEMENT_TYPES.has(m.movementType);
                     const inner = (
                       <>
                         <div className="flex items-start gap-3 min-w-0">
@@ -883,7 +915,7 @@ export default function AccountDetailPage() {
                   {cardPaginated.map((c) => (
                     <Link
                       key={c.paymentCardInstanceReference}
-                      href={`/system/cards/${c.paymentCardInstanceReference}`}
+                      href={`/system/cards/${c.paymentCardInstanceReference}${staffMode ? `?ctx=staff&customerId=${encodeURIComponent(staffCustomerId ?? '')}&partyRef=${encodeURIComponent(partyRef)}` : ''}`}
                       className="flex items-center justify-between py-3 hover:bg-gray-50 -mx-5 px-5 transition-colors group"
                     >
                       <div className="flex items-center gap-3">
@@ -926,8 +958,8 @@ export default function AccountDetailPage() {
               )}
             </div>
 
-            {/* Danger zone */}
-            {account.payoutAccountStatus !== 'closed' && (
+            {/* Danger zone. Hidden in staff-target mode (staff account view is strictly read-only). */}
+            {!staffMode && account.payoutAccountStatus !== 'closed' && (
               <div className="bg-white rounded-xl border border-red-200 p-5 space-y-3">
                 <div className="flex items-center gap-2">
                   <Trash2 size={14} className="text-red-500" />

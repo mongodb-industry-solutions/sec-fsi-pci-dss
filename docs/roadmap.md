@@ -748,3 +748,43 @@ with an enrolled device key. Real software authenticator (browser WebCrypto), no
 - [ ] Follow-ups: downstream v25 merchant-app passwordless UX; AAL2 platform UV; CIBA payment authorization + PSD2 dynamic linking.
 
 *Added 2026-07-09 (v24).*
+
+## v27 — KYC Field Expansion + Queryable Encryption Search Showcase
+
+> Delivered under **development plan v27** (`tmp/dev.v27.plan.md`). Extends the KYC (CDD) data
+> model with structured identity attributes and uses them to demonstrate every QE search type
+> (equality, range, substring, prefix, suffix) over encrypted GDPR PII. No card/PAN data is ever
+> placed in a searchable QE field. See technical-spec §1/§2.1/§5.
+
+### Objective
+Give analysts real searches (range / substring / prefix / suffix / equality) directly against
+encrypted fields, with the server never seeing plaintext, while staying aligned with BIAN
+(SD-13 / SD-53), PCI DSS, GDPR (Art. 5/32) and PSD2.
+
+### FR-v27: Functional Requirements
+
+| ID | Requirement | Acceptance criteria |
+|---|---|---|
+| FR-v27-01 | Substring search | `partyName` is `QE:substring` (lookup tier). A "contains" query (case/diacritic-insensitive, min length 3) returns matching parties over encrypted data. |
+| FR-v27-02 | Range search (date) | `partyDateOfBirth` stored as BSON Date, `QE:range`. Born-between queries return the expected rows; seed spreads DOB across 1950–2005. |
+| FR-v27-03 | Range search (int) | `customerAgreementKycCheckRiskScore` is `QE:range` int 0–100. `> 70` returns high-risk rows; seed spreads scores across the boundary. |
+| FR-v27-04 | Range search (expiry) | `customerAgreementGovernmentID.expiryDate` is `QE:range` date. "Expiring in next 90 days" returns rows; seed places some expiries within 90 days. |
+| FR-v27-05 | Prefix search | `customerAgreementTaxIDNumber` is `QE:prefix` (min length 2). "Starts with ES" returns rows; seed makes some TINs start with `ES`. |
+| FR-v27-06 | Suffix search | `customerAgreementGovernmentID.number` is `QE:suffix` (min length 3). "Ends with 4821" returns rows; seed makes some numbers end in `4821`. |
+| FR-v27-07 | Equality (contention) | `partyNationality`, `partyPlaceOfBirth`, `customerAgreementGovernmentID.type`/`.issuingCountry`, `customerAgreementOccupation`, KYC `RiskRating`/`PepStatus`/`SanctionsResult` are `QE:equality` with explicit contention (frequency-analysis guard). Both PEP values present in seed. |
+| FR-v27-08 | Tier access control | `QE:none` fields (`customerAgreementSourceOfFunds`, `customerAgreementPurposeOfRelationship`, `...ScreeningProviderRef`) decrypt only for the L2 client; L1 receives Binary (stripped). Searchable fields decrypt for L1 + L2. |
+| FR-v27-09 | Auth unaffected | `partyEmailAddress` / `partyMobilePhoneNumber` remain `QE:equality`; login and exact lookup regression-safe. |
+| FR-v27-10 | Text-search gating | `PSP_QE_TEXT_SEARCH=false` degrades substring/prefix/suffix to `QE:equality` (contention 8) so setup succeeds on pre-8.2 clusters without losing encryption or lookup-tier access. |
+| FR-v27-11 | Seed completeness | `--reset` + reseed leaves no new field unset (rows 1–20 of plan §3). Enrichment is deterministic (stable across reseeds) and idempotent (JSON-provided values win). |
+
+### Definition of Done — v27 (Phases 0–3)
+- [x] All new field names BIAN-prefixed (`party*` / `customerAgreement*` / `customerAgreementKycCheck*`).
+- [x] One DEK per encrypted field (16 new DEKs); nested QE leaves under plaintext parent sub-docs.
+- [x] Explicit `contention` on all low-cardinality `QE:equality` fields.
+- [x] No PAN/CHD in any searchable QE field; no unique index on any QE field.
+- [x] Plaintext helper index on `customerAgreementKycCheck.customerAgreementKycCheckStatus` only.
+- [x] `technical-spec.md` §1/§2.1/§5 + seeders + setup updated in the same change.
+- [x] Backend `tsc --noEmit` clean (incl. DOB → Date change).
+- [ ] Phases 4–6 (search API/service, per-role UI, HRP provider) tracked in `tmp/dev.v27.plan.md`.
+
+*Added 2026-07-16 (v27, Phases 0–3).*

@@ -15,7 +15,13 @@ vi.mock('../../../../backend/src/modules/provider/services/businessProcessEvent.
   emitProcessEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { createFraudCase, getCases, getCaseById } from '../../../../backend/src/modules/fraud/services/fraudDiagnosis.service';
+// createNotification is a fire-and-forget side effect at the end of createFraudCase. Stub it so the
+// execution-open tests focus on the case + link writes.
+vi.mock('../../../../backend/src/modules/notification/notifications.service', () => ({
+  createNotification: vi.fn().mockResolvedValue(undefined),
+}));
+
+import { createFraudCase, getCases, getCaseById, openCaseFromExecution } from '../../../../backend/src/modules/fraud/services/fraudDiagnosis.service';
 
 // Minimal transaction snapshot embedded in every fraud case (BIAN SD-254).
 const snapshot = {
@@ -131,6 +137,103 @@ describe('getCases', () => {
     const db = makeDb({ findResults: [], total: 0 });
     await getCases(db, {}, 1, 10);
     expect(db.collection().find).toHaveBeenCalledWith({});
+  });
+});
+
+describe('openCaseFromExecution (SD-65 transfer)', () => {
+  const exec = {
+    paymentExecutionInstanceReference: 'exec-777',
+    initiatorPartyReference: 'party-1',
+    grossAmount: 850,
+    currency: 'USD',
+    paymentExecutionRail: 'sepa',
+    paymentExecutionStatus: 'completed',
+    beneficiaryName: 'Jane Roe',
+    destinationAccountMasked: 'ES12••••5477',
+    destinationIban: 'SHOULD-NEVER-APPEAR',
+    initiatedAt: new Date(),
+    recordCreatedDateTime: new Date(),
+  };
+
+  // Multi-collection mock: routes findOne/insertOne/updateOne per collection name and records writes.
+  function makeExecDb(opts?: { dedup?: unknown; exec?: unknown; agreementUuid?: string }) {
+    const writes = { inserts: [] as Array<{ name: string; doc: any }>, updates: [] as Array<{ name: string; filter: any; update: any }> };
+    let createdCase: any = null;
+
+    const collection = vi.fn((name: string) => ({
+      findOne: vi.fn((filter: any) => {
+        if (name === 'fraudDiagnosisCase') {
+          // dedup query carries paymentExecutionInstanceReference + status; getCaseById carries the instance ref.
+          if (filter?.paymentExecutionInstanceReference && filter?.fraudDiagnosisCaseStatus) return Promise.resolve(opts?.dedup ?? null);
+          return Promise.resolve(createdCase);
+        }
+        if (name === 'paymentExecutionProcedure') return Promise.resolve(opts && 'exec' in opts ? opts.exec : exec);
+        if (name === 'customerAgreementProcedure') {
+          // Service derives the agreement by party; createFraudCase notification lookup also hits this.
+          if (filter?.partyInstanceReference) return Promise.resolve(opts?.agreementUuid ? { customerAgreementInstanceReference: opts.agreementUuid } : null);
+          return Promise.resolve(null);
+        }
+        return Promise.resolve(null);
+      }),
+      insertOne: vi.fn((doc: any) => {
+        writes.inserts.push({ name, doc });
+        if (name === 'fraudDiagnosisCase') createdCase = doc; // getCaseById reads it back
+        return Promise.resolve({ insertedId: 'x' });
+      }),
+      updateOne: vi.fn((filter: any, update: any) => {
+        writes.updates.push({ name, filter, update });
+        if (name === 'fraudDiagnosisCase' && createdCase && update?.$set) Object.assign(createdCase, update.$set);
+        return Promise.resolve({ modifiedCount: 1 });
+      }),
+      findOneAndUpdate: vi.fn().mockResolvedValue({ _id: 'caseRefSeq', seq: 1 }),
+      find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }),
+    }));
+
+    return { db: { collection } as any, writes };
+  }
+
+  it('creates a case and links the SD-65 execution (paymentExecutionInstanceReference + transactionKind p2p)', async () => {
+    const { db, writes } = makeExecDb({ agreementUuid: 'cust-uuid-1' });
+    const res = await openCaseFromExecution(db, 'exec-777', 'suspicious transfer');
+    expect('notFound' in res).toBe(false);
+    if ('notFound' in res) return;
+    expect(res.alreadyExisted).toBe(false);
+    expect(res.fraudDiagnosisInstanceReference).toMatch(/^[0-9a-f-]{36}$/);
+
+    const link = writes.updates.find((u) => u.name === 'fraudDiagnosisCase' && u.update?.$set?.paymentExecutionInstanceReference);
+    expect(link).toBeTruthy();
+    expect(link!.update.$set.paymentExecutionInstanceReference).toBe('exec-777');
+    expect(link!.update.$set.transactionKind).toBe('p2p');
+  });
+
+  it('derives the customer agreement from the initiator party', async () => {
+    const { db, writes } = makeExecDb({ agreementUuid: 'cust-uuid-1' });
+    await openCaseFromExecution(db, 'exec-777', undefined);
+    const caseDoc = writes.inserts.find((i) => i.name === 'fraudDiagnosisCase');
+    expect(caseDoc!.doc.customerAgreementInstanceReference).toBe('cust-uuid-1');
+    expect(caseDoc!.doc.cardTransactionInstanceReference).toBe('exec-777');
+  });
+
+  it('builds a display-safe snapshot with NO raw IBAN', async () => {
+    const { db, writes } = makeExecDb({ agreementUuid: 'cust-uuid-1' });
+    await openCaseFromExecution(db, 'exec-777', undefined);
+    const caseDoc = writes.inserts.find((i) => i.name === 'fraudDiagnosisCase')!.doc;
+    const serialized = JSON.stringify(caseDoc.transactionSnapshot);
+    expect(serialized).not.toContain('SHOULD-NEVER-APPEAR');
+    expect(caseDoc.transactionSnapshot.cardTransactionMaskedPanDisplay).toBe('ES12••••5477');
+  });
+
+  it('dedups: returns an existing non-resolved case without creating a duplicate', async () => {
+    const { db, writes } = makeExecDb({ dedup: { fraudDiagnosisInstanceReference: 'case-existing', fraudDiagnosisCaseReference: 'FD-2026-000009' } });
+    const res = await openCaseFromExecution(db, 'exec-777', undefined);
+    expect(res).toEqual({ fraudDiagnosisInstanceReference: 'case-existing', fraudDiagnosisCaseReference: 'FD-2026-000009', alreadyExisted: true });
+    expect(writes.inserts.some((i) => i.name === 'fraudDiagnosisCase')).toBe(false);
+  });
+
+  it('returns notFound when the execution does not exist', async () => {
+    const { db } = makeExecDb({ exec: null });
+    const res = await openCaseFromExecution(db, 'missing', undefined);
+    expect(res).toEqual({ notFound: true });
   });
 });
 

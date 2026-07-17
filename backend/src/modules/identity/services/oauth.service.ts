@@ -796,28 +796,48 @@ export async function listMerchantAuthorizations(
   return { authorizations, total, page, limit };
 }
 
+// v27: resolve a party's OAuth subject (customerAuthenticationInstanceReference == PartyAuthConsent
+// partyAuthenticationInstanceReference) from its SD-13 partyInstanceReference. Lets staff query/revoke
+// a found customer's authorized apps by party ref without the client sending the auth subject. Returns
+// null when the party has no authentication identity (e.g. a party that never enrolled to log in).
+export async function resolveSubForParty(db: Db, partyRef: string): Promise<string | null> {
+  if (!partyRef) return null;
+  const auth = await db
+    .collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
+    .findOne({ partyInstanceReference: partyRef }, { projection: { customerAuthenticationInstanceReference: 1 } });
+  return auth?.customerAuthenticationInstanceReference ?? null;
+}
+
 export async function revokeConsentGrant(
   db: Db,
   sub: string,
   consentId: string,
   revokedBy: 'user' | 'merchant' | 'psp' = 'user',
+  opts?: { staffOverride?: boolean },
 ): Promise<void> {
+  // Self-scoped by default (a foreign consentId 404s so existence is not leaked). A staff override
+  // (v27: L2 investigator revoking a grant they do not own) matches by consentId only; the grant's
+  // OWN subject is then used for token revocation, never the acting staff's sub.
+  const filter = opts?.staffOverride
+    ? { consentId }
+    : { consentId, partyAuthenticationInstanceReference: sub };
   const consent = await db
     .collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION)
-    .findOne({ consentId, partyAuthenticationInstanceReference: sub });
+    .findOne(filter);
 
   if (!consent) throw Object.assign(new Error('Consent grant not found'), { statusCode: 404 });
   if (consent.consentStatus === 'revoked') return;
 
+  const ownerSub = consent.partyAuthenticationInstanceReference;
   const now = new Date();
   await db.collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION).updateOne(
     { consentId },
     { $set: { consentStatus: 'revoked', consentRevokedAt: now, consentRevokedBy: revokedBy, recordUpdatedDateTime: now } },
   );
 
-  // Revoke all active tokens for this user+client
+  // Revoke all active tokens for the grant's OWN user + client (not the acting caller).
   await db.collection<PartyIssuedTokenRecord>(PARTY_ISSUED_TOKEN_COLLECTION).updateMany(
-    { sub, clientId: consent.oauthClientId, revokedAt: { $exists: false } },
+    { sub: ownerSub, clientId: consent.oauthClientId, revokedAt: { $exists: false } },
     { $set: { revokedAt: now } },
   );
 
@@ -825,7 +845,7 @@ export async function revokeConsentGrant(
   new WebhookService(db).dispatch( consent.merchantAgreementInstanceReference, 'oauth.authorization_revoked', {
     consentId,
     clientId: consent.oauthClientId,
-    subject: sub,
+    subject: ownerSub,
     scopes: consent.grantedScopes,
     revokedAt: now.toISOString(),
     revokedBy,

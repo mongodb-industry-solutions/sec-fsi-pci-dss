@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { getByEmail, getByPhone, getByAccountRef, getByInstanceReference } from '../services/customerAgreement.service';
+import { getByEmail, getByPhone, getByAccountRef, getByInstanceReference, getKycSearchRegistry, searchKyc, canRunKycSearch } from '../services/customerAgreement.service';
 import type { AuthenticatedRequest, JwtUserPayload } from '../../../shared/models/identity.model';
 
 // Acting user (unique id + name) from the JWT — recorded in the sensitive-access audit event
@@ -154,6 +154,79 @@ caller has the DEK-sensitive key, i.e. \`level2_investigator\` role.`,
     }
 
     return reply.status(400).send({ error: 'Provide email, phone, or accountRef query parameter' });
+  });
+
+  // GET /api/v1/customer/search/fields
+  // v27: field registry for the encrypted-KYC search UI. Reflects the active text-search gating
+  // (substring/prefix/suffix vs equality fallback) and which result fields are L2-only. API-first:
+  // the client renders only these fields and enforces nothing the server does not.
+  fastify.get('/search/fields', {
+    schema: {
+      tags: ['customer'],
+      summary: 'List QE-searchable KYC fields and their query modes',
+      description: 'Restricted to level2_investigator and security_auditor (least-privilege, PCI DSS Req 7). Level 1 analysts use the blind single-record lookup only.',
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: { type: 'object', additionalProperties: true },
+        401: { $ref: 'Error#' },
+        403: { description: 'KYC attribute search is restricted to investigator and auditor roles.', $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const { userRole } = request as unknown as AuthenticatedRequest;
+    if (!canRunKycSearch(userRole)) {
+      return reply.status(403).send({ error: 'KYC attribute search is restricted to investigator and auditor roles' });
+    }
+    return reply.send(getKycSearchRegistry());
+  });
+
+  // POST /api/v1/customer/search
+  // v27: run one QE search (equality/range/substring/prefix/suffix) over an encrypted KYC field.
+  // The server validates field, mode, length and bounds, encrypts the value locally and matches
+  // over ciphertext in Atlas. Results are tier-shaped (QE:none sensitive block only for L2/auditor).
+  fastify.post('/search', {
+    schema: {
+      tags: ['customer'],
+      summary: 'Search customers over encrypted KYC fields (Queryable Encryption showcase)',
+      description: `Runs a single QE search over one encrypted KYC field. The field and its
+allowed query mode come from \`GET /customer/search/fields\`. The API encrypts the query
+value locally; Atlas matches over ciphertext and never sees plaintext. Disallowed fields or
+malformed values are rejected with 400 (never silently dropped). Sensitive QE:none result
+fields are returned only to \`level2_investigator\` (with escalation token) and \`security_auditor\`.`,
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['field'],
+        properties: {
+          field: { type: 'string', description: 'Registry field key, e.g. partyName, taxId, riskScore.' },
+          value: { type: 'string', description: 'Search value for equality / substring / prefix / suffix modes.' },
+          from:  { type: 'string', description: 'Range lower bound (ISO date or number).' },
+          to:    { type: 'string', description: 'Range upper bound (ISO date or number).' },
+          limit: { type: 'number', description: 'Max rows (1-100, default 50).' },
+        },
+      },
+      response: {
+        200: { type: 'object', additionalProperties: true },
+        400: { description: 'Unknown field or malformed query.', $ref: 'Error#' },
+        401: { $ref: 'Error#' },
+        403: { description: 'Level 2 access requires a valid X-Escalation-Token header.', $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const body = request.body as { field: string; value?: string; from?: string; to?: string; limit?: number };
+    const { userRole, escalationToken } = request as unknown as AuthenticatedRequest;
+    try {
+      const rows = await searchKyc(
+        { field: body.field, value: body.value, from: body.from, to: body.to },
+        userRole, escalationToken, actorOf(request), body.limit ?? 50,
+      );
+      return reply.send({ field: body.field, count: rows.length, results: rows });
+    } catch (err) {
+      const e = err as { statusCode?: number; message?: string };
+      if (e.statusCode === 400) return reply.status(400).send({ error: e.message ?? 'Bad request' });
+      if (e.statusCode === 403) return reply.status(403).send({ error: e.message ?? 'Forbidden' });
+      throw err;
+    }
   });
 
   // GET /api/v1/customer/by-id/:id

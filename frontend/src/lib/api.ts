@@ -526,6 +526,118 @@ export interface SavedCardDisplay {
   paymentCardIsPreferred?: boolean;
 }
 
+// v27: staff investigation view of a customer's aggregated activity. Display-safe union row
+// (transfer/card); never CHD, raw IBAN or gateway payload. Mirrors the backend ActivityRow.
+export interface CustomerTransactionRow {
+  kind: 'transfer' | 'card';
+  paymentExecutionInstanceReference: string;
+  direction: 'sent' | 'received';
+  grossAmount?: number;
+  netAmount?: number;
+  feeAmount?: number;
+  currency?: string;
+  paymentExecutionRail: string | null;
+  paymentExecutionStatus: string;
+  concept: string | null;
+  beneficiaryName: string | null;
+  destinationAccountMasked: string | null;
+  initiatedAt: string | null;
+  completedAt: string | null;
+}
+
+// v27: one resolution step of an SD-65 payment execution (routing/settlement log). Display-safe.
+export interface PaymentExecutionResolutionStep {
+  stepName: string;
+  stepOutcome: 'found' | 'not_found' | 'fallback' | 'failed';
+  stepNote?: string;
+  stepDateTime: string;
+}
+
+// v27: display-safe SD-65 execution detail for the staff drill-down (no CHD, no raw IBAN).
+// Mirrors the backend ExecutionDetail returned by GET /customer/:customerId/transactions/:executionId.
+export interface ExecutionDetail {
+  kind: 'transfer';
+  paymentExecutionInstanceReference: string;
+  direction: 'sent' | 'received';
+  beneficiaryType: string;
+  initiatorPartyReference: string | null;
+  beneficiaryPartyReference: string | null;
+  sourcePayoutAccountReference: string | null;
+  resolvedPayoutAccountReference: string | null;
+  beneficiaryArrangementReference: string | null;
+  merchantAgreementReference: string | null;
+  grossAmount: number;
+  netAmount: number;
+  feeAmount: number;
+  currency: string;
+  recipientCurrency: string | null;
+  recipientAmount: number | null;
+  fxRate: number | null;
+  paymentExecutionRail: string | null;
+  paymentExecutionStatus: string;
+  concept: string | null;
+  beneficiaryName: string | null;
+  destinationAccountMasked: string | null;
+  destinationCountry: string | null;
+  failureReason: string | null;
+  resolutionLog: PaymentExecutionResolutionStep[];
+  initiatedAt: string | null;
+  completedAt: string | null;
+}
+
+// v27: Encrypted-KYC search (Queryable Encryption showcase). Field registry + tier-shaped results.
+export type KycSearchMode = 'substring' | 'prefix' | 'suffix' | 'range' | 'equality';
+
+export interface KycSearchFieldDef {
+  key: string;
+  label: string;
+  mode: KycSearchMode;                     // effective mode (text modes degrade to equality pre-8.2)
+  bsonType: 'string' | 'date' | 'int' | 'bool';
+  minQueryLength?: number;
+  maxQueryLength?: number;
+  rangeMin?: number | string;
+  rangeMax?: number | string;
+  enumValues?: Array<string | boolean>;
+}
+
+export interface KycSearchFieldsResponse {
+  textSearchEnabled: boolean;
+  fields: KycSearchFieldDef[];
+  sensitiveResultFields: string[];
+}
+
+export interface KycSearchResult {
+  customerAgreementInstanceReference: string;
+  partyInstanceReference: string;
+  customerName: string;
+  customerEmailAddress?: string;           // L2 (with token) / auditor only
+  customerMobilePhoneNumber?: string;      // L2 (with token) / auditor only
+  customerAgreementReference: string;
+  customerSegment?: string;
+  customerAgreementStatus?: string;
+  customerAgreementKycCheck?: Record<string, unknown> | null;
+  contactPiiRestricted: boolean;
+  sensitive?: {
+    customerAgreementResidentialAddress?: unknown;
+    governmentIdentificationReference?: unknown;
+    customerAgreementRiskNotes?: unknown;
+  };
+}
+
+export interface KycSearchResponse {
+  field: string;
+  count: number;
+  results: KycSearchResult[];
+}
+
+export interface KycSearchBody {
+  field: string;
+  value?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
 export const api = {
   acl: {
     effective: (token: string) =>
@@ -688,6 +800,21 @@ export const api = {
   },
 
   customer: {
+    // v27: encrypted-KYC search. The field registry drives which controls the UI renders;
+    // the search runs QE over ciphertext server-side. Sensitive result fields are returned
+    // only to L2 (with a valid escalation token) / auditor — the server is the boundary.
+    searchFields: (token: string) =>
+      apiFetch<KycSearchFieldsResponse>('/api/v1/customer/search/fields', {}, token),
+    search: (body: KycSearchBody, token: string, escalationToken?: string) =>
+      apiFetch<KycSearchResponse>(
+        '/api/v1/customer/search',
+        {
+          method: 'POST',
+          body: JSON.stringify(body),
+          ...(escalationToken ? { headers: { 'X-Escalation-Token': escalationToken } } : {}),
+        },
+        token,
+      ),
     getByEmail: (email: string, token: string) =>
       apiFetch<Record<string, unknown>>(
         `/api/v1/customer?email=${encodeURIComponent(email)}`, {}, token
@@ -713,6 +840,16 @@ export const api = {
       apiFetch<{ results: Record<string, unknown>[] }>(
         `/api/v1/customer/${encodeURIComponent(customerId)}/cards`, {}, token
       ),
+    // v27: staff investigation view of a customer's aggregated transactions (SD-65 + SD-254),
+    // display-safe and paginated. Restricted server-side to level2_investigator / security_auditor.
+    transactions: (customerId: string, params: { page?: number; limit?: number }, token: string) => {
+      const qs = new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])
+      ).toString();
+      return apiFetch<{ results: CustomerTransactionRow[]; total: number; page: number; limit: number }>(
+        `/api/v1/customer/${encodeURIComponent(customerId)}/transactions${qs ? `?${qs}` : ''}`, {}, token
+      );
+    },
     // The AUTHENTICATED caller's OWN saved cards (display-safe). The agreement is resolved server-side
     // from the token (partyRef) — never a client-supplied id — so a caller only ever sees their own
     // cards. Used by the hosted payment pages to offer a saved-card pick to the signed-in viewer.
@@ -768,6 +905,15 @@ export const api = {
       apiFetch<{ removed: boolean }>(
         `/api/v1/customer/${encodeURIComponent(customerId)}/cards/${encodeURIComponent(cardId)}`,
         { method: 'DELETE' },
+        token
+      ),
+    // v27 staff drill-down: display-safe SD-65 execution detail of ONE transfer belonging to a
+    // customer. Restricted server-side to level2_investigator / security_auditor (else 403); a
+    // transfer not belonging to the customer's party returns 404. Never returns the raw IBAN.
+    transactionDetail: (customerId: string, executionId: string, token: string) =>
+      apiFetch<ExecutionDetail>(
+        `/api/v1/customer/${encodeURIComponent(customerId)}/transactions/${encodeURIComponent(executionId)}`,
+        {},
         token
       ),
   },
@@ -892,7 +1038,8 @@ export const api = {
         { method: 'DELETE', body: JSON.stringify(body) },
         token
       ),
-    open: (body: { transactionId: string; reason?: string }, token: string) =>
+    // Open a case from EXACTLY ONE of a card transaction (transactionId) or an SD-65 transfer (executionId).
+    open: (body: { transactionId?: string; executionId?: string; reason?: string }, token: string) =>
       apiFetch<{ fraudDiagnosisInstanceReference: string; fraudDiagnosisCaseReference: string; alreadyExisted: boolean }>(
         '/api/v1/fraud',
         { method: 'POST', body: JSON.stringify(body) },
@@ -1297,9 +1444,60 @@ export const api = {
     // Revoked grants are kept; filter with status (active | revoked | all, default all).
     list: (token: string, status: 'active' | 'revoked' | 'all' = 'all') =>
       apiFetch<{ grants: ConsentGrant[] }>(`/api/v1/auth/grants?status=${status}`, {}, token),
+    // v27 staff view: list a found customer's authorized apps by their partyInstanceReference.
+    // Restricted server-side to level2_investigator / security_auditor (else 403). Reuses ConsentGrant.
+    listForParty: (partyRef: string, token: string, status: 'active' | 'revoked' | 'all' = 'all') =>
+      apiFetch<{ grants: ConsentGrant[] }>(
+        `/api/v1/auth/grants?partyRef=${encodeURIComponent(partyRef)}&status=${status}`, {}, token
+      ),
+    // v27 staff action: revoke a grant the caller does NOT own. level2_investigator only (audited).
+    revokeForParty: (consentId: string, partyRef: string, token: string) =>
+      apiFetch<{ revoked: boolean; consentId: string }>(
+        `/api/v1/auth/grants/${encodeURIComponent(consentId)}?partyRef=${encodeURIComponent(partyRef)}`,
+        { method: 'DELETE' },
+        token,
+      ),
     // v18 D-01: detail of one authorized app (scopes with descriptions, approval date/time, branding).
     getDetail: (consentId: string, token: string) =>
       apiFetch<ConsentGrantDetail>(`/api/v1/auth/grants/${encodeURIComponent(consentId)}`, {}, token),
+    // v27 staff view: detail of a grant owned by a found customer's party. Restricted server-side to
+    // level2_investigator / security_auditor (else 403). Same shape as getDetail.
+    getDetailForParty: (consentId: string, partyRef: string, token: string) =>
+      apiFetch<ConsentGrantDetail>(
+        `/api/v1/auth/grants/${encodeURIComponent(consentId)}?partyRef=${encodeURIComponent(partyRef)}`,
+        {}, token
+      ),
+    // v27 staff view: operations a found customer's party executed through this app. Restricted
+    // server-side to level2_investigator / security_auditor (else 403). Same shape as getOperations.
+    operationsForParty: (
+      consentId: string,
+      partyRef: string,
+      filters: { q?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number },
+      token: string,
+    ) => {
+      const qs = new URLSearchParams(
+        Object.entries(filters).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+      );
+      qs.set('partyRef', partyRef);
+      return apiFetch<{
+        events: Array<{
+          id: string;
+          eventDateTime: string;
+          processType: string;
+          processAction: string;
+          processOutcome: string;
+          entityType: string;
+          entityId: string;
+          clientId?: string;
+          actingPartyReference?: string;
+          actingChannel?: string;
+          summary?: Record<string, unknown>;
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/auth/grants/${encodeURIComponent(consentId)}/operations?${qs.toString()}`, {}, token);
+    },
     // v18 D-02: operations the caller executed through this app (display-safe). Filter + paginate.
     getOperations: (
       consentId: string,

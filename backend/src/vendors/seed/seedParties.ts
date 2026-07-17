@@ -15,6 +15,20 @@ const PHONE_PREFIX_COUNTRY: Array<[string, string]> = [
   ['+49', 'DE'], ['+48', 'PL'], ['+52', 'MX'], ['+234', 'NG'], ['+351', 'PT'],
 ];
 
+// Place-of-birth city pools per country (v27, deterministic; QE:equality demo).
+const PLACE_OF_BIRTH_POOLS: Record<string, string[]> = {
+  ES: ['Madrid', 'Barcelona', 'Sevilla', 'Valencia'],
+  GB: ['London', 'Manchester', 'Bristol'],
+  US: ['New York', 'San Francisco', 'Chicago'],
+  FR: ['Paris', 'Lyon'],
+  IT: ['Roma', 'Milano'],
+  DE: ['Berlin', 'Munich'],
+  PL: ['Warszawa', 'Kraków'],
+  MX: ['Ciudad de México', 'Guadalajara'],
+  NG: ['Lagos', 'Abuja'],
+  PT: ['Lisboa', 'Porto'],
+};
+
 // Realistic address pools per country (street + city + postal format).
 const ADDRESS_POOLS: Record<string, PartyPostalAddress[]> = {
   ES: [
@@ -56,28 +70,37 @@ function inferCountry(phone: string | undefined): string {
   return 'ES'; // .es digital bank — default residence
 }
 
-interface PartySeedRecord {
+export interface PartySeedRecord {
   partyInstanceReference: string;
   partyMobilePhoneNumber?: string;
   partyMobilePhoneNumberDigest?: string;
-  partyDateOfBirth?: string;
+  partyDateOfBirth?: Date | string;
   partyNationality?: string;
+  partyPlaceOfBirth?: string;
   partyPostalAddress?: PartyPostalAddress;
   [key: string]: unknown;
 }
 
-function enrichDemographics(record: PartySeedRecord): void {
+export function enrichDemographics(record: PartySeedRecord): void {
   const seed = hash(record.partyInstanceReference);
   const country = record.partyNationality ?? inferCountry(record.partyMobilePhoneNumber);
 
   if (!record.partyNationality) record.partyNationality = country;
 
+  if (!record.partyPlaceOfBirth) {
+    const cities = PLACE_OF_BIRTH_POOLS[country] ?? PLACE_OF_BIRTH_POOLS.ES;
+    record.partyPlaceOfBirth = cities[(seed >>> 9) % cities.length];
+  }
+
   if (!record.partyDateOfBirth) {
-    // Deterministic DOB in the 1965–1999 range (age ~27–61 at 2026).
-    const year = 1965 + (seed % 35);
-    const month = (seed >> 3) % 12 + 1;
-    const day = (seed >> 6) % 28 + 1;
-    record.partyDateOfBirth = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    // Deterministic DOB spread across decades 1950–2005 (QE:range demo). Stored as BSON Date.
+    const year = 1950 + (seed % 56);
+    const month = (seed >>> 3) % 12 + 1;
+    const day = (seed >>> 6) % 28 + 1;
+    record.partyDateOfBirth = new Date(Date.UTC(year, month - 1, day));
+  } else if (typeof record.partyDateOfBirth === 'string') {
+    // JSON-provided DOB wins but must be stored as a BSON Date for QE:range.
+    record.partyDateOfBirth = new Date(record.partyDateOfBirth);
   }
 
   if (!record.partyPostalAddress) {

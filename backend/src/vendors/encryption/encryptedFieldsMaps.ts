@@ -1,4 +1,11 @@
 import { DEKs } from './keyVault';
+import { config } from '../../config';
+
+// QE text-search preview query types (MongoDB 8.2 preview / mongodb-client-encryption 7.2).
+// If a spike shows different identifiers, change ONLY these three constants.
+const QT_SUBSTRING = 'substringPreview';
+const QT_PREFIX = 'prefixPreview';
+const QT_SUFFIX = 'suffixPreview';
 
 /**
  * Access tier for QE client pools (v2).
@@ -16,8 +23,20 @@ import { DEKs } from './keyVault';
  */
 export type QETier = 'level1' | 'level2';
 
-export function buildEncryptedFieldsMaps(deks: DEKs, tier: QETier = 'level2') {
+export function buildEncryptedFieldsMaps(
+  deks: DEKs,
+  tier: QETier = 'level2',
+  textSearch: boolean = config.qe.textSearch,
+) {
   const includeSensitive = tier === 'level2';
+
+  // Text-search query object, gated by textSearch. On pre-8.2 clusters the field degrades
+  // to QE:equality (still encrypted, still lookup-tier, exact-match searchable).
+  const textQuery = (
+    qt: string,
+    params: Record<string, unknown>,
+  ): Record<string, unknown> =>
+    textSearch ? { queryType: qt, ...params } : { queryType: 'equality', contention: 8 };
 
   return {
     // -- SD-13: Party Data Management ----------------------------------------─
@@ -35,11 +54,44 @@ export function buildEncryptedFieldsMaps(deks: DEKs, tier: QETier = 'level2') {
           bsonType: 'string',
           queries: { queryType: 'equality' },
         },
-        // GDPR PII — QE:none (L2 only). Postal address and date of birth are sensitive personal
-        // data; encrypted at rest, decrypted only for the L2 client (or the party themselves).
+        // v27 searchable KYC (lookup tier, both L1 + L2). Encrypted at rest, searchable over ciphertext.
+        {
+          keyId: deks.partyName,
+          path: 'partyName',
+          bsonType: 'string',
+          queries: textQuery(QT_SUBSTRING, {
+            // Params kept within the cluster default substringPreview limits (strMaxQueryLength
+            // capped) so setup needs no fleDisableSubstringPreviewParameterLimits override.
+            strMaxLength: 30, strMinQueryLength: 3, strMaxQueryLength: 10,
+            caseSensitive: false, diacriticSensitive: false,
+          }),
+        },
+        {
+          keyId: deks.partyDob,
+          path: 'partyDateOfBirth',
+          bsonType: 'date',
+          queries: {
+            queryType: 'range',
+            min: new Date('1900-01-01'), max: new Date('2020-01-01'),
+            sparsity: 1, trimFactor: 4,
+          },
+        },
+        {
+          keyId: deks.partyNationality,
+          path: 'partyNationality',
+          bsonType: 'string',
+          queries: { queryType: 'equality', contention: 8 },
+        },
+        {
+          keyId: deks.partyPlaceOfBirth,
+          path: 'partyPlaceOfBirth',
+          bsonType: 'string',
+          queries: { queryType: 'equality', contention: 8 },
+        },
+        // GDPR PII — QE:none (L2 only). Postal address is sensitive personal data;
+        // encrypted at rest, decrypted only for the L2 client (or the party themselves).
         ...(includeSensitive ? [
           { keyId: deks.partyAddress, path: 'partyPostalAddress', bsonType: 'object' },
-          { keyId: deks.partyDob,     path: 'partyDateOfBirth',   bsonType: 'string' },
         ] : []),
       ],
     },
@@ -87,7 +139,80 @@ export function buildEncryptedFieldsMaps(deks: DEKs, tier: QETier = 'level2') {
           queries: { queryType: 'equality' },
         },
 
-        // DEK-sensitive tier: address, govId, riskNotes - Level 2 only
+        // v27 searchable KYC (lookup tier, both L1 + L2). Nested scalar leaves are allowed
+        // because the parent sub-doc (customerAgreementGovernmentID) is plaintext.
+        {
+          keyId: deks.caGovIdNumber,
+          path: 'customerAgreementGovernmentID.number',
+          bsonType: 'string',
+          queries: textQuery(QT_SUFFIX, {
+            strMaxLength: 20, strMinQueryLength: 3, strMaxQueryLength: 10,
+            caseSensitive: true, diacriticSensitive: true,
+          }),
+        },
+        {
+          keyId: deks.caGovIdType,
+          path: 'customerAgreementGovernmentID.type',
+          bsonType: 'string',
+          queries: { queryType: 'equality', contention: 6 },
+        },
+        {
+          keyId: deks.caGovIdIssuingCountry,
+          path: 'customerAgreementGovernmentID.issuingCountry',
+          bsonType: 'string',
+          queries: { queryType: 'equality', contention: 6 },
+        },
+        {
+          keyId: deks.caGovIdExpiry,
+          path: 'customerAgreementGovernmentID.expiryDate',
+          bsonType: 'date',
+          queries: {
+            queryType: 'range',
+            min: new Date('2000-01-01'), max: new Date('2040-01-01'),
+            sparsity: 1, trimFactor: 4,
+          },
+        },
+        {
+          keyId: deks.caTaxId,
+          path: 'customerAgreementTaxIDNumber',
+          bsonType: 'string',
+          queries: textQuery(QT_PREFIX, {
+            strMaxLength: 20, strMinQueryLength: 2, strMaxQueryLength: 10,
+            caseSensitive: true, diacriticSensitive: true,
+          }),
+        },
+        {
+          keyId: deks.caOccupation,
+          path: 'customerAgreementOccupation',
+          bsonType: 'string',
+          queries: { queryType: 'equality', contention: 6 },
+        },
+        {
+          keyId: deks.kycRiskScore,
+          path: 'customerAgreementKycCheck.customerAgreementKycCheckRiskScore',
+          bsonType: 'int',
+          queries: { queryType: 'range', min: 0, max: 100, sparsity: 1, trimFactor: 4 },
+        },
+        {
+          keyId: deks.kycRiskRating,
+          path: 'customerAgreementKycCheck.customerAgreementKycCheckRiskRating',
+          bsonType: 'string',
+          queries: { queryType: 'equality', contention: 8 },
+        },
+        {
+          keyId: deks.kycPepStatus,
+          path: 'customerAgreementKycCheck.customerAgreementKycCheckPepStatus',
+          bsonType: 'bool',
+          queries: { queryType: 'equality', contention: 8 },
+        },
+        {
+          keyId: deks.kycSanctionsResult,
+          path: 'customerAgreementKycCheck.customerAgreementKycCheckSanctionsResult',
+          bsonType: 'string',
+          queries: { queryType: 'equality', contention: 8 },
+        },
+
+        // DEK-sensitive tier: QE:none - Level 2 only
         ...(includeSensitive ? [
           {
             keyId: deks.customerAddress,
@@ -99,11 +224,31 @@ export function buildEncryptedFieldsMaps(deks: DEKs, tier: QETier = 'level2') {
             keyId: deks.customerGovId,
             path: 'governmentIdentificationReference',
             bsonType: 'string',
+            // QE:none (deprecated v27)
           },
           {
             keyId: deks.customerRiskNotes,
             path: 'customerAgreementRiskNotes',
             bsonType: 'string',
+            // QE:none (deprecated v27)
+          },
+          {
+            keyId: deks.caSourceOfFunds,
+            path: 'customerAgreementSourceOfFunds',
+            bsonType: 'string',
+            // QE:none (v27)
+          },
+          {
+            keyId: deks.caPurpose,
+            path: 'customerAgreementPurposeOfRelationship',
+            bsonType: 'string',
+            // QE:none (v27)
+          },
+          {
+            keyId: deks.kycScreeningRef,
+            path: 'customerAgreementKycCheck.customerAgreementKycCheckScreeningProviderRef',
+            bsonType: 'string',
+            // QE:none (v27)
           },
         ] : []),
       ],

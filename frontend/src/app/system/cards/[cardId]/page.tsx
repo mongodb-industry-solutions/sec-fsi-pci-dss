@@ -78,6 +78,11 @@ export default function CardDetailPage() {
   const [card, setCard] = useState<CardDetail | null>(null);
   const [ready, setReady] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  // v27 staff-target mode: an investigator/auditor drilling into a found customer's card. Self
+  // behavior is unchanged; staff mode fetches the target's card via customerId from the query and
+  // gates mutations to L2 (auditor is read-only). The server re-enforces both.
+  const [staffMode, setStaffMode] = useState(false);
+  const [staffCanAct, setStaffCanAct] = useState(false);
 
   // Edit state (alias + note only)
   const [editing, setEditing] = useState(false);
@@ -87,7 +92,7 @@ export default function CardDetailPage() {
   const [removing, setRemoving] = useState(false);
   const [toggling, setToggling] = useState(false);
   // Breadcrumb navigation context (non-PII: where we arrived from). Read from the query string.
-  const [nav, setNav] = useState<{ from?: string; txnId?: string }>({});
+  const [nav, setNav] = useState<{ from?: string; txnId?: string; ctx?: string; customerId?: string; partyRef?: string }>({});
 
   // Funding account state
   const [fundingAccount, setFundingAccount] = useState<FundingAccount | null>(null);
@@ -105,7 +110,13 @@ export default function CardDetailPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const sp = new URLSearchParams(window.location.search);
-    setNav({ from: sp.get('from') ?? undefined, txnId: sp.get('txnId') ?? undefined });
+    setNav({
+      from: sp.get('from') ?? undefined,
+      txnId: sp.get('txnId') ?? undefined,
+      ctx: sp.get('ctx') ?? undefined,
+      customerId: sp.get('customerId') ?? undefined,
+      partyRef: sp.get('partyRef') ?? undefined,
+    });
   }, []);
 
   const loadTxns = useCallback(async (
@@ -145,15 +156,16 @@ export default function CardDetailPage() {
     }
   }, []);
 
-  const load = useCallback(async (t: string, agId: string) => {
+  const load = useCallback(async (t: string, agId: string, fundingPartyRef?: string) => {
     try {
       const c = await api.customer.getCardById(agId, cardId, t) as unknown as CardDetail;
       setCard(c);
       setAlias(c.paymentCardAlias ?? '');
       setNote(c.paymentCardCustomerNote ?? '');
-      // Load funding account details (non-blocking)
+      // Load funding account details (non-blocking). Self: the caller's own partyRef; staff: the
+      // target party's partyRef from the query (a staff account read is server-authorized).
       if (c.fundingPayoutAccountInstanceReference) {
-        const pRef = decodeToken(t)?.partyRef;
+        const pRef = fundingPartyRef ?? decodeToken(t)?.partyRef;
         if (pRef) {
           api.accounts.get(pRef, c.fundingPayoutAccountInstanceReference, t)
             .then((a) => setFundingAccount(a as unknown as FundingAccount))
@@ -166,10 +178,28 @@ export default function CardDetailPage() {
   }, [cardId]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const t = getToken() ?? '';
     const role = t ? decodeToken(t)?.role : null;
-    if (role !== 'customer') { router.replace('/system'); return; }
+    const sp = new URLSearchParams(window.location.search);
+    const isStaffCtx = sp.get('ctx') === 'staff'
+      && (role === 'level2_investigator' || role === 'security_auditor');
+
+    // Self-service is unchanged: only a `customer` (or an authorized staff ctx) may view here.
+    if (role !== 'customer' && !isStaffCtx) { router.replace('/system'); return; }
     setToken(t);
+
+    if (isStaffCtx) {
+      const cid = sp.get('customerId');
+      const pRef = sp.get('partyRef') ?? undefined;
+      setStaffMode(true);
+      setStaffCanAct(role === 'level2_investigator');
+      setAgreementId(cid);
+      if (cid) load(t, cid, pRef).finally(() => setReady(true));
+      else { setNotFound(true); setReady(true); }
+      return;
+    }
+
     api.auth.me(t)
       .then(async (me) => {
         const id = (me.agreement as { customerAgreementInstanceReference?: string } | null)?.customerAgreementInstanceReference ?? null;
@@ -218,7 +248,7 @@ export default function CardDetailPage() {
     try {
       await api.customer.deleteCard(agreementId, cardId, token);
       notify('Card removed.', 'success');
-      router.push('/system/cards');
+      router.push(staffMode ? `/system/users/${encodeURIComponent(agreementId)}` : '/system/cards');
     } catch (err) {
       notify(err instanceof Error ? err.message : 'Failed to remove card.', 'error');
       setRemoving(false);
@@ -257,7 +287,14 @@ export default function CardDetailPage() {
 
   const cardLabel = card?.paymentCardAlias || card?.paymentCardNetwork
     || (card?.paymentCardMaskedPanDisplay ? `Card ${card.paymentCardMaskedPanDisplay.slice(-4)}` : 'Card');
-  const crumbs: Crumb[] = nav.from === 'history' && nav.txnId
+  const crumbs: Crumb[] = staffMode
+    ? [
+        { label: 'Home', href: '/system' },
+        { label: 'Users', href: '/system/users' },
+        { label: 'Customer', href: nav.customerId ? `/system/users/${nav.customerId}` : '/system/users' },
+        { label: cardLabel },
+      ]
+    : nav.from === 'history' && nav.txnId
     ? [
         { label: 'Home', href: '/system' },
         { label: 'Transactions', href: '/system/payment/history' },
@@ -429,7 +466,7 @@ export default function CardDetailPage() {
                 <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Nickname &amp; note</h2>
                 {debugMode && <span className="text-xs font-mono text-gray-300">paymentCardAlias · paymentCardCustomerNote</span>}
               </div>
-              {!editing ? (
+              {staffMode ? null : !editing ? (
                 <button onClick={() => setEditing(true)}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors">
                   <Pencil size={13} /> Edit
@@ -480,8 +517,9 @@ export default function CardDetailPage() {
             )}
           </div>
 
-          {/* Activation toggle; only for customer-toggleable states (active ↔ suspended) */}
-          {(card.paymentCardStatus === 'active' || card.paymentCardStatus === 'suspended') && (
+          {/* Activation toggle; only for customer-toggleable states (active ↔ suspended). In staff
+              mode only an L2 investigator may deactivate/reactivate (auditor is read-only). */}
+          {(!staffMode || staffCanAct) && (card.paymentCardStatus === 'active' || card.paymentCardStatus === 'suspended') && (
             <div className="bg-white rounded-xl border p-5 flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <p className="text-sm font-medium text-gray-800">
@@ -506,7 +544,8 @@ export default function CardDetailPage() {
             </div>
           )}
 
-          {/* Danger zone */}
+          {/* Danger zone. In staff mode only an L2 investigator may remove a card (auditor read-only). */}
+          {(!staffMode || staffCanAct) && (
           <div className="bg-white rounded-xl border border-red-100 p-5 flex items-center justify-between gap-3 flex-wrap">
             <div>
               <p className="text-sm font-medium text-gray-800">Remove this card</p>
@@ -517,6 +556,7 @@ export default function CardDetailPage() {
               <Trash2 size={15} /> {removing ? 'Removing…' : 'Remove card'}
             </button>
           </div>
+          )}
 
           {/* Transaction list — only rendered when this card has a card token to filter by */}
           {card.paymentCardReference && (
@@ -587,7 +627,9 @@ export default function CardDetailPage() {
                       {txns.map((txn) => (
                         <tr key={txn.cardTransactionInstanceReference}
                           className="hover:bg-gray-50 cursor-pointer"
-                          onClick={() => router.push(`/system/payment/history/${txn.cardTransactionInstanceReference}?from=card&cardId=${cardId}`)}>
+                          onClick={() => router.push(staffMode
+                            ? `/system/transactions/${encodeURIComponent(txn.cardTransactionInstanceReference)}?ctx=staff&customerId=${encodeURIComponent(agreementId ?? '')}&partyRef=${encodeURIComponent(nav.partyRef ?? '')}`
+                            : `/system/payment/history/${txn.cardTransactionInstanceReference}?from=card&cardId=${cardId}`)}>
                           <td className="py-2.5 pr-3 text-gray-700 whitespace-nowrap">{fmtDate(txn.cardTransactionDateTime)}</td>
                           <td className="py-2.5 pr-3 text-gray-800 truncate max-w-[180px]">{txn.cardTransactionMerchantName || '-'}</td>
                           <td className="py-2.5 pr-3 text-gray-800 text-right font-mono whitespace-nowrap">

@@ -1,6 +1,7 @@
 // KYC capability module controller — STATIC routes (ADR-029).
 import { FastifyInstance } from 'fastify';
 import { verifyKyc } from '../services/kyc.service';
+import { screenParty } from '../services/hrpScreening.service';
 import {
   getCapabilityModuleConfig,
   upsertCapabilityModuleConfig,
@@ -37,6 +38,41 @@ export async function kycController(fastify: FastifyInstance) {
       return reply.code(401).send({ error: 'X-Integration-Source header required' });
     }
     return reply.send(verifyKyc(request.body as Record<string, unknown>));
+  });
+
+  fastify.post('/screen', {
+    schema: {
+      tags: ['modules:kyc'],
+      summary: 'HRP screening engine invocation (internal loopback)',
+      description: 'Internal High-Risk-Party (HRP) screening engine. Called by the integration router (ADR-029) '
+        + 'for the kyc.screening.requested event when no external screening vendor is active. Produces the '
+        + 'deterministic KYC verdict (risk score/rating, PEP, sanctions, provider ref) for a party reference. '
+        + 'Not JWT-authenticated; requires `X-Integration-Source` header.',
+      headers: { type: 'object', required: ['x-integration-source'], properties: { 'x-integration-source': { type: 'string', description: 'Caller identity header.' } } },
+      body: { type: 'object', additionalProperties: true, description: 'Screening payload (carries clientReference / partyInstanceReference).' },
+      response: {
+        200: {
+          type: 'object',
+          description: 'HRP screening verdict.',
+          properties: {
+            riskScore:            { type: 'number', description: 'Risk score 0-100.' },
+            riskRating:           { type: 'string', enum: ['low', 'medium', 'high'], description: 'Risk band derived from the score.' },
+            pepStatus:            { type: 'boolean', description: 'Politically-exposed-person flag.' },
+            sanctionsResult:      { type: 'string', enum: ['clear', 'hit', 'pending'], description: 'Sanctions/watchlist outcome.' },
+            screeningProviderRef: { type: 'string', description: 'Screening reference issued by the provider.' },
+          },
+        },
+        401: { type: 'object', properties: { error: { type: 'string' } }, description: 'Missing X-Integration-Source header.' },
+      },
+    },
+    config: { skipAuth: true },
+  }, async (request, reply) => {
+    if (!request.headers['x-integration-source']) {
+      return reply.code(401).send({ error: 'X-Integration-Source header required' });
+    }
+    const body = (request.body ?? {}) as { clientReference?: string; partyInstanceReference?: string };
+    const reference = body.clientReference ?? body.partyInstanceReference ?? '';
+    return reply.send(screenParty(reference));
   });
 
   fastify.get('/config', {
