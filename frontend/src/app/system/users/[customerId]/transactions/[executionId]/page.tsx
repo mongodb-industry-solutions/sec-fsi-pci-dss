@@ -4,11 +4,13 @@
 // ownership. Never renders CHD or the raw destination IBAN, only what the API returns.
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowDownLeft, ArrowUpRight, Landmark, Receipt } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowDownLeft, ArrowUpRight, Landmark, Receipt, ShieldAlert, ChevronRight } from 'lucide-react';
 import { api, type ExecutionDetail } from '../../../../../../lib/api';
 import { getToken, decodeToken } from '../../../../../../lib/auth';
 import { Breadcrumb, type Crumb } from '../../../../../../components/Breadcrumb';
 import { LoadingIndicator } from '../../../../../../components/LoadingIndicator';
+import { useConfirm, useNotify } from '../../../../../../components/ui/ConfirmProvider';
 
 function money(amount?: number | null, currency?: string | null): string {
   if (amount == null) return '-';
@@ -40,24 +42,63 @@ function fmtDate(iso?: string | null): string {
 export default function StaffExecutionDetailPage() {
   const { customerId, executionId } = useParams<{ customerId: string; executionId: string }>();
   const router = useRouter();
+  const confirm = useConfirm();
+  const notify = useNotify();
 
   const [detail, setDetail] = useState<ExecutionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [token, setToken] = useState('');
+  const [role, setRole] = useState<string | null>(null);
+  // Existing fraud case for this transfer (if any). P2P/transfer cases carry the executionId as their
+  // cardTransactionInstanceReference, so the standard transactionId filter finds them.
+  const [linkedCase, setLinkedCase] = useState<{ id: string; ref: string } | null>(null);
+  const [openBusy, setOpenBusy] = useState(false);
+
+  // Auditor is read-only; only the L2 investigator may open an investigation (SoD, PCI DSS Req 7).
+  const canOpen = role === 'level2_investigator';
 
   useEffect(() => {
     const t = getToken() ?? '';
-    const role = t ? decodeToken(t)?.role : null;
+    const r = t ? decodeToken(t)?.role ?? null : null;
     // Staff-only page; anyone else is bounced (the server also enforces the role).
-    if (role !== 'level2_investigator' && role !== 'security_auditor') { router.replace('/system'); return; }
+    if (r !== 'level2_investigator' && r !== 'security_auditor') { router.replace('/system'); return; }
+    setToken(t);
+    setRole(r);
     let alive = true;
     setLoading(true);
     api.customer.transactionDetail(customerId, executionId, t)
       .then((d) => { if (alive) setDetail(d); })
       .catch(() => { if (alive) setNotFound(true); })
       .finally(() => { if (alive) setLoading(false); });
+    // Look up any existing case for this transfer so we can offer "View case" instead of "Open".
+    api.fraud.list({ transactionId: executionId, limit: 1 }, t)
+      .then((res) => {
+        const c = res.results?.[0];
+        if (alive && c) setLinkedCase({ id: c.fraudDiagnosisInstanceReference, ref: c.fraudDiagnosisCaseReference });
+      })
+      .catch(() => { /* no case, or list unavailable */ });
     return () => { alive = false; };
   }, [customerId, executionId, router]);
+
+  async function handleOpenInvestigation() {
+    if (!canOpen || openBusy) return;
+    const ok = await confirm({
+      title: 'Open investigation case?',
+      message: 'This opens a fraud diagnosis case (SD-83) for this transfer and records the action in the audit trail.',
+      confirmLabel: 'Open case',
+    });
+    if (!ok) return;
+    setOpenBusy(true);
+    try {
+      const res = await api.fraud.open({ executionId }, token);
+      notify('Investigation case opened.', 'success');
+      router.push(`/system/investigation/${res.fraudDiagnosisInstanceReference}`);
+    } catch (err) {
+      notify(`Could not open case: ${err instanceof Error ? err.message : 'unknown error'}`, 'error');
+      setOpenBusy(false);
+    }
+  }
 
   const crumbs: Crumb[] = [
     { label: 'Home', href: '/system' },
@@ -98,6 +139,31 @@ export default function StaffExecutionDetailPage() {
               <p className="text-xs text-gray-400 font-mono">{detail.paymentExecutionInstanceReference}</p>
             </div>
             <span className={`ml-auto text-xs px-2 py-0.5 rounded font-medium ${statusPill(detail.paymentExecutionStatus)}`}>{detail.paymentExecutionStatus}</span>
+          </div>
+
+          {/* Investigation action: view the existing case, or (L2 only) open a new one */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {linkedCase ? (
+              <Link
+                href={`/system/investigation/${linkedCase.id}`}
+                className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-[#001E2B]/30 text-sm font-medium text-[#001E2B] hover:bg-[#001E2B]/5 transition-colors"
+              >
+                <ShieldAlert size={14} />
+                View case {linkedCase.ref}
+                <ChevronRight size={13} />
+              </Link>
+            ) : canOpen ? (
+              <button
+                onClick={handleOpenInvestigation}
+                disabled={openBusy}
+                className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg bg-[#001E2B] text-white text-sm font-medium hover:bg-[#00323f] disabled:opacity-50 transition-colors"
+              >
+                <ShieldAlert size={14} />
+                {openBusy ? 'Opening…' : 'Open investigation'}
+              </button>
+            ) : (
+              <span className="text-xs text-gray-400 italic">Read-only: opening an investigation requires an L2 investigator.</span>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

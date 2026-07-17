@@ -13,6 +13,7 @@ import { dispatchProvider } from '../../provider/services/integrationDispatch.se
 import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
 import { CARD_TRANSACTION_COLLECTION } from '../../transaction/models/cardTransaction.model';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
+import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../../gateway/models/paymentExecution.model';
 import { createNotification } from '../../notification/notifications.service';
 
 // -- BIAN SD-83: Note entry - resolved view of a note_added event enriched with retraction info
@@ -198,6 +199,106 @@ export async function createFraudCase(
   }).catch(() => { /* notification must never block case creation */ });
 
   return { fraudDiagnosisInstanceReference: caseId };
+}
+
+// Terminal statuses: a case in one of these is not an active investigation. Used to
+// decide whether a manual open should dedup to an existing case or start a new one.
+const RESOLVED_STATUSES: FraudDiagnosisControlRecord['fraudDiagnosisCaseStatus'][] = ['resolved_cleared', 'resolved_fraud', 'closed'];
+
+// Map an SD-65 payment-execution status onto the display-only cardTransactionStatus enum
+// carried by the shared TransactionSnapshot. This is presentation only (no CHD), so a coarse
+// mapping is fine: completed -> settled, terminal failures -> declined, everything else pending.
+function execStatusToSnapshotStatus(status: string): TransactionSnapshot['cardTransactionStatus'] {
+  if (status === 'completed') return 'settled';
+  if (status === 'failed' || status === 'exception' || status === 'reversed') return 'declined';
+  if (status === 'refunded') return 'disputed';
+  return 'pending';
+}
+
+// BIAN SD-83 / SD-65: manually open a fraud case from a payment execution (transfer), mirroring the
+// automated P2P compliance path (modules/gateway/services/p2pCompliance.process.ts). Builds a
+// DISPLAY-SAFE snapshot (no CHD, no raw IBAN), creates the case, then stamps it with the
+// paymentExecutionInstanceReference + transactionKind discriminator. Dedups to an existing
+// non-resolved case for the same execution instead of creating a duplicate.
+export async function openCaseFromExecution(
+  db: Db,
+  executionId: string,
+  reason: string | undefined,
+): Promise<
+  | { fraudDiagnosisInstanceReference: string; fraudDiagnosisCaseReference: string; alreadyExisted: boolean }
+  | { notFound: true }
+> {
+  // Dedup: an active (non-resolved/closed) case already covers this execution.
+  const existing = await db.collection<FraudDiagnosisControlRecord>(FRAUD_DIAGNOSIS_COLLECTION).findOne({
+    paymentExecutionInstanceReference: executionId,
+    fraudDiagnosisCaseStatus: { $nin: RESOLVED_STATUSES },
+  });
+  if (existing) {
+    return {
+      fraudDiagnosisInstanceReference: existing.fraudDiagnosisInstanceReference,
+      fraudDiagnosisCaseReference: existing.fraudDiagnosisCaseReference,
+      alreadyExisted: true,
+    };
+  }
+
+  const exec = await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION)
+    .findOne({ paymentExecutionInstanceReference: executionId });
+  if (!exec) return { notFound: true };
+
+  // Derive the subject customer agreement from the initiator (fallback: beneficiary) party.
+  const partyRef = exec.initiatorPartyReference ?? exec.beneficiaryPartyReference;
+  let customerRef = partyRef ?? executionId;
+  if (partyRef) {
+    const agreement = await db.collection<{ customerAgreementInstanceReference: string }>(CUSTOMER_AGREEMENT_COLLECTION)
+      .findOne({ partyInstanceReference: partyRef } as Record<string, unknown>, { projection: { customerAgreementInstanceReference: 1 } });
+    if (agreement?.customerAgreementInstanceReference) customerRef = agreement.customerAgreementInstanceReference;
+  }
+
+  const amount = exec.grossAmount ?? 0;
+  const severity: RiskSeverity =
+    amount > 1000 ? 'critical' :
+    amount > 500  ? 'high'     :
+    amount > 200  ? 'medium'   : 'low';
+
+  const direction = exec.initiatorPartyReference ? 'outbound' : 'inbound';
+
+  // DISPLAY-SAFE snapshot: amount, currency, rail, status, direction, beneficiaryName and the MASKED
+  // destination account only. No CHD, no raw IBAN. Extra transfer-context fields ride alongside the
+  // core TransactionSnapshot shape (same approach as the automated P2P path).
+  const snapshot = {
+    cardTransactionAmount: { amount, currency: exec.currency },
+    cardTransactionMerchantName: exec.beneficiaryName ?? `Transfer${exec.destinationAccountMasked ? ` to ${exec.destinationAccountMasked}` : ''}`,
+    cardTransactionDateTime: exec.initiatedAt ?? exec.recordCreatedDateTime,
+    cardTransactionStatus: execStatusToSnapshotStatus(exec.paymentExecutionStatus),
+    cardTransactionMaskedPanDisplay: exec.destinationAccountMasked ?? 'Bank transfer',
+    transferRail: exec.paymentExecutionRail,
+    transferStatus: exec.paymentExecutionStatus,
+    transferDirection: direction,
+    beneficiaryName: exec.beneficiaryName,
+    destinationAccountMasked: exec.destinationAccountMasked,
+  } as TransactionSnapshot;
+
+  const created = await createFraudCase(
+    db,
+    executionId,
+    customerRef,
+    [reason ? `manual_review: ${reason}` : 'manual_review'],
+    severity,
+    snapshot,
+  );
+
+  // Discriminate as a P2P/transfer case and link the SD-65 execution, exactly like the P2P process.
+  await db.collection(FRAUD_DIAGNOSIS_COLLECTION).updateOne(
+    { fraudDiagnosisInstanceReference: created.fraudDiagnosisInstanceReference },
+    { $set: { paymentExecutionInstanceReference: executionId, transactionKind: 'p2p', recordUpdatedDateTime: new Date() } },
+  );
+
+  const caseDoc = await getCaseById(db, created.fraudDiagnosisInstanceReference);
+  return {
+    fraudDiagnosisInstanceReference: created.fraudDiagnosisInstanceReference,
+    fraudDiagnosisCaseReference: caseDoc?.fraudDiagnosisCaseReference ?? '',
+    alreadyExisted: false,
+  };
 }
 
 export async function getCases(

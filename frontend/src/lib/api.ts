@@ -1038,7 +1038,8 @@ export const api = {
         { method: 'DELETE', body: JSON.stringify(body) },
         token
       ),
-    open: (body: { transactionId: string; reason?: string }, token: string) =>
+    // Open a case from EXACTLY ONE of a card transaction (transactionId) or an SD-65 transfer (executionId).
+    open: (body: { transactionId?: string; executionId?: string; reason?: string }, token: string) =>
       apiFetch<{ fraudDiagnosisInstanceReference: string; fraudDiagnosisCaseReference: string; alreadyExisted: boolean }>(
         '/api/v1/fraud',
         { method: 'POST', body: JSON.stringify(body) },

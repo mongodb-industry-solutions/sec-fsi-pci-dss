@@ -317,6 +317,11 @@ const ENC_ENDS = '$encStrEndsWith';
 // All searchable fields are QE lookup-tier (L1+ can decrypt + search). QE:none sensitive fields
 // (address, sourceOfFunds, purpose, screeningRef) are never searchable, so they are not listed.
 const KYC_SEARCH_FIELDS: KycSearchFieldDef[] = [
+  // Contact / account keys (QE:equality) — the same fields as the L1 blind lookup, exposed here so
+  // L2/auditor can do everything the simple lookup does from the one advanced surface (exact match).
+  { key: 'email',                label: 'Email',             collection: 'party',     path: 'partyEmailAddress',      baseMode: 'equality', bsonType: 'string' },
+  { key: 'phone',                label: 'Phone',             collection: 'party',     path: 'partyMobilePhoneNumber', baseMode: 'equality', bsonType: 'string' },
+  { key: 'accountRef',           label: 'Account reference', collection: 'agreement', path: 'customerAgreementReference', baseMode: 'equality', bsonType: 'string' },
   { key: 'partyName',            label: 'Name',              collection: 'party',     path: 'partyName',            baseMode: 'substring', bsonType: 'string', minQueryLength: 3, maxQueryLength: 10 },
   { key: 'partyDateOfBirth',     label: 'Date of birth',     collection: 'party',     path: 'partyDateOfBirth',     baseMode: 'range',     bsonType: 'date',   rangeMin: '1900-01-01', rangeMax: '2020-01-01' },
   { key: 'partyNationality',     label: 'Nationality',       collection: 'party',     path: 'partyNationality',     baseMode: 'equality',  bsonType: 'string', enumValues: ['ES','GB','US','FR','DE','IT','PT','PL','MX','NG'] },

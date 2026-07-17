@@ -131,6 +131,7 @@ export type ActionType =
   | 'escalated'
   | 'ai_review'
   | 'resolved'
+  | 'reopened'            // SD-83: a resolved/closed case was reopened for further review
   | 'closed'
   | 'question_created'    // SD-83: investigator posed a question to the customer
   | 'question_answered';  // SD-83: customer submitted an (immutable) response

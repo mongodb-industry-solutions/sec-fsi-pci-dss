@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, appendAuditEvent, createFraudCase, addCaseNote, retractCaseNote, getCaseNotes, getFraudStats, getFraudIntegrity } from '../services/fraudDiagnosis.service';
+import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, appendAuditEvent, createFraudCase, openCaseFromExecution, addCaseNote, retractCaseNote, getCaseNotes, getFraudStats, getFraudIntegrity } from '../services/fraudDiagnosis.service';
 import { getCardIntegrity } from '../../customer/services/paymentCard.service';
 import { getTransactionById } from '../../transaction/services/cardTransaction.service';
 import { generateToken } from '../../../vendors/security/escalationTokens';
@@ -23,6 +23,28 @@ import { createNotification } from '../../notification/notifications.service';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
 const ENRICHMENT_ROLES = ['level1_analyst', 'level2_investigator', 'security_auditor'];
+
+// Statuses from which a case may be reopened (terminal states only).
+const REOPENABLE_STATUSES = ['resolved_cleared', 'resolved_fraud', 'closed'];
+
+// Separation of duties (PCI DSS Req 7; BIAN SD-83): opening/initiating a fraud case is an analyst
+// control action. The security auditor is read-only oversight and must not initiate cases.
+// Exported so the guard can be unit-tested without a live server (mirrors resolveTargetSub).
+export function assertOpenAllowed(userRole: string): { error: string; status: 403 } | null {
+  if (userRole === 'security_auditor') {
+    return { error: 'Access denied: the auditor role is read-only and cannot open investigation cases (separation of duties, PCI DSS Req 7).', status: 403 };
+  }
+  return null;
+}
+
+// SoD: only an analyst (L1) or investigator (L2) may change a case status (including reopening a
+// resolved/closed case). The auditor stays read-only. Returns an error descriptor or null (allowed).
+export function assertStatusChangeAllowed(userRole: string): { error: string; status: 403 } | null {
+  if (userRole === 'security_auditor') {
+    return { error: 'Access denied: the auditor role is read-only and cannot change case status (separation of duties, PCI DSS Req 7).', status: 403 };
+  }
+  return null;
+}
 
 export async function fraudDiagnosisController(fastify: FastifyInstance) {
   fastify.get('/', {
@@ -172,9 +194,9 @@ without creating a duplicate.
       security: [{ bearerAuth: [] }],
       body: {
         type: 'object',
-        required: ['transactionId'],
         properties: {
-          transactionId: { type: 'string', description: '`cardTransactionInstanceReference` UUID of the transaction to investigate.' },
+          transactionId: { type: 'string', description: '`cardTransactionInstanceReference` UUID of the CARD transaction to investigate. Provide EXACTLY ONE of `transactionId` or `executionId`.' },
+          executionId:   { type: 'string', description: '`paymentExecutionInstanceReference` UUID of the SD-65 transfer (P2P / bank transfer) to investigate. Provide EXACTLY ONE of `transactionId` or `executionId`.' },
           reason:        { type: 'string', description: 'Reason for opening the case (stored as the first audit event detail).' },
         },
       },
@@ -198,13 +220,30 @@ without creating a duplicate.
     // an analyst control action. The security auditor is read-only oversight and must not
     // initiate cases. manager/merchant_officer/customer are already blocked from /fraud.
     const { userRole } = request as unknown as AuthenticatedRequest;
-    if (userRole === 'security_auditor') {
-      return reply.status(403).send({ error: 'Access denied: the auditor role is read-only and cannot open investigation cases (separation of duties, PCI DSS Req 7).' });
+    const openDenied = assertOpenAllowed(userRole);
+    if (openDenied) return reply.status(openDenied.status).send({ error: openDenied.error });
+
+    const { transactionId, executionId, reason } = request.body as { transactionId?: string; executionId?: string; reason?: string };
+
+    // Exactly one subject reference must be supplied (card transaction OR SD-65 transfer).
+    if ((!transactionId && !executionId) || (transactionId && executionId)) {
+      return reply.status(400).send({ error: 'Provide exactly one of transactionId (card) or executionId (transfer).' });
     }
-    const { transactionId, reason } = request.body as { transactionId: string; reason?: string };
+
+    // SD-65 transfer path: mirror the automated P2P compliance process (display-safe snapshot,
+    // dedup, paymentExecutionInstanceReference + transactionKind). The service appends the standard
+    // case_opened audit event and emits the fraud.case.opened process event via createFraudCase.
+    if (executionId) {
+      const result = await openCaseFromExecution(fastify.db, executionId, reason);
+      if ('notFound' in result) return reply.status(404).send({ error: 'Payment execution not found' });
+      return reply.send(result);
+    }
+
+    // Card transaction path (unchanged). transactionId is guaranteed present here (exactly-one guard above).
+    const cardTransactionId = transactionId as string;
 
     // Check if a case already exists
-    const existing = await getCases(fastify.db, { transactionId }, 1, 1);
+    const existing = await getCases(fastify.db, { transactionId: cardTransactionId }, 1, 1);
     if (existing.results.length > 0) {
       const c = existing.results[0];
       return reply.send({
@@ -215,7 +254,7 @@ without creating a duplicate.
     }
 
     // Fetch transaction data
-    const txn = await getTransactionById(fastify.db, transactionId);
+    const txn = await getTransactionById(fastify.db, cardTransactionId);
     if (!txn) return reply.status(404).send({ error: 'Transaction not found' });
 
     // Derive severity from amount
@@ -246,7 +285,7 @@ without creating a duplicate.
     // cardTransactionAccountReference is the human-readable ref (e.g. "ACC-LF-20240115");
     // fraudDiagnosisCase.customerAgreementInstanceReference must be the UUID primary key
     // so the raw document endpoint can find the linked customerAgreementProcedure document.
-    let customerAgreementUuid = t.cardTransactionAccountReference ?? transactionId;
+    let customerAgreementUuid = t.cardTransactionAccountReference ?? cardTransactionId;
     if (t.cardTransactionAccountReference) {
       try {
         const l1Db = await getDbForRole('level1_analyst', false);
@@ -263,7 +302,7 @@ without creating a duplicate.
 
     const result = await createFraudCase(
       fastify.db,
-      transactionId,
+      cardTransactionId,
       customerAgreementUuid,
       [reason ? `manual_review: ${reason}` : 'manual_review'],
       severity as 'low' | 'medium' | 'high' | 'critical',
@@ -541,18 +580,34 @@ Req 7 (least privilege) and Req 10 (audit of sensitive access).`,
       resolutionNotes?: string;
     };
 
-    // Role-based validation: L1 cannot close/resolve an escalated case
+    // Previous status: needed for the L1-escalated guard and for reopen detection (terminal -> open).
+    let previousStatus: string | undefined;
+
+    // Role-based validation on status changes.
     if (body.fraudDiagnosisCaseStatus) {
       const { userRole } = request as unknown as AuthenticatedRequest;
+
+      // SoD (PCI DSS Req 7): the auditor is read-only and cannot change a case status (incl. reopen).
+      const statusDenied = assertStatusChangeAllowed(userRole);
+      if (statusDenied) return reply.status(statusDenied.status).send({ error: statusDenied.error });
+
       const TERMINAL_STATUSES = ['resolved_cleared', 'resolved_fraud', 'closed'];
-      if (userRole === 'level1_analyst' && TERMINAL_STATUSES.includes(body.fraudDiagnosisCaseStatus)) {
-        const currentCase = await getCaseById(fastify.db, id);
-        if (!currentCase) return reply.status(404).send({ error: 'Fraud case not found' });
-        if (currentCase.fraudDiagnosisCaseStatus === 'escalated') {
-          return reply.status(403).send({ error: 'L1 analysts cannot close or resolve a case that has been escalated to L2' });
-        }
+      const currentCase = await getCaseById(fastify.db, id);
+      if (!currentCase) return reply.status(404).send({ error: 'Fraud case not found' });
+      previousStatus = currentCase.fraudDiagnosisCaseStatus;
+
+      // L1 cannot close/resolve a case already escalated to L2.
+      if (userRole === 'level1_analyst' && TERMINAL_STATUSES.includes(body.fraudDiagnosisCaseStatus)
+          && currentCase.fraudDiagnosisCaseStatus === 'escalated') {
+        return reply.status(403).send({ error: 'L1 analysts cannot close or resolve a case that has been escalated to L2' });
       }
     }
+
+    // Reopen: setting status back to 'open' from a terminal state (resolved_*/closed). L1 and L2 may
+    // do this; the auditor was already blocked above. No state-machine guard forbids it here.
+    const isReopen = body.fraudDiagnosisCaseStatus === 'open'
+      && previousStatus !== undefined
+      && REOPENABLE_STATUSES.includes(previousStatus);
 
     // Reject deprecated note fields - use POST /fraud/:id/notes instead
     if (body.fraudDiagnosisCaseNotes || body.fraudDiagnosisCustomerSubjectNotes) {
@@ -580,7 +635,9 @@ Req 7 (least privilege) and Req 10 (audit of sensitive access).`,
     const { userRole: callerRole } = request as unknown as AuthenticatedRequest;
 
     // Write audit event for status changes and note additions
-    const actionType = body.fraudDiagnosisCaseStatus === 'resolved_cleared' || body.fraudDiagnosisCaseStatus === 'resolved_fraud' || body.fraudDiagnosisCaseStatus === 'closed'
+    const actionType = isReopen
+      ? 'reopened' as const
+      : body.fraudDiagnosisCaseStatus === 'resolved_cleared' || body.fraudDiagnosisCaseStatus === 'resolved_fraud' || body.fraudDiagnosisCaseStatus === 'closed'
       ? 'resolved' as const
       : body.fraudDiagnosisCaseStatus === 'under_review' || body.fraudDiagnosisCaseStatus === 'open'
       ? 'assigned' as const
@@ -591,6 +648,7 @@ Req 7 (least privilege) and Req 10 (audit of sensitive access).`,
     if (actionType) {
       await appendAuditEvent(fastify.db, id, actionType, callerRole as AnalystRole, {
         newStatus: body.fraudDiagnosisCaseStatus,
+        ...(isReopen && { action: 'reopened', previousStatus }),
         hasInternalNote: !!body.fraudDiagnosisCaseNotes,
         hasCustomerNote: !!body.fraudDiagnosisCustomerSubjectNotes,
         resolutionOutcome: body.resolutionOutcome,
@@ -659,7 +717,7 @@ Events are append-only; they are never updated or deleted.
                   actionDateTime: { type: 'string', format: 'date-time' },
                   actionType: {
                     type: 'string',
-                    enum: ['case_opened', 'assigned', 'note_added', 'note_retracted', 'field_accessed', 'escalated', 'ai_review', 'resolved', 'closed'],
+                    enum: ['case_opened', 'assigned', 'note_added', 'note_retracted', 'field_accessed', 'escalated', 'ai_review', 'resolved', 'reopened', 'closed'],
                   },
                   performedByInstanceReference: { type: 'string' },
                   performedByName: { type: 'string', nullable: true, description: 'Display name of the individual user who performed the action (PCI DSS Req 10.2.1).' },
