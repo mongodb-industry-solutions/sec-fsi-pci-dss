@@ -545,6 +545,46 @@ export interface CustomerTransactionRow {
   completedAt: string | null;
 }
 
+// v27: one resolution step of an SD-65 payment execution (routing/settlement log). Display-safe.
+export interface PaymentExecutionResolutionStep {
+  stepName: string;
+  stepOutcome: 'found' | 'not_found' | 'fallback' | 'failed';
+  stepNote?: string;
+  stepDateTime: string;
+}
+
+// v27: display-safe SD-65 execution detail for the staff drill-down (no CHD, no raw IBAN).
+// Mirrors the backend ExecutionDetail returned by GET /customer/:customerId/transactions/:executionId.
+export interface ExecutionDetail {
+  kind: 'transfer';
+  paymentExecutionInstanceReference: string;
+  direction: 'sent' | 'received';
+  beneficiaryType: string;
+  initiatorPartyReference: string | null;
+  beneficiaryPartyReference: string | null;
+  sourcePayoutAccountReference: string | null;
+  resolvedPayoutAccountReference: string | null;
+  beneficiaryArrangementReference: string | null;
+  merchantAgreementReference: string | null;
+  grossAmount: number;
+  netAmount: number;
+  feeAmount: number;
+  currency: string;
+  recipientCurrency: string | null;
+  recipientAmount: number | null;
+  fxRate: number | null;
+  paymentExecutionRail: string | null;
+  paymentExecutionStatus: string;
+  concept: string | null;
+  beneficiaryName: string | null;
+  destinationAccountMasked: string | null;
+  destinationCountry: string | null;
+  failureReason: string | null;
+  resolutionLog: PaymentExecutionResolutionStep[];
+  initiatedAt: string | null;
+  completedAt: string | null;
+}
+
 // v27: Encrypted-KYC search (Queryable Encryption showcase). Field registry + tier-shaped results.
 export type KycSearchMode = 'substring' | 'prefix' | 'suffix' | 'range' | 'equality';
 
@@ -865,6 +905,15 @@ export const api = {
       apiFetch<{ removed: boolean }>(
         `/api/v1/customer/${encodeURIComponent(customerId)}/cards/${encodeURIComponent(cardId)}`,
         { method: 'DELETE' },
+        token
+      ),
+    // v27 staff drill-down: display-safe SD-65 execution detail of ONE transfer belonging to a
+    // customer. Restricted server-side to level2_investigator / security_auditor (else 403); a
+    // transfer not belonging to the customer's party returns 404. Never returns the raw IBAN.
+    transactionDetail: (customerId: string, executionId: string, token: string) =>
+      apiFetch<ExecutionDetail>(
+        `/api/v1/customer/${encodeURIComponent(customerId)}/transactions/${encodeURIComponent(executionId)}`,
+        {},
         token
       ),
   },
@@ -1410,6 +1459,44 @@ export const api = {
     // v18 D-01: detail of one authorized app (scopes with descriptions, approval date/time, branding).
     getDetail: (consentId: string, token: string) =>
       apiFetch<ConsentGrantDetail>(`/api/v1/auth/grants/${encodeURIComponent(consentId)}`, {}, token),
+    // v27 staff view: detail of a grant owned by a found customer's party. Restricted server-side to
+    // level2_investigator / security_auditor (else 403). Same shape as getDetail.
+    getDetailForParty: (consentId: string, partyRef: string, token: string) =>
+      apiFetch<ConsentGrantDetail>(
+        `/api/v1/auth/grants/${encodeURIComponent(consentId)}?partyRef=${encodeURIComponent(partyRef)}`,
+        {}, token
+      ),
+    // v27 staff view: operations a found customer's party executed through this app. Restricted
+    // server-side to level2_investigator / security_auditor (else 403). Same shape as getOperations.
+    operationsForParty: (
+      consentId: string,
+      partyRef: string,
+      filters: { q?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number },
+      token: string,
+    ) => {
+      const qs = new URLSearchParams(
+        Object.entries(filters).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+      );
+      qs.set('partyRef', partyRef);
+      return apiFetch<{
+        events: Array<{
+          id: string;
+          eventDateTime: string;
+          processType: string;
+          processAction: string;
+          processOutcome: string;
+          entityType: string;
+          entityId: string;
+          clientId?: string;
+          actingPartyReference?: string;
+          actingChannel?: string;
+          summary?: Record<string, unknown>;
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/auth/grants/${encodeURIComponent(consentId)}/operations?${qs.toString()}`, {}, token);
+    },
     // v18 D-02: operations the caller executed through this app (display-safe). Filter + paginate.
     getOperations: (
       consentId: string,

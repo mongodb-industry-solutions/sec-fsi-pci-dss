@@ -13,6 +13,7 @@ const h = vi.hoisted(() => ({
   listPartyExecutions: vi.fn().mockResolvedValue([]),
   getPartyCardTransactions: vi.fn().mockResolvedValue([]),
   resolveAccountReferenceForParty: vi.fn().mockResolvedValue(undefined),
+  getExecution: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('../../../../backend/src/vendors/encryption/roleClients', () => ({
@@ -20,13 +21,14 @@ vi.mock('../../../../backend/src/vendors/encryption/roleClients', () => ({
 }));
 vi.mock('../../../../backend/src/modules/gateway/services/paymentExecution.service', () => ({
   listPartyExecutions: h.listPartyExecutions,
+  getExecution: h.getExecution,
 }));
 vi.mock('../../../../backend/src/modules/transaction/services/cardTransaction.service', () => ({
   getPartyCardTransactions: h.getPartyCardTransactions,
   resolveAccountReferenceForParty: h.resolveAccountReferenceForParty,
 }));
 
-import { getCustomerTransactions } from '../../../../backend/src/modules/customer/services/customerActivity.service';
+import { getCustomerTransactions, getCustomerTransactionDetail } from '../../../../backend/src/modules/customer/services/customerActivity.service';
 
 const agreement = {
   customerAgreementInstanceReference: 'ca-001',
@@ -47,6 +49,7 @@ beforeEach(() => {
   h.listPartyExecutions.mockReset().mockResolvedValue([]);
   h.getPartyCardTransactions.mockReset().mockResolvedValue([]);
   h.resolveAccountReferenceForParty.mockReset().mockResolvedValue(undefined);
+  h.getExecution.mockReset().mockResolvedValue(null);
 });
 
 describe('getCustomerTransactions role gate (least-privilege, PCI DSS Req 7)', () => {
@@ -117,5 +120,52 @@ describe('getCustomerTransactions resolution + merge', () => {
     ]);
     const res = await getCustomerTransactions(makeDb(), 'ca-001', 'security_auditor');
     expect(res.results[0].direction).toBe('received');
+  });
+});
+
+describe('getCustomerTransactionDetail (SD-65 staff drill-down)', () => {
+  const exec = {
+    paymentExecutionInstanceReference: 'pe-1',
+    beneficiaryType: 'user',
+    initiatorPartyReference: 'party-001',
+    beneficiaryPartyReference: 'party-999',
+    grossAmount: 100, netAmount: 98, feeAmount: 2, currency: 'EUR',
+    paymentExecutionRail: 'sepa', paymentExecutionStatus: 'completed',
+    paymentExecutionRemittanceInformation: 'rent',
+    beneficiaryName: 'Landlord', destinationAccountMasked: 'ES12••••5477',
+    destinationIban: 'ES1234567890123456785477', // must NOT leak
+    resolutionLog: [{ stepName: 'resolve', stepOutcome: 'found', stepDateTime: new Date() }],
+  };
+
+  it('forbids level1_analyst and customer with 403', async () => {
+    await expect(getCustomerTransactionDetail(makeDb(), 'ca-001', 'pe-1', 'level1_analyst'))
+      .rejects.toMatchObject({ statusCode: 403 });
+    await expect(getCustomerTransactionDetail(makeDb(), 'ca-001', 'pe-1', 'customer'))
+      .rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it('404s when the agreement is not found', async () => {
+    h.getDbForRole.mockResolvedValue(makeDb(null));
+    await expect(getCustomerTransactionDetail(makeDb(), 'missing', 'pe-1', 'level2_investigator'))
+      .rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it('404s on a foreign execution not belonging to the party', async () => {
+    h.getExecution.mockResolvedValue({
+      ...exec, initiatorPartyReference: 'party-aaa', beneficiaryPartyReference: 'party-bbb',
+    });
+    await expect(getCustomerTransactionDetail(makeDb(), 'ca-001', 'pe-1', 'security_auditor'))
+      .rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it('returns display-safe detail for an owned execution (no raw IBAN)', async () => {
+    h.getExecution.mockResolvedValue(exec);
+    const d = await getCustomerTransactionDetail(makeDb(), 'ca-001', 'pe-1', 'level2_investigator');
+    expect(d.kind).toBe('transfer');
+    expect(d.direction).toBe('sent'); // party-001 is the initiator
+    expect(d.destinationAccountMasked).toBe('ES12••••5477');
+    expect(d.concept).toBe('rent');
+    expect(d.resolutionLog).toHaveLength(1);
+    expect((d as Record<string, unknown>).destinationIban).toBeUndefined();
   });
 });

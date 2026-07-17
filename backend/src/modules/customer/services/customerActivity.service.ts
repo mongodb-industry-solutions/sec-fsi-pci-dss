@@ -9,7 +9,8 @@ import type { UserRole } from '../../../shared/models/identity.model';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { canStaffInvestigate } from '../../../vendors/middleware/rbac';
 import { resolveAccountReferenceForParty, getPartyCardTransactions } from '../../transaction/services/cardTransaction.service';
-import { listPartyExecutions } from '../../gateway/services/paymentExecution.service';
+import { listPartyExecutions, getExecution } from '../../gateway/services/paymentExecution.service';
+import type { PaymentExecutionResolutionStep } from '../../gateway/models/paymentExecution.model';
 
 // Display-safe unified activity row (no CHD, no raw IBAN). Same shape the merchant OAuth history
 // exposes so the frontend can reuse one row renderer across contexts.
@@ -112,4 +113,102 @@ export async function getCustomerTransactions(
   const total = merged.length;
   const results = merged.slice((p - 1) * l, p * l);
   return { results, total, page: p, limit: l };
+}
+
+// Display-safe SD-65 execution detail for the staff drill-down (no CHD, no raw IBAN).
+export interface ExecutionDetail {
+  kind: 'transfer';
+  paymentExecutionInstanceReference: string;
+  direction: 'sent' | 'received';
+  beneficiaryType: string;
+  initiatorPartyReference: string | null;
+  beneficiaryPartyReference: string | null;
+  sourcePayoutAccountReference: string | null;
+  resolvedPayoutAccountReference: string | null;
+  beneficiaryArrangementReference: string | null;
+  merchantAgreementReference: string | null;
+  grossAmount: number;
+  netAmount: number;
+  feeAmount: number;
+  currency: string;
+  recipientCurrency: string | null;
+  recipientAmount: number | null;
+  fxRate: number | null;
+  paymentExecutionRail: string | null;
+  paymentExecutionStatus: string;
+  concept: string | null;
+  beneficiaryName: string | null;
+  destinationAccountMasked: string | null;
+  destinationCountry: string | null;
+  failureReason: string | null;
+  resolutionLog: PaymentExecutionResolutionStep[];
+  initiatedAt: string | null;
+  completedAt: string | null;
+}
+
+/**
+ * Staff drill-down: display-safe detail of ONE SD-65 payment execution belonging to a customer.
+ *
+ * Role gate (PCI DSS Req 7): restricted to level2_investigator and security_auditor (else 403).
+ * Resolves customerId (customerAgreementInstanceReference) -> partyInstanceReference, then asserts
+ * the execution belongs to that party (initiator or beneficiary) else 404 (existence not leaked).
+ * Reuses the SD-65 paymentExecution service; never returns the raw destination IBAN (QE:none).
+ */
+export async function getCustomerTransactionDetail(
+  db: Db,
+  customerId: string,
+  executionId: string,
+  role: UserRole,
+): Promise<ExecutionDetail> {
+  if (!canStaffInvestigate(role)) {
+    throw Object.assign(
+      new Error('Customer transaction detail is restricted to investigator and auditor roles'),
+      { statusCode: 403 },
+    );
+  }
+
+  const notFound = () => Object.assign(new Error('Transaction not found'), { statusCode: 404 });
+
+  const roleDb = await getDbForRole(role, false);
+  const agreement = await roleDb
+    .collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
+    .findOne({ customerAgreementInstanceReference: customerId });
+  if (!agreement) throw notFound();
+  const partyRef = agreement.partyInstanceReference;
+
+  const exec = await getExecution(db, executionId);
+  // Party ownership: the execution must involve this customer's party (sent or received).
+  if (!exec || (exec.initiatorPartyReference !== partyRef && exec.beneficiaryPartyReference !== partyRef)) {
+    throw notFound();
+  }
+
+  return {
+    kind: 'transfer',
+    paymentExecutionInstanceReference: exec.paymentExecutionInstanceReference,
+    direction: exec.initiatorPartyReference === partyRef ? 'sent' : 'received',
+    beneficiaryType: exec.beneficiaryType,
+    initiatorPartyReference: exec.initiatorPartyReference ?? null,
+    beneficiaryPartyReference: exec.beneficiaryPartyReference ?? null,
+    sourcePayoutAccountReference: exec.sourcePayoutAccountReference ?? null,
+    resolvedPayoutAccountReference: exec.resolvedPayoutAccountReference ?? null,
+    beneficiaryArrangementReference: exec.beneficiaryArrangementReference ?? null,
+    merchantAgreementReference: exec.merchantAgreementReference ?? null,
+    grossAmount: exec.grossAmount,
+    netAmount: exec.netAmount,
+    feeAmount: exec.feeAmount,
+    currency: exec.currency,
+    recipientCurrency: exec.recipientCurrency ?? null,
+    recipientAmount: exec.recipientAmount ?? null,
+    fxRate: exec.fxRate ?? null,
+    paymentExecutionRail: exec.paymentExecutionRail ?? null,
+    paymentExecutionStatus: exec.paymentExecutionStatus,
+    concept: exec.paymentExecutionRemittanceInformation ?? exec.routingNote ?? null,
+    beneficiaryName: exec.beneficiaryName ?? null,
+    destinationAccountMasked: exec.destinationAccountMasked ?? null,
+    destinationCountry: exec.destinationCountry ?? null,
+    failureReason: exec.failureReason ?? null,
+    resolutionLog: exec.resolutionLog ?? [],
+    initiatedAt: exec.initiatedAt?.toISOString() ?? null,
+    completedAt: exec.completedAt?.toISOString() ?? null,
+  };
 }

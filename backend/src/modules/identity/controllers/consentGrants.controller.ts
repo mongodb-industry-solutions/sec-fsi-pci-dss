@@ -18,6 +18,26 @@ function getSubFromRequest(request: FastifyRequest): string | null {
   return user?.sub ?? user?.partyAuthenticationInstanceReference ?? null;
 }
 
+// Resolve the OAuth subject the request targets. When `partyRef` is present this is a staff view of
+// another party's grants (gated to investigator/auditor); otherwise it is the caller's own sub.
+// Returns { sub } on success, or { error, status } to send. A staff partyRef with no auth identity
+// resolves to sub=null so the caller can return an empty payload without leaking existence.
+export async function resolveTargetSub(
+  fastify: FastifyInstance,
+  request: FastifyRequest,
+  partyRef: string | undefined,
+): Promise<{ sub: string | null } | { error: string; status: number }> {
+  if (partyRef) {
+    if (!canStaffInvestigate(extractUserRole(request))) {
+      return { error: 'Viewing another customer\'s authorized apps is restricted to investigator and auditor roles', status: 403 };
+    }
+    return { sub: await resolveSubForParty(fastify.db, partyRef) };
+  }
+  const sub = getSubFromRequest(request);
+  if (!sub) return { error: 'Unauthorized', status: 401 };
+  return { sub };
+}
+
 export async function consentGrantsController(fastify: FastifyInstance) {
   // GET /api/v1/auth/grants — list the calling user's active OAuth consent grants
   fastify.get('/grants', {
@@ -98,12 +118,18 @@ export async function consentGrantsController(fastify: FastifyInstance) {
     schema: {
       tags: ['auth:oauth'],
       summary: 'Get one of my authorized apps (detail)',
-      description: 'Returns the detail of a single OAuth consent grant owned by the authenticated user: merchant branding (name, logo_uri, client_uri), granted scopes with human-readable descriptions, approval date/time, last use and status. Self-scoped — a consentId that is not the caller\'s returns 404 (existence is not leaked).',
+      description: 'Returns the detail of a single OAuth consent grant owned by the authenticated user: merchant branding (name, logo_uri, client_uri), granted scopes with human-readable descriptions, approval date/time, last use and status. Self-scoped: a consentId that is not the caller\'s returns 404 (existence is not leaked). **Staff view (v27):** pass `partyRef` (a found customer\'s `partyInstanceReference`) to read THAT party\'s grant detail; restricted to `level2_investigator` and `security_auditor` (else 403).',
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
         required: ['consentId'],
         properties: { consentId: { type: 'string' } },
+      },
+      querystring: {
+        type: 'object',
+        properties: {
+          partyRef: { type: 'string', description: 'Staff target: a customer\'s `partyInstanceReference`. When present, requires investigator/auditor and returns that party\'s grant detail instead of the caller\'s own.' },
+        },
       },
       response: {
         200: {
@@ -137,11 +163,13 @@ export async function consentGrantsController(fastify: FastifyInstance) {
       },
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
-    const sub = getSubFromRequest(request);
-    if (!sub) return reply.status(401).send({ error: 'Unauthorized' });
+    const { partyRef } = request.query as { partyRef?: string };
+    const resolved = await resolveTargetSub(fastify, request, partyRef);
+    if ('error' in resolved) return reply.status(resolved.status).send({ error: resolved.error });
+    if (!resolved.sub) return reply.status(404).send({ error: 'Consent grant not found' });
 
     const { consentId } = request.params as { consentId: string };
-    const detail = await getUserConsentGrantDetail(fastify.db, sub, consentId);
+    const detail = await getUserConsentGrantDetail(fastify.db, resolved.sub, consentId);
     if (!detail) return reply.status(404).send({ error: 'Consent grant not found' });
     return {
       ...detail,
@@ -156,7 +184,7 @@ export async function consentGrantsController(fastify: FastifyInstance) {
     schema: {
       tags: ['auth:oauth'],
       summary: 'Operations I executed through this app',
-      description: 'Returns the businessProcessEvent operations the authenticated user executed through this authorized app (attributed by clientId / merchantAgreementReference AND actingPartyReference === caller). Paginated, free-text searchable, date-range filterable. Display-safe — never returns CHD or raw IBAN. Self-scoped: a foreign consentId returns 404.',
+      description: 'Returns the businessProcessEvent operations the authenticated user executed through this authorized app (attributed by clientId / merchantAgreementReference AND actingPartyReference === caller). Paginated, free-text searchable, date-range filterable. Display-safe: never returns CHD or raw IBAN. Self-scoped: a foreign consentId returns 404. **Staff view (v27):** pass `partyRef` (a found customer\'s `partyInstanceReference`) to read THAT party\'s operations through the app; restricted to `level2_investigator` and `security_auditor` (else 403).',
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
@@ -171,22 +199,25 @@ export async function consentGrantsController(fastify: FastifyInstance) {
           dateTo: { type: 'string', format: 'date-time' },
           page: { type: 'integer', minimum: 1 },
           limit: { type: 'integer', minimum: 1, maximum: 100 },
+          partyRef: { type: 'string', description: 'Staff target: a customer\'s `partyInstanceReference`. When present, requires investigator/auditor and returns that party\'s operations instead of the caller\'s own.' },
         },
       },
-      response: { 401: { $ref: 'Error#' }, 404: { $ref: 'Error#' } },
+      response: { 401: { $ref: 'Error#' }, 403: { $ref: 'Error#' }, 404: { $ref: 'Error#' } },
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
-    const sub = getSubFromRequest(request);
-    if (!sub) return reply.status(401).send({ error: 'Unauthorized' });
+    const { q, dateFrom, dateTo, page, limit, partyRef } = request.query as {
+      q?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number; partyRef?: string;
+    };
+    const resolved = await resolveTargetSub(fastify, request, partyRef);
+    if ('error' in resolved) return reply.status(resolved.status).send({ error: resolved.error });
+    if (!resolved.sub) return reply.status(404).send({ error: 'Consent grant not found' });
+    const sub = resolved.sub;
 
     const { consentId } = request.params as { consentId: string };
-    // Verify ownership (and resolve the app's clientId + merchant ref) before querying activity.
+    // Verify the grant belongs to the target sub (and resolve clientId + merchant ref) before querying.
     const detail = await getUserConsentGrantDetail(fastify.db, sub, consentId);
     if (!detail) return reply.status(404).send({ error: 'Consent grant not found' });
 
-    const { q, dateFrom, dateTo, page, limit } = request.query as {
-      q?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number;
-    };
     return listPartyAppActivity(fastify.db, {
       actingPartyReference: sub,
       clientId: detail.oauthClientId,

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api, type ConsentGrant, type CustomerTransactionRow } from '../../../../lib/api';
+import { api, type ConsentGrant, type CustomerTransactionRow, type FraudCase } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
 import { useResource } from '../../../../lib/useResource';
@@ -10,10 +10,18 @@ import { readEscalationToken } from '../../../../lib/escalation';
 import { useDebugMode } from '../../../../lib/debugMode';
 import { LoadingIndicator } from '../../../../components/LoadingIndicator';
 import { Pagination } from '../../../../components/Pagination';
+import { CaseTable } from '../../../../components/CaseTable';
 import { useConfirm, useNotify } from '../../../../components/ui/ConfirmProvider';
-import { UserCheck, ShieldCheck, Lock, ArrowUpRight, ArrowDownLeft, Layers, Landmark, CreditCard, Trash2, Pause } from 'lucide-react';
+import { UserCheck, ShieldCheck, Lock, ArrowUpRight, ArrowDownLeft, Layers, Landmark, CreditCard, Trash2, Pause, ShieldAlert } from 'lucide-react';
 
 const SEGMENT_LABELS: Record<string, string> = { retail: 'Retail', premium: 'Premium', corporate: 'Corporate', sme: 'SME' };
+
+// v27 staff navigation context appended to a detail-page URL so it opens in staff-target mode
+// (the target's data via staff endpoints, breadcrumb back to this profile). The page enforces the
+// role; these params only carry WHO is being inspected.
+function staffQuery(customerId: string, partyRef: string): string {
+  return `?ctx=staff&customerId=${encodeURIComponent(customerId)}&partyRef=${encodeURIComponent(partyRef)}`;
+}
 
 function money(amount?: number, currency?: string): string {
   if (amount == null) return '-';
@@ -32,7 +40,8 @@ function statusPill(status: string): string {
 // --- Staff-only sections (VIEW: L2 + auditor · ACTIONS: level2_investigator only) ------------
 
 // Transactions (SD-65 + SD-254), display-safe + paginated. Read-only for both staff roles.
-function StaffTransactionsSection({ customerId, token }: { customerId: string; token: string }) {
+function StaffTransactionsSection({ customerId, partyRef, token }: { customerId: string; partyRef: string; token: string }) {
+  const router = useRouter();
   const [rows, setRows] = useState<CustomerTransactionRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -75,8 +84,13 @@ function StaffTransactionsSection({ customerId, token }: { customerId: string; t
               <tbody>
                 {rows.map((r) => {
                   const when = r.completedAt ?? r.initiatedAt;
+                  // Card-kind → existing staff transaction detail; transfer-kind → SD-65 staff execution detail.
+                  const href = r.kind === 'card'
+                    ? `/system/transactions/${encodeURIComponent(r.paymentExecutionInstanceReference)}${staffQuery(customerId, partyRef)}`
+                    : `/system/users/${encodeURIComponent(customerId)}/transactions/${encodeURIComponent(r.paymentExecutionInstanceReference)}`;
                   return (
-                    <tr key={r.paymentExecutionInstanceReference} className="border-b border-gray-50">
+                    <tr key={r.paymentExecutionInstanceReference} onClick={() => router.push(href)}
+                      className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer">
                       <td className="py-2 pr-3">
                         <span className={`inline-flex items-center gap-1 text-xs ${r.direction === 'received' ? 'text-green-700' : 'text-gray-600'}`}>
                           {r.direction === 'received' ? <ArrowDownLeft size={12} /> : <ArrowUpRight size={12} />}{r.direction}
@@ -106,7 +120,7 @@ function StaffTransactionsSection({ customerId, token }: { customerId: string; t
 }
 
 // Authorized apps (OAuth consent grants) for the party. Staff revoke is level2_investigator only.
-function StaffAppsSection({ partyRef, token, canAct }: { partyRef: string; token: string; canAct: boolean }) {
+function StaffAppsSection({ customerId, partyRef, token, canAct }: { customerId: string; partyRef: string; token: string; canAct: boolean }) {
   const confirm = useConfirm();
   const notify = useNotify();
   const [grants, setGrants] = useState<ConsentGrant[]>([]);
@@ -154,7 +168,8 @@ function StaffAppsSection({ partyRef, token, canAct }: { partyRef: string; token
               <li key={g.consentId} className="py-3 flex items-center gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="font-medium text-sm text-gray-800 truncate flex items-center gap-2">
-                    {g.merchantName}
+                    <Link href={`/system/applications/${encodeURIComponent(g.consentId)}${staffQuery(customerId, partyRef)}`}
+                      className="hover:underline text-[#00684A]">{g.merchantName}</Link>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${revoked ? 'bg-gray-100 text-gray-500 border border-gray-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
                       {revoked ? 'Revoked' : 'Active'}
                     </span>
@@ -186,7 +201,7 @@ function StaffAppsSection({ partyRef, token, canAct }: { partyRef: string; token
 }
 
 // Payout accounts (GDPR/PSD2). IBAN reveal is gated server-side; here we show display-safe fields only.
-function StaffAccountsSection({ partyRef, token }: { partyRef: string; token: string }) {
+function StaffAccountsSection({ customerId, partyRef, token }: { customerId: string; partyRef: string; token: string }) {
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
   const [loading, setLoading] = useState(true);
 
@@ -211,7 +226,10 @@ function StaffAccountsSection({ partyRef, token }: { partyRef: string; token: st
             <li key={String(a.payoutAccountInstanceReference)} className="py-3 flex items-center gap-3">
               <div className="min-w-0 flex-1">
                 <p className="font-medium text-sm text-gray-800 truncate flex items-center gap-2">
-                  {String(a.payoutAccountAlias ?? a.payoutAccountBankName ?? a.payoutAccountType ?? 'Account')}
+                  <Link href={`/system/accounts/${encodeURIComponent(String(a.payoutAccountInstanceReference))}${staffQuery(customerId, partyRef)}`}
+                    className="hover:underline text-[#00684A]">
+                    {String(a.payoutAccountAlias ?? a.payoutAccountBankName ?? a.payoutAccountType ?? 'Account')}
+                  </Link>
                   {a.payoutAccountIsDefault === true && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">Default</span>}
                 </p>
                 <p className="text-[11px] text-gray-400 mt-0.5">
@@ -228,7 +246,7 @@ function StaffAccountsSection({ partyRef, token }: { partyRef: string; token: st
 }
 
 // Saved cards (SD-88), masked PAN only. Deactivate / remove are level2_investigator only.
-function StaffCardsSection({ customerId, token, canAct }: { customerId: string; token: string; canAct: boolean }) {
+function StaffCardsSection({ customerId, partyRef, token, canAct }: { customerId: string; partyRef: string; token: string; canAct: boolean }) {
   const confirm = useConfirm();
   const notify = useNotify();
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
@@ -279,7 +297,8 @@ function StaffCardsSection({ customerId, token, canAct }: { customerId: string; 
               <li key={cardId} className="py-3 flex items-center gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="font-medium text-sm text-gray-800 truncate flex items-center gap-2">
-                    <span className="font-mono">{masked}</span>
+                    <Link href={`/system/cards/${encodeURIComponent(cardId)}${staffQuery(customerId, partyRef)}`}
+                      className="font-mono hover:underline text-[#00684A]">{masked}</Link>
                     <span className="text-xs text-gray-500">{String(c.paymentCardNetwork ?? '')}</span>
                     {c.paymentCardIsPreferred === true && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">Preferred</span>}
                   </p>
@@ -306,6 +325,45 @@ function StaffCardsSection({ customerId, token, canAct }: { customerId: string; 
             );
           })}
         </ul>
+      )}
+    </div>
+  );
+}
+
+// Fraud/investigation cases opened against this customer (SD-77). Read-only list; each row links to
+// the existing case detail. Reuses CaseTable + Pagination. VIEW = L2 + auditor (server re-enforces).
+function StaffCasesSection({ customerId, token }: { customerId: string; token: string }) {
+  const [cases, setCases] = useState<FraudCase[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    api.fraud.list({ customerId, page, limit }, token)
+      .then((r) => { if (alive) { setCases(r.results); setTotal(r.total); } })
+      .catch(() => { if (alive) { setCases([]); setTotal(0); } })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [customerId, token, page, limit]);
+
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+
+  return (
+    <div className="bg-white rounded-xl border p-5">
+      <h2 className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-1.5"><ShieldAlert size={14} className="text-[#00684A]" /> Cases</h2>
+      {loading ? <LoadingIndicator label="Loading cases…" /> : cases.length === 0 ? (
+        <p className="text-sm text-gray-400 italic py-4">No investigation cases for this customer.</p>
+      ) : (
+        <>
+          <CaseTable cases={cases} basePath="/system/investigation" />
+          <div className="pt-2">
+            <Pagination page={page} totalPages={totalPages} total={total} limit={limit}
+              onPageChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); }} noun="cases" />
+          </div>
+        </>
       )}
     </div>
   );
@@ -479,12 +537,13 @@ export default function CustomerDetailPage() {
               {canAct ? 'L2 actions enabled' : 'Read-only (auditor)'}
             </span>
           </div>
-          <StaffTransactionsSection customerId={customerId} token={token} />
+          <StaffTransactionsSection customerId={customerId} partyRef={partyRef} token={token} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {partyRef ? <StaffAppsSection partyRef={partyRef} token={token} canAct={canAct} /> : null}
-            {partyRef ? <StaffAccountsSection partyRef={partyRef} token={token} /> : null}
+            {partyRef ? <StaffAppsSection customerId={customerId} partyRef={partyRef} token={token} canAct={canAct} /> : null}
+            {partyRef ? <StaffAccountsSection customerId={customerId} partyRef={partyRef} token={token} /> : null}
           </div>
-          <StaffCardsSection customerId={customerId} token={token} canAct={canAct} />
+          <StaffCardsSection customerId={customerId} partyRef={partyRef} token={token} canAct={canAct} />
+          <StaffCasesSection customerId={customerId} token={token} />
         </div>
       )}
     </div>
