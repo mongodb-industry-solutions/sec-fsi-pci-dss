@@ -60,7 +60,9 @@ export function buildEncryptedFieldsMaps(
           path: 'partyName',
           bsonType: 'string',
           queries: textQuery(QT_SUBSTRING, {
-            strMaxLength: 64, strMinQueryLength: 3, strMaxQueryLength: 30,
+            // Params kept within the cluster default substringPreview limits (strMaxQueryLength
+            // capped) so setup needs no fleDisableSubstringPreviewParameterLimits override.
+            strMaxLength: 30, strMinQueryLength: 3, strMaxQueryLength: 10,
             caseSensitive: false, diacriticSensitive: false,
           }),
         },
@@ -144,7 +146,7 @@ export function buildEncryptedFieldsMaps(
           path: 'customerAgreementGovernmentID.number',
           bsonType: 'string',
           queries: textQuery(QT_SUFFIX, {
-            strMaxLength: 32, strMinQueryLength: 3, strMaxQueryLength: 16,
+            strMaxLength: 20, strMinQueryLength: 3, strMaxQueryLength: 10,
             caseSensitive: true, diacriticSensitive: true,
           }),
         },
@@ -175,7 +177,7 @@ export function buildEncryptedFieldsMaps(
           path: 'customerAgreementTaxIDNumber',
           bsonType: 'string',
           queries: textQuery(QT_PREFIX, {
-            strMaxLength: 32, strMinQueryLength: 2, strMaxQueryLength: 16,
+            strMaxLength: 20, strMinQueryLength: 2, strMaxQueryLength: 10,
             caseSensitive: true, diacriticSensitive: true,
           }),
         },

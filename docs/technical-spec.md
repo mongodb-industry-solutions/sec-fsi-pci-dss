@@ -1248,15 +1248,15 @@ encrypted, lookup-tier and exact-searchable.
 
 | Field | bsonType | Query type | Params |
 |---|---|---|---|
-| `party.partyName` | string | substring | strMaxLength 64, strMinQueryLength 3, strMaxQueryLength 30, caseSensitive false, diacriticSensitive false |
+| `party.partyName` | string | substring | strMaxLength 30, strMinQueryLength 3, strMaxQueryLength 10, caseSensitive false, diacriticSensitive false (sized within cluster default substringPreview limits) |
 | `party.partyDateOfBirth` | date | range | min 1900-01-01, max 2020-01-01, sparsity 1, trimFactor 4 |
 | `party.partyNationality` | string | equality | contention 8 |
 | `party.partyPlaceOfBirth` | string | equality | contention 8 |
-| `customerAgreementGovernmentID.number` | string | suffix | strMaxLength 32, strMinQueryLength 3, strMaxQueryLength 16, caseSensitive true, diacriticSensitive true |
+| `customerAgreementGovernmentID.number` | string | suffix | strMaxLength 20, strMinQueryLength 3, strMaxQueryLength 10, caseSensitive true, diacriticSensitive true |
 | `customerAgreementGovernmentID.type` | string | equality | contention 6 |
 | `customerAgreementGovernmentID.issuingCountry` | string | equality | contention 6 |
 | `customerAgreementGovernmentID.expiryDate` | date | range | min 2000-01-01, max 2040-01-01, sparsity 1, trimFactor 4 |
-| `customerAgreementTaxIDNumber` | string | prefix | strMaxLength 32, strMinQueryLength 2, strMaxQueryLength 16, caseSensitive true, diacriticSensitive true |
+| `customerAgreementTaxIDNumber` | string | prefix | strMaxLength 20, strMinQueryLength 2, strMaxQueryLength 10, caseSensitive true, diacriticSensitive true |
 | `customerAgreementOccupation` | string | equality | contention 6 |
 | `customerAgreementKycCheck.customerAgreementKycCheckRiskScore` | int | range | min 0, max 100, sparsity 1, trimFactor 4 |
 | `customerAgreementKycCheck.customerAgreementKycCheckRiskRating` | string | equality | contention 8 |
