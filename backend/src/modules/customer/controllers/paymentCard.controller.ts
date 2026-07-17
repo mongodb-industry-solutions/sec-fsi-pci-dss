@@ -3,6 +3,8 @@ import { registerCardForCustomer, getCardsByCustomer, getCardById, getCardHolder
 import type { PaymentCardManagementControlRecord } from '../models/paymentCard.model';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
+import { canStaffMutate } from '../../../vendors/middleware/rbac';
+import type { UserRole } from '../../../shared/models/identity.model';
 
 const STAFF_READ_ROLES = ['level1_analyst', 'level2_investigator', 'security_auditor'];
 
@@ -563,9 +565,12 @@ audit event (Req 10).`,
     const { customerId, cardId } = request.params as { customerId: string; cardId: string };
     const { active } = request.body as { active: boolean };
 
+    // Owner (self-service) OR an L2 investigator acting as staff (BIAN SD-15 control). The auditor is
+    // read-only and L1 has no card-mutation reach, so both are blocked here (PCI DSS Req 7).
     const user = (request as { user?: JwtUserPayload }).user;
     const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
-    if (!ownId || ownId !== customerId) {
+    const isOwner = !!ownId && ownId === customerId;
+    if (!isOwner && !canStaffMutate((user?.role ?? '') as UserRole)) {
       return reply.status(403).send({ error: 'You can only change the status of your own saved cards.' });
     }
 
@@ -615,9 +620,11 @@ audit event (\`card.removed\`) is emitted. CVV/PIN are never involved.`,
     },
   }, async (request, reply) => {
     const { customerId, cardId } = request.params as { customerId: string; cardId: string };
+    // Owner (self-service) OR an L2 investigator acting as staff. Auditor (read-only) and L1 blocked.
     const user = (request as { user?: JwtUserPayload }).user;
     const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
-    if (!ownId || ownId !== customerId) {
+    const isOwner = !!ownId && ownId === customerId;
+    if (!isOwner && !canStaffMutate((user?.role ?? '') as UserRole)) {
       return reply.status(403).send({ error: 'You can only remove cards from your own account.' });
     }
     const removed = await revokeCard(fastify.db, customerId, cardId);

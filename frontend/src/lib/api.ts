@@ -526,6 +526,25 @@ export interface SavedCardDisplay {
   paymentCardIsPreferred?: boolean;
 }
 
+// v27: staff investigation view of a customer's aggregated activity. Display-safe union row
+// (transfer/card); never CHD, raw IBAN or gateway payload. Mirrors the backend ActivityRow.
+export interface CustomerTransactionRow {
+  kind: 'transfer' | 'card';
+  paymentExecutionInstanceReference: string;
+  direction: 'sent' | 'received';
+  grossAmount?: number;
+  netAmount?: number;
+  feeAmount?: number;
+  currency?: string;
+  paymentExecutionRail: string | null;
+  paymentExecutionStatus: string;
+  concept: string | null;
+  beneficiaryName: string | null;
+  destinationAccountMasked: string | null;
+  initiatedAt: string | null;
+  completedAt: string | null;
+}
+
 // v27: Encrypted-KYC search (Queryable Encryption showcase). Field registry + tier-shaped results.
 export type KycSearchMode = 'substring' | 'prefix' | 'suffix' | 'range' | 'equality';
 
@@ -781,6 +800,16 @@ export const api = {
       apiFetch<{ results: Record<string, unknown>[] }>(
         `/api/v1/customer/${encodeURIComponent(customerId)}/cards`, {}, token
       ),
+    // v27: staff investigation view of a customer's aggregated transactions (SD-65 + SD-254),
+    // display-safe and paginated. Restricted server-side to level2_investigator / security_auditor.
+    transactions: (customerId: string, params: { page?: number; limit?: number }, token: string) => {
+      const qs = new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])
+      ).toString();
+      return apiFetch<{ results: CustomerTransactionRow[]; total: number; page: number; limit: number }>(
+        `/api/v1/customer/${encodeURIComponent(customerId)}/transactions${qs ? `?${qs}` : ''}`, {}, token
+      );
+    },
     // The AUTHENTICATED caller's OWN saved cards (display-safe). The agreement is resolved server-side
     // from the token (partyRef) — never a client-supplied id — so a caller only ever sees their own
     // cards. Used by the hosted payment pages to offer a saved-card pick to the signed-in viewer.
@@ -1365,6 +1394,19 @@ export const api = {
     // Revoked grants are kept; filter with status (active | revoked | all, default all).
     list: (token: string, status: 'active' | 'revoked' | 'all' = 'all') =>
       apiFetch<{ grants: ConsentGrant[] }>(`/api/v1/auth/grants?status=${status}`, {}, token),
+    // v27 staff view: list a found customer's authorized apps by their partyInstanceReference.
+    // Restricted server-side to level2_investigator / security_auditor (else 403). Reuses ConsentGrant.
+    listForParty: (partyRef: string, token: string, status: 'active' | 'revoked' | 'all' = 'all') =>
+      apiFetch<{ grants: ConsentGrant[] }>(
+        `/api/v1/auth/grants?partyRef=${encodeURIComponent(partyRef)}&status=${status}`, {}, token
+      ),
+    // v27 staff action: revoke a grant the caller does NOT own. level2_investigator only (audited).
+    revokeForParty: (consentId: string, partyRef: string, token: string) =>
+      apiFetch<{ revoked: boolean; consentId: string }>(
+        `/api/v1/auth/grants/${encodeURIComponent(consentId)}?partyRef=${encodeURIComponent(partyRef)}`,
+        { method: 'DELETE' },
+        token,
+      ),
     // v18 D-01: detail of one authorized app (scopes with descriptions, approval date/time, branding).
     getDetail: (consentId: string, token: string) =>
       apiFetch<ConsentGrantDetail>(`/api/v1/auth/grants/${encodeURIComponent(consentId)}`, {}, token),

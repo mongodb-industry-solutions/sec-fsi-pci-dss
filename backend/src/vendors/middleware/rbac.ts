@@ -42,6 +42,25 @@ export function canReadSensitive(role: UserRole, hasValidToken: boolean): boolea
   return false;
 }
 
+// Staff investigation roles (v27 profile staff view, PCI DSS Req 7 least privilege).
+// VIEW of a found customer's related data (transactions, authorized apps, accounts, cards) is
+// limited to these roles; L1 analyst and customer are blocked. Mirrors KYC_SEARCH_ROLES.
+export const STAFF_INVESTIGATION_ROLES: ReadonlySet<UserRole> = new Set([
+  'level2_investigator',
+  'security_auditor',
+]);
+
+// May a role VIEW another party's related data on the staff profile page (read)?
+export function canStaffInvestigate(role: UserRole): boolean {
+  return STAFF_INVESTIGATION_ROLES.has(role);
+}
+
+// May a role perform a staff MUTATION on another party's data (deactivate/remove a card, revoke a
+// grant they do not own)? Investigator only. The auditor is read-only, L1 has no reach here.
+export function canStaffMutate(role: UserRole): boolean {
+  return role === 'level2_investigator';
+}
+
 export function attachRbacContext(request: FastifyRequest): void {
   const demoReq = request as unknown as AuthenticatedRequest;
   demoReq.userRole = extractUserRole(request);

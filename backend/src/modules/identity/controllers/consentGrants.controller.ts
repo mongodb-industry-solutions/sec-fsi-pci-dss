@@ -9,8 +9,9 @@
  *   DELETE /api/v1/auth/grants/:consentId — revoke a grant (tokens immediately invalidated)
  */
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { listUserConsentGrants, getUserConsentGrantDetail, revokeConsentGrant, reactivateConsentGrant } from '../services/oauth.service';
-import { listPartyAppActivity } from '../../provider/services/businessProcessEvent.service';
+import { listUserConsentGrants, getUserConsentGrantDetail, revokeConsentGrant, reactivateConsentGrant, resolveSubForParty } from '../services/oauth.service';
+import { listPartyAppActivity, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
+import { extractUserRole, canStaffInvestigate, canStaffMutate } from '../../../vendors/middleware/rbac';
 
 function getSubFromRequest(request: FastifyRequest): string | null {
   const user = (request as any).user as { sub?: string; partyAuthenticationInstanceReference?: string } | undefined;
@@ -23,12 +24,13 @@ export async function consentGrantsController(fastify: FastifyInstance) {
     schema: {
       tags: ['auth:oauth'],
       summary: 'List my authorized apps (OAuth consent grants)',
-      description: 'Returns the authenticated user\'s OAuth consent grants — the merchant apps authorized via OIDC. Revoked grants are kept (soft-revoke) so the user can review past apps/operations and re-approve; filter with `status` (active | revoked | all, default all). Requires a valid PSP session token (any role).',
+      description: 'Returns the authenticated user\'s OAuth consent grants — the merchant apps authorized via OIDC. Revoked grants are kept (soft-revoke) so the user can review past apps/operations and re-approve; filter with `status` (active | revoked | all, default all). Requires a valid PSP session token (any role). **Staff view (v27):** pass `partyRef` (a found customer\'s `partyInstanceReference`) to list THAT party\'s grants; this is restricted to `level2_investigator` and `security_auditor` (else 403).',
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
         properties: {
           status: { type: 'string', enum: ['active', 'revoked', 'all'], default: 'all', description: 'Filter by consent status. Default all (active + revoked).' },
+          partyRef: { type: 'string', description: 'Staff target: a customer\'s `partyInstanceReference`. When present, requires investigator/auditor and returns that party\'s grants instead of the caller\'s own.' },
         },
       },
       response: {
@@ -59,10 +61,21 @@ export async function consentGrantsController(fastify: FastifyInstance) {
       },
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
-    const sub = getSubFromRequest(request);
-    if (!sub) return reply.status(401).send({ error: 'Unauthorized' });
+    const { status, partyRef } = request.query as { status?: 'active' | 'revoked' | 'all'; partyRef?: string };
 
-    const { status } = request.query as { status?: 'active' | 'revoked' | 'all' };
+    // Staff view: resolve the target party's OAuth subject server-side. Gated to investigator/auditor.
+    let sub: string | null;
+    if (partyRef) {
+      if (!canStaffInvestigate(extractUserRole(request))) {
+        return reply.status(403).send({ error: 'Viewing another customer\'s authorized apps is restricted to investigator and auditor roles' });
+      }
+      sub = await resolveSubForParty(fastify.db, partyRef);
+      if (!sub) return { grants: [] }; // party has no auth identity → no grants (do not leak existence)
+    } else {
+      sub = getSubFromRequest(request);
+      if (!sub) return reply.status(401).send({ error: 'Unauthorized' });
+    }
+
     const grants = await listUserConsentGrants(fastify.db, sub, status ?? 'all');
     return {
       grants: grants.map((g) => ({
@@ -190,12 +203,18 @@ export async function consentGrantsController(fastify: FastifyInstance) {
     schema: {
       tags: ['auth:oauth'],
       summary: 'Revoke an OAuth consent grant',
-      description: 'Revokes a specific consent grant. All active access tokens and refresh tokens for this user + merchant client are immediately invalidated. The merchant receives an `oauth.authorization_revoked` webhook.',
+      description: 'Revokes a specific consent grant. All active access tokens and refresh tokens for this user + merchant client are immediately invalidated. The merchant receives an `oauth.authorization_revoked` webhook. **Staff action (v27):** pass `partyRef` to revoke a grant the caller does NOT own; this is restricted to `level2_investigator` only (auditor is read-only, L1 has no reach → 403) and is audited.',
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
         required: ['consentId'],
         properties: { consentId: { type: 'string' } },
+      },
+      querystring: {
+        type: 'object',
+        properties: {
+          partyRef: { type: 'string', description: 'Staff target: the owning customer\'s `partyInstanceReference`. When present, this is a staff revoke (level2_investigator only).' },
+        },
       },
       response: {
         200: {
@@ -206,6 +225,7 @@ export async function consentGrantsController(fastify: FastifyInstance) {
           },
         },
         401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
         404: { $ref: 'Error#' },
       },
     },
@@ -214,6 +234,35 @@ export async function consentGrantsController(fastify: FastifyInstance) {
     if (!sub) return reply.status(401).send({ error: 'Unauthorized' });
 
     const { consentId } = request.params as { consentId: string };
+    const { partyRef } = request.query as { partyRef?: string };
+    const role = extractUserRole(request);
+
+    // Staff revoke of a grant the caller does not own: investigator only, audited (PCI DSS Req 10).
+    if (partyRef) {
+      if (!canStaffMutate(role)) {
+        return reply.status(403).send({ error: 'Revoking another customer\'s authorized app is restricted to level2_investigator' });
+      }
+      try {
+        await revokeConsentGrant(fastify.db, sub, consentId, 'psp', { staffOverride: true });
+        emitComplianceEvent(fastify.db, {
+          entityType: 'customer',
+          entityId: partyRef,
+          processType: 'authentication',
+          processAction: 'oauth.consent.revoked_by_staff',
+          processOutcome: 'approved',
+          performedByPartyReference: sub,
+          performedByRole: role,
+          eventSummary: { consentId, targetPartyReference: partyRef },
+          bianServiceDomain: 'PartyAuthentication',
+          bianControlRecordType: 'ConsentGrant',
+        });
+        return { revoked: true, consentId };
+      } catch (err: any) {
+        return reply.status(err.statusCode ?? 500).send({ error: err.message });
+      }
+    }
+
+    // Self-revoke (unchanged).
     try {
       await revokeConsentGrant(fastify.db, sub, consentId, 'user');
       return { revoked: true, consentId };

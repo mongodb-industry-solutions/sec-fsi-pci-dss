@@ -152,6 +152,22 @@ export async function getExecution(
     .findOne({ paymentExecutionInstanceReference: executionRef });
 }
 
+// List a party's SD-65 executions (both sent and received), most recent first, capped. Used by the
+// staff customer-transactions view to aggregate the party's money movement alongside card txns.
+// Party references are plaintext business keys (not CHD/PII), so no QE decrypt is needed for the read.
+export async function listPartyExecutions(
+  db: Db,
+  partyRef: string,
+  cap = 200,
+): Promise<PaymentExecutionProcedure[]> {
+  if (!partyRef) return [];
+  return db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION)
+    .find({ $or: [{ initiatorPartyReference: partyRef }, { beneficiaryPartyReference: partyRef }] })
+    .sort({ initiatedAt: -1 })
+    .limit(cap)
+    .toArray();
+}
+
 export async function listExecutions(
   db: Db,
   opts?: { status?: PaymentExecutionStatus; page?: number; limit?: number },
