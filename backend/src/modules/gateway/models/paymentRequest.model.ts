@@ -75,7 +75,7 @@ export interface PaymentRequestProcedure {
   requesterPspId?: string;
   payeeName?: string;                         // QE:none (DEK-rtp-payee-name) — L2 only
   payeeCounterpartyReference?: string;        // FK → counterpartyArrangement (SD-54)
-  payeeAlias?: string;                        // QE:none (DEK-rtp-alias) — L2 plaintext display
+  payeeAlias?: string;                        // QE:none (DEK-rtp-payee-alias) — L2 plaintext display
   payeeAliasHash?: string;                    // SHA-256(alias) — indexed, non-reversible
   payeeReceivingAccountReference: string;     // FK → payoutAccountArrangement (required at create)
 
@@ -83,7 +83,7 @@ export interface PaymentRequestProcedure {
   payerPartyReference?: string;               // resolved payer (FK → party)
   payerCounterpartyReference?: string;        // FK → counterpartyArrangement (SD-54): the requester's
                                               // beneficiary that represents the payer (for the payee's link)
-  payerAlias?: string;                        // QE:none (DEK-rtp-alias)
+  payerAlias?: string;                        // QE:none (DEK-rtp-payer-alias)
   payerAliasHash?: string;                    // SHA-256(alias) — indexed
   payerPspId?: string;
   payerFundingAccountReference?: string;      // chosen at approval; else payer default account

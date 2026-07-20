@@ -29,12 +29,12 @@ function baseRequest(
 ): PaymentRequestProcedure {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + daysToExpiry * 24 * 3600 * 1000);
-  const payeeAlias = 'payee2@leafybank.example';
+  const payeeAlias = 'payee2@sec4pay.example';
   return {
     paymentRequestInstanceReference: ref,
     requestVersion: 1,
     requesterPartyReference: PAYEE_PARTY,
-    payeeName: 'Leafy Demo Payee',
+    payeeName: 'Sec4 Demo Payee',
     payeeAlias,
     payeeAliasHash: sha256(payeeAlias),
     payeeReceivingAccountReference: PAYEE_ACCOUNT,

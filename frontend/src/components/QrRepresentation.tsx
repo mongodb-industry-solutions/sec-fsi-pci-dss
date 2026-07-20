@@ -1,8 +1,8 @@
 'use client';
 // v28 Shared QR representation component. Renders a payable intent's encoded payload (signed deep link
-// or EPC/EMVCo string) for RTP, payment links, and checkout. No new dependency: we render the payload
-// as a scannable, copyable deep-link block (no canvas QR encoder). The backend owns the canonical
-// payload (qrPaymentRepresentation.encodedPayload); this component never holds PII beyond that string.
+// or EPC/EMVCo string) for RTP, payment links, and checkout. Renders a scannable QR (via qrcode.react,
+// QRCodeSVG) plus a copyable deep-link block. The backend owns the canonical payload
+// (qrPaymentRepresentation.encodedPayload); this component never holds PII beyond that string.
 import { useState, useMemo } from 'react';
 import { QrCode, Copy, Check } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';

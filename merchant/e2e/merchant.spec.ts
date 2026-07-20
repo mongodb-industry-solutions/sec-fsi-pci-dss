@@ -21,7 +21,7 @@ test.describe('Merchant ↔ Sec4 Pay SSO + API', () => {
   // Drives the OAuth consent page hosted by the PSP frontend and lands back on the merchant.
   async function login(page: Page) {
     await page.goto('/');
-    await page.getByRole('link', { name: /login with securit4 pay/i }).click();
+    await page.getByRole('link', { name: /login with sec4 pay/i }).click();
     await page.getByLabel(/email/i).fill(EMAIL);
     await page.getByLabel(/password/i).fill(PASSWORD);
     await page.getByRole('button', { name: /sign in/i }).click();
