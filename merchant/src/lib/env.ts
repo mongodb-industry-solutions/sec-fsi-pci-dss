@@ -82,7 +82,7 @@ export const ENV = {
     envVar('PSP_MERCHANT_SIMULATOR_URL') ??
     (envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8080/auth/authorize').replace('/auth/authorize', '/simulator'),
   // Browser-facing PSP passwordless credentials management page (PSP frontend). Lets the merchant link the
-  // user to Securit4 Pay to manage/revoke their enrolled keys. Derived from the authorize URL by default.
+  // user to Sec4 Pay to manage/revoke their enrolled keys. Derived from the authorize URL by default.
   pspCredentialsUrl: () =>
     envVar('PSP_MERCHANT_CREDENTIALS_URL') ??
     (envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8080/auth/authorize').replace('/auth/authorize', '/system/profile/credentials'),

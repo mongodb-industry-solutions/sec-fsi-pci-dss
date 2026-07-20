@@ -19,7 +19,7 @@ const PKG_VERSION = (() => {
 })();
 
 const SERVICE_ID = 'fsi-pci-dss-backend';
-const SERVICE_DESC = 'Securit4 Pay PSP Platform — Backend API';
+const SERVICE_DESC = 'Sec4 Pay PSP Platform — Backend API';
 
 type CheckStatus = 'pass' | 'fail' | 'warn';
 interface CheckEntry {

@@ -1,5 +1,5 @@
 // Profile + permissions: the signed-in user's identity and the exact scopes they granted
-// to this merchant via Securit4 Pay SSO. Read-only; permissions are managed in Securit4 Pay.
+// to this merchant via Sec4 Pay SSO. Read-only; permissions are managed in Sec4 Pay.
 import { redirect } from 'next/navigation';
 import { CircleUserRound, Store, ShieldCheck, KeyRound, RefreshCw, LogOut, Info } from 'lucide-react';
 import { getSession } from '@/lib/session';
@@ -40,7 +40,7 @@ export default async function ProfilePage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <h1 className="flex items-center gap-2 text-2xl font-bold">
         <CircleUserRound className="h-6 w-6 text-leaf-deep" aria-hidden /> Profile and permissions
-        <InfoHint label="Your Securit4 Pay identity and the access you granted to Espresso Works. Managed in your Securit4 Pay account." />
+        <InfoHint label="Your Sec4 Pay identity and the access you granted to Espresso Works. Managed in your Sec4 Pay account." />
       </h1>
 
       {/* Identity */}
@@ -67,7 +67,7 @@ export default async function ProfilePage() {
           </div>
           <div className="flex items-center justify-between gap-3">
             <dt className="text-muted">Sign-in</dt>
-            <dd className="text-ink">Securit4 Pay SSO (OAuth 2.0 / OIDC)</dd>
+            <dd className="text-ink">Sec4 Pay SSO (OAuth 2.0 / OIDC)</dd>
           </div>
         </dl>
       </section>
@@ -79,7 +79,7 @@ export default async function ProfilePage() {
           <span className="ml-auto"><Chip tone="accent">{scopes.length}</Chip></span>
         </h2>
         <p className="mt-1 text-sm text-muted">
-          What you allowed Espresso Works to do with your Securit4 Pay account. We never see your card, password or full IBAN.
+          What you allowed Espresso Works to do with your Sec4 Pay account. We never see your card, password or full IBAN.
         </p>
         <ul className="mt-3 divide-y divide-line">
           {scopes.map((s) => {
@@ -98,7 +98,7 @@ export default async function ProfilePage() {
         </ul>
       </section>
 
-      {/* Passwordless login (v25): enroll a browser credential + manage it at Securit4 Pay */}
+      {/* Passwordless login (v25): enroll a browser credential + manage it at Sec4 Pay */}
       <EnrollPasswordless sub={session.sub} email={session.email} credentialsUrl={ENV.pspCredentialsUrl()} />
 
       {/* Standalone ES256 key generator (throwaway keys, distinct from the login credential) */}
@@ -108,7 +108,7 @@ export default async function ProfilePage() {
       <section className="rounded-2xl border border-line p-5">
         <p className="flex items-start gap-2 text-sm text-muted">
           <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          Permissions are managed in your Securit4 Pay account. Re-authorize to change what Espresso Works can access, or sign out.
+          Permissions are managed in your Sec4 Pay account. Re-authorize to change what Espresso Works can access, or sign out.
         </p>
         <div className="mt-3 flex flex-wrap gap-3">
           <a href="/api/auth/login" className="btn-ghost inline-flex items-center gap-1.5 text-sm">

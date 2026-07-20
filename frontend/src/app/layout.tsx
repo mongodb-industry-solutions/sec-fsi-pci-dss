@@ -3,7 +3,7 @@ import './globals.css';
 import { UIProvider } from '../components/ui/ConfirmProvider';
 
 export const metadata: Metadata = {
-  title: 'Securit4 Pay',
+  title: 'Sec4 Pay',
   description: 'MongoDB Queryable Encryption · AWS KMS · PCI DSS Payment Security Demo',
   icons: {
     icon: [

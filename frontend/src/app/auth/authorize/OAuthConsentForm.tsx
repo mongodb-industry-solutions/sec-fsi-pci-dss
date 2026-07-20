@@ -162,7 +162,7 @@ export default function OAuthConsentForm({
         {/* Neutral login header. The merchant identity is shown once, in the row above the form. */}
         <div className="text-center mb-5">
           <h2 className="text-base font-semibold text-gray-900">Sign in to your account</h2>
-          <p className="text-xs text-gray-500 mt-1">Your password stays with Securit4 Pay and is never shared.</p>
+          <p className="text-xs text-gray-500 mt-1">Your password stays with Sec4 Pay and is never shared.</p>
         </div>
         <form onSubmit={handleLogin} className="space-y-3">
           <div>

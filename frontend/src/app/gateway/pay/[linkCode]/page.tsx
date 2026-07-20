@@ -185,7 +185,7 @@ function PaymentLinkPageInner() {
               </button>
             </div>
           )}
-          <div className="mt-4 text-xs text-gray-400">Powered by Securit4 Pay (MongoDB PSP Platform)</div>
+          <div className="mt-4 text-xs text-gray-400">Powered by Sec4 Pay (MongoDB PSP Platform)</div>
         </div>
       </div>
     );

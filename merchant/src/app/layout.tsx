@@ -5,8 +5,8 @@ import Nav from '@/components/Nav';
 import { TooltipProvider } from '@/components/ui/Tooltip';
 
 export const metadata: Metadata = {
-  title: 'Espresso Works · Securit4 Pay Demo',
-  description: 'Merchant demo integrating with the Securit4 Pay PSP via OAuth2/OIDC + API.',
+  title: 'Espresso Works · Sec4 Pay Demo',
+  description: 'Merchant demo integrating with the Sec4 Pay PSP via OAuth2/OIDC + API.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

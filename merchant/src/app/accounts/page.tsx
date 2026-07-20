@@ -25,13 +25,13 @@ export default async function AccountsPage() {
     <div>
       <h1 className="mb-6 flex items-center gap-2 text-2xl font-bold">
         <Wallet className="h-6 w-6 text-leaf-deep" aria-hidden /> Your accounts
-        <InfoHint label="Payout accounts held at Securit4 Pay. IBANs are always masked, so the merchant never receives them in clear (GDPR / PSD2)." />
+        <InfoHint label="Payout accounts held at Sec4 Pay. IBANs are always masked, so the merchant never receives them in clear (GDPR / PSD2)." />
       </h1>
 
       {error ? (
         <PspUnavailable message={error} />
       ) : results.length === 0 ? (
-        <EmptyState icon={<Wallet className="h-8 w-8" />} title="No accounts found" hint="Payout accounts you add in Securit4 Pay will appear here." />
+        <EmptyState icon={<Wallet className="h-8 w-8" />} title="No accounts found" hint="Payout accounts you add in Sec4 Pay will appear here." />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {results.map((a, i) => (

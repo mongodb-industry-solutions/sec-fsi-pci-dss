@@ -1,4 +1,4 @@
-// Single server-only client for the Securit4 Pay PSP API (DRY, OOP).
+// Single server-only client for the Sec4 Pay PSP API (DRY, OOP).
 // - Attaches the Bearer access token from the session.
 // - On 401, transparently refreshes once and retries.
 // - Throws PspError so callers (pages) can degrade gracefully (E-12).

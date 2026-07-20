@@ -24,9 +24,9 @@ async function stubCommon(page: import('@playwright/test').Page) {
 test.describe('FR-v1-05: login form', () => {
   test.beforeEach(async ({ page, context }) => { await context.clearCookies(); await stubCommon(page); });
 
-  test('renders the Securit4 Pay sign-in form', async ({ page }) => {
+  test('renders the Sec4 Pay sign-in form', async ({ page }) => {
     await page.goto('/system');
-    await expect(page.getByRole('heading', { name: 'Securit4 Pay' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: 'Sec4 Pay' })).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
   });
 
@@ -47,7 +47,7 @@ test.describe('FR-v1-05: login form', () => {
     await page.locator('input[type="password"]').fill('wrong');
     await page.getByRole('button', { name: 'Sign In' }).click();
     await expect(page.locator('text=/invalid|error|failed/i').first()).toBeVisible({ timeout: 5000 });
-    await expect(page.getByRole('heading', { name: 'Securit4 Pay' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sec4 Pay' })).toBeVisible();
   });
 });
 
@@ -85,7 +85,7 @@ test.describe('FR-v1-05: role-based dashboards', () => {
     const signOut = page.getByRole('menuitem', { name: 'Sign out' });
     await expect(signOut).toBeVisible({ timeout: 4000 });
     await signOut.click();
-    await expect(page.getByRole('heading', { name: 'Securit4 Pay' })).toBeVisible({ timeout: 6000 });
+    await expect(page.getByRole('heading', { name: 'Sec4 Pay' })).toBeVisible({ timeout: 6000 });
   });
 });
 
@@ -95,6 +95,6 @@ test.describe('FR-v1-05: auth guard', () => {
     await stubCommon(page);
     await page.goto('/system/transactions');
     await expect(page).toHaveURL(/\/system$/, { timeout: 8000 });
-    await expect(page.getByRole('heading', { name: 'Securit4 Pay' })).toBeVisible({ timeout: 6000 });
+    await expect(page.getByRole('heading', { name: 'Sec4 Pay' })).toBeVisible({ timeout: 6000 });
   });
 });

@@ -44,7 +44,7 @@ export default function BeneficiaryAdd() {
 
   if (!open) {
     return (
-      <Tip label="Add a payee by their Securit4 Pay email or phone.">
+      <Tip label="Add a payee by their Sec4 Pay email or phone.">
         <button onClick={() => { setOpen(true); setMsg(null); }} className="btn-primary text-sm">
           <UserPlus className="h-4 w-4" aria-hidden /> Add beneficiary
         </button>
