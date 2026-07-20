@@ -153,6 +153,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
 
   // GET /api/v1/payment-links/:code  (public - no auth)
   fastify.get('/:code', {
+    config: { skipAuth: true }, // buyer resolves the link without a login (hosted payment page)
     schema: {
       tags: ['payment:links'],
       summary: 'Resolve a payment link by code (public)',
@@ -188,6 +189,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
 
   // POST /api/v1/payment-links/:code/pay  (public)
   fastify.post('/:code/pay', {
+    config: { skipAuth: true }, // buyer pays the link without a login (hosted payment page)
     schema: {
       tags: ['payment:links'],
       summary: 'Process payment via payment link (public)',

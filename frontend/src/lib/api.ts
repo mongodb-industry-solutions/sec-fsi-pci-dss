@@ -1675,35 +1675,9 @@ export const api = {
         token
       ),
   },
-  simulator: {
-    createCheckoutSession: (body: {
-      merchantId: string;
-      amount: number;
-      currency: string;
-      description: string;
-      returnUrl: string;
-      cancelUrl: string;
-      merchantReference: string;
-    }) =>
-      apiFetch<{ checkoutSessionInstanceReference: string; paymentPageUrl: string; expiresAt: string }>(
-        '/api/v1/system/simulator/checkout-session', { method: 'POST', body: JSON.stringify(body) }
-      ),
-    createPaymentLink: (body: {
-      merchantId: string;
-      amount: number;
-      currency: string;
-      description: string;
-      customerMessage?: string;
-      usageType: 'single_use' | 'multi_use';
-    }) =>
-      apiFetch<{ paymentLinkInstanceReference: string; paymentLinkCode: string; paymentUrl: string }>(
-        '/api/v1/system/simulator/payment-link', { method: 'POST', body: JSON.stringify(body) }
-      ),
-    getTransactions: (email: string) =>
-      apiFetch<{ transactions: Record<string, unknown>[]; total: number }>(
-        `/api/v1/system/simulator/transactions/${encodeURIComponent(email)}`
-      ),
-  },
+  // v28: the simulator no longer has open (no-JWT) endpoints. It authenticates as the selected demo
+  // persona (getSimToken) and calls the real authenticated endpoints (checkout, paymentLinks,
+  // transactions), so it works identically in local and production without any open surface.
 
   integrations: {
     list: (token: string, params?: { type?: string; status?: string }) => {

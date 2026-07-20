@@ -45,9 +45,12 @@ const PUBLIC_EXACT: Set<string> = new Set([
 
 // URL prefixes that bypass JWT auth (Swagger UI and its static assets)
 // Admin run/logs endpoints handle their own admin token verification internally
-// Checkout, payment-link, and simulator routes are public (simulator endpoints block themselves in production via NODE_ENV guard)
+// Checkout and payment-link CREATION now require a valid JWT (no longer open). Only the buyer-facing
+// routes (resolve/pay a link or session) opt out per-route via `config: { skipAuth: true }`, since the
+// buyer is not logged in (hosted payment page, SAQ A). The simulator authenticates as the selected demo
+// user and calls these real authenticated endpoints (no open /system/simulator surface).
 // Internal stub endpoints use X-Integration-Source header validation instead of JWT (ADR-025)
-const PUBLIC_PREFIXES: string[] = ['/doc', '/public', '/api/v1/admin', '/api/v1/checkout', '/api/v1/payment/links', '/api/v1/system/simulator', '/api/v1/internal'];
+const PUBLIC_PREFIXES: string[] = ['/doc', '/public', '/api/v1/admin', '/api/v1/internal'];
 
 // Prefixes that bypass JWT auth only for GET requests (simulator read-only mode).
 // Mutation routes (PATCH /fraud/:id, POST /fraud/:id/escalate) still require JWT.

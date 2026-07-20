@@ -120,6 +120,7 @@ export async function checkoutController(fastify: FastifyInstance) {
 
   // GET /api/v1/checkout/sessions/:id
   fastify.get('/sessions/:id', {
+    config: { skipAuth: true }, // buyer/hosted page reads session status without a login
     schema: {
       tags: ['payment:checkout'],
       summary: 'Get checkout session (public status check)',
@@ -163,6 +164,7 @@ export async function checkoutController(fastify: FastifyInstance) {
 
   // POST /api/v1/checkout/sessions/:id/pay
   fastify.post('/sessions/:id/pay', {
+    config: { skipAuth: true }, // buyer pays on the hosted page without a login
     schema: {
       tags: ['payment:checkout'],
       summary: 'Process payment for a checkout session (public)',
