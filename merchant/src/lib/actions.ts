@@ -242,6 +242,9 @@ export async function requestMoney(input: { amount: number; currency?: string; p
     const c = await client();
     if (!(input.amount > 0)) return { ok: false, message: 'Amount must be greater than zero.' };
     const req = await c.createRtpRequest(input);
+    // Present it (created → presented) so the payer can approve and is notified. Mirrors the PSP
+    // first-party flow; without this the request stays `created` and accept returns 409 invalid_state.
+    try { await c.presentRtpRequest(req.paymentRequestInstanceReference); } catch { /* still created */ }
     let paymentUrl: string | undefined;
     try { paymentUrl = (await c.getRtpQr(req.paymentRequestInstanceReference)).encodedPayload; } catch { /* optional */ }
     return { ok: true, reference: req.paymentRequestInstanceReference, status: req.status, paymentUrl, data: req };
@@ -251,6 +254,13 @@ export async function requestMoney(input: { amount: number; currency?: string; p
 export async function approveRtp(ref: string, fundingAccountRef?: string): Promise<ActionResult> {
   return toResult(async () => {
     const c = await client();
+    // The accept endpoint requires the request to be presented (presented/delivered/viewed). Requests
+    // still in `created`/`validated` (e.g. created before the present step, or seeded) would 409, so
+    // present them first. Best-effort: if present fails, accept will surface the real error.
+    try {
+      const cur = await c.getRtpRequest(ref) as { status?: string };
+      if (cur?.status === 'created' || cur?.status === 'validated') await c.presentRtpRequest(ref);
+    } catch { /* fall through to accept */ }
     const res = await c.approveRtpRequest(ref, fundingAccountRef);
     return { ok: res.status === 'accepted', message: res.reason, status: res.status, reference: res.executionReference, data: res };
   });

@@ -298,6 +298,13 @@ export class PspClient {
       `/api/v1/gateway/rtp/requests`, { method: 'POST', body },
     );
   }
+  // Present the created request to the payer (created → presented) so it becomes approvable and the
+  // payer is notified. Mirrors the PSP first-party flow (create then present).
+  presentRtpRequest(ref: string) {
+    return this.request<{ paymentRequestInstanceReference: string; status: string }>(
+      `/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/present`, { method: 'POST', body: {} },
+    );
+  }
   listRtpRequests(box: 'inbox' | 'outbox' = 'outbox') {
     return this.request<{ results: Array<{ paymentRequestInstanceReference: string; status: string; amount: number; currency: string; purpose?: string; payeeName?: string }> }>(
       `/api/v1/gateway/rtp/requests?box=${box}`,
@@ -341,7 +348,10 @@ export class PspClient {
   }
 
   // ── History (merchant-isolated operation history for this party) — merchant OAuth (read:transactions) ──
-  listHistory(page = 1, limit = 20) {
+  // Merchant-isolated operation history (SD-89): the PSP /transactions OAuth channel already MERGES
+  // this party's SD-65 executions + card transactions made through THIS merchant. Request up to 100
+  // so the merchant's history is not silently truncated (the endpoint default is 20).
+  listHistory(page = 1, limit = 100) {
     return this.request<{ results: any[]; total: number; page: number; limit: number }>(
       `/api/v1/transactions`,
       { query: { page, limit } },
