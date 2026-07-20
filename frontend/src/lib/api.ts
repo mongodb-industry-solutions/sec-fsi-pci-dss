@@ -643,9 +643,23 @@ export interface RtpRequestDTO {
   paymentRequestInstanceReference: string;
   requesterPartyReference: string;
   payerPartyReference?: string;
-  payeeName?: string;
+  payerCounterpartyReference?: string; // the requester's beneficiary (SD-54) representing the payer
+  payeeName?: string;         // requester's own name (authorized to the payer on request)
+  payerName?: string;         // payer's real name — only returned once the payer consented (accepted+)
+  payerAlias?: string;        // payer display the requester provided (beneficiary label); for the payee's view
   payeeReceivingAccountReference: string;
   payerFundingAccountReference?: string;
+  // Destination account display (payer sees where the money goes): bank + masked IBAN (last 4).
+  payeeAccountDisplay?: { bankName?: string; maskedIban?: string; alias?: string } | null;
+  // Security case summary (both parties see the PSP/L1/L2 outcome affecting their funds).
+  securityCase?: {
+    caseInstanceReference?: string;
+    caseReference: string | null;
+    caseStatus: string | null;
+    caseSeverity: string | null;
+    resolutionOutcome: string | null;
+    notes: { noteId: string; noteText: string; performedByRole: string; actionDateTime: string; isRetracted?: boolean }[];
+  } | null;
   amount: number;
   currency: string;
   purpose?: string;
@@ -2063,8 +2077,8 @@ export const api = {
   rtp: {
     create: (
       body: {
-        amount: number; currency?: string; purpose?: string; payeeName?: string;
-        payeeReceivingAccountReference?: string; payerPartyReference?: string; expiresAt?: string;
+        amount: number; currency?: string; purpose?: string; payeeName?: string; payerAlias?: string;
+        payeeReceivingAccountReference?: string; payerPartyReference?: string; payerCounterpartyReference?: string; expiresAt?: string;
         structuredRemittance?: { referenceType?: string; reference?: string };
       },
       token: string,

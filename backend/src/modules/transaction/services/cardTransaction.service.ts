@@ -28,6 +28,7 @@ export interface CreateTransactionInput {
   cardTransactionMerchantName: string;
   cardTransactionMerchantCategoryCode: string;
   cardTransactionChannel: string;
+  cardTransactionAcceptanceMethod?: 'api' | 'payment_link' | 'redirect_checkout' | 'pos' | 'ecommerce';
   cardTransactionMaskedPanDisplay: string;
   cardTransactionType: string;
   cardTransactionDescription: string;
@@ -253,6 +254,7 @@ export async function initiateTransaction(
     cardTransactionType: input.cardTransactionType as CardTransactionLogControlRecord['cardTransactionType'],
     cardTransactionChannel: input.cardTransactionChannel as CardTransactionLogControlRecord['cardTransactionChannel'],
     cardTransactionInitiationType: 'customerInitiated',
+    ...(input.cardTransactionAcceptanceMethod && { cardTransactionAcceptanceMethod: input.cardTransactionAcceptanceMethod }),
     cardTransactionMerchantCategoryCode: input.cardTransactionMerchantCategoryCode,
     cardTransactionMerchantName: input.cardTransactionMerchantName,
     cardTransactionMaskedPanDisplay: input.cardTransactionMaskedPanDisplay,

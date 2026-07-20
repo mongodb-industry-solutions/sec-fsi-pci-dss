@@ -3970,6 +3970,13 @@ gated by the signature at the PSP, so serving the challenge to the `auth_req_id`
 > linked by immutable reference, then routed via the `payment_initiation` provider using the same
 > balance-aware hold→settle→credit sequence as P2P. RTP is account/alias-based → **outside PCI scope**.
 
+### 14.0 Card acceptance method (payment-history classification)
+`cardTransactionLog.cardTransactionAcceptanceMethod?` (plaintext, optional): `'api' | 'payment_link' |
+'redirect_checkout' | 'pos' | 'ecommerce'`. Set by the accepting flow (paymentLink.service →
+`payment_link`, checkout.service → `redirect_checkout`, direct API card → `api`) so `/system/payment/history`
+can classify card payments by method (Payment Link / Redirect vs plain Card). Seeded rows may omit it
+(shown as "Card"). No collection/QE/index change; consumed by the history list filters.
+
 ### 14.1 Data model (setup + seed are the single source of truth)
 - **`paymentRequestProcedure`** (QE-encrypted): canonical rail-agnostic request. QE:none (L2 only)
   fields: `payeeName`, `payeeAlias`, `payerAlias`, `unstructuredRemittance`, `structuredAddress`

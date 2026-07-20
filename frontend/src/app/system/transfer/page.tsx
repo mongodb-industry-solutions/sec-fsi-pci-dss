@@ -5,7 +5,6 @@ import { SectionHeader } from '../../../components/SectionHeader';
 import { Breadcrumb } from '../../../components/Breadcrumb';
 import { useEffect, useState } from 'react';
 import { getToken, decodeToken } from '../../../lib/auth';
-import { RtpPendingInbox } from './RtpPendingInbox';
 
 function MethodCard({ icon, title, description, href }: {
   icon: React.ReactNode; title: string; description: string; href: string;
@@ -81,8 +80,8 @@ export default function TransferPage() {
         />
       </div>
 
-      {/* Pending requests awaiting the payer's approval (RTP inbox). */}
-      <RtpPendingInbox />
+      {/* Transfer is a simplified menu of methods only. Pending RTP approvals live in
+          /system/payment/history (filter "Pending approval"); each opens its detail to approve/reject. */}
     </div>
   );
 }

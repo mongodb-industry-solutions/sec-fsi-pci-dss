@@ -48,7 +48,7 @@ export class RtpLifecycleProcess {
       await createNotification(this.db, {
         recipientPartyReference: req.requesterPartyReference, notificationType: 'payment_request',
         title: 'Payment received', detail: `You received ${req.amount} ${req.currency}`,
-        href: `/system/transfer?request=${req.paymentRequestInstanceReference}`,
+        href: `/system/payment/history/${req.paymentRequestInstanceReference}`,
         relatedReference: req.paymentRequestInstanceReference, actionable: false,
       });
     } catch { /* transition may race; idempotent no-op */ }
@@ -66,7 +66,7 @@ export class RtpLifecycleProcess {
       await createNotification(this.db, {
         recipientPartyReference: req.requesterPartyReference, notificationType: 'payment_request',
         title: 'Payment failed', detail: `Your request for ${req.amount} ${req.currency} could not be settled`,
-        href: `/system/transfer?request=${req.paymentRequestInstanceReference}`,
+        href: `/system/payment/history/${req.paymentRequestInstanceReference}`,
         relatedReference: req.paymentRequestInstanceReference, actionable: false,
       });
     } catch { /* idempotent */ }

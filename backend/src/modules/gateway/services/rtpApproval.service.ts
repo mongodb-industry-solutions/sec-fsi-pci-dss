@@ -78,7 +78,7 @@ export async function approveRtpRequest(db: Db, ref: string, input: ApproveRtpIn
       recipientPartyReference: req.payerPartyReference, notificationType: 'payment_request',
       title: 'Payment request held for review',
       detail: screen.reason ?? 'The request was held by security screening.',
-      href: `/system/transfer?request=${ref}`, relatedReference: ref, actionable: true,
+      href: `/system/payment/history/${ref}`, relatedReference: ref, actionable: true,
     });
     const current = await getRtpRequest(db, ref);
     return { status: 'blocked', request: current!, reason: screen.reason };
@@ -162,7 +162,7 @@ export async function approveRtpRequest(db: Db, ref: string, input: ApproveRtpIn
     recipientPartyReference: req.requesterPartyReference, notificationType: 'payment_request',
     title: 'Your payment request was approved',
     detail: `Your request for ${req.amount} ${req.currency} was approved and payment is on the way`,
-    href: `/system/transfer?request=${ref}`, relatedReference: ref, actionable: false,
+    href: `/system/payment/history/${ref}`, relatedReference: ref, actionable: false,
   });
 
   emitProcessEvent(db, {

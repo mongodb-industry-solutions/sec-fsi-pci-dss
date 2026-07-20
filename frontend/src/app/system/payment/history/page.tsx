@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, ClipboardList } from 'lucide-react';
+import { Plus, ClipboardList, ArrowDownLeft, ArrowUpRight, SlidersHorizontal, HandCoins } from 'lucide-react';
 import { SectionHeader } from '../../../../components/SectionHeader';
 import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
@@ -23,6 +23,7 @@ interface HistoryRow {
   merchant?: string;
   mcc?: string;
   channel?: string;
+  acceptanceMethod?: string;
   cardTransactionType?: string;
   maskedPan?: string;
   fraudCaseCreated?: boolean;
@@ -39,6 +40,7 @@ interface HistoryRow {
   // 'to_approve' = someone requested money from me (I must approve to pay, outgoing).
   rtpRole?: 'requested' | 'to_approve';
   rtpRequestRef?: string;
+  linkedExecutionRef?: string; // the SD-65 execution created on accept (money leg of this RTP)
 }
 
 // ── Card transaction type badges ──────────────────────────────────────────────
@@ -99,6 +101,59 @@ function cardDirection(type: string | undefined, status: string): 'debit' | 'cre
   return 'debit';
 }
 
+// Two-axis taxonomy (method vs state). TYPE/method is derived per row; STATUS is the lifecycle state
+// (settled, pending approval, rejected… are STATES, not types). "Payout" = a P2P/bank execution.
+type TypeKey = 'card' | 'payment_link' | 'redirect' | 'p2p' | 'bank' | 'rtp';
+const METHOD_LABELS: Record<TypeKey, string> = {
+  card:         'Card',
+  payment_link: 'Payment Link',
+  redirect:     'Redirect / Checkout',
+  p2p:          'P2P transfer',
+  bank:         'Bank transfer',
+  rtp:          'Request to Pay',
+};
+const BANK_RAILS = ['sepa', 'ach', 'swift', 'local_bank'];
+function rowTypeKey(r: HistoryRow): TypeKey {
+  if (r.category === 'rtp') return 'rtp';
+  if (r.category === 'p2p') return BANK_RAILS.includes((r.p2pRail ?? '').toLowerCase()) ? 'bank' : 'p2p';
+  // card: classify by the persisted acceptance method (payment link / redirect-checkout); else plain card.
+  const m = (r.acceptanceMethod ?? '').toLowerCase();
+  if (m === 'payment_link') return 'payment_link';
+  if (m === 'redirect_checkout') return 'redirect';
+  return 'card';
+}
+
+// Money direction from the current user's perspective (simple in/out for casual users).
+function rowDirection(r: HistoryRow): 'in' | 'out' | 'neutral' {
+  if (r.category === 'rtp') return r.rtpRole === 'requested' ? 'in' : 'out';
+  if (r.category === 'p2p') return r.p2pDirection === 'received' ? 'in' : 'out';
+  // card: refunds/adjustments are credits (in); everything else is a debit (out); non-movement neutral.
+  if (['declined', 'failed', 'voided', 'expired'].includes(r.status)) return 'neutral';
+  if (r.cardTransactionType && ['refund', 'adjustment'].includes(r.cardTransactionType)) return 'in';
+  return 'out';
+}
+
+// Canonical, deduplicated lifecycle-status groups spanning every BIAN state across card (SD-254),
+// payment execution (SD-65) and RTP (SD-65 intent). Each group's `key` is the filter value; `states`
+// are the raw statuses it matches. This avoids a duplicated "Settled" (settled/completed/payment_settled)
+// and lists every possible state, not only the ones currently present in the loaded rows.
+const STATUS_GROUPS: { key: string; label: string; states: string[] }[] = [
+  { key: 'pending_approval', label: 'Pending approval', states: ['created', 'validated', 'presented', 'delivered', 'viewed'] },
+  { key: 'pending',          label: 'Pending',             states: ['pending'] },
+  { key: 'authorized',       label: 'Authorized',          states: ['authorized', 'accepted'] },
+  { key: 'in_flight',        label: 'In flight / processing', states: ['in_flight', 'routing', 'submitted', 'payment_initiated', 'payment_processing', 'captured'] },
+  { key: 'settled',          label: 'Settled',             states: ['settled', 'completed', 'payment_settled'] },
+  { key: 'refunded',         label: 'Refunded',            states: ['refunded'] },
+  { key: 'reversed',         label: 'Reversed',            states: ['reversed'] },
+  { key: 'declined',         label: 'Declined',            states: ['declined'] },
+  { key: 'failed',           label: 'Failed',              states: ['failed', 'payment_failed', 'exception'] },
+  { key: 'rejected',         label: 'Rejected',            states: ['rejected'] },
+  { key: 'cancelled',        label: 'Cancelled / voided',  states: ['cancelled', 'voided'] },
+  { key: 'expired',          label: 'Expired',             states: ['expired'] },
+  { key: 'disputed',         label: 'Disputed',            states: ['disputed'] },
+];
+const STATUS_STATES_BY_KEY: Record<string, string[]> = Object.fromEntries(STATUS_GROUPS.map(g => [g.key, g.states]));
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function TransactionHistoryPage() {
   const [rows, setRows] = useState<HistoryRow[]>([]);
@@ -108,15 +163,17 @@ export default function TransactionHistoryPage() {
 
   const [qInput, setQInput] = useState('');
   const [q, setQ] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<'' | 'card' | 'p2p' | 'rtp'>('');
+  const [directionFilter, setDirectionFilter] = useState<'' | 'in' | 'out'>('');
+  const [typeFilter, setTypeFilter] = useState<'' | TypeKey>('');
   const [statusFilter, setStatusFilter] = useState('');
   const [fraudFilter, setFraudFilter] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const { debugMode } = useDebugMode();
 
   function handleLimitChange(n: number) { setPageSize(n); setPage(1); }
   function applySearch() { setPage(1); setQ(qInput.trim()); }
-  function clearAll() { setQInput(''); setQ(''); setCategoryFilter(''); setStatusFilter(''); setFraudFilter(''); setPage(1); }
+  function clearAll() { setQInput(''); setQ(''); setDirectionFilter(''); setTypeFilter(''); setStatusFilter(''); setFraudFilter(''); setPage(1); }
 
   useEffect(() => {
     const load = async () => {
@@ -150,6 +207,7 @@ export default function TransactionHistoryPage() {
             merchant:            row.cardTransactionMerchantName,
             mcc:                 row.cardTransactionMerchantCategoryCode ?? '',
             channel:             row.cardTransactionChannel ?? '',
+            acceptanceMethod:    (row as { cardTransactionAcceptanceMethod?: string }).cardTransactionAcceptanceMethod ?? '',
             cardTransactionType: row.cardTransactionType,
             maskedPan:           row.cardTransactionMaskedPanDisplay,
             concept:             row.cardTransactionDescription ?? null,
@@ -195,13 +253,19 @@ export default function TransactionHistoryPage() {
               status:        x.status,
               rtpRole:       role,
               rtpRequestRef: x.paymentRequestInstanceReference,
+              linkedExecutionRef: x.linkedPaymentExecutionReference,
               concept:       x.purpose ?? null,
             } satisfies HistoryRow));
           })
         : Promise.resolve([] as HistoryRow[]);
 
       const [cards, p2p, rtp] = await Promise.all([cardPromise, p2pPromise, rtpPromise]);
-      const merged = [...cards, ...p2p, ...rtp].sort(
+      // Presentation-only de-dup (BIAN keeps the RTP intent and the SD-65 execution as SEPARATE
+      // records): when an RTP has a linked execution, show ONLY the RTP row and hide that execution
+      // row so the same movement is not listed twice. The RTP detail links through to the execution.
+      const linkedExecRefs = new Set(rtp.map((r) => r.linkedExecutionRef).filter(Boolean) as string[]);
+      const p2pDeduped = p2p.filter((r) => !linkedExecRefs.has(r.id));
+      const merged = [...cards, ...p2pDeduped, ...rtp].sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
       setRows(merged);
@@ -211,18 +275,20 @@ export default function TransactionHistoryPage() {
   }, []);
 
   // ── Filter logic ────────────────────────────────────────────────────────────
-  const cardStatusKeys = Array.from(new Set(rows.filter(r => r.category === 'card').map(r => r.status)));
   const fraudKeys = Array.from(new Set(
     rows.filter(r => r.fraudCaseCreated && r.caseStatus).map(r => r.caseStatus as string)
   ));
   const ql = q.toLowerCase();
 
   const filtered = rows.filter((r) => {
-    if (categoryFilter && r.category !== categoryFilter) return false;
-    // 'pending_approval' is an RTP quick-filter spanning the pre-acceptance statuses.
-    if (statusFilter === 'pending_approval') {
-      if (!(r.category === 'rtp' && ['presented', 'delivered', 'viewed', 'created', 'validated'].includes(r.status))) return false;
-    } else if (statusFilter && r.status !== statusFilter) return false;
+    if (directionFilter && rowDirection(r) !== directionFilter) return false;
+    if (typeFilter && rowTypeKey(r) !== typeFilter) return false;
+    // Status is matched by canonical group (a group can cover several raw statuses, e.g. Settled).
+    if (statusFilter) {
+      const states = STATUS_STATES_BY_KEY[statusFilter];
+      if (states) { if (!states.includes(r.status)) return false; }
+      else if (r.status !== statusFilter) return false;
+    }
     if (fraudFilter === 'none' && r.fraudCaseCreated) return false;
     if (fraudFilter === 'any' && !r.fraudCaseCreated) return false;
     if (fraudFilter && fraudFilter !== 'none' && fraudFilter !== 'any' && r.caseStatus !== fraudFilter) return false;
@@ -251,8 +317,8 @@ export default function TransactionHistoryPage() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
-  const isFiltering = !!(q || qInput || categoryFilter || statusFilter || fraudFilter);
-  const showCardFilters = categoryFilter !== 'p2p';
+  const isFiltering = !!(q || qInput || directionFilter || typeFilter || statusFilter || fraudFilter);
+  const showCardFilters = typeFilter === '' || typeFilter === 'card' || typeFilter === 'payment_link' || typeFilter === 'redirect';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -284,7 +350,8 @@ export default function TransactionHistoryPage() {
         ) : (
           <>
             {/* ── Filters ──────────────────────────────────────────────────── */}
-            <div className="flex flex-col sm:flex-row gap-2 mb-5 flex-wrap">
+            {/* Simple row (everyone): search + direction (in/out) + advanced toggle. */}
+            <div className="flex flex-col sm:flex-row gap-2 mb-2 flex-wrap items-center">
               <input
                 type="text"
                 value={qInput}
@@ -293,60 +360,56 @@ export default function TransactionHistoryPage() {
                 placeholder="Search by merchant, card, reference, id…"
                 className="flex-1 min-w-[160px] border rounded-lg px-3 py-2 text-sm"
               />
-              {/* Category allows isolating card vs P2P */}
-              <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value as typeof categoryFilter); setStatusFilter(''); setFraudFilter(''); setPage(1); }}
-                className="border rounded-lg px-3 py-2 text-sm bg-white" title="Transaction category">
-                <option value="">All types</option>
-                <option value="card">💳 Card transactions</option>
-                <option value="p2p">↕ P2P transfers</option>
-                <option value="rtp">🧾 Request to Pay (RTP)</option>
-              </select>
-              {/* RTP status filter (incl. a quick "Pending approval" filter). Shown for RTP or All. */}
-              {(categoryFilter === 'rtp' || categoryFilter === '') && (
-                <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-                  className="border rounded-lg px-3 py-2 text-sm bg-white" title="Request to Pay status">
-                  <option value="">All RTP statuses</option>
-                  <option value="pending_approval">⏳ Pending approval</option>
-                  <option value="accepted">Accepted</option>
-                  <option value="payment_initiated">Payment initiated</option>
-                  <option value="payment_settled">Settled</option>
-                  <option value="payment_failed">Failed</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="cancelled">Cancelled</option>
-                  <option value="expired">Expired</option>
-                </select>
-              )}
-              {/* Payment status only meaningful for card transactions */}
-              {showCardFilters && categoryFilter === 'card' && (
-                <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-                  className="border rounded-lg px-3 py-2 text-sm bg-white" title="Payment authorization status">
-                  <option value="">All statuses</option>
-                  {cardStatusKeys.map((k) => (
-                    <option key={k} value={k}>{PAYMENT_STATUS[k]?.label ?? k.replace(/_/g, ' ')}</option>
-                  ))}
-                </select>
-              )}
-              {/* Fraud filter only meaningful for card transactions */}
-              {showCardFilters && (
-                <select value={fraudFilter} onChange={(e) => { setFraudFilter(e.target.value); setPage(1); }}
-                  className="border rounded-lg px-3 py-2 text-sm bg-white" title="Fraud / risk status">
-                  <option value="">All fraud statuses</option>
-                  <option value="any">Flagged as fraud (any)</option>
-                  {fraudKeys.map((k) => (
-                    <option key={k} value={k}>{FRAUD_STATUS[k]?.label ?? k.replace(/_/g, ' ')}</option>
-                  ))}
-                  <option value="none">No fraud case</option>
-                </select>
-              )}
-              <button onClick={applySearch} className="px-4 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold">
-                Search
+              {/* Direction segmented control — simple in/out for casual users. */}
+              <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden text-sm">
+                {([['', 'All'], ['in', 'In'], ['out', 'Out']] as const).map(([val, label]) => (
+                  <button key={val || 'all'} onClick={() => { setDirectionFilter(val); setPage(1); }}
+                    className={`inline-flex items-center gap-1 px-3 py-2 transition-colors ${directionFilter === val ? 'bg-[#001E2B] text-[#00ED64]' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                    {val === 'in' && <ArrowDownLeft size={14} />}{val === 'out' && <ArrowUpRight size={14} />}{label}
+                  </button>
+                ))}
+              </div>
+              <button onClick={applySearch} className="px-4 py-2 rounded-lg bg-[#001E2B] text-[#00ED64] text-sm font-semibold">Search</button>
+              <button onClick={() => setShowAdvanced(v => !v)}
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors ${showAdvanced ? 'border-[#001E2B] text-[#001E2B]' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                <SlidersHorizontal size={14} /> Advanced
               </button>
               {isFiltering && (
-                <button onClick={clearAll} className="px-3 py-2 rounded-lg border text-sm text-gray-500 hover:bg-gray-50 transition-colors">
-                  Clear
-                </button>
+                <button onClick={clearAll} className="px-3 py-2 rounded-lg border text-sm text-gray-500 hover:bg-gray-50 transition-colors">Clear</button>
               )}
             </div>
+
+            {/* Advanced row (power users): type / status / fraud. */}
+            {showAdvanced && (
+              <div className="flex flex-col sm:flex-row gap-2 mb-5 flex-wrap">
+                <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value as typeof typeFilter); setFraudFilter(''); setPage(1); }}
+                  className="border rounded-lg px-3 py-2 text-sm bg-white" title="Transaction type / method">
+                  <option value="">All types</option>
+                  {(Object.keys(METHOD_LABELS) as TypeKey[]).map((k) => (
+                    <option key={k} value={k}>{METHOD_LABELS[k]}</option>
+                  ))}
+                </select>
+                <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                  className="border rounded-lg px-3 py-2 text-sm bg-white" title="Lifecycle status">
+                  <option value="">All statuses</option>
+                  {STATUS_GROUPS.map((g) => (
+                    <option key={g.key} value={g.key}>{g.label}</option>
+                  ))}
+                </select>
+                {showCardFilters && (
+                  <select value={fraudFilter} onChange={(e) => { setFraudFilter(e.target.value); setPage(1); }}
+                    className="border rounded-lg px-3 py-2 text-sm bg-white" title="Fraud / risk status">
+                    <option value="">All fraud statuses</option>
+                    <option value="any">Flagged as fraud (any)</option>
+                    {fraudKeys.map((k) => (
+                      <option key={k} value={k}>{FRAUD_STATUS[k]?.label ?? k.replace(/_/g, ' ')}</option>
+                    ))}
+                    <option value="none">No fraud case</option>
+                  </select>
+                )}
+              </div>
+            )}
+            {!showAdvanced && <div className="mb-5" />}
 
             {filtered.length === 0 ? (
               <div className="bg-white rounded-xl border p-6 text-center text-gray-500">
@@ -422,12 +485,13 @@ export default function TransactionHistoryPage() {
                         ? (isIncoming ? 'Awaiting payer approval' : 'Pending your approval')
                         : row.status.replace(/_/g, ' ');
                       return (
-                        <Link key={row.id} href={`/system/transfer?request=${encodeURIComponent(row.rtpRequestRef ?? row.id)}`}
+                        <Link key={row.id} href={`/system/payment/history/${encodeURIComponent(row.rtpRequestRef ?? row.id)}`}
                           className="group block bg-white rounded-xl border p-4 hover:border-[#001E2B]/30 hover:shadow-md transition-all cursor-pointer">
                           <div className="flex items-start justify-between gap-3 mb-2">
                             <div className="min-w-0">
-                              <p className="font-semibold text-gray-900 truncate">
-                                {isIncoming ? '↓ Money requested (you receive)' : '↑ Request to approve (you pay)'}
+                              <p className="font-semibold text-gray-900 truncate flex items-center gap-1.5">
+                                {isIncoming ? <ArrowDownLeft size={15} className="text-green-700 shrink-0" /> : <ArrowUpRight size={15} className="text-red-600 shrink-0" />}
+                                {isIncoming ? 'Money requested (you receive)' : 'Request to approve (you pay)'}
                               </p>
                               <p className="text-xs text-gray-500">{new Date(row.createdAt).toLocaleString()}</p>
                               {row.concept && <p className="text-xs text-gray-400 mt-0.5 truncate">{row.concept}</p>}
@@ -442,7 +506,7 @@ export default function TransactionHistoryPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs px-2 py-0.5 rounded font-medium bg-purple-50 text-purple-700 border border-purple-200">🧾 Request to Pay</span>
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium bg-purple-50 text-purple-700 border border-purple-200"><HandCoins size={12} /> Request to Pay</span>
                             <span className={`text-xs px-2 py-0.5 rounded font-medium ${rtpStatusColor}`}>{rtpStatusLabel}</span>
                           </div>
                           {debugMode && <p className="mt-1.5 text-xs font-mono text-gray-400 truncate">id: {row.id}</p>}

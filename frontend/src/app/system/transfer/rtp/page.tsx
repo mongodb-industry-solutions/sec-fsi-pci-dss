@@ -12,13 +12,21 @@ import { QrRepresentation } from '../../../../components/QrRepresentation';
 import { api, RtpRequestDTO, QrRepresentationDTO } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 
+interface Beneficiary {
+  counterpartyArrangementReference: string;
+  counterpartyLabel: string;
+  counterpartyPartyReference: string;
+  counterpartyArrangementStatus?: string;
+}
+
 export default function RtpCreatePage() {
   const [token, setToken] = useState('');
   const [role, setRole] = useState('');
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('EUR');
   const [purpose, setPurpose] = useState('');
-  const [payerPartyReference, setPayer] = useState('');
+  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+  const [beneficiaryRef, setBeneficiaryRef] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<RtpRequestDTO | null>(null);
@@ -28,7 +36,19 @@ export default function RtpCreatePage() {
   useEffect(() => {
     const t = getToken() ?? '';
     setToken(t);
-    if (t) setRole(decodeToken(t)?.role ?? '');
+    if (!t) return;
+    const u = decodeToken(t);
+    setRole(u?.role ?? '');
+    // Load the requester's beneficiaries so they can pick WHO to request money from (simplifies the flow).
+    if (u?.partyRef) {
+      api.beneficiaries.list(t, { ownerRef: u.partyRef })
+        .then((r) => {
+          const list = ((r.results ?? []) as unknown as Beneficiary[]).filter((b) => b.counterpartyArrangementStatus !== 'removed');
+          setBeneficiaries(list);
+          if (list.length > 0) setBeneficiaryRef(list[0].counterpartyArrangementReference);
+        })
+        .catch(() => { /* none */ });
+    }
   }, []);
 
   const submit = async () => {
@@ -36,9 +56,13 @@ export default function RtpCreatePage() {
     try {
       const amt = parseFloat(amount);
       if (!(amt > 0)) throw new Error('Enter an amount greater than zero.');
+      const ben = beneficiaries.find((b) => b.counterpartyArrangementReference === beneficiaryRef);
+      if (!ben) throw new Error('Select a beneficiary to request money from.');
       const req = await api.rtp.create({
         amount: amt, currency, purpose: purpose || undefined,
-        payerPartyReference: payerPartyReference || undefined,
+        payerPartyReference: ben.counterpartyPartyReference,
+        payerCounterpartyReference: ben.counterpartyArrangementReference,
+        payerAlias: ben.counterpartyLabel,
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
       }, token, `rtp-create-${Date.now()}`);
       // Present so it reaches the payer's approval inbox, then offer a QR.
@@ -78,9 +102,19 @@ export default function RtpCreatePage() {
               <input value={purpose} onChange={e => setPurpose(e.target.value)} placeholder="e.g. Dinner split"
                 className="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
             </label>
-            <label className="block text-xs font-medium text-gray-700">Payer party reference
-              <input value={payerPartyReference} onChange={e => setPayer(e.target.value)} placeholder="party the request is sent to"
-                className="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
+            <label className="block text-xs font-medium text-gray-700">Request from (beneficiary)
+              {beneficiaries.length === 0 ? (
+                <div className="mt-1 text-xs text-amber-600">
+                  No beneficiaries yet. <Link href="/system/beneficiaries" className="text-blue-600 hover:underline">Add one</Link> to request money.
+                </div>
+              ) : (
+                <select value={beneficiaryRef} onChange={e => setBeneficiaryRef(e.target.value)}
+                  className="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40">
+                  {beneficiaries.map((b) => (
+                    <option key={b.counterpartyArrangementReference} value={b.counterpartyArrangementReference}>{b.counterpartyLabel}</option>
+                  ))}
+                </select>
+              )}
             </label>
             <label className="block text-xs font-medium text-gray-700 md:col-span-2">Expires at <span className="text-gray-400">(optional)</span>
               <input value={expiresAt} onChange={e => setExpiresAt(e.target.value)} type="datetime-local"
@@ -88,7 +122,7 @@ export default function RtpCreatePage() {
             </label>
           </div>
           <div className="flex justify-end">
-            <button disabled={busy} onClick={submit}
+            <button disabled={busy || !beneficiaryRef} onClick={submit}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[#001E2B] text-white rounded-lg hover:bg-[#001E2B]/80 transition-colors disabled:opacity-50">
               <HandCoins size={14} />{busy ? 'Creating…' : 'Create request'}
             </button>

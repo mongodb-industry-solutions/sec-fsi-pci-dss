@@ -232,6 +232,7 @@ export async function processCheckoutPayment(
       cardTransactionMerchantName: session.merchantName,
       cardTransactionMerchantCategoryCode: mcc,
       cardTransactionChannel: 'online',
+      cardTransactionAcceptanceMethod: 'redirect_checkout',
       cardTransactionMaskedPanDisplay: maskedPan,
       cardTransactionType: 'purchase',
       cardTransactionDescription: session.checkoutSessionDescription.slice(0, 22),

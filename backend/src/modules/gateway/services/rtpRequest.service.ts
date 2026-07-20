@@ -36,6 +36,7 @@ export interface CreateRtpInput {
   payeeCounterpartyReference?: string;
   payeeReceivingAccountReference?: string;   // if omitted, requester's default active account is used
   payerPartyReference?: string;
+  payerCounterpartyReference?: string;
   payerAlias?: string;
   invoiceReference?: string;
   dueAt?: Date;
@@ -129,6 +130,17 @@ export async function createRtpRequest(db: Db, input: CreateRtpInput): Promise<P
   }
 
   const receivingAccount = await resolveReceivingAccount(db, input);
+
+  // Privacy model: the requester's own name is server-derived from their SD-13 party (authoritative,
+  // authorized basic datum the payer may see on approval), not taken from client input. Falls back to
+  // any client-provided payeeName only if the party lookup yields nothing.
+  let payeeName = input.payeeName;
+  try {
+    const party = await db.collection<{ partyName?: string }>('party')
+      .findOne({ partyInstanceReference: input.requesterPartyReference } as Record<string, unknown>, { projection: { partyName: 1 } });
+    if (party?.partyName) payeeName = party.partyName;
+  } catch { /* keep client-provided fallback */ }
+
   const now = new Date();
   const expiresAt = input.expiresAt ?? new Date(now.getTime() + 14 * 24 * 3600 * 1000);
 
@@ -136,12 +148,13 @@ export async function createRtpRequest(db: Db, input: CreateRtpInput): Promise<P
     paymentRequestInstanceReference: uuidv4(),
     requestVersion: 1,
     requesterPartyReference: input.requesterPartyReference,
-    payeeName: input.payeeName,
+    payeeName,
     payeeCounterpartyReference: input.payeeCounterpartyReference,
     payeeAlias: input.payeeAlias,
     payeeAliasHash: input.payeeAlias ? hashAlias(input.payeeAlias) : undefined,
     payeeReceivingAccountReference: receivingAccount,
     payerPartyReference: input.payerPartyReference,
+    payerCounterpartyReference: input.payerCounterpartyReference,
     payerAlias: input.payerAlias,
     payerAliasHash: input.payerAlias ? hashAlias(input.payerAlias) : undefined,
     amount: input.amount,
@@ -248,7 +261,7 @@ export async function presentRtpRequest(db: Db, ref: string, actor?: string): Pr
       notificationType: 'payment_request',
       title: 'A payment request needs your approval',
       detail: `${updated.payeeName ?? 'A payee'} requested ${updated.amount} ${updated.currency}`,
-      href: `/system/transfer?request=${updated.paymentRequestInstanceReference}`,
+      href: `/system/payment/history/${updated.paymentRequestInstanceReference}`,
       relatedReference: updated.paymentRequestInstanceReference,
       actionable: true,
     });
@@ -282,7 +295,7 @@ export async function rejectRtpRequest(
     notificationType: 'payment_request',
     title: 'Your payment request was declined',
     detail: `Request for ${updated.amount} ${updated.currency} was declined`,
-    href: `/system/transfer?request=${ref}`,
+    href: `/system/payment/history/${ref}`,
     relatedReference: ref,
     actionable: false,
   });
@@ -303,7 +316,7 @@ export async function cancelRtpRequest(db: Db, ref: string, actor?: string): Pro
     notificationType: 'payment_request',
     title: 'Your payment request was cancelled',
     detail: `Request for ${updated.amount} ${updated.currency} was cancelled`,
-    href: `/system/transfer?request=${ref}`,
+    href: `/system/payment/history/${ref}`,
     relatedReference: ref,
     actionable: false,
   });

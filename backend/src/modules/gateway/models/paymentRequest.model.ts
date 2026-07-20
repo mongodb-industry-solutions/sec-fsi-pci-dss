@@ -81,6 +81,8 @@ export interface PaymentRequestProcedure {
 
   // Payer (approves + funds)
   payerPartyReference?: string;               // resolved payer (FK → party)
+  payerCounterpartyReference?: string;        // FK → counterpartyArrangement (SD-54): the requester's
+                                              // beneficiary that represents the payer (for the payee's link)
   payerAlias?: string;                        // QE:none (DEK-rtp-alias)
   payerAliasHash?: string;                    // SHA-256(alias) — indexed
   payerPspId?: string;

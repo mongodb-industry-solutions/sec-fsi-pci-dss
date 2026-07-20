@@ -18,6 +18,29 @@ import {
   PAYMENT_REQUEST_EVENT_COLLECTION, PaymentRequestEvent,
 } from '../models/paymentRequestEvent.model';
 import { PAYMENT_REQUEST_COLLECTION } from '../models/paymentRequest.model';
+import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
+import { getCaseNotes } from '../../fraud/services/fraudDiagnosis.service';
+
+// Statuses where the payer has consented (by approving/paying), so the payee may see the payer's name
+// (SEPA/PSD2: debtor name is disclosed to the creditor on the credit transfer).
+const PAYER_CONSENTED = ['accepted', 'payment_initiated', 'payment_processing', 'payment_settled', 'payment_failed', 'reversed', 'disputed'];
+
+// Build a customer-safe security-case summary for an RTP request (case is keyed by the request ref).
+// Authorized to BOTH parties of the request (transparency: both see the PSP/L1/L2 outcome on their funds).
+async function buildSecurityCase(db: import('mongodb').Db, ref: string) {
+  const fraudCase = await db.collection(FRAUD_DIAGNOSIS_COLLECTION).findOne({ cardTransactionInstanceReference: ref });
+  if (!fraudCase) return null;
+  const caseId = fraudCase['fraudDiagnosisInstanceReference'] as string;
+  const notes = (await getCaseNotes(db, caseId, 'customer')).filter((n) => !n.isRetracted);
+  return {
+    caseInstanceReference: caseId,
+    caseReference: fraudCase['fraudDiagnosisCaseReference'] ?? null,
+    caseStatus: fraudCase['fraudDiagnosisCaseStatus'] ?? null,
+    caseSeverity: fraudCase['fraudDiagnosisCaseSeverity'] ?? null,
+    resolutionOutcome: (fraudCase['fraudDiagnosisResolutionRecord'] as Record<string, unknown> | null)?.resolutionOutcome ?? null,
+    notes,
+  };
+}
 
 function getUser(request: unknown): JwtUserPayload | undefined {
   return (request as { user?: JwtUserPayload }).user;
@@ -65,6 +88,7 @@ export async function rtpController(fastify: FastifyInstance) {
           payeeCounterpartyReference: { type: 'string' },
           payeeReceivingAccountReference: { type: 'string' },
           payerPartyReference: { type: 'string' },
+          payerCounterpartyReference: { type: 'string' },
           payerAlias: { type: 'string', maxLength: 140 },
           invoiceReference: { type: 'string', maxLength: 60 },
           dueAt: { type: 'string', format: 'date-time' },
@@ -99,6 +123,7 @@ export async function rtpController(fastify: FastifyInstance) {
         payeeCounterpartyReference: b.payeeCounterpartyReference as string | undefined,
         payeeReceivingAccountReference: b.payeeReceivingAccountReference as string | undefined,
         payerPartyReference: b.payerPartyReference as string | undefined,
+        payerCounterpartyReference: b.payerCounterpartyReference as string | undefined,
         payerAlias: b.payerAlias as string | undefined,
         invoiceReference: b.invoiceReference as string | undefined,
         dueAt: b.dueAt ? new Date(b.dueAt as string) : undefined,
@@ -157,7 +182,45 @@ export async function rtpController(fastify: FastifyInstance) {
     if (!staff && req.requesterPartyReference !== actor.partyRef && req.payerPartyReference !== actor.partyRef) {
       return reply.code(403).send({ error: 'forbidden' });
     }
-    return reply.send(req);
+    // Enrich for the detail view:
+    // - payeeName: the requester's real name (authorized to the payer — requesting is the consent).
+    // - payerName: the payer's real name, only once they consented by approving/paying (SEPA/PSD2).
+    // - payeeAccountDisplay: the destination (bank + masked IBAN) so the payer sees where the money goes.
+    // - securityCase: visible to BOTH parties (transparency of the PSP/L1/L2 resolution on their funds).
+    const nameOf = async (partyRef?: string) => partyRef
+      ? (await fastify.db.collection<{ partyName?: string }>('party')
+          .findOne({ partyInstanceReference: partyRef } as Record<string, unknown>, { projection: { partyName: 1 } }))?.partyName
+      : undefined;
+
+    const payeeName = req.payeeName ?? await nameOf(req.requesterPartyReference);
+    const payerName = PAYER_CONSENTED.includes(req.status) ? await nameOf(req.payerPartyReference) : undefined;
+
+    let payeeAccountDisplay: { bankName?: string; maskedIban?: string; alias?: string } | undefined;
+    const acct = await fastify.db.collection<{ payoutAccountIban?: string; payoutAccountBankName?: string; payoutAccountAlias?: string }>('payoutAccountArrangement')
+      .findOne({ payoutAccountInstanceReference: req.payeeReceivingAccountReference } as Record<string, unknown>,
+        { projection: { payoutAccountIban: 1, payoutAccountBankName: 1, payoutAccountAlias: 1 } }).catch(() => null);
+    if (acct) {
+      const iban = acct.payoutAccountIban;
+      payeeAccountDisplay = {
+        bankName: acct.payoutAccountBankName,
+        alias: acct.payoutAccountAlias,
+        // Mask to the last 4 (GDPR minimisation): the payer sees the destination without the full IBAN.
+        maskedIban: iban ? `••••${iban.slice(-4)}` : undefined,
+      };
+    }
+
+    // Beneficiary link for the payee's view: the requester's SD-54 arrangement representing the payer.
+    // Resolve on read (covers RTP created before the field existed) if not already stored.
+    let payerCounterpartyReference = req.payerCounterpartyReference;
+    if (!payerCounterpartyReference && req.payerPartyReference) {
+      const arr = await fastify.db.collection<{ counterpartyArrangementReference?: string }>('counterpartyArrangement')
+        .findOne({ ownerPartyReference: req.requesterPartyReference, counterpartyPartyReference: req.payerPartyReference } as Record<string, unknown>,
+          { projection: { counterpartyArrangementReference: 1 } }).catch(() => null);
+      payerCounterpartyReference = arr?.counterpartyArrangementReference;
+    }
+
+    const securityCase = await buildSecurityCase(fastify.db, ref).catch(() => null);
+    return reply.send({ ...req, payeeName, payerName, payeeAccountDisplay, payerCounterpartyReference, securityCase });
   });
 
   // GET /requests/:ref/events — per-request timeseries trail.
