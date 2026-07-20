@@ -24,6 +24,6 @@ export async function POST(req: NextRequest) {
     if (e instanceof OAuthUpstreamError) {
       return NextResponse.json({ error: e.code, error_description: e.description }, { status: e.status });
     }
-    return NextResponse.json({ error: 'bc_authorize_failed', error_description: 'Could not reach Leafy Pay' }, { status: 502 });
+    return NextResponse.json({ error: 'bc_authorize_failed', error_description: 'Could not reach Securit4 Pay' }, { status: 502 });
   }
 }

@@ -12,13 +12,13 @@ type Phase = 'idle' | 'starting' | 'confirm' | 'approving' | 'polling' | 'error'
 // Friendly copy for the OAuth/CIBA error codes the PSP can return, so the UI never shows a raw
 // "bc-authorize failed: 400 {…}" string. Unknown codes fall back to the server's description.
 const FRIENDLY: Record<string, string> = {
-  unauthorized_client: 'Passwordless sign-in is not enabled for this store yet. Please use “Login with Leafy Pay”.',
+  unauthorized_client: 'Passwordless sign-in is not enabled for this store yet. Please use “Login with Securit4 Pay”.',
   unknown_user_id: 'This device is not enrolled for passwordless sign-in. Enable it from your profile after signing in.',
   invalid_scope: 'This store is not allowed the permissions needed for passwordless sign-in.',
   access_denied: 'The request was denied.',
   expired_token: 'The request expired. Please try again.',
-  bc_authorize_failed: 'Could not reach Leafy Pay. Please try again.',
-  invalid_grant: 'This device is no longer enrolled. Please sign in with Leafy Pay and re-enable passwordless.',
+  bc_authorize_failed: 'Could not reach Securit4 Pay. Please try again.',
+  invalid_grant: 'This device is no longer enrolled. Please sign in with Securit4 Pay and re-enable passwordless.',
 };
 
 function friendly(code?: string, fallback?: string): string {
@@ -75,7 +75,7 @@ export default function PasswordlessLoginButton() {
         if (apRes.status === 401 || apRes.status === 400) {
           await deleteCredential().catch(() => {});
           setAvailable(false);
-          return fail('This device is no longer enrolled. Please sign in with Leafy Pay and re-enable passwordless.');
+          return fail('This device is no longer enrolled. Please sign in with Securit4 Pay and re-enable passwordless.');
         }
         return fail(friendly(ap.error, ap.error_description));
       }

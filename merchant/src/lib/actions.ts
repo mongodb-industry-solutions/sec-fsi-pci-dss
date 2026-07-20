@@ -155,7 +155,7 @@ export async function addBeneficiary(input: {
     const c = await client();
     const data = await c.addBeneficiary(input.lookupType, value, input.label?.trim() || undefined);
     if (!data.found) {
-      return { ok: false, message: 'No matching Leafy Pay user was found (or they are already saved).' };
+      return { ok: false, message: 'No matching Securit4 Pay user was found (or they are already saved).' };
     }
     return {
       ok: true,

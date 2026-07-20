@@ -1,4 +1,4 @@
-// Help (demo explainer): what this integration is, HOW it was built, and WHY Leafy Pay / MongoDB.
+// Help (demo explainer): what this integration is, HOW it was built, and WHY Securit4 Pay / MongoDB.
 import Link from 'next/link';
 import {
   KeyRound, ShieldCheck, Database, Zap, Store, ServerCog, Link2, CreditCard, Repeat, UserCheck,
@@ -31,7 +31,7 @@ export default function HelpPage() {
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
           Espresso Works is an <b>external</b> storefront. It has no database and never touches card data. Everything
-          runs through the Leafy Pay PSP over OAuth2/OIDC and its API.
+          runs through the Securit4 Pay PSP over OAuth2/OIDC and its API.
         </p>
       </header>
 
@@ -52,7 +52,7 @@ export default function HelpPage() {
           </div>
           <div className="flex flex-1 flex-col items-center rounded-xl bg-gradient-to-br from-leaf-ink to-[#04322c] p-4 text-center text-white ring-1 ring-leaf/30">
             <ShieldCheck className="h-6 w-6 text-leaf" aria-hidden />
-            <p className="mt-2 text-sm font-medium">Leafy Pay PSP</p>
+            <p className="mt-2 text-sm font-medium">Securit4 Pay PSP</p>
             <p className="text-xs text-white/70">Auth · payments · balances</p>
           </div>
           <div className="flex items-center justify-center text-muted">
@@ -74,7 +74,7 @@ export default function HelpPage() {
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">How it was built</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <Card icon={<KeyRound className="h-5 w-5" aria-hidden />} title="OAuth2 / OIDC SSO with PKCE">
-            You sign in on Leafy Pay, not here. We use the authorization-code flow with{' '}
+            You sign in on Securit4 Pay, not here. We use the authorization-code flow with{' '}
             <Tip label="Proof Key for Code Exchange: protects the code exchange without a client secret in the browser."><span className="cursor-help font-medium text-leaf-deep underline">PKCE</span></Tip>{' '}
             and granular consent. The merchant only receives an encrypted session cookie, never your password or card.
           </Card>
@@ -106,12 +106,12 @@ export default function HelpPage() {
         </div>
       </section>
 
-      {/* WHY Leafy Pay / MongoDB */}
+      {/* WHY Securit4 Pay / MongoDB */}
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">Why Leafy Pay &amp; MongoDB</h2>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">Why Securit4 Pay &amp; MongoDB</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <Card icon={<ShieldCheck className="h-5 w-5" aria-hidden />} title="Secure, PCI-aligned PSP">
-            Card data and balances stay inside Leafy Pay. The merchant offloads compliance scope and never stores
+            Card data and balances stay inside Securit4 Pay. The merchant offloads compliance scope and never stores
             cardholder data.
           </Card>
           <Card icon={<Lock className="h-5 w-5" aria-hidden />} title="Queryable Encryption">
@@ -147,7 +147,7 @@ export default function HelpPage() {
               <span className="grid h-9 w-9 place-items-center rounded-xl bg-leaf/10 text-leaf-deep ring-1 ring-leaf/20"><FileCode className="h-5 w-5" aria-hidden /></span>
               <h3 className="font-semibold text-ink flex items-center gap-1.5">API (Swagger) <ExternalLink className="h-3.5 w-3.5 text-muted" aria-hidden /></h3>
             </div>
-            <p className="mt-3 text-sm text-muted">Interactive OpenAPI docs for the Leafy Pay PSP API this storefront integrates with.</p>
+            <p className="mt-3 text-sm text-muted">Interactive OpenAPI docs for the Securit4 Pay PSP API this storefront integrates with.</p>
           </a>
         </div>
       </section>

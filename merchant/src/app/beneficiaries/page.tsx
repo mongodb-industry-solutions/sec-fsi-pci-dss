@@ -55,7 +55,7 @@ export default async function BeneficiariesPage() {
       {error ? (
         <PspUnavailable message={error} />
       ) : results.length === 0 ? (
-        <EmptyState icon={<Users className="h-8 w-8" />} title="No saved beneficiaries yet" hint="Payees you add in Leafy Pay will appear here." />
+        <EmptyState icon={<Users className="h-8 w-8" />} title="No saved beneficiaries yet" hint="Payees you add in Securit4 Pay will appear here." />
       ) : (
         <ul className="glass divide-y divide-line/60 overflow-hidden rounded-2xl">
           {results.map((b, i) => (

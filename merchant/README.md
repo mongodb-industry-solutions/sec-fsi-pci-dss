@@ -1,7 +1,7 @@
 # Leafy Merchant Demo — Espresso Works Ltd
 
 An **autonomous** Next.js (App Router) demo storefront for *Espresso Works Ltd* that integrates
-with the **Leafy Pay PSP** purely via **OAuth2 / OIDC SSO + REST API**. It has **no database** and
+with the **Securit4 Pay PSP** purely via **OAuth2 / OIDC SSO + REST API**. It has **no database** and
 shares no code with the PSP `backend/`/`frontend/` — it is an external system, deployed separately.
 
 ## Architecture

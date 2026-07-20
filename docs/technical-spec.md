@@ -3950,7 +3950,7 @@ gated by the signature at the PSP, so serving the challenge to the `auth_req_id`
 ### 13.3 UI (`merchant/src/components`, `merchant/src/app`)
 - `PasswordlessLoginButton.tsx` — on landing, renders ONLY when a credential exists (else SSO only); runs
   start → challenge → sign → approve → poll → redirect; on revoked credential clears IndexedDB + falls back.
-- `EnrollPasswordless.tsx` + `Es256KeyTool.tsx` — hosted on `app/profile/page.tsx` (enroll/status + Leafy
+- `EnrollPasswordless.tsx` + `Es256KeyTool.tsx` — hosted on `app/profile/page.tsx` (enroll/status + Securit4
   Pay keys link + throwaway generator). `app/page.tsx` renders the login button in the logged-out branch.
 
 ### 13.4 Seed / compliance

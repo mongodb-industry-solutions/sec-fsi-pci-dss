@@ -27,17 +27,17 @@ const METHOD_ICON: Record<PaymentMethod, LucideIcon> = {
 // One short, human explanation per method (shown under the badge).
 const METHOD_BLURB: Record<PaymentMethod, string> = {
   payment_link: 'Generates a shareable link the buyer opens to pay.',
-  redirect: 'Opens Leafy Pay’s secure hosted checkout page.',
+  redirect: 'Opens Securit4 Pay’s secure hosted checkout page.',
   api_payment: 'Server-to-server charge on a tokenised card.',
   subscription: 'Hosted checkout that sets up a recurring plan.',
 };
 
 // Longer tooltip (on hover AND click).
 const METHOD_HELP: Record<PaymentMethod, string> = {
-  payment_link: 'Creates a shareable Leafy Pay link. The buyer pays on a hosted page. Nothing is charged until they open it.',
-  redirect: 'Sends the browser to Leafy Pay’s hosted checkout, where the PSP securely captures the card. The merchant never sees card data.',
+  payment_link: 'Creates a shareable Securit4 Pay link. The buyer pays on a hosted page. Nothing is charged until they open it.',
+  redirect: 'Sends the browser to Securit4 Pay’s hosted checkout, where the PSP securely captures the card. The merchant never sees card data.',
   api_payment: 'Server-to-server charge on a tokenised card using the merchant’s own credentials. The merchant never sees card data.',
-  subscription: 'Redirects to Leafy Pay’s hosted checkout to set up a recurring subscription.',
+  subscription: 'Redirects to Securit4 Pay’s hosted checkout to set up a recurring subscription.',
 };
 
 // Uniform primary-action label across ALL products for a homogeneous design.

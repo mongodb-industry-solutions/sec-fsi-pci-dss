@@ -15,7 +15,7 @@ export default async function ProductsPage() {
         <ShoppingBag className="h-6 w-6 text-leaf-deep" aria-hidden /> Shop
       </h1>
       <p className="mb-6 mt-1 text-sm text-muted">
-        Every purchase pays via Leafy Pay. We never see your card details.
+        Every purchase pays via Securit4 Pay. We never see your card details.
       </p>
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {PRODUCTS.map((p) => (
