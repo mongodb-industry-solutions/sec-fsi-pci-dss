@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../lib/api';
+import { getSimToken } from '../../lib/simulatorAuth';
 import { MerchantBrandingWrapper } from './MerchantBrandingWrapper';
 import { SimulatorStateManager } from './SimulatorStateManager';
 import type { SimulatorScenario } from '../../types/simulator';
@@ -84,14 +85,17 @@ export function PaymentLinkFlow({ scenario, merchantId }: Props) {
     setFlowState('creating');
     setErrorMsg(null);
     try {
-      const result = await api.simulator.createPaymentLink({
-        merchantId: merchantId ?? simulatorConfig.merchantId,
+      // Authenticate as the selected demo persona (real JWT) and call the REAL payment-link endpoint.
+      // No open simulator endpoint: works identically in local and production.
+      const token = await getSimToken(prefill.email);
+      const result = await api.paymentLinks.create({
+        merchantAgreementInstanceReference: merchantId ?? simulatorConfig.merchantId,
         amount,
         currency: prefill.currency,
         description: description.trim() || prefill.description,
         customerMessage: `Hi ${prefill.cardholderName}, please complete your payment using the link below.`,
         usageType: 'single_use',
-      });
+      }, token);
       const code = result.paymentLinkCode;
       setLinkCode(code);
       setPayUrl(`${window.location.origin}/gateway/pay/${code}`);

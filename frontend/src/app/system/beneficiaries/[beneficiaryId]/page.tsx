@@ -2,9 +2,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
-  UserCheck, ArrowLeft, Mail, Phone, Check, Edit3, X, AlertTriangle, SendHorizonal, Landmark,
+  UserCheck, ArrowLeft, Mail, Phone, Check, Edit3, X, AlertTriangle, SendHorizonal, Landmark, HandCoins,
 } from 'lucide-react';
 import { SectionHeader } from '../../../../components/SectionHeader';
+import { RequestMoneyModal } from '../../../../components/RequestMoneyModal';
 import { useDebugMode } from '../../../../lib/debugMode';
 import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
@@ -259,6 +260,7 @@ export default function BeneficiaryDetailPage() {
 
   // Send money modal
   const [showSend, setShowSend] = useState(false);
+  const [showRequest, setShowRequest] = useState(false);
   // Auto-open when navigated from the list page Send quick-action button (?action=send)
   useEffect(() => {
     if (record && searchParams?.get('action') === 'send') setShowSend(true);
@@ -298,10 +300,16 @@ export default function BeneficiaryDetailPage() {
           />
         </div>
         {canSend && (
-          <button type="button" onClick={() => setShowSend(true)}
-            className="flex items-center gap-2 bg-[#001E2B] hover:bg-[#001E2B]/80 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors shrink-0">
-            <SendHorizonal size={15} /> Send money
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button type="button" onClick={() => setShowSend(true)}
+              className="flex items-center gap-2 bg-[#001E2B] hover:bg-[#001E2B]/80 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors">
+              <SendHorizonal size={15} /> Send money
+            </button>
+            <button type="button" onClick={() => setShowRequest(true)}
+              className="flex items-center gap-2 border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] px-5 py-2.5 rounded-xl text-sm font-medium transition-colors">
+              <HandCoins size={15} /> Request money
+            </button>
+          </div>
         )}
       </div>
 
@@ -423,6 +431,14 @@ export default function BeneficiaryDetailPage() {
           ownerPartyRef={ownPartyRef}
           token={token}
           onClose={() => setShowSend(false)}
+        />
+      )}
+
+      {showRequest && record && (
+        <RequestMoneyModal
+          beneficiary={record}
+          token={token}
+          onClose={() => setShowRequest(false)}
         />
       )}
     </div>

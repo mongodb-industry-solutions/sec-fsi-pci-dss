@@ -11,6 +11,10 @@ import { COUNTERPARTY_COLLECTION } from '../../modules/identity/models/counterpa
 import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/gateway/models/balanceCreditLog.model';
 import { PARTY_ENROLLED_CREDENTIAL_COLLECTION } from '../../modules/identity/models/partyEnrolledCredential.model';
 import { PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION } from '../../modules/identity/models/partyBackchannelAuthentication.model';
+import { PAYMENT_REQUEST_COLLECTION } from '../../modules/gateway/models/paymentRequest.model';
+import { PAYMENT_REQUEST_EVENT_COLLECTION } from '../../modules/gateway/models/paymentRequestEvent.model';
+import { QR_REPRESENTATION_COLLECTION } from '../../modules/gateway/models/qrRepresentation.model';
+import { RTP_ALIAS_DIRECTORY_CACHE_COLLECTION } from '../../modules/gateway/models/rtpAliasDirectoryCache.model';
 
 const kmsConfig = getKmsConfig();
 
@@ -52,6 +56,12 @@ export async function createCollections(
     ...(maps.paymentExecutionProcedure
       ? [{ name: PAYMENT_EXECUTION_COLLECTION, map: maps.paymentExecutionProcedure }]
       : [{ name: PAYMENT_EXECUTION_COLLECTION, map: { fields: [] } }]
+    ),
+    // SD-65 (v28): Request to Pay canonical record. Alias/remittance/address/payee-name QE:none, L2 only
+    // (GDPR minimization). RTP is account/alias-based → OUTSIDE PCI scope (no PAN/CHD).
+    ...(maps.paymentRequestProcedure
+      ? [{ name: PAYMENT_REQUEST_COLLECTION, map: maps.paymentRequestProcedure }]
+      : [{ name: PAYMENT_REQUEST_COLLECTION, map: { fields: [] } }]
     ),
   ];
 
@@ -449,5 +459,49 @@ export async function createCollections(
     console.log(`  created: ${BALANCE_CREDIT_LOG_COLLECTION} (SD-66 balance credit audit log, PCI DSS Req 10)`);
   } else {
     console.log(`  skip:    ${BALANCE_CREDIT_LOG_COLLECTION} (already exists)`);
+  }
+
+  // SD-65 (v28): QR Payment Representation — plaintext (signed deep link / EMVCo / EPC string, no PII)
+  if (!existingNames.has(QR_REPRESENTATION_COLLECTION) || reset) {
+    if (existingNames.has(QR_REPRESENTATION_COLLECTION) && reset) {
+      await db.collection(QR_REPRESENTATION_COLLECTION).drop();
+      console.log(`  dropped: ${QR_REPRESENTATION_COLLECTION}`);
+    }
+    await db.createCollection(QR_REPRESENTATION_COLLECTION);
+    console.log(`  created: ${QR_REPRESENTATION_COLLECTION} (SD-65 shared QR capability)`);
+  } else {
+    console.log(`  skip:    ${QR_REPRESENTATION_COLLECTION} (already exists)`);
+  }
+
+  // Directory Entry (v28): RTP alias resolution cache — plaintext (aliasHash only, no plaintext alias)
+  if (!existingNames.has(RTP_ALIAS_DIRECTORY_CACHE_COLLECTION) || reset) {
+    if (existingNames.has(RTP_ALIAS_DIRECTORY_CACHE_COLLECTION) && reset) {
+      await db.collection(RTP_ALIAS_DIRECTORY_CACHE_COLLECTION).drop();
+      console.log(`  dropped: ${RTP_ALIAS_DIRECTORY_CACHE_COLLECTION}`);
+    }
+    await db.createCollection(RTP_ALIAS_DIRECTORY_CACHE_COLLECTION);
+    console.log(`  created: ${RTP_ALIAS_DIRECTORY_CACHE_COLLECTION} (RTP alias directory cache, TTL)`);
+  } else {
+    console.log(`  skip:    ${RTP_ALIAS_DIRECTORY_CACHE_COLLECTION} (already exists)`);
+  }
+
+  // SD-65 (v28): Payment Request Event — timeseries, TTL 365 days (per-request lifecycle trail).
+  // Timeseries collections cannot be converted; drop + recreate always on reset.
+  if (!existingNames.has(PAYMENT_REQUEST_EVENT_COLLECTION) || reset) {
+    if (existingNames.has(PAYMENT_REQUEST_EVENT_COLLECTION) && reset) {
+      await db.collection(PAYMENT_REQUEST_EVENT_COLLECTION).drop();
+      console.log(`  dropped: ${PAYMENT_REQUEST_EVENT_COLLECTION}`);
+    }
+    await db.createCollection(PAYMENT_REQUEST_EVENT_COLLECTION, {
+      timeseries: {
+        timeField: 'eventDateTime',
+        metaField: 'paymentRequestInstanceReference',
+        granularity: 'hours',
+      },
+      expireAfterSeconds: 31536000, // 365 days
+    });
+    console.log(`  created: ${PAYMENT_REQUEST_EVENT_COLLECTION} (timeseries, TTL 365d)`);
+  } else {
+    console.log(`  skip:    ${PAYMENT_REQUEST_EVENT_COLLECTION} (already exists)`);
   }
 }

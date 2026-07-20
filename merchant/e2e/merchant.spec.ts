@@ -15,13 +15,13 @@ const RUN = process.env.RUN_MERCHANT_E2E === '1';
 const EMAIL = process.env.MERCHANT_E2E_EMAIL ?? 'luis.fernandez@back.es';
 const PASSWORD = process.env.MERCHANT_E2E_PASSWORD ?? 'demo-password';
 
-test.describe('Merchant ↔ Leafy Pay SSO + API', () => {
+test.describe('Merchant ↔ Sec4 Pay SSO + API', () => {
   test.skip(!RUN, 'Set RUN_MERCHANT_E2E=1 with the full PSP + merchant stack running.');
 
   // Drives the OAuth consent page hosted by the PSP frontend and lands back on the merchant.
   async function login(page: Page) {
     await page.goto('/');
-    await page.getByRole('link', { name: /login with leafy pay/i }).click();
+    await page.getByRole('link', { name: /login with sec4 pay/i }).click();
     await page.getByLabel(/email/i).fill(EMAIL);
     await page.getByLabel(/password/i).fill(PASSWORD);
     await page.getByRole('button', { name: /sign in/i }).click();

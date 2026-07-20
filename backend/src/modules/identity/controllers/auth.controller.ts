@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
-import { loginUser, getDemoUsers, getEnabledDomains, registerSelfServiceUser, updateAuthProfile, bumpSessionEpoch, JwtPayload } from '../services/auth.service';
+import { loginUser, getEnabledDomains, registerSelfServiceUser, updateAuthProfile, bumpSessionEpoch, JwtPayload } from '../services/auth.service';
 import { getSelfProfile, updateSelfProfile } from '../../customer/services/customerAgreement.service';
 import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../models/party.model';
@@ -201,73 +201,10 @@ Password for all demo users: \`demo-password\``,
     return reply.status(200).send({ loggedOut: true });
   });
 
-  fastify.get('/users', {
-    schema: {
-      tags: ['auth'],
-      summary: 'List demo users (local domain)',
-      description: `Returns active pre-seeded demo user accounts (DB-backed) for the local domain.
-Intended for the UI to display one-click login shortcuts; passwords are **never** returned. This is
-the single, non-hardcoded roster shared by the debug-mode login picker and the simulator.
-
-Filters (combinable): \`featured=true\` (curated roster), \`role=customer,merchant_officer\`
-(comma list), \`q=\` (name/email substring), \`isMerchant=true\` (only customers who own a merchant).
-Results are returned in a deterministic order.`,
-      querystring: {
-        type: 'object',
-        properties: {
-          featured: { type: 'string', enum: ['true', 'false'], description: 'When "true", only users flagged customerAuthenticationDemoFeatured.' },
-          role: { type: 'string', description: 'Comma-separated role filter, e.g. "customer,merchant_officer".' },
-          q: { type: 'string', description: 'Case-insensitive substring match on name or email.' },
-          isMerchant: { type: 'string', enum: ['true', 'false'], description: 'When "true", only customers who own a merchant.' },
-        },
-      },
-      response: {
-        200: {
-          description: 'List of available demo users.',
-          type: 'object',
-          properties: {
-            users: {
-              type: 'array',
-              description: 'Active demo accounts matching the filters, in deterministic order.',
-              items: {
-                type: 'object',
-                properties: {
-                  email: { type: 'string', format: 'email', description: 'Login email; submit to POST /api/v1/auth/login.' },
-                  name: { type: 'string', description: 'Display name.' },
-                  role: {
-                    type: 'string',
-                    enum: ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor', 'merchant_officer', 'manager'],
-                    description: 'Role that will be encoded in the JWT on login.',
-                  },
-                  featured: { type: 'boolean', description: 'True if part of the curated demo roster.' },
-                  partyRef: { type: 'string', description: 'partyInstanceReference (SD-13).' },
-                  merchant: {
-                    type: 'object',
-                    nullable: true,
-                    description: 'Present when this customer owns a merchant (customer + merchant).',
-                    properties: {
-                      id: { type: 'string', description: 'merchantAgreementInstanceReference.' },
-                      name: { type: 'string', description: 'Merchant display name.' },
-                      mcc: { type: 'string', nullable: true, description: 'Merchant Category Code (ISO 18245).' },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  }, async (request, reply) => {
-    const { featured, role, q, isMerchant } = request.query as { featured?: string; role?: string; q?: string; isMerchant?: string };
-    const users = await getDemoUsers(fastify.db, {
-      featured: featured === 'true',
-      ...(role ? { role: role.split(',').map((r) => r.trim()).filter(Boolean) } : {}),
-      ...(q ? { q } : {}),
-      ...(isMerchant === 'true' ? { isMerchant: true } : {}),
-    });
-    return reply.send({ users });
-  });
+  // NOTE: the demo-user roster endpoint was consolidated to GET /api/v1/system/users (demo.controller).
+  // A demo access convenience (list users by role for the login picker + simulator) belongs under
+  // /system, not under /auth (real authentication). Both used the same getDemoUsers service; the
+  // /auth/users duplicate was removed.
 
   fastify.get('/domains', {
     schema: {

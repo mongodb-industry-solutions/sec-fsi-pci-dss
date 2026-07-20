@@ -5,7 +5,7 @@ import { api, FraudCase } from '../../../lib/api';
 import { CaseTable } from '../../../components/CaseTable';
 import { Pagination } from '../../../components/Pagination';
 import { EncryptedKycSearch } from '../../../components/EncryptedKycSearch';
-import { getSimTokenForRole } from '../../../lib/simulatorAuth';
+import { getSimTokenForRole, getSimToken } from '../../../lib/simulatorAuth';
 import { ROLE_LABELS } from '../../../lib/constants';
 
 type SearchField = 'caseRef' | 'email' | 'phone' | 'accountRef' | 'cardToken';
@@ -58,9 +58,11 @@ export default function SimulatorInvestigationPage() {
       setSimPayment(saved);
       if (saved.email) {
         setSearchValue(saved.email);
-        // Confirm DB state: how many transactions exist for this email
-        api.simulator.getTransactions(saved.email)
-          .then((res: { transactions: unknown[]; total: number }) => setDbTxCount(res.total))
+        // Confirm DB state: how many transactions exist for this email. Authenticate as the persona
+        // (real JWT) and use the REAL transactions endpoint (works in local + production, no open surface).
+        getSimToken(saved.email)
+          .then((token) => api.transactions.listAll({ email: saved.email, limit: 1 }, token))
+          .then((res: { total: number }) => setDbTxCount(res.total))
           .catch(() => null);
       }
       // Fetch the pinned case if we have its ID
@@ -394,7 +396,10 @@ function SimulatorKycSearchPanel() {
       {tokenError ? (
         <div className="text-sm text-red-600">{tokenError}</div>
       ) : !token ? (
-        <div className="text-sm text-gray-400">Preparing {ROLE_LABELS[role] ?? role} session…</div>
+        <div className="flex items-center gap-3 py-6 text-sm text-gray-500">
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-[#001E2B]" />
+          Waiting for the server to load the {ROLE_LABELS[role] ?? role} token…
+        </div>
       ) : (
         <EncryptedKycSearch token={token} role={role} />
       )}

@@ -36,6 +36,8 @@ export class ProviderGroups {
     this.bus.subscribe('card.issuer.validation.requested', (e) => this.onIssuer(e));
     this.bus.subscribe('fds.scoring.requested', (e) => this.onFds(e));
     this.bus.subscribe('hrp.screening.requested', (e) => this.onHrp(e));
+    // VOP is dispatched synchronously via dispatchProvider in the RTP screening flow (never emitted on
+    // the bus), so there is intentionally NO 'vop.verification.requested' subscription here.
     this.bus.subscribe('funds.check.requested', (e) => this.onFunds(e));
     // v27 Phase 6: KYC/HRP customer screening (SD-13 -> SD-53). A customer profile validation
     // completing triggers a re-screen; the request event is a first-class Integration Hub gate.

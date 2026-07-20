@@ -2,9 +2,10 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  UserCheck, Search, Plus, Mail, Phone, Trash2, ChevronLeft, ChevronRight, X, SendHorizonal, Check, Landmark,
+  UserCheck, Search, Plus, Mail, Phone, Trash2, ChevronLeft, ChevronRight, X, SendHorizonal, Check, Landmark, HandCoins,
 } from 'lucide-react';
 import { SectionHeader } from '../../../components/SectionHeader';
+import { RequestMoneyModal } from '../../../components/RequestMoneyModal';
 import { useDebugMode } from '../../../lib/debugMode';
 import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
@@ -344,6 +345,7 @@ export default function BeneficiariesPage() {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [sendTarget, setSendTarget] = useState<Beneficiary | null>(null);
+  const [requestTarget, setRequestTarget] = useState<Beneficiary | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<Beneficiary | null>(null);
   const [removing, setRemoving] = useState(false);
 
@@ -489,6 +491,14 @@ export default function BeneficiariesPage() {
                             <SendHorizonal size={12} /> Send
                           </button>
                         )}
+                        {isCustomer && b.counterpartyArrangementStatus === 'active' && (
+                          <button type="button"
+                            onClick={() => setRequestTarget(b)}
+                            className="flex items-center gap-1 text-xs text-[#001E2B] hover:text-[#001E2B]/70 border border-gray-200 hover:border-gray-300 rounded-lg px-2.5 py-1 transition-colors"
+                            title="Request money">
+                            <HandCoins size={12} /> Request
+                          </button>
+                        )}
                         {canWrite && b.counterpartyArrangementStatus === 'active' && (
                           <button type="button" onClick={() => setConfirmRemove(b)}
                             className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Remove">
@@ -526,6 +536,14 @@ export default function BeneficiariesPage() {
         <p className="text-[10px] font-mono text-gray-400">
           GET /api/v1/beneficiaries · SD-54 · roleScope: {isCustomer ? 'own' : 'all'} · ownerRef: {isCustomer ? ownPartyRef : ownerFilter || '(all)'}
         </p>
+      )}
+
+      {requestTarget && (
+        <RequestMoneyModal
+          beneficiary={requestTarget}
+          token={token}
+          onClose={() => setRequestTarget(null)}
+        />
       )}
 
       {sendTarget && (

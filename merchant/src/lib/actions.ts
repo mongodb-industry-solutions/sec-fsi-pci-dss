@@ -45,12 +45,11 @@ export async function payForProduct(productId: string): Promise<ActionResult> {
   return toResult(async () => {
     const product = findProduct(productId);
     if (!product) return { ok: false, message: 'Unknown product' };
-    const c = await client();
     const merchantRef = ENV.merchantAgreementRef();
 
     switch (product.method) {
       case 'payment_link': {
-        const link = await c.createPaymentLink({
+        const link = await PspClient.createPaymentLink({
           merchantAgreementInstanceReference: merchantRef,
           amount: product.price,
           currency: product.currency,
@@ -67,7 +66,7 @@ export async function payForProduct(productId: string): Promise<ActionResult> {
       case 'redirect':
       case 'subscription': {
         const base = ENV.baseUrl();
-        const session = await c.createCheckoutSession({
+        const session = await PspClient.createCheckoutSession({
           merchantAgreementInstanceReference: merchantRef,
           amount: product.price,
           currency: product.currency,
@@ -83,6 +82,7 @@ export async function payForProduct(productId: string): Promise<ActionResult> {
         // user session token. No CHD in the merchant; the PSP charges a tokenised card. We forward the
         // acting user's OAuth subject (from the session) purely for ATTRIBUTION so the charge is traceable
         // to the buyer (payment history + operations view) — the charge itself stays merchant-authenticated.
+        const c = await client();
         const order = await PspClient.apiPaymentServerToServer(
           {
             paymentOrderMerchantReference: `${product.id}-${Date.now()}`,
@@ -155,7 +155,7 @@ export async function addBeneficiary(input: {
     const c = await client();
     const data = await c.addBeneficiary(input.lookupType, value, input.label?.trim() || undefined);
     if (!data.found) {
-      return { ok: false, message: 'No matching Leafy Pay user was found (or they are already saved).' };
+      return { ok: false, message: 'No matching Sec4 Pay user was found (or they are already saved).' };
     }
     return {
       ok: true,
@@ -234,4 +234,42 @@ export async function bankTransfer(input: {
     });
     return { ok: true, data, message: 'Transfer submitted.' };
   });
+}
+
+// ── Request to Pay (RTP) — merchant requests / approves money (v28) ─────────────
+export async function requestMoney(input: { amount: number; currency?: string; purpose?: string; payerPartyReference?: string; payerCounterpartyReference?: string }): Promise<ActionResult> {
+  return toResult(async () => {
+    const c = await client();
+    if (!(input.amount > 0)) return { ok: false, message: 'Amount must be greater than zero.' };
+    const req = await c.createRtpRequest(input);
+    // Present it (created → presented) so the payer can approve and is notified. Mirrors the PSP
+    // first-party flow; without this the request stays `created` and accept returns 409 invalid_state.
+    try { await c.presentRtpRequest(req.paymentRequestInstanceReference); } catch { /* still created */ }
+    let paymentUrl: string | undefined;
+    try { paymentUrl = (await c.getRtpQr(req.paymentRequestInstanceReference)).encodedPayload; } catch { /* optional */ }
+    return { ok: true, reference: req.paymentRequestInstanceReference, status: req.status, paymentUrl, data: req };
+  });
+}
+
+export async function approveRtp(ref: string, fundingAccountRef?: string): Promise<ActionResult> {
+  return toResult(async () => {
+    const c = await client();
+    // The accept endpoint requires the request to be presented (presented/delivered/viewed). Requests
+    // still in `created`/`validated` (e.g. created before the present step, or seeded) would 409, so
+    // present them first. Best-effort: if present fails, accept will surface the real error.
+    try {
+      const cur = await c.getRtpRequest(ref) as { status?: string };
+      if (cur?.status === 'created' || cur?.status === 'validated') await c.presentRtpRequest(ref);
+    } catch { /* fall through to accept */ }
+    const res = await c.approveRtpRequest(ref, fundingAccountRef);
+    return { ok: res.status === 'accepted', message: res.reason, status: res.status, reference: res.executionReference, data: res };
+  });
+}
+
+export async function rejectRtp(ref: string): Promise<ActionResult> {
+  return toResult(async () => { await (await client()).rejectRtpRequest(ref); return { ok: true, reference: ref }; });
+}
+
+export async function cancelRtp(ref: string): Promise<ActionResult> {
+  return toResult(async () => { await (await client()).cancelRtpRequest(ref); return { ok: true, reference: ref }; });
 }

@@ -16,6 +16,7 @@ export type CapabilityKey =
   | 'card-issuer'
   | 'account-information'
   | 'payment-initiation'
+  | 'vop'
   | 'generic';
 
 export type ModuleDomain = 'fraud' | 'customer' | 'gateway';
@@ -49,6 +50,12 @@ export const CAPABILITIES: Record<CapabilityKey, CapabilityDescriptor> = {
     capability: 'hrp', providerType: 'hrp_sanctions', label: 'HRP / Sanctions',
     description: 'High-risk person/counterparty and sanctions/PEP screening.',
     callbackSegment: 'hrp', frontendFolder: 'hrp', moduleDomain: 'fraud', hasModule: true,
+    bianServiceDomain: 'SD-13 Party Data Management',
+  },
+  vop: {
+    capability: 'vop', providerType: 'vop_verification', label: 'Verification of Payee',
+    description: 'Payee name-vs-account confirmation (VoP / UK CoP). Additional to FDS/AML/HRP; market-gated.',
+    callbackSegment: 'vop', frontendFolder: 'vop', moduleDomain: 'fraud', hasModule: true,
     bianServiceDomain: 'SD-13 Party Data Management',
   },
   kyc: {

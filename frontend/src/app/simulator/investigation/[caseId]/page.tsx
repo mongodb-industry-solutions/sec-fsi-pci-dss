@@ -45,7 +45,14 @@ export default function SimulatorCaseDetailPage() {
   const [currentStep, setCurrentStep] = useState<StepId>('l1-open');
 
   // Real per-role tokens + the escalation token issued on L2 approval.
+  // Both role JWTs are fetched in the BACKGROUND on mount (via /api/v1/auth/login with the demo
+  // credential). The view is gated behind a spinner until they arrive, so no investigation action can
+  // run before the required tokens are loaded. These tokens live only in the simulator (in-memory);
+  // they never touch the real Application Mode session (setToken), so the real system is unaffected.
+  const [l1Token, setL1Token] = useState<string>('');
   const [l2Token, setL2Token] = useState<string>('');
+  const [tokensReady, setTokensReady] = useState(false);
+  const [tokenError, setTokenError] = useState<string | null>(null);
   const [escalationToken, setEscalationToken] = useState<string | null>(null);
 
   const [busy, setBusy] = useState(false);
@@ -65,6 +72,16 @@ export default function SimulatorCaseDetailPage() {
       .finally(() => setLoading(false));
   }, [caseId]);
 
+  // Background login for the L1 + L2 specialists. The view stays behind a spinner until both real
+  // JWTs are loaded; investigation actions then use the pre-loaded tokens (no per-action re-login).
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([getSimTokenForRole('level1_analyst'), getSimTokenForRole('level2_investigator')])
+      .then(([l1, l2]) => { if (cancelled) return; setL1Token(l1); setL2Token(l2); setTokensReady(true); })
+      .catch((e) => { if (!cancelled) setTokenError(e instanceof Error ? e.message : 'Could not load the specialist tokens.'); });
+    return () => { cancelled = true; };
+  }, []);
+
   // ── Real actions ──────────────────────────────────────────────────────────
   async function run(action: () => Promise<void>) {
     setBusy(true); setMsg(null);
@@ -75,7 +92,7 @@ export default function SimulatorCaseDetailPage() {
 
   function handleEscalate() {
     return run(async () => {
-      const l1 = await getSimTokenForRole('level1_analyst');
+      const l1 = l1Token || (await getSimTokenForRole('level1_analyst'));
       await api.fraud.escalate(caseId, { escalationReason: 'Risk exceeds L1 threshold. Requesting L2 review.' }, l1);
       await refreshCase(l1);
       setMsg('Case escalated to Level 2; persisted in MongoDB.');
@@ -85,7 +102,7 @@ export default function SimulatorCaseDetailPage() {
 
   function handleApprove(advance = false) {
     return run(async () => {
-      const l2 = await getSimTokenForRole('level2_investigator');
+      const l2 = l2Token || (await getSimTokenForRole('level2_investigator'));
       setL2Token(l2);
       const res = await api.fraud.escalateApprove(caseId, {}, l2);
       setEscalationToken(res.escalationToken);
@@ -176,6 +193,18 @@ export default function SimulatorCaseDetailPage() {
 
   if (loading) return <div className="text-center py-12 text-gray-400">Loading case…</div>;
   if (!fraudCase) return <div className="text-center py-12 text-gray-500">Case not found.</div>;
+  if (tokenError) return (
+    <div className="text-center py-12">
+      <p className="text-sm text-red-600">Could not load the specialist tokens: {tokenError}</p>
+      <button onClick={() => window.location.reload()} className="mt-3 text-sm text-[#001E2B] underline">Retry</button>
+    </div>
+  );
+  if (!tokensReady) return (
+    <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-[#001E2B]" />
+      <p className="mt-4 text-sm">Waiting for the server to load the required L1/L2 tokens…</p>
+    </div>
+  );
 
   const snap = fraudCase.transactionSnapshot;
 

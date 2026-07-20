@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../lib/api';
+import { getSimToken } from '../../lib/simulatorAuth';
 import { MerchantBrandingWrapper } from './MerchantBrandingWrapper';
 import { SimulatorStateManager } from './SimulatorStateManager';
 import type { SimulatorScenario } from '../../types/simulator';
@@ -77,15 +78,18 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
     setErrorMsg(null);
     try {
       const origin = window.location.origin;
-      const result = await api.simulator.createCheckoutSession({
-        merchantId: merchantId ?? simulatorConfig.merchantId,
+      // Authenticate as the selected demo persona (real JWT) and call the REAL checkout endpoint.
+      // No open simulator endpoint: works identically in local and production.
+      const token = await getSimToken(prefill.email);
+      const result = await api.checkout.createSession({
+        merchantAgreementInstanceReference: merchantId ?? simulatorConfig.merchantId,
         amount,
         currency: prefill.currency,
         description: description.trim() || prefill.description,
         returnUrl: `${origin}/simulator/payment/callback?result={result}&session={session_id}&txn={txn_id}&case={case_id}&token={card_token}&code={response_code}&reason={reason}`,
         cancelUrl: `${origin}/simulator/payment/callback?result=cancelled&session={session_id}`,
         merchantReference: `SIM-${scenario.id.toUpperCase()}-${Date.now()}`,
-      });
+      }, token);
       const sid = result.checkoutSessionInstanceReference;
       setSessionId(sid);
       SimulatorStateManager.setCheckoutSession(sid);

@@ -11,6 +11,7 @@ import {
 } from '../services/paymentLink.service';
 import { getMerchantById } from '../services/merchant.service';
 import { deliverWebhook } from '../services/webhook.service';
+import { dualPermission } from '../../../vendors/middleware/dualAuth';
 
 const LINK_STATUS_ENUM = ['active', 'completed', 'expired', 'deactivated'];
 const USAGE_TYPE_ENUM = ['single_use', 'multi_use'];
@@ -19,6 +20,10 @@ export async function paymentLinkController(fastify: FastifyInstance) {
 
   // POST /api/v1/payment-links
   fastify.post('/', {
+    // Dual-auth (v28): merchant client_credentials token (scope write:payments) OR PSP simulator
+    // persona session JWT. Never public — creation always requires a valid credential.
+    config: { dualAuth: true },
+    preHandler: dualPermission({ resource: 'merchants', action: 'view', scope: 'write:payments' }),
     schema: {
       tags: ['payment:links'],
       summary: 'Create a payment link',
@@ -153,6 +158,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
 
   // GET /api/v1/payment-links/:code  (public - no auth)
   fastify.get('/:code', {
+    config: { skipAuth: true }, // buyer resolves the link without a login (hosted payment page)
     schema: {
       tags: ['payment:links'],
       summary: 'Resolve a payment link by code (public)',
@@ -188,6 +194,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
 
   // POST /api/v1/payment-links/:code/pay  (public)
   fastify.post('/:code/pay', {
+    config: { skipAuth: true }, // buyer pays the link without a login (hosted payment page)
     schema: {
       tags: ['payment:links'],
       summary: 'Process payment via payment link (public)',

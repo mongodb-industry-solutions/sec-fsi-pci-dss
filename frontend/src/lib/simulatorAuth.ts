@@ -33,7 +33,7 @@ export async function getSimToken(email: string): Promise<string> {
 export async function getSimTokenForRole(role: string): Promise<string> {
   let email = emailByRole.get(role);
   if (!email) {
-    const { users } = await api.auth.users(true);
+    const { users } = await api.system.users(true);
     const match = users.find((u) => u.role === role);
     if (!match) {
       throw new Error(`No featured demo user found for role "${role}"`);

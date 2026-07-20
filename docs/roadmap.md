@@ -105,7 +105,7 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | 05A.1 | `POST /api/v1/auth/login` validates credentials against `customerAuthenticationAssessment` (SD-91) and returns a JWT | Valid credentials return `{ token, user: { name, email, role } }`; invalid credentials return 401 |
-| 05A.2 | `GET /api/v1/auth/users` returns list of demo users (name, email, role) without passwords | Response used by frontend user selector dropdown |
+| 05A.2 | `GET /api/v1/system/users` returns list of demo users (name, email, role) without passwords | Response used by frontend user selector dropdown |
 | 05A.3 | Application Mode login screen shows domain selector (`local`) and username dropdown | Selecting a username auto-fills the password field |
 | 05A.4 | JWT is verified on all protected `/api/v1/*` endpoints | Missing or invalid token returns 401 |
 | 05A.5 | Demo user accounts (5 users) are seeded by `bin/seed.ts` | All 5 users exist with correct roles and bcrypt-hashed passwords after seeding |
@@ -788,3 +788,56 @@ encrypted fields, with the server never seeing plaintext, while staying aligned 
 - [ ] Phases 4–6 (search API/service, per-role UI, HRP provider) tracked in `tmp/dev.v27.plan.md`.
 
 *Added 2026-07-16 (v27, Phases 0–3).*
+
+## v28 — Request to Pay (RTP) + shared QR
+
+> Delivered under **development plan v28** (`tmp/dev.v28.plan.md`). BIAN-aligned Request to Pay
+> as an intent domain separate from payment execution, between beneficiaries/counterparties,
+> reusing FDS/HRP/AML and the balance-aware P2P transfer flow; plus a shared QR capability.
+> Model: a transfer that requires the payer's in-app approval (no CIBA); balances update via hold→settle→credit.
+
+### Objective
+Let a payee create a structured payment request that a payer reviews and approves in-app
+(from the transfers section) before any executable payment order is created and routed to a provider rail. Request and
+payment states are independently queryable, screened, auditable, and SEPA/ISO 20022-mappable.
+
+### FR-v28: Functional Requirements
+
+| ID | Requirement | Acceptance criteria | Status |
+|---|---|---|---|
+| FR-v28-01 | Create/retrieve/list RTP requests | Payee creates a canonical request; requester/payer can list & fetch; idempotent create | ⏳ |
+| FR-v28-02 | Independent request lifecycle | Monotonic validated transitions draft→…→settled/failed; request never merged with payment record | ⏳ |
+| FR-v28-03 | Present / deliver / view / cancel / expire | State transitions emit durable, replayable events; expiry sweeper transitions + audits | ⏳ |
+| FR-v28-04 | Screening (FDS/HRP/AML) | accept-time `screenTransfer` fan-out; block/hold returns machine-readable decision + opens fraud case | ⏳ |
+| FR-v28-04b | VoP dedicated capability | New `vop` capability + built-in module + provider group; verify-payee + accept-time VoP as an additional independent check; market-gated (`not_supported` outside EU/UK); stub swappable; registry/seed/config updated | ⏳ |
+| FR-v28-04c | VoP admin dashboard & audit UI | Dedicated `/system/admin/modules/vop` config dashboard (match thresholds, matching strategy, decision policy, market gating) editable by admin/manager like FDS; VoP in providers/groups; VoP logs + `vop.verification.completed` filterable in `/system/audit-events` with correct RBAC | ⏳ |
+| FR-v28-05 | Payer approval (transfer-with-approval) | Payer sees pending requests in the transfers section and approves in-app (authenticated session); durable authorizationContext captured; no CIBA | ⏳ |
+| FR-v28-06 | Accepted request → linked payment order | Approve creates a separate paymentExecutionProcedure linked by immutable reference, routed via provider | ⏳ |
+| FR-v28-07 | Idempotency + audit | Duplicate create/approve are idempotent; complete tamper-evident event trail per request | ⏳ |
+| FR-v28-08 | SEPA/ISO 20022 readiness | Structured address + structured remittance stored; canonical→ISO 20022 mapper present | ⏳ |
+| FR-v28-09 | Shared QR representation | RTP, payment link, and redirect/checkout can issue a QR from a shared capability | ⏳ |
+| FR-v28-10 | Merchant app: send/request/approve/QR | Merchant can send to and request from a beneficiary, review pending approvals, and sell a QR-paid product | ⏳ |
+| FR-v28-11 | Notifications | On request delivery the payer (approver) is notified; on approval the payee (receiver) is notified; SSE badge/bell update live; alert cleared on approve/reject | ⏳ |
+| FR-v28-12 | Account preconditions | Payee with no active payout account cannot request; payer with no active account cannot approve; both rejected with machine-readable reason | ⏳ |
+| FR-v28-13 | Funds, screening & balance | Payer picks funding account or default; funds sufficiency (AIS) + FDS/HRP/AML checked before execution; balances of source+destination update via hold→settle→credit | ⏳ |
+
+### Definition of Done — v28
+- [ ] Requests create/deliver/view/accept/reject/cancel/expire end to end
+- [ ] Accepted requests create immutable linked payment orders routed via provider
+- [ ] Inter-service events durable and replayable; duplicate create/accept idempotent
+- [ ] Payer approves pending requests in-app from the transfers section (authenticated session, no CIBA)
+- [ ] FDS/HRP/AML can block or hold a request with machine-readable decision
+- [ ] VoP runs as a dedicated capability + built-in module + provider group (additional to FDS/HRP/AML), market-gated, seed/registry/config updated, stub swappable
+- [ ] VoP has its own admin dashboard at /system/admin/modules/vop (thresholds, matching strategy, decision policy, market gating) editable by admin/manager like FDS
+- [ ] VoP configurable in /system/admin/providers/groups; VoP logs/events visible in /system/audit-events with correct RBAC
+- [ ] Request and payment states independently queryable
+- [ ] Structured remittance + structured address preserved
+- [ ] Shared QR works for RTP, payment link, and checkout
+- [ ] Merchant app: send + request money to a beneficiary, review pending approvals, QR-paid product
+- [ ] Payer notified on request arrival; payee notified on approval; SSE badge/bell live; alert cleared on approve/reject
+- [ ] Payee/payer without an active payout account are blocked from requesting/approving with a clear reason
+- [ ] Payer selects funding account (or default); funds sufficiency + FDS/HRP/AML screened before execution
+- [ ] Source and destination account balances update via the P2P hold→settle→credit sequence
+- [ ] setup/seed/QE/indexes/ACL updated; technical-spec + demo-simulator updated
+
+*Added 2026-07-17 (v28).*

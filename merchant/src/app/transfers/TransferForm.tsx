@@ -113,7 +113,7 @@ export default function TransferForm({ accounts = [] }: { accounts?: AccountOpti
               {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />} Preview
             </button>
           </Tip>
-          <Tip label="Submit the transfer for execution by Leafy Pay.">
+          <Tip label="Submit the transfer for execution by Sec4 Pay.">
             <button onClick={onSend} disabled={pending} className="btn-primary text-sm">
               {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />} Send transfer
             </button>

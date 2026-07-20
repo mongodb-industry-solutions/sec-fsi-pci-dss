@@ -10,7 +10,8 @@ export type NotificationType =
   | 'transaction_status'  // customer: a transaction/case status change (flagged, escalated, resolved)
   | 'kyc_status'          // customer: KYC verification approved
   | 'kyb_status'          // merchant owner: KYB verification approved
-  | 'question_response';  // staff: the customer answered the analyst's question
+  | 'question_response'   // staff: the customer answered the analyst's question
+  | 'payment_request';    // v28 RTP: payer must approve / payee informed of approval/settlement
 export type NotificationStatus = 'unread' | 'read';
 
 export interface NotificationRecord {

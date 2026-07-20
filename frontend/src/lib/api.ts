@@ -638,6 +638,47 @@ export interface KycSearchBody {
   limit?: number;
 }
 
+// v28 Request to Pay DTOs (mirror backend PaymentRequestProcedure / QrPaymentRepresentation).
+export interface RtpRequestDTO {
+  paymentRequestInstanceReference: string;
+  requesterPartyReference: string;
+  payerPartyReference?: string;
+  payerCounterpartyReference?: string; // the requester's beneficiary (SD-54) representing the payer
+  payeeName?: string;         // requester's own name (authorized to the payer on request)
+  payerName?: string;         // payer's real name — only returned once the payer consented (accepted+)
+  payerAlias?: string;        // payer display the requester provided (beneficiary label); for the payee's view
+  payeeReceivingAccountReference: string;
+  payerFundingAccountReference?: string;
+  // Destination account display (payer sees where the money goes): bank + masked IBAN (last 4).
+  payeeAccountDisplay?: { bankName?: string; maskedIban?: string; alias?: string } | null;
+  // Security case summary (both parties see the PSP/L1/L2 outcome affecting their funds).
+  securityCase?: {
+    caseInstanceReference?: string;
+    caseReference: string | null;
+    caseStatus: string | null;
+    caseSeverity: string | null;
+    resolutionOutcome: string | null;
+    notes: { noteId: string; noteText: string; performedByRole: string; actionDateTime: string; isRetracted?: boolean }[];
+  } | null;
+  amount: number;
+  currency: string;
+  purpose?: string;
+  status: string;
+  expiresAt?: string;
+  qrRepresentationReference?: string;
+  linkedPaymentExecutionReference?: string;
+  recordCreatedDateTime?: string;
+}
+
+export interface QrRepresentationDTO {
+  qrRepresentationInstanceReference: string;
+  subjectType: string;
+  subjectReference: string;
+  payloadFormat: string;
+  encodedPayload: string;
+  expiresAt?: string;
+}
+
 export const api = {
   acl: {
     effective: (token: string) =>
@@ -684,8 +725,9 @@ export const api = {
     // Server-side logout: invalidates all of the caller's session tokens (advances their epoch).
     logout: (token: string) =>
       apiFetch<{ loggedOut: boolean }>('/api/v1/auth/logout', { method: 'POST' }, token),
-    users: (filters?: boolean | DemoUserFilters) =>
-      apiFetch<{ users: AuthUser[] }>(`/api/v1/auth/users${demoRosterQuery(filters)}`),
+    // Note: the demo-user roster utility lives at GET /api/v1/system/users (api.system.users).
+    // The duplicate /api/v1/auth/users was removed — a demo access convenience belongs under /system,
+    // not under /auth (real authentication). See api.system.users.
     domains: () =>
       apiFetch<{ domains: AuthDomain[] }>('/api/v1/auth/domains'),
     // Public self-registration for local domains that enable it. Role is always `customer`
@@ -782,7 +824,7 @@ export const api = {
         token,
       ),
     listAll: (
-      params: { status?: string; merchant?: string; cardToken?: string; email?: string; page?: number; limit?: number },
+      params: { status?: string; merchant?: string; cardToken?: string; email?: string; transactionId?: string; page?: number; limit?: number },
       token: string
     ) => {
       const qs = new URLSearchParams(
@@ -1648,35 +1690,9 @@ export const api = {
         token
       ),
   },
-  simulator: {
-    createCheckoutSession: (body: {
-      merchantId: string;
-      amount: number;
-      currency: string;
-      description: string;
-      returnUrl: string;
-      cancelUrl: string;
-      merchantReference: string;
-    }) =>
-      apiFetch<{ checkoutSessionInstanceReference: string; paymentPageUrl: string; expiresAt: string }>(
-        '/api/v1/system/simulator/checkout-session', { method: 'POST', body: JSON.stringify(body) }
-      ),
-    createPaymentLink: (body: {
-      merchantId: string;
-      amount: number;
-      currency: string;
-      description: string;
-      customerMessage?: string;
-      usageType: 'single_use' | 'multi_use';
-    }) =>
-      apiFetch<{ paymentLinkInstanceReference: string; paymentLinkCode: string; paymentUrl: string }>(
-        '/api/v1/system/simulator/payment-link', { method: 'POST', body: JSON.stringify(body) }
-      ),
-    getTransactions: (email: string) =>
-      apiFetch<{ transactions: Record<string, unknown>[]; total: number }>(
-        `/api/v1/system/simulator/transactions/${encodeURIComponent(email)}`
-      ),
-  },
+  // v28: the simulator no longer has open (no-JWT) endpoints. It authenticates as the selected demo
+  // persona (getSimToken) and calls the real authenticated endpoints (checkout, paymentLinks,
+  // transactions), so it works identically in local and production without any open surface.
 
   integrations: {
     list: (token: string, params?: { type?: string; status?: string }) => {
@@ -2055,6 +2071,40 @@ export const api = {
         { method: 'POST', body: JSON.stringify(body) },
         token,
       ),
+  },
+
+  // v28: Request to Pay (RTP) — a transfer that requires the payer's in-app approval + shared QR.
+  rtp: {
+    create: (
+      body: {
+        amount: number; currency?: string; purpose?: string; payeeName?: string; payerAlias?: string;
+        payeeReceivingAccountReference?: string; payerPartyReference?: string; payerCounterpartyReference?: string; expiresAt?: string;
+        structuredRemittance?: { referenceType?: string; reference?: string };
+      },
+      token: string,
+      idempotencyKey?: string,
+    ) =>
+      apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests`, { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }, token),
+    list: (params: { box?: 'inbox' | 'outbox'; status?: string }, token: string) => {
+      const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString();
+      return apiFetch<{ results: RtpRequestDTO[] }>(`/api/v1/gateway/rtp/requests${qs ? `?${qs}` : ''}`, {}, token);
+    },
+    getById: (ref: string, token: string) => apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}`, {}, token),
+    events: (ref: string, token: string) => apiFetch<{ events: Array<Record<string, unknown>> }>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/events`, {}, token),
+    present: (ref: string, token: string) => apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/present`, { method: 'POST', body: JSON.stringify({}) }, token),
+    view: (ref: string, token: string) => apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/view`, { method: 'POST', body: JSON.stringify({}) }, token),
+    verifyPayee: (ref: string, token: string) => apiFetch<{ matchResult: string; matchScore: number; recommendation: string }>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/verify-payee`, { method: 'POST', body: JSON.stringify({}) }, token),
+    accept: (ref: string, body: { fundingAccountRef?: string }, token: string, idempotencyKey?: string) =>
+      apiFetch<{ status: string; executionReference?: string; reason?: string; request: RtpRequestDTO }>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/accept`, { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }, token),
+    reject: (ref: string, token: string) => apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/reject`, { method: 'POST', body: JSON.stringify({}) }, token),
+    cancel: (ref: string, token: string) => apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/cancel`, { method: 'POST', body: JSON.stringify({}) }, token),
+    qr: (ref: string, token: string) => apiFetch<QrRepresentationDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/qr`, { method: 'POST', body: JSON.stringify({}) }, token),
+  },
+
+  qr: {
+    represent: (body: { subjectType: string; subjectReference: string; payloadFormat?: string; amount?: number; currency?: string; payeeName?: string; iban?: string }, token: string) =>
+      apiFetch<QrRepresentationDTO>(`/api/v1/gateway/qr/represent`, { method: 'POST', body: JSON.stringify(body) }, token),
+    resolve: (ref: string, token: string) => apiFetch<QrRepresentationDTO>(`/api/v1/gateway/qr/${encodeURIComponent(ref)}`, {}, token),
   },
 
   executions: {

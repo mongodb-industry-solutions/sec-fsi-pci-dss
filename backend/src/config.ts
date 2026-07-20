@@ -35,6 +35,15 @@ export const config = {
     cryptSharedLibPath: env('MONGODB_CRYPT_SHARED_LIB_PATH', '')!,
   },
 
+  rtp: {
+    // v28 Request to Pay (RTP). Gates RTP routes + lifecycle subscriber.
+    enabled: pspEnv('RTP_ENABLED', 'true') !== 'false',
+    // Verification of Payee capability (market-gated; when off the engine returns not_supported).
+    vop: pspEnv('RTP_VOP', 'true') !== 'false',
+    // ISO 3166-1 alpha-2 markets where VoP is supported (EU Instant Payments Reg + UK CoP).
+    vopMarkets: (pspEnv('RTP_VOP_MARKETS', 'ES,FR,DE,IT,NL,IE,PT,BE,AT,FI,GB')!).split(',').map((s) => s.trim().toUpperCase()),
+  },
+
   qe: {
     // QE text search (substring/prefix/suffix) needs MongoDB 8.2+ and mongodb-client-encryption 7.2.
     // Default TRUE (assume a recent Atlas). Set PSP_QE_TEXT_SEARCH=false for pre-8.2 clusters:

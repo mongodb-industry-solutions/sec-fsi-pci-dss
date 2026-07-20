@@ -549,6 +549,7 @@ Not accessible to the \`customer\` role (enforced by RBAC middleware).`,
           merchant:  { type: 'string', description: 'Case-insensitive partial match on merchant name.' },
           cardToken: { type: 'string', description: 'Filter by exact card token (paymentCardReference).' },
           email:     { type: 'string', format: 'email', description: 'Filter by customer email (QE:equality → account reference → transactions). Two-step QE search.' },
+          transactionId: { type: 'string', description: 'Filter by exact cardTransactionInstanceReference (PK).' },
           page:      { type: 'string', default: '1' },
           limit:     { type: 'string', default: '20' },
         },
@@ -592,8 +593,8 @@ Not accessible to the \`customer\` role (enforced by RBAC middleware).`,
       },
     },
   }, async (request, reply) => {
-    const { status, merchant, cardToken, email, page = '1', limit = '20' } = request.query as {
-      status?: string; merchant?: string; cardToken?: string; email?: string; page?: string; limit?: string;
+    const { status, merchant, cardToken, email, transactionId, page = '1', limit = '20' } = request.query as {
+      status?: string; merchant?: string; cardToken?: string; email?: string; transactionId?: string; page?: string; limit?: string;
     };
     // Privacy: a customer may only list their OWN transactions. Ignore any email
     // they pass and scope to the email in their JWT.
@@ -602,7 +603,7 @@ Not accessible to the \`customer\` role (enforced by RBAC middleware).`,
     const effectiveEmail = userRole === 'customer' ? jwtEmail : email;
     const result = await getAllTransactions(
       fastify.db,
-      { status, merchant, cardToken, email: effectiveEmail },
+      { status, merchant, cardToken, email: effectiveEmail, transactionId },
       parseInt(page, 10),
       parseInt(limit, 10)
     );

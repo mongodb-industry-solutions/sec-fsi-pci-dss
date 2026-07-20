@@ -344,6 +344,7 @@ export function bianMetaFor(type: IntegrationProviderType): { domain: string; co
     account_information: { domain: 'SD-36 Open Banking',               controlRecordType: 'AccountInformationValidation',               pciDss: ['Req 12.8.1', 'Req 10.2.1'] },
     payment_initiation:  { domain: 'SD-65 Payment Execution',          controlRecordType: 'PaymentExecutionProcedure',                  pciDss: ['Req 12.8.1', 'Req 10.2.1'] },
     currency_exchange:   { domain: 'SD-66 Payment Initiation',          controlRecordType: 'CurrencyExchangeConversion',                 pciDss: ['Req 10.2.1'] },
+    vop_verification:    { domain: 'SD-13 Party Data Management',        controlRecordType: 'PartyReferenceDataDirectoryEntry',           pciDss: ['Req 10.2.1', 'Req 12.3.1'] },
     generic:            { domain: 'External Provider Arrangements',     controlRecordType: 'ExternalProviderArrangementPortfolio',       pciDss: ['Req 12.8.1'] },
   };
   return map[type];

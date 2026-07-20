@@ -8,7 +8,7 @@ import { ScopeMissing, PspUnavailable } from '@/components/ScopeGate';
 import { EmptyState, InfoHint } from '@/components/ui/Bits';
 import { Tip } from '@/components/ui/Tooltip';
 import { loadAccountOptions } from '@/lib/accounts';
-import BeneficiarySend from './BeneficiarySend';
+import BeneficiaryPayModal from './BeneficiaryPayModal';
 import BeneficiaryAdd from './BeneficiaryAdd';
 import BeneficiaryRemove from './BeneficiaryRemove';
 
@@ -54,7 +54,7 @@ export default async function BeneficiariesPage() {
       {error ? (
         <PspUnavailable message={error} />
       ) : results.length === 0 ? (
-        <EmptyState icon={<Users className="h-8 w-8" />} title="No saved beneficiaries yet" hint="Payees you add in Leafy Pay will appear here." />
+        <EmptyState icon={<Users className="h-8 w-8" />} title="No saved beneficiaries yet" hint="Payees you add in Sec4 Pay will appear here." />
       ) : (
         <ul className="glass divide-y divide-line/60 overflow-hidden rounded-2xl">
           {results.map((b, i) => (
@@ -72,7 +72,12 @@ export default async function BeneficiariesPage() {
               </div>
               <div className="flex items-center gap-2">
                 {hasScope(session, 'write:transfers') && (b.counterpartyArrangementReference ?? b.beneficiaryToken) && (
-                  <BeneficiarySend beneficiaryToken={b.counterpartyArrangementReference ?? b.beneficiaryToken} accounts={accounts} />
+                  <BeneficiaryPayModal mode="send" beneficiaryToken={b.counterpartyArrangementReference ?? b.beneficiaryToken}
+                    beneficiaryLabel={b.counterpartyLabel ?? b.counterpartyName ?? b.label} accounts={accounts} />
+                )}
+                {hasScope(session, 'write:rtp') && (b.counterpartyArrangementReference ?? b.beneficiaryToken) && (
+                  <BeneficiaryPayModal mode="request" beneficiaryToken={b.counterpartyArrangementReference ?? b.beneficiaryToken}
+                    beneficiaryLabel={b.counterpartyLabel ?? b.counterpartyName ?? b.label} />
                 )}
                 {hasScope(session, 'write:beneficiaries') && (b.counterpartyArrangementReference ?? b.beneficiaryToken) && (
                   <BeneficiaryRemove

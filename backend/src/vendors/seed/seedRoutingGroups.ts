@@ -87,6 +87,13 @@ const DEFAULT_GROUP_DEFS: DefaultGroupDef[] = [
     pciDssRequirements: ['Req 12.8.1', 'Req 10.2.1'],
   },
   {
+    id: 'default-group-verification-of-payee',
+    type: 'vop_verification',
+    name: 'Default Verification of Payee Group',
+    bianServiceDomain: 'SD-13 Party Data Management',
+    pciDssRequirements: ['Req 10.2.1', 'Req 12.3.1'],
+  },
+  {
     id: 'default-group-generic',
     type: 'generic',
     name: 'Default Generic Integration Group',

@@ -23,6 +23,7 @@ export const RESOURCES = [
   'consents',       // Open Banking consent
   'accounts',       // SD-66 Payout Account Arrangement (v17)
   'beneficiaries',  // SD-54 Counterparty Administration (v18)
+  'paymentRequests', // SD-65 Payment Order — Request to Pay intent domain (v28)
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
@@ -64,6 +65,7 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       consents: ['view'],
       accounts: ['view', 'manage'],
       beneficiaries: ['view', 'manage'],  // SD-54: own contacts (scope: own enforced per-handler)
+      paymentRequests: ['view', 'manage'], // SD-65: own RTP requests (create/approve/reject/cancel)
     },
   },
   {
@@ -101,6 +103,7 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       auditEvents: ['view'],
       accounts: ['view', 'viewSensitive'],  // PCI Req 3.3 — IBAN reveal for fraud investigations
       beneficiaries: ['view', 'manage'],    // SD-54: can edit/remove beneficiary contacts for investigations
+      paymentRequests: ['view'],            // SD-65: read RTP requests for investigations
     },
   },
   {
@@ -122,6 +125,7 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       auditEvents: ['view'],
       accounts: ['view', 'viewSensitive'],
       beneficiaries: ['view', 'manage'],  // SD-54: full audit visibility
+      paymentRequests: ['view'],          // SD-65: full audit visibility of RTP requests
     },
   },
   {

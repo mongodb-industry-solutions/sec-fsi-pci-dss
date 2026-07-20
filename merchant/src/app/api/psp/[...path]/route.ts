@@ -15,6 +15,9 @@ const ALLOW: { method: string; pattern: RegExp }[] = [
   { method: 'GET', pattern: /^api\/v1\/accounts$/ },
   { method: 'GET', pattern: /^api\/v1\/transactions$/ },
   { method: 'POST', pattern: /^api\/v1\/gateway\/transfers\/preview$/ },
+  { method: 'GET', pattern: /^api\/v1\/gateway\/rtp\/requests$/ },
+  { method: 'GET', pattern: /^api\/v1\/gateway\/rtp\/requests\/[^/]+$/ },
+  { method: 'GET', pattern: /^api\/v1\/gateway\/qr\/[^/]+$/ },
 ];
 
 function isAllowed(method: string, joined: string): boolean {

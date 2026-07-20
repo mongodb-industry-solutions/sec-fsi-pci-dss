@@ -107,8 +107,8 @@ export default function PaymentResultModal({
               <p id={descId} className="text-sm text-muted">
                 {ok
                   ? isLink
-                    ? 'Share this link so the buyer can pay on Leafy Pay.'
-                    : 'The charge was processed securely by Leafy Pay.'
+                    ? 'Share this link so the buyer can pay on Sec4 Pay.'
+                    : 'The charge was processed securely by Sec4 Pay.'
                   : 'The payment could not be completed.'}
               </p>
             </div>

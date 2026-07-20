@@ -32,6 +32,9 @@ export interface CardTransactionLogControlRecord {
   cardTransactionType: CardTransactionType;
   cardTransactionChannel: CardTransactionChannel;
   cardTransactionInitiationType: CardTransactionInitiationType;
+  // v28: how the payment was accepted (acceptance method), so the history can classify card payments
+  // by Payment Link / Redirect-Checkout / API vs a plain card entry. Optional (seeded rows may omit it).
+  cardTransactionAcceptanceMethod?: 'api' | 'payment_link' | 'redirect_checkout' | 'pos' | 'ecommerce';
   cardTransactionMerchantCategoryCode: string;
   cardTransactionMerchantName: string;
   cardTransactionMaskedPanDisplay: string;
