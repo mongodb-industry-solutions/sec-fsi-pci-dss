@@ -36,7 +36,8 @@ export class ProviderGroups {
     this.bus.subscribe('card.issuer.validation.requested', (e) => this.onIssuer(e));
     this.bus.subscribe('fds.scoring.requested', (e) => this.onFds(e));
     this.bus.subscribe('hrp.screening.requested', (e) => this.onHrp(e));
-    this.bus.subscribe('vop.verification.requested', (e) => this.onVop(e));
+    // VOP is dispatched synchronously via dispatchProvider in the RTP screening flow (never emitted on
+    // the bus), so there is intentionally NO 'vop.verification.requested' subscription here.
     this.bus.subscribe('funds.check.requested', (e) => this.onFunds(e));
     // v27 Phase 6: KYC/HRP customer screening (SD-13 -> SD-53). A customer profile validation
     // completing triggers a re-screen; the request event is a first-class Integration Hub gate.
@@ -198,29 +199,6 @@ export class ProviderGroups {
       eventType: 'hrp.screening.completed', correlationId: e.correlationId, businessProcess: 'card_payment', source: 'callback.hrp', causationId: e.eventId,
       payload: { transactionId: e.correlationId, outcome: approved ? 'approved' : 'declined', approved, reason },
       bian: { serviceDomain: 'SD-13 Party Reference', controlRecord: 'PartyReferenceDataDirectoryEntry' },
-    }));
-  }
-
-  // Verification of Payee (v28). ADDITIONAL, independent name-vs-account check (not a replacement for
-  // FDS/HRP/AML). Market-gated; a not_supported result is advisory (never blocks). Fail-open on transport.
-  private async onVop(e: DomainEvent): Promise<void> {
-    const p = e.payload as Record<string, unknown>;
-    let matchResult = 'not_supported';
-    let decision = 'pass';
-    let matchScore = 0;
-    let recommendation: string | undefined;
-    try {
-      const r = await dispatchProvider(this.db, 'vop_verification', 'vop.verification.requested', {
-        declaredName: p.declaredName, accountHolderName: p.accountHolderName,
-        aliasName: p.aliasName, countryCode: p.countryCode, amount: p.amount,
-      }, { entityType: 'payment_request', entityId: e.correlationId, processType: 'aml_screening' });
-      const b = r.responseBody as { matchResult?: string; decision?: string; matchScore?: number; recommendation?: string } | undefined;
-      if (b) { matchResult = b.matchResult ?? matchResult; decision = b.decision ?? decision; matchScore = b.matchScore ?? 0; recommendation = b.recommendation; }
-    } catch { /* fail-open: advisory */ }
-    void this.bus.publish(makeEvent({
-      eventType: 'vop.verification.completed', correlationId: e.correlationId, businessProcess: 'fraud_investigation', source: 'callback.vop', causationId: e.eventId,
-      payload: { paymentRequestInstanceReference: e.correlationId, matchResult, decision, matchScore, recommendation, approved: decision !== 'block' },
-      bian: { serviceDomain: 'SD-13 Party Data Management', controlRecord: 'PartyReferenceDataDirectoryEntry' },
     }));
   }
 

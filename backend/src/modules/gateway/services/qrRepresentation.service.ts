@@ -46,11 +46,13 @@ function buildPayload(input: IssueQrInput): { payloadFormat: QrPayloadFormat; en
   }
   // Generic signed deep link into the frontend (resolves to the subject page).
   const base = config.server.urlFrontend.replace(/\/$/, '');
+  // Paths must match the real frontend routes: payment links at /gateway/pay/:code and checkout
+  // sessions at /gateway/checkout/:sessionId (RTP resolves to the in-app request detail).
   const path = input.subjectType === 'rtp_request'
     ? `/system/payment/history/${encodeURIComponent(input.subjectReference)}`
     : input.subjectType === 'payment_link'
-      ? `/pay/${encodeURIComponent(input.subjectReference)}`
-      : `/checkout/${encodeURIComponent(input.subjectReference)}`;
+      ? `/gateway/pay/${encodeURIComponent(input.subjectReference)}`
+      : `/gateway/checkout/${encodeURIComponent(input.subjectReference)}`;
   return { payloadFormat: 'url', encodedPayload: `${base}${path}` };
 }
 

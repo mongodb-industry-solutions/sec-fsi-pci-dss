@@ -16,7 +16,9 @@ export async function qrController(fastify: FastifyInstance) {
   // POST /represent — issue a QR for any subject (rtp_request / payment_link / checkout_session).
   fastify.post('/represent', {
     config: { dualAuth: true },
-    preHandler: dualPermission({ resource: 'paymentRequests', action: 'view', scope: 'read:rtp' }),
+    // State-changing (issues a new QR record) → write-level (PCI DSS Req 7 least privilege). Resolve
+    // (GET /:ref below) stays read-level.
+    preHandler: dualPermission({ resource: 'paymentRequests', action: 'manage', scope: 'write:rtp' }),
     schema: {
       tags: ['qr'], summary: 'Issue a QR representation for a payable subject', security: [{ bearerAuth: [] }],
       body: {
