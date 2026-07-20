@@ -3,26 +3,31 @@
 // "Request money" (RTP, SD-65 intent) so the two flows share an identical, simplified UI. The row only
 // shows a compact button; all data capture happens in a modal (portalled to <body> to escape any
 // transformed ancestor). Reuses the existing server actions and the PSP API only.
+//
+// After a successful action both modes show the SAME confirmation state (Repeat / Close) so it is
+// always clear the action completed. A beneficiary request is delivered to the payer in-app (approval
+// inbox), so no QR/deep-link is shown here (the link target is the PSP app, not a public page).
 import { useState, useTransition } from 'react';
 import { createPortal } from 'react-dom';
-import { Send, HandCoins, Loader2, CheckCircle2, TriangleAlert, X, Copy, QrCode } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
+import { Send, HandCoins, Loader2, CheckCircle2, TriangleAlert, X, RotateCcw } from 'lucide-react';
 import { sendToBeneficiary, requestMoney } from '@/lib/actions';
 import { Tip } from '@/components/ui/Tooltip';
 import type { AccountOption } from '@/lib/accounts';
 
 type Mode = 'send' | 'request';
 
-const COPY: Record<Mode, { verb: string; icon: typeof Send; title: string; tip: string; note: string }> = {
+const COPY: Record<Mode, { verb: string; icon: typeof Send; title: string; tip: string; note: string; done: string }> = {
   send: {
     verb: 'Send', icon: Send, title: 'Send money',
     tip: 'Send a payment to this beneficiary.',
     note: 'The PSP moves the funds. The merchant never sees the IBAN or card.',
+    done: 'Payment sent.',
   },
   request: {
     verb: 'Request', icon: HandCoins, title: 'Request money',
     tip: 'Request money from this beneficiary (they approve to pay).',
-    note: 'The beneficiary receives an approval request. Nothing moves until they approve.',
+    note: 'The beneficiary gets an in-app approval request. Nothing moves until they approve.',
+    done: 'Request sent for approval.',
   },
 };
 
@@ -45,34 +50,28 @@ export default function BeneficiaryPayModal({
   const sendDisabled = mode === 'send' && !hasAccounts;
 
   const [open, setOpen] = useState(false);
+  const [done, setDone] = useState(false);
   const [amount, setAmount] = useState('');
   const [fromAccountRef, setFromAccountRef] = useState(accounts[0]?.ref ?? '');
   const [text, setText] = useState(''); // description (send) / purpose (request)
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [ok, setOk] = useState(true);
-  const [payUrl, setPayUrl] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
-  function reset() { setAmount(''); setText(''); setMsg(null); setPayUrl(null); setOk(true); }
+  function reset() { setAmount(''); setText(''); setMsg(null); setOk(true); setDone(false); }
   function close() { setOpen(false); reset(); }
 
   function submit() {
     const value = Number(amount);
     if (!(value > 0)) { setOk(false); setMsg('Enter an amount greater than zero.'); return; }
-    setMsg(null); setPayUrl(null);
+    setMsg(null);
     start(async () => {
-      if (mode === 'send') {
-        const res = await sendToBeneficiary({ beneficiaryToken, amount: value, currency, fromAccountRef: fromAccountRef || undefined, note: text.trim() || undefined });
-        setOk(!!res.ok);
-        setMsg(res.message ?? (res.ok ? 'Sent.' : 'Failed.'));
-        if (res.ok) setAmount('');
-      } else {
-        const res = await requestMoney({ amount: value, currency, purpose: text.trim() || undefined, payerCounterpartyReference: beneficiaryToken });
-        setOk(!!res.ok);
-        setMsg(res.ok ? 'Request sent for approval.' : (res.message ?? 'Failed.'));
-        if (res.ok) { setAmount(''); setText(''); setPayUrl(res.paymentUrl ?? null); }
-      }
+      const res = mode === 'send'
+        ? await sendToBeneficiary({ beneficiaryToken, amount: value, currency, fromAccountRef: fromAccountRef || undefined, note: text.trim() || undefined })
+        : await requestMoney({ amount: value, currency, purpose: text.trim() || undefined, payerCounterpartyReference: beneficiaryToken });
+      setOk(!!res.ok);
+      if (res.ok) { setDone(true); setMsg(res.message ?? cfg.done); }
+      else setMsg(res.message ?? 'Failed.');
     });
   }
 
@@ -97,7 +96,21 @@ export default function BeneficiaryPayModal({
             </div>
             {beneficiaryLabel && <p className="mb-3 text-sm text-muted">To <span className="font-medium text-ink">{beneficiaryLabel}</span></p>}
 
-            {mode === 'send' && !hasAccounts ? (
+            {done ? (
+              /* Confirmation state — identical for send and request. Only Repeat / Close. */
+              <div className="space-y-4">
+                <div className="flex flex-col items-center gap-2 py-2 text-center">
+                  <CheckCircle2 className="h-10 w-10 text-leaf-deep" aria-hidden />
+                  <p className="text-sm font-medium text-ink">{msg ?? cfg.done}</p>
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <Tip label="Start another with a clean form.">
+                    <button onClick={reset} className="btn-ghost text-sm"><RotateCcw className="h-4 w-4" aria-hidden /> Repeat</button>
+                  </Tip>
+                  <button onClick={close} className="btn-primary text-sm">Close</button>
+                </div>
+              </div>
+            ) : mode === 'send' && !hasAccounts ? (
               <p className="text-sm text-[var(--err)]">You have no active payout account to send from.</p>
             ) : (
               <div className="space-y-3">
@@ -127,26 +140,14 @@ export default function BeneficiaryPayModal({
 
                 <p className="text-[11px] leading-snug text-muted">{cfg.note}</p>
 
-                {msg && (
-                  <p className={`flex items-center gap-1.5 text-xs ${ok ? 'text-leaf-deep' : 'text-[var(--err)]'}`}>
-                    {ok ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> : <TriangleAlert className="h-3.5 w-3.5" aria-hidden />} {msg}
+                {msg && !ok && (
+                  <p className="flex items-center gap-1.5 text-xs text-[var(--err)]">
+                    <TriangleAlert className="h-3.5 w-3.5" aria-hidden /> {msg}
                   </p>
                 )}
 
-                {/* Request success: show the shareable link as a scannable QR + copy. */}
-                {mode === 'request' && payUrl && (
-                  <div className="space-y-2 rounded-xl border border-line p-3">
-                    <p className="flex items-center gap-1.5 text-xs font-medium text-ink"><QrCode className="h-3.5 w-3.5 text-leaf-deep" aria-hidden /> Share this request</p>
-                    <div className="flex justify-center rounded-lg border border-line bg-white p-3"><QRCodeSVG value={payUrl} size={132} level="M" marginSize={2} /></div>
-                    <button onClick={() => { navigator.clipboard.writeText(payUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}
-                      className="inline-flex items-center gap-1 text-xs text-leaf-deep hover:underline">
-                      <Copy className="h-3 w-3" aria-hidden /> {copied ? 'Copied link' : 'Copy payment link'}
-                    </button>
-                  </div>
-                )}
-
                 <div className="flex items-center justify-end gap-2 pt-1">
-                  <button onClick={close} className="btn-ghost text-sm">Close</button>
+                  <button onClick={close} className="btn-ghost text-sm">Cancel</button>
                   <button onClick={submit} disabled={pending} className="btn-primary text-sm">
                     {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Icon className="h-4 w-4" aria-hidden />}
                     {pending ? `${cfg.verb}ing…` : cfg.verb}
