@@ -105,7 +105,7 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | 05A.1 | `POST /api/v1/auth/login` validates credentials against `customerAuthenticationAssessment` (SD-91) and returns a JWT | Valid credentials return `{ token, user: { name, email, role } }`; invalid credentials return 401 |
-| 05A.2 | `GET /api/v1/auth/users` returns list of demo users (name, email, role) without passwords | Response used by frontend user selector dropdown |
+| 05A.2 | `GET /api/v1/system/users` returns list of demo users (name, email, role) without passwords | Response used by frontend user selector dropdown |
 | 05A.3 | Application Mode login screen shows domain selector (`local`) and username dropdown | Selecting a username auto-fills the password field |
 | 05A.4 | JWT is verified on all protected `/api/v1/*` endpoints | Missing or invalid token returns 401 |
 | 05A.5 | Demo user accounts (5 users) are seeded by `bin/seed.ts` | All 5 users exist with correct roles and bcrypt-hashed passwords after seeding |

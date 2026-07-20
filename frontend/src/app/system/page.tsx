@@ -134,8 +134,7 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
   }, []);
 
   useEffect(() => {
-    api.system.users(demoRoster.login).then((r) => setUsers(r.users)).catch(() =>
-      api.auth.users(demoRoster.login).then((r) => setUsers(r.users)).catch(() => {}));
+    api.system.users(demoRoster.login).then((r) => setUsers(r.users)).catch(() => {});
     api.auth.domains()
       .then((r) => { setDomains(r.domains); if (r.domains.length > 0) setSelectedDomain(r.domains[0].name); })
       .catch(() => setDomains([{ name: 'local', displayName: 'Local (Demo Users)', type: 'local', flowType: 'client_credentials' }]));

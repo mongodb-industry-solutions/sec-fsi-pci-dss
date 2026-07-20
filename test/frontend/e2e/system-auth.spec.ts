@@ -16,7 +16,6 @@ const USERS = { users: [
 async function stubCommon(page: import('@playwright/test').Page) {
   await page.route('**/api/v1/auth/domains', (r) => r.fulfill(json(DOMAINS)));
   await page.route('**/api/v1/system/users**', (r) => r.fulfill(json(USERS)));
-  await page.route('**/api/v1/auth/users**', (r) => r.fulfill(json(USERS)));
   await page.route('**/api/v1/fraud/stats**', (r) => r.fulfill(json({ total: 0, open: 0, underReview: 0, escalated: 0, resolvedFraud: 0, resolvedCleared: 0, byStatus: [], bySeverity: [], byMonth: [] })));
   await page.route('**/api/v1/providers/vendors**', (r) => r.fulfill(json({ integrations: [] })));
   await page.route('**/api/v1/providers/vendors**', (r) => r.fulfill(json({ integrations: [] })));

@@ -2289,7 +2289,7 @@ Server-side logout for the session JWT. The PSP session token is a stateless HS2
 
 ---
 
-#### `GET /auth/users`
+#### `GET /system/users`
 
 Returns the list of local domain demo users for the login screen dropdown. Data is read from `backend/data/customerAuthentications.json` (seed file) rather than the QE-encrypted collection to avoid decryption overhead on this helper endpoint. Passwords are never included.
 

@@ -52,8 +52,8 @@ describe('FR-v1-05: Auth routes', () => {
     expect(res.status).toBe(401);
   });
 
-  skip('GET /api/v1/auth/users returns user list without password hashes', async () => {
-    const res = await supertest(app.server).get('/api/v1/auth/users');
+  skip('GET /api/v1/system/users returns user list without password hashes', async () => {
+    const res = await supertest(app.server).get('/api/v1/system/users');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.users)).toBe(true);
     for (const user of res.body.users) {

@@ -711,8 +711,9 @@ export const api = {
     // Server-side logout: invalidates all of the caller's session tokens (advances their epoch).
     logout: (token: string) =>
       apiFetch<{ loggedOut: boolean }>('/api/v1/auth/logout', { method: 'POST' }, token),
-    users: (filters?: boolean | DemoUserFilters) =>
-      apiFetch<{ users: AuthUser[] }>(`/api/v1/auth/users${demoRosterQuery(filters)}`),
+    // Note: the demo-user roster utility lives at GET /api/v1/system/users (api.system.users).
+    // The duplicate /api/v1/auth/users was removed — a demo access convenience belongs under /system,
+    // not under /auth (real authentication). See api.system.users.
     domains: () =>
       apiFetch<{ domains: AuthDomain[] }>('/api/v1/auth/domains'),
     // Public self-registration for local domains that enable it. Role is always `customer`
