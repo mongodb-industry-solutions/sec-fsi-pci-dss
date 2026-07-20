@@ -164,33 +164,8 @@ export class PspClient {
   }
 
   // ── Products: payment methods ───────────────────────────────────────────────
-  createPaymentLink(input: {
-    merchantAgreementInstanceReference: string;
-    amount: number;
-    currency: string;
-    description: string;
-    usageType?: 'single_use' | 'multi_use';
-  }) {
-    return this.request<{ paymentLinkInstanceReference: string; paymentLinkCode: string; paymentUrl: string }>(
-      '/api/v1/payment/links',
-      { method: 'POST', body: { usageType: 'single_use', ...input } },
-    );
-  }
-
-  createCheckoutSession(input: {
-    merchantAgreementInstanceReference: string;
-    amount: number;
-    currency: string;
-    description: string;
-    returnUrl: string;
-    cancelUrl: string;
-    merchantReference: string;
-  }) {
-    return this.request<{ checkoutSessionInstanceReference: string; paymentPageUrl: string; expiresAt: string }>(
-      '/api/v1/checkout/sessions',
-      { method: 'POST', body: input },
-    );
-  }
+  // Payment-link + checkout creation are merchant server-to-server operations: see the static
+  // PspClient.createPaymentLink / createCheckoutSession above (merchant client_credentials token).
 
   // API payment — SERVER-TO-SERVER merchant charge (Item 2). Uses the merchant's OWN client_credentials
   // machine token (scope write:payments), NOT the logged-in user's session/authorization_code token. No
@@ -216,6 +191,54 @@ export class PspClient {
     const data = text ? safeJson(text) : undefined;
     if (!res.ok) throw new PspError(res.status, data, (data as any)?.error_description ?? (data as any)?.error);
     return data as { paymentOrderInstanceReference: string; paymentOrderReference: string; paymentOrderStatus: string; cardTransactionInstanceReference?: string };
+  }
+
+  // Merchant server-to-server POST using the merchant's OWN client_credentials machine token
+  // (NOT a buyer session). Payment-link and checkout creation are merchant operations: the merchant
+  // authenticates as itself, the PSP hosts the card capture page, and the merchant never sees CHD.
+  // These endpoints are auth-protected (never public) even in the demo/simulator: security is identical
+  // whether the caller is a real integration or the demo shop.
+  private static async merchantPost<T>(path: string, body: unknown, scope = 'write:payments'): Promise<T> {
+    const accessToken = await getClientCredentialsToken(scope);
+    const base = ENV.pspBaseUrl();
+    const res = await fetch(`${base}${path}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+    });
+    const text = await res.text();
+    const data = text ? safeJson(text) : undefined;
+    if (!res.ok) throw new PspError(res.status, data, (data as any)?.error_description ?? (data as any)?.error);
+    return data as T;
+  }
+
+  static createPaymentLink(input: {
+    merchantAgreementInstanceReference: string;
+    amount: number;
+    currency: string;
+    description: string;
+    usageType?: 'single_use' | 'multi_use';
+  }) {
+    return PspClient.merchantPost<{ paymentLinkInstanceReference: string; paymentLinkCode: string; paymentUrl: string }>(
+      '/api/v1/payment/links',
+      { usageType: 'single_use', ...input },
+    );
+  }
+
+  static createCheckoutSession(input: {
+    merchantAgreementInstanceReference: string;
+    amount: number;
+    currency: string;
+    description: string;
+    returnUrl: string;
+    cancelUrl: string;
+    merchantReference: string;
+  }) {
+    return PspClient.merchantPost<{ checkoutSessionInstanceReference: string; paymentPageUrl: string; expiresAt: string }>(
+      '/api/v1/checkout/sessions',
+      input,
+    );
   }
 
   // ── Beneficiaries (OAuth on-behalf-of; owner derived from token.sub, never in the URL) ─────
@@ -270,7 +293,7 @@ export class PspClient {
   // ── Request to Pay (RTP) — merchant OAuth on-behalf-of (read:rtp / write:rtp) ──────────
   // RTP is a transfer that requires the payer's approval. The merchant can request money from a
   // payer, review requests awaiting its own approval, and issue a QR. No CIBA (authenticated session).
-  createRtpRequest(body: { amount: number; currency?: string; purpose?: string; payerPartyReference?: string; payeeReceivingAccountReference?: string }) {
+  createRtpRequest(body: { amount: number; currency?: string; purpose?: string; payerPartyReference?: string; payerCounterpartyReference?: string; payeeReceivingAccountReference?: string }) {
     return this.request<{ paymentRequestInstanceReference: string; status: string; amount: number; currency: string }>(
       `/api/v1/gateway/rtp/requests`, { method: 'POST', body },
     );

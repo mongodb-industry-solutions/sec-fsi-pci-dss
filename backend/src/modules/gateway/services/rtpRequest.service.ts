@@ -131,6 +131,16 @@ export async function createRtpRequest(db: Db, input: CreateRtpInput): Promise<P
 
   const receivingAccount = await resolveReceivingAccount(db, input);
 
+  // Resolve the payer party from the requester's beneficiary (SD-54) when only the counterparty token
+  // is provided (e.g. the merchant flow, which never handles raw party refs). Verifies ownership.
+  let payerPartyReference = input.payerPartyReference;
+  if (!payerPartyReference && input.payerCounterpartyReference) {
+    const arr = await db.collection<{ counterpartyPartyReference?: string }>('counterpartyArrangement')
+      .findOne({ counterpartyArrangementReference: input.payerCounterpartyReference, ownerPartyReference: input.requesterPartyReference } as Record<string, unknown>,
+        { projection: { counterpartyPartyReference: 1 } });
+    payerPartyReference = arr?.counterpartyPartyReference;
+  }
+
   // Privacy model: the requester's own name is server-derived from their SD-13 party (authoritative,
   // authorized basic datum the payer may see on approval), not taken from client input. Falls back to
   // any client-provided payeeName only if the party lookup yields nothing.
@@ -153,7 +163,7 @@ export async function createRtpRequest(db: Db, input: CreateRtpInput): Promise<P
     payeeAlias: input.payeeAlias,
     payeeAliasHash: input.payeeAlias ? hashAlias(input.payeeAlias) : undefined,
     payeeReceivingAccountReference: receivingAccount,
-    payerPartyReference: input.payerPartyReference,
+    payerPartyReference,
     payerCounterpartyReference: input.payerCounterpartyReference,
     payerAlias: input.payerAlias,
     payerAliasHash: input.payerAlias ? hashAlias(input.payerAlias) : undefined,

@@ -7,6 +7,9 @@ import { ScopeMissing, PspUnavailable } from '@/components/ScopeGate';
 import { Chip, EmptyState, InfoHint } from '@/components/ui/Bits';
 import CopyButton from '@/components/ui/CopyButton';
 import { MERCHANT_COMMISSION_RATE } from '@/config/products';
+import RtpActions from '../request-to-pay/RtpActions';
+
+const RTP_PENDING = ['created', 'validated', 'presented', 'delivered', 'viewed'];
 
 function money(a?: { amount: number; currency: string } | number, currency?: string) {
   if (a == null) return 'n/a';
@@ -44,6 +47,16 @@ export default async function HistoryPage() {
     error = e instanceof PspError ? e.message : 'Failed to load history';
   }
 
+  // RTP requests awaiting THIS merchant's approval (payer inbox). Reuses the PSP RTP API; approve/reject
+  // happen inline via the shared RtpActions client component (no separate page needed).
+  let pendingRtp: any[] = [];
+  if (hasScope(session, 'read:rtp')) {
+    try {
+      const inbox = await c!.listRtpRequests('inbox');
+      pendingRtp = (inbox.results ?? []).filter((r: any) => RTP_PENDING.includes(r.status));
+    } catch { /* ignore */ }
+  }
+
   const rows = results.map((t, i) => {
     const gross = t.grossAmount ?? t.paymentExecutionAmount?.amount;
     const commission = typeof gross === 'number' ? gross * MERCHANT_COMMISSION_RATE : undefined;
@@ -72,9 +85,29 @@ export default async function HistoryPage() {
         <InfoHint label="Every payment and transfer made on your behalf, with status, fees and the merchant commission." />
       </h1>
 
+      {/* RTP requests pending YOUR approval — approve/reject inline (money is a debit if you approve). */}
+      {pendingRtp.length > 0 && (
+        <div className="glass mb-5 rounded-2xl p-4">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+            <ArrowUpRight className="h-4 w-4 text-[var(--warn,#b45309)]" aria-hidden /> Pending your approval ({pendingRtp.length})
+          </h2>
+          <ul className="space-y-2">
+            {pendingRtp.map((r: any) => (
+              <li key={r.paymentRequestInstanceReference} className="flex items-center gap-3 rounded-xl border border-line p-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-ink">{money(r.amount, r.currency)} · {r.payeeName ?? 'A payee'}</p>
+                  <p className="truncate text-xs text-muted">{r.purpose ?? 'Payment request'} · outgoing if you approve</p>
+                </div>
+                <RtpActions reference={r.paymentRequestInstanceReference} mode="approve" />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {error ? (
         <PspUnavailable message={error} />
-      ) : rows.length === 0 ? (
+      ) : rows.length === 0 && pendingRtp.length === 0 ? (
         <EmptyState icon={<ReceiptText className="h-8 w-8" />} title="No operations yet" hint="Payments and transfers will show up here once you make one." />
       ) : (
         <>

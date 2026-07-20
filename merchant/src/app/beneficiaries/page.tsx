@@ -9,6 +9,7 @@ import { EmptyState, InfoHint } from '@/components/ui/Bits';
 import { Tip } from '@/components/ui/Tooltip';
 import { loadAccountOptions } from '@/lib/accounts';
 import BeneficiarySend from './BeneficiarySend';
+import BeneficiaryRequest from './BeneficiaryRequest';
 import BeneficiaryAdd from './BeneficiaryAdd';
 import BeneficiaryRemove from './BeneficiaryRemove';
 
@@ -73,6 +74,9 @@ export default async function BeneficiariesPage() {
               <div className="flex items-center gap-2">
                 {hasScope(session, 'write:transfers') && (b.counterpartyArrangementReference ?? b.beneficiaryToken) && (
                   <BeneficiarySend beneficiaryToken={b.counterpartyArrangementReference ?? b.beneficiaryToken} accounts={accounts} />
+                )}
+                {hasScope(session, 'write:rtp') && (b.counterpartyArrangementReference ?? b.beneficiaryToken) && (
+                  <BeneficiaryRequest beneficiaryToken={b.counterpartyArrangementReference ?? b.beneficiaryToken} />
                 )}
                 {hasScope(session, 'write:beneficiaries') && (b.counterpartyArrangementReference ?? b.beneficiaryToken) && (
                   <BeneficiaryRemove

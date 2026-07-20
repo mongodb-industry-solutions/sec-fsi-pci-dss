@@ -45,12 +45,11 @@ export async function payForProduct(productId: string): Promise<ActionResult> {
   return toResult(async () => {
     const product = findProduct(productId);
     if (!product) return { ok: false, message: 'Unknown product' };
-    const c = await client();
     const merchantRef = ENV.merchantAgreementRef();
 
     switch (product.method) {
       case 'payment_link': {
-        const link = await c.createPaymentLink({
+        const link = await PspClient.createPaymentLink({
           merchantAgreementInstanceReference: merchantRef,
           amount: product.price,
           currency: product.currency,
@@ -67,7 +66,7 @@ export async function payForProduct(productId: string): Promise<ActionResult> {
       case 'redirect':
       case 'subscription': {
         const base = ENV.baseUrl();
-        const session = await c.createCheckoutSession({
+        const session = await PspClient.createCheckoutSession({
           merchantAgreementInstanceReference: merchantRef,
           amount: product.price,
           currency: product.currency,
@@ -83,6 +82,7 @@ export async function payForProduct(productId: string): Promise<ActionResult> {
         // user session token. No CHD in the merchant; the PSP charges a tokenised card. We forward the
         // acting user's OAuth subject (from the session) purely for ATTRIBUTION so the charge is traceable
         // to the buyer (payment history + operations view) — the charge itself stays merchant-authenticated.
+        const c = await client();
         const order = await PspClient.apiPaymentServerToServer(
           {
             paymentOrderMerchantReference: `${product.id}-${Date.now()}`,
@@ -237,7 +237,7 @@ export async function bankTransfer(input: {
 }
 
 // ── Request to Pay (RTP) — merchant requests / approves money (v28) ─────────────
-export async function requestMoney(input: { amount: number; currency?: string; purpose?: string; payerPartyReference?: string }): Promise<ActionResult> {
+export async function requestMoney(input: { amount: number; currency?: string; purpose?: string; payerPartyReference?: string; payerCounterpartyReference?: string }): Promise<ActionResult> {
   return toResult(async () => {
     const c = await client();
     if (!(input.amount > 0)) return { ok: false, message: 'Amount must be greater than zero.' };

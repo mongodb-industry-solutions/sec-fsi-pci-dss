@@ -12,6 +12,7 @@ import { payForProduct, type ActionResult } from '@/lib/actions';
 import { Chip } from '@/components/ui/Bits';
 import { Tip } from '@/components/ui/Tooltip';
 import PaymentResultModal from './PaymentResultModal';
+import ProductQrButton from './ProductQrButton';
 
 const ICONS = { beans: Bean, machine: Coffee, course: GraduationCap, subscription: Repeat } as const;
 
@@ -89,17 +90,21 @@ export default function ProductCard({ product, commission }: { product: Product;
           <b className="text-ink">{fmt(product.price)}</b>
         </div>
         <div className="flex items-center justify-between text-muted">
-          <span>Merchant commission</span>
+          <span><span className="lg:hidden">Merchant </span>Commission</span>
           <span>{fmt(commission)}</span>
         </div>
       </div>
 
-      <Tip label={`${METHOD_HELP[product.method]} You will pay ${fmt(product.price)}.`}>
-        <button onClick={onPay} disabled={pending} className="btn-primary mt-4 w-full">
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CreditCard className="h-4 w-4" aria-hidden />}
-          {pending ? 'Processing…' : PAY_LABEL}
-        </button>
-      </Tip>
+      <div className="mt-4 flex items-center gap-2">
+        <Tip label={`${METHOD_HELP[product.method]} You will pay ${fmt(product.price)}.`}>
+          <button onClick={onPay} disabled={pending} className="btn-primary w-full">
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CreditCard className="h-4 w-4" aria-hidden />}
+            {pending ? 'Processing…' : PAY_LABEL}
+          </button>
+        </Tip>
+        {/* Pay-by-QR only for methods that produce a shareable/hosted URL (not the direct API charge). */}
+        {product.method !== 'api_payment' && <ProductQrButton product={product} />}
+      </div>
 
       {result && (
         <PaymentResultModal

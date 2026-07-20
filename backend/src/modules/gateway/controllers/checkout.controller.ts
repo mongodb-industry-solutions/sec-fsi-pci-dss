@@ -11,6 +11,7 @@ import {
 import { getMerchantById } from '../services/merchant.service';
 import { deliverWebhook } from '../services/webhook.service';
 import { tryMerchantContext } from '../../../vendors/middleware/validateMerchantToken';
+import { dualPermission } from '../../../vendors/middleware/dualAuth';
 import { resolvePartyInstanceReference } from '../../identity/services/oauth.service';
 
 const SESSION_STATUS_ENUM = ['pending', 'completed', 'expired', 'cancelled'];
@@ -19,6 +20,11 @@ export async function checkoutController(fastify: FastifyInstance) {
 
   // POST /api/v1/checkout/sessions
   fastify.post('/sessions', {
+    // Dual-auth (v28): a merchant integration authenticates with its own client_credentials
+    // RS256 token (scope write:payments); the PSP simulator authenticates as the selected demo
+    // persona (session JWT). Never public — creation always requires a valid credential.
+    config: { dualAuth: true },
+    preHandler: dualPermission({ resource: 'merchants', action: 'view', scope: 'write:payments' }),
     schema: {
       tags: ['payment:checkout'],
       summary: 'Create a checkout session (Redirect Checkout)',

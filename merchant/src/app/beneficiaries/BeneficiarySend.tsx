@@ -57,7 +57,7 @@ export default function BeneficiarySend({
         <button
           onClick={() => { setOpen(true); setMsg(null); }}
           disabled={!hasAccounts}
-          className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-leaf-deep hover:underline disabled:cursor-not-allowed disabled:text-muted disabled:no-underline"
+          className="btn-ghost shrink-0 text-sm text-leaf-deep disabled:cursor-not-allowed disabled:text-muted"
         >
           <Send className="h-3.5 w-3.5" aria-hidden /> Send
         </button>
