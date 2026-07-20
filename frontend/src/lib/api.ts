@@ -810,7 +810,7 @@ export const api = {
         token,
       ),
     listAll: (
-      params: { status?: string; merchant?: string; cardToken?: string; email?: string; page?: number; limit?: number },
+      params: { status?: string; merchant?: string; cardToken?: string; email?: string; transactionId?: string; page?: number; limit?: number },
       token: string
     ) => {
       const qs = new URLSearchParams(

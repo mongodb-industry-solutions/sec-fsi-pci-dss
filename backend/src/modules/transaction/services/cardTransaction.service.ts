@@ -666,14 +666,15 @@ export async function getTransactionsByCardToken(db: Db, value: string) {
 
 export async function getAllTransactions(
   db: Db,
-  filters: { status?: string; merchant?: string; cardToken?: string; email?: string },
+  filters: { status?: string; merchant?: string; cardToken?: string; email?: string; transactionId?: string },
   page: number,
   limit: number
 ) {
   const query: Record<string, unknown> = {};
-  if (filters.status)    query['cardTransactionStatus']       = filters.status;
-  if (filters.merchant)  query['cardTransactionMerchantName'] = { $regex: filters.merchant, $options: 'i' };
-  if (filters.cardToken) query['paymentCardReference']        = filters.cardToken;
+  if (filters.status)        query['cardTransactionStatus']            = filters.status;
+  if (filters.merchant)      query['cardTransactionMerchantName']      = { $regex: filters.merchant, $options: 'i' };
+  if (filters.cardToken)     query['paymentCardReference']             = filters.cardToken;
+  if (filters.transactionId) query['cardTransactionInstanceReference'] = filters.transactionId;
 
   // Lookup by email resolves the customer's canonical account reference, then
   // matches cardTransactionAccountReference (QE:equality) directly. This covers

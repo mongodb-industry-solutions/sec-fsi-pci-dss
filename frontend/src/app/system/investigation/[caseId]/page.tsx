@@ -323,6 +323,18 @@ export default function DemoCaseDetailPage() {
                 <span>{new Date(snap.cardTransactionDateTime).toLocaleString()}</span>
                 <span className="text-gray-500">Status:</span>
                 <span className="capitalize">{snap.cardTransactionStatus}</span>
+                {fraudCase.cardTransactionInstanceReference && (
+                  <>
+                    <span className="text-gray-500">Transaction ID:</span>
+                    <Link
+                      href={`/system/transactions/${fraudCase.cardTransactionInstanceReference}?from=investigation&caseId=${caseId}&caseRef=${encodeURIComponent(fraudCase.fraudDiagnosisCaseReference ?? '')}`}
+                      className="font-mono text-xs text-blue-600 hover:underline break-all"
+                      title="Open the associated transaction"
+                    >
+                      {fraudCase.cardTransactionInstanceReference}
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           )}

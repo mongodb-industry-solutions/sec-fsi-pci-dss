@@ -60,8 +60,9 @@ export default function TransactionsPage() {
   const [filterMerchant,  setFilterMerchant]  = useState('');
   const [filterCardToken, setFilterCardToken] = useState('');
   const [filterEmail,     setFilterEmail]     = useState('');
+  const [filterTransactionId, setFilterTransactionId] = useState('');
   const [searchInput,     setSearchInput]     = useState('');
-  const [searchType,      setSearchType]      = useState<'text' | 'email'>('text');
+  const [searchType,      setSearchType]      = useState<'text' | 'email' | 'txnId'>('text');
 
   const load = useCallback(async (p: number, ps: number) => {
     if (!token) return;
@@ -73,6 +74,7 @@ export default function TransactionsPage() {
           merchant:  filterMerchant  || undefined,
           cardToken: filterCardToken || undefined,
           email:     filterEmail     || undefined,
+          transactionId: filterTransactionId || undefined,
           page:      p,
           limit:     ps,
         },
@@ -86,11 +88,11 @@ export default function TransactionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, filterStatus, filterMerchant, filterCardToken, filterEmail]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [token, filterStatus, filterMerchant, filterCardToken, filterEmail, filterTransactionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (token) load(page, pageSize);
-  }, [token, filterStatus, filterMerchant, filterCardToken, filterEmail]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [token, filterStatus, filterMerchant, filterCardToken, filterEmail, filterTransactionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Deep-linkable filters: prefill from ?status=&email=&cardToken=&merchant= once after mount.
   // Read window.location.search inside the effect so it works with Next client navigation too.
@@ -115,8 +117,15 @@ export default function TransactionsPage() {
       setFilterEmail(v);
       setFilterMerchant('');
       setFilterCardToken('');
+      setFilterTransactionId('');
+    } else if (searchType === 'txnId') {
+      setFilterTransactionId(v);
+      setFilterEmail('');
+      setFilterMerchant('');
+      setFilterCardToken('');
     } else {
       setFilterEmail('');
+      setFilterTransactionId('');
       setFilterCardToken(v.startsWith('pm_') ? v : '');
       setFilterMerchant(!v.startsWith('pm_') ? v : '');
     }
@@ -124,7 +133,7 @@ export default function TransactionsPage() {
   }
 
   function clearAll() {
-    setFilterStatus(''); setFilterMerchant(''); setFilterCardToken(''); setFilterEmail('');
+    setFilterStatus(''); setFilterMerchant(''); setFilterCardToken(''); setFilterEmail(''); setFilterTransactionId('');
     setSearchInput(''); setPage(1);
   }
 
@@ -177,6 +186,15 @@ export default function TransactionsPage() {
               <Lock size={9} />QE
             </span>
           </button>
+          <button
+            onClick={() => { setSearchType('txnId'); setSearchInput(''); }}
+            className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+              searchType === 'txnId' ? 'bg-[#001E2B] text-[#00ED64] border-[#001E2B]' : 'border-gray-300 text-gray-600 hover:border-gray-400'
+            }`}
+          >
+            <CreditCard size={12} />
+            Transaction ID
+          </button>
         </div>
 
         <div className="flex gap-2">
@@ -188,7 +206,9 @@ export default function TransactionsPage() {
             placeholder={
               searchType === 'email'
                 ? 'customer@example.com'
-                : 'Merchant name  or  pm_xxxxxxxx'
+                : searchType === 'txnId'
+                  ? 'Card Transaction Instance Reference (UUID)'
+                  : 'Merchant name  or  pm_xxxxxxxx'
             }
             className="flex-1 border rounded-lg px-3 py-2 text-sm"
           />
@@ -200,7 +220,7 @@ export default function TransactionsPage() {
             <Search size={14} />
             <span className="hidden sm:inline">Search</span>
           </button>
-          {(filterStatus || filterMerchant || filterCardToken || filterEmail) && (
+          {(filterStatus || filterMerchant || filterCardToken || filterEmail || filterTransactionId) && (
             <button
               onClick={clearAll}
               className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50"
