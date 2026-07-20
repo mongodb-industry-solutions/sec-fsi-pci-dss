@@ -8,8 +8,7 @@ import { ScopeMissing, PspUnavailable } from '@/components/ScopeGate';
 import { EmptyState, InfoHint } from '@/components/ui/Bits';
 import { Tip } from '@/components/ui/Tooltip';
 import { loadAccountOptions } from '@/lib/accounts';
-import BeneficiarySend from './BeneficiarySend';
-import BeneficiaryRequest from './BeneficiaryRequest';
+import BeneficiaryPayModal from './BeneficiaryPayModal';
 import BeneficiaryAdd from './BeneficiaryAdd';
 import BeneficiaryRemove from './BeneficiaryRemove';
 
@@ -73,10 +72,12 @@ export default async function BeneficiariesPage() {
               </div>
               <div className="flex items-center gap-2">
                 {hasScope(session, 'write:transfers') && (b.counterpartyArrangementReference ?? b.beneficiaryToken) && (
-                  <BeneficiarySend beneficiaryToken={b.counterpartyArrangementReference ?? b.beneficiaryToken} accounts={accounts} />
+                  <BeneficiaryPayModal mode="send" beneficiaryToken={b.counterpartyArrangementReference ?? b.beneficiaryToken}
+                    beneficiaryLabel={b.counterpartyLabel ?? b.counterpartyName ?? b.label} accounts={accounts} />
                 )}
                 {hasScope(session, 'write:rtp') && (b.counterpartyArrangementReference ?? b.beneficiaryToken) && (
-                  <BeneficiaryRequest beneficiaryToken={b.counterpartyArrangementReference ?? b.beneficiaryToken} />
+                  <BeneficiaryPayModal mode="request" beneficiaryToken={b.counterpartyArrangementReference ?? b.beneficiaryToken}
+                    beneficiaryLabel={b.counterpartyLabel ?? b.counterpartyName ?? b.label} />
                 )}
                 {hasScope(session, 'write:beneficiaries') && (b.counterpartyArrangementReference ?? b.beneficiaryToken) && (
                   <BeneficiaryRemove
