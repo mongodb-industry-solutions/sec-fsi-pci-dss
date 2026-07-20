@@ -30,7 +30,7 @@
     "fastify-plugin": "^5.1.0",
     "fsi-pci-dss-demo": "file:..",
     "jsonwebtoken": "^9.0.2",
-    "mongodb": "^6.5.0",
+    "mongodb": "^7.5.0",
     "mongodb-client-encryption": "^6.0.1",
     "uuid": "^11.0.0"
   },
