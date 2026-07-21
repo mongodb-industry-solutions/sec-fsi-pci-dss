@@ -17,12 +17,16 @@ WORKDIR /app
 
 # Download MongoDB Automatic Encryption Shared Library (mongo_crypt_v1.so)
 # Requires glibc, this is why we use node:22-slim (Debian) instead of Alpine.
-# crypt_shared 8.0.5 is compatible with the mongodb + mongodb-client-encryption versions pinned in backend/package.json.
+# crypt_shared 8.2.4 matches the local dev library (Windows 8.2.4) and adds support for the QE
+# text-search query types (substringPreview / prefixPreview / suffixPreview) used by the v27 KYC
+# search. 8.0.5 rejected those with "analyze_query failed: Enumeration value 'substringPreview' ...
+# is not a valid value". Compatible with the mongodb + mongodb-client-encryption (7.2) pinned in
+# backend/package.json. The Linux build is used here (the image is Linux); the version is what matters.
 RUN ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "arm64" ]; then \
-        wget -q https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-aarch64-enterprise-ubuntu2204-8.0.5.tgz -O crypt.tgz; \
+        wget -q https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-aarch64-enterprise-ubuntu2204-8.2.4.tgz -O crypt.tgz; \
     else \
-        wget -q https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-x86_64-enterprise-ubuntu2204-8.0.5.tgz -O crypt.tgz; \
+        wget -q https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-x86_64-enterprise-ubuntu2204-8.2.4.tgz -O crypt.tgz; \
     fi && \
     tar -xzf crypt.tgz && \
     mkdir -p /usr/local/lib && \

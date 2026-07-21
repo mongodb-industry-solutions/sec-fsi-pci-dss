@@ -17,8 +17,16 @@ export async function qrController(fastify: FastifyInstance) {
   fastify.post('/represent', {
     config: { dualAuth: true },
     // State-changing (issues a new QR record) → write-level (PCI DSS Req 7 least privilege). Resolve
-    // (GET /:ref below) stays read-level.
-    preHandler: dualPermission({ resource: 'paymentRequests', action: 'manage', scope: 'write:rtp' }),
+    // (GET /:ref below) stays read-level. Authorization is per subjectType so each caller uses its
+    // natural scope: RTP requests → paymentRequests:manage / write:rtp; payment links & checkout
+    // sessions → merchants:view / write:payments (same guard as their creation endpoints).
+    preHandler: (request, reply) => {
+      const subjectType = (request.body as { subjectType?: string } | undefined)?.subjectType;
+      const guard = subjectType === 'rtp_request'
+        ? dualPermission({ resource: 'paymentRequests', action: 'manage', scope: 'write:rtp' })
+        : dualPermission({ resource: 'merchants', action: 'view', scope: 'write:payments' });
+      return guard(request, reply);
+    },
     schema: {
       tags: ['qr'], summary: 'Issue a QR representation for a payable subject', security: [{ bearerAuth: [] }],
       body: {

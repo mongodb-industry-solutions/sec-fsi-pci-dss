@@ -89,7 +89,7 @@ export default function BeneficiaryPayModal({
 
       {open && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={close}>
-          <div className="glass w-full max-w-sm rounded-2xl bg-surface p-6" onClick={(e) => e.stopPropagation()}>
+          <div role="dialog" aria-modal="true" aria-label={cfg.title} className="glass w-full max-w-sm rounded-2xl bg-surface p-6" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 flex items-center justify-between">
               <h3 className="flex items-center gap-2 font-semibold text-ink"><Icon className="h-5 w-5 text-leaf-deep" aria-hidden /> {cfg.title}</h3>
               <button onClick={close} aria-label="Close" className="text-muted hover:text-ink"><X className="h-5 w-5" aria-hidden /></button>

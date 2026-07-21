@@ -1,6 +1,6 @@
 {
   "name": "fsi-pci-dss-backend",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "private": true,
   "engines": {
     "node": ">=22"
@@ -26,16 +26,16 @@
     "@aws-sdk/client-kms": "^3.700.0",
     "@fastify/cors": "^10.1.0",
     "@fastify/swagger": "^9.7.0",
-    "@fastify/swagger-ui": "^5.2.6",
+    "@fastify/swagger-ui": "^6.1.0",
     "bcryptjs": "^2.4.3",
     "dotenv": "^17.4.2",
     "fastify": "^5.8.3",
     "fastify-plugin": "^5.1.0",
     "fsi-pci-dss-demo": "file:..",
     "jsonwebtoken": "^9.0.2",
-    "mongodb": "^7.4.0",
+    "mongodb": "^7.5.0",
     "mongodb-client-encryption": "^7.2.0",
-    "uuid": "^11.0.0"
+    "uuid": "^14.0.1"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.5.0",
@@ -43,7 +43,7 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/ms": "^2.1.0",
     "@types/node": "^20.12.7",
-    "@types/uuid": "^10.0.0",
+    "@types/uuid": "^11.0.0",
     "@types/webidl-conversions": "^7.0.3",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
