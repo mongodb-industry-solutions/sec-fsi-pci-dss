@@ -1,4 +1,4 @@
-import { Db } from 'mongodb';
+import { Db, MongoCryptError } from 'mongodb';
 import * as bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import {
@@ -73,11 +73,13 @@ async function readPartyPhone(partyRef: string): Promise<string | undefined> {
       .findOne({ partyInstanceReference: partyRef }, { projection: { partyMobilePhoneNumber: 1 } });
     return party?.partyMobilePhoneNumber || undefined;
   } catch (err) {
-    // Graceful degradation: a QE read can fail if the deployed crypt_shared lib does not support a
-    // configured queryType (e.g. substringPreview on <8.2). The phone is a non-critical detail
-    // field, so we omit it and still render the rest of the user record rather than 500 the page.
-    // The underlying error is still surfaced via pino + the admin log panel (onError hook).
-    console.warn(`[users] party phone read degraded for ${partyRef}: ${(err as Error).message}`);
+    // Graceful degradation, QE-only: a QE read can fail if the deployed crypt_shared lib does not
+    // support a configured queryType (e.g. substringPreview on <8.2). The phone is a non-critical
+    // detail field, so on a crypto/QE error we omit it and still render the rest of the user record
+    // rather than 500 the page. Any OTHER error (auth, network, driver bug) is unexpected and MUST
+    // propagate so it is not silently hidden (it then reaches pino + the admin log panel onError hook).
+    if (!(err instanceof MongoCryptError)) throw err;
+    console.warn(`[users] party phone read degraded (QE) for ${partyRef}: ${err.message}`);
     return undefined;
   }
 }
