@@ -67,10 +67,19 @@ async function writePartyContact(
 /** Reads the linked party's phone (QE:equality) for the detail view. Returns undefined if absent. */
 async function readPartyPhone(partyRef: string): Promise<string | undefined> {
   if (!partyRef) return undefined;
-  const roleDb = await getDbForRole('security_auditor', false);
-  const party = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
-    .findOne({ partyInstanceReference: partyRef }, { projection: { partyMobilePhoneNumber: 1 } });
-  return party?.partyMobilePhoneNumber || undefined;
+  try {
+    const roleDb = await getDbForRole('security_auditor', false);
+    const party = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
+      .findOne({ partyInstanceReference: partyRef }, { projection: { partyMobilePhoneNumber: 1 } });
+    return party?.partyMobilePhoneNumber || undefined;
+  } catch (err) {
+    // Graceful degradation: a QE read can fail if the deployed crypt_shared lib does not support a
+    // configured queryType (e.g. substringPreview on <8.2). The phone is a non-critical detail
+    // field, so we omit it and still render the rest of the user record rather than 500 the page.
+    // The underlying error is still surfaced via pino + the admin log panel (onError hook).
+    console.warn(`[users] party phone read degraded for ${partyRef}: ${(err as Error).message}`);
+    return undefined;
+  }
 }
 
 // ADR-030 / SD-91: local-domain user administration (manager-managed). Role assignment references
