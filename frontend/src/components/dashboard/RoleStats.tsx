@@ -193,17 +193,20 @@ function OperationsStats({ token }: { token: string }) {
   const acctsSampled = (accts?.total ?? 0) > acctRows.length;
   const cardSampleNote = cardsSampled ? `of first ${cardRows.length}` : undefined;
   const acctSampleNote = acctsSampled ? `of first ${acctRows.length}` : undefined;
+  // Only render a section when its dataset is actually present. A capability managed by an external
+  // provider returns 409 (list rejected via Promise.allSettled), so that side stays null and is
+  // omitted rather than shown as a misleading "0" with an empty breakdown.
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={<CreditCard size={14} />} label="Cards" value={String(cards?.total ?? 0)} sub="on file (excl. revoked)" />
-        <StatCard icon={<CheckCircle2 size={14} />} label="Active cards" value={String(cardCount('active'))} accent="text-green-600" sub={cardSampleNote} />
-        <StatCard icon={<Clock size={14} />} label="Suspended cards" value={String(cardCount('suspended'))} accent="text-orange-600" sub={cardSampleNote} />
-        <StatCard icon={<Landmark size={14} />} label="Payout accounts" value={String(accts?.total ?? 0)} sub={acctsSampled ? `${acctCount('active')} active (of first ${acctRows.length})` : `${acctCount('active')} active`} />
+        {cards && <StatCard icon={<CreditCard size={14} />} label="Cards" value={String(cards.total)} sub="on file (excl. revoked)" />}
+        {cards && <StatCard icon={<CheckCircle2 size={14} />} label="Active cards" value={String(cardCount('active'))} accent="text-green-600" sub={cardSampleNote} />}
+        {cards && <StatCard icon={<Clock size={14} />} label="Suspended cards" value={String(cardCount('suspended'))} accent="text-orange-600" sub={cardSampleNote} />}
+        {accts && <StatCard icon={<Landmark size={14} />} label="Payout accounts" value={String(accts.total)} sub={acctsSampled ? `${acctCount('active')} active (of first ${acctRows.length})` : `${acctCount('active')} active`} />}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <BreakdownBars title={cardsSampled ? `Cards by status (first ${cardRows.length} of ${cards?.total})` : 'Cards by status'} total={cardRows.length} items={cardStatuses.map((x) => ({ label: x.label.replace(/_/g, ' '), value: x.value, colorClass: color(STATUS_COLOR, x.label) }))} />
-        <BreakdownBars title={acctsSampled ? `Accounts by status (first ${acctRows.length} of ${accts?.total})` : 'Accounts by status'} total={acctRows.length} items={acctStatuses.map((x) => ({ label: x.label.replace(/_/g, ' '), value: x.value, colorClass: color(STATUS_COLOR, x.label) }))} />
+        {cards && <BreakdownBars title={cardsSampled ? `Cards by status (first ${cardRows.length} of ${cards.total})` : 'Cards by status'} total={cardRows.length} items={cardStatuses.map((x) => ({ label: x.label.replace(/_/g, ' '), value: x.value, colorClass: color(STATUS_COLOR, x.label) }))} />}
+        {accts && <BreakdownBars title={acctsSampled ? `Accounts by status (first ${acctRows.length} of ${accts.total})` : 'Accounts by status'} total={acctRows.length} items={acctStatuses.map((x) => ({ label: x.label.replace(/_/g, ' '), value: x.value, colorClass: color(STATUS_COLOR, x.label) }))} />}
       </div>
     </div>
   );

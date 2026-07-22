@@ -6,6 +6,7 @@ import { Pagination } from '../../../../../components/Pagination';
 import { api, type AdminCard } from '../../../../../lib/api';
 import { getToken } from '../../../../../lib/auth';
 import { useNotify, useConfirm } from '../../../../../components/ui/ConfirmProvider';
+import { useEffectivePermissions } from '../../../../../lib/permissions';
 import { ModalShell, Field, ModalActions } from './AdminModal';
 
 // v29 SD-88 global card administration panel (built-in card-issuer module). Rendered as the "Cards"
@@ -33,6 +34,10 @@ export function CardsAdminPanel() {
   const notify = useNotify();
   const confirm = useConfirm();
   const router = useRouter();
+  // cards:view reaches this tab, but POST/PATCH/DELETE require cards:manage (e.g. security_auditor is
+  // view-only). Hide mutation controls for view-only roles instead of surfacing guaranteed 403s.
+  const { can } = useEffectivePermissions();
+  const canManage = can('cards', 'manage');
 
   const [rows, setRows] = useState<AdminCard[]>([]);
   const [total, setTotal] = useState(0);
@@ -110,10 +115,12 @@ export function CardsAdminPanel() {
   return (
     <div className="space-y-5">
       <div className="flex justify-end">
+        {canManage && (
         <button onClick={() => setShowCreate(true)}
           className="flex items-center gap-2 bg-[#001E2B] hover:bg-[#001E2B]/80 text-white font-medium px-4 py-2 rounded-lg transition-colors text-sm">
           <Plus size={15} /> Register card
         </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -170,8 +177,8 @@ export function CardsAdminPanel() {
                   <td className="py-2.5 px-4">
                     <div className="flex items-center justify-end gap-1.5">
                       <button onClick={() => openDetail(c)} title="View detail" className="p-1.5 rounded text-gray-400 hover:text-[#001E2B] hover:bg-gray-100 transition-colors"><Eye size={15} /></button>
-                      <button onClick={() => toggleStatus(c)} disabled={!TOGGLEABLE_STATES.includes(c.paymentCardStatus)} title={TOGGLEABLE_STATES.includes(c.paymentCardStatus) ? (c.paymentCardStatus === 'active' ? 'Suspend' : 'Activate') : 'Status not toggleable'} className="p-1.5 rounded text-gray-400 hover:text-yellow-600 hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-gray-400 disabled:hover:bg-transparent"><Power size={15} /></button>
-                      <button onClick={() => revoke(c)} title="Revoke" className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-gray-100 transition-colors"><Trash2 size={15} /></button>
+                      {canManage && <button onClick={() => toggleStatus(c)} disabled={!TOGGLEABLE_STATES.includes(c.paymentCardStatus)} title={TOGGLEABLE_STATES.includes(c.paymentCardStatus) ? (c.paymentCardStatus === 'active' ? 'Suspend' : 'Activate') : 'Status not toggleable'} className="p-1.5 rounded text-gray-400 hover:text-yellow-600 hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-gray-400 disabled:hover:bg-transparent"><Power size={15} /></button>}
+                      {canManage && <button onClick={() => revoke(c)} title="Revoke" className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-gray-100 transition-colors"><Trash2 size={15} /></button>}
                     </div>
                   </td>
                 </tr>

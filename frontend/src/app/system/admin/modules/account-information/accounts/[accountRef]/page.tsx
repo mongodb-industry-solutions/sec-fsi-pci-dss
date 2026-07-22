@@ -9,6 +9,7 @@ import { useDebugMode } from '../../../../../../../lib/debugMode';
 import { useConfirm, useNotify } from '../../../../../../../components/ui/ConfirmProvider';
 import { Breadcrumb } from '../../../../../../../components/Breadcrumb';
 import { RequirePermission } from '../../../../../../../components/RequirePermission';
+import { useEffectivePermissions } from '../../../../../../../lib/permissions';
 
 // v29.2 global payout-account-administration DETAIL page (SD-66, built-in account-information module).
 // Dedicated page (not a modal) so the operations officer sees every QE-stripped field with room to act.
@@ -71,6 +72,10 @@ function AccountAdminDetail() {
   const confirm = useConfirm();
   const notify = useNotify();
   const { debugMode } = useDebugMode();
+  // The page is wrapped in accounts:view, but edit/close call accounts:manage endpoints. Render a
+  // read-only detail for view-only roles (e.g. security_auditor) instead of always-failing actions.
+  const { can } = useEffectivePermissions();
+  const canManage = can('accounts', 'manage');
 
   const token = getToken() ?? '';
   const [acct, setAcct] = useState<AccountDetail | null>(null);
@@ -251,7 +256,7 @@ function AccountAdminDetail() {
           <div className="bg-white rounded-xl border p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Editable details</h2>
-              {!editing ? (
+              {!canManage ? null : !editing ? (
                 <button onClick={() => setEditing(true)}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors">
                   <Pencil size={13} /> Edit
@@ -287,7 +292,7 @@ function AccountAdminDetail() {
           </div>
 
           {/* Danger zone */}
-          {acct.payoutAccountStatus !== 'closed' && (
+          {canManage && acct.payoutAccountStatus !== 'closed' && (
             <div className="bg-white rounded-xl border border-red-100 p-5 flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <p className="text-sm font-medium text-gray-800">Close this account</p>

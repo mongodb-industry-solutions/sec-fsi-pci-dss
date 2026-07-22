@@ -26,15 +26,18 @@ function ModuleTypeBadge({ type }: { type: ModuleType }) {
 }
 
 export default function ModulesIndexPage() {
-  const { can } = useEffectivePermissions();
+  const { can, loading: permsLoading } = useEffectivePermissions();
   const byDomain = (['fraud', 'customer', 'gateway'] as const).map((d) => ({
     domain: d,
     items: CAPABILITY_LIST.filter((c) => c.hasModule && c.moduleDomain === d),
   }));
 
-  // SoD (PCI Req 7): the "domain" core module administers Auth Domains (SD-16), which is the
-  // manager's remit, not operations_officer's. Show it only to roles that hold authDomains access.
-  const coreModules = CORE_ADMIN_MODULES.filter((m) => (m.key === 'domain' ? can('authDomains', 'view') : true));
+  // SoD (PCI Req 7): the "domain" core module administers Auth Domains (SD-16), which is the manager's
+  // remit, not operations_officer's. Show it only to roles that hold authDomains access. Wait for
+  // permissions to load (can() is default-deny meanwhile) to avoid the module flickering in on cold load.
+  const coreModules = permsLoading
+    ? []
+    : CORE_ADMIN_MODULES.filter((m) => (m.key === 'domain' ? can('authDomains', 'view') : true));
 
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">

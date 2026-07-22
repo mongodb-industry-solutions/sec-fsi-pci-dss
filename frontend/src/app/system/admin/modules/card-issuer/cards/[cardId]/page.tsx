@@ -9,6 +9,7 @@ import { useDebugMode } from '../../../../../../../lib/debugMode';
 import { useConfirm, useNotify } from '../../../../../../../components/ui/ConfirmProvider';
 import { Breadcrumb } from '../../../../../../../components/Breadcrumb';
 import { RequirePermission } from '../../../../../../../components/RequirePermission';
+import { useEffectivePermissions } from '../../../../../../../lib/permissions';
 
 // v29.2 global card-administration DETAIL page (SD-88, built-in card-issuer module). Dedicated page
 // (not a modal) so the operations officer sees every display-safe field with room to act.
@@ -64,6 +65,10 @@ function CardAdminDetail() {
   const confirm = useConfirm();
   const notify = useNotify();
   const { debugMode } = useDebugMode();
+  // The page is wrapped in cards:view, but edit/toggle/revoke call cards:manage endpoints. Render a
+  // read-only detail for view-only roles (e.g. security_auditor) instead of always-failing actions.
+  const { can } = useEffectivePermissions();
+  const canManage = can('cards', 'manage');
 
   const token = getToken() ?? '';
   const [card, setCard] = useState<CardDetail | null>(null);
@@ -247,7 +252,7 @@ function CardAdminDetail() {
           <div className="bg-white rounded-xl border p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Alias &amp; note</h2>
-              {!editing ? (
+              {!canManage ? null : !editing ? (
                 <button onClick={() => setEditing(true)}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors">
                   <Pencil size={13} /> Edit
@@ -294,7 +299,7 @@ function CardAdminDetail() {
           </div>
 
           {/* Activation toggle */}
-          {TOGGLEABLE_STATES.includes(card.paymentCardStatus ?? '') && (
+          {canManage && TOGGLEABLE_STATES.includes(card.paymentCardStatus ?? '') && (
             <div className="bg-white rounded-xl border p-5 flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <p className="text-sm font-medium text-gray-800">
@@ -320,6 +325,7 @@ function CardAdminDetail() {
           )}
 
           {/* Danger zone */}
+          {canManage && (
           <div className="bg-white rounded-xl border border-red-100 p-5 flex items-center justify-between gap-3 flex-wrap">
             <div>
               <p className="text-sm font-medium text-gray-800">Revoke this card</p>
@@ -330,6 +336,7 @@ function CardAdminDetail() {
               <Trash2 size={15} /> {removing ? 'Revoking…' : 'Revoke card'}
             </button>
           </div>
+          )}
         </>
       )}
     </div>

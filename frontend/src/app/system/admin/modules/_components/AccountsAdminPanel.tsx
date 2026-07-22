@@ -6,6 +6,7 @@ import { Pagination } from '../../../../../components/Pagination';
 import { api, type AdminPayoutAccount } from '../../../../../lib/api';
 import { getToken } from '../../../../../lib/auth';
 import { useNotify, useConfirm } from '../../../../../components/ui/ConfirmProvider';
+import { useEffectivePermissions } from '../../../../../lib/permissions';
 import { ModalShell, Field, ModalActions } from './AdminModal';
 
 // v29 SD-66 global payout-account administration panel (built-in account-information module). Rendered
@@ -31,6 +32,10 @@ export function AccountsAdminPanel() {
   const token = getToken() ?? '';
   const notify = useNotify();
   const confirm = useConfirm();
+  // accounts:view reaches this tab, but POST/PATCH/DELETE require accounts:manage (e.g. security_auditor
+  // is view-only). Hide mutation controls for view-only roles instead of surfacing guaranteed 403s.
+  const { can } = useEffectivePermissions();
+  const canManage = can('accounts', 'manage');
   const router = useRouter();
 
   const [rows, setRows] = useState<AdminPayoutAccount[]>([]);
@@ -99,10 +104,12 @@ export function AccountsAdminPanel() {
   return (
     <div className="space-y-5">
       <div className="flex justify-end">
+        {canManage && (
         <button onClick={() => setShowCreate(true)}
           className="flex items-center gap-2 bg-[#001E2B] hover:bg-[#001E2B]/80 text-white font-medium px-4 py-2 rounded-lg transition-colors text-sm">
           <Plus size={15} /> Create account
         </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -157,7 +164,7 @@ export function AccountsAdminPanel() {
                   <td className="py-2.5 px-4">
                     <div className="flex items-center justify-end gap-1.5">
                       <button onClick={() => openDetail(a)} title="View detail" className="p-1.5 rounded text-gray-400 hover:text-[#001E2B] hover:bg-gray-100 transition-colors"><Eye size={15} /></button>
-                      <button onClick={() => close(a)} title="Close account" className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-gray-100 transition-colors"><Trash2 size={15} /></button>
+                      {canManage && <button onClick={() => close(a)} title="Close account" className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-gray-100 transition-colors"><Trash2 size={15} /></button>}
                     </div>
                   </td>
                 </tr>
