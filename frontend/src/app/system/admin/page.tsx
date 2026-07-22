@@ -64,7 +64,7 @@ export default function AdminDashboardPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
   const { debugMode } = useDebugMode();
-  const { can } = useEffectivePermissions();
+  const { can, loading: permsLoading } = useEffectivePermissions();
 
   // manager owns provider CRUD; operations_officer administers internal modules (providers read-only).
   const canManageProviders = can('providers', 'manage');
@@ -83,29 +83,33 @@ export default function AdminDashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="w-full px-5 sm:px-8 lg:px-12 py-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {canManageProviders ? 'Integration Hub' : 'Internal Modules'}
-            </h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {canManageProviders
-                ? 'BIAN SD-193 External Provider Arrangements · PCI DSS Req 12.8'
-                : 'Internal module administration (config + data) · provider status shown read-only'}
-            </p>
+        {/* Wait for permissions before rendering role-specific header/body: can() is default-deny
+            while permissions load, which would briefly flash the wrong (operations-officer) view. */}
+        {!permsLoading && (
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {canManageProviders ? 'Integration Hub' : 'Internal Modules'}
+              </h1>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {canManageProviders
+                  ? 'BIAN SD-193 External Provider Arrangements · PCI DSS Req 12.8'
+                  : 'Internal module administration (config + data) · provider status shown read-only'}
+              </p>
+            </div>
+            {canManageProviders && (
+              <Link
+                href="/system/admin/providers"
+                className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
+              >
+                <Wrench size={14} />
+                Manage Integrations
+              </Link>
+            )}
           </div>
-          {canManageProviders && (
-            <Link
-              href="/system/admin/providers"
-              className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"
-            >
-              <Wrench size={14} />
-              Manage Integrations
-            </Link>
-          )}
-        </div>
+        )}
 
-        {loading ? (
+        {loading || permsLoading ? (
           <div className="text-center py-12 text-gray-400">Loading integration status...</div>
         ) : canManageProviders ? (
           <ProviderGrid activeByType={activeByType} debugMode={debugMode} />

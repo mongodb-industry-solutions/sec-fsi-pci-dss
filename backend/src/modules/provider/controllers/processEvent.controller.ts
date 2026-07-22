@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import type { AuthenticatedRequest } from '../../../shared/models/identity.model';
+import { requirePermission } from '../../../vendors/middleware/acl';
 import {
   listProcessEvents,
   listComplianceEvents,
@@ -11,14 +11,11 @@ import { MongoEventStore } from '../../../vendors/eventbus';
 
 const E = { type: 'object', properties: { error: { type: 'string' } } };
 
-// Roles allowed to read the audit/process event streams. All hold auditEvents:[view] in the RBAC
-// matrix. operations_officer (v29) needs it to observe how internal-module rules/config behave and
-// whether card-validation and connected-module processes fail (approved/rejected/error).
-function isAuditRole(request: AuthenticatedRequest): boolean {
-  return request.userRole === 'security_auditor'
-    || request.userRole === 'manager'
-    || request.userRole === 'operations_officer';
-}
+// Access to the audit/process event streams is data-driven (ADR-030): gated on the auditEvents:view
+// permission via requirePermission, so role/permission edits in the role collection (or custom roles
+// granting auditEvents:view) are honored without touching this controller. Seeded holders today:
+// security_auditor, manager, operations_officer (v29, observes internal-module process outcomes).
+const requireAuditView = requirePermission('auditEvents', 'view');
 
 export async function processEventController(fastify: FastifyInstance) {
   // ── GET /events/audit ───────────────────────────────────────────────────────
@@ -50,9 +47,8 @@ export async function processEventController(fastify: FastifyInstance) {
         403: E,
       },
     },
+    preHandler: requireAuditView,
     handler: async (request, reply) => {
-      if (!isAuditRole(request as unknown as AuthenticatedRequest))
-        return reply.status(403).send({ error: 'Forbidden: security_auditor, manager or operations_officer role required' });
       const q = request.query as Record<string, string>;
       const result = await listAuditEvents(fastify.db, {
         source:     (q.source as AuditSource | 'all' | undefined) ?? 'all',
@@ -83,9 +79,8 @@ export async function processEventController(fastify: FastifyInstance) {
       params: { type: 'object', required: ['correlationId'], properties: { correlationId: { type: 'string' } } },
       response: { 200: { type: 'object', additionalProperties: true }, 403: E },
     },
+    preHandler: requireAuditView,
     handler: async (request, reply) => {
-      if (!isAuditRole(request as unknown as AuthenticatedRequest))
-        return reply.status(403).send({ error: 'Forbidden: security_auditor, manager or operations_officer role required' });
       const { correlationId } = request.params as { correlationId: string };
       const events = await new MongoEventStore(fastify.db).trail(correlationId);
       return reply.send({ correlationId, count: events.length, events });
@@ -115,10 +110,8 @@ export async function processEventController(fastify: FastifyInstance) {
         403: E,
       },
     },
+    preHandler: requireAuditView,
     handler: async (request, reply) => {
-      if (!isAuditRole(request as unknown as AuthenticatedRequest))
-        return reply.status(403).send({ error: 'Forbidden: security_auditor, manager or operations_officer role required' });
-
       const q = request.query as Record<string, string>;
       const result = await listProcessEvents(fastify.db, {
         processType: q.processType as BusinessProcessType | undefined,
@@ -158,10 +151,8 @@ export async function processEventController(fastify: FastifyInstance) {
         403: E,
       },
     },
+    preHandler: requireAuditView,
     handler: async (request, reply) => {
-      if (!isAuditRole(request as unknown as AuthenticatedRequest))
-        return reply.status(403).send({ error: 'Forbidden: security_auditor, manager or operations_officer role required' });
-
       const { entityType, entityId } = request.params;
       const q = request.query as Record<string, string>;
       const result = await listProcessEvents(fastify.db, {
@@ -197,10 +188,8 @@ export async function processEventController(fastify: FastifyInstance) {
         403: E,
       },
     },
+    preHandler: requireAuditView,
     handler: async (request, reply) => {
-      if (!isAuditRole(request as unknown as AuthenticatedRequest))
-        return reply.status(403).send({ error: 'Forbidden: security_auditor, manager or operations_officer role required' });
-
       const q = request.query as Record<string, string>;
       const result = await listComplianceEvents(fastify.db, {
         processType: q.processType as ComplianceProcessType | undefined,
@@ -240,10 +229,8 @@ export async function processEventController(fastify: FastifyInstance) {
         403: E,
       },
     },
+    preHandler: requireAuditView,
     handler: async (request, reply) => {
-      if (!isAuditRole(request as unknown as AuthenticatedRequest))
-        return reply.status(403).send({ error: 'Forbidden: security_auditor, manager or operations_officer role required' });
-
       const { entityType, entityId } = request.params;
       const q = request.query as Record<string, string>;
       const result = await listComplianceEvents(fastify.db, {

@@ -42,6 +42,10 @@ describe('FR-v29: global resource administration (built-in modules)', () => {
     const res = await supertest(app.server)
       .post('/api/v1/auth/login')
       .send({ email, password: 'demo-password', domain: 'local' });
+    // Fail fast with an actionable message if auth breaks (missing seed user, wrong password),
+    // rather than surfacing as a downstream 401/403 in each test.
+    expect(res.status, `login failed for ${email}: ${JSON.stringify(res.body)}`).toBe(200);
+    expect(res.body.token, `no token returned for ${email}`).toBeTruthy();
     return res.body.token;
   }
 
