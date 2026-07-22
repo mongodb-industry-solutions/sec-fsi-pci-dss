@@ -7,6 +7,7 @@ import { Breadcrumb } from '../../../../../components/Breadcrumb';
 import { api } from '../../../../../lib/api';
 import { getToken } from '../../../../../lib/auth';
 import { useNotify } from '../../../../../components/ui/ConfirmProvider';
+import { useEffectivePermissions } from '../../../../../lib/permissions';
 import { Tooltip } from '../../../../../components/Tooltip';
 
 // Dedicated config UI for the internal VoP (Verification of Payee) engine (overrides the generic module
@@ -26,6 +27,8 @@ type Decision = 'block' | 'warn' | 'pass';
 
 export default function VopModulePage() {
   const notify = useNotify();
+  const { can } = useEffectivePermissions();
+  const canEdit = can('modules', 'manage'); // manager has modules:view only; only operations_officer may edit
   const [token, setToken] = useState('');
   const [matchT, setMatchT] = useState(DEFAULTS.thresholds.match);
   const [closeT, setCloseT] = useState(DEFAULTS.thresholds.closeMatch);
@@ -88,6 +91,12 @@ export default function VopModulePage() {
       <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Modules', href: '/system/admin/modules' }, { label: 'Verification of Payee (VoP)' }]} />
       <SectionHeader icon={ShieldCheck} title="Verification of Payee (VoP)" description="Payee name-vs-account confirmation. Additional to FDS/AML/HRP; market-gated." debugInfo="capability=vop · SD-13 Party Data Management · PCI DSS Req 12.8 / Req 10" />
 
+      {!canEdit && (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-600">
+          Read-only: your role can view this configuration but not change it (requires <code className="font-mono text-xs">modules:manage</code>).
+        </div>
+      )}
+      <fieldset disabled={!canEdit} className="space-y-5 border-0 p-0 m-0 min-w-0">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
 
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
@@ -157,6 +166,7 @@ export default function VopModulePage() {
           <ListChecks size={14} /> View verification logs in audit events
         </Link>
       </div>
+      </fieldset>
     </div>
   );
 }

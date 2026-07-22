@@ -1,5 +1,6 @@
 // Card Authorization capability module controller — STATIC routes (ADR-029).
 import { FastifyInstance } from 'fastify';
+import { requirePermission } from '../../../vendors/middleware/acl';
 import { authorizeCard } from '../services/cardAuthorization.service';
 import {
   getCapabilityModuleConfig,
@@ -40,6 +41,7 @@ export async function cardAuthorizationController(fastify: FastifyInstance) {
   });
 
   fastify.get('/config', {
+    preHandler: requirePermission('modules', 'view'),
     schema: {
       tags: ['modules:card-authorization'],
       summary: 'Get card-authorization module configuration',
@@ -53,6 +55,7 @@ export async function cardAuthorizationController(fastify: FastifyInstance) {
   });
 
   fastify.put('/config', {
+    preHandler: requirePermission('modules', 'manage'),
     schema: {
       tags: ['modules:card-authorization'],
       summary: 'Update card-authorization module configuration',

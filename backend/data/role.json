@@ -88,6 +88,22 @@
     }
   },
   {
+    "roleName": "operations_officer",
+    "roleLabel": "Operations Officer",
+    "roleDescription": "Card & payout-account operations (SD-88 / SD-66): global administration of cardholder cards and payout accounts via the built-in modules. No provider/module platform admin (SoD).",
+    "roleScope": "all",
+    "roleIsBuiltin": true,
+    "bianServiceDomain": "Payment Card / Payout Account Arrangement",
+    "bianControlRecordType": "PaymentCardManagement / PayoutAccountArrangement",
+    "rolePermissions": {
+      "cards": ["view", "manage"],
+      "accounts": ["view", "manage"],
+      "modules": ["view", "manage"],
+      "providers": ["view"],
+      "auditEvents": ["view"]
+    }
+  },
+  {
     "roleName": "manager",
     "roleLabel": "Integration Manager",
     "roleDescription": "Platform administrator (SD-193): providers, modules, auth domains and roles. No access to business/cardholder data (SoD, PCI Req 7).",
@@ -97,7 +113,7 @@
     "bianControlRecordType": "ExternalProviderArrangement",
     "rolePermissions": {
       "providers": ["view", "manage"],
-      "modules": ["view", "manage"],
+      "modules": ["view"],
       "authDomains": ["view", "manage"],
       "roles": ["view", "manage"],
       "auditEvents": ["view"]

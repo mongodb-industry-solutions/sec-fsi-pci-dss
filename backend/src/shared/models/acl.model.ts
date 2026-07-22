@@ -143,6 +143,34 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
     },
   },
   {
+    // v29: global operations of cardholder cards (SD-88) and payout accounts (SD-66) through the
+    // built-in modules (card-issuer / account-information). BIAN has no staff "Card/Account
+    // Administrator" role for SD-88/SD-66 (data domains), so we follow the project's established
+    // "<area>_officer" bank-employee convention (precedent: merchant_officer → SD-89). SoD (PCI Req 7):
+    // distinct from `manager` (SD-193, no CHD) and from `customer` (scope own, self-service).
+    roleName: 'operations_officer',
+    roleLabel: 'Operations Officer',
+    roleDescription: 'Card & payout-account operations (SD-88 / SD-66): global administration of cardholder cards and payout accounts via the built-in modules. No provider/module platform admin (SoD).',
+    roleScope: 'all',
+    roleIsBuiltin: true,
+    bianServiceDomain: 'Payment Card / Payout Account Arrangement',
+    bianControlRecordType: 'PaymentCardManagement / PayoutAccountArrangement',
+    rolePermissions: {
+      cards: ['view', 'manage'],
+      accounts: ['view', 'manage'],
+      // v29.1: administer the INTERNAL capability modules (engine config / policies of fds, aml, hrp,
+      // kyc, kyb, credit-bureau, card-authorization, card-issuer, account-information, payment-initiation,
+      // vop). Auth (SD-16) stays with `manager` because it is the separate `authDomains` resource, not
+      // `modules`. `manager` keeps `modules` too (platform super-admin); this is an accepted overlap.
+      modules: ['view', 'manage'],
+      // v29.2: READ-ONLY visibility of external providers (SD-193), so the operations landing can show
+      // which provider currently serves each capability (internal vs external / managed_externally).
+      // NO `manage`: provider CRUD/routing stays with `manager` (SoD, PCI Req 7).
+      providers: ['view'],
+      auditEvents: ['view'],
+    },
+  },
+  {
     roleName: 'manager',
     roleLabel: 'Integration Manager',
     roleDescription: 'Platform administrator (SD-193): providers, modules, auth domains and roles. No access to business/cardholder data (SoD, PCI Req 7).',
@@ -152,7 +180,10 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
     bianControlRecordType: 'ExternalProviderArrangement',
     rolePermissions: {
       providers: ['view', 'manage'],
-      modules: ['view', 'manage'],
+      // v29.2: system oversight only. Internal module engine/policy config is a business/risk process
+      // owned by `operations_officer` (view+manage); `manager` keeps `modules:view` for platform
+      // troubleshooting/security oversight but does not edit business policies (SoD, PCI Req 7).
+      modules: ['view'],
       authDomains: ['view', 'manage'],
       roles: ['view', 'manage'],
       auditEvents: ['view'],

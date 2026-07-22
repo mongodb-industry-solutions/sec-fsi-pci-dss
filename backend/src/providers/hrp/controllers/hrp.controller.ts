@@ -2,6 +2,7 @@
 //   POST /api/v1/modules/hrp/screen   — evaluate an individual (replaces old /integrations/hrp/screen)
 //   GET/PUT /api/v1/modules/hrp/config — admin config
 import { FastifyInstance } from 'fastify';
+import { requirePermission } from '../../../vendors/middleware/acl';
 import { screenHrp, HrpConfig } from '../services/hrp.service';
 import {
   getCapabilityModuleConfig,
@@ -45,6 +46,7 @@ export async function hrpController(fastify: FastifyInstance) {
   });
 
   fastify.get('/config', {
+    preHandler: requirePermission('modules', 'view'),
     schema: {
       tags: ['modules:hrp'],
       summary: 'Get HRP module configuration',
@@ -58,6 +60,7 @@ export async function hrpController(fastify: FastifyInstance) {
   });
 
   fastify.put('/config', {
+    preHandler: requirePermission('modules', 'manage'),
     schema: {
       tags: ['modules:hrp'],
       summary: 'Update HRP module configuration',

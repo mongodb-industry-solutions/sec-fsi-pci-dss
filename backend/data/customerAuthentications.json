@@ -263,5 +263,34 @@
     "bianControlRecordType": "CustomerAuthenticationAssessment",
     "recordCreatedDateTime": "2026-06-11T10:00:00.000Z",
     "schemaVersion": 1
+  },
+  {
+    "customerAuthenticationInstanceReference": "a1000060-0000-4000-8000-000000000060",
+    "partyInstanceReference": "b0000060-0000-4000-8000-000000000060",
+    "customerAuthenticationEmailAddress": "olivia.moreno@back.es",
+    "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
+    "customerAuthenticationUserRole": "operations_officer",
+    "customerAuthenticationUserName": "Olivia Moreno",
+    "customerAuthenticationLoginDomain": "local",
+    "customerAuthenticationAccountStatus": "active",
+    "customerAuthenticationDemoFeatured": true,
+    "bianServiceDomain": "Customer Authentication",
+    "bianControlRecordType": "CustomerAuthenticationAssessment",
+    "recordCreatedDateTime": "2026-06-11T10:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "customerAuthenticationInstanceReference": "a1000061-0000-4000-8000-000000000061",
+    "partyInstanceReference": "b0000061-0000-4000-8000-000000000061",
+    "customerAuthenticationEmailAddress": "daniel.rossi@back.es",
+    "customerAuthenticationCredentialHash": "$2a$12$SVc9xugmfI8qSMO7fQXRqewvi7e/Qm4VhpsiHvZ.Ik2Qlrv7zBNxe",
+    "customerAuthenticationUserRole": "operations_officer",
+    "customerAuthenticationUserName": "Daniel Rossi",
+    "customerAuthenticationLoginDomain": "local",
+    "customerAuthenticationAccountStatus": "active",
+    "bianServiceDomain": "Customer Authentication",
+    "bianControlRecordType": "CustomerAuthenticationAssessment",
+    "recordCreatedDateTime": "2026-06-11T10:00:00.000Z",
+    "schemaVersion": 1
   }
 ]

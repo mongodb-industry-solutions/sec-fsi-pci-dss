@@ -5,7 +5,15 @@
  * Auth: injected via demo_token cookie using loginAs (NOT localStorage — app reads cookies only).
  */
 import { test, expect } from '@playwright/test';
-import { loginAs, json } from './support/auth';
+import { loginAs, json, stubPermissions } from './support/auth';
+
+// Manager effective permissions (ADR-030): the admin dashboard heading is now data-driven
+// (providers:manage → "Integration Hub"), so E2E must stub /api/v1/acl/effective.
+const MANAGER_PERMS = {
+  providers: ['view', 'manage'],
+  modules: ['view'],
+  auditEvents: ['view'],
+};
 
 const MOCK_INTEGRATIONS = [
   { externalProviderArrangementInstanceReference: 'int-internal-fds-001', externalProviderArrangementName: 'Internal Fraud Scoring', externalProviderArrangementType: 'fraud_detection',  externalProviderIsInternal: true,  externalProviderArrangementStatus: 'active', externalProviderMode: 'sync',  externalProviderHealthStatus: 'ok', bianServiceDomain: 'Fraud Diagnosis',       pciDssRequirements: ['Req.10.2.1'] },
@@ -25,6 +33,7 @@ test.describe('FR-v6-01: manager access guard', () => {
 
   test('01.2 manager can access /system/admin without redirect', async ({ page, context }) => {
     await page.route('**/api/v1/providers/vendors**', (route) => route.fulfill(json({ integrations: MOCK_INTEGRATIONS })));
+    await stubPermissions(page, MANAGER_PERMS, 'manager');
     await loginAs(context, 'manager');
     await page.goto('/system/admin');
     await expect(page.locator('h1').first()).toBeVisible({ timeout: 8_000 });
@@ -36,6 +45,7 @@ test.describe('FR-v6-01: manager access guard', () => {
 test.describe('FR-v6-02: Admin Integration Hub dashboard', () => {
   test.beforeEach(async ({ page, context }) => {
     await page.route('**/api/v1/providers/vendors**', (route) => route.fulfill(json({ integrations: MOCK_INTEGRATIONS })));
+    await stubPermissions(page, MANAGER_PERMS, 'manager');
     await loginAs(context, 'manager');
   });
 
@@ -64,6 +74,7 @@ test.describe('FR-v6-02: Admin Integration Hub dashboard', () => {
 test.describe('FR-v6-03: Integrations list page', () => {
   test.beforeEach(async ({ page, context }) => {
     await page.route('**/api/v1/providers/vendors**', (route) => route.fulfill(json({ integrations: MOCK_INTEGRATIONS })));
+    await stubPermissions(page, MANAGER_PERMS, 'manager');
     await loginAs(context, 'manager');
   });
 
@@ -96,7 +107,8 @@ test.describe('FR-v6-03: Integrations list page', () => {
 // ── Register provider tests ───────────────────────────────────────────────────
 
 test.describe('FR-v6-06: Register integration wizard', () => {
-  test.beforeEach(async ({ context }) => {
+  test.beforeEach(async ({ page, context }) => {
+    await stubPermissions(page, MANAGER_PERMS, 'manager');
     await loginAs(context, 'manager');
   });
 

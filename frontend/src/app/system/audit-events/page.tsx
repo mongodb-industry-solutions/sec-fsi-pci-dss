@@ -6,7 +6,8 @@ import { Activity, RefreshCw, Search, ChevronDown, ChevronRight, ExternalLink, D
 import { SectionHeader } from '../../../components/SectionHeader';
 import { Pagination } from '../../../components/Pagination';
 import { api } from '../../../lib/api';
-import { getToken, decodeToken } from '../../../lib/auth';
+import { getToken } from '../../../lib/auth';
+import { useEffectivePermissions } from '../../../lib/permissions';
 import { JsonView } from '../../../components/json/JsonView';
 
 type AuditRow = {
@@ -62,6 +63,7 @@ const ENTITY_LABEL: Record<string, string> = {
 
 export default function AuditEventsPage() {
   const router = useRouter();
+  const { loading: permsLoading, can } = useEffectivePermissions();
   const [token, setToken] = useState('');
   const [authorized, setAuthorized] = useState<boolean | null>(null);
 
@@ -84,13 +86,16 @@ export default function AuditEventsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  useEffect(() => { setToken(getToken() ?? ''); }, []);
+
+  // Data-driven RBAC (ADR-030): authorize on the effective auditEvents:view permission rather than a
+  // hard-coded role list, so role edits / custom roles are honored. Wait for permissions to load to
+  // avoid a default-deny redirect flash.
   useEffect(() => {
-    const t = getToken() ?? '';
-    const role = t ? decodeToken(t)?.role : null;
-    setToken(t);
-    if (role !== 'manager' && role !== 'security_auditor') { setAuthorized(false); router.replace('/system'); return; }
+    if (permsLoading) return;
+    if (!can('auditEvents', 'view')) { setAuthorized(false); router.replace('/system'); return; }
     setAuthorized(true);
-  }, [router]);
+  }, [permsLoading, can, router]);
 
   const load = useCallback(async () => {
     if (!token) return;

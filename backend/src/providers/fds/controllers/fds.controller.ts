@@ -2,6 +2,7 @@
 //   POST /api/v1/modules/fds/score   — internal engine invocation (endpoint-first loopback)
 //   GET/PUT /api/v1/modules/fds/config — admin config of the internal engine
 import { FastifyInstance } from 'fastify';
+import { requirePermission } from '../../../vendors/middleware/acl';
 import { scoreFds, resolveFdsRules, FdsModuleConfig } from '../services/fds.service';
 import {
   getCapabilityModuleConfig,
@@ -54,6 +55,7 @@ export async function fdsController(fastify: FastifyInstance) {
 
   // Admin: read / update the internal Module config.
   fastify.get('/config', {
+    preHandler: requirePermission('modules', 'view'),
     schema: {
       tags: ['modules:fds'],
       summary: 'Get FDS module configuration',
@@ -91,6 +93,7 @@ export async function fdsController(fastify: FastifyInstance) {
   });
 
   fastify.put('/config', {
+    preHandler: requirePermission('modules', 'manage'),
     schema: {
       tags: ['modules:fds'],
       summary: 'Update FDS module configuration',

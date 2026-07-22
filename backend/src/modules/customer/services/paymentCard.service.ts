@@ -287,6 +287,59 @@ export async function rebuildCardRegistry(db: Db): Promise<number> {
   return tokens.length;
 }
 
+// v29 admin (SD-88, built-in module card-issuer): cross-party GLOBAL card list for the operations
+// officer. Display-safe projection identical to the customer list (surrogate token, masked PAN,
+// network, status, agreement ref, dates) — the QE:none expiry is NOT included here (returned only by
+// the per-card detail). Revoked cards are retained for audit and excluded. Paginated + filterable.
+export async function listAllCards(
+  db: Db,
+  opts?: { page?: number; limit?: number; network?: string; status?: string; agreement?: string },
+): Promise<{ results: unknown[]; total: number; page: number; limit: number }> {
+  const query: Record<string, unknown> = {};
+  // Default excludes revoked (audit-retained). An explicit status filter overrides.
+  query.paymentCardStatus = opts?.status ? opts.status : { $ne: 'revoked' };
+  if (opts?.network) query.paymentCardNetwork = opts.network;
+  if (opts?.agreement) query.customerAgreementInstanceReference = opts.agreement;
+
+  const page = Math.max(1, opts?.page ?? 1);
+  const limit = Math.min(100, Math.max(1, opts?.limit ?? 20));
+  const skip = (page - 1) * limit;
+
+  const col = db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION);
+  const [results, total] = await Promise.all([
+    col.find(query)
+      .project({
+        _id: 0,
+        paymentCardInstanceReference: 1,
+        customerAgreementInstanceReference: 1,
+        paymentCardReference: 1,
+        paymentCardMaskedPanDisplay: 1,
+        paymentCardNetwork: 1,
+        paymentCardStatus: 1,
+        paymentCardIsPreferred: 1,
+        paymentCardAlias: 1,
+        fundingPayoutAccountInstanceReference: 1,
+        recordCreatedDateTime: 1,
+      })
+      .sort({ recordCreatedDateTime: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray(),
+    col.countDocuments(query),
+  ]);
+  return { results, total, page, limit };
+}
+
+// v29 admin: cross-party per-card detail (any owner) for the operations officer. Unlike the
+// owner/staff self-service getCardById, this is NOT scoped by customerAgreementInstanceReference.
+// Returns the QE:none expiry (business need-to-know: verify a card is correctly registered; expiry
+// is CHD but NOT SAD, and PCI DSS does not mandate masking it). CVV/PIN are never stored. Null if
+// not found. Callers MUST audit the access (card.accessed, PCI Req 10).
+export async function getCardByIdAny(db: Db, cardId: string) {
+  return db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION)
+    .findOne({ paymentCardInstanceReference: cardId }, { projection: { _id: 0 } });
+}
+
 export async function getCardsByCustomer(db: Db, customerRef: string) {
   const results = await db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION)
     // Revoked (customer-removed) cards are retained for audit but excluded from the list.

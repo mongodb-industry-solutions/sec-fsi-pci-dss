@@ -3,6 +3,7 @@
 //   GET/PUT /api/v1/modules/vop/config — admin config of the internal engine
 //   GET /api/v1/modules/vop/rules      — effective config preview (drives the admin dashboard)
 import { FastifyInstance } from 'fastify';
+import { requirePermission } from '../../../vendors/middleware/acl';
 import { verifyPayee, resolveVopConfig, VopModuleConfig } from '../services/vop.service';
 import {
   getCapabilityModuleConfig,
@@ -47,6 +48,7 @@ export async function vopController(fastify: FastifyInstance) {
   });
 
   fastify.get('/config', {
+    preHandler: requirePermission('modules', 'view'),
     schema: {
       tags: ['modules:vop'],
       summary: 'Get VoP module configuration',
@@ -69,6 +71,7 @@ export async function vopController(fastify: FastifyInstance) {
   });
 
   fastify.put('/config', {
+    preHandler: requirePermission('modules', 'manage'),
     schema: {
       tags: ['modules:vop'],
       summary: 'Update VoP module configuration',

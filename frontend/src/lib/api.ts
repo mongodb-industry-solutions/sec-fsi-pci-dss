@@ -679,6 +679,39 @@ export interface QrRepresentationDTO {
   expiresAt?: string;
 }
 
+// v29 SD-88 global card administration row (display-safe; no full PAN / CVV / expiry).
+export interface AdminCard {
+  paymentCardInstanceReference: string;
+  customerAgreementInstanceReference: string;
+  paymentCardReference?: string;
+  paymentCardMaskedPanDisplay: string;
+  paymentCardNetwork?: string | null;
+  paymentCardStatus: string;
+  paymentCardIsPreferred?: boolean | null;
+  paymentCardAlias?: string | null;
+  fundingPayoutAccountInstanceReference?: string | null;
+  recordCreatedDateTime?: string | null;
+}
+
+// v29 SD-66 global payout-account administration row (QE-stripped; presence hints only).
+export interface AdminPayoutAccount {
+  payoutAccountInstanceReference: string;
+  partyInstanceReference: string;
+  payoutAccountType: string;
+  payoutAccountStatus: string;
+  payoutAccountCurrency: string;
+  payoutAccountCountryCode?: string;
+  payoutAccountPreferredRail?: string;
+  payoutAccountAlias?: string;
+  payoutAccountBankName?: string;
+  payoutAccountHolderName?: string;
+  payoutAccountBicSwift?: string;
+  payoutAccountIsDefault?: boolean;
+  payoutAccountHasIban?: boolean;
+  payoutAccountHasRoutingNumber?: boolean;
+  recordCreatedDateTime?: string;
+}
+
 export const api = {
   acl: {
     effective: (token: string) =>
@@ -1792,6 +1825,106 @@ export const api = {
         apiFetch<Record<string, unknown>>(`/api/v1/modules/domains/${id}`, { method: 'PUT', body: JSON.stringify(body) }, token),
       remove: (id: string, token: string) =>
         apiFetch<{ deleted: boolean }>(`/api/v1/modules/domains/${id}`, { method: 'DELETE' }, token),
+    },
+
+    // v29 SD-88: global card administration via the built-in card-issuer module. Display-safe only:
+    // surrogate token, masked PAN, network, status; expiry only in the per-card detail (need-to-know).
+    // Never accepts or returns CVV/PIN/full PAN. 409 managed_externally when a vendor owns the capability.
+    cardAdmin: {
+      list: (
+        params: { page?: number; limit?: number; network?: string; status?: string; agreement?: string },
+        token: string,
+      ) => {
+        const qs = new URLSearchParams(
+          Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]),
+        ).toString();
+        return apiFetch<{ results: AdminCard[]; total: number; page: number; limit: number }>(
+          `/api/v1/modules/card-issuer/cards${qs ? `?${qs}` : ''}`, {}, token,
+        );
+      },
+      get: (cardId: string, token: string) =>
+        apiFetch<Record<string, unknown>>(`/api/v1/modules/card-issuer/cards/${encodeURIComponent(cardId)}`, {}, token),
+      register: (
+        body: {
+          customerAgreementInstanceReference: string;
+          cardToken: string;
+          paymentCardMaskedPanDisplay: string;
+          paymentCardExpirationDate?: string;
+          paymentCardNetwork?: 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
+          paymentCardIsPreferred?: boolean;
+          paymentCardAlias?: string;
+        },
+        token: string,
+      ) =>
+        apiFetch<{ paymentCardInstanceReference: string; paymentCardStatus: string; reused?: boolean }>(
+          '/api/v1/modules/card-issuer/cards', { method: 'POST', body: JSON.stringify(body) }, token,
+        ),
+      update: (cardId: string, body: { paymentCardAlias?: string; paymentCardCustomerNote?: string }, token: string) =>
+        apiFetch<Record<string, unknown>>(
+          `/api/v1/modules/card-issuer/cards/${encodeURIComponent(cardId)}`,
+          { method: 'PATCH', body: JSON.stringify(body) }, token,
+        ),
+      setStatus: (cardId: string, active: boolean, token: string) =>
+        apiFetch<Record<string, unknown>>(
+          `/api/v1/modules/card-issuer/cards/${encodeURIComponent(cardId)}/status`,
+          { method: 'PATCH', body: JSON.stringify({ active }) }, token,
+        ),
+      revoke: (cardId: string, token: string) =>
+        apiFetch<{ removed: boolean }>(
+          `/api/v1/modules/card-issuer/cards/${encodeURIComponent(cardId)}`, { method: 'DELETE' }, token,
+        ),
+    },
+
+    // v29 SD-66: global payout-account administration via the built-in account-information module.
+    // QE/GDPR: IBAN/routing never returned (presence hints only). 409 managed_externally when a vendor owns it.
+    accountAdmin: {
+      list: (
+        params: { page?: number; limit?: number; status?: string; party?: string; currency?: string },
+        token: string,
+      ) => {
+        const qs = new URLSearchParams(
+          Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]),
+        ).toString();
+        return apiFetch<{ results: AdminPayoutAccount[]; total: number; page: number; limit: number }>(
+          `/api/v1/modules/account-information/accounts${qs ? `?${qs}` : ''}`, {}, token,
+        );
+      },
+      get: (accountRef: string, token: string) =>
+        apiFetch<Record<string, unknown>>(
+          `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}`, {}, token,
+        ),
+      create: (
+        body: {
+          partyInstanceReference: string;
+          payoutAccountType: 'bank_account' | 'wallet' | 'internal_ledger';
+          payoutAccountCurrency: string;
+          payoutAccountCountryCode: string;
+          payoutAccountPreferredRail: 'sepa' | 'ach' | 'swift' | 'local_bank' | 'internal_wallet' | 'internal_ledger';
+          payoutAccountAlias?: string;
+          payoutAccountBankName?: string;
+          payoutAccountHolderName?: string;
+          payoutAccountBicSwift?: string;
+          payoutAccountIban?: string;
+          payoutAccountRoutingNumber?: string;
+        },
+        token: string,
+      ) =>
+        apiFetch<AdminPayoutAccount>(
+          '/api/v1/modules/account-information/accounts', { method: 'POST', body: JSON.stringify(body) }, token,
+        ),
+      update: (
+        accountRef: string,
+        body: { payoutAccountAlias?: string; payoutAccountBankName?: string; payoutAccountHolderName?: string; payoutAccountBicSwift?: string },
+        token: string,
+      ) =>
+        apiFetch<AdminPayoutAccount>(
+          `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}`,
+          { method: 'PATCH', body: JSON.stringify(body) }, token,
+        ),
+      close: (accountRef: string, token: string) =>
+        apiFetch<{ closed: boolean }>(
+          `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}`, { method: 'DELETE' }, token,
+        ),
     },
   },
 

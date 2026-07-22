@@ -1387,5 +1387,47 @@
       "postalCode": "28009",
       "countryCode": "ES"
     }
+  },
+  {
+    "partyInstanceReference": "b0000060-0000-4000-8000-000000000060",
+    "partyEmailAddress": "olivia.moreno@back.es",
+    "partyMobilePhoneNumber": "+34 600 600 060",
+    "partyName": "Olivia Moreno",
+    "partyType": "employee",
+    "bianServiceDomain": "Party Data Management",
+    "bianControlRecordType": "Party",
+    "recordCreatedDateTime": "2026-02-01T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-11T10:00:00.000Z",
+    "schemaVersion": 1,
+    "partyNationality": "ES",
+    "partyPlaceOfBirth": "Sevilla",
+    "partyDateOfBirth": "1985-09-12",
+    "partyPostalAddress": {
+      "line1": "Avenida de la Constitución 20",
+      "city": "Sevilla",
+      "postalCode": "41004",
+      "countryCode": "ES"
+    }
+  },
+  {
+    "partyInstanceReference": "b0000061-0000-4000-8000-000000000061",
+    "partyEmailAddress": "daniel.rossi@back.es",
+    "partyMobilePhoneNumber": "+34 600 600 061",
+    "partyName": "Daniel Rossi",
+    "partyType": "employee",
+    "bianServiceDomain": "Party Data Management",
+    "bianControlRecordType": "Party",
+    "recordCreatedDateTime": "2026-02-01T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-11T10:00:00.000Z",
+    "schemaVersion": 1,
+    "partyNationality": "IT",
+    "partyPlaceOfBirth": "Milano",
+    "partyDateOfBirth": "1982-03-04",
+    "partyPostalAddress": {
+      "line1": "Gran Via 41",
+      "city": "Madrid",
+      "postalCode": "28013",
+      "countryCode": "ES"
+    }
   }
 ]
