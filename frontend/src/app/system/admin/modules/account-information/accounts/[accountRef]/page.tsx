@@ -174,7 +174,7 @@ function AccountAdminDetail() {
       ) : managedExternally ? (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 flex items-start gap-3 text-sm text-amber-800">
           <ShieldAlert size={18} className="text-amber-600 mt-0.5 shrink-0" />
-          <p>Esta capability está gestionada por un proveedor externo; la administración built-in está deshabilitada.</p>
+          <p>This capability is managed by an external provider; built-in administration is disabled.</p>
         </div>
       ) : notFound || !acct ? (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">

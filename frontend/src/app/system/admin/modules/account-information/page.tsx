@@ -112,7 +112,11 @@ function AccountInfoModule() {
         debugInfo="capability=account-information · SD-66 Payout Account Arrangement · GDPR/PSD2 · PCI Req 7 · Req 10"
       />
       <ModuleTabsBar tabs={TABS} active={tab} onChange={setTab} />
-      {tab === 'config' ? <AccountInfoConfigPanel /> : <AccountsAdminPanel />}
+      {tab === 'config' ? <AccountInfoConfigPanel /> : (
+        <RequirePermission resource="accounts" action="view">
+          <AccountsAdminPanel />
+        </RequirePermission>
+      )}
     </div>
   );
 }

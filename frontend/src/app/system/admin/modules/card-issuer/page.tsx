@@ -249,7 +249,11 @@ function CardIssuerModule() {
         debugInfo="capability=card-issuer · SD-88 Payment Card · PCI DSS Req 3.2/3.3 (no SAD stored) · Req 7 · Req 10"
       />
       <ModuleTabsBar tabs={TABS} active={tab} onChange={setTab} />
-      {tab === 'config' ? <CardIssuerConfigPanel /> : <CardsAdminPanel />}
+      {tab === 'config' ? <CardIssuerConfigPanel /> : (
+        <RequirePermission resource="cards" action="view">
+          <CardsAdminPanel />
+        </RequirePermission>
+      )}
     </div>
   );
 }

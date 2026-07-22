@@ -22,6 +22,7 @@ import {
   createPayoutAccount,
   updatePayoutAccount,
   closePayoutAccount,
+  type UpdatePayoutAccountInput,
 } from '../../../modules/gateway/services/payoutAccount.service';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
 
@@ -310,7 +311,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
     },
   }, async (request, reply) => {
     const { accountRef } = request.params as { accountRef: string };
-    const body = (request.body ?? {}) as Record<string, unknown>;
+    const body = (request.body ?? {}) as UpdatePayoutAccountInput;
     const updated = await updatePayoutAccount(fastify.db, accountRef, body);
     if (!updated) return reply.status(404).send({ error: 'Account not found' });
     const user = (request as { user?: JwtUserPayload }).user;

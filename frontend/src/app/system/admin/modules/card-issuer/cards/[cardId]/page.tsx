@@ -16,7 +16,11 @@ import { RequirePermission } from '../../../../../../../components/RequirePermis
 // here on a need-to-know basis. Req 7 (least privilege) + Req 10 (every mutation audited server-side).
 
 const LIST_HREF = '/system/admin/modules/card-issuer?tab=cards';
-const ACTIVE_STATES = ['active', 'issued'];
+// 'active' is the only status the backend treats as "on". The activation toggle only supports
+// active <-> suspended; every other status (issued, pending_activation, blocked, revoked, expired)
+// is not toggleable from the admin surface.
+const ACTIVE_STATES = ['active'];
+const TOGGLEABLE_STATES = ['active', 'suspended'];
 
 interface CardDetail {
   paymentCardInstanceReference?: string;
@@ -110,6 +114,7 @@ function CardAdminDetail() {
 
   async function handleToggle() {
     if (!card) return;
+    if (!TOGGLEABLE_STATES.includes(card.paymentCardStatus ?? '')) return;
     const active = !ACTIVE_STATES.includes(card.paymentCardStatus ?? '');
     if (!active) {
       const ok = await confirm({
@@ -180,7 +185,7 @@ function CardAdminDetail() {
       ) : managedExternally ? (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 flex items-start gap-3 text-sm text-amber-800">
           <ShieldAlert size={18} className="text-amber-600 mt-0.5 shrink-0" />
-          <p>Esta capability está gestionada por un proveedor externo; la administración built-in está deshabilitada.</p>
+          <p>This capability is managed by an external provider; built-in administration is disabled.</p>
         </div>
       ) : notFound || !card ? (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
@@ -289,7 +294,7 @@ function CardAdminDetail() {
           </div>
 
           {/* Activation toggle */}
-          {(card.paymentCardStatus === 'active' || card.paymentCardStatus === 'issued' || card.paymentCardStatus === 'suspended') && (
+          {TOGGLEABLE_STATES.includes(card.paymentCardStatus ?? '') && (
             <div className="bg-white rounded-xl border p-5 flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <p className="text-sm font-medium text-gray-800">

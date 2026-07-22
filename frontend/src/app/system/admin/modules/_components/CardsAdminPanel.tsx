@@ -15,7 +15,9 @@ import { ModalShell, Field, ModalActions } from './AdminModal';
 
 const NETWORKS = ['VISA', 'MASTERCARD', 'AMEX', 'ELO'] as const;
 const STATUSES = ['issued', 'active', 'pending_activation', 'blocked', 'suspended', 'revoked', 'expired'] as const;
-const ACTIVE_STATES = ['active', 'issued'];
+// The backend activation toggle only supports active <-> suspended. Every other status
+// (issued, pending_activation, blocked, revoked, expired) is NOT toggleable from here.
+const TOGGLEABLE_STATES = ['active', 'suspended'];
 
 function StatusBadge({ status }: { status: string }) {
   const tone =
@@ -66,10 +68,11 @@ export function CardsAdminPanel() {
   useEffect(() => { load(); }, [load]);
 
   async function toggleStatus(c: AdminCard) {
-    const active = !ACTIVE_STATES.includes(c.paymentCardStatus);
+    if (!TOGGLEABLE_STATES.includes(c.paymentCardStatus)) return;
+    const activate = c.paymentCardStatus === 'suspended';
     try {
-      await api.modules.cardAdmin.setStatus(c.paymentCardInstanceReference, active, token);
-      notify(active ? 'Card activated' : 'Card suspended', 'success');
+      await api.modules.cardAdmin.setStatus(c.paymentCardInstanceReference, activate, token);
+      notify(activate ? 'Card activated' : 'Card suspended', 'success');
       load();
     } catch (e) { notify(e instanceof Error ? e.message : 'Status change failed', 'error'); }
   }
@@ -99,7 +102,7 @@ export function CardsAdminPanel() {
     return (
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 flex items-start gap-3 text-sm text-amber-800">
         <ShieldAlert size={18} className="text-amber-600 mt-0.5 shrink-0" />
-        <p>Esta capability está gestionada por un proveedor externo; la administración built-in está deshabilitada.</p>
+        <p>This capability is managed by an external provider; built-in administration is disabled.</p>
       </div>
     );
   }
@@ -167,7 +170,7 @@ export function CardsAdminPanel() {
                   <td className="py-2.5 px-4">
                     <div className="flex items-center justify-end gap-1.5">
                       <button onClick={() => openDetail(c)} title="View detail" className="p-1.5 rounded text-gray-400 hover:text-[#001E2B] hover:bg-gray-100 transition-colors"><Eye size={15} /></button>
-                      <button onClick={() => toggleStatus(c)} title={ACTIVE_STATES.includes(c.paymentCardStatus) ? 'Suspend' : 'Activate'} className="p-1.5 rounded text-gray-400 hover:text-yellow-600 hover:bg-gray-100 transition-colors"><Power size={15} /></button>
+                      <button onClick={() => toggleStatus(c)} disabled={!TOGGLEABLE_STATES.includes(c.paymentCardStatus)} title={TOGGLEABLE_STATES.includes(c.paymentCardStatus) ? (c.paymentCardStatus === 'active' ? 'Suspend' : 'Activate') : 'Status not toggleable'} className="p-1.5 rounded text-gray-400 hover:text-yellow-600 hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-gray-400 disabled:hover:bg-transparent"><Power size={15} /></button>
                       <button onClick={() => revoke(c)} title="Revoke" className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-gray-100 transition-colors"><Trash2 size={15} /></button>
                     </div>
                   </td>

@@ -200,11 +200,11 @@ function ModuleGrid({ activeByType, debugMode }: { activeByType: Record<string, 
               </div>
               {external ? (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium border border-amber-200">
-                  Externo: {active.externalProviderArrangementName}
+                  External: {active.externalProviderArrangementName}
                 </span>
               ) : (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium border border-slate-200">
-                  Built-in / interno
+                  Built-in / internal
                 </span>
               )}
             </div>
