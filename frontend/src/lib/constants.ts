@@ -29,6 +29,7 @@ export const ROLE_LABELS: Record<string, string> = {
   level2_investigator: 'L2 Investigator',
   security_auditor: 'Security Auditor',
   merchant_officer: 'Merchant Officer',
+  operations_officer: 'Operations Officer',
   manager:          'Manager',
 };
 

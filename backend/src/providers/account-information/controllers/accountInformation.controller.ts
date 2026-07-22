@@ -13,10 +13,37 @@ import {
 } from '../../../modules/provider/services/capabilityModuleConfig.service';
 import { emitComplianceEvent } from '../../../modules/provider/services/businessProcessEvent.service';
 import { PAYOUT_ACCOUNT_COLLECTION } from '../../../modules/gateway/models/payoutAccount.model';
-import type { PayoutAccountArrangement } from '../../../modules/gateway/models/payoutAccount.model';
+import type { PayoutAccountArrangement, PayoutAccountStatus, PayoutAccountType, PayoutRail } from '../../../modules/gateway/models/payoutAccount.model';
+import { requirePermission } from '../../../vendors/middleware/acl';
+import { requireInternalProvider } from '../../../modules/provider/services/capabilityGate.service';
+import {
+  listAllPayoutAccounts,
+  getPayoutAccount,
+  createPayoutAccount,
+  updatePayoutAccount,
+  closePayoutAccount,
+} from '../../../modules/gateway/services/payoutAccount.service';
+import type { JwtUserPayload } from '../../../shared/models/identity.model';
+
+// v29 §8: aggregated list-access audit is opt-in (default off).
+const AUDIT_LIST_ACCESS = process.env.PSP_AUDIT_LIST_ACCESS === 'true';
+
+// QE/GDPR minimization: strip encrypted identifiers, expose only boolean presence hints.
+// Same contract as gateway/payoutAccount.controller safeAccount.
+function safeAccount(doc: unknown) {
+  const { payoutAccountIban, payoutAccountRoutingNumber, _id, ...rest } = doc as Record<string, unknown>;
+  return {
+    ...rest,
+    payoutAccountHasIban: typeof payoutAccountIban === 'string' && payoutAccountIban.length > 0,
+    payoutAccountHasRoutingNumber: typeof payoutAccountRoutingNumber === 'string' && payoutAccountRoutingNumber.length > 0,
+  };
+}
 
 export async function accountInformationController(fastify: FastifyInstance) {
   const CAP = 'account-information';
+  // v29 admin gate: accounts* routes require operations_officer permission AND the account-information
+  // capability resolving to its internal built-in provider (else 409 managed_externally).
+  const gate = requireInternalProvider('account_information');
 
   fastify.post('/validate', {
     schema: {
@@ -97,6 +124,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
   });
 
   fastify.get('/config', {
+    preHandler: requirePermission('modules', 'view'),
     schema: {
       tags: ['modules:account-information'],
       summary: 'Get AIS module configuration',
@@ -109,6 +137,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
   });
 
   fastify.put('/config', {
+    preHandler: requirePermission('modules', 'manage'),
     schema: {
       tags: ['modules:account-information'],
       summary: 'Update AIS module configuration',
@@ -120,5 +149,205 @@ export async function accountInformationController(fastify: FastifyInstance) {
   }, async (request) => {
     const body = request.body as { moduleConfig?: Record<string, unknown> };
     return upsertCapabilityModuleConfig(fastify.db, CAP, { moduleConfig: body.moduleConfig ?? {} });
+  });
+
+  // ── v29 GLOBAL PAYOUT-ACCOUNT ADMINISTRATION (SD-66, built-in module surface) ─────────────────
+  // Global cross-party administration of payout accounts, distinct from the party-scoped self-service
+  // surface (/api/v1/accounts/:partyRef). Gated to operations_officer (PCI Req 7) and to the
+  // account-information capability resolving to its internal provider (409 managed_externally).
+  // QE/GDPR: IBAN/routing are never returned here (presence hints only); reveal stays on its own route.
+
+  // GET /accounts — global paginated list (QE-stripped + hints).
+  fastify.get('/accounts', {
+    preHandler: [requirePermission('accounts', 'view'), gate],
+    schema: {
+      tags: ['modules:account-information'],
+      summary: 'List all payout accounts (global administration)',
+      description: 'Cross-party global payout-account inventory for the operations officer (SD-66). '
+        + 'QE-stripped rows with payoutAccountHasIban / payoutAccountHasRoutingNumber hints. IBAN reveal '
+        + 'stays on its dedicated route. Gated: operations_officer + internal account-information provider.',
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', minimum: 1, default: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+          status: { type: 'string', enum: ['active', 'pending_validation', 'suspended', 'closed'] },
+          party: { type: 'string', description: 'Filter by partyInstanceReference.' },
+          currency: { type: 'string', description: 'ISO-4217 currency code.' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            results: { type: 'array', items: { type: 'object', additionalProperties: true } },
+            total: { type: 'integer' },
+            page: { type: 'integer' },
+            limit: { type: 'integer' },
+          },
+        },
+        403: { $ref: 'Error#' },
+        409: { description: 'Capability managed by an external provider.', $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const q = (request.query ?? {}) as { page?: number; limit?: number; status?: PayoutAccountStatus; party?: string; currency?: string };
+    const { results, total, page, limit } = await listAllPayoutAccounts(fastify.db, q);
+    if (AUDIT_LIST_ACCESS) {
+      const user = (request as { user?: JwtUserPayload }).user;
+      emitComplianceEvent(fastify.db, {
+        entityType: 'account', entityId: 'account-information-admin-list',
+        processType: 'payment_processing', processAction: 'admin.accounts.listed', processOutcome: 'approved',
+        performedByPartyReference: user?.partyRef ?? null, performedByRole: user?.role ?? null,
+        eventSummary: { module: CAP, count: results.length, filters: q },
+        bianServiceDomain: 'SD-66 Payout Account Arrangement', bianControlRecordType: 'PayoutAccountArrangement',
+      });
+    }
+    return reply.send({ results: results.map(safeAccount), total, page, limit });
+  });
+
+  // GET /accounts/:accountRef — global account detail (QE-stripped; audited).
+  fastify.get('/accounts/:accountRef', {
+    preHandler: [requirePermission('accounts', 'view'), gate],
+    schema: {
+      tags: ['modules:account-information'],
+      summary: 'Get one payout account (global administration detail)',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['accountRef'], properties: { accountRef: { type: 'string' } } },
+      response: { 200: { type: 'object', additionalProperties: true }, 403: { $ref: 'Error#' }, 404: { $ref: 'Error#' }, 409: { $ref: 'Error#' } },
+    },
+  }, async (request, reply) => {
+    const { accountRef } = request.params as { accountRef: string };
+    const account = await getPayoutAccount(fastify.db, accountRef);
+    if (!account) return reply.status(404).send({ error: 'Account not found' });
+    const user = (request as { user?: JwtUserPayload }).user;
+    emitComplianceEvent(fastify.db, {
+      entityType: 'account', entityId: accountRef,
+      processType: 'payment_processing', processAction: 'account.accessed', processOutcome: 'approved',
+      performedByPartyReference: user?.partyRef ?? null, performedByRole: user?.role ?? null,
+      eventSummary: { module: CAP, partyInstanceReference: account.partyInstanceReference, status: account.payoutAccountStatus },
+      bianServiceDomain: 'SD-66 Payout Account Arrangement', bianControlRecordType: 'PayoutAccountArrangement',
+    });
+    return reply.send(safeAccount(account));
+  });
+
+  // POST /accounts — register a payout account for a party (IBAN/routing QE-encrypted at rest).
+  fastify.post('/accounts', {
+    preHandler: [requirePermission('accounts', 'manage'), gate],
+    schema: {
+      tags: ['modules:account-information'],
+      summary: 'Register a payout account (global administration)',
+      description: 'Creates an SD-66 payout account for a partyInstanceReference. IBAN/routing are '
+        + 'QE-encrypted at rest; the response is QE-stripped with presence hints.',
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['partyInstanceReference', 'payoutAccountType', 'payoutAccountCurrency', 'payoutAccountCountryCode', 'payoutAccountPreferredRail'],
+        properties: {
+          partyInstanceReference: { type: 'string' },
+          payoutAccountType: { type: 'string', enum: ['bank_account', 'wallet', 'internal_ledger'] },
+          payoutAccountCurrency: { type: 'string' },
+          payoutAccountCountryCode: { type: 'string' },
+          payoutAccountPreferredRail: { type: 'string', enum: ['sepa', 'ach', 'swift', 'local_bank', 'internal_wallet', 'internal_ledger'] },
+          payoutAccountAlias: { type: 'string' },
+          payoutAccountBankName: { type: 'string' },
+          payoutAccountHolderName: { type: 'string' },
+          payoutAccountBicSwift: { type: 'string' },
+          payoutAccountCorrespondentBic: { type: 'string' },
+          payoutAccountBankAddress: { type: 'string' },
+          payoutAccountIban: { type: 'string', description: 'QE-encrypted at rest; never returned.' },
+          payoutAccountRoutingNumber: { type: 'string', description: 'QE-encrypted at rest; never returned.' },
+          payoutAccountIsDefault: { type: 'boolean' },
+        },
+      },
+      response: { 201: { type: 'object', additionalProperties: true }, 403: { $ref: 'Error#' }, 409: { $ref: 'Error#' } },
+    },
+  }, async (request, reply) => {
+    const body = request.body as {
+      partyInstanceReference: string;
+      payoutAccountType: PayoutAccountType;
+      payoutAccountCurrency: string;
+      payoutAccountCountryCode: string;
+      payoutAccountPreferredRail: PayoutRail;
+      [k: string]: unknown;
+    };
+    const created = await createPayoutAccount(fastify.db, body);
+    const user = (request as { user?: JwtUserPayload }).user;
+    emitComplianceEvent(fastify.db, {
+      entityType: 'account', entityId: created.payoutAccountInstanceReference,
+      processType: 'payment_processing', processAction: 'account.created', processOutcome: 'approved',
+      performedByPartyReference: user?.partyRef ?? null, performedByRole: user?.role ?? null,
+      eventSummary: { module: CAP, partyInstanceReference: created.partyInstanceReference, type: created.payoutAccountType, currency: created.payoutAccountCurrency, hasIban: !!body.payoutAccountIban },
+      bianServiceDomain: 'SD-66 Payout Account Arrangement', bianControlRecordType: 'PayoutAccountArrangement',
+    });
+    return reply.status(201).send(safeAccount(created));
+  });
+
+  // PATCH /accounts/:accountRef — update mutable banking metadata (IBAN/currency/type immutable).
+  fastify.patch('/accounts/:accountRef', {
+    preHandler: [requirePermission('accounts', 'manage'), gate],
+    schema: {
+      tags: ['modules:account-information'],
+      summary: 'Update a payout account (global administration)',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['accountRef'], properties: { accountRef: { type: 'string' } } },
+      body: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          payoutAccountAlias: { type: 'string' },
+          payoutAccountIsDefault: { type: 'boolean' },
+          payoutAccountBankName: { type: 'string' },
+          payoutAccountHolderName: { type: 'string' },
+          payoutAccountBicSwift: { type: 'string' },
+          payoutAccountCorrespondentBic: { type: 'string' },
+          payoutAccountBankAddress: { type: 'string' },
+        },
+      },
+      response: { 200: { type: 'object', additionalProperties: true }, 403: { $ref: 'Error#' }, 404: { $ref: 'Error#' }, 409: { $ref: 'Error#' } },
+    },
+  }, async (request, reply) => {
+    const { accountRef } = request.params as { accountRef: string };
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const updated = await updatePayoutAccount(fastify.db, accountRef, body);
+    if (!updated) return reply.status(404).send({ error: 'Account not found' });
+    const user = (request as { user?: JwtUserPayload }).user;
+    emitComplianceEvent(fastify.db, {
+      entityType: 'account', entityId: accountRef,
+      processType: 'payment_processing', processAction: 'account.updated', processOutcome: 'approved',
+      performedByPartyReference: user?.partyRef ?? null, performedByRole: user?.role ?? null,
+      eventSummary: { module: CAP, partyInstanceReference: updated.partyInstanceReference, fields: Object.keys(body) },
+      bianServiceDomain: 'SD-66 Payout Account Arrangement', bianControlRecordType: 'PayoutAccountArrangement',
+    });
+    return reply.send(safeAccount(updated));
+  });
+
+  // DELETE /accounts/:accountRef — close the account (soft-close; record retained).
+  fastify.delete('/accounts/:accountRef', {
+    preHandler: [requirePermission('accounts', 'manage'), gate],
+    schema: {
+      tags: ['modules:account-information'],
+      summary: 'Close a payout account (global administration)',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['accountRef'], properties: { accountRef: { type: 'string' } } },
+      response: { 200: { type: 'object', properties: { closed: { type: 'boolean' } } }, 403: { $ref: 'Error#' }, 404: { $ref: 'Error#' }, 409: { $ref: 'Error#' } },
+    },
+  }, async (request, reply) => {
+    const { accountRef } = request.params as { accountRef: string };
+    const account = await getPayoutAccount(fastify.db, accountRef);
+    if (!account) return reply.status(404).send({ error: 'Account not found' });
+    const closed = await closePayoutAccount(fastify.db, account.partyInstanceReference, accountRef);
+    if (!closed) return reply.status(404).send({ error: 'Account not found or already closed' });
+    const user = (request as { user?: JwtUserPayload }).user;
+    emitComplianceEvent(fastify.db, {
+      entityType: 'account', entityId: accountRef,
+      processType: 'payment_processing', processAction: 'account.closed', processOutcome: 'approved',
+      performedByPartyReference: user?.partyRef ?? null, performedByRole: user?.role ?? null,
+      eventSummary: { module: CAP, partyInstanceReference: account.partyInstanceReference },
+      bianServiceDomain: 'SD-66 Payout Account Arrangement', bianControlRecordType: 'PayoutAccountArrangement',
+    });
+    return reply.send({ closed: true });
   });
 }

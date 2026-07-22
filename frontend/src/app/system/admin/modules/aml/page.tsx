@@ -8,6 +8,7 @@ import { Tooltip } from '../../../../../components/Tooltip';
 import { api } from '../../../../../lib/api';
 import { getToken } from '../../../../../lib/auth';
 import { useNotify } from '../../../../../components/ui/ConfirmProvider';
+import { useEffectivePermissions } from '../../../../../lib/permissions';
 
 // Dedicated config UI for the internal AML (Anti-Money-Laundering) monitoring engine (overrides the
 // generic module editor). DATA-DRIVEN: watchlist sources + continuous-monitoring flag live in the
@@ -17,6 +18,8 @@ const DEFAULT_SOURCES = ['OFAC_SDN', 'FATF', 'EU_Consolidated'];
 
 export default function AmlModulePage() {
   const notify = useNotify();
+  const { can } = useEffectivePermissions();
+  const canEdit = can('modules', 'manage'); // manager has modules:view only; only operations_officer may edit
   const [token, setToken] = useState('');
   const [sources, setSources] = useState(DEFAULT_SOURCES.join(', '));
   const [continuous, setContinuous] = useState(false);
@@ -56,6 +59,12 @@ export default function AmlModulePage() {
       <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Modules', href: '/system/admin/modules' }, { label: 'AML Monitoring' }]} />
       <SectionHeader icon={ScanSearch} title="AML Monitoring" description="Anti-money-laundering screening and suspicious-activity analysis." debugInfo="capability=aml · SD-99 Suspicious Activity Analysis · PCI DSS Req 12.8 / Req 10" />
 
+      {!canEdit && (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-600">
+          Read-only: your role can view this configuration but not change it (requires <code className="font-mono text-xs">modules:manage</code>).
+        </div>
+      )}
+      <fieldset disabled={!canEdit} className="space-y-5 border-0 p-0 m-0 min-w-0">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
           <h3 className="font-semibold text-sm text-gray-900">Watchlist sources<Tooltip text="The AML watchlist / typology sources the engine screens transactions and parties against (comma-separated). A high/critical alert is a hard block; lower alerts pass to post-initiation monitoring." /></h3>
@@ -81,6 +90,7 @@ export default function AmlModulePage() {
           <ListChecks size={14} /> View monitoring logs in audit events
         </Link>
       </div>
+      </fieldset>
     </div>
   );
 }

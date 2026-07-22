@@ -63,6 +63,9 @@ const PUBLIC_GET_PREFIXES: string[] = ['/api/v1/fraud'];
 const CUSTOMER_BLOCKED_PREFIXES: string[] = [
   '/api/v1/fraud',
   '/api/v1/customer',   // QE equality searches  -  customer must use /auth/me instead
+  '/api/v1/modules',    // v29: built-in module admin surfaces (global card/account admin) are staff-only.
+                        // The customer role has cards:[view,manage] for OWN cards (scope own), so the
+                        // ACL permission alone would let it reach the global list; block by prefix (PCI Req 7).
 ];
 
 // Exact paths blocked for customers even when the prefix is otherwise public

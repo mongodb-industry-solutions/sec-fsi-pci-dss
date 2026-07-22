@@ -47,9 +47,9 @@ describe('ACL builtin matrix (PCI Req 7)', () => {
     expect(hasPermission(undefined, 'transactions', 'view')).toBe(false);
   });
 
-  it('all six builtin roles are present and marked builtin', () => {
+  it('all builtin roles are present and marked builtin', () => {
     const names = BUILTIN_ROLES.map((r) => r.roleName).sort();
-    expect(names).toEqual(['customer', 'level1_analyst', 'level2_investigator', 'manager', 'merchant_officer', 'security_auditor']);
+    expect(names).toEqual(['customer', 'level1_analyst', 'level2_investigator', 'manager', 'merchant_officer', 'operations_officer', 'security_auditor']);
     expect(BUILTIN_ROLES.every((r) => r.roleIsBuiltin)).toBe(true);
   });
 });

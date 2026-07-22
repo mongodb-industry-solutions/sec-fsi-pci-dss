@@ -63,6 +63,11 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'Review Queue', path: '/system/merchant/review', icon: ClipboardCheck },
     { label: 'All Merchants',path: '/system/merchant',        icon: Store, exact: true },
   ],
+  operations_officer: [
+    { label: 'Hub',          path: '/system',               icon: Settings2, exact: true },
+    { label: 'Modules',      path: '/system/admin/modules', icon: LayoutGrid, tooltip: 'Internal module policies plus card (SD-88) and payout-account (SD-66) administration' },
+    { label: 'Audit Events', path: '/system/audit-events',  icon: Activity },
+  ],
   manager: [
     { label: 'Hub',           path: '/system',                       icon: Settings2,  exact: true },
     { label: 'Providers',     path: '/system/admin/providers',       icon: Plug },

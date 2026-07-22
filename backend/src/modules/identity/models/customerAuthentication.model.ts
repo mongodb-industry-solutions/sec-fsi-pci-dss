@@ -38,4 +38,5 @@ export type CustomerAuthRole =
   | 'level2_investigator'
   | 'security_auditor'
   | 'merchant_officer'    // Ch-05: SD-89 Merchant Acquiring bank employee
+  | 'operations_officer' // v29: SD-88/SD-66 cardholder & payout-account operations (built-in module admin)
   | 'manager';            // SD-193: Integration Hub administrator

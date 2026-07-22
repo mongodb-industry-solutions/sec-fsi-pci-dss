@@ -1,4 +1,4 @@
-import { Users, Search, KeyRound, ScrollText, CheckSquare, Database, type LucideIcon } from 'lucide-react';
+import { Users, Search, KeyRound, ScrollText, CheckSquare, Database, Wallet, type LucideIcon } from 'lucide-react';
 
 // Role responsibilities reference (shared by /system/help and /system/help/roles/[role]).
 // Explains what each role is accountable for, what data it may touch, the PCI DSS requirements
@@ -104,6 +104,25 @@ export const ROLE_GUIDE: Record<string, RoleGuide> = {
     ],
     pci: ['Req 7', 'Req 12'],
   },
+  operations_officer: {
+    icon: Wallet,
+    tagline: 'Global operations: administer customer cards (SD-88) and payout accounts (SD-66) through the built-in modules.',
+    responsibilities: [
+      'Administer the global card inventory: register, edit, activate/suspend, and revoke customer cards via the built-in card-issuer module.',
+      'Administer payout accounts: create, edit, and close party payout accounts via the built-in account-information module.',
+      'Keep the card and account registries accurate for downstream payment and payout operations.',
+    ],
+    dataAccess: [
+      'Display-safe card listing (surrogate token, masked PAN, network, status) and per-card detail with expiry (need-to-know only).',
+      'Payout account records with presence hints (payoutAccountHasIban); the raw IBAN and routing number are never exposed on this surface.',
+    ],
+    restrictions: [
+      'Never sees the full PAN, CVV, or PIN (SAD is never stored).',
+      'Does not manage providers or modules; that is the manager role (separation of duties, PCI DSS Req 7).',
+      'Administration is disabled (409 managed_externally) when an external provider takes over the capability.',
+    ],
+    pci: ['Req 3.2/3.3', 'Req 7', 'Req 10'],
+  },
   manager: {
     icon: Database,
     tagline: 'Integration Hub: manage external providers, routing, and credentials.',
@@ -125,4 +144,4 @@ export const ROLE_GUIDE: Record<string, RoleGuide> = {
 };
 
 // Display order for the role reference grids.
-export const ROLE_ORDER = ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor', 'merchant_officer', 'manager'];
+export const ROLE_ORDER = ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor', 'merchant_officer', 'operations_officer', 'manager'];

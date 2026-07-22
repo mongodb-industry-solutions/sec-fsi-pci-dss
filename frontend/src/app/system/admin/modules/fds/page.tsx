@@ -7,6 +7,7 @@ import { Breadcrumb } from '../../../../../components/Breadcrumb';
 import { api } from '../../../../../lib/api';
 import { getToken } from '../../../../../lib/auth';
 import { useNotify } from '../../../../../components/ui/ConfirmProvider';
+import { useEffectivePermissions } from '../../../../../lib/permissions';
 import { Tooltip } from '../../../../../components/Tooltip';
 
 // Dedicated config UI for the internal FDS (fraud-detection) engine (overrides the generic module
@@ -72,6 +73,8 @@ function coerceValue(op: RuleOp, raw: string): number | string | Array<number | 
 export default function FdsModulePage() {
   const token = getToken() ?? '';
   const notify = useNotify();
+  const { can } = useEffectivePermissions();
+  const canEdit = can('modules', 'manage'); // manager has modules:view only; only operations_officer may edit
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -166,6 +169,12 @@ export default function FdsModulePage() {
         <p className="text-sm text-gray-500">Loading…</p>
       ) : (
         <>
+          {!canEdit && (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-600">
+              Read-only: your role can view this configuration but not change it (requires <code className="font-mono text-xs">modules:manage</code>).
+            </div>
+          )}
+          <fieldset disabled={!canEdit} className="space-y-5 border-0 p-0 m-0 min-w-0">
           {/* Thresholds + bands */}
           <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
             <h2 className="font-semibold text-gray-800 text-sm">Thresholds &amp; score bands</h2>
@@ -271,6 +280,7 @@ export default function FdsModulePage() {
               <ListChecks size={14} /> View scoring logs in audit events
             </Link>
           </div>
+          </fieldset>
 
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
             <strong>How it scores:</strong> every transaction is evaluated against the enabled rules. The fired rules&rsquo; scores sum to the risk score; the bands map it to approve / review / decline, and any forced action wins. The verdict drives the fraud case (its score and severity), and the rules that fired are recorded in the audit trail. No PAN or CVV is ever used in scoring (PCI DSS Req 3.2).

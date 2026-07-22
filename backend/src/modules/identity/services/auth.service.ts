@@ -14,7 +14,8 @@ const ROLE_RANK: Record<string, number> = {
   level1_analyst: 2,
   level2_investigator: 3,
   security_auditor: 4,
-  manager: 5,
+  operations_officer: 5,
+  manager: 6,
 };
 
 export interface JwtPayload {

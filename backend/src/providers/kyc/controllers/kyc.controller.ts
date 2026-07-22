@@ -1,5 +1,6 @@
 // KYC capability module controller — STATIC routes (ADR-029).
 import { FastifyInstance } from 'fastify';
+import { requirePermission } from '../../../vendors/middleware/acl';
 import { verifyKyc } from '../services/kyc.service';
 import { screenParty } from '../services/hrpScreening.service';
 import {
@@ -76,6 +77,7 @@ export async function kycController(fastify: FastifyInstance) {
   });
 
   fastify.get('/config', {
+    preHandler: requirePermission('modules', 'view'),
     schema: {
       tags: ['modules:kyc'],
       summary: 'Get KYC module configuration',
@@ -89,6 +91,7 @@ export async function kycController(fastify: FastifyInstance) {
   });
 
   fastify.put('/config', {
+    preHandler: requirePermission('modules', 'manage'),
     schema: {
       tags: ['modules:kyc'],
       summary: 'Update KYC module configuration',

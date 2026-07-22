@@ -48,6 +48,31 @@ export async function listPayoutAccounts(
   return { results, total };
 }
 
+// v29 admin (SD-66, built-in module account-information): cross-party GLOBAL payout-account list for
+// the operations officer. Returns raw arrangements (caller strips QE fields via safeAccount, adding
+// payoutAccountHasIban/payoutAccountHasRoutingNumber hints — PCI/GDPR minimization). Paginated +
+// filterable by status / party / currency.
+export async function listAllPayoutAccounts(
+  db: Db,
+  opts?: { page?: number; limit?: number; status?: PayoutAccountStatus; party?: string; currency?: string },
+): Promise<{ results: PayoutAccountArrangement[]; total: number; page: number; limit: number }> {
+  const query: Record<string, unknown> = {};
+  if (opts?.status) query.payoutAccountStatus = opts.status;
+  if (opts?.party) query.partyInstanceReference = opts.party;
+  if (opts?.currency) query.payoutAccountCurrency = opts.currency;
+
+  const page = Math.max(1, opts?.page ?? 1);
+  const limit = Math.min(100, Math.max(1, opts?.limit ?? 20));
+  const skip = (page - 1) * limit;
+
+  const col = db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION);
+  const [results, total] = await Promise.all([
+    col.find(query).sort({ recordCreatedDateTime: -1 }).skip(skip).limit(limit).toArray(),
+    col.countDocuments(query),
+  ]);
+  return { results, total, page, limit };
+}
+
 export async function getPayoutAccount(
   db: Db,
   payoutAccountRef: string,

@@ -964,7 +964,7 @@ void db.collection(BUSINESS_PROCESS_EVENTS_COLLECTION).insertOne(event).catch(()
 
 Authorization is **data-driven, default-deny** (PCI DSS Req 7). The permission **catalog** (resource × action) is static code (`backend/src/shared/models/acl.model.ts`, mirrored in `frontend/src/config/acl.ts`); the role→permission **assignment** is data in the **`role`** collection (CRUD by the `manager`).
 
-**Resources** (→ BIAN SD): `transactions`(SD-254) · `customers`(SD-53) · `cards`(SD-88) · `fraudCases`(SD-83) · `merchants`(SD-89) · `providers`(SD-193) · `modules`(ADR-029) · `authDomains`(SD-16) · `roles` · `auditEvents`(ADR-025) · `consents`.
+**Resources** (→ BIAN SD): `transactions`(SD-254) · `customers`(SD-53) · `cards`(SD-88) · `accounts`(SD-66) · `fraudCases`(SD-83) · `merchants`(SD-89) · `providers`(SD-193) · `modules`(ADR-029) · `authDomains`(SD-16) · `roles` · `auditEvents`(ADR-025) · `consents`.
 **Actions** (PCI levels): `view` · `viewSensitive` (CHD/PII — Req 3/7, bound to the escalation flow) · `manage` · `investigate`. Scope `own` for `customer`.
 
 **`role` collection** — `{ roleName (PK, unique), roleLabel, roleDescription, rolePermissions: {[resource]: action[]}, roleScope: 'own'|'all', roleIsBuiltin, bianServiceDomain, bianControlRecordType, recordCreated/UpdatedDateTime }`. Builtin roles are editable (permissions) but not deletable; custom roles support any subset, including full-manage.
@@ -978,9 +978,12 @@ Authorization is **data-driven, default-deny** (PCI DSS Req 7). The permission *
 | **level2_investigator** | view·**viewSensitive** | view·**viewSensitive** | view·**viewSensitive** | view·investigate | view | — | — | — | — | view | — |
 | **security_auditor** | view·viewSensitive | view·viewSensitive | view·viewSensitive | view·viewSensitive | view | view | view | — | — | view | — |
 | **merchant_officer** | — | — | — | — | view·manage | — | — | — | — | view | — |
-| **manager** | **—** | **—** | **—** | **—** | — | view·manage | view·manage | view·manage | view·manage | view | — |
+| **operations_officer** | — | — | view·manage | — | — | view | view·manage | — | — | view | — |
+| **manager** | **—** | **—** | **—** | **—** | — | view·manage | view | view·manage | view·manage | view | — |
 
-> The `manager` (SD-193 platform admin) has **no** access to business/cardholder data — separation of duties (PCI Req 7). `can('manager','transactions','view') === false` ⇒ **403 backend** (`requirePermission` preHandler) + **`<AccessDenied>` frontend** (`<RequirePermission>`), with the role's responsibilities rendered from the live ACL.
+> The `operations_officer` (v29, BIAN SD-88 PaymentCardManagement + SD-66 PayoutAccountArrangement, department "Operations") also holds **`accounts: view·manage`** (SD-66; the `accounts` resource is not a column above). It is the global back-office administrator of the card inventory and payout accounts exposed by the built-in modules (§6.13). Scope `all`; permissions `cards:[view,manage]`, `accounts:[view,manage]`, `modules:[view,manage]`, `providers:[view]`, `auditEvents:[view]`. Via `modules:[view,manage]` it is the sole role that **manages** the configuration and policies of **all internal modules** (fds, aml, hrp, kyc, kyb, credit-bureau, card-authorization, card-issuer, account-information, payment-initiation, vop). `providers:[view]` is **read-only**: its administration landing shows which provider serves each capability (internal vs external / `managed_externally`), but provider CRUD stays with `manager`. This reflects the confirmed role philosophy: **`operations_officer` owns internal business logic and financial processes** (cards SD-88, accounts SD-66, the internal engines FDS/AML/HRP/card-issuer/AIS/PISP, audit, plus read-only provider visibility), whereas **`manager` owns system and platform** (integrations/providers, auth domains, roles, general config, security), never business or cardholder data. By separation of duties (PCI DSS Req 7) it is **distinct from `manager`**: `operations_officer` has **no** `providers:manage`, `authDomains` or `roles`; auth (SD-16, resource `authDomains`) stays exclusive to `manager`; `modules` no longer overlaps at the `manage` level (only `manager` retains `modules:view` for system/security oversight, editing of module config is exclusive to `operations_officer`). It is also distinct from `customer` (scope `own`, self-service).
+
+> The `manager` (SD-193 platform admin) has **no** access to business/cardholder data — separation of duties (PCI Req 7). `can('manager','transactions','view') === false` ⇒ **403 backend** (`requirePermission` preHandler) + **`<AccessDenied>` frontend** (`<RequirePermission>`), with the role's responsibilities rendered from the live ACL. As of v29.2 the `manager` relation to `modules` is **read-only** (`modules:view`), for system and security oversight; editing internal module config/policies is exclusive to `operations_officer`.
 
 **Enforcement & API:** `requirePermission(resource, action)` (Fastify preHandler, default-deny, cached role load + builtin fallback). `GET /api/v1/acl/effective` returns the caller's resolved permissions (frontend `can()` — permissions never live in the JWT). Roles CRUD: `GET/POST /api/v1/roles`, `GET/PUT/DELETE /api/v1/roles/:roleName` (`roles:manage`; builtin not deletable). Users (local): `GET/POST /api/v1/users`, `PUT/DELETE /api/v1/users/:id` (`authDomains:manage`). Remote role mappings: `partyAuthenticationDomainRoleMappings` on `authenticationDomain` (claim/group → role).
 
@@ -2639,6 +2642,74 @@ Mapping from the removed routes to the shared surface:
 
 ---
 
+### 6.13 Global resource administration (built-in modules, v29)
+
+> Base paths: `/api/v1/modules/card-issuer` (Swagger tag `modules:card-issuer`) and
+> `/api/v1/modules/account-information` (Swagger tag `modules:account-information`).
+> Auth: Bearer JWT + `requirePermission('cards'|'accounts', 'view'|'manage')` (role `operations_officer`).
+> These are **additive** administration surfaces owned by the built-in modules. They are a **distinct
+> surface** from the existing self-service/party-scoped routes (`/api/v1/customer/:customerId/cards`, §6.3,
+> and `/api/v1/accounts/:partyRef`, §6.10), which are unchanged. The self-service routes are scoped by
+> party; these list and mutate the **whole** card inventory (SD-88) and payout-account book (SD-66).
+
+**Capability gate (409 `managed_externally`).** Every route below runs the `requireInternalProvider`
+preHandler (`capabilityGate.service.ts`). A built-in module is the internal fallback adapter of its
+capability's provider group. If an external provider is the active winner of that group
+(`externalProviderIsInternal !== true`, priority < 999), the whole administration surface responds
+**409 Conflict** `{ "error": "managed_externally" }`. With only the internal provider active (priority
+999) the routes operate normally. The 409 emits an application `warn` log, not a compliance event.
+
+**Cards (built-in module `card-issuer`, SD-88)**
+
+| Method | Path | Permission | Notes |
+|---|---|---|---|
+| `GET` | `/modules/card-issuer/cards` | `cards:view` | Global listing, paginated `{results,total,page,limit}`, filters `network`/`status`/`agreement`. Display-safe rows: surrogate token, **masked PAN**, network, status, agreement ref, dates. **No PAN/CVV; expiry NOT included** (data minimization). |
+| `GET` | `/modules/card-issuer/cards/:cardId` | `cards:view` | Single card detail. **Reveals `paymentCardExpirationDate` (QE:none)** to `operations_officer` (see PCI note); 404 if absent. Emits `card.accessed` (Req 10). |
+| `POST` | `/modules/card-issuer/cards` | `cards:manage` | Registers a card for `customerAgreementInstanceReference`; reuses `registerCardForCustomer`; schema rejects CVV/PIN. Emits `card.registered`. |
+| `PATCH` | `/modules/card-issuer/cards/:cardId` | `cards:manage` | Updates metadata (alias/note); reuses `updateCardMetadata`. Emits `card.updated`. |
+| `PATCH` | `/modules/card-issuer/cards/:cardId/status` | `cards:manage` | `{active}` activate/suspend; reuses `setCardActivation`. Emits `card.(de|re)activated`. |
+| `DELETE` | `/modules/card-issuer/cards/:cardId` | `cards:manage` | Revoke (soft delete, record retained for audit); reuses `revokeCard`. Emits `card.removed`. `{removed:true}`. |
+
+**Accounts (built-in module `account-information`, SD-66)**
+
+| Method | Path | Permission | Notes |
+|---|---|---|---|
+| `GET` | `/modules/account-information/accounts` | `accounts:view` | Global listing, paginated `{results,total,page,limit}`, filters `status`/`party`/`currency`. Rows **QE-stripped** with hints `payoutAccountHasIban` / `payoutAccountHasRoutingNumber`. |
+| `GET` | `/modules/account-information/accounts/:accountRef` | `accounts:view` | Single account detail (QE-stripped + hints); reuses `getPayoutAccount`. Emits `account.accessed`. |
+| `POST` | `/modules/account-information/accounts` | `accounts:manage` | Registers an account for `partyInstanceReference`; IBAN/routing stored as QE ciphertext; reuses `createPayoutAccount`. Emits `account.created`. |
+| `PATCH` | `/modules/account-information/accounts/:accountRef` | `accounts:manage` | Updates account metadata; reuses `updatePayoutAccount`. Emits `account.updated`. |
+| `DELETE` | `/modules/account-information/accounts/:accountRef` | `accounts:manage` | Close (soft delete, status → `closed`); reuses `closePayoutAccount`. Emits `account.closed`. |
+
+> **IBAN/routing** are never returned by these routes (QE ciphertext stripped by `safeAccount()`); the
+> existing reveal endpoint and its roles are unchanged. **PAN** is always masked; **CVV/PIN** are never
+> accepted nor stored.
+
+**PCI decision (expiry in the card detail).** `paymentCardExpirationDate` (QE:none) is **revealed to
+`operations_officer` in the card detail** (`GET .../cards/:cardId`, audited via `card.accessed`) but
+**not in the listing** (minimization). Rationale: expiry is CHD but **not** Sensitive Authentication
+Data (SAD); PCI DSS only mandates masking of the PAN (Req 3.3), not the expiry. Req 7 need-to-know is
+satisfied by the dedicated role, and Req 10 by the per-access audit event. No deviation.
+
+**Auditing (Req 10).** Every mutation emits exactly one compliance event (`card.*` / `account.*`) with
+`performedByRole: operations_officer`, references and masked PAN / hints, never CHD in the clear. A
+single-card/account detail read emits one `card.accessed` / `account.accessed`. Global listings emit
+**no** per-row event; at most one aggregate event per call (`admin.cards.listed` / `admin.accounts.listed`
+with `{count, filters}`), gated by `PSP_AUDIT_LIST_ACCESS` (default off, §7).
+
+**Module configuration routes (v29.1).** The `GET/PUT /api/v1/modules/<cap>/config` routes of the 11
+internal modules (fds, aml, hrp, kyc, kyb, credit-bureau, card-authorization, card-issuer,
+account-information, payment-initiation, vop) previously had no backend guard; they are now protected with
+`requirePermission('modules', 'view'|'manage')`. `PUT .../config` requires `modules:manage`, which as of
+v29.2 only `operations_officer` holds (`manager` can no longer edit module config). `GET .../config`
+requires `modules:view`: accessible by `operations_officer`, `manager` and `security_auditor`.
+
+**Data model.** v29 introduced **no** schema or index changes: same collections (`paymentCardManagement`,
+`paymentCardRegistry`, `payoutAccountArrangement`), fields, QE encryptedFields, DEKs and indexes as v17/v28.
+The only additions are data-driven (ADR-030): the `operations_officer` builtin role and two demo users.
+Global listings sort by `recordCreatedDateTime` (demo-scale collscan; no supporting index added).
+
+---
+
 ## 7. Environment Variables Reference
 
 ```bash
@@ -2693,6 +2764,7 @@ PSP_PAYOUT_SETTLEMENT_DELAY_T2_MS=6000  # Simulated T+2 delay in ms
 PSP_PAYOUT_SETTLEMENT_DELAY_T3_MS=9000  # Simulated T+3 delay in ms
 PSP_PAYMENT_INITIATION_ALWAYS_SUCCEED=true  # Set false to simulate 5% rail failures
 PSP_AIS_ALWAYS_VERIFY=true               # Set false for builtin AIS to return unverified
+PSP_AUDIT_LIST_ACCESS=false              # v29: emit 1 aggregate compliance event per global admin listing (default off)
 ```
 
 ---

@@ -1,5 +1,6 @@
 // Credit Bureau capability module controller — STATIC routes (ADR-029).
 import { FastifyInstance } from 'fastify';
+import { requirePermission } from '../../../vendors/middleware/acl';
 import { scoreCreditBureau } from '../services/creditBureau.service';
 import {
   getCapabilityModuleConfig,
@@ -40,6 +41,7 @@ export async function creditBureauController(fastify: FastifyInstance) {
   });
 
   fastify.get('/config', {
+    preHandler: requirePermission('modules', 'view'),
     schema: {
       tags: ['modules:credit-bureau'],
       summary: 'Get credit-bureau module configuration',
@@ -53,6 +55,7 @@ export async function creditBureauController(fastify: FastifyInstance) {
   });
 
   fastify.put('/config', {
+    preHandler: requirePermission('modules', 'manage'),
     schema: {
       tags: ['modules:credit-bureau'],
       summary: 'Update credit-bureau module configuration',

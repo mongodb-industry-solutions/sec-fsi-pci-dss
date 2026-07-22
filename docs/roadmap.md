@@ -841,3 +841,47 @@ payment states are independently queryable, screened, auditable, and SEPA/ISO 20
 - [ ] setup/seed/QE/indexes/ACL updated; technical-spec + demo-simulator updated
 
 *Added 2026-07-17 (v28).*
+
+## v29 — Global card & account administration via built-in modules
+
+> Delivered under **development plan v29** (`tmp/dev.v29.plan.md`). Moves the **global administration
+> surface** (CRUD + listing) of cards (BIAN SD-88) and payout accounts (BIAN SD-66) onto the built-in
+> modules behind their provider groups, respecting EDA (event bus) + Hexagonal (ports/adapters) and
+> ADR-029 (Provider/Capability/Module). A built-in module is the internal fallback adapter of a
+> capability's port: its administration is only enabled when the provider group resolves to the internal
+> provider. **No data-model change** (same collections, fields, indexes, QE encryptedFields, DEKs); the
+> only additions are data-driven (ADR-030): the `operations_officer` role and two demo users. Target
+> version **2.3.0**.
+
+### Objective
+Give a dedicated back-office operator (`operations_officer`) a governed, separation-of-duties surface to
+administer the whole card inventory and payout-account book, additive to the existing party-scoped
+self-service routes, gated to the internal provider and fully audited (PCI DSS Req 7 + Req 10).
+
+### FR-v29: Functional Requirements
+
+| ID | Requirement | Acceptance criteria | Status |
+|---|---|---|---|
+| FR-29.1 | List all cards | `GET /api/v1/modules/card-issuer/cards` (paginated, filters network/status/agreement). `operations_officer` → 200 `{results,total,page,limit}`, display-safe rows (token, masked PAN, network, status, agreement, dates); no PAN/CVV/expiry. Other roles → 403. | ✅ |
+| FR-29.2 | View a card | `GET .../cards/:cardId` → 200 detail; **reveals expiry (QE:none)** to `operations_officer` (see PCI note), 404 if absent; emits `card.accessed`. | ✅ |
+| FR-29.3 | Register a card | `POST .../cards` (body `customerAgreementInstanceReference`) → 201; reuses `registerCardForCustomer`; dedup via registry; schema rejects CVV/PIN; emits `card.registered`. | ✅ |
+| FR-29.4 | Update card metadata & status | `PATCH .../cards/:cardId` (alias/note) and `PATCH .../cards/:cardId/status` (`{active}`) → 200; reuse `updateCardMetadata`/`setCardActivation`; emit `card.updated` / `card.(de|re)activated`. | ✅ |
+| FR-29.5 | Revoke a card | `DELETE .../cards/:cardId` → 200 `{removed:true}`; reuses `revokeCard`; record retained for audit; emits `card.removed`. | ✅ |
+| FR-29.6 | List all accounts | `GET /api/v1/modules/account-information/accounts` (paginated, filters status/party/currency). `operations_officer` → 200 `{results,total,page,limit}`, QE-stripped rows with hints (`payoutAccountHasIban`/`payoutAccountHasRoutingNumber`). Other roles → 403. | ✅ |
+| FR-29.7 | View / register / update / close account | `GET|POST|PATCH|DELETE .../accounts[/:accountRef]`; reuse `getPayoutAccount`/`createPayoutAccount`/`updatePayoutAccount`/`closePayoutAccount`; IBAN/routing QE; emit `account.created/updated/closed/accessed`. IBAN reveal stays on its existing route. | ✅ |
+| FR-29.8 | Capability gate | If the capability's provider group resolves to an active external provider (priority < 999), all admin routes → 409 `managed_externally`; with only the internal provider (999) they operate normally. Covered by an integration test that registers an external provider and asserts the 409. | ✅ |
+| FR-29.9 | Internal module configuration (v29.1) | `operations_officer` also holds `modules:[view,manage]` and administers the config/policies of all 11 internal modules. The `GET/PUT /api/v1/modules/<cap>/config` routes (previously unguarded) require `requirePermission('modules','view'|'manage')`. Auth (`authDomains`, SD-16) stays exclusive to `manager`. | ✅ |
+| FR-29.10 | Role-aware admin landing + config edit gating (v29.2) | `operations_officer` gains `providers:[view]` (read-only) so its admin landing shows module cards with the provider status serving each capability (internal vs external / `managed_externally`); provider CRUD stays with `manager`. Editing module config is gated by `modules:manage`: `PUT /modules/<cap>/config` is exclusive to `operations_officer`; `manager` drops to `modules:view` (read-only, system/security oversight), `GET .../config` accessible by `operations_officer`, `manager`, `security_auditor`. Confirmed philosophy: `operations_officer` owns internal business logic/financial processes, `manager` owns system/platform. | ✅ |
+
+### Definition of Done — v29
+- [x] FR-29.1–29.8 with green acceptance specs.
+- [x] `operations_officer` builtin role (scope `all`, `cards:[view,manage]`, `accounts:[view,manage]`, `modules:[view,manage]`, `providers:[view]`, `auditEvents:[view]`, SD-88/SD-66) added data-driven; SoD distinct from `manager` (keeps provider CRUD/authDomains/roles, holds `modules:view` only) and `customer`.
+- [x] Two demo users seeded (Olivia Moreno featured, Daniel Rossi), password `demo-password`, idempotent upsert.
+- [x] Role help synced: `/system/help/roles/operations_officer` renders guidance; `ROLE_LABELS` + `roleGuide` updated.
+- [x] Backend + frontend `tsc --noEmit` clean; existing tests green + new (global list, CRUD, gate 409).
+- [x] E2E live: create/list/edit/delete card and account as `operations_officer`; 409 with external provider; QE ciphertext intact; no CHD in responses or audit.
+- [x] No model/index change (R1); if a support index had been needed it would be added only via setup + documented (none was).
+- [x] `technical-spec.md` §6.13 + §RBAC + §7 (`PSP_AUDIT_LIST_ACCESS`), `PRD.md` personas/users, and this roadmap updated in the same change.
+- [ ] Frontend admin views under `/system/admin/modules/{card-issuer,account-information}` (F5) tracked in `tmp/dev.v29.plan.md`.
+
+*Added 2026-07-22 (v29).*

@@ -8,6 +8,7 @@ import { Tooltip } from '../../../../../components/Tooltip';
 import { api } from '../../../../../lib/api';
 import { getToken } from '../../../../../lib/auth';
 import { useNotify } from '../../../../../components/ui/ConfirmProvider';
+import { useEffectivePermissions } from '../../../../../lib/permissions';
 
 // Dedicated config UI for the internal HRP (High-Risk Person / Sanctions) engine (overrides the
 // generic module editor). DATA-DRIVEN: screening lists + match threshold live in the capability
@@ -17,6 +18,8 @@ const DEFAULT_LISTS = ['OFAC_SDN', 'EU_Consolidated', 'UN_Consolidated', 'PEP_Gl
 
 export default function HrpModulePage() {
   const notify = useNotify();
+  const { can } = useEffectivePermissions();
+  const canEdit = can('modules', 'manage'); // manager has modules:view only; only operations_officer may edit
   const [token, setToken] = useState('');
   const [lists, setLists] = useState(DEFAULT_LISTS.join(', '));
   const [matchThreshold, setMatchThreshold] = useState(85);
@@ -56,6 +59,12 @@ export default function HrpModulePage() {
       <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Modules', href: '/system/admin/modules' }, { label: 'HRP / Sanctions' }]} />
       <SectionHeader icon={ShieldAlert} title="HRP / Sanctions" description="High-risk person / counterparty and sanctions / PEP screening." debugInfo="capability=hrp · SD-13 Party Data Management · PCI DSS Req 12.8 / Req 10" />
 
+      {!canEdit && (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-600">
+          Read-only: your role can view this configuration but not change it (requires <code className="font-mono text-xs">modules:manage</code>).
+        </div>
+      )}
+      <fieldset disabled={!canEdit} className="space-y-5 border-0 p-0 m-0 min-w-0">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
           <h3 className="font-semibold text-sm text-gray-900">Screening lists<Tooltip text="The sanctions / watchlist / PEP sources the engine screens the party against (comma-separated). A hit on any list is a hard block (sanctions match)." /></h3>
@@ -81,6 +90,7 @@ export default function HrpModulePage() {
           <ListChecks size={14} /> View screening logs in audit events
         </Link>
       </div>
+      </fieldset>
     </div>
   );
 }
