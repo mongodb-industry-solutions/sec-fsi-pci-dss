@@ -32,6 +32,9 @@ export interface CreateCardInput {
   paymentCardIsPreferred: boolean;
   // Optional customer nickname (non-CHD display metadata) set at registration time.
   paymentCardAlias?: string;
+  // v30.1: the funding/payout account this card draws from (BIAN SD-88 cardAccountReference). The
+  // card owner is derived from this account's party, so admin registration requires it.
+  fundingPayoutAccountInstanceReference?: string;
 }
 
 export async function createCard(db: Db, input: CreateCardInput) {
@@ -49,6 +52,7 @@ export async function createCard(db: Db, input: CreateCardInput) {
     ...(input.paymentCardExpirationDate ? { paymentCardExpirationDate: input.paymentCardExpirationDate } : {}),
     ...(input.paymentCardNetwork ? { paymentCardNetwork: input.paymentCardNetwork } : {}),
     ...(input.paymentCardAlias ? { paymentCardAlias: input.paymentCardAlias } : {}),
+    ...(input.fundingPayoutAccountInstanceReference ? { fundingPayoutAccountInstanceReference: input.fundingPayoutAccountInstanceReference } : {}),
     bianServiceDomain: 'Payment Card',
     bianControlRecordType: 'PaymentCardManagement',
     recordCreatedDateTime: now,
@@ -215,6 +219,7 @@ export async function registerCardForCustomer(db: Db, input: CreateCardInput): P
     if (input.paymentCardNetwork) set.paymentCardNetwork = input.paymentCardNetwork;
     if (input.paymentCardAlias) set.paymentCardAlias = input.paymentCardAlias;
     if (input.paymentCardIsPreferred) set.paymentCardIsPreferred = true;
+    if (input.fundingPayoutAccountInstanceReference) set.fundingPayoutAccountInstanceReference = input.fundingPayoutAccountInstanceReference;
     await coll.updateOne({ paymentCardInstanceReference: existing.paymentCardInstanceReference }, { $set: set });
     cardId = existing.paymentCardInstanceReference;
   } else {
@@ -343,6 +348,37 @@ export async function listAllCards(
 export async function getCardByIdAny(db: Db, cardId: string) {
   return db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION)
     .findOne({ paymentCardInstanceReference: cardId }, { projection: { _id: 0 } });
+}
+
+// v30.1: reassign a card's funding/payout account. Because the card owner is DERIVED from the
+// funding account's party (a card never funds from another party's account), this also re-points the
+// card's customerAgreementInstanceReference to the new account's party agreement, keeping ownership
+// coherent. Returns the updated card, or null if the card or the account/agreement is not found.
+// The PAYOUT_ACCOUNT_COLLECTION is referenced by name to avoid a cross-module service import cycle.
+export async function setCardFundingAccount(db: Db, cardId: string, payoutAccountRef: string) {
+  const account = await db.collection('payoutAccountArrangement')
+    .findOne({ payoutAccountInstanceReference: payoutAccountRef }, { projection: { partyInstanceReference: 1 } });
+  if (!account?.partyInstanceReference) return null;
+  const agreementRef = await getOwnAgreementId(db, account.partyInstanceReference as string);
+  if (!agreementRef) return null;
+  const set: Record<string, unknown> = {
+    fundingPayoutAccountInstanceReference: payoutAccountRef,
+    customerAgreementInstanceReference: agreementRef,
+    recordUpdatedDateTime: new Date(),
+  };
+  const res = await db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION)
+    .updateOne({ paymentCardInstanceReference: cardId }, { $set: set });
+  if (res.matchedCount === 0) return null;
+  return getCardByIdAny(db, cardId);
+}
+
+// Resolve the agreement + owner for a payout account (used by admin card registration: the owner is
+// derived from the funding account's party). Returns null when the account or agreement is missing.
+export async function resolveAgreementForFundingAccount(db: Db, payoutAccountRef: string): Promise<string | null> {
+  const account = await db.collection('payoutAccountArrangement')
+    .findOne({ payoutAccountInstanceReference: payoutAccountRef }, { projection: { partyInstanceReference: 1 } });
+  if (!account?.partyInstanceReference) return null;
+  return getOwnAgreementId(db, account.partyInstanceReference as string);
 }
 
 export async function getCardsByCustomer(db: Db, customerRef: string) {

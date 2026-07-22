@@ -15,6 +15,8 @@ import {
   updateCardMetadata,
   setCardActivation,
   revokeCard,
+  setCardFundingAccount,
+  resolveAgreementForFundingAccount,
 } from '../../../modules/customer/services/paymentCard.service';
 import type { PaymentCardManagementControlRecord } from '../../../modules/customer/models/paymentCard.model';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
@@ -333,15 +335,17 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     schema: {
       tags: ['modules:card-issuer'],
       summary: 'Register a payment card for an agreement (global administration)',
-      description: 'Registers a card-on-file for a customerAgreementInstanceReference. Reuses the SD-88 '
-        + 'domain service (dedup via the shared registry). CVV/PIN are rejected by schema (additionalProperties:false).',
+      description: 'Registers a card-on-file. The funding payout account is REQUIRED; the card owner '
+        + '(agreement/party) is DERIVED from that account (a card never funds from another party account). '
+        + 'Reuses the SD-88 domain service (dedup via the shared registry). CVV/PIN rejected by schema.',
       security: [{ bearerAuth: [] }],
       body: {
         type: 'object',
         additionalProperties: false,
-        required: ['customerAgreementInstanceReference', 'cardToken', 'paymentCardMaskedPanDisplay'],
+        required: ['fundingPayoutAccountInstanceReference', 'cardToken'],
         properties: {
-          customerAgreementInstanceReference: { type: 'string' },
+          fundingPayoutAccountInstanceReference: { type: 'string', description: 'Funding payout account; the owner is derived from it.' },
+          customerAgreementInstanceReference: { type: 'string', description: 'Optional; derived from the funding account when omitted.' },
           cardToken: { type: 'string', description: 'PAN surrogate token (not CHD).' },
           paymentCardMaskedPanDisplay: { type: 'string', description: 'Display-safe last-4 (****-****-****-XXXX).' },
           paymentCardExpirationDate: { type: 'string', description: 'MM/YY, stored QE:none.' },
@@ -352,25 +356,33 @@ export async function cardIssuerController(fastify: FastifyInstance) {
       },
       response: {
         201: { type: 'object', properties: { paymentCardInstanceReference: { type: 'string' }, paymentCardStatus: { type: 'string' }, reused: { type: 'boolean' } } },
+        400: { $ref: 'Error#' },
         403: { $ref: 'Error#' },
         409: { $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
     const body = request.body as {
-      customerAgreementInstanceReference: string;
+      fundingPayoutAccountInstanceReference: string;
+      customerAgreementInstanceReference?: string;
       cardToken: string;
-      paymentCardMaskedPanDisplay: string;
+      paymentCardMaskedPanDisplay?: string;
       paymentCardExpirationDate?: string;
       paymentCardNetwork?: PaymentCardManagementControlRecord['paymentCardNetwork'];
       paymentCardIsPreferred?: boolean;
       paymentCardAlias?: string;
     };
+    // Owner is derived from the funding account's party (invariant: a card funds only from its
+    // owner's account). Resolve the agreement from the account unless one was explicitly passed.
+    const agreementRef = body.customerAgreementInstanceReference
+      ?? await resolveAgreementForFundingAccount(fastify.db, body.fundingPayoutAccountInstanceReference);
+    if (!agreementRef) return reply.status(400).send({ error: 'Funding account has no resolvable owner agreement' });
     const result = await registerCardForCustomer(fastify.db, {
-      customerAgreementInstanceReference: body.customerAgreementInstanceReference,
+      customerAgreementInstanceReference: agreementRef,
       cardToken: body.cardToken,
-      paymentCardMaskedPanDisplay: body.paymentCardMaskedPanDisplay,
+      paymentCardMaskedPanDisplay: body.paymentCardMaskedPanDisplay ?? '',
       paymentCardIsPreferred: body.paymentCardIsPreferred ?? false,
+      fundingPayoutAccountInstanceReference: body.fundingPayoutAccountInstanceReference,
       ...(body.paymentCardExpirationDate ? { paymentCardExpirationDate: body.paymentCardExpirationDate } : {}),
       ...(body.paymentCardNetwork ? { paymentCardNetwork: body.paymentCardNetwork } : {}),
       ...(body.paymentCardAlias ? { paymentCardAlias: body.paymentCardAlias } : {}),
@@ -485,6 +497,34 @@ export async function cardIssuerController(fastify: FastifyInstance) {
       bianServiceDomain: 'Payment Card', bianControlRecordType: 'PaymentCardManagement',
     });
     return reply.send({ removed: true });
+  });
+
+  // PATCH /cards/:cardId/funding — reassign the funding payout account. The card owner follows the
+  // new account's party (invariant), so this is also how ownership is reassigned. Audited.
+  fastify.patch('/cards/:cardId/funding', {
+    preHandler: [requirePermission('cards', 'manage'), gate],
+    schema: {
+      tags: ['modules:card-issuer'],
+      summary: 'Reassign a card funding account (and, implicitly, its owner)',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['cardId'], properties: { cardId: { type: 'string' } } },
+      body: { type: 'object', required: ['fundingPayoutAccountInstanceReference'], additionalProperties: false, properties: { fundingPayoutAccountInstanceReference: { type: 'string' } } },
+      response: { 200: { type: 'object', additionalProperties: true }, 400: { $ref: 'Error#' }, 403: { $ref: 'Error#' }, 404: { $ref: 'Error#' }, 409: { $ref: 'Error#' } },
+    },
+  }, async (request, reply) => {
+    const { cardId } = request.params as { cardId: string };
+    const { fundingPayoutAccountInstanceReference } = request.body as { fundingPayoutAccountInstanceReference: string };
+    const updated = await setCardFundingAccount(fastify.db, cardId, fundingPayoutAccountInstanceReference);
+    if (!updated) return reply.status(400).send({ error: 'Card not found or funding account has no resolvable owner' });
+    const user = (request as { user?: JwtUserPayload }).user;
+    emitComplianceEvent(fastify.db, {
+      entityType: 'card', entityId: cardId,
+      processType: 'card_management', processAction: 'card.funding.reassigned', processOutcome: 'approved',
+      performedByPartyReference: user?.partyRef ?? null, performedByRole: user?.role ?? null,
+      eventSummary: { module: CAP, fundingPayoutAccountInstanceReference, customerAgreementInstanceReference: updated.customerAgreementInstanceReference },
+      bianServiceDomain: 'Payment Card', bianControlRecordType: 'PaymentCardManagement',
+    });
+    return reply.send({ ...updated, paymentCardMaskedPanDisplay: deriveMaskedPan(updated) });
   });
 
   // ── v30 CVV / PAN reveal (SAD derived, CHD from the issuer vault) ────────────────────────────

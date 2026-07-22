@@ -22,6 +22,7 @@ import {
   createPayoutAccount,
   updatePayoutAccount,
   closePayoutAccount,
+  reassignPayoutAccountOwner,
   type UpdatePayoutAccountInput,
 } from '../../../modules/gateway/services/payoutAccount.service';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
@@ -300,6 +301,63 @@ export async function accountInformationController(fastify: FastifyInstance) {
       bianServiceDomain: 'SD-66 Payout Account Arrangement', bianControlRecordType: 'PayoutAccountArrangement',
     });
     return reply.send({ payoutAccountIban: account.payoutAccountIban });
+  });
+
+  // GET /accounts/:accountRef/routing (v30.1 reveal): full routing / national clearing number for
+  // operations_officer. Ephemeral, audited (account.routing.revealed). Step-up in prod.
+  fastify.get('/accounts/:accountRef/routing', {
+    preHandler: [requirePermission('accounts', 'manage'), gate],
+    schema: {
+      tags: ['modules:account-information'],
+      summary: 'Reveal a payout account routing number (operations officer)',
+      description: 'Returns the full routing / clearing number (QE-decrypted server-side), ephemerally. '
+        + 'operations_officer only, internal provider only. Audited (PCI/GDPR). Step-up MFA in production.',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['accountRef'], properties: { accountRef: { type: 'string' } } },
+      response: { 200: { type: 'object', properties: { payoutAccountRoutingNumber: { type: 'string' } } }, 403: { $ref: 'Error#' }, 404: { $ref: 'Error#' }, 409: { $ref: 'Error#' } },
+    },
+  }, async (request, reply) => {
+    const { accountRef } = request.params as { accountRef: string };
+    const account = await getPayoutAccount(fastify.db, accountRef);
+    if (!account || !account.payoutAccountRoutingNumber) return reply.status(404).send({ error: 'Routing number not found' });
+    const user = (request as { user?: JwtUserPayload }).user;
+    emitComplianceEvent(fastify.db, {
+      entityType: 'account', entityId: accountRef,
+      processType: 'payment_processing', processAction: 'account.routing.revealed', processOutcome: 'approved',
+      performedByPartyReference: user?.partyRef ?? null, performedByRole: user?.role ?? null,
+      eventSummary: { module: CAP, channel: 'admin_console', partyInstanceReference: account.partyInstanceReference },
+      bianServiceDomain: 'SD-66 Payout Account Arrangement', bianControlRecordType: 'PayoutAccountArrangement',
+    });
+    return reply.send({ payoutAccountRoutingNumber: account.payoutAccountRoutingNumber });
+  });
+
+  // PATCH /accounts/:accountRef/owner — v30.1 administrative ownership reassignment. Moves the account
+  // to a different party. Sensitive (PII/fraud); audited (account.owner.reassigned). accounts:manage.
+  fastify.patch('/accounts/:accountRef/owner', {
+    preHandler: [requirePermission('accounts', 'manage'), gate],
+    schema: {
+      tags: ['modules:account-information'],
+      summary: 'Reassign a payout account to a different owner (party)',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['accountRef'], properties: { accountRef: { type: 'string' } } },
+      body: { type: 'object', required: ['partyInstanceReference'], additionalProperties: false, properties: { partyInstanceReference: { type: 'string' } } },
+      response: { 200: { type: 'object', additionalProperties: true }, 403: { $ref: 'Error#' }, 404: { $ref: 'Error#' }, 409: { $ref: 'Error#' } },
+    },
+  }, async (request, reply) => {
+    const { accountRef } = request.params as { accountRef: string };
+    const { partyInstanceReference } = request.body as { partyInstanceReference: string };
+    const updated = await reassignPayoutAccountOwner(fastify.db, accountRef, partyInstanceReference);
+    if (!updated) return reply.status(404).send({ error: 'Account not found' });
+    const ownerName = await resolveOwnerNameByParty(fastify.db, partyInstanceReference);
+    const user = (request as { user?: JwtUserPayload }).user;
+    emitComplianceEvent(fastify.db, {
+      entityType: 'account', entityId: accountRef,
+      processType: 'payment_processing', processAction: 'account.owner.reassigned', processOutcome: 'approved',
+      performedByPartyReference: user?.partyRef ?? null, performedByRole: user?.role ?? null,
+      eventSummary: { module: CAP, partyInstanceReference },
+      bianServiceDomain: 'SD-66 Payout Account Arrangement', bianControlRecordType: 'PayoutAccountArrangement',
+    });
+    return reply.send({ ...safeAccount(updated), ownerName });
   });
 
   // POST /accounts — register a payout account for a party (IBAN/routing QE-encrypted at rest).

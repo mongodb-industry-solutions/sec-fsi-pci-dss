@@ -306,14 +306,14 @@ function CreateAccountModal({ token, onClose, onCreated, notify }: {
           </Field>
           <Field label="Routing number (optional)">
             <input value={form.payoutAccountRoutingNumber} onChange={(e) => setForm({ ...form, payoutAccountRoutingNumber: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
+              className="w-full border rounded-lg px-3 py-2 text-sm font-mono" placeholder="Auto-generated if left blank" />
           </Field>
         </div>
         <Field label="IBAN (optional, encrypted at rest)">
           <input value={form.payoutAccountIban} onChange={(e) => setForm({ ...form, payoutAccountIban: e.target.value.toUpperCase() })}
-            className="w-full border rounded-lg px-3 py-2 text-sm font-mono" placeholder="ESxx ..." />
+            className="w-full border rounded-lg px-3 py-2 text-sm font-mono" placeholder="Auto-generated if left blank" />
         </Field>
-        <p className="text-xs text-gray-400">IBAN and routing number are QE-encrypted at rest and never returned by this admin surface (presence hints only).</p>
+        <p className="text-xs text-gray-400">IBAN and routing number are auto-generated server-side if left blank. Both are QE-encrypted at rest and never returned by this admin surface (presence hints only).</p>
       </div>
       <ModalActions onClose={onClose} onConfirm={submit} confirmLabel={saving ? 'Saving…' : 'Create'} disabled={saving || !valid} />
     </ModalShell>

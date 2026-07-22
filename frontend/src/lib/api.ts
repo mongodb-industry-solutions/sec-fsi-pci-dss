@@ -1880,9 +1880,11 @@ export const api = {
         ),
       register: (
         body: {
-          customerAgreementInstanceReference: string;
+          // v30.2: funding account is required; the agreement (owner) is derived server-side.
+          fundingPayoutAccountInstanceReference: string;
+          customerAgreementInstanceReference?: string;
           cardToken: string;
-          paymentCardMaskedPanDisplay: string;
+          paymentCardMaskedPanDisplay?: string;
           paymentCardExpirationDate?: string;
           paymentCardNetwork?: 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
           paymentCardIsPreferred?: boolean;
@@ -1892,6 +1894,13 @@ export const api = {
       ) =>
         apiFetch<{ paymentCardInstanceReference: string; paymentCardStatus: string; reused?: boolean }>(
           '/api/v1/modules/card-issuer/cards', { method: 'POST', body: JSON.stringify(body) }, token,
+        ),
+      // v30.2: reassign a card's funding account. The owner follows the account's party.
+      // 409 managed_externally when a vendor owns the card.
+      reassignFunding: (cardId: string, fundingPayoutAccountInstanceReference: string, token: string) =>
+        apiFetch<Record<string, unknown>>(
+          `/api/v1/modules/card-issuer/cards/${encodeURIComponent(cardId)}/funding`,
+          { method: 'PATCH', body: JSON.stringify({ fundingPayoutAccountInstanceReference }) }, token,
         ),
       update: (cardId: string, body: { paymentCardAlias?: string; paymentCardCustomerNote?: string }, token: string) =>
         apiFetch<Record<string, unknown>>(
@@ -1978,6 +1987,18 @@ export const api = {
       revealIban: (accountRef: string, token: string) =>
         apiFetch<{ payoutAccountIban: string }>(
           `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}/iban`, {}, token,
+        ),
+      // v30.2: ephemeral routing-number reveal (GDPR: on demand, need-to-know). Mirrors revealIban.
+      revealRouting: (accountRef: string, token: string) =>
+        apiFetch<{ payoutAccountRoutingNumber: string }>(
+          `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}/routing`, {}, token,
+        ),
+      // v30.2: reassign the account owner (operations_officer, accounts:manage). Returns the updated
+      // account with the derived ownerName.
+      reassignOwner: (accountRef: string, partyInstanceReference: string, token: string) =>
+        apiFetch<AdminPayoutAccount & { ownerName?: string | null }>(
+          `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}/owner`,
+          { method: 'PATCH', body: JSON.stringify({ partyInstanceReference }) }, token,
         ),
       // Display-safe cards funded by this payout account (no full PAN / CVV).
       cards: (accountRef: string, token: string) =>

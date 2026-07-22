@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Landmark, CreditCard, ArrowLeft, Pencil, Save, X, Trash2, ShieldAlert, Check } from 'lucide-react';
-import { api } from '../../../../../../../lib/api';
+import { Landmark, CreditCard, ArrowLeft, Pencil, Save, X, Trash2, ShieldAlert, Check, Search, UserCog } from 'lucide-react';
+import { api, type PartyOwnerResult } from '../../../../../../../lib/api';
 import { SensitiveReveal } from '../../../../../../../components/SensitiveReveal';
 import { getToken } from '../../../../../../../lib/auth';
 import { useDebugMode } from '../../../../../../../lib/debugMode';
@@ -101,6 +101,7 @@ function AccountAdminDetail() {
   const [bicSwift, setBicSwift] = useState('');
   const [saving, setSaving] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [reassigning, setReassigning] = useState(false);
 
   const syncForm = useCallback((a: AccountDetail) => {
     setAlias(a.payoutAccountAlias ?? '');
@@ -171,6 +172,28 @@ function AccountAdminDetail() {
   function cancelEdit() {
     if (acct) syncForm(acct);
     setEditing(false);
+  }
+
+  async function reassignOwner(r: PartyOwnerResult) {
+    if (!acct) return;
+    const ok = await confirm({
+      title: 'Reassign account owner?',
+      message: `This payout account will be reassigned to ${r.ownerName ?? 'the selected party'}. This is a sensitive change and is audited.`,
+      confirmLabel: 'Reassign owner',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setReassigning(true);
+    try {
+      const updated = await api.modules.accountAdmin.reassignOwner(accountRef, r.partyInstanceReference, token);
+      setAcct((prev) => prev ? { ...prev, partyInstanceReference: updated.partyInstanceReference, ownerName: updated.ownerName ?? r.ownerName } : prev);
+      notify('Account owner reassigned.', 'success');
+    } catch (e) {
+      if (e instanceof Error && e.message === 'managed_externally') notify('Capability managed by an external provider.', 'error');
+      else notify(e instanceof Error ? e.message : 'Failed to reassign owner.', 'error');
+    } finally {
+      setReassigning(false);
+    }
   }
 
   const label = acct?.payoutAccountAlias || acct?.payoutAccountBankName || TYPE_LABELS[acct?.payoutAccountType ?? ''] || 'Account';
@@ -245,8 +268,16 @@ function AccountAdminDetail() {
               ) : (
                 <IbanHintRow present={acct.payoutAccountHasIban} debug={debugMode} />
               )}
-              <DetailRow label="Routing number" value={acct.payoutAccountHasRoutingNumber ? 'On file (encrypted)' : 'None'}
-                hint={debugMode ? 'QE-encrypted; never returned' : undefined} />
+              {acct.payoutAccountHasRoutingNumber === false ? (
+                <DetailRow label="Routing number" value="None"
+                  hint={debugMode ? 'QE-encrypted; never returned' : undefined} />
+              ) : (
+                // On demand routing reveal (GDPR need-to-know, re-hideable, audited). Mirrors IBAN.
+                // When the presence hint is absent we still offer it and handle a 404 gracefully.
+                <SensitiveReveal label="Routing number"
+                  hint={debugMode ? 'QE-encrypted; ephemeral reveal' : undefined}
+                  fetchValue={async () => (await api.modules.accountAdmin.revealRouting(accountRef, token)).payoutAccountRoutingNumber} />
+              )}
               {/* Owner: derived party name (need-to-know, audited). Distinct from the legal holder name. */}
               <DetailRow label="Owner" value={acct.ownerName ?? undefined}
                 hint={debugMode ? 'derived from party; need-to-know' : undefined} />
@@ -347,6 +378,22 @@ function AccountAdminDetail() {
             )}
           </div>
 
+          {/* Owner reassignment (operations_officer, accounts:manage). Sensitive; confirmed + audited. */}
+          {canManage && acct.payoutAccountStatus !== 'closed' && (
+            <div className="bg-white rounded-xl border p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
+                  <UserCog size={14} className="text-amber-600" />
+                </div>
+                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Reassign owner</h2>
+              </div>
+              <p className="text-xs text-gray-400">
+                Current owner: <span className="text-gray-700">{acct.ownerName ?? 'Unnamed party'}</span>. Search for a party to reassign this account; the change is confirmed and audited.
+              </p>
+              <PartySearch token={token} disabled={reassigning} onPick={reassignOwner} notify={notify} />
+            </div>
+          )}
+
           {/* Danger zone */}
           {canManage && acct.payoutAccountStatus !== 'closed' && (
             <div className="bg-white rounded-xl border border-red-100 p-5 flex items-center justify-between gap-3 flex-wrap">
@@ -407,6 +454,68 @@ function EditField({ label, value, onChange, mono }: { label: string; value: str
       <label className="block text-xs text-gray-500 mb-1">{label}</label>
       <input value={value} onChange={(e) => onChange(e.target.value)}
         className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#001E2B]/20 ${mono ? 'font-mono' : ''}`} />
+    </div>
+  );
+}
+
+// Debounced party search: queries parties by owner name; picking a result reassigns the account.
+// Reused pattern from the accounts admin panel (accountAdmin.searchParties).
+function PartySearch({ token, onPick, disabled, notify }: {
+  token: string;
+  onPick: (r: PartyOwnerResult) => void;
+  disabled?: boolean;
+  notify: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<PartyOwnerResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searched, setSearched] = useState(false);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setResults([]); setSearched(false); return; }
+    let cancelled = false;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.modules.accountAdmin.searchParties(q, token);
+        if (!cancelled) { setResults(r.results); setSearched(true); }
+      } catch (e) {
+        if (!cancelled) {
+          setResults([]); setSearched(true);
+          if (e instanceof Error && e.message === 'managed_externally') notify('Capability managed by an external provider.', 'error');
+        }
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [query, token, notify]);
+
+  return (
+    <div className="space-y-1.5">
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} disabled={disabled}
+          className="w-full border rounded-lg pl-8 pr-3 py-2 text-sm disabled:opacity-50" placeholder="Search new owner by name" />
+      </div>
+      {searching && <p className="text-xs text-gray-400">Searching…</p>}
+      {results.length > 0 && (
+        <ul className="border rounded-lg divide-y max-h-48 overflow-y-auto">
+          {results.map((r) => (
+            <li key={r.partyInstanceReference}>
+              <button type="button" onClick={() => onPick(r)} disabled={disabled}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors disabled:opacity-50">
+                <span className="text-gray-800 font-medium">{r.ownerName ?? 'Unnamed owner'}</span>
+                <span className="block text-xs text-gray-400 font-mono truncate">{r.partyInstanceReference}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {searched && !searching && results.length === 0 && (
+        <p className="text-xs text-gray-400">No matching party.</p>
+      )}
     </div>
   );
 }
