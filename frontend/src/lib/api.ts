@@ -2000,20 +2000,39 @@ export const api = {
           `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}/owner`,
           { method: 'PATCH', body: JSON.stringify({ partyInstanceReference }) }, token,
         ),
-      // Display-safe cards funded by this payout account (no full PAN / CVV).
-      cards: (accountRef: string, token: string) =>
-        apiFetch<{ results: Array<{
+      // Display-safe cards funded by this payout account (no full PAN / CVV). Paginated + filterable
+      // (same shape/fields as the global card admin list); 409 managed_externally when a vendor owns it.
+      cards: (
+        opts: {
+          accountRef: string;
+          token: string;
+          page?: number;
+          limit?: number;
+          network?: string;
+          status?: string;
+          last4?: string;
+          bin?: string;
+        },
+      ) => {
+        const { accountRef, token, ...params } = opts;
+        const qs = new URLSearchParams(
+          Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]),
+        ).toString();
+        return apiFetch<{ results: Array<{
           paymentCardInstanceReference: string;
           paymentCardMaskedPanDisplay: string;
+          paymentCardBin?: string | null;
+          paymentCardLast4?: string | null;
           paymentCardNetwork?: string | null;
           paymentCardStatus: string;
           paymentCardIsPreferred?: boolean | null;
           paymentCardAlias?: string | null;
           fundingPayoutAccountInstanceReference?: string | null;
           recordCreatedDateTime?: string | null;
-        }>; total: number }>(
-          `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}/cards`, {}, token,
-        ),
+        }>; total: number; page: number; limit: number }>(
+          `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}/cards${qs ? `?${qs}` : ''}`, {}, token,
+        );
+      },
     },
   },
 

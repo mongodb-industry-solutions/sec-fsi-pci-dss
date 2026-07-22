@@ -298,13 +298,15 @@ export async function rebuildCardRegistry(db: Db): Promise<number> {
 // the per-card detail). Revoked cards are retained for audit and excluded. Paginated + filterable.
 export async function listAllCards(
   db: Db,
-  opts?: { page?: number; limit?: number; network?: string; status?: string; agreement?: string; last4?: string; bin?: string },
+  opts?: { page?: number; limit?: number; network?: string; status?: string; agreement?: string; funding?: string; last4?: string; bin?: string },
 ): Promise<{ results: unknown[]; total: number; page: number; limit: number }> {
   const query: Record<string, unknown> = {};
   // Default excludes revoked (audit-retained). An explicit status filter overrides.
   query.paymentCardStatus = opts?.status ? opts.status : { $ne: 'revoked' };
   if (opts?.network) query.paymentCardNetwork = opts.network;
   if (opts?.agreement) query.customerAgreementInstanceReference = opts.agreement;
+  // Scope to the cards funded by one payout account (SD-88 cardAccountReference cross-linking).
+  if (opts?.funding) query.fundingPayoutAccountInstanceReference = opts.funding;
   // v30 non-CHD truncated-PAN search: last4 (equality) + BIN prefix. Cheap, no QE, no CHD.
   if (opts?.last4) query.paymentCardLast4 = opts.last4.replace(/\D/g, '').slice(-4);
   if (opts?.bin) query.paymentCardBin = { $regex: `^${opts.bin.replace(/\D/g, '').slice(0, 6)}` };

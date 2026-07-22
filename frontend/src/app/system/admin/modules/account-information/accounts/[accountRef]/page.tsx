@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Landmark, CreditCard, ArrowLeft, Pencil, Save, X, Trash2, ShieldAlert, Check, Search, UserCog } from 'lucide-react';
 import { api, type PartyOwnerResult } from '../../../../../../../lib/api';
+import { Pagination } from '../../../../../../../components/Pagination';
 import { SensitiveReveal } from '../../../../../../../components/SensitiveReveal';
 import { getToken } from '../../../../../../../lib/auth';
 import { useDebugMode } from '../../../../../../../lib/debugMode';
@@ -45,10 +46,15 @@ interface AccountDetail {
 interface LinkedCard {
   paymentCardInstanceReference: string;
   paymentCardMaskedPanDisplay: string;
+  paymentCardBin?: string | null;
+  paymentCardLast4?: string | null;
   paymentCardNetwork?: string | null;
   paymentCardStatus: string;
   paymentCardAlias?: string | null;
 }
+
+const CARD_NETWORKS = ['VISA', 'MASTERCARD', 'AMEX', 'ELO'] as const;
+const CARD_STATUSES = ['issued', 'active', 'pending_activation', 'blocked', 'suspended', 'revoked', 'expired'] as const;
 
 const TYPE_LABELS: Record<string, string> = { bank_account: 'Bank Account', wallet: 'Wallet', internal_ledger: 'PSP Ledger' };
 
@@ -89,7 +95,6 @@ function AccountAdminDetail() {
 
   const token = getToken() ?? '';
   const [acct, setAcct] = useState<AccountDetail | null>(null);
-  const [linkedCards, setLinkedCards] = useState<LinkedCard[]>([]);
   const [ready, setReady] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [managedExternally, setManagedExternally] = useState(false);
@@ -116,10 +121,6 @@ function AccountAdminDetail() {
       const a = await api.modules.accountAdmin.get(accountRef, token) as AccountDetail;
       setAcct(a);
       syncForm(a);
-      // Display-safe cards funded by this account (non-blocking; no full PAN/CVV).
-      api.modules.accountAdmin.cards(accountRef, token)
-        .then((r) => setLinkedCards(r.results as LinkedCard[]))
-        .catch(() => setLinkedCards([]));
     } catch (e) {
       if (e instanceof Error && e.message === 'managed_externally') setManagedExternally(true);
       else setNotFound(true);
@@ -296,36 +297,7 @@ function AccountAdminDetail() {
           </div>
 
           {/* Linked cards funded by this account (display-safe; no full PAN / CVV). */}
-          <div className="bg-white rounded-xl border p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
-                <CreditCard size={14} className="text-blue-600" />
-              </div>
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Linked cards</h2>
-            </div>
-            {linkedCards.length === 0 ? (
-              <p className="text-sm text-gray-400">No cards are funded by this account.</p>
-            ) : (
-              <ul className="divide-y text-sm">
-                {linkedCards.map((c) => (
-                  <li key={c.paymentCardInstanceReference}>
-                    <Link href={`/system/admin/modules/card-issuer/cards/${encodeURIComponent(c.paymentCardInstanceReference)}`}
-                      className="flex items-center justify-between gap-3 py-2.5 -mx-2 px-2 rounded hover:bg-gray-50 transition-colors group">
-                      <span className="flex items-center gap-2 min-w-0">
-                        <span className="font-mono text-gray-800">{c.paymentCardMaskedPanDisplay}</span>
-                        {c.paymentCardNetwork && <span className="text-xs text-gray-400">{c.paymentCardNetwork}</span>}
-                        {c.paymentCardAlias && <span className="text-xs text-gray-500 truncate">{c.paymentCardAlias}</span>}
-                      </span>
-                      <span className="flex items-center gap-2 shrink-0">
-                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${statusClass(c.paymentCardStatus)}`}>{c.paymentCardStatus}</span>
-                        <span className="text-xs text-[#001E2B] font-medium group-hover:underline">View</span>
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <LinkedCardsPanel accountRef={accountRef} token={token} notify={notify} />
 
           {/* Balance */}
           {acct.payoutAccountBalance && (
@@ -515,6 +487,162 @@ function PartySearch({ token, onPick, disabled, notify }: {
       )}
       {searched && !searching && results.length === 0 && (
         <p className="text-xs text-gray-400">No matching party.</p>
+      )}
+    </div>
+  );
+}
+
+// Display-safe cards funded by this payout account (no full PAN / CVV). Paginated + filterable,
+// mirroring the global card admin list UX (network/status selects, BIN/last4 search, shared Pagination).
+// 409 managed_externally renders the standard external-provider banner.
+function LinkedCardsPanel({ accountRef, token, notify }: {
+  accountRef: string;
+  token: string;
+  notify: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [rows, setRows] = useState<LinkedCard[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [loading, setLoading] = useState(true);
+  const [managedExternally, setManagedExternally] = useState(false);
+
+  const [network, setNetwork] = useState('');
+  const [status, setStatus] = useState('');
+  const [last4, setLast4] = useState('');
+  const [bin, setBin] = useState('');
+  // Debounced copies of the free-text search inputs (mirrors the global card admin panel, ~300ms).
+  const [last4Q, setLast4Q] = useState('');
+  const [binQ, setBinQ] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => { setPage(1); setLast4Q(last4); }, 300);
+    return () => clearTimeout(t);
+  }, [last4]);
+  useEffect(() => {
+    const t = setTimeout(() => { setPage(1); setBinQ(bin); }, 300);
+    return () => clearTimeout(t);
+  }, [bin]);
+
+  const load = useCallback(async () => {
+    if (!token || !accountRef) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      const r = await api.modules.accountAdmin.cards({
+        accountRef, token, page, limit,
+        network: network || undefined, status: status || undefined,
+        last4: last4Q || undefined, bin: binQ || undefined,
+      });
+      setRows(r.results as LinkedCard[]);
+      setTotal(r.total);
+      setManagedExternally(false);
+    } catch (e) {
+      if (e instanceof Error && e.message === 'managed_externally') setManagedExternally(true);
+      else notify(e instanceof Error ? e.message : 'Could not load linked cards.', 'error');
+      setRows([]); setTotal(0);
+    } finally { setLoading(false); }
+  }, [token, accountRef, page, limit, network, status, last4Q, binQ, notify]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const hasFilters = !!(network || status || last4Q || binQ);
+
+  return (
+    <div className="bg-white rounded-xl border p-5 space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+          <CreditCard size={14} className="text-blue-600" />
+        </div>
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Linked cards</h2>
+      </div>
+
+      {managedExternally ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3 text-sm text-amber-800">
+          <ShieldAlert size={16} className="text-amber-600 mt-0.5 shrink-0" />
+          <p>This capability is managed by an external provider; built-in administration is disabled.</p>
+        </div>
+      ) : (
+        <>
+          {/* Filters */}
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Network</label>
+              <select value={network} onChange={(e) => { setPage(1); setNetwork(e.target.value); }}
+                className="border rounded-lg px-3 py-1.5 text-sm">
+                <option value="">All</option>
+                {CARD_NETWORKS.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+              <select value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }}
+                className="border rounded-lg px-3 py-1.5 text-sm">
+                <option value="">All</option>
+                {CARD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">BIN</label>
+              <input value={bin} onChange={(e) => setBin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                placeholder="e.g. 411111" inputMode="numeric"
+                className="w-28 border rounded-lg px-3 py-1.5 text-sm font-mono" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Last 4</label>
+              <input value={last4} onChange={(e) => setLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                placeholder="1234" inputMode="numeric"
+                className="w-20 border rounded-lg px-3 py-1.5 text-sm font-mono" />
+            </div>
+          </div>
+
+          {/* Results */}
+          <div className="rounded-lg border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-gray-500 uppercase border-b bg-gray-50">
+                    <th className="py-2.5 px-4 font-medium">Masked PAN</th>
+                    <th className="py-2.5 px-4 font-medium">BIN</th>
+                    <th className="py-2.5 px-4 font-medium">Last 4</th>
+                    <th className="py-2.5 px-4 font-medium">Network</th>
+                    <th className="py-2.5 px-4 font-medium">Status</th>
+                    <th className="py-2.5 px-4 font-medium">Alias</th>
+                    <th className="py-2.5 px-4 font-medium text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td colSpan={7} className="py-8 text-center text-gray-400">Loading…</td></tr>
+                  ) : rows.length === 0 ? (
+                    <tr><td colSpan={7} className="py-8 text-center text-gray-400">
+                      {hasFilters ? 'No cards match these filters.' : 'No cards are funded by this account.'}
+                    </td></tr>
+                  ) : rows.map((c) => (
+                    <tr key={c.paymentCardInstanceReference} className="border-b last:border-0 hover:bg-gray-50">
+                      <td className="py-2.5 px-4 font-mono">{c.paymentCardMaskedPanDisplay}</td>
+                      <td className="py-2.5 px-4 font-mono text-xs text-gray-500">{c.paymentCardBin ?? '-'}</td>
+                      <td className="py-2.5 px-4 font-mono text-xs text-gray-500">{c.paymentCardLast4 ?? '-'}</td>
+                      <td className="py-2.5 px-4">{c.paymentCardNetwork ?? '-'}</td>
+                      <td className="py-2.5 px-4"><span className={`text-xs px-2 py-0.5 rounded font-medium ${statusClass(c.paymentCardStatus)}`}>{c.paymentCardStatus}</span></td>
+                      <td className="py-2.5 px-4 truncate max-w-[160px]">{c.paymentCardAlias ?? '-'}</td>
+                      <td className="py-2.5 px-4 text-right">
+                        <Link href={`/system/admin/modules/card-issuer/cards/${encodeURIComponent(c.paymentCardInstanceReference)}`}
+                          className="text-xs text-[#001E2B] font-medium hover:underline">View</Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {total > 0 && (
+              <div className="px-4 border-t">
+                <Pagination page={page} totalPages={totalPages} total={total} limit={limit}
+                  onPageChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); }} noun="cards" />
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

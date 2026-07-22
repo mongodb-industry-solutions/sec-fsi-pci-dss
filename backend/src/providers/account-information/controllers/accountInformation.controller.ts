@@ -26,7 +26,7 @@ import {
   type UpdatePayoutAccountInput,
 } from '../../../modules/gateway/services/payoutAccount.service';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
-import { getCardsByFundingAccount } from '../../../modules/customer/services/paymentCard.service';
+import { listAllCards } from '../../../modules/customer/services/paymentCard.service';
 import { deriveMaskedPan } from '../../../modules/customer/models/paymentCard.model';
 import { resolveOwnerNameByParty, searchPartiesByOwner } from '../../card-issuer/ports/owner.port';
 
@@ -257,22 +257,36 @@ export async function accountInformationController(fastify: FastifyInstance) {
   });
 
   // GET /accounts/:accountRef/cards (v30 cross-linking): list the payment cards funded by this
-  // account (SD-88 cardAccountReference). Reuses getCardsByFundingAccount via the Card-by-account
+  // account (SD-88 cardAccountReference). Reuses listAllCards (funding filter) via the Card-by-account
   // port. Display-safe (no full PAN, no CVV).
   fastify.get('/accounts/:accountRef/cards', {
     preHandler: [requirePermission('accounts', 'view'), gate],
     schema: {
       tags: ['modules:account-information'],
-      summary: 'List cards funded by a payout account (cross-linking)',
+      summary: 'List cards funded by a payout account (cross-linking, paginated)',
+      description: 'Paginated, filterable list of the cards funded by this account (SD-88 '
+        + 'cardAccountReference). Standard filters: network, status, last4, BIN. Display-safe (no full PAN/CVV).',
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['accountRef'], properties: { accountRef: { type: 'string' } } },
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', minimum: 1, default: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+          network: { type: 'string', enum: ['VISA', 'MASTERCARD', 'AMEX', 'ELO'] },
+          status: { type: 'string', enum: ['issued', 'active', 'pending_activation', 'blocked', 'suspended', 'revoked', 'expired'] },
+          last4: { type: 'string' },
+          bin: { type: 'string' },
+        },
+      },
       response: { 200: { type: 'object', additionalProperties: true }, 403: { $ref: 'Error#' }, 409: { $ref: 'Error#' } },
     },
   }, async (request, reply) => {
     const { accountRef } = request.params as { accountRef: string };
-    const { results } = await getCardsByFundingAccount(fastify.db, accountRef);
-    const cards = results.map((c) => ({ ...c, paymentCardMaskedPanDisplay: deriveMaskedPan(c as Record<string, string | undefined>) }));
-    return reply.send({ results: cards, total: cards.length });
+    const q = (request.query ?? {}) as { page?: number; limit?: number; network?: string; status?: string; last4?: string; bin?: string };
+    const result = await listAllCards(fastify.db, { ...q, funding: accountRef });
+    result.results = (result.results as Array<Record<string, unknown>>).map((c) => ({ ...c, paymentCardMaskedPanDisplay: deriveMaskedPan(c as Record<string, string | undefined>) }));
+    return reply.send(result);
   });
 
   // GET /accounts/:accountRef/iban (v30 reveal): full IBAN for operations_officer from the admin
