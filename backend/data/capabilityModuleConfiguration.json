@@ -168,8 +168,9 @@
     "moduleDomain": "gateway",
     "capabilityModuleStatus": "active",
     "moduleConfig": {
-      "alwaysVerify": true,
-      "allowedStatuses": ["active"]
+      "alwaysVerifyActive": true,
+      "returnInternalBalance": true,
+      "identityCheckEnabled": true
     },
     "moduleCallbackEndpoints": [],
     "bianServiceDomain": "SD-36 Open Banking AIS",
