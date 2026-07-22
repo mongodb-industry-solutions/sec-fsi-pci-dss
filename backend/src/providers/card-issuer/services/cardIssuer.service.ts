@@ -23,9 +23,19 @@ export interface CardNetworkRule {
   enabled: boolean;
 }
 
+/**
+ * Which CVV values the engine accepts:
+ *  - `both`     (default): the global escape-hatch CVV OR the realistic per-card derived CVV.
+ *  - `global`   : only the fixed global CVV (fast demo, no per-card lookup).
+ *  - `per_card` : only the derived per-card CVV (strict/realistic demo).
+ */
+export type CvvMode = 'both' | 'global' | 'per_card';
+
 export interface CardIssuerSimulatorConfig {
-  /** The single CVV the simulator accepts. A fixed demo value, never a real card secret. */
+  /** The single global CVV the simulator accepts (escape hatch). A fixed demo value, never a real card secret. */
   validCvv: string;
+  /** CVV acceptance mode (see CvvMode). Defaults to `both` so existing v29 demos keep working. */
+  cvvMode: CvvMode;
   /** When true, full card numbers must pass the Luhn checksum. */
   enforceLuhn: boolean;
   /** Supported card networks. Extend this list to add a new network. */
@@ -36,6 +46,7 @@ export interface CardIssuerSimulatorConfig {
 // back here, so the simulator always has a working rule set.
 export const DEFAULT_CARD_ISSUER_CONFIG: CardIssuerSimulatorConfig = {
   validCvv: '123',
+  cvvMode: 'both',
   enforceLuhn: true,
   networks: [
     { name: 'VISA',       prefixes: ['4'],                     lengths: [13, 16, 19], cvvLength: 3, enabled: true },
@@ -49,8 +60,11 @@ export const DEFAULT_CARD_ISSUER_CONFIG: CardIssuerSimulatorConfig = {
 // wholesale (so an operator can curate the exact supported set).
 export function resolveCardIssuerConfig(moduleConfig: Record<string, unknown> | undefined | null): CardIssuerSimulatorConfig {
   const c = (moduleConfig ?? {}) as Partial<CardIssuerSimulatorConfig>;
+  const cvvMode: CvvMode = c.cvvMode === 'global' || c.cvvMode === 'per_card' || c.cvvMode === 'both'
+    ? c.cvvMode : DEFAULT_CARD_ISSUER_CONFIG.cvvMode;
   return {
     validCvv: typeof c.validCvv === 'string' && c.validCvv.length ? c.validCvv : DEFAULT_CARD_ISSUER_CONFIG.validCvv,
+    cvvMode,
     enforceLuhn: typeof c.enforceLuhn === 'boolean' ? c.enforceLuhn : DEFAULT_CARD_ISSUER_CONFIG.enforceLuhn,
     networks: Array.isArray(c.networks) && c.networks.length ? c.networks : DEFAULT_CARD_ISSUER_CONFIG.networks,
   };
@@ -131,7 +145,29 @@ export interface CardValidationResult {
 // is present (direct simulator test) it runs network detection, Luhn and length checks; when only a
 // masked PAN + network are present (the tokenized payment path) it validates the network is
 // supported and the CVV when supplied. The PAN/CVV are used only transiently and never persisted.
-export function validateCard(input: Record<string, unknown>, config: CardIssuerSimulatorConfig): CardValidationResult {
+export interface CardValidationOptions {
+  /** Realistic per-card CVV derived from the CVK (HMAC). Compared when cvvMode allows per-card. */
+  perCardCvv?: string;
+  /** True when the card is registered (card-on-file exists and is active). */
+  cardRegistered?: boolean;
+  /** True when the card has a known funding/payout account linked. */
+  hasFundingAccount?: boolean;
+}
+
+// Accept the supplied CVV against the configured mode: the global escape-hatch value and/or the
+// realistic per-card derived value. The length check (when the network is known) still applies.
+function cvvAccepted(cvv: string, config: CardIssuerSimulatorConfig, perCardCvv: string | undefined): boolean {
+  const globalOk = (config.cvvMode === 'global' || config.cvvMode === 'both') && cvv === config.validCvv;
+  const perCardOk = (config.cvvMode === 'per_card' || config.cvvMode === 'both')
+    && !!perCardCvv && cvv === perCardCvv;
+  return globalOk || perCardOk;
+}
+
+export function validateCard(
+  input: Record<string, unknown>,
+  config: CardIssuerSimulatorConfig,
+  opts: CardValidationOptions = {},
+): CardValidationResult {
   const fullPan = digitsOnly(input.cardNumber ?? input.pan ?? input.primaryAccountNumber ?? input.fullCardNumber);
   const maskedPan = typeof input.maskedPan === 'string' ? input.maskedPan
     : typeof input.cardTransactionMaskedPanDisplay === 'string' ? input.cardTransactionMaskedPanDisplay : '';
@@ -180,12 +216,24 @@ export function validateCard(input: Record<string, unknown>, config: CardIssuerS
     return { approved: false, responseCode: '82', network, cvvValidationResult: 'not_provided', decisionReason: 'cvv_required', last4 };
   }
 
-  // CVV check (only when a CVV is supplied; the tokenized path does not send one). The length is only
+  // Registration + funding-account checks (v30): a card the PSP does not know, or one without a
+  // known funding/payout account, is declined. These facts are resolved by the caller via the Card
+  // Reference / Funding Account ports; they are only enforced when the caller asserts them (the
+  // direct simulator test path leaves them undefined and stays lenient).
+  if (opts.cardRegistered === false) {
+    return { approved: false, responseCode: '56', network, cvvValidationResult: 'not_provided', decisionReason: 'card_not_registered', last4 };
+  }
+  if (opts.hasFundingAccount === false) {
+    return { approved: false, responseCode: '57', network, cvvValidationResult: 'not_provided', decisionReason: 'no_funding_account', last4 };
+  }
+
+  // CVV check (only when a CVV is supplied; the tokenized path does not send one). Accept the global
+  // escape-hatch value and/or the realistic per-card derived value per cvvMode. The length is only
   // enforced when we know the network (and therefore its expected CVV length).
   let cvvValidationResult: CardValidationResult['cvvValidationResult'] = 'not_provided';
   if (cvv) {
     const lengthOk = rule ? cvv.length === rule.cvvLength : true;
-    const ok = cvv === config.validCvv && lengthOk;
+    const ok = cvvAccepted(cvv, config, opts.perCardCvv) && lengthOk;
     cvvValidationResult = ok ? 'match' : 'no_match';
     if (!ok) {
       return { approved: false, responseCode: '82', network, cvvValidationResult, decisionReason: 'invalid_cvv', last4 };
@@ -207,8 +255,9 @@ export type CardIssuerValidationResponse = CardIssuerInboundPayload & {
 export function validateCardIssuer(
   input: Record<string, unknown>,
   config: CardIssuerSimulatorConfig = DEFAULT_CARD_ISSUER_CONFIG,
+  opts: CardValidationOptions = {},
 ): CardIssuerValidationResponse {
-  const r = validateCard(input, config);
+  const r = validateCard(input, config, opts);
   return {
     cardStatus: 'active',
     actionConfirmed: r.approved,

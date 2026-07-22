@@ -143,6 +143,7 @@
     "capabilityModuleStatus": "active",
     "moduleConfig": {
       "validCvv": "123",
+      "cvvMode": "both",
       "enforceLuhn": true,
       "networks": [
         { "name": "VISA", "prefixes": ["4"], "lengths": [13, 16, 19], "cvvLength": 3, "enabled": true },

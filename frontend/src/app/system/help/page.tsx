@@ -245,7 +245,7 @@ const MONGODB_MAPPING = [
     docs: 'https://www.mongodb.com/docs/atlas/security-private-endpoint/' },
   { reqs: '3', area: 'Protect Stored Account Data (PAN/SAD)',
     features: ['Queryable Encryption (QE); equality search on encrypted fields', 'Client-Side Field Level Encryption (CSFLE)', 'Customer-Managed Keys (CMK) via AWS KMS, Azure Key Vault, GCP KMS, or KMIP', 'Envelope encryption; data keys encrypted by master keys you control'],
-    description: 'MongoDB Queryable Encryption is the only commercially available solution enabling equality searches on encrypted fields without the database server ever seeing plaintext PAN. Data is encrypted by the application driver using AEAD (AES-256-CBC + HMAC-SHA512) before reaching the database.',
+    description: 'MongoDB Queryable Encryption is the only commercially available solution enabling equality searches on encrypted fields without the database server ever seeing plaintext PAN. Data is encrypted by the application driver using AEAD (AES-256-CBC + HMAC-SHA512) before reaching the database. In this demo the full PAN and service code are stored with QE:equality only inside the module-owned issuer vault (cardIssuerVault); the PSP core keeps token + BIN + last4 and is descoped for the PAN. Envelope encryption runs KMS/master key → DEK → issuer key (CVK), from which the per-card CVV is derived on demand and never stored.',
     docs: 'https://www.mongodb.com/docs/manual/core/queryable-encryption/' },
   { reqs: '4', area: 'Protect Data in Transit',
     features: ['TLS 1.2/1.3 enforced for all Atlas connections', 'Certificate management via Atlas', 'Driver-level TLS certificate validation', 'Minimum TLS version configurable (TLS 1.2 floor)'],
@@ -540,7 +540,9 @@ export function HelpContent({ tab }: { tab: Tab }) {
             <p className="text-gray-400 text-sm leading-relaxed mb-3">
               The goal is to show that Atlas can support a regulated payments workload end to end.{' '}
               <span className="text-gray-200 font-medium">Queryable Encryption</span> lets analysts search sensitive
-              cardholder data (card reference, PAN) by exact match while the database server never sees the plaintext;
+              cardholder and personal data by exact match while the database server never sees the plaintext; the full PAN
+              lives only in the built-in issuer module vault (the PSP core keeps token + BIN + last4) and the CVV is
+              derived per card, never stored;
               <span className="text-gray-200 font-medium"> role-scoped clients and RBAC</span> control what each role may
               decrypt; and <span className="text-gray-200 font-medium">append-only audit events</span> record every
               sensitive access for review.
@@ -630,7 +632,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {[
-                { req: 'Req 3',    title: 'Stored Data Protection', desc: 'PAN encrypted via Queryable Encryption; CVV never stored after auth.' },
+                { req: 'Req 3',    title: 'Stored Data Protection', desc: 'Full PAN only in the issuer module vault (QE); PSP core keeps token + BIN + last4; CVV derived, never stored.' },
                 { req: 'Req 7, 8', title: 'Access Control and Auth', desc: 'Data-driven RBAC (ADR-030); each role gets the minimum data access.' },
                 { req: 'Req 10',   title: 'Audit Logging',           desc: 'Every case action logged with user, timestamp, and action type.' },
                 { req: 'BIAN',     title: 'Service Domain Model',    desc: 'SD-53/91 identity, SD-64/65/66 payments, SD-83 fraud, SD-88/89, SD-193.' },

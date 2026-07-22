@@ -43,6 +43,7 @@ vi.mock('../../../../backend/src/modules/provider/services/integrationRoutingGro
 vi.stubGlobal('fetch', h.fetchMock);
 
 import { dispatchProvider } from '../../../../backend/src/modules/provider/services/integrationDispatch.service';
+import { resolveProviderFromGroup } from '../../../../backend/src/modules/provider/services/integrationRoutingGroup.service';
 
 function makeDb() {
   return { collection: h.collection } as unknown as Parameters<typeof dispatchProvider>[0];
@@ -144,6 +145,47 @@ describe('businessContext persisted in integrationEvents', () => {
     await dispatchProvider(makeDb(), 'fraud_detection', 'test', { amount: 50 });
     const doc = h.insertOne.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(doc.businessContext).toBeUndefined();
+  });
+});
+
+// ── category routing (no hardcoded provider in domain) — dev.v30 FR-30.9 ──────
+
+describe('category routing (dev.v30 FR-30.9 / R9)', () => {
+  it('resolves the active provider for the exact category passed by the caller', async () => {
+    h.findOne.mockResolvedValueOnce(makeProvider({ externalProviderArrangementType: 'card_issuer' }));
+    await dispatchProvider(makeDb(), 'card_issuer', 'card.issuer.validation.requested', {});
+    // getActiveProviderForType (mocked as h.findOne) must be called with the caller's category,
+    // proving the type is data-driven and not hardcoded in the dispatch path.
+    expect(h.findOne).toHaveBeenCalledWith(expect.anything(), 'card_issuer');
+  });
+
+  it('routes each category independently (card_issuer, fraud_detection, hrp_sanctions, account_information)', async () => {
+    for (const category of ['card_issuer', 'fraud_detection', 'hrp_sanctions', 'account_information'] as const) {
+      h.findOne.mockResolvedValueOnce(makeProvider({ externalProviderArrangementType: category }));
+      await dispatchProvider(makeDb(), category, `${category}.test`, {});
+      expect(h.findOne).toHaveBeenLastCalledWith(expect.anything(), category);
+    }
+  });
+});
+
+// ── routing-group resolution — endpoint-first on the resolved member ──────────
+
+describe('routing group resolution (ADR-025)', () => {
+  it('dispatches to the group-resolved external member when it has an endpoint', async () => {
+    h.findOne.mockResolvedValueOnce(
+      makeProvider({ externalProviderIsInternal: false, routingGroupId: 'grp-1' })
+    );
+    // The group lookup uses db.collection(...).findOne — reuse the same mock; return a group doc.
+    h.findOne.mockResolvedValueOnce({ routingGroupInstanceReference: 'grp-1' });
+    vi.mocked(resolveProviderFromGroup).mockResolvedValueOnce(
+      makeProvider({
+        externalProviderIsInternal: false,
+        externalProviderApiEndpoint: 'https://api.vendor.com/score',
+      }) as never
+    );
+    const result = await dispatchProvider(makeDb(), 'fraud_detection', 'test', {});
+    expect(h.fetchMock).toHaveBeenCalledWith('https://api.vendor.com/score', expect.objectContaining({ method: 'POST' }));
+    expect(result.provider).toBe('external');
   });
 });
 

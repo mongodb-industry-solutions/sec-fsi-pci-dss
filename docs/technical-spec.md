@@ -4094,3 +4094,157 @@ use `dualPermission` (session RBAC `paymentRequests:view/manage` OR merchant OAu
 + merchant client seed + REQUESTED_SCOPES). Config gate `PSP_RTP_ENABLED`. ISO 20022 mapper: `rtpIso20022.mapper.ts`.
 
 *Added 2026-07-17 (v28).*
+
+## 15. v30 — Realistic per-card CVV, issuer CVK, and the card-issuer PAN vault (SD-88)
+
+v30 raises the fidelity of the built-in `card-issuer` module so the CVV behaves as it does in a real
+issuer (derived per card from an issuer key, never stored), while keeping a global escape-hatch CVV for
+fast demos. It also introduces the first **module-owned data**: the issuer key (CVK) in the key vault and
+a dedicated PAN vault collection (`cardIssuerVault`). The PSP core stays descoped for the PAN: it keeps
+only the token plus BIN and last 4. See ADR-043 and ADR-044 in `engineering-proposal.md`.
+
+### 15.1 CVV derivation + `cvvMode`
+
+Source: `backend/src/providers/card-issuer/services/cardVerificationKey.service.ts`.
+
+The per-card CVV is derived, never persisted (PCI DSS Req 3.2, SAD):
+
+```
+perCardCvv(card) = digits( HMAC-SHA256( CVK, cardToken + '|' + expiryMMYY + '|' + serviceCode ) )[0 : cvvLength]
+```
+
+- `cvvLength` per network: Visa / Mastercard = 3, Amex = 4.
+- `cardToken` = `paymentCardReference` (surrogate, not CHD); `expiryMMYY` from `paymentCardExpirationDate`;
+  `serviceCode` from the vault (`cardServiceCode`) or the constant `'201'` when the vault is inactive.
+- Derived on demand in validation and reveal; the value never enters any collection, log, listing, or
+  validation response.
+
+Config key `cvvMode` in `capabilityModuleConfiguration` for capability `card-issuer` (via `GET|PUT /config`):
+
+| `cvvMode` | Accepted CVV |
+|---|---|
+| `both` (default) | global escape-hatch (`validCvv`, default `'123'`) OR the derived per-card CVV |
+| `global` | only the global `validCvv` (simple demo) |
+| `per_card` | only the derived per-card CVV (strict / realistic demo) |
+
+### 15.2 CVK in the key vault (envelope encryption)
+
+The Card Verification Key (CVK) is issuer key material owned by the `card-issuer` module, one per module
+instance in v30. It is provisioned once and never stored in cleartext:
+
+```
+KMS / master key  →  DEK (wrapped in encryption.__keyVault)  →  CVK (HKDF from the unwrapped DEK)
+```
+
+- `provisionCardIssuerCvk()` provisions the DEK (idempotent, by `keyAltNames` alias) and wires from
+  `vendors/setup/provisionDEKs.ts`; `getCardIssuerCvk()` unwraps via the raw (non-QE) client and derives
+  the CVK in memory only via HKDF; `derivePerCardCvv()` computes the HMAC.
+- Rotation: rotate the DEK / re-key the vault; the CVV contract is unchanged. Per-card CVK is out of scope
+  for v30.
+- No new business collection and no new CHD are introduced by the CVV feature itself.
+
+### 15.3 `cardIssuerVault` — module-owned PAN vault (BIAN Card Administration)
+
+Module-owned CDE collection, only present / used while the built-in `card-issuer` is the active provider.
+BIAN control record: **Card Administration** (the issued device of the issuer), confirmed in F0, not
+invented. The PSP core never reads this collection; the cross-frontier read is only via a port.
+
+```typescript
+export const CARD_ISSUER_VAULT_COLLECTION = 'cardIssuerVault';
+
+export interface CardIssuerVaultControlRecord {
+  issuedCardInstanceReference: string;        // PK, UUID (module key)
+  paymentCardReference: string;               // FK token; join to the core via the Card Reference port
+  paymentCardInstanceReference: string;       // FK to the core arrangement
+  paymentCardNumber: string;                  // full PAN (CHD) — QE:equality
+  cardServiceCode: string;                    // issuer data, CVV derivation input — QE:equality
+  cardIssuerCvkKeyId: string;                 // reference to the DEK/CVK (not the key itself)
+  issuedCardStatus: string;
+  bianServiceDomain: 'Card Administration';
+  bianControlRecordType: 'CardAdministration';
+  recordCreatedDateTime: Date;
+  schemaVersion: number;
+  // CVV: SAD — never stored (derived)
+}
+```
+
+QE fields (`vendors/encryption/encryptedFieldsMaps.ts`), equality only (compatible with server 8.0;
+substring/suffix intentionally OFF, R13):
+
+| Field | Classification | QE | DEK |
+|---|---|---|---|
+| `paymentCardNumber` (full PAN) | CHD | QE:equality | `DEK-vault-pan` (`deks.vaultPan`) |
+| `cardServiceCode` | issuer data | QE:equality | `DEK-vault-service-code` (`deks.vaultServiceCode`) |
+
+### 15.4 Core `paymentCardManagement` changes (descoped for PAN)
+
+| Field | Change | Classification | Storage |
+|---|---|---|---|
+| `paymentCardBin` (first 6) | NEW | non-CHD (BIN, PCI permits ≤ 8) | plaintext, indexed (BIN prefix + network) |
+| `paymentCardLast4` (last 4) | NEW | non-CHD | plaintext, indexed (display + equality / suffix search) |
+| `paymentCardMaskedPanDisplay` | no longer persisted | display only | derived on the fly from `bin` + `last4` + `network` via `deriveMaskedPan()` |
+
+The masked PAN string is still returned by the API (computed in the DTO), so there is no v29 breaking
+change. The interface keeps the field optional for compile safety; the seed `$unset`s it. The
+`cardTransactionLog.cardTransactionMaskedPanDisplay` ledger snapshot is untouched (append-only, immutable).
+The core never stores the full PAN; removing the module (or using an external provider) leaves the core
+without PAN CHD.
+
+### 15.5 Ports (Hexagonal, cross-frontier reads)
+
+| Port | Purpose |
+|---|---|
+| Card Reference port | module reads `paymentCardManagement` (token, expiry, status, funding account) |
+| Funding Account port | resolve `payoutAccountArrangement` from a card (validation + cross-linking) |
+| Card-by-account port | `account-information` lists cards by funding account (reuses `getCardsByFundingAccount`) |
+
+### 15.6 API surface (additive)
+
+Built-in `card-issuer` (`/api/v1/modules/card-issuer`):
+- `POST /score` — extended: validates network + format (Luhn + length) + registered (card-on-file via
+  Card Reference port) + funding account known (Funding Account port) + CVV (global | per-card per
+  `cvvMode`). Loopback (`skipAuth` + `X-Integration-Source`). No CVV in the response.
+- `POST /reveal` — new loopback: derives and returns the ephemeral CVV (owner provider flow only).
+- `POST /reveal-pan` — new loopback: returns the ephemeral PAN (owner provider flow only).
+- `GET /cards/:cardId/cvv` — new (JWT): direct reveal for `operations_officer`.
+  `requirePermission('cards','manage')` + `requireInternalProvider('card_issuer')` + audit
+  `card.cvv.revealed`. 409 `managed_externally` when external; 403 for other roles.
+- `GET /cards/:cardId/pan` — new (JWT): direct PAN reveal for `operations_officer`, same gate, audit
+  `card.pan.revealed`.
+- `GET /cards/:cardId` — extended: includes a `fundingAccount` sub-object (QE-stripped: alias, bank,
+  currency, status, `payoutAccountHasIban`) resolved via port. No CVV.
+- `GET /cards?last4=..&bin=..` — plaintext search on the core (last4 equality, BIN prefix).
+- `GET /cards?panExact=..` — QE equality search on the vault.
+- `GET|PUT /config` — adds `cvvMode` and derivation config (never exposes the CVK).
+
+Built-in `account-information` (`/api/v1/modules/account-information`):
+- `GET /accounts/:accountRef/cards` — new (JWT, `accounts:view` + gate): cards by funding account, via
+  the Card-by-account port. Display-safe, no CVV.
+- `GET /accounts/:accountRef/iban` — new: IBAN reveal for `operations_officer` from the admin panel,
+  internal gate, audit `account.iban.revealed`. Ephemeral.
+
+Core PSP (owner self-service, never direct to the module):
+- `POST /api/v1/customer/:customerId/cards/:cardId/cvv` — owner reveal via
+  `dispatchProvider('card_issuer', 'card.cvv.reveal.requested')`. Owner-only + step-up + audit.
+- `POST /api/v1/customer/:customerId/cards/:cardId/pan` — owner PAN reveal via
+  `dispatchProvider('card_issuer', 'card.pan.reveal.requested')`. Owner-only + step-up + audit.
+
+Reveal gate decision (F0): `cards:manage` + mandatory audit, no new `viewSensitive` permission
+(step-up MFA/SCA in production).
+
+### 15.7 Indexes + setup/seed (single source of truth, R5)
+
+- `vendors/setup/createCollections.ts`: create `cardIssuerVault` (QE collection with its
+  `encryptedFieldsMap`); reflect core `paymentCardBin` / `paymentCardLast4` and the removal of the
+  persisted `paymentCardMaskedPanDisplay`.
+- `vendors/encryption/encryptedFieldsMaps.ts`: PAN (equality) + `cardServiceCode` (equality) for the vault.
+- `vendors/encryption/keyVault.ts` / `provisionDEKs.ts`: CVK DEK + `vaultPan` + `vaultServiceCode` DEKs
+  (deterministic, idempotent).
+- `vendors/setup/createIndexes.ts`: vault indexes on `paymentCardReference` and
+  `paymentCardInstanceReference`; core indexes on `paymentCardBin` and `paymentCardLast4` (idempotent).
+- `vendors/seed/*`: seed `cardIssuerVault` with the deterministic full PAN (upsert by
+  `paymentCardInstanceReference`) and `cardServiceCode`; populate core `bin` / `last4` from that PAN and
+  `$unset` the persisted masked; provision the CVK once. Requires a `--reset` + reseed because the QE
+  encrypted fields change.
+
+*Added 2026-07-22 (v30). Version 2.4.0.*

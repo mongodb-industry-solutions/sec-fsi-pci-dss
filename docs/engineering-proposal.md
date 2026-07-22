@@ -1975,3 +1975,103 @@ only the parallel route surface is gone. Trade-off: capability handlers now bran
 public-exact transactions route needs its bespoke OAuth detection.
 
 *Added 2026-07-09 (v23; doc + code together per repo rules).*
+
+---
+
+## ADR-043: Collection classification — Core PSP vs Integration/EDA infra vs Module-owned (v30)
+
+**Status:** Accepted (2026-07-22).
+
+**Context:** As built-in modules become extractable to microservices (ADR-029), the codebase needs an
+explicit statement of which collections are the PSP's own business domain, which are integration / event
+infrastructure, and which belong to a replaceable module. Until v30 every collection was either core or
+stateless module config; the card-issuer PAN vault (ADR-044) is the first case of a module owning its own
+data, so the boundary must be written down together with the ports that cross it.
+
+**Decision:** Classify every collection into three groups and express all cross-frontier reads as ports.
+
+**Core PSP (business domain, never replaced by a provider):**
+`party`, `customerAgreementProcedure`, `customerAuthenticationAssessment`, `partyAuthenticationAssessment`,
+`partyAuthenticationKey`, `partyAuthorizationCode`, `partyBackchannelAuthentication`,
+`partyEnrolledCredential`, `partyIssuedToken`, `partyAuthConsent`, `authenticationDomain`, `role`,
+`paymentCardManagement`, `paymentCardRegistry`, `payoutAccountArrangement`, `cardTransactionLog`,
+`cardAuthorizationRecord`, `recurringMandateProcedure`, `counterpartyArrangement`, `consentAgreement`,
+`consentAccessLog`, `merchantAgreementProcedure`, `merchantAgreementEvents`, `paymentOrderProcedure`,
+`paymentExecutionProcedure`, `paymentRequestProcedure`, `paymentRequestEvent`, `paymentLinkRecord`,
+`qrPaymentRepresentation`, `checkoutSessionLog`, `notification`, `balanceCreditLog`, `counters`,
+`idempotencyKey`, `rtpAliasDirectoryCache`, `cardEtokenProcedure`.
+
+**Integration / EDA infrastructure (hub core, cross-cutting):**
+`externalProviderArrangement`, `externalProviderArrangementPortfolio`,
+`externalProviderArrangementActionLog`, `capabilityModuleConfiguration`, `businessProcessEvent`,
+`complianceProcessEvent`, `domainEvent`.
+
+**Module-owned (replaceable / extractable to a microservice):**
+- `card-issuer`: the **CVK** in the key vault (base v30) and the **`cardIssuerVault`** collection (issuer
+  CDE) holding the full PAN (QE:equality) plus `cardServiceCode` (QE:equality). BIAN control record:
+  Card Administration (confirmed, not invented). This is the **first module with owned data** and the
+  reference example of PCI scope containment: disabling the module (or routing the capability to an
+  external provider) leaves the core descoped for the PAN, which keeps only token + BIN + last 4.
+- Other modules (fds, aml, hrp, kyc, kyb, credit-bureau, card-authorization, account-information,
+  payment-initiation, vop): stateless today (only config in `capabilityModuleConfiguration`); their
+  verdicts project onto core collections (e.g. `customerCreditRatingState`). The module computes, the
+  core persists; each is replaceable by an external provider without touching the core.
+
+**Ports (Hexagonal, cross-frontier):**
+- **Card Reference port:** `card-issuer` reads `paymentCardManagement` (token, expiry, status, funding
+  account); on extraction it becomes an API / event.
+- **Funding Account port:** resolve `payoutAccountArrangement` from a card (validation + cross-linking).
+- **Card-by-account port:** `account-information` lists cards by funding account (reuses
+  `getCardsByFundingAccount`).
+
+`paymentCardManagement` / `paymentCardRegistry` stay **core** (cards-on-file needed to process payments
+with any issuer); the card-issuer module depends on them by port, it does not own them.
+
+**Consequences:** The extraction path for each module is explicit. The card-issuer PAN vault demonstrates
+scope containment (the CHD lives only in the module-owned CDE). The trade-off is a documented module→core
+coupling via ports, acceptable in the demo monolith and replaceable by API / event on extraction.
+
+*Added 2026-07-22 (v30; doc + code together per repo rules).*
+
+---
+
+## ADR-044: Realistic per-card CVV (issuer CVK) + module-owned PAN vault (v30)
+
+**Status:** Accepted (2026-07-22).
+
+**Context:** The card-issuer engine accepted a single global CVV (`123`). To hold up in expert
+conversations the CVV should behave as a real issuer computes it (derived per card from a secret issuer
+key in an HSM), and MongoDB's encryption story (QE, envelope encryption, SAD non-persistence) should be
+demonstrated on genuine issuer data. Storing the full PAN was requested as an optional issuer feature
+without pulling the PSP core into PCI scope.
+
+**Decision:**
+1. **Per-card CVV derivation.** `cvv = truncateDigits( HMAC-SHA256( CVK, cardToken | expiryMMYY |
+   serviceCode ), cvvLength )`, `cvvLength` per network (Visa/MC = 3, Amex = 4). Derived on demand in
+   validation and reveal; **never stored** (PCI DSS Req 3.2, SAD). A **global escape-hatch** CVV
+   (`validCvv`, default `123`) remains for fast demos, selected by `cvvMode` (`both` default | `global` |
+   `per_card`).
+2. **CVK envelope encryption.** The Card Verification Key is module-owned issuer key material, provisioned
+   once and stored only wrapped: KMS/master → DEK (key vault) → CVK (HKDF from the unwrapped DEK). Cleartext
+   CVK exists only in process memory. Demonstrates the KMS → DEK → secret chain.
+3. **Module-owned PAN vault.** The full PAN lives only in `cardIssuerVault` (QE:equality), never in the
+   core. `cardServiceCode` (a CVV derivation input, not full track data) is also QE:equality in the vault.
+   The core keeps token + `paymentCardBin` (first 6, non-CHD) + `paymentCardLast4` (non-CHD); the persisted
+   `paymentCardMaskedPanDisplay` is removed and derived on the fly (`deriveMaskedPan`). The
+   `cardTransactionLog` snapshot is untouched.
+4. **Search.** Day-to-day search is plaintext on the non-sensitive core: `last4` (equality) + `bin`
+   (prefix). Exact PAN lookup uses QE:equality on the vault (`panExact`). Substring / suffix QE is **off**
+   (equality only, compatible with server 8.0; avoids the 8.2 pin risk).
+5. **Reveal on demand (eye-icon pattern, like IBAN).** PAN and CVV are hidden by default and revealed
+   ephemerally, audited (`card.pan.revealed` / `card.cvv.revealed`). `operations_officer` reveals directly
+   from the built-in admin console (`GET /modules/card-issuer/cards/:id/{cvv,pan}`,
+   `cards:manage` + `requireInternalProvider('card_issuer')`); the card owner reveals via the provider flow
+   (`dispatchProvider('card_issuer', 'card.{cvv,pan}.reveal.requested')`), never directly to the module.
+   409 `managed_externally` when an external provider governs the capability. Step-up MFA/SCA in production.
+
+**Consequences:** The CVV is realistic and PCI-honest (derived from the PCI-safe token as the HSM analogue,
+never persisted). The PAN is CHD only inside the module-owned CDE, so removing the module descopes the core
+(ADR-043). Changing the vault's QE fields requires `--reset` + reseed. No new `viewSensitive` permission is
+added: `cards:manage` + mandatory audit is the gate.
+
+*Added 2026-07-22 (v30; doc + code together per repo rules).*

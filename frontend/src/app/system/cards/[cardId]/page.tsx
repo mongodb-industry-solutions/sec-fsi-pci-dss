@@ -8,6 +8,7 @@ import { getToken, decodeToken } from '../../../../lib/auth';
 import { useDebugMode } from '../../../../lib/debugMode';
 import { useConfirm, useNotify } from '../../../../components/ui/ConfirmProvider';
 import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
+import { SensitiveReveal } from '../../../../components/SensitiveReveal';
 
 // Owner self-service detail for one saved card (BIAN SD-88). Shows the surrogate token, expiry
 // (QE:none, owner-visible), lifecycle dates and status. The alias/note are the ONLY editable
@@ -439,6 +440,18 @@ export default function CardDetailPage() {
             <dl className="divide-y text-sm">
               <DetailRow label="Network" value={card.paymentCardNetwork} />
               <DetailRow label="Masked number" value={card.paymentCardMaskedPanDisplay} mono />
+              {/* Owner self-service reveals (self mode only). Step-up MFA would gate these in
+                  production; omitted for the demo. Values are ephemeral, on demand and re-hideable. */}
+              {!staffMode && agreementId && (
+                <>
+                  <SensitiveReveal label="Full PAN" masked={card.paymentCardMaskedPanDisplay}
+                    hint={debugMode ? 'ephemeral; not stored' : undefined}
+                    fetchValue={async () => (await api.customer.revealPan(agreementId, cardId, token)).pan} />
+                  <SensitiveReveal label="CVV"
+                    hint={debugMode ? 'ephemeral; not stored' : undefined}
+                    fetchValue={async () => (await api.customer.revealCvv(agreementId, cardId, token)).cvv} />
+                </>
+              )}
               <DetailRow label="Expires" value={card.paymentCardExpirationDate} mono
                 hint={debugMode ? 'QE:none; owner-visible' : undefined} />
               <DetailRow label="Card token" value={card.paymentCardReference} mono

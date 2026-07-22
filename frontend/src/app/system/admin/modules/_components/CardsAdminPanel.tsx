@@ -49,6 +49,8 @@ export function CardsAdminPanel() {
   const [network, setNetwork] = useState('');
   const [status, setStatus] = useState('');
   const [agreement, setAgreement] = useState('');
+  const [last4, setLast4] = useState('');
+  const [bin, setBin] = useState('');
 
   const [showCreate, setShowCreate] = useState(false);
 
@@ -57,7 +59,7 @@ export function CardsAdminPanel() {
     setLoading(true);
     try {
       const r = await api.modules.cardAdmin.list(
-        { page, limit, network: network || undefined, status: status || undefined, agreement: agreement || undefined },
+        { page, limit, network: network || undefined, status: status || undefined, agreement: agreement || undefined, last4: last4 || undefined, bin: bin || undefined },
         token,
       );
       setRows(r.results);
@@ -68,7 +70,7 @@ export function CardsAdminPanel() {
       else notify(e instanceof Error ? e.message : 'Could not load cards', 'error');
       setRows([]); setTotal(0);
     } finally { setLoading(false); }
-  }, [token, page, limit, network, status, agreement, notify]);
+  }, [token, page, limit, network, status, agreement, last4, bin, notify]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -141,6 +143,18 @@ export function CardsAdminPanel() {
             {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">BIN</label>
+          <input value={bin} onChange={(e) => { setPage(1); setBin(e.target.value.replace(/\D/g, '').slice(0, 8)); }}
+            placeholder="e.g. 411111" inputMode="numeric"
+            className="w-28 border rounded-lg px-3 py-1.5 text-sm font-mono" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Last 4</label>
+          <input value={last4} onChange={(e) => { setPage(1); setLast4(e.target.value.replace(/\D/g, '').slice(0, 4)); }}
+            placeholder="1234" inputMode="numeric"
+            className="w-20 border rounded-lg px-3 py-1.5 text-sm font-mono" />
+        </div>
         <div className="grow min-w-[220px]">
           <label className="block text-xs font-medium text-gray-600 mb-1">Agreement reference</label>
           <input value={agreement} onChange={(e) => { setPage(1); setAgreement(e.target.value); }}
@@ -155,6 +169,8 @@ export function CardsAdminPanel() {
             <thead>
               <tr className="text-left text-xs text-gray-500 uppercase border-b bg-gray-50">
                 <th className="py-2.5 px-4 font-medium">Masked PAN</th>
+                <th className="py-2.5 px-4 font-medium">BIN</th>
+                <th className="py-2.5 px-4 font-medium">Last 4</th>
                 <th className="py-2.5 px-4 font-medium">Network</th>
                 <th className="py-2.5 px-4 font-medium">Status</th>
                 <th className="py-2.5 px-4 font-medium">Alias</th>
@@ -164,12 +180,14 @@ export function CardsAdminPanel() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="py-8 text-center text-gray-400">Loading…</td></tr>
+                <tr><td colSpan={8} className="py-8 text-center text-gray-400">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={6} className="py-8 text-center text-gray-400">No cards</td></tr>
+                <tr><td colSpan={8} className="py-8 text-center text-gray-400">No cards</td></tr>
               ) : rows.map((c) => (
                 <tr key={c.paymentCardInstanceReference} className="border-b last:border-0 hover:bg-gray-50">
                   <td className="py-2.5 px-4 font-mono">{c.paymentCardMaskedPanDisplay}</td>
+                  <td className="py-2.5 px-4 font-mono text-xs text-gray-500">{c.paymentCardBin ?? '—'}</td>
+                  <td className="py-2.5 px-4 font-mono text-xs text-gray-500">{c.paymentCardLast4 ?? '—'}</td>
                   <td className="py-2.5 px-4">{c.paymentCardNetwork ?? '—'}</td>
                   <td className="py-2.5 px-4"><StatusBadge status={c.paymentCardStatus} /></td>
                   <td className="py-2.5 px-4">{c.paymentCardAlias ?? '—'}</td>
