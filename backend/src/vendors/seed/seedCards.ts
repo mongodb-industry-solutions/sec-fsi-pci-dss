@@ -55,15 +55,26 @@ export async function seedCards(db: Db) {
       if (explicitAccount) { keptExplicit++; continue; }
     }
 
-    // Prefer bank_account as funding source; fall back to any default active account type.
-    const account = await db.collection(PA_COL).findOne(
-      {
-        partyInstanceReference: agreement.partyInstanceReference,
-        payoutAccountIsDefault: true,
-        payoutAccountStatus: 'active',
-      },
-      { sort: { payoutAccountType: 1 } } // 'bank_account' < 'internal_ledger' < 'wallet' alphabetically
-    );
+    // Prefer the holder's default active account (bank_account first). Safety net: if none is marked
+    // default, fall back to ANY active bank_account the holder owns, so EVERY card ends up funded by
+    // a bank account (invariant: a card is always assigned to a bank account of its owner).
+    const account =
+      await db.collection(PA_COL).findOne(
+        {
+          partyInstanceReference: agreement.partyInstanceReference,
+          payoutAccountIsDefault: true,
+          payoutAccountStatus: 'active',
+        },
+        { sort: { payoutAccountType: 1 } }, // 'bank_account' < 'internal_ledger' < 'wallet' alphabetically
+      )
+      ?? await db.collection(PA_COL).findOne(
+        {
+          partyInstanceReference: agreement.partyInstanceReference,
+          payoutAccountType: 'bank_account',
+          payoutAccountStatus: 'active',
+        },
+        { sort: { recordCreatedDateTime: 1 } },
+      );
     if (!account) { noAccount++; continue; }
 
     const newRef = account.payoutAccountInstanceReference as string;

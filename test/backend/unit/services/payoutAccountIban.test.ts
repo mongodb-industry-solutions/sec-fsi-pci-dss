@@ -28,6 +28,14 @@ describe('generateDemoIban', () => {
     expect(ibanIsValid(generateDemoIban(''))).toBe(true);
     expect(generateDemoIban('').slice(0, 2)).toBe('GB');
   });
+
+  it('is DETERMINISTIC for a given seed (seed backfill stays idempotent, R6)', () => {
+    const ref = 'pau00004-0000-4000-8000-000000000004';
+    expect(generateDemoIban('ES', ref)).toBe(generateDemoIban('ES', ref));
+    expect(generateDemoRouting(ref)).toBe(generateDemoRouting(ref));
+    // Different seeds give different values.
+    expect(generateDemoIban('ES', 'a')).not.toBe(generateDemoIban('ES', 'b'));
+  });
 });
 
 describe('generateDemoRouting', () => {

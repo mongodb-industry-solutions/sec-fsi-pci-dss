@@ -3,6 +3,7 @@
 
 import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
+import { createHash } from 'node:crypto';
 import {
   PAYOUT_ACCOUNT_COLLECTION,
   PayoutAccountArrangement,
@@ -11,16 +12,31 @@ import {
   PayoutRail,
 } from '../models/payoutAccount.model';
 
+// Stable stream of decimal digits. With a seed it is DETERMINISTIC (SHA-256 of the seed), so
+// seed backfill stays idempotent (R6); without a seed it falls back to a random stream.
+function digitStream(seed: string | undefined, n: number): string {
+  let out = '';
+  if (seed) {
+    let i = 0;
+    while (out.length < n) {
+      const h = createHash('sha256').update(`${seed}:${i++}`).digest('hex');
+      out += BigInt(`0x${h}`).toString().replace(/\D/g, '');
+    }
+  } else {
+    while (out.length < n) out += Math.floor(Math.random() * 1e15).toString();
+  }
+  return out.slice(0, n);
+}
+
 // Demo IBAN generator (v30.1). Produces a well-formed IBAN with a valid ISO 7064 mod-97 check.
-// Demo data only, never a real account. BBAN length is per-country (approximate) with the remainder
-// filled from the seed. The IBAN is stored QE-encrypted like any other.
+// Demo data only, never a real account. Deterministic when a seed is given (idempotent seed backfill).
+// The IBAN is stored QE-encrypted like any other.
 export function generateDemoIban(countryCode: string, seed?: string): string {
   const cc = (countryCode || 'GB').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2).padEnd(2, 'X');
   // BBAN length by country (fallback 18). Kept simple; digits only for the demo.
   const bbanLen: Record<string, number> = { GB: 18, DE: 18, ES: 20, FR: 23, US: 18, NL: 14, IT: 23, PT: 21 };
   const len = bbanLen[cc] ?? 18;
-  const base = (seed ? seed.replace(/\D/g, '') : '') + Math.floor(Math.random() * 1e12).toString();
-  const bban = (base + '000000000000000000000000').slice(0, len);
+  const bban = digitStream(seed, len);
   // mod-97: move CC+00 to the end, encode letters (A=10..Z=35), compute 98 - (n mod 97).
   const rearranged = `${bban}${cc}00`;
   const numeric = rearranged.replace(/[A-Z]/g, (ch) => (ch.charCodeAt(0) - 55).toString());
@@ -30,10 +46,9 @@ export function generateDemoIban(countryCode: string, seed?: string): string {
   return `${cc}${check}${bban}`;
 }
 
-// Demo routing / national clearing number (9 digits, ABA-style). Demo data only.
+// Demo routing / national clearing number (9 digits, ABA-style). Deterministic when seeded. Demo only.
 export function generateDemoRouting(seed?: string): string {
-  const base = (seed ? seed.replace(/\D/g, '') : '') + Math.floor(Math.random() * 1e9).toString();
-  return (base + '000000000').slice(0, 9);
+  return digitStream(seed, 9);
 }
 
 export interface CreatePayoutAccountInput {
