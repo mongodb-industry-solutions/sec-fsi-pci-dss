@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Briefcase, AlertTriangle, ShieldCheck, CheckCircle2, Receipt, TrendingUp, CalendarDays, Store, Clock, Plug } from 'lucide-react';
+import { Briefcase, AlertTriangle, ShieldCheck, CheckCircle2, Receipt, TrendingUp, CalendarDays, Store, Clock, Plug, CreditCard, Landmark } from 'lucide-react';
 import { api } from '../../lib/api';
 import { StatCard, MonthlyBars, BreakdownBars } from './Stats';
 
@@ -158,11 +158,55 @@ function ManagerStats({ token }: { token: string }) {
   );
 }
 
+// ── Operations officer: card (SD-88) + payout-account (SD-66) inventory ─────────
+// Aggregates only (counts by lifecycle status). No CHD/PII: statuses, never PAN/IBAN. If a capability
+// is managed by an external provider the admin list returns 409 (managed_externally); that side is
+// simply omitted (Promise.allSettled), so the panel still renders whatever is internally administered.
+type OpsCard = { paymentCardStatus: string };
+type OpsAcct = { payoutAccountStatus: string };
+function OperationsStats({ token }: { token: string }) {
+  const [cards, setCards] = useState<{ results: OpsCard[]; total: number } | null>(null);
+  const [accts, setAccts] = useState<{ results: OpsAcct[]; total: number } | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    Promise.allSettled([
+      api.modules.cardAdmin.list({ limit: 100 }, token),
+      api.modules.accountAdmin.list({ limit: 100 }, token),
+    ]).then(([c, a]) => {
+      if (c.status === 'fulfilled') setCards({ results: c.value.results as unknown as OpsCard[], total: c.value.total });
+      if (a.status === 'fulfilled') setAccts({ results: a.value.results as unknown as OpsAcct[], total: a.value.total });
+    }).finally(() => setLoading(false));
+  }, [token]);
+  if (loading) return <Loading />;
+  if (!cards && !accts) return null;
+  const cardRows = cards?.results ?? [];
+  const acctRows = accts?.results ?? [];
+  const cardCount = (s: string) => cardRows.filter((c) => c.paymentCardStatus === s).length;
+  const acctCount = (s: string) => acctRows.filter((a) => a.payoutAccountStatus === s).length;
+  const cardStatuses = tally(cardRows, (c) => c.paymentCardStatus);
+  const acctStatuses = tally(acctRows, (a) => a.payoutAccountStatus);
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard icon={<CreditCard size={14} />} label="Cards" value={String(cards?.total ?? 0)} sub="on file (excl. revoked)" />
+        <StatCard icon={<CheckCircle2 size={14} />} label="Active cards" value={String(cardCount('active'))} accent="text-green-600" />
+        <StatCard icon={<Clock size={14} />} label="Suspended cards" value={String(cardCount('suspended'))} accent="text-orange-600" />
+        <StatCard icon={<Landmark size={14} />} label="Payout accounts" value={String(accts?.total ?? 0)} sub={`${acctCount('active')} active`} />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <BreakdownBars title="Cards by status" total={cardRows.length} items={cardStatuses.map((x) => ({ label: x.label.replace(/_/g, ' '), value: x.value, colorClass: color(STATUS_COLOR, x.label) }))} />
+        <BreakdownBars title="Accounts by status" total={acctRows.length} items={acctStatuses.map((x) => ({ label: x.label.replace(/_/g, ' '), value: x.value, colorClass: color(STATUS_COLOR, x.label) }))} />
+      </div>
+    </div>
+  );
+}
+
 export function RoleStats({ role, token }: { role: string; token: string }) {
   if (!token) return null;
   if (role === 'level1_analyst' || role === 'level2_investigator' || role === 'security_auditor') return <FraudStats token={token} />;
   if (role === 'customer') return <CustomerStats token={token} />;
   if (role === 'merchant_officer') return <OfficerStats token={token} />;
+  if (role === 'operations_officer') return <OperationsStats token={token} />;
   if (role === 'manager') return <ManagerStats token={token} />;
   return null;
 }

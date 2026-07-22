@@ -88,7 +88,8 @@ export default function AuditEventsPage() {
     const t = getToken() ?? '';
     const role = t ? decodeToken(t)?.role : null;
     setToken(t);
-    if (role !== 'manager' && role !== 'security_auditor') { setAuthorized(false); router.replace('/system'); return; }
+    // Roles that hold auditEvents:[view] and are wired to the unified audit stream (backend isAuditRole).
+    if (role !== 'manager' && role !== 'security_auditor' && role !== 'operations_officer') { setAuthorized(false); router.replace('/system'); return; }
     setAuthorized(true);
   }, [router]);
 

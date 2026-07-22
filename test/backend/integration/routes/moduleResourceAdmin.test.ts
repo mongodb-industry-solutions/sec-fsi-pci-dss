@@ -186,6 +186,12 @@ describe('FR-v29: global resource administration (built-in modules)', () => {
     expect(res.status).toBe(403);
   });
 
+  // ── v29.3 audit stream access (auditEvents:view) ──────────────────────────
+  skip('audit stream: operations_officer can read /events/audit → 200', async () => {
+    const res = await supertest(app.server).get('/api/v1/events/audit?limit=5').set('Authorization', `Bearer ${opsToken}`);
+    expect(res.status).toBe(200);
+  });
+
   // ── FR-29.8 capability gate ───────────────────────────────────────────────
   skip('FR-29.8: active external card-issuer provider → 409 managed_externally', async () => {
     const group = await getDefaultGroupForType(db, 'card_issuer');

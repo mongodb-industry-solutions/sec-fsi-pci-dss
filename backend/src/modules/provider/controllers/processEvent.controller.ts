@@ -11,8 +11,13 @@ import { MongoEventStore } from '../../../vendors/eventbus';
 
 const E = { type: 'object', properties: { error: { type: 'string' } } };
 
+// Roles allowed to read the audit/process event streams. All hold auditEvents:[view] in the RBAC
+// matrix. operations_officer (v29) needs it to observe how internal-module rules/config behave and
+// whether card-validation and connected-module processes fail (approved/rejected/error).
 function isAuditRole(request: AuthenticatedRequest): boolean {
-  return request.userRole === 'security_auditor' || request.userRole === 'manager';
+  return request.userRole === 'security_auditor'
+    || request.userRole === 'manager'
+    || request.userRole === 'operations_officer';
 }
 
 export async function processEventController(fastify: FastifyInstance) {
@@ -47,7 +52,7 @@ export async function processEventController(fastify: FastifyInstance) {
     },
     handler: async (request, reply) => {
       if (!isAuditRole(request as unknown as AuthenticatedRequest))
-        return reply.status(403).send({ error: 'Forbidden: security_auditor or manager role required' });
+        return reply.status(403).send({ error: 'Forbidden: security_auditor, manager or operations_officer role required' });
       const q = request.query as Record<string, string>;
       const result = await listAuditEvents(fastify.db, {
         source:     (q.source as AuditSource | 'all' | undefined) ?? 'all',
@@ -80,7 +85,7 @@ export async function processEventController(fastify: FastifyInstance) {
     },
     handler: async (request, reply) => {
       if (!isAuditRole(request as unknown as AuthenticatedRequest))
-        return reply.status(403).send({ error: 'Forbidden: security_auditor or manager role required' });
+        return reply.status(403).send({ error: 'Forbidden: security_auditor, manager or operations_officer role required' });
       const { correlationId } = request.params as { correlationId: string };
       const events = await new MongoEventStore(fastify.db).trail(correlationId);
       return reply.send({ correlationId, count: events.length, events });
@@ -92,7 +97,7 @@ export async function processEventController(fastify: FastifyInstance) {
     schema: {
       tags: ['events'],
       summary: 'List business process events (ADR-025)',
-      description: 'Returns paginated businessProcessEvent documents. Requires security_auditor or manager role.',
+      description: 'Returns paginated businessProcessEvent documents. Requires security_auditor, manager or operations_officer role.',
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
@@ -112,7 +117,7 @@ export async function processEventController(fastify: FastifyInstance) {
     },
     handler: async (request, reply) => {
       if (!isAuditRole(request as unknown as AuthenticatedRequest))
-        return reply.status(403).send({ error: 'Forbidden: security_auditor or manager role required' });
+        return reply.status(403).send({ error: 'Forbidden: security_auditor, manager or operations_officer role required' });
 
       const q = request.query as Record<string, string>;
       const result = await listProcessEvents(fastify.db, {
@@ -155,7 +160,7 @@ export async function processEventController(fastify: FastifyInstance) {
     },
     handler: async (request, reply) => {
       if (!isAuditRole(request as unknown as AuthenticatedRequest))
-        return reply.status(403).send({ error: 'Forbidden: security_auditor or manager role required' });
+        return reply.status(403).send({ error: 'Forbidden: security_auditor, manager or operations_officer role required' });
 
       const { entityType, entityId } = request.params;
       const q = request.query as Record<string, string>;
@@ -174,7 +179,7 @@ export async function processEventController(fastify: FastifyInstance) {
     schema: {
       tags: ['events'],
       summary: 'List compliance process events (ADR-025)',
-      description: 'Returns paginated complianceProcessEvent documents. Requires security_auditor or manager role.',
+      description: 'Returns paginated complianceProcessEvent documents. Requires security_auditor, manager or operations_officer role.',
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
@@ -194,7 +199,7 @@ export async function processEventController(fastify: FastifyInstance) {
     },
     handler: async (request, reply) => {
       if (!isAuditRole(request as unknown as AuthenticatedRequest))
-        return reply.status(403).send({ error: 'Forbidden: security_auditor or manager role required' });
+        return reply.status(403).send({ error: 'Forbidden: security_auditor, manager or operations_officer role required' });
 
       const q = request.query as Record<string, string>;
       const result = await listComplianceEvents(fastify.db, {
@@ -237,7 +242,7 @@ export async function processEventController(fastify: FastifyInstance) {
     },
     handler: async (request, reply) => {
       if (!isAuditRole(request as unknown as AuthenticatedRequest))
-        return reply.status(403).send({ error: 'Forbidden: security_auditor or manager role required' });
+        return reply.status(403).send({ error: 'Forbidden: security_auditor, manager or operations_officer role required' });
 
       const { entityType, entityId } = request.params;
       const q = request.query as Record<string, string>;

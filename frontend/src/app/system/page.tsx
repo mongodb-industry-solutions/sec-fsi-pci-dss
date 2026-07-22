@@ -31,7 +31,8 @@ const ROLE_ORDER: Record<string, number> = {
   level2_investigator: 2,
   security_auditor:    3,
   merchant_officer:    4,
-  manager:             5,
+  operations_officer:  5,
+  manager:             6,
 };
 
 // ── Login form constants ──────────────────────────────────────────────────────
@@ -97,6 +98,12 @@ const ROLE_CARDS: Record<string, DashboardCard[]> = {
     { label: 'All Merchants',description: 'Full merchant portfolio with KYB status, activity and history.',           icon: Store,          href: '/system/merchant',        bianSd: 'SD-89', pciDss: 'Req 12.8' },
     { label: 'My Profile',   description: 'Manage your profile and contact details.',                                 icon: User,           href: '/system/profile',         bianSd: 'SD-53', pciDss: 'Req 8' },
   ],
+  operations_officer: [
+    { label: 'Modules',       description: 'Administer the internal capability engines (card issuer, AIS, FDS, AML, HRP...) and their business policies.', icon: LayoutGrid, href: '/system/admin/modules',                                 bianSd: 'ADR-029', pciDss: 'Req 12.8' },
+    { label: 'Cards',         description: 'Global cardholder card administration (SD-88): register, edit, activate/suspend and revoke saved cards.',        icon: CreditCard, href: '/system/admin/modules/card-issuer?tab=cards',           bianSd: 'SD-88',   pciDss: 'Req 3.3' },
+    { label: 'Payout Accounts', description: 'Global payout-account administration (SD-66): create, edit and close accounts. IBAN stays encrypted.',        icon: Landmark,   href: '/system/admin/modules/account-information?tab=accounts', bianSd: 'SD-66',   pciDss: 'Req 3.3' },
+    { label: 'Audit Events',  description: 'Follow how rules and configurations behave: card validation and connected-module outcomes (approved/rejected/error).', icon: Activity,   href: '/system/audit-events',                                 bianSd: 'ADR-025', pciDss: 'Req 10.2' },
+  ],
   manager: [],
 };
 
@@ -106,6 +113,7 @@ const ROLE_ACCENT: Record<string, { iconBg: string; iconText: string; badge: str
   level2_investigator: { iconBg: 'bg-orange-50', iconText: 'text-orange-600', badge: 'bg-orange-50 text-orange-700 border-orange-200' },
   security_auditor:    { iconBg: 'bg-purple-50', iconText: 'text-purple-600', badge: 'bg-purple-50 text-purple-700 border-purple-200' },
   merchant_officer:    { iconBg: 'bg-teal-50',   iconText: 'text-teal-600',   badge: 'bg-teal-50 text-teal-700 border-teal-200' },
+  operations_officer:  { iconBg: 'bg-emerald-50', iconText: 'text-emerald-600', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   manager:             { iconBg: 'bg-slate-100', iconText: 'text-slate-600',  badge: 'bg-slate-50 text-slate-700 border-slate-200' },
 };
 

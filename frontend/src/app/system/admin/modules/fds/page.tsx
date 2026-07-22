@@ -282,8 +282,8 @@ export default function FdsModulePage() {
           </div>
           </fieldset>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
-            <strong>How it scores:</strong> every transaction is evaluated against the enabled rules. The fired rules&rsquo; scores sum to the risk score; the bands map it to approve / review / decline, and any forced action wins. The verdict drives the fraud case (its score and severity), and the rules that fired are recorded in the audit trail. No PAN or CVV is ever used in scoring (PCI DSS Req 3.2).
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 mt-5">
+            <strong>How it scores: </strong> every transaction is evaluated against the enabled rules. The fired rules&rsquo; scores sum to the risk score; the bands map it to approve / review / decline, and any forced action wins. The verdict drives the fraud case (its score and severity), and the rules that fired are recorded in the audit trail. No PAN or CVV is ever used in scoring (PCI DSS Req 3.2).
           </div>
         </>
       )}
