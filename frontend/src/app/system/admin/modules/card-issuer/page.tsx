@@ -243,7 +243,7 @@ function CardIssuerConfigPanel() {
       </div>
       </fieldset>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 mt-5">
         <strong>Logging:</strong> every validation request records a compliance event with the request and response payloads and the linked transaction id / case reference. The event never contains the PAN or CVV (only a masked PAN and whether a CVV was supplied), per PCI DSS Req 3.2 and Req 10.
       </div>
     </>
