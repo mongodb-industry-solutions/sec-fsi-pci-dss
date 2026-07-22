@@ -679,12 +679,27 @@ export interface QrRepresentationDTO {
   expiresAt?: string;
 }
 
+// v30.1 owner picker result for card registration (agreement + derived owner name).
+export interface AgreementOwnerResult {
+  customerAgreementInstanceReference: string;
+  partyInstanceReference: string;
+  ownerName: string | null;
+}
+
+// v30.1 owner picker result for account creation (party + derived owner name).
+export interface PartyOwnerResult {
+  partyInstanceReference: string;
+  ownerName: string | null;
+}
+
 // v29 SD-88 global card administration row (display-safe; no full PAN / CVV / expiry).
 export interface AdminCard {
   paymentCardInstanceReference: string;
   customerAgreementInstanceReference: string;
   paymentCardReference?: string;
   paymentCardMaskedPanDisplay: string;
+  paymentCardBin?: string | null;
+  paymentCardLast4?: string | null;
   paymentCardNetwork?: string | null;
   paymentCardStatus: string;
   paymentCardIsPreferred?: boolean | null;
@@ -980,6 +995,20 @@ export const api = {
       apiFetch<{ removed: boolean }>(
         `/api/v1/customer/${encodeURIComponent(customerId)}/cards/${encodeURIComponent(cardId)}`,
         { method: 'DELETE' },
+        token
+      ),
+    // Owner self-service ephemeral reveals (routed via provider). Step-up MFA would gate these in
+    // production; omitted for the demo. Values are never stored, cached or logged; on demand only.
+    revealCvv: (customerId: string, cardId: string, token: string) =>
+      apiFetch<{ cvv: string }>(
+        `/api/v1/customer/${encodeURIComponent(customerId)}/cards/${encodeURIComponent(cardId)}/cvv`,
+        { method: 'POST', body: JSON.stringify({}) },
+        token
+      ),
+    revealPan: (customerId: string, cardId: string, token: string) =>
+      apiFetch<{ pan: string }>(
+        `/api/v1/customer/${encodeURIComponent(customerId)}/cards/${encodeURIComponent(cardId)}/pan`,
+        { method: 'POST', body: JSON.stringify({}) },
         token
       ),
     // v27 staff drill-down: display-safe SD-65 execution detail of ONE transfer belonging to a
@@ -1832,7 +1861,7 @@ export const api = {
     // Never accepts or returns CVV/PIN/full PAN. 409 managed_externally when a vendor owns the capability.
     cardAdmin: {
       list: (
-        params: { page?: number; limit?: number; network?: string; status?: string; agreement?: string },
+        params: { page?: number; limit?: number; network?: string; status?: string; agreement?: string; last4?: string; bin?: string; panExact?: string },
         token: string,
       ) => {
         const qs = new URLSearchParams(
@@ -1844,6 +1873,11 @@ export const api = {
       },
       get: (cardId: string, token: string) =>
         apiFetch<Record<string, unknown>>(`/api/v1/modules/card-issuer/cards/${encodeURIComponent(cardId)}`, {}, token),
+      // v30.1 owner picker: search agreements by owner name (fills customerAgreementInstanceReference).
+      searchAgreements: (query: string, token: string) =>
+        apiFetch<{ results: AgreementOwnerResult[] }>(
+          `/api/v1/modules/card-issuer/agreements?query=${encodeURIComponent(query)}`, {}, token,
+        ),
       register: (
         body: {
           customerAgreementInstanceReference: string;
@@ -1873,6 +1907,16 @@ export const api = {
         apiFetch<{ removed: boolean }>(
           `/api/v1/modules/card-issuer/cards/${encodeURIComponent(cardId)}`, { method: 'DELETE' }, token,
         ),
+      // Ephemeral CVV reveal (operations_officer, cards:manage). Never stored/logged; on demand only.
+      revealCvv: (cardId: string, token: string) =>
+        apiFetch<{ cvv: string }>(
+          `/api/v1/modules/card-issuer/cards/${encodeURIComponent(cardId)}/cvv`, {}, token,
+        ),
+      // Ephemeral full-PAN reveal (FR-30.16). Masked PAN is the default display; this is on demand only.
+      revealPan: (cardId: string, token: string) =>
+        apiFetch<{ pan: string }>(
+          `/api/v1/modules/card-issuer/cards/${encodeURIComponent(cardId)}/pan`, {}, token,
+        ),
     },
 
     // v29 SD-66: global payout-account administration via the built-in account-information module.
@@ -1892,6 +1936,11 @@ export const api = {
       get: (accountRef: string, token: string) =>
         apiFetch<Record<string, unknown>>(
           `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}`, {}, token,
+        ),
+      // v30.1 owner picker: search parties by owner name (fills partyInstanceReference).
+      searchParties: (query: string, token: string) =>
+        apiFetch<{ results: PartyOwnerResult[] }>(
+          `/api/v1/modules/account-information/parties?query=${encodeURIComponent(query)}`, {}, token,
         ),
       create: (
         body: {
@@ -1924,6 +1973,25 @@ export const api = {
       close: (accountRef: string, token: string) =>
         apiFetch<{ closed: boolean }>(
           `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}`, { method: 'DELETE' }, token,
+        ),
+      // Ephemeral IBAN reveal (GDPR: on demand, need-to-know). Never returned by list/detail.
+      revealIban: (accountRef: string, token: string) =>
+        apiFetch<{ payoutAccountIban: string }>(
+          `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}/iban`, {}, token,
+        ),
+      // Display-safe cards funded by this payout account (no full PAN / CVV).
+      cards: (accountRef: string, token: string) =>
+        apiFetch<{ results: Array<{
+          paymentCardInstanceReference: string;
+          paymentCardMaskedPanDisplay: string;
+          paymentCardNetwork?: string | null;
+          paymentCardStatus: string;
+          paymentCardIsPreferred?: boolean | null;
+          paymentCardAlias?: string | null;
+          fundingPayoutAccountInstanceReference?: string | null;
+          recordCreatedDateTime?: string | null;
+        }>; total: number }>(
+          `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}/cards`, {}, token,
         ),
     },
   },

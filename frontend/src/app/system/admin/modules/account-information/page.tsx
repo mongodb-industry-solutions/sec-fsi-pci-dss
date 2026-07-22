@@ -95,7 +95,7 @@ function AccountInfoConfigPanel() {
 }
 
 const TABS: ModuleTab[] = [
-  { key: 'config', label: 'Configuration / Policies' },
+  { key: 'config', label: 'Configuration' },
   { key: 'accounts', label: 'Accounts' },
 ];
 

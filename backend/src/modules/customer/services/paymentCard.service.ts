@@ -293,13 +293,16 @@ export async function rebuildCardRegistry(db: Db): Promise<number> {
 // the per-card detail). Revoked cards are retained for audit and excluded. Paginated + filterable.
 export async function listAllCards(
   db: Db,
-  opts?: { page?: number; limit?: number; network?: string; status?: string; agreement?: string },
+  opts?: { page?: number; limit?: number; network?: string; status?: string; agreement?: string; last4?: string; bin?: string },
 ): Promise<{ results: unknown[]; total: number; page: number; limit: number }> {
   const query: Record<string, unknown> = {};
   // Default excludes revoked (audit-retained). An explicit status filter overrides.
   query.paymentCardStatus = opts?.status ? opts.status : { $ne: 'revoked' };
   if (opts?.network) query.paymentCardNetwork = opts.network;
   if (opts?.agreement) query.customerAgreementInstanceReference = opts.agreement;
+  // v30 non-CHD truncated-PAN search: last4 (equality) + BIN prefix. Cheap, no QE, no CHD.
+  if (opts?.last4) query.paymentCardLast4 = opts.last4.replace(/\D/g, '').slice(-4);
+  if (opts?.bin) query.paymentCardBin = { $regex: `^${opts.bin.replace(/\D/g, '').slice(0, 6)}` };
 
   const page = Math.max(1, opts?.page ?? 1);
   const limit = Math.min(100, Math.max(1, opts?.limit ?? 20));
@@ -314,6 +317,8 @@ export async function listAllCards(
         customerAgreementInstanceReference: 1,
         paymentCardReference: 1,
         paymentCardMaskedPanDisplay: 1,
+        paymentCardBin: 1,
+        paymentCardLast4: 1,
         paymentCardNetwork: 1,
         paymentCardStatus: 1,
         paymentCardIsPreferred: 1,
@@ -393,7 +398,9 @@ export async function getCardByToken(db: Db, token: string, customerRef?: string
   if (customerRef) filter.customerAgreementInstanceReference = customerRef;
   return db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION).findOne(
     filter,
-    { projection: { _id: 0, paymentCardInstanceReference: 1, customerAgreementInstanceReference: 1, paymentCardStatus: 1, paymentCardMaskedPanDisplay: 1, paymentCardNetwork: 1 } },
+    // Includes the surrogate token, QE:none expiry and funding-account link (used by the card-issuer
+    // Card Reference port for realistic CVV derivation and funding checks). Still no CHD/CVV.
+    { projection: { _id: 0, paymentCardInstanceReference: 1, customerAgreementInstanceReference: 1, paymentCardReference: 1, paymentCardStatus: 1, paymentCardMaskedPanDisplay: 1, paymentCardNetwork: 1, paymentCardExpirationDate: 1, fundingPayoutAccountInstanceReference: 1 } },
   );
 }
 

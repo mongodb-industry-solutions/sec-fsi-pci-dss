@@ -143,7 +143,9 @@
     "capabilityModuleStatus": "active",
     "moduleConfig": {
       "validCvv": "123",
+      "cvvMode": "both",
       "enforceLuhn": true,
+      "verifyCardholderName": false,
       "networks": [
         { "name": "VISA", "prefixes": ["4"], "lengths": [13, 16, 19], "cvvLength": 3, "enabled": true },
         { "name": "MASTERCARD", "prefixes": ["51-55", "2221-2720"], "lengths": [16], "cvvLength": 3, "enabled": true },

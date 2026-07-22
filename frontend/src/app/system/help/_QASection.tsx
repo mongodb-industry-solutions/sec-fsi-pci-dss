@@ -230,8 +230,9 @@ const QA_DATA: QAItem[] = [
     answer: (
       <div>
         <P>PCI DSS v4.0 defines three categories of SAD that must <Em>never be stored after authorization</Em>: card verification codes (CVV/CVC2), PINs, and full track data. The prohibition is on <Em>storage</Em>, not on transmission: SAD is allowed in transit during the authorization window.</P>
-        <P>This system acts as a PSP intermediary. Sensitive card data received during payment initiation is encrypted immediately and forwarded securely to the card issuer through the external provider integration layer. The card issuer performs authorization on its side and returns an approval or decline. The PSP <Em>never persists</Em> CVV, PIN, or track data at any point in its database; only the tokenized reference and masked PAN are stored.</P>
-        <Callout label="Key PCI DSS Point">The SAD prohibition is satisfied by design: encrypt in transit, forward to issuer, discard. No SAD field ever reaches the storage layer of this system. This is the correct compliance posture for a CNP PSP acting as a secure pass-through.</Callout>
+        <P>This system acts as a PSP intermediary. Sensitive card data received during payment initiation is encrypted immediately and forwarded securely to the card issuer through the external provider integration layer. The card issuer performs authorization on its side and returns an approval or decline. The <Em>PSP core</Em> stays descoped: it persists only the tokenized reference plus <Code>paymentCardBin</Code> and <Code>paymentCardLast4</Code> (non-CHD). The <Em>CVV, PIN and track data are never persisted</Em> anywhere; the built-in issuer module even <Em>derives</Em> the per-card CVV on demand (HMAC-SHA256 under an issuer key, the CVK) instead of storing it.</P>
+        <P>When the built-in <Code>card-issuer</Code> module is the active provider it stores the <Em>full PAN</Em> and the <Code>cardServiceCode</Code> encrypted with Queryable Encryption in its own module-owned vault (<Code>cardIssuerVault</Code>, the issuer CDE), never in the PSP core. With an external issuer provider no PAN is stored at all.</P>
+        <Callout label="Key PCI DSS Point">The SAD prohibition is satisfied by design: CVV/PIN/track data are never stored (the CVV is derived on demand). The full PAN is CHD, not SAD: it is kept out of the PSP core entirely and, only inside the issuer module, encrypted under QE with reveal on demand. This is the correct posture for a CNP PSP with a scope-contained issuer subsystem.</Callout>
       </div>
     ),
     tags: ['SAD', 'magnetic stripe', 'track data', 'Card Not Present', 'CVV', 'PIN', 'card issuer', 'pass-through', 'never stored'],
@@ -249,6 +250,7 @@ const QA_DATA: QAItem[] = [
           ]}
         />
         <P>The critical distinction: SAD cannot be retained post-authorization under any circumstances, while CHD can be stored if appropriate protections are in place. The correct approach is applied throughout: card tokens and masked PANs are stored; expiry dates use QE:none; CVV and PIN are never accepted or stored at any API endpoint.</P>
+        <P>The <Em>service code</Em> is CHD (not SAD; only the full magnetic-stripe track is prohibited). When it applies, it is stored <Em>encrypted (QE:equality) in the built-in issuer vault</Em> (<Code>cardServiceCode</Code> in <Code>cardIssuerVault</Code>), never in the PSP core, and it feeds the per-card CVV derivation.</P>
       </div>
     ),
     tags: ['SAD', 'CHD', 'PAN', 'CVV', 'PIN', 'track data'],
@@ -258,7 +260,7 @@ const QA_DATA: QAItem[] = [
     question: 'Why does the system encrypt the card expiration date (QE:none) if the payment token is stored plaintext?',
     answer: (
       <div>
-        <P>The expiry date is different from the token. Under PCI DSS v4.0, the expiration date is classified as <Em>Cardholder Data (CHD)</Em> when stored in conjunction with a PAN. In this system it is stored alongside <Code>paymentCardReference</Code> (the token) and <Code>maskedPanDisplay</Code>. The expiry date co-located with card account data is a conservative but correct classification, and the cost of protecting it with QE:none is negligible.</P>
+        <P>The expiry date is different from the token. Under PCI DSS v4.0, the expiration date is classified as <Em>Cardholder Data (CHD)</Em> when stored in conjunction with a PAN. In this system it is stored alongside <Code>paymentCardReference</Code> (the token), <Code>paymentCardBin</Code> and <Code>paymentCardLast4</Code>. The masked PAN is no longer a persisted field: it is derived on the fly from BIN + last4 + network. The expiry date co-located with card account data is a conservative but correct classification, and the cost of protecting it with QE:none is negligible.</P>
         <P>QE:none also serves an illustrative purpose: it shows the &ldquo;non-searchable sensitive field&rdquo; pattern; data is encrypted but not queryable, visible only after decryption with the correct DEK. This is the same pattern used for <Code>residentialAddressFull</Code> and <Code>governmentIdentificationReference</Code> in the escalation workflow.</P>
       </div>
     ),
@@ -425,18 +427,28 @@ const QA_DATA: QAItem[] = [
     question: 'How does this solution satisfy PCI DSS Requirement 3.4 (PAN must be rendered unreadable wherever it is stored)?',
     answer: (
       <div>
-        <P>This solution satisfies Requirement 3.4 through <Em>non-storage</Em>: the PAN never enters the system at all. The standard requires the PAN to be rendered unreadable wherever it is <em>stored</em>; the architecture removes it from the flow before any storage decision is needed.</P>
-        <P>What the system stores per card:</P>
+        <P>This solution satisfies Requirement 3.4 with a clear scope boundary. The <Em>PSP core is descoped</Em>: it never stores the full PAN, only a token plus BIN and last4. When the built-in issuer module is active, the full PAN is stored <Em>only</Em> inside that module-owned vault, encrypted with Queryable Encryption (the server never sees plaintext), and rendered unreadable wherever it rests.</P>
+        <P>What the <Em>PSP core</Em> stores per card:</P>
         <Table
           headers={['Field', 'Value example', 'Classification', 'Storage']}
           rows={[
             [<Code>paymentCardReference</Code>, 'pm_7xB2kp1q', 'Card surrogate, not CHD', 'Plaintext, standard index'],
-            [<Code>maskedPanDisplay</Code>, '**** **** **** 4242', 'Permitted for display (last 4 digits)', 'Plaintext'],
+            [<Code>paymentCardBin</Code>, '424242', 'BIN, non-CHD (PCI permits ≤ 8)', 'Plaintext, indexed (prefix search)'],
+            [<Code>paymentCardLast4</Code>, '4242', 'Non-CHD', 'Plaintext, indexed (masked PAN derived, not stored)'],
             [<Code>cardExpirationDate</Code>, '[ciphertext]', 'CHD', 'QE:none, encrypted and non-searchable'],
-            ['CVV / PIN', 'not present', 'SAD', 'Never accepted at any endpoint'],
+            ['CVV / PIN', 'not present', 'SAD', 'Never stored; CVV derived on demand'],
           ]}
         />
-        <P>Someone does hold the PAN, but it is the <Em>token vault</Em> operated by the PSP or payment network (e.g., Visa Token Service or Mastercard MDES), a separately PCI DSS certified environment outside the scope of this system.</P>
+        <P>What the <Em>built-in issuer vault</Em> (<Code>cardIssuerVault</Code>, the issuer CDE) stores, only while the module owns the capability:</P>
+        <Table
+          headers={['Field', 'Classification', 'Storage']}
+          rows={[
+            [<Code>paymentCardNumber</Code>, 'PAN (CHD)', 'QE:equality ciphertext; revealed on demand, audited'],
+            [<Code>cardServiceCode</Code>, 'CHD', 'QE:equality ciphertext'],
+            ['CVV / PIN', 'SAD', 'Never stored'],
+          ]}
+        />
+        <P>With an external issuer provider, no PAN is stored by this system at all: the PAN is then held by that provider or the network token vault (e.g., Visa Token Service or Mastercard MDES), a separately PCI DSS certified environment.</P>
       </div>
     ),
     tags: ['Req 3.4', 'PAN', 'tokenization', 'non-storage', 'maskedPan', 'Visa Token Service'],
@@ -521,6 +533,31 @@ const QA_DATA: QAItem[] = [
       </div>
     ),
     tags: ['BIAN', 'SD-88', 'SD-53', 'SD-254', 'recurring payment', 'mandate', 'merchant-initiated'],
+  },
+  {
+    id: 24, category: 4,
+    question: 'How is the CVV handled realistically without ever storing it?',
+    answer: (
+      <div>
+        <P>The CVV is Sensitive Authentication Data: PCI DSS Req 3.2 forbids storing it after authorization, in cleartext or ciphertext. The built-in issuer therefore <Em>derives</Em> it per card on demand instead of storing a value, exactly as a real issuer recomputes it in an HSM:</P>
+        <Callout label="Derivation">cvv = digits( HMAC-SHA256( CVK, cardToken | expiryMMYY | serviceCode ) ) truncated to the network length (3 for Visa/Mastercard, 4 for Amex).</Callout>
+        <P>The <Code>CVK</Code> is the issuer key: module-owned key material, provisioned once and stored only wrapped (envelope encryption: KMS/master key → DEK → CVK), with cleartext only in process memory. The CVV appears only in an ephemeral, audited reveal response, never in a collection, log, listing, or validation response.</P>
+        <P>Two demo modes coexist via <Code>cvvMode</Code>: a <Em>global</Em> escape-hatch CVV (default <Code>123</Code>) for fast walkthroughs, and the realistic <Em>per-card</Em> derived CVV. The default <Code>both</Code> accepts either; <Code>global</Code> or <Code>per_card</Code> restrict to one.</P>
+      </div>
+    ),
+    tags: ['CVV', 'SAD', 'Req 3.2', 'HMAC', 'CVK', 'envelope encryption', 'derivation', 'cvvMode'],
+  },
+  {
+    id: 25, category: 4,
+    question: 'Why does the full PAN live in a separate issuer vault collection, and how does that contain PCI scope?',
+    answer: (
+      <div>
+        <P>Storing the full PAN is a feature of the <Em>issuer</Em>, not of the PSP. Keeping it in the core <Code>paymentCardManagement</Code> would pull the PSP core into PCI scope for the PAN and it would not descope when the module is swapped. So the full PAN is a bounded context (the issuer CDE) and lives in a <Em>module-owned</Em> collection, <Code>cardIssuerVault</Code> (BIAN Card Administration), encrypted with Queryable Encryption (QE:equality on the PAN and the service code). The PSP core keeps only the token + BIN + last4.</P>
+        <P>The payoff is <G>scope containment</G>: disable the module or route the capability to an external provider and the core is left with no PAN CHD at all. The core never reads the vault; the cross-boundary read is only through a port (the Card Reference port), which is what makes the module extractable to a microservice later.</P>
+        <P>The encryption chain is the MongoDB talking point: KMS/master key → DEK → CVK for the issuer key, and DEK → QE ciphertext for the PAN and service code, so the server can match an exact PAN without ever decrypting it. The full PAN and the IBAN are hidden by default and revealed on demand behind an eye icon (ephemeral, audited), the same pattern for both.</P>
+      </div>
+    ),
+    tags: ['PAN', 'CHD', 'cardIssuerVault', 'QE', 'scope containment', 'module-owned', 'port', 'reveal on demand', 'BIAN'],
   },
 ];
 

@@ -114,12 +114,15 @@ export const ROLE_GUIDE: Record<string, RoleGuide> = {
     ],
     dataAccess: [
       'Display-safe card listing (surrogate token, masked PAN, network, status) and per-card detail with expiry (need-to-know only).',
-      'Payout account records with presence hints (payoutAccountHasIban); the raw IBAN and routing number are never exposed on this surface.',
+      'Full PAN and IBAN are hidden by default and revealed on demand (eye icon) when the built-in module owns the capability: each reveal is ephemeral and audited, acting as the subsystem console.',
+      'The CVV is shown as a derived value (recomputed per card, never stored); the full PAN lives only in the built-in issuer vault (QE), never in the PSP core.',
+      'Payout account records with presence hints (payoutAccountHasIban); the raw IBAN is shown only through the same on-demand, audited reveal.',
     ],
     restrictions: [
-      'Never sees the full PAN, CVV, or PIN (SAD is never stored).',
+      'CVV and PIN are never seen persisted (SAD is never stored; the CVV is derived on demand).',
+      'Full PAN and raw IBAN are visible only through an explicit on-demand reveal (ephemeral, audited), never in listings or loaded by default.',
+      'Reveal (and administration) is disabled with 409 managed_externally when an external provider takes over the capability.',
       'Does not manage providers or modules; that is the manager role (separation of duties, PCI DSS Req 7).',
-      'Administration is disabled (409 managed_externally) when an external provider takes over the capability.',
     ],
     pci: ['Req 3.2/3.3', 'Req 7', 'Req 10'],
   },

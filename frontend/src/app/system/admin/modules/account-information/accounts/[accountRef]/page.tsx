@@ -2,8 +2,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Landmark, ArrowLeft, Pencil, Save, X, Trash2, ShieldAlert, Check } from 'lucide-react';
+import { Landmark, CreditCard, ArrowLeft, Pencil, Save, X, Trash2, ShieldAlert, Check } from 'lucide-react';
 import { api } from '../../../../../../../lib/api';
+import { SensitiveReveal } from '../../../../../../../components/SensitiveReveal';
 import { getToken } from '../../../../../../../lib/auth';
 import { useDebugMode } from '../../../../../../../lib/debugMode';
 import { useConfirm, useNotify } from '../../../../../../../components/ui/ConfirmProvider';
@@ -23,6 +24,7 @@ interface AccountDetail {
   partyInstanceReference?: string;
   payoutAccountType?: string;
   payoutAccountStatus?: string;
+  ownerName?: string | null;
   payoutAccountCurrency?: string;
   payoutAccountCountryCode?: string;
   payoutAccountPreferredRail?: string;
@@ -38,6 +40,14 @@ interface AccountDetail {
   payoutAccountBalance?: { availableAmount: number; pendingAmount: number; reservedAmount: number; currency: string };
   recordCreatedDateTime?: string;
   recordUpdatedDateTime?: string;
+}
+
+interface LinkedCard {
+  paymentCardInstanceReference: string;
+  paymentCardMaskedPanDisplay: string;
+  paymentCardNetwork?: string | null;
+  paymentCardStatus: string;
+  paymentCardAlias?: string | null;
 }
 
 const TYPE_LABELS: Record<string, string> = { bank_account: 'Bank Account', wallet: 'Wallet', internal_ledger: 'PSP Ledger' };
@@ -79,6 +89,7 @@ function AccountAdminDetail() {
 
   const token = getToken() ?? '';
   const [acct, setAcct] = useState<AccountDetail | null>(null);
+  const [linkedCards, setLinkedCards] = useState<LinkedCard[]>([]);
   const [ready, setReady] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [managedExternally, setManagedExternally] = useState(false);
@@ -104,6 +115,10 @@ function AccountAdminDetail() {
       const a = await api.modules.accountAdmin.get(accountRef, token) as AccountDetail;
       setAcct(a);
       syncForm(a);
+      // Display-safe cards funded by this account (non-blocking; no full PAN/CVV).
+      api.modules.accountAdmin.cards(accountRef, token)
+        .then((r) => setLinkedCards(r.results as LinkedCard[]))
+        .catch(() => setLinkedCards([]));
     } catch (e) {
       if (e instanceof Error && e.message === 'managed_externally') setManagedExternally(true);
       else setNotFound(true);
@@ -223,9 +238,18 @@ function AccountAdminDetail() {
               <DetailRow label="BIC / SWIFT" value={acct.payoutAccountBicSwift} mono />
               <DetailRow label="Correspondent BIC" value={acct.payoutAccountCorrespondentBic} mono />
               <DetailRow label="Bank address" value={acct.payoutAccountBankAddress} />
-              <IbanHintRow present={acct.payoutAccountHasIban} debug={debugMode} />
+              {acct.payoutAccountHasIban ? (
+                <SensitiveReveal label="IBAN"
+                  hint={debugMode ? 'QE-encrypted; ephemeral reveal' : undefined}
+                  fetchValue={async () => (await api.modules.accountAdmin.revealIban(accountRef, token)).payoutAccountIban} />
+              ) : (
+                <IbanHintRow present={acct.payoutAccountHasIban} debug={debugMode} />
+              )}
               <DetailRow label="Routing number" value={acct.payoutAccountHasRoutingNumber ? 'On file (encrypted)' : 'None'}
                 hint={debugMode ? 'QE-encrypted; never returned' : undefined} />
+              {/* Owner: derived party name (need-to-know, audited). Distinct from the legal holder name. */}
+              <DetailRow label="Owner" value={acct.ownerName ?? undefined}
+                hint={debugMode ? 'derived from party; need-to-know' : undefined} />
               <DetailRow label="Party" value={acct.partyInstanceReference} mono />
               <DetailRow label="Created" value={fmtDate(acct.recordCreatedDateTime)} />
               {acct.recordUpdatedDateTime && (
@@ -237,7 +261,39 @@ function AccountAdminDetail() {
                 payoutAccountInstanceReference: {acct.payoutAccountInstanceReference}
               </p>
             )}
-            <p className="text-xs text-gray-400 pt-1">IBAN and routing number are QE-encrypted at rest and never returned by this admin surface (presence hints only).</p>
+            <p className="text-xs text-gray-400 pt-1">IBAN and routing number are QE-encrypted at rest. The IBAN reveal is on demand (need-to-know, re-hideable) and audited; the routing number is never returned (GDPR Art. 5/32, PCI DSS Req 10).</p>
+          </div>
+
+          {/* Linked cards funded by this account (display-safe; no full PAN / CVV). */}
+          <div className="bg-white rounded-xl border p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                <CreditCard size={14} className="text-blue-600" />
+              </div>
+              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Linked cards</h2>
+            </div>
+            {linkedCards.length === 0 ? (
+              <p className="text-sm text-gray-400">No cards are funded by this account.</p>
+            ) : (
+              <ul className="divide-y text-sm">
+                {linkedCards.map((c) => (
+                  <li key={c.paymentCardInstanceReference}>
+                    <Link href={`/system/admin/modules/card-issuer/cards/${encodeURIComponent(c.paymentCardInstanceReference)}`}
+                      className="flex items-center justify-between gap-3 py-2.5 -mx-2 px-2 rounded hover:bg-gray-50 transition-colors group">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="font-mono text-gray-800">{c.paymentCardMaskedPanDisplay}</span>
+                        {c.paymentCardNetwork && <span className="text-xs text-gray-400">{c.paymentCardNetwork}</span>}
+                        {c.paymentCardAlias && <span className="text-xs text-gray-500 truncate">{c.paymentCardAlias}</span>}
+                      </span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${statusClass(c.paymentCardStatus)}`}>{c.paymentCardStatus}</span>
+                        <span className="text-xs text-[#001E2B] font-medium group-hover:underline">View</span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {/* Balance */}

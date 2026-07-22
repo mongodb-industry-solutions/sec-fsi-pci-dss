@@ -2,8 +2,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { CreditCard, ArrowLeft, Pause, Play, Pencil, Save, X, Trash2, ShieldAlert } from 'lucide-react';
+import { CreditCard, Landmark, ArrowLeft, ArrowRight, Pause, Play, Pencil, Save, X, Trash2, ShieldAlert } from 'lucide-react';
 import { api } from '../../../../../../../lib/api';
+import { SensitiveReveal } from '../../../../../../../components/SensitiveReveal';
 import { getToken } from '../../../../../../../lib/auth';
 import { useDebugMode } from '../../../../../../../lib/debugMode';
 import { useConfirm, useNotify } from '../../../../../../../components/ui/ConfirmProvider';
@@ -23,19 +24,32 @@ const LIST_HREF = '/system/admin/modules/card-issuer?tab=cards';
 const ACTIVE_STATES = ['active'];
 const TOGGLEABLE_STATES = ['active', 'suspended'];
 
+interface FundingAccount {
+  payoutAccountInstanceReference: string;
+  payoutAccountAlias?: string;
+  payoutAccountBankName?: string;
+  payoutAccountCurrency?: string;
+  payoutAccountStatus?: string;
+  payoutAccountHasIban?: boolean;
+}
+
 interface CardDetail {
   paymentCardInstanceReference?: string;
   customerAgreementInstanceReference?: string;
   paymentCardReference?: string;
   paymentCardMaskedPanDisplay?: string;
+  paymentCardBin?: string;
+  paymentCardLast4?: string;
   paymentCardNetwork?: string;
   paymentCardStatus?: string;
+  ownerName?: string | null;
   paymentCardExpirationDate?: string;
   paymentCardIsPreferred?: boolean;
   paymentCardAlias?: string;
   paymentCardCustomerNote?: string;
   paymentCardMandateStatus?: string;
   fundingPayoutAccountInstanceReference?: string;
+  fundingAccount?: FundingAccount | null;
   paymentCardIssuanceDateTime?: string;
   recordCreatedDateTime?: string;
   recordUpdatedDateTime?: string;
@@ -220,8 +234,25 @@ function CardAdminDetail() {
           <div className="bg-white rounded-xl border p-5 space-y-3">
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Card details</h2>
             <dl className="divide-y text-sm">
+              {/* Cardholder: derived PII from the linked party (need-to-know, audited). */}
+              <DetailRow label="Cardholder" value={card.ownerName ?? undefined}
+                hint={debugMode ? 'derived PII; need-to-know' : undefined} />
               <DetailRow label="Network" value={card.paymentCardNetwork} />
               <DetailRow label="Masked number" value={card.paymentCardMaskedPanDisplay} mono />
+              {card.paymentCardBin && <DetailRow label="BIN" value={card.paymentCardBin} mono />}
+              {card.paymentCardLast4 && <DetailRow label="Last 4" value={card.paymentCardLast4} mono />}
+              {/* Full PAN (FR-30.16): masked by default; ephemeral reveal on demand (cards:manage). */}
+              {canManage && (
+                <SensitiveReveal label="Full PAN" masked={card.paymentCardMaskedPanDisplay}
+                  hint={debugMode ? 'ephemeral; not stored' : undefined}
+                  fetchValue={async () => (await api.modules.cardAdmin.revealPan(cardId, token)).pan} />
+              )}
+              {/* CVV: never stored; ephemeral reveal on demand (cards:manage). */}
+              {canManage && (
+                <SensitiveReveal label="CVV"
+                  hint={debugMode ? 'ephemeral; not stored' : undefined}
+                  fetchValue={async () => (await api.modules.cardAdmin.revealCvv(cardId, token)).cvv} />
+              )}
               <DetailRow label="Expires" value={card.paymentCardExpirationDate} mono
                 hint={debugMode ? 'QE:none; need-to-know' : undefined} />
               <DetailRow label="Card token" value={card.paymentCardReference} mono
@@ -245,8 +276,41 @@ function CardAdminDetail() {
                 paymentCardInstanceReference: {card.paymentCardInstanceReference}
               </p>
             )}
-            <p className="text-xs text-gray-400 pt-1">Full PAN and CVV/PIN are never stored or shown (PCI DSS Req 3.2/3.3).</p>
+            <p className="text-xs text-gray-400 pt-1">Cardholder is derived from the linked party (need-to-know, audited). Full PAN and CVV are never stored. Any reveal is ephemeral (on demand, re-hideable), routed via the card provider and audited server-side (PCI DSS Req 3.2/3.3, Req 10).</p>
           </div>
+
+          {/* Funding account (SD-88 cardAccountReference). IBAN is hidden by default; reveal on demand. */}
+          {card.fundingAccount && (
+            <div className="bg-white rounded-xl border p-5 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                    <Landmark size={14} className="text-blue-600" />
+                  </div>
+                  <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Funding account</h2>
+                </div>
+                <Link href={`/system/admin/modules/account-information/accounts/${card.fundingAccount.payoutAccountInstanceReference}`}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                  View account details <ArrowRight size={13} />
+                </Link>
+              </div>
+              <dl className="divide-y text-sm">
+                <DetailRow label="Alias" value={card.fundingAccount.payoutAccountAlias} />
+                <DetailRow label="Bank" value={card.fundingAccount.payoutAccountBankName} />
+                <DetailRow label="Currency" value={card.fundingAccount.payoutAccountCurrency} mono />
+                <DetailRow label="Status" value={card.fundingAccount.payoutAccountStatus} />
+                {card.fundingAccount.payoutAccountHasIban ? (
+                  <SensitiveReveal label="IBAN"
+                    hint={debugMode ? 'QE-encrypted; ephemeral reveal' : undefined}
+                    fetchValue={async () => (await api.modules.accountAdmin.revealIban(card.fundingAccount!.payoutAccountInstanceReference, token)).payoutAccountIban} />
+                ) : (
+                  <DetailRow label="IBAN" value="None" />
+                )}
+                <DetailRow label="Account" value={card.fundingAccount.payoutAccountInstanceReference} mono />
+              </dl>
+              <p className="text-xs text-gray-400 pt-1">IBAN is QE-encrypted at rest. Reveal is on demand, need-to-know and audited (GDPR Art. 5/32).</p>
+            </div>
+          )}
 
           {/* Editable metadata */}
           <div className="bg-white rounded-xl border p-5 space-y-4">

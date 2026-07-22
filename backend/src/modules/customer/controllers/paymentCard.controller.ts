@@ -5,6 +5,7 @@ import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import { canStaffMutate, canStaffInvestigate } from '../../../vendors/middleware/rbac';
 import type { UserRole } from '../../../shared/models/identity.model';
+import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 
 const STAFF_READ_ROLES = ['level1_analyst', 'level2_investigator', 'security_auditor'];
 
@@ -440,6 +441,48 @@ audited (Req 10).`,
 
     return reply.send({ ...card, cardHolderCount });
   });
+
+  // POST /api/v1/customer/:customerId/cards/:cardId/cvv  (OWNER reveal of the per-card CVV), routed
+  // THROUGH the provider dispatch (never a direct call to the built-in module). Owner-only + step-up.
+  // The CVV is derived (never stored) and returned ephemerally; the reveal is audited (Req 10) with
+  // NO CVV in the log. If an external issuer governs the capability, the dispatch routes to it.
+  const ownerReveal = (kind: 'cvv' | 'pan') => async (request: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply) => {
+    const { customerId, cardId } = request.params as { customerId: string; cardId: string };
+    const user = (request as { user?: JwtUserPayload }).user;
+    const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
+    if (!ownId || ownId !== customerId) return reply.status(403).send({ error: 'You can only reveal your own card data.' });
+    const card = await getCardById(fastify.db, customerId, cardId);
+    if (!card) return reply.status(404).send({ error: 'Card not found' });
+    const event = kind === 'cvv' ? 'card.cvv.reveal.requested' : 'card.pan.reveal.requested';
+    const r = await dispatchProvider(fastify.db, 'card_issuer', event, {
+      cardId, cardToken: card.paymentCardReference,
+    }, { entityType: 'card', entityId: cardId, processType: 'card_management' });
+    const body = (r.responseBody ?? {}) as { cvv?: string; pan?: string };
+    const value = kind === 'cvv' ? body.cvv : body.pan;
+    if (!value) return reply.status(404).send({ error: `${kind.toUpperCase()} unavailable` });
+    emitComplianceEvent(fastify.db, {
+      entityType: 'card', entityId: cardId,
+      processType: 'card_management', processAction: kind === 'cvv' ? 'card.cvv.revealed' : 'card.pan.revealed', processOutcome: 'approved',
+      performedByPartyReference: user?.partyRef ?? null, performedByRole: user?.role ?? null,
+      eventSummary: { channel: 'owner_self_service', customerAgreementInstanceReference: customerId, last4: String(value).replace(/\D/g, '').slice(-4) },
+      bianServiceDomain: 'Payment Card', bianControlRecordType: 'PaymentCardManagement',
+    });
+    return reply.send(kind === 'cvv' ? { cvv: value } : { pan: value });
+  };
+
+  const ownerRevealSchema = (field: string) => ({
+    tags: ['cards'],
+    summary: `Reveal own card ${field.toUpperCase()} (owner self-service, via provider)`,
+    description: `Owner-only ephemeral reveal of the card ${field.toUpperCase()}, routed through `
+      + 'dispatchProvider (card_issuer). Never a direct call to the built-in module. Production: step-up MFA/SCA. '
+      + `Audited (Req 10), no ${field.toUpperCase()} in the log.`,
+    security: [{ bearerAuth: [] }],
+    params: { type: 'object', required: ['customerId', 'cardId'], properties: { customerId: { type: 'string' }, cardId: { type: 'string' } } },
+    response: { 200: { type: 'object', additionalProperties: true }, 403: { $ref: 'Error#' }, 404: { $ref: 'Error#' } },
+  });
+
+  fastify.post('/:customerId/cards/:cardId/cvv', { schema: ownerRevealSchema('cvv') }, ownerReveal('cvv'));
+  fastify.post('/:customerId/cards/:cardId/pan', { schema: ownerRevealSchema('pan') }, ownerReveal('pan'));
 
   // PATCH /api/v1/customer/:customerId/cards/:cardId  — edit the alias/note (the ONLY editable
   // attributes of a saved card). Owner-only. Both fields are non-CHD display metadata.
