@@ -92,7 +92,7 @@ export async function processEventController(fastify: FastifyInstance) {
     schema: {
       tags: ['events'],
       summary: 'List business process events (ADR-025)',
-      description: 'Returns paginated businessProcessEvent documents. Requires security_auditor, manager or operations_officer role.',
+      description: 'Returns paginated businessProcessEvent documents. Requires the auditEvents:view permission (ADR-030 data-driven RBAC).',
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
@@ -170,7 +170,7 @@ export async function processEventController(fastify: FastifyInstance) {
     schema: {
       tags: ['events'],
       summary: 'List compliance process events (ADR-025)',
-      description: 'Returns paginated complianceProcessEvent documents. Requires security_auditor, manager or operations_officer role.',
+      description: 'Returns paginated complianceProcessEvent documents. Requires the auditEvents:view permission (ADR-030 data-driven RBAC).',
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
