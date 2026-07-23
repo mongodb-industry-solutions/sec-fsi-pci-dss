@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { api, AuthUser, AuthDomain } from '../../lib/api';
+import { BRAND } from '../../config/brand';
 import { getToken, setToken, clearToken, decodeToken, isTokenExpired } from '../../lib/auth';
 import { DEMO_PASSWORD, ROLE_LABELS } from '../../lib/constants';
 import demoRoster from '../../config/demoRoster.json';
@@ -184,8 +185,8 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
             className={`absolute top-0 right-0 p-1.5 rounded-lg transition-colors ${debugMode ? 'bg-amber-100 text-amber-600 hover:bg-amber-200' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}>
             <Bug size={14} />
           </button>
-          <div className="text-4xl mb-2"> <img src="/app-icon.png" alt="Sec4 Pay Icon" className="w-20 h-20 mx-auto" /> </div>
-          <h1 className="text-2xl font-bold">Sec4 Pay</h1>
+          <div className="text-4xl mb-2"> <img src="/app-icon.png" alt={`${BRAND.full} Icon`} className="w-20 h-20 mx-auto" /> </div>
+          <h1 className="text-2xl font-bold">{BRAND.primary} {BRAND.secondary}</h1>
           <p className="text-gray-500 text-sm mt-1">Application Mode: Sign In</p>
         </div>
 
@@ -405,8 +406,8 @@ function RoleDashboard({ user, onSignOut }: { user: DecodedUser; onSignOut: () =
       {/* Standalone header */}
       <header className="sticky top-0 z-20 bg-[#001E2B] border-b border-white/8 px-3 sm:px-5 h-12 flex items-center justify-between shrink-0 gap-3">
         <Link href="/system" className="flex items-center gap-2 text-[#00ED64] font-bold text-sm whitespace-nowrap hover:text-[#00ED64]/80 transition-colors">
-          <span className="text-base"><img src="/app-icon.png" alt="Sec4 Pay Icon" className="w-9 h-9 mx-auto" /> </span>
-          <span className="text-[#FFFFFF]">Sec4</span><span>Pay</span>
+          <span className="text-base"><img src="/app-icon.png" alt={`${BRAND.full} Icon`} className="w-9 h-9 mx-auto" /> </span>
+          <span className="text-[#FFFFFF]">{BRAND.primary}</span><span>{BRAND.secondary}</span>
         </Link>
         <div className="flex items-center gap-2">
           <NotificationBell />

@@ -10,6 +10,7 @@ import {
 import Link from 'next/link';
 import type { ActionResult } from '@/lib/actions';
 import type { Product } from '@/config/products';
+import { BRAND } from '@/lib/brand';
 import { Chip } from '@/components/ui/Bits';
 import CopyButton from '@/components/ui/CopyButton';
 
@@ -107,8 +108,8 @@ export default function PaymentResultModal({
               <p id={descId} className="text-sm text-muted">
                 {ok
                   ? isLink
-                    ? 'Share this link so the buyer can pay on Sec4 Pay.'
-                    : 'The charge was processed securely by Sec4 Pay.'
+                    ? `Share this link so the buyer can pay on ${BRAND.full}.`
+                    : `The charge was processed securely by ${BRAND.full}.`
                   : 'The payment could not be completed.'}
               </p>
             </div>

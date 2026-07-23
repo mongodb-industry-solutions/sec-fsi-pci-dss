@@ -41,12 +41,12 @@ export const swaggerPlugin = fp(async function (fastify: FastifyInstance) {
     openapi: {
       openapi: '3.0.0',
       info: {
-        title: 'Sec4 Pay (PSP Platform API)',
+        title: `${config.app.name} (PSP Platform API)`,
         version: '1.0.0',
         description: `
 ## Overview
 
-REST API for the **Sec4 Pay** (PSP Platform Demo). It demonstrates how
+REST API for the **${config.app.name}** (PSP Platform Demo). It demonstrates how
 [MongoDB Queryable Encryption (QE)](https://www.mongodb.com/docs/manual/core/queryable-encryption/)
 enables a PCI DSS-aligned fraud investigation workflow for digital banks and card issuers:
 encrypted sensitive fields are searchable client-side without the plaintext ever reaching
@@ -160,7 +160,7 @@ Obtain a token via \`POST /api/v1/auth/login\`.
       tryItOutEnabled: true,
     },
     theme: {
-      title: 'Sec4 Pay API',
+      title: `${config.app.name} API`,
       css: [{
         filename: 'leafy-topbar.css',
         content: [
@@ -168,8 +168,8 @@ Obtain a token via \`POST /api/v1/auth/login\`.
           '.topbar-wrapper .link img { content: url("/public/app-icon.png"); height: 38px; width: auto; }',
           /* Hide any leftover "fastify" text node next to the logo */
           '.topbar-wrapper .link span:not([class]) { display: none; }',
-          /* Append "Sec4 Pay" label after the icon */
-          '.topbar-wrapper .link::after { content: "Sec4 Pay"; font-size: 1.15rem; font-weight: 700; color: #00ED64; margin-left: 8px; letter-spacing: 0.01em; }',
+          /* Append the product-name label after the icon */
+          `.topbar-wrapper .link::after { content: "${config.app.name}"; font-size: 1.15rem; font-weight: 700; color: #00ED64; margin-left: 8px; letter-spacing: 0.01em; }`,
         ].join('\n'),
       }],
     },

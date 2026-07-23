@@ -93,6 +93,11 @@ export const config = {
   },
 
   app: {
+    // Product / system name (single source of truth). Compound name, two words (styled separately in
+    // the UIs). Override via PSP_NAME_PRIMARY / PSP_NAME_SECONDARY; defaults to the current name.
+    namePrimary: pspEnv('NAME_PRIMARY', 'Sec4')!.trim(),
+    nameSecondary: pspEnv('NAME_SECONDARY', 'Pay')!.trim(),
+    get name() { return `${this.namePrimary} ${this.nameSecondary}`.trim(); },
     adminUser: pspEnv('ADM_USER'),
     adminPass: pspEnv('ADM_PASS'),
     jwtSecret: pspEnv('JWT_SECRET', 'dev-secret-change-me')!,

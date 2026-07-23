@@ -6,6 +6,7 @@
  */
 import { headers } from 'next/headers';
 import OAuthConsentForm, { MerchantAvatar } from './OAuthConsentForm';
+import { BRAND } from '../../../config/brand';
 
 interface AuthorizePageProps {
   // Next.js 15+/16: searchParams is a Promise and must be awaited.
@@ -110,7 +111,7 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
         {/* Header */}
         <div className="text-center mb-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/app-logo.png" alt="Sec4 Pay" className="h-14 w-auto mx-auto mb-3" />
+          <img src="/app-logo.png" alt={BRAND.full} className="h-14 w-auto mx-auto mb-3" />
           <p className="text-sm text-gray-500 mt-1">Payments made effortless and secure</p>
         </div>
 
@@ -141,7 +142,7 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-4">
-          By allowing, you agree that {info.client_name} may access your Sec4 Pay account
+          By allowing, you agree that {info.client_name} may access your {BRAND.full} account
           in accordance with the permissions above.
         </p>
       </div>

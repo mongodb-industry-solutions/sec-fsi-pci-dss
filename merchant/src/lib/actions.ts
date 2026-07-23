@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { PspClient, PspError } from './PspClient';
 import { ENV } from './env';
 import { findProduct } from '@/config/products';
+import { BRAND } from './brand';
 
 export interface ActionResult {
   ok: boolean;
@@ -155,7 +156,7 @@ export async function addBeneficiary(input: {
     const c = await client();
     const data = await c.addBeneficiary(input.lookupType, value, input.label?.trim() || undefined);
     if (!data.found) {
-      return { ok: false, message: 'No matching Sec4 Pay user was found (or they are already saved).' };
+      return { ok: false, message: `No matching ${BRAND.full} user was found (or they are already saved).` };
     }
     return {
       ok: true,

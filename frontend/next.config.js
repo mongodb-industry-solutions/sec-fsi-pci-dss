@@ -1,4 +1,8 @@
 /** @type {import('next').NextConfig} */
+// Load the repo-root .env so a single global file configures every app in local dev (the backend
+// already does this). Guarded: in Docker (frontend-only build context) the root .env / dotenv module
+// are absent, and the values then come from the container environment or the defaults below.
+try { require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') }); } catch { /* no root .env in this context */ }
 const { version: FRONTEND_VERSION } = require('./package.json');
 // The canonical project version lives in the repo-root package.json. In Docker (Kaniko) the build
 // context is the frontend/ dir only, so the repo root is not present: fall back to a build-arg env
@@ -13,6 +17,10 @@ const nextConfig = {
     env: {
         NEXT_PUBLIC_FRONTEND_VERSION: FRONTEND_VERSION,
         NEXT_PUBLIC_APP_VERSION: APP_VERSION,
+        // Product name (compound, two words). Inlined so the client bundle picks up the value from the
+        // root .env / environment; defaults keep the current name when unset.
+        NEXT_PUBLIC_PSP_NAME_PRIMARY: process.env.NEXT_PUBLIC_PSP_NAME_PRIMARY || 'Sec4',
+        NEXT_PUBLIC_PSP_NAME_SECONDARY: process.env.NEXT_PUBLIC_PSP_NAME_SECONDARY || 'Pay',
     },
     allowedDevOrigins: ['127.0.0.1', 'localhost'],
     async rewrites() {

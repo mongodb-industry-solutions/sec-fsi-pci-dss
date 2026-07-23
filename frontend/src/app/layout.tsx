@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { UIProvider } from '../components/ui/ConfirmProvider';
+import { BRAND } from '../config/brand';
 
 export const metadata: Metadata = {
-  title: 'Sec4 Pay',
+  title: BRAND.full,
   description: 'MongoDB Queryable Encryption · AWS KMS · PCI DSS Payment Security Demo',
   icons: {
     icon: [

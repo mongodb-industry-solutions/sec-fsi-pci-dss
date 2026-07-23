@@ -10,6 +10,7 @@ import { Tip } from '@/components/ui/Tooltip';
 import { loadAccountOptions } from '@/lib/accounts';
 import BeneficiaryPayModal from './BeneficiaryPayModal';
 import BeneficiaryAdd from './BeneficiaryAdd';
+import { BRAND } from '@/lib/brand';
 import BeneficiaryRemove from './BeneficiaryRemove';
 
 export default async function BeneficiariesPage() {
@@ -54,7 +55,7 @@ export default async function BeneficiariesPage() {
       {error ? (
         <PspUnavailable message={error} />
       ) : results.length === 0 ? (
-        <EmptyState icon={<Users className="h-8 w-8" />} title="No saved beneficiaries yet" hint="Payees you add in Sec4 Pay will appear here." />
+        <EmptyState icon={<Users className="h-8 w-8" />} title="No saved beneficiaries yet" hint={`Payees you add in ${BRAND.full} will appear here.`} />
       ) : (
         <ul className="glass divide-y divide-line/60 overflow-hidden rounded-2xl">
           {results.map((b, i) => (
