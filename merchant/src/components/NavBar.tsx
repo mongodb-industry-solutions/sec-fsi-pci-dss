@@ -34,7 +34,7 @@ export default function NavBar({ links, user }: { links: NavLink[]; user: Profil
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-gradient-to-r from-leaf-ink via-[#032a26] to-leaf-ink text-white shadow-card [backdrop-filter:blur(12px)]">
-      <nav className="mx-auto flex max-w-5xl items-center gap-2 px-4 py-3">
+      <nav className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-3">
         <Link href="/" className="flex items-center gap-2 font-bold tracking-tight transition hover:opacity-90">
           <span className="grid h-8 w-8 place-items-center rounded-xl bg-leaf/15 ring-1 ring-leaf/30">
             <Coffee className="h-4 w-4 text-leaf" aria-hidden />
@@ -94,7 +94,7 @@ export default function NavBar({ links, user }: { links: NavLink[]; user: Profil
       {/* Mobile drawer */}
       {user && open && (
         <div className="border-t border-white/10 md:hidden">
-          <div className="mx-auto flex max-w-5xl flex-col gap-1 px-4 py-3">
+          <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-3">
             {links.map((l) => {
               const Icon = ICONS[l.icon];
               return (
