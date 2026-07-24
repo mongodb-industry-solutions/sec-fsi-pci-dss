@@ -2361,5 +2361,48 @@
     "customerAgreementOccupation": "lawyer",
     "customerAgreementSourceOfFunds": "business",
     "customerAgreementPurposeOfRelationship": "savings"
+  },
+  {
+    "customerAgreementInstanceReference": "c0000059-0000-4000-8000-000000000059",
+    "partyInstanceReference": "b0000059-0000-4000-8000-000000000059",
+    "customerAgreementReference": "ACC-LF-20260610",
+    "customerSegment": "retail",
+    "customerAgreementStatus": "active",
+    "customerAgreementEnrollmentDate": "2026-06-10T10:00:00.000Z",
+    "customerAgreementPreferredLanguage": "de",
+    "customerAgreementResidentialAddress": {
+      "streetAddress": "Friedrichstraße 43",
+      "city": "Berlin",
+      "postalCode": "10117",
+      "countryCode": "DE"
+    },
+    "governmentIdentificationReference": "SYNTH-LF-2059",
+    "customerAgreementRiskNotes": "No prior fraud history.",
+    "bianServiceDomain": "Customer Agreement",
+    "bianControlRecordType": "CustomerAgreementProcedure",
+    "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2026-06-10T10:00:00.000Z",
+      "customerAgreementKycCheckReference": "KYC-B0000059-059",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 32,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-a3f10059"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "DE",
+      "number": "DE-C01X00T47",
+      "expiryDate": "2029-05-12"
+    },
+    "customerAgreementTaxIDNumber": "DE-26954371829",
+    "customerAgreementPurposeOfRelationship": "personal_banking",
+    "customerAgreementOccupation": "designer",
+    "customerAgreementSourceOfFunds": "salary"
   }
 ]

@@ -25,11 +25,15 @@ export interface DEKs {
   partyName: Binary;              // party.partyName (SD-13) - QE:substring
   partyNationality: Binary;       // party.partyNationality (SD-13) - QE:equality
   partyPlaceOfBirth: Binary;      // party.partyPlaceOfBirth (SD-13) - QE:equality
+  partySex: Binary;               // party.partySex (SD-13) - QE:equality
   caGovIdType: Binary;            // customerAgreementGovernmentID.type - QE:equality
   caGovIdNumber: Binary;          // customerAgreementGovernmentID.number - QE:suffix
   caGovIdIssuingCountry: Binary;  // customerAgreementGovernmentID.issuingCountry - QE:equality
   caGovIdExpiry: Binary;          // customerAgreementGovernmentID.expiryDate - QE:range
   caTaxId: Binary;                // customerAgreementTaxIDNumber - QE:prefix
+  // v30 issuer vault (module-owned CDE) - QE:equality, lookup tier
+  vaultPan: Binary;               // cardIssuerVault.paymentCardNumber (full PAN) - QE:equality
+  vaultServiceCode: Binary;       // cardIssuerVault.cardServiceCode - QE:equality
   caOccupation: Binary;           // customerAgreementOccupation - QE:equality
   kycRiskScore: Binary;           // customerAgreementKycCheck.customerAgreementKycCheckRiskScore - QE:range
   kycRiskRating: Binary;          // customerAgreementKycCheck.customerAgreementKycCheckRiskRating - QE:equality
@@ -95,11 +99,15 @@ export async function provisionDataEncryptionKeys(client: MongoClient): Promise<
   const partyName = await getOrCreate('DEK-party-name');
   const partyNationality = await getOrCreate('DEK-party-nationality');
   const partyPlaceOfBirth = await getOrCreate('DEK-party-place-of-birth');
+  const partySex = await getOrCreate('DEK-party-sex');
   const caGovIdType = await getOrCreate('DEK-ca-govid-type');
   const caGovIdNumber = await getOrCreate('DEK-ca-govid-number');
   const caGovIdIssuingCountry = await getOrCreate('DEK-ca-govid-issuing-country');
   const caGovIdExpiry = await getOrCreate('DEK-ca-govid-expiry');
   const caTaxId = await getOrCreate('DEK-ca-tax-id');
+  // v30 issuer vault
+  const vaultPan = await getOrCreate('DEK-vault-pan');
+  const vaultServiceCode = await getOrCreate('DEK-vault-service-code');
   const caOccupation = await getOrCreate('DEK-ca-occupation');
   const kycRiskScore = await getOrCreate('DEK-kyc-risk-score');
   const kycRiskRating = await getOrCreate('DEK-kyc-risk-rating');
@@ -131,9 +139,10 @@ export async function provisionDataEncryptionKeys(client: MongoClient): Promise<
 
   return {
     txAccountRef, partyEmail, partyPhone, customerAccountRef, authEmail,
-    partyName, partyNationality, partyPlaceOfBirth,
+    partyName, partyNationality, partyPlaceOfBirth, partySex,
     caGovIdType, caGovIdNumber, caGovIdIssuingCountry, caGovIdExpiry,
     caTaxId, caOccupation, kycRiskScore, kycRiskRating, kycPepStatus, kycSanctionsResult,
+    vaultPan, vaultServiceCode,
     txRawPayload, txProcessorMeta, customerAddress, customerGovId, customerRiskNotes, cardExpiry,
     payoutIban, payoutRouting, execDestIban, partyAddress, partyDob,
     caSourceOfFunds, caPurpose, kycScreeningRef,

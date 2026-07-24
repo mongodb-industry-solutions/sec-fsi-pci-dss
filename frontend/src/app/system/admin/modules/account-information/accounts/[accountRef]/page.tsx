@@ -2,8 +2,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Landmark, ArrowLeft, Pencil, Save, X, Trash2, ShieldAlert, Check } from 'lucide-react';
-import { api } from '../../../../../../../lib/api';
+import { Landmark, CreditCard, ArrowLeft, Pencil, Save, X, Trash2, ShieldAlert, Check, Search, UserCog } from 'lucide-react';
+import { api, type PartyOwnerResult } from '../../../../../../../lib/api';
+import { Pagination } from '../../../../../../../components/Pagination';
+import { SensitiveReveal } from '../../../../../../../components/SensitiveReveal';
 import { getToken } from '../../../../../../../lib/auth';
 import { useDebugMode } from '../../../../../../../lib/debugMode';
 import { useConfirm, useNotify } from '../../../../../../../components/ui/ConfirmProvider';
@@ -23,6 +25,7 @@ interface AccountDetail {
   partyInstanceReference?: string;
   payoutAccountType?: string;
   payoutAccountStatus?: string;
+  ownerName?: string | null;
   payoutAccountCurrency?: string;
   payoutAccountCountryCode?: string;
   payoutAccountPreferredRail?: string;
@@ -39,6 +42,19 @@ interface AccountDetail {
   recordCreatedDateTime?: string;
   recordUpdatedDateTime?: string;
 }
+
+interface LinkedCard {
+  paymentCardInstanceReference: string;
+  paymentCardMaskedPanDisplay: string;
+  paymentCardBin?: string | null;
+  paymentCardLast4?: string | null;
+  paymentCardNetwork?: string | null;
+  paymentCardStatus: string;
+  paymentCardAlias?: string | null;
+}
+
+const CARD_NETWORKS = ['VISA', 'MASTERCARD', 'AMEX', 'ELO'] as const;
+const CARD_STATUSES = ['issued', 'active', 'pending_activation', 'blocked', 'suspended', 'revoked', 'expired'] as const;
 
 const TYPE_LABELS: Record<string, string> = { bank_account: 'Bank Account', wallet: 'Wallet', internal_ledger: 'PSP Ledger' };
 
@@ -90,6 +106,7 @@ function AccountAdminDetail() {
   const [bicSwift, setBicSwift] = useState('');
   const [saving, setSaving] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [reassigning, setReassigning] = useState(false);
 
   const syncForm = useCallback((a: AccountDetail) => {
     setAlias(a.payoutAccountAlias ?? '');
@@ -158,6 +175,28 @@ function AccountAdminDetail() {
     setEditing(false);
   }
 
+  async function reassignOwner(r: PartyOwnerResult) {
+    if (!acct) return;
+    const ok = await confirm({
+      title: 'Reassign account owner?',
+      message: `This payout account will be reassigned to ${r.ownerName ?? 'the selected party'}. This is a sensitive change and is audited.`,
+      confirmLabel: 'Reassign owner',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setReassigning(true);
+    try {
+      const updated = await api.modules.accountAdmin.reassignOwner(accountRef, r.partyInstanceReference, token);
+      setAcct((prev) => prev ? { ...prev, partyInstanceReference: updated.partyInstanceReference, ownerName: updated.ownerName ?? r.ownerName } : prev);
+      notify('Account owner reassigned.', 'success');
+    } catch (e) {
+      if (e instanceof Error && e.message === 'managed_externally') notify('Capability managed by an external provider.', 'error');
+      else notify(e instanceof Error ? e.message : 'Failed to reassign owner.', 'error');
+    } finally {
+      setReassigning(false);
+    }
+  }
+
   const label = acct?.payoutAccountAlias || acct?.payoutAccountBankName || TYPE_LABELS[acct?.payoutAccountType ?? ''] || 'Account';
 
   return (
@@ -223,9 +262,26 @@ function AccountAdminDetail() {
               <DetailRow label="BIC / SWIFT" value={acct.payoutAccountBicSwift} mono />
               <DetailRow label="Correspondent BIC" value={acct.payoutAccountCorrespondentBic} mono />
               <DetailRow label="Bank address" value={acct.payoutAccountBankAddress} />
-              <IbanHintRow present={acct.payoutAccountHasIban} debug={debugMode} />
-              <DetailRow label="Routing number" value={acct.payoutAccountHasRoutingNumber ? 'On file (encrypted)' : 'None'}
-                hint={debugMode ? 'QE-encrypted; never returned' : undefined} />
+              {acct.payoutAccountHasIban ? (
+                <SensitiveReveal label="IBAN"
+                  hint={debugMode ? 'QE-encrypted; ephemeral reveal' : undefined}
+                  fetchValue={async () => (await api.modules.accountAdmin.revealIban(accountRef, token)).payoutAccountIban} />
+              ) : (
+                <IbanHintRow present={acct.payoutAccountHasIban} debug={debugMode} />
+              )}
+              {acct.payoutAccountHasRoutingNumber === false ? (
+                <DetailRow label="Routing number" value="None"
+                  hint={debugMode ? 'QE-encrypted; never returned' : undefined} />
+              ) : (
+                // On demand routing reveal (GDPR need-to-know, re-hideable, audited). Mirrors IBAN.
+                // When the presence hint is absent we still offer it and handle a 404 gracefully.
+                <SensitiveReveal label="Routing number"
+                  hint={debugMode ? 'QE-encrypted; ephemeral reveal' : undefined}
+                  fetchValue={async () => (await api.modules.accountAdmin.revealRouting(accountRef, token)).payoutAccountRoutingNumber} />
+              )}
+              {/* Owner: derived party name (need-to-know, audited). Distinct from the legal holder name. */}
+              <DetailRow label="Owner" value={acct.ownerName ?? undefined}
+                hint={debugMode ? 'derived from party; need-to-know' : undefined} />
               <DetailRow label="Party" value={acct.partyInstanceReference} mono />
               <DetailRow label="Created" value={fmtDate(acct.recordCreatedDateTime)} />
               {acct.recordUpdatedDateTime && (
@@ -237,8 +293,11 @@ function AccountAdminDetail() {
                 payoutAccountInstanceReference: {acct.payoutAccountInstanceReference}
               </p>
             )}
-            <p className="text-xs text-gray-400 pt-1">IBAN and routing number are QE-encrypted at rest and never returned by this admin surface (presence hints only).</p>
+            <p className="text-xs text-gray-400 pt-1">IBAN and routing number are QE-encrypted at rest. The IBAN reveal is on demand (need-to-know, re-hideable) and audited; the routing number is never returned (GDPR Art. 5/32, PCI DSS Req 10).</p>
           </div>
+
+          {/* Linked cards funded by this account (display-safe; no full PAN / CVV). */}
+          <LinkedCardsPanel accountRef={accountRef} token={token} notify={notify} />
 
           {/* Balance */}
           {acct.payoutAccountBalance && (
@@ -290,6 +349,22 @@ function AccountAdminDetail() {
               </div>
             )}
           </div>
+
+          {/* Owner reassignment (operations_officer, accounts:manage). Sensitive; confirmed + audited. */}
+          {canManage && acct.payoutAccountStatus !== 'closed' && (
+            <div className="bg-white rounded-xl border p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
+                  <UserCog size={14} className="text-amber-600" />
+                </div>
+                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Reassign owner</h2>
+              </div>
+              <p className="text-xs text-gray-400">
+                Current owner: <span className="text-gray-700">{acct.ownerName ?? 'Unnamed party'}</span>. Search for a party to reassign this account; the change is confirmed and audited.
+              </p>
+              <PartySearch token={token} disabled={reassigning} onPick={reassignOwner} notify={notify} />
+            </div>
+          )}
 
           {/* Danger zone */}
           {canManage && acct.payoutAccountStatus !== 'closed' && (
@@ -351,6 +426,224 @@ function EditField({ label, value, onChange, mono }: { label: string; value: str
       <label className="block text-xs text-gray-500 mb-1">{label}</label>
       <input value={value} onChange={(e) => onChange(e.target.value)}
         className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#001E2B]/20 ${mono ? 'font-mono' : ''}`} />
+    </div>
+  );
+}
+
+// Debounced party search: queries parties by owner name; picking a result reassigns the account.
+// Reused pattern from the accounts admin panel (accountAdmin.searchParties).
+function PartySearch({ token, onPick, disabled, notify }: {
+  token: string;
+  onPick: (r: PartyOwnerResult) => void;
+  disabled?: boolean;
+  notify: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<PartyOwnerResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searched, setSearched] = useState(false);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setResults([]); setSearched(false); return; }
+    let cancelled = false;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.modules.accountAdmin.searchParties(q, token);
+        if (!cancelled) { setResults(r.results); setSearched(true); }
+      } catch (e) {
+        if (!cancelled) {
+          setResults([]); setSearched(true);
+          if (e instanceof Error && e.message === 'managed_externally') notify('Capability managed by an external provider.', 'error');
+        }
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [query, token, notify]);
+
+  return (
+    <div className="space-y-1.5">
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} disabled={disabled}
+          className="w-full border rounded-lg pl-8 pr-3 py-2 text-sm disabled:opacity-50" placeholder="Search new owner by name" />
+      </div>
+      {searching && <p className="text-xs text-gray-400">Searching…</p>}
+      {results.length > 0 && (
+        <ul className="border rounded-lg divide-y max-h-48 overflow-y-auto">
+          {results.map((r) => (
+            <li key={r.partyInstanceReference}>
+              <button type="button" onClick={() => onPick(r)} disabled={disabled}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors disabled:opacity-50">
+                <span className="text-gray-800 font-medium">{r.ownerName ?? 'Unnamed owner'}</span>
+                <span className="block text-xs text-gray-400 font-mono truncate">{r.partyInstanceReference}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {searched && !searching && results.length === 0 && (
+        <p className="text-xs text-gray-400">No matching party.</p>
+      )}
+    </div>
+  );
+}
+
+// Display-safe cards funded by this payout account (no full PAN / CVV). Paginated + filterable,
+// mirroring the global card admin list UX (network/status selects, BIN/last4 search, shared Pagination).
+// 409 managed_externally renders the standard external-provider banner.
+function LinkedCardsPanel({ accountRef, token, notify }: {
+  accountRef: string;
+  token: string;
+  notify: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [rows, setRows] = useState<LinkedCard[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [loading, setLoading] = useState(true);
+  const [managedExternally, setManagedExternally] = useState(false);
+
+  const [network, setNetwork] = useState('');
+  const [status, setStatus] = useState('');
+  const [last4, setLast4] = useState('');
+  const [bin, setBin] = useState('');
+  // Debounced copies of the free-text search inputs (mirrors the global card admin panel, ~300ms).
+  const [last4Q, setLast4Q] = useState('');
+  const [binQ, setBinQ] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => { setPage(1); setLast4Q(last4); }, 300);
+    return () => clearTimeout(t);
+  }, [last4]);
+  useEffect(() => {
+    const t = setTimeout(() => { setPage(1); setBinQ(bin); }, 300);
+    return () => clearTimeout(t);
+  }, [bin]);
+
+  const load = useCallback(async () => {
+    if (!token || !accountRef) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      const r = await api.modules.accountAdmin.cards({
+        accountRef, token, page, limit,
+        network: network || undefined, status: status || undefined,
+        last4: last4Q || undefined, bin: binQ || undefined,
+      });
+      setRows(r.results as LinkedCard[]);
+      setTotal(r.total);
+      setManagedExternally(false);
+    } catch (e) {
+      if (e instanceof Error && e.message === 'managed_externally') setManagedExternally(true);
+      else notify(e instanceof Error ? e.message : 'Could not load linked cards.', 'error');
+      setRows([]); setTotal(0);
+    } finally { setLoading(false); }
+  }, [token, accountRef, page, limit, network, status, last4Q, binQ, notify]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const hasFilters = !!(network || status || last4Q || binQ);
+
+  return (
+    <div className="bg-white rounded-xl border p-5 space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+          <CreditCard size={14} className="text-blue-600" />
+        </div>
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Linked cards</h2>
+      </div>
+
+      {managedExternally ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3 text-sm text-amber-800">
+          <ShieldAlert size={16} className="text-amber-600 mt-0.5 shrink-0" />
+          <p>This capability is managed by an external provider; built-in administration is disabled.</p>
+        </div>
+      ) : (
+        <>
+          {/* Filters */}
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Network</label>
+              <select value={network} onChange={(e) => { setPage(1); setNetwork(e.target.value); }}
+                className="border rounded-lg px-3 py-1.5 text-sm">
+                <option value="">All</option>
+                {CARD_NETWORKS.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+              <select value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }}
+                className="border rounded-lg px-3 py-1.5 text-sm">
+                <option value="">All</option>
+                {CARD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">BIN</label>
+              <input value={bin} onChange={(e) => setBin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                placeholder="e.g. 411111" inputMode="numeric"
+                className="w-28 border rounded-lg px-3 py-1.5 text-sm font-mono" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Last 4</label>
+              <input value={last4} onChange={(e) => setLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                placeholder="1234" inputMode="numeric"
+                className="w-20 border rounded-lg px-3 py-1.5 text-sm font-mono" />
+            </div>
+          </div>
+
+          {/* Results */}
+          <div className="rounded-lg border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-gray-500 uppercase border-b bg-gray-50">
+                    <th className="py-2.5 px-4 font-medium">Masked PAN</th>
+                    <th className="py-2.5 px-4 font-medium">BIN</th>
+                    <th className="py-2.5 px-4 font-medium">Last 4</th>
+                    <th className="py-2.5 px-4 font-medium">Network</th>
+                    <th className="py-2.5 px-4 font-medium">Status</th>
+                    <th className="py-2.5 px-4 font-medium">Alias</th>
+                    <th className="py-2.5 px-4 font-medium text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td colSpan={7} className="py-8 text-center text-gray-400">Loading…</td></tr>
+                  ) : rows.length === 0 ? (
+                    <tr><td colSpan={7} className="py-8 text-center text-gray-400">
+                      {hasFilters ? 'No cards match these filters.' : 'No cards are funded by this account.'}
+                    </td></tr>
+                  ) : rows.map((c) => (
+                    <tr key={c.paymentCardInstanceReference} className="border-b last:border-0 hover:bg-gray-50">
+                      <td className="py-2.5 px-4 font-mono">{c.paymentCardMaskedPanDisplay}</td>
+                      <td className="py-2.5 px-4 font-mono text-xs text-gray-500">{c.paymentCardBin ?? '-'}</td>
+                      <td className="py-2.5 px-4 font-mono text-xs text-gray-500">{c.paymentCardLast4 ?? '-'}</td>
+                      <td className="py-2.5 px-4">{c.paymentCardNetwork ?? '-'}</td>
+                      <td className="py-2.5 px-4"><span className={`text-xs px-2 py-0.5 rounded font-medium ${statusClass(c.paymentCardStatus)}`}>{c.paymentCardStatus}</span></td>
+                      <td className="py-2.5 px-4 truncate max-w-[160px]">{c.paymentCardAlias ?? '-'}</td>
+                      <td className="py-2.5 px-4 text-right">
+                        <Link href={`/system/admin/modules/card-issuer/cards/${encodeURIComponent(c.paymentCardInstanceReference)}`}
+                          className="text-xs text-[#001E2B] font-medium hover:underline">View</Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {total > 0 && (
+              <div className="px-4 border-t">
+                <Pagination page={page} totalPages={totalPages} total={total} limit={limit}
+                  onPageChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); }} noun="cards" />
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

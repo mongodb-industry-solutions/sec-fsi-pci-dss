@@ -8,9 +8,16 @@ import { useEffectivePermissions } from '../../../../lib/permissions';
 
 const DOMAIN_LABEL: Record<string, string> = {
   fraud: 'Fraud & Financial Crime',
-  customer: 'Customer Due Diligence',
+  customer: 'Customer & Business Due Diligence',
   gateway: 'Card / Payments',
 };
+
+// DISPLAY grouping only. KYB is owned by the `gateway` module (SD-89 merchant data ownership / callback
+// routing / §10 matrix stay unchanged), but for the operator it is an onboarding due-diligence sibling of
+// KYC (SD-53). So group it next to KYC under "Customer & Business Due Diligence" without touching its
+// moduleDomain. This override does not affect the backend or the config route (/modules/kyb/config).
+const displayDomain = (c: { capability: string; moduleDomain: string | null }): string | null =>
+  c.capability === 'kyb' ? 'customer' : c.moduleDomain;
 
 // §2.6: every module entry shows whether it is PSP Core or a replaceable Built-in Provider.
 function ModuleTypeBadge({ type }: { type: ModuleType }) {
@@ -29,7 +36,7 @@ export default function ModulesIndexPage() {
   const { can, loading: permsLoading } = useEffectivePermissions();
   const byDomain = (['fraud', 'customer', 'gateway'] as const).map((d) => ({
     domain: d,
-    items: CAPABILITY_LIST.filter((c) => c.hasModule && c.moduleDomain === d),
+    items: CAPABILITY_LIST.filter((c) => c.hasModule && displayDomain(c) === d),
   }));
 
   // SoD (PCI Req 7): the "domain" core module administers Auth Domains (SD-16), which is the manager's

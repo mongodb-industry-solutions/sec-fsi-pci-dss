@@ -1,9 +1,9 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Trash2, Eye, ShieldAlert, Check } from 'lucide-react';
+import { Plus, Trash2, Eye, ShieldAlert, Check, Search, X } from 'lucide-react';
 import { Pagination } from '../../../../../components/Pagination';
-import { api, type AdminPayoutAccount } from '../../../../../lib/api';
+import { api, type AdminPayoutAccount, type PartyOwnerResult } from '../../../../../lib/api';
 import { getToken } from '../../../../../lib/auth';
 import { useNotify, useConfirm } from '../../../../../components/ui/ConfirmProvider';
 import { useEffectivePermissions } from '../../../../../lib/permissions';
@@ -202,7 +202,20 @@ function CreateAccountModal({ token, onClose, onCreated, notify }: {
     payoutAccountRoutingNumber: '',
   });
   const [saving, setSaving] = useState(false);
+  // Owner picker: search parties by owner name; selecting one fills the party reference.
+  const [ownerName, setOwnerName] = useState('');
+  const [manual, setManual] = useState(false);
   const valid = form.partyInstanceReference.trim() && form.payoutAccountCurrency.trim() && form.payoutAccountCountryCode.trim();
+
+  function pickOwner(r: PartyOwnerResult) {
+    setForm((f) => ({ ...f, partyInstanceReference: r.partyInstanceReference }));
+    setOwnerName(r.ownerName ?? 'Unnamed owner');
+  }
+
+  function clearOwner() {
+    setForm((f) => ({ ...f, partyInstanceReference: '' }));
+    setOwnerName('');
+  }
 
   async function submit() {
     if (!valid) { notify('Party, currency and country code are required', 'error'); return; }
@@ -232,9 +245,25 @@ function CreateAccountModal({ token, onClose, onCreated, notify }: {
   return (
     <ModalShell title="Create payout account" onClose={onClose}>
       <div className="space-y-3">
-        <Field label="Party reference *">
-          <input value={form.partyInstanceReference} onChange={(e) => setForm({ ...form, partyInstanceReference: e.target.value })}
-            className="w-full border rounded-lg px-3 py-2 text-sm font-mono" placeholder="partyInstanceReference" />
+        <Field label="Owner (party) *">
+          {form.partyInstanceReference && ownerName ? (
+            <div className="flex items-center justify-between gap-3 border rounded-lg px-3 py-2 text-sm bg-gray-50">
+              <span className="min-w-0">
+                <span className="text-gray-800 font-medium truncate">{ownerName}</span>
+                <span className="block text-xs text-gray-400 font-mono truncate">{form.partyInstanceReference}</span>
+              </span>
+              <button type="button" onClick={clearOwner} title="Change owner"
+                className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-gray-100 transition-colors shrink-0"><X size={15} /></button>
+            </div>
+          ) : manual ? (
+            <div className="space-y-1.5">
+              <input value={form.partyInstanceReference} onChange={(e) => setForm({ ...form, partyInstanceReference: e.target.value })}
+                className="w-full border rounded-lg px-3 py-2 text-sm font-mono" placeholder="partyInstanceReference" />
+              <button type="button" onClick={() => setManual(false)} className="text-xs text-[#001E2B] hover:underline">Search by owner name instead</button>
+            </div>
+          ) : (
+            <OwnerSearch token={token} onPick={pickOwner} onManual={() => setManual(true)} notify={notify} />
+          )}
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Type">
@@ -277,17 +306,81 @@ function CreateAccountModal({ token, onClose, onCreated, notify }: {
           </Field>
           <Field label="Routing number (optional)">
             <input value={form.payoutAccountRoutingNumber} onChange={(e) => setForm({ ...form, payoutAccountRoutingNumber: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
+              className="w-full border rounded-lg px-3 py-2 text-sm font-mono" placeholder="Auto-generated if left blank" />
           </Field>
         </div>
         <Field label="IBAN (optional, encrypted at rest)">
           <input value={form.payoutAccountIban} onChange={(e) => setForm({ ...form, payoutAccountIban: e.target.value.toUpperCase() })}
-            className="w-full border rounded-lg px-3 py-2 text-sm font-mono" placeholder="ESxx ..." />
+            className="w-full border rounded-lg px-3 py-2 text-sm font-mono" placeholder="Auto-generated if left blank" />
         </Field>
-        <p className="text-xs text-gray-400">IBAN and routing number are QE-encrypted at rest and never returned by this admin surface (presence hints only).</p>
+        <p className="text-xs text-gray-400">IBAN and routing number are auto-generated server-side if left blank. Both are QE-encrypted at rest and never returned by this admin surface (presence hints only).</p>
       </div>
       <ModalActions onClose={onClose} onConfirm={submit} confirmLabel={saving ? 'Saving…' : 'Create'} disabled={saving || !valid} />
     </ModalShell>
+  );
+}
+
+// Debounced owner search box: queries parties by owner name; picking a result fills the party
+// reference. Falls back to a manual UUID paste when the search yields nothing.
+function OwnerSearch({ token, onPick, onManual, notify }: {
+  token: string;
+  onPick: (r: PartyOwnerResult) => void;
+  onManual: () => void;
+  notify: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<PartyOwnerResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searched, setSearched] = useState(false);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setResults([]); setSearched(false); return; }
+    let cancelled = false;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.modules.accountAdmin.searchParties(q, token);
+        if (!cancelled) { setResults(r.results); setSearched(true); }
+      } catch (e) {
+        if (!cancelled) {
+          setResults([]); setSearched(true);
+          if (e instanceof Error && e.message === 'managed_externally') notify('Capability managed by an external provider', 'error');
+        }
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [query, token, notify]);
+
+  return (
+    <div className="space-y-1.5">
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} autoFocus
+          className="w-full border rounded-lg pl-8 pr-3 py-2 text-sm" placeholder="Search owner by name" />
+      </div>
+      {searching && <p className="text-xs text-gray-400">Searching…</p>}
+      {results.length > 0 && (
+        <ul className="border rounded-lg divide-y max-h-48 overflow-y-auto">
+          {results.map((r) => (
+            <li key={r.partyInstanceReference}>
+              <button type="button" onClick={() => onPick(r)}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors">
+                <span className="text-gray-800 font-medium">{r.ownerName ?? 'Unnamed owner'}</span>
+                <span className="block text-xs text-gray-400 font-mono truncate">{r.partyInstanceReference}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {searched && !searching && results.length === 0 && (
+        <p className="text-xs text-gray-400">
+          No match. <button type="button" onClick={onManual} className="text-[#001E2B] hover:underline">Enter a party reference manually</button>.
+        </p>
+      )}
+    </div>
   );
 }
 

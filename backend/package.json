@@ -1,6 +1,6 @@
 {
   "name": "fsi-pci-dss-backend",
-  "version": "2.3.0",
+  "version": "2.5.0",
   "private": true,
   "engines": {
     "node": ">=22"
@@ -14,9 +14,11 @@
     "setup:check": "ts-node bin/validate.ts",
     "setup:key:rsa": "ts-node bin/setup-oauth-keys.ts",
     "seed": "ts-node bin/seed.ts",
+    "setup:seed": "ts-node bin/seed.ts",
     "setup:key:master": "ts-node bin/seed-generate-key.ts",
     "setup:integrity-issues": "ts-node bin/seed-integrity-issues.ts",
     "generate:data": "ts-node bin/seed-generate.ts",
+    "setup:generate": "ts-node bin/seed-generate.ts",
     "test": "jest --runInBand",
     "test:unit": "jest --runInBand --testPathPattern=unit",
     "test:integration": "jest --runInBand --testPathPattern=integration",

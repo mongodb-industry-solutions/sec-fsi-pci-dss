@@ -1,9 +1,9 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Trash2, Power, Eye, ShieldAlert } from 'lucide-react';
+import { Plus, Trash2, Power, Eye, ShieldAlert, Search, X } from 'lucide-react';
 import { Pagination } from '../../../../../components/Pagination';
-import { api, type AdminCard } from '../../../../../lib/api';
+import { api, type AdminCard, type AdminPayoutAccount, type PartyOwnerResult } from '../../../../../lib/api';
 import { getToken } from '../../../../../lib/auth';
 import { useNotify, useConfirm } from '../../../../../components/ui/ConfirmProvider';
 import { useEffectivePermissions } from '../../../../../lib/permissions';
@@ -49,6 +49,8 @@ export function CardsAdminPanel() {
   const [network, setNetwork] = useState('');
   const [status, setStatus] = useState('');
   const [agreement, setAgreement] = useState('');
+  const [last4, setLast4] = useState('');
+  const [bin, setBin] = useState('');
 
   const [showCreate, setShowCreate] = useState(false);
 
@@ -57,7 +59,7 @@ export function CardsAdminPanel() {
     setLoading(true);
     try {
       const r = await api.modules.cardAdmin.list(
-        { page, limit, network: network || undefined, status: status || undefined, agreement: agreement || undefined },
+        { page, limit, network: network || undefined, status: status || undefined, agreement: agreement || undefined, last4: last4 || undefined, bin: bin || undefined },
         token,
       );
       setRows(r.results);
@@ -68,7 +70,7 @@ export function CardsAdminPanel() {
       else notify(e instanceof Error ? e.message : 'Could not load cards', 'error');
       setRows([]); setTotal(0);
     } finally { setLoading(false); }
-  }, [token, page, limit, network, status, agreement, notify]);
+  }, [token, page, limit, network, status, agreement, last4, bin, notify]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -141,6 +143,18 @@ export function CardsAdminPanel() {
             {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">BIN</label>
+          <input value={bin} onChange={(e) => { setPage(1); setBin(e.target.value.replace(/\D/g, '').slice(0, 8)); }}
+            placeholder="e.g. 411111" inputMode="numeric"
+            className="w-28 border rounded-lg px-3 py-1.5 text-sm font-mono" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Last 4</label>
+          <input value={last4} onChange={(e) => { setPage(1); setLast4(e.target.value.replace(/\D/g, '').slice(0, 4)); }}
+            placeholder="1234" inputMode="numeric"
+            className="w-20 border rounded-lg px-3 py-1.5 text-sm font-mono" />
+        </div>
         <div className="grow min-w-[220px]">
           <label className="block text-xs font-medium text-gray-600 mb-1">Agreement reference</label>
           <input value={agreement} onChange={(e) => { setPage(1); setAgreement(e.target.value); }}
@@ -155,6 +169,8 @@ export function CardsAdminPanel() {
             <thead>
               <tr className="text-left text-xs text-gray-500 uppercase border-b bg-gray-50">
                 <th className="py-2.5 px-4 font-medium">Masked PAN</th>
+                <th className="py-2.5 px-4 font-medium">BIN</th>
+                <th className="py-2.5 px-4 font-medium">Last 4</th>
                 <th className="py-2.5 px-4 font-medium">Network</th>
                 <th className="py-2.5 px-4 font-medium">Status</th>
                 <th className="py-2.5 px-4 font-medium">Alias</th>
@@ -164,12 +180,14 @@ export function CardsAdminPanel() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="py-8 text-center text-gray-400">Loading…</td></tr>
+                <tr><td colSpan={8} className="py-8 text-center text-gray-400">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={6} className="py-8 text-center text-gray-400">No cards</td></tr>
+                <tr><td colSpan={8} className="py-8 text-center text-gray-400">No cards</td></tr>
               ) : rows.map((c) => (
                 <tr key={c.paymentCardInstanceReference} className="border-b last:border-0 hover:bg-gray-50">
                   <td className="py-2.5 px-4 font-mono">{c.paymentCardMaskedPanDisplay}</td>
+                  <td className="py-2.5 px-4 font-mono text-xs text-gray-500">{c.paymentCardBin ?? '—'}</td>
+                  <td className="py-2.5 px-4 font-mono text-xs text-gray-500">{c.paymentCardLast4 ?? '—'}</td>
                   <td className="py-2.5 px-4">{c.paymentCardNetwork ?? '—'}</td>
                   <td className="py-2.5 px-4"><StatusBadge status={c.paymentCardStatus} /></td>
                   <td className="py-2.5 px-4">{c.paymentCardAlias ?? '—'}</td>
@@ -203,7 +221,6 @@ function CreateCardModal({ token, onClose, onCreated, notify }: {
   token: string; onClose: () => void; onCreated: () => void; notify: (m: string, t: 'success' | 'error') => void;
 }) {
   const [form, setForm] = useState({
-    customerAgreementInstanceReference: '',
     cardToken: '',
     paymentCardMaskedPanDisplay: '',
     paymentCardNetwork: 'VISA' as (typeof NETWORKS)[number],
@@ -211,16 +228,25 @@ function CreateCardModal({ token, onClose, onCreated, notify }: {
     paymentCardAlias: '',
   });
   const [saving, setSaving] = useState(false);
-  const valid = form.customerAgreementInstanceReference.trim() && form.cardToken.trim() && form.paymentCardMaskedPanDisplay.trim();
+  // v30.2 funding picker: search the owner by name (party) then pick one of their payout accounts.
+  // The chosen funding account is required; the cardholder (agreement) is derived server-side.
+  const [party, setParty] = useState<PartyOwnerResult | null>(null);
+  const [funding, setFunding] = useState<AdminPayoutAccount | null>(null);
+  const valid = !!funding && form.cardToken.trim();
+
+  function clearParty() {
+    setParty(null);
+    setFunding(null);
+  }
 
   async function submit() {
-    if (!valid) { notify('Agreement, token and masked PAN are required', 'error'); return; }
+    if (!valid || !funding) { notify('A funding account and card token are required', 'error'); return; }
     setSaving(true);
     try {
       await api.modules.cardAdmin.register({
-        customerAgreementInstanceReference: form.customerAgreementInstanceReference.trim(),
+        fundingPayoutAccountInstanceReference: funding.payoutAccountInstanceReference,
         cardToken: form.cardToken.trim(),
-        paymentCardMaskedPanDisplay: form.paymentCardMaskedPanDisplay.trim(),
+        ...(form.paymentCardMaskedPanDisplay.trim() ? { paymentCardMaskedPanDisplay: form.paymentCardMaskedPanDisplay.trim() } : {}),
         paymentCardNetwork: form.paymentCardNetwork,
         ...(form.paymentCardExpirationDate.trim() ? { paymentCardExpirationDate: form.paymentCardExpirationDate.trim() } : {}),
         ...(form.paymentCardAlias.trim() ? { paymentCardAlias: form.paymentCardAlias.trim() } : {}),
@@ -236,15 +262,32 @@ function CreateCardModal({ token, onClose, onCreated, notify }: {
   return (
     <ModalShell title="Register card" onClose={onClose}>
       <div className="space-y-3">
-        <Field label="Customer agreement reference *">
-          <input value={form.customerAgreementInstanceReference} onChange={(e) => setForm({ ...form, customerAgreementInstanceReference: e.target.value })}
-            className="w-full border rounded-lg px-3 py-2 text-sm font-mono" placeholder="customerAgreementInstanceReference" />
+        <Field label="Funding account *">
+          {party && funding ? (
+            <div className="flex items-center justify-between gap-3 border rounded-lg px-3 py-2 text-sm bg-gray-50">
+              <span className="min-w-0">
+                <span className="text-gray-800 font-medium truncate">{party.ownerName ?? 'Unnamed owner'}</span>
+                <span className="block text-xs text-gray-500 truncate">
+                  {funding.payoutAccountAlias ?? funding.payoutAccountBankName ?? 'Payout account'}
+                  {funding.payoutAccountCurrency ? ` · ${funding.payoutAccountCurrency}` : ''}
+                </span>
+                <span className="block text-xs text-gray-400 font-mono truncate">{funding.payoutAccountInstanceReference}</span>
+              </span>
+              <button type="button" onClick={clearParty} title="Change funding account"
+                className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-gray-100 transition-colors shrink-0"><X size={15} /></button>
+            </div>
+          ) : party ? (
+            <FundingAccountPicker token={token} party={party} onPick={setFunding} onBack={() => setParty(null)} notify={notify} />
+          ) : (
+            <OwnerSearch token={token} onPick={setParty} notify={notify} />
+          )}
+          <p className="mt-1 text-xs text-gray-400">The cardholder (owner) is derived from the funding account server-side.</p>
         </Field>
         <Field label="Card token (PAN surrogate) *">
           <input value={form.cardToken} onChange={(e) => setForm({ ...form, cardToken: e.target.value })}
             className="w-full border rounded-lg px-3 py-2 text-sm font-mono" placeholder="tok_..." />
         </Field>
-        <Field label="Masked PAN *">
+        <Field label="Masked PAN (optional)">
           <input value={form.paymentCardMaskedPanDisplay} onChange={(e) => setForm({ ...form, paymentCardMaskedPanDisplay: e.target.value })}
             className="w-full border rounded-lg px-3 py-2 text-sm font-mono" placeholder="****-****-****-1234" />
         </Field>
@@ -268,6 +311,124 @@ function CreateCardModal({ token, onClose, onCreated, notify }: {
       </div>
       <ModalActions onClose={onClose} onConfirm={submit} confirmLabel={saving ? 'Saving…' : 'Register'} disabled={saving || !valid} />
     </ModalShell>
+  );
+}
+
+// Debounced owner search box: queries parties by owner name; picking a result advances to the
+// funding-account picker for that party.
+function OwnerSearch({ token, onPick, notify }: {
+  token: string;
+  onPick: (r: PartyOwnerResult) => void;
+  notify: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<PartyOwnerResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searched, setSearched] = useState(false);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setResults([]); setSearched(false); return; }
+    let cancelled = false;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.modules.accountAdmin.searchParties(q, token);
+        if (!cancelled) { setResults(r.results); setSearched(true); }
+      } catch (e) {
+        if (!cancelled) {
+          setResults([]); setSearched(true);
+          if (e instanceof Error && e.message === 'managed_externally') notify('Capability managed by an external provider', 'error');
+        }
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [query, token, notify]);
+
+  return (
+    <div className="space-y-1.5">
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} autoFocus
+          className="w-full border rounded-lg pl-8 pr-3 py-2 text-sm" placeholder="Search owner by name" />
+      </div>
+      {searching && <p className="text-xs text-gray-400">Searching…</p>}
+      {results.length > 0 && (
+        <ul className="border rounded-lg divide-y max-h-48 overflow-y-auto">
+          {results.map((r) => (
+            <li key={r.partyInstanceReference}>
+              <button type="button" onClick={() => onPick(r)}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors">
+                <span className="text-gray-800 font-medium">{r.ownerName ?? 'Unnamed owner'}</span>
+                <span className="block text-xs text-gray-400 font-mono truncate">{r.partyInstanceReference}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {searched && !searching && results.length === 0 && (
+        <p className="text-xs text-gray-400">No matching owner.</p>
+      )}
+    </div>
+  );
+}
+
+// Loads the selected party's payout accounts and lets the user pick the card's funding account.
+function FundingAccountPicker({ token, party, onPick, onBack, notify }: {
+  token: string;
+  party: PartyOwnerResult;
+  onPick: (a: AdminPayoutAccount) => void;
+  onBack: () => void;
+  notify: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [accounts, setAccounts] = useState<AdminPayoutAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api.modules.accountAdmin.list({ party: party.partyInstanceReference, limit: 50 }, token)
+      .then((r) => { if (!cancelled) setAccounts(r.results); })
+      .catch((e) => {
+        if (!cancelled) {
+          setAccounts([]);
+          if (e instanceof Error && e.message === 'managed_externally') notify('Capability managed by an external provider', 'error');
+          else notify(e instanceof Error ? e.message : 'Could not load payout accounts', 'error');
+        }
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [token, party.partyInstanceReference, notify]);
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-gray-500 truncate">Owner: <span className="text-gray-800 font-medium">{party.ownerName ?? 'Unnamed owner'}</span></span>
+        <button type="button" onClick={onBack} className="text-xs text-[#001E2B] hover:underline shrink-0">Change owner</button>
+      </div>
+      {loading ? (
+        <p className="text-xs text-gray-400">Loading payout accounts…</p>
+      ) : accounts.length === 0 ? (
+        <p className="text-xs text-gray-400">This owner has no payout accounts.</p>
+      ) : (
+        <ul className="border rounded-lg divide-y max-h-48 overflow-y-auto">
+          {accounts.map((a) => (
+            <li key={a.payoutAccountInstanceReference}>
+              <button type="button" onClick={() => onPick(a)}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors">
+                <span className="text-gray-800 font-medium">
+                  {a.payoutAccountAlias ?? a.payoutAccountBankName ?? 'Payout account'}
+                  {a.payoutAccountCurrency ? ` · ${a.payoutAccountCurrency}` : ''}
+                </span>
+                <span className="block text-xs text-gray-400 font-mono truncate">{a.payoutAccountInstanceReference}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

@@ -71,6 +71,11 @@ async function connectAndWire(fastify: FastifyInstance): Promise<void> {
   const { PostAuthorizationProcess } = await import('../modules/transaction/services/postAuthorization.process');
   new PostAuthorizationProcess(db, getEventBus()).register();
 
+  // v31 §5bis: KYB verification saga (kyb_business + hrp + aml scatter-gather → structured entity
+  // verdict → decisionMode resolution). Registered after ProviderGroups so its reactors are live.
+  const { KybVerificationSaga } = await import('../modules/gateway/services/kybVerification.saga');
+  new KybVerificationSaga(db, getEventBus()).register();
+
   // v17: payout orchestration (merchant settlement, SD-65/SD-66/SD-36).
   const { PayoutOrchestrationProcess } = await import('../modules/gateway/services/payoutOrchestration.process');
   new PayoutOrchestrationProcess(db, getEventBus()).register();

@@ -45,6 +45,7 @@ export interface PartyControlRecord {
   partyDateOfBirth?: Date;               // v27: BSON Date, QE:range (DEK-party-dob) — was ISO string / QE:none
   partyNationality?: string;             // v27: QE:equality contention 8 (DEK-party-nationality). ISO 3166-1 alpha-2
   partyPlaceOfBirth?: string;            // v27: QE:equality contention 8 (DEK-party-place-of-birth) — city
+  partySex?: PartySex;                   // QE:equality contention 8 (DEK-party-sex). GDPR PII. 'male'|'female'|'other'|'unspecified'
   partyPostalAddress?: PartyPostalAddress; // SD-13 postal contact point — GDPR PII, QE:none (DEK-party-address, L2 only)
                                          // KYC-typical demographics apply to EVERY party (customer + employee),
                                          // so staff profiles are as complete as customers'. Address + DOB are
@@ -57,6 +58,7 @@ export interface PartyControlRecord {
 }
 
 export type PartyType = 'customer' | 'employee' | 'service_account';
+export type PartySex = 'male' | 'female' | 'other' | 'unspecified';
 ```
 
 > **Blind index for phone uniqueness.** `partyMobilePhoneNumber` is a QE:equality field, and
@@ -1216,6 +1218,7 @@ All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `k
 | `deks.partyName` | `DEK-party-name` | `party.partyName` (v27, QE:substring — lookup tier) |
 | `deks.partyNationality` | `DEK-party-nationality` | `party.partyNationality` (v27, QE:equality c8) |
 | `deks.partyPlaceOfBirth` | `DEK-party-place-of-birth` | `party.partyPlaceOfBirth` (v27, QE:equality c8) |
+| `deks.partySex` | `DEK-party-sex` | `party.partySex` (QE:equality c8, GDPR PII) |
 | `deks.caGovIdNumber` | `DEK-ca-govid-number` | `customerAgreementGovernmentID.number` (v27, QE:suffix) |
 | `deks.caGovIdType` | `DEK-ca-govid-type` | `customerAgreementGovernmentID.type` (v27, QE:equality c6) |
 | `deks.caGovIdIssuingCountry` | `DEK-ca-govid-issuing-country` | `customerAgreementGovernmentID.issuingCountry` (v27, QE:equality c6) |
@@ -1255,6 +1258,7 @@ encrypted, lookup-tier and exact-searchable.
 | `party.partyDateOfBirth` | date | range | min 1900-01-01, max 2020-01-01, sparsity 1, trimFactor 4 |
 | `party.partyNationality` | string | equality | contention 8 |
 | `party.partyPlaceOfBirth` | string | equality | contention 8 |
+| `party.partySex` | string | equality | contention 8 |
 | `customerAgreementGovernmentID.number` | string | suffix | strMaxLength 20, strMinQueryLength 3, strMaxQueryLength 10, caseSensitive true, diacriticSensitive true |
 | `customerAgreementGovernmentID.type` | string | equality | contention 6 |
 | `customerAgreementGovernmentID.issuingCountry` | string | equality | contention 6 |
@@ -2765,6 +2769,14 @@ PSP_PAYOUT_SETTLEMENT_DELAY_T3_MS=9000  # Simulated T+3 delay in ms
 PSP_PAYMENT_INITIATION_ALWAYS_SUCCEED=true  # Set false to simulate 5% rail failures
 PSP_AIS_ALWAYS_VERIFY=true               # Set false for builtin AIS to return unverified
 PSP_AUDIT_LIST_ACCESS=false              # v29: emit 1 aggregate compliance event per global admin listing (default off)
+
+# ── Frontend demo convenience (NEXT_PUBLIC_, build-time) ───────────
+# Kill-switch for the OIDC /auth/authorize demo shortcut. Two per-request query params drive it:
+#   prefill_password=<pw>  → prefills the password field (login_hint prefills the email).
+#   auto_login=1|true      → additionally submits the login automatically (needs both credentials).
+# INSECURE by design (URLs leak passwords into history, proxy logs, Referer). ALLOWED by default in
+# ANY environment; set this flag to 'false' to disable both params entirely and harden a deployment.
+NEXT_PUBLIC_PSP_OIDC_AUTO=true
 ```
 
 ---
@@ -4094,3 +4106,257 @@ use `dualPermission` (session RBAC `paymentRequests:view/manage` OR merchant OAu
 + merchant client seed + REQUESTED_SCOPES). Config gate `PSP_RTP_ENABLED`. ISO 20022 mapper: `rtpIso20022.mapper.ts`.
 
 *Added 2026-07-17 (v28).*
+
+## 15. v30 — Realistic per-card CVV, issuer CVK, and the card-issuer PAN vault (SD-88)
+
+v30 raises the fidelity of the built-in `card-issuer` module so the CVV behaves as it does in a real
+issuer (derived per card from an issuer key, never stored), while keeping a global escape-hatch CVV for
+fast demos. It also introduces the first **module-owned data**: the issuer key (CVK) in the key vault and
+a dedicated PAN vault collection (`cardIssuerVault`). The PSP core stays descoped for the PAN: it keeps
+only the token plus BIN and last 4. See ADR-043 and ADR-044 in `engineering-proposal.md`.
+
+### 15.1 CVV derivation + `cvvMode`
+
+Source: `backend/src/providers/card-issuer/services/cardVerificationKey.service.ts`.
+
+The per-card CVV is derived, never persisted (PCI DSS Req 3.2, SAD):
+
+```
+perCardCvv(card) = digits( HMAC-SHA256( CVK, cardToken + '|' + expiryMMYY + '|' + serviceCode ) )[0 : cvvLength]
+```
+
+- `cvvLength` per network: Visa / Mastercard = 3, Amex = 4.
+- `cardToken` = `paymentCardReference` (surrogate, not CHD); `expiryMMYY` from `paymentCardExpirationDate`;
+  `serviceCode` from the vault (`cardServiceCode`) or the constant `'201'` when the vault is inactive.
+- Derived on demand in validation and reveal; the value never enters any collection, log, listing, or
+  validation response.
+
+Config key `cvvMode` in `capabilityModuleConfiguration` for capability `card-issuer` (via `GET|PUT /config`):
+
+| `cvvMode` | Accepted CVV |
+|---|---|
+| `both` (default) | global escape-hatch (`validCvv`, default `'123'`) OR the derived per-card CVV |
+| `global` | only the global `validCvv` (simple demo) |
+| `per_card` | only the derived per-card CVV (strict / realistic demo) |
+
+### 15.2 CVK in the key vault (envelope encryption)
+
+The Card Verification Key (CVK) is issuer key material owned by the `card-issuer` module, one per module
+instance in v30. It is provisioned once and never stored in cleartext:
+
+```
+KMS / master key  →  DEK (wrapped in encryption.__keyVault)  →  CVK (HKDF from the unwrapped DEK)
+```
+
+- `provisionCardIssuerCvk()` provisions the DEK (idempotent, by `keyAltNames` alias) and wires from
+  `vendors/setup/provisionDEKs.ts`; `getCardIssuerCvk()` unwraps via the raw (non-QE) client and derives
+  the CVK in memory only via HKDF; `derivePerCardCvv()` computes the HMAC.
+- Rotation: rotate the DEK / re-key the vault; the CVV contract is unchanged. Per-card CVK is out of scope
+  for v30.
+- No new business collection and no new CHD are introduced by the CVV feature itself.
+
+### 15.3 `cardIssuerVault` — module-owned PAN vault (BIAN Card Administration)
+
+Module-owned CDE collection, only present / used while the built-in `card-issuer` is the active provider.
+BIAN control record: **Card Administration** (the issued device of the issuer), confirmed in F0, not
+invented. The PSP core never reads this collection; the cross-frontier read is only via a port.
+
+```typescript
+export const CARD_ISSUER_VAULT_COLLECTION = 'cardIssuerVault';
+
+export interface CardIssuerVaultControlRecord {
+  issuedCardInstanceReference: string;        // PK, UUID (module key)
+  paymentCardReference: string;               // FK token; join to the core via the Card Reference port
+  paymentCardInstanceReference: string;       // FK to the core arrangement
+  paymentCardNumber: string;                  // full PAN (CHD) — QE:equality
+  cardServiceCode: string;                    // issuer data, CVV derivation input — QE:equality
+  cardIssuerCvkKeyId: string;                 // reference to the DEK/CVK (not the key itself)
+  issuedCardStatus: string;
+  bianServiceDomain: 'Card Administration';
+  bianControlRecordType: 'CardAdministration';
+  recordCreatedDateTime: Date;
+  schemaVersion: number;
+  // CVV: SAD — never stored (derived)
+}
+```
+
+QE fields (`vendors/encryption/encryptedFieldsMaps.ts`), equality only (compatible with server 8.0;
+substring/suffix intentionally OFF, R13):
+
+| Field | Classification | QE | DEK |
+|---|---|---|---|
+| `paymentCardNumber` (full PAN) | CHD | QE:equality | `DEK-vault-pan` (`deks.vaultPan`) |
+| `cardServiceCode` | issuer data | QE:equality | `DEK-vault-service-code` (`deks.vaultServiceCode`) |
+
+### 15.4 Core `paymentCardManagement` changes (descoped for PAN)
+
+| Field | Change | Classification | Storage |
+|---|---|---|---|
+| `paymentCardBin` (first 6) | NEW | non-CHD (BIN, PCI permits ≤ 8) | plaintext, indexed (BIN prefix + network) |
+| `paymentCardLast4` (last 4) | NEW | non-CHD | plaintext, indexed (display + equality / suffix search) |
+| `paymentCardMaskedPanDisplay` | no longer persisted | display only | derived on the fly from `bin` + `last4` + `network` via `deriveMaskedPan()` |
+
+The masked PAN string is still returned by the API (computed in the DTO), so there is no v29 breaking
+change. The interface keeps the field optional for compile safety; the seed `$unset`s it. The
+`cardTransactionLog.cardTransactionMaskedPanDisplay` ledger snapshot is untouched (append-only, immutable).
+The core never stores the full PAN; removing the module (or using an external provider) leaves the core
+without PAN CHD.
+
+### 15.5 Ports (Hexagonal, cross-frontier reads)
+
+| Port | Purpose |
+|---|---|
+| Card Reference port | module reads `paymentCardManagement` (token, expiry, status, funding account) |
+| Funding Account port | resolve `payoutAccountArrangement` from a card (validation + cross-linking) |
+| Card-by-account port | `account-information` lists cards by funding account (reuses `getCardsByFundingAccount`) |
+
+### 15.6 API surface (additive)
+
+Built-in `card-issuer` (`/api/v1/modules/card-issuer`):
+- `POST /score` — extended: validates network + format (Luhn + length) + registered (card-on-file via
+  Card Reference port) + funding account known (Funding Account port) + CVV (global | per-card per
+  `cvvMode`). Loopback (`skipAuth` + `X-Integration-Source`). No CVV in the response.
+- `POST /reveal` — new loopback: derives and returns the ephemeral CVV (owner provider flow only).
+- `POST /reveal-pan` — new loopback: returns the ephemeral PAN (owner provider flow only).
+- `GET /cards/:cardId/cvv` — new (JWT): direct reveal for `operations_officer`.
+  `requirePermission('cards','manage')` + `requireInternalProvider('card_issuer')` + audit
+  `card.cvv.revealed`. 409 `managed_externally` when external; 403 for other roles.
+- `GET /cards/:cardId/pan` — new (JWT): direct PAN reveal for `operations_officer`, same gate, audit
+  `card.pan.revealed`.
+- `GET /cards/:cardId` — extended: includes a `fundingAccount` sub-object (QE-stripped: alias, bank,
+  currency, status, `payoutAccountHasIban`) resolved via port. No CVV.
+- `GET /cards?last4=..&bin=..` — plaintext search on the core (last4 equality, BIN prefix).
+- `GET /cards?panExact=..` — QE equality search on the vault.
+- `GET|PUT /config` — adds `cvvMode` and derivation config (never exposes the CVK).
+
+Built-in `account-information` (`/api/v1/modules/account-information`):
+- `GET /accounts/:accountRef/cards` — new (JWT, `accounts:view` + gate): cards by funding account, via
+  the Card-by-account port. Display-safe, no CVV.
+- `GET /accounts/:accountRef/iban` — new: IBAN reveal for `operations_officer` from the admin panel,
+  internal gate, audit `account.iban.revealed`. Ephemeral.
+
+Core PSP (owner self-service, never direct to the module):
+- `POST /api/v1/customer/:customerId/cards/:cardId/cvv` — owner reveal via
+  `dispatchProvider('card_issuer', 'card.cvv.reveal.requested')`. Owner-only + step-up + audit.
+- `POST /api/v1/customer/:customerId/cards/:cardId/pan` — owner PAN reveal via
+  `dispatchProvider('card_issuer', 'card.pan.reveal.requested')`. Owner-only + step-up + audit.
+
+Reveal gate decision (F0): `cards:manage` + mandatory audit, no new `viewSensitive` permission
+(step-up MFA/SCA in production).
+
+### 15.7 Indexes + setup/seed (single source of truth, R5)
+
+- `vendors/setup/createCollections.ts`: create `cardIssuerVault` (QE collection with its
+  `encryptedFieldsMap`); reflect core `paymentCardBin` / `paymentCardLast4` and the removal of the
+  persisted `paymentCardMaskedPanDisplay`.
+- `vendors/encryption/encryptedFieldsMaps.ts`: PAN (equality) + `cardServiceCode` (equality) for the vault.
+- `vendors/encryption/keyVault.ts` / `provisionDEKs.ts`: CVK DEK + `vaultPan` + `vaultServiceCode` DEKs
+  (deterministic, idempotent).
+- `vendors/setup/createIndexes.ts`: vault indexes on `paymentCardReference` and
+  `paymentCardInstanceReference`; core indexes on `paymentCardBin` and `paymentCardLast4` (idempotent).
+- `vendors/seed/*`: seed `cardIssuerVault` with the deterministic full PAN (upsert by
+  `paymentCardInstanceReference`) and `cardServiceCode`; populate core `bin` / `last4` from that PAN and
+  `$unset` the persisted masked; provision the CVK once. Requires a `--reset` + reseed because the QE
+  encrypted fields change.
+
+*Added 2026-07-22 (v30). Version 2.4.0.*
+
+---
+
+## §6.13 KYC & KYB Administration API (v31, SD-53 / SD-89)
+
+All under `/api/v1`. KYC administration is owned by the **customer** module (prefix `/customer`),
+KYB by the **gateway** module (prefix `/merchants`). The provider (`providers/kyc|kyb`) keeps only
+`/score`, `/screen`, `/config`. Administration operates on the domain control records, never on the
+provider, so the built-in engine stays swappable.
+
+### Model change: `MerchantBeneficialOwner` (SD-89 + SD-13, FATF/4th AMLD)
+Bounded embed on `MerchantAgreementControlRecord.merchantBeneficialOwners: MerchantBeneficialOwner[]`
+(cap `MERCHANT_BENEFICIAL_OWNERS_MAX = 25`). Fields: `merchantBeneficialOwnerPartyReference` (FK to party),
+`merchantBeneficialOwnerRole` (`ultimate_beneficial_owner|director|shareholder|authorized_signatory`),
+`merchantBeneficialOwnerOwnershipPercentage` (0..100, 2 dp), `merchantBeneficialOwnerIsPrimary` (exactly
+one true), `merchantBeneficialOwnerIsControllingPerson` (FATF greater-than 25% or board), `AddedDateTime`,
+`AddedByPartyReference?`. Invariants enforced in `merchantBeneficialOwner.ts` (length at least 1, one
+primary, sum at most 100, primary equals derived scalar `merchantOwnerPartyReference`). Owner PII lives in
+`party` (QE tiers), never duplicated in the embed (GDPR Art. 5). The `merchantAgreementProcedure` QE map
+is unchanged (merchant is plaintext).
+
+### Structured KYB verdict (entity layer): new `MerchantAgreementKybCheck` fields
+`merchantAgreementKybCheckBusinessRiskLevel` (`low|medium|high`), `SanctionsResult`/`AdverseMediaResult`
+(`clear|hit|pending`), `ScreeningProviderRef`. Result vocabularies (ADR-009), plaintext, no CHD/QE.
+Owner-layer risk is composed by reference from each UBO `customerAgreementKycCheck` (no duplication).
+
+### Decision mode (built-in module config)
+New `capabilityModuleConfiguration.moduleConfig` fields for kyc and kyb: `decisionMode`
+(`manual|automated|assisted`, unset defaults to manual fail-safe), `decisionAutoApproveMaxRisk` (`low`),
+`decisionAutoRejectOn`, `decisionEscalateToManualOn`. The provider never sets the mode. Seeded:
+KYC=`automated`, KYB=`manual`. Hard guardrail: a sanctions/PEP hit never auto-approves.
+
+### KYC Administration (customer module)
+| Method | Route | Permission | Notes |
+|---|---|---|---|
+| GET | `/customer/kyc?status=&segment=&riskRating=&page=&limit=` | `customers:view` | Paged list of KYC-completed parties. L1 masked. Index-backed. |
+| GET | `/customer/:partyInstanceReference/kyc` | `customers:view` (+`viewSensitive` for L2) | Full detail; sensitive fields masked unless escalation token. |
+| PATCH | `/customer/:partyInstanceReference/kyc` | `customers:manage` | Edit occupation/source-of-funds/purpose/govID/address. `amendmentReason` required. Rejects status writes (400). Emits `kyc.record.amended`. |
+| POST | `/customer/:partyInstanceReference/kyc/re-screen` | `customers:manage` | Publishes `kyc.screening.requested` on the bus (swappable). |
+| GET | `/customer/:partyInstanceReference/kyc/process` | `customers:view` | Correlated timeline (`listAuditEvents({ref})`). |
+
+### KYB Administration (gateway module)
+| Method | Route | Permission | Notes |
+|---|---|---|---|
+| GET | `/merchants/:id/kyb` | `merchants:view` | KYB detail: entity verdict + owners (party summaries) + owner-layer risk. |
+| PATCH | `/merchants/:id/kyb` | `merchants:manage` | Edit legal entity/MCC/name/country/notes. `amendmentReason` required. Rejects status writes (400). Emits `kyb.record.amended`. |
+| GET | `/merchants/:id/kyb/owners` | `merchants:view` (owner-scoped for customers) | Shareholder list. |
+| POST | `/merchants/:id/kyb/owners` | `merchants:manage` | Add owner; invariants enforced. `kyb.owner.added`. |
+| PATCH | `/merchants/:id/kyb/owners/:partyRef` | `merchants:manage` | Edit role/pct/primary; primary reassignment atomic. `kyb.owner.amended`/`primary.reassigned`. |
+| DELETE | `/merchants/:id/kyb/owners/:partyRef` | `merchants:manage` | Remove; blocked if last or primary. `kyb.owner.removed`. |
+| GET | `/merchants/:id/kyb/process` | `merchants:view` | Correlated timeline. |
+
+### KYB onboarding event chain (events only)
+`createMerchant` publishes `merchant.validation.requested` on the bus. `ProviderGroups.onMerchantValidated`
+fans out `kyb.screening.requested` + `hrp.screening.requested` + `aml.screening.requested` (entity) and
+one `kyc.screening.requested` per beneficial owner (owner layer). `KybVerificationSaga` (keyed by
+`correlationId = merchantAgreementInstanceReference`) collects the entity completions, composes the
+verdict + owner-layer risk, calls `applyKybScreeningVerdict` (sets verdict + BQ:Step status atomically
+via the shared `deriveKybCheckStatus` mapper), then resolves the agreement per `decisionMode`
+(`resolveKybOnboarding`). Every provider is reached only via `dispatchProvider` (swappable, zero reactor
+change to externalize). New event contracts in `onboarding.events.ts`; new canonical ledger milestones
+`kyb.screening.completed`/`aml.screening.completed`/`kyb.verification.completed`.
+
+### Status-coherence fix
+`applyKycScreeningVerdict` and `applyKybScreeningVerdict` now set the BQ:Step status in the same atomic
+update as the verdict, via the shared pure mappers `deriveKycCheckStatus`/`deriveKybCheckStatus`
+(`shared/models/onboardingDecision.ts`), so the internal saga path and the external callback path yield
+identical status for the same verdict.
+
+### Indexes (createIndexes.ts)
+- `merchantAgreementProcedure`: `{ merchantAgreementStatus:1, merchantRiskCategory:1, recordUpdatedDateTime:-1 }`
+  (KYB admin list, ESR) and `{ 'merchantBeneficialOwners.merchantBeneficialOwnerPartyReference':1 }` (multikey owner scoping).
+- `customerAgreementProcedure`: `{ 'customerAgreementKycCheck.customerAgreementKycCheckStatus':1, recordUpdatedDateTime:-1 }`
+  (KYC admin list, ESR; segment is a residual filter so the sort stays index-served whether or not segment is supplied).
+All verified with `explain()`: IXSCAN, no COLLSCAN, no blocking SORT.
+
+---
+
+## §10 Module vs Collection Ownership and Access (v31)
+
+Answers the lifecycle questions (switch engine to external / extract module / detect orphans). The
+built-in KYC/KYB engines own NO collections (stateless verification ports; only durable state is the
+`capabilityModuleConfiguration` row), the "zero-orphan" property of the internal-first pattern.
+
+| Module | Owns (RW) | Reads (RO) | Core-data touch (PCI/GDPR) |
+|---|---|---|---|
+| `customer` (SD-53 KYC) | `customerAgreementProcedure` | `party`, `complianceProcessEvent` | YES: QE identity fields (govID, address, source of funds); L1/L2 tiers |
+| `gateway` (SD-89 KYB) | `merchantAgreementProcedure`, `merchantAgreementEvents` | `party`, `payoutAccountArrangement`, `customerAgreementProcedure` (owner KYC compose), `complianceProcessEvent` | Merchant/UBO PII via `party` refs; legal-entity data (GDPR, not PCI CHD) |
+| `identity` (SD-13) | `party` | - | YES: PII owner surface (QE tiers) |
+| `provider` (SD-193) | `externalProviderArrangement`, `capabilityModuleConfiguration`, `businessProcessEvent`, `complianceProcessEvent`, `externalProviderArrangementActionLog` | capability registry (code) | NO CHD (SoD: manager) |
+| `providers/kyc` (`kyc_identity`) | none (stateless; config in `capabilityModuleConfiguration`) | payload passed by port | NO persistence |
+| `providers/kyb` (`kyb_business`) | none (stateless; config in `capabilityModuleConfiguration`) | payload passed by port | NO persistence |
+
+- Q1 (switch internal to external engine): only the module `capabilityModuleConfiguration` row is
+  superseded by the `externalProviderArrangement` record; control records + party + audit stay in use, nothing orphaned.
+- Q2 (extract module to microservice): stateless engines own no collections, a code-only move; the
+  microservice calls back through the port. For kyc/kyb the re-home set is empty (clean extraction).
+- Q3 (detect orphans): a collection is a decommission candidate iff no module lists it under Owns/Reads.
+
+*Added 2026-07-24 (v31). Version 2.5.0.*

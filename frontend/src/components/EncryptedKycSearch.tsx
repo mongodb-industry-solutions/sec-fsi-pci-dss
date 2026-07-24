@@ -10,6 +10,7 @@ import {
 } from '../lib/api';
 import { Pagination } from './Pagination';
 import { LoadingIndicator } from './LoadingIndicator';
+import { RawMongoPanel } from './RawMongoPanel';
 import { useDebugMode } from '../lib/debugMode';
 
 // v27 Phase 5: ONE shared encrypted-KYC search surface, mounted in both the production
@@ -55,9 +56,43 @@ const MODE_BADGE_COLOR: Record<KycSearchMode, string> = {
 
 const DEBOUNCE_MS = 450;
 
+// Human explanation of each QE query mode, for the debug detail shown to a demo audience.
+const MODE_DESCRIPTION: Record<KycSearchMode, string> = {
+  substring: 'Substring match (encStrContains) evaluated over ciphertext',
+  prefix:    'Prefix match (encStrStartsWith) evaluated over ciphertext',
+  suffix:    'Suffix match (encStrEndsWith) evaluated over ciphertext',
+  range:     'Encrypted range query over ciphertext',
+  equality:  'Deterministic equality match over ciphertext',
+};
+
+// Logical registry collection -> physical MongoDB collection name (for the debug detail).
+const COLLECTION_NAME: Record<string, string> = {
+  party:     'party',
+  agreement: 'customerAgreementProcedure',
+};
+
+// ISO country codes used by the KYC registry (nationality / issuing country enums). Shown as
+// a friendly name plus the code, so the operator sees "Spain (ES)" instead of the raw "ES".
+const COUNTRY_NAMES: Record<string, string> = {
+  ES: 'Spain', GB: 'United Kingdom', US: 'United States', FR: 'France', DE: 'Germany',
+  IT: 'Italy', PT: 'Portugal', PL: 'Poland', MX: 'Mexico', NG: 'Nigeria',
+};
+
+// Turn a system enum value (e.g. "national_id", "driver_license") into a human label.
+function humanizeEnum(v: string): string {
+  return v
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .replace(/\bId\b/g, 'ID');
+}
+
 function enumOptionLabel(field: KycSearchFieldDef, v: string | boolean): string {
   if (field.bsonType === 'bool') return v === true || v === 'true' ? 'Yes' : 'No';
-  return String(v);
+  const s = String(v);
+  if (COUNTRY_NAMES[s]) return `${COUNTRY_NAMES[s]} (${s})`;
+  // Preserve unknown ISO 2-letter codes as-is (humanizeEnum would turn "NL" into "Nl").
+  if (/^[A-Z]{2}$/.test(s)) return s;
+  return humanizeEnum(s);
 }
 
 function enumOptionValue(v: string | boolean): string {
@@ -240,18 +275,27 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
               className="border rounded-lg px-3 py-2 text-sm bg-white"
             >
               {fields.map((f) => (
-                <option key={f.key} value={f.key}>{f.label}</option>
+                <option key={f.key} value={f.key}>
+                  {/* Debug mode annotates each option with its QE query type, so the operator
+                      can see which fields support contains / starts-with / range, etc. */}
+                  {debugMode ? `${f.label} (${MODE_BADGE[f.mode]})` : f.label}
+                </option>
               ))}
             </select>
           </div>
 
           {field && (
-            <span
-              className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-xs font-medium ${MODE_BADGE_COLOR[field.mode]}`}
-              title={`Query mode: ${MODE_BADGE[field.mode]}`}
-            >
-              <Lock size={11} /> {MODE_BADGE[field.mode]} · over encrypted data
-            </span>
+            // Invisible label spacer keeps the badge's top edge aligned with the select input
+            // (not the "Search field" label above it).
+            <div>
+              <label className="block text-xs font-medium mb-1 invisible" aria-hidden="true">Mode</label>
+              <span
+                className={`inline-flex items-center gap-1 rounded border px-2 py-2 text-xs font-medium ${MODE_BADGE_COLOR[field.mode]}`}
+                title={`Query mode: ${MODE_BADGE[field.mode]}`}
+              >
+                <Lock size={11} /> {MODE_BADGE[field.mode]} · over encrypted data
+              </span>
+            </div>
           )}
 
           {/* Manual reload: re-run the current query against the server (e.g. to refresh after
@@ -364,6 +408,46 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
             )}
           </div>
         ) : null}
+
+        {/* Debug detail: narrate for the audience exactly what this query targets, so they can see
+            the encrypted field, its owning collection and the QE query type MongoDB is running. */}
+        {debugMode && field && (
+          <div className="rounded-lg border border-[#00ED64]/30 bg-[#001E2B] px-3 py-2.5 text-xs text-gray-300 space-y-1.5">
+            <div className="flex items-center gap-2 text-[#00ED64] font-semibold">
+              <ShieldCheck size={13} /> Query plan (debug)
+            </div>
+            <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1 font-mono">
+              <dt className="text-gray-500">field</dt>
+              <dd className="text-amber-300">{field.label} <span className="text-gray-500">({field.key})</span></dd>
+
+              <dt className="text-gray-500">collection</dt>
+              <dd className="text-amber-300">{field.collection ? (COLLECTION_NAME[field.collection] ?? field.collection) : '—'}</dd>
+
+              <dt className="text-gray-500">path</dt>
+              <dd className="text-amber-300">{field.path ?? '—'}</dd>
+
+              <dt className="text-gray-500">bsonType</dt>
+              <dd className="text-gray-300">{field.bsonType}</dd>
+
+              <dt className="text-gray-500">search type</dt>
+              <dd className="text-gray-300">
+                {MODE_BADGE[field.mode]}: {MODE_DESCRIPTION[field.mode]}
+                {field.baseMode && field.baseMode !== field.mode && (
+                  <span className="text-amber-400">
+                    {' '}(intended {MODE_BADGE[field.baseMode]}, degraded to {MODE_BADGE[field.mode]} on this pre-8.2 cluster)
+                  </span>
+                )}
+              </dd>
+
+              <dt className="text-gray-500">filter</dt>
+              <dd className="text-emerald-300">{body ? JSON.stringify(body) : <span className="text-gray-500">none (enter a value)</span>}</dd>
+            </dl>
+            <p className="text-gray-500 pt-1 border-t border-white/5">
+              The value is encrypted before it reaches Atlas and matched ciphertext-to-ciphertext; the
+              server never sends, and Atlas never sees, the plaintext.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Results */}
@@ -457,6 +541,33 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
         )}
         </div>
       ) : null}
+
+      {/* Debug mode: raw (undecrypted) Atlas documents for the first match, so the demo can
+          prove the queried fields are stored as QE ciphertext ("$binary") even though the
+          search matched them. The query value never leaves the server as plaintext. */}
+      {debugMode && results && results.length > 0 && (
+        <RawMongoPanel
+          key={results[0].customerAgreementInstanceReference}
+          token={token}
+          title="Debug - Raw encrypted documents (first match)"
+          sections={[
+            {
+              kind: 'mongo',
+              collection: 'party',
+              id: results[0].partyInstanceReference,
+              label: 'party',
+              description: 'KYC identity (name, DOB, nationality, place of birth): QE encrypted',
+            },
+            {
+              kind: 'mongo',
+              collection: 'customerAgreementProcedure',
+              id: results[0].customerAgreementInstanceReference,
+              label: 'customerAgreementProcedure',
+              description: 'Agreement, government ID, tax ID, KYC risk: QE encrypted',
+            },
+          ]}
+        />
+      )}
     </div>
   );
 }

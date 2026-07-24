@@ -444,7 +444,23 @@
     "externalProviderInternalHandler": "cardIssuer.internalCvvValidation",
     "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
-      "card.issuer.validation.requested"
+      "card.issuer.validation.requested",
+      "card.cvv.reveal.requested",
+      "card.pan.reveal.requested"
+    ],
+    "externalProviderEvents": [
+      {
+        "event": "card.issuer.validation.requested",
+        "outbound": { "url": "/api/v1/modules/card-issuer/score", "httpMethod": "POST", "mapping": [] }
+      },
+      {
+        "event": "card.cvv.reveal.requested",
+        "outbound": { "url": "/api/v1/modules/card-issuer/reveal", "httpMethod": "POST", "mapping": [] }
+      },
+      {
+        "event": "card.pan.reveal.requested",
+        "outbound": { "url": "/api/v1/modules/card-issuer/reveal-pan", "httpMethod": "POST", "mapping": [] }
+      }
     ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 3000,

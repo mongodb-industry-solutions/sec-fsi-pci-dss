@@ -32,6 +32,9 @@ export interface CreateCardInput {
   paymentCardIsPreferred: boolean;
   // Optional customer nickname (non-CHD display metadata) set at registration time.
   paymentCardAlias?: string;
+  // v30.1: the funding/payout account this card draws from (BIAN SD-88 cardAccountReference). The
+  // card owner is derived from this account's party, so admin registration requires it.
+  fundingPayoutAccountInstanceReference?: string;
 }
 
 export async function createCard(db: Db, input: CreateCardInput) {
@@ -49,6 +52,7 @@ export async function createCard(db: Db, input: CreateCardInput) {
     ...(input.paymentCardExpirationDate ? { paymentCardExpirationDate: input.paymentCardExpirationDate } : {}),
     ...(input.paymentCardNetwork ? { paymentCardNetwork: input.paymentCardNetwork } : {}),
     ...(input.paymentCardAlias ? { paymentCardAlias: input.paymentCardAlias } : {}),
+    ...(input.fundingPayoutAccountInstanceReference ? { fundingPayoutAccountInstanceReference: input.fundingPayoutAccountInstanceReference } : {}),
     bianServiceDomain: 'Payment Card',
     bianControlRecordType: 'PaymentCardManagement',
     recordCreatedDateTime: now,
@@ -215,6 +219,7 @@ export async function registerCardForCustomer(db: Db, input: CreateCardInput): P
     if (input.paymentCardNetwork) set.paymentCardNetwork = input.paymentCardNetwork;
     if (input.paymentCardAlias) set.paymentCardAlias = input.paymentCardAlias;
     if (input.paymentCardIsPreferred) set.paymentCardIsPreferred = true;
+    if (input.fundingPayoutAccountInstanceReference) set.fundingPayoutAccountInstanceReference = input.fundingPayoutAccountInstanceReference;
     await coll.updateOne({ paymentCardInstanceReference: existing.paymentCardInstanceReference }, { $set: set });
     cardId = existing.paymentCardInstanceReference;
   } else {
@@ -293,13 +298,23 @@ export async function rebuildCardRegistry(db: Db): Promise<number> {
 // the per-card detail). Revoked cards are retained for audit and excluded. Paginated + filterable.
 export async function listAllCards(
   db: Db,
-  opts?: { page?: number; limit?: number; network?: string; status?: string; agreement?: string },
+  opts?: { page?: number; limit?: number; network?: string; status?: string; agreement?: string; funding?: string; last4?: string; bin?: string },
 ): Promise<{ results: unknown[]; total: number; page: number; limit: number }> {
   const query: Record<string, unknown> = {};
   // Default excludes revoked (audit-retained). An explicit status filter overrides.
   query.paymentCardStatus = opts?.status ? opts.status : { $ne: 'revoked' };
   if (opts?.network) query.paymentCardNetwork = opts.network;
   if (opts?.agreement) query.customerAgreementInstanceReference = opts.agreement;
+  // Scope to the cards funded by one payout account (SD-88 cardAccountReference cross-linking).
+  if (opts?.funding) query.fundingPayoutAccountInstanceReference = opts.funding;
+  // v30 non-CHD truncated-PAN search: last4 (equality) + BIN prefix. Cheap, no QE, no CHD.
+  if (opts?.last4) query.paymentCardLast4 = opts.last4.replace(/\D/g, '').slice(-4);
+  // Only add the BIN prefix predicate when the sanitized input actually has digits: an empty prefix
+  // would produce /^/ which matches every card (unintended full scan).
+  if (opts?.bin) {
+    const binPrefix = opts.bin.replace(/\D/g, '').slice(0, 6);
+    if (binPrefix) query.paymentCardBin = { $regex: `^${binPrefix}` };
+  }
 
   const page = Math.max(1, opts?.page ?? 1);
   const limit = Math.min(100, Math.max(1, opts?.limit ?? 20));
@@ -314,6 +329,8 @@ export async function listAllCards(
         customerAgreementInstanceReference: 1,
         paymentCardReference: 1,
         paymentCardMaskedPanDisplay: 1,
+        paymentCardBin: 1,
+        paymentCardLast4: 1,
         paymentCardNetwork: 1,
         paymentCardStatus: 1,
         paymentCardIsPreferred: 1,
@@ -338,6 +355,37 @@ export async function listAllCards(
 export async function getCardByIdAny(db: Db, cardId: string) {
   return db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION)
     .findOne({ paymentCardInstanceReference: cardId }, { projection: { _id: 0 } });
+}
+
+// v30.1: reassign a card's funding/payout account. Because the card owner is DERIVED from the
+// funding account's party (a card never funds from another party's account), this also re-points the
+// card's customerAgreementInstanceReference to the new account's party agreement, keeping ownership
+// coherent. Returns the updated card, or null if the card or the account/agreement is not found.
+// The PAYOUT_ACCOUNT_COLLECTION is referenced by name to avoid a cross-module service import cycle.
+export async function setCardFundingAccount(db: Db, cardId: string, payoutAccountRef: string) {
+  const account = await db.collection('payoutAccountArrangement')
+    .findOne({ payoutAccountInstanceReference: payoutAccountRef }, { projection: { partyInstanceReference: 1 } });
+  if (!account?.partyInstanceReference) return null;
+  const agreementRef = await getOwnAgreementId(db, account.partyInstanceReference as string);
+  if (!agreementRef) return null;
+  const set: Record<string, unknown> = {
+    fundingPayoutAccountInstanceReference: payoutAccountRef,
+    customerAgreementInstanceReference: agreementRef,
+    recordUpdatedDateTime: new Date(),
+  };
+  const res = await db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION)
+    .updateOne({ paymentCardInstanceReference: cardId }, { $set: set });
+  if (res.matchedCount === 0) return null;
+  return getCardByIdAny(db, cardId);
+}
+
+// Resolve the agreement + owner for a payout account (used by admin card registration: the owner is
+// derived from the funding account's party). Returns null when the account or agreement is missing.
+export async function resolveAgreementForFundingAccount(db: Db, payoutAccountRef: string): Promise<string | null> {
+  const account = await db.collection('payoutAccountArrangement')
+    .findOne({ payoutAccountInstanceReference: payoutAccountRef }, { projection: { partyInstanceReference: 1 } });
+  if (!account?.partyInstanceReference) return null;
+  return getOwnAgreementId(db, account.partyInstanceReference as string);
 }
 
 export async function getCardsByCustomer(db: Db, customerRef: string) {
@@ -393,7 +441,9 @@ export async function getCardByToken(db: Db, token: string, customerRef?: string
   if (customerRef) filter.customerAgreementInstanceReference = customerRef;
   return db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION).findOne(
     filter,
-    { projection: { _id: 0, paymentCardInstanceReference: 1, customerAgreementInstanceReference: 1, paymentCardStatus: 1, paymentCardMaskedPanDisplay: 1, paymentCardNetwork: 1 } },
+    // Includes the surrogate token, QE:none expiry and funding-account link (used by the card-issuer
+    // Card Reference port for realistic CVV derivation and funding checks). Still no CHD/CVV.
+    { projection: { _id: 0, paymentCardInstanceReference: 1, customerAgreementInstanceReference: 1, paymentCardReference: 1, paymentCardStatus: 1, paymentCardMaskedPanDisplay: 1, paymentCardNetwork: 1, paymentCardExpirationDate: 1, fundingPayoutAccountInstanceReference: 1 } },
   );
 }
 

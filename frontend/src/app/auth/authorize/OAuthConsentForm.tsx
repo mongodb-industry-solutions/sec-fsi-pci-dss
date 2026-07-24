@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { API_BASE_URL } from '../../../lib/constants';
+import { BRAND } from '../../../config/brand';
 import { setToken } from '../../../lib/auth';
 
 interface ScopeDescriptor {
@@ -24,6 +25,9 @@ interface OAuthConsentFormProps {
   /** Demo convenience: prefill values coming from the authorize URL (login_hint / prefill_*). */
   prefillEmail?: string;
   prefillPassword?: string;
+  /** Demo convenience: when both email + password arrive prefilled, submit the login automatically
+   * (skips the manual step). Insecure by design (password rides in the URL); gated to demo builds. */
+  autoLogin?: boolean;
 }
 
 /** Merchant avatar: logo with a graceful initial-letter fallback if missing or broken. */
@@ -60,6 +64,7 @@ export default function OAuthConsentForm({
   originalSearchParams,
   prefillEmail = '',
   prefillPassword = '',
+  autoLogin = false,
 }: OAuthConsentFormProps) {
   const [view, setView] = useState<'login' | 'consent'>('login');
   const [email, setEmail] = useState(prefillEmail);
@@ -83,8 +88,8 @@ export default function OAuthConsentForm({
     });
   }
 
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleLogin(e?: React.FormEvent) {
+    e?.preventDefault();
     setError('');
     setLoading(true);
 
@@ -137,6 +142,19 @@ export default function OAuthConsentForm({
     }
   }
 
+  // Demo auto-login: when enabled and both credentials arrived prefilled, submit the login once on
+  // mount so the demo lands straight on the consent screen (or redirects if already granted). The
+  // consent decision itself is still shown; only the credential entry is skipped.
+  const autoLoginTried = useRef(false);
+  useEffect(() => {
+    if (!autoLogin || autoLoginTried.current) return;
+    if (view !== 'login' || loading) return;
+    if (!email || !password) return;
+    autoLoginTried.current = true;
+    void handleLogin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLogin]);
+
   // Build the "grant" URL. `sub`/`scopes` can be passed explicitly (e.g. the auto-approve path,
   // which runs before the userSub state has committed); otherwise the current form state is used.
   function buildGrantUrl(sub: string = userSub, scopes: string[] = [...selected]) {
@@ -162,7 +180,7 @@ export default function OAuthConsentForm({
         {/* Neutral login header. The merchant identity is shown once, in the row above the form. */}
         <div className="text-center mb-5">
           <h2 className="text-base font-semibold text-gray-900">Sign in to your account</h2>
-          <p className="text-xs text-gray-500 mt-1">Your password stays with Sec4 Pay and is never shared.</p>
+          <p className="text-xs text-gray-500 mt-1">Your password stays with {BRAND.full} and is never shared.</p>
         </div>
         <form onSubmit={handleLogin} className="space-y-3">
           <div>

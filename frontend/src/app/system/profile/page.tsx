@@ -2,12 +2,13 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { api, type ConsentGrant } from '../../../lib/api';
-import { getToken, decodeToken } from '../../../lib/auth';
+import { getToken, decodeToken, setToken as persistToken } from '../../../lib/auth';
 import { ROLE_LABELS } from '../../../lib/constants';
 import { useDebugMode } from '../../../lib/debugMode';
-import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, User, Layers, Trash2, Copy, Check, KeyRound, ChevronRight } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, User, Layers, Trash2, Copy, Check, KeyRound, ChevronRight, Info, IdCard } from 'lucide-react';
 import { RawMongoPanel } from '../../../components/RawMongoPanel';
 import { SectionHeader } from '../../../components/SectionHeader';
+import { PasswordFields, passwordFieldsValid } from '../../../components/PasswordFields';
 
 type KycCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
 
@@ -16,6 +17,18 @@ interface CustomerAgreementKycCheck {
   customerAgreementKycCheckCompletedDate?: string;
   customerAgreementKycCheckReference?: string;
   customerAgreementKycCheckNotes?: string;
+  // v27 provider-produced verdicts (structured, auditable). Present for the owner.
+  customerAgreementKycCheckRiskScore?: number;
+  customerAgreementKycCheckRiskRating?: 'low' | 'medium' | 'high';
+  customerAgreementKycCheckPepStatus?: boolean;
+  customerAgreementKycCheckSanctionsResult?: 'clear' | 'hit' | 'pending';
+}
+
+interface GovernmentID {
+  type?: string;
+  number?: string;
+  issuingCountry?: string;
+  expiryDate?: string;
 }
 
 interface ProfileData {
@@ -38,6 +51,14 @@ interface ProfileData {
     customerAgreementEnrollmentDate?: string;
     customerAgreementPreferredLanguage?: string;
     customerAgreementKycCheck?: CustomerAgreementKycCheck;  // BQ:Step, SD-53. PCI DSS Req 8.1
+    // v27 KYC identity, decrypted for the owner (self-profile runs on the L2/auditor client).
+    customerAgreementGovernmentID?: GovernmentID | null;
+    customerAgreementTaxIDNumber?: string;
+    customerAgreementOccupation?: string;
+    partyDateOfBirth?: string;
+    partyNationality?: string;
+    partyPlaceOfBirth?: string;
+    partySex?: string;
     sensitive?: {
       customerAgreementResidentialAddress?: {
         streetAddress?: string;
@@ -46,8 +67,37 @@ interface ProfileData {
         countryCode?: string;
       } | null;
       governmentIdentificationReference?: string | null;
+      customerAgreementSourceOfFunds?: string | null;
+      customerAgreementPurposeOfRelationship?: string | null;
     } | null;
   } | null;
+}
+
+const COUNTRY_NAMES: Record<string, string> = {
+  ES: 'Spain', GB: 'United Kingdom', US: 'United States', FR: 'France', DE: 'Germany',
+  IT: 'Italy', PT: 'Portugal', PL: 'Poland', MX: 'Mexico', NG: 'Nigeria',
+};
+
+// Turn a system enum value (e.g. "national_id", "salary") into a human label.
+function humanize(v: string): string {
+  return v.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\bId\b/g, 'ID');
+}
+
+function countryLabel(code?: string): string {
+  if (!code) return '—';
+  return COUNTRY_NAMES[code] ? `${COUNTRY_NAMES[code]} (${code})` : code;
+}
+
+const SEX_LABELS: Record<string, string> = {
+  male: 'Male',
+  female: 'Female',
+  other: 'Other',
+  unspecified: 'Not specified',
+};
+
+function sexLabel(value?: string): string {
+  if (!value) return '—';
+  return SEX_LABELS[value] ?? value;
 }
 
 const SEGMENT_LABELS: Record<string, string> = {
@@ -109,23 +159,32 @@ function KycStatusBadge({ kyc, debugMode }: { kyc: CustomerAgreementKycCheck; de
   );
 }
 
-function maskPhone(phone: string) {
-  return phone.slice(0, 4) + ' ●●●● ' + phone.slice(-3);
-}
+type QEType = 'qe-equality' | 'qe-none' | 'qe-range' | 'qe-prefix' | 'qe-suffix';
 
-function maskAccountRef(ref: string) {
-  return ref.slice(0, 4) + '-●●●●●●●';
-}
+// Badge label + styling per QE query mode, so each field shows how it is stored/searchable.
+const QE_BADGE: Record<QEType, { label: string; cls: string }> = {
+  'qe-equality': { label: 'QE:equality', cls: 'bg-blue-100 text-blue-700 border-blue-200' },
+  'qe-range':    { label: 'QE:range',    cls: 'bg-cyan-100 text-cyan-700 border-cyan-200' },
+  'qe-prefix':   { label: 'QE:prefix',   cls: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
+  'qe-suffix':   { label: 'QE:suffix',   cls: 'bg-violet-100 text-violet-700 border-violet-200' },
+  'qe-none':     { label: 'QE:none',     cls: 'bg-purple-100 text-purple-700 border-purple-200' },
+};
 
-function maskAddress(addr: { streetAddress?: string; city?: string; postalCode?: string; countryCode?: string }) {
-  return `${addr.streetAddress?.slice(0, 3)}●●●●, ${addr.city ?? ''}, ${addr.countryCode ?? ''}`;
+// Hover/focus tooltip that explains what a profile field means. Icon-only so it never adds noise;
+// the text appears on hover and is exposed to assistive tech via role="tooltip".
+function InfoHint({ text }: { text: string }) {
+  return (
+    <span className="group relative inline-flex items-center align-middle">
+      <Info size={12} className="text-gray-400 hover:text-[#001E2B] cursor-help shrink-0" tabIndex={0} aria-label={text} />
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-1/2 top-full z-30 mt-1 w-56 -translate-x-1/2 rounded-lg bg-[#001E2B] px-3 py-2 text-xs font-normal leading-snug text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+      >
+        {text}
+      </span>
+    </span>
+  );
 }
-
-function maskGovId(id: string) {
-  return id.slice(0, 6) + '●●●●';
-}
-
-type QEType = 'qe-equality' | 'qe-none';
 
 function CollectionChip({ name }: { name: string }) {
   return (
@@ -161,39 +220,42 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   );
 }
 
+// Fully obscured placeholder for any encrypted value while hidden. We deliberately do NOT leak
+// the length or any characters of the plaintext; the eye toggle reveals the real value on demand.
+const MASK = '••••••••';
+
 function RevealField({
   label,
   plainValue,
-  maskedValue,
   type,
   collection,
+  info,
 }: {
   label: string;
   plainValue: string;
-  maskedValue: string;
   type: QEType;
   collection?: string;
+  info?: string;
 }) {
   const [revealed, setRevealed] = useState(false);
   const { debugMode } = useDebugMode();
-  const badgeStyle = type === 'qe-equality'
-    ? 'bg-blue-100 text-blue-700 border-blue-200'
-    : 'bg-purple-100 text-purple-700 border-purple-200';
+  const badge = QE_BADGE[type];
 
   return (
     <>
       <div className="flex items-center gap-1.5 flex-wrap">
         <span className="text-gray-500 text-sm">{label}</span>
+        {info && <InfoHint text={info} />}
         {debugMode && (
-          <span className={`text-xs px-1.5 py-0.5 rounded border font-mono ${badgeStyle}`}>
-            {type === 'qe-equality' ? 'QE:equality' : 'QE:none'}
+          <span className={`text-xs px-1.5 py-0.5 rounded border font-mono ${badge.cls}`}>
+            {badge.label}
           </span>
         )}
         {debugMode && collection && <CollectionChip name={collection} />}
       </div>
       <div className="flex items-center gap-2 min-w-0">
         <span className={`text-sm font-mono transition-all break-all min-w-0 ${revealed ? 'text-gray-900' : 'text-gray-400 select-none'}`}>
-          {revealed ? plainValue : maskedValue}
+          {revealed ? plainValue : MASK}
         </span>
         <button
           onClick={() => setRevealed((v) => !v)}
@@ -210,12 +272,18 @@ function RevealField({
   );
 }
 
-function PlainField({ label, value, collection }: { label: string; value: string; collection?: string }) {
+function PlainField({ label, value, collection, qe, info }: { label: string; value: string; collection?: string; qe?: QEType; info?: string }) {
   const { debugMode } = useDebugMode();
   return (
     <>
       <div className="flex items-center gap-1.5 flex-wrap">
         <span className="text-gray-500 text-sm">{label}</span>
+        {info && <InfoHint text={info} />}
+        {debugMode && qe && (
+          <span className={`text-xs px-1.5 py-0.5 rounded border font-mono ${QE_BADGE[qe].cls}`}>
+            {QE_BADGE[qe].label}
+          </span>
+        )}
         {debugMode && collection && <CollectionChip name={collection} />}
       </div>
       <span className="text-sm text-gray-900 break-all">{value}</span>
@@ -245,6 +313,37 @@ export default function ProfilePage() {
   // QE reference accordion state
   const [qeExpanded, setQeExpanded] = useState<Record<string, boolean>>({});
   const toggleQe = (key: string) => setQeExpanded(p => ({ ...p, [key]: !p[key] }));
+
+  // Change-password state
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pwCurrent, setPwCurrent] = useState('');
+  const [pwNew, setPwNew] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMsg, setPwMsg] = useState<string | null>(null);
+  const pwValid = pwCurrent.length > 0 && passwordFieldsValid(pwNew, pwConfirm) && pwNew !== pwCurrent;
+
+  function resetPwForm() {
+    setPwCurrent(''); setPwNew(''); setPwConfirm(''); setPwMsg(null);
+  }
+
+  async function handleChangePassword() {
+    setPwSaving(true);
+    setPwMsg(null);
+    try {
+      const { token: fresh } = await api.auth.changePassword({ currentPassword: pwCurrent, newPassword: pwNew }, token);
+      // Persist + swap the reissued token so the current session stays authenticated.
+      persistToken(fresh);
+      setToken(fresh);
+      resetPwForm();
+      setPwOpen(false);
+      setPwMsg('Password changed. Other sessions have been signed out.');
+    } catch (e) {
+      setPwMsg(`Error: ${e instanceof Error ? e.message : 'Could not change password.'}`);
+    } finally {
+      setPwSaving(false);
+    }
+  }
 
   async function reload(t: string) {
     const data = await api.auth.me(t).catch(() => null);
@@ -340,12 +439,21 @@ export default function ProfilePage() {
     partyMobilePhoneNumber?: string;
     partyDateOfBirth?: string;
     partyNationality?: string;
+    partySex?: string;
     partyPostalAddress?: { line1: string; line2?: string; city: string; postalCode: string; countryCode: string };
   } | null | undefined;
   const name   = ag?.customerName ?? profile.name;
   const status = ag?.customerAgreementStatus ?? 'active';
   const hasAddress = ag?.sensitive?.customerAgreementResidentialAddress;
   const hasGovId   = ag?.sensitive?.governmentIdentificationReference;
+  // v27 structured KYC identity (customer self-profile, decrypted by the L2/auditor client).
+  const govId      = ag?.customerAgreementGovernmentID;
+  const custDob    = ag?.partyDateOfBirth ? new Date(ag.partyDateOfBirth) : null;
+  const custDobOk  = custDob && !isNaN(custDob.getTime());
+  const govExpiry  = govId?.expiryDate ? new Date(govId.expiryDate) : null;
+  const govExpiryOk = govExpiry && !isNaN(govExpiry.getTime());
+  const sourceOfFunds = ag?.sensitive?.customerAgreementSourceOfFunds;
+  const purpose       = ag?.sensitive?.customerAgreementPurposeOfRelationship;
 
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
@@ -410,9 +518,9 @@ export default function ProfilePage() {
           <RevealField
             label="Email"
             plainValue={ag?.customerEmailAddress ?? profile.email}
-            maskedValue={(() => { const e = ag?.customerEmailAddress ?? profile.email; const [l, d] = e.split('@'); return (l?.slice(0,2) ?? '') + '●●●' + '@' + (d ?? '●●●'); })()}
             type="qe-equality"
             collection="party"
+            info="Your login email. Encrypted at rest; searchable by exact match (QE:equality)."
           />
 
           {/* Phone - editable (customer only) */}
@@ -435,7 +543,7 @@ export default function ProfilePage() {
               />
             </>
           ) : ag?.customerMobilePhoneNumber ? (
-            <RevealField label="Phone" plainValue={ag.customerMobilePhoneNumber} maskedValue={maskPhone(ag.customerMobilePhoneNumber)} type="qe-equality" collection="party" />
+            <RevealField label="Phone" plainValue={ag.customerMobilePhoneNumber} type="qe-equality" collection="party" info="Your mobile number (GDPR PII). Encrypted at rest; searchable by exact match (QE:equality)." />
           ) : ag ? (
             <>
               <span className="text-gray-500 text-sm">Phone</span>
@@ -445,7 +553,7 @@ export default function ProfilePage() {
 
           {/* Account Reference - customers only (staff have no customer agreement) */}
           {ag?.customerAgreementReference ? (
-            <RevealField label="Account Reference" plainValue={ag.customerAgreementReference} maskedValue={maskAccountRef(ag.customerAgreementReference)} type="qe-equality" collection="customerAgreementProcedure" />
+            <RevealField label="Account Reference" plainValue={ag.customerAgreementReference} type="qe-equality" collection="customerAgreementProcedure" info="Your account/agreement reference. Encrypted at rest; searchable by exact match (QE:equality)." />
           ) : ag ? (
             <>
               <span className="text-gray-500 text-sm">Account Reference</span>
@@ -454,8 +562,8 @@ export default function ProfilePage() {
           ) : null}
 
           {/* Segment / member since - read-only */}
-          {ag?.customerSegment && <PlainField label="Account type" value={SEGMENT_LABELS[ag.customerSegment] ?? ag.customerSegment} collection="customerAgreementProcedure" />}
-          {ag?.customerAgreementEnrollmentDate && <PlainField label="Member since" value={new Date(ag.customerAgreementEnrollmentDate).toLocaleDateString()} collection="customerAgreementProcedure" />}
+          {ag?.customerSegment && <PlainField label="Account type" value={SEGMENT_LABELS[ag.customerSegment] ?? ag.customerSegment} collection="customerAgreementProcedure" info="Your customer segment (retail, premium, etc.). Stored as plaintext (not sensitive)." />}
+          {ag?.customerAgreementEnrollmentDate && <PlainField label="Member since" value={new Date(ag.customerAgreementEnrollmentDate).toLocaleDateString()} collection="customerAgreementProcedure" info="The date your agreement was opened. Stored as plaintext (not sensitive)." />}
 
           {/* Language - editable (customer only) */}
           {(editing && ag) ? (
@@ -474,7 +582,7 @@ export default function ProfilePage() {
               </select>
             </>
           ) : ag?.customerAgreementPreferredLanguage && (
-            <PlainField label="Language" value={ag.customerAgreementPreferredLanguage.toUpperCase()} collection="customerAgreementProcedure" />
+            <PlainField label="Language" value={ag.customerAgreementPreferredLanguage.toUpperCase()} collection="customerAgreementProcedure" info="Your preferred communication language. Stored as plaintext (not sensitive)." />
           )}
 
           {/* Address - editable (QE:none, customer only) */}
@@ -518,8 +626,8 @@ export default function ProfilePage() {
           ) : hasAddress ? (
             <RevealField
               label="Address"
+              info="Your residential address (GDPR PII). Encrypted at rest and not searchable (QE:none); requires Level 2 escalation for staff to reveal."
               plainValue={`${hasAddress.streetAddress}, ${hasAddress.city}, ${hasAddress.postalCode}, ${hasAddress.countryCode}`}
-              maskedValue={maskAddress(hasAddress)}
               type="qe-none"
               collection="customerAgreementProcedure"
             />
@@ -534,19 +642,21 @@ export default function ProfilePage() {
             </>
           )}
 
-          {/* Government ID - read-only */}
-          {hasGovId ? (
-            <RevealField label="Government ID" plainValue={hasGovId} maskedValue={maskGovId(hasGovId)} type="qe-none" collection="customerAgreementProcedure" />
-          ) : ag !== null && (
-            <>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-gray-500 text-sm">Government ID</span>
-                {debugMode && <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-purple-100 text-purple-700 border-purple-200">QE:none</span>}
-                {debugMode && <CollectionChip name="customerAgreementProcedure" />}
-              </div>
-              <span className="text-gray-400 text-xs italic">Not on file</span>
-            </>
+          {/* v27 KYC identity attributes (the government identity document itself is grouped in its
+              own "Identity document" card below, to avoid a confusing "Government ID no." label when
+              the document is e.g. a driver license). */}
+          {custDobOk && (
+            <RevealField label="Date of birth" plainValue={custDob!.toLocaleDateString()} type="qe-range" collection="party" info="Your date of birth (GDPR PII). Encrypted at rest; supports encrypted range queries (QE:range)." />
           )}
+          {ag?.partyNationality && <PlainField label="Nationality" value={countryLabel(ag.partyNationality)} qe="qe-equality" collection="party" info="Your nationality (ISO country code). Encrypted at rest; searchable by exact match (QE:equality)." />}
+          {ag?.partyPlaceOfBirth && <PlainField label="Place of birth" value={ag.partyPlaceOfBirth} qe="qe-equality" collection="party" info="City/country where you were born. Encrypted at rest; searchable by exact match (QE:equality)." />}
+          {ag?.partySex && <PlainField label="Sex" value={sexLabel(ag.partySex)} qe="qe-equality" collection="party" info="Sex/gender demographic (SD-13, GDPR PII). Encrypted at rest; searchable by exact match (QE:equality)." />}
+          {ag?.customerAgreementTaxIDNumber && (
+            <RevealField label="Tax ID (TIN)" plainValue={ag.customerAgreementTaxIDNumber} type="qe-prefix" collection="customerAgreementProcedure" info="Your tax identification number. Encrypted at rest; supports encrypted starts-with queries (QE:prefix)." />
+          )}
+          {ag?.customerAgreementOccupation && <PlainField label="Occupation" value={humanize(ag.customerAgreementOccupation)} qe="qe-equality" collection="customerAgreementProcedure" info="Your declared occupation, collected for KYC. Encrypted at rest; searchable by exact match (QE:equality)." />}
+          {sourceOfFunds && <PlainField label="Source of funds" value={humanize(sourceOfFunds)} qe="qe-none" collection="customerAgreementProcedure" info="Declared origin of your funds (AML/KYC). Encrypted at rest and not searchable (QE:none)." />}
+          {purpose && <PlainField label="Purpose of relationship" value={humanize(purpose)} qe="qe-none" collection="customerAgreementProcedure" info="Why you opened this account (AML/KYC). Encrypted at rest and not searchable (QE:none)." />}
 
           {/* SD-13 Party demographics — shown for staff (no customer agreement), so their profile
               carries the same KYC-typical detail as customers: phone, DOB, nationality, address.
@@ -558,18 +668,18 @@ export default function ProfilePage() {
             const addrFull = addr
               ? [addr.line1, addr.line2, addr.city, addr.postalCode, addr.countryCode].filter(Boolean).join(', ')
               : '';
-            const addrMasked = addr ? `••• ${addr.city}, ${addr.countryCode}` : '';
             return (
               <>
                 {pty.partyMobilePhoneNumber && (
-                  <RevealField label="Phone" plainValue={pty.partyMobilePhoneNumber} maskedValue={maskPhone(pty.partyMobilePhoneNumber)} type="qe-equality" collection="party" />
+                  <RevealField label="Phone" plainValue={pty.partyMobilePhoneNumber} type="qe-equality" collection="party" />
                 )}
                 {dobValid && (
-                  <RevealField label="Date of birth" plainValue={dob!.toLocaleDateString()} maskedValue="••/••/••••" type="qe-none" collection="party" />
+                  <RevealField label="Date of birth" plainValue={dob!.toLocaleDateString()} type="qe-none" collection="party" />
                 )}
                 {pty.partyNationality && <PlainField label="Nationality" value={pty.partyNationality} collection="party" />}
+                {pty.partySex && <PlainField label="Sex" value={sexLabel(pty.partySex)} qe="qe-equality" collection="party" />}
                 {addr && (
-                  <RevealField label="Address" plainValue={addrFull} maskedValue={addrMasked} type="qe-none" collection="party" />
+                  <RevealField label="Address" plainValue={addrFull} type="qe-none" collection="party" />
                 )}
               </>
             );
@@ -598,6 +708,42 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      {/* Identity document (Government ID) - grouped in its own card so the document number is
+          labelled generically ("Document number") alongside its type, rather than the confusing
+          "Government ID no." when the document is e.g. a driver license. */}
+      {ag && (govId?.number || hasGovId) && (
+        <div className="bg-white rounded-xl border p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <IdCard size={16} className="text-gray-500 shrink-0" />
+              <h2 className="font-semibold text-gray-800 text-sm">Identity document</h2>
+              <InfoHint text="The government-issued identity document you provided at onboarding (KYC). Each field is encrypted at rest in MongoDB with Queryable Encryption." />
+            </div>
+            {debugMode && (
+              <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-teal-50 text-teal-700 border-teal-200 shrink-0">
+                SD-53 · customerAgreementGovernmentID
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm items-start">
+            {govId?.type && (
+              <PlainField label="Document type" value={humanize(govId.type)} qe="qe-equality" collection="customerAgreementProcedure" info="Kind of identity document (passport, national ID, driver license). Encrypted at rest; searchable by exact match (QE:equality)." />
+            )}
+            {govId?.number ? (
+              <RevealField label="Document number" plainValue={govId.number} type="qe-suffix" collection="customerAgreementProcedure" info="The document's number. Encrypted at rest; supports encrypted ends-with queries (QE:suffix)." />
+            ) : hasGovId ? (
+              <RevealField label="Document reference" plainValue={hasGovId} type="qe-none" collection="customerAgreementProcedure" info="Legacy single-string government ID reference. Encrypted at rest and not searchable (QE:none)." />
+            ) : null}
+            {govId?.issuingCountry && (
+              <PlainField label="Issuing country" value={countryLabel(govId.issuingCountry)} qe="qe-equality" collection="customerAgreementProcedure" info="Country that issued the document (ISO code). Encrypted at rest; searchable by exact match (QE:equality)." />
+            )}
+            {govExpiryOk && (
+              <PlainField label="Expiry date" value={govExpiry!.toLocaleDateString()} qe="qe-range" collection="customerAgreementProcedure" info="When the document expires. Encrypted at rest; supports encrypted range queries (QE:range)." />
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Legend - only visible in debug mode */}
       {debugMode && (
         <div className="bg-white rounded-xl border p-4 text-sm">
@@ -605,7 +751,19 @@ export default function ProfilePage() {
           <div className="space-y-1.5 text-xs text-gray-600">
             <div className="flex items-center gap-2">
               <span className="bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-mono shrink-0">QE:equality</span>
-              <span>Encrypted in Atlas. Searchable without server-side decryption.</span>
+              <span>Encrypted in Atlas. Searchable by exact match without server-side decryption.</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="bg-cyan-100 text-cyan-700 border border-cyan-200 px-1.5 py-0.5 rounded font-mono shrink-0">QE:range</span>
+              <span>Encrypted in Atlas. Searchable by range (e.g. dates, scores) over ciphertext.</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="bg-indigo-100 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded font-mono shrink-0">QE:prefix</span>
+              <span>Encrypted in Atlas. Searchable by starts-with over ciphertext (8.2+).</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="bg-violet-100 text-violet-700 border border-violet-200 px-1.5 py-0.5 rounded font-mono shrink-0">QE:suffix</span>
+              <span>Encrypted in Atlas. Searchable by ends-with over ciphertext (8.2+).</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="bg-purple-100 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded font-mono shrink-0">QE:none</span>
@@ -649,6 +807,19 @@ export default function ProfilePage() {
                 </span>
               </>
             )}
+            {/* v27 provider verdicts (HRP screening): risk score QE:range; rating / PEP / sanctions QE:equality. */}
+            {typeof ag.customerAgreementKycCheck.customerAgreementKycCheckRiskScore === 'number' && (
+              <PlainField label="Risk score" value={`${ag.customerAgreementKycCheck.customerAgreementKycCheckRiskScore} / 100`} qe="qe-range" collection="customerAgreementProcedure" info="Screening risk score (0-100) from KYC/AML checks. Encrypted at rest; supports encrypted range queries (QE:range)." />
+            )}
+            {ag.customerAgreementKycCheck.customerAgreementKycCheckRiskRating && (
+              <PlainField label="Risk rating" value={humanize(ag.customerAgreementKycCheck.customerAgreementKycCheckRiskRating)} qe="qe-equality" collection="customerAgreementProcedure" info="Overall risk band (low / medium / high). Encrypted at rest; searchable by exact match (QE:equality)." />
+            )}
+            {typeof ag.customerAgreementKycCheck.customerAgreementKycCheckPepStatus === 'boolean' && (
+              <PlainField label="PEP status" value={ag.customerAgreementKycCheck.customerAgreementKycCheckPepStatus ? 'Yes' : 'No'} qe="qe-equality" collection="customerAgreementProcedure" info="Whether you are a Politically Exposed Person. Encrypted at rest; searchable by exact match (QE:equality)." />
+            )}
+            {ag.customerAgreementKycCheck.customerAgreementKycCheckSanctionsResult && (
+              <PlainField label="Sanctions result" value={humanize(ag.customerAgreementKycCheck.customerAgreementKycCheckSanctionsResult)} qe="qe-equality" collection="customerAgreementProcedure" info="Result of sanctions-list screening (clear / hit / pending). Encrypted at rest; searchable by exact match (QE:equality)." />
+            )}
             {debugMode && ag.customerAgreementKycCheck.customerAgreementKycCheckReference && (
               <>
                 <span className="text-gray-500 text-sm">Reference</span>
@@ -662,6 +833,80 @@ export default function ProfilePage() {
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Change password — local accounts only (remote IdP accounts manage their own credentials) */}
+      {profile.domain === 'local' && (
+        <div className="bg-white rounded-xl border p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <KeyRound size={16} className="text-gray-500 shrink-0" />
+              <h2 className="font-semibold text-gray-800 text-sm">Password</h2>
+            </div>
+            {!pwOpen && (
+              <button
+                onClick={() => { resetPwForm(); setPwOpen(true); }}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 flex items-center gap-1.5"
+              >
+                <Lock size={13} /> Change password
+              </button>
+            )}
+          </div>
+
+          {!pwOpen ? (
+            <p className="text-xs text-gray-500">
+              Change your password. You will be asked for your current password, and all other active sessions will be signed out.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="pw-current" className="block text-xs text-gray-500 mb-1">Current password</label>
+                <input
+                  id="pw-current"
+                  type="password"
+                  autoComplete="current-password"
+                  value={pwCurrent}
+                  onChange={(e) => setPwCurrent(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 focus:border-[#00ED64]"
+                />
+              </div>
+
+              <PasswordFields
+                password={pwNew}
+                confirm={pwConfirm}
+                onPasswordChange={setPwNew}
+                onConfirmChange={setPwConfirm}
+                label="New password"
+                idPrefix="pw-new"
+              />
+
+              {pwNew.length > 0 && pwNew === pwCurrent && (
+                <p className="text-xs text-amber-600">New password must be different from the current one.</p>
+              )}
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleChangePassword}
+                  disabled={!pwValid || pwSaving}
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-[#00ED64] text-black hover:brightness-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                >
+                  <Save size={13} /> {pwSaving ? 'Saving…' : 'Update password'}
+                </button>
+                <button
+                  onClick={() => { resetPwForm(); setPwOpen(false); }}
+                  disabled={pwSaving}
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 flex items-center gap-1.5"
+                >
+                  <X size={13} /> Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {pwMsg && (
+            <p className={`text-xs ${pwMsg.startsWith('Error') ? 'text-red-600' : 'text-green-600'}`}>{pwMsg}</p>
+          )}
         </div>
       )}
 

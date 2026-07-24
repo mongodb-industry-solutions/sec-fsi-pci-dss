@@ -45,6 +45,9 @@ export async function createCollections(
     { name: 'customerAgreementProcedure',       map: maps.customerAgreementProcedure },
     // SD-88: Payment Card Management
     { name: 'paymentCardManagement',            map: maps.paymentCardManagement },
+    // Card Administration (issuer CDE, v30): module-owned vault with the full PAN + service code
+    // (QE:equality). The PSP core NEVER holds these; extracting the module leaves the core descoped.
+    { name: 'cardIssuerVault',                  map: maps.cardIssuerVault },
     // SD-91: Customer Authentication
     { name: 'customerAuthenticationAssessment', map: maps.customerAuthenticationAssessment },
     // SD-66: Payout Account Arrangement (IBAN/routing QE:none, L2 only — PCI DSS Req 3.3)

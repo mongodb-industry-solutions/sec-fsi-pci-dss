@@ -88,6 +88,12 @@ export function buildEncryptedFieldsMaps(
           bsonType: 'string',
           queries: { queryType: 'equality', contention: 8 },
         },
+        {
+          keyId: deks.partySex,
+          path: 'partySex',
+          bsonType: 'string',
+          queries: { queryType: 'equality', contention: 8 },
+        },
         // GDPR PII — QE:none (L2 only). Postal address is sensitive personal data;
         // encrypted at rest, decrypted only for the L2 client (or the party themselves).
         ...(includeSensitive ? [
@@ -266,6 +272,28 @@ export function buildEncryptedFieldsMaps(
           // QE:none - not searchable, retrieval only (same for both tiers: expiry is not
           // a sensitive-escalation field; it is always returned to Level 1 as ciphertext
           // since QE:none fields without equality queries are never searchable anyway)
+        },
+      ],
+    },
+
+    // -- Card Administration (issuer CDE): cardIssuerVault -------------------─
+    // Module-owned issuer vault (v30). Holds the FULL PAN (CHD) and the card service code, which
+    // never exist in the PSP core (core stays descoped: token + BIN + last4 only). QE:equality lets
+    // MongoDB locate/dedup a card by its exact PAN over ciphertext without client-side decryption
+    // (the differentiator). Lookup tier so setup succeeds on 8.0 (no substring/suffix showcase).
+    cardIssuerVault: {
+      fields: [
+        {
+          keyId: deks.vaultPan,
+          path: 'paymentCardNumber',
+          bsonType: 'string',
+          queries: { queryType: 'equality', contention: 8 },
+        },
+        {
+          keyId: deks.vaultServiceCode,
+          path: 'cardServiceCode',
+          bsonType: 'string',
+          queries: { queryType: 'equality', contention: 8 },
         },
       ],
     },

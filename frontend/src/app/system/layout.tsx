@@ -7,6 +7,7 @@ import { DemoSidebar, MobileBottomNav } from '../../components/DemoSidebar';
 import { UserMenu } from '../../components/UserMenu';
 import { NotificationBell } from '../../components/NotificationBell';
 import Link from 'next/link';
+import { BRAND } from '../../config/brand';
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
 
@@ -18,7 +19,7 @@ function DemoShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<ReturnType<typeof decodeToken>>(null);
 
   useEffect(() => {
-    document.title = 'Sec4 Pay';
+    document.title = BRAND.full;
   }, []);
 
   useEffect(() => {
@@ -48,9 +49,9 @@ function DemoShell({ children }: { children: React.ReactNode }) {
           href={roleHome}
           className="flex items-center gap-2 text-[#00ED64] font-bold text-sm whitespace-nowrap hover:text-[#00ED64]/80 transition-colors"
         >
-          <span className="text-base"><img src="/app-icon.png" alt="Sec4 Pay Icon" className="w-9 h-9 mx-auto" /> </span>
-          <span className="text-[#FFFFFF] hidden xs:inline">Sec4</span><span className="hidden xs:inline">Pay</span>
-          <span className="text-[#FFFFFF] xs:hidden">Sec4</span><span className="xs:hidden">Pay</span>
+          <span className="text-base"><img src="/app-icon.png" alt={`${BRAND.full} Icon`} className="w-9 h-9 mx-auto" /> </span>
+          <span className="text-[#FFFFFF] hidden xs:inline">{BRAND.primary}</span><span className="hidden xs:inline">{BRAND.secondary}</span>
+          <span className="text-[#FFFFFF] xs:hidden">{BRAND.primary}</span><span className="xs:hidden">{BRAND.secondary}</span>
         </Link>
 
         {/* Right side */}

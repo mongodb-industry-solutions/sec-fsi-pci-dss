@@ -63,6 +63,7 @@ function CardIssuerConfigPanel() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [validCvv, setValidCvv] = useState('123');
+  const [cvvMode, setCvvMode] = useState<'both' | 'global' | 'per_card'>('both');
   const [enforceLuhn, setEnforceLuhn] = useState(true);
   const [networks, setNetworks] = useState<NetworkForm[]>(DEFAULT_NETWORKS);
 
@@ -73,6 +74,7 @@ function CardIssuerConfigPanel() {
         const c = await api.modules.getConfig(CAP, token);
         const mc = (c?.moduleConfig as Record<string, unknown>) ?? {};
         setValidCvv(typeof mc.validCvv === 'string' && mc.validCvv ? mc.validCvv : '123');
+        setCvvMode(mc.cvvMode === 'global' || mc.cvvMode === 'per_card' ? mc.cvvMode : 'both');
         setEnforceLuhn(typeof mc.enforceLuhn === 'boolean' ? mc.enforceLuhn : true);
         setNetworks(toForm(mc.networks));
       } catch {
@@ -101,6 +103,7 @@ function CardIssuerConfigPanel() {
     try {
       const moduleConfig = {
         validCvv,
+        cvvMode,
         enforceLuhn,
         networks: networks
           .filter((n) => n.name.trim())
@@ -144,6 +147,21 @@ function CardIssuerConfigPanel() {
               placeholder="123"
             />
             <p className="text-xs text-gray-500 mt-1">The single CVV the simulator accepts. Fixed demo value; never a real card secret and never stored.</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">CVV acceptance mode (demo)</label>
+            <select
+              value={cvvMode}
+              onChange={(e) => setCvvMode(e.target.value as 'both' | 'global' | 'per_card')}
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="both">both (global or per-card)</option>
+              <option value="global">global (fixed demo CVV only)</option>
+              <option value="per_card">per_card (real per-card CVV only)</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              both: accepts the global {validCvv || '123'} or the real per-card CVV. global: only the fixed demo CVV. per_card: only the card&apos;s own CVV.
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Card-number checksum</label>
@@ -225,7 +243,7 @@ function CardIssuerConfigPanel() {
       </div>
       </fieldset>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 mt-5">
         <strong>Logging:</strong> every validation request records a compliance event with the request and response payloads and the linked transaction id / case reference. The event never contains the PAN or CVV (only a masked PAN and whether a CVV was supplied), per PCI DSS Req 3.2 and Req 10.
       </div>
     </>
@@ -233,7 +251,7 @@ function CardIssuerConfigPanel() {
 }
 
 const TABS: ModuleTab[] = [
-  { key: 'config', label: 'Configuration / Policies' },
+  { key: 'config', label: 'Configuration' },
   { key: 'cards', label: 'Cards' },
 ];
 

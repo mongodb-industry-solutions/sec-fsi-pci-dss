@@ -3,6 +3,7 @@
 
 import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
+import { createHash } from 'node:crypto';
 import {
   PAYOUT_ACCOUNT_COLLECTION,
   PayoutAccountArrangement,
@@ -10,6 +11,48 @@ import {
   PayoutAccountStatus,
   PayoutRail,
 } from '../models/payoutAccount.model';
+
+// Stable stream of decimal digits. With a seed it is DETERMINISTIC (SHA-256 of the seed), so
+// seed backfill stays idempotent (R6); without a seed it falls back to a random stream.
+function digitStream(seed: string | undefined, n: number): string {
+  let out = '';
+  if (seed) {
+    let i = 0;
+    while (out.length < n) {
+      const h = createHash('sha256').update(`${seed}:${i++}`).digest('hex');
+      out += BigInt(`0x${h}`).toString().replace(/\D/g, '');
+    }
+  } else {
+    while (out.length < n) out += Math.floor(Math.random() * 1e15).toString();
+  }
+  return out.slice(0, n);
+}
+
+// Demo IBAN generator (v30.1). Produces a well-formed IBAN with a valid ISO 7064 mod-97 check.
+// Demo data only, never a real account. Deterministic when a seed is given (idempotent seed backfill).
+// The IBAN is stored QE-encrypted like any other.
+export function generateDemoIban(countryCode: string, seed?: string): string {
+  // Fall back to 'GB' unless a valid 2-letter ISO code is present: garbage input like "1" would
+  // otherwise normalize to "XX" and produce a bogus IBAN country.
+  const cleaned = (countryCode || '').toUpperCase().replace(/[^A-Z]/g, '');
+  const cc = cleaned.length === 2 ? cleaned : 'GB';
+  // BBAN length by country (fallback 18). Kept simple; digits only for the demo.
+  const bbanLen: Record<string, number> = { GB: 18, DE: 18, ES: 20, FR: 23, US: 18, NL: 14, IT: 23, PT: 21 };
+  const len = bbanLen[cc] ?? 18;
+  const bban = digitStream(seed, len);
+  // mod-97: move CC+00 to the end, encode letters (A=10..Z=35), compute 98 - (n mod 97).
+  const rearranged = `${bban}${cc}00`;
+  const numeric = rearranged.replace(/[A-Z]/g, (ch) => (ch.charCodeAt(0) - 55).toString());
+  let rem = 0;
+  for (const d of numeric) rem = (rem * 10 + Number(d)) % 97;
+  const check = (98 - rem).toString().padStart(2, '0');
+  return `${cc}${check}${bban}`;
+}
+
+// Demo routing / national clearing number (9 digits, ABA-style). Deterministic when seeded. Demo only.
+export function generateDemoRouting(seed?: string): string {
+  return digitStream(seed, 9);
+}
 
 export interface CreatePayoutAccountInput {
   partyInstanceReference: string;
@@ -99,9 +142,10 @@ export async function createPayoutAccount(
   // If this is the first account, make it default automatically
   const existingCount = await col.countDocuments({ partyInstanceReference: input.partyInstanceReference });
   const isDefault = input.payoutAccountIsDefault ?? existingCount === 0;
+  const id = uuidv4();
 
   const record: PayoutAccountArrangement = {
-    payoutAccountInstanceReference: uuidv4(),
+    payoutAccountInstanceReference: id,
     partyInstanceReference: input.partyInstanceReference,
     payoutAccountType: input.payoutAccountType,
     payoutAccountStatus: 'active',
@@ -118,8 +162,19 @@ export async function createPayoutAccount(
     ...(input.payoutAccountBankAddress ? { payoutAccountBankAddress: input.payoutAccountBankAddress } : {}),
     // QE-encrypted fields: MUST be absent (not null/undefined) when not provided.
     // MongoDB error 31041: "Cannot encrypt element of type: null" — QE driver rejects null values.
-    ...(input.payoutAccountIban ? { payoutAccountIban: input.payoutAccountIban } : {}),
-    ...(input.payoutAccountRoutingNumber ? { payoutAccountRoutingNumber: input.payoutAccountRoutingNumber } : {}),
+    // v30.1: auto-generate a valid demo IBAN + routing when the caller leaves them empty — but ONLY for
+    // externally-linked accounts. `internal_ledger` accounts intentionally have no bank identifiers, so
+    // they are left absent unless explicitly provided. The demo IBAN/routing are seeded with the unique
+    // account id (not the party ref) so a party with several accounts never gets duplicate identifiers.
+    ...(input.payoutAccountType === 'internal_ledger'
+      ? {
+          ...(input.payoutAccountIban ? { payoutAccountIban: input.payoutAccountIban } : {}),
+          ...(input.payoutAccountRoutingNumber ? { payoutAccountRoutingNumber: input.payoutAccountRoutingNumber } : {}),
+        }
+      : {
+          payoutAccountIban: input.payoutAccountIban || generateDemoIban(input.payoutAccountCountryCode, id),
+          payoutAccountRoutingNumber: input.payoutAccountRoutingNumber || generateDemoRouting(id),
+        }),
     payoutAccountBalance: {
       pendingAmount: 0,
       availableAmount: 0,
@@ -226,5 +281,21 @@ export async function updatePayoutAccount(
   // QE constraint: findOneAndUpdate with returnDocument:'after' uses new:true which is
   // unsupported on encrypted collections. Use updateOne + findOne instead.
   await col.updateOne({ payoutAccountInstanceReference: accountRef }, { $set: safePatch });
+  return col.findOne({ payoutAccountInstanceReference: accountRef });
+}
+
+// v30.1 administrative ownership reassignment: move a payout account to a different party. This is a
+// deliberately separate, explicit operation (the generic update keeps partyInstanceReference
+// immutable). Callers MUST audit it. Returns the updated account, or null when not found.
+export async function reassignPayoutAccountOwner(
+  db: Db,
+  accountRef: string,
+  newPartyRef: string,
+): Promise<PayoutAccountArrangement | null> {
+  const col = db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION);
+  await col.updateOne(
+    { payoutAccountInstanceReference: accountRef },
+    { $set: { partyInstanceReference: newPartyRef, recordUpdatedDateTime: new Date() } },
+  );
   return col.findOne({ payoutAccountInstanceReference: accountRef });
 }

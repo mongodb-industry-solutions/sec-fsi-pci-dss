@@ -2,8 +2,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { CreditCard, ArrowLeft, Pause, Play, Pencil, Save, X, Trash2, ShieldAlert } from 'lucide-react';
-import { api } from '../../../../../../../lib/api';
+import { CreditCard, Landmark, ArrowLeft, ArrowRight, Pause, Play, Pencil, Save, X, Trash2, ShieldAlert, Search, Repeat } from 'lucide-react';
+import { api, type AdminPayoutAccount, type PartyOwnerResult } from '../../../../../../../lib/api';
+import { SensitiveReveal } from '../../../../../../../components/SensitiveReveal';
 import { getToken } from '../../../../../../../lib/auth';
 import { useDebugMode } from '../../../../../../../lib/debugMode';
 import { useConfirm, useNotify } from '../../../../../../../components/ui/ConfirmProvider';
@@ -23,19 +24,32 @@ const LIST_HREF = '/system/admin/modules/card-issuer?tab=cards';
 const ACTIVE_STATES = ['active'];
 const TOGGLEABLE_STATES = ['active', 'suspended'];
 
+interface FundingAccount {
+  payoutAccountInstanceReference: string;
+  payoutAccountAlias?: string;
+  payoutAccountBankName?: string;
+  payoutAccountCurrency?: string;
+  payoutAccountStatus?: string;
+  payoutAccountHasIban?: boolean;
+}
+
 interface CardDetail {
   paymentCardInstanceReference?: string;
   customerAgreementInstanceReference?: string;
   paymentCardReference?: string;
   paymentCardMaskedPanDisplay?: string;
+  paymentCardBin?: string;
+  paymentCardLast4?: string;
   paymentCardNetwork?: string;
   paymentCardStatus?: string;
+  ownerName?: string | null;
   paymentCardExpirationDate?: string;
   paymentCardIsPreferred?: boolean;
   paymentCardAlias?: string;
   paymentCardCustomerNote?: string;
   paymentCardMandateStatus?: string;
   fundingPayoutAccountInstanceReference?: string;
+  fundingAccount?: FundingAccount | null;
   paymentCardIssuanceDateTime?: string;
   recordCreatedDateTime?: string;
   recordUpdatedDateTime?: string;
@@ -82,6 +96,7 @@ function CardAdminDetail() {
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [reassigningFunding, setReassigningFunding] = useState(false);
 
   const load = useCallback(async () => {
     if (!token || !cardId) { setReady(true); return; }
@@ -168,6 +183,28 @@ function CardAdminDetail() {
     setEditing(false);
   }
 
+  async function reassignFunding(a: AdminPayoutAccount) {
+    if (!card) return;
+    const ok = await confirm({
+      title: 'Change funding account?',
+      message: `This card will be funded by ${a.payoutAccountAlias ?? a.payoutAccountBankName ?? 'the selected account'}. This also reassigns the card owner to the account's party. This is a sensitive change and is audited.`,
+      confirmLabel: 'Change funding account',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setReassigningFunding(true);
+    try {
+      await api.modules.cardAdmin.reassignFunding(cardId, a.payoutAccountInstanceReference, token);
+      notify('Funding account changed.', 'success');
+      await load();
+    } catch (e) {
+      if (e instanceof Error && e.message === 'managed_externally') notify('Capability managed by an external provider.', 'error');
+      else notify(e instanceof Error ? e.message : 'Failed to change funding account.', 'error');
+    } finally {
+      setReassigningFunding(false);
+    }
+  }
+
   const label = card?.paymentCardAlias || card?.paymentCardNetwork
     || (card?.paymentCardMaskedPanDisplay ? `Card ${card.paymentCardMaskedPanDisplay.slice(-4)}` : 'Card');
 
@@ -220,8 +257,25 @@ function CardAdminDetail() {
           <div className="bg-white rounded-xl border p-5 space-y-3">
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Card details</h2>
             <dl className="divide-y text-sm">
+              {/* Cardholder: derived PII from the linked party (need-to-know, audited). */}
+              <DetailRow label="Cardholder" value={card.ownerName ?? undefined}
+                hint={debugMode ? 'derived PII; need-to-know' : undefined} />
               <DetailRow label="Network" value={card.paymentCardNetwork} />
               <DetailRow label="Masked number" value={card.paymentCardMaskedPanDisplay} mono />
+              {card.paymentCardBin && <DetailRow label="BIN" value={card.paymentCardBin} mono />}
+              {card.paymentCardLast4 && <DetailRow label="Last 4" value={card.paymentCardLast4} mono />}
+              {/* Full PAN (FR-30.16): masked by default; ephemeral reveal on demand (cards:manage). */}
+              {canManage && (
+                <SensitiveReveal label="Full PAN" masked={card.paymentCardMaskedPanDisplay}
+                  hint={debugMode ? 'ephemeral; not stored' : undefined}
+                  fetchValue={async () => (await api.modules.cardAdmin.revealPan(cardId, token)).pan} />
+              )}
+              {/* CVV: never stored; ephemeral reveal on demand (cards:manage). */}
+              {canManage && (
+                <SensitiveReveal label="CVV"
+                  hint={debugMode ? 'ephemeral; not stored' : undefined}
+                  fetchValue={async () => (await api.modules.cardAdmin.revealCvv(cardId, token)).cvv} />
+              )}
               <DetailRow label="Expires" value={card.paymentCardExpirationDate} mono
                 hint={debugMode ? 'QE:none; need-to-know' : undefined} />
               <DetailRow label="Card token" value={card.paymentCardReference} mono
@@ -245,8 +299,57 @@ function CardAdminDetail() {
                 paymentCardInstanceReference: {card.paymentCardInstanceReference}
               </p>
             )}
-            <p className="text-xs text-gray-400 pt-1">Full PAN and CVV/PIN are never stored or shown (PCI DSS Req 3.2/3.3).</p>
+            <p className="text-xs text-gray-400 pt-1">Cardholder is derived from the linked party (need-to-know, audited). Full PAN and CVV are never stored. Any reveal is ephemeral (on demand, re-hideable), routed via the card provider and audited server-side (PCI DSS Req 3.2/3.3, Req 10).</p>
           </div>
+
+          {/* Funding account (SD-88 cardAccountReference). IBAN is hidden by default; reveal on demand. */}
+          {card.fundingAccount && (
+            <div className="bg-white rounded-xl border p-5 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                    <Landmark size={14} className="text-blue-600" />
+                  </div>
+                  <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Funding account</h2>
+                </div>
+                <Link href={`/system/admin/modules/account-information/accounts/${card.fundingAccount.payoutAccountInstanceReference}`}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                  View account details <ArrowRight size={13} />
+                </Link>
+              </div>
+              <dl className="divide-y text-sm">
+                <DetailRow label="Alias" value={card.fundingAccount.payoutAccountAlias} />
+                <DetailRow label="Bank" value={card.fundingAccount.payoutAccountBankName} />
+                <DetailRow label="Currency" value={card.fundingAccount.payoutAccountCurrency} mono />
+                <DetailRow label="Status" value={card.fundingAccount.payoutAccountStatus} />
+                {card.fundingAccount.payoutAccountHasIban ? (
+                  <SensitiveReveal label="IBAN"
+                    hint={debugMode ? 'QE-encrypted; ephemeral reveal' : undefined}
+                    fetchValue={async () => (await api.modules.accountAdmin.revealIban(card.fundingAccount!.payoutAccountInstanceReference, token)).payoutAccountIban} />
+                ) : (
+                  <DetailRow label="IBAN" value="None" />
+                )}
+                <DetailRow label="Account" value={card.fundingAccount.payoutAccountInstanceReference} mono />
+              </dl>
+              <p className="text-xs text-gray-400 pt-1">IBAN is QE-encrypted at rest. Reveal is on demand, need-to-know and audited (GDPR Art. 5/32).</p>
+            </div>
+          )}
+
+          {/* Change funding account (cards:manage). Also reassigns the owner; confirmed + audited. */}
+          {canManage && (
+            <div className="bg-white rounded-xl border p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
+                  <Repeat size={14} className="text-amber-600" />
+                </div>
+                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Change funding account</h2>
+              </div>
+              <p className="text-xs text-gray-400">
+                Search an owner, then pick one of their payout accounts. Changing the funding account also reassigns the card owner to that account&apos;s party. The change is confirmed and audited.
+              </p>
+              <FundingReassignPicker token={token} disabled={reassigningFunding} onPick={reassignFunding} notify={notify} />
+            </div>
+          )}
 
           {/* Editable metadata */}
           <div className="bg-white rounded-xl border p-5 space-y-4">
@@ -351,6 +454,120 @@ function DetailRow({ label, value, mono, hint }: { label: string; value?: string
         {hint && <span className="text-xs text-gray-300 font-mono hidden sm:inline">{hint}</span>}
         <span className={`text-gray-800 text-right truncate ${mono ? 'font-mono' : ''}`}>{value ?? '-'}</span>
       </span>
+    </div>
+  );
+}
+
+// Two-step funding picker: search an owner (party) by name, then pick one of their payout accounts.
+// Reuses the account-information module search + list endpoints (accountAdmin).
+function FundingReassignPicker({ token, onPick, disabled, notify }: {
+  token: string;
+  onPick: (a: AdminPayoutAccount) => void;
+  disabled?: boolean;
+  notify: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [parties, setParties] = useState<PartyOwnerResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searched, setSearched] = useState(false);
+  const [party, setParty] = useState<PartyOwnerResult | null>(null);
+  const [accounts, setAccounts] = useState<AdminPayoutAccount[]>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+
+  useEffect(() => {
+    if (party) return;
+    const q = query.trim();
+    if (q.length < 2) { setParties([]); setSearched(false); return; }
+    let cancelled = false;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.modules.accountAdmin.searchParties(q, token);
+        if (!cancelled) { setParties(r.results); setSearched(true); }
+      } catch (e) {
+        if (!cancelled) {
+          setParties([]); setSearched(true);
+          if (e instanceof Error && e.message === 'managed_externally') notify('Capability managed by an external provider.', 'error');
+        }
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [query, token, party, notify]);
+
+  useEffect(() => {
+    if (!party) return;
+    let cancelled = false;
+    setLoadingAccounts(true);
+    api.modules.accountAdmin.list({ party: party.partyInstanceReference, limit: 50 }, token)
+      .then((r) => { if (!cancelled) setAccounts(r.results); })
+      .catch((e) => {
+        if (!cancelled) {
+          setAccounts([]);
+          if (e instanceof Error && e.message === 'managed_externally') notify('Capability managed by an external provider.', 'error');
+          else notify(e instanceof Error ? e.message : 'Could not load payout accounts.', 'error');
+        }
+      })
+      .finally(() => { if (!cancelled) setLoadingAccounts(false); });
+    return () => { cancelled = true; };
+  }, [party, token, notify]);
+
+  if (party) {
+    return (
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-gray-500 truncate">Owner: <span className="text-gray-800 font-medium">{party.ownerName ?? 'Unnamed owner'}</span></span>
+          <button type="button" onClick={() => { setParty(null); setAccounts([]); }} className="text-xs text-[#001E2B] hover:underline shrink-0">Change owner</button>
+        </div>
+        {loadingAccounts ? (
+          <p className="text-xs text-gray-400">Loading payout accounts…</p>
+        ) : accounts.length === 0 ? (
+          <p className="text-xs text-gray-400">This owner has no payout accounts.</p>
+        ) : (
+          <ul className="border rounded-lg divide-y max-h-48 overflow-y-auto">
+            {accounts.map((a) => (
+              <li key={a.payoutAccountInstanceReference}>
+                <button type="button" onClick={() => onPick(a)} disabled={disabled}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors disabled:opacity-50">
+                  <span className="text-gray-800 font-medium">
+                    {a.payoutAccountAlias ?? a.payoutAccountBankName ?? 'Payout account'}
+                    {a.payoutAccountCurrency ? ` · ${a.payoutAccountCurrency}` : ''}
+                  </span>
+                  <span className="block text-xs text-gray-400 font-mono truncate">{a.payoutAccountInstanceReference}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} disabled={disabled}
+          className="w-full border rounded-lg pl-8 pr-3 py-2 text-sm disabled:opacity-50" placeholder="Search owner by name" />
+      </div>
+      {searching && <p className="text-xs text-gray-400">Searching…</p>}
+      {parties.length > 0 && (
+        <ul className="border rounded-lg divide-y max-h-48 overflow-y-auto">
+          {parties.map((r) => (
+            <li key={r.partyInstanceReference}>
+              <button type="button" onClick={() => setParty(r)}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors">
+                <span className="text-gray-800 font-medium">{r.ownerName ?? 'Unnamed owner'}</span>
+                <span className="block text-xs text-gray-400 font-mono truncate">{r.partyInstanceReference}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {searched && !searching && parties.length === 0 && (
+        <p className="text-xs text-gray-400">No matching owner.</p>
+      )}
     </div>
   );
 }

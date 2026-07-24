@@ -2,13 +2,14 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { BookOpen, Code2 } from 'lucide-react';
 import { BACKEND_PUBLIC_URL } from '../lib/constants';
+import { BRAND } from '../config/brand';
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#001E2B] text-white flex flex-col items-center justify-center p-6">
       <div className="max-w-3xl w-full text-center">
-        <div className="text-6xl mb-4"><div className="text-4xl mb-2"> <img src="/app-icon.png" alt="Sec4 Pay Icon" className="w-24 h-24 mx-auto" /> </div></div>
-        <h1 className="text-3xl font-bold mb-2">Sec4 <span className="text-[#00ED64]">Pay</span> <span className="text-gray-400 font-medium text-md">(PSP - PCI DSS)</span></h1>
+        <div className="text-6xl mb-4"><div className="text-4xl mb-2"> <img src="/app-icon.png" alt={`${BRAND.full} Icon`} className="w-24 h-24 mx-auto" /> </div></div>
+        <h1 className="text-3xl font-bold mb-2">{BRAND.primary} <span className="text-[#00ED64]">{BRAND.secondary}</span> <span className="text-gray-400 font-medium text-md">(PSP - PCI DSS)</span></h1>
         <p className="text-[#00ED64] text-lg mb-8 font-medium">
           MongoDB Queryable Encryption · AWS KMS
         </p>
