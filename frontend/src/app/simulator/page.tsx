@@ -54,7 +54,7 @@ export default function SimulatorHubPage() {
         <div className="text-5xl mb-3">🎬</div>
         <h1 className="text-2xl font-bold text-[#001E2B] mb-2">Simulator Mode</h1>
         <p className="text-gray-600 text-sm max-w-xl mx-auto">
-          Choose which part of the PCI DSS payment story you want to explore.
+          Choose which part of the payment story you want to explore.
         </p>
       </div>
 

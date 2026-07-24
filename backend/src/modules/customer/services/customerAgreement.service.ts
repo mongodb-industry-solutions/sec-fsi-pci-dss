@@ -14,6 +14,7 @@ import { validateToken } from '../../../vendors/security/escalationTokens';
 import { appendAuditEvent } from '../../fraud/services/fraudDiagnosis.service';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
+import { deriveKycCheckStatus, DecisionMode } from '../../../shared/models/onboardingDecision';
 import { config } from '../../../config';
 
 /**
@@ -145,6 +146,120 @@ export async function getByInstanceReference(db: Db, id: string, role: UserRole 
   if (!party) return null;
   await maybeAudit(roleDb, caseId, role, doc, canSee, actor);
   return buildResponse(doc, party, role, canSee, caseId);
+}
+
+// ── v31 KYC Administration (customer module) ─────────────────────────────────────────────────────
+// KYC detail keyed on partyInstanceReference (the party is the single owner of a KYC record). L1/L2
+// masking respected exactly like the lookup functions (viewSensitive + escalation token → L2 decrypt).
+export async function getKycByPartyRef(db: Db, partyRef: string, role: UserRole = 'level1_analyst', escalationToken?: string, actor?: { ref?: string; name?: string }) {
+  const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
+  const canSee = canReadSensitive(role, hasValidToken);
+  const result = await findPartyAndAgreement(roleDb, { partyInstanceReference: partyRef } as Partial<PartyControlRecord>);
+  if (!result) return null;
+  await maybeAudit(roleDb, caseId, role, result.doc, canSee, actor);
+  return buildResponse(result.doc, result.party, role, canSee, caseId);
+}
+
+const KYC_COMPLETED_STATUSES = ['verified', 'rejected', 'expired'];
+
+// Paged list of parties that COMPLETED KYC. L1 (masked) by default — QE:none sensitive leaves come back
+// as ciphertext and are never projected here. Index-backed: the ESR compound
+// { kycCheckStatus, customerSegment, recordUpdatedDateTime } serves the filter + sort (no COLLSCAN).
+export async function listKycAdmin(
+  role: UserRole,
+  filters: { status?: string; segment?: string; riskRating?: string; page?: number; limit?: number },
+) {
+  const roleDb = await getDbForRole(role, false); // L1 masked for the list
+  const query: Record<string, unknown> = {
+    'customerAgreementKycCheck.customerAgreementKycCheckStatus': filters.status && KYC_COMPLETED_STATUSES.includes(filters.status)
+      ? filters.status
+      : { $in: KYC_COMPLETED_STATUSES },
+  };
+  if (filters.segment) query.customerSegment = filters.segment;
+  // riskRating is QE:equality — queryable on the QE client via a plain equality predicate.
+  if (filters.riskRating) query['customerAgreementKycCheck.customerAgreementKycCheckRiskRating'] = filters.riskRating;
+
+  const page = Math.max(1, filters.page ?? 1);
+  const limit = Math.min(100, Math.max(1, filters.limit ?? 20));
+  const skip = (page - 1) * limit;
+
+  const col = roleDb.collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION);
+  const [docs, total] = await Promise.all([
+    col.find(query).sort({ recordUpdatedDateTime: -1 }).skip(skip).limit(limit).toArray(),
+    col.countDocuments(query),
+  ]);
+
+  const partyRefs = docs.map((d) => d.partyInstanceReference);
+  const parties = partyRefs.length
+    ? await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
+        .find({ partyInstanceReference: { $in: partyRefs } } as never, { projection: { partyInstanceReference: 1, partyName: 1 } })
+        .toArray()
+    : [];
+  const nameByRef = new Map(parties.map((p) => [p.partyInstanceReference, typeof p.partyName === 'string' ? p.partyName : null]));
+
+  const results = docs.map((d) => ({
+    partyInstanceReference: d.partyInstanceReference,
+    partyName: nameByRef.get(d.partyInstanceReference) ?? null,
+    customerAgreementInstanceReference: d.customerAgreementInstanceReference,
+    customerSegment: d.customerSegment,
+    customerAgreementStatus: d.customerAgreementStatus,
+    customerAgreementKycCheckStatus: d.customerAgreementKycCheck?.customerAgreementKycCheckStatus,
+    customerAgreementKycCheckRiskRating: d.customerAgreementKycCheck?.customerAgreementKycCheckRiskRating,
+    customerAgreementKycCheckPepStatus: d.customerAgreementKycCheck?.customerAgreementKycCheckPepStatus,
+    customerAgreementKycCheckSanctionsResult: d.customerAgreementKycCheck?.customerAgreementKycCheckSanctionsResult,
+    recordUpdatedDateTime: d.recordUpdatedDateTime,
+  }));
+  return { results, total, page, limit };
+}
+
+// KYC data fields the Administration surface may correct (plan §4.2). NEVER the KYC check status/verdict.
+const KYC_EDITABLE_FIELDS = new Set([
+  'customerAgreementOccupation',
+  'customerAgreementSourceOfFunds',
+  'customerAgreementPurposeOfRelationship',
+  'customerAgreementGovernmentID',
+  'customerAgreementResidentialAddress',
+]);
+
+export type KycPatchResult = { status: 'not_found' } | { status: 'invalid'; error: string } | { status: 'ok' };
+
+// Correct KYC data. Writes through the L2 QE client so QE leaves encrypt on write. Rejects any write to
+// customerAgreementKycCheckStatus (verdict is not editable here — decision 2). Emits kyc.record.amended
+// with changed FIELD NAMES only (no before/after PII in the ledger, GDPR minimization).
+export async function patchKycData(
+  db: Db,
+  partyRef: string,
+  patch: Record<string, unknown>,
+  amendmentReason: string,
+  actor: { performedByPartyReference?: string; performedByRole?: string },
+): Promise<KycPatchResult> {
+  const set: Record<string, unknown> = {};
+  const changedFields: string[] = [];
+  for (const [k, v] of Object.entries(patch)) {
+    if (!KYC_EDITABLE_FIELDS.has(k)) return { status: 'invalid', error: `Field '${k}' is not editable on the KYC administration surface.` };
+    set[k] = v;
+    changedFields.push(k);
+  }
+  if (changedFields.length === 0) return { status: 'invalid', error: 'No editable fields supplied.' };
+  set.recordUpdatedDateTime = new Date();
+
+  const roleDb = await getDbForRole('security_auditor', false); // L2 QE client (encrypt on write)
+  const res = await roleDb.collection(CUSTOMER_AGREEMENT_COLLECTION).updateOne({ partyInstanceReference: partyRef }, { $set: set });
+  if (res.matchedCount === 0) return { status: 'not_found' };
+
+  emitComplianceEvent(db, {
+    entityType: 'customer',
+    entityId: partyRef,
+    processType: 'kyc_verification',
+    processAction: 'kyc.record.amended',
+    processOutcome: 'approved',
+    performedByPartyReference: actor.performedByPartyReference ?? null,
+    performedByRole: actor.performedByRole ?? null,
+    eventSummary: { amendmentReason, changedFields },
+    bianServiceDomain: 'Customer Agreement',
+    bianControlRecordType: 'CustomerAgreementProcedure',
+  });
+  return { status: 'ok' };
 }
 
 export async function getSelfProfile(db: Db, email: string): Promise<Record<string, unknown> | null> {
@@ -505,13 +620,22 @@ export async function applyKycScreeningVerdict(
     pepStatus: boolean;
     sanctionsResult: 'clear' | 'hit' | 'pending';
     screeningProviderRef: string;
+    verificationStatus?: 'pass' | 'fail' | 'manual_review';
   },
+  mode: DecisionMode = 'automated',
 ): Promise<boolean> {
   const roleDb = await getDbForRole('security_auditor', false);
+  // v31 §3.7: derive the BQ:Step status from the verdict with the shared mapper and write it in the SAME
+  // atomic update as the verdict fields (no drift between the risk verdict and the lifecycle status).
+  const status = deriveKycCheckStatus(
+    { riskRating: verdict.riskRating, pepStatus: verdict.pepStatus, sanctionsResult: verdict.sanctionsResult, verificationStatus: verdict.verificationStatus },
+    mode,
+  );
   const res = await roleDb.collection(CUSTOMER_AGREEMENT_COLLECTION).updateOne(
     { partyInstanceReference },
     {
       $set: {
+        'customerAgreementKycCheck.customerAgreementKycCheckStatus': status,
         'customerAgreementKycCheck.customerAgreementKycCheckRiskScore': verdict.riskScore,
         'customerAgreementKycCheck.customerAgreementKycCheckRiskRating': verdict.riskRating,
         'customerAgreementKycCheck.customerAgreementKycCheckPepStatus': verdict.pepStatus,

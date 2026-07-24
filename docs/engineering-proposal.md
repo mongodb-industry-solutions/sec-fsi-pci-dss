@@ -2075,3 +2075,62 @@ never persisted). The PAN is CHD only inside the module-owned CDE, so removing t
 added: `cards:manage` + mandatory audit is the gate.
 
 *Added 2026-07-22 (v30; doc + code together per repo rules).*
+
+---
+
+## v31 ADRs: KYC/KYB Administration, Beneficial Owners, Onboarding Orchestration
+
+### ADR-043: KYB Beneficial Owners as a bounded SD-13 Party-role embed
+Context: KYB requires 1..N shareholders with numeric ownership and a controlling person (UBO), FATF/4th
+AMLD. Decision: model owners as Party (SD-13) roles referenced from the Merchant Agreement (SD-89), as a
+bounded embedded array `merchantBeneficialOwners` on `merchantAgreementProcedure` (subset pattern, hard
+cap 25). PII stays in `party` (QE tiers); the embed holds only FK + role + numeric ownership/control
+metadata (GDPR Art. 5). Rationale: embedding keeps merchant read, ownership scoping, and owners list all
+single-document/single-collection (no `$lookup` fan-out on the hot merchant path); the reverse lookup
+"which merchants does this party own" is a multikey index match. The legacy scalar
+`merchantOwnerPartyReference` is kept as a derived pointer to the primary (back-compat). Consequence: no
+new collection; QE map unchanged; ownership CRUD is a single atomic document update with optimistic
+concurrency (`recordUpdatedDateTime` guard).
+
+### ADR-044: KYC/KYB Administration gated by the data resource (SoD)
+Context: KYC/KYB administration edits customer PII and merchant/owner data, which crosses into the
+`customers`/`merchants` data resources. Decision: Administration is gated by the DATA resource
+(`customers`/`merchants`), Configuration by `modules`. `operations_officer` gains
+`customers:[view,manage]` + `merchants:[view,manage]`. The KYB DECISION (approve/reject/suspend) stays
+with `merchant_officer`; the Operations Officer does DATA CORRECTION only. Both emit the same compliance
+events; the split is procedural and recorded in the audit `actorPartyReference`. Rationale: avoids a
+"modules can edit any business data" bypass (itself an SoD anti-pattern) and keeps a single permission
+model. The Administration PATCH endpoints reject any status/verdict write (400), preserving decision vs
+correction separation (PCI Req 7).
+
+### ADR-045: Onboarding decision mode is a built-in-module policy, not a provider signal
+Context: whether onboarding auto-resolves or needs a human is a PSP policy, not the vendor. Decision:
+`decisionMode` (manual/automated/assisted) + thresholds live in `capabilityModuleConfiguration.moduleConfig`
+per capability, edited from the Configuration tab. The provider returns evidence; the PSP decides how it
+resolves. Unset defaults to manual (fail-safe). Hard guardrail: sanctions/PEP hit never auto-approves;
+`assisted` keeps a human confirmer (EU AI Act / GDPR Art. 22 HITL); every automated/assisted decision is
+logged with the rule/recommendation and the confirming actor. If externalized, the decision engine is
+reached only via `dispatchProvider`.
+
+### ADR-046: KYB onboarding orchestration (events only) and the zero-orphan stateless engine
+Context: KYB had no bus chain (manual only). Decision: mirror the KYC pattern with an events-only fan-out:
+`merchant.validation.requested` bridges to kyb+hrp+aml (entity) and per-owner kyc (owner layer); a
+`KybVerificationSaga` (scatter-gather keyed by `correlationId`) composes the two-layer verdict, persists
+it, and resolves per `decisionMode`. Every provider is reached only via `dispatchProvider`, so replacing
+the built-in engine with an external subsystem needs zero reactor changes (set
+`externalProviderApiEndpoint` on the arrangement; async vendor responses arrive via the existing callback
+handlers). The built-in KYC/KYB engines own no collections (stateless ports; only durable state is the
+`capabilityModuleConfiguration` row) — the zero-orphan property (see technical-spec section 10). This
+lineage extends ADR-011 (Internal-First) and ADR-025 (endpoint-first dispatch).
+
+### ADR-047: One deterministic verdict-to-status mapper per process
+Context: `applyKycScreeningVerdict` wrote the verdict but never advanced the BQ:Step status; the status
+was set only by the seeder or the external callback (uncoordinated paths, potential drift). Decision:
+introduce shared pure mappers `deriveKycCheckStatus`/`deriveKybCheckStatus`
+(`shared/models/onboardingDecision.ts`) called by BOTH the internal saga path and the external callback
+path, so status is always derived from the verdict the same way. `applyKycScreeningVerdict` and the new
+`applyKybScreeningVerdict` set verdict + BQ:Step status in the same atomic single-document update.
+Idempotent (deterministic). Only BIAN BQ:Step vocabulary (initiated/verified/rejected/expired); no
+`passed`/`failed`/`pending` as a lifecycle status (ADR-009).
+
+*Added 2026-07-24 (v31; doc + code together per repo rules). Version 2.5.0.*

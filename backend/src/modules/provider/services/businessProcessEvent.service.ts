@@ -85,6 +85,12 @@ const CANONICAL_LEDGER_EVENTS: Record<string, { processType: BusinessProcessType
   'aml.monitoring.completed':             { processType: 'aml_screening',      entityType: 'transaction', bian: { serviceDomain: 'SD-99 AML', controlRecord: 'SuspiciousActivityAnalysisAssessment' } },
   'p2p.transfer.completed':               { processType: 'payment_processing', entityType: 'transaction', bian: { serviceDomain: 'Payment Execution', controlRecord: 'PaymentExecutionProcedure' } },
   'vop.verification.completed':           { processType: 'aml_screening',      entityType: 'payment_request', bian: { serviceDomain: 'SD-13 Party Data Management', controlRecord: 'PartyReferenceDataDirectoryEntry' } },
+  // v31 KYB onboarding chain (§5bis): entity-level screening milestones, keyed by merchantAgreementRef
+  // (correlationId). processType tags them under aml_screening for the ledger; the processAction (event
+  // name) is the real label. entityType 'merchant' so they surface in the merchant KYB process timeline.
+  'kyb.screening.completed':              { processType: 'sanctions_check',    entityType: 'merchant', bian: { serviceDomain: 'SD-89 Merchant Relations', controlRecord: 'MerchantAgreementProcedure' } },
+  'aml.screening.completed':              { processType: 'aml_screening',      entityType: 'merchant', bian: { serviceDomain: 'SD-99 AML', controlRecord: 'SuspiciousActivityAnalysisAssessment' } },
+  'kyb.verification.completed':           { processType: 'sanctions_check',    entityType: 'merchant', bian: { serviceDomain: 'SD-89 Merchant Relations', controlRecord: 'MerchantAgreementProcedure' } },
 };
 
 // §5.0 / §9.2: the durable audit ledger is a PROJECTION written by this single bus subscriber from the

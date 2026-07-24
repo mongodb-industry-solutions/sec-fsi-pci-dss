@@ -11,6 +11,7 @@
 
 import { FastifyInstance } from 'fastify';
 import { merchantController }             from './controllers/merchant.controller';
+import { merchantKybController }          from './controllers/merchantKyb.controller';
 import { paymentController }              from './controllers/payment.controller';
 import { tokenController }                from './controllers/token.controller';
 import { checkoutController }             from './controllers/checkout.controller';
@@ -26,6 +27,9 @@ import { config }                         from '../../config';
 export async function gatewayModule(fastify: FastifyInstance) {
   // SD-89: Merchant Relations  -  top-level resource
   await fastify.register(merchantController, { prefix: '/merchants' });
+  // SD-89 v31: KYB administration surface (KYB data correction + beneficial owners + process timeline).
+  // Same /merchants prefix (one merchant surface, no forked API). requirePermission-gated per route.
+  await fastify.register(merchantKybController, { prefix: '/merchants' });
 
   // SD-64 + SD-65: Payment Order + Execution  -  namespaced under /gateway/
   await fastify.register(paymentController,  { prefix: '/gateway/payments' });

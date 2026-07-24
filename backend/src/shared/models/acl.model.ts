@@ -129,9 +129,15 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
     },
   },
   {
+    // KYB DECISION authority (SD-89). v31 SoD split: merchant_officer owns the KYB *decision*
+    // (review → approve/reject/suspend via the merchant/review flow, the Control action). This is
+    // distinct from operations_officer, who owns KYB *data correction* (fields + beneficial owners)
+    // on already-registered merchants. Both share the `merchants` resource and emit the same
+    // compliance events; the boundary is procedural (decision vs correction) and recorded in the
+    // audit actorPartyReference. Verdict override stays here, never on the Administration surface.
     roleName: 'merchant_officer',
     roleLabel: 'Merchant Officer',
-    roleDescription: 'Merchant acquiring: review/approve merchants and manage their configuration (KYB decisions).',
+    roleDescription: 'Merchant acquiring: KYB decision authority (review → approve/reject/suspend) and merchant configuration. Decision path, distinct from operations_officer data correction (SoD, PCI Req 7).',
     roleScope: 'all',
     roleIsBuiltin: true,
     bianServiceDomain: 'Merchant Relations',
@@ -150,7 +156,7 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
     // distinct from `manager` (SD-193, no CHD) and from `customer` (scope own, self-service).
     roleName: 'operations_officer',
     roleLabel: 'Operations Officer',
-    roleDescription: 'Card & payout-account operations (SD-88 / SD-66): global administration of cardholder cards and payout accounts via the built-in modules. No provider/module platform admin (SoD).',
+    roleDescription: 'Operations: administers cardholder cards (SD-88) and payout accounts (SD-66) via the built-in modules, plus KYC (SD-53) and KYB (SD-89) data administration (review/correct records and beneficial owners). KYB decision (approve/reject) stays with merchant_officer (SoD, PCI Req 7).',
     roleScope: 'all',
     roleIsBuiltin: true,
     bianServiceDomain: 'Payment Card / Payout Account Arrangement',
@@ -158,6 +164,18 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
     rolePermissions: {
       cards: ['view', 'manage'],
       accounts: ['view', 'manage'],
+      // v31: KYC/KYB DATA ADMINISTRATION (review + correction of KYC/KYB records and beneficial
+      // owners). Administration is gated by the DATA resource (customers / merchants), NOT by
+      // `modules`, so it stays SoD-clean: no "modules can edit any business data" bypass.
+      //   customers → SD-53 KYC record review/correction (occupation, source of funds, gov ID,
+      //     address, purpose). `viewSensitive` NOT granted here: decrypted CHD-adjacent identity
+      //     fields still require the L2 escalation token, exactly like the investigator path.
+      //   merchants → SD-89 KYB data correction + beneficial-owner (UBO) administration on
+      //     already-registered merchants. This is the *correction* half of the v31 SoD split;
+      //     the KYB *decision* (approve/reject/suspend) stays with `merchant_officer`. Both emit
+      //     the same compliance events; neither replaces the other (PCI Req 7).
+      customers: ['view', 'manage'],
+      merchants: ['view', 'manage'],
       // v29.1: administer the INTERNAL capability modules (engine config / policies of fds, aml, hrp,
       // kyc, kyb, credit-bureau, card-authorization, card-issuer, account-information, payment-initiation,
       // vop). Auth (SD-16) stays with `manager` because it is the separate `authDomains` resource, not

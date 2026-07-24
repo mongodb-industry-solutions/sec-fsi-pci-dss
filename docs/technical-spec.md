@@ -4260,3 +4260,103 @@ Reveal gate decision (F0): `cards:manage` + mandatory audit, no new `viewSensiti
   encrypted fields change.
 
 *Added 2026-07-22 (v30). Version 2.4.0.*
+
+---
+
+## §6.13 KYC & KYB Administration API (v31, SD-53 / SD-89)
+
+All under `/api/v1`. KYC administration is owned by the **customer** module (prefix `/customer`),
+KYB by the **gateway** module (prefix `/merchants`). The provider (`providers/kyc|kyb`) keeps only
+`/score`, `/screen`, `/config`. Administration operates on the domain control records, never on the
+provider, so the built-in engine stays swappable.
+
+### Model change: `MerchantBeneficialOwner` (SD-89 + SD-13, FATF/4th AMLD)
+Bounded embed on `MerchantAgreementControlRecord.merchantBeneficialOwners: MerchantBeneficialOwner[]`
+(cap `MERCHANT_BENEFICIAL_OWNERS_MAX = 25`). Fields: `merchantBeneficialOwnerPartyReference` (FK to party),
+`merchantBeneficialOwnerRole` (`ultimate_beneficial_owner|director|shareholder|authorized_signatory`),
+`merchantBeneficialOwnerOwnershipPercentage` (0..100, 2 dp), `merchantBeneficialOwnerIsPrimary` (exactly
+one true), `merchantBeneficialOwnerIsControllingPerson` (FATF greater-than 25% or board), `AddedDateTime`,
+`AddedByPartyReference?`. Invariants enforced in `merchantBeneficialOwner.ts` (length at least 1, one
+primary, sum at most 100, primary equals derived scalar `merchantOwnerPartyReference`). Owner PII lives in
+`party` (QE tiers), never duplicated in the embed (GDPR Art. 5). The `merchantAgreementProcedure` QE map
+is unchanged (merchant is plaintext).
+
+### Structured KYB verdict (entity layer): new `MerchantAgreementKybCheck` fields
+`merchantAgreementKybCheckBusinessRiskLevel` (`low|medium|high`), `SanctionsResult`/`AdverseMediaResult`
+(`clear|hit|pending`), `ScreeningProviderRef`. Result vocabularies (ADR-009), plaintext, no CHD/QE.
+Owner-layer risk is composed by reference from each UBO `customerAgreementKycCheck` (no duplication).
+
+### Decision mode (built-in module config, section 4.0)
+New `capabilityModuleConfiguration.moduleConfig` fields for kyc and kyb: `decisionMode`
+(`manual|automated|assisted`, unset defaults to manual fail-safe), `decisionAutoApproveMaxRisk` (`low`),
+`decisionAutoRejectOn`, `decisionEscalateToManualOn`. The provider never sets the mode. Seeded:
+KYC=`automated`, KYB=`manual`. Hard guardrail: a sanctions/PEP hit never auto-approves.
+
+### KYC Administration (customer module)
+| Method | Route | Permission | Notes |
+|---|---|---|---|
+| GET | `/customer/kyc?status=&segment=&riskRating=&page=&limit=` | `customers:view` | Paged list of KYC-completed parties. L1 masked. Index-backed. |
+| GET | `/customer/:partyInstanceReference/kyc` | `customers:view` (+`viewSensitive` for L2) | Full detail; sensitive fields masked unless escalation token. |
+| PATCH | `/customer/:partyInstanceReference/kyc` | `customers:manage` | Edit occupation/source-of-funds/purpose/govID/address. `amendmentReason` required. Rejects status writes (400). Emits `kyc.record.amended`. |
+| POST | `/customer/:partyInstanceReference/kyc/re-screen` | `customers:manage` | Publishes `kyc.screening.requested` on the bus (swappable). |
+| GET | `/customer/:partyInstanceReference/kyc/process` | `customers:view` | Correlated timeline (`listAuditEvents({ref})`). |
+
+### KYB Administration (gateway module)
+| Method | Route | Permission | Notes |
+|---|---|---|---|
+| GET | `/merchants/:id/kyb` | `merchants:view` | KYB detail: entity verdict + owners (party summaries) + owner-layer risk. |
+| PATCH | `/merchants/:id/kyb` | `merchants:manage` | Edit legal entity/MCC/name/country/notes. `amendmentReason` required. Rejects status writes (400). Emits `kyb.record.amended`. |
+| GET | `/merchants/:id/kyb/owners` | `merchants:view` (owner-scoped for customers) | Shareholder list. |
+| POST | `/merchants/:id/kyb/owners` | `merchants:manage` | Add owner; invariants enforced. `kyb.owner.added`. |
+| PATCH | `/merchants/:id/kyb/owners/:partyRef` | `merchants:manage` | Edit role/pct/primary; primary reassignment atomic. `kyb.owner.amended`/`primary.reassigned`. |
+| DELETE | `/merchants/:id/kyb/owners/:partyRef` | `merchants:manage` | Remove; blocked if last or primary. `kyb.owner.removed`. |
+| GET | `/merchants/:id/kyb/process` | `merchants:view` | Correlated timeline. |
+
+### KYB onboarding event chain (section 5bis, events only)
+`createMerchant` publishes `merchant.validation.requested` on the bus. `ProviderGroups.onMerchantValidated`
+fans out `kyb.screening.requested` + `hrp.screening.requested` + `aml.screening.requested` (entity) and
+one `kyc.screening.requested` per beneficial owner (owner layer). `KybVerificationSaga` (keyed by
+`correlationId = merchantAgreementInstanceReference`) collects the entity completions, composes the
+verdict + owner-layer risk, calls `applyKybScreeningVerdict` (sets verdict + BQ:Step status atomically
+via the shared `deriveKybCheckStatus` mapper), then resolves the agreement per `decisionMode`
+(`resolveKybOnboarding`). Every provider is reached only via `dispatchProvider` (swappable, zero reactor
+change to externalize). New event contracts in `onboarding.events.ts`; new canonical ledger milestones
+`kyb.screening.completed`/`aml.screening.completed`/`kyb.verification.completed`.
+
+### Status-coherence fix (section 3.7)
+`applyKycScreeningVerdict` and `applyKybScreeningVerdict` now set the BQ:Step status in the same atomic
+update as the verdict, via the shared pure mappers `deriveKycCheckStatus`/`deriveKybCheckStatus`
+(`shared/models/onboardingDecision.ts`), so the internal saga path and the external callback path yield
+identical status for the same verdict.
+
+### Indexes (createIndexes.ts)
+- `merchantAgreementProcedure`: `{ merchantAgreementStatus:1, merchantRiskCategory:1, recordUpdatedDateTime:-1 }`
+  (KYB admin list, ESR) and `{ 'merchantBeneficialOwners.merchantBeneficialOwnerPartyReference':1 }` (multikey owner scoping).
+- `customerAgreementProcedure`: `{ 'customerAgreementKycCheck.customerAgreementKycCheckStatus':1, recordUpdatedDateTime:-1 }`
+  (KYC admin list, ESR; segment is a residual filter so the sort stays index-served whether or not segment is supplied).
+All verified with `explain()`: IXSCAN, no COLLSCAN, no blocking SORT.
+
+---
+
+## §10 Module vs Collection Ownership and Access (v31)
+
+Answers the lifecycle questions (switch engine to external / extract module / detect orphans). The
+built-in KYC/KYB engines own NO collections (stateless verification ports; only durable state is the
+`capabilityModuleConfiguration` row), the "zero-orphan" property of the internal-first pattern.
+
+| Module | Owns (RW) | Reads (RO) | Core-data touch (PCI/GDPR) |
+|---|---|---|---|
+| `customer` (SD-53 KYC) | `customerAgreementProcedure` | `party`, `complianceProcessEvent` | YES: QE identity fields (govID, address, source of funds); L1/L2 tiers |
+| `gateway` (SD-89 KYB) | `merchantAgreementProcedure`, `merchantAgreementEvents` | `party`, `payoutAccountArrangement`, `customerAgreementProcedure` (owner KYC compose), `complianceProcessEvent` | Merchant/UBO PII via `party` refs; legal-entity data (GDPR, not PCI CHD) |
+| `identity` (SD-13) | `party` | - | YES: PII owner surface (QE tiers) |
+| `provider` (SD-193) | `externalProviderArrangement`, `capabilityModuleConfiguration`, `businessProcessEvent`, `complianceProcessEvent`, `externalProviderArrangementActionLog` | capability registry (code) | NO CHD (SoD: manager) |
+| `providers/kyc` (`kyc_identity`) | none (stateless; config in `capabilityModuleConfiguration`) | payload passed by port | NO persistence |
+| `providers/kyb` (`kyb_business`) | none (stateless; config in `capabilityModuleConfiguration`) | payload passed by port | NO persistence |
+
+- Q1 (switch internal to external engine): only the module `capabilityModuleConfiguration` row is
+  superseded by the `externalProviderArrangement` record; control records + party + audit stay in use, nothing orphaned.
+- Q2 (extract module to microservice): stateless engines own no collections, a code-only move; the
+  microservice calls back through the port. For kyc/kyb the re-home set is empty (clean extraction).
+- Q3 (detect orphans): a collection is a decommission candidate iff no module lists it under Owns/Reads.
+
+*Added 2026-07-24 (v31). Version 2.5.0.*

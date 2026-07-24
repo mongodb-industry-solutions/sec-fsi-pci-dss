@@ -89,28 +89,30 @@ export const ROLE_GUIDE: Record<string, RoleGuide> = {
   },
   merchant_officer: {
     icon: CheckSquare,
-    tagline: 'Merchant onboarding and KYB review across the merchant portfolio.',
+    tagline: 'Merchant onboarding and KYB decision authority across the merchant portfolio.',
     responsibilities: [
       'Work the merchant onboarding review queue.',
-      'Perform KYB checks and approve or reject merchant agreements.',
+      'Perform KYB checks and approve/reject/suspend merchant agreements (the KYB decision).',
       'Maintain the merchant registry and document review decisions.',
     ],
     dataAccess: [
-      'Merchant agreements, KYB data, and the full merchant portfolio.',
+      'Merchant agreements, KYB data, beneficial owners, and the full merchant portfolio.',
       'No cardholder PAN; the merchant lifecycle does not require it.',
     ],
     restrictions: [
       'No fraud case or audit log access; no access to cardholder data.',
+      'KYB decision (approve/reject) authority; data correction of KYB records/owners is shared with the Operations Officer, who cannot make the decision (SoD, PCI Req 7).',
     ],
     pci: ['Req 7', 'Req 12'],
   },
   operations_officer: {
     icon: Wallet,
-    tagline: 'Global operations: administer customer cards (SD-88) and payout accounts (SD-66) through the built-in modules.',
+    tagline: 'Operations: administer customer cards (SD-88), payout accounts (SD-66) and KYC/KYB records via the built-in modules.',
     responsibilities: [
       'Administer the global card inventory: register, edit, activate/suspend, and revoke customer cards via the built-in card-issuer module.',
       'Administer payout accounts: create, edit, and close party payout accounts via the built-in account-information module.',
-      'Keep the card and account registries accurate for downstream payment and payout operations.',
+      'KYC/KYB data administration: review and correct KYC records (SD-53) and KYB records + beneficial owners (SD-89). Data correction only, NOT the KYB approve/reject decision (that stays with the Merchant Officer, SoD).',
+      'Keep the card, account, KYC and KYB registries accurate for downstream operations.',
     ],
     dataAccess: [
       'Display-safe card listing (surrogate token, masked PAN, network, status) and per-card detail with expiry (need-to-know only).',

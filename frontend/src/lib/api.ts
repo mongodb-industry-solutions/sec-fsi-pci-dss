@@ -916,6 +916,20 @@ export const api = {
         },
         token,
       ),
+    // v31 KYC administration (SD-53). Backend enforces customers:view / customers:manage; sensitive
+    // fields decrypt only with a valid escalation token (viewSensitive).
+    kycList: (filters: { status?: string; segment?: string; riskRating?: string; page?: number; limit?: number }, token: string) => {
+      const qs = new URLSearchParams(Object.entries(filters).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString();
+      return apiFetch<{ results: Record<string, unknown>[]; total: number; page: number; limit: number }>(`/api/v1/customer/kyc${qs ? `?${qs}` : ''}`, {}, token);
+    },
+    kycDetail: (partyRef: string, token: string, escalationToken?: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/customer/${encodeURIComponent(partyRef)}/kyc`, escalationToken ? { headers: { 'X-Escalation-Token': escalationToken } } : {}, token),
+    kycPatch: (partyRef: string, patch: Record<string, unknown>, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/customer/${encodeURIComponent(partyRef)}/kyc`, { method: 'PATCH', body: JSON.stringify(patch) }, token),
+    kycRescreen: (partyRef: string, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/customer/${encodeURIComponent(partyRef)}/kyc/re-screen`, { method: 'POST' }, token),
+    kycProcess: (partyRef: string, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/customer/${encodeURIComponent(partyRef)}/kyc/process`, {}, token),
     getByEmail: (email: string, token: string) =>
       apiFetch<Record<string, unknown>>(
         `/api/v1/customer?email=${encodeURIComponent(email)}`, {}, token
@@ -1236,6 +1250,21 @@ export const api = {
     },
     getById: (id: string, token: string) =>
       apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}`, {}, token),
+    // v31 KYB administration (SD-89). Backend enforces merchants:view / merchants:manage.
+    kybDetail: (id: string, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}/kyb`, {}, token),
+    kybPatch: (id: string, patch: Record<string, unknown>, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}/kyb`, { method: 'PATCH', body: JSON.stringify(patch) }, token),
+    kybProcess: (id: string, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}/kyb/process`, {}, token),
+    kybOwners: (id: string, token: string) =>
+      apiFetch<{ owners: Record<string, unknown>[]; primaryOwnerPartyReference?: string }>(`/api/v1/merchants/${id}/kyb/owners`, {}, token),
+    kybOwnerAdd: (id: string, body: Record<string, unknown>, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}/kyb/owners`, { method: 'POST', body: JSON.stringify(body) }, token),
+    kybOwnerUpdate: (id: string, partyRef: string, body: Record<string, unknown>, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}/kyb/owners/${encodeURIComponent(partyRef)}`, { method: 'PATCH', body: JSON.stringify(body) }, token),
+    kybOwnerRemove: (id: string, partyRef: string, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}/kyb/owners/${encodeURIComponent(partyRef)}`, { method: 'DELETE' }, token),
     // Partial update of merchant configuration (PATCH /:id). Owner may self-serve
     // operational fields; risk-governed fields require PSP staff.
     update: (

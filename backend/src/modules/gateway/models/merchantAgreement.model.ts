@@ -54,6 +54,33 @@ export interface MerchantWebhookConfig {
   webhookLastDeliveryError?: string;
 }
 
+// v31 (SD-89 + SD-13): beneficial owner / shareholder / controlling person. FATF / 4th AMLD (UBO).
+// Owners are Party (SD-13) roles referenced from the Merchant Agreement (SD-89), consistent with the
+// existing D-21 dual-role Party pattern. PII (name/DOB/address/govID) is NOT duplicated here: it lives
+// in the referenced `party` record (QE-tiered, GDPR Art. 5 minimization). This embed carries only the
+// FK + role + numeric ownership/control metadata. Bounded set (regulatory reporting caps it) → safe to
+// embed (subset pattern), NOT an unbounded array. Reverse lookup "which merchants does this party own"
+// is a multikey index match on merchantBeneficialOwnerPartyReference.
+export type MerchantBeneficialOwnerRole =
+  | 'ultimate_beneficial_owner'
+  | 'director'
+  | 'shareholder'
+  | 'authorized_signatory';
+
+export interface MerchantBeneficialOwner {
+  merchantBeneficialOwnerPartyReference: string;        // FK → party.partyInstanceReference (SD-13)
+  merchantBeneficialOwnerRole: MerchantBeneficialOwnerRole;
+  merchantBeneficialOwnerOwnershipPercentage: number;   // REQUIRED numeric participation, 0..100 (2 dp)
+  merchantBeneficialOwnerIsPrimary: boolean;            // exactly one true = default/controlling owner
+  merchantBeneficialOwnerIsControllingPerson: boolean;  // FATF control test (>25% or board control)
+  merchantBeneficialOwnerAddedDateTime: Date;
+  merchantBeneficialOwnerAddedByPartyReference?: string; // FK → party (officer who added)
+}
+
+// Hard cap: store only REPORTABLE beneficial owners (> threshold) + controllers, never the full cap
+// table. Keeps the document far below 16 MB and the array bounded (anti-pattern guard, plan §10.2).
+export const MERCHANT_BENEFICIAL_OWNERS_MAX = 25;
+
 export interface MerchantAgreementControlRecord {
   // Identifiers
   merchantAgreementInstanceReference: string;       // UUID, primary key
@@ -65,7 +92,14 @@ export interface MerchantAgreementControlRecord {
   merchantTier: 'standard' | 'enterprise';
 
   // D-21: Party owner link — BIAN-canonical cross-domain reference via SD-13 Party.
+  // v31: kept and maintained as a DERIVED pointer to the primary/controlling owner (back-compat:
+  // existing N:1 reverse-lookups, payout fallback, notification routing). Always equals the party ref
+  // of the merchantBeneficialOwners element whose merchantBeneficialOwnerIsPrimary === true.
   merchantOwnerPartyReference?: string;             // FK → party.partyInstanceReference (SD-13)
+
+  // v31 (SD-89 + SD-13, FATF/4th AMLD): beneficial owners / shareholders. 1..N; invariant: exactly one
+  // isPrimary (= merchantOwnerPartyReference). Bounded embed (subset pattern). See MerchantBeneficialOwner.
+  merchantBeneficialOwners?: MerchantBeneficialOwner[];
 
   // v17: Default settlement account (SD-66). Used as payout destination for merchant settlements.
   // Resolution order: merchantDefaultPayoutAccountReference → owner's default payoutAccount → exception
@@ -124,12 +158,26 @@ export type MerchantAgreementStatus =
 // BQ:Step — KYB business verification (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
 export type KybCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
 
+// v31: result vocabularies (NOT lifecycle statuses — ADR-009). Reused verbatim from the provider/HRP
+// layer so internal and external screening speak the same language.
+export type KybBusinessRiskLevel = 'low' | 'medium' | 'high';
+export type KybScreeningResult = 'clear' | 'hit' | 'pending';
+
 export interface MerchantAgreementKybCheck {
   merchantAgreementKybCheckStatus: KybCheckStatus;
   merchantAgreementKybCheckCompletedDate?: Date;
   merchantAgreementKybCheckReference?: string;       // trade register / AML screening reference
   merchantAgreementKybCheckNotes?: string;
   merchantAgreementKybCheckPerformedByPartyReference?: string;  // FK → party (reviewing officer)
+
+  // v31 structured ENTITY-layer verdict (SD-89 BQ:Step, plaintext, no CHD/QE). Mirrors the KYC v27
+  // verdict so KYB administration can review structured data (AML defensibility). Produced by the KYB
+  // screening chain (§5bis) via applyKybScreeningVerdict, never by manual entry. The OWNER-layer risk
+  // is composed by reference from each UBO's customerAgreementKycCheck (no duplication onto the merchant).
+  merchantAgreementKybCheckBusinessRiskLevel?: KybBusinessRiskLevel;
+  merchantAgreementKybCheckSanctionsResult?: KybScreeningResult;
+  merchantAgreementKybCheckAdverseMediaResult?: KybScreeningResult;
+  merchantAgreementKybCheckScreeningProviderRef?: string;
 }
 
 export type MerchantRiskCategory = 'low' | 'medium' | 'high';

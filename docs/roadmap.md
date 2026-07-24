@@ -885,3 +885,43 @@ self-service routes, gated to the internal provider and fully audited (PCI DSS R
 - [ ] Frontend admin views under `/system/admin/modules/{card-issuer,account-information}` (F5) tracked in `tmp/dev.v29.plan.md`.
 
 *Added 2026-07-22 (v29).*
+
+---
+
+## v31: KYC & KYB Built-in Module Administration (Operations Officer)
+
+Give the Operations Officer a production-grade administration surface for the two identity/onboarding
+built-in modules, KYC (SD-53, customers) and KYB (SD-89, merchants), each split into Configuration
+(built-in engine policy incl. decisionMode) and Administration (review workbench). Starting a KYC/KYB
+process fans out to providers purely via the event bus; each process is tracked by one `correlationId`.
+
+### Functional requirements
+
+| FR | Requirement | Acceptance criteria |
+|---|---|---|
+| FR-31.1 | RBAC extension (SoD) | `operations_officer` gains `customers:[view,manage]` + `merchants:[view,manage]`. Administration gated by data resource; Configuration by `modules:manage`. `merchant_officer` keeps the KYB decision. Backend rejects unpermitted callers even with the UI bypassed. |
+| FR-31.2 | Beneficial owners (SD-89 + SD-13) | Merchant has 1..N owners with numeric participation; exactly one primary (= scalar pointer); sum at most 100; bounded embed (cap 25); every shareholder sees the merchant. Invariants unit-tested. |
+| FR-31.3 | KYB administration | List/detail/patch KYB data + owners CRUD, all index-backed, all mutations emit compliance events; PATCH rejects status writes (400). |
+| FR-31.4 | KYC administration | List (L1 masked)/detail (L2 with escalation)/patch/re-screen/process endpoints; PATCH rejects status writes; emits `kyc.record.amended`. |
+| FR-31.5 | KYB event orchestration | `merchant.validation.requested` fans out kyb+hrp+aml (entity) + per-owner kyc; `KybVerificationSaga` aggregates, persists the structured verdict, resolves per `decisionMode`. Events only (no service-to-service). |
+| FR-31.6 | Decision mode (section 4.0) | `decisionMode` per module; automated auto-resolves within thresholds; assisted recommends (HITL); manual = officer decides; unset defaults to manual. Sanctions/PEP never auto-approve. |
+| FR-31.7 | Status coherence (section 3.7) | Verdict and BQ:Step status set atomically via a shared mapper; internal and external paths identical. |
+| FR-31.8 | Process traceability | `GET /{merchants|customer}/:id/{kyb|kyc}/process` returns the correlated timeline (bus milestones + provider wire calls). |
+
+### Non-functional
+- NFR-31.1 No regressions: full existing suite green; current flows unchanged.
+- NFR-31.2 No MongoDB anti-patterns: bounded embed, multikey owner index, ESR list indexes, explain() shows IXSCAN, no COLLSCAN, no blocking SORT.
+- NFR-31.3 Standards: BIAN SD-13/53/89/193, PCI Req 7/8/10/12.8, GDPR Art. 5/30/32, EU AI Act HITL for assisted.
+- NFR-31.4 All schema/data changes via setup + seed; technical-spec updated in the same change.
+
+### Definition of Done
+- [x] RBAC extended in `acl.model.ts` + `role.json` + role guide, with inline SoD rationale.
+- [x] `MerchantBeneficialOwner` model + invariants + unit tests; seed cap tables (2-owner 60/40, 3-owner 50/30/20, free-float 80/15); decisionMode seeded.
+- [x] Multikey + ESR list indexes; explain() verified (IXSCAN, no SORT).
+- [x] KYB + KYC administration endpoints + owners CRUD + process timelines.
+- [x] KYB saga + reactors + decisionMode resolution + status mappers; events-only fan-out.
+- [x] Frontend two-tab KYC/KYB pages, deep-linkable detail routes, owners panel, tooltips, responsive.
+- [x] technical-spec section 6.13 + section 10 matrix; roadmap; ADRs; CLAUDE.md matrix obligation.
+- [x] Version bump to 2.5.0 across all four package.json.
+
+*Added 2026-07-24 (v31). Version 2.5.0.*

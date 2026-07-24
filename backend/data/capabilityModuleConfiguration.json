@@ -81,7 +81,7 @@
     "capability": "kyc",
     "moduleDomain": "customer",
     "capabilityModuleStatus": "active",
-    "moduleConfig": { "defaultLevel": "basic", "reVerificationDays": 365, "consentRequired": true },
+    "moduleConfig": { "defaultLevel": "basic", "reVerificationDays": 365, "consentRequired": true, "decisionMode": "automated", "decisionAutoApproveMaxRisk": "low", "decisionAutoRejectOn": ["sanctions_hit", "kyc_failed"], "decisionEscalateToManualOn": ["pep_hit", "adverse_media_hit"] },
     "moduleCallbackEndpoints": [
       { "event": "kyc.verified", "path": "/api/v1/providers/callback/kyc/int-internal-kyc-001" }
     ],
@@ -96,7 +96,7 @@
     "capability": "kyb",
     "moduleDomain": "gateway",
     "capabilityModuleStatus": "active",
-    "moduleConfig": { "dueDiligenceLevel": "standard", "uboDisclosureThreshold": 25, "pepScreeningIncluded": true },
+    "moduleConfig": { "dueDiligenceLevel": "standard", "uboDisclosureThreshold": 25, "pepScreeningIncluded": true, "decisionMode": "manual", "decisionAutoApproveMaxRisk": "low", "decisionAutoRejectOn": ["sanctions_hit", "kyb_failed"], "decisionEscalateToManualOn": ["pep_hit", "adverse_media_hit"] },
     "moduleCallbackEndpoints": [
       { "event": "kyb.verified", "path": "/api/v1/providers/callback/kyb/int-internal-kyb-001" }
     ],

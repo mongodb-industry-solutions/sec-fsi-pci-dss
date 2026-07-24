@@ -144,6 +144,12 @@ export async function createIndexes(client: MongoClient) {
     { key: { partyInstanceReference: 1 } },
     { key: { customerAgreementStatus: 1 } },
     { key: { 'customerAgreementKycCheck.customerAgreementKycCheckStatus': 1 } },
+    // v31: KYC admin-list ESR index. The default list filters on kycCheckStatus and sorts by
+    // recordUpdatedDateTime, so the sort key must immediately follow the equality prefix (ESR) to sort
+    // FROM the index with no blocking SORT. customerSegment is an OPTIONAL, low-selectivity filter and
+    // is applied as a residual predicate (kept out of the index so the sort stays index-served whether
+    // or not segment is supplied). Verified via explain(): IXSCAN, no SORT stage. Leaves are plaintext.
+    { key: { 'customerAgreementKycCheck.customerAgreementKycCheckStatus': 1, recordUpdatedDateTime: -1 } },
   ]);
 
   // SD-88: Payment Card Management (the per-customer card-on-file arrangement).
@@ -276,6 +282,12 @@ export async function createIndexes(client: MongoClient) {
     { key: { merchantAgreementStatus: 1 } },
     { key: { merchantCategoryCode: 1 } },
     { key: { merchantOwnerPartyReference: 1 } },
+    // v31: KYB admin-list ESR compound (Equality: merchantAgreementStatus, merchantRiskCategory;
+    // Sort: recordUpdatedDateTime desc). Sorts from the index, no blocking SORT.
+    { key: { merchantAgreementStatus: 1, merchantRiskCategory: 1, recordUpdatedDateTime: -1 } },
+    // v31: multikey reverse lookup "which merchants does this party own" (beneficial-owner scoping).
+    // Bounded multikey (owners array is capped) → safe; equality predicate, IXSCAN, no COLLSCAN.
+    { key: { 'merchantBeneficialOwners.merchantBeneficialOwnerPartyReference': 1 } },
   ]);
 
   // SD-89: Merchant lifecycle audit trail (append-only, PCI DSS Req 10)

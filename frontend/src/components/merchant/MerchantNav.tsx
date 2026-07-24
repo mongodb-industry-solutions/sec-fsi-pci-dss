@@ -22,6 +22,7 @@ function buildItems(merchantId: string): NavItem[] {
     { href: `${base}/events`,    label: 'Events',           icon: Activity },
     { href: `${base}/activity`,  label: 'Activity',         icon: ListChecks },
     { href: `${base}/authorizations`, label: 'Authorizations', icon: Users },
+    { href: `${base}/owners`,    label: 'Owners',           icon: Users }, // v31: beneficial owners / shareholders
     { href: `${base}/settings`,  label: 'Settings',         icon: Settings },
   ];
 }

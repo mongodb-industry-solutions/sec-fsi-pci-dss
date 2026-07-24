@@ -14,6 +14,7 @@ import {
   MerchantApiKeyRecord,
 } from '../models/merchantAgreement.model';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
+import { getEventBus, makeEvent } from '../../../vendors/eventbus';
 import { deliverWebhook } from './webhook.service';
 import { createNotification } from '../../notification/notifications.service';
 
@@ -47,7 +48,15 @@ export async function getMerchants(
   if (filters.mcc) query.merchantCategoryCode = filters.mcc;
   if (filters.name) query.merchantName = { $regex: filters.name, $options: 'i' };
   if (filters.risk) query.merchantRiskCategory = filters.risk;
-  if (filters.ownerPartyRef) query.merchantOwnerPartyReference = filters.ownerPartyRef;
+  // v31 (§3.2b): scope to EVERY shareholder, not just the primary. Match the multikey owner array
+  // (index-backed) OR the legacy scalar pointer during the transition so pre-migration data resolves.
+  // After a reseed back-fills the array for all merchants, the scalar clause is redundant.
+  if (filters.ownerPartyRef) {
+    query.$or = [
+      { merchantOwnerPartyReference: filters.ownerPartyRef },
+      { 'merchantBeneficialOwners.merchantBeneficialOwnerPartyReference': filters.ownerPartyRef },
+    ];
+  }
 
   const page = Math.max(1, filters.page ?? 1);
   const limit = Math.min(100, Math.max(1, filters.limit ?? 20));
@@ -92,11 +101,19 @@ export async function getMerchantPicker(
   return { results, total };
 }
 
+// v31: resolves a merchant the party owns (primary OR any beneficial owner). Returns the FIRST match
+// (a party may, in principle, own several merchants; getMerchants is authoritative for full listing).
+// Used by the /me self-service path so minority shareholders also see their merchant.
 export async function getMerchantByOwnerPartyRef(db: Db, partyRef: string) {
   const merchant = await db
     .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
     .findOne(
-      { merchantOwnerPartyReference: partyRef } as Partial<MerchantAgreementControlRecord>,
+      {
+        $or: [
+          { merchantOwnerPartyReference: partyRef },
+          { 'merchantBeneficialOwners.merchantBeneficialOwnerPartyReference': partyRef },
+        ],
+      } as never,
       { projection: { merchantApiKeys: 0, merchantWebhookSecret: 0 } }
     );
   return merchant ?? null;
@@ -225,6 +242,17 @@ export async function createMerchant(db: Db, input: CreateMerchantInput) {
     bianServiceDomain: 'Merchant Relations',
     bianControlRecordType: 'MerchantAgreementProcedure',
   });
+
+  // v31 §5bis: fan out the KYB onboarding chain purely on the bus (events only). The KybVerificationSaga
+  // + ProviderGroups reactors screen the entity (kyb_business + hrp + aml) AND every beneficial owner
+  // (kyc), then resolve per decisionMode. No internal service-to-service provider call from here.
+  try {
+    getEventBus().publish(makeEvent({
+      eventType: 'merchant.validation.requested', correlationId: id, businessProcess: 'merchant_onboarding', source: 'psp.core',
+      payload: { merchantAgreementInstanceReference: id, merchantName: input.merchantName, merchantCategoryCode: input.merchantCategoryCode, merchantCountryCode: input.merchantCountryCode },
+      bian: { serviceDomain: 'SD-89 Merchant Relations', controlRecord: 'MerchantAgreementProcedure' },
+    }));
+  } catch { /* bus not initialized (unit tests / degraded mode) */ }
 
   return {
     merchantAgreementInstanceReference: id,
