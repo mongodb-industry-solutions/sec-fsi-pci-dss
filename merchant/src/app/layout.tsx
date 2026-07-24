@@ -18,8 +18,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen font-sans" suppressHydrationWarning>
         <TooltipProvider>
           <Nav />
-          <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
-          <footer className="mx-auto flex max-w-5xl items-center gap-2 px-4 py-6 text-xs text-muted">
+          <main className="mx-auto max-w-7xl px-4 py-8">{children}</main>
+          <footer className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-6 text-xs text-muted">
             <ShieldCheck className="h-3.5 w-3.5 text-leaf-deep" aria-hidden />
             Espresso Works Ltd, external merchant demo. No card data handled here (PCI DSS SAQ A).
           </footer>

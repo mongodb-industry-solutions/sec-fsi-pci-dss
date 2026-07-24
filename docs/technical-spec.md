@@ -3259,9 +3259,12 @@ All routes are under the `/api/v1` prefix.
   "description": "Order #1234",
   "returnUrl": "https://merchant.com/success",
   "cancelUrl": "https://merchant.com/cancel",
-  "merchantReference": "ORDER-1234"
+  "merchantReference": "ORDER-1234",
+  "actingSubjectReference": "sub-of-logged-in-buyer"
 }
 ```
+
+`actingSubjectReference` (optional, v18): OAuth subject (SD-91 login id) of the user the merchant app is acting for. Attribution only, the charge stays merchant-authenticated (client_credentials); it lets the resulting purchase land in the payer payment history and the merchant operations view. Resolved server-side to the payer party and canonical account reference so `cardTransactionAccountReference` is the payer ACC (not the raw email or card token). Mirrors the API-payment path.
 
 **POST `/checkout/sessions` response (201):**
 ```json
@@ -3739,7 +3742,15 @@ and makes `paymentCardNetwork` / `paymentCardExpirationDate` optional (external 
   `(customer, token)`.
 - **FDS/AML surfaces.** Customer card detail returns `cardHolderCount` (number only). Investigation
   (L1/L2/auditor): `GET /api/v1/customer/card-registry/:token` → holders + count; transaction detail
-  shows a shared-card indicator. Auditor Data Integrity (`/api/v1/fraud/integrity` → `cards`):
+  shows a shared-card indicator. **Investigation pivot** (L1/L2/auditor):
+  `GET /api/v1/customer/card-by-token/:token` resolves a transaction's surrogate token
+  (`paymentCardReference`) to the identifiers needed to continue an investigation:
+  `paymentCardInstanceReference` (card detail), `customerAgreementInstanceReference` (owner/KYC) and
+  `fundingPayoutAccountInstanceReference` (funding account), plus masked PAN / network / status. No
+  CHD, no card expiry. Used by the transaction detail page to link the card token to the card page,
+  resolve the customer when the account reference is not a canonical `ACC-xxx` (card-not-present
+  merchant checkout), and link the funding bank account. Auditor Data Integrity
+  (`/api/v1/fraud/integrity` → `cards`):
   duplicate arrangements, inconsistent tokenization (same masked card under multiple tokens), registry
   drift.
 

@@ -1,7 +1,7 @@
 {
   "name": "sec-pay-psp",
   "description": "Sec4 Pay is a PCI DSS-aligned Payment Service Provider (PSP) platform designed to provide digital banks and card issuers with secure and efficient payment processing capabilities, built on MongoDB.",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "private": true,
   "scripts": {
     "setup": "npm install && npm install --prefix frontend && npm install --prefix backend && npm install --prefix merchant",

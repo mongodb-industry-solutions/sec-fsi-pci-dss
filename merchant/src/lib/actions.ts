@@ -67,6 +67,11 @@ export async function payForProduct(productId: string): Promise<ActionResult> {
       case 'redirect':
       case 'subscription': {
         const base = ENV.baseUrl();
+        // Forward the logged-in buyer's OAuth subject for ATTRIBUTION so the purchase shows in their
+        // payment history and the merchant operations view. The session itself is created with the
+        // merchant's own client_credentials token (the charge stays merchant-authenticated); this mirrors
+        // the api_payment path. Best-effort: if there is no session, the session is created unattributed.
+        const c = await client();
         const session = await PspClient.createCheckoutSession({
           merchantAgreementInstanceReference: merchantRef,
           amount: product.price,
@@ -75,6 +80,7 @@ export async function payForProduct(productId: string): Promise<ActionResult> {
           returnUrl: `${base}/history`,
           cancelUrl: `${base}/products`,
           merchantReference: `${product.id}-${Date.now()}`,
+          ...(c.sub && { actingSubjectReference: c.sub }),
         });
         return { ok: true, redirectUrl: session.paymentPageUrl, message: 'Redirecting to secure checkout…' };
       }
