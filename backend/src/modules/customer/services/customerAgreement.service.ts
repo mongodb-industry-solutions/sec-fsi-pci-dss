@@ -165,9 +165,21 @@ export async function getSelfProfile(db: Db, email: string): Promise<Record<stri
     customerAgreementEnrollmentDate:    doc.customerAgreementEnrollmentDate,
     customerAgreementPreferredLanguage: doc.customerAgreementPreferredLanguage,
     customerAgreementKycCheck:          doc.customerAgreementKycCheck ?? null,
+    // v27 KYC identity (SD-53). Self-profile runs on the L2/auditor client, so the QE-encrypted
+    // scalar leaves (govId .number QE:suffix, .type/.issuingCountry QE:equality, .expiryDate
+    // QE:range; taxId QE:prefix; occupation QE:equality) are decrypted for the owner.
+    customerAgreementGovernmentID:      doc.customerAgreementGovernmentID ?? null,
+    customerAgreementTaxIDNumber:       doc.customerAgreementTaxIDNumber,
+    customerAgreementOccupation:        doc.customerAgreementOccupation,
+    // SD-13 party demographics, decrypted here for the owner (QE:range DOB, QE:equality rest).
+    partyDateOfBirth:                   party.partyDateOfBirth,
+    partyNationality:                   party.partyNationality,
+    partyPlaceOfBirth:                  party.partyPlaceOfBirth,
     sensitive: isSensitiveDecrypted(doc.customerAgreementResidentialAddress) ? {
-      customerAgreementResidentialAddress: doc.customerAgreementResidentialAddress,
-      governmentIdentificationReference:   doc.governmentIdentificationReference,
+      customerAgreementResidentialAddress:    doc.customerAgreementResidentialAddress,
+      governmentIdentificationReference:      doc.governmentIdentificationReference,
+      customerAgreementSourceOfFunds:         doc.customerAgreementSourceOfFunds,
+      customerAgreementPurposeOfRelationship: doc.customerAgreementPurposeOfRelationship,
     } : null,
   };
 }
