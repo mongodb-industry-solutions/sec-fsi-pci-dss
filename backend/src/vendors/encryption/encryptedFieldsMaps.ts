@@ -88,6 +88,12 @@ export function buildEncryptedFieldsMaps(
           bsonType: 'string',
           queries: { queryType: 'equality', contention: 8 },
         },
+        {
+          keyId: deks.partySex,
+          path: 'partySex',
+          bsonType: 'string',
+          queries: { queryType: 'equality', contention: 8 },
+        },
         // GDPR PII — QE:none (L2 only). Postal address is sensitive personal data;
         // encrypted at rest, decrypted only for the L2 client (or the party themselves).
         ...(includeSensitive ? [

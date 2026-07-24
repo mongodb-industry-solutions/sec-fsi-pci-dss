@@ -57,6 +57,7 @@ interface ProfileData {
     partyDateOfBirth?: string;
     partyNationality?: string;
     partyPlaceOfBirth?: string;
+    partySex?: string;
     sensitive?: {
       customerAgreementResidentialAddress?: {
         streetAddress?: string;
@@ -84,6 +85,18 @@ function humanize(v: string): string {
 function countryLabel(code?: string): string {
   if (!code) return '—';
   return COUNTRY_NAMES[code] ? `${COUNTRY_NAMES[code]} (${code})` : code;
+}
+
+const SEX_LABELS: Record<string, string> = {
+  male: 'Male',
+  female: 'Female',
+  other: 'Other',
+  unspecified: 'Not specified',
+};
+
+function sexLabel(value?: string): string {
+  if (!value) return '—';
+  return SEX_LABELS[value] ?? value;
 }
 
 const SEGMENT_LABELS: Record<string, string> = {
@@ -394,6 +407,7 @@ export default function ProfilePage() {
     partyMobilePhoneNumber?: string;
     partyDateOfBirth?: string;
     partyNationality?: string;
+    partySex?: string;
     partyPostalAddress?: { line1: string; line2?: string; city: string; postalCode: string; countryCode: string };
   } | null | undefined;
   const name   = ag?.customerName ?? profile.name;
@@ -604,6 +618,7 @@ export default function ProfilePage() {
           )}
           {ag?.partyNationality && <PlainField label="Nationality" value={countryLabel(ag.partyNationality)} qe="qe-equality" collection="party" info="Your nationality (ISO country code). Encrypted at rest; searchable by exact match (QE:equality)." />}
           {ag?.partyPlaceOfBirth && <PlainField label="Place of birth" value={ag.partyPlaceOfBirth} qe="qe-equality" collection="party" info="City/country where you were born. Encrypted at rest; searchable by exact match (QE:equality)." />}
+          {ag?.partySex && <PlainField label="Sex" value={sexLabel(ag.partySex)} qe="qe-equality" collection="party" info="Sex/gender demographic (SD-13, GDPR PII). Encrypted at rest; searchable by exact match (QE:equality)." />}
           {ag?.customerAgreementTaxIDNumber && (
             <RevealField label="Tax ID (TIN)" plainValue={ag.customerAgreementTaxIDNumber} type="qe-prefix" collection="customerAgreementProcedure" info="Your tax identification number. Encrypted at rest; supports encrypted starts-with queries (QE:prefix)." />
           )}
@@ -630,6 +645,7 @@ export default function ProfilePage() {
                   <RevealField label="Date of birth" plainValue={dob!.toLocaleDateString()} type="qe-none" collection="party" />
                 )}
                 {pty.partyNationality && <PlainField label="Nationality" value={pty.partyNationality} collection="party" />}
+                {pty.partySex && <PlainField label="Sex" value={sexLabel(pty.partySex)} qe="qe-equality" collection="party" />}
                 {addr && (
                   <RevealField label="Address" plainValue={addrFull} type="qe-none" collection="party" />
                 )}

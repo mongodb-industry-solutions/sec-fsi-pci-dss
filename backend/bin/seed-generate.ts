@@ -138,6 +138,12 @@ async function main() {
       partyType: 'customer',
       partyDateOfBirth: faker.date.birthdate({ min: 18, max: 70, mode: 'age' }).toISOString().split('T')[0],
       partyNationality: 'GB',
+      // SD-13 sex/gender demographic (QE:equality). Mostly male/female with a small share of
+      // other/unspecified so the demo exercises the full vocabulary.
+      partySex: faker.helpers.weightedArrayElement([
+        { weight: 48, value: 'male' }, { weight: 48, value: 'female' },
+        { weight: 2, value: 'other' }, { weight: 2, value: 'unspecified' },
+      ]),
       bianServiceDomain: 'Party Data Management',
       bianControlRecordType: 'Party',
       recordCreatedDateTime: faker.date.past({ years: 2 }),
@@ -148,6 +154,7 @@ async function main() {
 
   for (const ep of employeeParties) {
     parties.push({
+      partySex: 'unspecified',
       ...ep,
       bianServiceDomain: 'Party Data Management',
       bianControlRecordType: 'Party',

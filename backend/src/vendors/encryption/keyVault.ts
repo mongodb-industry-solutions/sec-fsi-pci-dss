@@ -25,6 +25,7 @@ export interface DEKs {
   partyName: Binary;              // party.partyName (SD-13) - QE:substring
   partyNationality: Binary;       // party.partyNationality (SD-13) - QE:equality
   partyPlaceOfBirth: Binary;      // party.partyPlaceOfBirth (SD-13) - QE:equality
+  partySex: Binary;               // party.partySex (SD-13) - QE:equality
   caGovIdType: Binary;            // customerAgreementGovernmentID.type - QE:equality
   caGovIdNumber: Binary;          // customerAgreementGovernmentID.number - QE:suffix
   caGovIdIssuingCountry: Binary;  // customerAgreementGovernmentID.issuingCountry - QE:equality
@@ -98,6 +99,7 @@ export async function provisionDataEncryptionKeys(client: MongoClient): Promise<
   const partyName = await getOrCreate('DEK-party-name');
   const partyNationality = await getOrCreate('DEK-party-nationality');
   const partyPlaceOfBirth = await getOrCreate('DEK-party-place-of-birth');
+  const partySex = await getOrCreate('DEK-party-sex');
   const caGovIdType = await getOrCreate('DEK-ca-govid-type');
   const caGovIdNumber = await getOrCreate('DEK-ca-govid-number');
   const caGovIdIssuingCountry = await getOrCreate('DEK-ca-govid-issuing-country');
@@ -137,7 +139,7 @@ export async function provisionDataEncryptionKeys(client: MongoClient): Promise<
 
   return {
     txAccountRef, partyEmail, partyPhone, customerAccountRef, authEmail,
-    partyName, partyNationality, partyPlaceOfBirth,
+    partyName, partyNationality, partyPlaceOfBirth, partySex,
     caGovIdType, caGovIdNumber, caGovIdIssuingCountry, caGovIdExpiry,
     caTaxId, caOccupation, kycRiskScore, kycRiskRating, kycPepStatus, kycSanctionsResult,
     vaultPan, vaultServiceCode,

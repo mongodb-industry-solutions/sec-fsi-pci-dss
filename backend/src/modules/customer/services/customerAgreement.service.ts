@@ -175,6 +175,7 @@ export async function getSelfProfile(db: Db, email: string): Promise<Record<stri
     partyDateOfBirth:                   party.partyDateOfBirth,
     partyNationality:                   party.partyNationality,
     partyPlaceOfBirth:                  party.partyPlaceOfBirth,
+    partySex:                           party.partySex,
     sensitive: isSensitiveDecrypted(doc.customerAgreementResidentialAddress) ? {
       customerAgreementResidentialAddress:    doc.customerAgreementResidentialAddress,
       governmentIdentificationReference:      doc.governmentIdentificationReference,

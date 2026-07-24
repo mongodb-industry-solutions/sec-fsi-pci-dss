@@ -45,6 +45,7 @@ export interface PartyControlRecord {
   partyDateOfBirth?: Date;               // v27: BSON Date, QE:range (DEK-party-dob) — was ISO string / QE:none
   partyNationality?: string;             // v27: QE:equality contention 8 (DEK-party-nationality). ISO 3166-1 alpha-2
   partyPlaceOfBirth?: string;            // v27: QE:equality contention 8 (DEK-party-place-of-birth) — city
+  partySex?: PartySex;                   // QE:equality contention 8 (DEK-party-sex). GDPR PII. 'male'|'female'|'other'|'unspecified'
   partyPostalAddress?: PartyPostalAddress; // SD-13 postal contact point — GDPR PII, QE:none (DEK-party-address, L2 only)
                                          // KYC-typical demographics apply to EVERY party (customer + employee),
                                          // so staff profiles are as complete as customers'. Address + DOB are
@@ -57,6 +58,7 @@ export interface PartyControlRecord {
 }
 
 export type PartyType = 'customer' | 'employee' | 'service_account';
+export type PartySex = 'male' | 'female' | 'other' | 'unspecified';
 ```
 
 > **Blind index for phone uniqueness.** `partyMobilePhoneNumber` is a QE:equality field, and
@@ -1216,6 +1218,7 @@ All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `k
 | `deks.partyName` | `DEK-party-name` | `party.partyName` (v27, QE:substring — lookup tier) |
 | `deks.partyNationality` | `DEK-party-nationality` | `party.partyNationality` (v27, QE:equality c8) |
 | `deks.partyPlaceOfBirth` | `DEK-party-place-of-birth` | `party.partyPlaceOfBirth` (v27, QE:equality c8) |
+| `deks.partySex` | `DEK-party-sex` | `party.partySex` (QE:equality c8, GDPR PII) |
 | `deks.caGovIdNumber` | `DEK-ca-govid-number` | `customerAgreementGovernmentID.number` (v27, QE:suffix) |
 | `deks.caGovIdType` | `DEK-ca-govid-type` | `customerAgreementGovernmentID.type` (v27, QE:equality c6) |
 | `deks.caGovIdIssuingCountry` | `DEK-ca-govid-issuing-country` | `customerAgreementGovernmentID.issuingCountry` (v27, QE:equality c6) |
@@ -1255,6 +1258,7 @@ encrypted, lookup-tier and exact-searchable.
 | `party.partyDateOfBirth` | date | range | min 1900-01-01, max 2020-01-01, sparsity 1, trimFactor 4 |
 | `party.partyNationality` | string | equality | contention 8 |
 | `party.partyPlaceOfBirth` | string | equality | contention 8 |
+| `party.partySex` | string | equality | contention 8 |
 | `customerAgreementGovernmentID.number` | string | suffix | strMaxLength 20, strMinQueryLength 3, strMaxQueryLength 10, caseSensitive true, diacriticSensitive true |
 | `customerAgreementGovernmentID.type` | string | equality | contention 6 |
 | `customerAgreementGovernmentID.issuingCountry` | string | equality | contention 6 |
