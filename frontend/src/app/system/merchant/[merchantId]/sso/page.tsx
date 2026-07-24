@@ -10,7 +10,7 @@ import { Tooltip } from '../../../../../components/Tooltip';
 import { useRequireActiveMerchant } from '../../../../../lib/merchantContext';
 import { useDebugMode } from '../../../../../lib/debugMode';
 import { api, type MerchantOAuthClient, type TypedWebhookConfig } from '../../../../../lib/api';
-import { BACKEND_PUBLIC_URL } from '../../../../../lib/constants';
+import { BACKEND_PUBLIC_URL, BACKEND_PRIVATE_URL } from '../../../../../lib/constants';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -82,6 +82,29 @@ function UriListEditor({ uris, onChange, placeholder }: { uris: string[]; onChan
         className="flex items-center gap-1 text-xs text-[#001E2B] hover:underline"
       >
         <Plus size={12} /> Add URI
+      </button>
+    </div>
+  );
+}
+
+// ── Endpoint scope toggle (public vs private/in-VPC base URL) ──────────────────
+
+function EndpointScopeToggle({ usePrivate, onChange }: { usePrivate: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="inline-flex rounded-lg border border-gray-200 p-0.5 text-xs">
+      <button
+        type="button"
+        onClick={() => onChange(false)}
+        className={`px-2.5 py-1 rounded-md transition-colors ${!usePrivate ? 'bg-[#001E2B] text-white' : 'text-gray-500 hover:text-[#001E2B]'}`}
+      >
+        Public URL
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(true)}
+        className={`px-2.5 py-1 rounded-md transition-colors ${usePrivate ? 'bg-[#001E2B] text-white' : 'text-gray-500 hover:text-[#001E2B]'}`}
+      >
+        Private URL
       </button>
     </div>
   );
@@ -303,6 +326,13 @@ export default function MerchantSSOPage() {
   const [frontendBase, setFrontendBase] = useState('');
   useEffect(() => { setFrontendBase(window.location.origin); }, []);
 
+  // OIDC endpoint base scope: public URL by default, or the private/in-VPC URL for integrators
+  // wiring server-to-server calls from inside the private network. Only affects the backend
+  // (server-to-server) endpoints; Authorize/Logout are browser-facing frontend pages either way.
+  const hasPrivateUrl = BACKEND_PRIVATE_URL !== '' && BACKEND_PRIVATE_URL !== BACKEND_PUBLIC_URL;
+  const privateBase = BACKEND_PRIVATE_URL || BACKEND_PUBLIC_URL; // fall back to public when unconfigured
+  const [usePrivateEndpoints, setUsePrivateEndpoints] = useState(false);
+
   const load = useCallback(async () => {
     if (!merchantId || !token) return;
     try {
@@ -456,7 +486,7 @@ export default function MerchantSSOPage() {
   // are different hosts in staging/prod). Authorize/logout are browser-facing PSP frontend PAGES
   // (the backend's /api/v1/auth/authorize returns JSON, not UI) — this page's own origin
   // (frontendBase state above, set post-mount to avoid a hydration mismatch).
-  const issuerBase = BACKEND_PUBLIC_URL;
+  const issuerBase = usePrivateEndpoints ? privateBase : BACKEND_PUBLIC_URL;
   const endpoints = [
     { label: 'Discovery', value: `${issuerBase}/.well-known/openid-configuration` },
     { label: 'Authorize', value: `${frontendBase}/auth/authorize` },
@@ -502,7 +532,10 @@ export default function MerchantSSOPage() {
           <div className="space-y-5">
             <CreateClientForm merchantId={merchantId} token={token} onCreated={(secret) => { setNewSecret(secret); setShowSecret(true); load(); }} />
             <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <p className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-1.5"><Globe size={14} className="text-gray-400" /> OIDC Endpoints</p>
+              <div className="flex items-center gap-3 mb-3">
+                <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5"><Globe size={14} className="text-gray-400" /> OIDC Endpoints</p>
+                <EndpointScopeToggle usePrivate={usePrivateEndpoints} onChange={setUsePrivateEndpoints} />
+              </div>
               {endpoints.map((e) => <EndpointRow key={e.label} {...e} />)}
             </div>
           </div>
@@ -854,8 +887,11 @@ export default function MerchantSSOPage() {
 
       {/* ── 4. Integration reference ── */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <p className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-1.5">
-          <Globe size={14} className="text-gray-400" /> OIDC endpoints
+        <div className="flex items-center gap-3 mb-3">
+          <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+            <Globe size={14} className="text-gray-400" /> OIDC endpoints
+          </p>
+          <EndpointScopeToggle usePrivate={usePrivateEndpoints} onChange={setUsePrivateEndpoints} />
           <a
             href={`${issuerBase}/.well-known/openid-configuration`}
             target="_blank" rel="noopener noreferrer"
@@ -863,6 +899,13 @@ export default function MerchantSSOPage() {
           >
             Open discovery <ExternalLink size={11} />
           </a>
+        </div>
+        <p className="text-[11px] text-gray-400 mb-2">
+          {usePrivateEndpoints
+            ? (hasPrivateUrl
+                ? 'Showing the private (in-VPC) base URL for server-to-server integrations inside the private network. Authorize/Logout remain browser-facing pages.'
+                : 'No private/in-VPC URL is configured for this deployment (NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE), so the public URL is shown.')
+            : 'Showing the public base URL. Switch to Private URL for server-to-server integrations inside a VPC.'}
         </p>
         {endpoints.map((e) => <EndpointRow key={e.label} {...e} />)}
 

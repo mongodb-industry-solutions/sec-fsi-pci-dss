@@ -2,6 +2,12 @@
 export const BACKEND_PUBLIC_URL =
   process.env.NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC || 'http://localhost:8081';
 
+// Private/internal backend base URL (e.g. in-VPC service address). Used only for display,
+// so integrators calling from inside the private network can copy in-VPC OIDC endpoints.
+// Empty when not configured (single-URL deployments); consumers should fall back to public.
+export const BACKEND_PRIVATE_URL =
+  process.env.NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE || '';
+
 // Base URL the browser uses for fetch / SSE calls.
 // When PRIVATE is defined → proxy mode: browser uses same-origin (''), Next.js
 // rewrites forward to the PRIVATE URL server-side (see next.config.js).
