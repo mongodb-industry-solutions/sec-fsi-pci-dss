@@ -221,7 +221,7 @@ export default function DemoPaymentPage() {
           .map((c) => ({
             id: c.paymentCardInstanceReference as string,
             alias: (c.paymentCardAlias as string | undefined) || (c.paymentCardNetwork as string | undefined) || 'Card',
-            masked: c.paymentCardMaskedPanDisplay as string,
+            masked: (c.paymentCardMaskedPanDisplay as string | undefined) ?? '',
             network: c.paymentCardNetwork as SavedCard['network'],
             token: c.paymentCardReference as string,
             isPreferred: !!c.paymentCardIsPreferred,
