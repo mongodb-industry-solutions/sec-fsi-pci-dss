@@ -19,7 +19,7 @@ const nextConfig = {
         NEXT_PUBLIC_APP_VERSION: APP_VERSION,
         // Product name (compound, two words). Inlined so the client bundle picks up the value from the
         // root .env / environment; defaults keep the current name when unset.
-        NEXT_PUBLIC_PSP_NAME_PRIMARY: process.env.NEXT_PUBLIC_PSP_NAME_PRIMARY || 'Sec4',
+        NEXT_PUBLIC_PSP_NAME_PRIMARY: process.env.NEXT_PUBLIC_PSP_NAME_PRIMARY || 'Leafy',
         NEXT_PUBLIC_PSP_NAME_SECONDARY: process.env.NEXT_PUBLIC_PSP_NAME_SECONDARY || 'Pay',
     },
     allowedDevOrigins: ['127.0.0.1', 'localhost'],
