@@ -4,7 +4,7 @@
 // is gated by modules:manage; Administration by merchants:view/manage (SoD: data resource, not modules).
 import { Suspense, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Building2, Save, ArrowRight } from 'lucide-react';
+import { Building2, Save, ArrowRight, SlidersHorizontal, ChevronDown, Search, X } from 'lucide-react';
 import { SectionHeader } from '../../../../../components/SectionHeader';
 import { Breadcrumb } from '../../../../../components/Breadcrumb';
 import { Tooltip } from '../../../../../components/Tooltip';
@@ -96,30 +96,57 @@ function KybAdmin({ token, canView }: { token: string; canView: boolean }) {
   const [limit, setLimit] = useState(20);
   const [status, setStatus] = useState('');
   const [risk, setRisk] = useState('');
+  // Explicit search: text inputs commit on Enter / Search button (into `applied`); selects apply live.
   const [name, setName] = useState('');
+  const [mcc, setMcc] = useState('');
+  const [legalEntity, setLegalEntity] = useState('');
+  const [country, setCountry] = useState('');
+  const [applied, setApplied] = useState({ name: '', mcc: '', legalEntity: '', country: '' });
+  const [advanced, setAdvanced] = useState(false);
 
   const load = useCallback(async () => {
     if (!token) return;
     try {
-      const r = await api.merchants.list({ status: status || undefined, risk: risk || undefined, name: name || undefined, page, limit }, token);
+      const r = await api.merchants.list({ status: status || undefined, risk: risk || undefined, name: applied.name || undefined, mcc: applied.mcc || undefined, legalEntity: applied.legalEntity || undefined, country: applied.country || undefined, page, limit }, token);
       setRows(r.results); setTotal(r.total);
     } catch { /* handled by empty state */ }
-  }, [token, status, risk, name, page, limit]);
+  }, [token, status, risk, applied, page, limit]);
   useEffect(() => { void load(); }, [load]);
+
+  const doSearch = () => { setPage(1); setApplied({ name, mcc, legalEntity, country }); };
+  const clearAll = () => {
+    setName(''); setMcc(''); setLegalEntity(''); setCountry('');
+    setApplied({ name: '', mcc: '', legalEntity: '', country: '' });
+    setStatus(''); setRisk(''); setPage(1);
+  };
+  const onEnter = (e: { key: string }) => { if (e.key === 'Enter') doSearch(); };
+  const hasActiveFilters = !!(applied.name || applied.mcc || applied.legalEntity || applied.country || status || risk);
 
   if (!canView) return <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-600">Your role cannot view merchant administration (requires <code className="font-mono text-xs">merchants:view</code>).</div>;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <input placeholder="Search name…" value={name} onChange={(e) => { setPage(1); setName(e.target.value); }} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+        <input placeholder="Search name…" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={onEnter} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+        <button onClick={doSearch} className="flex items-center gap-1.5 text-sm px-4 py-1.5 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] font-medium transition-colors"><Search size={14} /> Search</button>
+        {hasActiveFilters && <button onClick={clearAll} className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-800"><X size={14} /> Clear</button>}
         <select value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm">
           <option value="">All statuses</option>{['under_review', 'agreed', 'active', 'suspended', 'rejected', 'closed'].map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
         <select value={risk} onChange={(e) => { setPage(1); setRisk(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm">
           <option value="">All risk</option>{['low', 'medium', 'high'].map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
+        <button onClick={() => setAdvanced((v) => !v)} className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50">
+          <SlidersHorizontal size={14} /> Advanced<ChevronDown size={14} className={`text-gray-400 transition-transform ${advanced ? 'rotate-180' : ''}`} />
+        </button>
       </div>
+      {advanced && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <label className="text-xs text-gray-600 block">MCC (ISO 18245)<input placeholder="e.g. 5812" value={mcc} onChange={(e) => setMcc(e.target.value)} onKeyDown={onEnter} className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm" /></label>
+          <label className="text-xs text-gray-600 block">Legal entity / tax ref<input placeholder="partial match" value={legalEntity} onChange={(e) => setLegalEntity(e.target.value)} onKeyDown={onEnter} className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm" /></label>
+          <label className="text-xs text-gray-600 block">Country (ISO alpha-2)<input placeholder="e.g. US" maxLength={2} value={country} onChange={(e) => setCountry(e.target.value)} onKeyDown={onEnter} className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm uppercase" /></label>
+        </div>
+      )}
       <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead><tr className="text-left text-xs text-gray-500 border-b border-gray-100">

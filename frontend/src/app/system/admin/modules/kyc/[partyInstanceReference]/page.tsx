@@ -6,7 +6,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { UserCheck, Save, RefreshCw, History, ShieldCheck, Lock, Pencil, X, IdCard } from 'lucide-react';
+import { UserCheck, Save, RefreshCw, History, ShieldCheck, Lock, Pencil, X, IdCard, Mail, FileText } from 'lucide-react';
 import { SectionHeader } from '../../../../../../components/SectionHeader';
 import { Breadcrumb } from '../../../../../../components/Breadcrumb';
 import { Tooltip } from '../../../../../../components/Tooltip';
@@ -116,24 +116,25 @@ export default function KycDetailPage() {
       <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Modules', href: '/system/admin/modules' }, { label: 'KYC', href: '/system/admin/modules/kyc' }, { label: String(r.customerName ?? r.partyName ?? partyRef).slice(0, 24) }]} />
       <SectionHeader icon={UserCheck} title={String(r.customerName ?? r.partyName ?? 'Customer')} description="KYC administration: verdict review, data correction, re-screen, process timeline." debugInfo={`party=${partyRef} · SD-53`} />
 
-      {/* Detailed person profile, split into focused cards (two columns on large screens). Each field
-          carries an info tooltip (what it means, incl. its encryption tier). QE-searchable fields are
-          decrypted at rest for the KYC admin (need-to-know). */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-        {/* Identity (SD-13 party demographics) */}
+      {/* Full person profile, distributed across four focused, semantically distinct cards (two columns
+          on large screens). Each field carries an info tooltip (what it means + its encryption tier).
+          QE-searchable fields are decrypted at rest for the KYC admin (need-to-know). */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
+        {/* Personal details (SD-13 demographics) */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="font-semibold text-sm text-gray-900 mb-2 flex items-center gap-1.5"><UserCheck size={15} /> Identity
-            <Tooltip text="SD-13 Party identity (demographics). QE-searchable fields are encrypted at rest in Atlas (Queryable Encryption) and decrypted in-process for a role with need-to-know." /></h3>
+          <h3 className="font-semibold text-sm text-gray-900 mb-2 flex items-center gap-1.5"><UserCheck size={15} /> Personal details
+            <Tooltip text="SD-13 Party demographics. QE-searchable fields are encrypted at rest in Atlas (Queryable Encryption) and decrypted in-process for a role with need-to-know." /></h3>
           <dl className="text-sm">
             <ProfileRow label="Full name" value={String(r.customerName ?? '')} info="Legal name of the party (SD-13). Encrypted at rest with QE substring search so it can be found without decrypting server-side." />
             <ProfileRow label="Date of birth" value={r.partyDateOfBirth ? String(r.partyDateOfBirth).slice(0, 10) : ''} info="Party date of birth (SD-13). Encrypted at rest with QE range so it is searchable by range without exposing the value." />
+            <ProfileRow label="Sex" value={humanize(r.partySex)} info="Party sex (SD-13). QE:equality encrypted at rest." />
             <ProfileRow label="Nationality" value={humanize(r.partyNationality)} info="Declared nationality. QE:equality encrypted (searchable by exact match)." />
             <ProfileRow label="Place of birth" value={humanize(r.partyPlaceOfBirth)} info="Declared place of birth. QE:equality encrypted at rest." />
-            <ProfileRow label="Sex" value={humanize(r.partySex)} info="Party sex (SD-13). QE:equality encrypted at rest." />
           </dl>
         </div>
 
-        {/* Identity document (SD-53) — one of the fundamental KYC data points, broken down per leaf */}
+        {/* Identity document (SD-53) — one of the fundamental KYC data points, broken down per leaf.
+            Placed next to Personal details: both have 5 rows, so they balance side by side. */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h3 className="font-semibold text-sm text-gray-900 mb-2 flex items-center gap-1.5"><IdCard size={15} /> Identity document
             <Tooltip text="The government-issued identity document verified at KYC (SD-53). Each leaf is QE-encrypted at rest: number by suffix search, type / issuing country by equality, expiry by range. The tax ID is a separate QE:prefix field." /></h3>
@@ -146,14 +147,25 @@ export default function KycDetailPage() {
           </dl>
         </div>
 
-        {/* Agreement summary (SD-53) */}
+        {/* Contact & preferences (SD-13) */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="font-semibold text-sm text-gray-900 mb-2 flex items-center gap-1.5"><ShieldCheck size={15} /> Agreement
-            <Tooltip text="SD-53 customer-agreement summary: commercial segment, lifecycle status, enrolment date and the internal agreement reference." /></h3>
+          <h3 className="font-semibold text-sm text-gray-900 mb-2 flex items-center gap-1.5"><Mail size={15} /> Contact &amp; preferences
+            <Tooltip text="How the customer is reached (SD-13). Email and phone are QE:equality (encrypted at rest, exact-match searchable), decrypted for the KYC admin's need-to-know. Residential/postal address is under Protected details (audited reveal)." /></h3>
+          <dl className="text-sm">
+            <ProfileRow label="Email" value={String(r.customerEmailAddress ?? '')} info="Contact email (SD-13). QE:equality encrypted at rest (exact-match searchable)." />
+            <ProfileRow label="Phone" value={String(r.customerMobilePhoneNumber ?? '')} info="Contact mobile phone (SD-13). QE:equality encrypted at rest (exact-match searchable)." />
+            <ProfileRow label="Preferred language" value={humanize(r.customerAgreementPreferredLanguage)} info="Preferred communication language (SD-53). Plaintext business metadata." />
+          </dl>
+        </div>
+
+        {/* Customer agreement (SD-53) — account classification & lifecycle metadata */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h3 className="font-semibold text-sm text-gray-900 mb-2 flex items-center gap-1.5"><FileText size={15} /> Customer agreement
+            <Tooltip text="SD-53 customer-agreement classification & lifecycle: party type, commercial segment, declared occupation, lifecycle status, enrolment date and the internal agreement reference." /></h3>
           <dl className="text-sm">
             <ProfileRow label="Party type" value={humanize(r.partyType)} info="Classification of the party: customer, employee or service account. Not PII; stored in plaintext." />
-            <ProfileRow label="Occupation" value={humanize(r.customerAgreementOccupation)} info="Declared occupation (KYC/AML risk signal). QE:equality encrypted at rest." />
             <ProfileRow label="Segment" value={humanize(r.customerSegment)} info="Commercial segment (retail / premium / corporate / SME). Business metadata, plaintext." />
+            <ProfileRow label="Occupation" value={humanize(r.customerAgreementOccupation)} info="Declared occupation (KYC/AML risk signal). QE:equality encrypted at rest." />
             <ProfileRow label="Agreement status" value={humanize(r.customerAgreementStatus)} info="BIAN SD-53 agreement lifecycle status (initiated / active / suspended / closed …). Plaintext." />
             <ProfileRow label="Enrolled" value={r.customerAgreementEnrollmentDate ? String(r.customerAgreementEnrollmentDate).slice(0, 10) : ''} info="Date the customer agreement was enrolled. Plaintext business metadata." />
             <div className="flex items-center justify-between gap-3 py-2.5">

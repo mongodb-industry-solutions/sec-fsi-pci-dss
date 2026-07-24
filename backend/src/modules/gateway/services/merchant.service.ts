@@ -41,13 +41,16 @@ export interface CreateMerchantInput {
 
 export async function getMerchants(
   db: Db,
-  filters: { status?: MerchantAgreementStatus; mcc?: string; name?: string; risk?: string; page?: number; limit?: number; ownerPartyRef?: string }
+  filters: { status?: MerchantAgreementStatus; mcc?: string; name?: string; risk?: string; legalEntity?: string; country?: string; page?: number; limit?: number; ownerPartyRef?: string }
 ) {
   const query: Record<string, unknown> = {};
   if (filters.status) query.merchantAgreementStatus = filters.status;
   if (filters.mcc) query.merchantCategoryCode = filters.mcc;
   if (filters.name) query.merchantName = { $regex: filters.name, $options: 'i' };
   if (filters.risk) query.merchantRiskCategory = filters.risk;
+  // v31 KYB advanced filters (merchant data is plaintext): partial legal-entity match + exact country.
+  if (filters.legalEntity) query.merchantLegalEntityReference = { $regex: filters.legalEntity, $options: 'i' };
+  if (filters.country) query.merchantCountryCode = filters.country.toUpperCase();
   // v31 (§3.2b): scope to EVERY shareholder, not just the primary. Match the multikey owner array
   // (index-backed) OR the legacy scalar pointer during the transition so pre-migration data resolves.
   // After a reseed back-fills the array for all merchants, the scalar clause is redundant.

@@ -80,6 +80,8 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
           mcc: { type: 'string', description: 'Filter by Merchant Category Code (ISO 18245).' },
           name: { type: 'string', description: 'Case-insensitive partial match on merchant name.' },
           risk: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Filter by risk category.' },
+          legalEntity: { type: 'string', description: 'v31: case-insensitive partial match on the legal-entity / tax reference.' },
+          country: { type: 'string', description: 'v31: exact ISO 3166-1 alpha-2 country code.' },
           page: { type: 'integer', minimum: 1, default: 1 },
           limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
           mine: { type: 'boolean', description: 'When true, restrict results to the caller\'s own merchants regardless of role.' },
@@ -116,10 +118,10 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
     },
   }, async (request, reply) => {
     const user = (request as { user?: JwtUserPayload }).user;
-    const { status, mcc, name, risk, page, limit, mine } = request.query as { status?: string; mcc?: string; name?: string; risk?: string; page?: number; limit?: number; mine?: boolean };
+    const { status, mcc, name, risk, legalEntity, country, page, limit, mine } = request.query as { status?: string; mcc?: string; name?: string; risk?: string; legalEntity?: string; country?: string; page?: number; limit?: number; mine?: boolean };
     // Customers see only their own merchants; mine=true scopes any role to their own records
     const ownerPartyRef = (user?.role === 'customer' || mine) ? (user?.partyRef ?? undefined) : undefined;
-    const result = await getMerchants(fastify.db, { status: status as never, mcc, name, risk, page, limit, ownerPartyRef });
+    const result = await getMerchants(fastify.db, { status: status as never, mcc, name, risk, legalEntity, country, page, limit, ownerPartyRef });
     return reply.send(result);
   });
 

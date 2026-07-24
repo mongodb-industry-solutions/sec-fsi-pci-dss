@@ -174,6 +174,9 @@ export async function getKycByPartyRef(db: Db, partyRef: string, role: UserRole 
     customerAgreementInstanceReference: doc.customerAgreementInstanceReference,
     customerName: party.partyName,
     partyType: party.partyType,
+    // Contact PII (QE:equality → searchable, decrypted at L1 for the KYC admin's need-to-know).
+    customerEmailAddress: isSensitiveDecrypted(party.partyEmailAddress) ? party.partyEmailAddress : null,
+    customerMobilePhoneNumber: isSensitiveDecrypted(party.partyMobilePhoneNumber) ? party.partyMobilePhoneNumber : null,
     // Identity (QE searchable → L1-visible; encrypted at rest).
     partyDateOfBirth: party.partyDateOfBirth ?? null,
     partyNationality: party.partyNationality ?? null,
@@ -246,7 +249,7 @@ const KYC_COMPLETED_STATUSES = ['verified', 'rejected', 'expired'];
 // { kycCheckStatus, customerSegment, recordUpdatedDateTime } serves the filter + sort (no COLLSCAN).
 export async function listKycAdmin(
   role: UserRole,
-  filters: { status?: string; segment?: string; riskRating?: string; partyType?: string; page?: number; limit?: number },
+  filters: { status?: string; segment?: string; riskRating?: string; partyType?: string; name?: string; email?: string; phone?: string; nationality?: string; page?: number; limit?: number },
 ) {
   const roleDb = await getDbForRole(role, false); // L1 masked for the list
   const query: Record<string, unknown> = {
@@ -258,14 +261,25 @@ export async function listKycAdmin(
   // riskRating is QE:equality — queryable on the QE client via a plain equality predicate.
   if (filters.riskRating) query['customerAgreementKycCheck.customerAgreementKycCheckRiskRating'] = filters.riskRating;
 
-  // v31: scope to a party TYPE (default 'customer' from the UI). partyType lives on the `party` record,
-  // so resolve the matching party refs first and constrain the agreement query by them (bounded set).
-  // `all` (or unset) applies no type constraint.
-  if (filters.partyType && filters.partyType !== 'all') {
-    const typedParties = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
-      .find({ partyType: filters.partyType } as never, { projection: { partyInstanceReference: 1 } })
+  // v31: party-side search. partyType/email/phone/nationality live on the `party` record and are
+  // QE:equality (exact match, searchable while encrypted at rest); name is QE:substring (contains),
+  // used only when QE text search is available, else it degrades to an exact match. Resolve the
+  // matching party refs once (bounded set) and constrain the agreement query by them.
+  const partyClauses: Record<string, unknown>[] = [];
+  if (filters.partyType && filters.partyType !== 'all') partyClauses.push({ partyType: filters.partyType });
+  if (filters.email) partyClauses.push({ partyEmailAddress: filters.email.trim() });
+  if (filters.phone) partyClauses.push({ partyMobilePhoneNumber: filters.phone.trim() });
+  if (filters.nationality) partyClauses.push({ partyNationality: filters.nationality.trim() });
+  if (filters.name) {
+    const v = filters.name.trim();
+    partyClauses.push(config.qe.textSearch ? { $expr: { [ENC_CONTAINS]: ['$partyName', v] } } : { partyName: v });
+  }
+  if (partyClauses.length) {
+    const pq = partyClauses.length === 1 ? partyClauses[0] : { $and: partyClauses };
+    const matched = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
+      .find(pq as never, { projection: { partyInstanceReference: 1 } })
       .toArray();
-    query.partyInstanceReference = { $in: typedParties.map((p) => p.partyInstanceReference) };
+    query.partyInstanceReference = { $in: matched.map((p) => p.partyInstanceReference) };
   }
 
   const page = Math.max(1, filters.page ?? 1);

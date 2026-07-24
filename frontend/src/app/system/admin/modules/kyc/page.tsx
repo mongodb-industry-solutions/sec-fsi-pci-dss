@@ -4,7 +4,7 @@
 // by modules:manage; Administration by customers:view/manage (SoD: data resource, not modules).
 import { Suspense, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { UserCheck, Save, ArrowRight } from 'lucide-react';
+import { UserCheck, Save, ArrowRight, Search, X } from 'lucide-react';
 import { SectionHeader } from '../../../../../components/SectionHeader';
 import { Breadcrumb } from '../../../../../components/Breadcrumb';
 import { Tooltip } from '../../../../../components/Tooltip';
@@ -92,16 +92,42 @@ function KycAdmin({ token, canView }: { token: string; canView: boolean }) {
   // Default to customer-type parties (changeable). KYC administers cardholders/customers; staff and
   // service accounts are shown only when explicitly selected.
   const [partyType, setPartyType] = useState('customer');
+  // Text search is EXPLICIT: the inputs only take effect on Enter or the Search button (committed into
+  // `applied`), so a partial exact-match query doesn't clear the list on every keystroke.
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [nationality, setNationality] = useState('');
+  const [applied, setApplied] = useState({ name: '', email: '', phone: '', nationality: '' });
   const load = useCallback(async () => {
     if (!token) return;
-    try { const r = await api.customer.kycList({ status: status || undefined, segment: segment || undefined, riskRating: riskRating || undefined, partyType: partyType || undefined, page, limit }, token); setRows(r.results); setTotal(r.total); }
+    try { const r = await api.customer.kycList({ status: status || undefined, segment: segment || undefined, riskRating: riskRating || undefined, partyType: partyType || undefined, name: applied.name || undefined, email: applied.email || undefined, phone: applied.phone || undefined, nationality: applied.nationality || undefined, page, limit }, token); setRows(r.results); setTotal(r.total); }
     catch { /* empty state */ }
-  }, [token, status, segment, riskRating, partyType, page, limit]);
+  }, [token, status, segment, riskRating, partyType, applied, page, limit]);
   useEffect(() => { void load(); }, [load]);
+
+  const doSearch = () => { setPage(1); setApplied({ name, email, phone, nationality }); };
+  const clearAll = () => {
+    setName(''); setEmail(''); setPhone(''); setNationality('');
+    setApplied({ name: '', email: '', phone: '', nationality: '' });
+    setStatus(''); setSegment(''); setRiskRating(''); setPartyType('customer'); setPage(1);
+  };
+  const onEnter = (e: { key: string }) => { if (e.key === 'Enter') doSearch(); };
+  const hasActiveFilters = !!(applied.name || applied.email || applied.phone || applied.nationality || status || segment || riskRating || partyType !== 'customer');
 
   if (!canView) return <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-600">Your role cannot view KYC administration (requires <code className="font-mono text-xs">customers:view</code>).</div>;
   return (
     <div className="space-y-4">
+      {/* Explicit search (Enter or Search button) over QE-searchable party attributes (name substring
+          where available, email/phone/nationality exact) + live status/segment/risk/party-type filters. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input placeholder="Name…" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={onEnter} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+        <input placeholder="Email…" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={onEnter} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+        <input placeholder="Phone…" value={phone} onChange={(e) => setPhone(e.target.value)} onKeyDown={onEnter} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+        <input placeholder="Nationality…" value={nationality} onChange={(e) => setNationality(e.target.value)} onKeyDown={onEnter} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm" title="Exact match (QE:equality)" />
+        <button onClick={doSearch} className="flex items-center gap-1.5 text-sm px-4 py-1.5 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] font-medium transition-colors"><Search size={14} /> Search</button>
+        {hasActiveFilters && <button onClick={clearAll} className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-800"><X size={14} /> Clear</button>}
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <select value={partyType} onChange={(e) => { setPage(1); setPartyType(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" title="Party type"><option value="customer">Customers</option><option value="employee">Employees</option><option value="service_account">Service accounts</option><option value="all">All party types</option></select>
         <select value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"><option value="">All statuses</option>{['verified', 'rejected', 'expired'].map((s) => <option key={s} value={s}>{s}</option>)}</select>
