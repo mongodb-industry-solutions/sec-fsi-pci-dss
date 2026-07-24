@@ -2769,6 +2769,14 @@ PSP_PAYOUT_SETTLEMENT_DELAY_T3_MS=9000  # Simulated T+3 delay in ms
 PSP_PAYMENT_INITIATION_ALWAYS_SUCCEED=true  # Set false to simulate 5% rail failures
 PSP_AIS_ALWAYS_VERIFY=true               # Set false for builtin AIS to return unverified
 PSP_AUDIT_LIST_ACCESS=false              # v29: emit 1 aggregate compliance event per global admin listing (default off)
+
+# ── Frontend demo convenience (NEXT_PUBLIC_, build-time) ───────────
+# Kill-switch for the OIDC /auth/authorize demo shortcut. Two per-request query params drive it:
+#   prefill_password=<pw>  → prefills the password field (login_hint prefills the email).
+#   auto_login=1|true      → additionally submits the login automatically (needs both credentials).
+# INSECURE by design (URLs leak passwords into history, proxy logs, Referer). ALLOWED by default in
+# ANY environment; set this flag to 'false' to disable both params entirely and harden a deployment.
+NEXT_PUBLIC_PSP_OIDC_AUTO=true
 ```
 
 ---
