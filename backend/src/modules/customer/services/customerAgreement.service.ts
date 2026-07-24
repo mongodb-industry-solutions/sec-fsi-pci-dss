@@ -116,7 +116,9 @@ export async function getByEmail(db: Db, email: string, role: UserRole = 'level1
 export async function getByPhone(db: Db, phone: string, role: UserRole = 'level1_analyst', escalationToken?: string, actor?: { ref?: string; name?: string }) {
   const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
   const canSee = canReadSensitive(role, hasValidToken);
-  const result = await findPartyAndAgreement(roleDb, { partyMobilePhoneNumber: phone } as Partial<PartyControlRecord>);
+  // Match on the normalized blind-index digest (space/format-insensitive), not the formatted encrypted
+  // value, so "+34 612 345 678" and "+34612345678" resolve to the same party.
+  const result = await findPartyAndAgreement(roleDb, { partyMobilePhoneNumberDigest: phoneDigest(phone) } as Partial<PartyControlRecord>);
   if (!result) return null;
   await maybeAudit(roleDb, caseId, role, result.doc, canSee, actor);
   return buildResponse(result.doc, result.party, role, canSee, caseId);
@@ -268,7 +270,11 @@ export async function listKycAdmin(
   const partyClauses: Record<string, unknown>[] = [];
   if (filters.partyType && filters.partyType !== 'all') partyClauses.push({ partyType: filters.partyType });
   if (filters.email) partyClauses.push({ partyEmailAddress: filters.email.trim() });
-  if (filters.phone) partyClauses.push({ partyMobilePhoneNumber: filters.phone.trim() });
+  // Phone is stored formatted (e.g. "+34 612 345 678") for display, but equality on the formatted value
+  // would fail if the user types it without spaces. Match on the plaintext blind-index digest instead:
+  // phoneDigest normalizes both the stored value and the query input (strips spaces/formatting), so the
+  // exact match is space-insensitive. Reuses the unique-indexed partyMobilePhoneNumberDigest field.
+  if (filters.phone) partyClauses.push({ partyMobilePhoneNumberDigest: phoneDigest(filters.phone) });
   if (filters.nationality) partyClauses.push({ partyNationality: filters.nationality.trim() });
   if (filters.name) {
     const v = filters.name.trim();

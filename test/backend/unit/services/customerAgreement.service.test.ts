@@ -24,6 +24,7 @@ vi.mock('../../../../backend/src/vendors/security/escalationTokens', () => ({
 
 import { getByEmail, getByPhone, getByAccountRef } from '../../../../backend/src/modules/customer/services/customerAgreement.service';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../../../backend/src/modules/customer/models/customerAgreement.model';
+import { phoneDigest } from '../../../../backend/src/vendors/encryption/digest';
 import { PARTY_COLLECTION } from '../../../../backend/src/modules/identity/models/party.model';
 
 const party = {
@@ -105,12 +106,15 @@ describe('getByPhone', () => {
     expect(result!.customerName).toBe('John Doe');
   });
 
-  it('queries party by partyMobilePhoneNumber', async () => {
+  it('queries party by the normalized phone blind-index digest (space-insensitive)', async () => {
     const db = makeRoleDb(party, agreement);
     h.getDbForRole.mockResolvedValue(db);
     await getByPhone({} as any, '+1-555-0001');
+    // Spaced and unspaced inputs must resolve to the same digest, so the query matches on the digest.
+    const expectedDigest = phoneDigest('+1 555 0001');
+    expect(phoneDigest('+1-555-0001')).toBe(expectedDigest);
     expect(db.partyFindOne).toHaveBeenCalledWith(
-      expect.objectContaining({ partyMobilePhoneNumber: '+1-555-0001' })
+      expect.objectContaining({ partyMobilePhoneNumberDigest: expectedDigest })
     );
   });
 
