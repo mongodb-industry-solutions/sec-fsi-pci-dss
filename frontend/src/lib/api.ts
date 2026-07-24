@@ -592,6 +592,9 @@ export interface KycSearchFieldDef {
   key: string;
   label: string;
   mode: KycSearchMode;                     // effective mode (text modes degrade to equality pre-8.2)
+  baseMode?: KycSearchMode;                // intended mode before pre-8.2 degradation (debug detail)
+  collection?: 'party' | 'agreement';      // logical owner collection (debug detail)
+  path?: string;                           // dotted document path of the encrypted field (debug detail)
   bsonType: 'string' | 'date' | 'int' | 'bool';
   minQueryLength?: number;
   maxQueryLength?: number;

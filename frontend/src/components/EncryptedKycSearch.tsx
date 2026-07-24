@@ -56,6 +56,21 @@ const MODE_BADGE_COLOR: Record<KycSearchMode, string> = {
 
 const DEBOUNCE_MS = 450;
 
+// Human explanation of each QE query mode, for the debug detail shown to a demo audience.
+const MODE_DESCRIPTION: Record<KycSearchMode, string> = {
+  substring: 'Substring match (encStrContains) evaluated over ciphertext',
+  prefix:    'Prefix match (encStrStartsWith) evaluated over ciphertext',
+  suffix:    'Suffix match (encStrEndsWith) evaluated over ciphertext',
+  range:     'Encrypted range query over ciphertext',
+  equality:  'Deterministic equality match over ciphertext',
+};
+
+// Logical registry collection -> physical MongoDB collection name (for the debug detail).
+const COLLECTION_NAME: Record<string, string> = {
+  party:     'party',
+  agreement: 'customerAgreementProcedure',
+};
+
 // ISO country codes used by the KYC registry (nationality / issuing country enums). Shown as
 // a friendly name plus the code, so the operator sees "Spain (ES)" instead of the raw "ES".
 const COUNTRY_NAMES: Record<string, string> = {
@@ -391,6 +406,46 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
             )}
           </div>
         ) : null}
+
+        {/* Debug detail: narrate for the audience exactly what this query targets, so they can see
+            the encrypted field, its owning collection and the QE query type MongoDB is running. */}
+        {debugMode && field && (
+          <div className="rounded-lg border border-[#00ED64]/30 bg-[#001E2B] px-3 py-2.5 text-xs text-gray-300 space-y-1.5">
+            <div className="flex items-center gap-2 text-[#00ED64] font-semibold">
+              <ShieldCheck size={13} /> Query plan (debug)
+            </div>
+            <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1 font-mono">
+              <dt className="text-gray-500">field</dt>
+              <dd className="text-amber-300">{field.label} <span className="text-gray-500">({field.key})</span></dd>
+
+              <dt className="text-gray-500">collection</dt>
+              <dd className="text-amber-300">{field.collection ? (COLLECTION_NAME[field.collection] ?? field.collection) : '—'}</dd>
+
+              <dt className="text-gray-500">path</dt>
+              <dd className="text-amber-300">{field.path ?? '—'}</dd>
+
+              <dt className="text-gray-500">bsonType</dt>
+              <dd className="text-gray-300">{field.bsonType}</dd>
+
+              <dt className="text-gray-500">search type</dt>
+              <dd className="text-gray-300">
+                {MODE_BADGE[field.mode]}: {MODE_DESCRIPTION[field.mode]}
+                {field.baseMode && field.baseMode !== field.mode && (
+                  <span className="text-amber-400">
+                    {' '}(intended {MODE_BADGE[field.baseMode]}, degraded to {MODE_BADGE[field.mode]} on this pre-8.2 cluster)
+                  </span>
+                )}
+              </dd>
+
+              <dt className="text-gray-500">filter</dt>
+              <dd className="text-emerald-300">{body ? JSON.stringify(body) : <span className="text-gray-500">none (enter a value)</span>}</dd>
+            </dl>
+            <p className="text-gray-500 pt-1 border-t border-white/5">
+              The value is encrypted before it reaches Atlas and matched ciphertext-to-ciphertext; the
+              server never sends, and Atlas never sees, the plaintext.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Results */}

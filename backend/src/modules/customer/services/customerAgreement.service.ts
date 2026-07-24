@@ -354,6 +354,9 @@ export function getKycSearchRegistry() {
       key: f.key,
       label: f.label,
       mode: effectiveMode(f),
+      baseMode: f.baseMode,      // intended mode (before pre-8.2 degradation), for the debug detail
+      collection: f.collection,  // logical owner: party | agreement
+      path: f.path,              // dotted document path of the encrypted field
       bsonType: f.bsonType,
       minQueryLength: f.minQueryLength,
       maxQueryLength: f.maxQueryLength,
