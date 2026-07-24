@@ -47,10 +47,12 @@ export async function seedCardIssuerVault(db: Db) {
       || digitsFromToken(`${token}:l4`, 4);
     const { pan, bin } = buildPan(token, network, last4);
 
-    // Core stays descoped: set BIN/last4 (non-CHD), drop any persisted masked (now derived).
+    // Core stays descoped: set BIN/last4 (non-CHD) and a derived masked display (last4 only). Several
+    // read paths return paymentCardMaskedPanDisplay directly, so keep it populated (never blank) rather
+    // than unsetting it. The value exposes only the last 4 (PCI DSS-permitted display).
     await db.collection(PAYMENT_CARD_COLLECTION).updateOne(
       { paymentCardInstanceReference: card.paymentCardInstanceReference },
-      { $set: { paymentCardBin: bin, paymentCardLast4: last4 }, $unset: { paymentCardMaskedPanDisplay: '' } },
+      { $set: { paymentCardBin: bin, paymentCardLast4: last4, paymentCardMaskedPanDisplay: `****-****-****-${last4}` } },
     );
 
     // Issuer vault: full PAN (QE) + service code (QE) + CVK reference. Keyed by the core PK.

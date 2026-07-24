@@ -42,7 +42,9 @@ function member(id: string, priority: number): RoutingGroupMember {
   return { externalProviderArrangementInstanceReference: id, memberPriority: priority, memberRole: 'peer' };
 }
 
-function makeGroup(strategy: RoutingStrategy, members: RoutingGroupMember[], ref = `grp-${Math.random()}`): IntegrationRoutingGroup {
+// Deterministic sequential default ref (reproducible failures); tests needing a specific ref pass it.
+let _grpSeq = 0;
+function makeGroup(strategy: RoutingStrategy, members: RoutingGroupMember[], ref = `grp-${++_grpSeq}`): IntegrationRoutingGroup {
   return {
     routingGroupInstanceReference: ref,
     routingGroupName: 'test-group',

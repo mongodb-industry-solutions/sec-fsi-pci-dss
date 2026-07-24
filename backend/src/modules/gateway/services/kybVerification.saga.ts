@@ -82,9 +82,12 @@ export class KybVerificationSaga {
     st.decided = true;
     setTimeout(() => this.journeys.delete(merchantRef), 60_000).unref?.();
 
-    const businessRiskLevel = st.businessRiskLevel ?? 'low';
-    const adverseMediaResult = st.adverseMediaResult ?? 'clear';
-    let sanctionsResult = st.sanctionsResult ?? 'clear';
+    // Incomplete evidence (a provider timed out / never responded) must NOT default to clean/low, or the
+    // automated path could auto-approve without screening. A missing gate resolves to pending/high so the
+    // verdict stays `initiated` and the saga escalates to manual review (fail-open to a SAFE state).
+    const businessRiskLevel = st.businessRiskLevel ?? (st.gatesIn.has('kyb') ? 'low' : 'high');
+    const adverseMediaResult = st.adverseMediaResult ?? (st.gatesIn.has('aml') ? 'clear' : 'pending');
+    let sanctionsResult = st.sanctionsResult ?? (st.gatesIn.has('hrp') ? 'clear' : 'pending');
     const screeningProviderRef = st.screeningProviderRef ?? 'kyb_business:internal';
 
     // Owner layer (§3.5): a controlling person failing PEP/sanctions raises the merchant's risk.

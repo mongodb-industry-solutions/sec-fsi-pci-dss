@@ -32,7 +32,10 @@ function digitStream(seed: string | undefined, n: number): string {
 // Demo data only, never a real account. Deterministic when a seed is given (idempotent seed backfill).
 // The IBAN is stored QE-encrypted like any other.
 export function generateDemoIban(countryCode: string, seed?: string): string {
-  const cc = (countryCode || 'GB').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2).padEnd(2, 'X');
+  // Fall back to 'GB' unless a valid 2-letter ISO code is present: garbage input like "1" would
+  // otherwise normalize to "XX" and produce a bogus IBAN country.
+  const cleaned = (countryCode || '').toUpperCase().replace(/[^A-Z]/g, '');
+  const cc = cleaned.length === 2 ? cleaned : 'GB';
   // BBAN length by country (fallback 18). Kept simple; digits only for the demo.
   const bbanLen: Record<string, number> = { GB: 18, DE: 18, ES: 20, FR: 23, US: 18, NL: 14, IT: 23, PT: 21 };
   const len = bbanLen[cc] ?? 18;
