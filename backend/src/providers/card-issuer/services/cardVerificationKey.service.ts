@@ -81,7 +81,14 @@ export async function getCardIssuerCvk(): Promise<Buffer> {
   const rec = await keyVaultColl(client).findOne({ keyAltNames: CVK_KEY_ALT_NAME });
   if (!rec) throw new Error('card-issuer CVK not provisioned (run setup/seed)');
   const kms = buildKmsKeyProvider() as unknown as KmsKeyProvider;
-  const dek = await kms.unwrapDataKey(Buffer.from(rec.cvkWrapped.buffer), rec.kid);
+  // Slice a BSON Binary to its ACTUAL length before unwrapping: Binary.buffer can be larger than the
+  // payload (capacity vs. length), and trailing bytes would break AES-GCM tag verification. Handle both
+  // a Binary (has .length()) and a plain Buffer.
+  const w = rec.cvkWrapped as unknown as { buffer: Uint8Array; length?: () => number };
+  const wrappedBuf = typeof w?.length === 'function'
+    ? Buffer.from(w.buffer.subarray(0, w.length()))
+    : Buffer.from(w?.buffer ?? (rec.cvkWrapped as unknown as Uint8Array));
+  const dek = await kms.unwrapDataKey(wrappedBuf, rec.kid);
   // Derive the CVK from the DEK cleartext (second envelope hop). CVK never at rest.
   const cvk = Buffer.from(hkdfSync('sha256', dek, Buffer.alloc(0), Buffer.from(CVK_PURPOSE), CVK_BYTES));
   dek.fill(0);

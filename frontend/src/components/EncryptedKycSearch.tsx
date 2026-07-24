@@ -90,6 +90,8 @@ function enumOptionLabel(field: KycSearchFieldDef, v: string | boolean): string 
   if (field.bsonType === 'bool') return v === true || v === 'true' ? 'Yes' : 'No';
   const s = String(v);
   if (COUNTRY_NAMES[s]) return `${COUNTRY_NAMES[s]} (${s})`;
+  // Preserve unknown ISO 2-letter codes as-is (humanizeEnum would turn "NL" into "Nl").
+  if (/^[A-Z]{2}$/.test(s)) return s;
   return humanizeEnum(s);
 }
 
