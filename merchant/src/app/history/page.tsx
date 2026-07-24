@@ -56,6 +56,25 @@ function statusLabel(s?: string): string {
   return STATUS_LABEL[s.toLowerCase()] ?? s.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
+// Human-friendly labels for the payout rail (PayoutRail + the synthetic 'card'/'rtp' rows). Acronyms
+// stay upper-case; multi-word values become sentence case (e.g. internal_ledger → Internal ledger).
+const RAIL_LABEL: Record<string, string> = {
+  sepa: 'SEPA',
+  ach: 'ACH',
+  swift: 'SWIFT',
+  local_bank: 'Local bank',
+  internal_wallet: 'Internal wallet',
+  internal_ledger: 'Internal ledger',
+  card: 'Card',
+  rtp: 'Request to pay',
+};
+
+function railLabel(r?: string): string {
+  if (!r) return 'n/a';
+  const v = r.toLowerCase();
+  return RAIL_LABEL[v] ?? v.replace(/_/g, ' ').replace(/^\w/, (m) => m.toUpperCase());
+}
+
 // Map a PSP status string to a chip tone.
 function statusTone(s?: string): 'ok' | 'warn' | 'err' | 'neutral' {
   const v = (s ?? '').toLowerCase();
@@ -113,7 +132,9 @@ export default async function HistoryPage() {
       concept: (t.concept ?? '') as string,
       direction: (t.direction ?? 'n/a') as string,
       amount: money(gross, t.currency),
-      fee: money(t.feeAmount, t.currency),
+      // feeAmount is only persisted when a commission is charged (a zero fee is not written), so an
+      // absent value means no fee, i.e. 0 — show it as a real 0.00 amount rather than n/a.
+      fee: money(t.feeAmount ?? 0, t.currency),
       commission: commission != null ? money(commission, t.currency) : 'n/a',
       rail: (t.paymentExecutionRail ?? 'n/a') as string,
       status: (t.paymentExecutionStatus ?? t.status) as string,
@@ -140,7 +161,7 @@ export default async function HistoryPage() {
       concept: (x.purpose ?? 'Payment request') as string,
       direction: role === 'to_approve' ? 'sent' : 'received',
       amount: money(gross, x.currency),
-      fee: 'n/a',
+      fee: money(0, x.currency),
       commission: commission != null ? money(commission, x.currency) : 'n/a',
       rail: 'rtp',
       status: x.status as string,
@@ -199,7 +220,7 @@ export default async function HistoryPage() {
                       <td className="p-3 font-medium">{r.amount}</td>
                       <td className="p-3 text-muted">{r.fee}</td>
                       <td className="p-3 text-muted">{r.commission}</td>
-                      <td className="p-3 uppercase">{r.rail}</td>
+                      <td className="p-3">{railLabel(r.rail)}</td>
                       <td className="p-3">
                         {r.approveRef
                           ? <RtpActions reference={r.approveRef} mode="approve" />
@@ -228,7 +249,7 @@ export default async function HistoryPage() {
                   </div>
                   <div className="mt-2 flex items-baseline justify-between">
                     <span className="text-lg font-semibold text-ink">{r.amount}</span>
-                    <span className="text-xs uppercase text-muted">{r.rail}</span>
+                    <span className="text-xs text-muted">{railLabel(r.rail)}</span>
                   </div>
                   <div className="mt-1 flex gap-4 text-xs text-muted">
                     <span>Fee {r.fee}</span>

@@ -234,6 +234,9 @@ export class PspClient {
     returnUrl: string;
     cancelUrl: string;
     merchantReference: string;
+    // Attribution only (v18): the logged-in buyer's OAuth subject so the resulting purchase lands in
+    // their payment history. The charge itself stays merchant-authenticated (client_credentials).
+    actingSubjectReference?: string;
   }) {
     return PspClient.merchantPost<{ checkoutSessionInstanceReference: string; paymentPageUrl: string; expiresAt: string }>(
       '/api/v1/checkout/sessions',

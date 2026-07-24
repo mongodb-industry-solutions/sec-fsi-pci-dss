@@ -3259,9 +3259,12 @@ All routes are under the `/api/v1` prefix.
   "description": "Order #1234",
   "returnUrl": "https://merchant.com/success",
   "cancelUrl": "https://merchant.com/cancel",
-  "merchantReference": "ORDER-1234"
+  "merchantReference": "ORDER-1234",
+  "actingSubjectReference": "sub-of-logged-in-buyer"
 }
 ```
+
+`actingSubjectReference` (optional, v18): OAuth subject (SD-91 login id) of the user the merchant app is acting for. Attribution only, the charge stays merchant-authenticated (client_credentials); it lets the resulting purchase land in the payer payment history and the merchant operations view. Resolved server-side to the payer party and canonical account reference so `cardTransactionAccountReference` is the payer ACC (not the raw email or card token). Mirrors the API-payment path.
 
 **POST `/checkout/sessions` response (201):**
 ```json
