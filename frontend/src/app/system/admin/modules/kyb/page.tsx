@@ -4,7 +4,7 @@
 // is gated by modules:manage; Administration by merchants:view/manage (SoD: data resource, not modules).
 import { Suspense, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Building2, Save } from 'lucide-react';
+import { Building2, Save, ArrowRight } from 'lucide-react';
 import { SectionHeader } from '../../../../../components/SectionHeader';
 import { Breadcrumb } from '../../../../../components/Breadcrumb';
 import { Tooltip } from '../../../../../components/Tooltip';
@@ -23,7 +23,7 @@ export default function KybModulePage() {
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Modules', href: '/system/admin/modules' }, { label: 'KYB (Merchant Onboarding)' }]} />
-      <SectionHeader icon={Building2} title="KYB — Know Your Business" description="Merchant onboarding verification engine and the KYB administration workbench." debugInfo="capability=kyb · SD-89 Merchant Relations · FATF/4th AMLD UBO · PCI Req 7/12.8" />
+      <SectionHeader icon={Building2} title="KYB: Know Your Business" description="Merchant onboarding verification engine and the KYB administration workbench." debugInfo="capability=kyb · SD-89 Merchant Relations · FATF/4th AMLD UBO · PCI Req 7/12.8" />
       <Suspense fallback={<div className="text-sm text-gray-400">Loading…</div>}>
         <KybTabs />
       </Suspense>
@@ -132,7 +132,7 @@ function KybAdmin({ token, canView }: { token: string; canView: boolean }) {
                 <td className="py-2.5 px-4 hidden sm:table-cell text-gray-600">{String(m.merchantCategoryCode ?? '')}</td>
                 <td className="py-2.5 px-4">{String(m.merchantAgreementStatus)}</td>
                 <td className="py-2.5 px-4 hidden sm:table-cell">{String(m.merchantRiskCategory ?? '')}</td>
-                <td className="py-2.5 px-4 text-right"><Link href={`/system/admin/modules/kyb/${String(m.merchantAgreementInstanceReference)}`} className="text-[#016BF8] hover:underline">Review →</Link></td>
+                <td className="py-2.5 px-4 text-right"><Link href={`/system/admin/modules/kyb/${String(m.merchantAgreementInstanceReference)}`} className="inline-flex items-center gap-1 text-[#016BF8] hover:underline">Review <ArrowRight size={14} /></Link></td>
               </tr>
             ))}
             {rows.length === 0 && <tr><td colSpan={5} className="py-8 text-center text-sm text-gray-400">No merchants match.</td></tr>}

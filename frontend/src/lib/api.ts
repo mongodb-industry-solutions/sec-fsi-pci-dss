@@ -918,7 +918,7 @@ export const api = {
       ),
     // v31 KYC administration (SD-53). Backend enforces customers:view / customers:manage; sensitive
     // fields decrypt only with a valid escalation token (viewSensitive).
-    kycList: (filters: { status?: string; segment?: string; riskRating?: string; page?: number; limit?: number }, token: string) => {
+    kycList: (filters: { status?: string; segment?: string; riskRating?: string; partyType?: string; page?: number; limit?: number }, token: string) => {
       const qs = new URLSearchParams(Object.entries(filters).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString();
       return apiFetch<{ results: Record<string, unknown>[]; total: number; page: number; limit: number }>(`/api/v1/customer/kyc${qs ? `?${qs}` : ''}`, {}, token);
     },

@@ -4,7 +4,7 @@
 // by modules:manage; Administration by customers:view/manage (SoD: data resource, not modules).
 import { Suspense, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { UserCheck, Save } from 'lucide-react';
+import { UserCheck, Save, ArrowRight } from 'lucide-react';
 import { SectionHeader } from '../../../../../components/SectionHeader';
 import { Breadcrumb } from '../../../../../components/Breadcrumb';
 import { Tooltip } from '../../../../../components/Tooltip';
@@ -23,7 +23,7 @@ export default function KycModulePage() {
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Modules', href: '/system/admin/modules' }, { label: 'KYC (Customer Onboarding)' }]} />
-      <SectionHeader icon={UserCheck} title="KYC — Know Your Customer" description="Customer onboarding verification engine and the KYC administration workbench." debugInfo="capability=kyc · SD-53 Customer Agreement · PCI Req 7/8/10/12.8" />
+      <SectionHeader icon={UserCheck} title="KYC: Know Your Customer" description="Customer onboarding verification engine and the KYC administration workbench." debugInfo="capability=kyc · SD-53 Customer Agreement · PCI Req 7/8/10/12.8" />
       <Suspense fallback={<div className="text-sm text-gray-400">Loading…</div>}>
         <KycTabs />
       </Suspense>
@@ -89,17 +89,21 @@ function KycAdmin({ token, canView }: { token: string; canView: boolean }) {
   const [status, setStatus] = useState('');
   const [segment, setSegment] = useState('');
   const [riskRating, setRiskRating] = useState('');
+  // Default to customer-type parties (changeable). KYC administers cardholders/customers; staff and
+  // service accounts are shown only when explicitly selected.
+  const [partyType, setPartyType] = useState('customer');
   const load = useCallback(async () => {
     if (!token) return;
-    try { const r = await api.customer.kycList({ status: status || undefined, segment: segment || undefined, riskRating: riskRating || undefined, page, limit }, token); setRows(r.results); setTotal(r.total); }
+    try { const r = await api.customer.kycList({ status: status || undefined, segment: segment || undefined, riskRating: riskRating || undefined, partyType: partyType || undefined, page, limit }, token); setRows(r.results); setTotal(r.total); }
     catch { /* empty state */ }
-  }, [token, status, segment, riskRating, page, limit]);
+  }, [token, status, segment, riskRating, partyType, page, limit]);
   useEffect(() => { void load(); }, [load]);
 
   if (!canView) return <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-600">Your role cannot view KYC administration (requires <code className="font-mono text-xs">customers:view</code>).</div>;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
+        <select value={partyType} onChange={(e) => { setPage(1); setPartyType(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" title="Party type"><option value="customer">Customers</option><option value="employee">Employees</option><option value="service_account">Service accounts</option><option value="all">All party types</option></select>
         <select value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"><option value="">All statuses</option>{['verified', 'rejected', 'expired'].map((s) => <option key={s} value={s}>{s}</option>)}</select>
         <select value={segment} onChange={(e) => { setPage(1); setSegment(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"><option value="">All segments</option>{['retail', 'premium', 'corporate', 'sme'].map((s) => <option key={s} value={s}>{s}</option>)}</select>
         <select value={riskRating} onChange={(e) => { setPage(1); setRiskRating(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"><option value="">All risk</option>{['low', 'medium', 'high'].map((s) => <option key={s} value={s}>{s}</option>)}</select>
@@ -117,7 +121,7 @@ function KycAdmin({ token, canView }: { token: string; canView: boolean }) {
                 <td className="py-2.5 px-4">{String(c.customerAgreementKycCheckStatus ?? '')}</td>
                 <td className="py-2.5 px-4 hidden sm:table-cell">{String(c.customerAgreementKycCheckRiskRating ?? '')}</td>
                 <td className="py-2.5 px-4 hidden sm:table-cell">{c.customerAgreementKycCheckPepStatus ? 'yes' : 'no'}</td>
-                <td className="py-2.5 px-4 text-right"><Link href={`/system/admin/modules/kyc/${String(c.partyInstanceReference)}`} className="text-[#016BF8] hover:underline">Review →</Link></td>
+                <td className="py-2.5 px-4 text-right"><Link href={`/system/admin/modules/kyc/${String(c.partyInstanceReference)}`} className="inline-flex items-center gap-1 text-[#016BF8] hover:underline">Review <ArrowRight size={14} /></Link></td>
               </tr>
             ))}
             {rows.length === 0 && <tr><td colSpan={6} className="py-8 text-center text-sm text-gray-400">No KYC records match.</td></tr>}

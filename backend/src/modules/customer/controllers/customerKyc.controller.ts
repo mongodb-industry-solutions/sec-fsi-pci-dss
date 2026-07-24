@@ -34,6 +34,7 @@ export async function customerKycController(fastify: FastifyInstance) {
           status: { type: 'string', enum: ['verified', 'rejected', 'expired'] },
           segment: { type: 'string', enum: ['retail', 'premium', 'corporate', 'sme'] },
           riskRating: { type: 'string', enum: ['low', 'medium', 'high'] },
+          partyType: { type: 'string', enum: ['customer', 'employee', 'service_account', 'all'], description: 'Party type filter (UI defaults to customer). `all` applies no type constraint.' },
           page: { type: 'integer', minimum: 1, default: 1 },
           limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
         },
@@ -43,7 +44,7 @@ export async function customerKycController(fastify: FastifyInstance) {
     preHandler: canView,
     handler: async (request, reply) => {
       const { userRole } = request as unknown as AuthenticatedRequest;
-      const q = request.query as { status?: string; segment?: string; riskRating?: string; page?: number; limit?: number };
+      const q = request.query as { status?: string; segment?: string; riskRating?: string; partyType?: string; page?: number; limit?: number };
       const result = await listKycAdmin(userRole, q);
       return reply.send(result);
     },

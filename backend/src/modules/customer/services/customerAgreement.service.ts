@@ -167,7 +167,7 @@ const KYC_COMPLETED_STATUSES = ['verified', 'rejected', 'expired'];
 // { kycCheckStatus, customerSegment, recordUpdatedDateTime } serves the filter + sort (no COLLSCAN).
 export async function listKycAdmin(
   role: UserRole,
-  filters: { status?: string; segment?: string; riskRating?: string; page?: number; limit?: number },
+  filters: { status?: string; segment?: string; riskRating?: string; partyType?: string; page?: number; limit?: number },
 ) {
   const roleDb = await getDbForRole(role, false); // L1 masked for the list
   const query: Record<string, unknown> = {
@@ -178,6 +178,16 @@ export async function listKycAdmin(
   if (filters.segment) query.customerSegment = filters.segment;
   // riskRating is QE:equality — queryable on the QE client via a plain equality predicate.
   if (filters.riskRating) query['customerAgreementKycCheck.customerAgreementKycCheckRiskRating'] = filters.riskRating;
+
+  // v31: scope to a party TYPE (default 'customer' from the UI). partyType lives on the `party` record,
+  // so resolve the matching party refs first and constrain the agreement query by them (bounded set).
+  // `all` (or unset) applies no type constraint.
+  if (filters.partyType && filters.partyType !== 'all') {
+    const typedParties = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
+      .find({ partyType: filters.partyType } as never, { projection: { partyInstanceReference: 1 } })
+      .toArray();
+    query.partyInstanceReference = { $in: typedParties.map((p) => p.partyInstanceReference) };
+  }
 
   const page = Math.max(1, filters.page ?? 1);
   const limit = Math.min(100, Math.max(1, filters.limit ?? 20));
