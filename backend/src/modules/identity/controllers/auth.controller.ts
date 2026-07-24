@@ -244,7 +244,9 @@ Password for all demo users: \`demo-password\``,
       const e = err as { statusCode?: number; message: string };
       const allowed = [400, 401, 404];
       const statusCode = (allowed.includes(e.statusCode ?? 0) ? e.statusCode : 500) as 400 | 401 | 404 | 500;
-      return reply.status(statusCode).send({ error: e.message });
+      // Don't leak internal error details on an unexpected 500; keep the specific message only for the
+      // expected client errors (400/401/404).
+      return reply.status(statusCode).send({ error: statusCode === 500 ? 'Internal server error' : e.message });
     }
   });
 

@@ -139,9 +139,10 @@ export async function createPayoutAccount(
   // If this is the first account, make it default automatically
   const existingCount = await col.countDocuments({ partyInstanceReference: input.partyInstanceReference });
   const isDefault = input.payoutAccountIsDefault ?? existingCount === 0;
+  const id = uuidv4();
 
   const record: PayoutAccountArrangement = {
-    payoutAccountInstanceReference: uuidv4(),
+    payoutAccountInstanceReference: id,
     partyInstanceReference: input.partyInstanceReference,
     payoutAccountType: input.payoutAccountType,
     payoutAccountStatus: 'active',
@@ -158,9 +159,19 @@ export async function createPayoutAccount(
     ...(input.payoutAccountBankAddress ? { payoutAccountBankAddress: input.payoutAccountBankAddress } : {}),
     // QE-encrypted fields: MUST be absent (not null/undefined) when not provided.
     // MongoDB error 31041: "Cannot encrypt element of type: null" — QE driver rejects null values.
-    // v30.1: auto-generate a valid demo IBAN + routing when the caller leaves them empty.
-    payoutAccountIban: input.payoutAccountIban || generateDemoIban(input.payoutAccountCountryCode, input.partyInstanceReference),
-    payoutAccountRoutingNumber: input.payoutAccountRoutingNumber || generateDemoRouting(input.partyInstanceReference),
+    // v30.1: auto-generate a valid demo IBAN + routing when the caller leaves them empty — but ONLY for
+    // externally-linked accounts. `internal_ledger` accounts intentionally have no bank identifiers, so
+    // they are left absent unless explicitly provided. The demo IBAN/routing are seeded with the unique
+    // account id (not the party ref) so a party with several accounts never gets duplicate identifiers.
+    ...(input.payoutAccountType === 'internal_ledger'
+      ? {
+          ...(input.payoutAccountIban ? { payoutAccountIban: input.payoutAccountIban } : {}),
+          ...(input.payoutAccountRoutingNumber ? { payoutAccountRoutingNumber: input.payoutAccountRoutingNumber } : {}),
+        }
+      : {
+          payoutAccountIban: input.payoutAccountIban || generateDemoIban(input.payoutAccountCountryCode, id),
+          payoutAccountRoutingNumber: input.payoutAccountRoutingNumber || generateDemoRouting(id),
+        }),
     payoutAccountBalance: {
       pendingAmount: 0,
       availableAmount: 0,

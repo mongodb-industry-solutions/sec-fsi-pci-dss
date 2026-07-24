@@ -309,7 +309,12 @@ export async function listAllCards(
   if (opts?.funding) query.fundingPayoutAccountInstanceReference = opts.funding;
   // v30 non-CHD truncated-PAN search: last4 (equality) + BIN prefix. Cheap, no QE, no CHD.
   if (opts?.last4) query.paymentCardLast4 = opts.last4.replace(/\D/g, '').slice(-4);
-  if (opts?.bin) query.paymentCardBin = { $regex: `^${opts.bin.replace(/\D/g, '').slice(0, 6)}` };
+  // Only add the BIN prefix predicate when the sanitized input actually has digits: an empty prefix
+  // would produce /^/ which matches every card (unintended full scan).
+  if (opts?.bin) {
+    const binPrefix = opts.bin.replace(/\D/g, '').slice(0, 6);
+    if (binPrefix) query.paymentCardBin = { $regex: `^${binPrefix}` };
+  }
 
   const page = Math.max(1, opts?.page ?? 1);
   const limit = Math.min(100, Math.max(1, opts?.limit ?? 20));

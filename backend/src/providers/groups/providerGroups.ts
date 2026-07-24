@@ -64,7 +64,9 @@ export class ProviderGroups {
       void this.bus.publish(makeEvent({ eventType, correlationId: e.correlationId, businessProcess: 'merchant_onboarding', source: 'psp.core', causationId: e.eventId, payload, bian }));
 
     pub('kyb.screening.requested', { merchantAgreementInstanceReference: merchantRef, merchantName: p.merchantName, merchantCategoryCode: p.merchantCategoryCode, merchantCountryCode: p.merchantCountryCode }, { serviceDomain: 'SD-89 Merchant Relations', controlRecord: 'MerchantAgreementProcedure' });
-    pub('hrp.screening.requested', { cardTransactionInstanceReference: merchantRef, merchantName: p.merchantName }, { serviceDomain: 'SD-13 Party Reference', controlRecord: 'PartyReferenceDataDirectoryEntry' });
+    // HRP screens the entity: pass the merchant reference via accountReference (the field onHrp forwards),
+    // not a transaction id. correlationId already carries the merchant ref for the journey.
+    pub('hrp.screening.requested', { accountReference: merchantRef, merchantName: p.merchantName }, { serviceDomain: 'SD-13 Party Reference', controlRecord: 'PartyReferenceDataDirectoryEntry' });
     pub('aml.screening.requested', { merchantAgreementInstanceReference: merchantRef, merchantCategoryCode: p.merchantCategoryCode }, { serviceDomain: 'SD-99 AML', controlRecord: 'SuspiciousActivityAnalysisAssessment' });
 
     // Owner layer: screen every beneficial owner (controlling person) by reusing the KYC chain.

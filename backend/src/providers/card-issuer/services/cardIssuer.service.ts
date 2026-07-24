@@ -249,7 +249,9 @@ export function validateCard(
   // The tokenized card-on-file path sends no name, so this is skipped (opts.expectedCardholderName
   // may still be set, but suppliedName is empty -> skip). Never logs the names.
   const suppliedName = input.cardHolderName ?? input.cardholderName ?? input.nameOnCard ?? input.name;
-  if (normalizeName(suppliedName) && opts.expectedCardholderName !== undefined) {
+  // Honor the module flag directly (single source of truth): only compare when verifyCardholderName is
+  // enabled, so the check can never fire when the feature is off even if a caller supplies an expected name.
+  if (config.verifyCardholderName && normalizeName(suppliedName) && opts.expectedCardholderName !== undefined) {
     if (normalizeName(suppliedName) !== normalizeName(opts.expectedCardholderName)) {
       return { approved: false, responseCode: '05', network, cvvValidationResult: 'not_provided', decisionReason: 'cardholder_name_mismatch', last4 };
     }

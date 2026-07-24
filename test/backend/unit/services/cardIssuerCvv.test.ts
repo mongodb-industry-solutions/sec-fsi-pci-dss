@@ -77,17 +77,23 @@ describe('extended validation (registration + funding)', () => {
 
 describe('cardholder-name verification (v30.1)', () => {
   const base = { network: 'VISA' } as Record<string, unknown>;
+  // The check only runs when the module flag verifyCardholderName is enabled (default off).
+  const cfgOn = { ...DEFAULT_CARD_ISSUER_CONFIG, verifyCardholderName: true };
   it('approves when the supplied name matches the registered owner (case/spacing lenient)', () => {
-    const r = validateCard({ ...base, cardHolderName: '  JOHN   Doe ' }, DEFAULT_CARD_ISSUER_CONFIG, { expectedCardholderName: 'John Doe' });
+    const r = validateCard({ ...base, cardHolderName: '  JOHN   Doe ' }, cfgOn, { expectedCardholderName: 'John Doe' });
     expect(r.approved).toBe(true);
   });
   it('declines on a name mismatch', () => {
-    const r = validateCard({ ...base, cardHolderName: 'Jane Smith' }, DEFAULT_CARD_ISSUER_CONFIG, { expectedCardholderName: 'John Doe' });
+    const r = validateCard({ ...base, cardHolderName: 'Jane Smith' }, cfgOn, { expectedCardholderName: 'John Doe' });
     expect(r.approved).toBe(false);
     expect(r.decisionReason).toBe('cardholder_name_mismatch');
   });
   it('is skipped on the tokenized path (no name supplied), even with an expected name', () => {
-    const r = validateCard({ ...base }, DEFAULT_CARD_ISSUER_CONFIG, { expectedCardholderName: 'John Doe' });
+    const r = validateCard({ ...base }, cfgOn, { expectedCardholderName: 'John Doe' });
+    expect(r.approved).toBe(true);
+  });
+  it('is skipped entirely when verifyCardholderName is off (default), even on a mismatch', () => {
+    const r = validateCard({ ...base, cardHolderName: 'Jane Smith' }, DEFAULT_CARD_ISSUER_CONFIG, { expectedCardholderName: 'John Doe' });
     expect(r.approved).toBe(true);
   });
 });

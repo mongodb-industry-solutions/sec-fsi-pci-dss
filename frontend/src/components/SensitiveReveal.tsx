@@ -54,6 +54,8 @@ export function SensitiveReveal({
           onClick={toggle}
           disabled={disabled || loading}
           title={shown ? `Hide ${label}` : `Reveal ${label}`}
+          aria-label={shown ? `Hide ${label}` : `Reveal ${label}`}
+          aria-pressed={shown}
           className="p-1.5 rounded text-gray-400 hover:text-[#001E2B] hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
         >
           {loading ? <Loader2 size={15} className="animate-spin" /> : shown ? <EyeOff size={15} /> : <Eye size={15} />}

@@ -53,15 +53,18 @@ export interface KybVerdictInput {
 export function deriveKycCheckStatus(verdict: KycVerdictInput, mode: DecisionMode): CheckStatus {
   if (verdict.sanctionsResult === 'hit' || verdict.verificationStatus === 'fail') return 'rejected';
   if (verdict.verificationStatus === 'manual_review') return 'initiated';
-  if (mode === 'automated' && verdict.riskRating === 'low' && verdict.pepStatus !== true) return 'verified';
+  // Verify ONLY on an affirmatively CLEAN screening: sanctions must be explicitly `clear` (a `pending`
+  // or missing result means the screening is incomplete and must not auto-verify), low risk, no PEP.
+  if (mode === 'automated' && verdict.riskRating === 'low' && verdict.pepStatus !== true && verdict.sanctionsResult === 'clear') return 'verified';
   return 'initiated';
 }
 
 export function deriveKybCheckStatus(verdict: KybVerdictInput, mode: DecisionMode): CheckStatus {
   if (verdict.sanctionsResult === 'hit' || verdict.verificationStatus === 'fail') return 'rejected';
   if (verdict.verificationStatus === 'manual_review') return 'initiated';
-  // sanctionsResult === 'hit' already returned above; only adverse-media can still block auto-verify.
-  if (mode === 'automated' && verdict.businessRiskLevel === 'low' && verdict.adverseMediaResult !== 'hit') {
+  // Verify ONLY on an affirmatively CLEAN screening: both sanctions and adverse media must be explicitly
+  // `clear` (a `pending`/missing result is incomplete and must not auto-verify), low business risk.
+  if (mode === 'automated' && verdict.businessRiskLevel === 'low' && verdict.sanctionsResult === 'clear' && verdict.adverseMediaResult === 'clear') {
     return 'verified';
   }
   return 'initiated';

@@ -128,6 +128,8 @@ export interface KybScreeningCompleted {
   merchantAgreementInstanceReference: string;
   outcome: 'completed' | 'error';
   businessRiskLevel?: 'low' | 'medium' | 'high';
+  sanctionsResult?: 'clear' | 'hit' | 'pending';
+  verificationStatus?: 'pass' | 'fail' | 'manual_review';
   screeningProviderRef?: string;
 }
 
