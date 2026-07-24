@@ -16,32 +16,33 @@ import { api } from '../../../../../../lib/api';
 import { getToken } from '../../../../../../lib/auth';
 import { useNotify } from '../../../../../../components/ui/ConfirmProvider';
 import { useEffectivePermissions } from '../../../../../../lib/permissions';
+import { useDebugMode } from '../../../../../../lib/debugMode';
 
 function Badge({ label, tone }: { label: string; tone: 'green' | 'amber' | 'red' | 'gray' }) {
   const cls = { green: 'bg-emerald-50 text-emerald-700 border-emerald-200', amber: 'bg-amber-50 text-amber-700 border-amber-200', red: 'bg-red-50 text-red-700 border-red-200', gray: 'bg-gray-50 text-gray-600 border-gray-200' }[tone];
   return <span className={`text-[11px] px-1.5 py-0.5 rounded border ${cls}`}>{label}</span>;
 }
 
-// A profile field row: label + encryption-tier badge (the badge label is empty so only the lock/tier
-// icon shows, with the full tier in its title tooltip) + value. Consistent alignment/spacing.
-function ProfileRow({ label, value, enc }: { label: string; value: string; enc: 'qe-equality' | 'qe-none' | 'plaintext' }) {
+// A profile field row: label + info tooltip (what the field means, incl. its encryption tier) + value.
+// No inline encryption badge — the tier is explained in the tooltip to keep the card uncluttered.
+function ProfileRow({ label, value, info }: { label: string; value: string; info?: string }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2.5 border-b border-gray-50 last:border-0">
-      <span className="flex items-center gap-1.5 text-gray-500 shrink-0">{label}<EncryptionBadge label="" type={enc} /></span>
-      <span className="text-gray-800 text-right font-mono truncate">{value || <span className="text-gray-400 font-sans">n/a</span>}</span>
+      <span className="flex items-center gap-1.5 text-gray-500 shrink-0">{label}{info && <Tooltip text={info} />}</span>
+      <span className="text-gray-800 text-right truncate">{value || <span className="text-gray-400">n/a</span>}</span>
     </div>
   );
 }
 
-function fmtGovId(g: unknown): string {
-  if (!g || typeof g !== 'object') return '';
-  const o = g as Record<string, unknown>;
-  const type = String(o.type ?? '').replace(/_/g, ' ');
-  const num = String(o.number ?? '');
-  const country = o.issuingCountry ? String(o.issuingCountry) : '';
-  const exp = o.expiryDate ? String(o.expiryDate).slice(0, 10) : '';
-  const suffix = [country, exp && `exp ${exp}`].filter(Boolean).join(', ');
-  return `${type} ${num}${suffix ? ` (${suffix})` : ''}`.trim();
+// Humanize an enum/snake_case value for display, e.g. 'personal_banking' → 'Personal Banking',
+// 'service_account' → 'Service Account', 'sme' → 'SME'. Known short acronyms stay upper-case.
+const ACRONYMS = new Set(['sme', 'id', 'vat', 'ssn', 'kyc', 'kyb', 'ubo', 'pep', 'usd', 'eur', 'gbp', 'us', 'uk', 'eu']);
+function humanize(v: unknown): string {
+  const s = v == null ? '' : String(v).trim();
+  if (!s) return '';
+  return s.split(/[_\-\s]+/).filter(Boolean)
+    .map((w) => (ACRONYMS.has(w.toLowerCase()) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
+    .join(' ');
 }
 
 function fmtAddress(a: unknown): string {
@@ -56,6 +57,7 @@ export default function KycDetailPage() {
   const partyRef = String(params.partyInstanceReference);
   const notify = useNotify();
   const { can } = useEffectivePermissions();
+  const { debugMode } = useDebugMode();
   const canManage = can('customers', 'manage');
   const [token, setToken] = useState('');
   const [rec, setRec] = useState<Record<string, unknown> | null>(null);
@@ -107,35 +109,59 @@ export default function KycDetailPage() {
   const sanctions = String(kyc.customerAgreementKycCheckSanctionsResult ?? r.customerAgreementKycCheckSanctionsResult ?? 'n/a');
   const pep = kyc.customerAgreementKycCheckPepStatus ?? r.customerAgreementKycCheckPepStatus;
   const sensitiveMasked = Boolean(r.sensitiveMasked);
+  const govId = (r.customerAgreementGovernmentID ?? {}) as Record<string, unknown>;
 
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Modules', href: '/system/admin/modules' }, { label: 'KYC', href: '/system/admin/modules/kyc' }, { label: String(r.customerName ?? r.partyName ?? partyRef).slice(0, 24) }]} />
       <SectionHeader icon={UserCheck} title={String(r.customerName ?? r.partyName ?? 'Customer')} description="KYC administration: verdict review, data correction, re-screen, process timeline." debugInfo={`party=${partyRef} · SD-53`} />
 
-      {/* Identity & documents (SD-13 party + SD-53 agreement). QE-searchable fields are decrypted at rest
-          for the KYC admin (need-to-know); each field is badged with its encryption tier. */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="font-semibold text-sm text-gray-900 mb-3 flex items-center gap-1.5"><IdCard size={15} /> Identity &amp; documents
-          <Tooltip text="Full person profile (SD-13 party + SD-53 agreement). Fields badged QE are encrypted at rest in Atlas (Queryable Encryption); the driver decrypts them in-process for a role with need-to-know. QE-searchable identity/document fields are shown here; QE:none fields are under Protected details (audited reveal)." /></h3>
-        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-          <ProfileRow label="Full name" enc="qe-equality" value={String(r.customerName ?? '')} />
-          <ProfileRow label="Party type" enc="plaintext" value={String(r.partyType ?? '')} />
-          <ProfileRow label="Date of birth" enc="qe-equality" value={r.partyDateOfBirth ? String(r.partyDateOfBirth).slice(0, 10) : ''} />
-          <ProfileRow label="Nationality" enc="qe-equality" value={String(r.partyNationality ?? '')} />
-          <ProfileRow label="Place of birth" enc="qe-equality" value={String(r.partyPlaceOfBirth ?? '')} />
-          <ProfileRow label="Sex" enc="qe-equality" value={String(r.partySex ?? '')} />
-          <ProfileRow label="Government ID" enc="qe-equality" value={fmtGovId(r.customerAgreementGovernmentID)} />
-          <ProfileRow label="Tax ID" enc="qe-equality" value={String(r.customerAgreementTaxIDNumber ?? '')} />
-          <ProfileRow label="Occupation" enc="qe-equality" value={String(r.customerAgreementOccupation ?? '')} />
-          <ProfileRow label="Segment" enc="plaintext" value={String(r.customerSegment ?? '')} />
-          <ProfileRow label="Agreement status" enc="plaintext" value={String(r.customerAgreementStatus ?? '')} />
-          <ProfileRow label="Enrolled" enc="plaintext" value={r.customerAgreementEnrollmentDate ? String(r.customerAgreementEnrollmentDate).slice(0, 10) : ''} />
-          <div className="sm:col-span-2 flex items-center justify-between gap-3 py-2.5 border-b border-gray-50 last:border-0">
-            <span className="flex items-center gap-2 text-gray-500 shrink-0">Agreement reference<EncryptionBadge label="" type="qe-equality" /></span>
-            <span className="text-gray-800 text-right font-mono text-xs break-all">{String(r.customerAgreementReference ?? partyRef)}</span>
-          </div>
-        </dl>
+      {/* Detailed person profile, split into focused cards (two columns on large screens). Each field
+          carries an info tooltip (what it means, incl. its encryption tier). QE-searchable fields are
+          decrypted at rest for the KYC admin (need-to-know). */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+        {/* Identity (SD-13 party demographics) */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h3 className="font-semibold text-sm text-gray-900 mb-2 flex items-center gap-1.5"><UserCheck size={15} /> Identity
+            <Tooltip text="SD-13 Party identity (demographics). QE-searchable fields are encrypted at rest in Atlas (Queryable Encryption) and decrypted in-process for a role with need-to-know." /></h3>
+          <dl className="text-sm">
+            <ProfileRow label="Full name" value={String(r.customerName ?? '')} info="Legal name of the party (SD-13). Encrypted at rest with QE substring search so it can be found without decrypting server-side." />
+            <ProfileRow label="Date of birth" value={r.partyDateOfBirth ? String(r.partyDateOfBirth).slice(0, 10) : ''} info="Party date of birth (SD-13). Encrypted at rest with QE range so it is searchable by range without exposing the value." />
+            <ProfileRow label="Nationality" value={humanize(r.partyNationality)} info="Declared nationality. QE:equality encrypted (searchable by exact match)." />
+            <ProfileRow label="Place of birth" value={humanize(r.partyPlaceOfBirth)} info="Declared place of birth. QE:equality encrypted at rest." />
+            <ProfileRow label="Sex" value={humanize(r.partySex)} info="Party sex (SD-13). QE:equality encrypted at rest." />
+          </dl>
+        </div>
+
+        {/* Identity document (SD-53) — one of the fundamental KYC data points, broken down per leaf */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h3 className="font-semibold text-sm text-gray-900 mb-2 flex items-center gap-1.5"><IdCard size={15} /> Identity document
+            <Tooltip text="The government-issued identity document verified at KYC (SD-53). Each leaf is QE-encrypted at rest: number by suffix search, type / issuing country by equality, expiry by range. The tax ID is a separate QE:prefix field." /></h3>
+          <dl className="text-sm">
+            <ProfileRow label="Document type" value={humanize(govId.type)} info="Kind of identity document (passport, national ID, driver licence …). QE:equality encrypted at rest." />
+            <ProfileRow label="Document number" value={String(govId.number ?? '')} info="Identity document number. QE:suffix encrypted (suffix-searchable while encrypted at rest)." />
+            <ProfileRow label="Issuing country" value={humanize(govId.issuingCountry)} info="Country that issued the document (ISO). QE:equality encrypted at rest." />
+            <ProfileRow label="Expiry date" value={govId.expiryDate ? String(govId.expiryDate).slice(0, 10) : ''} info="Document expiry date. QE:range encrypted (searchable by range, e.g. expiring soon), value not exposed." />
+            <ProfileRow label="Tax ID" value={String(r.customerAgreementTaxIDNumber ?? '')} info="Taxpayer identification number. QE:prefix encrypted (prefix-searchable while encrypted at rest)." />
+          </dl>
+        </div>
+
+        {/* Agreement summary (SD-53) */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h3 className="font-semibold text-sm text-gray-900 mb-2 flex items-center gap-1.5"><ShieldCheck size={15} /> Agreement
+            <Tooltip text="SD-53 customer-agreement summary: commercial segment, lifecycle status, enrolment date and the internal agreement reference." /></h3>
+          <dl className="text-sm">
+            <ProfileRow label="Party type" value={humanize(r.partyType)} info="Classification of the party: customer, employee or service account. Not PII; stored in plaintext." />
+            <ProfileRow label="Occupation" value={humanize(r.customerAgreementOccupation)} info="Declared occupation (KYC/AML risk signal). QE:equality encrypted at rest." />
+            <ProfileRow label="Segment" value={humanize(r.customerSegment)} info="Commercial segment (retail / premium / corporate / SME). Business metadata, plaintext." />
+            <ProfileRow label="Agreement status" value={humanize(r.customerAgreementStatus)} info="BIAN SD-53 agreement lifecycle status (initiated / active / suspended / closed …). Plaintext." />
+            <ProfileRow label="Enrolled" value={r.customerAgreementEnrollmentDate ? String(r.customerAgreementEnrollmentDate).slice(0, 10) : ''} info="Date the customer agreement was enrolled. Plaintext business metadata." />
+            <div className="flex items-center justify-between gap-3 py-2.5">
+              <span className="flex items-center gap-1.5 text-gray-500 shrink-0">Agreement reference<Tooltip text="Internal reference for the customer agreement (SD-53), used for lookups. QE:equality encrypted at rest." /></span>
+              <span className="text-gray-800 text-right font-mono text-xs break-all">{String(r.customerAgreementReference ?? partyRef)}</span>
+            </div>
+          </dl>
+        </div>
       </div>
 
       {/* Protected details (QE:none, L2-only). Masked by default; audited on-demand reveal (eye). */}
@@ -143,12 +169,12 @@ export default function KycDetailPage() {
         <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
           <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-1.5"><Lock size={15} /> Protected details
             <Tooltip text="QE:none fields (encrypted at rest, NOT searchable): residential/postal address, source of funds, purpose of relationship, risk notes. Hidden by default; the eye performs an on-demand, ephemeral, audited reveal (PCI Req 3.2/3.3, GDPR need-to-know, Req 10). The value is never persisted or logged; only the fact of the reveal is audited (field names only)." /></h3>
-          <EncryptionBadge label="QE: encrypted, not searchable" type="qe-none" />
+          {debugMode && <EncryptionBadge label="QE: encrypted, not searchable" type="qe-none" />}
         </div>
         <div className="divide-y divide-gray-50">
           <SensitiveReveal label="Residential address" masked="•••• (masked)" fetchValue={async () => fmtAddress((await fetchReveal()).customerAgreementResidentialAddress) || 'n/a'} />
-          <SensitiveReveal label="Source of funds" masked="•••• (masked)" fetchValue={async () => String((await fetchReveal()).customerAgreementSourceOfFunds ?? 'n/a')} />
-          <SensitiveReveal label="Purpose of relationship" masked="•••• (masked)" fetchValue={async () => String((await fetchReveal()).customerAgreementPurposeOfRelationship ?? 'n/a')} />
+          <SensitiveReveal label="Source of funds" masked="•••• (masked)" fetchValue={async () => humanize((await fetchReveal()).customerAgreementSourceOfFunds) || 'n/a'} />
+          <SensitiveReveal label="Purpose of relationship" masked="•••• (masked)" fetchValue={async () => humanize((await fetchReveal()).customerAgreementPurposeOfRelationship) || 'n/a'} />
           <SensitiveReveal label="Risk notes" masked="•••• (masked)" fetchValue={async () => String((await fetchReveal()).customerAgreementRiskNotes ?? 'n/a')} />
           <SensitiveReveal label="Postal address" masked="•••• (masked)" fetchValue={async () => fmtAddress((await fetchReveal()).partyPostalAddress) || 'n/a'} />
         </div>
@@ -157,7 +183,7 @@ export default function KycDetailPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
         <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-1.5"><ShieldCheck size={15} /> KYC verdict
-          <Tooltip text="Structured KYC verdict from the screening chain (kyc_identity + hrp). The BQ:Step status is derived from the verdict by the shared mapper (§3.7): a sanctions hit → rejected; automated + low risk + no PEP → verified; manual/assisted → stays initiated until an officer resolves." /></h3>
+          <Tooltip text="Structured KYC verdict from the screening chain (kyc_identity + hrp). The BQ:Step status is derived from the verdict by the shared mapper: a sanctions hit → rejected; automated + low risk + no PEP → verified; manual/assisted → stays initiated until an officer resolves." /></h3>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-gray-500 text-xs">Status</span><Badge label={status} tone={status === 'verified' ? 'green' : status === 'rejected' ? 'red' : 'gray'} />
           <span className="text-gray-500 text-xs ml-2">Risk</span><Badge label={risk} tone={risk === 'low' ? 'green' : risk === 'high' ? 'red' : 'amber'} />

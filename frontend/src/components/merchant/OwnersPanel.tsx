@@ -3,7 +3,8 @@
 // and the merchant detail Owners tab. Read-only unless `canManage` (merchants:manage). Enforces the
 // invariants client-side (sum ≤ 100 meter, one-primary) mirroring the server (which is authoritative).
 import { useEffect, useState, useCallback } from 'react';
-import { Users, Star, Plus, Trash2, Save, AlertTriangle } from 'lucide-react';
+import Link from 'next/link';
+import { Users, Star, Plus, Trash2, Save, AlertTriangle, ArrowUpRight } from 'lucide-react';
 import { Tooltip } from '../Tooltip';
 import { api } from '../../lib/api';
 import { useNotify } from '../ui/ConfirmProvider';
@@ -109,7 +110,15 @@ export function OwnersPanel({ merchantId, token, canManage }: { merchantId: stri
             {owners.map((o) => (
               <tr key={o.merchantBeneficialOwnerPartyReference} className="border-b border-gray-50">
                 <td className="py-2 pr-3">
-                  <div className="font-medium text-gray-900">{o.party?.partyName ?? o.merchantBeneficialOwnerPartyReference.slice(0, 8)}</div>
+                  {/* Staff (merchants:manage) get a link to the owner's KYC detail — closes the KYB→KYC
+                      analysis loop (owner layer). A merchant-owner viewing the shell sees plain text. */}
+                  {canManage ? (
+                    <Link href={`/system/admin/modules/kyc/${o.merchantBeneficialOwnerPartyReference}`} title="Open this owner's KYC record" className="font-medium text-[#016BF8] hover:underline inline-flex items-center gap-1">
+                      {o.party?.partyName ?? o.merchantBeneficialOwnerPartyReference.slice(0, 8)}<ArrowUpRight size={12} className="text-gray-400" />
+                    </Link>
+                  ) : (
+                    <span className="font-medium text-gray-900">{o.party?.partyName ?? o.merchantBeneficialOwnerPartyReference.slice(0, 8)}</span>
+                  )}
                   <div className="font-mono text-[11px] text-gray-400">{o.merchantBeneficialOwnerPartyReference.slice(0, 13)}</div>
                 </td>
                 <td className="py-2 pr-3 hidden sm:table-cell">{ROLE_LABEL[o.merchantBeneficialOwnerRole] ?? o.merchantBeneficialOwnerRole}</td>
