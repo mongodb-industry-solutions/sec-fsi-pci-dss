@@ -10,6 +10,7 @@ import {
 } from '../lib/api';
 import { Pagination } from './Pagination';
 import { LoadingIndicator } from './LoadingIndicator';
+import { RawMongoPanel } from './RawMongoPanel';
 import { useDebugMode } from '../lib/debugMode';
 
 // v27 Phase 5: ONE shared encrypted-KYC search surface, mounted in both the production
@@ -55,9 +56,26 @@ const MODE_BADGE_COLOR: Record<KycSearchMode, string> = {
 
 const DEBOUNCE_MS = 450;
 
+// ISO country codes used by the KYC registry (nationality / issuing country enums). Shown as
+// a friendly name plus the code, so the operator sees "Spain (ES)" instead of the raw "ES".
+const COUNTRY_NAMES: Record<string, string> = {
+  ES: 'Spain', GB: 'United Kingdom', US: 'United States', FR: 'France', DE: 'Germany',
+  IT: 'Italy', PT: 'Portugal', PL: 'Poland', MX: 'Mexico', NG: 'Nigeria',
+};
+
+// Turn a system enum value (e.g. "national_id", "driver_license") into a human label.
+function humanizeEnum(v: string): string {
+  return v
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .replace(/\bId\b/g, 'ID');
+}
+
 function enumOptionLabel(field: KycSearchFieldDef, v: string | boolean): string {
   if (field.bsonType === 'bool') return v === true || v === 'true' ? 'Yes' : 'No';
-  return String(v);
+  const s = String(v);
+  if (COUNTRY_NAMES[s]) return `${COUNTRY_NAMES[s]} (${s})`;
+  return humanizeEnum(s);
 }
 
 function enumOptionValue(v: string | boolean): string {
@@ -240,18 +258,27 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
               className="border rounded-lg px-3 py-2 text-sm bg-white"
             >
               {fields.map((f) => (
-                <option key={f.key} value={f.key}>{f.label}</option>
+                <option key={f.key} value={f.key}>
+                  {/* Debug mode annotates each option with its QE query type, so the operator
+                      can see which fields support contains / starts-with / range, etc. */}
+                  {debugMode ? `${f.label} (${MODE_BADGE[f.mode]})` : f.label}
+                </option>
               ))}
             </select>
           </div>
 
           {field && (
-            <span
-              className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-xs font-medium ${MODE_BADGE_COLOR[field.mode]}`}
-              title={`Query mode: ${MODE_BADGE[field.mode]}`}
-            >
-              <Lock size={11} /> {MODE_BADGE[field.mode]} · over encrypted data
-            </span>
+            // Invisible label spacer keeps the badge's top edge aligned with the select input
+            // (not the "Search field" label above it).
+            <div>
+              <label className="block text-xs font-medium mb-1 invisible" aria-hidden="true">Mode</label>
+              <span
+                className={`inline-flex items-center gap-1 rounded border px-2 py-2 text-xs font-medium ${MODE_BADGE_COLOR[field.mode]}`}
+                title={`Query mode: ${MODE_BADGE[field.mode]}`}
+              >
+                <Lock size={11} /> {MODE_BADGE[field.mode]} · over encrypted data
+              </span>
+            </div>
           )}
 
           {/* Manual reload: re-run the current query against the server (e.g. to refresh after
@@ -457,6 +484,33 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
         )}
         </div>
       ) : null}
+
+      {/* Debug mode: raw (undecrypted) Atlas documents for the first match, so the demo can
+          prove the queried fields are stored as QE ciphertext ("$binary") even though the
+          search matched them. The query value never leaves the server as plaintext. */}
+      {debugMode && results && results.length > 0 && (
+        <RawMongoPanel
+          key={results[0].customerAgreementInstanceReference}
+          token={token}
+          title="Debug - Raw encrypted documents (first match)"
+          sections={[
+            {
+              kind: 'mongo',
+              collection: 'party',
+              id: results[0].partyInstanceReference,
+              label: 'party',
+              description: 'KYC identity (name, DOB, nationality, place of birth): QE encrypted',
+            },
+            {
+              kind: 'mongo',
+              collection: 'customerAgreementProcedure',
+              id: results[0].customerAgreementInstanceReference,
+              label: 'customerAgreementProcedure',
+              description: 'Agreement, government ID, tax ID, KYC risk: QE encrypted',
+            },
+          ]}
+        />
+      )}
     </div>
   );
 }
