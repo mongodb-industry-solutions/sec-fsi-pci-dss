@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
-import { loginUser, getEnabledDomains, registerSelfServiceUser, updateAuthProfile, bumpSessionEpoch, JwtPayload } from '../services/auth.service';
+import { loginUser, getEnabledDomains, registerSelfServiceUser, updateAuthProfile, bumpSessionEpoch, changeOwnPassword, JwtPayload } from '../services/auth.service';
 import { getSelfProfile, updateSelfProfile } from '../../customer/services/customerAgreement.service';
 import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../models/party.model';
@@ -199,6 +199,53 @@ Password for all demo users: \`demo-password\``,
     if (!user?.sub) return reply.status(401).send({ error: 'Unauthenticated' });
     await bumpSessionEpoch(fastify.db, user.sub);
     return reply.status(200).send({ loggedOut: true });
+  });
+
+  // POST /api/v1/auth/password/change — the authenticated user changes their own password.
+  // Requires the current password plus the new one (server also re-checks the policy). Confirmation
+  // matching is a client-side concern, but the API accepts only `currentPassword` + `newPassword`.
+  // On success every OTHER session is invalidated (epoch bump) and a fresh token is returned for
+  // the current session. Behind the global auth middleware, so `request.user` is set.
+  fastify.post('/password/change', {
+    schema: {
+      tags: ['auth'],
+      summary: 'Change your own password',
+      description: 'Verifies the current password, enforces the password policy on the new one, then '
+        + 'rehashes it (12-round bcrypt) and invalidates all other outstanding sessions. Returns a fresh '
+        + 'token so the current session stays signed in. Only available for `local` accounts.',
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['currentPassword', 'newPassword'],
+        properties: {
+          currentPassword: { type: 'string', description: 'The account\'s current password.' },
+          newPassword:     { type: 'string', minLength: 8, description: 'New password (min 8 chars, at least one letter and one number; enforced server-side).' },
+        },
+      },
+      response: {
+        200: { type: 'object', properties: { token: { type: 'string', description: 'Fresh JWT for the current session, stamped with the new session epoch.' } } },
+        400: { $ref: 'Error#', description: 'Weak password, no-op change, or non-local account.' },
+        401: { $ref: 'Error#', description: 'Current password is incorrect, or not authenticated.' },
+        404: { $ref: 'Error#', description: 'Account not found.' },
+        500: { $ref: 'Error#', description: 'Unexpected server error.' },
+      },
+    },
+  }, async (request, reply) => {
+    const user = (request as FastifyRequest & { user?: JwtPayload }).user;
+    if (!user?.sub) return reply.status(401).send({ error: 'Unauthenticated' });
+    const { currentPassword, newPassword } = request.body as { currentPassword: string; newPassword: string };
+    if (!currentPassword || !newPassword) {
+      return reply.status(400).send({ error: 'currentPassword and newPassword are required' });
+    }
+    try {
+      const { token } = await changeOwnPassword(fastify.db, user.sub, currentPassword, newPassword);
+      return reply.status(200).send({ token });
+    } catch (err: unknown) {
+      const e = err as { statusCode?: number; message: string };
+      const allowed = [400, 401, 404];
+      const statusCode = (allowed.includes(e.statusCode ?? 0) ? e.statusCode : 500) as 400 | 401 | 404 | 500;
+      return reply.status(statusCode).send({ error: e.message });
+    }
   });
 
   // NOTE: the demo-user roster endpoint was consolidated to GET /api/v1/system/users (demo.controller).

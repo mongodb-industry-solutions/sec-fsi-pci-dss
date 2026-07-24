@@ -802,6 +802,14 @@ export const api = {
         { method: 'PATCH', body: JSON.stringify(body) },
         token
       ),
+    // Change own password: requires the current password + new one. Returns a fresh token (the
+    // current session survives; all other sessions are invalidated server-side).
+    changePassword: (body: { currentPassword: string; newPassword: string }, token: string) =>
+      apiFetch<{ token: string }>(
+        '/api/v1/auth/password/change',
+        { method: 'POST', body: JSON.stringify(body) },
+        token
+      ),
     me: (token: string) =>
       apiFetch<{
         sub: string;
