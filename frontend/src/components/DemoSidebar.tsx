@@ -14,6 +14,7 @@ import {
 import { getToken, decodeToken } from '../lib/auth';
 import { api } from '../lib/api';
 import { useNotificationsChanged, useNotificationsStream } from '../lib/useNotificationsStream';
+import { formatBadgeCount } from '../lib/badge';
 import { CarouselNav } from './CarouselNav';
 
 interface NavItem {
@@ -199,7 +200,7 @@ export function DemoSidebar() {
               {!collapsed && <span className="truncate">{item.label}</span>}
               {item.path === '/system/notifications' && notifCount > 0 && (
                 <span className={`${collapsed ? 'absolute top-1.5 right-1.5 w-2 h-2 p-0' : 'ml-auto min-w-[18px] h-[18px] px-1'} rounded-full bg-[#00ED64] text-[#001E2B] text-[10px] font-bold flex items-center justify-center`}>
-                  {collapsed ? '' : notifCount}
+                  {collapsed ? '' : formatBadgeCount(notifCount)}
                 </span>
               )}
             </Link>

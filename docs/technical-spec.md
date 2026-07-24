@@ -3739,7 +3739,15 @@ and makes `paymentCardNetwork` / `paymentCardExpirationDate` optional (external 
   `(customer, token)`.
 - **FDS/AML surfaces.** Customer card detail returns `cardHolderCount` (number only). Investigation
   (L1/L2/auditor): `GET /api/v1/customer/card-registry/:token` → holders + count; transaction detail
-  shows a shared-card indicator. Auditor Data Integrity (`/api/v1/fraud/integrity` → `cards`):
+  shows a shared-card indicator. **Investigation pivot** (L1/L2/auditor):
+  `GET /api/v1/customer/card-by-token/:token` resolves a transaction's surrogate token
+  (`paymentCardReference`) to the identifiers needed to continue an investigation:
+  `paymentCardInstanceReference` (card detail), `customerAgreementInstanceReference` (owner/KYC) and
+  `fundingPayoutAccountInstanceReference` (funding account), plus masked PAN / network / status. No
+  CHD, no card expiry. Used by the transaction detail page to link the card token to the card page,
+  resolve the customer when the account reference is not a canonical `ACC-xxx` (card-not-present
+  merchant checkout), and link the funding bank account. Auditor Data Integrity
+  (`/api/v1/fraud/integrity` → `cards`):
   duplicate arrangements, inconsistent tokenization (same masked card under multiple tokens), registry
   drift.
 

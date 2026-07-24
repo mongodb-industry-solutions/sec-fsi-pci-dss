@@ -998,6 +998,17 @@ export const api = {
         {},
         token
       ),
+    // Investigation pivot: resolve card / owner-agreement / funding-account UUIDs from a
+    // transaction's surrogate token. Investigation roles only (backend-gated).
+    getCardByToken: (cardToken: string, token: string) =>
+      apiFetch<{
+        paymentCardInstanceReference?: string;
+        customerAgreementInstanceReference?: string;
+        fundingPayoutAccountInstanceReference?: string;
+        paymentCardMaskedPanDisplay?: string;
+        paymentCardNetwork?: string | null;
+        paymentCardStatus?: string;
+      }>(`/api/v1/customer/card-by-token/${encodeURIComponent(cardToken)}`, {}, token),
     // Edit the alias/note; the only mutable attributes of a saved card. Owner-only; audited.
     updateCard: (
       customerId: string,

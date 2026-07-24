@@ -12,7 +12,8 @@ import { useResource } from '../../../../lib/useResource';
 import { useEffectivePermissions } from '../../../../lib/permissions';
 import { AccessDenied } from '../../../../components/AccessDenied';
 import { storeEscalationToken, readEscalationToken } from '../../../../lib/escalation';
-import { Eye, EyeOff, UserCheck, Store, ChevronRight } from 'lucide-react';
+import { Tooltip } from '../../../../components/Tooltip';
+import { Eye, EyeOff, UserCheck, Store, ChevronRight, CreditCard, Landmark, Lock, AlertTriangle } from 'lucide-react';
 
 type TxnDetail = Awaited<ReturnType<typeof api.transactions.getById>>;
 
@@ -58,6 +59,16 @@ function RevealField({ label, value, type }: { label: string; value: string; typ
   );
 }
 
+// Grid label cell with an optional info tooltip, so an auditor understands each field's meaning.
+function InfoLabel({ label, tip }: { label: string; tip?: string }) {
+  return (
+    <span className="text-gray-500 flex items-center">
+      {label}
+      {tip && <Tooltip text={tip} />}
+    </span>
+  );
+}
+
 export default function TransactionDetailPage() {
   const { txnId } = useParams<{ txnId: string }>();
   const router = useRouter();
@@ -76,6 +87,16 @@ export default function TransactionDetailPage() {
   // Parties involved (role-gated by the backend): customer (KYC) + merchant (KYB).
   const [partyCustomer, setPartyCustomer] = useState<Record<string, unknown> | null>(null);
   const [partyMerchant, setPartyMerchant] = useState<Record<string, unknown> | null>(null);
+  // True once customer resolution has run, so the KYC panel can distinguish "loading" from
+  // "no PSP customer" (external card-not-present) instead of spinning forever.
+  const [custResolveDone, setCustResolveDone] = useState(false);
+  // Investigation pivot: card/owner/funding-account UUIDs resolved from the transaction's token.
+  const [cardResolved, setCardResolved] = useState<{ cardInstanceRef?: string; agreementUuid?: string; fundingAccountRef?: string } | null>(null);
+  // Funding (payer source) bank account: masked by default, IBAN revealed on demand (GDPR/PSD2).
+  const [fundingAccount, setFundingAccount] = useState<Record<string, unknown> | null>(null);
+  const [ibanShown, setIbanShown] = useState(false);
+  const [ibanValue, setIbanValue] = useState<string | null>(null);
+  const [ibanLoading, setIbanLoading] = useState(false);
   // Breadcrumb context: a transaction opened from a case reflects that path.
   const [fromCase, setFromCase] = useState<{ caseId: string; caseRef?: string } | null>(null);
   const { loading: permLoading, can: canPerm } = useEffectivePermissions();
@@ -124,16 +145,67 @@ export default function TransactionDetailPage() {
   // L2 sees the sensitive KYC fields in place. Merchant data carries no PII.
   useEffect(() => {
     if (!txn || !token) return;
-    const accountRef = txn.cardTransactionAccountReference;
-    if (accountRef) {
-      api.customer.getByAccountRef(accountRef, token, escalationToken ?? undefined)
-        .then(setPartyCustomer).catch(() => setPartyCustomer(null));
-    }
+    let cancelled = false;
+    setCustResolveDone(false);
+    (async () => {
+      const accountRef = txn.cardTransactionAccountReference;
+      // Primary path: the account reference is a canonical ACC-xxx that resolves the customer.
+      let cust = accountRef
+        ? await api.customer.getByAccountRef(accountRef, token, escalationToken ?? undefined).catch(() => null)
+        : null;
+      let resolved: { cardInstanceRef?: string; agreementUuid?: string; fundingAccountRef?: string } | null = null;
+      // The transaction always carries the surrogate token; resolve it to the card / owner /
+      // funding-account UUIDs so the investigator can pivot, and use it as the customer fallback
+      // when the account reference is not resolvable (card-not-present merchant checkout).
+      if (txn.paymentCardReference) {
+        const card = await api.customer.getCardByToken(txn.paymentCardReference, token).catch(() => null);
+        if (card?.paymentCardInstanceReference) {
+          resolved = {
+            cardInstanceRef: card.paymentCardInstanceReference,
+            agreementUuid: card.customerAgreementInstanceReference,
+            fundingAccountRef: card.fundingPayoutAccountInstanceReference ?? undefined,
+          };
+          if (!cust?.customerAgreementInstanceReference && card.customerAgreementInstanceReference) {
+            cust = await api.customer.getById(card.customerAgreementInstanceReference, token, escalationToken ?? undefined).catch(() => null);
+          }
+        }
+      }
+      if (cancelled) return;
+      setPartyCustomer(cust);
+      setCardResolved(resolved);
+      setCustResolveDone(true);
+    })();
     const mid = txn.merchantAgreementInstanceReference;
     if (mid) {
-      api.merchants.getById(mid, token).then(setPartyMerchant).catch(() => setPartyMerchant(null));
+      api.merchants.getById(mid, token).then((m) => { if (!cancelled) setPartyMerchant(m); }).catch(() => { if (!cancelled) setPartyMerchant(null); });
     }
+    return () => { cancelled = true; };
   }, [txn, token, escalationToken]);
+
+  // Payer's funding (source) bank account, once the card resolves it and we know the party.
+  useEffect(() => {
+    const partyRef = partyCustomer?.partyInstanceReference as string | undefined;
+    const acctRef = cardResolved?.fundingAccountRef;
+    setIbanShown(false); setIbanValue(null);
+    if (!token || !partyRef || !acctRef) { setFundingAccount(null); return; }
+    api.accounts.get(partyRef, acctRef, token).then(setFundingAccount).catch(() => setFundingAccount(null));
+  }, [token, partyCustomer, cardResolved]);
+
+  async function toggleIban() {
+    if (ibanShown) { setIbanShown(false); return; }
+    if (ibanValue !== null) { setIbanShown(true); return; }
+    const partyRef = partyCustomer?.partyInstanceReference as string | undefined;
+    const acctRef = cardResolved?.fundingAccountRef;
+    if (!partyRef || !acctRef) return;
+    setIbanLoading(true);
+    try {
+      const r = await api.accounts.revealIban(partyRef, acctRef, token);
+      setIbanValue(r.payoutAccountIban);
+      setIbanShown(true);
+    } catch { /* reveal not permitted / unavailable */ } finally {
+      setIbanLoading(false);
+    }
+  }
 
   async function approveAndReveal() {
     // Approve the escalation on the linked case to obtain a sensitive-access token. Setting the
@@ -198,6 +270,22 @@ export default function TransactionDetailPage() {
   const acctRef = txn.cardTransactionAccountReference;
   const custSensitive = partyCustomer?.sensitive as { customerAgreementResidentialAddress?: { streetAddress?: string; city?: string; postalCode?: string; countryCode?: string }; governmentIdentificationReference?: string; customerAgreementRiskNotes?: string } | undefined;
 
+  // The account reference mirrors the card token on card-not-present merchant checkouts that
+  // had no customer account reference; flag it so the auditor is not misled.
+  const acctRefIsToken = !!acctRef && acctRef === txn.paymentCardReference;
+  const partyRef = partyCustomer?.partyInstanceReference as string | undefined;
+  const agreementUuid = (partyCustomer?.customerAgreementInstanceReference as string | undefined) ?? cardResolved?.agreementUuid;
+  // Staff-mode deep links (read-only) into the card and funding-account detail pages.
+  const cardHref = cardResolved?.cardInstanceRef && agreementUuid && partyRef
+    ? `/system/cards/${cardResolved.cardInstanceRef}?ctx=staff&customerId=${encodeURIComponent(agreementUuid)}&partyRef=${encodeURIComponent(partyRef)}`
+    : null;
+  const accountHref = cardResolved?.fundingAccountRef && partyRef
+    ? `/system/accounts/${cardResolved.fundingAccountRef}?ctx=staff&partyRef=${encodeURIComponent(partyRef)}`
+    : null;
+  const currency = txn.cardTransactionAmount?.currency;
+  const feeAmount = (txn as { feeAmount?: number }).feeAmount;
+  const acceptanceMethod = (txn as { cardTransactionAcceptanceMethod?: string }).cardTransactionAcceptanceMethod;
+
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <Breadcrumb items={crumbs} />
@@ -212,7 +300,10 @@ export default function TransactionDetailPage() {
             </p>
           </div>
           <div className="text-right shrink-0">
-            <p className="text-2xl font-bold text-gray-900">{formattedAmount}</p>
+            <p className="text-2xl font-bold text-gray-900">
+              {formattedAmount}
+              {currency && <span className="text-sm font-medium text-gray-400 ml-1.5">{currency}</span>}
+            </p>
             <span className={`text-xs px-2 py-0.5 rounded font-medium ${STATUS_COLORS[txn.cardTransactionStatus ?? ''] ?? 'bg-gray-100 text-gray-700'}`}>
               {txn.cardTransactionStatus}
             </span>
@@ -220,23 +311,43 @@ export default function TransactionDetailPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm border-t pt-4">
-          <span className="text-gray-500">Transaction ID</span>
+          <InfoLabel label="Transaction ID" tip="BIAN SD-254 CardTransactionLog instance reference. The immutable primary key for this transaction record." />
           <span className="font-mono text-xs break-all">{txn.cardTransactionInstanceReference ?? txnId}</span>
+          <InfoLabel label="Amount" tip="Authorized amount and settlement currency (ISO 4217). This card transaction is single-currency; no FX conversion applies." />
+          <span className="font-medium">{formattedAmount}{currency ? <span className="text-gray-400 font-normal ml-1">({currency})</span> : null}</span>
+          {txn.cardTransactionType && (
+            <>
+              <InfoLabel label="Type" tip="BIAN SD-254 transaction type: purchase, cash advance, balance transfer, refund, fee or adjustment." />
+              <span className="capitalize">{txn.cardTransactionType.replace(/_/g, ' ')}</span>
+            </>
+          )}
+          {feeAmount != null && (
+            <>
+              <InfoLabel label="Merchant commission" tip="BIAN SD-89 acquiring commission captured on this payment (fee attributed to the merchant), in the settlement currency." />
+              <span className="font-mono text-xs">{currency ? new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(feeAmount) : feeAmount}</span>
+            </>
+          )}
           {txn.cardTransactionChannel && (
             <>
-              <span className="text-gray-500">Channel</span>
+              <InfoLabel label="Channel" tip="How the card was presented: online (e-commerce), point of sale, contactless (NFC), or ATM. Drives risk scoring." />
               <span>{CHANNEL_LABELS[txn.cardTransactionChannel] ?? txn.cardTransactionChannel}</span>
             </>
           )}
           {txn.cardTransactionInitiationType && (
             <>
-              <span className="text-gray-500">Initiation</span>
+              <InfoLabel label="Initiation" tip="Who initiated the payment: customer-initiated (CIT) or merchant-initiated (MIT, e.g. recurring). Relevant to SCA/PSD2." />
               <span>{INIT_LABELS[txn.cardTransactionInitiationType] ?? txn.cardTransactionInitiationType}</span>
+            </>
+          )}
+          {acceptanceMethod && (
+            <>
+              <InfoLabel label="Acceptance method" tip="How the payment was accepted: API, payment link, redirect checkout, POS or e-commerce." />
+              <span className="capitalize">{acceptanceMethod.replace(/_/g, ' ')}</span>
             </>
           )}
           {txn.cardTransactionMerchantCategoryCode && (
             <>
-              <span className="text-gray-500">Merchant category</span>
+              <InfoLabel label="Merchant category" tip="ISO 18245 Merchant Category Code (MCC): a 4-digit code identifying the merchant's business type." />
               <span className="font-mono text-xs">MCC {txn.cardTransactionMerchantCategoryCode}</span>
             </>
           )}
@@ -257,47 +368,64 @@ export default function TransactionDetailPage() {
           <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
             {txn.cardTransactionMaskedPanDisplay && (
               <>
-                <span className="text-gray-500">Card number</span>
+                <InfoLabel label="Card number" tip="PCI DSS-permitted last-4 display (masked PAN). The full PAN is never stored or shown." />
                 <span className="font-mono">{txn.cardTransactionMaskedPanDisplay}</span>
               </>
             )}
             {txn.paymentCardReference && (
               <>
-                <span className="text-gray-500">Card token</span>
-                <span className="font-mono text-xs text-gray-600 truncate">{txn.paymentCardReference}</span>
+                <InfoLabel label="Card token" tip="Surrogate token for the card (not CHD under PCI DSS v4.0). Deterministic per PAN, so it correlates every transaction made with the same card. Open the card to review its details." />
+                {cardHref ? (
+                  <Link href={cardHref} className="font-mono text-xs text-[#001E2B] truncate hover:underline inline-flex items-center gap-1 min-w-0">
+                    <CreditCard size={12} className="shrink-0" />
+                    <span className="truncate">{txn.paymentCardReference}</span>
+                  </Link>
+                ) : (
+                  <span className="font-mono text-xs text-gray-600 truncate">{txn.paymentCardReference}</span>
+                )}
               </>
             )}
             {cardHolders !== null && cardHolders > 0 && (
               <>
-                <span className="text-gray-500">Card held by</span>
-                <span className={cardHolders > 3 ? 'text-amber-700 font-semibold' : 'text-gray-700'}>
+                <InfoLabel label="Card held by" tip="How many distinct customers hold this card on file (shared-card registry). A high count is a shared-card / money-mule (AML) indicator." />
+                <span className={`inline-flex items-center gap-1 ${cardHolders > 3 ? 'text-amber-700 font-semibold' : 'text-gray-700'}`}>
                   {cardHolders} customer{cardHolders !== 1 ? 's' : ''}
-                  {cardHolders > 3 && ' ⚠ shared-card / mule risk'}
+                  {cardHolders > 3 && <><AlertTriangle size={13} className="shrink-0" /> shared-card / mule risk</>}
                 </span>
               </>
             )}
           </div>
 
-          {/* Account Reference - QE:equality encrypted */}
-          <div className="bg-blue-50 rounded-lg p-3">
-            {debugMode && (
-              <p className="text-xs font-semibold text-blue-700 uppercase mb-2">QE:equality  -  searchable while encrypted</p>
-            )}
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm items-center">
-              {txn.cardTransactionAccountReference ? (
-                <RevealField
-                  label="Account Reference"
-                  value={txn.cardTransactionAccountReference}
-                  type="qe-equality"
-                />
-              ) : (
-                <>
-                  <EncryptionBadge label="Account Reference" type="qe-equality" />
-                  <span className="text-gray-400 text-xs italic">Not available at this access level</span>
-                </>
+          {/* Account Reference - QE:equality encrypted. Omitted when it merely mirrors the card
+              token (card-not-present merchant checkout with no customer account reference), since
+              showing the same value twice adds no information; a short note explains why instead. */}
+          {acctRefIsToken ? (
+            <p className="text-xs text-gray-500 flex items-start gap-1">
+              <AlertTriangle size={12} className="shrink-0 mt-0.5 text-amber-600" />
+              No customer account reference: this was a card-not-present merchant checkout, so the
+              card token above is used as the transaction correlation key.
+            </p>
+          ) : (
+            <div className="bg-blue-50 rounded-lg p-3">
+              {debugMode && (
+                <p className="text-xs font-semibold text-blue-700 uppercase mb-2">QE:equality  -  searchable while encrypted</p>
               )}
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm items-center">
+                {txn.cardTransactionAccountReference ? (
+                  <RevealField
+                    label="Account Reference"
+                    value={txn.cardTransactionAccountReference}
+                    type="qe-equality"
+                  />
+                ) : (
+                  <>
+                    <EncryptionBadge label="Account Reference" type="qe-equality" />
+                    <span className="text-gray-400 text-xs italic">Not available at this access level</span>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* QE:none - debug only: explains system architecture (DEK-sensitive, L2 escalation) */}
           {debugMode && (
@@ -353,48 +481,53 @@ export default function TransactionDetailPage() {
         </div>
       </div>
 
-      {/* Parties; customer (KYC) + merchant (KYB), role-gated, to continue the investigation */}
+      {/* Parties; payer (source) = customer + funding account + card, payee (destination) = merchant.
+          Role-gated by the backend, to continue the investigation. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Customer (KYC) */}
+        {/* Payer (source): Customer (KYC) + funding bank account */}
         <div className="bg-white rounded-xl border p-5">
           <div className="flex items-center gap-2 mb-3">
             <UserCheck size={15} className="text-[#001E2B]" />
             <h2 className="font-semibold text-sm">Customer (KYC)</h2>
-            {partyCustomer?.customerAgreementInstanceReference != null && (
-              <Link href={`/system/users/${String(partyCustomer.customerAgreementInstanceReference)}?from=transaction&txnId=${txnId}`}
+            <span className="text-[10px] uppercase tracking-wide bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Payer (source)</span>
+            <Tooltip text="The paying party (source of funds): the cardholder, their KYC record and the bank account funding the card." />
+            {agreementUuid && partyCustomer && (
+              <Link href={`/system/users/${encodeURIComponent(agreementUuid)}?from=transaction&txnId=${txnId}`}
                 className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
                 Open customer <ChevronRight size={12} />
               </Link>
             )}
           </div>
-          {!partyCustomer ? (
-            <p className="text-xs text-gray-400">{acctRef ? 'Loading customer…' : 'No account reference on this transaction.'}</p>
+          {!custResolveDone ? (
+            <p className="text-xs text-gray-400">Loading customer…</p>
+          ) : !partyCustomer ? (
+            <p className="text-xs text-gray-500">External card: no PSP customer on file (card-not-present at a merchant).</p>
           ) : (
             <>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-                <span className="text-gray-500">Name</span><span className="font-medium truncate">{String(partyCustomer.customerName ?? '-')}</span>
-                <span className="text-gray-500">Segment</span><span className="capitalize">{String(partyCustomer.customerSegment ?? '-')}</span>
-                <span className="text-gray-500">Status</span><span className="capitalize">{String(partyCustomer.customerAgreementStatus ?? '-')}</span>
-                <span className="text-gray-500">KYC check</span><span className="capitalize">{String((partyCustomer.customerAgreementKycCheck as { customerAgreementKycCheckStatus?: string } | null)?.customerAgreementKycCheckStatus ?? 'n/a')}</span>
+                <InfoLabel label="Name" tip="Registered account holder (BIAN SD-13 Party). PII, minimized to the name here." /><span className="font-medium truncate">{String(partyCustomer.customerName ?? '-')}</span>
+                <InfoLabel label="Segment" tip="Customer segment (e.g. retail, SME, corporate), used for risk and servicing." /><span className="capitalize">{String(partyCustomer.customerSegment ?? '-')}</span>
+                <InfoLabel label="Status" tip="Lifecycle status of the customer agreement (active, suspended, closed)." /><span className="capitalize">{String(partyCustomer.customerAgreementStatus ?? '-')}</span>
+                <InfoLabel label="KYC check" tip="Know Your Customer verification outcome (BIAN SD-13). Cleared / pending / failed drives onboarding and monitoring." /><span className="capitalize">{String((partyCustomer.customerAgreementKycCheck as { customerAgreementKycCheckStatus?: string } | null)?.customerAgreementKycCheckStatus ?? 'n/a')}</span>
               </div>
               {custSensitive ? (
                 <div className="mt-3 rounded-lg border border-purple-200 bg-purple-50 p-3">
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
                     {custSensitive.customerAgreementResidentialAddress && (
                       <>
-                        <span className="text-gray-500">Address</span>
+                        <InfoLabel label="Address" tip="Residential address (GDPR-protected PII). Visible to auditor / after L2 escalation." />
                         <span className="font-mono text-xs break-words">{[custSensitive.customerAgreementResidentialAddress.streetAddress, custSensitive.customerAgreementResidentialAddress.city, custSensitive.customerAgreementResidentialAddress.postalCode, custSensitive.customerAgreementResidentialAddress.countryCode].filter(Boolean).join(', ')}</span>
                       </>
                     )}
                     {custSensitive.governmentIdentificationReference && (
                       <>
-                        <span className="text-gray-500">Gov ID</span>
+                        <InfoLabel label="Gov ID" tip="Government identification reference (GDPR-protected). Used for identity verification." />
                         <span className="font-mono text-xs">{custSensitive.governmentIdentificationReference}</span>
                       </>
                     )}
                     {custSensitive.customerAgreementRiskNotes && (
                       <>
-                        <span className="text-gray-500">Risk notes</span>
+                        <InfoLabel label="Risk notes" tip="Analyst risk annotations on this customer (investigation context)." />
                         <span>{custSensitive.customerAgreementRiskNotes}</span>
                       </>
                     )}
@@ -403,15 +536,55 @@ export default function TransactionDetailPage() {
               ) : (
                 <p className="mt-3 text-xs text-gray-400 italic">Sensitive KYC PII requires {isAuditor ? 'auditor access' : 'L2 escalation'}.</p>
               )}
+
+              {/* Funding (source) bank account: GDPR/PSD2, masked IBAN revealed on demand. */}
+              {cardResolved?.fundingAccountRef && (
+                <div className="mt-3 border-t pt-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Landmark size={13} className="text-[#001E2B]" />
+                    <span className="text-xs font-semibold text-gray-700">Funding account</span>
+                    <Tooltip text="The bank account that funds this card (BIAN SD-66). IBAN is GDPR/PSD2-protected (not PCI DSS scope) and revealed on demand." />
+                    {accountHref && (
+                      <Link href={accountHref} className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
+                        Open account <ChevronRight size={12} />
+                      </Link>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm items-center">
+                    {fundingAccount?.payoutAccountAlias != null && (
+                      <>
+                        <InfoLabel label="Account" tip="Customer-defined nickname for the funding account." />
+                        <span className="truncate">{String(fundingAccount.payoutAccountAlias)}</span>
+                      </>
+                    )}
+                    {(fundingAccount?.payoutAccountHasIban as boolean | undefined) && (
+                      <>
+                        <span className="text-gray-500 flex items-center gap-1"><Lock size={11} className="text-gray-400" /> IBAN</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`font-mono text-xs tracking-wider ${ibanShown && ibanValue ? 'text-gray-900' : 'text-gray-400 select-none'}`}>
+                            {ibanShown && ibanValue ? ibanValue.replace(/(.{4})/g, '$1 ').trim() : '•••• •••• •••• ••••'}
+                          </span>
+                          <button onClick={toggleIban} disabled={ibanLoading} title={ibanShown ? 'Hide IBAN' : 'Reveal IBAN (GDPR/PSD2, need-to-know)'}
+                            className="text-gray-400 hover:text-[#001E2B] transition-colors shrink-0 disabled:opacity-50">
+                            {ibanLoading ? <span className="text-xs">…</span> : ibanShown ? <EyeOff size={13} /> : <Eye size={13} />}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
 
-        {/* Merchant (KYB) */}
+        {/* Payee (destination): Merchant (KYB) or external card-network descriptor */}
         <div className="bg-white rounded-xl border p-5">
           <div className="flex items-center gap-2 mb-3">
             <Store size={15} className="text-[#001E2B]" />
             <h2 className="font-semibold text-sm">Merchant (KYB)</h2>
+            <span className="text-[10px] uppercase tracking-wide bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Payee (destination)</span>
+            <Tooltip text="The receiving party (destination of funds): the merchant the payment was made to, with its Know Your Business record when acquired by this PSP." />
             {txn.merchantAgreementInstanceReference && (
               <Link href={`/system/merchant/${txn.merchantAgreementInstanceReference}?from=transaction&txnId=${txnId}`}
                 className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">

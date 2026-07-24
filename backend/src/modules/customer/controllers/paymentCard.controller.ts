@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { registerCardForCustomer, getCardsByCustomer, getCardById, getCardHolderCount, getCardRegistryByToken, updateCardMetadata, setCardActivation, revokeCard, getOwnAgreementId } from '../services/paymentCard.service';
+import { registerCardForCustomer, getCardsByCustomer, getCardById, getCardHolderCount, getCardRegistryByToken, getCardByToken, updateCardMetadata, setCardActivation, revokeCard, getOwnAgreementId } from '../services/paymentCard.service';
 import type { PaymentCardManagementControlRecord } from '../models/paymentCard.model';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
@@ -351,6 +351,53 @@ shared-card / money-mule indicator. Restricted to fraud analyst / investigator /
     const reg = await getCardRegistryByToken(fastify.db, token);
     if (!reg) return reply.status(404).send({ error: 'No registry entry for this token' });
     return reply.send(reg);
+  });
+
+  // GET /api/v1/customer/card-by-token/:token  — investigation pivot from a transaction.
+  // A transaction only carries the surrogate token (paymentCardReference); this resolves the
+  // UUIDs an investigator needs to pivot to the card detail, the owning customer (KYC) and the
+  // funding bank account. Restricted to investigation roles. Token is non-CHD; no expiry/CVV.
+  fastify.get('/card-by-token/:token', {
+    schema: {
+      tags: ['cards'],
+      summary: 'Resolve card / owner / funding account from a surrogate token (investigation roles)',
+      description: `Given a card surrogate token (a transaction's \`paymentCardReference\`), returns the
+identifiers needed to continue an investigation: the card instance, its owning customer agreement and
+its funding/payout account. No CHD, no card expiry. Restricted to fraud analyst / investigator / auditor.`,
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['token'], properties: { token: { type: 'string' } } },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            paymentCardInstanceReference: { type: 'string', description: 'Card UUID (for the card detail page).' },
+            customerAgreementInstanceReference: { type: 'string', description: 'Owning customer agreement UUID.' },
+            fundingPayoutAccountInstanceReference: { type: 'string', nullable: true, description: 'Funding/payout account UUID.' },
+            paymentCardMaskedPanDisplay: { type: 'string', description: 'Last-4 display string.' },
+            paymentCardNetwork: { type: 'string', nullable: true },
+            paymentCardStatus: { type: 'string' },
+          },
+        },
+        403: { description: 'Restricted to investigation roles.', $ref: 'Error#' },
+        404: { description: 'No card on file for this token.', $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const user = (request as { user?: JwtUserPayload }).user;
+    if (!STAFF_READ_ROLES.includes(user?.role ?? '')) {
+      return reply.status(403).send({ error: 'Card lookup by token is restricted to investigation roles.' });
+    }
+    const { token } = request.params as { token: string };
+    const card = await getCardByToken(fastify.db, token);
+    if (!card) return reply.status(404).send({ error: 'No card on file for this token' });
+    return reply.send({
+      paymentCardInstanceReference: card.paymentCardInstanceReference,
+      customerAgreementInstanceReference: card.customerAgreementInstanceReference,
+      fundingPayoutAccountInstanceReference: card.fundingPayoutAccountInstanceReference,
+      paymentCardMaskedPanDisplay: card.paymentCardMaskedPanDisplay,
+      paymentCardNetwork: card.paymentCardNetwork,
+      paymentCardStatus: card.paymentCardStatus,
+    });
   });
 
   // GET /api/v1/customer/:customerId/cards/:cardId  — card detail.
