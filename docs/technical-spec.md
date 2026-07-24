@@ -4286,7 +4286,7 @@ is unchanged (merchant is plaintext).
 (`clear|hit|pending`), `ScreeningProviderRef`. Result vocabularies (ADR-009), plaintext, no CHD/QE.
 Owner-layer risk is composed by reference from each UBO `customerAgreementKycCheck` (no duplication).
 
-### Decision mode (built-in module config, section 4.0)
+### Decision mode (built-in module config)
 New `capabilityModuleConfiguration.moduleConfig` fields for kyc and kyb: `decisionMode`
 (`manual|automated|assisted`, unset defaults to manual fail-safe), `decisionAutoApproveMaxRisk` (`low`),
 `decisionAutoRejectOn`, `decisionEscalateToManualOn`. The provider never sets the mode. Seeded:
@@ -4312,7 +4312,7 @@ KYC=`automated`, KYB=`manual`. Hard guardrail: a sanctions/PEP hit never auto-ap
 | DELETE | `/merchants/:id/kyb/owners/:partyRef` | `merchants:manage` | Remove; blocked if last or primary. `kyb.owner.removed`. |
 | GET | `/merchants/:id/kyb/process` | `merchants:view` | Correlated timeline. |
 
-### KYB onboarding event chain (section 5bis, events only)
+### KYB onboarding event chain (events only)
 `createMerchant` publishes `merchant.validation.requested` on the bus. `ProviderGroups.onMerchantValidated`
 fans out `kyb.screening.requested` + `hrp.screening.requested` + `aml.screening.requested` (entity) and
 one `kyc.screening.requested` per beneficial owner (owner layer). `KybVerificationSaga` (keyed by
@@ -4323,7 +4323,7 @@ via the shared `deriveKybCheckStatus` mapper), then resolves the agreement per `
 change to externalize). New event contracts in `onboarding.events.ts`; new canonical ledger milestones
 `kyb.screening.completed`/`aml.screening.completed`/`kyb.verification.completed`.
 
-### Status-coherence fix (section 3.7)
+### Status-coherence fix
 `applyKycScreeningVerdict` and `applyKybScreeningVerdict` now set the BQ:Step status in the same atomic
 update as the verdict, via the shared pure mappers `deriveKycCheckStatus`/`deriveKybCheckStatus`
 (`shared/models/onboardingDecision.ts`), so the internal saga path and the external callback path yield

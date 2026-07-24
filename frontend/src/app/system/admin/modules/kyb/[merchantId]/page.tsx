@@ -5,7 +5,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Building2, Save, ShieldCheck, History, AlertTriangle } from 'lucide-react';
+import { Building2, Save, ShieldCheck, History, AlertTriangle, Pencil, X } from 'lucide-react';
 import { SectionHeader } from '../../../../../../components/SectionHeader';
 import { Breadcrumb } from '../../../../../../components/Breadcrumb';
 import { Tooltip } from '../../../../../../components/Tooltip';
@@ -35,14 +35,20 @@ export default function KybDetailPage() {
   const [detail, setDetail] = useState<KybDetail | null>(null);
   const [timeline, setTimeline] = useState<Record<string, unknown>[]>([]);
   const [reason, setReason] = useState('');
+  const [editing, setEditing] = useState(false);
   const [edit, setEdit] = useState<{ merchantLegalEntityReference?: string; merchantCategoryCode?: string; merchantAgreementKybCheckNotes?: string }>({});
+
+  const editFromMerchant = (m: Record<string, unknown>) => ({
+    merchantLegalEntityReference: String(m.merchantLegalEntityReference ?? ''),
+    merchantCategoryCode: String(m.merchantCategoryCode ?? ''),
+    merchantAgreementKybCheckNotes: String((m.merchantAgreementKybCheck as Record<string, unknown> | undefined)?.merchantAgreementKybCheckNotes ?? ''),
+  });
 
   const load = useCallback(async (t: string) => {
     try {
       const d = await api.merchants.kybDetail(merchantId, t) as unknown as KybDetail;
       setDetail(d);
-      const m = d.merchant ?? {};
-      setEdit({ merchantLegalEntityReference: String(m.merchantLegalEntityReference ?? ''), merchantCategoryCode: String(m.merchantCategoryCode ?? '') });
+      setEdit(editFromMerchant(d.merchant ?? {}));
       const tl = await api.merchants.kybProcess(merchantId, t) as { results?: Record<string, unknown>[] };
       setTimeline(tl.results ?? []);
     } catch (e) { notify(e instanceof Error ? e.message : 'Could not load KYB detail', 'error'); }
@@ -50,9 +56,10 @@ export default function KybDetailPage() {
 
   useEffect(() => { const t = getToken() ?? ''; setToken(t); if (t) void load(t); }, [load]);
 
+  const cancelEdit = () => { setEdit(editFromMerchant(detail?.merchant ?? {})); setReason(''); setEditing(false); };
   const saveKyb = async () => {
     if (reason.trim().length < 3) { notify('An amendment reason is required.', 'error'); return; }
-    try { await api.merchants.kybPatch(merchantId, { ...edit, amendmentReason: reason }, token); notify('KYB data corrected', 'success'); setReason(''); void load(token); }
+    try { await api.merchants.kybPatch(merchantId, { ...edit, amendmentReason: reason }, token); notify('KYB data corrected', 'success'); setReason(''); setEditing(false); void load(token); }
     catch (e) { notify(e instanceof Error ? e.message : 'Could not save', 'error'); }
   };
 
@@ -79,7 +86,7 @@ export default function KybDetailPage() {
           <p className="text-[11px] text-gray-400 font-mono">provider: {String(kyb.merchantAgreementKybCheckScreeningProviderRef ?? 'n/a')}</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-2">
-          <h3 className="font-semibold text-sm text-gray-900">Owner-layer risk (composed)
+          <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-1.5">Owner-layer risk (composed)
             <Tooltip text="Aggregated from each beneficial owner's SD-53 KYC verdict by reference (no PII duplication). A controlling person failing PEP/sanctions raises the merchant's risk." /></h3>
           {olr ? (
             <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -95,16 +102,33 @@ export default function KybDetailPage() {
       {/* Beneficial owners */}
       {token && <OwnersPanel merchantId={merchantId} token={token} canManage={canManage} />}
 
-      {/* KYB data correction */}
+      {/* KYB data */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-        <h3 className="font-semibold text-sm text-gray-900">KYB data correction<Tooltip text="Corrects KYB data fields (legal entity, MCC, notes). This is data administration, NOT a decision: the verdict/status is not editable here (approve/reject stays with merchant_officer). An amendment reason is required (audit, PCI Req 10)." /></h3>
-        <fieldset disabled={!canManage} className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-0 p-0 m-0 min-w-0">
-          <label className="text-xs text-gray-600 block">Legal entity reference<input value={edit.merchantLegalEntityReference ?? ''} onChange={(e) => setEdit({ ...edit, merchantLegalEntityReference: e.target.value })} className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm" /></label>
-          <label className="text-xs text-gray-600 block">MCC<input value={edit.merchantCategoryCode ?? ''} onChange={(e) => setEdit({ ...edit, merchantCategoryCode: e.target.value })} className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm" /></label>
-          <label className="text-xs text-gray-600 block sm:col-span-2">KYB notes<input value={edit.merchantAgreementKybCheckNotes ?? String(kyb.merchantAgreementKybCheckNotes ?? '')} onChange={(e) => setEdit({ ...edit, merchantAgreementKybCheckNotes: e.target.value })} className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm" /></label>
-          <label className="text-xs text-gray-600 block sm:col-span-2">Amendment reason (required)<input value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm" /></label>
-        </fieldset>
-        {canManage && <button onClick={saveKyb} className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] font-medium"><Save size={14} /> Save correction</button>}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-1.5">KYB data<Tooltip text="KYB data fields (legal entity, MCC, notes). This is data administration, NOT a decision: the verdict/status is not editable here (approve/reject stays with merchant_officer). Click Edit to correct a field; an amendment reason is required (audit, PCI Req 10)." /></h3>
+          {canManage && !editing && <button onClick={() => setEditing(true)} className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] font-medium transition-colors"><Pencil size={14} /> Edit</button>}
+        </div>
+
+        {!editing ? (
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-sm">
+            <div><dt className="text-xs text-gray-500">Legal entity reference</dt><dd className="text-gray-900">{edit.merchantLegalEntityReference || <span className="text-gray-400">n/a</span>}</dd></div>
+            <div><dt className="text-xs text-gray-500">MCC</dt><dd className="text-gray-900">{edit.merchantCategoryCode || <span className="text-gray-400">n/a</span>}</dd></div>
+            <div className="sm:col-span-2"><dt className="text-xs text-gray-500">KYB notes</dt><dd className="text-gray-900">{edit.merchantAgreementKybCheckNotes || <span className="text-gray-400">n/a</span>}</dd></div>
+          </dl>
+        ) : (
+          <>
+            <fieldset className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-0 p-0 m-0 min-w-0">
+              <label className="text-xs text-gray-600 block">Legal entity reference<input value={edit.merchantLegalEntityReference ?? ''} onChange={(e) => setEdit({ ...edit, merchantLegalEntityReference: e.target.value })} className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm" /></label>
+              <label className="text-xs text-gray-600 block">MCC<input value={edit.merchantCategoryCode ?? ''} onChange={(e) => setEdit({ ...edit, merchantCategoryCode: e.target.value })} className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm" /></label>
+              <label className="text-xs text-gray-600 block sm:col-span-2">KYB notes<input value={edit.merchantAgreementKybCheckNotes ?? ''} onChange={(e) => setEdit({ ...edit, merchantAgreementKybCheckNotes: e.target.value })} className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm" /></label>
+              <label className="text-xs text-gray-600 block sm:col-span-2">Amendment reason (required)<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. corrected legal entity reference per registry update" className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm" /></label>
+            </fieldset>
+            <div className="flex items-center gap-2 pt-4 mt-1 border-t border-gray-100">
+              <button onClick={saveKyb} className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] font-medium transition-colors"><Save size={14} /> Save changes</button>
+              <button onClick={cancelEdit} className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg text-gray-500 hover:text-gray-800"><X size={14} /> Cancel</button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Process timeline */}

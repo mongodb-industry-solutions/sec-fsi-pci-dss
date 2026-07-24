@@ -8,7 +8,7 @@ import type { AuthenticatedRequest, JwtUserPayload } from '../../../shared/model
 import { requirePermission } from '../../../vendors/middleware/acl';
 import { getEventBus, makeEvent } from '../../../vendors/eventbus';
 import { listAuditEvents } from '../../provider/services/businessProcessEvent.service';
-import { listKycAdmin, getKycByPartyRef, patchKycData } from '../services/customerAgreement.service';
+import { listKycAdmin, getKycByPartyRef, patchKycData, revealKycSensitive } from '../services/customerAgreement.service';
 
 const E = { $ref: 'Error#' };
 
@@ -105,6 +105,27 @@ export async function customerKycController(fastify: FastifyInstance) {
       if (result.status === 'not_found') return reply.status(404).send({ error: 'KYC record not found' });
       if (result.status === 'invalid') return reply.status(400).send({ error: result.error });
       return reply.send({ partyInstanceReference, updated: true });
+    },
+  });
+
+  // GET /customer/:partyInstanceReference/kyc/reveal — audited on-demand reveal of the QE:none KYC fields
+  // (residential address, source of funds, purpose, risk notes, postal address). Ephemeral, need-to-know,
+  // audited (PCI Req 3.2/3.3 CHD-adjacent, GDPR, Req 10). Gated by customers:manage (the KYC admin).
+  fastify.get('/:partyInstanceReference/kyc/reveal', {
+    schema: {
+      tags: ['customer'],
+      summary: 'Reveal QE:none KYC fields on demand (SD-53, v31)',
+      description: 'Returns the decrypted L2-only KYC fields for display (never persisted). Emits `kyc.sensitive.revealed` (field names only, no values). Requires `customers:manage`.',
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['partyInstanceReference'], properties: { partyInstanceReference: { type: 'string' } } },
+      response: { 200: { type: 'object', additionalProperties: true }, 401: E, 403: E, 404: E },
+    },
+    preHandler: canManage,
+    handler: async (request, reply) => {
+      const { partyInstanceReference } = request.params as { partyInstanceReference: string };
+      const result = await revealKycSensitive(fastify.db, partyInstanceReference, actor(request));
+      if (result.status === 'not_found') return reply.status(404).send({ error: 'KYC record not found' });
+      return reply.send(result.fields);
     },
   });
 

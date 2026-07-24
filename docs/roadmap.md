@@ -904,8 +904,8 @@ process fans out to providers purely via the event bus; each process is tracked 
 | FR-31.3 | KYB administration | List/detail/patch KYB data + owners CRUD, all index-backed, all mutations emit compliance events; PATCH rejects status writes (400). |
 | FR-31.4 | KYC administration | List (L1 masked)/detail (L2 with escalation)/patch/re-screen/process endpoints; PATCH rejects status writes; emits `kyc.record.amended`. |
 | FR-31.5 | KYB event orchestration | `merchant.validation.requested` fans out kyb+hrp+aml (entity) + per-owner kyc; `KybVerificationSaga` aggregates, persists the structured verdict, resolves per `decisionMode`. Events only (no service-to-service). |
-| FR-31.6 | Decision mode (section 4.0) | `decisionMode` per module; automated auto-resolves within thresholds; assisted recommends (HITL); manual = officer decides; unset defaults to manual. Sanctions/PEP never auto-approve. |
-| FR-31.7 | Status coherence (section 3.7) | Verdict and BQ:Step status set atomically via a shared mapper; internal and external paths identical. |
+| FR-31.6 | Decision mode | `decisionMode` per module; automated auto-resolves within thresholds; assisted recommends (HITL); manual = officer decides; unset defaults to manual. Sanctions/PEP never auto-approve. |
+| FR-31.7 | Status coherence | Verdict and BQ:Step status set atomically via a shared mapper; internal and external paths identical. |
 | FR-31.8 | Process traceability | `GET /{merchants|customer}/:id/{kyb|kyc}/process` returns the correlated timeline (bus milestones + provider wire calls). |
 
 ### Non-functional

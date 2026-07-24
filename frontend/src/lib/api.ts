@@ -930,6 +930,9 @@ export const api = {
       apiFetch<Record<string, unknown>>(`/api/v1/customer/${encodeURIComponent(partyRef)}/kyc/re-screen`, { method: 'POST' }, token),
     kycProcess: (partyRef: string, token: string) =>
       apiFetch<Record<string, unknown>>(`/api/v1/customer/${encodeURIComponent(partyRef)}/kyc/process`, {}, token),
+    // v31: audited on-demand reveal of the QE:none KYC fields (address, source of funds, purpose, notes).
+    kycReveal: (partyRef: string, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/customer/${encodeURIComponent(partyRef)}/kyc/reveal`, {}, token),
     getByEmail: (email: string, token: string) =>
       apiFetch<Record<string, unknown>>(
         `/api/v1/customer?email=${encodeURIComponent(email)}`, {}, token

@@ -157,7 +157,86 @@ export async function getKycByPartyRef(db: Db, partyRef: string, role: UserRole 
   const result = await findPartyAndAgreement(roleDb, { partyInstanceReference: partyRef } as Partial<PartyControlRecord>);
   if (!result) return null;
   await maybeAudit(roleDb, caseId, role, result.doc, canSee, actor);
-  return buildResponse(result.doc, result.party, role, canSee, caseId);
+  const { doc, party } = result;
+
+  // KYC-administration detail (v31). Surfaces the full person profile with per-field encryption tiers so
+  // the UI can badge each field and offer an audited on-demand reveal for the QE:none fields. Tiering:
+  //  - QE:equality / range / prefix / suffix (searchable) are in the L1 map → auto-decrypted at L1 and
+  //    shown directly (identity + documents are the KYC admin's need-to-know: name, DOB, nationality,
+  //    place of birth, sex, occupation, tax ID, and the government ID leaves). Encrypted AT REST; the
+  //    driver decrypts in-process, Atlas never sees plaintext.
+  //  - QE:none (residential address, source of funds, purpose, risk notes, party postal address) are
+  //    L2-only: returned here ONLY when the caller already decrypted them (auditor / L2 with token);
+  //    otherwise null + sensitiveMasked=true. The UI offers the audited reveal endpoint for them.
+  const dec = (v: unknown): unknown => (isSensitiveDecrypted(v) ? v : null);
+  return {
+    partyInstanceReference: doc.partyInstanceReference,
+    customerAgreementInstanceReference: doc.customerAgreementInstanceReference,
+    customerName: party.partyName,
+    partyType: party.partyType,
+    // Identity (QE searchable → L1-visible; encrypted at rest).
+    partyDateOfBirth: party.partyDateOfBirth ?? null,
+    partyNationality: party.partyNationality ?? null,
+    partyPlaceOfBirth: party.partyPlaceOfBirth ?? null,
+    partySex: party.partySex ?? null,
+    customerSegment: doc.customerSegment,
+    customerAgreementStatus: doc.customerAgreementStatus,
+    customerAgreementReference: doc.customerAgreementReference,
+    customerAgreementEnrollmentDate: doc.customerAgreementEnrollmentDate,
+    customerAgreementPreferredLanguage: doc.customerAgreementPreferredLanguage,
+    customerAgreementKycCheck: doc.customerAgreementKycCheck ?? null,
+    // Documents + KYC data. occupation/taxID/govID are QE searchable → visible at L1 (identity docs).
+    customerAgreementOccupation: isSensitiveDecrypted(doc.customerAgreementOccupation) ? doc.customerAgreementOccupation : null,
+    customerAgreementTaxIDNumber: isSensitiveDecrypted(doc.customerAgreementTaxIDNumber) ? doc.customerAgreementTaxIDNumber : null,
+    customerAgreementGovernmentID: dec(doc.customerAgreementGovernmentID),
+    // QE:none (L2-only) — null unless the caller decrypted them; offered via the audited reveal endpoint.
+    customerAgreementSourceOfFunds: dec(doc.customerAgreementSourceOfFunds),
+    customerAgreementPurposeOfRelationship: dec(doc.customerAgreementPurposeOfRelationship),
+    customerAgreementResidentialAddress: dec(doc.customerAgreementResidentialAddress),
+    sensitiveMasked: !canSee,
+  };
+}
+
+// v31: audited on-demand reveal of the QE:none (L2-only) KYC fields for the administration workbench.
+// Mirrors the operations_officer PAN/IBAN reveal pattern (ephemeral, on demand, audited — PCI Req 3.2/3.3
+// for CHD-adjacent identity data, GDPR need-to-know, Req 10). Reads via the L2 QE client so the QE:none
+// fields decrypt, records a field-access compliance event (field NAMES only, no values), and returns the
+// plaintext to the caller for display only (never persisted). Gated by customers:manage at the route.
+export async function revealKycSensitive(
+  db: Db,
+  partyRef: string,
+  actor: { performedByPartyReference?: string; performedByRole?: string },
+): Promise<{ status: 'not_found' } | { status: 'ok'; fields: Record<string, unknown> }> {
+  const roleDb = await getDbForRole('security_auditor', false); // L2 QE client (decrypts QE:none)
+  const doc = await roleDb.collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
+    .findOne({ partyInstanceReference: partyRef });
+  if (!doc) return { status: 'not_found' };
+  const party = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
+    .findOne({ partyInstanceReference: partyRef });
+
+  const fields = {
+    customerAgreementResidentialAddress: doc.customerAgreementResidentialAddress ?? null,
+    customerAgreementSourceOfFunds: doc.customerAgreementSourceOfFunds ?? null,
+    customerAgreementPurposeOfRelationship: doc.customerAgreementPurposeOfRelationship ?? null,
+    customerAgreementRiskNotes: doc.customerAgreementRiskNotes ?? null,
+    partyPostalAddress: party?.partyPostalAddress ?? null,
+  };
+
+  emitComplianceEvent(db, {
+    entityType: 'customer',
+    entityId: partyRef,
+    processType: 'kyc_verification',
+    processAction: 'kyc.sensitive.revealed',
+    processOutcome: 'approved',
+    performedByPartyReference: actor.performedByPartyReference ?? null,
+    performedByRole: actor.performedByRole ?? null,
+    // GDPR minimization / PCI Req 10: log which fields were revealed, never their values.
+    eventSummary: { revealedFields: Object.keys(fields) },
+    bianServiceDomain: 'Customer Agreement',
+    bianControlRecordType: 'CustomerAgreementProcedure',
+  });
+
+  return { status: 'ok', fields };
 }
 
 const KYC_COMPLETED_STATUSES = ['verified', 'rejected', 'expired'];
