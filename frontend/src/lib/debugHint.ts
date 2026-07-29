@@ -1,37 +1,45 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const SEEN_KEY = 'psp_debug_hint_seen';
-const AUTO_HIDE_MS = 8000;
+// 3 flickers of 0.2s in debug-hint-blink, plus a beat before the class is removed.
+const BURST_MS = 750;
+const REST_MS = 9000;
 
 /**
- * First-visit hint for the debug toggle on the sign-in screen. Debug mode is what lists the demo
- * accounts and auto-fills their credentials, so a first-time visitor who misses that 14px icon has
- * no obvious way into the demo.
- *
- * Auto-hides so it never lingers. Only engaging with it (opening debug mode, or dismissing) retires
- * it for good: letting it time out leaves it armed, so a visitor who looked away still gets it next
- * time.
+ * First-visit hint for the debug toggle on the sign-in screen. Flickers for BURST_MS, sleeps for
+ * REST_MS, and repeats until `dismissHint` retires it permanently.
  */
 export function useDebugHint() {
-  const [visible, setVisible] = useState(false);
+  const [pulsing, setPulsing] = useState(false);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const stopped = useRef(false);
 
   useEffect(() => {
     if (read(SEEN_KEY)) return;
-    setVisible(true);
-    const timer = setTimeout(() => setVisible(false), AUTO_HIDE_MS);
-    return () => clearTimeout(timer);
+    let on = false;
+    const tick = () => {
+      if (stopped.current) return;
+      on = !on;
+      setPulsing(on);
+      timers.current.push(setTimeout(tick, on ? BURST_MS : REST_MS));
+    };
+    tick();
+    return () => { timers.current.forEach(clearTimeout); timers.current = []; };
   }, []);
 
   const dismissHint = useCallback(() => {
-    setVisible(false);
+    stopped.current = true;
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
+    setPulsing(false);
     write(SEEN_KEY, '1');
   }, []);
 
-  return { hintVisible: visible, dismissHint };
+  return { pulsing, dismissHint };
 }
 
-// Storage is unavailable in some privacy modes; a hint is not worth a crash.
+// Storage throws in some privacy modes.
 function read(key: string): string | null {
   try { return window.localStorage.getItem(key); } catch { return null; }
 }

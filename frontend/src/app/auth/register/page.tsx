@@ -111,8 +111,8 @@ function RegisterForm() {
 
 export default function RegisterPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+    <div className="min-h-screen flex items-center justify-center bg-[#001E2B] p-6">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
         <Suspense fallback={<p className="text-sm text-gray-400 text-center">Loading…</p>}>
           <RegisterForm />
         </Suspense>

@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { UserCheck, Save, RefreshCw, History, ShieldCheck, Lock, Pencil, X, IdCard, Mail, FileText } from 'lucide-react';
 import { SectionHeader } from '../../../../../../components/SectionHeader';
 import { Breadcrumb } from '../../../../../../components/Breadcrumb';
+import { LoadingIndicator } from '../../../../../../components/LoadingIndicator';
 import { Tooltip } from '../../../../../../components/Tooltip';
 import { EncryptionBadge } from '../../../../../../components/EncryptionBadge';
 import { SensitiveReveal } from '../../../../../../components/SensitiveReveal';
@@ -42,7 +43,9 @@ export default function KycDetailPage() {
   const [editing, setEditing] = useState(false);
   const [edit, setEdit] = useState<{ customerAgreementOccupation?: string; customerAgreementSourceOfFunds?: string; customerAgreementPurposeOfRelationship?: string }>({});
 
+  const [loading, setLoading] = useState(true);
   const load = useCallback(async (t: string) => {
+    setLoading(true);
     try {
       const d = await api.customer.kycDetail(partyRef, t) as Record<string, unknown>;
       setRec(d);
@@ -50,6 +53,7 @@ export default function KycDetailPage() {
       const tl = await api.customer.kycProcess(partyRef, t) as { results?: Record<string, unknown>[] };
       setTimeline(tl.results ?? []);
     } catch (e) { notify(e instanceof Error ? e.message : 'Could not load KYC detail', 'error'); }
+    finally { setLoading(false); }
   }, [partyRef, notify]);
 
   useEffect(() => { const t = getToken() ?? ''; setToken(t); if (t) void load(t); }, [load]);
@@ -77,6 +81,25 @@ export default function KycDetailPage() {
     if (!revealCache.current) revealCache.current = await api.customer.kycReveal(partyRef, token);
     return revealCache.current;
   }, [partyRef, token]);
+
+  const crumbs = [
+    { label: 'Home', href: '/system' },
+    { label: 'Modules', href: '/system/admin/modules' },
+    { label: 'KYC', href: '/system/admin/modules/kyc' },
+  ];
+  if (loading || !rec) {
+    return (
+      <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
+        <Breadcrumb items={[...crumbs, { label: 'Loading…' }]} />
+        {loading
+          ? <LoadingIndicator label="Loading KYC record…" />
+          : <div className="bg-white rounded-xl border border-gray-200 p-6 text-sm text-gray-600">
+              This KYC record could not be loaded. It may not exist, or your role may not reach it.
+              <Link href="/system/admin/modules/kyc" className="ml-1 text-[#016BF8] hover:underline">Back to KYC administration</Link>
+            </div>}
+      </div>
+    );
+  }
 
   const r = rec ?? {};
   const kyc = (r.kycCheck ?? r.customerAgreementKycCheck ?? {}) as Record<string, unknown>;
