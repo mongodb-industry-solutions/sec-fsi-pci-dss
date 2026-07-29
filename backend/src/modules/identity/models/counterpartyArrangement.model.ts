@@ -24,7 +24,9 @@ export interface CounterpartyArrangement {
   counterpartyLabel: string;                 // owner-defined label or masked hint if blank at creation
   counterpartyLookupType: CounterpartyLookupType;
   counterpartyLookupHint: string;            // masked at store time: "+34 6** *** 789" or "j***@example.com"
-                                             // NEVER stores raw phone/email
+                                             // NEVER stores raw phone/email.
+  // Masked by maskLookupValue before it is written: the plaintext is never persisted, so no role
+  // can recover it and there is no reveal endpoint for it (GDPR Art. 5(1)(c), Art. 25(2)).
 
   counterpartyArrangementStatus: CounterpartyArrangementStatus;
 

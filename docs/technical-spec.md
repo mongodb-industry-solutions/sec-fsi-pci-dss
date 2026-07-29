@@ -157,7 +157,10 @@ export interface CustomerAgreementControlRecord {
 
   // QE:none (DEK-sensitive tier) — returned as Binary by L1 client; decrypted by L2
   customerAgreementResidentialAddress?: ResidentialAddress;
-  governmentIdentificationReference?: string;  // @deprecated v27 — use customerAgreementGovernmentID
+  governmentIdentificationReference?: string;  // @deprecated v27, LEGACY READ-ONLY since v32 (ADR-050):
+                                               // never written (removed from the seeder and fixtures) and never
+                                               // returned by any response. Use customerAgreementGovernmentID,
+                                               // the single source of truth and the only searchable one.
   customerAgreementRiskNotes?: string;         // @deprecated v27 — use structured KYC verdicts
 
   // v27 KYC identity (user-supplied). Structured gov ID leaves are QE-searchable (see GovernmentID).
@@ -1207,7 +1210,7 @@ All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `k
 | `deks.customerAccountRef` | `DEK-customer-account-ref` | `customerAgreementProcedure.customerAgreementReference` |
 | `deks.txAccountRef` | `DEK-tx-account-ref` | `cardTransactionLog.cardTransactionAccountReference` |
 | `deks.customerAddress` | `DEK-customer-address` | `customerAgreementProcedure.customerAgreementResidentialAddress` (QE:none, inline v2) |
-| `deks.customerGovId` | `DEK-customer-gov-id` | `customerAgreementProcedure.governmentIdentificationReference` (QE:none, inline v2) |
+| `deks.customerGovId` | `DEK-customer-gov-id` | `customerAgreementProcedure.governmentIdentificationReference` (QE:none, inline v2). v32: legacy. The field is no longer written or read; the DEK stays so documents seeded before v32 remain decryptable. |
 | `deks.customerRiskNotes` | `DEK-customer-risk-notes` | `customerAgreementProcedure.customerAgreementRiskNotes` (QE:none, inline v2) |
 | `deks.txRawPayload` | `DEK-tx-raw-payload` | `cardTransactionLog.rawGatewayPayload` (QE:none, inline v2) |
 | `deks.txProcessorMeta` | `DEK-tx-processor-meta` | `cardTransactionLog.processorTransactionMetadata` (QE:none, inline v2) |
@@ -1874,17 +1877,34 @@ Standard index query on `paymentCardReference` (plaintext field: token is a card
 
 QE equality search on the corresponding encrypted field.
 
-**Response 200:**
+**Response 200** (the projection is `buildResponse()`; it is the contract, and the route schema must stay `additionalProperties: true` or the serializer silently strips fields):
 ```json
 {
   "customerAgreementInstanceReference": "...",
+  "partyInstanceReference": "...",
   "customerName": "John Doe",
+  "customerEmailAddress": "john@example.com",
+  "customerMobilePhoneNumber": "+34-600-000-000",
+  "customerAgreementReference": "ACC-001",
   "customerSegment": "retail",
-  "customerAgreementStatus": "active"
+  "customerAgreementStatus": "active",
+  "customerAgreementGovernmentID": {
+    "type": "driver_license", "number": "GB31454621", "issuingCountry": "GB", "expiryDate": "2031-12-24"
+  },
+  "customerAgreementTaxIDNumber": "ES12345678",
+  "customerAgreementOccupation": "engineer",
+  "contactPiiRestricted": false,
+  "sensitiveAvailable": true
 }
 ```
 
-> Encrypted fields (`customerEmailAddress`, `customerMobilePhoneNumber`, `customerAgreementReference`) are not echoed back in the response. They are used only as search predicates.
+**Tiering (v32, plan §4.1).**
+- **Lookup tier**, returned to every role that can reach the record so a displayed value is always a searchable value: the identity document (`customerAgreementGovernmentID`: `.number` QE:suffix, `.type`/`.issuingCountry` QE:equality, `.expiryDate` QE:range), `customerAgreementTaxIDNumber` (QE:prefix) and `customerAgreementOccupation` (QE:equality).
+- **Contact PII** (`customerEmailAddress`, `customerMobilePhoneNumber`) is restricted to `level2_investigator` and `security_auditor`; `contactPiiRestricted: true` tells the client why it is absent.
+- **Sensitive tier** (QE:none: `customerAgreementResidentialAddress`, `customerAgreementRiskNotes`) travels in a `sensitive` block **only** on the audited escalation path (a case reference, which is what emits `field_accessed`). Otherwise the response carries `sensitiveAvailable: true` and the value must be obtained from `GET /customer/:partyRef/kyc/reveal`, which emits one `kyc.sensitive.revealed` event per disclosure (PCI DSS Req 10.2.2). ADR-052.
+- `governmentIdentificationReference` is **not** part of any response since v32 (ADR-050).
+
+> The encrypted search keys are also echoed back only under the tiering above; they are primarily used as search predicates.
 
 ---
 
@@ -2356,13 +2376,26 @@ Returns unique `{ name, mcc }` pairs aggregated from the `cardTransactionLog` co
 
 ### 6.8 Raw Document (Demo Tool)
 
-Available only when `NODE_ENV !== 'production'`. Used by the "Encrypted in Atlas" toggle in both modes.
+Used by the "Encrypted in Atlas" toggle in both modes. Enabled by default; set `PSP_DEMO_RAW_DOCUMENTS=false` to remove the surface (403).
 
-#### `GET /demo/raw-document/:collection/:id`
+#### `GET /api/v1/system/raw/:collection/:id`
 
 Returns the raw BSON document as stored in Atlas (ciphertext visible, no auto-decryption). Uses a plain MongoClient without `autoEncryption`.
 
-**Path params:** `collection` (e.g., `cardTransactionLog`), `id` (document `_id` or primary key value)
+**Authorization (v32 C5).** JWT alone is not sufficient. `RAW_COLLECTION_RESOURCE` maps each allowed collection to the BIAN resource that owns it, and it is the single source of truth for both the allowed list and the check:
+
+| Collection | Owning resource |
+|---|---|
+| `party`, `customerAgreementProcedure`, `customerAuthenticationAssessment` | `customers` |
+| `cardTransactionLog` | `transactions` |
+| `paymentCardManagement` | `cards` |
+| `fraudDiagnosisCase` | `fraudCases` |
+
+- Roles with scope `all` (staff) need `view` on the owning resource.
+- Roles with scope `own` (`customer`) are authorized by **ownership** instead: the data subject reaches its own record (GDPR Art. 15) without holding the staff-facing permissions. Ownership is resolved server-side from the caller's identity (own party reference, own `sub`, own agreement, and an L1-client probe for a transaction / card / case), never from a request parameter.
+- The kill-switch may only remove the surface, never grant access to it (P6 / ADR-051).
+
+**Path params:** `collection` (from the table above), `id` (primary key `*InstanceReference`)
 
 **Response 200:**
 ```json
@@ -2377,7 +2410,7 @@ Returns the raw BSON document as stored in Atlas (ciphertext visible, no auto-de
 }
 ```
 
-**Response 403:** Returned if `NODE_ENV === 'production'`.
+**Response 400:** Unknown collection. **Response 403:** `PSP_DEMO_RAW_DOCUMENTS=false` (`code` absent), the role lacks `view` on the owning resource (`code: ACL_DENIED`), or the document belongs to another party (`code: OWNERSHIP_DENIED`).
 
 ---
 
@@ -2625,6 +2658,33 @@ Returns a single execution by reference. Includes full `resolutionLog`.
 
 ### 6.12 Merchant Beneficiary API — SD-54
 
+> **v32 (ADR-048): this is a SEARCH surface, not an enumeration surface.**
+>
+> `GET /api/v1/beneficiaries` (and `/:ownerRef`) requires a discriminating predicate for any
+> non-own-scope caller: `ownerRef`, `caseRef`, or `q` of at least 3 characters. Without one the route
+> returns **400** `{ error, code: 'PREDICATE_REQUIRED' }`. The rule is enforced in
+> `assertBeneficiaryPredicate()` at the service boundary, so a future caller cannot bypass it.
+>
+> Capabilities: `beneficiaries:view` authorises a drill-down for a **known** owner party reference;
+> `beneficiaries:investigate` is additionally required for a **cross-party** read (held by
+> `level2_investigator` and `security_auditor`, not by `level1_analyst`). `security_auditor` holds no
+> `manage` (read-only oversight, segregation of duties).
+>
+> Projection: the display-safe projection applies to **every** channel including the session one. A
+> list response never contains `counterpartyPartyReference` or the raw lookup value. The counterparty
+> identifier is masked by `maskLookupValue` *before* it is written, so the plaintext is not persisted
+> and is unrecoverable by any role: there is deliberately no reveal endpoint for it.
+>
+> Audit: one `beneficiary.record.disclosed` compliance event per record returned, naming the owner
+> party reference and which predicate was used (PCI DSS Req 10.2.2). `BusinessEntityType` gains
+> `'beneficiary'` for this purpose.
+>
+> `GET /api/v1/beneficiaries/aggregates` returns `{ total, byStatus, byLookupType }` with **no
+> identifiers**, so an oversight role can size the population without addressing a record. It emits no
+> disclosure event because nothing is disclosed.
+
+
+
 > **Superseded in v23.** The dedicated `/api/v1/merchant/beneficiaries/*` tree was removed. Merchant
 > beneficiary operations now use the SHARED `/api/v1/beneficiaries` capability endpoints on the OAuth
 > channel (owner derived from `token.sub`, never in the URL). See the **v23 dual-auth capability surface**
@@ -2770,6 +2830,15 @@ PSP_PAYMENT_INITIATION_ALWAYS_SUCCEED=true  # Set false to simulate 5% rail fail
 PSP_AIS_ALWAYS_VERIFY=true               # Set false for builtin AIS to return unverified
 PSP_AUDIT_LIST_ACCESS=false              # v29: emit 1 aggregate compliance event per global admin listing (default off)
 
+# ── Demo exposure switches ─────────────────────────────────────────
+# "What does Atlas see?" raw-ciphertext view (GET /system/demo/raw/:collection/:id) bypasses QE
+# auto-decryption. Enabled by default in EVERY environment (this is a demo system, and the view is
+# the encryption story). Set to false to harden a deployment towards production-ready behaviour, or
+# on any environment holding real cardholder data (PCI DSS Req. 7 / 10).
+PSP_DEMO_RAW_DOCUMENTS=true
+# Re-enables /admin/exec under NODE_ENV=production (arbitrary command execution; demo only).
+PSP_ADMIN_ENFORCE=false
+
 # ── Frontend demo convenience (NEXT_PUBLIC_, build-time) ───────────
 # Kill-switch for the OIDC /auth/authorize demo shortcut. Two per-request query params drive it:
 #   prefill_password=<pw>  → prefills the password field (login_hint prefills the email).
@@ -2787,19 +2856,58 @@ Seed files live in `backend/data/`. The seed script (`backend/bin/seed.ts`) read
 
 ### Seed volumes
 
+Counts are the v33 population.
+
 | File | Collection (BIAN SD) | Documents | Generator |
 |---|---|---|---|
-| `backend/data/parties.json` | `party` (SD-13) | 53 (50 customers + 3 employees) | `bin/seed-generate.ts` |
-| `backend/data/customerAuthentications.json` | `customerAuthenticationAssessment` (SD-91) | 5 | `bin/seed-generate.ts` |
-| `backend/data/authDomains.json` | `authenticationDomain` (SD-16) | 3 | manual |
-| `backend/data/customerAgreements.json` | `customerAgreementProcedure` (SD-53) | 50 | `bin/seed-generate.ts` — includes inline QE:none fields (v2) |
-| `backend/data/paymentCards.json` | `paymentCardManagement` (SD-88) | 50 | `bin/seed-generate.ts` |
-| `backend/data/cardTransactions.json` | `cardTransactionLog` (SD-254) | 200 | `bin/seed-generate.ts` — includes inline QE:none fields (v2) |
+| `backend/data/parties.json` | `party` (SD-13) | 68 (57 customers + 11 employees) | `bin/seed-generate.ts` (additive) |
+| `backend/data/customerAuthentications.json` | `customerAuthenticationAssessment` (SD-91) | 68 (one per party; 14 `customerAuthenticationDemoFeatured`) | `bin/seed-generate.ts` (additive) |
+| `backend/data/authDomains.json` | `authenticationDomain` (SD-16) | 3 | manual (the `local` domain ships with self-registration on, manual approval) |
+| `backend/data/customerAgreements.json` | `customerAgreementProcedure` (SD-53) | 57 | `bin/seed-generate.ts` — includes inline QE:none fields (v2) |
+| `backend/data/paymentCards.json` | `paymentCardManagement` (SD-88) | 205 | `bin/seed-generate.ts` (additive) |
+| `backend/data/payoutAccounts.json` | `payoutAccountArrangement` (SD-66) | 65 | `bin/seed-generate.ts` (additive; curated records are never rewritten) |
+| `backend/data/cardTransactions.json` | `cardTransactionLog` (SD-254) | 230 | `bin/seed-generate.ts` — includes inline QE:none fields (v2) |
 | `backend/data/fraudCases.json` | `fraudDiagnosisCase` (SD-83) | 20 | `bin/seed-generate.ts` |
 | `backend/data/fraudCaseEvents.json` | `fraudDiagnosisCaseEvents` (SD-83) | 20 | `bin/seed-generate.ts` |
 | `backend/data/customerCreditRatings.json` | `customerCreditRatingState` (SD-60) | 5 | manual (HRPC profiles) |
 
-**Regenerating synthetic data:** Run `npm run setup:data --prefix backend` (executes `bin/seed-generate.ts`). This overwrites all files marked `bin/seed-generate.ts` above. Manual files (`authDomains.json`, `customerCreditRatings.json`) are never overwritten by the generator.
+**Regenerating synthetic data:** run `npm run generate:data --prefix backend` (executes `bin/seed-generate.ts`).
+
+Since v33 (ADR-054) the generator is **additive and refuses to clobber**: it loads the existing
+fixtures, keeps every curated record byte-for-byte, and only tops the synthetic population up to the
+target floors (50 customer parties, 4 transactions per customer, 20 fraud cases). `write()` refuses to
+reduce any collection's record count and exits non-zero unless `--force` is passed. A second run over
+its own output changes nothing, so it is safe to run at any time. Manual files (`authDomains.json`,
+`customerCreditRatings.json`, `merchants.json`) are never touched.
+
+Set `PSP_SEED_DATA_DIR` to write to a different directory (the seeder reads the same variable). The
+integrity test uses it to exercise the generator without touching the real fixtures.
+
+### Fixture integrity invariants (v33)
+
+The fixtures, not the runtime, are the source of truth for the demo population, so the invariants are
+asserted against `backend/data/*.json` in `test/backend/unit/services/seedDataIntegrity.test.ts` and
+`seedGeneratorAdditive.test.ts`. The shared repairs live in `backend/src/vendors/seed/dataIntegrity.ts`
+and are applied by **both** halves of the pipeline (the generator and the runtime seeders), so neither
+can drift from the other.
+
+| Invariant | Enforced by |
+|---|---|
+| Every `customer` party has exactly one SD-91 login, identity taken from the party (SD-13 is the source of truth) | `deriveCustomerLogins`, called by the generator and by `seedUsers` |
+| Every customer is complete: agreement with a KYC record, ≥1 card, ≥1 payout account, ≥1 transaction | `completeCustomerPopulation`, called by the generator |
+| Every transaction points at a card held by the same party, masked PANs agreeing | `repointTransactionsToCards`, called by the generator and by `seedTransactions` |
+| A fraud case snapshot shows the masked PAN its transaction carries | `syncFraudCaseSnapshots` |
+| Every card is funded by an active payout account owned by the same party | `seedCards` (relink pass) |
+
+Deliberate exceptions, asserted rather than repaired:
+
+- **A shared card token is not a duplicate.** One physical card (one token) held by several customers
+  is the FDS/AML shared-card signal: the SD-88 arrangement is keyed by `(customerAgreementInstanceReference, paymentCardReference)`,
+  which the unique compound index enforces, and the distinct-holder count is surfaced as
+  `cardHolderCount`. There is deliberately **no** unique index on `paymentCardReference` alone.
+- **A masked-PAN collision is realistic.** Different PANs legitimately share their last four digits.
+- **One `initiated` KYC record** is an in-progress lifecycle state on an otherwise complete customer.
+  It is what makes the KYC administration list's completed-subset count explainable (v32 Track E).
 
 ### Demo users (`data/customerAuthentications.json`)
 
@@ -2813,7 +2921,13 @@ Credentials are stored in `customerAuthenticationAssessment` (SD-91). Passwords 
 | `michael.obi@back.es` | `level2_investigator` | Michael Obi |
 | `admin@back.es` | `security_auditor` | Admin |
 
-Each of these 5 users has a corresponding `party` document in `parties.json` linked via `partyInstanceReference`.
+Each of these users has a corresponding `party` document in `parties.json` linked via `partyInstanceReference`.
+
+Since v33 **every** party holds a login, not just the curated ones: 57 customers plus 11 staff. The
+login picker still shows only the curated cast, selected by `customerAuthenticationDemoFeatured: true`
+(14 records); every other customer is reachable through search and signs in with the same shared demo
+credential. A customer with an agreement, cards, a payout account, transactions and a fraud case who
+could not sign in was the single largest coherence gap in the demo (v33 F1).
 
 ### Synthetic data rules
 
@@ -2822,8 +2936,13 @@ Each of these 5 users has a corresponding `party` document in `parties.json` lin
 - `paymentCardMaskedPanDisplay` / `cardTransactionMaskedPanDisplay` format: `****-****-****-XXXX` where XXXX is a random 4-digit suffix
 - `paymentCardExpirationDate` is always a future date (at least 12 months from generation)
 - CVV, PIN, full PAN, and magnetic stripe data are **never included** in seed files
-- Government IDs use a format that is clearly synthetic: `SYNTH-<random-8-digits>`
-- Fraud cases are linked to the first 20 transactions (indices 0–19) in the transactions seed
+- Identity documents are the structured `customerAgreementGovernmentID` sub-document only, produced by
+  `enrichKyc` (the single source, ADR-050). The deprecated flat `governmentIdentificationReference`
+  and its `SYNTH-<8-digits>` values are gone from every fixture and from the generator (v33 F5); a test
+  asserts neither string reappears
+- Fraud cases attach to transactions that do not already carry one, up to the target of 20
+- Records the generator derives (a login, a completing agreement/card/transaction) use references
+  derived from their parent reference, so regenerating produces identical output rather than duplicates
 
 ### Upsert key per collection
 
@@ -4084,6 +4203,7 @@ can classify card payments by method (Payment Link / Redirect vs plain Card). Se
 - **`rtpAliasDirectoryCache`** (plaintext): `aliasHash` (unique) → party/counterparty, TTL.
 - Indexes: see `createIndexes.ts` (inbox/outbox, expiry sweeper `{status,expiresAt}`, linkage, idempotency).
 - `BusinessEntityType` gains `'payment_request'`; `NotificationType` gains `'payment_request'`.
+- v32: `BusinessEntityType` gains `'beneficiary'` (SD-54 CounterpartyArrangement), so the per-record beneficiary disclosure event emitted by the beneficiary search is attributed to its own control record (PCI DSS Req 10.2.2).
 
 ### 14.2 Lifecycle (monotonic, validated by `rtpStateMachine.ts`)
 `draft→created→validated→presented→delivered→viewed→accepted|rejected|cancelled|expired`,

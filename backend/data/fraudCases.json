@@ -12,7 +12,7 @@
       "cardTransactionMerchantName": "Treutel - Altenwerth",
       "cardTransactionDateTime": "2026-05-21T00:50:09.504Z",
       "cardTransactionStatus": "authorized",
-      "cardTransactionMaskedPanDisplay": "****-****-****-4153"
+      "cardTransactionMaskedPanDisplay": "****-****-****-0144"
     },
     "fraudDiagnosisCaseStatus": "open",
     "fraudDiagnosisCaseSeverity": "medium",
@@ -43,7 +43,7 @@
       "cardTransactionMerchantName": "Brakus - Fahey",
       "cardTransactionDateTime": "2026-05-20T08:54:01.228Z",
       "cardTransactionStatus": "settled",
-      "cardTransactionMaskedPanDisplay": "****-****-****-4243"
+      "cardTransactionMaskedPanDisplay": "****-****-****-1177"
     },
     "fraudDiagnosisCaseStatus": "open",
     "fraudDiagnosisCaseSeverity": "medium",
@@ -74,7 +74,7 @@
       "cardTransactionMerchantName": "Keeling LLC",
       "cardTransactionDateTime": "2026-05-20T03:29:35.900Z",
       "cardTransactionStatus": "disputed",
-      "cardTransactionMaskedPanDisplay": "****-****-****-9928"
+      "cardTransactionMaskedPanDisplay": "****-****-****-1229"
     },
     "fraudDiagnosisCaseStatus": "open",
     "fraudDiagnosisCaseSeverity": "low",
@@ -105,7 +105,7 @@
       "cardTransactionMerchantName": "Dach and Sons",
       "cardTransactionDateTime": "2026-05-11T14:54:38.361Z",
       "cardTransactionStatus": "authorized",
-      "cardTransactionMaskedPanDisplay": "****-****-****-1623"
+      "cardTransactionMaskedPanDisplay": "****-****-****-4335"
     },
     "fraudDiagnosisCaseStatus": "open",
     "fraudDiagnosisCaseSeverity": "low",
@@ -136,7 +136,7 @@
       "cardTransactionMerchantName": "Huel, Rutherford and DuBuque",
       "cardTransactionDateTime": "2026-05-06T20:01:09.846Z",
       "cardTransactionStatus": "settled",
-      "cardTransactionMaskedPanDisplay": "****-****-****-7205"
+      "cardTransactionMaskedPanDisplay": "****-****-****-5812"
     },
     "fraudDiagnosisCaseStatus": "open",
     "fraudDiagnosisCaseSeverity": "high",
@@ -167,7 +167,7 @@
       "cardTransactionMerchantName": "Dach Group",
       "cardTransactionDateTime": "2026-04-30T07:47:39.023Z",
       "cardTransactionStatus": "disputed",
-      "cardTransactionMaskedPanDisplay": "****-****-****-4124"
+      "cardTransactionMaskedPanDisplay": "****-****-****-8280"
     },
     "fraudDiagnosisCaseStatus": "under_review",
     "fraudDiagnosisCaseSeverity": "medium",
@@ -198,7 +198,7 @@
       "cardTransactionMerchantName": "Cruickshank - Predovic",
       "cardTransactionDateTime": "2026-05-20T13:47:24.181Z",
       "cardTransactionStatus": "authorized",
-      "cardTransactionMaskedPanDisplay": "****-****-****-8516"
+      "cardTransactionMaskedPanDisplay": "****-****-****-7519"
     },
     "fraudDiagnosisCaseStatus": "under_review",
     "fraudDiagnosisCaseSeverity": "critical",
@@ -229,7 +229,7 @@
       "cardTransactionMerchantName": "McKenzie and Sons",
       "cardTransactionDateTime": "2026-05-16T08:59:03.499Z",
       "cardTransactionStatus": "settled",
-      "cardTransactionMaskedPanDisplay": "****-****-****-8118"
+      "cardTransactionMaskedPanDisplay": "****-****-****-7419"
     },
     "fraudDiagnosisCaseStatus": "under_review",
     "fraudDiagnosisCaseSeverity": "high",
@@ -260,7 +260,7 @@
       "cardTransactionMerchantName": "Beier - Stokes",
       "cardTransactionDateTime": "2026-05-19T09:43:29.736Z",
       "cardTransactionStatus": "disputed",
-      "cardTransactionMaskedPanDisplay": "****-****-****-2204"
+      "cardTransactionMaskedPanDisplay": "****-****-****-5062"
     },
     "fraudDiagnosisCaseStatus": "under_review",
     "fraudDiagnosisCaseSeverity": "high",
@@ -292,7 +292,7 @@
       "cardTransactionMerchantName": "Kreiger LLC",
       "cardTransactionDateTime": "2026-05-12T11:06:38.684Z",
       "cardTransactionStatus": "authorized",
-      "cardTransactionMaskedPanDisplay": "****-****-****-1209"
+      "cardTransactionMaskedPanDisplay": "****-****-****-0296"
     },
     "fraudDiagnosisCaseStatus": "under_review",
     "fraudDiagnosisCaseSeverity": "critical",
@@ -324,7 +324,7 @@
       "cardTransactionMerchantName": "McClure, Erdman and Kuhlman",
       "cardTransactionDateTime": "2026-05-25T23:39:21.626Z",
       "cardTransactionStatus": "settled",
-      "cardTransactionMaskedPanDisplay": "****-****-****-5252"
+      "cardTransactionMaskedPanDisplay": "****-****-****-8147"
     },
     "fraudDiagnosisCaseStatus": "escalated",
     "fraudDiagnosisCaseSeverity": "critical",
@@ -356,7 +356,7 @@
       "cardTransactionMerchantName": "Johnson LLC",
       "cardTransactionDateTime": "2026-05-25T15:37:26.934Z",
       "cardTransactionStatus": "disputed",
-      "cardTransactionMaskedPanDisplay": "****-****-****-6561"
+      "cardTransactionMaskedPanDisplay": "****-****-****-2402"
     },
     "fraudDiagnosisCaseStatus": "escalated",
     "fraudDiagnosisCaseSeverity": "high",
@@ -387,7 +387,7 @@
       "cardTransactionMerchantName": "Wiegand and Sons",
       "cardTransactionDateTime": "2026-05-26T10:19:47.557Z",
       "cardTransactionStatus": "authorized",
-      "cardTransactionMaskedPanDisplay": "****-****-****-1678"
+      "cardTransactionMaskedPanDisplay": "****-****-****-5828"
     },
     "fraudDiagnosisCaseStatus": "escalated",
     "fraudDiagnosisCaseSeverity": "medium",
@@ -418,7 +418,7 @@
       "cardTransactionMerchantName": "Wehner, Runolfsson and Hodkiewicz",
       "cardTransactionDateTime": "2026-05-20T23:57:09.963Z",
       "cardTransactionStatus": "settled",
-      "cardTransactionMaskedPanDisplay": "****-****-****-7583"
+      "cardTransactionMaskedPanDisplay": "****-****-****-4281"
     },
     "fraudDiagnosisCaseStatus": "escalated",
     "fraudDiagnosisCaseSeverity": "high",
@@ -449,7 +449,7 @@
       "cardTransactionMerchantName": "Wolf, Goyette and Schaefer",
       "cardTransactionDateTime": "2026-05-28T22:59:38.496Z",
       "cardTransactionStatus": "disputed",
-      "cardTransactionMaskedPanDisplay": "****-****-****-6119"
+      "cardTransactionMaskedPanDisplay": "****-****-****-3443"
     },
     "fraudDiagnosisCaseStatus": "escalated",
     "fraudDiagnosisCaseSeverity": "medium",
@@ -480,7 +480,7 @@
       "cardTransactionMerchantName": "Romaguera LLC",
       "cardTransactionDateTime": "2026-05-19T21:01:29.610Z",
       "cardTransactionStatus": "authorized",
-      "cardTransactionMaskedPanDisplay": "****-****-****-6472"
+      "cardTransactionMaskedPanDisplay": "****-****-****-3382"
     },
     "fraudDiagnosisCaseStatus": "resolved_cleared",
     "fraudDiagnosisCaseSeverity": "critical",
@@ -511,7 +511,7 @@
       "cardTransactionMerchantName": "Schaden, Gislason and Lockman",
       "cardTransactionDateTime": "2026-05-12T19:01:10.037Z",
       "cardTransactionStatus": "settled",
-      "cardTransactionMaskedPanDisplay": "****-****-****-8066"
+      "cardTransactionMaskedPanDisplay": "****-****-****-2164"
     },
     "fraudDiagnosisCaseStatus": "resolved_cleared",
     "fraudDiagnosisCaseSeverity": "medium",
@@ -542,7 +542,7 @@
       "cardTransactionMerchantName": "Frami, Powlowski and Leannon",
       "cardTransactionDateTime": "2026-05-04T13:15:31.084Z",
       "cardTransactionStatus": "disputed",
-      "cardTransactionMaskedPanDisplay": "****-****-****-7564"
+      "cardTransactionMaskedPanDisplay": "****-****-****-4487"
     },
     "fraudDiagnosisCaseStatus": "resolved_cleared",
     "fraudDiagnosisCaseSeverity": "high",
@@ -574,7 +574,7 @@
       "cardTransactionMerchantName": "Hand, Fay and Runolfsdottir",
       "cardTransactionDateTime": "2026-05-01T02:53:10.961Z",
       "cardTransactionStatus": "authorized",
-      "cardTransactionMaskedPanDisplay": "****-****-****-0094"
+      "cardTransactionMaskedPanDisplay": "****-****-****-8346"
     },
     "fraudDiagnosisCaseStatus": "resolved_cleared",
     "fraudDiagnosisCaseSeverity": "low",
@@ -605,7 +605,7 @@
       "cardTransactionMerchantName": "Sauer Inc",
       "cardTransactionDateTime": "2026-05-27T01:01:16.044Z",
       "cardTransactionStatus": "settled",
-      "cardTransactionMaskedPanDisplay": "****-****-****-6673"
+      "cardTransactionMaskedPanDisplay": "****-****-****-7350"
     },
     "fraudDiagnosisCaseStatus": "resolved_cleared",
     "fraudDiagnosisCaseSeverity": "low",

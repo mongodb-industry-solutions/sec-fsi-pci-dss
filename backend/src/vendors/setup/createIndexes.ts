@@ -359,8 +359,9 @@ export async function createIndexes(client: MongoClient) {
     { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
     { key: { processType: 1, eventDateTime: -1 } },
     { key: { processAction: 1, processOutcome: 1 } },
-    // v18: "user × merchant × action" activity view (SD-16 audit). Sparse — only OAuth-attributed events.
-    { key: { merchantAgreementReference: 1, actingPartyReference: 1, eventDateTime: -1 }, sparse: true },
+    // v18: "user x merchant x action" activity view (SD-16 audit).
+    // Not sparse: timeseries collections reject the sparse option.
+    { key: { merchantAgreementReference: 1, actingPartyReference: 1, eventDateTime: -1 } },
   ]).catch(() => { /* timeseries collection may not exist on the very first run */ });
 
   // ADR-025: Compliance Process Events — timeseries

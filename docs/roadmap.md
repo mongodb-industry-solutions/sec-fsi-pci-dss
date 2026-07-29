@@ -925,3 +925,91 @@ process fans out to providers purely via the event bus; each process is tracked 
 - [x] Version bump to 2.5.0 across all four package.json.
 
 *Added 2026-07-24 (v31). Version 2.5.0.*
+
+
+## v32: Worker-role visibility, defense in depth and identity-document reconciliation
+
+Driver: a review of what `security_auditor` actually sees. Full analysis, decisions and execution log
+in `tmp/dev.v32.plan.md`.
+
+### FR
+
+| Id | Requirement | Acceptance criteria |
+|---|---|---|
+| FR-v32-01 | The beneficiary surface is a search surface, not an enumeration surface | `GET /api/v1/beneficiaries` returns 400 (`PREDICATE_REQUIRED`) for a staff caller with no `ownerRef`, `caseRef` or `q` of at least 3 characters; the rule is enforced in the service, so calling it directly also throws |
+| FR-v32-02 | Cross-party beneficiary search is a distinct capability | `beneficiaries:investigate` is required for a read with no owner; `level1_analyst` holds `view` only and is refused with 403 |
+| FR-v32-03 | The auditor is read-only on beneficiaries | `security_auditor` holds no `beneficiaries:manage`; the UI renders no write control for it |
+| FR-v32-04 | Every disclosed beneficiary record is audited individually | one `beneficiary.record.disclosed` compliance event per record returned, naming the owner party and the predicate used (PCI DSS 10.2.2) |
+| FR-v32-05 | Oversight can size the population without identifying it | `GET /api/v1/beneficiaries/aggregates` returns totals and distributions with no identifiers and emits no disclosure event |
+| FR-v32-06 | The identity document has one physical source of truth | every role that can reach a customer record receives `customerAgreementGovernmentID` and `customerAgreementTaxIDNumber`; `governmentIdentificationReference` appears in no response, no fixture and no generated record |
+| FR-v32-07 | A displayed value is a searchable value | the identity number rendered on `/system/users/[id]` and on the KYC administration page is byte-identical, and a `govIdNumber` suffix search on it matches |
+| FR-v32-08 | Sensitive-tier values are masked for every role | address and risk notes render masked on the users and investigation pages for L1, L2 and the auditor; revealing them issues a server request that emits `kyc.sensitive.revealed` |
+| FR-v32-09 | The reveal capability is named, not hardcoded | `canRevealKycSensitive` grants the Level 2 QE client; no service obtains it by passing a literal role string to `getDbForRole` |
+| FR-v32-10 | Raw and debug panels never disclose | ciphertext is previewed as hex and sensitive-tier keys are redacted by name in every raw panel, including `static` sections |
+| FR-v32-11 | The raw-document endpoint is authorized | staff need `view` on the resource that owns the collection; a customer reaches only records proven to be its own; the demo kill-switch cannot grant access |
+| FR-v32-12 | No orphan information | `/system/users/[id]` links to the KYC record when the session holds `customers:view` and `modules:view` |
+| FR-v32-13 | The KYC list states its population | the surface says it lists parties with a completed KYC record and that `initiated` records are excluded; the party-type filter offers only options that can structurally match (BIAN SD-53) |
+| FR-v32-14 | Every touched page is responsive | no horizontal document scroll at 375, 834 and desktop widths; the reveal control is reachable and a long revealed value does not widen the layout |
+
+### NFR
+
+| Id | Requirement | Acceptance criteria |
+|---|---|---|
+| NFR-v32-01 | No duplication | one field row, one group, one identity-document renderer, one masking helper, one redaction helper; the four page-local field variants are gone |
+| NFR-v32-02 | Defense in depth | every restriction holds at the QE tier, the route guard, the service boundary and the projection; tests call the API directly rather than through the UI |
+| NFR-v32-03 | No standards deviation | no new BIAN collection or field; `BusinessEntityType` gains `beneficiary` (SD-54) only so a disclosure event can name its own control record; EDA and Hexagonal preserved (rules in services, publish-then-project events) |
+| NFR-v32-04 | The five QE search modes keep working | equality, range, prefix, suffix and substring each have an explicit test, and the pre-8.2 degradation path is asserted; predicate hardening reuses the existing per-field minimums and never raises them |
+
+### Definition of Done
+
+- [x] `test:unit` green (543 tests, 67 files).
+- [x] Both type-checks clean.
+- [x] E2E green except two failures that pre-exist on a clean tree (verified by stashing all v32 changes).
+- [x] Responsive spec green on desktop, tablet and mobile projects.
+- [x] `technical-spec.md` sections 1, 6.2, 6.8 and the events section updated with the code.
+- [x] ADR-048 to ADR-053 recorded in `engineering-proposal.md`.
+- [ ] D2 (one field-descriptor catalog served from the search registry) and the remaining
+      card-to-`RecordGroup` conversion on the KYC page: deferred, see the execution log.
+
+*Added 2026-07-29 (v32).*
+
+
+## v33: Seed-data integrity and realism
+
+Driver: an audit of the demo population found data that contradicted the storyline. Not a security
+defect (no permission is bypassed and no sensitive value leaks) but a credibility one, visible to
+anyone who clicks twice in front of an audience. Full analysis, decisions and execution log in
+`tmp/dev.v33.plan.md`.
+
+### FR
+
+| Id | Requirement | Acceptance criteria |
+|---|---|---|
+| FR-v33-01 | Regenerating the data never destroys the curated cast | the generator is additive: run over the fixtures, no collection's record count falls and no record present before is missing after; `write()` refuses a reduction unless `--force` is passed; a second run over its own output changes nothing (ADR-054) |
+| FR-v33-02 | The deprecated identity field cannot come back | after `npm run generate:data`, no fixture contains `governmentIdentificationReference` or the string `SYNTH-`; every agreement carries a complete structured document (type, number, issuing country, expiry) whose number is long enough for a last-4 suffix query |
+| FR-v33-03 | Every customer can sign in | all 57 `customer` parties hold exactly one SD-91 login; email and display name come from the party (SD-13 is the source of truth); login emails stay unique; the curated picker still returns exactly 14 featured logins; a reseed is idempotent |
+| FR-v33-04 | Every transaction resolves to its card | 0 transactions carry a token matching no card; for every transaction the card it points at is held by the party its account reference belongs to; the masked PAN on the transaction equals the one derived from that card; fraud-case snapshots agree |
+| FR-v33-05 | No customer is a partial record | all 57 `customer` parties hold an agreement with a KYC record, at least one card, at least one payout account and at least one transaction; David Chen gains the agreement and card he lacked while holding a login, a payout account and a merchant; each completed customer has at least one dispute or decline so the self-service view is not empty (D-3) |
+| FR-v33-06 | A shared card token stays a compliance signal | `paymentCardReference` is not unique on its own; the `(agreement, token)` pair is; at least one token exceeds the 3-holder threshold so `cardHolderCount` has something to trip on; transaction repointing prefers a token unique to the holder (ADR-055) |
+| FR-v33-07 | The audit cannot regress silently | one table-driven invariant test over the fixtures covers referential integrity, uniqueness, population completeness and the card link; the generator contract has its own test that runs the real script into a temporary directory |
+
+### NFR
+
+| Id | Requirement | Acceptance criteria |
+|---|---|---|
+| NFR-v33-01 | Reuse before creation (P8) | one shared `vendors/seed/dataIntegrity.ts` called by both the generator and the runtime seeders, never the same repair written twice; masked PANs come from `deriveMaskedPan`, KYC leaves from `enrichKyc`, the deterministic seed from `screeningHash`, the token shape from the SD-57 tokenization service; the output directory reuses `PSP_SEED_DATA_DIR` |
+| NFR-v33-02 | Setup and seed remain the only source of truth (P7) | every change is applied from `vendors/seed/*` plus the fixtures, both halves together; no ad-hoc migration; the database is rebuilt with `--reset` plus reseed |
+| NFR-v33-03 | No standards deviation | no new collection and no new field; SD-91 authentication stays a control record separate from the SD-53 agreement, so a credential-less customer remains representable and a non-active one is expressed through `customerAuthenticationAccountStatus`; card data handling unchanged (PCI DSS: no PAN, CVV or PIN in a fixture) |
+| NFR-v33-04 | Deterministic and idempotent | every derived reference comes from its parent reference, so regenerating or reseeding produces identical records rather than duplicates |
+
+### Definition of Done
+
+- [x] `test:unit` green (621 tests, 69 files).
+- [x] Both type-checks clean.
+- [x] Generator verified additive and idempotent against the real fixtures.
+- [x] `technical-spec.md` §8 (seed volumes, demo users, synthetic data rules, integrity invariants) updated with the code.
+- [x] ADR-054 and ADR-055 recorded in `engineering-proposal.md`.
+- [ ] Database `--reset` plus reseed: performed by the user (D-2).
+- [ ] E2E: the card link from a transaction detail resolves for staff. Pending the reseed.
+
+*Added 2026-07-29 (v33).*

@@ -619,10 +619,19 @@ export interface KycSearchResult {
   customerSegment?: string;
   customerAgreementStatus?: string;
   customerAgreementKycCheck?: Record<string, unknown> | null;
+  // v32 B1: lookup tier (QE suffix/equality/range/prefix), returned to every role that can search,
+  // so a displayed value is always a searchable value.
+  customerAgreementGovernmentID?: {
+    type?: unknown; number?: unknown; issuingCountry?: unknown; expiryDate?: unknown;
+  } | null;
+  customerAgreementTaxIDNumber?: unknown;
   contactPiiRestricted: boolean;
+  /** Present only on the audited escalation path (a case reference); otherwise use the reveal endpoint. */
+  sensitiveAvailable?: boolean;
   sensitive?: {
     customerAgreementResidentialAddress?: unknown;
-    governmentIdentificationReference?: unknown;
+    // v32 (ADR-050): governmentIdentificationReference is gone. The identity document is the
+    // structured, searchable customerAgreementGovernmentID on the base record.
     customerAgreementRiskNotes?: unknown;
   };
 }

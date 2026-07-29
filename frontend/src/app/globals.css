@@ -58,3 +58,35 @@ select:not([multiple]) {
   background: linear-gradient(90deg, transparent, var(--mongodb-green), transparent);
   animation: admin-indeterminate 1.2s ease-in-out infinite;
 }
+
+/* Sign-in screen debug toggle: concentric waves spreading from the button, like a drop hitting
+   water. Two rings offset by half a period give a continuous swell. useDebugHint adds and removes
+   this class, so the burst length must stay in step with BURST_MS there. */
+@keyframes debug-hint-wave {
+  0%        { transform: scale(1);   opacity: 0.85; }
+  75%, 100% { transform: scale(2.9); opacity: 0; }
+}
+.debug-hint-pulse {
+  background-color: rgb(254 243 199);
+  color: rgb(180 83 9);
+}
+.debug-hint-pulse::before,
+.debug-hint-pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid rgb(217 119 6);
+  pointer-events: none;
+  animation: debug-hint-wave 1.5s cubic-bezier(0, 0, 0.2, 1) 3;
+}
+.debug-hint-pulse::after { animation-delay: 0.5s; }
+
+/* No motion, but keep the highlight. */
+@media (prefers-reduced-motion: reduce) {
+  .debug-hint-pulse {
+    box-shadow: 0 0 0 2px rgb(217 119 6 / 0.5);
+  }
+  .debug-hint-pulse::before,
+  .debug-hint-pulse::after { display: none; }
+}

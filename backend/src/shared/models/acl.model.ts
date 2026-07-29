@@ -83,7 +83,10 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       merchants: ['view'],
       fraudCases: ['view', 'investigate'],
       auditEvents: ['view'],
-      beneficiaries: ['view'],  // SD-54: read-only view of beneficiary contacts
+      // v32 A2 (ADR-048): `view` is drill-down for a KNOWN owner party reference. Cross-party SEARCH
+      // needs `investigate`, which L1 deliberately does NOT hold: first-line triage has no need to
+      // enumerate counterparties across the whole customer base (PCI DSS 7.2.2, EBA §31(a)).
+      beneficiaries: ['view'],
     },
   },
   {
@@ -102,7 +105,8 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       fraudCases: ['view', 'investigate'],
       auditEvents: ['view'],
       accounts: ['view', 'viewSensitive'],  // PCI Req 3.3 — IBAN reveal for fraud investigations
-      beneficiaries: ['view', 'manage'],    // SD-54: can edit/remove beneficiary contacts for investigations
+      // v32 A2: `investigate` authorises cross-party beneficiary SEARCH (ADR-048).
+      beneficiaries: ['view', 'investigate', 'manage'],  // SD-54: search + edit/remove for investigations
       paymentRequests: ['view'],            // SD-65: read RTP requests for investigations
     },
   },
@@ -124,7 +128,11 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       modules: ['view'],
       auditEvents: ['view'],
       accounts: ['view', 'viewSensitive'],
-      beneficiaries: ['view', 'manage'],  // SD-54: full audit visibility
+      // v32 A8: the role is documented as read-only global oversight, yet it held `manage` and the UI
+      // rendered Add/Remove for it. A read-only auditor able to delete a beneficiary is a
+      // segregation-of-duties finding (EBA/GL/2019/04 §31(a), ISO 27001 A.8.2, PCI DSS Req 7).
+      // `investigate` gives it the cross-party search it actually needs (ADR-048).
+      beneficiaries: ['view', 'investigate'],  // SD-54: full audit visibility, READ-ONLY
       paymentRequests: ['view'],          // SD-65: full audit visibility of RTP requests
     },
   },

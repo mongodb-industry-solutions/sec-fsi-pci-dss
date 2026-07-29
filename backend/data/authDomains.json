@@ -6,6 +6,8 @@
     "partyAuthenticationDomainType": "local",
     "partyAuthenticationDomainFlowType": "client_credentials",
     "partyAuthenticationDomainEnabled": true,
+    "partyAuthenticationDomainSelfRegistrationEnabled": true,
+    "partyAuthenticationDomainSelfRegistrationAutoApprove": false,
     "partyAuthenticationDomainConfiguration": {},
     "bianServiceDomain": "PartyAuthentication",
     "bianControlRecordType": "AuthenticationDomain",

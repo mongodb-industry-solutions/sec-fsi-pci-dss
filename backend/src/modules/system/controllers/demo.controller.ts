@@ -7,6 +7,7 @@ import { getRawClient } from '../../../vendors/encryption/rawClient';
 import { getDemoUsers } from '../../identity/services/auth.service';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
+import { authorizeRawDocumentAccess, RAW_COLLECTION_RESOURCE } from '../services/rawDocumentAccess.service';
 import { config } from '../../../config';
 
 // ── Health check helpers (IETF draft-inadarei-api-health-check) ─────────────
@@ -295,11 +296,11 @@ Filters (combinable): \`featured=true\`, \`role=customer,merchant_officer\` (com
     schema: {
       tags: ['system'],
       summary: 'Raw (undecrypted) document from Atlas',
-      description: `**Non-production only  -  blocked in production (403).** Returns the MongoDB document exactly as stored on Atlas, bypassing QE auto-decryption.
+      description: `**Demo endpoint, enabled in every environment; set \`PSP_DEMO_RAW_DOCUMENTS=false\` to disable it (403).** Returns the MongoDB document exactly as stored on Atlas, bypassing QE auto-decryption.
 
 QE-protected fields appear as BSON binary ciphertext  -  this is the core of the **"What does Atlas see?"** demo step.
 
-**JWT required.** The plain \`MongoClient\` (no \`autoEncryption\`) is used, so ciphertext is returned as-is.`,
+**JWT required, plus authorization (v32 C5):** staff roles need \`view\` on the BIAN resource that owns the collection; a customer may only read its own records. The plain \`MongoClient\` (no \`autoEncryption\`) is used, so ciphertext is returned as-is.`,
       'x-internal': true,
       security: [{ bearerAuth: [] }],
       params: {
@@ -308,12 +309,7 @@ QE-protected fields appear as BSON binary ciphertext  -  this is the core of the
         properties: {
           collection: {
             type: 'string',
-            enum: [
-              'party', 'customerAuthenticationAssessment',
-              'cardTransactionLog',
-              'customerAgreementProcedure',
-              'paymentCardManagement', 'fraudDiagnosisCase',
-            ],
+            enum: Object.keys(RAW_COLLECTION_RESOURCE),
             description: 'Collection name (allowed list enforced server-side)',
           },
           id: { type: 'string', description: 'Primary key UUID (*InstanceReference)' },
@@ -330,28 +326,36 @@ QE-protected fields appear as BSON binary ciphertext  -  this is the core of the
         },
         400: { $ref: 'Error#' },
         401: { $ref: 'Error#' },
-        403: { description: 'Blocked in production.', $ref: 'Error#' },
+        403: { description: 'Disabled on this deployment (PSP_DEMO_RAW_DOCUMENTS=false).', $ref: 'Error#' },
         404: { $ref: 'Error#' },
         500: { $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
-    if (process.env.NODE_ENV === 'production') {
-      return reply.status(403).send({ error: 'Not available in production' });
+    // Allowed by default (demo system); opt out with PSP_DEMO_RAW_DOCUMENTS=false.
+    if (!config.demo.rawDocuments) {
+      return reply.status(403).send({
+        error: 'Raw document view is disabled on this deployment (PSP_DEMO_RAW_DOCUMENTS=false).',
+      });
     }
 
     const { collection, id } = request.params as { collection: string; id: string };
 
-    // v2: *Sensitive collections removed - sensitive fields live inline in their parent collection.
-    const allowedCollections = new Set([
-      'party', 'customerAuthenticationAssessment',
-      'cardTransactionLog',
-      'customerAgreementProcedure',
-      'paymentCardManagement', 'fraudDiagnosisCase',
-    ]);
-
-    if (!allowedCollections.has(collection)) {
-      return reply.status(400).send({ error: 'Unknown collection' });
+    // Allowed collections and the authorization rule both live in the service.
+    const caller = (request as unknown as {
+      userRole?: string;
+      user?: { role?: string; partyRef?: string; sub?: string };
+    });
+    const decision = await authorizeRawDocumentAccess(fastify.db, collection, id, {
+      ...(caller.userRole ?? caller.user?.role ? { role: caller.userRole ?? caller.user?.role } : {}),
+      ...(caller.user?.partyRef ? { partyRef: caller.user.partyRef } : {}),
+      ...(caller.user?.sub ? { sub: caller.user.sub } : {}),
+    });
+    if (!decision.allowed) {
+      return reply.status(decision.status).send({
+        error: decision.error,
+        ...(decision.code ? { code: decision.code } : {}),
+      });
     }
 
     try {

@@ -5,7 +5,7 @@ import {
   CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord, CustomerAuthRole,
 } from '../models/customerAuthentication.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../models/party.model';
-import { getDbForRole } from '../../../vendors/encryption/roleClients';
+import { getSensitiveTierDb, getEncryptionWriteDb } from '../../../vendors/encryption/roleClients';
 import { phoneDigest } from '../../../vendors/encryption/digest';
 
 // Account status includes `pending` for self-registered accounts awaiting manager approval
@@ -20,7 +20,7 @@ async function writePartyContact(
   partyRef: string,
   patch: { name?: string; email?: string; phone?: string },
 ): Promise<void> {
-  const roleDb = await getDbForRole('security_auditor', false);
+  const roleDb = await getEncryptionWriteDb('user.partyContact.update');
   const col = roleDb.collection<PartyControlRecord>(PARTY_COLLECTION);
   const existing = await col.findOne({ partyInstanceReference: partyRef });
 
@@ -68,7 +68,7 @@ async function writePartyContact(
 async function readPartyPhone(partyRef: string): Promise<string | undefined> {
   if (!partyRef) return undefined;
   try {
-    const roleDb = await getDbForRole('security_auditor', false);
+    const roleDb = await getSensitiveTierDb('user.detail.contactRead');
     const party = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
       .findOne({ partyInstanceReference: partyRef }, { projection: { partyMobilePhoneNumber: 1 } });
     return party?.partyMobilePhoneNumber || undefined;

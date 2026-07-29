@@ -20,6 +20,9 @@ const h = vi.hoisted(() => {
 
 vi.mock('../../../../backend/src/vendors/encryption/roleClients', () => ({
   getDbForRole: h.getDbForRole,
+  // v32 C6: the sensitive-tier / encryption-write clients are the same double here.
+  getSensitiveTierDb: h.getDbForRole,
+  getEncryptionWriteDb: h.getDbForRole,
 }));
 
 import { getPartyCardTransactions } from '../../../../backend/src/modules/transaction/services/cardTransaction.service';

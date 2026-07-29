@@ -127,6 +127,20 @@ export async function getDbForRole(role: UserRole, hasValidToken = false): Promi
   return client.db(config.mongodb.dbName);
 }
 
+/** Level 2 Db for a caller that has passed a named capability check (e.g. canRevealKycSensitive). */
+export async function getSensitiveTierDb(capability: string): Promise<Db> {
+  if (!capability) throw new Error('getSensitiveTierDb requires the granting capability name');
+  const client = await getL2QEClient();
+  return client.db(config.mongodb.dbName);
+}
+
+/** Db for a write that must encrypt QE:none fields. Not a disclosure: nothing is returned. */
+export async function getEncryptionWriteDb(reason: string): Promise<Db> {
+  if (!reason) throw new Error('getEncryptionWriteDb requires the reason for needing the full map');
+  const client = await getL2QEClient();
+  return client.db(config.mongodb.dbName);
+}
+
 export async function closeRoleClients(): Promise<void> {
   // Wait for any in-flight build to settle FIRST so we don't leak a client that finishes
   // constructing after teardown (its .then sets _l1Client/_l2Client). Capture the promises, let

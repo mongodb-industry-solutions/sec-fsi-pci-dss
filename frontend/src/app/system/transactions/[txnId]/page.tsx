@@ -6,6 +6,8 @@ import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { EncryptionBadge } from '../../../../components/EncryptionBadge';
 import { useDebugMode } from '../../../../lib/debugMode';
+import { DisplayMask } from '../../../../components/record/DisplayMask';
+import { SensitiveReveal } from '../../../../components/SensitiveReveal';
 import { RawMongoPanel } from '../../../../components/RawMongoPanel';
 import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
 import { useResource } from '../../../../lib/useResource';
@@ -37,25 +39,18 @@ const INIT_LABELS: Record<string, string> = {
   merchantInitiated: 'Merchant Initiated (MIT)',
 };
 
+// v32 C1: the value masked here is the LOOKUP-tier account reference (QE:equality) of the party
+// under investigation, which the caller is authorised to hold, so this is a screen-sharing mask and
+// not an access control. It delegates to the shared DisplayMask, whose tooltip says so, instead of
+// implying a disclosure decision that never happens. Sensitive-tier (QE:none) values on this page go
+// through SensitiveReveal, which fetches from an audited endpoint (ADR-052).
 function RevealField({ label, value, type }: { label: string; value: string; type: 'qe-equality' | 'qe-none' }) {
-  const [shown, setShown] = useState(false);
-  const masked = type === 'qe-equality'
-    ? value.slice(0, 3) + '●●●●●●●●' + value.slice(-3)
-    : '●●●●●●●●●●●●';
-  // Renders as two grid cells (label, value) so protected fields line up with the regular
-  // label/value rows in the surrounding `grid grid-cols-2`.
   return (
-    <>
-      <EncryptionBadge label={label} type={type} />
-      <div className="flex items-center gap-2 min-w-0">
-        <span className={`text-xs font-mono truncate transition-colors ${shown ? 'text-gray-900' : 'text-gray-400 select-none'}`}>
-          {shown ? value : masked}
-        </span>
-        <button onClick={() => setShown(v => !v)} className="text-gray-400 hover:text-[#001E2B] transition-colors shrink-0" title={shown ? 'Hide' : 'Reveal'}>
-          {shown ? <EyeOff size={13} /> : <Eye size={13} />}
-        </button>
-      </div>
-    </>
+    <DisplayMask
+      label={label}
+      value={value}
+      chrome={<EncryptionBadge label="" type={type} />}
+    />
   );
 }
 
@@ -268,7 +263,10 @@ export default function TransactionDetailPage() {
       ];
 
   const acctRef = txn.cardTransactionAccountReference;
-  const custSensitive = partyCustomer?.sensitive as { customerAgreementResidentialAddress?: { streetAddress?: string; city?: string; postalCode?: string; countryCode?: string }; governmentIdentificationReference?: string; customerAgreementRiskNotes?: string } | undefined;
+  const custSensitive = partyCustomer?.sensitive as { customerAgreementResidentialAddress?: { streetAddress?: string; city?: string; postalCode?: string; countryCode?: string }; customerAgreementRiskNotes?: string } | undefined;
+  // v32 B4: the identity document is lookup tier on the base record (searchable), not a QE:none leaf.
+  const custGovIdRaw = partyCustomer?.customerAgreementGovernmentID as { number?: unknown } | undefined;
+  const custGovIdNumber = custGovIdRaw?.number != null ? String(custGovIdRaw.number) : '';
 
   // The account reference mirrors the card token on card-not-present merchant checkouts that
   // had no customer account reference; flag it so the auditor is not misled.
@@ -445,24 +443,28 @@ export default function TransactionDetailPage() {
                 )}
               </div>
 
+              {/* v32 C4: these are QE:none payloads for another party. They were JSON.stringify'd in
+                  the clear once escalation was approved; now each one is hidden behind the shared
+                  reveal affordance, so a screen share does not expose them by default and the
+                  disclosure is an explicit act (ADR-052). */}
               {canSeeSensitive && txn.sensitive ? (
-                <div className="space-y-2">
-                  {txn.sensitive.rawGatewayPayload && (
-                    <div>
-                      <p className="text-xs font-medium text-gray-600 mb-1">Raw Gateway Payload</p>
-                      <pre className="text-xs bg-white rounded border p-2 overflow-x-auto font-mono text-gray-700">
-                        {JSON.stringify(txn.sensitive.rawGatewayPayload, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                  {txn.sensitive.processorTransactionMetadata && (
-                    <div>
-                      <p className="text-xs font-medium text-gray-600 mb-1">Processor Metadata</p>
-                      <pre className="text-xs bg-white rounded border p-2 overflow-x-auto font-mono text-gray-700">
-                        {JSON.stringify(txn.sensitive.processorTransactionMetadata, null, 2)}
-                      </pre>
-                    </div>
-                  )}
+                <div className="divide-y divide-gray-100">
+                  {txn.sensitive.rawGatewayPayload ? (
+                    <SensitiveReveal
+                      label="Raw Gateway Payload"
+                      masked="•••• (masked)"
+                      info="Full acquirer/gateway payload for this authorization (SD-254). QE:none: encrypted at rest and not searchable."
+                      fetchValue={async () => JSON.stringify(txn.sensitive?.rawGatewayPayload, null, 2)}
+                    />
+                  ) : null}
+                  {txn.sensitive.processorTransactionMetadata ? (
+                    <SensitiveReveal
+                      label="Processor Metadata"
+                      masked="•••• (masked)"
+                      info="Processor-side metadata for this transaction (SD-254). QE:none: encrypted at rest and not searchable."
+                      fetchValue={async () => JSON.stringify(txn.sensitive?.processorTransactionMetadata, null, 2)}
+                    />
+                  ) : null}
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm items-center">
@@ -519,10 +521,10 @@ export default function TransactionDetailPage() {
                         <span className="font-mono text-xs break-words">{[custSensitive.customerAgreementResidentialAddress.streetAddress, custSensitive.customerAgreementResidentialAddress.city, custSensitive.customerAgreementResidentialAddress.postalCode, custSensitive.customerAgreementResidentialAddress.countryCode].filter(Boolean).join(', ')}</span>
                       </>
                     )}
-                    {custSensitive.governmentIdentificationReference && (
+                    {custGovIdNumber && (
                       <>
                         <InfoLabel label="Gov ID" tip="Government identification reference (GDPR-protected). Used for identity verification." />
-                        <span className="font-mono text-xs">{custSensitive.governmentIdentificationReference}</span>
+                        <span className="font-mono text-xs">{custGovIdNumber}</span>
                       </>
                     )}
                     {custSensitive.customerAgreementRiskNotes && (

@@ -42,6 +42,17 @@ export function canReadSensitive(role: UserRole, hasValidToken: boolean): boolea
   return false;
 }
 
+// Roles authorised to perform the audited reveal of the QE:none KYC fields. Named capability that
+// grants the sensitive-tier QE client; the route also gates on customers:manage or viewSensitive.
+export const KYC_ADMIN_REVEAL_ROLES: ReadonlySet<UserRole> = new Set([
+  'operations_officer' as UserRole, // v31 KYC data administration (customers:manage)
+  'security_auditor',               // read-only oversight, sensitive tier without a token
+]);
+
+export function canRevealKycSensitive(role: UserRole, hasValidToken = false): boolean {
+  return KYC_ADMIN_REVEAL_ROLES.has(role) || canReadSensitive(role, hasValidToken);
+}
+
 // Staff investigation roles (v27 profile staff view, PCI DSS Req 7 least privilege).
 // VIEW of a found customer's related data (transactions, authorized apps, accounts, cards) is
 // limited to these roles; L1 analyst and customer are blocked. Mirrors KYC_SEARCH_ROLES.

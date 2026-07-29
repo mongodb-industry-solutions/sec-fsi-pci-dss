@@ -331,7 +331,10 @@ export default function BeneficiariesPage() {
 
   const isCustomer = role === 'customer';
   const isStaff = role === 'level1_analyst' || role === 'level2_investigator' || role === 'security_auditor';
-  const canWrite = role === 'customer' || role === 'level2_investigator' || role === 'security_auditor';
+  // The auditor is read-only on beneficiaries; the server returns 403 regardless.
+  const canWrite = role === 'customer' || role === 'level2_investigator';
+  // Cross-party search needs beneficiaries:investigate; L1 drills down by owner instead.
+  const canSearchAcrossParties = role === 'level2_investigator' || role === 'security_auditor';
 
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [total, setTotal] = useState(0);
@@ -351,15 +354,25 @@ export default function BeneficiariesPage() {
 
   const LIMIT = 10;
 
+  // A staff caller needs a predicate (owner party reference, or MIN_QUERY chars) before any
+  // request is issued. The server enforces the same rule and returns 400 without one.
+  const MIN_QUERY = 3;
+  const hasPredicate = isCustomer || !!ownerFilter.trim() || search.trim().length >= MIN_QUERY;
+
   const load = useCallback(async (pg: number, q: string, owner: string) => {
     if (!token) return;
+    // Customers: always scoped to own; the backend forces it regardless of what is sent.
+    const effectiveOwner = isCustomer ? ownPartyRef : owner.trim();
+    const term = q.trim();
+    if (!isCustomer && !effectiveOwner && term.length < MIN_QUERY) {
+      setBeneficiaries([]); setTotal(0); setError(''); setLoading(false);
+      return;
+    }
     setLoading(true); setError('');
     try {
-      // Customers: always scoped to own, pass ownerRef so backend returns own records only
-      const effectiveOwner = isCustomer ? ownPartyRef : owner;
       const res = await api.beneficiaries.list(token, {
         page: pg, limit: LIMIT,
-        ...(q ? { q } : {}),
+        ...(term ? { q: term } : {}),
         ...(effectiveOwner ? { ownerRef: effectiveOwner } : {}),
       });
       setBeneficiaries(res.results);
@@ -371,8 +384,12 @@ export default function BeneficiariesPage() {
   }, [token, isCustomer, ownPartyRef]);
 
   useEffect(() => {
-    if (token && (isCustomer ? ownPartyRef : true)) load(page, search, ownerFilter);
-  }, [token, page, load, search, ownerFilter, isCustomer, ownPartyRef]);
+    // Customers load their own list; staff wait for a predicate (no query on mount).
+    if (!token) return;
+    if (isCustomer) { if (ownPartyRef) load(page, search, ownerFilter); return; }
+    if (hasPredicate) load(page, search, ownerFilter);
+    else { setBeneficiaries([]); setTotal(0); }
+  }, [token, page, load, search, ownerFilter, isCustomer, ownPartyRef, hasPredicate]);
 
   function handleSearchChange(val: string) {
     setSearch(val);
@@ -417,13 +434,14 @@ export default function BeneficiariesPage() {
         <div className="relative flex-1 min-w-48">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input value={search} onChange={e => handleSearchChange(e.target.value)}
-            placeholder="Search by name or contact…"
+            placeholder={isCustomer ? 'Search by name or contact…' : `Search by name or contact (min ${MIN_QUERY} characters)…`}
             className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
         </div>
         {/* Staff-only: owner filter */}
         {isStaff && (
           <input value={ownerFilter} onChange={e => { setOwnerFilter(e.target.value); setPage(1); load(1, search, e.target.value); }}
-            placeholder="Filter by owner party ref…"
+            placeholder="Owner party reference…"
+            title="A staff read is scoped to one owner party, or to a search term of at least 3 characters (v32, ADR-048)"
             className="w-60 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
         )}
         {canWrite && (
@@ -434,7 +452,21 @@ export default function BeneficiariesPage() {
         )}
       </div>
 
+      {/* Empty search state for staff until a predicate is supplied. */}
+      {!isCustomer && !hasPredicate && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 text-sm text-gray-600 space-y-1">
+          <p className="font-medium text-gray-800">Search for a beneficiary to begin</p>
+          <p>
+            Enter an owner party reference, or at least {MIN_QUERY} characters of a name or contact.
+            {canSearchAcrossParties
+              ? ' A cross-party search is available to your role and every record it returns is recorded in the compliance ledger.'
+              : ' Your role can look up beneficiaries for a known owner party; cross-party search requires the investigate capability.'}
+          </p>
+        </div>
+      )}
+
       {/* Table */}
+      {(isCustomer || hasPredicate) && (
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-sm text-gray-400">Loading…</div>
@@ -514,6 +546,7 @@ export default function BeneficiariesPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Pagination */}
       {totalPages > 1 && (
@@ -534,7 +567,7 @@ export default function BeneficiariesPage() {
 
       {debugMode && (
         <p className="text-[10px] font-mono text-gray-400">
-          GET /api/v1/beneficiaries · SD-54 · roleScope: {isCustomer ? 'own' : 'all'} · ownerRef: {isCustomer ? ownPartyRef : ownerFilter || '(all)'}
+          GET /api/v1/beneficiaries · SD-54 · scope: {isCustomer ? 'own (forced server-side)' : 'search'} · predicate: {isCustomer ? `ownerRef=${ownPartyRef}` : ownerFilter.trim() ? `ownerRef=${ownerFilter.trim()}` : search.trim().length >= MIN_QUERY ? `q=${search.trim()}` : 'none (no request issued)'}
         </p>
       )}
 

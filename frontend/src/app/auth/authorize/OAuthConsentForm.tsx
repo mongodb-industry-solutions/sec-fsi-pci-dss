@@ -1,10 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
-import { API_BASE_URL } from '../../../lib/constants';
+import { Eye, EyeOff, Bug } from 'lucide-react';
+import { API_BASE_URL, DEMO_PASSWORD } from '../../../lib/constants';
 import { BRAND } from '../../../config/brand';
 import { setToken } from '../../../lib/auth';
+import { api, AuthUser } from '../../../lib/api';
+import demoRoster from '../../../config/demoRoster.json';
+import { useDebugHint } from '../../../lib/debugHint';
+import { useDebugMode } from '../../../lib/debugMode';
+import { Tooltip } from '../../../components/Tooltip';
 
 interface ScopeDescriptor {
   scope: string;
@@ -52,6 +57,32 @@ export function MerchantAvatar({ logoUri, clientName, size = 'md' }: { logoUri?:
   );
 }
 
+/**
+ * Debug toggle for the consent screen, rendered next to the brand logo (same placement and styling
+ * as the sign-in screen). Shares state with the form through DebugModeProvider.
+ */
+export function DebugModeToggle({ hintDisabled = false }: { hintDisabled?: boolean }) {
+  const { debugMode, toggleDebug } = useDebugMode();
+  // Own "seen" flag: this screen is reached from the merchant app, so its hint must not be considered
+  // dismissed just because the PSP sign-in screen was visited before.
+  const { pulsing, dismissHint } = useDebugHint('psp_debug_hint_seen_consent');
+  const showPulse = pulsing && !debugMode && !hintDisabled;
+  return (
+    <Tooltip text={debugMode
+      ? 'Debug mode is on: pick a ready-made cardholder and their credentials are filled in, so you can sign in with one click. Click to turn it off.'
+      : 'Turn on debug mode. It offers ready-made cardholder accounts, so you can sign in with one click instead of typing credentials.'}>
+      <button type="button" onClick={() => { dismissHint(); toggleDebug(); }}
+        aria-label={debugMode ? 'Disable debug mode' : 'Enable debug mode'}
+        className={`relative p-1.5 rounded-lg transition-colors ${
+          debugMode ? 'bg-amber-100 text-amber-600 hover:bg-amber-200'
+          : showPulse ? 'debug-hint-pulse'
+          : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}>
+        <Bug size={14} />
+      </button>
+    </Tooltip>
+  );
+}
+
 export default function OAuthConsentForm({
   clientId,
   clientName,
@@ -78,6 +109,22 @@ export default function OAuthConsentForm({
   const [selected, setSelected] = useState<Set<string>>(() => new Set(scopeDetails.map((s) => s.scope)));
   // Scopes already granted before this request → anything not here is "new" on re-consent (E-10).
   const [priorScopes, setPriorScopes] = useState<string[] | null>(null);
+  // Debug mode (presentation aid, toggled from the header next to the brand logo): pick a seeded
+  // customer instead of typing credentials. This is a cardholder-facing consent screen, so only the
+  // customer role is offered; staff roles are excluded.
+  const { debugMode } = useDebugMode();
+  const [demoUsers, setDemoUsers] = useState<AuthUser[]>([]);
+
+  useEffect(() => {
+    if (!debugMode || demoUsers.length > 0) return;
+    api.system.users(demoRoster.simulatorPersonas).then((r) => setDemoUsers(r.users)).catch(() => {});
+  }, [debugMode, demoUsers.length]);
+
+  function handleDemoUserSelect(value: string) {
+    setEmail(value);
+    setPassword(value ? DEMO_PASSWORD : '');
+    setError('');
+  }
 
   function toggleScope(scope: string, required: boolean) {
     if (required) return; // required scopes cannot be toggled
@@ -183,8 +230,39 @@ export default function OAuthConsentForm({
           <p className="text-xs text-gray-500 mt-1">Your password stays with {BRAND.full} and is never shared.</p>
         </div>
         <form onSubmit={handleLogin} className="space-y-3">
+          {debugMode && (
+            <div>
+              <label htmlFor="oauth-demo-user" className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-1">
+                Choose a demo account
+                <Tooltip text="Ready-made accounts you can sign in with while trying out the demo. Pick one and its email and password are filled in for you: they all use the same password." />
+              </label>
+              {demoUsers.length === 0 ? (
+                <div className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-400 animate-pulse">Loading customers…</div>
+              ) : (
+                <select
+                  id="oauth-demo-user"
+                  value={demoUsers.some((u) => u.email === email) ? email : ''}
+                  onChange={(e) => handleDemoUserSelect(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="">Select an account…</option>
+                  {demoUsers.map((u) => (
+                    <option key={u.email} value={u.email}>{u.name} ({u.email})</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
           <div>
-            <label htmlFor="oauth-email" className="block text-xs font-medium text-gray-700 mb-1">Email / username</label>
+            <label htmlFor="oauth-email" className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-1">
+              Email or username
+              <Tooltip text={<>
+                The email address or username you use for your account.
+                {' '}Short on time? Turn on debug mode
+                {' '}<Bug size={11} className="mx-0.5 inline align-[-1px] text-amber-400" />
+                {' '}next to the logo and pick a ready-made test account instead of typing credentials.
+              </>} />
+            </label>
             <input
               id="oauth-email"
               type="text"
@@ -197,7 +275,10 @@ export default function OAuthConsentForm({
             />
           </div>
           <div>
-            <label htmlFor="oauth-password" className="block text-xs font-medium text-gray-700 mb-1">Password</label>
+            <label htmlFor="oauth-password" className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-1">
+              Password
+              <Tooltip text={`Your secret key. It stays with ${BRAND.full} and is never shared with the app asking for access.`} />
+            </label>
             <div className="relative">
               <input
                 id="oauth-password"

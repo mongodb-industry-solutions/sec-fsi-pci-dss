@@ -229,14 +229,23 @@ function spawnSSE(
   } = {},
 ): Promise<number> {
   const finalize = opts.finalize !== false;
+  // A hijacked socket may already be gone (client navigated away, proxy dropped the stream).
+  // Writing to it must never take down the run, which keeps going to completion server-side.
+  const write = (frame: string) => {
+    try { raw.write(frame); } catch { /* socket gone; the child process still finishes */ }
+  };
   const sendText = (type: string, text: string) => {
-    raw.write(`event: ${type}\ndata: ${JSON.stringify({ text })}\n\n`);
+    write(`event: ${type}\ndata: ${JSON.stringify({ text })}\n\n`);
     appendLog(`[${label}] ${text}`);
   };
   // The summary frame carries the structured object directly (not wrapped in {text}).
   const sendSummary = (summary: NormalizedTestSummary) => {
-    raw.write(`event: summary\ndata: ${JSON.stringify(summary)}\n\n`);
+    write(`event: summary\ndata: ${JSON.stringify(summary)}\n\n`);
   };
+  // Long silent steps (e.g. seeding 200 QE-encrypted PANs) leave the stream idle for minutes,
+  // and an ingress/proxy drops an idle connection, so the browser never receives `done` and the
+  // panel spins forever. A comment frame keeps the stream alive, as the other SSE routes do.
+  const heartbeat = setInterval(() => write(': ping\n\n'), 15000);
 
   sendText('start', `> ${command} ${args.join(' ')}  (cwd: ${cwd})`);
 
@@ -254,6 +263,7 @@ function spawnSSE(
       chunk.toString().split('\n').filter(Boolean).forEach((l) => sendText('error', l));
     });
     child.on('close', (code, signal) => {
+      clearInterval(heartbeat);
       // A process killed by a signal reports code === null; treat that as a failure (non-zero)
       // so a signalled/aborted run is never reported as success by the SSE stream or aggregate runner.
       const exitCode = code ?? (signal ? 1 : 0);
@@ -272,6 +282,7 @@ function spawnSSE(
       resolve(exitCode);
     });
     child.on('error', (err) => {
+      clearInterval(heartbeat);
       sendText('error', `Failed to start: ${err.message}`);
       if (finalize) (raw as import('http').ServerResponse).end?.();
       resolve(-1);
@@ -469,8 +480,14 @@ export async function adminController(fastify: FastifyInstance) {
     schema: {
       tags: ['admin'],
       summary: 'Stream server request log ring-buffer via SSE',
-      description: 'Sends the current log buffer snapshot (up to 500 entries) then polls every 2s for new entries.',
+      description: 'Sends the current log buffer snapshot (up to 500 entries) then polls every 2s for new entries. A `: ping` comment every 15s of silence keeps proxies from dropping the stream. Pass `snapshot=false` when reconnecting to skip the initial dump and avoid duplicated lines.',
       security: [{ adminAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          snapshot: { type: 'string', enum: ['true', 'false'], description: 'Send the buffered snapshot first (default true).' },
+        },
+      },
     },
   }, async (request, reply) => {
     const ip = request.ip ?? 'unknown';
@@ -485,9 +502,15 @@ export async function adminController(fastify: FastifyInstance) {
 
     beginSSE(reply, request);
 
-    [...logBuffer].forEach((line) => {
-      reply.raw.write(`event: log\ndata: ${JSON.stringify({ text: line })}\n\n`);
-    });
+    let lastSentAt = Date.now();
+    const send = (frame: string) => {
+      try { reply.raw.write(frame); lastSentAt = Date.now(); } catch { /* socket gone */ }
+    };
+    const sendLine = (line: string) => send(`event: log\ndata: ${JSON.stringify({ text: line })}\n\n`);
+
+    // A reconnecting client already holds the buffered lines; resending them would duplicate them.
+    const { snapshot } = request.query as { snapshot?: string };
+    if (snapshot !== 'false') [...logBuffer].forEach(sendLine);
 
     let lastWrite = writeCount;
     const interval = setInterval(() => {
@@ -495,10 +518,12 @@ export async function adminController(fastify: FastifyInstance) {
       const cur = writeCount;
       if (cur > lastWrite) {
         const newCount = Math.min(cur - lastWrite, logBuffer.length);
-        logBuffer.slice(logBuffer.length - newCount).forEach((line) => {
-          reply.raw.write(`event: log\ndata: ${JSON.stringify({ text: line })}\n\n`);
-        });
+        logBuffer.slice(logBuffer.length - newCount).forEach(sendLine);
         lastWrite = cur;
+      } else if (Date.now() - lastSentAt >= 15000) {
+        // An idle server produces no log lines, and a proxy drops an idle connection, which would
+        // silently kill the live view. Keep the stream warm, as the other SSE routes do.
+        send(': ping\n\n');
       }
     }, 2000);
 

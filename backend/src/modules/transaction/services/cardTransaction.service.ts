@@ -4,7 +4,7 @@ import {
   CARD_TRANSACTION_COLLECTION,
   CardTransactionLogControlRecord,
 } from '../models/cardTransaction.model';
-import { getDbForRole } from '../../../vendors/encryption/roleClients';
+import { getDbForRole, getEncryptionWriteDb } from '../../../vendors/encryption/roleClients';
 import { canReadSensitive } from '../../../vendors/middleware/rbac';
 import { createFraudCase } from '../../fraud/services/fraudDiagnosis.service';
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
@@ -230,7 +230,7 @@ export async function initiateTransaction(
 ): Promise<{ cardTransactionInstanceReference: string; cardTransactionStatus: 'pending'; settled: Promise<AuthorizationOutcome> }> {
   const txnId = uuidv4();
   const now = new Date();
-  const txWriteDb = await getDbForRole('security_auditor', false);
+  const txWriteDb = await getEncryptionWriteDb('cardTransaction.write');
 
   // PSP-level control (BIAN SD-15): a deactivated/removed card-on-file is rejected up front,
   // regardless of the issuer (new/unsaved tokens pass through).
@@ -416,7 +416,7 @@ export async function completeAuthorized(db: Db, txnId: string, fdsVerdict?: Fds
   pendingContext.delete(txnId);
   const { input, canonicalAccountRef, resolvedUuid } = ctx;
   const now = new Date();
-  const txWriteDb = await getDbForRole('security_auditor', false);
+  const txWriteDb = await getEncryptionWriteDb('cardTransaction.write');
 
   await txWriteDb.collection(CARD_TRANSACTION_COLLECTION).updateOne(
     { cardTransactionInstanceReference: txnId },
@@ -524,7 +524,7 @@ export async function completeAuthorized(db: Db, txnId: string, fdsVerdict?: Fds
 export async function declineTransaction(db: Db, txnId: string, reason: string, code: string): Promise<void> {
   const ctx = pendingContext.get(txnId);
   pendingContext.delete(txnId);
-  const txWriteDb = await getDbForRole('security_auditor', false);
+  const txWriteDb = await getEncryptionWriteDb('cardTransaction.write');
   await txWriteDb.collection(CARD_TRANSACTION_COLLECTION).updateOne(
     { cardTransactionInstanceReference: txnId },
     { $set: { cardTransactionStatus: 'declined', recordUpdatedDateTime: new Date() } },

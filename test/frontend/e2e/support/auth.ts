@@ -17,6 +17,7 @@ export type DemoRole =
   | 'level2_investigator'
   | 'security_auditor'
   | 'merchant_officer'
+  | 'operations_officer'
   | 'manager';
 
 const ROLE_USER: Record<DemoRole, { sub: string; email: string; name: string }> = {
@@ -25,6 +26,7 @@ const ROLE_USER: Record<DemoRole, { sub: string; email: string; name: string }> 
   level2_investigator: { sub: 'u-l2-001',   email: 'michael.obi@back.es',    name: 'Michael Obi' },
   security_auditor:    { sub: 'u-aud-001',  email: 'admin@back.es',          name: 'Audit User' },
   merchant_officer:    { sub: 'u-mo-001',   email: 'olivia.park@back.es',    name: 'Olivia Park' },
+  operations_officer:  { sub: 'u-ops-001',  email: 'nina.torres@back.es',    name: 'Nina Torres' },
   manager:             { sub: 'u-mgr-001',  email: 'alex.rivera@back.es',    name: 'Alex Rivera' },
 };
 

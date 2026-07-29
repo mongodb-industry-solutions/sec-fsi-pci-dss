@@ -9,9 +9,11 @@ import { SectionHeader } from '../../../../../components/SectionHeader';
 import { Breadcrumb } from '../../../../../components/Breadcrumb';
 import { Tooltip } from '../../../../../components/Tooltip';
 import { Pagination } from '../../../../../components/Pagination';
+import { LoadingIndicator } from '../../../../../components/LoadingIndicator';
 import { api } from '../../../../../lib/api';
 import { getToken } from '../../../../../lib/auth';
 import { useNotify } from '../../../../../components/ui/ConfirmProvider';
+import { useDebugMode } from '../../../../../lib/debugMode';
 import { useEffectivePermissions } from '../../../../../lib/permissions';
 import { ModuleTabsBar, useActiveTab } from '../_components/ModuleTabs';
 
@@ -84,6 +86,7 @@ function KycConfig({ token, canEdit }: { token: string; canEdit: boolean }) {
 function KycAdmin({ token, canView }: { token: string; canView: boolean }) {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [total, setTotal] = useState(0);
+  const { debugMode } = useDebugMode();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [status, setStatus] = useState('');
@@ -99,10 +102,13 @@ function KycAdmin({ token, canView }: { token: string; canView: boolean }) {
   const [phone, setPhone] = useState('');
   const [nationality, setNationality] = useState('');
   const [applied, setApplied] = useState({ name: '', email: '', phone: '', nationality: '' });
+  const [listLoading, setListLoading] = useState(true);
   const load = useCallback(async () => {
     if (!token) return;
+    setListLoading(true);
     try { const r = await api.customer.kycList({ status: status || undefined, segment: segment || undefined, riskRating: riskRating || undefined, partyType: partyType || undefined, name: applied.name || undefined, email: applied.email || undefined, phone: applied.phone || undefined, nationality: applied.nationality || undefined, page, limit }, token); setRows(r.results); setTotal(r.total); }
     catch { /* empty state */ }
+    finally { setListLoading(false); }
   }, [token, status, segment, riskRating, partyType, applied, page, limit]);
   useEffect(() => { void load(); }, [load]);
 
@@ -129,7 +135,8 @@ function KycAdmin({ token, canView }: { token: string; canView: boolean }) {
         {hasActiveFilters && <button onClick={clearAll} className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-800"><X size={14} /> Clear</button>}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <select value={partyType} onChange={(e) => { setPage(1); setPartyType(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" title="Party type"><option value="customer">Customers</option><option value="employee">Employees</option><option value="service_account">Service accounts</option><option value="all">All party types</option></select>
+        {/* Only a customer holds a CustomerAgreement (SD-53), so Employee is always empty here. */}
+        <select value={partyType} onChange={(e) => { setPage(1); setPartyType(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" title="Party type (SD-13). KYC administers customer agreements (SD-53), which only a customer party holds."><option value="customer">Customer</option><option value="employee">Employee</option><option value="all">All</option></select>
         <select value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"><option value="">All statuses</option>{['verified', 'rejected', 'expired'].map((s) => <option key={s} value={s}>{s}</option>)}</select>
         <select value={segment} onChange={(e) => { setPage(1); setSegment(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"><option value="">All segments</option>{['retail', 'premium', 'corporate', 'sme'].map((s) => <option key={s} value={s}>{s}</option>)}</select>
         <select value={riskRating} onChange={(e) => { setPage(1); setRiskRating(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"><option value="">All risk</option>{['low', 'medium', 'high'].map((s) => <option key={s} value={s}>{s}</option>)}</select>
@@ -140,7 +147,8 @@ function KycAdmin({ token, canView }: { token: string; canView: boolean }) {
             <th className="py-2.5 px-4">Party</th><th className="py-2.5 px-4 hidden sm:table-cell">Segment</th><th className="py-2.5 px-4">KYC status</th><th className="py-2.5 px-4 hidden sm:table-cell">Risk</th><th className="py-2.5 px-4 hidden sm:table-cell">PEP</th><th className="py-2.5 px-4"></th>
           </tr></thead>
           <tbody>
-            {rows.map((c) => (
+            {listLoading && <tr><td colSpan={6}><LoadingIndicator label="Loading KYC records…" /></td></tr>}
+            {!listLoading && rows.map((c) => (
               <tr key={String(c.partyInstanceReference)} className="border-b border-gray-50 hover:bg-gray-50">
                 <td className="py-2.5 px-4"><div className="font-medium text-gray-900">{String(c.partyName ?? String(c.partyInstanceReference).slice(0, 8))}</div><div className="font-mono text-[11px] text-gray-400">{String(c.partyInstanceReference).slice(0, 13)}</div></td>
                 <td className="py-2.5 px-4 hidden sm:table-cell text-gray-600">{String(c.customerSegment ?? '')}</td>
@@ -150,11 +158,31 @@ function KycAdmin({ token, canView }: { token: string; canView: boolean }) {
                 <td className="py-2.5 px-4 text-right"><Link href={`/system/admin/modules/kyc/${String(c.partyInstanceReference)}`} className="inline-flex items-center gap-1 text-[#016BF8] hover:underline">Review <ArrowRight size={14} /></Link></td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td colSpan={6} className="py-8 text-center text-sm text-gray-400">No KYC records match.</td></tr>}
+            {!listLoading && rows.length === 0 && (
+              <tr><td colSpan={6} className="py-8 px-4 text-center text-sm text-gray-400">
+                {partyType === 'employee'
+                  ? 'No employee holds a customer agreement. KYC administers cardholders, and in BIAN only a customer party holds a CustomerAgreement (SD-53), so this surface is empty for employees by design.'
+                  : 'No KYC records match.'}
+              </td></tr>
+            )}
           </tbody>
         </table>
       </div>
-      <Pagination page={page} totalPages={Math.max(1, Math.ceil(total / limit))} total={total} limit={limit} onPageChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); }} noun="customers" />
+      {/* v32 E1/E3: the population is stated explicitly. It is NOT the same as the number of login
+          users a manager sees: this counts parties with a COMPLETED KYC record (SD-53 agreements,
+          statuses verified / rejected / expired), while the user administration surface counts
+          authentication users (SD-16). Records still in `initiated` are excluded here, which is why
+          this total can be lower than the number of customer agreements. */}
+      {!listLoading && (
+        <>
+          <p className="text-xs text-gray-500">
+            {total} {total === 1 ? 'user' : 'users'} with a completed KYC record
+            {status ? ` (status: ${status})` : ' (verified, rejected or expired; records still initiated are excluded)'}.
+            {debugMode && ' SD-53 customer agreements, not SD-16 authentication users: the two populations differ.'}
+          </p>
+          <Pagination page={page} totalPages={Math.max(1, Math.ceil(total / limit))} total={total} limit={limit} onPageChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); }} noun="KYC records" />
+        </>
+      )}
     </div>
   );
 }
