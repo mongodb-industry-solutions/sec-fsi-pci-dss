@@ -29,6 +29,9 @@ export function useNotificationsChanged(onChange: () => void) {
 // bell, the sidebar badge, the transaction page, the questions panel…). Opening a separate SSE stream
 // per component starved the browser's per-host connection limit (HTTP/1.1), so some surfaces updated
 // and others didn't. A single multiplexed stream keeps every surface in sync.
+//
+// A 401/403 is permanent for that token, so it stops the stream instead of retrying: a tab left open
+// after a logout elsewhere used to re-request every 3s forever. Only a new token recovers.
 
 type Sub = () => void;
 const subscribers = new Set<Sub>();
@@ -36,6 +39,7 @@ let sharedToken: string | null = null;
 let sharedCtrl: AbortController | null = null;
 let sharedStopped = false;
 let sharedRetry: ReturnType<typeof setTimeout> | null = null;
+const rejectedTokens = new Set<string>();
 
 function fanOut() { for (const s of subscribers) { try { s(); } catch { /* ignore */ } } }
 
@@ -56,6 +60,12 @@ function startShared(token: string) {
         headers: { Authorization: `Bearer ${token}` },
         signal: sharedCtrl.signal,
       });
+      // Remembered so a component remount cannot restart the loop.
+      if (res.status === 401 || res.status === 403) {
+        rejectedTokens.add(token);
+        teardownShared();
+        return;
+      }
       if (!res.ok || !res.body) { schedule(); return; }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -80,6 +90,7 @@ function startShared(token: string) {
 }
 
 function ensureShared(token: string) {
+  if (rejectedTokens.has(token)) return; // refused by the server; only a new token can recover
   if (sharedToken === token && sharedCtrl) return; // already connected with this token
   teardownShared();
   sharedToken = token;

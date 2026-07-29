@@ -2856,19 +2856,58 @@ Seed files live in `backend/data/`. The seed script (`backend/bin/seed.ts`) read
 
 ### Seed volumes
 
+Counts are the v33 population.
+
 | File | Collection (BIAN SD) | Documents | Generator |
 |---|---|---|---|
-| `backend/data/parties.json` | `party` (SD-13) | 53 (50 customers + 3 employees) | `bin/seed-generate.ts` |
-| `backend/data/customerAuthentications.json` | `customerAuthenticationAssessment` (SD-91) | 5 | `bin/seed-generate.ts` |
-| `backend/data/authDomains.json` | `authenticationDomain` (SD-16) | 3 | manual |
-| `backend/data/customerAgreements.json` | `customerAgreementProcedure` (SD-53) | 50 | `bin/seed-generate.ts` — includes inline QE:none fields (v2) |
-| `backend/data/paymentCards.json` | `paymentCardManagement` (SD-88) | 50 | `bin/seed-generate.ts` |
-| `backend/data/cardTransactions.json` | `cardTransactionLog` (SD-254) | 200 | `bin/seed-generate.ts` — includes inline QE:none fields (v2) |
+| `backend/data/parties.json` | `party` (SD-13) | 68 (57 customers + 11 employees) | `bin/seed-generate.ts` (additive) |
+| `backend/data/customerAuthentications.json` | `customerAuthenticationAssessment` (SD-91) | 68 (one per party; 14 `customerAuthenticationDemoFeatured`) | `bin/seed-generate.ts` (additive) |
+| `backend/data/authDomains.json` | `authenticationDomain` (SD-16) | 3 | manual (the `local` domain ships with self-registration on, manual approval) |
+| `backend/data/customerAgreements.json` | `customerAgreementProcedure` (SD-53) | 57 | `bin/seed-generate.ts` — includes inline QE:none fields (v2) |
+| `backend/data/paymentCards.json` | `paymentCardManagement` (SD-88) | 205 | `bin/seed-generate.ts` (additive) |
+| `backend/data/payoutAccounts.json` | `payoutAccountArrangement` (SD-66) | 65 | `bin/seed-generate.ts` (additive; curated records are never rewritten) |
+| `backend/data/cardTransactions.json` | `cardTransactionLog` (SD-254) | 230 | `bin/seed-generate.ts` — includes inline QE:none fields (v2) |
 | `backend/data/fraudCases.json` | `fraudDiagnosisCase` (SD-83) | 20 | `bin/seed-generate.ts` |
 | `backend/data/fraudCaseEvents.json` | `fraudDiagnosisCaseEvents` (SD-83) | 20 | `bin/seed-generate.ts` |
 | `backend/data/customerCreditRatings.json` | `customerCreditRatingState` (SD-60) | 5 | manual (HRPC profiles) |
 
-**Regenerating synthetic data:** Run `npm run setup:data --prefix backend` (executes `bin/seed-generate.ts`). This overwrites all files marked `bin/seed-generate.ts` above. Manual files (`authDomains.json`, `customerCreditRatings.json`) are never overwritten by the generator.
+**Regenerating synthetic data:** run `npm run generate:data --prefix backend` (executes `bin/seed-generate.ts`).
+
+Since v33 (ADR-054) the generator is **additive and refuses to clobber**: it loads the existing
+fixtures, keeps every curated record byte-for-byte, and only tops the synthetic population up to the
+target floors (50 customer parties, 4 transactions per customer, 20 fraud cases). `write()` refuses to
+reduce any collection's record count and exits non-zero unless `--force` is passed. A second run over
+its own output changes nothing, so it is safe to run at any time. Manual files (`authDomains.json`,
+`customerCreditRatings.json`, `merchants.json`) are never touched.
+
+Set `PSP_SEED_DATA_DIR` to write to a different directory (the seeder reads the same variable). The
+integrity test uses it to exercise the generator without touching the real fixtures.
+
+### Fixture integrity invariants (v33)
+
+The fixtures, not the runtime, are the source of truth for the demo population, so the invariants are
+asserted against `backend/data/*.json` in `test/backend/unit/services/seedDataIntegrity.test.ts` and
+`seedGeneratorAdditive.test.ts`. The shared repairs live in `backend/src/vendors/seed/dataIntegrity.ts`
+and are applied by **both** halves of the pipeline (the generator and the runtime seeders), so neither
+can drift from the other.
+
+| Invariant | Enforced by |
+|---|---|
+| Every `customer` party has exactly one SD-91 login, identity taken from the party (SD-13 is the source of truth) | `deriveCustomerLogins`, called by the generator and by `seedUsers` |
+| Every customer is complete: agreement with a KYC record, ≥1 card, ≥1 payout account, ≥1 transaction | `completeCustomerPopulation`, called by the generator |
+| Every transaction points at a card held by the same party, masked PANs agreeing | `repointTransactionsToCards`, called by the generator and by `seedTransactions` |
+| A fraud case snapshot shows the masked PAN its transaction carries | `syncFraudCaseSnapshots` |
+| Every card is funded by an active payout account owned by the same party | `seedCards` (relink pass) |
+
+Deliberate exceptions, asserted rather than repaired:
+
+- **A shared card token is not a duplicate.** One physical card (one token) held by several customers
+  is the FDS/AML shared-card signal: the SD-88 arrangement is keyed by `(customerAgreementInstanceReference, paymentCardReference)`,
+  which the unique compound index enforces, and the distinct-holder count is surfaced as
+  `cardHolderCount`. There is deliberately **no** unique index on `paymentCardReference` alone.
+- **A masked-PAN collision is realistic.** Different PANs legitimately share their last four digits.
+- **One `initiated` KYC record** is an in-progress lifecycle state on an otherwise complete customer.
+  It is what makes the KYC administration list's completed-subset count explainable (v32 Track E).
 
 ### Demo users (`data/customerAuthentications.json`)
 
@@ -2882,7 +2921,13 @@ Credentials are stored in `customerAuthenticationAssessment` (SD-91). Passwords 
 | `michael.obi@back.es` | `level2_investigator` | Michael Obi |
 | `admin@back.es` | `security_auditor` | Admin |
 
-Each of these 5 users has a corresponding `party` document in `parties.json` linked via `partyInstanceReference`.
+Each of these users has a corresponding `party` document in `parties.json` linked via `partyInstanceReference`.
+
+Since v33 **every** party holds a login, not just the curated ones: 57 customers plus 11 staff. The
+login picker still shows only the curated cast, selected by `customerAuthenticationDemoFeatured: true`
+(14 records); every other customer is reachable through search and signs in with the same shared demo
+credential. A customer with an agreement, cards, a payout account, transactions and a fraud case who
+could not sign in was the single largest coherence gap in the demo (v33 F1).
 
 ### Synthetic data rules
 
@@ -2891,8 +2936,13 @@ Each of these 5 users has a corresponding `party` document in `parties.json` lin
 - `paymentCardMaskedPanDisplay` / `cardTransactionMaskedPanDisplay` format: `****-****-****-XXXX` where XXXX is a random 4-digit suffix
 - `paymentCardExpirationDate` is always a future date (at least 12 months from generation)
 - CVV, PIN, full PAN, and magnetic stripe data are **never included** in seed files
-- Government IDs use a format that is clearly synthetic: `SYNTH-<random-8-digits>`
-- Fraud cases are linked to the first 20 transactions (indices 0–19) in the transactions seed
+- Identity documents are the structured `customerAgreementGovernmentID` sub-document only, produced by
+  `enrichKyc` (the single source, ADR-050). The deprecated flat `governmentIdentificationReference`
+  and its `SYNTH-<8-digits>` values are gone from every fixture and from the generator (v33 F5); a test
+  asserts neither string reappears
+- Fraud cases attach to transactions that do not already carry one, up to the target of 20
+- Records the generator derives (a login, a completing agreement/card/transaction) use references
+  derived from their parent reference, so regenerating produces identical output rather than duplicates
 
 ### Upsert key per collection
 

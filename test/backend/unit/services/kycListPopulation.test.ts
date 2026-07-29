@@ -60,13 +60,23 @@ describe('KYC administration list population', () => {
     expect(completed.length).toBeGreaterThan(0);
   });
 
-  it('the KYC population is larger than the login-user population (they must not be compared)', () => {
+  it('the KYC population and the login population still differ, now the other way round (v33)', () => {
     const usersFile = join(DATA, 'customerAuthentications.json');
     if (!existsSync(usersFile)) return; // seed layout changed; nothing to assert
-    const users = JSON.parse(readFileSync(usersFile, 'utf-8')) as unknown[];
+    const users = JSON.parse(readFileSync(usersFile, 'utf-8')) as Array<Record<string, unknown>>;
     const completed = agreements.filter((a) => COMPLETED.includes(kycStatus(a) ?? '')).length;
-    // The synthetic customers exist so the five QE search modes have a population to search; the
-    // login users are a small demo subset. A mismatch between the two counts is expected.
-    expect(completed).toBeGreaterThan(users.length);
+    // Until v33 the login roster was a small curated subset, so the KYC list was the LARGER of the
+    // two and the mismatch was explained that way. v33 (F1/D-3) gave every customer a login, so the
+    // login population is now the larger one: it covers the staff parties as well, and staff hold no
+    // customer agreement. The two counts still must not be compared, but for the opposite reason.
+    expect(users.length).toBeGreaterThan(completed);
+    // The login roster is split by the PARTY type, not by the role: a customer party may hold a
+    // staff-ish role (a merchant owner is a customer of the PSP with a merchant_officer login).
+    const customerPartyRefs = new Set(
+      parties.filter((p) => p.partyType === 'customer').map((p) => p.partyInstanceReference as string),
+    );
+    const customerLogins = users.filter((u) => customerPartyRefs.has(u.partyInstanceReference as string));
+    expect(users.length - customerLogins.length).toBeGreaterThan(0); // staff logins exist
+    expect(customerLogins.length).toBe(customerPartyRefs.size); // and every customer has exactly one
   });
 });

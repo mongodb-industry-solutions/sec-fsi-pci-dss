@@ -2348,5 +2348,46 @@
     "customerAgreementPurposeOfRelationship": "personal_banking",
     "customerAgreementOccupation": "designer",
     "customerAgreementSourceOfFunds": "salary"
+  },
+  {
+    "customerAgreementInstanceReference": "12ff3c58-d10d-4895-ac62-ceb9b5c2f73a",
+    "partyInstanceReference": "b0000057-0000-4000-8000-000000000057",
+    "customerAgreementReference": "ACC-DC-62191055",
+    "customerSegment": "premium",
+    "customerAgreementStatus": "active",
+    "customerAgreementEnrollmentDate": "2025-05-17T14:00:00.000Z",
+    "customerAgreementPreferredLanguage": "en",
+    "customerAgreementResidentialAddress": {
+      "streetAddress": "Calle de Alcalá 128",
+      "city": "Madrid",
+      "postalCode": "28009",
+      "countryCode": "ES"
+    },
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2025-05-17T14:00:00.000Z",
+      "customerAgreementKycCheckReference": "KYC-1B8C79CF",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 71,
+      "customerAgreementKycCheckRiskRating": "high",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-cfa6893a"
+    },
+    "bianServiceDomain": "Customer Agreement",
+    "bianControlRecordType": "CustomerAgreementProcedure",
+    "recordCreatedDateTime": "2025-05-17T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3,
+    "customerAgreementGovernmentID": {
+      "type": "driver_license",
+      "issuingCountry": "FR",
+      "number": "FR373636818",
+      "expiryDate": "2032-07-20T21:21:14.944Z"
+    },
+    "customerAgreementTaxIDNumber": "FR28868682",
+    "customerAgreementOccupation": "doctor",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementPurposeOfRelationship": "business_banking"
   }
 ]

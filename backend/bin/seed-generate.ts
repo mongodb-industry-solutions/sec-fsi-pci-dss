@@ -1,16 +1,30 @@
 /**
  * Generates synthetic seed data for all BIAN-compliant collections.
- * Run: ts-node bin/seed-generate.ts
+ * Run: ts-node bin/seed-generate.ts [--force]
  * Output: backend/data/*.json
  *
  * v2: *Sensitive files removed. Sensitive fields are inline in the main files.
  * The QE client (DEK-sensitive tier) encrypts them on write.
+ *
+ * v33 (F6): the generator is ADDITIVE and refuses to clobber. It loads the existing fixtures, keeps
+ * every curated record exactly as it is, and only tops the synthetic population up to the target
+ * size. `write()` refuses to reduce a collection's record count unless `--force` is passed. Before
+ * v33 it rebuilt everything from scratch: since the fixtures had been hand-extended well past the
+ * generator's targets, `npm run generate:data` silently deleted the curated demo cast.
+ *
+ * v33 (F5): the deprecated `governmentIdentificationReference` (`SYNTH-*`) is gone. Structured
+ * identity documents come from `enrichKyc`, the same single source the seeder uses (ADR-050).
+ *
+ * v33 (F1/F2/F3): the shared, database-free integrity passes in `vendors/seed/dataIntegrity.ts` run
+ * over the WHOLE population (curated plus generated) before the files are written, so the fixtures
+ * themselves satisfy the invariants rather than relying on a runtime repair.
  *
  * BIAN collection mapping:
  *   parties.json                 → party (SD-13 Party Data Management)
  *   customerAuthentications.json → customerAuthenticationAssessment (SD-91)
  *   customerAgreements.json      → customerAgreementProcedure (SD-53) [includes address, govId]
  *   paymentCards.json            → paymentCardManagement (SD-88)
+ *   payoutAccounts.json          → payoutAccountArrangement (SD-66)
  *   cardTransactions.json        → cardTransactionLog (SD-254) [includes gateway payload]
  *   fraudCases.json              → fraudDiagnosisCase (SD-83)
  *   fraudCaseEvents.json         → fraudDiagnosisCaseEvents (SD-83)
@@ -20,8 +34,32 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { faker } from '@faker-js/faker';
+import { enrichKyc, type CustomerAgreementSeed } from '../src/vendors/seed/seedCustomers';
+import {
+  completeCustomerPopulation,
+  deriveCustomerLogins,
+  repointTransactionsToCards,
+  syncFraudCaseSnapshots,
+  type AgreementSeed,
+  type AuthenticationSeed,
+  type CardSeed,
+  type FraudCaseSeed,
+  type PartySeed,
+  type PayoutAccountSeed,
+  type TransactionSeed,
+} from '../src/vendors/seed/dataIntegrity';
 
-const OUT_DIR = path.join(__dirname, '..', 'data');
+// Honours the same PSP_SEED_DATA_DIR the seeder reads (config.app.seedDataDir), so the generator can
+// be pointed at a temporary directory. Used by the integrity test to assert the no-shrink guard
+// without touching the real fixtures.
+const OUT_DIR = process.env.PSP_SEED_DATA_DIR ?? process.env.SEED_DATA_DIR ?? path.join(__dirname, '..', 'data');
+const FORCE = process.argv.includes('--force');
+
+// Target sizes for the SYNTHETIC population. They are floors, never ceilings: the fixtures hold more
+// than this because the demo cast has been curated over many iterations, and that is fine.
+const TARGET_CUSTOMERS = 50;
+const TARGET_TRANSACTIONS_PER_CUSTOMER = 4;
+const TARGET_FRAUD_CASES = 20;
 
 function uuid(): string {
   return crypto.randomUUID();
@@ -43,16 +81,11 @@ function futureExpiry(): string {
   return `${month}/${year}`;
 }
 
-function synthGovId(): string {
-  return `SYNTH-${String(Math.floor(Math.random() * 100000000)).padStart(8, '0')}`;
-}
-
 function caseRef(n: number): string {
   return `FD-2026-${String(n).padStart(6, '0')}`;
 }
 
 const NETWORKS = ['VISA', 'MASTERCARD', 'AMEX', 'ELO'] as const;
-const SEGMENTS = ['retail', 'premium', 'corporate', 'sme'] as const;
 const CHANNELS = ['online', 'pos', 'contactless', 'atm'] as const;
 const STATUSES = ['authorized', 'settled', 'disputed'] as const;
 const MCC_LIST = ['5812', '6011', '7995', '5734', '5411', '5912', '4814', '5999'];
@@ -76,61 +109,90 @@ function descriptorFor(merchantName: string, txType: string): { description: str
 
 const NOW = new Date('2026-05-27T14:00:00Z');
 
+// ── Additive fixture loading ──────────────────────────────────────────────────
+
+/** Reads an existing fixture, or an empty population on a clean checkout. */
+function load<T>(name: string): T[] {
+  const filePath = path.join(OUT_DIR, name);
+  if (!fs.existsSync(filePath)) return [];
+  return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as T[];
+}
+
 async function main() {
   const demoPassword = await bcrypt.hash('demo-password', 12);
 
+  // Curated population, kept verbatim. Everything below only appends.
+  const parties = load<PartySeed>('parties.json');
+  const customerAuthentications = load<AuthenticationSeed>('customerAuthentications.json');
+  const customerAgreements = load<AgreementSeed>('customerAgreements.json');
+  const paymentCards = load<CardSeed>('paymentCards.json');
+  const payoutAccounts = load<PayoutAccountSeed>('payoutAccounts.json');
+  const cardTransactions = load<TransactionSeed>('cardTransactions.json');
+  const fraudCases = load<FraudCaseSeed>('fraudCases.json');
+  const fraudCaseEvents = load<Record<string, unknown>>('fraudCaseEvents.json');
+
+  const baseline = {
+    'parties.json': parties.length,
+    'customerAuthentications.json': customerAuthentications.length,
+    'customerAgreements.json': customerAgreements.length,
+    'paymentCards.json': paymentCards.length,
+    'payoutAccounts.json': payoutAccounts.length,
+    'cardTransactions.json': cardTransactions.length,
+    'fraudCases.json': fraudCases.length,
+    'fraudCaseEvents.json': fraudCaseEvents.length,
+  };
+
+  const partyByEmail = new Map(parties.map((p) => [String(p.partyEmailAddress ?? '').toLowerCase(), p]));
+  const takenEmails = new Set(partyByEmail.keys());
+  const takenPhones = new Set(parties.map((p) => String(p.partyMobilePhoneNumber ?? '')).filter(Boolean));
+
   // -- 1. Parties (SD-13 Party Data Management) --------------------─
-  // 50 customer parties + 3 employee parties
-  const customerPartyIds: string[] = [];
-  const customerEmails: string[] = [];
-  const customerPhones: string[] = [];
-  const customerNames: string[] = [];
-
-  const parties = [];
-
-  // Fixed employee parties (linked to customerAuthentications)
-  const employeeParties = [
-    {
-      partyInstanceReference: uuid(),
-      partyEmailAddress: 'sarah.chen@back.es',
-      partyMobilePhoneNumber: '+44 7900 000051',
-      partyName: 'Sarah Chen',
-      partyType: 'employee',
-    },
-    {
-      partyInstanceReference: uuid(),
-      partyEmailAddress: 'michael.obi@back.es',
-      partyMobilePhoneNumber: '+44 7900 000052',
-      partyName: 'Michael Obi',
-      partyType: 'employee',
-    },
-    {
-      partyInstanceReference: uuid(),
-      partyEmailAddress: 'diego.sans@back.es',
-      partyMobilePhoneNumber: '+44 7900 000053',
-      partyName: 'Diego Sans',
-      partyType: 'employee',
-    },
+  // The three fixed staff parties the curated logins point at. Added only when absent.
+  const employeeSpecs = [
+    { partyEmailAddress: 'sarah.chen@back.es', partyMobilePhoneNumber: '+44 7900 000051', partyName: 'Sarah Chen' },
+    { partyEmailAddress: 'michael.obi@back.es', partyMobilePhoneNumber: '+44 7900 000052', partyName: 'Michael Obi' },
+    { partyEmailAddress: 'diego.sans@back.es', partyMobilePhoneNumber: '+44 7900 000053', partyName: 'Diego Sans' },
   ];
 
-  // 50 customer parties (first 2 linked to demo customer auth users)
-  const demoCustomerEmails = ['luis.fernandez@back.es', 'julia.santos@back.es'];
-  const demoCustomerNames = ['Luis Fernandez', 'Julia Santos'];
-  const demoCustomerPhones = ['+44 7900 000001', '+44 7900 000002'];
+  for (const spec of employeeSpecs) {
+    if (partyByEmail.has(spec.partyEmailAddress)) continue;
+    const party: PartySeed = {
+      partyInstanceReference: uuid(),
+      ...spec,
+      partyType: 'employee',
+      partySex: 'unspecified',
+      bianServiceDomain: 'Party Data Management',
+      bianControlRecordType: 'Party',
+      recordCreatedDateTime: NOW,
+      recordUpdatedDateTime: NOW,
+      schemaVersion: 1,
+    };
+    parties.push(party);
+    partyByEmail.set(spec.partyEmailAddress, party);
+    takenEmails.add(spec.partyEmailAddress);
+  }
 
-  for (let i = 0; i < 50; i++) {
-    const partyId = uuid();
-    const email = i < 2 ? demoCustomerEmails[i] : faker.internet.email().toLowerCase();
-    const name = i < 2 ? demoCustomerNames[i] : faker.person.fullName();
+  // Customer parties: top the synthetic population up to the floor. Each new party also gets an
+  // SD-66 payout account, because a customer with no funding source cannot hold a card (D-3).
+  const demoCustomers = [
+    { partyEmailAddress: 'luis.fernandez@back.es', partyName: 'Luis Fernandez', partyMobilePhoneNumber: '+44 7900 000001' },
+    { partyEmailAddress: 'julia.santos@back.es', partyName: 'Julia Santos', partyMobilePhoneNumber: '+44 7900 000002' },
+  ];
+
+  const newCustomerParties: PartySeed[] = [];
+  const customerCount = () => parties.filter((p) => p.partyType === 'customer').length + newCustomerParties.length;
+
+  while (customerCount() < TARGET_CUSTOMERS) {
+    const demo = demoCustomers.find((d) => !takenEmails.has(d.partyEmailAddress));
+    const email = demo?.partyEmailAddress ?? uniqueEmail(takenEmails);
+    const name = demo?.partyName ?? faker.person.fullName();
     // faker v10 dropped the format-string overload of phone.number(); build the UK mobile shape explicitly.
-    const phone = i < 2 ? demoCustomerPhones[i] : `+44 7${faker.string.numeric(3)} ${faker.string.numeric(6)}`;
+    const phone = demo?.partyMobilePhoneNumber ?? uniquePhone(takenPhones);
+    takenEmails.add(email);
+    takenPhones.add(phone);
 
-    customerPartyIds.push(partyId);
-    customerEmails.push(email);
-    customerPhones.push(phone);
-    customerNames.push(name);
-
-    parties.push({
+    const partyId = uuid();
+    newCustomerParties.push({
       partyInstanceReference: partyId,
       partyEmailAddress: email,
       partyMobilePhoneNumber: phone,
@@ -150,201 +212,156 @@ async function main() {
       recordUpdatedDateTime: NOW,
       schemaVersion: 1,
     });
-  }
 
-  for (const ep of employeeParties) {
-    parties.push({
-      partySex: 'unspecified',
-      ...ep,
-      bianServiceDomain: 'Party Data Management',
-      bianControlRecordType: 'Party',
+    payoutAccounts.push({
+      payoutAccountInstanceReference: uuid(),
+      partyInstanceReference: partyId,
+      payoutAccountType: 'bank_account',
+      payoutAccountStatus: 'active',
+      payoutAccountIsDefault: true,
+      payoutAccountAlias: 'Main account',
+      payoutAccountBankName: 'Leafy Bank',
+      payoutAccountCurrency: 'EUR',
+      payoutAccountCountryCode: 'GB',
+      payoutAccountPreferredRail: 'sepa',
+      payoutAccountIban: faker.finance.iban({ countryCode: 'GB' }),
+      payoutAccountBalance: {
+        pendingAmount: 0,
+        availableAmount: parseFloat((Math.random() * 8000 + 500).toFixed(2)),
+        reservedAmount: 0,
+        currency: 'EUR',
+        lastUpdatedDateTime: NOW,
+      },
+      bianServiceDomain: 'Payment Initiation',
+      bianControlRecordType: 'PayoutAccountArrangement',
       recordCreatedDateTime: NOW,
       recordUpdatedDateTime: NOW,
       schemaVersion: 1,
     });
   }
+  parties.push(...newCustomerParties);
 
   // -- 2. Customer authentication assessments (SD-91) ----------------
-  const customerAuthentications = [
-    {
-      customerAuthenticationInstanceReference: uuid(),
-      partyInstanceReference: customerPartyIds[0],
-      customerAuthenticationEmailAddress: 'luis.fernandez@back.es',
-      customerAuthenticationCredentialHash: demoPassword,
-      customerAuthenticationUserRole: 'customer',
-      customerAuthenticationUserName: 'Luis Fernandez',
-      customerAuthenticationLoginDomain: 'local',
-      customerAuthenticationAccountStatus: 'active',
-      bianServiceDomain: 'Customer Authentication',
-      bianControlRecordType: 'CustomerAuthenticationAssessment',
-      recordCreatedDateTime: NOW,
-      schemaVersion: 1,
-    },
-    {
-      customerAuthenticationInstanceReference: uuid(),
-      partyInstanceReference: customerPartyIds[1],
-      customerAuthenticationEmailAddress: 'julia.santos@back.es',
-      customerAuthenticationCredentialHash: demoPassword,
-      customerAuthenticationUserRole: 'customer',
-      customerAuthenticationUserName: 'Julia Santos',
-      customerAuthenticationLoginDomain: 'local',
-      customerAuthenticationAccountStatus: 'active',
-      bianServiceDomain: 'Customer Authentication',
-      bianControlRecordType: 'CustomerAuthenticationAssessment',
-      recordCreatedDateTime: NOW,
-      schemaVersion: 1,
-    },
-    {
-      customerAuthenticationInstanceReference: uuid(),
-      partyInstanceReference: employeeParties[0].partyInstanceReference,
-      customerAuthenticationEmailAddress: 'sarah.chen@back.es',
-      customerAuthenticationCredentialHash: demoPassword,
-      customerAuthenticationUserRole: 'level1_analyst',
-      customerAuthenticationUserName: 'Sarah Chen',
-      customerAuthenticationLoginDomain: 'local',
-      customerAuthenticationAccountStatus: 'active',
-      bianServiceDomain: 'Customer Authentication',
-      bianControlRecordType: 'CustomerAuthenticationAssessment',
-      recordCreatedDateTime: NOW,
-      schemaVersion: 1,
-    },
-    {
-      customerAuthenticationInstanceReference: uuid(),
-      partyInstanceReference: employeeParties[1].partyInstanceReference,
-      customerAuthenticationEmailAddress: 'michael.obi@back.es',
-      customerAuthenticationCredentialHash: demoPassword,
-      customerAuthenticationUserRole: 'level2_investigator',
-      customerAuthenticationUserName: 'Michael Obi',
-      customerAuthenticationLoginDomain: 'local',
-      customerAuthenticationAccountStatus: 'active',
-      bianServiceDomain: 'Customer Authentication',
-      bianControlRecordType: 'CustomerAuthenticationAssessment',
-      recordCreatedDateTime: NOW,
-      schemaVersion: 1,
-    },
-    {
-      customerAuthenticationInstanceReference: uuid(),
-      partyInstanceReference: employeeParties[2].partyInstanceReference,
-      customerAuthenticationEmailAddress: 'diego.sans@back.es',
-      customerAuthenticationCredentialHash: demoPassword,
-      customerAuthenticationUserRole: 'security_auditor',
-      customerAuthenticationUserName: 'Diego Sans',
-      customerAuthenticationLoginDomain: 'local',
-      customerAuthenticationAccountStatus: 'active',
-      bianServiceDomain: 'Customer Authentication',
-      bianControlRecordType: 'CustomerAuthenticationAssessment',
-      recordCreatedDateTime: NOW,
-      schemaVersion: 1,
-    },
+  // The curated staff/customer logins. Added only when absent; F1 below covers every other customer.
+  const loginSpecs = [
+    { email: 'luis.fernandez@back.es', role: 'customer', name: 'Luis Fernandez' },
+    { email: 'julia.santos@back.es', role: 'customer', name: 'Julia Santos' },
+    { email: 'sarah.chen@back.es', role: 'level1_analyst', name: 'Sarah Chen' },
+    { email: 'michael.obi@back.es', role: 'level2_investigator', name: 'Michael Obi' },
+    { email: 'diego.sans@back.es', role: 'security_auditor', name: 'Diego Sans' },
   ];
-
-  // -- 3. Customer agreements (SD-53) ------------------------------─
-  // PII removed: email, phone, name now live in party (SD-13)
-  const customerAgreementIds: string[] = [];
-  const customerAgreementRefs: string[] = [];
-  const customerAgreements = [];
-
-  // Fixed account refs for the two demo customers (used in seeded fraud cases and transactions)
-  const DEMO_ACCOUNT_REFS = ['ACC-LF-20240115', 'ACC-JS-20231201'];
-
-  for (let i = 0; i < 50; i++) {
-    const id = uuid();
-    const ref = i < 2 ? DEMO_ACCOUNT_REFS[i] : `ACC-${String(i + 1).padStart(3, '0')}`;
-    customerAgreementIds.push(id);
-    customerAgreementRefs.push(ref);
-
-    // v2: QE:equality + QE:none sensitive fields merged inline.
-    // PII (name, email, phone) lives exclusively in party (SD-13). Do not add them here.
-    customerAgreements.push({
-      customerAgreementInstanceReference: id,
-      partyInstanceReference: customerPartyIds[i],
-      customerAgreementReference: ref,
-      customerAgreementResidentialAddress: {
-        streetAddress: faker.location.streetAddress(),
-        city: faker.location.city(),
-        postalCode: faker.location.zipCode(),
-        countryCode: 'GB',
-      },
-      governmentIdentificationReference: synthGovId(),
-      customerAgreementRiskNotes: 'No prior fraud history.',
-      customerSegment: SEGMENTS[i % SEGMENTS.length],
-      customerAgreementStatus: 'active',
-      customerAgreementEnrollmentDate: faker.date.past({ years: 2 }),
-      customerAgreementPreferredLanguage: 'en',
-      customerAgreementPreferredPaymentCardReference: null,
-      // Ch-06: BQ:Step — KYC identity verification (BIAN SD-53 BQ:Step). PCI DSS Req 8.1.
-      customerAgreementKycCheck: {
-        customerAgreementKycCheckStatus: 'verified',
-        customerAgreementKycCheckCompletedDate: faker.date.recent({ days: 365 }),
-        customerAgreementKycCheckReference: `KYC-${faker.string.alphanumeric(8).toUpperCase()}`,
-        customerAgreementKycCheckNotes: 'Identity verified via document check at onboarding',
-      },
-      bianServiceDomain: 'Customer Agreement',
-      bianControlRecordType: 'CustomerAgreementProcedure',
-      recordCreatedDateTime: faker.date.past({ years: 2 }),
-      recordUpdatedDateTime: NOW,
-      schemaVersion: 3,
+  const loginEmails = new Set(
+    customerAuthentications.map((a) => String(a.customerAuthenticationEmailAddress ?? '').toLowerCase()),
+  );
+  for (const spec of loginSpecs) {
+    if (loginEmails.has(spec.email)) continue;
+    const party = partyByEmail.get(spec.email);
+    if (!party) continue; // the matching party was not generated (population already large enough)
+    loginEmails.add(spec.email);
+    customerAuthentications.push({
+      customerAuthenticationInstanceReference: uuid(),
+      partyInstanceReference: party.partyInstanceReference,
+      customerAuthenticationEmailAddress: spec.email,
+      customerAuthenticationCredentialHash: demoPassword,
+      customerAuthenticationUserRole: spec.role,
+      customerAuthenticationUserName: spec.name,
+      customerAuthenticationLoginDomain: 'local',
+      customerAuthenticationAccountStatus: 'active',
+      customerAuthenticationDemoFeatured: true,
+      bianServiceDomain: 'Customer Authentication',
+      bianControlRecordType: 'CustomerAuthenticationAssessment',
+      recordCreatedDateTime: NOW,
+      schemaVersion: 1,
     });
   }
 
+  // -- 3. F2 / D-3: complete every customer party --------------------
+  // One code path serves both a freshly generated synthetic party and a curated one with a gap
+  // (David Chen holds a login, a payout account and a merchant but no agreement and no card).
+  const completion = completeCustomerPopulation(
+    parties,
+    customerAgreements,
+    paymentCards,
+    cardTransactions,
+    payoutAccounts,
+    { now: NOW },
+  );
+  // F5: structured identity documents from the single source (ADR-050). No SYNTH-* value is ever
+  // written, and `governmentIdentificationReference` is stripped if a fixture still carries it.
+  for (const agreement of completion.agreements) enrichKyc(agreement as CustomerAgreementSeed);
+  customerAgreements.push(...completion.agreements);
+  paymentCards.push(...completion.cards);
+  cardTransactions.push(...completion.transactions);
+  console.log(
+    `  completeness: +${completion.agreements.length} agreements, +${completion.cards.length} cards, ` +
+    `+${completion.transactions.length} transactions`,
+  );
+
+  // The curated agreements are deliberately NOT re-enriched: they already carry the v27 KYC leaves,
+  // and seedCustomers enriches on write anyway, so touching them here would only rewrite curated
+  // records (P7/F6: keep them byte-for-byte).
+
   // -- 4. Payment cards (SD-88) --------------------------------------
-  // Per-customer card-on-file arrangements: 3-4 cards each, with a customer alias and one preferred.
-  // cardTokenMap[agreement] = the customer's PREFERRED card token (used to link their transactions).
-  const cardTokenMap: Record<string, string> = {};
-  const paymentCards = [];
+  // Card-on-file variety for the NEW agreements only: 3-4 cards each with a customer alias and one
+  // preferred. Curated holders keep exactly the cards they have.
   const CARD_ALIASES = ['Personal', 'Work', 'Travel', 'Backup', 'Online shopping', 'Groceries', 'Subscriptions', 'Family', 'Everyday', 'Business'];
+  const newAgreementRefs = new Set(completion.agreements.map((a) => a.customerAgreementInstanceReference));
 
-  for (let i = 0; i < 50; i++) {
-    const agId = customerAgreementIds[i];
-    const count = 3 + (i % 2); // 3 or 4 cards
-    const usedAliases = new Set<string>();
-    let preferredCardId: string | null = null;
-    let preferredToken: string | null = null;
-
-    for (let j = 0; j < count; j++) {
-      const cardId = uuid();
-      const token = cardToken();
-      let alias = CARD_ALIASES[(i + j) % CARD_ALIASES.length];
-      while (usedAliases.has(alias)) alias = CARD_ALIASES[(i + j + usedAliases.size) % CARD_ALIASES.length];
+  let cardIndex = 0;
+  for (const agreement of completion.agreements) {
+    const existing = paymentCards.filter(
+      (c) => c.customerAgreementInstanceReference === agreement.customerAgreementInstanceReference,
+    );
+    const usedAliases = new Set(existing.map((c) => String(c.paymentCardAlias ?? '')));
+    const target = 3 + (cardIndex % 2); // 3 or 4 cards
+    for (let j = existing.length; j < target; j++) {
+      let alias = CARD_ALIASES[(cardIndex + j) % CARD_ALIASES.length];
+      let bump = 0;
+      while (usedAliases.has(alias)) alias = CARD_ALIASES[(cardIndex + j + ++bump) % CARD_ALIASES.length];
       usedAliases.add(alias);
-
-      const isPreferred = j === 0; // first card is the default
-      if (isPreferred) { preferredCardId = cardId; preferredToken = token; }
-
       paymentCards.push({
-        paymentCardInstanceReference: cardId,
-        customerAgreementInstanceReference: agId,
-        paymentCardReference: token,
+        paymentCardInstanceReference: uuid(),
+        customerAgreementInstanceReference: agreement.customerAgreementInstanceReference,
+        paymentCardReference: cardToken(),
         paymentCardExpirationDate: futureExpiry(),
         paymentCardMaskedPanDisplay: maskedPan(),
-        paymentCardNetwork: NETWORKS[(i + j) % NETWORKS.length],
+        paymentCardNetwork: NETWORKS[(cardIndex + j) % NETWORKS.length],
         paymentCardStatus: 'active',
         paymentCardIssuanceDateTime: faker.date.past({ years: 1 }),
-        paymentCardIsPreferred: isPreferred,
+        paymentCardIsPreferred: false,
         paymentCardAlias: alias,
+        fundingPayoutAccountInstanceReference: existing[0]?.fundingPayoutAccountInstanceReference,
         bianServiceDomain: 'Payment Card',
         bianControlRecordType: 'PaymentCardManagement',
         recordCreatedDateTime: faker.date.past({ years: 1 }),
         schemaVersion: 1,
       });
     }
-
-    cardTokenMap[agId] = preferredToken!;
-    customerAgreements[i].customerAgreementPreferredPaymentCardReference = preferredCardId as unknown as null;
+    cardIndex++;
   }
 
   // Shared cards (FDS/AML): one physical card (same token) held by several customers. One exceeds
   // the shared-card threshold (>3 holders) so it trips the compliance signal; the registry counts
-  // distinct holders. Each holder gets their own arrangement row + alias.
+  // distinct holders. Each holder gets their own arrangement row + alias. NOT a duplicate-token
+  // defect: the SD-88 arrangement is keyed by (customer, token), which the unique compound index
+  // enforces. Topped up to the holder count, never rebuilt.
   const SHARED_CARDS = [
     { token: 'pm_shared00000a4153', masked: '****-****-****-4153', network: 'VISA',       holders: 5 },
     { token: 'pm_shared00000b8821', masked: '****-****-****-8821', network: 'MASTERCARD', holders: 2 },
   ];
+  const allAgreementRefs = customerAgreements.map((a) => a.customerAgreementInstanceReference);
   let sharedCursor = 0;
   for (const s of SHARED_CARDS) {
-    for (let h = 0; h < s.holders; h++) {
-      const agId = customerAgreementIds[sharedCursor % 50];
+    const held = new Set(
+      paymentCards.filter((c) => c.paymentCardReference === s.token).map((c) => c.customerAgreementInstanceReference),
+    );
+    while (held.size < s.holders && sharedCursor < allAgreementRefs.length * 2) {
+      const agId = allAgreementRefs[sharedCursor % allAgreementRefs.length];
       sharedCursor++;
+      if (held.has(agId)) continue;
+      held.add(agId);
+      const funding = paymentCards.find((c) => c.customerAgreementInstanceReference === agId)
+        ?.fundingPayoutAccountInstanceReference;
       paymentCards.push({
         paymentCardInstanceReference: uuid(),
         customerAgreementInstanceReference: agId,
@@ -356,6 +373,7 @@ async function main() {
         paymentCardIssuanceDateTime: faker.date.past({ years: 1 }),
         paymentCardIsPreferred: false,
         paymentCardAlias: 'Shared',
+        fundingPayoutAccountInstanceReference: funding,
         bianServiceDomain: 'Payment Card',
         bianControlRecordType: 'PaymentCardManagement',
         recordCreatedDateTime: faker.date.past({ years: 1 }),
@@ -365,26 +383,32 @@ async function main() {
   }
 
   // -- 5. Card transactions (SD-254) --------------------------------─
-  const txnIds: string[] = [];
-  const cardTransactions = [];
+  // Topped up to the per-customer floor, spread over the new agreements first so a freshly generated
+  // population has history everywhere.
+  const targetTransactions = Math.max(
+    cardTransactions.length,
+    TARGET_TRANSACTIONS_PER_CUSTOMER * customerAgreements.length,
+  );
+  const spreadRefs = newAgreementRefs.size > 0
+    ? customerAgreements.filter((a) => newAgreementRefs.has(a.customerAgreementInstanceReference))
+    : customerAgreements;
 
-  for (let i = 0; i < 200; i++) {
-    const txnId = uuid();
-    const custIdx = i % 50;
-    const token = cardTokenMap[customerAgreementIds[custIdx]];
+  for (let i = 0; cardTransactions.length < targetTransactions; i++) {
+    const agreement = spreadRefs[i % spreadRefs.length];
+    const card = paymentCards.find(
+      (c) => c.customerAgreementInstanceReference === agreement.customerAgreementInstanceReference,
+    );
+    if (!card) break; // nothing to attach a transaction to; F3 below would only flag it as unresolvable
     const amount = parseFloat((Math.random() * 1500 + 10).toFixed(2));
-    const mcc = MCC_LIST[i % MCC_LIST.length];
-    txnIds.push(txnId);
-
-    // v2: sensitive gateway fields (QE:none, DEK-sensitive tier) merged inline.
     const merchantName = faker.company.name();
     const txType = TX_TYPES[i % TX_TYPES.length];
     const { description, narrative } = descriptorFor(merchantName, txType);
 
+    // v2: sensitive gateway fields (QE:none, DEK-sensitive tier) merged inline.
     cardTransactions.push({
-      cardTransactionInstanceReference: txnId,
-      paymentCardReference: token,
-      cardTransactionAccountReference: customerAgreementRefs[custIdx],
+      cardTransactionInstanceReference: uuid(),
+      paymentCardReference: card.paymentCardReference,
+      cardTransactionAccountReference: agreement.customerAgreementReference,
       rawGatewayPayload: {
         gatewayId: `GW-${uuid()}`,
         processorCode: `PROC${Math.floor(Math.random() * 9000 + 1000)}`,
@@ -401,9 +425,9 @@ async function main() {
       cardTransactionType: txType,
       cardTransactionChannel: CHANNELS[i % CHANNELS.length],
       cardTransactionInitiationType: 'customerInitiated',
-      cardTransactionMerchantCategoryCode: mcc,
+      cardTransactionMerchantCategoryCode: MCC_LIST[i % MCC_LIST.length],
       cardTransactionMerchantName: merchantName,
-      cardTransactionMaskedPanDisplay: paymentCards[custIdx].paymentCardMaskedPanDisplay,
+      cardTransactionMaskedPanDisplay: card.paymentCardMaskedPanDisplay,
       cardTransactionDescription: description,
       cardTransactionNarrative: narrative,
       bianServiceDomain: 'Card Transaction',
@@ -415,27 +439,39 @@ async function main() {
   }
 
   // -- 6. Fraud cases + events (SD-83) ------------------------------
-  const fraudCases = [];
-  const fraudCaseEvents = [];
+  // Topped up to the floor over transactions that do not already have a case.
+  const casedTransactions = new Set(fraudCases.map((c) => c.cardTransactionInstanceReference));
+  const usedCaseRefs = new Set(fraudCases.map((c) => String(c.fraudDiagnosisCaseReference ?? '')));
+  const agreementByBusinessRef = new Map(customerAgreements.map((a) => [a.customerAgreementReference, a]));
+  let caseCounter = 0;
 
-  for (let i = 0; i < 20; i++) {
-    const txn = cardTransactions[i];
+  for (const txn of cardTransactions) {
+    if (fraudCases.length >= TARGET_FRAUD_CASES) break;
+    if (casedTransactions.has(txn.cardTransactionInstanceReference)) continue;
+    const agreement = agreementByBusinessRef.get(txn.cardTransactionAccountReference);
+    if (!agreement) continue;
+
+    const amountValue = (txn.cardTransactionAmount as { amount: number }).amount;
+    const mcc = String(txn.cardTransactionMerchantCategoryCode);
     const caseId = uuid();
-    const isFraud = txn.cardTransactionAmount.amount > 500 || RISK_MCC.includes(txn.cardTransactionMerchantCategoryCode);
-    const severity = txn.cardTransactionAmount.amount > 1000 ? 'critical'
-      : txn.cardTransactionAmount.amount > 500 ? 'high'
-      : txn.cardTransactionAmount.amount > 200 ? 'medium' : 'low';
+    const isFraud = amountValue > 500 || RISK_MCC.includes(mcc);
+    const severity = amountValue > 1000 ? 'critical' : amountValue > 500 ? 'high' : amountValue > 200 ? 'medium' : 'low';
 
     const riskIndicators: string[] = [];
-    if (txn.cardTransactionAmount.amount > 500) riskIndicators.push('amount_threshold');
-    if (RISK_MCC.includes(txn.cardTransactionMerchantCategoryCode)) riskIndicators.push('high_risk_mcc');
+    if (amountValue > 500) riskIndicators.push('amount_threshold');
+    if (RISK_MCC.includes(mcc)) riskIndicators.push('high_risk_mcc');
     if (riskIndicators.length === 0) riskIndicators.push('manual_review');
+
+    let ref = caseRef(++caseCounter);
+    while (usedCaseRefs.has(ref)) ref = caseRef(++caseCounter);
+    usedCaseRefs.add(ref);
+    const index = fraudCases.length;
 
     fraudCases.push({
       fraudDiagnosisInstanceReference: caseId,
-      fraudDiagnosisCaseReference: caseRef(i + 1),
-      cardTransactionInstanceReference: txnIds[i],
-      customerAgreementInstanceReference: customerAgreementIds[i % 50],
+      fraudDiagnosisCaseReference: ref,
+      cardTransactionInstanceReference: txn.cardTransactionInstanceReference,
+      customerAgreementInstanceReference: agreement.customerAgreementInstanceReference,
       transactionSnapshot: {
         cardTransactionAmount: txn.cardTransactionAmount,
         cardTransactionMerchantName: txn.cardTransactionMerchantName,
@@ -443,7 +479,7 @@ async function main() {
         cardTransactionStatus: txn.cardTransactionStatus,
         cardTransactionMaskedPanDisplay: txn.cardTransactionMaskedPanDisplay,
       },
-      fraudDiagnosisCaseStatus: i < 5 ? 'open' : i < 10 ? 'under_review' : i < 15 ? 'escalated' : 'resolved_cleared',
+      fraudDiagnosisCaseStatus: index < 5 ? 'open' : index < 10 ? 'under_review' : index < 15 ? 'escalated' : 'resolved_cleared',
       fraudDiagnosisCaseSeverity: severity,
       fraudDiagnosisRequestDateTime: txn.cardTransactionDateTime,
       fraudDiagnosisAssessment: {
@@ -457,6 +493,7 @@ async function main() {
       recordUpdatedDateTime: NOW,
       schemaVersion: 1,
     });
+    casedTransactions.add(txn.cardTransactionInstanceReference);
 
     fraudCaseEvents.push({
       fraudDiagnosisInstanceReference: caseId,
@@ -469,6 +506,30 @@ async function main() {
     });
   }
 
+  // -- 7. F1: a login for every customer party ----------------------
+  const derivedLogins = deriveCustomerLogins(parties, customerAuthentications);
+  customerAuthentications.push(...derivedLogins);
+  const customerParties = parties.filter((p) => p.partyType === 'customer');
+  const partiesWithLogin = new Set(customerAuthentications.map((a) => a.partyInstanceReference));
+  console.log(
+    `  customer parties with a login: ${customerParties.filter((p) => partiesWithLogin.has(p.partyInstanceReference)).length}` +
+    `/${customerParties.length} (+${derivedLogins.length} derived)`,
+  );
+
+  // -- 8. F3: the transaction-to-card link --------------------------
+  const repoint = repointTransactionsToCards(cardTransactions, paymentCards, customerAgreements);
+  const snapshots = syncFraudCaseSnapshots(fraudCases, cardTransactions);
+  console.log(
+    `  card link: ${repoint.repointed} transactions repointed, ${repoint.maskedPanAligned} masked PANs aligned, ` +
+    `${snapshots} case snapshots refreshed, ${repoint.unresolvable.length} unresolvable`,
+  );
+  if (repoint.unresolvable.length > 0) {
+    throw new Error(
+      'Seed consistency check failed - transactions whose account reference resolves to no card holder:\n  - ' +
+      repoint.unresolvable.slice(0, 10).join('\n  - '),
+    );
+  }
+
   // -- Consistency guard (prevents party/auth email drift) ----------─
   // The self-profile lookup resolves a customer's agreement via QE:equality
   // match of party.partyEmailAddress == login email (customerAgreement.service
@@ -477,7 +538,6 @@ async function main() {
   // to a non-existent party — /system/cards silently returns empty. Fail loud
   // at generation time instead of shipping drifted seed data.
   const partyByRef = new Map(parties.map((p) => [p.partyInstanceReference, p]));
-  const partyEmails = new Set(parties.map((p) => p.partyEmailAddress));
   const drift: string[] = [];
   for (const auth of customerAuthentications) {
     const party = partyByRef.get(auth.partyInstanceReference);
@@ -488,14 +548,12 @@ async function main() {
       );
       continue;
     }
-    if (party.partyEmailAddress !== auth.customerAuthenticationEmailAddress) {
+    if (String(party.partyEmailAddress).toLowerCase() !== String(auth.customerAuthenticationEmailAddress).toLowerCase()) {
       drift.push(
         `login ${auth.customerAuthenticationEmailAddress} → party ` +
           `${auth.partyInstanceReference} partyEmailAddress is ` +
           `${party.partyEmailAddress} (must equal the login email)`,
       );
-    } else if (!partyEmails.has(auth.customerAuthenticationEmailAddress)) {
-      drift.push(`login ${auth.customerAuthenticationEmailAddress} has no party with matching partyEmailAddress`);
     }
   }
   if (drift.length > 0) {
@@ -505,21 +563,54 @@ async function main() {
   }
 
   // -- Write files --------------------------------------------------─
+  // F6: refuse to shrink. A generator that produces fewer records than the fixtures hold is stale,
+  // and overwriting would delete curated demo content. `--force` is the deliberate escape hatch.
+  const shrunk: string[] = [];
   const write = (name: string, data: unknown[]) => {
+    const before = baseline[name as keyof typeof baseline] ?? 0;
+    if (data.length < before && !FORCE) {
+      shrunk.push(`${name}: ${before} → ${data.length}`);
+      return;
+    }
     const filePath = path.join(OUT_DIR, name);
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-    console.log(`wrote ${filePath} (${data.length} records)`);
+    // Trailing newline: the curated fixtures have one, so an unchanged collection stays a no-diff.
+    fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`);
+    console.log(`wrote ${filePath} (${data.length} records, was ${before})`);
   };
 
   write('parties.json', parties);
   write('customerAuthentications.json', customerAuthentications);
   write('customerAgreements.json', customerAgreements);
   write('paymentCards.json', paymentCards);
+  write('payoutAccounts.json', payoutAccounts);
   write('cardTransactions.json', cardTransactions);
   write('fraudCases.json', fraudCases);
   write('fraudCaseEvents.json', fraudCaseEvents);
 
+  if (shrunk.length > 0) {
+    throw new Error(
+      'Refusing to reduce a collection\'s record count (curated data would be lost):\n  - ' +
+      `${shrunk.join('\n  - ')}\n  Re-run with --force only if the reduction is intended.`,
+    );
+  }
+
   console.log('Done.');
+}
+
+function uniqueEmail(taken: Set<string>): string {
+  for (let i = 0; i < 100; i++) {
+    const candidate = faker.internet.email().toLowerCase();
+    if (!taken.has(candidate)) return candidate;
+  }
+  return `customer.${crypto.randomBytes(4).toString('hex')}@back.es`;
+}
+
+function uniquePhone(taken: Set<string>): string {
+  for (let i = 0; i < 100; i++) {
+    const candidate = `+44 7${faker.string.numeric(3)} ${faker.string.numeric(6)}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+  return `+44 7${crypto.randomInt(100, 999)} ${crypto.randomInt(100000, 999999)}`;
 }
 
 main().catch((err) => {

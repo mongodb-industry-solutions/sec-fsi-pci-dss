@@ -1,7 +1,7 @@
 [
   {
     "cardTransactionInstanceReference": "a0000201-0000-4000-8000-000000000201",
-    "paymentCardReference": "pm_okf2024sale01",
+    "paymentCardReference": "pm_b577f67eb747396e469372cf0144",
     "cardTransactionAccountReference": "ACC-LF-20240115",
     "cardTransactionAmount": {
       "amount": 129,
@@ -14,7 +14,7 @@
     "cardTransactionType": "purchase",
     "cardTransactionMerchantCategoryCode": "7372",
     "cardTransactionMerchantName": "Okafor Digital Services",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4153",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0144",
     "merchantAgreementInstanceReference": "m0000002-0000-4000-8000-000000000002",
     "cardTransactionDescription": "Software subscription",
     "bianServiceDomain": "Card Transaction",
@@ -25,7 +25,7 @@
   },
   {
     "cardTransactionInstanceReference": "a0000202-0000-4000-8000-000000000202",
-    "paymentCardReference": "pm_okf2024sale02",
+    "paymentCardReference": "pm_18e89d64cfffbdb3b8a676071177",
     "cardTransactionAccountReference": "ACC-JS-20231201",
     "cardTransactionAmount": {
       "amount": 49.99,
@@ -38,7 +38,7 @@
     "cardTransactionType": "purchase",
     "cardTransactionMerchantCategoryCode": "7372",
     "cardTransactionMerchantName": "Okafor Digital Services",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1212",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1177",
     "merchantAgreementInstanceReference": "m0000002-0000-4000-8000-000000000002",
     "cardTransactionDescription": "Consulting session",
     "bianServiceDomain": "Card Transaction",
@@ -49,7 +49,7 @@
   },
   {
     "cardTransactionInstanceReference": "a0000203-0000-4000-8000-000000000203",
-    "paymentCardReference": "pm_okf2024sale03",
+    "paymentCardReference": "pm_a634a55d68378912",
     "cardTransactionAccountReference": "ACC-005",
     "cardTransactionAmount": {
       "amount": 299,
@@ -62,7 +62,7 @@
     "cardTransactionType": "purchase",
     "cardTransactionMerchantCategoryCode": "7372",
     "cardTransactionMerchantName": "Okafor Digital Services",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7781",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5812",
     "merchantAgreementInstanceReference": "m0000002-0000-4000-8000-000000000002",
     "cardTransactionDescription": "Annual plan",
     "bianServiceDomain": "Card Transaction",
@@ -73,7 +73,7 @@
   },
   {
     "cardTransactionInstanceReference": "a0000204-0000-4000-8000-000000000204",
-    "paymentCardReference": "pm_okf2024sale04",
+    "paymentCardReference": "pm_bd8c156b3c7028b3",
     "cardTransactionAccountReference": "ACC-012",
     "cardTransactionAmount": {
       "amount": 79,
@@ -86,7 +86,7 @@
     "cardTransactionType": "purchase",
     "cardTransactionMerchantCategoryCode": "7372",
     "cardTransactionMerchantName": "Okafor Digital Services",
-    "cardTransactionMaskedPanDisplay": "****-****-****-3098",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2402",
     "merchantAgreementInstanceReference": "m0000002-0000-4000-8000-000000000002",
     "cardTransactionDescription": "Monthly plan",
     "bianServiceDomain": "Card Transaction",
@@ -97,7 +97,7 @@
   },
   {
     "cardTransactionInstanceReference": "a0000205-0000-4000-8000-000000000205",
-    "paymentCardReference": "pm_okf2024sale05",
+    "paymentCardReference": "pm_ed29bb97801fe424",
     "cardTransactionAccountReference": "ACC-031",
     "cardTransactionAmount": {
       "amount": 499,
@@ -110,7 +110,7 @@
     "cardTransactionType": "purchase",
     "cardTransactionMerchantCategoryCode": "7372",
     "cardTransactionMerchantName": "Okafor Digital Services",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5210",
+    "cardTransactionMaskedPanDisplay": "****-****-****-9820",
     "merchantAgreementInstanceReference": "m0000002-0000-4000-8000-000000000002",
     "cardTransactionDescription": "Enterprise add-on",
     "bianServiceDomain": "Card Transaction",
@@ -121,7 +121,7 @@
   },
   {
     "cardTransactionInstanceReference": "a0000206-0000-4000-8000-000000000206",
-    "paymentCardReference": "pm_okf2024sale06",
+    "paymentCardReference": "pm_bcd7e5e9cfa326d6",
     "cardTransactionAccountReference": "ACC-019",
     "cardTransactionAmount": {
       "amount": 159,
@@ -134,7 +134,7 @@
     "cardTransactionType": "purchase",
     "cardTransactionMerchantCategoryCode": "7372",
     "cardTransactionMerchantName": "Okafor Digital Services",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6620",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8346",
     "merchantAgreementInstanceReference": "m0000002-0000-4000-8000-000000000002",
     "cardTransactionDescription": "Team seats",
     "bianServiceDomain": "Card Transaction",
@@ -145,7 +145,7 @@
   },
   {
     "cardTransactionInstanceReference": "a0000211-0000-4000-8000-000000000211",
-    "paymentCardReference": "pm_esp2024sale01",
+    "paymentCardReference": "pm_18e89d64cfffbdb3b8a676071177",
     "cardTransactionAccountReference": "ACC-JS-20231201",
     "cardTransactionAmount": {
       "amount": 12.5,
@@ -158,7 +158,7 @@
     "cardTransactionType": "purchase",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Espresso Works Ltd",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1212",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1177",
     "merchantAgreementInstanceReference": "m0000001-0000-4000-8000-000000000001",
     "cardTransactionDescription": "Coffee and workspace",
     "bianServiceDomain": "Card Transaction",
@@ -169,7 +169,7 @@
   },
   {
     "cardTransactionInstanceReference": "a0000212-0000-4000-8000-000000000212",
-    "paymentCardReference": "pm_esp2024sale02",
+    "paymentCardReference": "pm_a634a55d68378912",
     "cardTransactionAccountReference": "ACC-005",
     "cardTransactionAmount": {
       "amount": 8.75,
@@ -182,7 +182,7 @@
     "cardTransactionType": "purchase",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Espresso Works Ltd",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7781",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5812",
     "merchantAgreementInstanceReference": "m0000001-0000-4000-8000-000000000001",
     "cardTransactionDescription": "Espresso bar",
     "bianServiceDomain": "Card Transaction",
@@ -193,7 +193,7 @@
   },
   {
     "cardTransactionInstanceReference": "a0000213-0000-4000-8000-000000000213",
-    "paymentCardReference": "pm_esp2024sale03",
+    "paymentCardReference": "pm_bd8c156b3c7028b3",
     "cardTransactionAccountReference": "ACC-012",
     "cardTransactionAmount": {
       "amount": 24,
@@ -206,7 +206,7 @@
     "cardTransactionType": "purchase",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Espresso Works Ltd",
-    "cardTransactionMaskedPanDisplay": "****-****-****-3098",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2402",
     "merchantAgreementInstanceReference": "m0000001-0000-4000-8000-000000000001",
     "cardTransactionDescription": "Team lunch",
     "bianServiceDomain": "Card Transaction",
@@ -217,7 +217,7 @@
   },
   {
     "cardTransactionInstanceReference": "4dd6a964-deac-4975-96aa-b9c630f4f517",
-    "paymentCardReference": "pm_e82c09ff8db21749",
+    "paymentCardReference": "pm_b577f67eb747396e469372cf0144",
     "cardTransactionAccountReference": "ACC-LF-20240115",
     "cardTransactionAmount": {
       "amount": 452.18,
@@ -229,7 +229,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Treutel - Altenwerth",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4153",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0144",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-14T18:25:55.855Z",
@@ -238,7 +238,7 @@
   },
   {
     "cardTransactionInstanceReference": "36d59340-be0a-4e08-b056-ed51f3a1473b",
-    "paymentCardReference": "pm_81c70327af327b45",
+    "paymentCardReference": "pm_18e89d64cfffbdb3b8a676071177",
     "cardTransactionAccountReference": "ACC-JS-20231201",
     "cardTransactionAmount": {
       "amount": 417.09,
@@ -250,7 +250,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Brakus - Fahey",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4243",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1177",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-09T19:10:32.850Z",
@@ -259,7 +259,7 @@
   },
   {
     "cardTransactionInstanceReference": "0f86bccf-f74b-4402-84e5-0c324f1eea5e",
-    "paymentCardReference": "pm_bb74429aa49cb9f2",
+    "paymentCardReference": "pm_5437fb2c43b9aac2",
     "cardTransactionAccountReference": "ACC-003",
     "cardTransactionAmount": {
       "amount": 194.69,
@@ -271,7 +271,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Keeling LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9928",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1229",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-08T06:49:34.685Z",
@@ -280,7 +280,7 @@
   },
   {
     "cardTransactionInstanceReference": "f29b4bc3-a63c-428c-a8bf-7b79b54cdee6",
-    "paymentCardReference": "pm_8a434e2b79ad64e3",
+    "paymentCardReference": "pm_a54761865d2c0ee8",
     "cardTransactionAccountReference": "ACC-004",
     "cardTransactionAmount": {
       "amount": 135.86,
@@ -292,7 +292,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Dach and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1623",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4335",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-15T04:50:59.126Z",
@@ -301,7 +301,7 @@
   },
   {
     "cardTransactionInstanceReference": "b7296269-6140-4874-9728-f867086a715b",
-    "paymentCardReference": "pm_276acae5c9af5036",
+    "paymentCardReference": "pm_a634a55d68378912",
     "cardTransactionAccountReference": "ACC-005",
     "cardTransactionAmount": {
       "amount": 957.39,
@@ -313,7 +313,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Huel, Rutherford and DuBuque",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7205",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5812",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-11T23:03:01.748Z",
@@ -322,7 +322,7 @@
   },
   {
     "cardTransactionInstanceReference": "d27562b0-81ca-4d18-b8ee-1aaa96fbca32",
-    "paymentCardReference": "pm_ab8fb0f6ce30e6c1",
+    "paymentCardReference": "pm_68fb8cb3b980c1ac",
     "cardTransactionAccountReference": "ACC-006",
     "cardTransactionAmount": {
       "amount": 425.26,
@@ -334,7 +334,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Dach Group",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4124",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8280",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-21T03:41:08.994Z",
@@ -343,7 +343,7 @@
   },
   {
     "cardTransactionInstanceReference": "a6ef41a1-c719-40ee-a174-025b531428e0",
-    "paymentCardReference": "pm_119ae57c59fcbc61",
+    "paymentCardReference": "pm_322ddfc5d5174fe7",
     "cardTransactionAccountReference": "ACC-007",
     "cardTransactionAmount": {
       "amount": 1401.59,
@@ -355,7 +355,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Cruickshank - Predovic",
-    "cardTransactionMaskedPanDisplay": "****-****-****-8516",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7519",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-23T04:00:17.365Z",
@@ -364,7 +364,7 @@
   },
   {
     "cardTransactionInstanceReference": "f41000c3-7a65-4762-89fa-347fc5287a22",
-    "paymentCardReference": "pm_bb60c4f107086fb7",
+    "paymentCardReference": "pm_4699f6a09158900c",
     "cardTransactionAccountReference": "ACC-008",
     "cardTransactionAmount": {
       "amount": 897.77,
@@ -376,7 +376,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "McKenzie and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-8118",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7419",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-09T12:05:32.879Z",
@@ -385,7 +385,7 @@
   },
   {
     "cardTransactionInstanceReference": "708df675-3bfb-425a-8fc5-66a1c4710c5b",
-    "paymentCardReference": "pm_a4daba232993517e",
+    "paymentCardReference": "pm_df628c8e223de235",
     "cardTransactionAccountReference": "ACC-009",
     "cardTransactionAmount": {
       "amount": 510.88,
@@ -397,7 +397,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Beier - Stokes",
-    "cardTransactionMaskedPanDisplay": "****-****-****-2204",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5062",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-14T12:57:05.941Z",
@@ -406,7 +406,7 @@
   },
   {
     "cardTransactionInstanceReference": "f611c4c8-3faa-4477-95b6-f6ce284c0b58",
-    "paymentCardReference": "pm_cf704d296d6054f9",
+    "paymentCardReference": "pm_f1eb173441e24f61",
     "cardTransactionAccountReference": "ACC-010",
     "cardTransactionAmount": {
       "amount": 1501.45,
@@ -418,7 +418,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Kreiger LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1209",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0296",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-04T14:28:49.909Z",
@@ -427,7 +427,7 @@
   },
   {
     "cardTransactionInstanceReference": "3f5d36b5-563c-465f-9fdb-0e8187859099",
-    "paymentCardReference": "pm_e0ec440e1523d386",
+    "paymentCardReference": "pm_be5fd1c3c6a8d805",
     "cardTransactionAccountReference": "ACC-011",
     "cardTransactionAmount": {
       "amount": 1222.04,
@@ -439,7 +439,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "McClure, Erdman and Kuhlman",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5252",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8147",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-28T05:09:33.679Z",
@@ -448,7 +448,7 @@
   },
   {
     "cardTransactionInstanceReference": "b065217e-50c9-47b0-800a-525dfd689919",
-    "paymentCardReference": "pm_0557f22ff7ac0f77",
+    "paymentCardReference": "pm_bd8c156b3c7028b3",
     "cardTransactionAccountReference": "ACC-012",
     "cardTransactionAmount": {
       "amount": 589.42,
@@ -460,7 +460,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Johnson LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6561",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2402",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-24T02:20:21.558Z",
@@ -469,7 +469,7 @@
   },
   {
     "cardTransactionInstanceReference": "4ab58c42-1d11-4ddd-9486-8d23bd6334ae",
-    "paymentCardReference": "pm_40ea271454f92f55",
+    "paymentCardReference": "pm_d4cd6721d280b961",
     "cardTransactionAccountReference": "ACC-013",
     "cardTransactionAmount": {
       "amount": 495.79,
@@ -481,7 +481,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Wiegand and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1678",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5828",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-13T19:13:37.147Z",
@@ -490,7 +490,7 @@
   },
   {
     "cardTransactionInstanceReference": "855ed3ac-e087-4895-b76b-9ba06235e46b",
-    "paymentCardReference": "pm_9ddc972f1c4722c2",
+    "paymentCardReference": "pm_c37a8edf1367d1f1",
     "cardTransactionAccountReference": "ACC-014",
     "cardTransactionAmount": {
       "amount": 726.9,
@@ -502,7 +502,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Wehner, Runolfsson and Hodkiewicz",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7583",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4281",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-03T08:50:15.243Z",
@@ -511,7 +511,7 @@
   },
   {
     "cardTransactionInstanceReference": "2c5dbf72-2036-47e5-a11c-18c63acc1392",
-    "paymentCardReference": "pm_f0bcc94e6b708b43",
+    "paymentCardReference": "pm_68b4dade658e251e",
     "cardTransactionAccountReference": "ACC-015",
     "cardTransactionAmount": {
       "amount": 268.99,
@@ -523,7 +523,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Wolf, Goyette and Schaefer",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6119",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3443",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-06T18:10:31.301Z",
@@ -532,7 +532,7 @@
   },
   {
     "cardTransactionInstanceReference": "313957e8-5dc8-401d-a161-3341d9c68d86",
-    "paymentCardReference": "pm_793503921d9d9d7e",
+    "paymentCardReference": "pm_6b6fdde67d891313",
     "cardTransactionAccountReference": "ACC-016",
     "cardTransactionAmount": {
       "amount": 1399.16,
@@ -544,7 +544,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Romaguera LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6472",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3382",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-04-30T00:42:26.625Z",
@@ -553,7 +553,7 @@
   },
   {
     "cardTransactionInstanceReference": "d7531b1a-d6dd-4acc-abaf-fd7cce426624",
-    "paymentCardReference": "pm_c8571ad7b9c81812",
+    "paymentCardReference": "pm_8567ce62b5e8aade",
     "cardTransactionAccountReference": "ACC-017",
     "cardTransactionAmount": {
       "amount": 272.69,
@@ -565,7 +565,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Schaden, Gislason and Lockman",
-    "cardTransactionMaskedPanDisplay": "****-****-****-8066",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2164",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-24T15:01:40.745Z",
@@ -574,7 +574,7 @@
   },
   {
     "cardTransactionInstanceReference": "eec4c0b6-c81a-497c-abea-375682d2adc6",
-    "paymentCardReference": "pm_c6f42b9d9adb5e95",
+    "paymentCardReference": "pm_06c7267218fd6ea3",
     "cardTransactionAccountReference": "ACC-018",
     "cardTransactionAmount": {
       "amount": 586.81,
@@ -586,7 +586,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Frami, Powlowski and Leannon",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7564",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4487",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-18T12:42:10.628Z",
@@ -595,7 +595,7 @@
   },
   {
     "cardTransactionInstanceReference": "5afc8486-2c72-452e-ba41-9290eb1e9e06",
-    "paymentCardReference": "pm_2274fdf5e363e030",
+    "paymentCardReference": "pm_bcd7e5e9cfa326d6",
     "cardTransactionAccountReference": "ACC-019",
     "cardTransactionAmount": {
       "amount": 11.89,
@@ -607,7 +607,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Hand, Fay and Runolfsdottir",
-    "cardTransactionMaskedPanDisplay": "****-****-****-0094",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8346",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-01T07:48:27.454Z",
@@ -616,7 +616,7 @@
   },
   {
     "cardTransactionInstanceReference": "59da4b13-59b5-4bd0-a1b4-85029b4ec4cb",
-    "paymentCardReference": "pm_51750f8fe7388d48",
+    "paymentCardReference": "pm_e3b5b4fa92766d91",
     "cardTransactionAccountReference": "ACC-020",
     "cardTransactionAmount": {
       "amount": 59.86,
@@ -628,7 +628,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Sauer Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6673",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7350",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-19T23:53:08.618Z",
@@ -637,7 +637,7 @@
   },
   {
     "cardTransactionInstanceReference": "efd73305-3150-42f4-9063-80320a47f3da",
-    "paymentCardReference": "pm_7b1812968bffd782",
+    "paymentCardReference": "pm_f3c7f6cdadb3c103",
     "cardTransactionAccountReference": "ACC-021",
     "cardTransactionAmount": {
       "amount": 147.33,
@@ -649,7 +649,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Ullrich Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1203",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1380",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-15T13:48:15.899Z",
@@ -658,7 +658,7 @@
   },
   {
     "cardTransactionInstanceReference": "68f54764-04f4-4e50-be4f-e60e069b6ea0",
-    "paymentCardReference": "pm_4c6134558acf6f12",
+    "paymentCardReference": "pm_d473e40773eebf98",
     "cardTransactionAccountReference": "ACC-022",
     "cardTransactionAmount": {
       "amount": 1286.03,
@@ -670,7 +670,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Mosciski and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1820",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3407",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-02T00:05:55.244Z",
@@ -679,7 +679,7 @@
   },
   {
     "cardTransactionInstanceReference": "b44704b6-4c0e-42bf-8e3f-d29c2e32e2fb",
-    "paymentCardReference": "pm_aa5fc4637e16e677",
+    "paymentCardReference": "pm_177a6b6a00b8fd05",
     "cardTransactionAccountReference": "ACC-023",
     "cardTransactionAmount": {
       "amount": 137.72,
@@ -691,7 +691,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Homenick - Schroeder",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4691",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3424",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-23T17:03:56.822Z",
@@ -700,7 +700,7 @@
   },
   {
     "cardTransactionInstanceReference": "fa450e6e-2f10-4abb-bee0-53faf94368a2",
-    "paymentCardReference": "pm_6fc768e15f383d2d",
+    "paymentCardReference": "pm_9880794a78bf08ac",
     "cardTransactionAccountReference": "ACC-024",
     "cardTransactionAmount": {
       "amount": 1192.83,
@@ -712,7 +712,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Muller - Wehner",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1475",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1313",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-25T03:21:05.991Z",
@@ -721,7 +721,7 @@
   },
   {
     "cardTransactionInstanceReference": "f4fb6a66-aa3b-4f96-877c-5426816a7413",
-    "paymentCardReference": "pm_c5bef4ee560e40e7",
+    "paymentCardReference": "pm_6ed827b736d3c420",
     "cardTransactionAccountReference": "ACC-025",
     "cardTransactionAmount": {
       "amount": 264.96,
@@ -733,7 +733,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Gerhold LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9710",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5749",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-17T22:13:17.027Z",
@@ -742,7 +742,7 @@
   },
   {
     "cardTransactionInstanceReference": "143c5c6d-940f-4afc-932f-5fa1c775bf5d",
-    "paymentCardReference": "pm_c41292f11899cb1b",
+    "paymentCardReference": "pm_09bcacdac09e9efd",
     "cardTransactionAccountReference": "ACC-026",
     "cardTransactionAmount": {
       "amount": 940.5,
@@ -754,7 +754,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Lueilwitz Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-8412",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0310",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-22T23:37:42.556Z",
@@ -763,7 +763,7 @@
   },
   {
     "cardTransactionInstanceReference": "4fb32407-be68-4d5f-a3f8-7a5d5d296721",
-    "paymentCardReference": "pm_3f82f55cfc6de3a4",
+    "paymentCardReference": "pm_73e68a8df6c13587",
     "cardTransactionAccountReference": "ACC-027",
     "cardTransactionAmount": {
       "amount": 465.04,
@@ -775,7 +775,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Gusikowski, Hermann and Johns",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9960",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4544",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-19T22:23:46.250Z",
@@ -784,7 +784,7 @@
   },
   {
     "cardTransactionInstanceReference": "0df761b4-c525-450e-97cf-f2717b072125",
-    "paymentCardReference": "pm_c56fb13eb3633e48",
+    "paymentCardReference": "pm_b2feeaa06d464d2f",
     "cardTransactionAccountReference": "ACC-028",
     "cardTransactionAmount": {
       "amount": 457.14,
@@ -796,7 +796,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Leffler LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5392",
+    "cardTransactionMaskedPanDisplay": "****-****-****-9265",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-28T02:26:20.466Z",
@@ -805,7 +805,7 @@
   },
   {
     "cardTransactionInstanceReference": "93354622-4785-45b7-8c5c-4a822e7a9557",
-    "paymentCardReference": "pm_186c9f24a90bdf3e",
+    "paymentCardReference": "pm_c74772a7f0e11ba9",
     "cardTransactionAccountReference": "ACC-029",
     "cardTransactionAmount": {
       "amount": 167.25,
@@ -817,7 +817,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Klein, Grady and Goyette",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9809",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7283",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-20T15:27:38.618Z",
@@ -826,7 +826,7 @@
   },
   {
     "cardTransactionInstanceReference": "4d9b8ee5-bade-4b84-911f-b35b5b950d12",
-    "paymentCardReference": "pm_5e4f772dad100b09",
+    "paymentCardReference": "pm_90711498c1c2e7b9",
     "cardTransactionAccountReference": "ACC-030",
     "cardTransactionAmount": {
       "amount": 1393.74,
@@ -838,7 +838,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Carter Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9303",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7919",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-15T03:29:54.910Z",
@@ -847,7 +847,7 @@
   },
   {
     "cardTransactionInstanceReference": "1770a3c3-ce21-49db-8adc-4cce2e8adc57",
-    "paymentCardReference": "pm_626a69c8bc0485f6",
+    "paymentCardReference": "pm_ed29bb97801fe424",
     "cardTransactionAccountReference": "ACC-031",
     "cardTransactionAmount": {
       "amount": 1337.51,
@@ -859,7 +859,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Cassin Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4541",
+    "cardTransactionMaskedPanDisplay": "****-****-****-9820",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-09T04:22:13.893Z",
@@ -868,7 +868,7 @@
   },
   {
     "cardTransactionInstanceReference": "afc64dc7-944f-4f6d-bb92-e253b3ac480f",
-    "paymentCardReference": "pm_425a42b1b54338eb",
+    "paymentCardReference": "pm_32076a626c373a47",
     "cardTransactionAccountReference": "ACC-032",
     "cardTransactionAmount": {
       "amount": 863.05,
@@ -880,7 +880,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Strosin Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-3670",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0842",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-23T07:37:33.845Z",
@@ -889,7 +889,7 @@
   },
   {
     "cardTransactionInstanceReference": "f4bdc3b9-7bde-4058-a674-72a326f5ea98",
-    "paymentCardReference": "pm_beea772ffe472e54",
+    "paymentCardReference": "pm_2143c3f10c924026",
     "cardTransactionAccountReference": "ACC-033",
     "cardTransactionAmount": {
       "amount": 1080.95,
@@ -901,7 +901,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Bogan - Braun",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9632",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3555",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-19T05:40:36.283Z",
@@ -910,7 +910,7 @@
   },
   {
     "cardTransactionInstanceReference": "51b086bd-4a3d-46ba-bd40-1d855beaaf37",
-    "paymentCardReference": "pm_8e8fe0dc19413728",
+    "paymentCardReference": "pm_cfe0563f94f8ae33",
     "cardTransactionAccountReference": "ACC-034",
     "cardTransactionAmount": {
       "amount": 1382.47,
@@ -922,7 +922,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Kessler - Grady",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4369",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1529",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-06T11:24:16.887Z",
@@ -931,7 +931,7 @@
   },
   {
     "cardTransactionInstanceReference": "1578475b-daa4-4158-96d8-093bf3139510",
-    "paymentCardReference": "pm_8d2cd8ab7193c346",
+    "paymentCardReference": "pm_165ae376b5876db9",
     "cardTransactionAccountReference": "ACC-035",
     "cardTransactionAmount": {
       "amount": 80.3,
@@ -943,7 +943,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Kozey, Thompson and Kassulke",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5686",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0285",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-04T04:13:44.391Z",
@@ -952,7 +952,7 @@
   },
   {
     "cardTransactionInstanceReference": "ecac9c55-0dca-4415-bf6a-6098f1b13423",
-    "paymentCardReference": "pm_b7f0731ee8601540",
+    "paymentCardReference": "pm_30eddc65c67a6f14",
     "cardTransactionAccountReference": "ACC-036",
     "cardTransactionAmount": {
       "amount": 792.19,
@@ -964,7 +964,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "O'Reilly LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-0986",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4214",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-04T13:03:04.902Z",
@@ -973,7 +973,7 @@
   },
   {
     "cardTransactionInstanceReference": "8d53e999-3942-416b-9421-5bd1eb768abe",
-    "paymentCardReference": "pm_8843e04f12f24cd5",
+    "paymentCardReference": "pm_5cdd47d4b88e98b9",
     "cardTransactionAccountReference": "ACC-037",
     "cardTransactionAmount": {
       "amount": 1296.08,
@@ -985,7 +985,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Dietrich - Heidenreich",
-    "cardTransactionMaskedPanDisplay": "****-****-****-0748",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0835",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-11T17:25:18.575Z",
@@ -994,7 +994,7 @@
   },
   {
     "cardTransactionInstanceReference": "77d4db7b-abbb-4f78-9c32-9de876e66ca4",
-    "paymentCardReference": "pm_dd34f5fcf7a61535",
+    "paymentCardReference": "pm_0c81f7fb6c99f847",
     "cardTransactionAccountReference": "ACC-038",
     "cardTransactionAmount": {
       "amount": 792.24,
@@ -1006,7 +1006,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "O'Keefe, Schinner and Leuschke",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6322",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2017",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-13T04:38:48.169Z",
@@ -1015,7 +1015,7 @@
   },
   {
     "cardTransactionInstanceReference": "c75b4391-36c8-400c-b49d-a50681aebc35",
-    "paymentCardReference": "pm_ac50e12244dd2712",
+    "paymentCardReference": "pm_945c8e554afd14d7",
     "cardTransactionAccountReference": "ACC-039",
     "cardTransactionAmount": {
       "amount": 842.9,
@@ -1027,7 +1027,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Haag, Hayes and Wiegand",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5511",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1362",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-11T15:29:08.323Z",
@@ -1036,7 +1036,7 @@
   },
   {
     "cardTransactionInstanceReference": "7b9bf341-716f-42a5-a803-131195401318",
-    "paymentCardReference": "pm_e2786a63286e1723",
+    "paymentCardReference": "pm_ec221b7a27dbec57",
     "cardTransactionAccountReference": "ACC-040",
     "cardTransactionAmount": {
       "amount": 1138.88,
@@ -1048,7 +1048,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Brown - Runte",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7281",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4579",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-18T18:01:53.918Z",
@@ -1057,7 +1057,7 @@
   },
   {
     "cardTransactionInstanceReference": "8745658b-1629-47d2-9d8a-113321004bb8",
-    "paymentCardReference": "pm_7283d8911b1a87f5",
+    "paymentCardReference": "pm_7f3842cb2069549a",
     "cardTransactionAccountReference": "ACC-041",
     "cardTransactionAmount": {
       "amount": 731.37,
@@ -1069,7 +1069,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Kunze - Kerluke",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4829",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8545",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-19T04:30:31.019Z",
@@ -1078,7 +1078,7 @@
   },
   {
     "cardTransactionInstanceReference": "cb447d72-fe8d-4819-add9-a0d056a70bb2",
-    "paymentCardReference": "pm_e42dbb0314689fef",
+    "paymentCardReference": "pm_a1cad5bfd3339d47",
     "cardTransactionAccountReference": "ACC-042",
     "cardTransactionAmount": {
       "amount": 675.04,
@@ -1090,7 +1090,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Hilpert - O'Kon",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1678",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8854",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-17T19:34:24.057Z",
@@ -1099,7 +1099,7 @@
   },
   {
     "cardTransactionInstanceReference": "9be49f94-652e-4181-820b-19e9169b7a68",
-    "paymentCardReference": "pm_529c682e12bb3445",
+    "paymentCardReference": "pm_8164986a5fce688c",
     "cardTransactionAccountReference": "ACC-043",
     "cardTransactionAmount": {
       "amount": 86.41,
@@ -1111,7 +1111,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Gleason, Christiansen and Cronin",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4315",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4348",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-16T12:12:10.644Z",
@@ -1120,7 +1120,7 @@
   },
   {
     "cardTransactionInstanceReference": "7c33a23c-8491-4506-983f-2dd7e376aa14",
-    "paymentCardReference": "pm_e8120fd3df3abb36",
+    "paymentCardReference": "pm_fef3e32908f3e72e",
     "cardTransactionAccountReference": "ACC-044",
     "cardTransactionAmount": {
       "amount": 416.54,
@@ -1132,7 +1132,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Casper - Schumm",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7118",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5308",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-14T03:32:32.339Z",
@@ -1141,7 +1141,7 @@
   },
   {
     "cardTransactionInstanceReference": "bb200e33-b13b-4f5d-8801-12890c48af03",
-    "paymentCardReference": "pm_aff1645db6ca6e69",
+    "paymentCardReference": "pm_63b185e2c5d7d3e7",
     "cardTransactionAccountReference": "ACC-045",
     "cardTransactionAmount": {
       "amount": 813.86,
@@ -1153,7 +1153,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Jacobi and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-0936",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0914",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-22T12:15:06.557Z",
@@ -1162,7 +1162,7 @@
   },
   {
     "cardTransactionInstanceReference": "0e0f6ad2-1f60-41e0-bc9e-f3cd149f6f08",
-    "paymentCardReference": "pm_195632554dede69d",
+    "paymentCardReference": "pm_4d6c6682e2c5428a",
     "cardTransactionAccountReference": "ACC-046",
     "cardTransactionAmount": {
       "amount": 844.88,
@@ -1174,7 +1174,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Langosh, Keeling and Wiegand",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7590",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0348",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-17T20:26:52.854Z",
@@ -1183,7 +1183,7 @@
   },
   {
     "cardTransactionInstanceReference": "fe59937e-f144-425d-a039-a48c43b95ccf",
-    "paymentCardReference": "pm_4f29bd9a61faeab9",
+    "paymentCardReference": "pm_276f4b12e383da12",
     "cardTransactionAccountReference": "ACC-047",
     "cardTransactionAmount": {
       "amount": 1098.05,
@@ -1195,7 +1195,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Treutel and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9482",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2823",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-28T13:26:08.050Z",
@@ -1204,7 +1204,7 @@
   },
   {
     "cardTransactionInstanceReference": "56568b9d-8e3a-438f-9a90-34267024dc17",
-    "paymentCardReference": "pm_9be89a6ba7f75d3c",
+    "paymentCardReference": "pm_b08013bf40403d6c",
     "cardTransactionAccountReference": "ACC-048",
     "cardTransactionAmount": {
       "amount": 579.04,
@@ -1216,7 +1216,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Casper, Schiller and Kiehn",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7330",
+    "cardTransactionMaskedPanDisplay": "****-****-****-6486",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-24T02:39:46.471Z",
@@ -1225,7 +1225,7 @@
   },
   {
     "cardTransactionInstanceReference": "53950e9a-ceec-4b90-9926-80b270dc0526",
-    "paymentCardReference": "pm_c857c761acf7d08f",
+    "paymentCardReference": "pm_0d52870eef5c7f27",
     "cardTransactionAccountReference": "ACC-049",
     "cardTransactionAmount": {
       "amount": 1004.25,
@@ -1237,7 +1237,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Windler LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5010",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2865",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-11T19:05:20.317Z",
@@ -1246,7 +1246,7 @@
   },
   {
     "cardTransactionInstanceReference": "f169098b-f46b-4d96-8e39-41468cbe9b23",
-    "paymentCardReference": "pm_ba01517614a64280",
+    "paymentCardReference": "pm_57fc53d5a2ba0dc1",
     "cardTransactionAccountReference": "ACC-050",
     "cardTransactionAmount": {
       "amount": 903.93,
@@ -1258,7 +1258,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Zieme Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7583",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2949",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-25T15:11:59.241Z",
@@ -1267,7 +1267,7 @@
   },
   {
     "cardTransactionInstanceReference": "3e7e4c86-be8e-4ac8-80f0-87b0e9182ed6",
-    "paymentCardReference": "pm_e82c09ff8db21749",
+    "paymentCardReference": "pm_b577f67eb747396e469372cf0144",
     "cardTransactionAccountReference": "ACC-LF-20240115",
     "cardTransactionAmount": {
       "amount": 1370.46,
@@ -1279,7 +1279,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Senger - Franecki",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4153",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0144",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-19T05:02:16.912Z",
@@ -1288,7 +1288,7 @@
   },
   {
     "cardTransactionInstanceReference": "d70b1d1a-b4ad-4913-aa80-d5786af162a4",
-    "paymentCardReference": "pm_81c70327af327b45",
+    "paymentCardReference": "pm_18e89d64cfffbdb3b8a676071177",
     "cardTransactionAccountReference": "ACC-JS-20231201",
     "cardTransactionAmount": {
       "amount": 1033.89,
@@ -1300,7 +1300,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "McLaughlin Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4243",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1177",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-14T09:46:03.473Z",
@@ -1309,7 +1309,7 @@
   },
   {
     "cardTransactionInstanceReference": "35ec69da-5aaa-42a8-a2ef-6d2454f695d4",
-    "paymentCardReference": "pm_bb74429aa49cb9f2",
+    "paymentCardReference": "pm_5437fb2c43b9aac2",
     "cardTransactionAccountReference": "ACC-003",
     "cardTransactionAmount": {
       "amount": 1205.03,
@@ -1321,7 +1321,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Schimmel and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9928",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1229",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-17T12:42:05.429Z",
@@ -1330,7 +1330,7 @@
   },
   {
     "cardTransactionInstanceReference": "679fbf21-e1f5-4a93-8ff7-f88cea5fccea",
-    "paymentCardReference": "pm_8a434e2b79ad64e3",
+    "paymentCardReference": "pm_a54761865d2c0ee8",
     "cardTransactionAccountReference": "ACC-004",
     "cardTransactionAmount": {
       "amount": 893.47,
@@ -1342,7 +1342,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Parisian - Padberg",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1623",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4335",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-09T08:22:12.446Z",
@@ -1351,7 +1351,7 @@
   },
   {
     "cardTransactionInstanceReference": "9498f27d-7a8c-4902-bc70-8df85e101905",
-    "paymentCardReference": "pm_276acae5c9af5036",
+    "paymentCardReference": "pm_a634a55d68378912",
     "cardTransactionAccountReference": "ACC-005",
     "cardTransactionAmount": {
       "amount": 932.94,
@@ -1363,7 +1363,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Watsica - DuBuque",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7205",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5812",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-06T13:41:20.217Z",
@@ -1372,7 +1372,7 @@
   },
   {
     "cardTransactionInstanceReference": "55d068ed-c497-4084-8f97-5d4e64d1ebd8",
-    "paymentCardReference": "pm_ab8fb0f6ce30e6c1",
+    "paymentCardReference": "pm_68fb8cb3b980c1ac",
     "cardTransactionAccountReference": "ACC-006",
     "cardTransactionAmount": {
       "amount": 528.05,
@@ -1384,7 +1384,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Sipes - Treutel",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4124",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8280",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-01T01:47:37.798Z",
@@ -1393,7 +1393,7 @@
   },
   {
     "cardTransactionInstanceReference": "1a3bc47d-bfff-4501-80d3-b6e17511de5d",
-    "paymentCardReference": "pm_119ae57c59fcbc61",
+    "paymentCardReference": "pm_322ddfc5d5174fe7",
     "cardTransactionAccountReference": "ACC-007",
     "cardTransactionAmount": {
       "amount": 1420.3,
@@ -1405,7 +1405,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Lehner, Swaniawski and Satterfield",
-    "cardTransactionMaskedPanDisplay": "****-****-****-8516",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7519",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-20T02:09:19.840Z",
@@ -1414,7 +1414,7 @@
   },
   {
     "cardTransactionInstanceReference": "26872372-5f93-4101-a9d3-535e30ade1ae",
-    "paymentCardReference": "pm_bb60c4f107086fb7",
+    "paymentCardReference": "pm_4699f6a09158900c",
     "cardTransactionAccountReference": "ACC-008",
     "cardTransactionAmount": {
       "amount": 162.54,
@@ -1426,7 +1426,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Hermiston - Gibson",
-    "cardTransactionMaskedPanDisplay": "****-****-****-8118",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7419",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-04-30T19:27:39.854Z",
@@ -1435,7 +1435,7 @@
   },
   {
     "cardTransactionInstanceReference": "fa9d055a-7ee8-44c4-889b-2077facff54e",
-    "paymentCardReference": "pm_a4daba232993517e",
+    "paymentCardReference": "pm_df628c8e223de235",
     "cardTransactionAccountReference": "ACC-009",
     "cardTransactionAmount": {
       "amount": 237.7,
@@ -1447,7 +1447,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Braun - Rosenbaum",
-    "cardTransactionMaskedPanDisplay": "****-****-****-2204",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5062",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-14T03:14:37.850Z",
@@ -1456,7 +1456,7 @@
   },
   {
     "cardTransactionInstanceReference": "7e17ba37-a94c-472a-bbe8-4f03809b84d6",
-    "paymentCardReference": "pm_cf704d296d6054f9",
+    "paymentCardReference": "pm_f1eb173441e24f61",
     "cardTransactionAccountReference": "ACC-010",
     "cardTransactionAmount": {
       "amount": 1492.48,
@@ -1468,7 +1468,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Kub LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1209",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0296",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-04T11:43:20.688Z",
@@ -1477,7 +1477,7 @@
   },
   {
     "cardTransactionInstanceReference": "5caad350-591b-4bd0-8a54-82fa78dba331",
-    "paymentCardReference": "pm_e0ec440e1523d386",
+    "paymentCardReference": "pm_be5fd1c3c6a8d805",
     "cardTransactionAccountReference": "ACC-011",
     "cardTransactionAmount": {
       "amount": 126.02,
@@ -1489,7 +1489,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Herzog - Nikolaus",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5252",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8147",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-24T08:36:57.835Z",
@@ -1498,7 +1498,7 @@
   },
   {
     "cardTransactionInstanceReference": "2747c0f1-a67c-4dc2-96b4-f2116968410e",
-    "paymentCardReference": "pm_0557f22ff7ac0f77",
+    "paymentCardReference": "pm_bd8c156b3c7028b3",
     "cardTransactionAccountReference": "ACC-012",
     "cardTransactionAmount": {
       "amount": 978.88,
@@ -1510,7 +1510,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Runolfsdottir - Bernhard",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6561",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2402",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-02T19:54:54.615Z",
@@ -1519,7 +1519,7 @@
   },
   {
     "cardTransactionInstanceReference": "6e55f0a0-4ae9-4387-a42b-87de980c0d0e",
-    "paymentCardReference": "pm_40ea271454f92f55",
+    "paymentCardReference": "pm_d4cd6721d280b961",
     "cardTransactionAccountReference": "ACC-013",
     "cardTransactionAmount": {
       "amount": 293.13,
@@ -1531,7 +1531,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Gorczany, Harris and Bogan",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1678",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5828",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-10T12:49:54.853Z",
@@ -1540,7 +1540,7 @@
   },
   {
     "cardTransactionInstanceReference": "9e1a339e-cead-4cd6-b744-f4d5e7371589",
-    "paymentCardReference": "pm_9ddc972f1c4722c2",
+    "paymentCardReference": "pm_c37a8edf1367d1f1",
     "cardTransactionAccountReference": "ACC-014",
     "cardTransactionAmount": {
       "amount": 1502.28,
@@ -1552,7 +1552,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Murphy, Schroeder and Gutmann",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7583",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4281",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-26T06:04:04.734Z",
@@ -1561,7 +1561,7 @@
   },
   {
     "cardTransactionInstanceReference": "e02a5494-0d8b-45a5-890a-cff41f313248",
-    "paymentCardReference": "pm_f0bcc94e6b708b43",
+    "paymentCardReference": "pm_68b4dade658e251e",
     "cardTransactionAccountReference": "ACC-015",
     "cardTransactionAmount": {
       "amount": 1241.75,
@@ -1573,7 +1573,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Osinski - Feest",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6119",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3443",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-28T13:40:49.933Z",
@@ -1582,7 +1582,7 @@
   },
   {
     "cardTransactionInstanceReference": "02c37c71-08ab-41f7-89d7-93721973d9f8",
-    "paymentCardReference": "pm_793503921d9d9d7e",
+    "paymentCardReference": "pm_6b6fdde67d891313",
     "cardTransactionAccountReference": "ACC-016",
     "cardTransactionAmount": {
       "amount": 1068.86,
@@ -1594,7 +1594,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Mraz - Schneider",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6472",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3382",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-08T21:25:00.146Z",
@@ -1603,7 +1603,7 @@
   },
   {
     "cardTransactionInstanceReference": "131f1544-c126-438f-81a2-9e0f983a3547",
-    "paymentCardReference": "pm_c8571ad7b9c81812",
+    "paymentCardReference": "pm_8567ce62b5e8aade",
     "cardTransactionAccountReference": "ACC-017",
     "cardTransactionAmount": {
       "amount": 1216.14,
@@ -1615,7 +1615,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Davis, Murazik and Torphy",
-    "cardTransactionMaskedPanDisplay": "****-****-****-8066",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2164",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-23T06:25:39.316Z",
@@ -1624,7 +1624,7 @@
   },
   {
     "cardTransactionInstanceReference": "d7b332d7-93c7-41de-8794-f0837b96981a",
-    "paymentCardReference": "pm_c6f42b9d9adb5e95",
+    "paymentCardReference": "pm_06c7267218fd6ea3",
     "cardTransactionAccountReference": "ACC-018",
     "cardTransactionAmount": {
       "amount": 1338.13,
@@ -1636,7 +1636,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Wolff, Ullrich and Bartell",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7564",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4487",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-05T04:05:26.570Z",
@@ -1645,7 +1645,7 @@
   },
   {
     "cardTransactionInstanceReference": "71fb7af5-8199-47d3-a4ab-f8b3bbeccb6d",
-    "paymentCardReference": "pm_2274fdf5e363e030",
+    "paymentCardReference": "pm_bcd7e5e9cfa326d6",
     "cardTransactionAccountReference": "ACC-019",
     "cardTransactionAmount": {
       "amount": 1096.1,
@@ -1657,7 +1657,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Casper - Hansen",
-    "cardTransactionMaskedPanDisplay": "****-****-****-0094",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8346",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-24T18:57:28.196Z",
@@ -1666,7 +1666,7 @@
   },
   {
     "cardTransactionInstanceReference": "082c6e7d-4a8f-4e58-b3c8-7b3bbdf1fee9",
-    "paymentCardReference": "pm_51750f8fe7388d48",
+    "paymentCardReference": "pm_e3b5b4fa92766d91",
     "cardTransactionAccountReference": "ACC-020",
     "cardTransactionAmount": {
       "amount": 92.77,
@@ -1678,7 +1678,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Stiedemann and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6673",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7350",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-15T03:05:29.174Z",
@@ -1687,7 +1687,7 @@
   },
   {
     "cardTransactionInstanceReference": "1118878e-607f-463b-9c38-62811c08ce0f",
-    "paymentCardReference": "pm_7b1812968bffd782",
+    "paymentCardReference": "pm_f3c7f6cdadb3c103",
     "cardTransactionAccountReference": "ACC-021",
     "cardTransactionAmount": {
       "amount": 446.73,
@@ -1699,7 +1699,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Bruen Group",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1203",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1380",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-19T01:33:22.201Z",
@@ -1708,7 +1708,7 @@
   },
   {
     "cardTransactionInstanceReference": "4d4b2434-2022-4b2a-b38e-819529a18631",
-    "paymentCardReference": "pm_4c6134558acf6f12",
+    "paymentCardReference": "pm_d473e40773eebf98",
     "cardTransactionAccountReference": "ACC-022",
     "cardTransactionAmount": {
       "amount": 50.61,
@@ -1720,7 +1720,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Kshlerin Group",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1820",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3407",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-04T05:39:27.391Z",
@@ -1729,7 +1729,7 @@
   },
   {
     "cardTransactionInstanceReference": "67ff8074-afb5-4762-bbb5-b0cf9374995b",
-    "paymentCardReference": "pm_aa5fc4637e16e677",
+    "paymentCardReference": "pm_177a6b6a00b8fd05",
     "cardTransactionAccountReference": "ACC-023",
     "cardTransactionAmount": {
       "amount": 19.97,
@@ -1741,7 +1741,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Bernier, Cole and Wehner",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4691",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3424",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-09T15:51:23.014Z",
@@ -1750,7 +1750,7 @@
   },
   {
     "cardTransactionInstanceReference": "2bcb24a7-30b7-4f8e-99f7-19616c29e9a0",
-    "paymentCardReference": "pm_6fc768e15f383d2d",
+    "paymentCardReference": "pm_9880794a78bf08ac",
     "cardTransactionAccountReference": "ACC-024",
     "cardTransactionAmount": {
       "amount": 190.16,
@@ -1762,7 +1762,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Grady, Wiza and Beer",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1475",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1313",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-24T05:06:09.477Z",
@@ -1771,7 +1771,7 @@
   },
   {
     "cardTransactionInstanceReference": "9803ea7a-cce2-4abd-b8d0-4e16f656395c",
-    "paymentCardReference": "pm_c5bef4ee560e40e7",
+    "paymentCardReference": "pm_6ed827b736d3c420",
     "cardTransactionAccountReference": "ACC-025",
     "cardTransactionAmount": {
       "amount": 1041.16,
@@ -1783,7 +1783,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Oberbrunner, Luettgen and Hahn",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9710",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5749",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-03T01:45:40.046Z",
@@ -1792,7 +1792,7 @@
   },
   {
     "cardTransactionInstanceReference": "11fa4299-db09-4935-83fc-db63e1214af1",
-    "paymentCardReference": "pm_c41292f11899cb1b",
+    "paymentCardReference": "pm_09bcacdac09e9efd",
     "cardTransactionAccountReference": "ACC-026",
     "cardTransactionAmount": {
       "amount": 849.79,
@@ -1804,7 +1804,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Kuvalis Group",
-    "cardTransactionMaskedPanDisplay": "****-****-****-8412",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0310",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-21T20:08:45.646Z",
@@ -1813,7 +1813,7 @@
   },
   {
     "cardTransactionInstanceReference": "82357561-a951-4d22-b13b-ba5813f32240",
-    "paymentCardReference": "pm_3f82f55cfc6de3a4",
+    "paymentCardReference": "pm_73e68a8df6c13587",
     "cardTransactionAccountReference": "ACC-027",
     "cardTransactionAmount": {
       "amount": 244.23,
@@ -1825,7 +1825,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Auer - Hane",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9960",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4544",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-26T21:27:31.095Z",
@@ -1834,7 +1834,7 @@
   },
   {
     "cardTransactionInstanceReference": "c7909e1f-2f5d-4fcf-ac8a-30fd9f5d6274",
-    "paymentCardReference": "pm_c56fb13eb3633e48",
+    "paymentCardReference": "pm_b2feeaa06d464d2f",
     "cardTransactionAccountReference": "ACC-028",
     "cardTransactionAmount": {
       "amount": 685.17,
@@ -1846,7 +1846,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Lockman, Hilll and Beer",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5392",
+    "cardTransactionMaskedPanDisplay": "****-****-****-9265",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-12T06:14:20.334Z",
@@ -1855,7 +1855,7 @@
   },
   {
     "cardTransactionInstanceReference": "a0e16b4f-6c3e-46d3-b0e1-393b9ce7dc3d",
-    "paymentCardReference": "pm_186c9f24a90bdf3e",
+    "paymentCardReference": "pm_c74772a7f0e11ba9",
     "cardTransactionAccountReference": "ACC-029",
     "cardTransactionAmount": {
       "amount": 560.85,
@@ -1867,7 +1867,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Cartwright Group",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9809",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7283",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-24T07:43:43.654Z",
@@ -1876,7 +1876,7 @@
   },
   {
     "cardTransactionInstanceReference": "12b8a93c-df10-494d-82c6-0fb6279b5516",
-    "paymentCardReference": "pm_5e4f772dad100b09",
+    "paymentCardReference": "pm_90711498c1c2e7b9",
     "cardTransactionAccountReference": "ACC-030",
     "cardTransactionAmount": {
       "amount": 154.62,
@@ -1888,7 +1888,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Kunze - Schmitt",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9303",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7919",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-11T02:28:06.679Z",
@@ -1897,7 +1897,7 @@
   },
   {
     "cardTransactionInstanceReference": "e58a8fb3-c311-48be-a864-ee9c2fbc95f7",
-    "paymentCardReference": "pm_626a69c8bc0485f6",
+    "paymentCardReference": "pm_ed29bb97801fe424",
     "cardTransactionAccountReference": "ACC-031",
     "cardTransactionAmount": {
       "amount": 504.04,
@@ -1909,7 +1909,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Steuber LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4541",
+    "cardTransactionMaskedPanDisplay": "****-****-****-9820",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-25T17:24:13.690Z",
@@ -1918,7 +1918,7 @@
   },
   {
     "cardTransactionInstanceReference": "6da4bbd3-8871-4eea-b614-e39339fa177c",
-    "paymentCardReference": "pm_425a42b1b54338eb",
+    "paymentCardReference": "pm_32076a626c373a47",
     "cardTransactionAccountReference": "ACC-032",
     "cardTransactionAmount": {
       "amount": 1290.79,
@@ -1930,7 +1930,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Bosco Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-3670",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0842",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-09T05:29:56.822Z",
@@ -1939,7 +1939,7 @@
   },
   {
     "cardTransactionInstanceReference": "e82dd618-6fb3-4a96-a8bd-417e6ee5c9c1",
-    "paymentCardReference": "pm_beea772ffe472e54",
+    "paymentCardReference": "pm_2143c3f10c924026",
     "cardTransactionAccountReference": "ACC-033",
     "cardTransactionAmount": {
       "amount": 806.11,
@@ -1951,7 +1951,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Mueller - Dicki",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9632",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3555",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-04-30T23:12:02.362Z",
@@ -1960,7 +1960,7 @@
   },
   {
     "cardTransactionInstanceReference": "a2aed446-3d4c-4120-aa84-8520bc7dd7f9",
-    "paymentCardReference": "pm_8e8fe0dc19413728",
+    "paymentCardReference": "pm_cfe0563f94f8ae33",
     "cardTransactionAccountReference": "ACC-034",
     "cardTransactionAmount": {
       "amount": 519.16,
@@ -1972,7 +1972,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Graham - Hamill",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4369",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1529",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-04T10:03:07.540Z",
@@ -1981,7 +1981,7 @@
   },
   {
     "cardTransactionInstanceReference": "b8f53a68-f303-4742-8d25-476c8dfe75f5",
-    "paymentCardReference": "pm_8d2cd8ab7193c346",
+    "paymentCardReference": "pm_165ae376b5876db9",
     "cardTransactionAccountReference": "ACC-035",
     "cardTransactionAmount": {
       "amount": 810.33,
@@ -1993,7 +1993,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Hodkiewicz and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5686",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0285",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-23T05:09:08.141Z",
@@ -2002,7 +2002,7 @@
   },
   {
     "cardTransactionInstanceReference": "1b3d9629-2c35-4e36-a61c-7f7130791cbf",
-    "paymentCardReference": "pm_b7f0731ee8601540",
+    "paymentCardReference": "pm_30eddc65c67a6f14",
     "cardTransactionAccountReference": "ACC-036",
     "cardTransactionAmount": {
       "amount": 45.75,
@@ -2014,7 +2014,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Fahey - Hammes",
-    "cardTransactionMaskedPanDisplay": "****-****-****-0986",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4214",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-01T02:59:43.662Z",
@@ -2023,7 +2023,7 @@
   },
   {
     "cardTransactionInstanceReference": "511ef801-11d7-41be-8de1-a5fc1fbb564e",
-    "paymentCardReference": "pm_8843e04f12f24cd5",
+    "paymentCardReference": "pm_5cdd47d4b88e98b9",
     "cardTransactionAccountReference": "ACC-037",
     "cardTransactionAmount": {
       "amount": 570.88,
@@ -2035,7 +2035,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Hyatt Group",
-    "cardTransactionMaskedPanDisplay": "****-****-****-0748",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0835",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-04T22:31:07.936Z",
@@ -2044,7 +2044,7 @@
   },
   {
     "cardTransactionInstanceReference": "767cc8a3-3f25-484b-b74e-cf7aa9f26f5b",
-    "paymentCardReference": "pm_dd34f5fcf7a61535",
+    "paymentCardReference": "pm_0c81f7fb6c99f847",
     "cardTransactionAccountReference": "ACC-038",
     "cardTransactionAmount": {
       "amount": 1144.89,
@@ -2056,7 +2056,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Goldner - Macejkovic",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6322",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2017",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-14T18:28:39.277Z",
@@ -2065,7 +2065,7 @@
   },
   {
     "cardTransactionInstanceReference": "25cf054e-1ec5-4d92-bd59-053f8a76b498",
-    "paymentCardReference": "pm_ac50e12244dd2712",
+    "paymentCardReference": "pm_945c8e554afd14d7",
     "cardTransactionAccountReference": "ACC-039",
     "cardTransactionAmount": {
       "amount": 1396.19,
@@ -2077,7 +2077,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Torphy - Kohler",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5511",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1362",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-15T14:44:19.810Z",
@@ -2086,7 +2086,7 @@
   },
   {
     "cardTransactionInstanceReference": "5f08fa5b-d52b-4132-ae95-7ccc966605b3",
-    "paymentCardReference": "pm_e2786a63286e1723",
+    "paymentCardReference": "pm_ec221b7a27dbec57",
     "cardTransactionAccountReference": "ACC-040",
     "cardTransactionAmount": {
       "amount": 1304.07,
@@ -2098,7 +2098,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Harris Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7281",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4579",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-16T15:22:54.757Z",
@@ -2107,7 +2107,7 @@
   },
   {
     "cardTransactionInstanceReference": "844390f5-d88c-490c-bbb7-35b281f73a48",
-    "paymentCardReference": "pm_7283d8911b1a87f5",
+    "paymentCardReference": "pm_7f3842cb2069549a",
     "cardTransactionAccountReference": "ACC-041",
     "cardTransactionAmount": {
       "amount": 1499.9,
@@ -2119,7 +2119,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Windler - Towne",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4829",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8545",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-26T10:12:16.470Z",
@@ -2128,7 +2128,7 @@
   },
   {
     "cardTransactionInstanceReference": "39d4ae79-8ff9-42be-bc60-88db9541604d",
-    "paymentCardReference": "pm_e42dbb0314689fef",
+    "paymentCardReference": "pm_a1cad5bfd3339d47",
     "cardTransactionAccountReference": "ACC-042",
     "cardTransactionAmount": {
       "amount": 810.97,
@@ -2140,7 +2140,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Wuckert, Crist and Luettgen",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1678",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8854",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-21T10:26:47.393Z",
@@ -2149,7 +2149,7 @@
   },
   {
     "cardTransactionInstanceReference": "62873b90-beaf-4c0f-a169-23fb18b8897a",
-    "paymentCardReference": "pm_529c682e12bb3445",
+    "paymentCardReference": "pm_8164986a5fce688c",
     "cardTransactionAccountReference": "ACC-043",
     "cardTransactionAmount": {
       "amount": 977.91,
@@ -2161,7 +2161,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Hand, Carter and Hackett",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4315",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4348",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-19T09:16:31.309Z",
@@ -2170,7 +2170,7 @@
   },
   {
     "cardTransactionInstanceReference": "ffe050be-463b-44cb-a87a-b0a64b2497a7",
-    "paymentCardReference": "pm_e8120fd3df3abb36",
+    "paymentCardReference": "pm_fef3e32908f3e72e",
     "cardTransactionAccountReference": "ACC-044",
     "cardTransactionAmount": {
       "amount": 773.63,
@@ -2182,7 +2182,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Stroman - Wilkinson",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7118",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5308",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-19T10:28:44.741Z",
@@ -2191,7 +2191,7 @@
   },
   {
     "cardTransactionInstanceReference": "77e3ddba-349a-4442-bbe1-62f08270bd88",
-    "paymentCardReference": "pm_aff1645db6ca6e69",
+    "paymentCardReference": "pm_63b185e2c5d7d3e7",
     "cardTransactionAccountReference": "ACC-045",
     "cardTransactionAmount": {
       "amount": 777.75,
@@ -2203,7 +2203,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Leffler Group",
-    "cardTransactionMaskedPanDisplay": "****-****-****-0936",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0914",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-10T18:48:45.422Z",
@@ -2212,7 +2212,7 @@
   },
   {
     "cardTransactionInstanceReference": "5f9ba14d-2a31-450e-859c-c920d14ffe36",
-    "paymentCardReference": "pm_195632554dede69d",
+    "paymentCardReference": "pm_4d6c6682e2c5428a",
     "cardTransactionAccountReference": "ACC-046",
     "cardTransactionAmount": {
       "amount": 1343.16,
@@ -2224,7 +2224,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Brekke Group",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7590",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0348",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-20T09:33:10.895Z",
@@ -2233,7 +2233,7 @@
   },
   {
     "cardTransactionInstanceReference": "fb526f44-77f4-455f-b0fb-cce1ffbc60d8",
-    "paymentCardReference": "pm_4f29bd9a61faeab9",
+    "paymentCardReference": "pm_276f4b12e383da12",
     "cardTransactionAccountReference": "ACC-047",
     "cardTransactionAmount": {
       "amount": 1132.2,
@@ -2245,7 +2245,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Nitzsche, Littel and Conn",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9482",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2823",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-17T23:43:27.411Z",
@@ -2254,7 +2254,7 @@
   },
   {
     "cardTransactionInstanceReference": "7625df98-9515-4f4b-9b56-349d35960989",
-    "paymentCardReference": "pm_9be89a6ba7f75d3c",
+    "paymentCardReference": "pm_b08013bf40403d6c",
     "cardTransactionAccountReference": "ACC-048",
     "cardTransactionAmount": {
       "amount": 1085.87,
@@ -2266,7 +2266,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Padberg Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7330",
+    "cardTransactionMaskedPanDisplay": "****-****-****-6486",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-11T19:08:13.963Z",
@@ -2275,7 +2275,7 @@
   },
   {
     "cardTransactionInstanceReference": "8ccdb911-3e9c-4c1d-8b98-8879e1f80cee",
-    "paymentCardReference": "pm_c857c761acf7d08f",
+    "paymentCardReference": "pm_0d52870eef5c7f27",
     "cardTransactionAccountReference": "ACC-049",
     "cardTransactionAmount": {
       "amount": 648.46,
@@ -2287,7 +2287,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Raynor - Turner",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5010",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2865",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-24T09:27:51.255Z",
@@ -2296,7 +2296,7 @@
   },
   {
     "cardTransactionInstanceReference": "18f19fe6-cde7-4db3-af3b-e0aa08e8e70f",
-    "paymentCardReference": "pm_ba01517614a64280",
+    "paymentCardReference": "pm_57fc53d5a2ba0dc1",
     "cardTransactionAccountReference": "ACC-050",
     "cardTransactionAmount": {
       "amount": 1361.51,
@@ -2308,7 +2308,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Kemmer LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7583",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2949",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-04-30T06:22:44.848Z",
@@ -2317,7 +2317,7 @@
   },
   {
     "cardTransactionInstanceReference": "a82cc119-b9c2-437d-b292-84aea7075b92",
-    "paymentCardReference": "pm_e82c09ff8db21749",
+    "paymentCardReference": "pm_b577f67eb747396e469372cf0144",
     "cardTransactionAccountReference": "ACC-LF-20240115",
     "cardTransactionAmount": {
       "amount": 738.47,
@@ -2329,7 +2329,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Becker - Kautzer",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4153",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0144",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-17T00:45:37.146Z",
@@ -2338,7 +2338,7 @@
   },
   {
     "cardTransactionInstanceReference": "2f40f6dd-e017-4d53-88c6-4131546934f1",
-    "paymentCardReference": "pm_81c70327af327b45",
+    "paymentCardReference": "pm_18e89d64cfffbdb3b8a676071177",
     "cardTransactionAccountReference": "ACC-JS-20231201",
     "cardTransactionAmount": {
       "amount": 1425.74,
@@ -2350,7 +2350,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Rolfson Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4243",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1177",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-24T20:43:19.319Z",
@@ -2359,7 +2359,7 @@
   },
   {
     "cardTransactionInstanceReference": "ce210357-bc4f-41c5-babf-9eafab833248",
-    "paymentCardReference": "pm_bb74429aa49cb9f2",
+    "paymentCardReference": "pm_5437fb2c43b9aac2",
     "cardTransactionAccountReference": "ACC-003",
     "cardTransactionAmount": {
       "amount": 1089.27,
@@ -2371,7 +2371,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Hirthe, Adams and Hansen",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9928",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1229",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-06T20:35:42.234Z",
@@ -2380,7 +2380,7 @@
   },
   {
     "cardTransactionInstanceReference": "099b1d7b-6bc9-409a-84f5-e45693c2563c",
-    "paymentCardReference": "pm_8a434e2b79ad64e3",
+    "paymentCardReference": "pm_a54761865d2c0ee8",
     "cardTransactionAccountReference": "ACC-004",
     "cardTransactionAmount": {
       "amount": 823.83,
@@ -2392,7 +2392,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Pacocha, Schuster and Runolfsson",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1623",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4335",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-07T17:24:49.133Z",
@@ -2401,7 +2401,7 @@
   },
   {
     "cardTransactionInstanceReference": "1ac5bf12-0e42-4819-a5ad-b307ca06ff00",
-    "paymentCardReference": "pm_276acae5c9af5036",
+    "paymentCardReference": "pm_a634a55d68378912",
     "cardTransactionAccountReference": "ACC-005",
     "cardTransactionAmount": {
       "amount": 679.95,
@@ -2413,7 +2413,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Dickinson, Kirlin and Leuschke",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7205",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5812",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-15T23:44:38.176Z",
@@ -2422,7 +2422,7 @@
   },
   {
     "cardTransactionInstanceReference": "7be68d42-717f-4ae2-9b96-87c4b1195257",
-    "paymentCardReference": "pm_ab8fb0f6ce30e6c1",
+    "paymentCardReference": "pm_68fb8cb3b980c1ac",
     "cardTransactionAccountReference": "ACC-006",
     "cardTransactionAmount": {
       "amount": 1170.43,
@@ -2434,7 +2434,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Hodkiewicz and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4124",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8280",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-07T10:51:16.624Z",
@@ -2443,7 +2443,7 @@
   },
   {
     "cardTransactionInstanceReference": "5d6f36fa-52c9-4aba-a48e-dcc34fc72912",
-    "paymentCardReference": "pm_119ae57c59fcbc61",
+    "paymentCardReference": "pm_322ddfc5d5174fe7",
     "cardTransactionAccountReference": "ACC-007",
     "cardTransactionAmount": {
       "amount": 1469.12,
@@ -2455,7 +2455,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Reichert, Parker and Gusikowski",
-    "cardTransactionMaskedPanDisplay": "****-****-****-8516",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7519",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-10T23:35:13.414Z",
@@ -2464,7 +2464,7 @@
   },
   {
     "cardTransactionInstanceReference": "248e42cc-26a1-4e59-a2bf-913e7b6d5907",
-    "paymentCardReference": "pm_bb60c4f107086fb7",
+    "paymentCardReference": "pm_4699f6a09158900c",
     "cardTransactionAccountReference": "ACC-008",
     "cardTransactionAmount": {
       "amount": 272.72,
@@ -2476,7 +2476,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Rath LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-8118",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7419",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-02T03:47:46.645Z",
@@ -2485,7 +2485,7 @@
   },
   {
     "cardTransactionInstanceReference": "294b914c-45d2-42d0-bf92-919612f5f2f6",
-    "paymentCardReference": "pm_a4daba232993517e",
+    "paymentCardReference": "pm_df628c8e223de235",
     "cardTransactionAccountReference": "ACC-009",
     "cardTransactionAmount": {
       "amount": 1042.97,
@@ -2497,7 +2497,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Maggio, Altenwerth and Buckridge",
-    "cardTransactionMaskedPanDisplay": "****-****-****-2204",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5062",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-06T21:17:58.717Z",
@@ -2506,7 +2506,7 @@
   },
   {
     "cardTransactionInstanceReference": "94490a59-1ac0-41a5-a1eb-d417c593689f",
-    "paymentCardReference": "pm_cf704d296d6054f9",
+    "paymentCardReference": "pm_f1eb173441e24f61",
     "cardTransactionAccountReference": "ACC-010",
     "cardTransactionAmount": {
       "amount": 827.67,
@@ -2518,7 +2518,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Heathcote and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1209",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0296",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-13T19:50:34.987Z",
@@ -2527,7 +2527,7 @@
   },
   {
     "cardTransactionInstanceReference": "f1fdae68-e47a-471c-bd0b-c5d978e3419e",
-    "paymentCardReference": "pm_e0ec440e1523d386",
+    "paymentCardReference": "pm_be5fd1c3c6a8d805",
     "cardTransactionAccountReference": "ACC-011",
     "cardTransactionAmount": {
       "amount": 533.76,
@@ -2539,7 +2539,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Harvey - Beahan",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5252",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8147",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-01T06:52:39.214Z",
@@ -2548,7 +2548,7 @@
   },
   {
     "cardTransactionInstanceReference": "336593a4-2e16-478b-8873-12679bbeba4e",
-    "paymentCardReference": "pm_0557f22ff7ac0f77",
+    "paymentCardReference": "pm_bd8c156b3c7028b3",
     "cardTransactionAccountReference": "ACC-012",
     "cardTransactionAmount": {
       "amount": 91.91,
@@ -2560,7 +2560,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Maggio, Rutherford and Lesch",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6561",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2402",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-02T22:46:27.075Z",
@@ -2569,7 +2569,7 @@
   },
   {
     "cardTransactionInstanceReference": "239ecb04-6240-4708-be02-6d890a8a5fea",
-    "paymentCardReference": "pm_40ea271454f92f55",
+    "paymentCardReference": "pm_d4cd6721d280b961",
     "cardTransactionAccountReference": "ACC-013",
     "cardTransactionAmount": {
       "amount": 1373.41,
@@ -2581,7 +2581,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Haley - Bogan",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1678",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5828",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-12T21:30:00.740Z",
@@ -2590,7 +2590,7 @@
   },
   {
     "cardTransactionInstanceReference": "1fcf573f-ef7b-47ef-af00-ed862f9414e0",
-    "paymentCardReference": "pm_9ddc972f1c4722c2",
+    "paymentCardReference": "pm_c37a8edf1367d1f1",
     "cardTransactionAccountReference": "ACC-014",
     "cardTransactionAmount": {
       "amount": 356.81,
@@ -2602,7 +2602,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Herman Group",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7583",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4281",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-28T22:47:07.611Z",
@@ -2611,7 +2611,7 @@
   },
   {
     "cardTransactionInstanceReference": "76fbd179-5db4-4d49-85c3-4aca9544c8ef",
-    "paymentCardReference": "pm_f0bcc94e6b708b43",
+    "paymentCardReference": "pm_68b4dade658e251e",
     "cardTransactionAccountReference": "ACC-015",
     "cardTransactionAmount": {
       "amount": 164.62,
@@ -2623,7 +2623,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Green Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6119",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3443",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-14T16:12:22.816Z",
@@ -2632,7 +2632,7 @@
   },
   {
     "cardTransactionInstanceReference": "819be83e-8aba-43dd-a708-a08ca9e7bb52",
-    "paymentCardReference": "pm_793503921d9d9d7e",
+    "paymentCardReference": "pm_6b6fdde67d891313",
     "cardTransactionAccountReference": "ACC-016",
     "cardTransactionAmount": {
       "amount": 537.73,
@@ -2644,7 +2644,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Aufderhar, Moore and Bartell",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6472",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3382",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-25T08:54:48.479Z",
@@ -2653,7 +2653,7 @@
   },
   {
     "cardTransactionInstanceReference": "c9db1a4b-d49f-43e2-95d2-89bc4d200250",
-    "paymentCardReference": "pm_c8571ad7b9c81812",
+    "paymentCardReference": "pm_8567ce62b5e8aade",
     "cardTransactionAccountReference": "ACC-017",
     "cardTransactionAmount": {
       "amount": 951.21,
@@ -2665,7 +2665,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Waelchi, Lang and Gutmann",
-    "cardTransactionMaskedPanDisplay": "****-****-****-8066",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2164",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-21T08:19:35.850Z",
@@ -2674,7 +2674,7 @@
   },
   {
     "cardTransactionInstanceReference": "a602a48e-f3ee-49ca-8266-51540a19b2e3",
-    "paymentCardReference": "pm_c6f42b9d9adb5e95",
+    "paymentCardReference": "pm_06c7267218fd6ea3",
     "cardTransactionAccountReference": "ACC-018",
     "cardTransactionAmount": {
       "amount": 67.91,
@@ -2686,7 +2686,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Russel, Homenick and Conroy",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7564",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4487",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-11T22:17:06.691Z",
@@ -2695,7 +2695,7 @@
   },
   {
     "cardTransactionInstanceReference": "95000f47-10cf-4d07-b721-b4e491adc54b",
-    "paymentCardReference": "pm_2274fdf5e363e030",
+    "paymentCardReference": "pm_bcd7e5e9cfa326d6",
     "cardTransactionAccountReference": "ACC-019",
     "cardTransactionAmount": {
       "amount": 183.26,
@@ -2707,7 +2707,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Schowalter - Harber",
-    "cardTransactionMaskedPanDisplay": "****-****-****-0094",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8346",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-23T05:03:35.355Z",
@@ -2716,7 +2716,7 @@
   },
   {
     "cardTransactionInstanceReference": "98cf0e67-5dd4-488a-8c32-73aa74bd0107",
-    "paymentCardReference": "pm_51750f8fe7388d48",
+    "paymentCardReference": "pm_e3b5b4fa92766d91",
     "cardTransactionAccountReference": "ACC-020",
     "cardTransactionAmount": {
       "amount": 610.16,
@@ -2728,7 +2728,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Kovacek Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6673",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7350",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-22T23:20:32.331Z",
@@ -2737,7 +2737,7 @@
   },
   {
     "cardTransactionInstanceReference": "3919a440-c566-4632-85ee-e36a794f790c",
-    "paymentCardReference": "pm_7b1812968bffd782",
+    "paymentCardReference": "pm_f3c7f6cdadb3c103",
     "cardTransactionAccountReference": "ACC-021",
     "cardTransactionAmount": {
       "amount": 1360.12,
@@ -2749,7 +2749,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Corwin LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1203",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1380",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-18T23:02:08.266Z",
@@ -2758,7 +2758,7 @@
   },
   {
     "cardTransactionInstanceReference": "4071a5d5-0026-4fe2-9e40-9fbd12744ab1",
-    "paymentCardReference": "pm_4c6134558acf6f12",
+    "paymentCardReference": "pm_d473e40773eebf98",
     "cardTransactionAccountReference": "ACC-022",
     "cardTransactionAmount": {
       "amount": 887.73,
@@ -2770,7 +2770,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Raynor LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1820",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3407",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-13T23:57:10.680Z",
@@ -2779,7 +2779,7 @@
   },
   {
     "cardTransactionInstanceReference": "18995395-e443-456b-b33b-c49323277a3a",
-    "paymentCardReference": "pm_aa5fc4637e16e677",
+    "paymentCardReference": "pm_177a6b6a00b8fd05",
     "cardTransactionAccountReference": "ACC-023",
     "cardTransactionAmount": {
       "amount": 263.09,
@@ -2791,7 +2791,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Erdman - Turner",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4691",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3424",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-02T05:10:51.962Z",
@@ -2800,7 +2800,7 @@
   },
   {
     "cardTransactionInstanceReference": "37b54414-4858-4422-9fcb-e16b7df1bf9c",
-    "paymentCardReference": "pm_6fc768e15f383d2d",
+    "paymentCardReference": "pm_9880794a78bf08ac",
     "cardTransactionAccountReference": "ACC-024",
     "cardTransactionAmount": {
       "amount": 853.34,
@@ -2812,7 +2812,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Sporer, Schneider and Veum",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1475",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1313",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-03T11:12:57.720Z",
@@ -2821,7 +2821,7 @@
   },
   {
     "cardTransactionInstanceReference": "42c69876-5a52-4618-88c9-4cc4e90692cb",
-    "paymentCardReference": "pm_c5bef4ee560e40e7",
+    "paymentCardReference": "pm_6ed827b736d3c420",
     "cardTransactionAccountReference": "ACC-025",
     "cardTransactionAmount": {
       "amount": 360.84,
@@ -2833,7 +2833,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Mann Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9710",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5749",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-06T15:13:52.157Z",
@@ -2842,7 +2842,7 @@
   },
   {
     "cardTransactionInstanceReference": "649a5a6b-063e-4848-b9a0-3bb8f5b3b3bd",
-    "paymentCardReference": "pm_c41292f11899cb1b",
+    "paymentCardReference": "pm_09bcacdac09e9efd",
     "cardTransactionAccountReference": "ACC-026",
     "cardTransactionAmount": {
       "amount": 490.8,
@@ -2854,7 +2854,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Schowalter, Conn and Purdy",
-    "cardTransactionMaskedPanDisplay": "****-****-****-8412",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0310",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-13T19:41:51.086Z",
@@ -2863,7 +2863,7 @@
   },
   {
     "cardTransactionInstanceReference": "0d8c02f7-17f8-46b5-ad6e-01ef8047b8f9",
-    "paymentCardReference": "pm_3f82f55cfc6de3a4",
+    "paymentCardReference": "pm_73e68a8df6c13587",
     "cardTransactionAccountReference": "ACC-027",
     "cardTransactionAmount": {
       "amount": 1271.41,
@@ -2875,7 +2875,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Boehm LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9960",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4544",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-23T19:28:40.853Z",
@@ -2884,7 +2884,7 @@
   },
   {
     "cardTransactionInstanceReference": "202e3e35-3029-468d-8bb8-4fc1dbc64cf9",
-    "paymentCardReference": "pm_c56fb13eb3633e48",
+    "paymentCardReference": "pm_b2feeaa06d464d2f",
     "cardTransactionAccountReference": "ACC-028",
     "cardTransactionAmount": {
       "amount": 581.05,
@@ -2896,7 +2896,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Becker - Harris",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5392",
+    "cardTransactionMaskedPanDisplay": "****-****-****-9265",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-17T21:33:08.729Z",
@@ -2905,7 +2905,7 @@
   },
   {
     "cardTransactionInstanceReference": "e7ab3978-3873-43d5-9cea-f1947470eefe",
-    "paymentCardReference": "pm_186c9f24a90bdf3e",
+    "paymentCardReference": "pm_c74772a7f0e11ba9",
     "cardTransactionAccountReference": "ACC-029",
     "cardTransactionAmount": {
       "amount": 526.63,
@@ -2917,7 +2917,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Marquardt Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9809",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7283",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-17T07:06:34.952Z",
@@ -2926,7 +2926,7 @@
   },
   {
     "cardTransactionInstanceReference": "64d10256-cc03-4a3e-8a28-8a2cf441881f",
-    "paymentCardReference": "pm_5e4f772dad100b09",
+    "paymentCardReference": "pm_90711498c1c2e7b9",
     "cardTransactionAccountReference": "ACC-030",
     "cardTransactionAmount": {
       "amount": 1084.48,
@@ -2938,7 +2938,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Denesik LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9303",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7919",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-09T21:37:03.402Z",
@@ -2947,7 +2947,7 @@
   },
   {
     "cardTransactionInstanceReference": "af6e13a6-335e-4ba0-a3db-9e1ee4d68b79",
-    "paymentCardReference": "pm_626a69c8bc0485f6",
+    "paymentCardReference": "pm_ed29bb97801fe424",
     "cardTransactionAccountReference": "ACC-031",
     "cardTransactionAmount": {
       "amount": 750.5,
@@ -2959,7 +2959,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Carter, Donnelly and VonRueden",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4541",
+    "cardTransactionMaskedPanDisplay": "****-****-****-9820",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-20T12:50:40.112Z",
@@ -2968,7 +2968,7 @@
   },
   {
     "cardTransactionInstanceReference": "d46f8804-b34a-4eb2-ac6a-991ca95e6754",
-    "paymentCardReference": "pm_425a42b1b54338eb",
+    "paymentCardReference": "pm_32076a626c373a47",
     "cardTransactionAccountReference": "ACC-032",
     "cardTransactionAmount": {
       "amount": 526.93,
@@ -2980,7 +2980,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Grimes, Hodkiewicz and Mann",
-    "cardTransactionMaskedPanDisplay": "****-****-****-3670",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0842",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-12T11:32:37.158Z",
@@ -2989,7 +2989,7 @@
   },
   {
     "cardTransactionInstanceReference": "e7821dd7-525d-4f33-b218-185da938b68d",
-    "paymentCardReference": "pm_beea772ffe472e54",
+    "paymentCardReference": "pm_2143c3f10c924026",
     "cardTransactionAccountReference": "ACC-033",
     "cardTransactionAmount": {
       "amount": 1022.33,
@@ -3001,7 +3001,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Spinka LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9632",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3555",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-25T06:55:22.104Z",
@@ -3010,7 +3010,7 @@
   },
   {
     "cardTransactionInstanceReference": "adc8359a-490c-410d-81cb-61565954f566",
-    "paymentCardReference": "pm_8e8fe0dc19413728",
+    "paymentCardReference": "pm_cfe0563f94f8ae33",
     "cardTransactionAccountReference": "ACC-034",
     "cardTransactionAmount": {
       "amount": 287.82,
@@ -3022,7 +3022,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Heller LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4369",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1529",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-21T03:01:08.890Z",
@@ -3031,7 +3031,7 @@
   },
   {
     "cardTransactionInstanceReference": "f44a08c6-74ec-4768-a1c2-ae991f1d58fb",
-    "paymentCardReference": "pm_8d2cd8ab7193c346",
+    "paymentCardReference": "pm_165ae376b5876db9",
     "cardTransactionAccountReference": "ACC-035",
     "cardTransactionAmount": {
       "amount": 51.38,
@@ -3043,7 +3043,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Jacobi Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5686",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0285",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-11T06:39:01.802Z",
@@ -3052,7 +3052,7 @@
   },
   {
     "cardTransactionInstanceReference": "54da657e-8f60-423c-a6f4-c2c1b433d235",
-    "paymentCardReference": "pm_b7f0731ee8601540",
+    "paymentCardReference": "pm_30eddc65c67a6f14",
     "cardTransactionAccountReference": "ACC-036",
     "cardTransactionAmount": {
       "amount": 1274.92,
@@ -3064,7 +3064,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Tillman, Bode and Lueilwitz",
-    "cardTransactionMaskedPanDisplay": "****-****-****-0986",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4214",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-26T03:28:10.403Z",
@@ -3073,7 +3073,7 @@
   },
   {
     "cardTransactionInstanceReference": "c76a1272-bad0-4180-a8ec-f041861d5399",
-    "paymentCardReference": "pm_8843e04f12f24cd5",
+    "paymentCardReference": "pm_5cdd47d4b88e98b9",
     "cardTransactionAccountReference": "ACC-037",
     "cardTransactionAmount": {
       "amount": 133.61,
@@ -3085,7 +3085,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Kirlin, Monahan and Jakubowski",
-    "cardTransactionMaskedPanDisplay": "****-****-****-0748",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0835",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-28T04:53:20.417Z",
@@ -3094,7 +3094,7 @@
   },
   {
     "cardTransactionInstanceReference": "3702781f-af3c-4239-bde4-40ae59b3782c",
-    "paymentCardReference": "pm_dd34f5fcf7a61535",
+    "paymentCardReference": "pm_0c81f7fb6c99f847",
     "cardTransactionAccountReference": "ACC-038",
     "cardTransactionAmount": {
       "amount": 20.15,
@@ -3106,7 +3106,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Olson - Reilly",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6322",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2017",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-01T21:43:57.981Z",
@@ -3115,7 +3115,7 @@
   },
   {
     "cardTransactionInstanceReference": "00321d05-6bbc-4481-9a08-bbd24036e01a",
-    "paymentCardReference": "pm_ac50e12244dd2712",
+    "paymentCardReference": "pm_945c8e554afd14d7",
     "cardTransactionAccountReference": "ACC-039",
     "cardTransactionAmount": {
       "amount": 401.08,
@@ -3127,7 +3127,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Wolff Group",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5511",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1362",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-17T17:23:39.863Z",
@@ -3136,7 +3136,7 @@
   },
   {
     "cardTransactionInstanceReference": "f75b4078-598c-48cb-a0a9-0ae3e5410962",
-    "paymentCardReference": "pm_e2786a63286e1723",
+    "paymentCardReference": "pm_ec221b7a27dbec57",
     "cardTransactionAccountReference": "ACC-040",
     "cardTransactionAmount": {
       "amount": 158.47,
@@ -3148,7 +3148,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Dickens - Schuster",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7281",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4579",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-05T13:13:16.000Z",
@@ -3157,7 +3157,7 @@
   },
   {
     "cardTransactionInstanceReference": "8993b4cd-aa8c-4602-8a89-51f195194349",
-    "paymentCardReference": "pm_7283d8911b1a87f5",
+    "paymentCardReference": "pm_7f3842cb2069549a",
     "cardTransactionAccountReference": "ACC-041",
     "cardTransactionAmount": {
       "amount": 1233.53,
@@ -3169,7 +3169,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Parker and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4829",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8545",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-25T22:22:54.893Z",
@@ -3178,7 +3178,7 @@
   },
   {
     "cardTransactionInstanceReference": "2ecde2ab-2711-44aa-b114-6d56be47b85f",
-    "paymentCardReference": "pm_e42dbb0314689fef",
+    "paymentCardReference": "pm_a1cad5bfd3339d47",
     "cardTransactionAccountReference": "ACC-042",
     "cardTransactionAmount": {
       "amount": 462.96,
@@ -3190,7 +3190,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Grady - Hoeger",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1678",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8854",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-03T13:06:45.676Z",
@@ -3199,7 +3199,7 @@
   },
   {
     "cardTransactionInstanceReference": "aae52a1b-d3d8-446f-b073-14aa23add36f",
-    "paymentCardReference": "pm_529c682e12bb3445",
+    "paymentCardReference": "pm_8164986a5fce688c",
     "cardTransactionAccountReference": "ACC-043",
     "cardTransactionAmount": {
       "amount": 381.79,
@@ -3211,7 +3211,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "King and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4315",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4348",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-21T15:10:52.133Z",
@@ -3220,7 +3220,7 @@
   },
   {
     "cardTransactionInstanceReference": "bb8f2bd8-7631-4bbe-a90a-c5613dd7e777",
-    "paymentCardReference": "pm_e8120fd3df3abb36",
+    "paymentCardReference": "pm_fef3e32908f3e72e",
     "cardTransactionAccountReference": "ACC-044",
     "cardTransactionAmount": {
       "amount": 581.83,
@@ -3232,7 +3232,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Dibbert and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7118",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5308",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-24T10:43:23.952Z",
@@ -3241,7 +3241,7 @@
   },
   {
     "cardTransactionInstanceReference": "9226f1ca-ee63-451b-8ab3-ccd9dbc42060",
-    "paymentCardReference": "pm_aff1645db6ca6e69",
+    "paymentCardReference": "pm_63b185e2c5d7d3e7",
     "cardTransactionAccountReference": "ACC-045",
     "cardTransactionAmount": {
       "amount": 500.72,
@@ -3253,7 +3253,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Marks, Shanahan and Leannon",
-    "cardTransactionMaskedPanDisplay": "****-****-****-0936",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0914",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-08T09:25:42.247Z",
@@ -3262,7 +3262,7 @@
   },
   {
     "cardTransactionInstanceReference": "89c82f46-72ea-4e6f-83d4-16b2fdf2e24b",
-    "paymentCardReference": "pm_195632554dede69d",
+    "paymentCardReference": "pm_4d6c6682e2c5428a",
     "cardTransactionAccountReference": "ACC-046",
     "cardTransactionAmount": {
       "amount": 1345.45,
@@ -3274,7 +3274,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Tromp - Ankunding",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7590",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0348",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-06T19:27:52.475Z",
@@ -3283,7 +3283,7 @@
   },
   {
     "cardTransactionInstanceReference": "55cb6d52-1d23-426b-82f5-d4d2a5dfe546",
-    "paymentCardReference": "pm_4f29bd9a61faeab9",
+    "paymentCardReference": "pm_276f4b12e383da12",
     "cardTransactionAccountReference": "ACC-047",
     "cardTransactionAmount": {
       "amount": 579.5,
@@ -3295,7 +3295,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Kovacek - Bartoletti",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9482",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2823",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-05T19:49:58.616Z",
@@ -3304,7 +3304,7 @@
   },
   {
     "cardTransactionInstanceReference": "e5717db1-d916-4429-b094-c137a9337590",
-    "paymentCardReference": "pm_9be89a6ba7f75d3c",
+    "paymentCardReference": "pm_b08013bf40403d6c",
     "cardTransactionAccountReference": "ACC-048",
     "cardTransactionAmount": {
       "amount": 612.19,
@@ -3316,7 +3316,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Wintheiser, Considine and Leuschke",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7330",
+    "cardTransactionMaskedPanDisplay": "****-****-****-6486",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-15T08:35:46.324Z",
@@ -3325,7 +3325,7 @@
   },
   {
     "cardTransactionInstanceReference": "e70efc19-7c9d-4472-a5d7-2eab88f14128",
-    "paymentCardReference": "pm_c857c761acf7d08f",
+    "paymentCardReference": "pm_0d52870eef5c7f27",
     "cardTransactionAccountReference": "ACC-049",
     "cardTransactionAmount": {
       "amount": 1369.65,
@@ -3337,7 +3337,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Douglas Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5010",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2865",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-01T04:50:02.982Z",
@@ -3346,7 +3346,7 @@
   },
   {
     "cardTransactionInstanceReference": "94031890-d25e-43b8-b626-50bfe137bf01",
-    "paymentCardReference": "pm_ba01517614a64280",
+    "paymentCardReference": "pm_57fc53d5a2ba0dc1",
     "cardTransactionAccountReference": "ACC-050",
     "cardTransactionAmount": {
       "amount": 1419.71,
@@ -3358,7 +3358,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Haley and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7583",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2949",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-18T13:47:31.368Z",
@@ -3367,7 +3367,7 @@
   },
   {
     "cardTransactionInstanceReference": "b248e120-aab3-418c-9062-52338c7d2ba8",
-    "paymentCardReference": "pm_e82c09ff8db21749",
+    "paymentCardReference": "pm_b577f67eb747396e469372cf0144",
     "cardTransactionAccountReference": "ACC-LF-20240115",
     "cardTransactionAmount": {
       "amount": 515.82,
@@ -3379,7 +3379,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Murphy Group",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4153",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0144",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-25T10:25:48.001Z",
@@ -3388,7 +3388,7 @@
   },
   {
     "cardTransactionInstanceReference": "2215b0de-906d-42ad-996b-9864c6eb89ca",
-    "paymentCardReference": "pm_81c70327af327b45",
+    "paymentCardReference": "pm_18e89d64cfffbdb3b8a676071177",
     "cardTransactionAccountReference": "ACC-JS-20231201",
     "cardTransactionAmount": {
       "amount": 141.95,
@@ -3400,7 +3400,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Terry and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4243",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1177",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-14T20:23:10.177Z",
@@ -3409,7 +3409,7 @@
   },
   {
     "cardTransactionInstanceReference": "0e9a6ab4-2190-4b2d-b1cf-aa8bd02d527e",
-    "paymentCardReference": "pm_bb74429aa49cb9f2",
+    "paymentCardReference": "pm_5437fb2c43b9aac2",
     "cardTransactionAccountReference": "ACC-003",
     "cardTransactionAmount": {
       "amount": 997.28,
@@ -3421,7 +3421,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Considine and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9928",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1229",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-21T12:43:01.893Z",
@@ -3430,7 +3430,7 @@
   },
   {
     "cardTransactionInstanceReference": "14d05e7c-129f-4ca5-9224-b8b99ca75ec1",
-    "paymentCardReference": "pm_8a434e2b79ad64e3",
+    "paymentCardReference": "pm_a54761865d2c0ee8",
     "cardTransactionAccountReference": "ACC-004",
     "cardTransactionAmount": {
       "amount": 867.17,
@@ -3442,7 +3442,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Becker Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1623",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4335",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-01T11:58:54.335Z",
@@ -3451,7 +3451,7 @@
   },
   {
     "cardTransactionInstanceReference": "e8aa0584-3c78-4e57-8da7-0f60f8d09064",
-    "paymentCardReference": "pm_276acae5c9af5036",
+    "paymentCardReference": "pm_a634a55d68378912",
     "cardTransactionAccountReference": "ACC-005",
     "cardTransactionAmount": {
       "amount": 975.65,
@@ -3463,7 +3463,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Conn - Schneider",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7205",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5812",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-14T21:26:26.075Z",
@@ -3472,7 +3472,7 @@
   },
   {
     "cardTransactionInstanceReference": "60467e05-258c-4be5-bd85-69df6f19efcf",
-    "paymentCardReference": "pm_ab8fb0f6ce30e6c1",
+    "paymentCardReference": "pm_68fb8cb3b980c1ac",
     "cardTransactionAccountReference": "ACC-006",
     "cardTransactionAmount": {
       "amount": 1026.34,
@@ -3484,7 +3484,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Wyman Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4124",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8280",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-10T23:54:33.013Z",
@@ -3493,7 +3493,7 @@
   },
   {
     "cardTransactionInstanceReference": "687c696e-188b-4a5e-86ff-5f113af109fb",
-    "paymentCardReference": "pm_119ae57c59fcbc61",
+    "paymentCardReference": "pm_322ddfc5d5174fe7",
     "cardTransactionAccountReference": "ACC-007",
     "cardTransactionAmount": {
       "amount": 1375.74,
@@ -3505,7 +3505,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Hauck - Kling",
-    "cardTransactionMaskedPanDisplay": "****-****-****-8516",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7519",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-17T21:05:57.779Z",
@@ -3514,7 +3514,7 @@
   },
   {
     "cardTransactionInstanceReference": "bc7191e7-bc49-4fa7-be82-9ff86569c1d7",
-    "paymentCardReference": "pm_bb60c4f107086fb7",
+    "paymentCardReference": "pm_4699f6a09158900c",
     "cardTransactionAccountReference": "ACC-008",
     "cardTransactionAmount": {
       "amount": 987.31,
@@ -3526,7 +3526,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Ernser Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-8118",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7419",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-06T14:12:13.220Z",
@@ -3535,7 +3535,7 @@
   },
   {
     "cardTransactionInstanceReference": "474deac8-ad1b-47b6-8a5c-bc175020d145",
-    "paymentCardReference": "pm_a4daba232993517e",
+    "paymentCardReference": "pm_df628c8e223de235",
     "cardTransactionAccountReference": "ACC-009",
     "cardTransactionAmount": {
       "amount": 441.9,
@@ -3547,7 +3547,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Greenfelder - Pfannerstill",
-    "cardTransactionMaskedPanDisplay": "****-****-****-2204",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5062",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-14T18:07:49.389Z",
@@ -3556,7 +3556,7 @@
   },
   {
     "cardTransactionInstanceReference": "df749673-c3ef-4fb9-8ac0-2e8fe199852b",
-    "paymentCardReference": "pm_cf704d296d6054f9",
+    "paymentCardReference": "pm_f1eb173441e24f61",
     "cardTransactionAccountReference": "ACC-010",
     "cardTransactionAmount": {
       "amount": 490.06,
@@ -3568,7 +3568,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Crooks - Wiza",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1209",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0296",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-17T04:07:59.813Z",
@@ -3577,7 +3577,7 @@
   },
   {
     "cardTransactionInstanceReference": "b392937d-5bcc-4fe5-a73a-8d8aa3f2eee6",
-    "paymentCardReference": "pm_e0ec440e1523d386",
+    "paymentCardReference": "pm_be5fd1c3c6a8d805",
     "cardTransactionAccountReference": "ACC-011",
     "cardTransactionAmount": {
       "amount": 301.02,
@@ -3589,7 +3589,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Batz, D'Amore and Stehr",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5252",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8147",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-08T20:57:06.231Z",
@@ -3598,7 +3598,7 @@
   },
   {
     "cardTransactionInstanceReference": "5f8d45ac-15db-4fe6-b0d7-442a2d286086",
-    "paymentCardReference": "pm_0557f22ff7ac0f77",
+    "paymentCardReference": "pm_bd8c156b3c7028b3",
     "cardTransactionAccountReference": "ACC-012",
     "cardTransactionAmount": {
       "amount": 1215.35,
@@ -3610,7 +3610,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Goyette - Crist",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6561",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2402",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-04-30T02:10:12.133Z",
@@ -3619,7 +3619,7 @@
   },
   {
     "cardTransactionInstanceReference": "0f41d7fe-8829-47e8-bdbd-5be95e1d9175",
-    "paymentCardReference": "pm_40ea271454f92f55",
+    "paymentCardReference": "pm_d4cd6721d280b961",
     "cardTransactionAccountReference": "ACC-013",
     "cardTransactionAmount": {
       "amount": 1429.76,
@@ -3631,7 +3631,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Schaefer and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1678",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5828",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-21T19:04:16.642Z",
@@ -3640,7 +3640,7 @@
   },
   {
     "cardTransactionInstanceReference": "7b5c3eaf-4121-4756-9a93-d9ff4d0e07fa",
-    "paymentCardReference": "pm_9ddc972f1c4722c2",
+    "paymentCardReference": "pm_c37a8edf1367d1f1",
     "cardTransactionAccountReference": "ACC-014",
     "cardTransactionAmount": {
       "amount": 585.65,
@@ -3652,7 +3652,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Dickinson Group",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7583",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4281",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-02T15:58:30.893Z",
@@ -3661,7 +3661,7 @@
   },
   {
     "cardTransactionInstanceReference": "c1349357-79dd-4fff-b8b7-6dc5400d42af",
-    "paymentCardReference": "pm_f0bcc94e6b708b43",
+    "paymentCardReference": "pm_68b4dade658e251e",
     "cardTransactionAccountReference": "ACC-015",
     "cardTransactionAmount": {
       "amount": 368.2,
@@ -3673,7 +3673,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Huels, Anderson and Harris",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6119",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3443",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-12T12:29:57.315Z",
@@ -3682,7 +3682,7 @@
   },
   {
     "cardTransactionInstanceReference": "aa8e66cb-c44a-4588-8631-e43eefdc9e35",
-    "paymentCardReference": "pm_793503921d9d9d7e",
+    "paymentCardReference": "pm_6b6fdde67d891313",
     "cardTransactionAccountReference": "ACC-016",
     "cardTransactionAmount": {
       "amount": 64.42,
@@ -3694,7 +3694,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Larson - Gutmann",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6472",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3382",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-12T13:56:44.808Z",
@@ -3703,7 +3703,7 @@
   },
   {
     "cardTransactionInstanceReference": "f7ddbf1a-7d70-4b1a-a4e2-2d547bbe7358",
-    "paymentCardReference": "pm_c8571ad7b9c81812",
+    "paymentCardReference": "pm_8567ce62b5e8aade",
     "cardTransactionAccountReference": "ACC-017",
     "cardTransactionAmount": {
       "amount": 1309.54,
@@ -3715,7 +3715,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Lynch - Price",
-    "cardTransactionMaskedPanDisplay": "****-****-****-8066",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2164",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-20T11:42:24.547Z",
@@ -3724,7 +3724,7 @@
   },
   {
     "cardTransactionInstanceReference": "49bb193f-2d71-4c0f-846a-c77bc8262fe2",
-    "paymentCardReference": "pm_c6f42b9d9adb5e95",
+    "paymentCardReference": "pm_06c7267218fd6ea3",
     "cardTransactionAccountReference": "ACC-018",
     "cardTransactionAmount": {
       "amount": 1509.36,
@@ -3736,7 +3736,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Jakubowski - Morissette",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7564",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4487",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-10T15:18:42.989Z",
@@ -3745,7 +3745,7 @@
   },
   {
     "cardTransactionInstanceReference": "e22f5608-512c-48b0-ad2f-4d0c52a7b837",
-    "paymentCardReference": "pm_2274fdf5e363e030",
+    "paymentCardReference": "pm_bcd7e5e9cfa326d6",
     "cardTransactionAccountReference": "ACC-019",
     "cardTransactionAmount": {
       "amount": 923.39,
@@ -3757,7 +3757,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Crist and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-0094",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8346",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-04T00:49:50.178Z",
@@ -3766,7 +3766,7 @@
   },
   {
     "cardTransactionInstanceReference": "77aeefd0-5869-4407-b9ed-7278d523e608",
-    "paymentCardReference": "pm_51750f8fe7388d48",
+    "paymentCardReference": "pm_e3b5b4fa92766d91",
     "cardTransactionAccountReference": "ACC-020",
     "cardTransactionAmount": {
       "amount": 547.86,
@@ -3778,7 +3778,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Stehr - Yundt",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6673",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7350",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-07T02:38:23.136Z",
@@ -3787,7 +3787,7 @@
   },
   {
     "cardTransactionInstanceReference": "e7ffe575-95d6-4353-bb9b-72a353630d02",
-    "paymentCardReference": "pm_7b1812968bffd782",
+    "paymentCardReference": "pm_f3c7f6cdadb3c103",
     "cardTransactionAccountReference": "ACC-021",
     "cardTransactionAmount": {
       "amount": 740,
@@ -3799,7 +3799,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Wiegand - Ledner",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1203",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1380",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-09T06:06:04.049Z",
@@ -3808,7 +3808,7 @@
   },
   {
     "cardTransactionInstanceReference": "b74c1e94-b547-4fa2-aaab-8bf0fc481f73",
-    "paymentCardReference": "pm_4c6134558acf6f12",
+    "paymentCardReference": "pm_d473e40773eebf98",
     "cardTransactionAccountReference": "ACC-022",
     "cardTransactionAmount": {
       "amount": 1191.96,
@@ -3820,7 +3820,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Jakubowski, Price and Weber",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1820",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3407",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-16T20:47:56.284Z",
@@ -3829,7 +3829,7 @@
   },
   {
     "cardTransactionInstanceReference": "57f4aaf8-92e7-4307-8e51-ba338b13bd9d",
-    "paymentCardReference": "pm_aa5fc4637e16e677",
+    "paymentCardReference": "pm_177a6b6a00b8fd05",
     "cardTransactionAccountReference": "ACC-023",
     "cardTransactionAmount": {
       "amount": 436.4,
@@ -3841,7 +3841,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Predovic - Price",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4691",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3424",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-18T04:32:59.509Z",
@@ -3850,7 +3850,7 @@
   },
   {
     "cardTransactionInstanceReference": "03cafbeb-4799-489e-98a6-9b2a86a76578",
-    "paymentCardReference": "pm_6fc768e15f383d2d",
+    "paymentCardReference": "pm_9880794a78bf08ac",
     "cardTransactionAccountReference": "ACC-024",
     "cardTransactionAmount": {
       "amount": 1116.34,
@@ -3862,7 +3862,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Heller and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1475",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1313",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-22T14:59:44.751Z",
@@ -3871,7 +3871,7 @@
   },
   {
     "cardTransactionInstanceReference": "02c69ea1-12f5-41c1-9c25-c89872567033",
-    "paymentCardReference": "pm_c5bef4ee560e40e7",
+    "paymentCardReference": "pm_6ed827b736d3c420",
     "cardTransactionAccountReference": "ACC-025",
     "cardTransactionAmount": {
       "amount": 688.33,
@@ -3883,7 +3883,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Boyle - Stokes",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9710",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5749",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-24T07:47:48.529Z",
@@ -3892,7 +3892,7 @@
   },
   {
     "cardTransactionInstanceReference": "26cb2289-c219-4f12-9012-362107b18a30",
-    "paymentCardReference": "pm_c41292f11899cb1b",
+    "paymentCardReference": "pm_09bcacdac09e9efd",
     "cardTransactionAccountReference": "ACC-026",
     "cardTransactionAmount": {
       "amount": 803.59,
@@ -3904,7 +3904,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Weber, Hudson and Kuvalis",
-    "cardTransactionMaskedPanDisplay": "****-****-****-8412",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0310",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-01T12:35:50.887Z",
@@ -3913,7 +3913,7 @@
   },
   {
     "cardTransactionInstanceReference": "1a22936f-2f7a-4068-89c5-a0db48c8586e",
-    "paymentCardReference": "pm_3f82f55cfc6de3a4",
+    "paymentCardReference": "pm_73e68a8df6c13587",
     "cardTransactionAccountReference": "ACC-027",
     "cardTransactionAmount": {
       "amount": 520.55,
@@ -3925,7 +3925,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Mann, Mitchell and Harber",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9960",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4544",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-26T00:01:30.675Z",
@@ -3934,7 +3934,7 @@
   },
   {
     "cardTransactionInstanceReference": "75bcef66-eda1-4767-b0dd-889bf466068f",
-    "paymentCardReference": "pm_c56fb13eb3633e48",
+    "paymentCardReference": "pm_b2feeaa06d464d2f",
     "cardTransactionAccountReference": "ACC-028",
     "cardTransactionAmount": {
       "amount": 1056.1,
@@ -3946,7 +3946,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Glover - Schimmel",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5392",
+    "cardTransactionMaskedPanDisplay": "****-****-****-9265",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-18T06:04:17.028Z",
@@ -3955,7 +3955,7 @@
   },
   {
     "cardTransactionInstanceReference": "f30aa4a5-f648-42e8-bbc8-e24669a4e61b",
-    "paymentCardReference": "pm_186c9f24a90bdf3e",
+    "paymentCardReference": "pm_c74772a7f0e11ba9",
     "cardTransactionAccountReference": "ACC-029",
     "cardTransactionAmount": {
       "amount": 708.35,
@@ -3967,7 +3967,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Wehner, Klein and Lynch",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9809",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7283",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-22T11:04:33.160Z",
@@ -3976,7 +3976,7 @@
   },
   {
     "cardTransactionInstanceReference": "2dba126b-60a2-40c1-9547-21e6af88cd76",
-    "paymentCardReference": "pm_5e4f772dad100b09",
+    "paymentCardReference": "pm_90711498c1c2e7b9",
     "cardTransactionAccountReference": "ACC-030",
     "cardTransactionAmount": {
       "amount": 419.87,
@@ -3988,7 +3988,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Kautzer, Christiansen and Pacocha",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9303",
+    "cardTransactionMaskedPanDisplay": "****-****-****-7919",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-27T21:55:00.958Z",
@@ -3997,7 +3997,7 @@
   },
   {
     "cardTransactionInstanceReference": "b78c3a1d-cc47-41ee-82b2-25cdb4aa74e9",
-    "paymentCardReference": "pm_626a69c8bc0485f6",
+    "paymentCardReference": "pm_ed29bb97801fe424",
     "cardTransactionAccountReference": "ACC-031",
     "cardTransactionAmount": {
       "amount": 537.54,
@@ -4009,7 +4009,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Reilly, Will and Von",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4541",
+    "cardTransactionMaskedPanDisplay": "****-****-****-9820",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-09T06:52:25.062Z",
@@ -4018,7 +4018,7 @@
   },
   {
     "cardTransactionInstanceReference": "965e722e-c397-4dc5-be38-766312d762c5",
-    "paymentCardReference": "pm_425a42b1b54338eb",
+    "paymentCardReference": "pm_32076a626c373a47",
     "cardTransactionAccountReference": "ACC-032",
     "cardTransactionAmount": {
       "amount": 239.33,
@@ -4030,7 +4030,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Goodwin - Fritsch",
-    "cardTransactionMaskedPanDisplay": "****-****-****-3670",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0842",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-09T17:23:45.873Z",
@@ -4039,7 +4039,7 @@
   },
   {
     "cardTransactionInstanceReference": "dddb3b72-9923-4a1d-bca8-1e8474c578a4",
-    "paymentCardReference": "pm_beea772ffe472e54",
+    "paymentCardReference": "pm_2143c3f10c924026",
     "cardTransactionAccountReference": "ACC-033",
     "cardTransactionAmount": {
       "amount": 1259.63,
@@ -4051,7 +4051,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Turner, Baumbach and Satterfield",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9632",
+    "cardTransactionMaskedPanDisplay": "****-****-****-3555",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-09T06:02:14.119Z",
@@ -4060,7 +4060,7 @@
   },
   {
     "cardTransactionInstanceReference": "29178fce-d982-462b-bf75-b4085660ccc7",
-    "paymentCardReference": "pm_8e8fe0dc19413728",
+    "paymentCardReference": "pm_cfe0563f94f8ae33",
     "cardTransactionAccountReference": "ACC-034",
     "cardTransactionAmount": {
       "amount": 602.5,
@@ -4072,7 +4072,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Wunsch, Kris and Pacocha",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4369",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1529",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-04T18:37:02.246Z",
@@ -4081,7 +4081,7 @@
   },
   {
     "cardTransactionInstanceReference": "8dd6252c-e41a-4990-af34-a6de4a9a006c",
-    "paymentCardReference": "pm_8d2cd8ab7193c346",
+    "paymentCardReference": "pm_165ae376b5876db9",
     "cardTransactionAccountReference": "ACC-035",
     "cardTransactionAmount": {
       "amount": 981.8,
@@ -4093,7 +4093,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Weissnat - Walter",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5686",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0285",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-14T18:27:24.848Z",
@@ -4102,7 +4102,7 @@
   },
   {
     "cardTransactionInstanceReference": "e8d4c443-e610-4648-92c7-4a832b6993b8",
-    "paymentCardReference": "pm_b7f0731ee8601540",
+    "paymentCardReference": "pm_30eddc65c67a6f14",
     "cardTransactionAccountReference": "ACC-036",
     "cardTransactionAmount": {
       "amount": 918.24,
@@ -4114,7 +4114,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Ebert Group",
-    "cardTransactionMaskedPanDisplay": "****-****-****-0986",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4214",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-05T13:54:35.714Z",
@@ -4123,7 +4123,7 @@
   },
   {
     "cardTransactionInstanceReference": "12e0b7e1-8637-4dad-90eb-8c3428ad9653",
-    "paymentCardReference": "pm_8843e04f12f24cd5",
+    "paymentCardReference": "pm_5cdd47d4b88e98b9",
     "cardTransactionAccountReference": "ACC-037",
     "cardTransactionAmount": {
       "amount": 696.05,
@@ -4135,7 +4135,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Feest - Mraz",
-    "cardTransactionMaskedPanDisplay": "****-****-****-0748",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0835",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-17T14:27:10.768Z",
@@ -4144,7 +4144,7 @@
   },
   {
     "cardTransactionInstanceReference": "1a3873ab-059f-4335-a6e9-e43f1a0c02f5",
-    "paymentCardReference": "pm_dd34f5fcf7a61535",
+    "paymentCardReference": "pm_0c81f7fb6c99f847",
     "cardTransactionAccountReference": "ACC-038",
     "cardTransactionAmount": {
       "amount": 1480.22,
@@ -4156,7 +4156,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Durgan - Simonis",
-    "cardTransactionMaskedPanDisplay": "****-****-****-6322",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2017",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-19T10:50:57.929Z",
@@ -4165,7 +4165,7 @@
   },
   {
     "cardTransactionInstanceReference": "bb222453-81b8-4c21-8e53-41a3c3b38b90",
-    "paymentCardReference": "pm_ac50e12244dd2712",
+    "paymentCardReference": "pm_945c8e554afd14d7",
     "cardTransactionAccountReference": "ACC-039",
     "cardTransactionAmount": {
       "amount": 843.28,
@@ -4177,7 +4177,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Schultz and Sons",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5511",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1362",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-11T14:28:37.603Z",
@@ -4186,7 +4186,7 @@
   },
   {
     "cardTransactionInstanceReference": "0f6e2ea9-2533-4393-8246-77624010aca8",
-    "paymentCardReference": "pm_e2786a63286e1723",
+    "paymentCardReference": "pm_ec221b7a27dbec57",
     "cardTransactionAccountReference": "ACC-040",
     "cardTransactionAmount": {
       "amount": 707.28,
@@ -4198,7 +4198,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Carter - Morar",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7281",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4579",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-24T18:38:36.336Z",
@@ -4207,7 +4207,7 @@
   },
   {
     "cardTransactionInstanceReference": "6a886d6b-d841-49e3-ba88-097240713eb7",
-    "paymentCardReference": "pm_7283d8911b1a87f5",
+    "paymentCardReference": "pm_7f3842cb2069549a",
     "cardTransactionAccountReference": "ACC-041",
     "cardTransactionAmount": {
       "amount": 1022.94,
@@ -4219,7 +4219,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Wyman - Yost",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4829",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8545",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-02T12:37:20.446Z",
@@ -4228,7 +4228,7 @@
   },
   {
     "cardTransactionInstanceReference": "500a984e-7195-43eb-b5bb-dfc5700e4830",
-    "paymentCardReference": "pm_e42dbb0314689fef",
+    "paymentCardReference": "pm_a1cad5bfd3339d47",
     "cardTransactionAccountReference": "ACC-042",
     "cardTransactionAmount": {
       "amount": 679.86,
@@ -4240,7 +4240,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Larkin - Funk",
-    "cardTransactionMaskedPanDisplay": "****-****-****-1678",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8854",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-22T18:12:26.734Z",
@@ -4249,7 +4249,7 @@
   },
   {
     "cardTransactionInstanceReference": "a2697f6a-fa80-4f0a-803f-02065dfc576f",
-    "paymentCardReference": "pm_529c682e12bb3445",
+    "paymentCardReference": "pm_8164986a5fce688c",
     "cardTransactionAccountReference": "ACC-043",
     "cardTransactionAmount": {
       "amount": 700.51,
@@ -4261,7 +4261,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5812",
     "cardTransactionMerchantName": "Ratke Group",
-    "cardTransactionMaskedPanDisplay": "****-****-****-4315",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4348",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-07T07:10:03.345Z",
@@ -4270,7 +4270,7 @@
   },
   {
     "cardTransactionInstanceReference": "84df9003-5026-45cc-8a8f-ca3e0769d218",
-    "paymentCardReference": "pm_e8120fd3df3abb36",
+    "paymentCardReference": "pm_fef3e32908f3e72e",
     "cardTransactionAccountReference": "ACC-044",
     "cardTransactionAmount": {
       "amount": 799.74,
@@ -4282,7 +4282,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "6011",
     "cardTransactionMerchantName": "Kunze Inc",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7118",
+    "cardTransactionMaskedPanDisplay": "****-****-****-5308",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-08T03:34:38.824Z",
@@ -4291,7 +4291,7 @@
   },
   {
     "cardTransactionInstanceReference": "a7e956c8-7a62-4443-82cc-97617425be23",
-    "paymentCardReference": "pm_aff1645db6ca6e69",
+    "paymentCardReference": "pm_63b185e2c5d7d3e7",
     "cardTransactionAccountReference": "ACC-045",
     "cardTransactionAmount": {
       "amount": 344.77,
@@ -4303,7 +4303,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "7995",
     "cardTransactionMerchantName": "Sauer LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-0936",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0914",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-11T14:44:07.137Z",
@@ -4312,7 +4312,7 @@
   },
   {
     "cardTransactionInstanceReference": "b56a030e-a6c4-4b5b-9721-eea61a84644d",
-    "paymentCardReference": "pm_195632554dede69d",
+    "paymentCardReference": "pm_4d6c6682e2c5428a",
     "cardTransactionAccountReference": "ACC-046",
     "cardTransactionAmount": {
       "amount": 336.9,
@@ -4324,7 +4324,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5734",
     "cardTransactionMerchantName": "Bailey - Wisozk",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7590",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0348",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-04-30T17:06:27.104Z",
@@ -4333,7 +4333,7 @@
   },
   {
     "cardTransactionInstanceReference": "b4acd29e-bd73-4ab8-988f-6f93af736435",
-    "paymentCardReference": "pm_4f29bd9a61faeab9",
+    "paymentCardReference": "pm_276f4b12e383da12",
     "cardTransactionAccountReference": "ACC-047",
     "cardTransactionAmount": {
       "amount": 452.2,
@@ -4345,7 +4345,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5411",
     "cardTransactionMerchantName": "Kuphal LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-9482",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2823",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-02T21:43:54.784Z",
@@ -4354,7 +4354,7 @@
   },
   {
     "cardTransactionInstanceReference": "0b9029ad-e528-47be-a67f-3ea56526426d",
-    "paymentCardReference": "pm_9be89a6ba7f75d3c",
+    "paymentCardReference": "pm_b08013bf40403d6c",
     "cardTransactionAccountReference": "ACC-048",
     "cardTransactionAmount": {
       "amount": 174.38,
@@ -4366,7 +4366,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5912",
     "cardTransactionMerchantName": "Cartwright, Ebert and Friesen",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7330",
+    "cardTransactionMaskedPanDisplay": "****-****-****-6486",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-08T17:23:16.087Z",
@@ -4375,7 +4375,7 @@
   },
   {
     "cardTransactionInstanceReference": "58d67d71-e337-4b4f-b7f9-23414abd3af5",
-    "paymentCardReference": "pm_c857c761acf7d08f",
+    "paymentCardReference": "pm_0d52870eef5c7f27",
     "cardTransactionAccountReference": "ACC-049",
     "cardTransactionAmount": {
       "amount": 942.78,
@@ -4387,7 +4387,7 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "4814",
     "cardTransactionMerchantName": "Bednar LLC",
-    "cardTransactionMaskedPanDisplay": "****-****-****-5010",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2865",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-01T17:14:13.278Z",
@@ -4396,7 +4396,7 @@
   },
   {
     "cardTransactionInstanceReference": "294163c9-81b0-46b9-b627-7a6e0789bc5a",
-    "paymentCardReference": "pm_ba01517614a64280",
+    "paymentCardReference": "pm_57fc53d5a2ba0dc1",
     "cardTransactionAccountReference": "ACC-050",
     "cardTransactionAmount": {
       "amount": 978.26,
@@ -4408,11 +4408,515 @@
     "cardTransactionInitiationType": "customerInitiated",
     "cardTransactionMerchantCategoryCode": "5999",
     "cardTransactionMerchantName": "Von, Emard and Bogisich",
-    "cardTransactionMaskedPanDisplay": "****-****-****-7583",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2949",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
     "recordCreatedDateTime": "2026-05-25T05:51:05.108Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
+  },
+  {
+    "cardTransactionInstanceReference": "d119828d-c017-466d-a898-fbfa80eac966",
+    "paymentCardReference": "pm_b04c9532c0cb4194",
+    "cardTransactionAccountReference": "ACC-DC-62191055",
+    "cardTransactionAmount": {
+      "amount": 415.55,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-05-10T14:00:00.000Z",
+    "cardTransactionStatus": "authorized",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "atm",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "5812",
+    "cardTransactionMerchantName": "Orbit Electronics",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1055",
+    "cardTransactionDescription": "ORBIT ELECTRONICS",
+    "cardTransactionNarrative": "PURCHASE at Orbit Electronics - ref 1B8C79CF",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-05-10T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "875fb075-65fa-43f3-af41-4e5e138e4bca",
+    "paymentCardReference": "pm_b04c9532c0cb4194",
+    "cardTransactionAccountReference": "ACC-DC-62191055",
+    "cardTransactionAmount": {
+      "amount": 24.74,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-04-27T14:00:00.000Z",
+    "cardTransactionStatus": "settled",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "contactless",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "5734",
+    "cardTransactionMerchantName": "Harbour Books",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1055",
+    "cardTransactionDescription": "HARBOUR BOOKS",
+    "cardTransactionNarrative": "PURCHASE at Harbour Books - ref 1B8C98BE",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-04-27T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "24ea09b0-8348-478b-ac55-424d2de6f550",
+    "paymentCardReference": "pm_b04c9532c0cb4194",
+    "cardTransactionAccountReference": "ACC-DC-62191055",
+    "cardTransactionAmount": {
+      "amount": 103.93,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-04-16T14:00:00.000Z",
+    "cardTransactionStatus": "disputed",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "contactless",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "7372",
+    "cardTransactionMerchantName": "Orbit Electronics",
+    "cardTransactionMaskedPanDisplay": "****-****-****-1055",
+    "cardTransactionDescription": "ORBIT ELECTRONICS",
+    "cardTransactionNarrative": "PURCHASE at Orbit Electronics - ref 1B8CB7AD",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-04-16T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "a61c6386-2872-47e7-89d9-8bdbc4acf516",
+    "paymentCardReference": "pm_dd0359f295646a6a608cd1b32403",
+    "cardTransactionAccountReference": "ACC-AO-20260101",
+    "cardTransactionAmount": {
+      "amount": 325.41,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-05-24T14:00:00.000Z",
+    "cardTransactionStatus": "authorized",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "pos",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "5912",
+    "cardTransactionMerchantName": "Corner Bakery",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2403",
+    "cardTransactionDescription": "CORNER BAKERY",
+    "cardTransactionNarrative": "PURCHASE at Corner Bakery - ref F1A86551",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-05-24T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "0a82fccf-e530-4b2e-982c-cb7e72d846bb",
+    "paymentCardReference": "pm_dd0359f295646a6a608cd1b32403",
+    "cardTransactionAccountReference": "ACC-AO-20260101",
+    "cardTransactionAmount": {
+      "amount": 404.6,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-05-25T14:00:00.000Z",
+    "cardTransactionStatus": "settled",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "pos",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "4814",
+    "cardTransactionMerchantName": "Leafy Grocers",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2403",
+    "cardTransactionDescription": "LEAFY GROCERS",
+    "cardTransactionNarrative": "PURCHASE at Leafy Grocers - ref F1A88440",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-05-25T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "c106e457-05b7-4426-9bd4-eb65bb9f1254",
+    "paymentCardReference": "pm_dd0359f295646a6a608cd1b32403",
+    "cardTransactionAccountReference": "ACC-AO-20260101",
+    "cardTransactionAmount": {
+      "amount": 483.79,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-01-28T14:00:00.000Z",
+    "cardTransactionStatus": "disputed",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "online",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "5411",
+    "cardTransactionMerchantName": "Orbit Electronics",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2403",
+    "cardTransactionDescription": "ORBIT ELECTRONICS",
+    "cardTransactionNarrative": "PURCHASE at Orbit Electronics - ref F1A8A32F",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-01-28T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "61d95357-5bf6-4bbc-8c49-2565cb519869",
+    "paymentCardReference": "pm_17d7cd2888a0f20c",
+    "cardTransactionAccountReference": "ACC-LF-20260610",
+    "cardTransactionAmount": {
+      "amount": 102.31,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-05-14T14:00:00.000Z",
+    "cardTransactionStatus": "settled",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "atm",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "5912",
+    "cardTransactionMerchantName": "Corner Bakery",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4021",
+    "cardTransactionDescription": "CORNER BAKERY",
+    "cardTransactionNarrative": "PURCHASE at Corner Bakery - ref C7C450D3",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-05-14T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "d1b0304d-d717-481e-a48c-c2ae1f015840",
+    "paymentCardReference": "pm_17d7cd2888a0f20c",
+    "cardTransactionAccountReference": "ACC-LF-20260610",
+    "cardTransactionAmount": {
+      "amount": 181.5,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-05-05T14:00:00.000Z",
+    "cardTransactionStatus": "settled",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "atm",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "4814",
+    "cardTransactionMerchantName": "Leafy Grocers",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4021",
+    "cardTransactionDescription": "LEAFY GROCERS",
+    "cardTransactionNarrative": "PURCHASE at Leafy Grocers - ref C7C46FC2",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-05-05T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "38770e13-21c4-49cd-9caf-8fe9fe86ff71",
+    "paymentCardReference": "pm_17d7cd2888a0f20c",
+    "cardTransactionAccountReference": "ACC-LF-20260610",
+    "cardTransactionAmount": {
+      "amount": 260.69,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-04-28T14:00:00.000Z",
+    "cardTransactionStatus": "declined",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "contactless",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "5411",
+    "cardTransactionMerchantName": "Corner Bakery",
+    "cardTransactionMaskedPanDisplay": "****-****-****-4021",
+    "cardTransactionDescription": "CORNER BAKERY",
+    "cardTransactionNarrative": "PURCHASE at Corner Bakery - ref C7C48EB1",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-04-28T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "5614d562-b6d1-4afc-94c8-ebc0149a8f0a",
+    "paymentCardReference": "pm_593e110f7b5a05ba1b9043fd6266",
+    "cardTransactionAccountReference": "ACC-CG-20260610",
+    "cardTransactionAmount": {
+      "amount": 449.75,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-04-20T14:00:00.000Z",
+    "cardTransactionStatus": "authorized",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "online",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "4814",
+    "cardTransactionMerchantName": "Leafy Grocers",
+    "cardTransactionMaskedPanDisplay": "****-****-****-6266",
+    "cardTransactionDescription": "LEAFY GROCERS",
+    "cardTransactionNarrative": "PURCHASE at Leafy Grocers - ref DA626503",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-04-20T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "e41d027f-49e7-454b-9356-a551ae7a31ee",
+    "paymentCardReference": "pm_593e110f7b5a05ba1b9043fd6266",
+    "cardTransactionAccountReference": "ACC-CG-20260610",
+    "cardTransactionAmount": {
+      "amount": 58.94,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-03-18T14:00:00.000Z",
+    "cardTransactionStatus": "settled",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "atm",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "5812",
+    "cardTransactionMerchantName": "Corner Bakery",
+    "cardTransactionMaskedPanDisplay": "****-****-****-6266",
+    "cardTransactionDescription": "CORNER BAKERY",
+    "cardTransactionNarrative": "PURCHASE at Corner Bakery - ref DA6283F2",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-03-18T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "1c92ca6c-7d93-4554-8a77-d2865f2f806c",
+    "paymentCardReference": "pm_593e110f7b5a05ba1b9043fd6266",
+    "cardTransactionAccountReference": "ACC-CG-20260610",
+    "cardTransactionAmount": {
+      "amount": 138.13,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-02-15T14:00:00.000Z",
+    "cardTransactionStatus": "disputed",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "atm",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "5734",
+    "cardTransactionMerchantName": "Leafy Grocers",
+    "cardTransactionMaskedPanDisplay": "****-****-****-6266",
+    "cardTransactionDescription": "LEAFY GROCERS",
+    "cardTransactionNarrative": "PURCHASE at Leafy Grocers - ref DA62A2E1",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-02-15T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "54bc3bb8-454f-4057-a8aa-c4dab951838b",
+    "paymentCardReference": "pm_a9f0066cbc12632b",
+    "cardTransactionAccountReference": "ACC-PP-20260610",
+    "cardTransactionAmount": {
+      "amount": 226.65,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-05-20T14:00:00.000Z",
+    "cardTransactionStatus": "settled",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "contactless",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "4814",
+    "cardTransactionMerchantName": "Northwind Travel",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8367",
+    "cardTransactionDescription": "NORTHWIND TRAVEL",
+    "cardTransactionNarrative": "PURCHASE at Northwind Travel - ref B07E5085",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-05-20T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "d106e6e3-dd05-4957-aea1-8a930e74b0c2",
+    "paymentCardReference": "pm_a9f0066cbc12632b",
+    "cardTransactionAccountReference": "ACC-PP-20260610",
+    "cardTransactionAmount": {
+      "amount": 305.84,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-05-17T14:00:00.000Z",
+    "cardTransactionStatus": "settled",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "pos",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "5411",
+    "cardTransactionMerchantName": "Metro Transit",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8367",
+    "cardTransactionDescription": "METRO TRANSIT",
+    "cardTransactionNarrative": "PURCHASE at Metro Transit - ref B07E6F74",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-05-17T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "9ca9daf1-9be5-46de-a10c-c62640733d46",
+    "paymentCardReference": "pm_a9f0066cbc12632b",
+    "cardTransactionAccountReference": "ACC-PP-20260610",
+    "cardTransactionAmount": {
+      "amount": 385.03,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-05-16T14:00:00.000Z",
+    "cardTransactionStatus": "disputed",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "pos",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "5999",
+    "cardTransactionMerchantName": "Leafy Grocers",
+    "cardTransactionMaskedPanDisplay": "****-****-****-8367",
+    "cardTransactionDescription": "LEAFY GROCERS",
+    "cardTransactionNarrative": "PURCHASE at Leafy Grocers - ref B07E8E63",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-05-16T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "9db47d84-5ac1-4526-a051-21a5293eaa51",
+    "paymentCardReference": "pm_dcbc07138ce8d06a",
+    "cardTransactionAccountReference": "ACC-MG-20260101",
+    "cardTransactionAmount": {
+      "amount": 109.15,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-05-10T14:00:00.000Z",
+    "cardTransactionStatus": "settled",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "pos",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "7372",
+    "cardTransactionMerchantName": "Northwind Travel",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2107",
+    "cardTransactionDescription": "NORTHWIND TRAVEL",
+    "cardTransactionNarrative": "PURCHASE at Northwind Travel - ref 4A17AC47",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-05-10T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "153c5634-d6ff-42fd-9fda-0f13900dd1cf",
+    "paymentCardReference": "pm_dcbc07138ce8d06a",
+    "cardTransactionAccountReference": "ACC-MG-20260101",
+    "cardTransactionAmount": {
+      "amount": 188.34,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-04-27T14:00:00.000Z",
+    "cardTransactionStatus": "authorized",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "online",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "5912",
+    "cardTransactionMerchantName": "Metro Transit",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2107",
+    "cardTransactionDescription": "METRO TRANSIT",
+    "cardTransactionNarrative": "PURCHASE at Metro Transit - ref 4A17CB36",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-04-27T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "b2fdb3c8-9f05-4a8d-8f02-fd6f1013d48c",
+    "paymentCardReference": "pm_dcbc07138ce8d06a",
+    "cardTransactionAccountReference": "ACC-MG-20260101",
+    "cardTransactionAmount": {
+      "amount": 267.53,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-04-16T14:00:00.000Z",
+    "cardTransactionStatus": "disputed",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "online",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "4814",
+    "cardTransactionMerchantName": "Northwind Travel",
+    "cardTransactionMaskedPanDisplay": "****-****-****-2107",
+    "cardTransactionDescription": "NORTHWIND TRAVEL",
+    "cardTransactionNarrative": "PURCHASE at Northwind Travel - ref 4A17EA25",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-04-16T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "84640196-3ca1-49b4-afd8-db41f40f3596",
+    "paymentCardReference": "pm_612186625eec7586",
+    "cardTransactionAccountReference": "ACC-AH-20260201",
+    "cardTransactionAmount": {
+      "amount": 356.05,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-04-30T14:00:00.000Z",
+    "cardTransactionStatus": "authorized",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "atm",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "7372",
+    "cardTransactionMerchantName": "Bluebell Pharmacy",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0197",
+    "cardTransactionDescription": "BLUEBELL PHARMACY",
+    "cardTransactionNarrative": "PURCHASE at Bluebell Pharmacy - ref 203397C9",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-04-30T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "0bbd28cb-99e9-4406-92ef-2edc050d9276",
+    "paymentCardReference": "pm_612186625eec7586",
+    "cardTransactionAccountReference": "ACC-AH-20260201",
+    "cardTransactionAmount": {
+      "amount": 435.24,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-04-07T14:00:00.000Z",
+    "cardTransactionStatus": "settled",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "contactless",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "5912",
+    "cardTransactionMerchantName": "Cloudline Software",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0197",
+    "cardTransactionDescription": "CLOUDLINE SOFTWARE",
+    "cardTransactionNarrative": "PURCHASE at Cloudline Software - ref 2033B6B8",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-04-07T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "173b41c2-d618-4c88-a15a-c17c84c60de4",
+    "paymentCardReference": "pm_612186625eec7586",
+    "cardTransactionAccountReference": "ACC-AH-20260201",
+    "cardTransactionAmount": {
+      "amount": 44.43,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-03-17T14:00:00.000Z",
+    "cardTransactionStatus": "disputed",
+    "cardTransactionType": "purchase",
+    "cardTransactionChannel": "contactless",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionMerchantCategoryCode": "4814",
+    "cardTransactionMerchantName": "Northwind Travel",
+    "cardTransactionMaskedPanDisplay": "****-****-****-0197",
+    "cardTransactionDescription": "NORTHWIND TRAVEL",
+    "cardTransactionNarrative": "PURCHASE at Northwind Travel - ref 2033D5A7",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-03-17T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
+    "schemaVersion": 3
   }
 ]

@@ -2235,3 +2235,52 @@ KYC route. That would widen those roles into every other admin module as a side 
 least-privilege regression (PCI DSS 7.2.2, EBA §31(a)) introduced for a UI convenience.
 
 *Added 2026-07-29 (v32; doc + code together per repo rules).*
+
+### ADR-054: the data generator is additive and refuses to clobber
+
+**Decision.** `bin/seed-generate.ts` reads the existing `backend/data/*.json`, keeps every record it
+finds byte-for-byte, and only appends what is needed to reach its target floors. `write()` refuses to
+reduce any collection's record count and fails the run unless `--force` is passed. A second run over
+its own output is a no-op, so the generator is safe to invoke at any point in the lifecycle.
+
+**Context.** The generator produced 50 customer parties, 3 employee parties and 5 logins. The fixtures
+had been curated up to 57, 11 and 20 across many iterations, and `ensureDataFiles()` only runs the
+generator when the files are **absent**, so the drift was invisible. Anyone running
+`npm run generate:data` would have silently deleted 8 staff parties, most of the curated login roster
+and the demo cast the storyline depends on.
+
+**Rejected alternative.** Bringing the generator up to the fixtures, by encoding the 57 customers, the
+11 employees and the 20 curated logins in the generator so its output equals the current files. It is
+cleaner conceptually, and it is exactly what caused the drift: it hard-codes curated demo content into
+a generator, so the two must then be kept in step by hand forever. Additive inverts the dependency:
+curated content lives only in the fixtures, and the generator's job is to top up a synthetic
+population, never to own the cast.
+
+**Consequence.** The fixtures are the source of truth for the population, so the population invariants
+are asserted against them (`seedDataIntegrity.test.ts`) rather than against a live database, and the
+shared repairs in `vendors/seed/dataIntegrity.ts` are applied by both the generator and the runtime
+seeders. Growing the demo means editing a fixture or raising a floor, never rewriting the generator.
+
+*Added 2026-07-29 (v33; doc + code together per repo rules).*
+
+### ADR-055: a shared card token is a compliance signal, not a duplicate key
+
+**Decision.** `paymentCardManagement.paymentCardReference` is deliberately **not** unique. Uniqueness
+is on the pair `(customerAgreementInstanceReference, paymentCardReference)`: the SD-88 control record
+is the per-customer card-on-file *arrangement*, and one physical card may legitimately be on file for
+several customers. The distinct-holder count is materialized in `paymentCardRegistry.cardHolderCount`
+and is the FDS/AML shared-card signal (a count above three trips the compliance indicator and is
+surfaced to the cardholder as "this card is also on file for N other people").
+
+**Context.** The v33 audit read the two multi-holder tokens (`pm_shared00000a4153` on 5 arrangements,
+`pm_shared00000b8821` on 2) as a duplicate-key defect and proposed regenerating them plus a unique
+index on the token alone. That would have deleted the shared-card capability: the seeded holders are
+the only population the signal has to fire on.
+
+**Consequence.** The token is a PAN surrogate, so a token-only lookup is inherently ambiguous when a
+card is shared. `getCardByToken` therefore documents itself as a best-effort global check and takes an
+optional `customerRef` for the correct per-customer view. Where the seed must resolve a token to one
+holder (repointing a transaction to its card, v33 F3), it prefers a token unique to that holder, so the
+transaction surfaces stay unambiguous while the shared-card demo keeps its population.
+
+*Added 2026-07-29 (v33; doc + code together per repo rules).*

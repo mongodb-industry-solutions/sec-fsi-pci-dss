@@ -972,3 +972,44 @@ in `tmp/dev.v32.plan.md`.
       card-to-`RecordGroup` conversion on the KYC page: deferred, see the execution log.
 
 *Added 2026-07-29 (v32).*
+
+
+## v33: Seed-data integrity and realism
+
+Driver: an audit of the demo population found data that contradicted the storyline. Not a security
+defect (no permission is bypassed and no sensitive value leaks) but a credibility one, visible to
+anyone who clicks twice in front of an audience. Full analysis, decisions and execution log in
+`tmp/dev.v33.plan.md`.
+
+### FR
+
+| Id | Requirement | Acceptance criteria |
+|---|---|---|
+| FR-v33-01 | Regenerating the data never destroys the curated cast | the generator is additive: run over the fixtures, no collection's record count falls and no record present before is missing after; `write()` refuses a reduction unless `--force` is passed; a second run over its own output changes nothing (ADR-054) |
+| FR-v33-02 | The deprecated identity field cannot come back | after `npm run generate:data`, no fixture contains `governmentIdentificationReference` or the string `SYNTH-`; every agreement carries a complete structured document (type, number, issuing country, expiry) whose number is long enough for a last-4 suffix query |
+| FR-v33-03 | Every customer can sign in | all 57 `customer` parties hold exactly one SD-91 login; email and display name come from the party (SD-13 is the source of truth); login emails stay unique; the curated picker still returns exactly 14 featured logins; a reseed is idempotent |
+| FR-v33-04 | Every transaction resolves to its card | 0 transactions carry a token matching no card; for every transaction the card it points at is held by the party its account reference belongs to; the masked PAN on the transaction equals the one derived from that card; fraud-case snapshots agree |
+| FR-v33-05 | No customer is a partial record | all 57 `customer` parties hold an agreement with a KYC record, at least one card, at least one payout account and at least one transaction; David Chen gains the agreement and card he lacked while holding a login, a payout account and a merchant; each completed customer has at least one dispute or decline so the self-service view is not empty (D-3) |
+| FR-v33-06 | A shared card token stays a compliance signal | `paymentCardReference` is not unique on its own; the `(agreement, token)` pair is; at least one token exceeds the 3-holder threshold so `cardHolderCount` has something to trip on; transaction repointing prefers a token unique to the holder (ADR-055) |
+| FR-v33-07 | The audit cannot regress silently | one table-driven invariant test over the fixtures covers referential integrity, uniqueness, population completeness and the card link; the generator contract has its own test that runs the real script into a temporary directory |
+
+### NFR
+
+| Id | Requirement | Acceptance criteria |
+|---|---|---|
+| NFR-v33-01 | Reuse before creation (P8) | one shared `vendors/seed/dataIntegrity.ts` called by both the generator and the runtime seeders, never the same repair written twice; masked PANs come from `deriveMaskedPan`, KYC leaves from `enrichKyc`, the deterministic seed from `screeningHash`, the token shape from the SD-57 tokenization service; the output directory reuses `PSP_SEED_DATA_DIR` |
+| NFR-v33-02 | Setup and seed remain the only source of truth (P7) | every change is applied from `vendors/seed/*` plus the fixtures, both halves together; no ad-hoc migration; the database is rebuilt with `--reset` plus reseed |
+| NFR-v33-03 | No standards deviation | no new collection and no new field; SD-91 authentication stays a control record separate from the SD-53 agreement, so a credential-less customer remains representable and a non-active one is expressed through `customerAuthenticationAccountStatus`; card data handling unchanged (PCI DSS: no PAN, CVV or PIN in a fixture) |
+| NFR-v33-04 | Deterministic and idempotent | every derived reference comes from its parent reference, so regenerating or reseeding produces identical records rather than duplicates |
+
+### Definition of Done
+
+- [x] `test:unit` green (621 tests, 69 files).
+- [x] Both type-checks clean.
+- [x] Generator verified additive and idempotent against the real fixtures.
+- [x] `technical-spec.md` §8 (seed volumes, demo users, synthetic data rules, integrity invariants) updated with the code.
+- [x] ADR-054 and ADR-055 recorded in `engineering-proposal.md`.
+- [ ] Database `--reset` plus reseed: performed by the user (D-2).
+- [ ] E2E: the card link from a transaction detail resolves for staff. Pending the reseed.
+
+*Added 2026-07-29 (v33).*
