@@ -295,7 +295,7 @@ Filters (combinable): \`featured=true\`, \`role=customer,merchant_officer\` (com
     schema: {
       tags: ['system'],
       summary: 'Raw (undecrypted) document from Atlas',
-      description: `**Non-production only  -  blocked in production (403).** Returns the MongoDB document exactly as stored on Atlas, bypassing QE auto-decryption.
+      description: `**Demo endpoint, enabled in every environment; set \`PSP_DEMO_RAW_DOCUMENTS=false\` to disable it (403).** Returns the MongoDB document exactly as stored on Atlas, bypassing QE auto-decryption.
 
 QE-protected fields appear as BSON binary ciphertext  -  this is the core of the **"What does Atlas see?"** demo step.
 
@@ -330,14 +330,17 @@ QE-protected fields appear as BSON binary ciphertext  -  this is the core of the
         },
         400: { $ref: 'Error#' },
         401: { $ref: 'Error#' },
-        403: { description: 'Blocked in production.', $ref: 'Error#' },
+        403: { description: 'Disabled on this deployment (PSP_DEMO_RAW_DOCUMENTS=false).', $ref: 'Error#' },
         404: { $ref: 'Error#' },
         500: { $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
-    if (process.env.NODE_ENV === 'production') {
-      return reply.status(403).send({ error: 'Not available in production' });
+    // Allowed by default (demo system); opt out with PSP_DEMO_RAW_DOCUMENTS=false.
+    if (!config.demo.rawDocuments) {
+      return reply.status(403).send({
+        error: 'Raw document view is disabled on this deployment (PSP_DEMO_RAW_DOCUMENTS=false).',
+      });
     }
 
     const { collection, id } = request.params as { collection: string; id: string };

@@ -52,6 +52,15 @@ export const config = {
     textSearch: pspEnv('QE_TEXT_SEARCH', 'true') !== 'false',
   },
 
+  demo: {
+    // "What does Atlas see?" raw-ciphertext view (GET /system/demo/raw/:collection/:id). It bypasses
+    // QE auto-decryption to show the stored documents, so it is the core of the encryption story and
+    // stays ALLOWED in every environment, including NODE_ENV=production (this is a demo system).
+    // Set PSP_DEMO_RAW_DOCUMENTS=false to turn it off on a deployment that must behave as
+    // production-ready, or on any environment holding real cardholder data.
+    rawDocuments: pspEnv('DEMO_RAW_DOCUMENTS', 'true') !== 'false',
+  },
+
   kms: {
     provider: (pspEnv('KMS_PROVIDER', 'local')!) as 'local' | 'aws',
     localMasterKey: pspEnv('KMS_LOCAL_MASTER_KEY') ?? pspEnv('LOCAL_MASTER_KEY'),

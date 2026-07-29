@@ -2770,6 +2770,15 @@ PSP_PAYMENT_INITIATION_ALWAYS_SUCCEED=true  # Set false to simulate 5% rail fail
 PSP_AIS_ALWAYS_VERIFY=true               # Set false for builtin AIS to return unverified
 PSP_AUDIT_LIST_ACCESS=false              # v29: emit 1 aggregate compliance event per global admin listing (default off)
 
+# ── Demo exposure switches ─────────────────────────────────────────
+# "What does Atlas see?" raw-ciphertext view (GET /system/demo/raw/:collection/:id) bypasses QE
+# auto-decryption. Enabled by default in EVERY environment (this is a demo system, and the view is
+# the encryption story). Set to false to harden a deployment towards production-ready behaviour, or
+# on any environment holding real cardholder data (PCI DSS Req. 7 / 10).
+PSP_DEMO_RAW_DOCUMENTS=true
+# Re-enables /admin/exec under NODE_ENV=production (arbitrary command execution; demo only).
+PSP_ADMIN_ENFORCE=false
+
 # ── Frontend demo convenience (NEXT_PUBLIC_, build-time) ───────────
 # Kill-switch for the OIDC /auth/authorize demo shortcut. Two per-request query params drive it:
 #   prefill_password=<pw>  → prefills the password field (login_hint prefills the email).
