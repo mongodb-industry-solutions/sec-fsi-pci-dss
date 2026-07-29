@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Coffee, LogIn, Menu, X, Package, Users, Send, Wallet, ReceiptText, HelpCircle } from 'lucide-react';
 import { Tip } from './ui/Tooltip';
+import { BRAND } from '@/lib/brand';
 import ProfileMenu, { type ProfileUser } from './ProfileMenu';
 
 export type NavIcon = 'products' | 'beneficiaries' | 'transfers' | 'accounts' | 'history' | 'help';
@@ -33,7 +34,7 @@ export default function NavBar({ links, user }: { links: NavLink[]; user: Profil
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-gradient-to-r from-leaf-ink via-[#032a26] to-leaf-ink text-white shadow-card [backdrop-filter:blur(12px)]">
-      <nav className="mx-auto flex max-w-5xl items-center gap-2 px-4 py-3">
+      <nav className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-3">
         <Link href="/" className="flex items-center gap-2 font-bold tracking-tight transition hover:opacity-90">
           <span className="grid h-8 w-8 place-items-center rounded-xl bg-leaf/15 ring-1 ring-leaf/30">
             <Coffee className="h-4 w-4 text-leaf" aria-hidden />
@@ -66,12 +67,12 @@ export default function NavBar({ links, user }: { links: NavLink[]; user: Profil
           {user ? (
             <ProfileMenu user={user} />
           ) : (
-            <Tip label="Sign in with your Leafy Pay account (OAuth SSO). We never see your card or password.">
+            <Tip label={`Sign in with your ${BRAND.full} account (OAuth SSO). We never see your card or password.`}>
               <a
                 href="/api/auth/login"
                 className="flex items-center gap-2 rounded-xl bg-leaf px-3.5 py-2 text-sm font-semibold text-leaf-ink transition duration-200 hover:shadow-glow hover:brightness-105 active:scale-[.98]"
               >
-                <LogIn className="h-4 w-4" aria-hidden /> Login with Leafy Pay
+                <LogIn className="h-4 w-4" aria-hidden /> Login with {BRAND.full}
               </a>
             </Tip>
           )}
@@ -93,7 +94,7 @@ export default function NavBar({ links, user }: { links: NavLink[]; user: Profil
       {/* Mobile drawer */}
       {user && open && (
         <div className="border-t border-white/10 md:hidden">
-          <div className="mx-auto flex max-w-5xl flex-col gap-1 px-4 py-3">
+          <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-3">
             {links.map((l) => {
               const Icon = ICONS[l.icon];
               return (

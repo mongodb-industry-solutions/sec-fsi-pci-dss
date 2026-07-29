@@ -5,6 +5,7 @@ import { PspClient, PspError } from '@/lib/PspClient';
 import { getSession, hasScope } from '@/lib/session';
 import { ScopeMissing, PspUnavailable } from '@/components/ScopeGate';
 import { Chip, EmptyState, InfoHint } from '@/components/ui/Bits';
+import { BRAND } from '@/lib/brand';
 
 export default async function AccountsPage() {
   const session = await getSession();
@@ -25,13 +26,13 @@ export default async function AccountsPage() {
     <div>
       <h1 className="mb-6 flex items-center gap-2 text-2xl font-bold">
         <Wallet className="h-6 w-6 text-leaf-deep" aria-hidden /> Your accounts
-        <InfoHint label="Payout accounts held at Leafy Pay. IBANs are always masked, so the merchant never receives them in clear (GDPR / PSD2)." />
+        <InfoHint label={`Payout accounts held at ${BRAND.full}. IBANs are always masked, so the merchant never receives them in clear (GDPR / PSD2).`} />
       </h1>
 
       {error ? (
         <PspUnavailable message={error} />
       ) : results.length === 0 ? (
-        <EmptyState icon={<Wallet className="h-8 w-8" />} title="No accounts found" hint="Payout accounts you add in Leafy Pay will appear here." />
+        <EmptyState icon={<Wallet className="h-8 w-8" />} title="No accounts found" hint={`Payout accounts you add in ${BRAND.full} will appear here.`} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {results.map((a, i) => (

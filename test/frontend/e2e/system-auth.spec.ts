@@ -5,6 +5,9 @@
  */
 import { test, expect } from '@playwright/test';
 import { loginAs, json, mintJwt, DemoRole } from './support/auth';
+// Brand name is a single source of truth (frontend/src/config/brand.ts); read it here so the auth
+// assertions survive a rebrand instead of hard-coding the product name.
+import { BRAND } from '../../../frontend/src/config/brand';
 
 const DOMAINS = { domains: [{ name: 'local', displayName: 'Local (Demo Users)', type: 'local', flowType: 'client_credentials' }] };
 const USERS = { users: [
@@ -16,7 +19,6 @@ const USERS = { users: [
 async function stubCommon(page: import('@playwright/test').Page) {
   await page.route('**/api/v1/auth/domains', (r) => r.fulfill(json(DOMAINS)));
   await page.route('**/api/v1/system/users**', (r) => r.fulfill(json(USERS)));
-  await page.route('**/api/v1/auth/users**', (r) => r.fulfill(json(USERS)));
   await page.route('**/api/v1/fraud/stats**', (r) => r.fulfill(json({ total: 0, open: 0, underReview: 0, escalated: 0, resolvedFraud: 0, resolvedCleared: 0, byStatus: [], bySeverity: [], byMonth: [] })));
   await page.route('**/api/v1/providers/vendors**', (r) => r.fulfill(json({ integrations: [] })));
   await page.route('**/api/v1/providers/vendors**', (r) => r.fulfill(json({ integrations: [] })));
@@ -25,9 +27,9 @@ async function stubCommon(page: import('@playwright/test').Page) {
 test.describe('FR-v1-05: login form', () => {
   test.beforeEach(async ({ page, context }) => { await context.clearCookies(); await stubCommon(page); });
 
-  test('renders the Leafy Pay sign-in form', async ({ page }) => {
+  test('renders the branded sign-in form', async ({ page }) => {
     await page.goto('/system');
-    await expect(page.getByRole('heading', { name: 'Leafy Pay' })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: BRAND.full })).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
   });
 
@@ -48,7 +50,7 @@ test.describe('FR-v1-05: login form', () => {
     await page.locator('input[type="password"]').fill('wrong');
     await page.getByRole('button', { name: 'Sign In' }).click();
     await expect(page.locator('text=/invalid|error|failed/i').first()).toBeVisible({ timeout: 5000 });
-    await expect(page.getByRole('heading', { name: 'Leafy Pay' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: BRAND.full })).toBeVisible();
   });
 });
 
@@ -86,7 +88,7 @@ test.describe('FR-v1-05: role-based dashboards', () => {
     const signOut = page.getByRole('menuitem', { name: 'Sign out' });
     await expect(signOut).toBeVisible({ timeout: 4000 });
     await signOut.click();
-    await expect(page.getByRole('heading', { name: 'Leafy Pay' })).toBeVisible({ timeout: 6000 });
+    await expect(page.getByRole('heading', { name: BRAND.full })).toBeVisible({ timeout: 6000 });
   });
 });
 
@@ -96,6 +98,6 @@ test.describe('FR-v1-05: auth guard', () => {
     await stubCommon(page);
     await page.goto('/system/transactions');
     await expect(page).toHaveURL(/\/system$/, { timeout: 8000 });
-    await expect(page.getByRole('heading', { name: 'Leafy Pay' })).toBeVisible({ timeout: 6000 });
+    await expect(page.getByRole('heading', { name: BRAND.full })).toBeVisible({ timeout: 6000 });
   });
 });

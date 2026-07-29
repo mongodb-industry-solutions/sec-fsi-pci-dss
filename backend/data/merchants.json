@@ -7,6 +7,26 @@
     "merchantCountryCode": "US",
     "merchantAgreementStatus": "active",
     "merchantOwnerPartyReference": "b0000001-0000-4000-8000-000000000001",
+    "merchantBeneficialOwners": [
+      {
+        "merchantBeneficialOwnerPartyReference": "b0000001-0000-4000-8000-000000000001",
+        "merchantBeneficialOwnerRole": "ultimate_beneficial_owner",
+        "merchantBeneficialOwnerOwnershipPercentage": 60,
+        "merchantBeneficialOwnerIsPrimary": true,
+        "merchantBeneficialOwnerIsControllingPerson": true,
+        "merchantBeneficialOwnerAddedDateTime": "2026-05-15T10:30:00.000Z",
+        "merchantBeneficialOwnerAddedByPartyReference": "b0000056-0000-4000-8000-000000000056"
+      },
+      {
+        "merchantBeneficialOwnerPartyReference": "b0000002-0000-4000-8000-000000000002",
+        "merchantBeneficialOwnerRole": "shareholder",
+        "merchantBeneficialOwnerOwnershipPercentage": 40,
+        "merchantBeneficialOwnerIsPrimary": false,
+        "merchantBeneficialOwnerIsControllingPerson": true,
+        "merchantBeneficialOwnerAddedDateTime": "2026-05-15T10:30:00.000Z",
+        "merchantBeneficialOwnerAddedByPartyReference": "b0000056-0000-4000-8000-000000000056"
+      }
+    ],
     "merchantTier": "standard",
     "merchantAllowedCurrencies": [
       "EUR"
@@ -25,7 +45,7 @@
       "oauthRedirectUris": ["http://localhost:8082/api/auth/callback", "http://sec-fsi-pci-dss-merchant-web-app:80/api/auth/callback", "https://sec-fsi-pci-dss-merchant.industrysolutions.staging.corp.mongodb.com/api/auth/callback", "https://sec-fsi-pci-dss-merchant.industrysolutions.prod.corp.mongodb.com/api/auth/callback"],
       "oauthPostLogoutRedirectUris": ["http://localhost:8082/", "http://sec-fsi-pci-dss-merchant-web-app:80/", "https://sec-fsi-pci-dss-merchant.industrysolutions.staging.corp.mongodb.com/", "https://sec-fsi-pci-dss-merchant.industrysolutions.prod.corp.mongodb.com/"],
       "oauthGrantTypes": ["authorization_code", "refresh_token", "client_credentials", "urn:openid:params:grant-type:ciba"],
-      "oauthScopes": ["openid", "profile", "read:beneficiaries", "write:beneficiaries", "read:transactions", "read:accounts", "read:merchant_profile", "read:notifications", "write:transfers", "write:payments"],
+      "oauthScopes": ["openid", "profile", "read:beneficiaries", "write:beneficiaries", "read:transactions", "read:accounts", "read:merchant_profile", "read:notifications", "write:transfers", "write:payments", "read:rtp", "write:rtp"],
       "oauthClientStatus": "active",
       "oauthClientCreatedDateTime": "2026-05-15T10:30:00.000Z",
       "oauthTokenLifetimeSeconds": 3600,
@@ -61,13 +81,17 @@
       "merchantAgreementKybCheckCompletedDate": "2026-05-15T10:30:00.000Z",
       "merchantAgreementKybCheckReference": "KYB-US-2026-001",
       "merchantAgreementKybCheckNotes": "KYB passed, business registered, tax ID verified, no adverse media",
-      "merchantAgreementKybCheckPerformedByPartyReference": "b0000056-0000-4000-8000-000000000056"
+      "merchantAgreementKybCheckPerformedByPartyReference": "b0000056-0000-4000-8000-000000000056",
+      "merchantAgreementKybCheckBusinessRiskLevel": "low",
+      "merchantAgreementKybCheckSanctionsResult": "clear",
+      "merchantAgreementKybCheckAdverseMediaResult": "clear",
+      "merchantAgreementKybCheckScreeningProviderRef": "kyb_business:internal"
     },
     "bianServiceDomain": "Merchant Relations",
     "bianControlRecordType": "MerchantAgreementProcedure",
     "recordCreatedDateTime": "2026-05-14T09:00:00.000Z",
     "recordUpdatedDateTime": "2026-05-15T10:30:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3
   },
   {
     "merchantAgreementInstanceReference": "m0000002-0000-4000-8000-000000000002",
@@ -77,12 +101,42 @@
     "merchantCountryCode": "US",
     "merchantAgreementStatus": "active",
     "merchantOwnerPartyReference": "b0000058-0000-4000-8000-000000000058",
+    "merchantBeneficialOwners": [
+      {
+        "merchantBeneficialOwnerPartyReference": "b0000058-0000-4000-8000-000000000058",
+        "merchantBeneficialOwnerRole": "ultimate_beneficial_owner",
+        "merchantBeneficialOwnerOwnershipPercentage": 50,
+        "merchantBeneficialOwnerIsPrimary": true,
+        "merchantBeneficialOwnerIsControllingPerson": true,
+        "merchantBeneficialOwnerAddedDateTime": "2026-06-10T09:00:00.000Z",
+        "merchantBeneficialOwnerAddedByPartyReference": "b0000056-0000-4000-8000-000000000056"
+      },
+      {
+        "merchantBeneficialOwnerPartyReference": "b0000059-0000-4000-8000-000000000059",
+        "merchantBeneficialOwnerRole": "director",
+        "merchantBeneficialOwnerOwnershipPercentage": 30,
+        "merchantBeneficialOwnerIsPrimary": false,
+        "merchantBeneficialOwnerIsControllingPerson": true,
+        "merchantBeneficialOwnerAddedDateTime": "2026-06-10T09:00:00.000Z",
+        "merchantBeneficialOwnerAddedByPartyReference": "b0000056-0000-4000-8000-000000000056"
+      },
+      {
+        "merchantBeneficialOwnerPartyReference": "b0000060-0000-4000-8000-000000000060",
+        "merchantBeneficialOwnerRole": "shareholder",
+        "merchantBeneficialOwnerOwnershipPercentage": 20,
+        "merchantBeneficialOwnerIsPrimary": false,
+        "merchantBeneficialOwnerIsControllingPerson": false,
+        "merchantBeneficialOwnerAddedDateTime": "2026-06-10T09:00:00.000Z",
+        "merchantBeneficialOwnerAddedByPartyReference": "b0000056-0000-4000-8000-000000000056"
+      }
+    ],
     "merchantTier": "standard",
     "merchantAllowedCurrencies": [
       "EUR"
     ],
     "merchantTransactionLimitAmount": 5000,
     "merchantSettlementSchedule": "T+2",
+    "merchantCommissionRate": 0.02,
     "merchantAverageTransactionAmount": 0,
     "merchantTransactionCount30d": 0,
     "merchantRiskCategory": "low",
@@ -94,7 +148,7 @@
       "oauthRedirectUris": ["http://localhost:3000/api/auth/callback", "https://leafy-wallet-frontend.industrysolutions.staging.corp.mongodb.com/api/auth/callback", "https://leafy-wallet-frontend.industrysolutions.prod.corp.mongodb.com/api/auth/callback"],
       "oauthPostLogoutRedirectUris": ["http://localhost:3000/", "https://leafy-wallet-frontend.industrysolutions.staging.corp.mongodb.com/", "https://leafy-wallet-frontend.industrysolutions.prod.corp.mongodb.com/"],
       "oauthGrantTypes": ["authorization_code", "refresh_token", "client_credentials", "urn:openid:params:grant-type:ciba"],
-      "oauthScopes": ["openid", "profile", "email", "read:beneficiaries", "write:beneficiaries", "read:transactions", "read:accounts", "read:merchant_profile", "read:notifications", "write:transfers", "write:payments"],
+      "oauthScopes": ["openid", "profile", "email", "read:beneficiaries", "write:beneficiaries", "read:transactions", "read:accounts", "read:merchant_profile", "read:notifications", "write:transfers", "write:payments", "read:rtp", "write:rtp"],
       "oauthClientStatus": "active",
       "oauthClientCreatedDateTime": "2026-07-14T12:05:12.675Z",
       "oauthTokenLifetimeSeconds": 3600,
@@ -111,13 +165,17 @@
       "merchantAgreementKybCheckCompletedDate": "2026-06-10T09:00:00.000Z",
       "merchantAgreementKybCheckReference": "KYB-US-2026-002",
       "merchantAgreementKybCheckNotes": "KYB passed; US-registered LLC, EIN verified, no adverse media",
-      "merchantAgreementKybCheckPerformedByPartyReference": "b0000056-0000-4000-8000-000000000056"
+      "merchantAgreementKybCheckPerformedByPartyReference": "b0000056-0000-4000-8000-000000000056",
+      "merchantAgreementKybCheckBusinessRiskLevel": "low",
+      "merchantAgreementKybCheckSanctionsResult": "clear",
+      "merchantAgreementKybCheckAdverseMediaResult": "clear",
+      "merchantAgreementKybCheckScreeningProviderRef": "kyb_business:internal"
     },
     "bianServiceDomain": "Merchant Relations",
     "bianControlRecordType": "MerchantAgreementProcedure",
     "recordCreatedDateTime": "2026-06-08T11:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T09:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3
   },
   {
     "merchantAgreementInstanceReference": "m0000003-0000-4000-8000-000000000003",
@@ -127,12 +185,33 @@
     "merchantCountryCode": "DE",
     "merchantAgreementStatus": "active",
     "merchantOwnerPartyReference": "b0000057-0000-4000-8000-000000000057",
+    "merchantBeneficialOwners": [
+      {
+        "merchantBeneficialOwnerPartyReference": "b0000057-0000-4000-8000-000000000057",
+        "merchantBeneficialOwnerRole": "ultimate_beneficial_owner",
+        "merchantBeneficialOwnerOwnershipPercentage": 80,
+        "merchantBeneficialOwnerIsPrimary": true,
+        "merchantBeneficialOwnerIsControllingPerson": true,
+        "merchantBeneficialOwnerAddedDateTime": "2026-05-20T14:15:00.000Z",
+        "merchantBeneficialOwnerAddedByPartyReference": "b0000056-0000-4000-8000-000000000056"
+      },
+      {
+        "merchantBeneficialOwnerPartyReference": "b0000061-0000-4000-8000-000000000061",
+        "merchantBeneficialOwnerRole": "shareholder",
+        "merchantBeneficialOwnerOwnershipPercentage": 15,
+        "merchantBeneficialOwnerIsPrimary": false,
+        "merchantBeneficialOwnerIsControllingPerson": false,
+        "merchantBeneficialOwnerAddedDateTime": "2026-05-20T14:15:00.000Z",
+        "merchantBeneficialOwnerAddedByPartyReference": "b0000056-0000-4000-8000-000000000056"
+      }
+    ],
     "merchantTier": "standard",
     "merchantAllowedCurrencies": [
       "EUR"
     ],
     "merchantTransactionLimitAmount": 8000,
     "merchantSettlementSchedule": "T+2",
+    "merchantCommissionRate": 0.03,
     "merchantAverageTransactionAmount": 350,
     "merchantTransactionCount30d": 28,
     "merchantRiskCategory": "low",
@@ -146,12 +225,16 @@
       "merchantAgreementKybCheckCompletedDate": "2026-05-20T14:15:00.000Z",
       "merchantAgreementKybCheckReference": "KYB-DE-2026-003",
       "merchantAgreementKybCheckNotes": "KYB passed, German trade register verified, VAT ID confirmed",
-      "merchantAgreementKybCheckPerformedByPartyReference": "b0000056-0000-4000-8000-000000000056"
+      "merchantAgreementKybCheckPerformedByPartyReference": "b0000056-0000-4000-8000-000000000056",
+      "merchantAgreementKybCheckBusinessRiskLevel": "low",
+      "merchantAgreementKybCheckSanctionsResult": "clear",
+      "merchantAgreementKybCheckAdverseMediaResult": "clear",
+      "merchantAgreementKybCheckScreeningProviderRef": "kyb_business:internal"
     },
     "bianServiceDomain": "Merchant Relations",
     "bianControlRecordType": "MerchantAgreementProcedure",
     "recordCreatedDateTime": "2026-05-19T08:00:00.000Z",
     "recordUpdatedDateTime": "2026-05-20T14:15:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 3
   }
 ]

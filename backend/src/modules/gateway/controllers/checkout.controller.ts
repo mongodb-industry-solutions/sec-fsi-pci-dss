@@ -11,6 +11,7 @@ import {
 import { getMerchantById } from '../services/merchant.service';
 import { deliverWebhook } from '../services/webhook.service';
 import { tryMerchantContext } from '../../../vendors/middleware/validateMerchantToken';
+import { dualPermission } from '../../../vendors/middleware/dualAuth';
 import { resolvePartyInstanceReference } from '../../identity/services/oauth.service';
 
 const SESSION_STATUS_ENUM = ['pending', 'completed', 'expired', 'cancelled'];
@@ -19,6 +20,11 @@ export async function checkoutController(fastify: FastifyInstance) {
 
   // POST /api/v1/checkout/sessions
   fastify.post('/sessions', {
+    // Dual-auth (v28): a merchant integration authenticates with its own client_credentials
+    // RS256 token (scope write:payments); the PSP simulator authenticates as the selected demo
+    // persona (session JWT). Never public — creation always requires a valid credential.
+    config: { dualAuth: true },
+    preHandler: dualPermission({ resource: 'merchants', action: 'view', scope: 'write:payments' }),
     schema: {
       tags: ['payment:checkout'],
       summary: 'Create a checkout session (Redirect Checkout)',
@@ -44,6 +50,7 @@ export async function checkoutController(fastify: FastifyInstance) {
           returnUrl: { type: 'string', description: 'URL buyer is redirected to after successful payment.' },
           cancelUrl: { type: 'string', description: 'URL buyer is redirected to on cancellation or failure.' },
           merchantReference: { type: 'string', maxLength: 100, description: "Merchant's own order/cart ID (idempotency key)." },
+          actingSubjectReference: { type: 'string', description: 'v18: OAuth subject (SD-91 login id) of the user the merchant app is acting for. Attribution only — creation stays merchant-authenticated. Lets the resulting purchase land in the payer payment history + operations view.' },
         },
       },
       response: {
@@ -69,6 +76,7 @@ export async function checkoutController(fastify: FastifyInstance) {
       returnUrl: string;
       cancelUrl: string;
       merchantReference: string;
+      actingSubjectReference?: string;
     };
 
     const merchant = await getMerchantById(fastify.db, body.merchantAgreementInstanceReference);
@@ -78,22 +86,27 @@ export async function checkoutController(fastify: FastifyInstance) {
 
     const baseUrl = process.env.PSP_URL_FRONTEND ?? 'http://localhost:8080';
 
-    // On-behalf-of attribution (best-effort, public endpoint): if the merchant app forwarded the acting
-    // user's OAuth Bearer, capture who created this session so the resulting purchase is attributed to the
-    // payer (visible in their payment history) and audited in the connected-apps operations view. A missing
-    // or invalid token simply leaves the session unattributed — the public flow is unchanged.
-    // Fully best-effort: neither token resolution nor the subject→party lookup may fail this PUBLIC
-    // endpoint. A DB blip during the party lookup must leave the session unattributed, not return 500.
+    // On-behalf-of attribution: capture who this session was created for so the resulting purchase is
+    // attributed to the payer (visible in their payment history) and audited in the connected-apps
+    // operations view. The redirect/checkout flow authenticates with the merchant's OWN client_credentials
+    // token, so the token subject is the machine client (never a buyer party). The acting user is therefore
+    // conveyed explicitly via body.actingSubjectReference (attribution only, mirrors the API-payment path);
+    // we still fall back to the token subject for a forwarded user Bearer.
+    // Fully best-effort: neither token resolution nor the subject→party lookup may fail this endpoint.
+    // A DB blip during the party lookup must leave the session unattributed, not return 500.
     let merchantCtx: Awaited<ReturnType<typeof tryMerchantContext>>;
     let actingPartyReference: string | undefined;
+    let actingSubjectReference: string | undefined;
     try {
       merchantCtx = await tryMerchantContext(request);
-      if (merchantCtx?.sub) {
-        actingPartyReference = await resolvePartyInstanceReference(fastify.db, merchantCtx.sub) ?? undefined;
+      actingSubjectReference = body.actingSubjectReference ?? merchantCtx?.sub;
+      if (actingSubjectReference) {
+        actingPartyReference = await resolvePartyInstanceReference(fastify.db, actingSubjectReference) ?? undefined;
       }
     } catch {
       merchantCtx = undefined;
       actingPartyReference = undefined;
+      actingSubjectReference = body.actingSubjectReference;
     }
 
     const result = await createCheckoutSession(fastify.db, {
@@ -106,7 +119,7 @@ export async function checkoutController(fastify: FastifyInstance) {
       returnUrl: body.returnUrl,
       cancelUrl: body.cancelUrl,
       merchantReference: body.merchantReference,
-      ...(merchantCtx?.sub && { actingSubjectReference: merchantCtx.sub }),
+      ...(actingSubjectReference && { actingSubjectReference }),
       ...(actingPartyReference && { actingPartyReference }),
       ...(merchantCtx?.clientId && { actingClientId: merchantCtx.clientId }),
     }, baseUrl);
@@ -120,6 +133,7 @@ export async function checkoutController(fastify: FastifyInstance) {
 
   // GET /api/v1/checkout/sessions/:id
   fastify.get('/sessions/:id', {
+    config: { skipAuth: true }, // buyer/hosted page reads session status without a login
     schema: {
       tags: ['payment:checkout'],
       summary: 'Get checkout session (public status check)',
@@ -163,6 +177,7 @@ export async function checkoutController(fastify: FastifyInstance) {
 
   // POST /api/v1/checkout/sessions/:id/pay
   fastify.post('/sessions/:id/pay', {
+    config: { skipAuth: true }, // buyer pays on the hosted page without a login
     schema: {
       tags: ['payment:checkout'],
       summary: 'Process payment for a checkout session (public)',

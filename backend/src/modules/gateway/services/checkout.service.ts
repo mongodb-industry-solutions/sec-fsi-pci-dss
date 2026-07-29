@@ -226,12 +226,18 @@ export async function processCheckoutPayment(
   try {
     txResult = await createTransaction(db, {
       cardToken: input.cardToken,
-      accountReference: input.customerEmail ?? actingAccountReference ?? input.cardToken,
+      // Prefer the authenticated payer identity over a typed email. When the merchant app created this
+      // session on behalf of a logged-in user, actingAccountReference is that payer's canonical ACC-xxx
+      // and is authoritative; a hosted-page email can be absent or not match a party, which would stamp
+      // the row with a raw email and drop it from party-scoped views (merchant /history, PSP history).
+      // Mirrors payment.controller.ts (direct API path). Falls back to email (guest) then cardToken.
+      accountReference: actingAccountReference ?? input.customerEmail ?? input.cardToken,
       amount: session.checkoutSessionAmount,
       currency: session.checkoutSessionCurrency,
       cardTransactionMerchantName: session.merchantName,
       cardTransactionMerchantCategoryCode: mcc,
       cardTransactionChannel: 'online',
+      cardTransactionAcceptanceMethod: 'redirect_checkout',
       cardTransactionMaskedPanDisplay: maskedPan,
       cardTransactionType: 'purchase',
       cardTransactionDescription: session.checkoutSessionDescription.slice(0, 22),

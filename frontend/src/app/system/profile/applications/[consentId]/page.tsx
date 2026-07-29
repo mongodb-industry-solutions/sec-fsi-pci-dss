@@ -8,7 +8,7 @@ import { ArrowLeft, ExternalLink, Layers, ListChecks, RefreshCw, RotateCcw, Sear
 import { SectionHeader } from '../../../../../components/SectionHeader';
 import { Pagination } from '../../../../../components/Pagination';
 import { api, type ConsentGrantDetail } from '../../../../../lib/api';
-import { getToken } from '../../../../../lib/auth';
+import { getToken, decodeToken } from '../../../../../lib/auth';
 import { useConfirm, useNotify } from '../../../../../components/ui/ConfirmProvider';
 
 const LIMIT_OPTIONS = [10, 25, 50];
@@ -45,8 +45,13 @@ function AppLogo({ name, logoUri, size = 56 }: { name: string; logoUri?: string 
   );
 }
 
-function operationHref(row: OperationRow): string | null {
-  if (row.entityType === 'transaction' && row.entityId) return `/system/payment/history/${row.entityId}`;
+function operationHref(row: OperationRow, staffCtx?: string): string | null {
+  if (row.entityType === 'transaction' && row.entityId) {
+    // Self: the caller's own payment history. Staff: the shared transaction detail with nav context.
+    return staffCtx
+      ? `/system/transactions/${encodeURIComponent(row.entityId)}${staffCtx}`
+      : `/system/payment/history/${row.entityId}`;
+  }
   return null;
 }
 
@@ -56,6 +61,12 @@ export default function AuthorizedApplicationDetailPage() {
   const notify = useNotify();
   const consentId = decodeURIComponent(String(params?.consentId ?? ''));
   const [token, setToken] = useState('');
+  // v27 staff-target mode: an investigator/auditor inspecting a found customer's authorized app.
+  // Self behavior is unchanged; staff mode reads via the party endpoints and only an L2 may revoke.
+  const [staffMode, setStaffMode] = useState(false);
+  const [staffCanAct, setStaffCanAct] = useState(false);
+  const [staffPartyRef, setStaffPartyRef] = useState('');
+  const [staffCustomerId, setStaffCustomerId] = useState('');
 
   const [detail, setDetail] = useState<ConsentGrantDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,9 +86,26 @@ export default function AuthorizedApplicationDetailPage() {
   const [limit, setLimit] = useState(10);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const t = getToken() ?? '';
     setToken(t);
     if (!t || !consentId) { setLoading(false); return; }
+    const role = decodeToken(t)?.role;
+    const sp = new URLSearchParams(window.location.search);
+    const pRef = sp.get('partyRef') ?? '';
+    const isStaffCtx = sp.get('ctx') === 'staff' && !!pRef
+      && (role === 'level2_investigator' || role === 'security_auditor');
+    if (isStaffCtx) {
+      setStaffMode(true);
+      setStaffCanAct(role === 'level2_investigator');
+      setStaffPartyRef(pRef);
+      setStaffCustomerId(sp.get('customerId') ?? '');
+      api.consentGrants.getDetailForParty(consentId, pRef, t)
+        .then((d) => setDetail(d))
+        .catch(() => setNotFound(true))
+        .finally(() => setLoading(false));
+      return;
+    }
     api.consentGrants.getDetail(consentId, t)
       .then((d) => setDetail(d))
       .catch(() => setNotFound(true))
@@ -88,17 +116,20 @@ export default function AuthorizedApplicationDetailPage() {
     if (!token || !consentId || !detail) return;
     setOpsLoading(true);
     try {
-      const r = await api.consentGrants.getOperations(consentId, {
+      const filters = {
         q: q || undefined,
         dateFrom: from ? new Date(from).toISOString() : undefined,
         dateTo: to ? new Date(to).toISOString() : undefined,
         page, limit,
-      }, token);
+      };
+      const r = staffMode
+        ? await api.consentGrants.operationsForParty(consentId, staffPartyRef, filters, token)
+        : await api.consentGrants.getOperations(consentId, filters, token);
       setOps(r.events as OperationRow[]);
       setOpsTotal(r.total);
     } catch { setOps([]); setOpsTotal(0); }
     setOpsLoading(false);
-  }, [token, consentId, detail, q, from, to, page, limit]);
+  }, [token, consentId, detail, q, from, to, page, limit, staffMode, staffPartyRef]);
 
   useEffect(() => { setPage(1); }, [q, from, to, limit]);
   useEffect(() => { loadOps(); }, [loadOps]);
@@ -119,7 +150,9 @@ export default function AuthorizedApplicationDetailPage() {
     if (!ok) return;
     setActing(true);
     try {
-      await api.consentGrants.revoke(consentId, token);
+      // Staff (L2) revoke a grant they do NOT own via the party endpoint; self-service otherwise.
+      if (staffMode) await api.consentGrants.revokeForParty(consentId, staffPartyRef, token);
+      else await api.consentGrants.revoke(consentId, token);
       setStatusOverride('revoked');
       notify('Access revoked. This app can no longer access your account.', 'success');
     } catch {
@@ -150,13 +183,19 @@ export default function AuthorizedApplicationDetailPage() {
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(opsTotal / limit)), [opsTotal, limit]);
   const hasFilters = q || from || to;
+  // Staff mode: back to the customer profile and carry nav context onto related operation links.
+  const staffCtxQuery = staffMode
+    ? `?ctx=staff&customerId=${encodeURIComponent(staffCustomerId)}&partyRef=${encodeURIComponent(staffPartyRef)}`
+    : undefined;
+  const backHref = staffMode && staffCustomerId ? `/system/users/${staffCustomerId}` : '/system/applications';
+  const backLabel = staffMode ? 'Customer profile' : 'Authorized Applications';
 
   if (loading) return <div className="p-6 text-gray-400 text-sm">Loading application…</div>;
   if (notFound || !detail) {
     return (
       <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-4">
-        <Link href="/system/applications" className="inline-flex items-center gap-1 text-sm text-[#001E2B] hover:underline">
-          <ArrowLeft size={14} /> Authorized Applications
+        <Link href={backHref} className="inline-flex items-center gap-1 text-sm text-[#001E2B] hover:underline">
+          <ArrowLeft size={14} /> {backLabel}
         </Link>
         <div className="bg-white rounded-xl border p-8 text-center text-sm text-gray-500">This application was not found among your authorizations.</div>
       </div>
@@ -165,8 +204,8 @@ export default function AuthorizedApplicationDetailPage() {
 
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
-      <Link href="/system/applications" className="inline-flex items-center gap-1 text-sm text-[#001E2B] hover:underline">
-        <ArrowLeft size={14} /> Authorized Applications
+      <Link href={backHref} className="inline-flex items-center gap-1 text-sm text-[#001E2B] hover:underline">
+        <ArrowLeft size={14} /> {backLabel}
       </Link>
 
       <SectionHeader
@@ -213,7 +252,15 @@ export default function AuthorizedApplicationDetailPage() {
               {detail.lastUsedAt && <span className="text-gray-400">· Last used {new Date(detail.lastUsedAt).toLocaleString()}</span>}
             </div>
           </div>
-          {status === 'active' ? (
+          {staffMode ? (
+            // Staff: only an L2 investigator may revoke (auditor is read-only). No re-approve for staff.
+            status === 'active' && staffCanAct ? (
+              <button onClick={revoke} disabled={acting}
+                className="flex items-center gap-1.5 text-sm text-red-600 hover:text-white hover:bg-red-600 border border-red-300 rounded-lg px-3 py-1.5 disabled:opacity-50 shrink-0 transition-colors">
+                <Trash2 size={14} />{acting ? 'Revoking…' : 'Revoke access'}
+              </button>
+            ) : null
+          ) : status === 'active' ? (
             <button onClick={revoke} disabled={acting}
               className="flex items-center gap-1.5 text-sm text-red-600 hover:text-white hover:bg-red-600 border border-red-300 rounded-lg px-3 py-1.5 disabled:opacity-50 shrink-0 transition-colors">
               <Trash2 size={14} />{acting ? 'Revoking…' : 'Revoke access'}
@@ -289,7 +336,7 @@ export default function AuthorizedApplicationDetailPage() {
         ) : (
           <ul className="divide-y divide-gray-100">
             {ops.map((row) => {
-              const href = operationHref(row);
+              const href = operationHref(row, staffCtxQuery);
               return (
                 <li key={row.id} className="px-5 py-3 flex items-start gap-3">
                   <div className="flex-1 min-w-0">

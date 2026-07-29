@@ -105,7 +105,7 @@ Deliver a runnable demo that proves MongoDB Queryable Encryption works end-to-en
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | 05A.1 | `POST /api/v1/auth/login` validates credentials against `customerAuthenticationAssessment` (SD-91) and returns a JWT | Valid credentials return `{ token, user: { name, email, role } }`; invalid credentials return 401 |
-| 05A.2 | `GET /api/v1/auth/users` returns list of demo users (name, email, role) without passwords | Response used by frontend user selector dropdown |
+| 05A.2 | `GET /api/v1/system/users` returns list of demo users (name, email, role) without passwords | Response used by frontend user selector dropdown |
 | 05A.3 | Application Mode login screen shows domain selector (`local`) and username dropdown | Selecting a username auto-fills the password field |
 | 05A.4 | JWT is verified on all protected `/api/v1/*` endpoints | Missing or invalid token returns 401 |
 | 05A.5 | Demo user accounts (5 users) are seeded by `bin/seed.ts` | All 5 users exist with correct roles and bcrypt-hashed passwords after seeding |
@@ -748,3 +748,180 @@ with an enrolled device key. Real software authenticator (browser WebCrypto), no
 - [ ] Follow-ups: downstream v25 merchant-app passwordless UX; AAL2 platform UV; CIBA payment authorization + PSD2 dynamic linking.
 
 *Added 2026-07-09 (v24).*
+
+## v27 — KYC Field Expansion + Queryable Encryption Search Showcase
+
+> Delivered under **development plan v27** (`tmp/dev.v27.plan.md`). Extends the KYC (CDD) data
+> model with structured identity attributes and uses them to demonstrate every QE search type
+> (equality, range, substring, prefix, suffix) over encrypted GDPR PII. No card/PAN data is ever
+> placed in a searchable QE field. See technical-spec §1/§2.1/§5.
+
+### Objective
+Give analysts real searches (range / substring / prefix / suffix / equality) directly against
+encrypted fields, with the server never seeing plaintext, while staying aligned with BIAN
+(SD-13 / SD-53), PCI DSS, GDPR (Art. 5/32) and PSD2.
+
+### FR-v27: Functional Requirements
+
+| ID | Requirement | Acceptance criteria |
+|---|---|---|
+| FR-v27-01 | Substring search | `partyName` is `QE:substring` (lookup tier). A "contains" query (case/diacritic-insensitive, min length 3) returns matching parties over encrypted data. |
+| FR-v27-02 | Range search (date) | `partyDateOfBirth` stored as BSON Date, `QE:range`. Born-between queries return the expected rows; seed spreads DOB across 1950–2005. |
+| FR-v27-03 | Range search (int) | `customerAgreementKycCheckRiskScore` is `QE:range` int 0–100. `> 70` returns high-risk rows; seed spreads scores across the boundary. |
+| FR-v27-04 | Range search (expiry) | `customerAgreementGovernmentID.expiryDate` is `QE:range` date. "Expiring in next 90 days" returns rows; seed places some expiries within 90 days. |
+| FR-v27-05 | Prefix search | `customerAgreementTaxIDNumber` is `QE:prefix` (min length 2). "Starts with ES" returns rows; seed makes some TINs start with `ES`. |
+| FR-v27-06 | Suffix search | `customerAgreementGovernmentID.number` is `QE:suffix` (min length 3). "Ends with 4821" returns rows; seed makes some numbers end in `4821`. |
+| FR-v27-07 | Equality (contention) | `partyNationality`, `partyPlaceOfBirth`, `customerAgreementGovernmentID.type`/`.issuingCountry`, `customerAgreementOccupation`, KYC `RiskRating`/`PepStatus`/`SanctionsResult` are `QE:equality` with explicit contention (frequency-analysis guard). Both PEP values present in seed. |
+| FR-v27-08 | Tier access control | `QE:none` fields (`customerAgreementSourceOfFunds`, `customerAgreementPurposeOfRelationship`, `...ScreeningProviderRef`) decrypt only for the L2 client; L1 receives Binary (stripped). Searchable fields decrypt for L1 + L2. |
+| FR-v27-09 | Auth unaffected | `partyEmailAddress` / `partyMobilePhoneNumber` remain `QE:equality`; login and exact lookup regression-safe. |
+| FR-v27-10 | Text-search gating | `PSP_QE_TEXT_SEARCH=false` degrades substring/prefix/suffix to `QE:equality` (contention 8) so setup succeeds on pre-8.2 clusters without losing encryption or lookup-tier access. |
+| FR-v27-11 | Seed completeness | `--reset` + reseed leaves no new field unset (rows 1–20 of plan §3). Enrichment is deterministic (stable across reseeds) and idempotent (JSON-provided values win). |
+
+### Definition of Done — v27 (Phases 0–3)
+- [x] All new field names BIAN-prefixed (`party*` / `customerAgreement*` / `customerAgreementKycCheck*`).
+- [x] One DEK per encrypted field (16 new DEKs); nested QE leaves under plaintext parent sub-docs.
+- [x] Explicit `contention` on all low-cardinality `QE:equality` fields.
+- [x] No PAN/CHD in any searchable QE field; no unique index on any QE field.
+- [x] Plaintext helper index on `customerAgreementKycCheck.customerAgreementKycCheckStatus` only.
+- [x] `technical-spec.md` §1/§2.1/§5 + seeders + setup updated in the same change.
+- [x] Backend `tsc --noEmit` clean (incl. DOB → Date change).
+- [ ] Phases 4–6 (search API/service, per-role UI, HRP provider) tracked in `tmp/dev.v27.plan.md`.
+
+*Added 2026-07-16 (v27, Phases 0–3).*
+
+## v28 — Request to Pay (RTP) + shared QR
+
+> Delivered under **development plan v28** (`tmp/dev.v28.plan.md`). BIAN-aligned Request to Pay
+> as an intent domain separate from payment execution, between beneficiaries/counterparties,
+> reusing FDS/HRP/AML and the balance-aware P2P transfer flow; plus a shared QR capability.
+> Model: a transfer that requires the payer's in-app approval (no CIBA); balances update via hold→settle→credit.
+
+### Objective
+Let a payee create a structured payment request that a payer reviews and approves in-app
+(from the transfers section) before any executable payment order is created and routed to a provider rail. Request and
+payment states are independently queryable, screened, auditable, and SEPA/ISO 20022-mappable.
+
+### FR-v28: Functional Requirements
+
+| ID | Requirement | Acceptance criteria | Status |
+|---|---|---|---|
+| FR-v28-01 | Create/retrieve/list RTP requests | Payee creates a canonical request; requester/payer can list & fetch; idempotent create | ⏳ |
+| FR-v28-02 | Independent request lifecycle | Monotonic validated transitions draft→…→settled/failed; request never merged with payment record | ⏳ |
+| FR-v28-03 | Present / deliver / view / cancel / expire | State transitions emit durable, replayable events; expiry sweeper transitions + audits | ⏳ |
+| FR-v28-04 | Screening (FDS/HRP/AML) | accept-time `screenTransfer` fan-out; block/hold returns machine-readable decision + opens fraud case | ⏳ |
+| FR-v28-04b | VoP dedicated capability | New `vop` capability + built-in module + provider group; verify-payee + accept-time VoP as an additional independent check; market-gated (`not_supported` outside EU/UK); stub swappable; registry/seed/config updated | ⏳ |
+| FR-v28-04c | VoP admin dashboard & audit UI | Dedicated `/system/admin/modules/vop` config dashboard (match thresholds, matching strategy, decision policy, market gating) editable by admin/manager like FDS; VoP in providers/groups; VoP logs + `vop.verification.completed` filterable in `/system/audit-events` with correct RBAC | ⏳ |
+| FR-v28-05 | Payer approval (transfer-with-approval) | Payer sees pending requests in the transfers section and approves in-app (authenticated session); durable authorizationContext captured; no CIBA | ⏳ |
+| FR-v28-06 | Accepted request → linked payment order | Approve creates a separate paymentExecutionProcedure linked by immutable reference, routed via provider | ⏳ |
+| FR-v28-07 | Idempotency + audit | Duplicate create/approve are idempotent; complete tamper-evident event trail per request | ⏳ |
+| FR-v28-08 | SEPA/ISO 20022 readiness | Structured address + structured remittance stored; canonical→ISO 20022 mapper present | ⏳ |
+| FR-v28-09 | Shared QR representation | RTP, payment link, and redirect/checkout can issue a QR from a shared capability | ⏳ |
+| FR-v28-10 | Merchant app: send/request/approve/QR | Merchant can send to and request from a beneficiary, review pending approvals, and sell a QR-paid product | ⏳ |
+| FR-v28-11 | Notifications | On request delivery the payer (approver) is notified; on approval the payee (receiver) is notified; SSE badge/bell update live; alert cleared on approve/reject | ⏳ |
+| FR-v28-12 | Account preconditions | Payee with no active payout account cannot request; payer with no active account cannot approve; both rejected with machine-readable reason | ⏳ |
+| FR-v28-13 | Funds, screening & balance | Payer picks funding account or default; funds sufficiency (AIS) + FDS/HRP/AML checked before execution; balances of source+destination update via hold→settle→credit | ⏳ |
+
+### Definition of Done — v28
+- [ ] Requests create/deliver/view/accept/reject/cancel/expire end to end
+- [ ] Accepted requests create immutable linked payment orders routed via provider
+- [ ] Inter-service events durable and replayable; duplicate create/accept idempotent
+- [ ] Payer approves pending requests in-app from the transfers section (authenticated session, no CIBA)
+- [ ] FDS/HRP/AML can block or hold a request with machine-readable decision
+- [ ] VoP runs as a dedicated capability + built-in module + provider group (additional to FDS/HRP/AML), market-gated, seed/registry/config updated, stub swappable
+- [ ] VoP has its own admin dashboard at /system/admin/modules/vop (thresholds, matching strategy, decision policy, market gating) editable by admin/manager like FDS
+- [ ] VoP configurable in /system/admin/providers/groups; VoP logs/events visible in /system/audit-events with correct RBAC
+- [ ] Request and payment states independently queryable
+- [ ] Structured remittance + structured address preserved
+- [ ] Shared QR works for RTP, payment link, and checkout
+- [ ] Merchant app: send + request money to a beneficiary, review pending approvals, QR-paid product
+- [ ] Payer notified on request arrival; payee notified on approval; SSE badge/bell live; alert cleared on approve/reject
+- [ ] Payee/payer without an active payout account are blocked from requesting/approving with a clear reason
+- [ ] Payer selects funding account (or default); funds sufficiency + FDS/HRP/AML screened before execution
+- [ ] Source and destination account balances update via the P2P hold→settle→credit sequence
+- [ ] setup/seed/QE/indexes/ACL updated; technical-spec + demo-simulator updated
+
+*Added 2026-07-17 (v28).*
+
+## v29 — Global card & account administration via built-in modules
+
+> Delivered under **development plan v29** (`tmp/dev.v29.plan.md`). Moves the **global administration
+> surface** (CRUD + listing) of cards (BIAN SD-88) and payout accounts (BIAN SD-66) onto the built-in
+> modules behind their provider groups, respecting EDA (event bus) + Hexagonal (ports/adapters) and
+> ADR-029 (Provider/Capability/Module). A built-in module is the internal fallback adapter of a
+> capability's port: its administration is only enabled when the provider group resolves to the internal
+> provider. **No data-model change** (same collections, fields, indexes, QE encryptedFields, DEKs); the
+> only additions are data-driven (ADR-030): the `operations_officer` role and two demo users. Target
+> version **2.3.0**.
+
+### Objective
+Give a dedicated back-office operator (`operations_officer`) a governed, separation-of-duties surface to
+administer the whole card inventory and payout-account book, additive to the existing party-scoped
+self-service routes, gated to the internal provider and fully audited (PCI DSS Req 7 + Req 10).
+
+### FR-v29: Functional Requirements
+
+| ID | Requirement | Acceptance criteria | Status |
+|---|---|---|---|
+| FR-29.1 | List all cards | `GET /api/v1/modules/card-issuer/cards` (paginated, filters network/status/agreement). `operations_officer` → 200 `{results,total,page,limit}`, display-safe rows (token, masked PAN, network, status, agreement, dates); no PAN/CVV/expiry. Other roles → 403. | ✅ |
+| FR-29.2 | View a card | `GET .../cards/:cardId` → 200 detail; **reveals expiry (QE:none)** to `operations_officer` (see PCI note), 404 if absent; emits `card.accessed`. | ✅ |
+| FR-29.3 | Register a card | `POST .../cards` (body `customerAgreementInstanceReference`) → 201; reuses `registerCardForCustomer`; dedup via registry; schema rejects CVV/PIN; emits `card.registered`. | ✅ |
+| FR-29.4 | Update card metadata & status | `PATCH .../cards/:cardId` (alias/note) and `PATCH .../cards/:cardId/status` (`{active}`) → 200; reuse `updateCardMetadata`/`setCardActivation`; emit `card.updated` / `card.(de|re)activated`. | ✅ |
+| FR-29.5 | Revoke a card | `DELETE .../cards/:cardId` → 200 `{removed:true}`; reuses `revokeCard`; record retained for audit; emits `card.removed`. | ✅ |
+| FR-29.6 | List all accounts | `GET /api/v1/modules/account-information/accounts` (paginated, filters status/party/currency). `operations_officer` → 200 `{results,total,page,limit}`, QE-stripped rows with hints (`payoutAccountHasIban`/`payoutAccountHasRoutingNumber`). Other roles → 403. | ✅ |
+| FR-29.7 | View / register / update / close account | `GET|POST|PATCH|DELETE .../accounts[/:accountRef]`; reuse `getPayoutAccount`/`createPayoutAccount`/`updatePayoutAccount`/`closePayoutAccount`; IBAN/routing QE; emit `account.created/updated/closed/accessed`. IBAN reveal stays on its existing route. | ✅ |
+| FR-29.8 | Capability gate | If the capability's provider group resolves to an active external provider (priority < 999), all admin routes → 409 `managed_externally`; with only the internal provider (999) they operate normally. Covered by an integration test that registers an external provider and asserts the 409. | ✅ |
+| FR-29.9 | Internal module configuration (v29.1) | `operations_officer` also holds `modules:[view,manage]` and administers the config/policies of all 11 internal modules. The `GET/PUT /api/v1/modules/<cap>/config` routes (previously unguarded) require `requirePermission('modules','view'|'manage')`. Auth (`authDomains`, SD-16) stays exclusive to `manager`. | ✅ |
+| FR-29.10 | Role-aware admin landing + config edit gating (v29.2) | `operations_officer` gains `providers:[view]` (read-only) so its admin landing shows module cards with the provider status serving each capability (internal vs external / `managed_externally`); provider CRUD stays with `manager`. Editing module config is gated by `modules:manage`: `PUT /modules/<cap>/config` is exclusive to `operations_officer`; `manager` drops to `modules:view` (read-only, system/security oversight), `GET .../config` accessible by `operations_officer`, `manager`, `security_auditor`. Confirmed philosophy: `operations_officer` owns internal business logic/financial processes, `manager` owns system/platform. | ✅ |
+
+### Definition of Done — v29
+- [x] FR-29.1–29.8 with green acceptance specs.
+- [x] `operations_officer` builtin role (scope `all`, `cards:[view,manage]`, `accounts:[view,manage]`, `modules:[view,manage]`, `providers:[view]`, `auditEvents:[view]`, SD-88/SD-66) added data-driven; SoD distinct from `manager` (keeps provider CRUD/authDomains/roles, holds `modules:view` only) and `customer`.
+- [x] Two demo users seeded (Olivia Moreno featured, Daniel Rossi), password `demo-password`, idempotent upsert.
+- [x] Role help synced: `/system/help/roles/operations_officer` renders guidance; `ROLE_LABELS` + `roleGuide` updated.
+- [x] Backend + frontend `tsc --noEmit` clean; existing tests green + new (global list, CRUD, gate 409).
+- [x] E2E live: create/list/edit/delete card and account as `operations_officer`; 409 with external provider; QE ciphertext intact; no CHD in responses or audit.
+- [x] No model/index change (R1); if a support index had been needed it would be added only via setup + documented (none was).
+- [x] `technical-spec.md` §6.13 + §RBAC + §7 (`PSP_AUDIT_LIST_ACCESS`), `PRD.md` personas/users, and this roadmap updated in the same change.
+- [ ] Frontend admin views under `/system/admin/modules/{card-issuer,account-information}` (F5) tracked in `tmp/dev.v29.plan.md`.
+
+*Added 2026-07-22 (v29).*
+
+---
+
+## v31: KYC & KYB Built-in Module Administration (Operations Officer)
+
+Give the Operations Officer a production-grade administration surface for the two identity/onboarding
+built-in modules, KYC (SD-53, customers) and KYB (SD-89, merchants), each split into Configuration
+(built-in engine policy incl. decisionMode) and Administration (review workbench). Starting a KYC/KYB
+process fans out to providers purely via the event bus; each process is tracked by one `correlationId`.
+
+### Functional requirements
+
+| FR | Requirement | Acceptance criteria |
+|---|---|---|
+| FR-31.1 | RBAC extension (SoD) | `operations_officer` gains `customers:[view,manage]` + `merchants:[view,manage]`. Administration gated by data resource; Configuration by `modules:manage`. `merchant_officer` keeps the KYB decision. Backend rejects unpermitted callers even with the UI bypassed. |
+| FR-31.2 | Beneficial owners (SD-89 + SD-13) | Merchant has 1..N owners with numeric participation; exactly one primary (= scalar pointer); sum at most 100; bounded embed (cap 25); every shareholder sees the merchant. Invariants unit-tested. |
+| FR-31.3 | KYB administration | List/detail/patch KYB data + owners CRUD, all index-backed, all mutations emit compliance events; PATCH rejects status writes (400). |
+| FR-31.4 | KYC administration | List (L1 masked)/detail (L2 with escalation)/patch/re-screen/process endpoints; PATCH rejects status writes; emits `kyc.record.amended`. |
+| FR-31.5 | KYB event orchestration | `merchant.validation.requested` fans out kyb+hrp+aml (entity) + per-owner kyc; `KybVerificationSaga` aggregates, persists the structured verdict, resolves per `decisionMode`. Events only (no service-to-service). |
+| FR-31.6 | Decision mode | `decisionMode` per module; automated auto-resolves within thresholds; assisted recommends (HITL); manual = officer decides; unset defaults to manual. Sanctions/PEP never auto-approve. |
+| FR-31.7 | Status coherence | Verdict and BQ:Step status set atomically via a shared mapper; internal and external paths identical. |
+| FR-31.8 | Process traceability | `GET /{merchants|customer}/:id/{kyb|kyc}/process` returns the correlated timeline (bus milestones + provider wire calls). |
+
+### Non-functional
+- NFR-31.1 No regressions: full existing suite green; current flows unchanged.
+- NFR-31.2 No MongoDB anti-patterns: bounded embed, multikey owner index, ESR list indexes, explain() shows IXSCAN, no COLLSCAN, no blocking SORT.
+- NFR-31.3 Standards: BIAN SD-13/53/89/193, PCI Req 7/8/10/12.8, GDPR Art. 5/30/32, EU AI Act HITL for assisted.
+- NFR-31.4 All schema/data changes via setup + seed; technical-spec updated in the same change.
+
+### Definition of Done
+- [x] RBAC extended in `acl.model.ts` + `role.json` + role guide, with inline SoD rationale.
+- [x] `MerchantBeneficialOwner` model + invariants + unit tests; seed cap tables (2-owner 60/40, 3-owner 50/30/20, free-float 80/15); decisionMode seeded.
+- [x] Multikey + ESR list indexes; explain() verified (IXSCAN, no SORT).
+- [x] KYB + KYC administration endpoints + owners CRUD + process timelines.
+- [x] KYB saga + reactors + decisionMode resolution + status mappers; events-only fan-out.
+- [x] Frontend two-tab KYC/KYB pages, deep-linkable detail routes, owners panel, tooltips, responsive.
+- [x] technical-spec section 6.13 + section 10 matrix; roadmap; ADRs; CLAUDE.md matrix obligation.
+- [x] Version bump to 2.5.0 across all four package.json.
+
+*Added 2026-07-24 (v31). Version 2.5.0.*

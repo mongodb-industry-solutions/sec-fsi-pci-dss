@@ -7,10 +7,11 @@ import { ENV } from '@/lib/env';
 import { Chip } from '@/components/ui/Bits';
 import { Tip } from '@/components/ui/Tooltip';
 import PasswordlessLoginButton from '@/components/PasswordlessLoginButton';
+import { BRAND } from '@/lib/brand';
 
 // Human-readable meaning for each OAuth scope (shown as tooltips).
 const SCOPE_HELP: Record<string, string> = {
-  openid: 'Confirms who you are (your Leafy Pay identity).',
+  openid: `Confirms who you are (your ${BRAND.full} identity).`,
   profile: 'Share your name so we can greet you.',
   email: 'Share your email address.',
   'read:beneficiaries': 'View your saved payees (masked).',
@@ -28,7 +29,7 @@ const AUTH_ERROR_INFO: Record<string, { title: string; hint: string }> = {
   },
   token_exchange_failed: {
     title: 'We could not complete sign-in',
-    hint: 'Leafy Pay approved the request but the token exchange failed. This is usually temporary. Please try again in a moment.',
+    hint: `${BRAND.full} approved the request but the token exchange failed. This is usually temporary. Please try again in a moment.`,
   },
   access_denied: {
     title: 'Sign-in was cancelled',
@@ -56,11 +57,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
         <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-leaf/25 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-highlight/20 blur-3xl" />
         <span className="relative inline-flex items-center gap-1.5 rounded-full bg-leaf/15 px-3 py-1 text-xs font-medium text-leaf ring-1 ring-leaf/30">
-          <ShieldCheck className="h-3.5 w-3.5" aria-hidden /> Powered by Leafy Pay
+          <ShieldCheck className="h-3.5 w-3.5" aria-hidden /> Powered by {BRAND.full}
         </span>
         <h1 className="relative mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Espresso Works Ltd</h1>
         <p className="relative mt-3 max-w-xl text-white/80">
-          Premium coffee, powered by Leafy Pay. Sign in with your Leafy Pay account to shop, pay beneficiaries, and
+          Premium coffee, powered by {BRAND.full}. Sign in with your {BRAND.full} account to shop, pay beneficiaries, and
           manage transfers, all without sharing your card details with us.
         </p>
 
@@ -100,7 +101,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
                 href="/api/auth/login"
                 className="inline-flex items-center gap-2 rounded-xl bg-leaf px-5 py-2.5 font-semibold text-leaf-ink transition duration-200 hover:shadow-glow hover:brightness-105 active:scale-[.98]"
               >
-                <LogIn className="h-4 w-4" aria-hidden /> Login with Leafy Pay
+                <LogIn className="h-4 w-4" aria-hidden /> Login with {BRAND.full}
               </a>
             </Tip>
             {/* CIBA passwordless (v25): renders only when a credential exists in this browser. */}
@@ -109,7 +110,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
         )}
       </section>
 
-      {/* Marketing: what the Leafy Pay PSP offers, with a CTA into the full demo simulator. */}
+      {/* Marketing: what the Sec4 Pay PSP offers, with a CTA into the full demo simulator. */}
       <section className="glass rounded-2xl p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -117,7 +118,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
               <Clapperboard className="h-5 w-5 text-leaf-deep" aria-hidden /> One PSP, the whole payment story
             </h2>
             <p className="mt-1 max-w-2xl text-sm text-muted">
-              Espresso Works is just one way in. Behind it, <b>Leafy Pay</b> powers the end-to-end PCI DSS journey on a
+              Espresso Works is just one way in. Behind it, <b>{BRAND.full}</b> powers the end-to-end PCI DSS journey on a
               single MongoDB data layer, from checkout to investigation, with sensitive data encrypted yet still searchable.
             </p>
           </div>

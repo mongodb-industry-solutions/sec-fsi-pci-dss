@@ -9,6 +9,7 @@ import { JsonView } from '../../../../../components/json/JsonView';
 import { api } from '../../../../../lib/api';
 import { getToken } from '../../../../../lib/auth';
 import { useNotify } from '../../../../../components/ui/ConfirmProvider';
+import { useEffectivePermissions } from '../../../../../lib/permissions';
 import { byCapability, isCapabilityKey } from '../../../../../config/capabilities';
 
 export default function ModuleConfigPage() {
@@ -16,6 +17,8 @@ export default function ModuleConfigPage() {
   const capability = String(params.capability);
   const token = getToken() ?? '';
   const notify = useNotify();
+  const { can } = useEffectivePermissions();
+  const canEdit = can('modules', 'manage'); // manager has modules:view only; only operations_officer may edit
 
   const descriptor = isCapabilityKey(capability) ? byCapability(capability) : null;
 
@@ -70,14 +73,21 @@ export default function ModuleConfigPage() {
         <p className="text-sm text-gray-500">Loading…</p>
       ) : (
         <>
+          {!canEdit && (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-600">
+              Read-only: your role can view this configuration but not change it (requires <code className="font-mono text-xs">modules:manage</code>).
+            </div>
+          )}
           <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
             <h2 className="font-semibold text-gray-800 text-sm">Engine configuration <code className="font-mono text-xs text-gray-500">moduleConfig</code></h2>
             <p className="text-xs text-gray-500">Thresholds / rules used by the internal engine; overrides the built-in defaults.</p>
-            <JsonEditor value={text} onChange={setText} minHeight="10rem" maxHeight="22rem" error={invalid ? 'Invalid JSON' : null} />
-            <button onClick={save} disabled={saving || invalid}
-              className="flex items-center gap-2 bg-[#001E2B] hover:bg-[#001E2B]/80 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-60 text-sm">
-              <Save size={15} />{saving ? 'Saving…' : 'Save configuration'}
-            </button>
+            <JsonEditor value={text} onChange={setText} readOnly={!canEdit} minHeight="10rem" maxHeight="22rem" error={invalid ? 'Invalid JSON' : null} />
+            {canEdit && (
+              <button onClick={save} disabled={saving || invalid}
+                className="flex items-center gap-2 bg-[#001E2B] hover:bg-[#001E2B]/80 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-60 text-sm">
+                <Save size={15} />{saving ? 'Saving…' : 'Save configuration'}
+              </button>
+            )}
           </div>
 
           {config?.moduleCallbackEndpoints !== undefined && (

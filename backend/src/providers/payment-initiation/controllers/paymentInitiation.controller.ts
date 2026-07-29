@@ -3,6 +3,7 @@
 // GET/PUT /config — admin configuration.
 
 import { FastifyInstance } from 'fastify';
+import { requirePermission } from '../../../vendors/middleware/acl';
 import {
   resolvePaymentInitiationConfig,
   initiateTransfer,
@@ -134,6 +135,7 @@ export async function paymentInitiationController(fastify: FastifyInstance) {
   });
 
   fastify.get('/config', {
+    preHandler: requirePermission('modules', 'view'),
     schema: {
       tags: ['modules:payment-initiation'],
       summary: 'Get payment-initiation module configuration',
@@ -146,6 +148,7 @@ export async function paymentInitiationController(fastify: FastifyInstance) {
   });
 
   fastify.put('/config', {
+    preHandler: requirePermission('modules', 'manage'),
     schema: {
       tags: ['modules:payment-initiation'],
       summary: 'Update payment-initiation module configuration',

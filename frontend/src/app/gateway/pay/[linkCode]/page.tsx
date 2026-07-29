@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { api } from '../../../../lib/api';
+import { BRAND } from '../../../../config/brand';
 import { deriveCardToken } from '../../../../lib/cardTokenize';
 import { useViewerSavedCards, SavedCardSelector, PayingWithSummary, SignedInBadge } from '../../../../components/gateway/SavedCardSelector';
 import { Lock, CreditCard, CheckCircle, XCircle, Eye, EyeOff, Copy, Check } from 'lucide-react';
@@ -185,7 +186,7 @@ function PaymentLinkPageInner() {
               </button>
             </div>
           )}
-          <div className="mt-4 text-xs text-gray-400">Powered by Leafy Pay (MongoDB PSP Platform)</div>
+          <div className="mt-4 text-xs text-gray-400">Powered by {BRAND.full} (MongoDB PSP Platform)</div>
         </div>
       </div>
     );

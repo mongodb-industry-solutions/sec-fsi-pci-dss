@@ -35,6 +35,23 @@ export const config = {
     cryptSharedLibPath: env('MONGODB_CRYPT_SHARED_LIB_PATH', '')!,
   },
 
+  rtp: {
+    // v28 Request to Pay (RTP). Gates RTP routes + lifecycle subscriber.
+    enabled: pspEnv('RTP_ENABLED', 'true') !== 'false',
+    // Verification of Payee capability (market-gated; when off the engine returns not_supported).
+    vop: pspEnv('RTP_VOP', 'true') !== 'false',
+    // ISO 3166-1 alpha-2 markets where VoP is supported (EU Instant Payments Reg + UK CoP).
+    vopMarkets: (pspEnv('RTP_VOP_MARKETS', 'ES,FR,DE,IT,NL,IE,PT,BE,AT,FI,GB')!).split(',').map((s) => s.trim().toUpperCase()),
+  },
+
+  qe: {
+    // QE text search (substring/prefix/suffix) needs MongoDB 8.2+ and mongodb-client-encryption 7.2.
+    // Default TRUE (assume a recent Atlas). Set PSP_QE_TEXT_SEARCH=false for pre-8.2 clusters:
+    // text-search fields degrade to QE:equality (still encrypted + searchable exactly, still lookup-tier)
+    // so setup never fails and L1 keeps decrypting them.
+    textSearch: pspEnv('QE_TEXT_SEARCH', 'true') !== 'false',
+  },
+
   kms: {
     provider: (pspEnv('KMS_PROVIDER', 'local')!) as 'local' | 'aws',
     localMasterKey: pspEnv('KMS_LOCAL_MASTER_KEY') ?? pspEnv('LOCAL_MASTER_KEY'),
@@ -76,6 +93,11 @@ export const config = {
   },
 
   app: {
+    // Product / system name (single source of truth). Compound name, two words (styled separately in
+    // the UIs). Override via PSP_NAME_PRIMARY / PSP_NAME_SECONDARY; defaults to the current name.
+    namePrimary: pspEnv('NAME_PRIMARY', 'Leafy')!.trim(),
+    nameSecondary: pspEnv('NAME_SECONDARY', 'Pay')!.trim(),
+    get name() { return `${this.namePrimary} ${this.nameSecondary}`.trim(); },
     adminUser: pspEnv('ADM_USER'),
     adminPass: pspEnv('ADM_PASS'),
     jwtSecret: pspEnv('JWT_SECRET', 'dev-secret-change-me')!,

@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { api, FraudCase, ActionEvent, TransactionNotesResponse } from '../../../../../lib/api';
+import { api, FraudCase, ActionEvent, TransactionNotesResponse, RtpRequestDTO } from '../../../../../lib/api';
+import { RtpDetailView } from '../../../../../components/RtpDetailView';
 import { getToken, decodeToken } from '../../../../../lib/auth';
 import { useDebugMode } from '../../../../../lib/debugMode';
 import { Check, Copy, Eye, EyeOff, Info } from 'lucide-react';
@@ -231,6 +232,7 @@ export default function TransactionDetailPage() {
     cardTransactionNarrative?: string;
   } | null>(null);
   const [fraudCase, setFraudCase] = useState<FraudCase | null>(null);
+  const [rtpRequest, setRtpRequest] = useState<RtpRequestDTO | null>(null);
   const [caseNotes, setCaseNotes] = useState<TransactionNotesResponse | null>(null);
   const [events, setEvents] = useState<ActionEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -254,6 +256,13 @@ export default function TransactionDetailPage() {
       const p2p = await api.accounts.getTransfer(txnId, t).catch(() => null);
       if (p2p) {
         setP2pTransfer(p2p);
+        if (showLoading) setLoading(false);
+        return;
+      }
+      // RTP (Request to Pay): the id is a paymentRequestInstanceReference (intent domain, SD-65).
+      const rtp = await api.rtp.getById(txnId, t).catch(() => null);
+      if (rtp) {
+        setRtpRequest(rtp);
         if (showLoading) setLoading(false);
         return;
       }
@@ -326,6 +335,12 @@ export default function TransactionDetailPage() {
   if (loading) return (
     <PageShell {...shell}>
       <div className="text-center py-12 text-gray-400">Loading transaction...</div>
+    </PageShell>
+  );
+
+  if (rtpRequest) return (
+    <PageShell {...shell}>
+      <RtpDetailView request={rtpRequest} token={token} partyRef={user?.partyRef} role={user?.role} onChanged={refresh} />
     </PageShell>
   );
 

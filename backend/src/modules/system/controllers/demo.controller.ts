@@ -19,7 +19,7 @@ const PKG_VERSION = (() => {
 })();
 
 const SERVICE_ID = 'fsi-pci-dss-backend';
-const SERVICE_DESC = 'Leafy Pay PSP Platform — Backend API';
+const SERVICE_DESC = `${config.app.name} PSP Platform, Backend API`;
 
 type CheckStatus = 'pass' | 'fail' | 'warn';
 interface CheckEntry {
@@ -250,7 +250,7 @@ Filters (combinable): \`featured=true\`, \`role=customer,merchant_officer\` (com
                   name: { type: 'string', description: 'Display name.' },
                   role: {
                     type: 'string',
-                    enum: ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor', 'merchant_officer', 'manager'],
+                    enum: ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor', 'merchant_officer', 'operations_officer', 'manager'],
                     description: 'Role encoded in the JWT on login.',
                   },
                   featured: { type: 'boolean', description: 'True if part of the curated demo roster.' },

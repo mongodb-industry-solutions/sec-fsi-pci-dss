@@ -7,6 +7,7 @@ import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { Breadcrumb } from '../../../../components/Breadcrumb';
 import { SectionHeader } from '../../../../components/SectionHeader';
+import { QrRepresentation } from '../../../../components/QrRepresentation';
 
 interface MerchantOption {
   merchantAgreementInstanceReference: string;
@@ -149,6 +150,10 @@ function RequestForm({ token, onDone }: { token: string; onDone: () => void }) {
           </div>
           <p className="font-semibold text-gray-900">Payment link created</p>
           <p className="text-xs font-mono text-gray-500 mt-1">{result.code}</p>
+        </div>
+        {/* Shared QR so the buyer can scan the payment link instead of copying the URL. */}
+        <div className="max-w-xs mx-auto">
+          <QrRepresentation encodedPayload={result.url} payloadFormat="url" label="Scan to pay this link" />
         </div>
         <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 text-xs text-gray-700 break-all font-mono">
           {result.url}

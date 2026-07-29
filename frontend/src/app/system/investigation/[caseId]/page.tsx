@@ -12,7 +12,8 @@ import { SEVERITY_COLORS, STATUS_COLORS, ROLE_LABELS, formatRiskIndicator } from
 import { useDebugMode } from '../../../../lib/debugMode';
 import { Breadcrumb } from '../../../../components/Breadcrumb';
 import { storeEscalationToken } from '../../../../lib/escalation';
-import { ArrowUpFromLine, CheckCircle, XCircle, ShieldAlert, Activity, Store, CreditCard, UserCheck, ChevronRight } from 'lucide-react';
+import { ArrowUpFromLine, CheckCircle, XCircle, ShieldAlert, Activity, Store, CreditCard, UserCheck, ChevronRight, RotateCcw } from 'lucide-react';
+import { useConfirm } from '../../../../components/ui/ConfirmProvider';
 
 const ACTION_LABELS: Record<string, string> = {
   case_opened: 'Case opened',
@@ -22,6 +23,7 @@ const ACTION_LABELS: Record<string, string> = {
   escalated: 'Escalated to L2',
   ai_review: 'AI pre-review',
   resolved: 'Resolved',
+  reopened: 'Reopened',
   closed: 'Closed',
 };
 
@@ -30,6 +32,7 @@ const ACTION_COLORS: Record<string, string> = {
   escalated: 'bg-yellow-100 text-yellow-800',
   case_opened: 'bg-blue-100 text-blue-800',
   resolved: 'bg-green-100 text-green-800',
+  reopened: 'bg-blue-100 text-blue-800',
   note_added: 'bg-gray-100 text-gray-700',
 };
 
@@ -51,6 +54,7 @@ const HRPC_COLORS: Record<string, string> = {
 export default function DemoCaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const router = useRouter();
+  const confirm = useConfirm();
 
   // role/token must start with stable defaults to avoid SSR/client hydration mismatch.
   // getToken() reads localStorage which is undefined during SSR.
@@ -180,6 +184,18 @@ export default function DemoCaseDetailPage() {
     }
   }
 
+  // Reopen a resolved/closed case (L1/L2 only; auditor is read-only). Confirm, set status back to
+  // 'open', then reload. The backend records a 'reopened' audit event (SD-83, PCI DSS Req 10).
+  async function handleReopen() {
+    const ok = await confirm({
+      title: 'Reopen this case?',
+      message: 'This returns the case to the open state for further review. The action is recorded in the audit trail.',
+      confirmLabel: 'Reopen case',
+    });
+    if (!ok) return;
+    await handleAction({ fraudDiagnosisCaseStatus: 'open' }, 'Case reopened.');
+  }
+
   async function handleCancelEscalation() {
     setActionBusy(true);
     setActionMsg(null);
@@ -307,6 +323,18 @@ export default function DemoCaseDetailPage() {
                 <span>{new Date(snap.cardTransactionDateTime).toLocaleString()}</span>
                 <span className="text-gray-500">Status:</span>
                 <span className="capitalize">{snap.cardTransactionStatus}</span>
+                {fraudCase.cardTransactionInstanceReference && (
+                  <>
+                    <span className="text-gray-500">Transaction ID:</span>
+                    <Link
+                      href={`/system/transactions/${fraudCase.cardTransactionInstanceReference}?from=investigation&caseId=${caseId}&caseRef=${encodeURIComponent(fraudCase.fraudDiagnosisCaseReference ?? '')}`}
+                      className="font-mono text-xs text-blue-600 hover:underline break-all"
+                      title="Open the associated transaction"
+                    >
+                      {fraudCase.cardTransactionInstanceReference}
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -522,6 +550,26 @@ export default function DemoCaseDetailPage() {
             <p className="text-xs text-gray-500 mt-1">
               {new Date(fraudCase.fraudDiagnosisResolutionRecord.resolutionDateTime).toLocaleString()}
             </p>
+          </div>
+        )}
+
+        {/* -- Reopen a resolved/closed case (L1/L2 only; auditor read-only) -- */}
+        {isResolved && (isL1 || isL2) && (
+          <div className="bg-white rounded-xl border p-5">
+            <h2 className="font-semibold mb-3">Case reopening</h2>
+            <button
+              onClick={handleReopen}
+              disabled={actionBusy}
+              className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-blue-600 text-blue-700 text-sm font-medium hover:bg-blue-50 disabled:opacity-50 transition-colors"
+            >
+              <RotateCcw size={14} />
+              Reopen case
+            </button>
+            {actionMsg && (
+              <div className={`mt-2 text-sm rounded p-2 ${actionMsg.startsWith('Error') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+                {actionMsg}
+              </div>
+            )}
           </div>
         )}
 

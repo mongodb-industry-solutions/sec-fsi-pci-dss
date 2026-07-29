@@ -76,7 +76,7 @@
   {
     "roleName": "merchant_officer",
     "roleLabel": "Merchant Officer",
-    "roleDescription": "Merchant acquiring: review/approve merchants and manage their configuration (KYB decisions).",
+    "roleDescription": "Merchant acquiring: KYB decision authority (review, approve/reject/suspend) and merchant configuration. Decision path, distinct from operations_officer data correction (SoD, PCI Req 7).",
     "roleScope": "all",
     "roleIsBuiltin": true,
     "bianServiceDomain": "Merchant Relations",
@@ -85,6 +85,24 @@
       "merchants": ["view", "manage"],
       "auditEvents": ["view"],
       "accounts": ["view"]
+    }
+  },
+  {
+    "roleName": "operations_officer",
+    "roleLabel": "Operations Officer",
+    "roleDescription": "Operations: administers cardholder cards (SD-88) and payout accounts (SD-66) via the built-in modules, plus KYC (SD-53) and KYB (SD-89) data administration (review/correct records and beneficial owners). KYB decision (approve/reject) stays with merchant_officer (SoD, PCI Req 7).",
+    "roleScope": "all",
+    "roleIsBuiltin": true,
+    "bianServiceDomain": "Payment Card / Payout Account Arrangement",
+    "bianControlRecordType": "PaymentCardManagement / PayoutAccountArrangement",
+    "rolePermissions": {
+      "cards": ["view", "manage"],
+      "accounts": ["view", "manage"],
+      "customers": ["view", "manage"],
+      "merchants": ["view", "manage"],
+      "modules": ["view", "manage"],
+      "providers": ["view"],
+      "auditEvents": ["view"]
     }
   },
   {
@@ -97,7 +115,7 @@
     "bianControlRecordType": "ExternalProviderArrangement",
     "rolePermissions": {
       "providers": ["view", "manage"],
-      "modules": ["view", "manage"],
+      "modules": ["view"],
       "authDomains": ["view", "manage"],
       "roles": ["view", "manage"],
       "auditEvents": ["view"]

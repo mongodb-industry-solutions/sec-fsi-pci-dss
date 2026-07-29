@@ -77,6 +77,11 @@ steps:
         - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-backend
         - ingress.enabled=true
         - ingress.hosts[0]=sec-fsi-pci-dss-backend.industrysolutions.staging.corp.mongodb.com
+        # Expose the backend API publicly (no corp Okta SSO on the ingress) so external callers/TPPs
+        # can hit /api/v1/* and /doc directly, matching the frontend. Kanopy web-app ingress defaults
+        # to authenticated=true; false makes it public. NOTE: verify the flag name against the Kanopy
+        # web-app chart 4.25.0 on the first staging run (drone-helm fails the upgrade if it is wrong).
+        - ingress.authenticated=false
         - mesh.enabled=true
       wait: true
       timeout: 300s
@@ -211,6 +216,9 @@ steps:
         - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-backend
         - ingress.enabled=true
         - ingress.hosts[0]=sec-fsi-pci-dss-backend.industrysolutions.prod.corp.mongodb.com
+        # Public backend API ingress (no corp Okta SSO) — see staging deploy note. Verify the flag
+        # name against the Kanopy web-app chart 4.25.0 before relying on it in production.
+        - ingress.authenticated=false
         - mesh.enabled=true
       wait: true
       timeout: 300s

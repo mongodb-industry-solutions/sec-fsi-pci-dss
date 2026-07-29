@@ -4,35 +4,42 @@ import { exchangeCode, verifyIdToken, fetchUserinfo } from '@/lib/oauth';
 import { attachSession, clearLoginStateOn, readLoginState } from '@/lib/session';
 import { expiresAtFrom } from '@/lib/expiry';
 import { ENV } from '@/lib/env';
+import { oauthLog } from '@/lib/logger';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const home = new URL('/', ENV.baseUrl());
 
-  const error = searchParams.get('error');
-  if (error) {
-    home.searchParams.set('auth_error', error);
-    return NextResponse.redirect(home);
-  }
-
   const code = searchParams.get('code');
   const state = searchParams.get('state');
   // Read (do not mutate) the login-state; we expire it on the response we return.
   const login = readLoginState(req);
+  const flowId = login?.flowId;
+
+  // The PSP redirected back with an error (e.g. access_denied when the user declined consent). Record
+  // that the callback DID reach the merchant, with the reason, before bouncing home.
+  const error = searchParams.get('error');
+  if (error) {
+    oauthLog.warn('callback.psp_error', { flowId, error, reached: true });
+    home.searchParams.set('auth_error', error);
+    const res = NextResponse.redirect(home);
+    clearLoginStateOn(res);
+    return res;
+  }
+
+  oauthLog.info('callback.received', { flowId, hasCode: !!code, hasState: !!state, host: req.nextUrl.host });
 
   // CSRF: state must match the value we issued at /login.
   if (!code || !login || !state || state !== login.state) {
     // Concise diagnostic (no secrets) to explain spurious invalid_state.
-    console.warn(
-      '[auth/callback] invalid_state',
-      JSON.stringify({
-        hasCode: !!code,
-        cookiePresent: !!login,
-        stateParamPresent: !!state,
-        stateMatches: !!login && !!state && state === login.state,
-        host: req.nextUrl.host,
-      }),
-    );
+    oauthLog.warn('callback.invalid_state', {
+      flowId,
+      hasCode: !!code,
+      cookiePresent: !!login,
+      stateParamPresent: !!state,
+      stateMatches: !!login && !!state && state === login.state,
+      host: req.nextUrl.host,
+    });
     home.searchParams.set('auth_error', 'invalid_state');
     const res = NextResponse.redirect(home);
     clearLoginStateOn(res);
@@ -41,6 +48,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const tokens = await exchangeCode(code, login.codeVerifier);
+    oauthLog.info('callback.token_exchanged', { flowId });
     const grantedScopes = tokens.scope ? tokens.scope.split(' ').filter(Boolean) : [];
 
     let sub = '';
@@ -74,6 +82,7 @@ export async function GET(req: NextRequest) {
     // identity/attribution. (A malformed/invalid id_token throws in verifyIdToken and is handled by the
     // catch below.) Treat the empty-subject case as an auth failure instead.
     if (!sub) {
+      oauthLog.error('callback.no_subject', { flowId, reason: 'id_token missing or lacked sub (openid scope not granted?)' });
       home.searchParams.set('auth_error', 'token_exchange_failed');
       const res = NextResponse.redirect(home);
       clearLoginStateOn(res);
@@ -93,8 +102,18 @@ export async function GET(req: NextRequest) {
       email,
     });
     clearLoginStateOn(res);
+    // Login complete: the identified user + granted scopes, correlatable to the PSP ledger by flowId.
+    oauthLog.info('callback.login_success', { flowId, sub, scopes: grantedScopes });
     return res;
-  } catch {
+  } catch (e) {
+    // The real cause (from exchangeCode / verifyIdToken): invalid_grant, invalid_client, PKCE mismatch,
+    // redirect_uri mismatch, discovery unreachable, id_token nonce mismatch, … — no secret is logged.
+    const err = e as { code?: string; description?: string; message?: string };
+    oauthLog.error('callback.failed', {
+      flowId,
+      reason: err.code ?? err.message ?? 'token_exchange_failed',
+      detail: err.description || undefined,
+    });
     home.searchParams.set('auth_error', 'token_exchange_failed');
     const res = NextResponse.redirect(home);
     clearLoginStateOn(res);

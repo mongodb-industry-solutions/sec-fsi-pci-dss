@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { backchannelAuthorize, OAuthUpstreamError } from '@/lib/oauth';
 import { REQUESTED_SCOPES } from '@/lib/env';
 import { randomInt } from 'crypto';
+import { BRAND } from '@/lib/brand';
 
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as { login_hint_token?: string };
@@ -24,6 +25,6 @@ export async function POST(req: NextRequest) {
     if (e instanceof OAuthUpstreamError) {
       return NextResponse.json({ error: e.code, error_description: e.description }, { status: e.status });
     }
-    return NextResponse.json({ error: 'bc_authorize_failed', error_description: 'Could not reach Leafy Pay' }, { status: 502 });
+    return NextResponse.json({ error: 'bc_authorize_failed', error_description: `Could not reach ${BRAND.full}` }, { status: 502 });
   }
 }

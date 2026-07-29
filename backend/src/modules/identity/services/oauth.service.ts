@@ -11,6 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { MERCHANT_AGREEMENT_COLLECTION, MerchantAgreementControlRecord, OAuthGrantType } from '../../gateway/models/merchantAgreement.model';
 import { describeScope, requiredScopesIn, ScopeDescriptor } from '../../gateway/services/merchantOAuth.service';
 import { emitProcessEvent, attributionFromMerchantContext } from '../../provider/services/businessProcessEvent.service';
+import { auditOAuth } from './oauthAudit.service';
 import { PARTY_AUTH_CONSENT_COLLECTION, PartyAuthConsentRecord } from '../models/partyAuthConsent.model';
 import { WebhookService } from '../../gateway/services/merchantWebhook.service';
 import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
@@ -158,6 +159,14 @@ export async function initiateAuthorization(
     throw oauthError(400, 'invalid_request', 'Only code_challenge_method=S256 is supported');
   }
 
+  auditOAuth(db, 'oauth.authorize.initiated', {
+    clientId: client.clientId,
+    merchantName: client.merchantName,
+    state: params.state,
+    scopes: allowedScopes,
+    outcome: 'approved',
+  });
+
   return {
     client,
     scopes: allowedScopes,
@@ -209,6 +218,15 @@ export async function issueAuthorizationCode(
   };
 
   await db.collection<PartyAuthorizationCodeRecord>(PARTY_AUTHORIZATION_CODE_COLLECTION).insertOne(record);
+
+  auditOAuth(db, 'oauth.code.issued', {
+    clientId,
+    sub,
+    state: validated.state,
+    scopes: validated.scopes,
+    outcome: 'approved',
+  });
+
   return { code, state: validated.state };
 }
 
@@ -243,6 +261,16 @@ export async function exchangeAuthorizationCode(
     nonce: record.nonce,
     tokenLifetimeSeconds: client.tokenLifetimeSeconds,
     refreshTokenLifetimeDays: client.refreshTokenLifetimeDays,
+  });
+
+  auditOAuth(db, 'oauth.token.issued', {
+    clientId,
+    merchantName: client.merchantName,
+    sub: record.partyAuthenticationInstanceReference,
+    state: record.state,
+    scopes: record.scopes,
+    grantType: 'authorization_code',
+    outcome: 'verified',
   });
 
   // Upsert consent grant record (SD-16). Created on first exchange; lastUsedAt updated on refresh.
@@ -348,11 +376,21 @@ export async function issueClientCredentialsToken(
     ? requestedScopes.filter((s) => client.scopes.includes(s))
     : client.scopes;
 
-  return issueTokens(db, clientId, clientId, allowedScopes, 'client_credentials', {
+  const tokens = await issueTokens(db, clientId, clientId, allowedScopes, 'client_credentials', {
     tokenLifetimeSeconds: client.tokenLifetimeSeconds,
     refreshTokenLifetimeDays: client.refreshTokenLifetimeDays,
     isClientCredentials: true,
   });
+
+  auditOAuth(db, 'oauth.token.issued', {
+    clientId,
+    merchantName: client.merchantName,
+    scopes: allowedScopes,
+    grantType: 'client_credentials',
+    outcome: 'verified',
+  });
+
+  return tokens;
 }
 
 // ── Refresh Token ─────────────────────────────────────────────────────────────
@@ -370,10 +408,21 @@ export async function refreshAccessToken(
   if (record.expiresAt < new Date()) throw oauth401('invalid_grant', 'Refresh token has expired');
 
   const client = await resolveOAuthClient(db, clientId);
-  return issueTokens(db, record.sub, clientId, record.scopes, 'refresh_token', {
+  const tokens = await issueTokens(db, record.sub, clientId, record.scopes, 'refresh_token', {
     tokenLifetimeSeconds: client.tokenLifetimeSeconds,
     refreshTokenLifetimeDays: client.refreshTokenLifetimeDays,
   });
+
+  auditOAuth(db, 'oauth.token.refreshed', {
+    clientId,
+    merchantName: client.merchantName,
+    sub: record.sub,
+    scopes: record.scopes,
+    grantType: 'refresh_token',
+    outcome: 'verified',
+  });
+
+  return tokens;
 }
 
 // ── Subject → Party resolution (SD-91 → SD-13) ─────────────────────────────────
@@ -412,6 +461,14 @@ export async function getUserinfo(db: Db, accessToken: string): Promise<Record<s
   if (scopes.includes('email')) {
     claims.email = user.customerAuthenticationEmailAddress;
   }
+
+  auditOAuth(db, 'oauth.userinfo.accessed', {
+    clientId: payload.aud as string | undefined,
+    sub: payload.sub,
+    scopes,
+    outcome: 'verified',
+  });
+
   return claims;
 }
 
@@ -423,12 +480,14 @@ export async function revokeToken(db: Db, token: string): Promise<void> {
   const byId = await col.findOne({ tokenId: token });
   if (byId) {
     await col.updateOne({ tokenId: token }, { $set: { revokedAt: new Date() } });
+    auditOAuth(db, 'oauth.token.revoked', { clientId: byId.clientId, sub: byId.sub, scopes: byId.scopes, outcome: 'approved' });
     return;
   }
   // Try as access token jti
   try {
     const payload = await verifyAccessToken(token);
     await col.updateOne({ tokenId: payload.jti as string }, { $set: { revokedAt: new Date() } });
+    auditOAuth(db, 'oauth.token.revoked', { clientId: payload.aud as string | undefined, sub: payload.sub, outcome: 'approved' });
   } catch {
     // RFC 7009: always return 200, no error for unknown tokens
   }
@@ -737,28 +796,48 @@ export async function listMerchantAuthorizations(
   return { authorizations, total, page, limit };
 }
 
+// v27: resolve a party's OAuth subject (customerAuthenticationInstanceReference == PartyAuthConsent
+// partyAuthenticationInstanceReference) from its SD-13 partyInstanceReference. Lets staff query/revoke
+// a found customer's authorized apps by party ref without the client sending the auth subject. Returns
+// null when the party has no authentication identity (e.g. a party that never enrolled to log in).
+export async function resolveSubForParty(db: Db, partyRef: string): Promise<string | null> {
+  if (!partyRef) return null;
+  const auth = await db
+    .collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
+    .findOne({ partyInstanceReference: partyRef }, { projection: { customerAuthenticationInstanceReference: 1 } });
+  return auth?.customerAuthenticationInstanceReference ?? null;
+}
+
 export async function revokeConsentGrant(
   db: Db,
   sub: string,
   consentId: string,
   revokedBy: 'user' | 'merchant' | 'psp' = 'user',
+  opts?: { staffOverride?: boolean },
 ): Promise<void> {
+  // Self-scoped by default (a foreign consentId 404s so existence is not leaked). A staff override
+  // (v27: L2 investigator revoking a grant they do not own) matches by consentId only; the grant's
+  // OWN subject is then used for token revocation, never the acting staff's sub.
+  const filter = opts?.staffOverride
+    ? { consentId }
+    : { consentId, partyAuthenticationInstanceReference: sub };
   const consent = await db
     .collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION)
-    .findOne({ consentId, partyAuthenticationInstanceReference: sub });
+    .findOne(filter);
 
   if (!consent) throw Object.assign(new Error('Consent grant not found'), { statusCode: 404 });
   if (consent.consentStatus === 'revoked') return;
 
+  const ownerSub = consent.partyAuthenticationInstanceReference;
   const now = new Date();
   await db.collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION).updateOne(
     { consentId },
     { $set: { consentStatus: 'revoked', consentRevokedAt: now, consentRevokedBy: revokedBy, recordUpdatedDateTime: now } },
   );
 
-  // Revoke all active tokens for this user+client
+  // Revoke all active tokens for the grant's OWN user + client (not the acting caller).
   await db.collection<PartyIssuedTokenRecord>(PARTY_ISSUED_TOKEN_COLLECTION).updateMany(
-    { sub, clientId: consent.oauthClientId, revokedAt: { $exists: false } },
+    { sub: ownerSub, clientId: consent.oauthClientId, revokedAt: { $exists: false } },
     { $set: { revokedAt: now } },
   );
 
@@ -766,7 +845,7 @@ export async function revokeConsentGrant(
   new WebhookService(db).dispatch( consent.merchantAgreementInstanceReference, 'oauth.authorization_revoked', {
     consentId,
     clientId: consent.oauthClientId,
-    subject: sub,
+    subject: ownerSub,
     scopes: consent.grantedScopes,
     revokedAt: now.toISOString(),
     revokedBy,

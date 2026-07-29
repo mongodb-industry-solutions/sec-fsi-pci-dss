@@ -183,7 +183,9 @@
     "bianControlRecordType": "PayoutAccountArrangement",
     "recordCreatedDateTime": "2026-06-20T11:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z",
-    "schemaVersion": 1
+    "schemaVersion": 1,
+    "payoutAccountIban": "DE42110241624530483194",
+    "payoutAccountRoutingNumber": "110241624"
   },
   {
     "payoutAccountInstanceReference": "pau00005-0000-4000-8000-000000000005",

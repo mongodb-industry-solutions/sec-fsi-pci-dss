@@ -5,6 +5,7 @@ import { Bell } from 'lucide-react';
 import { api, type NotificationItem } from '../lib/api';
 import { getToken } from '../lib/auth';
 import { useNotificationsStream, useNotificationsChanged, emitNotificationsChanged } from '../lib/useNotificationsStream';
+import { formatBadgeCount } from '../lib/badge';
 
 // ADR-031: top-bar notifications. Dark dropdown matching the adjacent user menu. Shows an unread
 // (actionable) count badge; lists the latest 5 with a one-line (truncated) message and a "View all"
@@ -67,7 +68,7 @@ export function NotificationBell() {
         <Bell size={17} />
         {count > 0 && (
           <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#00ED64] text-[#001E2B] text-[10px] font-bold flex items-center justify-center">
-            {count > 9 ? '9+' : count}
+            {formatBadgeCount(count)}
           </span>
         )}
       </button>

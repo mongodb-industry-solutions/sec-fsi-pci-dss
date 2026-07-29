@@ -7,6 +7,8 @@ import { Breadcrumb } from '../../../../../components/Breadcrumb';
 import { api } from '../../../../../lib/api';
 import { getToken } from '../../../../../lib/auth';
 import { useNotify } from '../../../../../components/ui/ConfirmProvider';
+import { useEffectivePermissions } from '../../../../../lib/permissions';
+import { Tooltip } from '../../../../../components/Tooltip';
 
 // Dedicated config UI for the internal FDS (fraud-detection) engine (overrides the generic module
 // editor for this capability). The rules are DATA-DRIVEN and stored in the capability moduleConfig;
@@ -71,6 +73,8 @@ function coerceValue(op: RuleOp, raw: string): number | string | Array<number | 
 export default function FdsModulePage() {
   const token = getToken() ?? '';
   const notify = useNotify();
+  const { can } = useEffectivePermissions();
+  const canEdit = can('modules', 'manage'); // manager has modules:view only; only operations_officer may edit
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -165,40 +169,46 @@ export default function FdsModulePage() {
         <p className="text-sm text-gray-500">Loading…</p>
       ) : (
         <>
+          {!canEdit && (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-600">
+              Read-only: your role can view this configuration but not change it (requires <code className="font-mono text-xs">modules:manage</code>).
+            </div>
+          )}
+          <fieldset disabled={!canEdit} className="space-y-5 border-0 p-0 m-0 min-w-0">
           {/* Thresholds + bands */}
           <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
             <h2 className="font-semibold text-gray-800 text-sm">Thresholds &amp; score bands</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Review amount</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Review amount<Tooltip text="Transaction amount at/over which the HIGH_VALUE_TXN rule fires and flags the transaction for review. Single source of truth shared with the fraud-case threshold." /></label>
                 <input type="number" value={reviewAmount} onChange={(e) => setReviewAmount(Number(e.target.value) || 0)}
                   className="w-32 border rounded-lg px-3 py-2 text-sm font-mono" />
                 <p className="text-xs text-gray-500 mt-1">Single source of truth for the amount threshold (shared with the fraud-case rule).</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Decline amount <span className="text-gray-400">(optional)</span></label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Decline amount <span className="text-gray-400">(optional)</span><Tooltip text="Amount at/over which the VERY_HIGH_VALUE_TXN rule forces an auto-decline. Leave blank to never auto-decline based on amount alone." /></label>
                 <input type="number" value={declineAmount} onChange={(e) => setDeclineAmount(e.target.value)}
                   className="w-32 border rounded-lg px-3 py-2 text-sm font-mono" placeholder="—" />
                 <p className="text-xs text-gray-500 mt-1">Amount at/over which a transaction is auto-declined. Leave blank to never auto-decline on amount.</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Velocity: max txns / 24h <span className="text-gray-400">(optional)</span></label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Velocity: max txns / 24h <span className="text-gray-400">(optional)</span><Tooltip text="The VELOCITY_24H rule fires when the number of transactions in the last 24h exceeds this count (only when that signal is supplied to the engine)." /></label>
                 <input type="number" value={window24hMax} onChange={(e) => setWindow24hMax(e.target.value)}
                   className="w-32 border rounded-lg px-3 py-2 text-sm font-mono" placeholder="—" />
                 <p className="text-xs text-gray-500 mt-1">Fires the velocity rule above this count (when the signal is supplied).</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Review at score ≥</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Review at score ≥<Tooltip text="Aggregate risk-score band: at/above this total the recommendation becomes 'review' (even if no single rule forced it)." /></label>
                 <input type="number" value={reviewAtOrAbove} onChange={(e) => setReviewAtOrAbove(Number(e.target.value) || 0)}
                   className="w-32 border rounded-lg px-3 py-2 text-sm font-mono" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Decline at score ≥ <span className="text-gray-400">(optional)</span></label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Decline at score ≥ <span className="text-gray-400">(optional)</span><Tooltip text="Aggregate risk-score band: at/above this total the recommendation becomes 'decline'. Leave blank to never auto-decline purely on the aggregate score." /></label>
                 <input type="number" value={declineAtOrAbove} onChange={(e) => setDeclineAtOrAbove(e.target.value)}
                   className="w-32 border rounded-lg px-3 py-2 text-sm font-mono" placeholder="—" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Risky MCC list</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Risky MCC list<Tooltip text="Merchant Category Codes (comma-separated) used by the RISKY_MCC rule; a transaction whose MCC is in this list scores extra risk and is flagged for review." /></label>
                 <input value={riskyMcc} onChange={(e) => setRiskyMcc(e.target.value)}
                   className="w-full border rounded-lg px-3 py-2 text-sm font-mono" placeholder="5812, 6011, 7995" />
                 <p className="text-xs text-gray-500 mt-1">Merchant category codes used by the <code>RISKY_MCC</code> rule (comma-separated).</p>
@@ -209,7 +219,7 @@ export default function FdsModulePage() {
           {/* Rules table (extensible) */}
           <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-gray-800 text-sm">Scoring rules</h2>
+              <h2 className="font-semibold text-gray-800 text-sm">Scoring rules<Tooltip text="Data-driven rules evaluated on every transaction. Each rule fires when its field/operator/value condition matches, adding its score; the aggregate score and any forced action produce the approve/review/decline recommendation." /></h2>
               <button onClick={addRule} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gray-300 hover:border-gray-500 text-gray-700 transition-colors">
                 <Plus size={13} /> Add rule
               </button>
@@ -263,16 +273,17 @@ export default function FdsModulePage() {
 
           <div className="flex items-center gap-3">
             <button onClick={save} disabled={saving}
-              className="flex items-center gap-2 bg-[#001E2B] hover:bg-[#001E2B]/80 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-60 text-sm">
-              <Save size={15} />{saving ? 'Saving…' : 'Save rules'}
+              className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium disabled:opacity-60">
+              <Save size={14} />{saving ? 'Saving…' : 'Save rules'}
             </button>
             <Link href="/system/audit-events" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors">
               <ListChecks size={14} /> View scoring logs in audit events
             </Link>
           </div>
+          </fieldset>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
-            <strong>How it scores:</strong> every transaction is evaluated against the enabled rules. The fired rules&rsquo; scores sum to the risk score; the bands map it to approve / review / decline, and any forced action wins. The verdict drives the fraud case (its score and severity), and the rules that fired are recorded in the audit trail. No PAN or CVV is ever used in scoring (PCI DSS Req 3.2).
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 mt-5">
+            <strong>How it scores: </strong> every transaction is evaluated against the enabled rules. The fired rules&rsquo; scores sum to the risk score; the bands map it to approve / review / decline, and any forced action wins. The verdict drives the fraud case (its score and severity), and the rules that fired are recorded in the audit trail. No PAN or CVV is ever used in scoring (PCI DSS Req 3.2).
           </div>
         </>
       )}

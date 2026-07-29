@@ -11,6 +11,7 @@ import { seedMerchants } from './seedMerchants';
 import { seedAuthDomains } from './seedAuthDomains';
 import { seedCustomers } from './seedCustomers';
 import { seedCards } from './seedCards';
+import { seedCardIssuerVault } from './seedCardIssuerVault';
 import { seedTransactions } from './seedTransactions';
 import { seedCases } from './seedCases';
 import { seedCustomerQuestions } from './seedCustomerQuestions';
@@ -21,6 +22,7 @@ import { seedCapabilityModules } from './seedCapabilityModules';
 import { seedPayoutAccounts } from './seedPayoutAccounts';
 import { seedPaymentExecutions } from './seedPaymentExecutions';
 import { seedCounterpartyArrangements } from './seedCounterpartyArrangements';
+import { seedRtpRequests } from './seedRtpRequests';
 import { seedBalanceCredits } from './seedBalanceCredits';
 import { seedEnrolledCredentials } from './seedEnrolledCredentials';
 
@@ -98,6 +100,9 @@ export async function runSeed() {
     console.log('Seeding paymentCardManagement...');
     await seedCards(db);
 
+    console.log('Seeding cardIssuerVault (issuer CDE: full PAN QE + core BIN/last4)...');
+    await seedCardIssuerVault(db);
+
     console.log('Seeding cardTransactionLog (v2: sensitive fields inline)...');
     await seedTransactions(db);
 
@@ -129,6 +134,9 @@ export async function runSeed() {
     // apply their balance movements and the ledger reconciles: opening − Σ(settled sent) + Σ(received).
     console.log('Seeding paymentExecutionProcedure (SD-65, v17)...');
     await seedPaymentExecutions(db);
+
+    console.log('Seeding paymentRequestProcedure (SD-65 Request to Pay, v28)...');
+    await seedRtpRequests(db);
 
     console.log('Seeding externalProviderArrangement (SD-193, Ch-07)...');
     await seedIntegrations(db);

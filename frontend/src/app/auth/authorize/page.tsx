@@ -6,6 +6,7 @@
  */
 import { headers } from 'next/headers';
 import OAuthConsentForm, { MerchantAvatar } from './OAuthConsentForm';
+import { BRAND } from '../../../config/brand';
 
 interface AuthorizePageProps {
   // Next.js 15+/16: searchParams is a Promise and must be awaited.
@@ -100,9 +101,18 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
   // Demo convenience: prefill the login form from the authorize URL.
   // login_hint is the standard OIDC param; prefill_email is a demo-only alias.
   const prefillEmail = params.login_hint || params.prefill_email || '';
-  // prefill_password is accepted ONLY in non-production builds: URLs leak into browser history,
-  // server/proxy logs and Referer headers, so a password must never ride in a query param in prod.
-  const prefillPassword = process.env.NODE_ENV !== 'production' ? (params.prefill_password || '') : '';
+  // prefill_password lets a demo pass the password in the query string, and auto-login submits it.
+  // This is INSECURE by design (URLs leak into browser history, server/proxy logs and Referer
+  // headers). It is a per-request opt-in: nothing happens unless prefill_password is in the URL.
+  // NEXT_PUBLIC_PSP_OIDC_AUTO is a kill-switch: ALLOWED by default (any environment), and only
+  // disabled when explicitly set to 'false'. Set it to 'false' to harden a real deployment.
+  const oidcAutoAllowed = process.env.NEXT_PUBLIC_PSP_OIDC_AUTO !== 'false';
+  const prefillPassword = oidcAutoAllowed ? (params.prefill_password || '') : '';
+  // Auto-login is a SEPARATE, explicit opt-in: prefilling the password only fills the field. The
+  // login is submitted automatically only when the URL also carries auto_login=1|true (and both
+  // credentials are present). Without it, the user still clicks the login button.
+  const autoLoginRequested = params.auto_login === '1' || params.auto_login === 'true';
+  const autoLogin = oidcAutoAllowed && autoLoginRequested && Boolean(prefillEmail && prefillPassword);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
@@ -110,7 +120,7 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
         {/* Header */}
         <div className="text-center mb-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/app-logo.png" alt="Leafy Pay" className="h-14 w-auto mx-auto mb-3" />
+          <img src="/app-logo.png" alt={BRAND.full} className="h-14 w-auto mx-auto mb-3" />
           <p className="text-sm text-gray-500 mt-1">Payments made effortless and secure</p>
         </div>
 
@@ -137,11 +147,12 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
             originalSearchParams={params}
             prefillEmail={prefillEmail}
             prefillPassword={prefillPassword}
+            autoLogin={autoLogin}
           />
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-4">
-          By allowing, you agree that {info.client_name} may access your Leafy Pay account
+          By allowing, you agree that {info.client_name} may access your {BRAND.full} account
           in accordance with the permissions above.
         </p>
       </div>

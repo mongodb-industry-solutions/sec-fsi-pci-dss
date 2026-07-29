@@ -24,8 +24,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-01-15T09:00:00.000Z",
       "customerAgreementKycCheckReference": "KYC-B0000001-001",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 21,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-dd675895"
+    },
+    "customerAgreementGovernmentID": {
+      "issuingCountry": "GB",
+      "number": "GB31454621",
+      "expiryDate": "2031-12-24",
+      "type": "driver_license"
+    },
+    "customerAgreementTaxIDNumber": "ES-8138428",
+    "customerAgreementOccupation": "engineer",
+    "customerAgreementPurposeOfRelationship": "personal_banking",
+    "customerAgreementSourceOfFunds": "salary"
   },
   {
     "customerAgreementInstanceReference": "d4d288de-8a3f-40c9-a0ec-e7e3f857dffa",
@@ -52,8 +67,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2023-12-01T10:00:00.000Z",
       "customerAgreementKycCheckReference": "KYC-B0000002-002",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 5,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-7d10237a"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "driver_license",
+      "issuingCountry": "FR",
+      "number": "FR181034658",
+      "expiryDate": "2032-01-30"
+    },
+    "customerAgreementTaxIDNumber": "FR75569051",
+    "customerAgreementOccupation": "analyst",
+    "customerAgreementSourceOfFunds": "investment",
+    "customerAgreementPurposeOfRelationship": "payments"
   },
   {
     "customerAgreementInstanceReference": "b57261f4-e956-4026-82f9-b2e9d47c93e3",
@@ -80,8 +110,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-12-04T04:22:53.631Z",
       "customerAgreementKycCheckReference": "KYC-B0000003-003",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 73,
+      "customerAgreementKycCheckRiskRating": "high",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-1fe2ac20"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "driver_license",
+      "issuingCountry": "GB",
+      "number": "GB543064821",
+      "expiryDate": "2029-12-29"
+    },
+    "customerAgreementTaxIDNumber": "GB26717153",
+    "customerAgreementOccupation": "doctor",
+    "customerAgreementSourceOfFunds": "inheritance",
+    "customerAgreementPurposeOfRelationship": "personal_banking"
   },
   {
     "customerAgreementInstanceReference": "ef94403e-3530-4c08-959b-bd85cafa5ffc",
@@ -108,8 +153,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-05-11T17:54:17.083Z",
       "customerAgreementKycCheckReference": "KYC-B0000004-004",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 13,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-b7aaaec2"
+    },
+    "customerAgreementGovernmentID": {
+      "issuingCountry": "GB",
+      "number": "GB-569326386",
+      "expiryDate": "2028-08-06",
+      "type": "driver_license"
+    },
+    "customerAgreementTaxIDNumber": "GB-27923466",
+    "customerAgreementOccupation": "engineer",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementPurposeOfRelationship": "savings"
   },
   {
     "customerAgreementInstanceReference": "33a46103-01bd-4509-b1d9-e52b802beb40",
@@ -136,8 +196,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-09-16T07:36:05.840Z",
       "customerAgreementKycCheckReference": "KYC-B0000005-005",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 39,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "hit",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-aac7839c"
+    },
+    "customerAgreementGovernmentID": {
+      "issuingCountry": "GB",
+      "number": "GB-703274821",
+      "expiryDate": "2027-10-01",
+      "type": "driver_license"
+    },
+    "customerAgreementTaxIDNumber": "GB-34680164",
+    "customerAgreementOccupation": "doctor",
+    "customerAgreementSourceOfFunds": "savings",
+    "customerAgreementPurposeOfRelationship": "payments"
   },
   {
     "customerAgreementInstanceReference": "499f8479-43ac-4ba3-adde-3cb64b96a94a",
@@ -164,8 +239,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2026-02-23T13:13:30.227Z",
       "customerAgreementKycCheckReference": "KYC-B0000006-006",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 61,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-160a6c06"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "GB",
+      "number": "GB813608766",
+      "expiryDate": "2032-05-17"
+    },
+    "customerAgreementTaxIDNumber": "GB21555680",
+    "customerAgreementOccupation": "nurse",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementPurposeOfRelationship": "personal_banking"
   },
   {
     "customerAgreementInstanceReference": "73b6880a-0f6a-4607-a3da-5fe701e1817c",
@@ -192,8 +282,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-10-19T02:56:26.021Z",
       "customerAgreementKycCheckReference": "KYC-B0000007-007",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 41,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "hit",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-64abc444"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "national_id",
+      "issuingCountry": "ES",
+      "number": "ES911564821",
+      "expiryDate": "2026-09-25"
+    },
+    "customerAgreementTaxIDNumber": "ES62780578",
+    "customerAgreementOccupation": "doctor",
+    "customerAgreementSourceOfFunds": "business",
+    "customerAgreementPurposeOfRelationship": "personal_banking"
   },
   {
     "customerAgreementInstanceReference": "6c18ffbe-6283-4fd0-b197-9d7af4e7815a",
@@ -220,8 +325,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2026-01-02T11:23:00.433Z",
       "customerAgreementKycCheckReference": "KYC-B0000008-008",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 61,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": true,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-d42b3efc"
+    },
+    "customerAgreementGovernmentID": {
+      "issuingCountry": "DE",
+      "number": "DE-502094821",
+      "expiryDate": "2032-12-01",
+      "type": "driver_license"
+    },
+    "customerAgreementTaxIDNumber": "DE-12980105",
+    "customerAgreementOccupation": "lawyer",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementPurposeOfRelationship": "savings"
   },
   {
     "customerAgreementInstanceReference": "189d5b8f-3cdf-4ce3-9a43-006066fe0d4c",
@@ -248,8 +368,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-11-20T09:56:53.781Z",
       "customerAgreementKycCheckReference": "KYC-B0000009-009",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 92,
+      "customerAgreementKycCheckRiskRating": "high",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-64f04b4c"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "driver_license",
+      "issuingCountry": "GB",
+      "number": "GB118444821",
+      "expiryDate": "2031-09-10"
+    },
+    "customerAgreementTaxIDNumber": "GB62920922",
+    "customerAgreementOccupation": "plumber",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementPurposeOfRelationship": "payments"
   },
   {
     "customerAgreementInstanceReference": "616f62e9-1f61-4b68-a4ae-21f9b90c7ff5",
@@ -276,8 +411,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-04-02T01:03:25.509Z",
       "customerAgreementKycCheckReference": "KYC-B0000010-010",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 76,
+      "customerAgreementKycCheckRiskRating": "high",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-c7ba5007"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "US",
+      "number": "US-456966167",
+      "expiryDate": "2027-12-31"
+    },
+    "customerAgreementTaxIDNumber": "US-19502848",
+    "customerAgreementPurposeOfRelationship": "personal_banking",
+    "customerAgreementOccupation": "doctor",
+    "customerAgreementSourceOfFunds": "salary"
   },
   {
     "customerAgreementInstanceReference": "3f778384-51ec-45f2-b093-6ab1242c8bf2",
@@ -304,8 +454,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-03-28T02:10:11.011Z",
       "customerAgreementKycCheckReference": "KYC-B0000011-011",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 90,
+      "customerAgreementKycCheckRiskRating": "high",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-171581fb"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "national_id",
+      "issuingCountry": "DE",
+      "number": "DE953437499",
+      "expiryDate": "2031-08-24"
+    },
+    "customerAgreementTaxIDNumber": "DE22102671",
+    "customerAgreementOccupation": "lawyer",
+    "customerAgreementSourceOfFunds": "investment",
+    "customerAgreementPurposeOfRelationship": "business_banking"
   },
   {
     "customerAgreementInstanceReference": "d1bea47e-bb79-41e8-ae4a-4834f4dad78d",
@@ -332,8 +497,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-03-05T09:49:30.595Z",
       "customerAgreementKycCheckReference": "KYC-B0000012-012",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 86,
+      "customerAgreementKycCheckRiskRating": "high",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-91d8dd20"
+    },
+    "customerAgreementGovernmentID": {
+      "issuingCountry": "DE",
+      "number": "DE-236624821",
+      "expiryDate": "2029-06-20",
+      "type": "driver_license"
+    },
+    "customerAgreementTaxIDNumber": "DE-47751831",
+    "customerAgreementOccupation": "nurse",
+    "customerAgreementSourceOfFunds": "business",
+    "customerAgreementPurposeOfRelationship": "business_banking"
   },
   {
     "customerAgreementInstanceReference": "055a212f-3b82-4bdf-b588-b1c54005fa85",
@@ -360,8 +540,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-01-13T14:02:48.328Z",
       "customerAgreementKycCheckReference": "KYC-B0000013-013",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 94,
+      "customerAgreementKycCheckRiskRating": "high",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-f36e1d9d"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "DE",
+      "number": "DE-304557029",
+      "expiryDate": "2027-08-15"
+    },
+    "customerAgreementTaxIDNumber": "DE3409772",
+    "customerAgreementOccupation": "engineer",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementPurposeOfRelationship": "business_banking"
   },
   {
     "customerAgreementInstanceReference": "62e6270e-bd62-4d27-81f3-6cc8128a97b5",
@@ -388,8 +583,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-06-03T23:24:26.623Z",
       "customerAgreementKycCheckReference": "KYC-B0000014-014",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 8,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-74ee97e2"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "GB",
+      "number": "GB420941506",
+      "expiryDate": "2031-08-31"
+    },
+    "customerAgreementTaxIDNumber": "GB71306047",
+    "customerAgreementOccupation": "doctor",
+    "customerAgreementSourceOfFunds": "savings",
+    "customerAgreementPurposeOfRelationship": "payments"
   },
   {
     "customerAgreementInstanceReference": "d75b1048-9c4a-4db0-9bc4-5d51faff9fe6",
@@ -416,8 +626,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-08-01T18:25:47.764Z",
       "customerAgreementKycCheckReference": "KYC-B0000015-015",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 91,
+      "customerAgreementKycCheckRiskRating": "high",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-b74f1f91"
+    },
+    "customerAgreementGovernmentID": {
+      "issuingCountry": "FR",
+      "number": "FR-719598953",
+      "expiryDate": "2032-11-20",
+      "type": "driver_license"
+    },
+    "customerAgreementTaxIDNumber": "ES-28110980",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementOccupation": "nurse",
+    "customerAgreementPurposeOfRelationship": "payments"
   },
   {
     "customerAgreementInstanceReference": "e497e7d8-5f5f-448a-a1fa-f6ebaaa8547e",
@@ -444,8 +669,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-03-16T17:33:33.352Z",
       "customerAgreementKycCheckReference": "KYC-B0000016-016",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 45,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-d45bcb0d"
+    },
+    "customerAgreementGovernmentID": {
+      "issuingCountry": "DE",
+      "number": "DE-313601549",
+      "expiryDate": "2031-10-13",
+      "type": "driver_license"
+    },
+    "customerAgreementTaxIDNumber": "ES-12880680",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementOccupation": "doctor",
+    "customerAgreementPurposeOfRelationship": "payments"
   },
   {
     "customerAgreementInstanceReference": "da01b491-d9ae-43da-89b7-7d6f73643323",
@@ -472,8 +712,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-11-20T01:51:32.462Z",
       "customerAgreementKycCheckReference": "KYC-B0000017-017",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 87,
+      "customerAgreementKycCheckRiskRating": "high",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "pending",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-9de65bce"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "DE",
+      "number": "DE-754766694",
+      "expiryDate": "2032-03-06"
+    },
+    "customerAgreementTaxIDNumber": "ES-41432738",
+    "customerAgreementOccupation": "engineer",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementPurposeOfRelationship": "payments"
   },
   {
     "customerAgreementInstanceReference": "8a8fa4fd-b4b9-4b27-92be-0c149b574247",
@@ -500,8 +755,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-07-06T20:34:33.524Z",
       "customerAgreementKycCheckReference": "KYC-B0000018-018",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 99,
+      "customerAgreementKycCheckRiskRating": "high",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-7a086041"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "driver_license",
+      "issuingCountry": "GB",
+      "number": "GB805805281",
+      "expiryDate": "2031-01-18"
+    },
+    "customerAgreementTaxIDNumber": "ES73980290",
+    "customerAgreementOccupation": "nurse",
+    "customerAgreementSourceOfFunds": "investment",
+    "customerAgreementPurposeOfRelationship": "personal_banking"
   },
   {
     "customerAgreementInstanceReference": "ef4ae506-9804-42bd-9d76-df70e42881ed",
@@ -528,8 +798,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-02-16T23:42:17.964Z",
       "customerAgreementKycCheckReference": "KYC-B0000019-019",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 34,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "hit",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-aa8d28aa"
+    },
+    "customerAgreementGovernmentID": {
+      "issuingCountry": "GB",
+      "number": "GB-393508706",
+      "expiryDate": "2032-03-18",
+      "type": "passport"
+    },
+    "customerAgreementTaxIDNumber": "GB-34799675",
+    "customerAgreementPurposeOfRelationship": "personal_banking",
+    "customerAgreementOccupation": "nurse",
+    "customerAgreementSourceOfFunds": "inheritance"
   },
   {
     "customerAgreementInstanceReference": "ca377496-2999-4f61-97f0-0c0fce3cd6b4",
@@ -556,8 +841,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-04-04T20:17:41.724Z",
       "customerAgreementKycCheckReference": "KYC-B0000020-020",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 42,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-f13ee6fc"
+    },
+    "customerAgreementGovernmentID": {
+      "issuingCountry": "ES",
+      "number": "ES-709934821",
+      "expiryDate": "2026-08-06",
+      "type": "driver_license"
+    },
+    "customerAgreementTaxIDNumber": "ES2264503",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementOccupation": "engineer",
+    "customerAgreementPurposeOfRelationship": "savings"
   },
   {
     "customerAgreementInstanceReference": "2bbd9a85-6def-44d7-9745-43e4d102be6a",
@@ -584,8 +884,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-03-16T11:04:28.121Z",
       "customerAgreementKycCheckReference": "KYC-B0000021-021",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 36,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-633c1bb0"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "driver_license",
+      "issuingCountry": "US",
+      "number": "US252274821",
+      "expiryDate": "2032-01-04"
+    },
+    "customerAgreementTaxIDNumber": "US62027613",
+    "customerAgreementOccupation": "engineer",
+    "customerAgreementSourceOfFunds": "inheritance",
+    "customerAgreementPurposeOfRelationship": "payments"
   },
   {
     "customerAgreementInstanceReference": "73991d43-8892-4bd5-b9ac-c233c5d272e2",
@@ -612,8 +927,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-03-02T01:11:24.672Z",
       "customerAgreementKycCheckReference": "KYC-B0000022-022",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 61,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-e61371e3"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "DE",
+      "number": "DE66707019",
+      "expiryDate": "2027-08-05"
+    },
+    "customerAgreementTaxIDNumber": "DE-3591665",
+    "customerAgreementOccupation": "doctor",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementPurposeOfRelationship": "business_banking"
   },
   {
     "customerAgreementInstanceReference": "984ddc9e-efe2-4900-b606-229117e40dab",
@@ -640,8 +970,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-01-01T20:37:11.305Z",
       "customerAgreementKycCheckReference": "KYC-B0000023-023",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 13,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-33e0acfa"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "driver_license",
+      "issuingCountry": "US",
+      "number": "US476479362",
+      "expiryDate": "2028-07-13"
+    },
+    "customerAgreementTaxIDNumber": "US37198823",
+    "customerAgreementOccupation": "engineer",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementPurposeOfRelationship": "personal_banking"
   },
   {
     "customerAgreementInstanceReference": "196655df-9ba9-4ee7-8a16-af2bbc52f3f2",
@@ -668,8 +1013,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-10-12T15:25:28.529Z",
       "customerAgreementKycCheckReference": "KYC-B0000024-024",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 81,
+      "customerAgreementKycCheckRiskRating": "high",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-a514aa85"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "FR",
+      "number": "FR-157688013",
+      "expiryDate": "2030-04-25"
+    },
+    "customerAgreementTaxIDNumber": "FR-37667884",
+    "customerAgreementOccupation": "nurse",
+    "customerAgreementSourceOfFunds": "savings",
+    "customerAgreementPurposeOfRelationship": "savings"
   },
   {
     "customerAgreementInstanceReference": "76fc2f03-37d4-48df-80e5-ec1241ef82e2",
@@ -696,8 +1056,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-03-14T13:14:47.829Z",
       "customerAgreementKycCheckReference": "KYC-B0000025-025",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 64,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "pending",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-b0058920"
+    },
+    "customerAgreementGovernmentID": {
+      "issuingCountry": "ES",
+      "number": "ES-634064821",
+      "expiryDate": "2026-10-05",
+      "type": "driver_license"
+    },
+    "customerAgreementTaxIDNumber": "ES-31931703",
+    "customerAgreementOccupation": "plumber",
+    "customerAgreementSourceOfFunds": "savings",
+    "customerAgreementPurposeOfRelationship": "business_banking"
   },
   {
     "customerAgreementInstanceReference": "12a62fde-24e1-444b-8a0b-397d3b53f05f",
@@ -724,8 +1099,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-10-09T23:37:34.025Z",
       "customerAgreementKycCheckReference": "KYC-B0000026-026",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 67,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-823e804e"
+    },
+    "customerAgreementGovernmentID": {
+      "issuingCountry": "FR",
+      "number": "FR-45727158",
+      "expiryDate": "2027-12-22",
+      "type": "passport"
+    },
+    "customerAgreementTaxIDNumber": "FR-55932286",
+    "customerAgreementOccupation": "engineer",
+    "customerAgreementPurposeOfRelationship": "personal_banking",
+    "customerAgreementSourceOfFunds": "salary"
   },
   {
     "customerAgreementInstanceReference": "04dd6da7-e8b3-4a60-a838-a6184a126789",
@@ -752,8 +1142,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2026-05-23T13:38:03.139Z",
       "customerAgreementKycCheckReference": "KYC-B0000027-027",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 61,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-69afa47e"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "national_id",
+      "issuingCountry": "ES",
+      "number": "ES399112590",
+      "expiryDate": "2026-09-15"
+    },
+    "customerAgreementTaxIDNumber": "ES65409955",
+    "customerAgreementOccupation": "plumber",
+    "customerAgreementSourceOfFunds": "inheritance",
+    "customerAgreementPurposeOfRelationship": "personal_banking"
   },
   {
     "customerAgreementInstanceReference": "440bacd9-9179-49eb-b488-f6f316b6a125",
@@ -780,8 +1185,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-06-24T22:37:09.102Z",
       "customerAgreementKycCheckReference": "KYC-B0000028-028",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 11,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-27228855"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "driver_license",
+      "issuingCountry": "DE",
+      "number": "DE959097549",
+      "expiryDate": "2029-01-16"
+    },
+    "customerAgreementTaxIDNumber": "ES30517954",
+    "customerAgreementOccupation": "teacher",
+    "customerAgreementSourceOfFunds": "inheritance",
+    "customerAgreementPurposeOfRelationship": "personal_banking"
   },
   {
     "customerAgreementInstanceReference": "091eb14a-1896-4dc8-aceb-ef1e1c8f1dfd",
@@ -808,8 +1228,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-12-17T20:15:54.526Z",
       "customerAgreementKycCheckReference": "KYC-B0000029-029",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 99,
+      "customerAgreementKycCheckRiskRating": "high",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-58dd9008"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "driver_license",
+      "issuingCountry": "GB",
+      "number": "GB422084821",
+      "expiryDate": "2031-03-14"
+    },
+    "customerAgreementTaxIDNumber": "GB56591104",
+    "customerAgreementOccupation": "engineer",
+    "customerAgreementSourceOfFunds": "savings",
+    "customerAgreementPurposeOfRelationship": "personal_banking"
   },
   {
     "customerAgreementInstanceReference": "19e5c310-acb0-43d0-84c5-28030b00a502",
@@ -836,8 +1271,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-06-11T16:31:45.493Z",
       "customerAgreementKycCheckReference": "KYC-B0000030-030",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 11,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-8f7fc4a0"
+    },
+    "customerAgreementGovernmentID": {
+      "issuingCountry": "GB",
+      "number": "GB-557504821",
+      "expiryDate": "2031-02-02",
+      "type": "driver_license"
+    },
+    "customerAgreementTaxIDNumber": "GB-48982875",
+    "customerAgreementPurposeOfRelationship": "personal_banking",
+    "customerAgreementOccupation": "engineer",
+    "customerAgreementSourceOfFunds": "inheritance"
   },
   {
     "customerAgreementInstanceReference": "b517180d-bec6-4366-b211-aa259f337ec7",
@@ -864,8 +1314,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2026-03-14T18:33:29.027Z",
       "customerAgreementKycCheckReference": "KYC-B0000031-031",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 27,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-da0100a2"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "GB",
+      "number": "GB-517827786",
+      "expiryDate": "2029-09-10"
+    },
+    "customerAgreementTaxIDNumber": "ES-9920891",
+    "customerAgreementPurposeOfRelationship": "personal_banking",
+    "customerAgreementOccupation": "nurse",
+    "customerAgreementSourceOfFunds": "business"
   },
   {
     "customerAgreementInstanceReference": "e907261d-ef98-4be3-bd67-d6c223f79aee",
@@ -892,8 +1357,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2026-01-31T17:19:31.637Z",
       "customerAgreementKycCheckReference": "KYC-B0000032-032",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 55,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-5c38fe8d"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "driver_license",
+      "issuingCountry": "FR",
+      "number": "FR524405053",
+      "expiryDate": "2030-06-04"
+    },
+    "customerAgreementTaxIDNumber": "ES58351220",
+    "customerAgreementOccupation": "analyst",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementPurposeOfRelationship": "savings"
   },
   {
     "customerAgreementInstanceReference": "1bf0b11b-f4ff-42f5-9ec4-2250e5a95836",
@@ -920,8 +1400,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-08-05T12:35:18.803Z",
       "customerAgreementKycCheckReference": "KYC-B0000033-033",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 44,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": true,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-1f365137"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "driver_license",
+      "issuingCountry": "GB",
+      "number": "GB683397431",
+      "expiryDate": "2031-06-17"
+    },
+    "customerAgreementTaxIDNumber": "GB26364169",
+    "customerAgreementOccupation": "teacher",
+    "customerAgreementSourceOfFunds": "investment",
+    "customerAgreementPurposeOfRelationship": "business_banking"
   },
   {
     "customerAgreementInstanceReference": "322c0f0f-51a4-4e09-b5cc-0b3bc111b8b7",
@@ -948,8 +1443,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-03-20T01:51:21.209Z",
       "customerAgreementKycCheckReference": "KYC-B0000034-034",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 53,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "pending",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-9c38cd29"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "FR",
+      "number": "FR-349427233",
+      "expiryDate": "2028-03-06"
+    },
+    "customerAgreementTaxIDNumber": "FR-42312471",
+    "customerAgreementOccupation": "lawyer",
+    "customerAgreementSourceOfFunds": "business",
+    "customerAgreementPurposeOfRelationship": "business_banking"
   },
   {
     "customerAgreementInstanceReference": "76230470-338d-4bba-944a-3c2919dec4d6",
@@ -976,8 +1486,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-10-15T19:10:06.116Z",
       "customerAgreementKycCheckReference": "KYC-B0000035-035",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 19,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-a4c111b8"
+    },
+    "customerAgreementGovernmentID": {
+      "issuingCountry": "FR",
+      "number": "FR18194821",
+      "expiryDate": "2028-08-28",
+      "type": "passport"
+    },
+    "customerAgreementTaxIDNumber": "ES-37839091",
+    "customerAgreementOccupation": "engineer",
+    "customerAgreementSourceOfFunds": "business",
+    "customerAgreementPurposeOfRelationship": "business_banking"
   },
   {
     "customerAgreementInstanceReference": "cc61ad66-4e72-450e-8a38-7af791e53a1b",
@@ -1004,8 +1529,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-09-06T20:49:08.242Z",
       "customerAgreementKycCheckReference": "KYC-B0000036-036",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 53,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-5881821b"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "driver_license",
+      "issuingCountry": "DE",
+      "number": "DE251539459",
+      "expiryDate": "2028-10-18"
+    },
+    "customerAgreementTaxIDNumber": "DE56402576",
+    "customerAgreementOccupation": "nurse",
+    "customerAgreementSourceOfFunds": "business",
+    "customerAgreementPurposeOfRelationship": "savings"
   },
   {
     "customerAgreementInstanceReference": "721f44f0-7b7f-48d0-adee-7d4fcc2db5bb",
@@ -1032,8 +1572,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2026-01-22T16:28:42.930Z",
       "customerAgreementKycCheckReference": "KYC-B0000037-037",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 68,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-89cdaf48"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "DE",
+      "number": "DE19404821",
+      "expiryDate": "2028-06-25"
+    },
+    "customerAgreementTaxIDNumber": "DE-51969030",
+    "customerAgreementOccupation": "doctor",
+    "customerAgreementSourceOfFunds": "business",
+    "customerAgreementPurposeOfRelationship": "payments"
   },
   {
     "customerAgreementInstanceReference": "2cfa71f3-8d2c-4f44-b40d-8ce8da922528",
@@ -1060,8 +1615,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-07-24T21:46:24.969Z",
       "customerAgreementKycCheckReference": "KYC-B0000038-038",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 54,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "hit",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-c72193ec"
+    },
+    "customerAgreementGovernmentID": {
+      "issuingCountry": "ES",
+      "number": "ES-412984821",
+      "expiryDate": "2026-08-16",
+      "type": "passport"
+    },
+    "customerAgreementTaxIDNumber": "ES-19815649",
+    "customerAgreementOccupation": "doctor",
+    "customerAgreementSourceOfFunds": "business",
+    "customerAgreementPurposeOfRelationship": "payments"
   },
   {
     "customerAgreementInstanceReference": "eaa4f350-f5be-4f36-b807-7c3cfab0c8ab",
@@ -1088,8 +1658,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-12-20T15:24:11.219Z",
       "customerAgreementKycCheckReference": "KYC-B0000039-039",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 89,
+      "customerAgreementKycCheckRiskRating": "high",
+      "customerAgreementKycCheckPepStatus": true,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-6c5ed1bf"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "driver_license",
+      "issuingCountry": "US",
+      "number": "US645871407",
+      "expiryDate": "2031-05-24"
+    },
+    "customerAgreementTaxIDNumber": "US66817293",
+    "customerAgreementOccupation": "engineer",
+    "customerAgreementSourceOfFunds": "inheritance",
+    "customerAgreementPurposeOfRelationship": "business_banking"
   },
   {
     "customerAgreementInstanceReference": "55e77972-cbf0-4934-89d4-b7f2c89f1a8c",
@@ -1116,8 +1701,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-07-17T23:03:00.002Z",
       "customerAgreementKycCheckReference": "KYC-B0000040-040",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 37,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-eeb7ab48"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "DE",
+      "number": "DE-220604821",
+      "expiryDate": "2028-06-25"
+    },
+    "customerAgreementTaxIDNumber": "DE938970",
+    "customerAgreementOccupation": "teacher",
+    "customerAgreementSourceOfFunds": "business",
+    "customerAgreementPurposeOfRelationship": "payments"
   },
   {
     "customerAgreementInstanceReference": "66ba7237-721b-408a-a070-57b4c98c267f",
@@ -1144,8 +1744,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-06-08T07:09:31.113Z",
       "customerAgreementKycCheckReference": "KYC-B0000041-041",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 42,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-5d7b21ca"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "driver_license",
+      "issuingCountry": "GB",
+      "number": "GB219162666",
+      "expiryDate": "2029-05-13"
+    },
+    "customerAgreementTaxIDNumber": "GB59010958",
+    "customerAgreementOccupation": "nurse",
+    "customerAgreementSourceOfFunds": "business",
+    "customerAgreementPurposeOfRelationship": "business_banking"
   },
   {
     "customerAgreementInstanceReference": "cc23b89d-e957-4e96-b875-ecbd8ee1096f",
@@ -1172,8 +1787,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-09-26T08:15:41.183Z",
       "customerAgreementKycCheckReference": "KYC-B0000042-042",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 84,
+      "customerAgreementKycCheckRiskRating": "high",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "hit",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-42e243b9"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "DE",
+      "number": "DE327955729",
+      "expiryDate": "2029-07-15"
+    },
+    "customerAgreementTaxIDNumber": "DE45066397",
+    "customerAgreementOccupation": "analyst",
+    "customerAgreementSourceOfFunds": "business",
+    "customerAgreementPurposeOfRelationship": "payments"
   },
   {
     "customerAgreementInstanceReference": "9820bc3e-df74-44f9-8fe9-a04b767949f2",
@@ -1200,8 +1830,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2026-04-19T14:48:10.199Z",
       "customerAgreementKycCheckReference": "KYC-B0000043-043",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 33,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "pending",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-dd75626a"
+    },
+    "customerAgreementGovernmentID": {
+      "issuingCountry": "US",
+      "number": "US-293546642",
+      "expiryDate": "2032-01-14",
+      "type": "passport"
+    },
+    "customerAgreementTaxIDNumber": "US-8109677",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementOccupation": "teacher",
+    "customerAgreementPurposeOfRelationship": "savings"
   },
   {
     "customerAgreementInstanceReference": "aacfc6b9-ea14-49e0-b1a1-02b930c195e5",
@@ -1228,8 +1873,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-07-10T12:03:42.303Z",
       "customerAgreementKycCheckReference": "KYC-B0000044-044",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 38,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-590927e6"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "driver_license",
+      "issuingCountry": "US",
+      "number": "US407667262",
+      "expiryDate": "2028-04-04"
+    },
+    "customerAgreementTaxIDNumber": "US56680383",
+    "customerAgreementOccupation": "engineer",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementPurposeOfRelationship": "payments"
   },
   {
     "customerAgreementInstanceReference": "474fac9f-c0d8-4272-8e67-fd2fc1c8cb68",
@@ -1256,8 +1916,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-08-17T01:38:06.092Z",
       "customerAgreementKycCheckReference": "KYC-B0000045-045",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 90,
+      "customerAgreementKycCheckRiskRating": "high",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-feb23e6d"
+    },
+    "customerAgreementGovernmentID": {
+      "issuingCountry": "FR",
+      "number": "FR-70663253",
+      "expiryDate": "2028-03-26",
+      "type": "driver_license"
+    },
+    "customerAgreementTaxIDNumber": "ES9316467",
+    "customerAgreementOccupation": "nurse",
+    "customerAgreementSourceOfFunds": "inheritance",
+    "customerAgreementPurposeOfRelationship": "savings"
   },
   {
     "customerAgreementInstanceReference": "052397d8-344b-49a6-a31e-f432f2af5ca3",
@@ -1284,8 +1959,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2025-08-06T07:13:36.673Z",
       "customerAgreementKycCheckReference": "KYC-B0000046-046",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 88,
+      "customerAgreementKycCheckRiskRating": "high",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-17a5aec4"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "FR",
+      "number": "FR558844821",
+      "expiryDate": "2027-12-12"
+    },
+    "customerAgreementTaxIDNumber": "ES22397942",
+    "customerAgreementOccupation": "doctor",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementPurposeOfRelationship": "savings"
   },
   {
     "customerAgreementInstanceReference": "335d0a6c-f37b-4234-bddb-946d6ba72267",
@@ -1312,8 +2002,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-12-06T01:18:39.669Z",
       "customerAgreementKycCheckReference": "KYC-B0000047-047",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 14,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-820f2035"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "ES",
+      "number": "ES-186217365",
+      "expiryDate": "2026-09-20"
+    },
+    "customerAgreementTaxIDNumber": "ES-56029311",
+    "customerAgreementPurposeOfRelationship": "personal_banking",
+    "customerAgreementOccupation": "teacher",
+    "customerAgreementSourceOfFunds": "business"
   },
   {
     "customerAgreementInstanceReference": "6761a6fb-4902-4622-a470-0d704a7fb64c",
@@ -1340,8 +2045,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2024-09-20T13:38:43.211Z",
       "customerAgreementKycCheckReference": "KYC-B0000048-048",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 61,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-2d6aaba1"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "driver_license",
+      "issuingCountry": "FR",
+      "number": "FR228428473",
+      "expiryDate": "2031-07-29"
+    },
+    "customerAgreementTaxIDNumber": "ES33811421",
+    "customerAgreementOccupation": "nurse",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementPurposeOfRelationship": "payments"
   },
   {
     "customerAgreementInstanceReference": "cc9ba57d-7f5f-424b-a9ed-df9311fd4da7",
@@ -1368,8 +2088,23 @@
       "customerAgreementKycCheckStatus": "expired",
       "customerAgreementKycCheckCompletedDate": "2025-04-10T09:00:00.000Z",
       "customerAgreementKycCheckReference": "KYC-B0000049",
-      "customerAgreementKycCheckNotes": "KYC expired; annual renewal required per AML policy"
-    }
+      "customerAgreementKycCheckNotes": "KYC expired; annual renewal required per AML policy",
+      "customerAgreementKycCheckRiskScore": 49,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-be25734"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "national_id",
+      "issuingCountry": "GB",
+      "number": "GB514274821",
+      "expiryDate": "2029-10-30"
+    },
+    "customerAgreementTaxIDNumber": "GB16230713",
+    "customerAgreementOccupation": "plumber",
+    "customerAgreementSourceOfFunds": "inheritance",
+    "customerAgreementPurposeOfRelationship": "payments"
   },
   {
     "customerAgreementInstanceReference": "26487f52-efd7-4e95-ac67-5c8ac90c6ba0",
@@ -1394,8 +2129,23 @@
     "schemaVersion": 3,
     "customerAgreementKycCheck": {
       "customerAgreementKycCheckStatus": "initiated",
-      "customerAgreementKycCheckNotes": "KYC document check in progress; awaiting ID upload"
-    }
+      "customerAgreementKycCheckNotes": "KYC document check in progress; awaiting ID upload",
+      "customerAgreementKycCheckRiskScore": 8,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-e675bc18"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "DE",
+      "number": "DE-407354821",
+      "expiryDate": "2031-10-08"
+    },
+    "customerAgreementTaxIDNumber": "DE-3390368",
+    "customerAgreementPurposeOfRelationship": "personal_banking",
+    "customerAgreementOccupation": "nurse",
+    "customerAgreementSourceOfFunds": "salary"
   },
   {
     "customerAgreementInstanceReference": "c0000060-0000-4000-8000-000000000060",
@@ -1422,8 +2172,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2026-06-10T10:00:00.000Z",
       "customerAgreementKycCheckReference": "KYC-B0000060-060",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 20,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-dfb43564"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "GB",
+      "number": "GB-148744821",
+      "expiryDate": "2031-02-22"
+    },
+    "customerAgreementTaxIDNumber": "GB-6932437",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementOccupation": "nurse",
+    "customerAgreementPurposeOfRelationship": "business_banking"
   },
   {
     "customerAgreementInstanceReference": "c0000061-0000-4000-8000-000000000061",
@@ -1450,8 +2215,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2026-06-10T10:00:00.000Z",
       "customerAgreementKycCheckReference": "KYC-B0000061-061",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 58,
+      "customerAgreementKycCheckRiskRating": "medium",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-b5d020e6"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "GB",
+      "number": "GB-207061006",
+      "expiryDate": "2027-07-23"
+    },
+    "customerAgreementTaxIDNumber": "ES-28895353",
+    "customerAgreementPurposeOfRelationship": "personal_banking",
+    "customerAgreementOccupation": "engineer",
+    "customerAgreementSourceOfFunds": "inheritance"
   },
   {
     "customerAgreementInstanceReference": "f1000071-0000-4000-8000-000000000071",
@@ -1478,8 +2258,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2026-01-01T10:00:00.000Z",
       "customerAgreementKycCheckReference": "KYC-B0000071-001",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 77,
+      "customerAgreementKycCheckRiskRating": "high",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-9d97b60c"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "US",
+      "number": "US-376164821",
+      "expiryDate": "2031-07-08"
+    },
+    "customerAgreementTaxIDNumber": "US-41593808",
+    "customerAgreementOccupation": "engineer",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementPurposeOfRelationship": "savings"
   },
   {
     "customerAgreementInstanceReference": "f1000072-0000-4000-8000-000000000072",
@@ -1506,8 +2301,23 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2026-02-01T10:00:00.000Z",
       "customerAgreementKycCheckReference": "KYC-B0000072-001",
-      "customerAgreementKycCheckNotes": "Enhanced due diligence completed; cross-border risk noted."
-    }
+      "customerAgreementKycCheckNotes": "Enhanced due diligence completed; cross-border risk noted.",
+      "customerAgreementKycCheckRiskScore": 14,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-73b3a18e"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "national_id",
+      "issuingCountry": "US",
+      "number": "US120086142",
+      "expiryDate": "2027-12-06"
+    },
+    "customerAgreementTaxIDNumber": "ES70661004",
+    "customerAgreementOccupation": "plumber",
+    "customerAgreementSourceOfFunds": "savings",
+    "customerAgreementPurposeOfRelationship": "business_banking"
   },
   {
     "customerAgreementInstanceReference": "ca000058-0000-4000-8000-000000000058",
@@ -1534,7 +2344,65 @@
       "customerAgreementKycCheckStatus": "verified",
       "customerAgreementKycCheckCompletedDate": "2026-01-01T09:00:00.000Z",
       "customerAgreementKycCheckReference": "KYC-B0000058-001",
-      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding"
-    }
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 37,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-dfd88a23"
+    },
+    "customerAgreementGovernmentID": {
+      "issuingCountry": "US",
+      "number": "US-460629307",
+      "expiryDate": "2028-05-19",
+      "type": "passport"
+    },
+    "customerAgreementTaxIDNumber": "ES-6858031",
+    "customerAgreementOccupation": "lawyer",
+    "customerAgreementSourceOfFunds": "business",
+    "customerAgreementPurposeOfRelationship": "savings"
+  },
+  {
+    "customerAgreementInstanceReference": "c0000059-0000-4000-8000-000000000059",
+    "partyInstanceReference": "b0000059-0000-4000-8000-000000000059",
+    "customerAgreementReference": "ACC-LF-20260610",
+    "customerSegment": "retail",
+    "customerAgreementStatus": "active",
+    "customerAgreementEnrollmentDate": "2026-06-10T10:00:00.000Z",
+    "customerAgreementPreferredLanguage": "de",
+    "customerAgreementResidentialAddress": {
+      "streetAddress": "Friedrichstraße 43",
+      "city": "Berlin",
+      "postalCode": "10117",
+      "countryCode": "DE"
+    },
+    "governmentIdentificationReference": "SYNTH-LF-2059",
+    "customerAgreementRiskNotes": "No prior fraud history.",
+    "bianServiceDomain": "Customer Agreement",
+    "bianControlRecordType": "CustomerAgreementProcedure",
+    "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 3,
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2026-06-10T10:00:00.000Z",
+      "customerAgreementKycCheckReference": "KYC-B0000059-059",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 32,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-a3f10059"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "passport",
+      "issuingCountry": "DE",
+      "number": "DE-C01X00T47",
+      "expiryDate": "2029-05-12"
+    },
+    "customerAgreementTaxIDNumber": "DE-26954371829",
+    "customerAgreementPurposeOfRelationship": "personal_banking",
+    "customerAgreementOccupation": "designer",
+    "customerAgreementSourceOfFunds": "salary"
   }
 ]

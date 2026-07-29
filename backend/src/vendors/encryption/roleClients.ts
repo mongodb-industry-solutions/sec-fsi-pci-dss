@@ -77,7 +77,14 @@ async function buildQEClient(uri: string, tier: 'level1' | 'level2'): Promise<Mo
           : {}),
       },
       extraOptions: {
-        ...(cryptLib.cryptSharedLibPath && { cryptSharedLibPath: cryptLib.cryptSharedLibPath }),
+        // v7 types cryptSharedLibPath as a `${string}mongo_crypt_v${number}.{so,dll,dylib}`
+        // template literal. The path is resolved/validated at runtime in cryptLib, so cast here.
+        ...(cryptLib.cryptSharedLibPath && {
+          cryptSharedLibPath: cryptLib.cryptSharedLibPath as
+            | `${string}mongo_crypt_v${number}.so`
+            | `${string}mongo_crypt_v${number}.dll`
+            | `${string}mongo_crypt_v${number}.dylib`,
+        }),
         cryptSharedLibRequired: cryptLib.cryptSharedLibRequired,
       },
     },

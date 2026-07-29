@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
-import { loginUser, getDemoUsers, getEnabledDomains, registerSelfServiceUser, updateAuthProfile, bumpSessionEpoch, JwtPayload } from '../services/auth.service';
+import { loginUser, getEnabledDomains, registerSelfServiceUser, updateAuthProfile, bumpSessionEpoch, changeOwnPassword, JwtPayload } from '../services/auth.service';
 import { getSelfProfile, updateSelfProfile } from '../../customer/services/customerAgreement.service';
 import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../models/party.model';
@@ -201,73 +201,59 @@ Password for all demo users: \`demo-password\``,
     return reply.status(200).send({ loggedOut: true });
   });
 
-  fastify.get('/users', {
+  // POST /api/v1/auth/password/change — the authenticated user changes their own password.
+  // Requires the current password plus the new one (server also re-checks the policy). Confirmation
+  // matching is a client-side concern, but the API accepts only `currentPassword` + `newPassword`.
+  // On success every OTHER session is invalidated (epoch bump) and a fresh token is returned for
+  // the current session. Behind the global auth middleware, so `request.user` is set.
+  fastify.post('/password/change', {
     schema: {
       tags: ['auth'],
-      summary: 'List demo users (local domain)',
-      description: `Returns active pre-seeded demo user accounts (DB-backed) for the local domain.
-Intended for the UI to display one-click login shortcuts; passwords are **never** returned. This is
-the single, non-hardcoded roster shared by the debug-mode login picker and the simulator.
-
-Filters (combinable): \`featured=true\` (curated roster), \`role=customer,merchant_officer\`
-(comma list), \`q=\` (name/email substring), \`isMerchant=true\` (only customers who own a merchant).
-Results are returned in a deterministic order.`,
-      querystring: {
+      summary: 'Change your own password',
+      description: 'Verifies the current password, enforces the password policy on the new one, then '
+        + 'rehashes it (12-round bcrypt) and invalidates all other outstanding sessions. Returns a fresh '
+        + 'token so the current session stays signed in. Only available for `local` accounts.',
+      security: [{ bearerAuth: [] }],
+      body: {
         type: 'object',
+        required: ['currentPassword', 'newPassword'],
         properties: {
-          featured: { type: 'string', enum: ['true', 'false'], description: 'When "true", only users flagged customerAuthenticationDemoFeatured.' },
-          role: { type: 'string', description: 'Comma-separated role filter, e.g. "customer,merchant_officer".' },
-          q: { type: 'string', description: 'Case-insensitive substring match on name or email.' },
-          isMerchant: { type: 'string', enum: ['true', 'false'], description: 'When "true", only customers who own a merchant.' },
+          currentPassword: { type: 'string', description: 'The account\'s current password.' },
+          newPassword:     { type: 'string', minLength: 8, description: 'New password (min 8 chars, at least one letter and one number; enforced server-side).' },
         },
       },
       response: {
-        200: {
-          description: 'List of available demo users.',
-          type: 'object',
-          properties: {
-            users: {
-              type: 'array',
-              description: 'Active demo accounts matching the filters, in deterministic order.',
-              items: {
-                type: 'object',
-                properties: {
-                  email: { type: 'string', format: 'email', description: 'Login email; submit to POST /api/v1/auth/login.' },
-                  name: { type: 'string', description: 'Display name.' },
-                  role: {
-                    type: 'string',
-                    enum: ['customer', 'level1_analyst', 'level2_investigator', 'security_auditor', 'merchant_officer', 'manager'],
-                    description: 'Role that will be encoded in the JWT on login.',
-                  },
-                  featured: { type: 'boolean', description: 'True if part of the curated demo roster.' },
-                  partyRef: { type: 'string', description: 'partyInstanceReference (SD-13).' },
-                  merchant: {
-                    type: 'object',
-                    nullable: true,
-                    description: 'Present when this customer owns a merchant (customer + merchant).',
-                    properties: {
-                      id: { type: 'string', description: 'merchantAgreementInstanceReference.' },
-                      name: { type: 'string', description: 'Merchant display name.' },
-                      mcc: { type: 'string', nullable: true, description: 'Merchant Category Code (ISO 18245).' },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+        200: { type: 'object', properties: { token: { type: 'string', description: 'Fresh JWT for the current session, stamped with the new session epoch.' } } },
+        400: { $ref: 'Error#', description: 'Weak password, no-op change, or non-local account.' },
+        401: { $ref: 'Error#', description: 'Current password is incorrect, or not authenticated.' },
+        404: { $ref: 'Error#', description: 'Account not found.' },
+        500: { $ref: 'Error#', description: 'Unexpected server error.' },
       },
     },
   }, async (request, reply) => {
-    const { featured, role, q, isMerchant } = request.query as { featured?: string; role?: string; q?: string; isMerchant?: string };
-    const users = await getDemoUsers(fastify.db, {
-      featured: featured === 'true',
-      ...(role ? { role: role.split(',').map((r) => r.trim()).filter(Boolean) } : {}),
-      ...(q ? { q } : {}),
-      ...(isMerchant === 'true' ? { isMerchant: true } : {}),
-    });
-    return reply.send({ users });
+    const user = (request as FastifyRequest & { user?: JwtPayload }).user;
+    if (!user?.sub) return reply.status(401).send({ error: 'Unauthenticated' });
+    const { currentPassword, newPassword } = request.body as { currentPassword: string; newPassword: string };
+    if (!currentPassword || !newPassword) {
+      return reply.status(400).send({ error: 'currentPassword and newPassword are required' });
+    }
+    try {
+      const { token } = await changeOwnPassword(fastify.db, user.sub, currentPassword, newPassword);
+      return reply.status(200).send({ token });
+    } catch (err: unknown) {
+      const e = err as { statusCode?: number; message: string };
+      const allowed = [400, 401, 404];
+      const statusCode = (allowed.includes(e.statusCode ?? 0) ? e.statusCode : 500) as 400 | 401 | 404 | 500;
+      // Don't leak internal error details on an unexpected 500; keep the specific message only for the
+      // expected client errors (400/401/404).
+      return reply.status(statusCode).send({ error: statusCode === 500 ? 'Internal server error' : e.message });
+    }
   });
+
+  // NOTE: the demo-user roster endpoint was consolidated to GET /api/v1/system/users (demo.controller).
+  // A demo access convenience (list users by role for the login picker + simulator) belongs under
+  // /system, not under /auth (real authentication). Both used the same getDemoUsers service; the
+  // /auth/users duplicate was removed.
 
   fastify.get('/domains', {
     schema: {

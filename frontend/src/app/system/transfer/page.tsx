@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { ArrowLeftRight, SendHorizonal, Landmark, QrCode, ChevronRight } from 'lucide-react';
+import { ArrowLeftRight, SendHorizonal, Landmark, QrCode, ChevronRight, HandCoins } from 'lucide-react';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { Breadcrumb } from '../../../components/Breadcrumb';
 import { useEffect, useState } from 'react';
@@ -72,7 +72,16 @@ export default function TransferPage() {
           description="Create a shareable payment link for any amount"
           href="/system/transfer/request"
         />
+        <MethodCard
+          icon={<HandCoins size={20} className="text-[#001E2B]" />}
+          title="Request to Pay"
+          description="Request money from someone; they approve to pay"
+          href="/system/transfer/rtp"
+        />
       </div>
+
+      {/* Transfer is a simplified menu of methods only. Pending RTP approvals live in
+          /system/payment/history (filter "Pending approval"); each opens its detail to approve/reject. */}
     </div>
   );
 }

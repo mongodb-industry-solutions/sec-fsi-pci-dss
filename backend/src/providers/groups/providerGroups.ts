@@ -8,6 +8,10 @@ import { PAYMENT_CARD_COLLECTION } from '../../modules/customer/models/paymentCa
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../../modules/gateway/models/payoutAccount.model';
 import { holdCardFunds } from '../../modules/gateway/services/payoutAccountBalance.service';
 import { resolveAndConvert } from '../currency-exchange/services/currencyExchange.service';
+import { applyKycScreeningVerdict } from '../../modules/customer/services/customerAgreement.service';
+import { getCapabilityModuleConfig } from '../../modules/provider/services/capabilityModuleConfig.service';
+import { effectiveDecisionMode, DecisionModeConfig } from '../../shared/models/onboardingDecision';
+import type { HrpScreeningVerdict } from '../kyc/services/hrpScreening.service';
 import {
   RESPONSE_CODE_APPROVED,
   RESPONSE_CODE_INSUFFICIENT_FUNDS,
@@ -34,7 +38,162 @@ export class ProviderGroups {
     this.bus.subscribe('card.issuer.validation.requested', (e) => this.onIssuer(e));
     this.bus.subscribe('fds.scoring.requested', (e) => this.onFds(e));
     this.bus.subscribe('hrp.screening.requested', (e) => this.onHrp(e));
+    // VOP is dispatched synchronously via dispatchProvider in the RTP screening flow (never emitted on
+    // the bus), so there is intentionally NO 'vop.verification.requested' subscription here.
     this.bus.subscribe('funds.check.requested', (e) => this.onFunds(e));
+    // v27 Phase 6: KYC/HRP customer screening (SD-13 -> SD-53). A customer profile validation
+    // completing triggers a re-screen; the request event is a first-class Integration Hub gate.
+    this.bus.subscribe('profile.validation.completed', (e) => this.onProfileValidated(e));
+    this.bus.subscribe('kyc.screening.requested', (e) => this.onKycScreening(e));
+    // v31 KYB onboarding chain (§5bis): bridge + entity screening reactors. Fan-out is events-only —
+    // every provider is reached via dispatchProvider, so the built-in engine is swappable for an
+    // external vendor with zero reactor change. correlationId = merchantAgreementInstanceReference.
+    this.bus.subscribe('merchant.validation.requested', (e) => this.onMerchantValidated(e));
+    this.bus.subscribe('kyb.screening.requested', (e) => this.onKybScreening(e));
+    this.bus.subscribe('aml.screening.requested', (e) => this.onAml(e));
+  }
+
+  // Bridge (mirror of onProfileValidated): a merchant onboarding init fans out the KYB entity screening
+  // (kyb_business + hrp_sanctions + aml_monitoring) AND one KYC screening per beneficial owner (owner
+  // layer, reusing onKycScreening). All events carry the same correlationId (= merchantRef) so the whole
+  // journey is reconstructable, and causationId = e.eventId preserves cause→effect.
+  private async onMerchantValidated(e: DomainEvent): Promise<void> {
+    const p = e.payload as { merchantAgreementInstanceReference?: string; merchantName?: string; merchantCategoryCode?: string; merchantCountryCode?: string };
+    const merchantRef = p.merchantAgreementInstanceReference ?? e.correlationId;
+    const pub = (eventType: string, payload: Record<string, unknown>, bian: { serviceDomain: string; controlRecord: string }) =>
+      void this.bus.publish(makeEvent({ eventType, correlationId: e.correlationId, businessProcess: 'merchant_onboarding', source: 'psp.core', causationId: e.eventId, payload, bian }));
+
+    pub('kyb.screening.requested', { merchantAgreementInstanceReference: merchantRef, merchantName: p.merchantName, merchantCategoryCode: p.merchantCategoryCode, merchantCountryCode: p.merchantCountryCode }, { serviceDomain: 'SD-89 Merchant Relations', controlRecord: 'MerchantAgreementProcedure' });
+    // HRP screens the entity: pass the merchant reference via accountReference (the field onHrp forwards),
+    // not a transaction id. correlationId already carries the merchant ref for the journey.
+    pub('hrp.screening.requested', { accountReference: merchantRef, merchantName: p.merchantName }, { serviceDomain: 'SD-13 Party Reference', controlRecord: 'PartyReferenceDataDirectoryEntry' });
+    pub('aml.screening.requested', { merchantAgreementInstanceReference: merchantRef, merchantCategoryCode: p.merchantCategoryCode }, { serviceDomain: 'SD-99 AML', controlRecord: 'SuspiciousActivityAnalysisAssessment' });
+
+    // Owner layer: screen every beneficial owner (controlling person) by reusing the KYC chain.
+    try {
+      const merchant = await this.db.collection<{ merchantBeneficialOwners?: Array<{ merchantBeneficialOwnerPartyReference: string }>; merchantOwnerPartyReference?: string }>('merchantAgreementProcedure')
+        .findOne({ merchantAgreementInstanceReference: merchantRef }, { projection: { merchantBeneficialOwners: 1, merchantOwnerPartyReference: 1 } });
+      const ownerRefs = new Set<string>();
+      for (const o of merchant?.merchantBeneficialOwners ?? []) ownerRefs.add(o.merchantBeneficialOwnerPartyReference);
+      if (merchant?.merchantOwnerPartyReference) ownerRefs.add(merchant.merchantOwnerPartyReference);
+      for (const ref of ownerRefs) {
+        void this.bus.publish(makeEvent({
+          eventType: 'kyc.screening.requested', correlationId: ref, businessProcess: 'customer_onboarding',
+          source: 'psp.core', causationId: e.eventId, payload: { partyInstanceReference: ref },
+          bian: { serviceDomain: 'SD-13 Party Data Management', controlRecord: 'PartyReferenceDataDirectoryEntry' },
+        }));
+      }
+    } catch { /* owner screening is best-effort; entity chain still resolves */ }
+  }
+
+  // KYB entity screening reactor. Dispatches the kyb_business provider (internal engine loopback to
+  // /modules/kyb/score, or an external vendor if configured), then publishes kyb.screening.completed.
+  // Fail-open: a transport error yields a low-risk/clear default so onboarding is never hard-blocked.
+  private async onKybScreening(e: DomainEvent): Promise<void> {
+    const p = e.payload as { merchantAgreementInstanceReference?: string; merchantName?: string; merchantCategoryCode?: string; merchantCountryCode?: string };
+    const merchantRef = p.merchantAgreementInstanceReference ?? e.correlationId;
+    let businessRiskLevel: 'low' | 'medium' | 'high' = 'low';
+    let sanctionsResult: 'clear' | 'hit' | 'pending' = 'clear';
+    let verificationStatus: 'pass' | 'fail' | 'manual_review' = 'pass';
+    let providerRef = 'kyb_business:internal';
+    let outcome: 'completed' | 'error' = 'error';
+    try {
+      const r = await dispatchProvider(this.db, 'kyb_business', 'kyb.screening.requested', {
+        merchantAgreementInstanceReference: merchantRef, clientReference: merchantRef,
+        merchantName: p.merchantName, merchantCategoryCode: p.merchantCategoryCode, merchantCountryCode: p.merchantCountryCode,
+      }, { entityType: 'merchant', entityId: merchantRef, processType: 'kyb_verification' });
+      const b = r.responseBody as { verificationStatus?: 'pass' | 'fail' | 'manual_review'; businessRiskLevel?: 'low' | 'medium' | 'high'; sanctionsMatch?: boolean } | undefined;
+      if (b) {
+        businessRiskLevel = b.businessRiskLevel ?? 'low';
+        sanctionsResult = b.sanctionsMatch ? 'hit' : 'clear';
+        verificationStatus = b.verificationStatus ?? 'pass';
+        const pr = (r as { providerReference?: string }).providerReference;
+        if (pr) providerRef = pr;
+        outcome = 'completed';
+      }
+    } catch { /* fail-open */ }
+    void this.bus.publish(makeEvent({
+      eventType: 'kyb.screening.completed', correlationId: e.correlationId, businessProcess: 'merchant_onboarding',
+      source: 'callback.kyb', causationId: e.eventId,
+      payload: { merchantAgreementInstanceReference: merchantRef, outcome, businessRiskLevel, sanctionsResult, verificationStatus, screeningProviderRef: providerRef },
+      bian: { serviceDomain: 'SD-89 Merchant Relations', controlRecord: 'MerchantAgreementProcedure' },
+    }));
+  }
+
+  // AML monitoring reactor (business AML / MCC / adverse media). Dispatches aml_monitoring, publishes
+  // aml.screening.completed. Fail-open on transport error.
+  private async onAml(e: DomainEvent): Promise<void> {
+    const p = e.payload as { merchantAgreementInstanceReference?: string; merchantCategoryCode?: string };
+    const merchantRef = p.merchantAgreementInstanceReference ?? e.correlationId;
+    let adverseMediaResult: 'clear' | 'hit' | 'pending' = 'clear';
+    let outcome: 'completed' | 'error' = 'error';
+    try {
+      const r = await dispatchProvider(this.db, 'aml_monitoring', 'aml.screening.requested', {
+        merchantAgreementInstanceReference: merchantRef, clientReference: merchantRef, merchantCategoryCode: p.merchantCategoryCode,
+      }, { entityType: 'merchant', entityId: merchantRef, processType: 'aml_screening' });
+      const b = r.responseBody as { alertLevel?: string; requiresReview?: boolean } | undefined;
+      if (b) {
+        adverseMediaResult = b.alertLevel && b.alertLevel !== 'none' ? 'hit' : (b.requiresReview ? 'pending' : 'clear');
+        outcome = 'completed';
+      }
+    } catch { /* fail-open */ }
+    void this.bus.publish(makeEvent({
+      eventType: 'aml.screening.completed', correlationId: e.correlationId, businessProcess: 'merchant_onboarding',
+      source: 'callback.aml', causationId: e.eventId,
+      payload: { merchantAgreementInstanceReference: merchantRef, outcome, adverseMediaResult },
+      bian: { serviceDomain: 'SD-99 AML', controlRecord: 'SuspiciousActivityAnalysisAssessment' },
+    }));
+  }
+
+  // Bridge: a completed customer-profile validation requests a KYC/HRP re-screen. Keeps the trigger
+  // bus-driven (the onboarding service only emits its compliance milestone; screening is a reaction),
+  // so updateSelfProfile stays untouched. correlationId = partyInstanceReference throughout.
+  private onProfileValidated(e: DomainEvent): void {
+    const p = e.payload as { entityType?: string };
+    if (p.entityType && p.entityType !== 'customer') return;
+    void this.bus.publish(makeEvent({
+      eventType: 'kyc.screening.requested', correlationId: e.correlationId,
+      businessProcess: 'customer_onboarding', source: 'psp.core', causationId: e.eventId,
+      payload: { partyInstanceReference: e.correlationId },
+      bian: { serviceDomain: 'SD-13 Party Data Management', controlRecord: 'PartyReferenceDataDirectoryEntry' },
+    }));
+  }
+
+  // KYC/HRP screening reactor. Dispatches the screening provider through the Integration Hub
+  // (kyc_identity capability, internal stub Module engine loopback), then persists the structured
+  // verdict onto the KYC check sub-doc via the owning customer service (L2 QE write). Fail-open:
+  // a transport error leaves the existing (seeded) verdicts in place.
+  private async onKycScreening(e: DomainEvent): Promise<void> {
+    const p = e.payload as { partyInstanceReference?: string };
+    const partyRef = p.partyInstanceReference ?? e.correlationId;
+
+    let verdict: HrpScreeningVerdict | undefined;
+    try {
+      const r = await dispatchProvider(this.db, 'kyc_identity', 'kyc.screening.requested', {
+        partyInstanceReference: partyRef, clientReference: partyRef,
+      }, { entityType: 'customer', entityId: partyRef, processType: 'kyc_verification' });
+      verdict = r.responseBody as HrpScreeningVerdict | undefined;
+    } catch { /* fail-open: leave existing verdicts */ }
+
+    let outcome: 'completed' | 'error' = 'error';
+    if (verdict && typeof verdict.riskScore === 'number') {
+      // v31 §3.7/§4.0: resolve the KYC decisionMode (seeded automated) so applyKycScreeningVerdict sets
+      // the BQ:Step status coherently. Unknown/unset → manual (fail-safe) via effectiveDecisionMode.
+      const cfg = (await getCapabilityModuleConfig(this.db, 'kyc').catch(() => null))?.moduleConfig as DecisionModeConfig | undefined;
+      const persisted = await applyKycScreeningVerdict(partyRef, verdict, effectiveDecisionMode(cfg)).catch(() => false);
+      if (persisted) outcome = 'completed';
+    }
+
+    void this.bus.publish(makeEvent({
+      eventType: 'kyc.screening.completed', correlationId: e.correlationId,
+      businessProcess: 'customer_onboarding', source: 'callback.kyc', causationId: e.eventId,
+      payload: {
+        partyInstanceReference: partyRef, outcome,
+        riskScore: verdict?.riskScore, riskRating: verdict?.riskRating, pepStatus: verdict?.pepStatus,
+        sanctionsResult: verdict?.sanctionsResult, screeningProviderRef: verdict?.screeningProviderRef,
+      },
+      bian: { serviceDomain: 'SD-53 Customer Agreement', controlRecord: 'CustomerAgreementProcedure' },
+    }));
   }
 
   // v17 funds-availability gate (SD-36 AIS). Resolves the funding account from the card token, reads

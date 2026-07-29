@@ -16,7 +16,7 @@ export function MerchantSelector({ selected, onSelect }: {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.auth.users(demoRoster.simulatorMerchants)
+    api.system.users(demoRoster.simulatorMerchants)
       .then((r) => {
         const seen = new Set<string>();
         const list = (r.users ?? [])

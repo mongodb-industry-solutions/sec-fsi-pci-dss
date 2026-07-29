@@ -20,6 +20,7 @@ import { providersModule } from '../src/modules/provider';
 import { fdsModule }       from '../src/providers/fds';
 import { hrpModule }       from '../src/providers/hrp';
 import { amlModule }       from '../src/providers/aml';
+import { vopModule }       from '../src/providers/vop';
 import { kycModule }       from '../src/providers/kyc';
 import { kybModule }       from '../src/providers/kyb';
 import { creditBureauModule }      from '../src/providers/credit-bureau';
@@ -109,6 +110,23 @@ export async function buildApp(): Promise<FastifyInstance> {
     done();
   });
 
+  // Surface handler exceptions in the admin log panel. Without this, a thrown error (e.g. a
+  // MongoCryptError on a QE read) only reached pino/stdout, so the panel showed just "-> 500"
+  // with no cause. We mirror the error into the SAME ring buffer the panel streams.
+  // PCI DSS Req 10 / GDPR: we log the error TYPE and a length-capped MESSAGE only (never the
+  // full stack), since a stack can carry request PII; driver messages carry field/namespace
+  // names, not plaintext values.
+  fastify.addHook('onError', (request, reply, error, done) => {
+    const status = (error as { statusCode?: number }).statusCode ?? reply.statusCode ?? 500;
+    const name = error.name || 'Error';
+    const message = (error.message || '').replace(/\s+/g, ' ').slice(0, 500);
+    appendLog(
+      `[${new Date().toISOString()}] ERROR ${request.method} ${request.url} -> ${status} `
+      + `[${request.id}] ${name}: ${message}`,
+    );
+    done();
+  });
+
   // Root redirect -> /doc
   fastify.get('/', {
     schema: {
@@ -175,6 +193,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(fdsModule,          { prefix: '/api/v1' });
   await fastify.register(hrpModule,          { prefix: '/api/v1' });
   await fastify.register(amlModule,          { prefix: '/api/v1' });
+  await fastify.register(vopModule,          { prefix: '/api/v1' });
   await fastify.register(kycModule,          { prefix: '/api/v1' });
   await fastify.register(kybModule,          { prefix: '/api/v1' });
   await fastify.register(creditBureauModule, { prefix: '/api/v1' });
@@ -190,7 +209,29 @@ export async function buildApp(): Promise<FastifyInstance> {
   return fastify;
 }
 
+// Process-level safety net: async errors thrown outside a request (event-bus reactors, sagas,
+// timers, SSE streams) never hit the Fastify onError hook, so they used to vanish from the admin
+// panel. Mirror them into the SAME ring buffer. PCI DSS Req 10 / GDPR: type + capped message only.
+function installProcessErrorHooks(): void {
+  const record = (kind: string, err: unknown) => {
+    const e = err as { name?: string; message?: string };
+    const name = e?.name || (typeof err === 'string' ? 'Error' : typeof err);
+    const message = String(e?.message ?? err).replace(/\s+/g, ' ').slice(0, 500);
+    appendLog(`[${new Date().toISOString()}] PROCESS ${kind}: ${name}: ${message}`);
+  };
+  process.on('unhandledRejection', (reason) => record('unhandledRejection', reason));
+  process.on('warning', (w) => record('warning', w));
+  process.on('uncaughtException', (err) => {
+    record('uncaughtException', err);
+    // Preserve Node's default crash semantics: state is undefined after an uncaught throw, so let
+    // the pod restart cleanly (k8s) rather than continue in a corrupted state.
+    console.error(err);
+    process.exit(1);
+  });
+}
+
 async function start() {
+  installProcessErrorHooks();
   const app = await buildApp();
   const port = parseInt(process.env.PORT ?? '8081', 10);
   const host = process.env.HOST ?? '0.0.0.0';

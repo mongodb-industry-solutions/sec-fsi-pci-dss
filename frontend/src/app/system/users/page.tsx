@@ -6,6 +6,7 @@ import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { Breadcrumb, type Crumb } from '../../../components/Breadcrumb';
+import { EncryptedKycSearch } from '../../../components/EncryptedKycSearch';
 import { Users } from 'lucide-react';
 
 type SearchField = 'email' | 'phone' | 'accountRef';
@@ -52,6 +53,11 @@ export default function UsersPage() {
   const [fromTxn, setFromTxn] = useState<string | null>(null);
   // Opening/reopening a case is an analyst action (SoD); the auditor is read-only.
   const canOpenCase = role === 'level1_analyst' || role === 'level2_investigator';
+  // Blind single-record lookup is the L1 triage surface (no browsing). L2/auditor use only the
+  // advanced encrypted-attribute search below, which also carries the email/phone/accountRef keys,
+  // so everything the simple lookup does is available there too (unified, simpler UI).
+  const isL1 = role === 'level1_analyst';
+  const isStaffSearch = role === 'level2_investigator' || role === 'security_auditor';
 
   useEffect(() => {
     const t = getToken() ?? '';
@@ -192,11 +198,14 @@ export default function UsersPage() {
       <SectionHeader
         icon={Users}
         title="Users"
-        description="Find a customer by encrypted email, phone or account reference."
-        debugInfo="BIAN SD-53 Customer Agreement / SD-91 · PCI DSS Req 12.3 · QE equality search (no plaintext leaves the app)"
+        description={isL1
+          ? 'Find a customer by encrypted email, phone or account reference.'
+          : 'Find a customer by exact key (email, phone, account reference) or investigate over encrypted KYC attributes with Queryable Encryption.'}
+        debugInfo="BIAN SD-53 Customer Agreement / SD-91 · PCI DSS Req 3/7/12.3 · MongoDB Queryable Encryption (no plaintext leaves the app)"
       />
 
-      {/* QE search */}
+      {/* Blind single-record lookup — L1 only. L2/auditor use the advanced search below. */}
+      {isL1 && (<>
       <div className="bg-white rounded-xl border p-5 space-y-4">
         <h2 className="font-semibold">Search by encrypted field</h2>
         <div className="flex gap-2 flex-wrap">
@@ -385,6 +394,23 @@ export default function UsersPage() {
       {transactions.length === 0 && customer && cardToken && !txnLoading && (
         <div className="bg-white rounded-xl border p-5 text-center text-sm text-gray-500">
           No transactions found for this card token.
+        </div>
+      )}
+      </>
+      )}
+
+      {/* v27: encrypted-attribute search (Queryable Encryption). For L2/auditor this is THE search
+          surface: it carries the exact keys (email/phone/account reference) plus the KYC attributes,
+          so everything the L1 blind lookup does is available here too. Discovery capability that
+          returns a list, gated to L2 investigator / auditor (least-privilege, PCI DSS Req 7). Server
+          enforces the gate. */}
+      {isStaffSearch && (
+        <div className="space-y-4">
+          <EncryptedKycSearch
+            token={token}
+            role={role}
+            resultHref={(r) => `/system/users/${r.customerAgreementInstanceReference}`}
+          />
         </div>
       )}
     </div>

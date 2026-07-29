@@ -27,6 +27,8 @@ interface LoginState {
   state: string;
   nonce: string;
   codeVerifier: string;
+  /** Correlation id for this login attempt; logged at every step to trace the flow end-to-end. */
+  flowId?: string;
 }
 
 function key(): Buffer {

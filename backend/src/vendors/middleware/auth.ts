@@ -24,7 +24,6 @@ const PUBLIC_EXACT: Set<string> = new Set([
   '/api/v1/system/users',
   '/api/v1/auth/login',
   '/api/v1/auth/register',
-  '/api/v1/auth/users',
   '/api/v1/auth/domains',
   // OAuth2/OIDC authorization-server endpoints: authenticated by client credentials, PKCE,
   // or their own RS256 access token — NOT the PSP session JWT. Exact paths only, so the
@@ -45,9 +44,12 @@ const PUBLIC_EXACT: Set<string> = new Set([
 
 // URL prefixes that bypass JWT auth (Swagger UI and its static assets)
 // Admin run/logs endpoints handle their own admin token verification internally
-// Checkout, payment-link, and simulator routes are public (simulator endpoints block themselves in production via NODE_ENV guard)
+// Checkout and payment-link CREATION now require a valid JWT (no longer open). Only the buyer-facing
+// routes (resolve/pay a link or session) opt out per-route via `config: { skipAuth: true }`, since the
+// buyer is not logged in (hosted payment page, SAQ A). The simulator authenticates as the selected demo
+// user and calls these real authenticated endpoints (no open /system/simulator surface).
 // Internal stub endpoints use X-Integration-Source header validation instead of JWT (ADR-025)
-const PUBLIC_PREFIXES: string[] = ['/doc', '/public', '/api/v1/admin', '/api/v1/checkout', '/api/v1/payment/links', '/api/v1/system/simulator', '/api/v1/internal'];
+const PUBLIC_PREFIXES: string[] = ['/doc', '/public', '/api/v1/admin', '/api/v1/internal'];
 
 // Prefixes that bypass JWT auth only for GET requests (simulator read-only mode).
 // Mutation routes (PATCH /fraud/:id, POST /fraud/:id/escalate) still require JWT.
@@ -61,6 +63,9 @@ const PUBLIC_GET_PREFIXES: string[] = ['/api/v1/fraud'];
 const CUSTOMER_BLOCKED_PREFIXES: string[] = [
   '/api/v1/fraud',
   '/api/v1/customer',   // QE equality searches  -  customer must use /auth/me instead
+  '/api/v1/modules',    // v29: built-in module admin surfaces (global card/account admin) are staff-only.
+                        // The customer role has cards:[view,manage] for OWN cards (scope own), so the
+                        // ACL permission alone would let it reach the global list; block by prefix (PCI Req 7).
 ];
 
 // Exact paths blocked for customers even when the prefix is otherwise public

@@ -11,6 +11,7 @@
 
 import { FastifyInstance } from 'fastify';
 import { merchantController }             from './controllers/merchant.controller';
+import { merchantKybController }          from './controllers/merchantKyb.controller';
 import { paymentController }              from './controllers/payment.controller';
 import { tokenController }                from './controllers/token.controller';
 import { checkoutController }             from './controllers/checkout.controller';
@@ -19,10 +20,16 @@ import { payoutAccountController }        from './controllers/payoutAccount.cont
 import { paymentExecutionController }     from './controllers/paymentExecution.controller';
 import { beneficiaryController }          from './controllers/beneficiary.controller';
 import { transferController }             from './controllers/transfer.controller';
+import { rtpController }                  from './controllers/rtp.controller';
+import { qrController }                   from './controllers/qr.controller';
+import { config }                         from '../../config';
 
 export async function gatewayModule(fastify: FastifyInstance) {
   // SD-89: Merchant Relations  -  top-level resource
   await fastify.register(merchantController, { prefix: '/merchants' });
+  // SD-89 v31: KYB administration surface (KYB data correction + beneficial owners + process timeline).
+  // Same /merchants prefix (one merchant surface, no forked API). requirePermission-gated per route.
+  await fastify.register(merchantKybController, { prefix: '/merchants' });
 
   // SD-64 + SD-65: Payment Order + Execution  -  namespaced under /gateway/
   await fastify.register(paymentController,  { prefix: '/gateway/payments' });
@@ -49,4 +56,10 @@ export async function gatewayModule(fastify: FastifyInstance) {
 
   // SD-65 + SD-66: Bank transfers (ACH/SEPA/SWIFT rail engine)  (v17.1)
   await fastify.register(transferController,            { prefix: '/gateway/transfers' });
+
+  // SD-65: Request to Pay (RTP) intent domain + shared QR capability (v28). Gated by config.rtp.enabled.
+  if (config.rtp.enabled) {
+    await fastify.register(rtpController,               { prefix: '/gateway/rtp' });
+    await fastify.register(qrController,                { prefix: '/gateway/qr' });
+  }
 }

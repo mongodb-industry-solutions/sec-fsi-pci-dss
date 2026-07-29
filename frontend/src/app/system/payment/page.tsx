@@ -221,7 +221,7 @@ export default function DemoPaymentPage() {
           .map((c) => ({
             id: c.paymentCardInstanceReference as string,
             alias: (c.paymentCardAlias as string | undefined) || (c.paymentCardNetwork as string | undefined) || 'Card',
-            masked: c.paymentCardMaskedPanDisplay as string,
+            masked: (c.paymentCardMaskedPanDisplay as string | undefined) ?? '',
             network: c.paymentCardNetwork as SavedCard['network'],
             token: c.paymentCardReference as string,
             isPreferred: !!c.paymentCardIsPreferred,
@@ -260,7 +260,11 @@ export default function DemoPaymentPage() {
     : null;
 
   async function handleConfirm() {
-    if (!maskedCard) { setError('Please enter or select a card number.'); return; }
+    // A saved card is identified by its surrogate token (used to charge); a new card by the
+    // masked PAN derived from the digits typed. maskedCard alone is display-only, so gate on
+    // the value that actually drives the charge for the current mode.
+    const hasCard = cardMode === 'saved' ? !!cardToken : !!maskedCard;
+    if (!hasCard) { setError('Please select or enter a card.'); return; }
     setSubmitting(true);
     setError(null);
     try {
@@ -581,7 +585,8 @@ export default function DemoPaymentPage() {
                       setSelectedNetwork(tk.network);
                       setNewCardExpiry(tk.expiry);
                     } catch (e) { setError(e instanceof Error ? e.message : 'Invalid card details.'); return; }
-                  } else if (!maskedCard) {
+                  } else if (!cardToken) {
+                    // Saved mode: the surrogate token identifies the card (masked PAN is display-only).
                     setError('Please select or enter a card.'); return;
                   }
                   setError(null); setStep(2);

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { UserPlus, Loader2, CheckCircle2, TriangleAlert, X } from 'lucide-react';
 import { addBeneficiary } from '@/lib/actions';
 import { Tip } from '@/components/ui/Tooltip';
+import { BRAND } from '@/lib/brand';
 
 export default function BeneficiaryAdd() {
   const router = useRouter();
@@ -44,7 +45,7 @@ export default function BeneficiaryAdd() {
 
   if (!open) {
     return (
-      <Tip label="Add a payee by their Leafy Pay email or phone.">
+      <Tip label={`Add a payee by their ${BRAND.full} email or phone.`}>
         <button onClick={() => { setOpen(true); setMsg(null); }} className="btn-primary text-sm">
           <UserPlus className="h-4 w-4" aria-hidden /> Add beneficiary
         </button>

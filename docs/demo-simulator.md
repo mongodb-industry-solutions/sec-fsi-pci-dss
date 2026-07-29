@@ -538,7 +538,7 @@ All `/demo/*` routes require a valid JWT. Middleware reads role from token and g
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-The username dropdown (shown in **debug mode**) lists the **featured roster** from the database via `GET /api/v1/auth/users?featured=true`. Selecting a user auto-fills the password with the shared demo credential (`DEMO_PASSWORD`). The domain selector defaults to `local` (JWT against MongoDB). The MS Entra ID entry is wired but not active in v1. See §12.3 for the full featured roster (13 users).
+The username dropdown (shown in **debug mode**) lists the **featured roster** from the database via `GET /api/v1/system/users?featured=true`. Selecting a user auto-fills the password with the shared demo credential (`DEMO_PASSWORD`). The domain selector defaults to `local` (JWT against MongoDB). The MS Entra ID entry is wired but not active in v1. See §12.3 for the full featured roster (13 users).
 
 ### 4.3 Pre-defined Users and Roles
 
@@ -1072,11 +1072,11 @@ The `domain` field is the extension point. When domain is `msentra`, the backend
 
 ### 7.2 Pre-populated user selector
 
-`GET /api/v1/auth/users` returns the list of demo users (name, email, role) without passwords. The login screen calls this endpoint on mount to populate the dropdown. Selecting a user auto-fills the email and a known test password.
+`GET /api/v1/system/users` returns the list of demo users (name, email, role) without passwords. The login screen calls this endpoint on mount to populate the dropdown. Selecting a user auto-fills the email and a known test password.
 
 ### 7.3 API security
 
-All `/api/v1/*` endpoints except `/api/v1/auth/login`, `/api/v1/auth/users`, and `/api/v1/health` require a valid `Authorization: Bearer <JWT>` header. Missing or invalid tokens return HTTP 401. Role enforcement (e.g., L2 collections) returns HTTP 403.
+All `/api/v1/*` endpoints except `/api/v1/auth/login`, `/api/v1/system/users`, and `/api/v1/health` require a valid `Authorization: Bearer <JWT>` header. Missing or invalid tokens return HTTP 401. Role enforcement (e.g., L2 collections) returns HTTP 403.
 
 In the Simulator mode, requests include a synthetic `X-Demo-Role` header instead of a JWT. The backend treats this header as trusted in demo/simulator mode. The role controls which collections are queried.
 
@@ -1378,7 +1378,7 @@ In debug mode, each card also shows the BIAN reference IDs:
 
 ### 12.3 Demo Users (Current — curated featured roster)
 
-The **featured roster** (13 users, `customerAuthenticationDemoFeatured: true`) drives the debug-mode user picker in Application mode and the Simulator. The full seed contains more users (e.g. Lena Fischer, Priya Patel, Marco Rossi, Maria Garcia, Ahmed Hassan) which remain available for ad-hoc login/testing but are not surfaced in the picker. `GET /api/v1/auth/users?featured=true` returns only the featured set. All emails use the `@back.es` domain.
+The **featured roster** (13 users, `customerAuthenticationDemoFeatured: true`) drives the debug-mode user picker in Application mode and the Simulator. The full seed contains more users (e.g. Lena Fischer, Priya Patel, Marco Rossi, Maria Garcia, Ahmed Hassan) which remain available for ad-hoc login/testing but are not surfaced in the picker. `GET /api/v1/system/users?featured=true` returns only the featured set. All emails use the `@back.es` domain.
 
 | Display Name | Username | Role | Party Ref | Simulator use |
 |---|---|---|---|---|
@@ -1798,3 +1798,23 @@ Two tabs:
   Debit)" option creates a SEPA SDD / ACH SDD mandate with a chosen frequency.
 
 *Added 2026-07-04 (v17.1).*
+
+## v28 — Request to Pay (RTP), shared QR, and VoP admin
+
+**Real system (`/system/**`):** RTP is "a transfer that needs the payer's approval", so it lives inside
+the Transfer area (no separate silo). Transfer hub gains a **Request to Pay** card → `/system/transfer/rtp`
+(payee creates a request; on create it is presented to the payer and a shared QR is offered). The payer sees
+**"Requests awaiting your approval"** directly on the Transfer hub (`RtpPendingInbox`): approve (with a
+funding-account selector) runs funds check + FDS/HRP/AML + VoP then creates the linked P2P transfer, or
+reject. Notifications fire on delivery (payer) and approval/settlement (payee); the alert clears on approve/reject.
+
+**VoP admin (`/system/admin/modules/vop`):** dedicated data-driven config dashboard (match thresholds,
+matching strategy toggles, decision policy, market gating), editable by admin/manager like FDS. VoP also
+appears under `/system/admin/providers/groups` and its `vop.verification.completed` events + dispatch logs
+are queryable in `/system/audit-events`.
+
+**Merchant app (`merchant/`):** `/request-to-pay` (scope-gated `read:rtp`/`write:rtp`) shows incoming
+requests to approve/reject and sent requests with status; Nav link gated by scope. Approve/reject reuse the
+authenticated OAuth session (no CIBA).
+
+*Added 2026-07-17 (v28).*

@@ -183,6 +183,7 @@ Merchant System        LeafyBank Gateway
 | **Security Auditor** | Read: audit log, case history only | Review access events, export case timeline |
 | **Merchant** *(Ch-04)* | Write: checkout sessions, payment links; Read: own merchant data | Create checkout sessions, create payment links, manage API keys, view webhook logs |
 | **Merchant Officer** *(Ch-05)* | Write: merchant agreement Control actions; Read: all merchant applications | Review pending merchant onboarding applications; approve or reject with KYB notes (BIAN SD-89, Action: Control) |
+| **Operations Officer** *(v29)* | Write/Read: global card inventory (SD-88) and payout accounts (SD-66) via the built-in modules, plus configuration/policies of all internal modules (`modules:[view,manage]`); Read: audit events and provider status (`providers:[view]`) | Owns internal business logic and financial processes: administer the whole card and payout-account book (list, register, edit, activate/suspend, revoke cards; register, edit, close accounts) and the config/policies of the internal engines (fds, aml, hrp, kyc, kyb, credit-bureau, card-authorization, card-issuer, account-information, payment-initiation, vop). Its landing shows, read-only, which provider serves each capability (internal vs external). Back-office counterpart to self-service, gated to the internal provider. Separation of duties: no provider CRUD, no auth domains or roles (those stay with `manager`), nor fraud/transaction data |
 
 ---
 
@@ -1021,7 +1022,7 @@ Every UI element in the application gains technical context overlays:
 - Role badge colors: `customer`=blue, `level1_analyst`=amber, `level2_investigator`=orange, `security_auditor`=red, `merchant_officer`=purple.
 - In debug mode, each card also shows: `partyInstanceReference` (SD-13 FK), `customerAuthenticationInstanceReference` (SD-91 FK).
 
-### 12.3 Demo Users (7 total after Ch-05)
+### 12.3 Demo Users (9 total after v29)
 
 | Display Name | Username | Role | Department | Party Ref |
 |---|---|---|---|---|
@@ -1033,6 +1034,8 @@ Every UI element in the application gains technical context overlays:
 | Level 2 Investigator | `investigator@bank.demo` | level2_investigator | Fraud Investigation | — |
 | Security Auditor | `auditor@bank.demo` | security_auditor | Compliance | — |
 | Rachel Torres | `officer@bank.demo` | merchant_officer | Merchant Acquiring | PTY-056 |
+| Olivia Moreno | `olivia.moreno@back.es` | operations_officer | Operations | b0000060 |
+| Daniel Rossi | `daniel.rossi@back.es` | operations_officer | Operations | b0000061 |
 
 ---
 
@@ -1246,7 +1249,7 @@ Key SD-193 concepts mapped to LeafyBank:
 **Name (demo):** "Alex Morgan, Integration & Compliance Technology Manager"  
 **Avatar:** Slate — `bg-slate-600`
 
-The System Administrator is the business-side owner of the compliance integration stack. They are not a developer (they don't restart servers or edit config files) and not a fraud analyst (they don't investigate cases). Their job is to ensure the bank's automated compliance functions are properly configured, tested, and auditable.
+The System Administrator is the business-side owner of the compliance integration stack. They are not a developer (they don't restart servers or edit config files) and not a fraud analyst (they don't investigate cases). Their job is to ensure the bank's automated compliance functions are properly configured, tested, and auditable. Their remit is system and platform governance (integrations/providers, auth domains, roles, general config, security), not business or cardholder data. As of v29.2 their relation to the internal modules is **read-only** (`modules:view`, system and security oversight): editing internal module config and policies belongs to the `operations_officer`, who owns internal business logic and financial processes. (Note: this platform-admin persona is labelled `system_admin` here but maps to the `manager` role in the RBAC matrix of `technical-spec.md` §1.15.)
 
 **User stories:**
 

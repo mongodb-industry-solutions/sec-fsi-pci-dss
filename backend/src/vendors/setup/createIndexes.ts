@@ -8,6 +8,9 @@ import { RECURRING_MANDATE_COLLECTION } from '../../modules/gateway/models/recur
 import { IDEMPOTENCY_COLLECTION } from '../../modules/gateway/services/idempotency.service';
 import { PARTY_ENROLLED_CREDENTIAL_COLLECTION } from '../../modules/identity/models/partyEnrolledCredential.model';
 import { PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION } from '../../modules/identity/models/partyBackchannelAuthentication.model';
+import { PAYMENT_REQUEST_COLLECTION } from '../../modules/gateway/models/paymentRequest.model';
+import { QR_REPRESENTATION_COLLECTION } from '../../modules/gateway/models/qrRepresentation.model';
+import { RTP_ALIAS_DIRECTORY_CACHE_COLLECTION } from '../../modules/gateway/models/rtpAliasDirectoryCache.model';
 import { config } from '../../config';
 
 // ── Self-healing index helpers ────────────────────────────────────────────────
@@ -134,10 +137,19 @@ export async function createIndexes(client: MongoClient) {
   ]);
 
   // SD-53: Customer Agreement Procedure
+  // v27: helper index on the plaintext KYC status (NOT a QE field). QE-encrypted KYC leaves
+  // (riskScore, riskRating, etc.) are searched via QE and must NOT carry btree/unique indexes.
   await ensureIndexes(db, 'customerAgreementProcedure', [
     { key: { customerAgreementInstanceReference: 1 }, unique: true },
     { key: { partyInstanceReference: 1 } },
     { key: { customerAgreementStatus: 1 } },
+    { key: { 'customerAgreementKycCheck.customerAgreementKycCheckStatus': 1 } },
+    // v31: KYC admin-list ESR index. The default list filters on kycCheckStatus and sorts by
+    // recordUpdatedDateTime, so the sort key must immediately follow the equality prefix (ESR) to sort
+    // FROM the index with no blocking SORT. customerSegment is an OPTIONAL, low-selectivity filter and
+    // is applied as a residual predicate (kept out of the index so the sort stays index-served whether
+    // or not segment is supplied). Verified via explain(): IXSCAN, no SORT stage. Leaves are plaintext.
+    { key: { 'customerAgreementKycCheck.customerAgreementKycCheckStatus': 1, recordUpdatedDateTime: -1 } },
   ]);
 
   // SD-88: Payment Card Management (the per-customer card-on-file arrangement).
@@ -147,6 +159,17 @@ export async function createIndexes(client: MongoClient) {
     { key: { paymentCardReference: 1 } },
     { key: { customerAgreementInstanceReference: 1 } },
     { key: { customerAgreementInstanceReference: 1, paymentCardReference: 1 }, unique: true },
+    // v30 non-CHD truncated-PAN search: BIN prefix (+ network) and last4 equality/suffix.
+    { key: { paymentCardBin: 1 } },
+    { key: { paymentCardLast4: 1 } },
+  ]);
+
+  // Card Administration (issuer CDE, v30): module-owned PAN vault. Indexed by the join keys only
+  // (the PAN itself is QE-indexed by the encrypted collection metadata, not here).
+  await ensureIndexes(db, 'cardIssuerVault', [
+    { key: { issuedCardInstanceReference: 1 }, unique: true },
+    { key: { paymentCardInstanceReference: 1 }, unique: true },
+    { key: { paymentCardReference: 1 } },
   ]);
 
   // SD-88: Payment Card Registry (the physical card, one per token). Token is the unique identity;
@@ -259,6 +282,12 @@ export async function createIndexes(client: MongoClient) {
     { key: { merchantAgreementStatus: 1 } },
     { key: { merchantCategoryCode: 1 } },
     { key: { merchantOwnerPartyReference: 1 } },
+    // v31: KYB admin-list ESR compound (Equality: merchantAgreementStatus, merchantRiskCategory;
+    // Sort: recordUpdatedDateTime desc). Sorts from the index, no blocking SORT.
+    { key: { merchantAgreementStatus: 1, merchantRiskCategory: 1, recordUpdatedDateTime: -1 } },
+    // v31: multikey reverse lookup "which merchants does this party own" (beneficial-owner scoping).
+    // Bounded multikey (owners array is capped) → safe; equality predicate, IXSCAN, no COLLSCAN.
+    { key: { 'merchantBeneficialOwners.merchantBeneficialOwnerPartyReference': 1 } },
   ]);
 
   // SD-89: Merchant lifecycle audit trail (append-only, PCI DSS Req 10)
@@ -438,4 +467,30 @@ export async function createIndexes(client: MongoClient) {
   await ensureIndexes(db, IDEMPOTENCY_COLLECTION, [
     { key: { idempotencyKey: 1 }, unique: true },
   ]);
+
+  // SD-65 (v28): Request to Pay canonical record. Inbox/outbox + expiry-sweeper + linkage queries.
+  await ensureIndexes(db, PAYMENT_REQUEST_COLLECTION, [
+    { key: { paymentRequestInstanceReference: 1 }, unique: true },
+    { key: { requesterPartyReference: 1, recordCreatedDateTime: -1 } },
+    { key: { payerPartyReference: 1, status: 1, expiresAt: 1 } },
+    { key: { status: 1, expiresAt: 1 } },
+    { key: { invoiceReference: 1 }, sparse: true },
+    { key: { linkedPaymentExecutionReference: 1 }, sparse: true },
+    { key: { idempotencyKey: 1 }, unique: true, partialFilterExpression: { idempotencyKey: { $exists: true } } },
+  ]);
+
+  // Directory Entry (v28): RTP alias resolution cache — hashed alias PK + TTL.
+  await ensureIndexes(db, RTP_ALIAS_DIRECTORY_CACHE_COLLECTION, [
+    { key: { aliasHash: 1 }, unique: true },
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
+  ]);
+
+  // SD-65 (v28): shared QR representation — PK, subject lookup, TTL.
+  await ensureIndexes(db, QR_REPRESENTATION_COLLECTION, [
+    { key: { qrRepresentationInstanceReference: 1 }, unique: true },
+    { key: { subjectType: 1, subjectReference: 1 } },
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
+  ]);
+  // Note: paymentRequestEvent is a timeseries collection; its meta index is defined on the
+  // collection itself (createCollections.ts), not here.
 }

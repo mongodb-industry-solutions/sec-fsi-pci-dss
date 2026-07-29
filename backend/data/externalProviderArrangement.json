@@ -1,5 +1,50 @@
 [
   {
+    "externalProviderArrangementInstanceReference": "int-internal-vop-001",
+    "externalProviderArrangementName": "Internal Verification of Payee Engine",
+    "externalProviderArrangementType": "vop_verification",
+    "externalProviderArrangementStatus": "active",
+    "externalProviderIsInternal": true,
+    "externalProviderApiEndpoint": "/api/v1/modules/vop/verify",
+    "externalProviderInternalHandler": "vop.verifyPayee",
+    "externalProviderCallbackEnabled": true,
+    "externalProviderTriggerEvents": [
+      "vop.verification.requested"
+    ],
+    "externalProviderMode": "sync",
+    "externalProviderTimeoutMs": 500,
+    "externalProviderRetryPolicy": {
+      "maxAttempts": 1,
+      "backoffMs": 0
+    },
+    "externalProviderHealthStatus": "ok",
+    "externalProviderLastHealthCheckAt": "2026-07-17T10:00:00.000Z",
+    "categoryConfig": {
+      "matchResultField": "matchResult",
+      "scoreField": "matchScore",
+      "recommendationField": "recommendation",
+      "realTimeRequired": true,
+      "batchSupported": false,
+      "modelVersion": "internal-v1",
+      "scoreScaleMax": 100
+    },
+    "fieldMappingConfig": {
+      "outbound": [],
+      "inbound": [],
+      "schemaVersion": 1
+    },
+    "routingPriority": 999,
+    "bianServiceDomain": "Party Data Management",
+    "bianControlRecordType": "PartyReferenceDataDirectoryEntry",
+    "pciDssRequirements": [
+      "Req 10.2.1",
+      "Req 12.3.1"
+    ],
+    "recordCreatedDateTime": "2026-07-17T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-07-17T10:00:00.000Z",
+    "schemaVersion": 2
+  },
+  {
     "externalProviderArrangementInstanceReference": "int-internal-fds-001",
     "externalProviderArrangementName": "Internal Fraud Scoring Engine",
     "externalProviderArrangementType": "fraud_detection",
@@ -172,7 +217,8 @@
     "externalProviderInternalHandler": "customerAgreement.internalKycCheck",
     "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
-      "kyc.validation.requested"
+      "kyc.validation.requested",
+      "kyc.screening.requested"
     ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 1000,
@@ -213,7 +259,31 @@
     ],
     "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 2,
+    "externalProviderEvents": [
+      {
+        "event": "kyc.validation.requested",
+        "outbound": {
+          "url": "/api/v1/modules/kyc/score",
+          "httpMethod": "POST",
+          "mapping": []
+        },
+        "inbound": {
+          "mapping": []
+        }
+      },
+      {
+        "event": "kyc.screening.requested",
+        "outbound": {
+          "url": "/api/v1/modules/kyc/screen",
+          "httpMethod": "POST",
+          "mapping": []
+        },
+        "inbound": {
+          "mapping": []
+        }
+      }
+    ]
   },
   {
     "externalProviderArrangementInstanceReference": "int-internal-kyb-001",
@@ -374,7 +444,23 @@
     "externalProviderInternalHandler": "cardIssuer.internalCvvValidation",
     "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
-      "card.issuer.validation.requested"
+      "card.issuer.validation.requested",
+      "card.cvv.reveal.requested",
+      "card.pan.reveal.requested"
+    ],
+    "externalProviderEvents": [
+      {
+        "event": "card.issuer.validation.requested",
+        "outbound": { "url": "/api/v1/modules/card-issuer/score", "httpMethod": "POST", "mapping": [] }
+      },
+      {
+        "event": "card.cvv.reveal.requested",
+        "outbound": { "url": "/api/v1/modules/card-issuer/reveal", "httpMethod": "POST", "mapping": [] }
+      },
+      {
+        "event": "card.pan.reveal.requested",
+        "outbound": { "url": "/api/v1/modules/card-issuer/reveal-pan", "httpMethod": "POST", "mapping": [] }
+      }
     ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 3000,

@@ -5,7 +5,8 @@ env:
   # provider auto-generates an RSA signing key on first boot in non-production. Switch to `aws` only
   # with @aws-sdk/client-kms available (now a backend dep) + a REAL PSP_OAUTH_AWS_KEY_ARN + IRSA.
   PSP_OAUTH_KEY_PROVIDER: local
-  PSP_CORS_ORIGIN: "https://sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com"
+  PSP_CORS_ORIGIN: "*"
+  # PSP_CORS_ORIGIN: "https://sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com"
   PSP_URL_FRONTEND: "https://sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com"
   # Backend OIDC issuer + endpoints (discovery/token/jwks/userinfo) AND internal self-dispatch. Must be
   # a URL reachable BOTH by the backend itself and by the merchant pod → the in-cluster service (same

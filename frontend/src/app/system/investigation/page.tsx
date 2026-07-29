@@ -9,26 +9,28 @@ import { useDebugMode } from '../../../lib/debugMode';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { BriefcaseMedical } from 'lucide-react';
 
-type SearchField = 'caseRef' | 'email' | 'phone' | 'accountRef' | 'cardToken' | 'customerId';
+type SearchField = 'caseRef' | 'email' | 'phone' | 'accountRef' | 'cardToken' | 'customerId' | 'transactionId';
 
 const PAGE_SIZE = 10;
 
 const FIELD_LABELS: Record<SearchField, string> = {
-  caseRef:    'Case Reference',
-  email:      'Email (QE:equality)',
-  phone:      'Phone (QE:equality)',
-  accountRef: 'Account Ref (QE:equality)',
-  cardToken:  'Card Token',
-  customerId: 'Customer Ref (internal)',
+  caseRef:       'Case Reference',
+  email:         'Email (QE:equality)',
+  phone:         'Phone (QE:equality)',
+  accountRef:    'Account Ref (QE:equality)',
+  cardToken:     'Card Token',
+  customerId:    'Customer Ref (internal)',
+  transactionId: 'Transaction ID',
 };
 
 const FIELD_PLACEHOLDERS: Record<SearchField, string> = {
-  caseRef:    'FD-2026-001001',
-  email:      'customer@example.com',
-  phone:      '+1-555-0000',
-  accountRef: 'ACC-001',
-  cardToken:  'pm_xxxxxxxx',
-  customerId: 'CUST-...',
+  caseRef:       'FD-2026-001001',
+  email:         'customer@example.com',
+  phone:         '+1-555-0000',
+  accountRef:    'ACC-001',
+  cardToken:     'pm_xxxxxxxx',
+  customerId:    'CUST-...',
+  transactionId: 'Card Transaction Instance Reference (UUID)',
 };
 
 export default function InvestigationPage() {
@@ -152,6 +154,12 @@ export default function InvestigationPage() {
         // Used to review orphaned references flagged by the data-integrity oversight.
         const res = await api.fraud.list({ customerId: value, limit: 50 }, token);
         foundCases = res.results;
+
+      } else if (field === 'transactionId') {
+        // Transaction ID: fraud cases associated with a cardTransactionInstanceReference (direct filter).
+        const res = await api.fraud.list({ transactionId: value, limit: 50 }, token);
+        foundCases = res.results;
+        if (foundCases.length === 0) setSearchError(`No investigation cases found for transaction "${value}".`);
 
       } else if (field === 'cardToken') {
         // Card token: get transactions for this token, then find their fraud cases

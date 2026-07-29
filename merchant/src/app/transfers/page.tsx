@@ -6,6 +6,7 @@ import { ScopeMissing } from '@/components/ScopeGate';
 import { InfoHint } from '@/components/ui/Bits';
 import { loadAccountOptions } from '@/lib/accounts';
 import TransferForm from './TransferForm';
+import { BRAND } from '@/lib/brand';
 
 export default async function TransfersPage() {
   const session = await getSession();
@@ -19,7 +20,7 @@ export default async function TransfersPage() {
     <div>
       <h1 className="flex items-center gap-2 text-2xl font-bold">
         <Send className="h-6 w-6 text-leaf-deep" aria-hidden /> Bank transfer
-        <InfoHint label="Espresso Works asks Leafy Pay to move money on your behalf. The PSP holds all balances; the merchant never does." />
+        <InfoHint label={`Espresso Works asks ${BRAND.full} to move money on your behalf. The PSP holds all balances; the merchant never does.`} />
       </h1>
       <p className="mb-6 mt-1 text-sm text-muted">Preview fees and rail, then submit. The PSP holds all balances.</p>
       <TransferForm accounts={accounts} />

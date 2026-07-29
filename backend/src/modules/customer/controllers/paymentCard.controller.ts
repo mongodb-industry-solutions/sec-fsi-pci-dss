@@ -1,8 +1,11 @@
 import { FastifyInstance } from 'fastify';
-import { registerCardForCustomer, getCardsByCustomer, getCardById, getCardHolderCount, getCardRegistryByToken, updateCardMetadata, setCardActivation, revokeCard, getOwnAgreementId } from '../services/paymentCard.service';
+import { registerCardForCustomer, getCardsByCustomer, getCardById, getCardHolderCount, getCardRegistryByToken, getCardByToken, updateCardMetadata, setCardActivation, revokeCard, getOwnAgreementId } from '../services/paymentCard.service';
 import type { PaymentCardManagementControlRecord } from '../models/paymentCard.model';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
+import { canStaffMutate, canStaffInvestigate } from '../../../vendors/middleware/rbac';
+import type { UserRole } from '../../../shared/models/identity.model';
+import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 
 const STAFF_READ_ROLES = ['level1_analyst', 'level2_investigator', 'security_auditor'];
 
@@ -350,9 +353,57 @@ shared-card / money-mule indicator. Restricted to fraud analyst / investigator /
     return reply.send(reg);
   });
 
-  // GET /api/v1/customer/:customerId/cards/:cardId  — owner self-service card detail.
-  // Returns the full card-on-file (surrogate token, QE:none expiry, lifecycle dates, alias/note).
-  // Owner-only: the cardholder may inspect their own card. CVV/PIN are never stored, never returned.
+  // GET /api/v1/customer/card-by-token/:token  — investigation pivot from a transaction.
+  // A transaction only carries the surrogate token (paymentCardReference); this resolves the
+  // UUIDs an investigator needs to pivot to the card detail, the owning customer (KYC) and the
+  // funding bank account. Restricted to investigation roles. Token is non-CHD; no expiry/CVV.
+  fastify.get('/card-by-token/:token', {
+    schema: {
+      tags: ['cards'],
+      summary: 'Resolve card / owner / funding account from a surrogate token (investigation roles)',
+      description: `Given a card surrogate token (a transaction's \`paymentCardReference\`), returns the
+identifiers needed to continue an investigation: the card instance, its owning customer agreement and
+its funding/payout account. No CHD, no card expiry. Restricted to fraud analyst / investigator / auditor.`,
+      security: [{ bearerAuth: [] }],
+      params: { type: 'object', required: ['token'], properties: { token: { type: 'string' } } },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            paymentCardInstanceReference: { type: 'string', description: 'Card UUID (for the card detail page).' },
+            customerAgreementInstanceReference: { type: 'string', description: 'Owning customer agreement UUID.' },
+            fundingPayoutAccountInstanceReference: { type: 'string', nullable: true, description: 'Funding/payout account UUID.' },
+            paymentCardMaskedPanDisplay: { type: 'string', description: 'Last-4 display string.' },
+            paymentCardNetwork: { type: 'string', nullable: true },
+            paymentCardStatus: { type: 'string' },
+          },
+        },
+        403: { description: 'Restricted to investigation roles.', $ref: 'Error#' },
+        404: { description: 'No card on file for this token.', $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const user = (request as { user?: JwtUserPayload }).user;
+    if (!STAFF_READ_ROLES.includes(user?.role ?? '')) {
+      return reply.status(403).send({ error: 'Card lookup by token is restricted to investigation roles.' });
+    }
+    const { token } = request.params as { token: string };
+    const card = await getCardByToken(fastify.db, token);
+    if (!card) return reply.status(404).send({ error: 'No card on file for this token' });
+    return reply.send({
+      paymentCardInstanceReference: card.paymentCardInstanceReference,
+      customerAgreementInstanceReference: card.customerAgreementInstanceReference,
+      fundingPayoutAccountInstanceReference: card.fundingPayoutAccountInstanceReference,
+      paymentCardMaskedPanDisplay: card.paymentCardMaskedPanDisplay,
+      paymentCardNetwork: card.paymentCardNetwork,
+      paymentCardStatus: card.paymentCardStatus,
+    });
+  });
+
+  // GET /api/v1/customer/:customerId/cards/:cardId  — card detail.
+  // Returns the card-on-file (surrogate token, lifecycle dates, alias/note). The owner also sees the
+  // QE:none expiry; staff (investigator/auditor) get a READ without the expiry (owner-only reveal,
+  // PCI DSS Req 3.3). CVV/PIN are never stored, never returned.
   fastify.get('/:customerId/cards/:cardId', {
     schema: {
       tags: ['cards'],
@@ -405,11 +456,17 @@ audited (Req 10).`,
     const { customerId, cardId } = request.params as { customerId: string; cardId: string };
     const user = (request as { user?: JwtUserPayload }).user;
     const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
-    if (!ownId || ownId !== customerId) {
+    const isOwner = !!ownId && ownId === customerId;
+    const isStaff = canStaffInvestigate((user?.role ?? '') as UserRole);
+    if (!isOwner && !isStaff) {
       return reply.status(403).send({ error: 'You can only view your own saved cards.' });
     }
     const card = await getCardById(fastify.db, customerId, cardId);
     if (!card) return reply.status(404).send({ error: 'Card not found' });
+
+    // The QE:none expiry is disclosed to the cardholder only (PCI DSS Req 3.3). A staff investigation
+    // READ never reveals it; strip it so the drill-down stays display-safe.
+    if (!isOwner) delete (card as Record<string, unknown>).paymentCardExpirationDate;
 
     // FDS/AML shared-card signal: how many customers hold this same physical card (the number only,
     // never the other holders' identities — PCI/PII minimization for the cardholder's own view).
@@ -431,6 +488,48 @@ audited (Req 10).`,
 
     return reply.send({ ...card, cardHolderCount });
   });
+
+  // POST /api/v1/customer/:customerId/cards/:cardId/cvv  (OWNER reveal of the per-card CVV), routed
+  // THROUGH the provider dispatch (never a direct call to the built-in module). Owner-only + step-up.
+  // The CVV is derived (never stored) and returned ephemerally; the reveal is audited (Req 10) with
+  // NO CVV in the log. If an external issuer governs the capability, the dispatch routes to it.
+  const ownerReveal = (kind: 'cvv' | 'pan') => async (request: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply) => {
+    const { customerId, cardId } = request.params as { customerId: string; cardId: string };
+    const user = (request as { user?: JwtUserPayload }).user;
+    const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
+    if (!ownId || ownId !== customerId) return reply.status(403).send({ error: 'You can only reveal your own card data.' });
+    const card = await getCardById(fastify.db, customerId, cardId);
+    if (!card) return reply.status(404).send({ error: 'Card not found' });
+    const event = kind === 'cvv' ? 'card.cvv.reveal.requested' : 'card.pan.reveal.requested';
+    const r = await dispatchProvider(fastify.db, 'card_issuer', event, {
+      cardId, cardToken: card.paymentCardReference,
+    }, { entityType: 'card', entityId: cardId, processType: 'card_management' });
+    const body = (r.responseBody ?? {}) as { cvv?: string; pan?: string };
+    const value = kind === 'cvv' ? body.cvv : body.pan;
+    if (!value) return reply.status(404).send({ error: `${kind.toUpperCase()} unavailable` });
+    emitComplianceEvent(fastify.db, {
+      entityType: 'card', entityId: cardId,
+      processType: 'card_management', processAction: kind === 'cvv' ? 'card.cvv.revealed' : 'card.pan.revealed', processOutcome: 'approved',
+      performedByPartyReference: user?.partyRef ?? null, performedByRole: user?.role ?? null,
+      eventSummary: { channel: 'owner_self_service', customerAgreementInstanceReference: customerId, last4: String(value).replace(/\D/g, '').slice(-4) },
+      bianServiceDomain: 'Payment Card', bianControlRecordType: 'PaymentCardManagement',
+    });
+    return reply.send(kind === 'cvv' ? { cvv: value } : { pan: value });
+  };
+
+  const ownerRevealSchema = (field: string) => ({
+    tags: ['cards'],
+    summary: `Reveal own card ${field.toUpperCase()} (owner self-service, via provider)`,
+    description: `Owner-only ephemeral reveal of the card ${field.toUpperCase()}, routed through `
+      + 'dispatchProvider (card_issuer). Never a direct call to the built-in module. Production: step-up MFA/SCA. '
+      + `Audited (Req 10), no ${field.toUpperCase()} in the log.`,
+    security: [{ bearerAuth: [] }],
+    params: { type: 'object', required: ['customerId', 'cardId'], properties: { customerId: { type: 'string' }, cardId: { type: 'string' } } },
+    response: { 200: { type: 'object', additionalProperties: true }, 403: { $ref: 'Error#' }, 404: { $ref: 'Error#' } },
+  });
+
+  fastify.post('/:customerId/cards/:cardId/cvv', { schema: ownerRevealSchema('cvv') }, ownerReveal('cvv'));
+  fastify.post('/:customerId/cards/:cardId/pan', { schema: ownerRevealSchema('pan') }, ownerReveal('pan'));
 
   // PATCH /api/v1/customer/:customerId/cards/:cardId  — edit the alias/note (the ONLY editable
   // attributes of a saved card). Owner-only. Both fields are non-CHD display metadata.
@@ -563,9 +662,12 @@ audit event (Req 10).`,
     const { customerId, cardId } = request.params as { customerId: string; cardId: string };
     const { active } = request.body as { active: boolean };
 
+    // Owner (self-service) OR an L2 investigator acting as staff (BIAN SD-15 control). The auditor is
+    // read-only and L1 has no card-mutation reach, so both are blocked here (PCI DSS Req 7).
     const user = (request as { user?: JwtUserPayload }).user;
     const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
-    if (!ownId || ownId !== customerId) {
+    const isOwner = !!ownId && ownId === customerId;
+    if (!isOwner && !canStaffMutate((user?.role ?? '') as UserRole)) {
       return reply.status(403).send({ error: 'You can only change the status of your own saved cards.' });
     }
 
@@ -615,9 +717,11 @@ audit event (\`card.removed\`) is emitted. CVV/PIN are never involved.`,
     },
   }, async (request, reply) => {
     const { customerId, cardId } = request.params as { customerId: string; cardId: string };
+    // Owner (self-service) OR an L2 investigator acting as staff. Auditor (read-only) and L1 blocked.
     const user = (request as { user?: JwtUserPayload }).user;
     const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
-    if (!ownId || ownId !== customerId) {
+    const isOwner = !!ownId && ownId === customerId;
+    if (!isOwner && !canStaffMutate((user?.role ?? '') as UserRole)) {
       return reply.status(403).send({ error: 'You can only remove cards from your own account.' });
     }
     const removed = await revokeCard(fastify.db, customerId, cardId);

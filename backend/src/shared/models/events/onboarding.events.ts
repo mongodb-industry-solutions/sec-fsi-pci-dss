@@ -41,6 +41,30 @@ export interface ProfileValidationCompleted {
   reason?: string;
 }
 
+/**
+ * @event    kyc.screening.requested
+ * @producer psp.core (bridge from profile.validation.completed)  @consumer HRP Screening Provider
+ * v27: high-risk-party screening for a customer, dispatched through the Integration Hub (SD-193).
+ */
+export interface KycScreeningRequested {
+  partyInstanceReference: string;
+}
+
+/**
+ * @event    kyc.screening.completed
+ * @producer callback.kyc  @consumer Onboarding UI, compliance/audit
+ * Carries the provider-produced KYC verdict persisted on customerAgreementKycCheck.
+ */
+export interface KycScreeningCompleted {
+  partyInstanceReference: string;
+  outcome: 'completed' | 'error';
+  riskScore?: number;
+  riskRating?: 'low' | 'medium' | 'high';
+  pepStatus?: boolean;
+  sanctionsResult?: 'clear' | 'hit' | 'pending';
+  screeningProviderRef?: string;
+}
+
 // ── merchant_onboarding (KYB) ─────────────────────────────────────────────────
 
 /**
@@ -79,4 +103,69 @@ export interface KybValidationCompleted {
 export interface MerchantValidationCompleted {
   outcome: 'verified' | 'rejected' | 'review';
   reason?: string;
+}
+
+// ── v31 KYB onboarding event chain (§5bis) — mirrors the KYC screening pattern, events only ─────────
+
+/**
+ * @event    kyb.screening.requested
+ * @producer psp.core (bridge from merchant.validation.requested)  @consumer KYB business-registry provider
+ * correlationId = merchantAgreementInstanceReference.
+ */
+export interface KybScreeningRequested {
+  merchantAgreementInstanceReference: string;
+  merchantName?: string;
+  merchantCategoryCode?: string;
+  merchantCountryCode?: string;
+}
+
+/**
+ * @event    kyb.screening.completed
+ * @producer callback.kyb  @consumer KybVerificationSaga, compliance/audit
+ * Entity-level KYB registry/legal-entity verdict.
+ */
+export interface KybScreeningCompleted {
+  merchantAgreementInstanceReference: string;
+  outcome: 'completed' | 'error';
+  businessRiskLevel?: 'low' | 'medium' | 'high';
+  sanctionsResult?: 'clear' | 'hit' | 'pending';
+  verificationStatus?: 'pass' | 'fail' | 'manual_review';
+  screeningProviderRef?: string;
+}
+
+/**
+ * @event    aml.screening.requested
+ * @producer psp.core (bridge from merchant.validation.requested)  @consumer AML monitoring provider
+ * correlationId = merchantAgreementInstanceReference (business AML / MCC / adverse media).
+ */
+export interface AmlScreeningRequested {
+  merchantAgreementInstanceReference: string;
+  merchantCategoryCode?: string;
+}
+
+/**
+ * @event    aml.screening.completed
+ * @producer callback.aml  @consumer KybVerificationSaga, compliance/audit
+ */
+export interface AmlScreeningCompleted {
+  merchantAgreementInstanceReference: string;
+  outcome: 'completed' | 'error';
+  adverseMediaResult?: 'clear' | 'hit' | 'pending';
+  sanctionsResult?: 'clear' | 'hit' | 'pending';
+}
+
+/**
+ * @event    kyb.verification.completed
+ * @producer saga.kyb-verification  @consumer Onboarding UI, compliance/audit
+ * Terminal aggregated KYB verdict + the decision-mode resolution (§4.0 / §5bis.5).
+ */
+export interface KybVerificationCompleted {
+  merchantAgreementInstanceReference: string;
+  outcome: 'verified' | 'rejected' | 'under_review';
+  businessRiskLevel?: 'low' | 'medium' | 'high';
+  sanctionsResult?: 'clear' | 'hit' | 'pending';
+  adverseMediaResult?: 'clear' | 'hit' | 'pending';
+  decisionMode: 'manual' | 'automated' | 'assisted';
+  resolution: 'auto_approve' | 'auto_reject' | 'escalate' | 'recommend';
+  recommended?: 'approve' | 'reject';
 }

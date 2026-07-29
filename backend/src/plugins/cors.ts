@@ -25,7 +25,7 @@ async function corsPlugin(fastify: FastifyInstance) {
   await fastify.register(cors, {
     origin: buildOrigin(),
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Role', 'X-Escalation-Token'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Role', 'X-Escalation-Token', 'Idempotency-Key'],
     credentials: true,
   });
 }

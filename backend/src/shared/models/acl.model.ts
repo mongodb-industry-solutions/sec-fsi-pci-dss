@@ -23,6 +23,7 @@ export const RESOURCES = [
   'consents',       // Open Banking consent
   'accounts',       // SD-66 Payout Account Arrangement (v17)
   'beneficiaries',  // SD-54 Counterparty Administration (v18)
+  'paymentRequests', // SD-65 Payment Order — Request to Pay intent domain (v28)
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
@@ -64,6 +65,7 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       consents: ['view'],
       accounts: ['view', 'manage'],
       beneficiaries: ['view', 'manage'],  // SD-54: own contacts (scope: own enforced per-handler)
+      paymentRequests: ['view', 'manage'], // SD-65: own RTP requests (create/approve/reject/cancel)
     },
   },
   {
@@ -101,6 +103,7 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       auditEvents: ['view'],
       accounts: ['view', 'viewSensitive'],  // PCI Req 3.3 — IBAN reveal for fraud investigations
       beneficiaries: ['view', 'manage'],    // SD-54: can edit/remove beneficiary contacts for investigations
+      paymentRequests: ['view'],            // SD-65: read RTP requests for investigations
     },
   },
   {
@@ -122,12 +125,19 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       auditEvents: ['view'],
       accounts: ['view', 'viewSensitive'],
       beneficiaries: ['view', 'manage'],  // SD-54: full audit visibility
+      paymentRequests: ['view'],          // SD-65: full audit visibility of RTP requests
     },
   },
   {
+    // KYB DECISION authority (SD-89). v31 SoD split: merchant_officer owns the KYB *decision*
+    // (review → approve/reject/suspend via the merchant/review flow, the Control action). This is
+    // distinct from operations_officer, who owns KYB *data correction* (fields + beneficial owners)
+    // on already-registered merchants. Both share the `merchants` resource and emit the same
+    // compliance events; the boundary is procedural (decision vs correction) and recorded in the
+    // audit actorPartyReference. Verdict override stays here, never on the Administration surface.
     roleName: 'merchant_officer',
     roleLabel: 'Merchant Officer',
-    roleDescription: 'Merchant acquiring: review/approve merchants and manage their configuration (KYB decisions).',
+    roleDescription: 'Merchant acquiring: KYB decision authority (review → approve/reject/suspend) and merchant configuration. Decision path, distinct from operations_officer data correction (SoD, PCI Req 7).',
     roleScope: 'all',
     roleIsBuiltin: true,
     bianServiceDomain: 'Merchant Relations',
@@ -136,6 +146,46 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       merchants: ['view', 'manage'],
       auditEvents: ['view'],
       accounts: ['view'],
+    },
+  },
+  {
+    // v29: global operations of cardholder cards (SD-88) and payout accounts (SD-66) through the
+    // built-in modules (card-issuer / account-information). BIAN has no staff "Card/Account
+    // Administrator" role for SD-88/SD-66 (data domains), so we follow the project's established
+    // "<area>_officer" bank-employee convention (precedent: merchant_officer → SD-89). SoD (PCI Req 7):
+    // distinct from `manager` (SD-193, no CHD) and from `customer` (scope own, self-service).
+    roleName: 'operations_officer',
+    roleLabel: 'Operations Officer',
+    roleDescription: 'Operations: administers cardholder cards (SD-88) and payout accounts (SD-66) via the built-in modules, plus KYC (SD-53) and KYB (SD-89) data administration (review/correct records and beneficial owners). KYB decision (approve/reject) stays with merchant_officer (SoD, PCI Req 7).',
+    roleScope: 'all',
+    roleIsBuiltin: true,
+    bianServiceDomain: 'Payment Card / Payout Account Arrangement',
+    bianControlRecordType: 'PaymentCardManagement / PayoutAccountArrangement',
+    rolePermissions: {
+      cards: ['view', 'manage'],
+      accounts: ['view', 'manage'],
+      // v31: KYC/KYB DATA ADMINISTRATION (review + correction of KYC/KYB records and beneficial
+      // owners). Administration is gated by the DATA resource (customers / merchants), NOT by
+      // `modules`, so it stays SoD-clean: no "modules can edit any business data" bypass.
+      //   customers → SD-53 KYC record review/correction (occupation, source of funds, gov ID,
+      //     address, purpose). `viewSensitive` NOT granted here: decrypted CHD-adjacent identity
+      //     fields still require the L2 escalation token, exactly like the investigator path.
+      //   merchants → SD-89 KYB data correction + beneficial-owner (UBO) administration on
+      //     already-registered merchants. This is the *correction* half of the v31 SoD split;
+      //     the KYB *decision* (approve/reject/suspend) stays with `merchant_officer`. Both emit
+      //     the same compliance events; neither replaces the other (PCI Req 7).
+      customers: ['view', 'manage'],
+      merchants: ['view', 'manage'],
+      // v29.1: administer the INTERNAL capability modules (engine config / policies of fds, aml, hrp,
+      // kyc, kyb, credit-bureau, card-authorization, card-issuer, account-information, payment-initiation,
+      // vop). Auth (SD-16) stays with `manager` because it is the separate `authDomains` resource, not
+      // `modules`. `manager` keeps `modules` too (platform super-admin); this is an accepted overlap.
+      modules: ['view', 'manage'],
+      // v29.2: READ-ONLY visibility of external providers (SD-193), so the operations landing can show
+      // which provider currently serves each capability (internal vs external / managed_externally).
+      // NO `manage`: provider CRUD/routing stays with `manager` (SoD, PCI Req 7).
+      providers: ['view'],
+      auditEvents: ['view'],
     },
   },
   {
@@ -148,7 +198,10 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
     bianControlRecordType: 'ExternalProviderArrangement',
     rolePermissions: {
       providers: ['view', 'manage'],
-      modules: ['view', 'manage'],
+      // v29.2: system oversight only. Internal module engine/policy config is a business/risk process
+      // owned by `operations_officer` (view+manage); `manager` keeps `modules:view` for platform
+      // troubleshooting/security oversight but does not edit business policies (SoD, PCI Req 7).
+      modules: ['view'],
       authDomains: ['view', 'manage'],
       roles: ['view', 'manage'],
       auditEvents: ['view'],

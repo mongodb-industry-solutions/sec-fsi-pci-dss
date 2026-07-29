@@ -207,6 +207,7 @@ export async function processLinkPayment(
       cardTransactionMerchantName: link.merchantName,
       cardTransactionMerchantCategoryCode: '5999',
       cardTransactionChannel: 'online',
+      cardTransactionAcceptanceMethod: 'payment_link',
       cardTransactionMaskedPanDisplay: maskedPan,
       cardTransactionType: 'purchase',
       cardTransactionDescription: link.paymentLinkDescription.slice(0, 22),

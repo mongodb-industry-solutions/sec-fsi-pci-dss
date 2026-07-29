@@ -12,6 +12,7 @@ import { WebhookService } from '../services/merchantWebhook.service';
 import type { WebhookEventType } from '../models/merchantAgreement.model';
 import { getMerchantTransactions, getMerchantTransactionById, getMerchantStats } from '../../transaction/services/cardTransaction.service';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
+import { isMerchantOwner } from '../services/merchantBeneficialOwner';
 
 // Roles allowed to READ a merchant's business detail (profile, payments, analytics, audit trail).
 // PSP staff: `merchant_officer` and `security_auditor`. Fraud-investigation roles
@@ -79,6 +80,8 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
           mcc: { type: 'string', description: 'Filter by Merchant Category Code (ISO 18245).' },
           name: { type: 'string', description: 'Case-insensitive partial match on merchant name.' },
           risk: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Filter by risk category.' },
+          legalEntity: { type: 'string', description: 'v31: case-insensitive partial match on the legal-entity / tax reference.' },
+          country: { type: 'string', description: 'v31: exact ISO 3166-1 alpha-2 country code.' },
           page: { type: 'integer', minimum: 1, default: 1 },
           limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
           mine: { type: 'boolean', description: 'When true, restrict results to the caller\'s own merchants regardless of role.' },
@@ -115,10 +118,10 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
     },
   }, async (request, reply) => {
     const user = (request as { user?: JwtUserPayload }).user;
-    const { status, mcc, name, risk, page, limit, mine } = request.query as { status?: string; mcc?: string; name?: string; risk?: string; page?: number; limit?: number; mine?: boolean };
+    const { status, mcc, name, risk, legalEntity, country, page, limit, mine } = request.query as { status?: string; mcc?: string; name?: string; risk?: string; legalEntity?: string; country?: string; page?: number; limit?: number; mine?: boolean };
     // Customers see only their own merchants; mine=true scopes any role to their own records
     const ownerPartyRef = (user?.role === 'customer' || mine) ? (user?.partyRef ?? undefined) : undefined;
-    const result = await getMerchants(fastify.db, { status: status as never, mcc, name, risk, page, limit, ownerPartyRef });
+    const result = await getMerchants(fastify.db, { status: status as never, mcc, name, risk, legalEntity, country, page, limit, ownerPartyRef });
     return reply.send(result);
   });
 
@@ -175,15 +178,9 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
     if (!body.merchantOwnerPartyReference && user?.partyRef) {
       body.merchantOwnerPartyReference = user.partyRef as string;
     }
+    // v31 §5bis: createMerchant publishes merchant.validation.requested on the bus; the KybVerificationSaga
+    // + ProviderGroups reactors fan out to every provider via dispatchProvider (events only, swappable).
     const result = await createMerchant(fastify.db, body);
-
-    void dispatchProvider(fastify.db, 'kyb_business', 'kyb.validation.requested', {
-      merchantAgreementInstanceReference: result.merchantAgreementInstanceReference,
-      merchantName: body.merchantName,
-      merchantCategoryCode: body.merchantCategoryCode,
-      merchantCountryCode: body.merchantCountryCode,
-    }).catch(() => { /* fire-and-forget */ });
-
     return reply.status(201).send(result);
   });
 
@@ -391,8 +388,8 @@ Used by customers to detect their onboarding state: no application / under_revie
     const merchant = await getMerchantById(fastify.db, id);
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
 
-    const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
-    const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
+    // v31 (§3.2b): any beneficial owner (not just the primary) may READ merchant sub-resources.
+    const isOwner = isMerchantOwner(merchant as never, user?.partyRef);
     const isStaff = MERCHANT_DETAIL_READ_ROLES.has(user?.role ?? '');
     if (!isOwner && !isStaff) {
       return reply.status(403).send({ error: 'Access denied: only the merchant owner, PSP staff, or a fraud investigator can view received payments.' });
@@ -454,8 +451,8 @@ Used by customers to detect their onboarding state: no application / under_revie
     const merchant = await getMerchantById(fastify.db, id);
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
 
-    const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
-    const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
+    // v31 (§3.2b): any beneficial owner (not just the primary) may READ merchant sub-resources.
+    const isOwner = isMerchantOwner(merchant as never, user?.partyRef);
     const isStaff = MERCHANT_DETAIL_READ_ROLES.has(user?.role ?? '');
     if (!isOwner && !isStaff) {
       return reply.status(403).send({ error: 'Access denied' });
@@ -507,8 +504,8 @@ Used by customers to detect their onboarding state: no application / under_revie
     const user = (request as { user?: JwtUserPayload }).user;
     const merchant = await getMerchantById(fastify.db, id);
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
-    const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
-    const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
+    // v31 (§3.2b): any beneficial owner (not just the primary) may READ merchant sub-resources.
+    const isOwner = isMerchantOwner(merchant as never, user?.partyRef);
     const isStaff = MERCHANT_DETAIL_READ_ROLES.has(user?.role ?? '');
     if (!isOwner && !isStaff) {
       return reply.status(403).send({ error: 'Access denied: only the merchant owner, PSP staff, or a fraud investigator can view merchant analytics.' });
@@ -557,8 +554,8 @@ Used by customers to detect their onboarding state: no application / under_revie
     const user = (request as { user?: JwtUserPayload }).user;
     const merchant = await getMerchantById(fastify.db, id);
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
-    const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
-    const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
+    // v31 (§3.2b): any beneficial owner (not just the primary) may READ merchant sub-resources.
+    const isOwner = isMerchantOwner(merchant as never, user?.partyRef);
     const isStaff = MERCHANT_DETAIL_READ_ROLES.has(user?.role ?? '');
     if (!isOwner && !isStaff) {
       return reply.status(403).send({ error: 'Access denied: only the merchant owner, PSP staff, or a fraud investigator can view the audit trail.' });
@@ -639,8 +636,8 @@ Used by customers to detect their onboarding state: no application / under_revie
     const user = (request as { user?: JwtUserPayload }).user;
     const merchant = await getMerchantById(fastify.db, id);
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
-    const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
-    const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
+    // v31 (§3.2b): any beneficial owner (not just the primary) may READ merchant sub-resources.
+    const isOwner = isMerchantOwner(merchant as never, user?.partyRef);
     const isStaff = MERCHANT_DETAIL_READ_ROLES.has(user?.role ?? '');
     if (!isOwner && !isStaff) {
       return reply.status(403).send({ error: 'Access denied: only the merchant owner, PSP staff, or a fraud investigator can view merchant activity.' });
@@ -716,8 +713,8 @@ Display-safe — no CHD, no raw IBAN.`,
     const user = (request as { user?: JwtUserPayload }).user;
     const merchant = await getMerchantById(fastify.db, id);
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
-    const ownerRef = (merchant as Record<string, unknown>).merchantOwnerPartyReference;
-    const isOwner = !!user?.partyRef && ownerRef === user.partyRef;
+    // v31 (§3.2b): any beneficial owner (not just the primary) may READ merchant sub-resources.
+    const isOwner = isMerchantOwner(merchant as never, user?.partyRef);
     const isStaff = MERCHANT_DETAIL_READ_ROLES.has(user?.role ?? '');
     if (!isOwner && !isStaff) {
       return reply.status(403).send({ error: 'Access denied: only the merchant owner, PSP staff, or a fraud investigator can view merchant authorizations.' });

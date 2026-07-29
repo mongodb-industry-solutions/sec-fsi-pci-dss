@@ -19,6 +19,7 @@ export type CapabilityKey =
   | 'kyb'
   | 'card-authorization'
   | 'card-issuer'
+  | 'vop'
   | 'generic';
 
 // Code module that physically owns the capability's internal engine (engine grouped by capability
@@ -147,6 +148,19 @@ export const CAPABILITIES: Record<CapabilityKey, CapabilityDescriptor> = {
     bianServiceDomain: 'SD-88 Payment Card', // confirm vs technical-spec §9 before Phase 2 seed
     bianControlRecordType: 'PaymentCardManagement',
     pciDssRequirements: ['Req 3.2', 'Req 3.3', 'Req 12.8.1'],
+  },
+  vop: {
+    capability: 'vop',
+    providerType: 'vop_verification',
+    label: 'Verification of Payee',
+    description: 'Payee name-vs-account confirmation (VoP / UK CoP). Additional to FDS/AML/HRP; market-gated.',
+    callbackSegment: 'vop',
+    frontendFolder: 'vop',
+    moduleDomain: 'fraud',
+    hasModule: true,
+    bianServiceDomain: 'SD-13 Party Data Management',
+    bianControlRecordType: 'PartyReferenceDataDirectoryEntry',
+    pciDssRequirements: ['Req 10.2.1', 'Req 12.3.1'],
   },
   generic: {
     capability: 'generic',

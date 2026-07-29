@@ -50,15 +50,6 @@ export async function registerBeneficiary(
 ): Promise<BeneficiaryLookupResult> {
   const col = db.collection<CounterpartyArrangement>(COUNTERPARTY_COLLECTION);
 
-  // Enforce max beneficiary limit
-  const count = await col.countDocuments({
-    ownerPartyReference: input.ownerPartyReference,
-    counterpartyArrangementStatus: 'active',
-  });
-  if (count >= COUNTERPARTY_MAX_PER_USER) {
-    throw Object.assign(new Error('Beneficiary limit reached'), { statusCode: 422 });
-  }
-
   // QE equality search — resolve raw phone/email to a party reference
   const counterpartyParty = await resolvePartyByLookup(input.lookupType, input.lookupValue);
 
@@ -72,20 +63,64 @@ export async function registerBeneficiary(
     return { found: false };
   }
 
-  // Check for duplicate (owner already has this party as beneficiary)
-  const existing = await col.findOne({
-    ownerPartyReference: input.ownerPartyReference,
-    counterpartyPartyReference: counterpartyParty.partyInstanceReference,
-    counterpartyArrangementStatus: 'active',
-  });
-  if (existing) {
-    // Return found:false to prevent confirmation of existing relationship (anti-enumeration)
-    return { found: false };
-  }
-
   const maskedHint = maskLookupValue(input.lookupType, input.lookupValue);
   const label = input.label?.trim() || maskedHint;
   const now = new Date();
+
+  // Check for an existing arrangement (any status) for this (owner, counterparty) pair.
+  // The unique index on (ownerPartyReference, counterpartyPartyReference) covers soft-deleted
+  // records too, so a plain insert would collide. Reactivate a removed one instead.
+  const existing = await col.findOne({
+    ownerPartyReference: input.ownerPartyReference,
+    counterpartyPartyReference: counterpartyParty.partyInstanceReference,
+  });
+  if (existing && existing.counterpartyArrangementStatus === 'active') {
+    // Return found:false to prevent confirmation of existing relationship (anti-enumeration).
+    // Checked before the limit so an at-limit re-add stays idempotent instead of leaking a 422.
+    return { found: false };
+  }
+
+  // Enforce max beneficiary limit only on paths that add an active arrangement
+  // (fresh insert or reactivation of a soft-deleted one).
+  const count = await col.countDocuments({
+    ownerPartyReference: input.ownerPartyReference,
+    counterpartyArrangementStatus: 'active',
+  });
+  if (count >= COUNTERPARTY_MAX_PER_USER) {
+    throw Object.assign(new Error('Beneficiary limit reached'), { statusCode: 422 });
+  }
+
+  if (existing) {
+    // Reactivate the soft-deleted arrangement, refreshing label/hint/type.
+    const res = await col.updateOne(
+      {
+        counterpartyArrangementReference: existing.counterpartyArrangementReference,
+        ownerPartyReference: input.ownerPartyReference,
+        counterpartyArrangementStatus: existing.counterpartyArrangementStatus,
+      },
+      {
+        $set: {
+          counterpartyArrangementStatus: 'active',
+          counterpartyLabel: label,
+          counterpartyLookupType: input.lookupType,
+          counterpartyLookupHint: maskedHint,
+          recordUpdatedDateTime: now,
+        },
+      },
+    );
+    // If the record changed status between findOne and updateOne (concurrent reactivation),
+    // the filter no longer matches. Treat it like an already-active arrangement (anti-enumeration)
+    // rather than reporting a reactivation that did not actually happen.
+    if (res.modifiedCount !== 1) {
+      return { found: false };
+    }
+    return {
+      found: true,
+      counterpartyArrangementReference: existing.counterpartyArrangementReference,
+      counterpartyLabel: label,
+      counterpartyLookupHint: maskedHint,
+    };
+  }
 
   const record: CounterpartyArrangement = {
     counterpartyArrangementReference: uuidv4(),

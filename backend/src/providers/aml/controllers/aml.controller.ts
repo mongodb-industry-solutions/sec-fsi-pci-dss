@@ -1,5 +1,6 @@
 // AML capability module controller — STATIC routes (ADR-029).
 import { FastifyInstance } from 'fastify';
+import { requirePermission } from '../../../vendors/middleware/acl';
 import { screenAml } from '../services/aml.service';
 import {
   getCapabilityModuleConfig,
@@ -40,6 +41,7 @@ export async function amlController(fastify: FastifyInstance) {
   });
 
   fastify.get('/config', {
+    preHandler: requirePermission('modules', 'view'),
     schema: {
       tags: ['modules:aml'],
       summary: 'Get AML module configuration',
@@ -53,6 +55,7 @@ export async function amlController(fastify: FastifyInstance) {
   });
 
   fastify.put('/config', {
+    preHandler: requirePermission('modules', 'manage'),
     schema: {
       tags: ['modules:aml'],
       summary: 'Update AML module configuration',

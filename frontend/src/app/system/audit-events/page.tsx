@@ -6,7 +6,8 @@ import { Activity, RefreshCw, Search, ChevronDown, ChevronRight, ExternalLink, D
 import { SectionHeader } from '../../../components/SectionHeader';
 import { Pagination } from '../../../components/Pagination';
 import { api } from '../../../lib/api';
-import { getToken, decodeToken } from '../../../lib/auth';
+import { getToken } from '../../../lib/auth';
+import { useEffectivePermissions } from '../../../lib/permissions';
 import { JsonView } from '../../../components/json/JsonView';
 
 type AuditRow = {
@@ -62,6 +63,7 @@ const ENTITY_LABEL: Record<string, string> = {
 
 export default function AuditEventsPage() {
   const router = useRouter();
+  const { loading: permsLoading, can } = useEffectivePermissions();
   const [token, setToken] = useState('');
   const [authorized, setAuthorized] = useState<boolean | null>(null);
 
@@ -84,13 +86,16 @@ export default function AuditEventsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  useEffect(() => { setToken(getToken() ?? ''); }, []);
+
+  // Data-driven RBAC (ADR-030): authorize on the effective auditEvents:view permission rather than a
+  // hard-coded role list, so role edits / custom roles are honored. Wait for permissions to load to
+  // avoid a default-deny redirect flash.
   useEffect(() => {
-    const t = getToken() ?? '';
-    const role = t ? decodeToken(t)?.role : null;
-    setToken(t);
-    if (role !== 'manager' && role !== 'security_auditor') { setAuthorized(false); router.replace('/system'); return; }
+    if (permsLoading) return;
+    if (!can('auditEvents', 'view')) { setAuthorized(false); router.replace('/system'); return; }
     setAuthorized(true);
-  }, [router]);
+  }, [permsLoading, can, router]);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -217,11 +222,11 @@ export default function AuditEventsPage() {
           </div>
         </div>
         <div className="lg:col-span-2">
-          <label className="block text-xs text-gray-500 mb-1">Related reference (txn · case · merchant · customer · card token)</label>
+          <label className="block text-xs text-gray-500 mb-1">Related reference (txn · case · merchant · customer · card token · login flow id)</label>
           <div className="relative">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
             <input value={ref} onChange={(e) => { setRef(e.target.value); resetToFirst(); }}
-              placeholder="Paste a transaction id, case id, merchant id, account ref or card token…"
+              placeholder="Paste a transaction id, case id, merchant id, account ref, card token or login flow id (flow:…)…"
               className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
           </div>
         </div>

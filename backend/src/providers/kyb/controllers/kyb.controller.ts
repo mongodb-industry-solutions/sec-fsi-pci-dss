@@ -1,5 +1,6 @@
 // KYB capability module controller — STATIC routes (ADR-029).
 import { FastifyInstance } from 'fastify';
+import { requirePermission } from '../../../vendors/middleware/acl';
 import { verifyKyb } from '../services/kyb.service';
 import {
   getCapabilityModuleConfig,
@@ -41,6 +42,7 @@ export async function kybController(fastify: FastifyInstance) {
   });
 
   fastify.get('/config', {
+    preHandler: requirePermission('modules', 'view'),
     schema: {
       tags: ['modules:kyb'],
       summary: 'Get KYB module configuration',
@@ -54,6 +56,7 @@ export async function kybController(fastify: FastifyInstance) {
   });
 
   fastify.put('/config', {
+    preHandler: requirePermission('modules', 'manage'),
     schema: {
       tags: ['modules:kyb'],
       summary: 'Update KYB module configuration',

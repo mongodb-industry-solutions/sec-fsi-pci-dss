@@ -14,7 +14,8 @@ const ROLE_RANK: Record<string, number> = {
   level1_analyst: 2,
   level2_investigator: 3,
   security_auditor: 4,
-  manager: 5,
+  operations_officer: 5,
+  manager: 6,
 };
 
 export interface JwtPayload {
@@ -47,6 +48,19 @@ export async function loginUser(
 
   const valid = await bcrypt.compare(password, user.customerAuthenticationCredentialHash);
   if (!valid) {
+    // Wrong password for a known account. Identify the user so an auditor/manager can see WHO failed.
+    emitComplianceEvent(db, {
+      entityType: 'customer',
+      entityId: user.customerAuthenticationInstanceReference,
+      processType: 'authentication',
+      processAction: 'auth.login.failed',
+      processOutcome: 'rejected',
+      performedByPartyReference: user.partyInstanceReference ?? user.customerAuthenticationInstanceReference,
+      performedByRole: user.customerAuthenticationUserRole ?? 'customer',
+      eventSummary: { domain, failureCause: 'invalid_password', accountStatus: user.customerAuthenticationAccountStatus ?? 'active' },
+      bianServiceDomain: 'PartyAuthentication',
+      bianControlRecordType: 'CustomerAuthenticationAssessment',
+    });
     throw Object.assign(new Error('Invalid credentials'), { statusCode: 401 });
   }
 
@@ -57,6 +71,19 @@ export async function loginUser(
     const reason = user.customerAuthenticationAccountStatus === 'pending'
       ? 'Account pending approval'
       : 'Account suspended';
+    // Blocked-user case (distinct from wrong password), clearly labelled for the audit trail.
+    emitComplianceEvent(db, {
+      entityType: 'customer',
+      entityId: user.customerAuthenticationInstanceReference,
+      processType: 'authentication',
+      processAction: 'auth.login.blocked',
+      processOutcome: 'rejected',
+      performedByPartyReference: user.partyInstanceReference ?? user.customerAuthenticationInstanceReference,
+      performedByRole: user.customerAuthenticationUserRole ?? 'customer',
+      eventSummary: { domain, failureCause: `account_${user.customerAuthenticationAccountStatus}`, reason },
+      bianServiceDomain: 'PartyAuthentication',
+      bianControlRecordType: 'CustomerAuthenticationAssessment',
+    });
     throw Object.assign(new Error(reason), { statusCode: 403 });
   }
 
@@ -74,6 +101,21 @@ export async function loginUser(
   const secret = process.env.PSP_JWT_SECRET ?? 'demo-local-secret-change-in-production';
   const expiresIn = process.env.PSP_JWT_EXPIRES_IN ?? '24h';
   const token = jwt.sign(payload, secret, { expiresIn } as jwt.SignOptions);
+
+  // Successful authentication: identify the user + role/domain (no PII) so the full login flow is
+  // trackable, and the correct-login case is distinguishable from failed/blocked in the audit trail.
+  emitComplianceEvent(db, {
+    entityType: 'customer',
+    entityId: user.customerAuthenticationInstanceReference,
+    processType: 'authentication',
+    processAction: 'auth.login',
+    processOutcome: 'verified',
+    performedByPartyReference: user.partyInstanceReference ?? user.customerAuthenticationInstanceReference,
+    performedByRole: user.customerAuthenticationUserRole ?? 'customer',
+    eventSummary: { domain, role: user.customerAuthenticationUserRole },
+    bianServiceDomain: 'PartyAuthentication',
+    bianControlRecordType: 'CustomerAuthenticationAssessment',
+  });
 
   return {
     token,
@@ -121,6 +163,85 @@ export async function bumpSessionEpoch(db: Db, sub: string): Promise<number> {
     );
   if (!before) return 0; // no matching user, nothing incremented
   return (before.customerAuthenticationSessionEpoch ?? 0) + 1;
+}
+
+/**
+ * Change the caller's own password. Verifies the current password, enforces the password policy on
+ * the new one, rejects a no-op change, then rehashes (12-round bcrypt) and advances the session epoch
+ * so every OTHER outstanding token is invalidated. A fresh token (stamped with the new epoch) is
+ * returned so the current session stays valid. Only `local` accounts have a password to change.
+ */
+export async function changeOwnPassword(
+  db: Db,
+  sub: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ token: string }> {
+  const col = db.collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION);
+  const user = await col.findOne({ customerAuthenticationInstanceReference: sub } as Partial<CustomerAuthenticationAssessmentRecord>);
+  if (!user) {
+    throw Object.assign(new Error('Account not found'), { statusCode: 404 });
+  }
+  if (user.customerAuthenticationLoginDomain !== 'local') {
+    throw Object.assign(new Error('Password is managed by your identity provider and cannot be changed here'), { statusCode: 400 });
+  }
+
+  const currentValid = await bcrypt.compare(currentPassword, user.customerAuthenticationCredentialHash);
+  if (!currentValid) {
+    emitComplianceEvent(db, {
+      entityType: 'customer',
+      entityId: user.customerAuthenticationInstanceReference,
+      processType: 'authentication',
+      processAction: 'auth.password.change.failed',
+      processOutcome: 'rejected',
+      performedByPartyReference: user.partyInstanceReference ?? user.customerAuthenticationInstanceReference,
+      performedByRole: user.customerAuthenticationUserRole ?? 'customer',
+      eventSummary: { failureCause: 'invalid_current_password' },
+      bianServiceDomain: 'PartyAuthentication',
+      bianControlRecordType: 'CustomerAuthenticationAssessment',
+    });
+    throw Object.assign(new Error('Current password is incorrect'), { statusCode: 401 });
+  }
+
+  assertPasswordPolicy(newPassword);
+  if (await bcrypt.compare(newPassword, user.customerAuthenticationCredentialHash)) {
+    throw Object.assign(new Error('New password must be different from the current password'), { statusCode: 400 });
+  }
+
+  const newHash = await bcrypt.hash(newPassword, 12);
+  const nextEpoch = (user.customerAuthenticationSessionEpoch ?? 0) + 1;
+  await col.updateOne(
+    { customerAuthenticationInstanceReference: sub } as Partial<CustomerAuthenticationAssessmentRecord>,
+    { $set: { customerAuthenticationCredentialHash: newHash, customerAuthenticationSessionEpoch: nextEpoch } },
+  );
+
+  emitComplianceEvent(db, {
+    entityType: 'customer',
+    entityId: user.customerAuthenticationInstanceReference,
+    processType: 'authentication',
+    processAction: 'auth.password.change',
+    processOutcome: 'verified',
+    performedByPartyReference: user.partyInstanceReference ?? user.customerAuthenticationInstanceReference,
+    performedByRole: user.customerAuthenticationUserRole ?? 'customer',
+    eventSummary: { sessionsInvalidated: true }, // no PII, no secrets
+    bianServiceDomain: 'PartyAuthentication',
+    bianControlRecordType: 'CustomerAuthenticationAssessment',
+  });
+
+  // Reissue a token stamped with the new epoch so the current session survives the invalidation.
+  const payload: JwtPayload = {
+    sub: user.customerAuthenticationInstanceReference,
+    email: user.customerAuthenticationEmailAddress,
+    role: user.customerAuthenticationUserRole,
+    name: user.customerAuthenticationUserName,
+    domain: user.customerAuthenticationLoginDomain,
+    ...(user.partyInstanceReference && { partyRef: user.partyInstanceReference }),
+    epoch: nextEpoch,
+  };
+  const secret = process.env.PSP_JWT_SECRET ?? 'demo-local-secret-change-in-production';
+  const expiresIn = process.env.PSP_JWT_EXPIRES_IN ?? '24h';
+  const token = jwt.sign(payload, secret, { expiresIn } as jwt.SignOptions);
+  return { token };
 }
 
 /**

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Briefcase, AlertTriangle, ShieldCheck, CheckCircle2, Receipt, TrendingUp, CalendarDays, Store, Clock, Plug } from 'lucide-react';
+import { Briefcase, AlertTriangle, ShieldCheck, CheckCircle2, Receipt, TrendingUp, CalendarDays, Store, Clock, Plug, CreditCard, Landmark } from 'lucide-react';
 import { api } from '../../lib/api';
 import { StatCard, MonthlyBars, BreakdownBars } from './Stats';
 
@@ -158,11 +158,66 @@ function ManagerStats({ token }: { token: string }) {
   );
 }
 
+// ── Operations officer: card (SD-88) + payout-account (SD-66) inventory ─────────
+// Aggregates only (counts by lifecycle status). No CHD/PII: statuses, never PAN/IBAN. If a capability
+// is managed by an external provider the admin list returns 409 (managed_externally); that side is
+// simply omitted (Promise.allSettled), so the panel still renders whatever is internally administered.
+type OpsCard = { paymentCardStatus: string };
+type OpsAcct = { payoutAccountStatus: string };
+// The status breakdowns and derived counts below are computed from the first page only. Totals
+// (cards.total / accts.total) are global; when they exceed the sample the derived figures are
+// labeled "of first N" so they are not read as global counts.
+const OPS_SAMPLE = 100;
+function OperationsStats({ token }: { token: string }) {
+  const [cards, setCards] = useState<{ results: OpsCard[]; total: number } | null>(null);
+  const [accts, setAccts] = useState<{ results: OpsAcct[]; total: number } | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    Promise.allSettled([
+      api.modules.cardAdmin.list({ limit: OPS_SAMPLE }, token),
+      api.modules.accountAdmin.list({ limit: OPS_SAMPLE }, token),
+    ]).then(([c, a]) => {
+      if (c.status === 'fulfilled') setCards({ results: c.value.results as unknown as OpsCard[], total: c.value.total });
+      if (a.status === 'fulfilled') setAccts({ results: a.value.results as unknown as OpsAcct[], total: a.value.total });
+    }).finally(() => setLoading(false));
+  }, [token]);
+  if (loading) return <Loading />;
+  if (!cards && !accts) return null;
+  const cardRows = cards?.results ?? [];
+  const acctRows = accts?.results ?? [];
+  const cardCount = (s: string) => cardRows.filter((c) => c.paymentCardStatus === s).length;
+  const acctCount = (s: string) => acctRows.filter((a) => a.payoutAccountStatus === s).length;
+  const cardStatuses = tally(cardRows, (c) => c.paymentCardStatus);
+  const acctStatuses = tally(acctRows, (a) => a.payoutAccountStatus);
+  const cardsSampled = (cards?.total ?? 0) > cardRows.length;
+  const acctsSampled = (accts?.total ?? 0) > acctRows.length;
+  const cardSampleNote = cardsSampled ? `of first ${cardRows.length}` : undefined;
+  const acctSampleNote = acctsSampled ? `of first ${acctRows.length}` : undefined;
+  // Only render a section when its dataset is actually present. A capability managed by an external
+  // provider returns 409 (list rejected via Promise.allSettled), so that side stays null and is
+  // omitted rather than shown as a misleading "0" with an empty breakdown.
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {cards && <StatCard icon={<CreditCard size={14} />} label="Cards" value={String(cards.total)} sub="on file (excl. revoked)" />}
+        {cards && <StatCard icon={<CheckCircle2 size={14} />} label="Active cards" value={String(cardCount('active'))} accent="text-green-600" sub={cardSampleNote} />}
+        {cards && <StatCard icon={<Clock size={14} />} label="Suspended cards" value={String(cardCount('suspended'))} accent="text-orange-600" sub={cardSampleNote} />}
+        {accts && <StatCard icon={<Landmark size={14} />} label="Payout accounts" value={String(accts.total)} sub={acctsSampled ? `${acctCount('active')} active (of first ${acctRows.length})` : `${acctCount('active')} active`} />}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {cards && <BreakdownBars title={cardsSampled ? `Cards by status (first ${cardRows.length} of ${cards.total})` : 'Cards by status'} total={cardRows.length} items={cardStatuses.map((x) => ({ label: x.label.replace(/_/g, ' '), value: x.value, colorClass: color(STATUS_COLOR, x.label) }))} />}
+        {accts && <BreakdownBars title={acctsSampled ? `Accounts by status (first ${acctRows.length} of ${accts.total})` : 'Accounts by status'} total={acctRows.length} items={acctStatuses.map((x) => ({ label: x.label.replace(/_/g, ' '), value: x.value, colorClass: color(STATUS_COLOR, x.label) }))} />}
+      </div>
+    </div>
+  );
+}
+
 export function RoleStats({ role, token }: { role: string; token: string }) {
   if (!token) return null;
   if (role === 'level1_analyst' || role === 'level2_investigator' || role === 'security_auditor') return <FraudStats token={token} />;
   if (role === 'customer') return <CustomerStats token={token} />;
   if (role === 'merchant_officer') return <OfficerStats token={token} />;
+  if (role === 'operations_officer') return <OperationsStats token={token} />;
   if (role === 'manager') return <ManagerStats token={token} />;
   return null;
 }

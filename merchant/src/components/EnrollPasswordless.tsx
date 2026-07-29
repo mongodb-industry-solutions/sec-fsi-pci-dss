@@ -8,6 +8,7 @@ import { Fingerprint, Plus, ShieldCheck, Trash2, ExternalLink } from 'lucide-rea
 import {
   hasCredential, createCredential, saveMeta, signWithCredential, deleteCredential,
 } from '@/lib/authenticator';
+import { BRAND } from '@/lib/brand';
 
 export default function EnrollPasswordless({
   sub, email, credentialsUrl,
@@ -56,7 +57,7 @@ export default function EnrollPasswordless({
     try {
       await deleteCredential();
       setEnrolled(false);
-      setMsg({ tone: 'ok', text: 'Removed from this browser. Revoke it at Leafy Pay to disable it everywhere.' });
+      setMsg({ tone: 'ok', text: `Removed from this browser. Revoke it at ${BRAND.full} to disable it everywhere.` });
     } finally {
       setBusy(false);
     }
@@ -70,7 +71,7 @@ export default function EnrollPasswordless({
       </h2>
       <p className="mt-1 text-sm text-muted">
         Sign in without a password from this browser. A key pair is generated here; only the public key is
-        sent to Leafy Pay. The private key is non-extractable, stays in this browser, and is never exported.
+        sent to {BRAND.full}. The private key is non-extractable, stays in this browser, and is never exported.
       </p>
 
       {msg && (
@@ -91,7 +92,7 @@ export default function EnrollPasswordless({
           </button>
         )}
         <a href={credentialsUrl} target="_blank" rel="noreferrer" className="btn-ghost inline-flex items-center gap-1.5 text-sm">
-          <ExternalLink className="h-4 w-4" aria-hidden /> Manage keys at Leafy Pay
+          <ExternalLink className="h-4 w-4" aria-hidden /> Manage keys at {BRAND.full}
         </a>
       </div>
     </section>

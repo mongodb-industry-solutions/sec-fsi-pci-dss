@@ -526,6 +526,210 @@ export interface SavedCardDisplay {
   paymentCardIsPreferred?: boolean;
 }
 
+// v27: staff investigation view of a customer's aggregated activity. Display-safe union row
+// (transfer/card); never CHD, raw IBAN or gateway payload. Mirrors the backend ActivityRow.
+export interface CustomerTransactionRow {
+  kind: 'transfer' | 'card';
+  paymentExecutionInstanceReference: string;
+  direction: 'sent' | 'received';
+  grossAmount?: number;
+  netAmount?: number;
+  feeAmount?: number;
+  currency?: string;
+  paymentExecutionRail: string | null;
+  paymentExecutionStatus: string;
+  concept: string | null;
+  beneficiaryName: string | null;
+  destinationAccountMasked: string | null;
+  initiatedAt: string | null;
+  completedAt: string | null;
+}
+
+// v27: one resolution step of an SD-65 payment execution (routing/settlement log). Display-safe.
+export interface PaymentExecutionResolutionStep {
+  stepName: string;
+  stepOutcome: 'found' | 'not_found' | 'fallback' | 'failed';
+  stepNote?: string;
+  stepDateTime: string;
+}
+
+// v27: display-safe SD-65 execution detail for the staff drill-down (no CHD, no raw IBAN).
+// Mirrors the backend ExecutionDetail returned by GET /customer/:customerId/transactions/:executionId.
+export interface ExecutionDetail {
+  kind: 'transfer';
+  paymentExecutionInstanceReference: string;
+  direction: 'sent' | 'received';
+  beneficiaryType: string;
+  initiatorPartyReference: string | null;
+  beneficiaryPartyReference: string | null;
+  sourcePayoutAccountReference: string | null;
+  resolvedPayoutAccountReference: string | null;
+  beneficiaryArrangementReference: string | null;
+  merchantAgreementReference: string | null;
+  grossAmount: number;
+  netAmount: number;
+  feeAmount: number;
+  currency: string;
+  recipientCurrency: string | null;
+  recipientAmount: number | null;
+  fxRate: number | null;
+  paymentExecutionRail: string | null;
+  paymentExecutionStatus: string;
+  concept: string | null;
+  beneficiaryName: string | null;
+  destinationAccountMasked: string | null;
+  destinationCountry: string | null;
+  failureReason: string | null;
+  resolutionLog: PaymentExecutionResolutionStep[];
+  initiatedAt: string | null;
+  completedAt: string | null;
+}
+
+// v27: Encrypted-KYC search (Queryable Encryption showcase). Field registry + tier-shaped results.
+export type KycSearchMode = 'substring' | 'prefix' | 'suffix' | 'range' | 'equality';
+
+export interface KycSearchFieldDef {
+  key: string;
+  label: string;
+  mode: KycSearchMode;                     // effective mode (text modes degrade to equality pre-8.2)
+  baseMode?: KycSearchMode;                // intended mode before pre-8.2 degradation (debug detail)
+  collection?: 'party' | 'agreement';      // logical owner collection (debug detail)
+  path?: string;                           // dotted document path of the encrypted field (debug detail)
+  bsonType: 'string' | 'date' | 'int' | 'bool';
+  minQueryLength?: number;
+  maxQueryLength?: number;
+  rangeMin?: number | string;
+  rangeMax?: number | string;
+  enumValues?: Array<string | boolean>;
+}
+
+export interface KycSearchFieldsResponse {
+  textSearchEnabled: boolean;
+  fields: KycSearchFieldDef[];
+  sensitiveResultFields: string[];
+}
+
+export interface KycSearchResult {
+  customerAgreementInstanceReference: string;
+  partyInstanceReference: string;
+  customerName: string;
+  customerEmailAddress?: string;           // L2 (with token) / auditor only
+  customerMobilePhoneNumber?: string;      // L2 (with token) / auditor only
+  customerAgreementReference: string;
+  customerSegment?: string;
+  customerAgreementStatus?: string;
+  customerAgreementKycCheck?: Record<string, unknown> | null;
+  contactPiiRestricted: boolean;
+  sensitive?: {
+    customerAgreementResidentialAddress?: unknown;
+    governmentIdentificationReference?: unknown;
+    customerAgreementRiskNotes?: unknown;
+  };
+}
+
+export interface KycSearchResponse {
+  field: string;
+  count: number;
+  results: KycSearchResult[];
+}
+
+export interface KycSearchBody {
+  field: string;
+  value?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
+// v28 Request to Pay DTOs (mirror backend PaymentRequestProcedure / QrPaymentRepresentation).
+export interface RtpRequestDTO {
+  paymentRequestInstanceReference: string;
+  requesterPartyReference: string;
+  payerPartyReference?: string;
+  payerCounterpartyReference?: string; // the requester's beneficiary (SD-54) representing the payer
+  payeeName?: string;         // requester's own name (authorized to the payer on request)
+  payerName?: string;         // payer's real name — only returned once the payer consented (accepted+)
+  payerAlias?: string;        // payer display the requester provided (beneficiary label); for the payee's view
+  payeeReceivingAccountReference: string;
+  payerFundingAccountReference?: string;
+  // Destination account display (payer sees where the money goes): bank + masked IBAN (last 4).
+  payeeAccountDisplay?: { bankName?: string; maskedIban?: string; alias?: string } | null;
+  // Security case summary (both parties see the PSP/L1/L2 outcome affecting their funds).
+  securityCase?: {
+    caseInstanceReference?: string;
+    caseReference: string | null;
+    caseStatus: string | null;
+    caseSeverity: string | null;
+    resolutionOutcome: string | null;
+    notes: { noteId: string; noteText: string; performedByRole: string; actionDateTime: string; isRetracted?: boolean }[];
+  } | null;
+  amount: number;
+  currency: string;
+  purpose?: string;
+  status: string;
+  expiresAt?: string;
+  qrRepresentationReference?: string;
+  linkedPaymentExecutionReference?: string;
+  recordCreatedDateTime?: string;
+}
+
+export interface QrRepresentationDTO {
+  qrRepresentationInstanceReference: string;
+  subjectType: string;
+  subjectReference: string;
+  payloadFormat: string;
+  encodedPayload: string;
+  expiresAt?: string;
+}
+
+// v30.1 owner picker result for card registration (agreement + derived owner name).
+export interface AgreementOwnerResult {
+  customerAgreementInstanceReference: string;
+  partyInstanceReference: string;
+  ownerName: string | null;
+}
+
+// v30.1 owner picker result for account creation (party + derived owner name).
+export interface PartyOwnerResult {
+  partyInstanceReference: string;
+  ownerName: string | null;
+}
+
+// v29 SD-88 global card administration row (display-safe; no full PAN / CVV / expiry).
+export interface AdminCard {
+  paymentCardInstanceReference: string;
+  customerAgreementInstanceReference: string;
+  paymentCardReference?: string;
+  paymentCardMaskedPanDisplay: string;
+  paymentCardBin?: string | null;
+  paymentCardLast4?: string | null;
+  paymentCardNetwork?: string | null;
+  paymentCardStatus: string;
+  paymentCardIsPreferred?: boolean | null;
+  paymentCardAlias?: string | null;
+  fundingPayoutAccountInstanceReference?: string | null;
+  recordCreatedDateTime?: string | null;
+}
+
+// v29 SD-66 global payout-account administration row (QE-stripped; presence hints only).
+export interface AdminPayoutAccount {
+  payoutAccountInstanceReference: string;
+  partyInstanceReference: string;
+  payoutAccountType: string;
+  payoutAccountStatus: string;
+  payoutAccountCurrency: string;
+  payoutAccountCountryCode?: string;
+  payoutAccountPreferredRail?: string;
+  payoutAccountAlias?: string;
+  payoutAccountBankName?: string;
+  payoutAccountHolderName?: string;
+  payoutAccountBicSwift?: string;
+  payoutAccountIsDefault?: boolean;
+  payoutAccountHasIban?: boolean;
+  payoutAccountHasRoutingNumber?: boolean;
+  recordCreatedDateTime?: string;
+}
+
 export const api = {
   acl: {
     effective: (token: string) =>
@@ -572,8 +776,9 @@ export const api = {
     // Server-side logout: invalidates all of the caller's session tokens (advances their epoch).
     logout: (token: string) =>
       apiFetch<{ loggedOut: boolean }>('/api/v1/auth/logout', { method: 'POST' }, token),
-    users: (filters?: boolean | DemoUserFilters) =>
-      apiFetch<{ users: AuthUser[] }>(`/api/v1/auth/users${demoRosterQuery(filters)}`),
+    // Note: the demo-user roster utility lives at GET /api/v1/system/users (api.system.users).
+    // The duplicate /api/v1/auth/users was removed — a demo access convenience belongs under /system,
+    // not under /auth (real authentication). See api.system.users.
     domains: () =>
       apiFetch<{ domains: AuthDomain[] }>('/api/v1/auth/domains'),
     // Public self-registration for local domains that enable it. Role is always `customer`
@@ -595,6 +800,14 @@ export const api = {
       apiFetch<{ updated: boolean }>(
         '/api/v1/auth/me',
         { method: 'PATCH', body: JSON.stringify(body) },
+        token
+      ),
+    // Change own password: requires the current password + new one. Returns a fresh token (the
+    // current session survives; all other sessions are invalidated server-side).
+    changePassword: (body: { currentPassword: string; newPassword: string }, token: string) =>
+      apiFetch<{ token: string }>(
+        '/api/v1/auth/password/change',
+        { method: 'POST', body: JSON.stringify(body) },
         token
       ),
     me: (token: string) =>
@@ -670,7 +883,7 @@ export const api = {
         token,
       ),
     listAll: (
-      params: { status?: string; merchant?: string; cardToken?: string; email?: string; page?: number; limit?: number },
+      params: { status?: string; merchant?: string; cardToken?: string; email?: string; transactionId?: string; page?: number; limit?: number },
       token: string
     ) => {
       const qs = new URLSearchParams(
@@ -688,6 +901,38 @@ export const api = {
   },
 
   customer: {
+    // v27: encrypted-KYC search. The field registry drives which controls the UI renders;
+    // the search runs QE over ciphertext server-side. Sensitive result fields are returned
+    // only to L2 (with a valid escalation token) / auditor — the server is the boundary.
+    searchFields: (token: string) =>
+      apiFetch<KycSearchFieldsResponse>('/api/v1/customer/search/fields', {}, token),
+    search: (body: KycSearchBody, token: string, escalationToken?: string) =>
+      apiFetch<KycSearchResponse>(
+        '/api/v1/customer/search',
+        {
+          method: 'POST',
+          body: JSON.stringify(body),
+          ...(escalationToken ? { headers: { 'X-Escalation-Token': escalationToken } } : {}),
+        },
+        token,
+      ),
+    // v31 KYC administration (SD-53). Backend enforces customers:view / customers:manage; sensitive
+    // fields decrypt only with a valid escalation token (viewSensitive).
+    kycList: (filters: { status?: string; segment?: string; riskRating?: string; partyType?: string; name?: string; email?: string; phone?: string; nationality?: string; page?: number; limit?: number }, token: string) => {
+      const qs = new URLSearchParams(Object.entries(filters).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString();
+      return apiFetch<{ results: Record<string, unknown>[]; total: number; page: number; limit: number }>(`/api/v1/customer/kyc${qs ? `?${qs}` : ''}`, {}, token);
+    },
+    kycDetail: (partyRef: string, token: string, escalationToken?: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/customer/${encodeURIComponent(partyRef)}/kyc`, escalationToken ? { headers: { 'X-Escalation-Token': escalationToken } } : {}, token),
+    kycPatch: (partyRef: string, patch: Record<string, unknown>, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/customer/${encodeURIComponent(partyRef)}/kyc`, { method: 'PATCH', body: JSON.stringify(patch) }, token),
+    kycRescreen: (partyRef: string, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/customer/${encodeURIComponent(partyRef)}/kyc/re-screen`, { method: 'POST' }, token),
+    kycProcess: (partyRef: string, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/customer/${encodeURIComponent(partyRef)}/kyc/process`, {}, token),
+    // v31: audited on-demand reveal of the QE:none KYC fields (address, source of funds, purpose, notes).
+    kycReveal: (partyRef: string, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/customer/${encodeURIComponent(partyRef)}/kyc/reveal`, {}, token),
     getByEmail: (email: string, token: string) =>
       apiFetch<Record<string, unknown>>(
         `/api/v1/customer?email=${encodeURIComponent(email)}`, {}, token
@@ -713,6 +958,16 @@ export const api = {
       apiFetch<{ results: Record<string, unknown>[] }>(
         `/api/v1/customer/${encodeURIComponent(customerId)}/cards`, {}, token
       ),
+    // v27: staff investigation view of a customer's aggregated transactions (SD-65 + SD-254),
+    // display-safe and paginated. Restricted server-side to level2_investigator / security_auditor.
+    transactions: (customerId: string, params: { page?: number; limit?: number }, token: string) => {
+      const qs = new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])
+      ).toString();
+      return apiFetch<{ results: CustomerTransactionRow[]; total: number; page: number; limit: number }>(
+        `/api/v1/customer/${encodeURIComponent(customerId)}/transactions${qs ? `?${qs}` : ''}`, {}, token
+      );
+    },
     // The AUTHENTICATED caller's OWN saved cards (display-safe). The agreement is resolved server-side
     // from the token (partyRef) — never a client-supplied id — so a caller only ever sees their own
     // cards. Used by the hosted payment pages to offer a saved-card pick to the signed-in viewer.
@@ -743,6 +998,17 @@ export const api = {
         {},
         token
       ),
+    // Investigation pivot: resolve card / owner-agreement / funding-account UUIDs from a
+    // transaction's surrogate token. Investigation roles only (backend-gated).
+    getCardByToken: (cardToken: string, token: string) =>
+      apiFetch<{
+        paymentCardInstanceReference?: string;
+        customerAgreementInstanceReference?: string;
+        fundingPayoutAccountInstanceReference?: string;
+        paymentCardMaskedPanDisplay?: string;
+        paymentCardNetwork?: string | null;
+        paymentCardStatus?: string;
+      }>(`/api/v1/customer/card-by-token/${encodeURIComponent(cardToken)}`, {}, token),
     // Edit the alias/note; the only mutable attributes of a saved card. Owner-only; audited.
     updateCard: (
       customerId: string,
@@ -768,6 +1034,29 @@ export const api = {
       apiFetch<{ removed: boolean }>(
         `/api/v1/customer/${encodeURIComponent(customerId)}/cards/${encodeURIComponent(cardId)}`,
         { method: 'DELETE' },
+        token
+      ),
+    // Owner self-service ephemeral reveals (routed via provider). Step-up MFA would gate these in
+    // production; omitted for the demo. Values are never stored, cached or logged; on demand only.
+    revealCvv: (customerId: string, cardId: string, token: string) =>
+      apiFetch<{ cvv: string }>(
+        `/api/v1/customer/${encodeURIComponent(customerId)}/cards/${encodeURIComponent(cardId)}/cvv`,
+        { method: 'POST', body: JSON.stringify({}) },
+        token
+      ),
+    revealPan: (customerId: string, cardId: string, token: string) =>
+      apiFetch<{ pan: string }>(
+        `/api/v1/customer/${encodeURIComponent(customerId)}/cards/${encodeURIComponent(cardId)}/pan`,
+        { method: 'POST', body: JSON.stringify({}) },
+        token
+      ),
+    // v27 staff drill-down: display-safe SD-65 execution detail of ONE transfer belonging to a
+    // customer. Restricted server-side to level2_investigator / security_auditor (else 403); a
+    // transfer not belonging to the customer's party returns 404. Never returns the raw IBAN.
+    transactionDetail: (customerId: string, executionId: string, token: string) =>
+      apiFetch<ExecutionDetail>(
+        `/api/v1/customer/${encodeURIComponent(customerId)}/transactions/${encodeURIComponent(executionId)}`,
+        {},
         token
       ),
   },
@@ -892,7 +1181,8 @@ export const api = {
         { method: 'DELETE', body: JSON.stringify(body) },
         token
       ),
-    open: (body: { transactionId: string; reason?: string }, token: string) =>
+    // Open a case from EXACTLY ONE of a card transaction (transactionId) or an SD-65 transfer (executionId).
+    open: (body: { transactionId?: string; executionId?: string; reason?: string }, token: string) =>
       apiFetch<{ fraudDiagnosisInstanceReference: string; fraudDiagnosisCaseReference: string; alreadyExisted: boolean }>(
         '/api/v1/fraud',
         { method: 'POST', body: JSON.stringify(body) },
@@ -964,7 +1254,7 @@ export const api = {
         { method: 'PATCH', body: JSON.stringify(body) },
         token
       ),
-    list: (filters: { status?: string; mcc?: string; name?: string; risk?: string; page?: number; limit?: number }, token: string) => {
+    list: (filters: { status?: string; mcc?: string; name?: string; risk?: string; legalEntity?: string; country?: string; page?: number; limit?: number }, token: string) => {
       const qs = new URLSearchParams(
         Object.entries(filters).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])
       ).toString();
@@ -974,6 +1264,21 @@ export const api = {
     },
     getById: (id: string, token: string) =>
       apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}`, {}, token),
+    // v31 KYB administration (SD-89). Backend enforces merchants:view / merchants:manage.
+    kybDetail: (id: string, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}/kyb`, {}, token),
+    kybPatch: (id: string, patch: Record<string, unknown>, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}/kyb`, { method: 'PATCH', body: JSON.stringify(patch) }, token),
+    kybProcess: (id: string, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}/kyb/process`, {}, token),
+    kybOwners: (id: string, token: string) =>
+      apiFetch<{ owners: Record<string, unknown>[]; primaryOwnerPartyReference?: string }>(`/api/v1/merchants/${id}/kyb/owners`, {}, token),
+    kybOwnerAdd: (id: string, body: Record<string, unknown>, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}/kyb/owners`, { method: 'POST', body: JSON.stringify(body) }, token),
+    kybOwnerUpdate: (id: string, partyRef: string, body: Record<string, unknown>, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}/kyb/owners/${encodeURIComponent(partyRef)}`, { method: 'PATCH', body: JSON.stringify(body) }, token),
+    kybOwnerRemove: (id: string, partyRef: string, token: string) =>
+      apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}/kyb/owners/${encodeURIComponent(partyRef)}`, { method: 'DELETE' }, token),
     // Partial update of merchant configuration (PATCH /:id). Owner may self-serve
     // operational fields; risk-governed fields require PSP staff.
     update: (
@@ -1297,9 +1602,60 @@ export const api = {
     // Revoked grants are kept; filter with status (active | revoked | all, default all).
     list: (token: string, status: 'active' | 'revoked' | 'all' = 'all') =>
       apiFetch<{ grants: ConsentGrant[] }>(`/api/v1/auth/grants?status=${status}`, {}, token),
+    // v27 staff view: list a found customer's authorized apps by their partyInstanceReference.
+    // Restricted server-side to level2_investigator / security_auditor (else 403). Reuses ConsentGrant.
+    listForParty: (partyRef: string, token: string, status: 'active' | 'revoked' | 'all' = 'all') =>
+      apiFetch<{ grants: ConsentGrant[] }>(
+        `/api/v1/auth/grants?partyRef=${encodeURIComponent(partyRef)}&status=${status}`, {}, token
+      ),
+    // v27 staff action: revoke a grant the caller does NOT own. level2_investigator only (audited).
+    revokeForParty: (consentId: string, partyRef: string, token: string) =>
+      apiFetch<{ revoked: boolean; consentId: string }>(
+        `/api/v1/auth/grants/${encodeURIComponent(consentId)}?partyRef=${encodeURIComponent(partyRef)}`,
+        { method: 'DELETE' },
+        token,
+      ),
     // v18 D-01: detail of one authorized app (scopes with descriptions, approval date/time, branding).
     getDetail: (consentId: string, token: string) =>
       apiFetch<ConsentGrantDetail>(`/api/v1/auth/grants/${encodeURIComponent(consentId)}`, {}, token),
+    // v27 staff view: detail of a grant owned by a found customer's party. Restricted server-side to
+    // level2_investigator / security_auditor (else 403). Same shape as getDetail.
+    getDetailForParty: (consentId: string, partyRef: string, token: string) =>
+      apiFetch<ConsentGrantDetail>(
+        `/api/v1/auth/grants/${encodeURIComponent(consentId)}?partyRef=${encodeURIComponent(partyRef)}`,
+        {}, token
+      ),
+    // v27 staff view: operations a found customer's party executed through this app. Restricted
+    // server-side to level2_investigator / security_auditor (else 403). Same shape as getOperations.
+    operationsForParty: (
+      consentId: string,
+      partyRef: string,
+      filters: { q?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number },
+      token: string,
+    ) => {
+      const qs = new URLSearchParams(
+        Object.entries(filters).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+      );
+      qs.set('partyRef', partyRef);
+      return apiFetch<{
+        events: Array<{
+          id: string;
+          eventDateTime: string;
+          processType: string;
+          processAction: string;
+          processOutcome: string;
+          entityType: string;
+          entityId: string;
+          clientId?: string;
+          actingPartyReference?: string;
+          actingChannel?: string;
+          summary?: Record<string, unknown>;
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/api/v1/auth/grants/${encodeURIComponent(consentId)}/operations?${qs.toString()}`, {}, token);
+    },
     // v18 D-02: operations the caller executed through this app (display-safe). Filter + paginate.
     getOperations: (
       consentId: string,
@@ -1450,35 +1806,9 @@ export const api = {
         token
       ),
   },
-  simulator: {
-    createCheckoutSession: (body: {
-      merchantId: string;
-      amount: number;
-      currency: string;
-      description: string;
-      returnUrl: string;
-      cancelUrl: string;
-      merchantReference: string;
-    }) =>
-      apiFetch<{ checkoutSessionInstanceReference: string; paymentPageUrl: string; expiresAt: string }>(
-        '/api/v1/system/simulator/checkout-session', { method: 'POST', body: JSON.stringify(body) }
-      ),
-    createPaymentLink: (body: {
-      merchantId: string;
-      amount: number;
-      currency: string;
-      description: string;
-      customerMessage?: string;
-      usageType: 'single_use' | 'multi_use';
-    }) =>
-      apiFetch<{ paymentLinkInstanceReference: string; paymentLinkCode: string; paymentUrl: string }>(
-        '/api/v1/system/simulator/payment-link', { method: 'POST', body: JSON.stringify(body) }
-      ),
-    getTransactions: (email: string) =>
-      apiFetch<{ transactions: Record<string, unknown>[]; total: number }>(
-        `/api/v1/system/simulator/transactions/${encodeURIComponent(email)}`
-      ),
-  },
+  // v28: the simulator no longer has open (no-JWT) endpoints. It authenticates as the selected demo
+  // persona (getSimToken) and calls the real authenticated endpoints (checkout, paymentLinks,
+  // transactions), so it works identically in local and production without any open surface.
 
   integrations: {
     list: (token: string, params?: { type?: string; status?: string }) => {
@@ -1578,6 +1908,185 @@ export const api = {
         apiFetch<Record<string, unknown>>(`/api/v1/modules/domains/${id}`, { method: 'PUT', body: JSON.stringify(body) }, token),
       remove: (id: string, token: string) =>
         apiFetch<{ deleted: boolean }>(`/api/v1/modules/domains/${id}`, { method: 'DELETE' }, token),
+    },
+
+    // v29 SD-88: global card administration via the built-in card-issuer module. Display-safe only:
+    // surrogate token, masked PAN, network, status; expiry only in the per-card detail (need-to-know).
+    // Never accepts or returns CVV/PIN/full PAN. 409 managed_externally when a vendor owns the capability.
+    cardAdmin: {
+      list: (
+        params: { page?: number; limit?: number; network?: string; status?: string; agreement?: string; last4?: string; bin?: string; panExact?: string },
+        token: string,
+      ) => {
+        const qs = new URLSearchParams(
+          Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]),
+        ).toString();
+        return apiFetch<{ results: AdminCard[]; total: number; page: number; limit: number }>(
+          `/api/v1/modules/card-issuer/cards${qs ? `?${qs}` : ''}`, {}, token,
+        );
+      },
+      get: (cardId: string, token: string) =>
+        apiFetch<Record<string, unknown>>(`/api/v1/modules/card-issuer/cards/${encodeURIComponent(cardId)}`, {}, token),
+      // v30.1 owner picker: search agreements by owner name (fills customerAgreementInstanceReference).
+      searchAgreements: (query: string, token: string) =>
+        apiFetch<{ results: AgreementOwnerResult[] }>(
+          `/api/v1/modules/card-issuer/agreements?query=${encodeURIComponent(query)}`, {}, token,
+        ),
+      register: (
+        body: {
+          // v30.2: funding account is required; the agreement (owner) is derived server-side.
+          fundingPayoutAccountInstanceReference: string;
+          customerAgreementInstanceReference?: string;
+          cardToken: string;
+          paymentCardMaskedPanDisplay?: string;
+          paymentCardExpirationDate?: string;
+          paymentCardNetwork?: 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
+          paymentCardIsPreferred?: boolean;
+          paymentCardAlias?: string;
+        },
+        token: string,
+      ) =>
+        apiFetch<{ paymentCardInstanceReference: string; paymentCardStatus: string; reused?: boolean }>(
+          '/api/v1/modules/card-issuer/cards', { method: 'POST', body: JSON.stringify(body) }, token,
+        ),
+      // v30.2: reassign a card's funding account. The owner follows the account's party.
+      // 409 managed_externally when a vendor owns the card.
+      reassignFunding: (cardId: string, fundingPayoutAccountInstanceReference: string, token: string) =>
+        apiFetch<Record<string, unknown>>(
+          `/api/v1/modules/card-issuer/cards/${encodeURIComponent(cardId)}/funding`,
+          { method: 'PATCH', body: JSON.stringify({ fundingPayoutAccountInstanceReference }) }, token,
+        ),
+      update: (cardId: string, body: { paymentCardAlias?: string; paymentCardCustomerNote?: string }, token: string) =>
+        apiFetch<Record<string, unknown>>(
+          `/api/v1/modules/card-issuer/cards/${encodeURIComponent(cardId)}`,
+          { method: 'PATCH', body: JSON.stringify(body) }, token,
+        ),
+      setStatus: (cardId: string, active: boolean, token: string) =>
+        apiFetch<Record<string, unknown>>(
+          `/api/v1/modules/card-issuer/cards/${encodeURIComponent(cardId)}/status`,
+          { method: 'PATCH', body: JSON.stringify({ active }) }, token,
+        ),
+      revoke: (cardId: string, token: string) =>
+        apiFetch<{ removed: boolean }>(
+          `/api/v1/modules/card-issuer/cards/${encodeURIComponent(cardId)}`, { method: 'DELETE' }, token,
+        ),
+      // Ephemeral CVV reveal (operations_officer, cards:manage). Never stored/logged; on demand only.
+      revealCvv: (cardId: string, token: string) =>
+        apiFetch<{ cvv: string }>(
+          `/api/v1/modules/card-issuer/cards/${encodeURIComponent(cardId)}/cvv`, {}, token,
+        ),
+      // Ephemeral full-PAN reveal (FR-30.16). Masked PAN is the default display; this is on demand only.
+      revealPan: (cardId: string, token: string) =>
+        apiFetch<{ pan: string }>(
+          `/api/v1/modules/card-issuer/cards/${encodeURIComponent(cardId)}/pan`, {}, token,
+        ),
+    },
+
+    // v29 SD-66: global payout-account administration via the built-in account-information module.
+    // QE/GDPR: IBAN/routing never returned (presence hints only). 409 managed_externally when a vendor owns it.
+    accountAdmin: {
+      list: (
+        params: { page?: number; limit?: number; status?: string; party?: string; currency?: string },
+        token: string,
+      ) => {
+        const qs = new URLSearchParams(
+          Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]),
+        ).toString();
+        return apiFetch<{ results: AdminPayoutAccount[]; total: number; page: number; limit: number }>(
+          `/api/v1/modules/account-information/accounts${qs ? `?${qs}` : ''}`, {}, token,
+        );
+      },
+      get: (accountRef: string, token: string) =>
+        apiFetch<Record<string, unknown>>(
+          `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}`, {}, token,
+        ),
+      // v30.1 owner picker: search parties by owner name (fills partyInstanceReference).
+      searchParties: (query: string, token: string) =>
+        apiFetch<{ results: PartyOwnerResult[] }>(
+          `/api/v1/modules/account-information/parties?query=${encodeURIComponent(query)}`, {}, token,
+        ),
+      create: (
+        body: {
+          partyInstanceReference: string;
+          payoutAccountType: 'bank_account' | 'wallet' | 'internal_ledger';
+          payoutAccountCurrency: string;
+          payoutAccountCountryCode: string;
+          payoutAccountPreferredRail: 'sepa' | 'ach' | 'swift' | 'local_bank' | 'internal_wallet' | 'internal_ledger';
+          payoutAccountAlias?: string;
+          payoutAccountBankName?: string;
+          payoutAccountHolderName?: string;
+          payoutAccountBicSwift?: string;
+          payoutAccountIban?: string;
+          payoutAccountRoutingNumber?: string;
+        },
+        token: string,
+      ) =>
+        apiFetch<AdminPayoutAccount>(
+          '/api/v1/modules/account-information/accounts', { method: 'POST', body: JSON.stringify(body) }, token,
+        ),
+      update: (
+        accountRef: string,
+        body: { payoutAccountAlias?: string; payoutAccountBankName?: string; payoutAccountHolderName?: string; payoutAccountBicSwift?: string },
+        token: string,
+      ) =>
+        apiFetch<AdminPayoutAccount>(
+          `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}`,
+          { method: 'PATCH', body: JSON.stringify(body) }, token,
+        ),
+      close: (accountRef: string, token: string) =>
+        apiFetch<{ closed: boolean }>(
+          `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}`, { method: 'DELETE' }, token,
+        ),
+      // Ephemeral IBAN reveal (GDPR: on demand, need-to-know). Never returned by list/detail.
+      revealIban: (accountRef: string, token: string) =>
+        apiFetch<{ payoutAccountIban: string }>(
+          `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}/iban`, {}, token,
+        ),
+      // v30.2: ephemeral routing-number reveal (GDPR: on demand, need-to-know). Mirrors revealIban.
+      revealRouting: (accountRef: string, token: string) =>
+        apiFetch<{ payoutAccountRoutingNumber: string }>(
+          `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}/routing`, {}, token,
+        ),
+      // v30.2: reassign the account owner (operations_officer, accounts:manage). Returns the updated
+      // account with the derived ownerName.
+      reassignOwner: (accountRef: string, partyInstanceReference: string, token: string) =>
+        apiFetch<AdminPayoutAccount & { ownerName?: string | null }>(
+          `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}/owner`,
+          { method: 'PATCH', body: JSON.stringify({ partyInstanceReference }) }, token,
+        ),
+      // Display-safe cards funded by this payout account (no full PAN / CVV). Paginated + filterable
+      // (same shape/fields as the global card admin list); 409 managed_externally when a vendor owns it.
+      cards: (
+        opts: {
+          accountRef: string;
+          token: string;
+          page?: number;
+          limit?: number;
+          network?: string;
+          status?: string;
+          last4?: string;
+          bin?: string;
+        },
+      ) => {
+        const { accountRef, token, ...params } = opts;
+        const qs = new URLSearchParams(
+          Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]),
+        ).toString();
+        return apiFetch<{ results: Array<{
+          paymentCardInstanceReference: string;
+          paymentCardMaskedPanDisplay: string;
+          paymentCardBin?: string | null;
+          paymentCardLast4?: string | null;
+          paymentCardNetwork?: string | null;
+          paymentCardStatus: string;
+          paymentCardIsPreferred?: boolean | null;
+          paymentCardAlias?: string | null;
+          fundingPayoutAccountInstanceReference?: string | null;
+          recordCreatedDateTime?: string | null;
+        }>; total: number; page: number; limit: number }>(
+          `/api/v1/modules/account-information/accounts/${encodeURIComponent(accountRef)}/cards${qs ? `?${qs}` : ''}`, {}, token,
+        );
+      },
     },
   },
 
@@ -1857,6 +2366,40 @@ export const api = {
         { method: 'POST', body: JSON.stringify(body) },
         token,
       ),
+  },
+
+  // v28: Request to Pay (RTP) — a transfer that requires the payer's in-app approval + shared QR.
+  rtp: {
+    create: (
+      body: {
+        amount: number; currency?: string; purpose?: string; payeeName?: string; payerAlias?: string;
+        payeeReceivingAccountReference?: string; payerPartyReference?: string; payerCounterpartyReference?: string; expiresAt?: string;
+        structuredRemittance?: { referenceType?: string; reference?: string };
+      },
+      token: string,
+      idempotencyKey?: string,
+    ) =>
+      apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests`, { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }, token),
+    list: (params: { box?: 'inbox' | 'outbox'; status?: string }, token: string) => {
+      const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString();
+      return apiFetch<{ results: RtpRequestDTO[] }>(`/api/v1/gateway/rtp/requests${qs ? `?${qs}` : ''}`, {}, token);
+    },
+    getById: (ref: string, token: string) => apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}`, {}, token),
+    events: (ref: string, token: string) => apiFetch<{ events: Array<Record<string, unknown>> }>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/events`, {}, token),
+    present: (ref: string, token: string) => apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/present`, { method: 'POST', body: JSON.stringify({}) }, token),
+    view: (ref: string, token: string) => apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/view`, { method: 'POST', body: JSON.stringify({}) }, token),
+    verifyPayee: (ref: string, token: string) => apiFetch<{ matchResult: string; matchScore: number; recommendation: string }>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/verify-payee`, { method: 'POST', body: JSON.stringify({}) }, token),
+    accept: (ref: string, body: { fundingAccountRef?: string }, token: string, idempotencyKey?: string) =>
+      apiFetch<{ status: string; executionReference?: string; reason?: string; request: RtpRequestDTO }>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/accept`, { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined }, token),
+    reject: (ref: string, token: string) => apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/reject`, { method: 'POST', body: JSON.stringify({}) }, token),
+    cancel: (ref: string, token: string) => apiFetch<RtpRequestDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/cancel`, { method: 'POST', body: JSON.stringify({}) }, token),
+    qr: (ref: string, token: string) => apiFetch<QrRepresentationDTO>(`/api/v1/gateway/rtp/requests/${encodeURIComponent(ref)}/qr`, { method: 'POST', body: JSON.stringify({}) }, token),
+  },
+
+  qr: {
+    represent: (body: { subjectType: string; subjectReference: string; payloadFormat?: string; amount?: number; currency?: string; payeeName?: string; iban?: string }, token: string) =>
+      apiFetch<QrRepresentationDTO>(`/api/v1/gateway/qr/represent`, { method: 'POST', body: JSON.stringify(body) }, token),
+    resolve: (ref: string, token: string) => apiFetch<QrRepresentationDTO>(`/api/v1/gateway/qr/${encodeURIComponent(ref)}`, {}, token),
   },
 
   executions: {

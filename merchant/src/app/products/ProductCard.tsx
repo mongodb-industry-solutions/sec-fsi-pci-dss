@@ -12,6 +12,8 @@ import { payForProduct, type ActionResult } from '@/lib/actions';
 import { Chip } from '@/components/ui/Bits';
 import { Tip } from '@/components/ui/Tooltip';
 import PaymentResultModal from './PaymentResultModal';
+import ProductQrButton from './ProductQrButton';
+import { BRAND } from '@/lib/brand';
 
 const ICONS = { beans: Bean, machine: Coffee, course: GraduationCap, subscription: Repeat } as const;
 
@@ -26,17 +28,17 @@ const METHOD_ICON: Record<PaymentMethod, LucideIcon> = {
 // One short, human explanation per method (shown under the badge).
 const METHOD_BLURB: Record<PaymentMethod, string> = {
   payment_link: 'Generates a shareable link the buyer opens to pay.',
-  redirect: 'Opens Leafy Pay’s secure hosted checkout page.',
+  redirect: `Opens ${BRAND.full}’s secure hosted checkout page.`,
   api_payment: 'Server-to-server charge on a tokenised card.',
   subscription: 'Hosted checkout that sets up a recurring plan.',
 };
 
 // Longer tooltip (on hover AND click).
 const METHOD_HELP: Record<PaymentMethod, string> = {
-  payment_link: 'Creates a shareable Leafy Pay link. The buyer pays on a hosted page. Nothing is charged until they open it.',
-  redirect: 'Sends the browser to Leafy Pay’s hosted checkout, where the PSP securely captures the card. The merchant never sees card data.',
+  payment_link: `Creates a shareable ${BRAND.full} link. The buyer pays on a hosted page. Nothing is charged until they open it.`,
+  redirect: `Sends the browser to ${BRAND.full}’s hosted checkout, where the PSP securely captures the card. The merchant never sees card data.`,
   api_payment: 'Server-to-server charge on a tokenised card using the merchant’s own credentials. The merchant never sees card data.',
-  subscription: 'Redirects to Leafy Pay’s hosted checkout to set up a recurring subscription.',
+  subscription: `Redirects to ${BRAND.full}’s hosted checkout to set up a recurring subscription.`,
 };
 
 // Uniform primary-action label across ALL products for a homogeneous design.
@@ -89,17 +91,21 @@ export default function ProductCard({ product, commission }: { product: Product;
           <b className="text-ink">{fmt(product.price)}</b>
         </div>
         <div className="flex items-center justify-between text-muted">
-          <span>Merchant commission</span>
+          <span><span className="lg:hidden">Merchant </span>Commission</span>
           <span>{fmt(commission)}</span>
         </div>
       </div>
 
-      <Tip label={`${METHOD_HELP[product.method]} You will pay ${fmt(product.price)}.`}>
-        <button onClick={onPay} disabled={pending} className="btn-primary mt-4 w-full">
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CreditCard className="h-4 w-4" aria-hidden />}
-          {pending ? 'Processing…' : PAY_LABEL}
-        </button>
-      </Tip>
+      <div className="mt-4 flex items-center gap-2">
+        <Tip label={`${METHOD_HELP[product.method]} You will pay ${fmt(product.price)}.`}>
+          <button onClick={onPay} disabled={pending} className="btn-primary w-full">
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CreditCard className="h-4 w-4" aria-hidden />}
+            {pending ? 'Processing…' : PAY_LABEL}
+          </button>
+        </Tip>
+        {/* Pay-by-QR only for methods that produce a shareable/hosted URL (not the direct API charge). */}
+        {product.method !== 'api_payment' && <ProductQrButton product={product} />}
+      </div>
 
       {result && (
         <PaymentResultModal
