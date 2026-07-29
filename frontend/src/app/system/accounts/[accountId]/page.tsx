@@ -257,8 +257,8 @@ export default function AccountDetailPage() {
     const decoded = t ? decodeToken(t) : null;
     const role = decoded?.role;
     const sp = new URLSearchParams(window.location.search);
-    const isStaffCtx = sp.get('ctx') === 'staff'
-      && (role === 'level2_investigator' || role === 'security_auditor');
+    // Any non-customer role may drill down; the server enforces accounts:view and the party scope.
+    const isStaffCtx = sp.get('ctx') === 'staff' && !!role && role !== 'customer';
 
     if (isStaffCtx) {
       // Staff read the target party's account (partyRef supplied by the profile drill-down).

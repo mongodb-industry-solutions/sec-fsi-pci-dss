@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, type ConsentGrant, type CustomerTransactionRow, type FraudCase } from '../../../../lib/api';
@@ -8,11 +8,19 @@ import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
 import { useResource } from '../../../../lib/useResource';
 import { readEscalationToken } from '../../../../lib/escalation';
 import { useDebugMode } from '../../../../lib/debugMode';
+import { useEffectivePermissions } from '../../../../lib/permissions';
 import { LoadingIndicator } from '../../../../components/LoadingIndicator';
 import { Pagination } from '../../../../components/Pagination';
 import { CaseTable } from '../../../../components/CaseTable';
 import { useConfirm, useNotify } from '../../../../components/ui/ConfirmProvider';
-import { UserCheck, ShieldCheck, Lock, ArrowUpRight, ArrowDownLeft, Layers, Landmark, CreditCard, Trash2, Pause, ShieldAlert } from 'lucide-react';
+import { UserCheck, ShieldCheck, Lock, ArrowUpRight, ArrowDownLeft, Layers, Landmark, CreditCard, Trash2, Pause, ShieldAlert, IdCard, ExternalLink } from 'lucide-react';
+// v32 B4/D1: the shared record primitives. This page used a local plain `Field` with no mask, no
+// tooltip and no reveal, so the auditor read QE:none PII in clear here while the operations officer
+// had to perform an audited reveal for the same fields. One renderer, one contract (ADR-052).
+import { RecordGroup, RecordGroupGrid } from '../../../../components/record/RecordGroup';
+import { RecordField } from '../../../../components/record/RecordField';
+import { IdentityDocumentBlock } from '../../../../components/record/IdentityDocumentBlock';
+import { humanize, fmtAddress, fmtDate } from '../../../../components/record/format';
 
 const SEGMENT_LABELS: Record<string, string> = { retail: 'Retail', premium: 'Premium', corporate: 'Corporate', sme: 'SME' };
 
@@ -375,6 +383,9 @@ export default function CustomerDetailPage() {
   const { customerId } = useParams<{ customerId: string }>();
   const router = useRouter();
   const { debugMode } = useDebugMode();
+  const { can } = useEffectivePermissions();
+  // v32 C2: one audited reveal per view; the ephemeral values live here only while shown.
+  const revealCache = useRef<Record<string, unknown> | null>(null);
 
   const [token, setToken] = useState('');
   const [role, setRole] = useState('level1_analyst');
@@ -425,7 +436,14 @@ export default function CustomerDetailPage() {
   const canAct = role === 'level2_investigator';
   const partyRef = c.partyInstanceReference != null ? String(c.partyInstanceReference) : '';
   const kyc = c.customerAgreementKycCheck as { customerAgreementKycCheckStatus?: string; customerAgreementKycCheckReference?: string; customerAgreementKycCheckCompletedDate?: string; customerAgreementKycCheckNotes?: string } | null;
-  const sensitive = c.sensitive as { customerAgreementResidentialAddress?: { streetAddress?: string; city?: string; postalCode?: string; countryCode?: string }; governmentIdentificationReference?: string; customerAgreementRiskNotes?: string } | undefined;
+  // v32 C2: QE:none values travel in the payload only on the audited escalation path (a case
+  // reference). Otherwise the server sends `sensitiveAvailable` and the value is fetched from the
+  // reveal endpoint, which emits one compliance event per disclosure (PCI DSS Req 10.2.2).
+  const sensitive = c.sensitive as { customerAgreementResidentialAddress?: Record<string, unknown>; customerAgreementRiskNotes?: string } | undefined;
+  const sensitiveAvailable = sensitive != null || c.sensitiveAvailable === true;
+  // v32 B7 (P5): no orphan information. The auditor and the L2 investigator already hold both
+  // permissions the KYC record needs; they were simply never given a link to it.
+  const canOpenKycRecord = !!partyRef && can('customers', 'view') && can('modules', 'view');
 
   const crumbs: Crumb[] =
     navCtx?.from === 'investigation' && navCtx.caseId
@@ -448,12 +466,12 @@ export default function CustomerDetailPage() {
           { label: name },
         ];
 
-  const Field = ({ label, value }: { label: string; value?: unknown }) => (
-    <>
-      <span className="text-gray-500">{label}</span>
-      <span className="font-medium text-gray-900 text-right truncate">{value != null && value !== '' ? String(value) : '-'}</span>
-    </>
-  );
+  // v32 C2: the audited reveal endpoint is the only way to obtain a QE:none value. Fetched once
+  // per view and cached, so toggling the eye does not re-request (and does not re-audit) it.
+  const revealKyc = async (): Promise<Record<string, unknown>> => {
+    if (!revealCache.current) revealCache.current = await api.customer.kycReveal(partyRef, token);
+    return revealCache.current;
+  };
 
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
@@ -469,62 +487,90 @@ export default function CustomerDetailPage() {
         <span className="ml-auto text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">{roleLabel}</span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Profile (QE:equality fields decrypt for staff; no QE:none here) */}
-        <div className="bg-white rounded-xl border p-5">
-          <h2 className="font-semibold text-gray-800 text-sm mb-3">Profile</h2>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <Field label="Email" value={c.customerEmailAddress} />
-            <Field label="Phone" value={c.customerMobilePhoneNumber} />
-            <Field label="Account reference" value={c.customerAgreementReference} />
-            <Field label="Segment" value={SEGMENT_LABELS[String(c.customerSegment)] ?? c.customerSegment} />
-            <Field label="Status" value={c.customerAgreementStatus} />
-            <Field label="Enrolled" value={c.customerAgreementEnrollmentDate ? new Date(String(c.customerAgreementEnrollmentDate)).toLocaleDateString() : undefined} />
-            <Field label="Language" value={c.customerAgreementPreferredLanguage} />
-          </div>
-          {c.contactPiiRestricted === true && (
-            <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              Contact PII (email, phone) is restricted at the L1 access level{debugMode ? ' (PCI DSS Req 7, need-to-know)' : ''}. Available to L2 investigators and the security auditor.
-            </p>
-          )}
-        </div>
+      <RecordGroupGrid>
+        {/* Profile: SD-13/SD-53 lookup tier (QE equality/range), decrypted in-process for staff. */}
+        <RecordGroup
+          icon={UserCheck}
+          title="Profile"
+          info="Party and agreement attributes at LOOKUP tier: encrypted at rest in Atlas with Queryable Encryption and searchable while encrypted. Decrypted in-process for a role with need-to-know."
+          accessNote={c.contactPiiRestricted === true
+            ? `Contact PII (email, phone) is restricted at the L1 access level${debugMode ? ' (PCI DSS Req 7, need-to-know)' : ''}. Available to L2 investigators and the security auditor.`
+            : undefined}
+        >
+          <RecordField label="Email" tier="lookup" value={c.customerEmailAddress ? String(c.customerEmailAddress) : ''} info="Contact email (SD-13). QE:equality encrypted at rest (exact-match searchable)." />
+          <RecordField label="Phone" tier="lookup" value={c.customerMobilePhoneNumber ? String(c.customerMobilePhoneNumber) : ''} info="Contact mobile phone (SD-13). QE:equality encrypted at rest (exact-match searchable)." />
+          <RecordField label="Account reference" tier="lookup" mono value={c.customerAgreementReference ? String(c.customerAgreementReference) : ''} info="Internal reference for the customer agreement (SD-53), used for lookups. QE:equality encrypted at rest." />
+          <RecordField label="Segment" value={SEGMENT_LABELS[String(c.customerSegment)] ?? humanize(c.customerSegment)} info="Commercial segment (retail / premium / corporate / SME). Business metadata, plaintext." />
+          <RecordField label="Status" value={humanize(c.customerAgreementStatus)} info="BIAN SD-53 agreement lifecycle status. Plaintext." />
+          <RecordField label="Enrolled" value={fmtDate(c.customerAgreementEnrollmentDate)} info="Date the customer agreement was enrolled. Plaintext business metadata." />
+          <RecordField label="Language" value={humanize(c.customerAgreementPreferredLanguage)} info="Preferred communication language (SD-53). Plaintext business metadata." />
+        </RecordGroup>
 
-        {/* KYC check (BIAN SD-53 BQ:Step) */}
-        <div className="bg-white rounded-xl border p-5">
-          <h2 className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-1.5"><ShieldCheck size={14} className="text-teal-600" /> KYC check{debugMode ? ' (SD-53)' : ''}</h2>
+        {/* v32 B4: the same identity document the KYC administration page shows, from the same
+            source of truth, so a displayed value is always a searchable value. */}
+        <IdentityDocumentBlock
+          governmentId={c.customerAgreementGovernmentID as Record<string, unknown> | null}
+          taxIdNumber={c.customerAgreementTaxIDNumber}
+        />
+
+        {/* KYC check (BIAN SD-53 BQ:Step), with the v32 B7 link onward to the full KYC record. */}
+        <RecordGroup
+          icon={ShieldCheck}
+          title={`KYC check${debugMode ? ' (SD-53)' : ''}`}
+          info="Outcome of the Know Your Customer verification step (SD-53 BQ:Step): lifecycle status, provider reference and completion date."
+          badge={canOpenKycRecord ? (
+            <Link
+              href={`/system/admin/modules/kyc/${encodeURIComponent(partyRef)}`}
+              className="text-xs inline-flex items-center gap-1 text-[#001E2B] hover:underline"
+            >
+              KYC record <ExternalLink size={12} />
+            </Link>
+          ) : undefined}
+        >
           {kyc ? (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-              <Field label="Status" value={kyc.customerAgreementKycCheckStatus} />
-              <Field label="Reference" value={kyc.customerAgreementKycCheckReference} />
-              <Field label="Completed" value={kyc.customerAgreementKycCheckCompletedDate ? new Date(String(kyc.customerAgreementKycCheckCompletedDate)).toLocaleDateString() : undefined} />
-              {kyc.customerAgreementKycCheckNotes && (<><span className="text-gray-500">Notes</span><span className="text-right">{kyc.customerAgreementKycCheckNotes}</span></>)}
-            </div>
+            <>
+              <RecordField label="Status" value={humanize(kyc.customerAgreementKycCheckStatus)} info="KYC lifecycle status derived from the screening verdict (initiated / verified / rejected / expired)." />
+              <RecordField label="Reference" tier="lookup" mono value={kyc.customerAgreementKycCheckReference ? String(kyc.customerAgreementKycCheckReference) : ''} info="Provider-side reference for the KYC check (SD-53)." />
+              <RecordField label="Completed" value={fmtDate(kyc.customerAgreementKycCheckCompletedDate)} info="Date the KYC check completed. Plaintext business metadata." />
+              {kyc.customerAgreementKycCheckNotes ? (
+                <RecordField label="Notes" value={String(kyc.customerAgreementKycCheckNotes)} info="Free-text notes recorded with the KYC outcome." />
+              ) : null}
+            </>
           ) : <p className="text-sm text-gray-400">No KYC record.</p>}
-        </div>
-      </div>
+        </RecordGroup>
 
-      {/* Sensitive PII; auditor always; L2 only with a valid escalation token */}
-      <div className="bg-white rounded-xl border p-5">
-        <div className="flex items-center gap-2 mb-3">
-          <Lock size={14} className="text-gray-400" />
-          <h2 className="font-semibold text-gray-800 text-sm">Sensitive PII{debugMode ? ' (QE:none)' : ''}</h2>
-          <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium ${sensitive ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'}`}>
-            {sensitive ? 'Unlocked' : 'Restricted'}
-          </span>
-        </div>
-        {sensitive ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <Field label="Address" value={sensitive.customerAgreementResidentialAddress ? [sensitive.customerAgreementResidentialAddress.streetAddress, sensitive.customerAgreementResidentialAddress.city, sensitive.customerAgreementResidentialAddress.postalCode, sensitive.customerAgreementResidentialAddress.countryCode].filter(Boolean).join(', ') : undefined} />
-            <Field label="Government ID" value={sensitive.governmentIdentificationReference} />
-            {sensitive.customerAgreementRiskNotes && (<><span className="text-gray-500">Risk notes</span><span className="text-right">{sensitive.customerAgreementRiskNotes}</span></>)}
-          </div>
-        ) : (
-          <p className="text-sm text-gray-400 italic">
-            {debugMode && 'Address, government ID and risk notes are QE:none (encrypted, not searchable). '}
-            {isAuditor ? 'Address, government ID and risk notes are unavailable.' : 'Address, government ID and risk notes require a valid L2 escalation acceptance; the security auditor has full access.'}
-          </p>
-        )}
-      </div>
+        {/* Protected details (QE:none). Masked for EVERY role; the eye performs the audited reveal.
+            v32 C1/C3: this page used to print these values in clear for the auditor while the
+            operations officer had to reveal the same fields, which inverted the friction. */}
+        <RecordGroup
+          icon={Lock}
+          title={`Protected details${debugMode ? ' (QE:none)' : ''}`}
+          info="QE:none fields (encrypted at rest, NOT searchable): residential address and risk notes. Hidden by default; the eye performs an on-demand, ephemeral, audited reveal (PCI DSS Req 3.2/3.3 and Req 10, GDPR need-to-know). The value is never persisted; only the fact of the reveal is audited, by field name."
+          badge={
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sensitiveAvailable ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'}`}>
+              {sensitiveAvailable ? 'Reveal available' : 'Restricted'}
+            </span>
+          }
+          accessNote={sensitiveAvailable
+            ? undefined
+            : (isAuditor
+              ? 'These fields are unavailable for this record.'
+              : 'Revealing these fields requires a valid L2 escalation acceptance; the security auditor reveals them directly.')}
+        >
+          <RecordField
+            label="Residential address"
+            tier="sensitive"
+            info="Full residential address (SD-53). QE:none: encrypted at rest and not searchable."
+            {...(sensitiveAvailable ? { fetchValue: async () => fmtAddress(sensitive?.customerAgreementResidentialAddress ?? (await revealKyc()).customerAgreementResidentialAddress) || 'n/a' } : {})}
+          />
+          <RecordField
+            label="Risk notes"
+            tier="sensitive"
+            info="Internal analyst risk notes. QE:none: encrypted at rest, never exposed to L1."
+            {...(sensitiveAvailable ? { fetchValue: async () => String(sensitive?.customerAgreementRiskNotes ?? (await revealKyc()).customerAgreementRiskNotes ?? 'n/a') } : {})}
+          />
+        </RecordGroup>
+      </RecordGroupGrid>
 
       {/* Staff-only investigation sections. VIEW: level2_investigator + security_auditor.
           ACTIONS (revoke app, deactivate/remove card): level2_investigator only. The server

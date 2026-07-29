@@ -17,6 +17,9 @@ const h = vi.hoisted(() => ({
 
 vi.mock('../../../../backend/src/vendors/encryption/roleClients', () => ({
   getDbForRole: h.getDbForRole,
+  // v32 C6: the sensitive-tier / encryption-write clients are the same double here.
+  getSensitiveTierDb: h.getDbForRole,
+  getEncryptionWriteDb: h.getDbForRole,
 }));
 vi.mock('../../../../backend/src/vendors/security/escalationTokens', () => ({
   validateToken: h.validateToken,
@@ -44,8 +47,15 @@ const agreement = {
   customerAgreementStatus: 'active',
   // decrypted sensitive value present so the L2 path attaches the sensitive block
   customerAgreementResidentialAddress: { streetAddress: '1 St', city: 'Madrid', postalCode: '28001', countryCode: 'ES' },
-  governmentIdentificationReference: 'ID-4821',
+  // v32: the deprecated field is still on the fixture on purpose, so the tests prove it is never
+  // surfaced even when a pre-v32 document still carries it.
+  governmentIdentificationReference: 'SYNTH-AG-4821',
   customerAgreementRiskNotes: 'none',
+  // v27 structured identity document (lookup tier, the searchable source of truth).
+  customerAgreementGovernmentID: {
+    type: 'driver_license', number: 'ES123454821', issuingCountry: 'ES', expiryDate: '2031-12-24',
+  },
+  customerAgreementTaxIDNumber: 'ES12345678',
 };
 
 /** Records the last filter passed to find() per collection, returns fixed docs. */
@@ -179,11 +189,28 @@ describe('searchKyc validation (reject, not silently drop)', () => {
 });
 
 describe('searchKyc tier gate on result fields', () => {
-  it('security auditor gets the sensitive block and contact PII', async () => {
+  // v32 C2/D-3: a search result never carries QE:none plaintext. The auditor is told the
+  // sensitive tier is available and must call the reveal endpoint, which emits one compliance
+  // event per disclosure (PCI DSS Req 10.2.2). Contact PII is lookup tier and still travels.
+  it('security auditor gets sensitiveAvailable (not plaintext) and contact PII', async () => {
     h.getDbForRole.mockResolvedValue(makeDb());
     const rows = await searchKyc({ field: 'partyNationality', value: 'ES' }, 'security_auditor');
-    expect(rows[0].sensitive).toBeDefined();
+    expect(rows[0].sensitive).toBeUndefined();
+    expect(rows[0].sensitiveAvailable).toBe(true);
     expect(rows[0].customerEmailAddress).toBe('ana@example.com');
+  });
+
+  // v32 B1: the identity document is lookup tier, so every role that reaches the record sees the
+  // same searchable value (plan §4.1). This is what makes a suffix search on the displayed
+  // number possible, and it is the regression guard for the SYNTH-* defect.
+  it('returns the structured identity document to every role that can search', async () => {
+    h.getDbForRole.mockResolvedValue(makeDb());
+    for (const role of ['security_auditor', 'level2_investigator'] as const) {
+      const rows = await searchKyc({ field: 'partyNationality', value: 'ES' }, role);
+      expect(rows[0].customerAgreementGovernmentID).toEqual(agreement.customerAgreementGovernmentID);
+      expect(rows[0].customerAgreementTaxIDNumber).toBe(agreement.customerAgreementTaxIDNumber);
+      expect(JSON.stringify(rows[0])).not.toContain('SYNTH-');
+    }
   });
 
   it('L2 investigator sees sensitive fields only with a valid escalation token', async () => {

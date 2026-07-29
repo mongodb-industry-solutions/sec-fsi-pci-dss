@@ -66,6 +66,16 @@ function fmtDate(iso?: string): string {
   return isNaN(d.getTime()) ? '-' : d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+
+// Staff context propagated to the next page, so it reads the target party and not the caller's own.
+function staffCtxQuery(nav: { ctx?: string; customerId?: string; partyRef?: string }): string {
+  if (nav.ctx !== 'staff') return '';
+  const params = new URLSearchParams({ ctx: 'staff' });
+  if (nav.customerId) params.set('customerId', nav.customerId);
+  if (nav.partyRef) params.set('partyRef', nav.partyRef);
+  return `?${params.toString()}`;
+}
+
 export default function CardDetailPage() {
   const params = useParams<{ cardId: string }>();
   const cardId = params?.cardId as string;
@@ -346,7 +356,7 @@ export default function CardDetailPage() {
                   {card.paymentCardStatus}
                 </span>
                 {card.fundingPayoutAccountInstanceReference && (
-                  <Link href={`/system/accounts/${card.fundingPayoutAccountInstanceReference}`} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors">
+                  <Link href={`/system/accounts/${card.fundingPayoutAccountInstanceReference}${staffCtxQuery(nav)}`} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors">
                     <Landmark size={10} />
                     Funded by linked account
                   </Link>
@@ -389,7 +399,7 @@ export default function CardDetailPage() {
               </div>
               {fundingAccount ? (
                 <Link
-                  href={`/system/accounts/${card.fundingPayoutAccountInstanceReference}`}
+                  href={`/system/accounts/${card.fundingPayoutAccountInstanceReference}${staffCtxQuery(nav)}`}
                   className="flex items-center justify-between group hover:bg-gray-50 -mx-5 px-5 py-3 rounded-b-xl transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -425,7 +435,7 @@ export default function CardDetailPage() {
                 </Link>
               ) : (
                 <Link
-                  href={`/system/accounts/${card.fundingPayoutAccountInstanceReference}`}
+                  href={`/system/accounts/${card.fundingPayoutAccountInstanceReference}${staffCtxQuery(nav)}`}
                   className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 -mx-5 px-5 py-3 rounded-b-xl transition-colors"
                 >
                   <Landmark size={14} /> View linked account →

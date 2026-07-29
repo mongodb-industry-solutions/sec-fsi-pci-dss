@@ -5,6 +5,7 @@ import { api, type ConsentGrant } from '../../../lib/api';
 import { getToken, decodeToken, setToken as persistToken } from '../../../lib/auth';
 import { ROLE_LABELS } from '../../../lib/constants';
 import { useDebugMode } from '../../../lib/debugMode';
+import { DisplayMask } from '../../../components/record/DisplayMask';
 import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, User, Layers, Trash2, Copy, Check, KeyRound, ChevronRight, Info, IdCard } from 'lucide-react';
 import { RawMongoPanel } from '../../../components/RawMongoPanel';
 import { SectionHeader } from '../../../components/SectionHeader';
@@ -66,7 +67,6 @@ interface ProfileData {
         postalCode?: string;
         countryCode?: string;
       } | null;
-      governmentIdentificationReference?: string | null;
       customerAgreementSourceOfFunds?: string | null;
       customerAgreementPurposeOfRelationship?: string | null;
     } | null;
@@ -224,51 +224,30 @@ function CopyButton({ value, label }: { value: string; label: string }) {
 // the length or any characters of the plaintext; the eye toggle reveals the real value on demand.
 const MASK = '••••••••';
 
+// v32 C1: this is the customer's OWN record, which the data subject is entitled to hold (GDPR
+// Art. 15), so the mask here is a screen-sharing convenience and NOT an access control. It uses the
+// shared DisplayMask, whose tooltip states that plainly, rather than SensitiveReveal, which is
+// reserved for values fetched from an audited reveal endpoint (ADR-052).
 function RevealField({
-  label,
-  plainValue,
-  type,
-  collection,
-  info,
+  label, plainValue, type, collection, info,
 }: {
-  label: string;
-  plainValue: string;
-  type: QEType;
-  collection?: string;
-  info?: string;
+  label: string; plainValue: string; type: QEType; collection?: string; info?: string;
 }) {
-  const [revealed, setRevealed] = useState(false);
   const { debugMode } = useDebugMode();
   const badge = QE_BADGE[type];
-
   return (
-    <>
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="text-gray-500 text-sm">{label}</span>
-        {info && <InfoHint text={info} />}
-        {debugMode && (
-          <span className={`text-xs px-1.5 py-0.5 rounded border font-mono ${badge.cls}`}>
-            {badge.label}
-          </span>
-        )}
-        {debugMode && collection && <CollectionChip name={collection} />}
-      </div>
-      <div className="flex items-center gap-2 min-w-0">
-        <span className={`text-sm font-mono transition-all break-all min-w-0 ${revealed ? 'text-gray-900' : 'text-gray-400 select-none'}`}>
-          {revealed ? plainValue : MASK}
-        </span>
-        <button
-          onClick={() => setRevealed((v) => !v)}
-          title={revealed ? 'Hide' : 'Reveal'}
-          className="text-gray-400 hover:text-[#001E2B] transition-colors shrink-0"
-        >
-          {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
-        </button>
-        {/* Only offer copy once the value is revealed — avoids copying/leaking the plaintext of a
-            still-masked field (e.g. during a screen share). Matches the account-detail IBAN behavior. */}
-        {revealed && <CopyButton value={plainValue} label={label} />}
-      </div>
-    </>
+    <DisplayMask
+      label={label}
+      value={plainValue}
+      {...(info ? { info } : {})}
+      chrome={debugMode ? (
+        <>
+          <span className={`text-xs px-1.5 py-0.5 rounded border font-mono ${badge.cls}`}>{badge.label}</span>
+          {collection && <CollectionChip name={collection} />}
+        </>
+      ) : undefined}
+      actions={(shown) => <CopyButton value={shown} label={label} />}
+    />
   );
 }
 
@@ -445,7 +424,7 @@ export default function ProfilePage() {
   const name   = ag?.customerName ?? profile.name;
   const status = ag?.customerAgreementStatus ?? 'active';
   const hasAddress = ag?.sensitive?.customerAgreementResidentialAddress;
-  const hasGovId   = ag?.sensitive?.governmentIdentificationReference;
+  // v32 (ADR-050): the deprecated document reference is gone; govId below is the source of truth.
   // v27 structured KYC identity (customer self-profile, decrypted by the L2/auditor client).
   const govId      = ag?.customerAgreementGovernmentID;
   const custDob    = ag?.partyDateOfBirth ? new Date(ag.partyDateOfBirth) : null;
@@ -711,7 +690,7 @@ export default function ProfilePage() {
       {/* Identity document (Government ID) - grouped in its own card so the document number is
           labelled generically ("Document number") alongside its type, rather than the confusing
           "Government ID no." when the document is e.g. a driver license. */}
-      {ag && (govId?.number || hasGovId) && (
+      {ag && govId?.number && (
         <div className="bg-white rounded-xl border p-5 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -731,8 +710,6 @@ export default function ProfilePage() {
             )}
             {govId?.number ? (
               <RevealField label="Document number" plainValue={govId.number} type="qe-suffix" collection="customerAgreementProcedure" info="The document's number. Encrypted at rest; supports encrypted ends-with queries (QE:suffix)." />
-            ) : hasGovId ? (
-              <RevealField label="Document reference" plainValue={hasGovId} type="qe-none" collection="customerAgreementProcedure" info="Legacy single-string government ID reference. Encrypted at rest and not searchable (QE:none)." />
             ) : null}
             {govId?.issuingCountry && (
               <PlainField label="Issuing country" value={countryLabel(govId.issuingCountry)} qe="qe-equality" collection="customerAgreementProcedure" info="Country that issued the document (ISO code). Encrypted at rest; searchable by exact match (QE:equality)." />

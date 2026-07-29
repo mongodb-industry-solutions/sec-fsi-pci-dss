@@ -180,17 +180,47 @@ export async function removeBeneficiary(
   return result.modifiedCount === 1;
 }
 
-// Staff-facing: list all beneficiaries across all users, with optional filtering.
+/** Minimum length of a free-text beneficiary predicate, aligned with the QE text-search minimums. */
+export const BENEFICIARY_MIN_QUERY_LENGTH = 3;
+
+/** Thrown when a staff caller asks for beneficiaries without a discriminating predicate. */
+export class PredicateRequiredError extends Error {
+  readonly statusCode = 400;
+  constructor(message: string) { super(message); this.name = 'PredicateRequiredError'; }
+}
+
+/**
+ * Requires a discriminating predicate for a cross-party read: an owner party reference, a case
+ * reference, or a search term of at least BENEFICIARY_MIN_QUERY_LENGTH. ADR-048.
+ */
+export function assertBeneficiaryPredicate(opts?: {
+  ownerRef?: string; q?: string; caseRef?: string;
+}): void {
+  if (opts?.ownerRef) return;
+  if (opts?.caseRef) return;
+  const q = (opts?.q ?? '').trim();
+  if (q.length >= BENEFICIARY_MIN_QUERY_LENGTH) return;
+  throw new PredicateRequiredError(
+    'A discriminating predicate is required: provide an owner party reference, a case reference, or a '
+    + `search term of at least ${BENEFICIARY_MIN_QUERY_LENGTH} characters.`,
+  );
+}
+
+// Staff-facing beneficiary search. A predicate is mandatory.
 export async function listAllBeneficiaries(
   db: Db,
   opts?: {
     ownerRef?: string;
     q?: string;
+    caseRef?: string;
     status?: CounterpartyArrangementStatus;
     page?: number;
     limit?: number;
+    /** Own-scope callers (customer) are already pinned to their own ownerRef by the caller. */
+    skipPredicateCheck?: boolean;
   },
 ): Promise<{ results: CounterpartyArrangement[]; total: number }> {
+  if (!opts?.skipPredicateCheck) assertBeneficiaryPredicate(opts);
   const query: Record<string, unknown> = {};
   if (opts?.ownerRef) query.ownerPartyReference = opts.ownerRef;
   query.counterpartyArrangementStatus = opts?.status ?? 'active';
@@ -234,4 +264,20 @@ export async function updateBeneficiaryLabel(
     { $set: { counterpartyLabel: newLabel.trim(), recordUpdatedDateTime: new Date() } },
   );
   return col.findOne({ counterpartyArrangementReference }, { projection: { _id: 0 } });
+}
+
+/** Aggregate beneficiary metrics with no identifiers. ADR-048. */
+export async function getBeneficiaryAggregates(
+  db: Db,
+): Promise<{ total: number; byStatus: Record<string, number>; byLookupType: Record<string, number> }> {
+  const col = db.collection<CounterpartyArrangement>(COUNTERPARTY_COLLECTION);
+  const [byStatus, byLookupType, total] = await Promise.all([
+    col.aggregate([{ $group: { _id: '$counterpartyArrangementStatus', n: { $sum: 1 } } }]).toArray(),
+    col.aggregate([{ $group: { _id: '$counterpartyLookupType', n: { $sum: 1 } } }]).toArray(),
+    col.countDocuments({}),
+  ]);
+  const toMap = (rows: Array<Record<string, unknown>>) => Object.fromEntries(
+    rows.map((r) => [String(r._id ?? 'unknown'), Number(r.n ?? 0)]),
+  );
+  return { total, byStatus: toMap(byStatus), byLookupType: toMap(byLookupType) };
 }

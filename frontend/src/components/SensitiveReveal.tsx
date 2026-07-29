@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Tooltip } from './Tooltip';
 
 // Shared on-demand reveal for a sensitive value (CVV, full PAN, IBAN). The value is HIDDEN by
 // default: only the masked display (if any) is shown. Clicking the eye fetches the ephemeral value
@@ -12,6 +13,7 @@ export function SensitiveReveal({
   fetchValue,
   disabled,
   hint,
+  info,
 }: {
   label: string;
   masked?: string;
@@ -19,6 +21,8 @@ export function SensitiveReveal({
   fetchValue: () => Promise<string>;
   disabled?: boolean;
   hint?: string;
+  // v32 D1: per-field help, same contract as RecordField, so a sensitive row explains itself too.
+  info?: string;
 }) {
   const [value, setValue] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -40,11 +44,13 @@ export function SensitiveReveal({
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 py-2.5">
-      <span className="text-gray-500 shrink-0">{label}</span>
+    // v32 P8: stacks on small viewports so a revealed long value (full PAN, IBAN) never widens
+    // the layout or pushes the eye out of the viewport.
+    <div className="flex flex-col gap-1 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+      <span className="flex items-center gap-1.5 text-gray-500 shrink-0">{label}{info && <Tooltip text={info} />}</span>
       <span className="flex items-center gap-2 min-w-0">
         {hint && <span className="text-xs text-gray-300 font-mono hidden sm:inline">{hint}</span>}
-        <span className="text-gray-800 text-right font-mono truncate">
+        <span className="text-gray-800 sm:text-right font-mono truncate">
           {error ? <span className="text-red-500 text-xs font-sans">{error}</span>
             : shown ? value
             : (masked ?? '••••')}

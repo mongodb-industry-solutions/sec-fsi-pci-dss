@@ -157,7 +157,10 @@ export interface CustomerAgreementControlRecord {
 
   // QE:none (DEK-sensitive tier) — returned as Binary by L1 client; decrypted by L2
   customerAgreementResidentialAddress?: ResidentialAddress;
-  governmentIdentificationReference?: string;  // @deprecated v27 — use customerAgreementGovernmentID
+  governmentIdentificationReference?: string;  // @deprecated v27, LEGACY READ-ONLY since v32 (ADR-050):
+                                               // never written (removed from the seeder and fixtures) and never
+                                               // returned by any response. Use customerAgreementGovernmentID,
+                                               // the single source of truth and the only searchable one.
   customerAgreementRiskNotes?: string;         // @deprecated v27 — use structured KYC verdicts
 
   // v27 KYC identity (user-supplied). Structured gov ID leaves are QE-searchable (see GovernmentID).
@@ -1207,7 +1210,7 @@ All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `k
 | `deks.customerAccountRef` | `DEK-customer-account-ref` | `customerAgreementProcedure.customerAgreementReference` |
 | `deks.txAccountRef` | `DEK-tx-account-ref` | `cardTransactionLog.cardTransactionAccountReference` |
 | `deks.customerAddress` | `DEK-customer-address` | `customerAgreementProcedure.customerAgreementResidentialAddress` (QE:none, inline v2) |
-| `deks.customerGovId` | `DEK-customer-gov-id` | `customerAgreementProcedure.governmentIdentificationReference` (QE:none, inline v2) |
+| `deks.customerGovId` | `DEK-customer-gov-id` | `customerAgreementProcedure.governmentIdentificationReference` (QE:none, inline v2). v32: legacy. The field is no longer written or read; the DEK stays so documents seeded before v32 remain decryptable. |
 | `deks.customerRiskNotes` | `DEK-customer-risk-notes` | `customerAgreementProcedure.customerAgreementRiskNotes` (QE:none, inline v2) |
 | `deks.txRawPayload` | `DEK-tx-raw-payload` | `cardTransactionLog.rawGatewayPayload` (QE:none, inline v2) |
 | `deks.txProcessorMeta` | `DEK-tx-processor-meta` | `cardTransactionLog.processorTransactionMetadata` (QE:none, inline v2) |
@@ -1874,17 +1877,34 @@ Standard index query on `paymentCardReference` (plaintext field: token is a card
 
 QE equality search on the corresponding encrypted field.
 
-**Response 200:**
+**Response 200** (the projection is `buildResponse()`; it is the contract, and the route schema must stay `additionalProperties: true` or the serializer silently strips fields):
 ```json
 {
   "customerAgreementInstanceReference": "...",
+  "partyInstanceReference": "...",
   "customerName": "John Doe",
+  "customerEmailAddress": "john@example.com",
+  "customerMobilePhoneNumber": "+34-600-000-000",
+  "customerAgreementReference": "ACC-001",
   "customerSegment": "retail",
-  "customerAgreementStatus": "active"
+  "customerAgreementStatus": "active",
+  "customerAgreementGovernmentID": {
+    "type": "driver_license", "number": "GB31454621", "issuingCountry": "GB", "expiryDate": "2031-12-24"
+  },
+  "customerAgreementTaxIDNumber": "ES12345678",
+  "customerAgreementOccupation": "engineer",
+  "contactPiiRestricted": false,
+  "sensitiveAvailable": true
 }
 ```
 
-> Encrypted fields (`customerEmailAddress`, `customerMobilePhoneNumber`, `customerAgreementReference`) are not echoed back in the response. They are used only as search predicates.
+**Tiering (v32, plan §4.1).**
+- **Lookup tier**, returned to every role that can reach the record so a displayed value is always a searchable value: the identity document (`customerAgreementGovernmentID`: `.number` QE:suffix, `.type`/`.issuingCountry` QE:equality, `.expiryDate` QE:range), `customerAgreementTaxIDNumber` (QE:prefix) and `customerAgreementOccupation` (QE:equality).
+- **Contact PII** (`customerEmailAddress`, `customerMobilePhoneNumber`) is restricted to `level2_investigator` and `security_auditor`; `contactPiiRestricted: true` tells the client why it is absent.
+- **Sensitive tier** (QE:none: `customerAgreementResidentialAddress`, `customerAgreementRiskNotes`) travels in a `sensitive` block **only** on the audited escalation path (a case reference, which is what emits `field_accessed`). Otherwise the response carries `sensitiveAvailable: true` and the value must be obtained from `GET /customer/:partyRef/kyc/reveal`, which emits one `kyc.sensitive.revealed` event per disclosure (PCI DSS Req 10.2.2). ADR-052.
+- `governmentIdentificationReference` is **not** part of any response since v32 (ADR-050).
+
+> The encrypted search keys are also echoed back only under the tiering above; they are primarily used as search predicates.
 
 ---
 
@@ -2356,13 +2376,26 @@ Returns unique `{ name, mcc }` pairs aggregated from the `cardTransactionLog` co
 
 ### 6.8 Raw Document (Demo Tool)
 
-Available only when `NODE_ENV !== 'production'`. Used by the "Encrypted in Atlas" toggle in both modes.
+Used by the "Encrypted in Atlas" toggle in both modes. Enabled by default; set `PSP_DEMO_RAW_DOCUMENTS=false` to remove the surface (403).
 
-#### `GET /demo/raw-document/:collection/:id`
+#### `GET /api/v1/system/raw/:collection/:id`
 
 Returns the raw BSON document as stored in Atlas (ciphertext visible, no auto-decryption). Uses a plain MongoClient without `autoEncryption`.
 
-**Path params:** `collection` (e.g., `cardTransactionLog`), `id` (document `_id` or primary key value)
+**Authorization (v32 C5).** JWT alone is not sufficient. `RAW_COLLECTION_RESOURCE` maps each allowed collection to the BIAN resource that owns it, and it is the single source of truth for both the allowed list and the check:
+
+| Collection | Owning resource |
+|---|---|
+| `party`, `customerAgreementProcedure`, `customerAuthenticationAssessment` | `customers` |
+| `cardTransactionLog` | `transactions` |
+| `paymentCardManagement` | `cards` |
+| `fraudDiagnosisCase` | `fraudCases` |
+
+- Roles with scope `all` (staff) need `view` on the owning resource.
+- Roles with scope `own` (`customer`) are authorized by **ownership** instead: the data subject reaches its own record (GDPR Art. 15) without holding the staff-facing permissions. Ownership is resolved server-side from the caller's identity (own party reference, own `sub`, own agreement, and an L1-client probe for a transaction / card / case), never from a request parameter.
+- The kill-switch may only remove the surface, never grant access to it (P6 / ADR-051).
+
+**Path params:** `collection` (from the table above), `id` (primary key `*InstanceReference`)
 
 **Response 200:**
 ```json
@@ -2377,7 +2410,7 @@ Returns the raw BSON document as stored in Atlas (ciphertext visible, no auto-de
 }
 ```
 
-**Response 403:** Returned if `NODE_ENV === 'production'`.
+**Response 400:** Unknown collection. **Response 403:** `PSP_DEMO_RAW_DOCUMENTS=false` (`code` absent), the role lacks `view` on the owning resource (`code: ACL_DENIED`), or the document belongs to another party (`code: OWNERSHIP_DENIED`).
 
 ---
 
@@ -2624,6 +2657,33 @@ Returns a single execution by reference. Includes full `resolutionLog`.
 ---
 
 ### 6.12 Merchant Beneficiary API — SD-54
+
+> **v32 (ADR-048): this is a SEARCH surface, not an enumeration surface.**
+>
+> `GET /api/v1/beneficiaries` (and `/:ownerRef`) requires a discriminating predicate for any
+> non-own-scope caller: `ownerRef`, `caseRef`, or `q` of at least 3 characters. Without one the route
+> returns **400** `{ error, code: 'PREDICATE_REQUIRED' }`. The rule is enforced in
+> `assertBeneficiaryPredicate()` at the service boundary, so a future caller cannot bypass it.
+>
+> Capabilities: `beneficiaries:view` authorises a drill-down for a **known** owner party reference;
+> `beneficiaries:investigate` is additionally required for a **cross-party** read (held by
+> `level2_investigator` and `security_auditor`, not by `level1_analyst`). `security_auditor` holds no
+> `manage` (read-only oversight, segregation of duties).
+>
+> Projection: the display-safe projection applies to **every** channel including the session one. A
+> list response never contains `counterpartyPartyReference` or the raw lookup value. The counterparty
+> identifier is masked by `maskLookupValue` *before* it is written, so the plaintext is not persisted
+> and is unrecoverable by any role: there is deliberately no reveal endpoint for it.
+>
+> Audit: one `beneficiary.record.disclosed` compliance event per record returned, naming the owner
+> party reference and which predicate was used (PCI DSS Req 10.2.2). `BusinessEntityType` gains
+> `'beneficiary'` for this purpose.
+>
+> `GET /api/v1/beneficiaries/aggregates` returns `{ total, byStatus, byLookupType }` with **no
+> identifiers**, so an oversight role can size the population without addressing a record. It emits no
+> disclosure event because nothing is disclosed.
+
+
 
 > **Superseded in v23.** The dedicated `/api/v1/merchant/beneficiaries/*` tree was removed. Merchant
 > beneficiary operations now use the SHARED `/api/v1/beneficiaries` capability endpoints on the OAuth
@@ -4093,6 +4153,7 @@ can classify card payments by method (Payment Link / Redirect vs plain Card). Se
 - **`rtpAliasDirectoryCache`** (plaintext): `aliasHash` (unique) → party/counterparty, TTL.
 - Indexes: see `createIndexes.ts` (inbox/outbox, expiry sweeper `{status,expiresAt}`, linkage, idempotency).
 - `BusinessEntityType` gains `'payment_request'`; `NotificationType` gains `'payment_request'`.
+- v32: `BusinessEntityType` gains `'beneficiary'` (SD-54 CounterpartyArrangement), so the per-record beneficiary disclosure event emitted by the beneficiary search is attributed to its own control record (PCI DSS Req 10.2.2).
 
 ### 14.2 Lifecycle (monotonic, validated by `rtpStateMachine.ts`)
 `draft→created→validated→presented→delivered→viewed→accepted|rejected|cancelled|expired`,

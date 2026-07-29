@@ -429,7 +429,8 @@ function L2ReviewView({ fraudCase, customer, escalationToken, l2HasAccepted, isE
   showRaw: boolean; rawDoc: RawDocumentResponse | null; onToggleRaw: () => void;
 }) {
   const addr = customer?.customerAgreementResidentialAddress as Addr | undefined;
-  const govId = customer?.governmentIdentificationReference as string | undefined;
+  // v32 B4 (ADR-050): the identity document is the structured, searchable field.
+  const govId = (customer?.customerAgreementGovernmentID as { number?: unknown } | undefined)?.number as string | undefined;
   const email = customer?.customerEmailAddress as string | undefined;
   const phone = customer?.customerMobilePhoneNumber as string | undefined;
   const accountRef = customer?.customerAgreementReference as string | undefined;

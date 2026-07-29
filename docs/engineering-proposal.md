@@ -2134,3 +2134,104 @@ Idempotent (deterministic). Only BIAN BQ:Step vocabulary (initiated/verified/rej
 `passed`/`failed`/`pending` as a lifecycle status (ADR-009).
 
 *Added 2026-07-24 (v31; doc + code together per repo rules). Version 2.5.0.*
+
+
+## v32 ADRs: worker-role visibility, defense in depth, identity-document reconciliation
+
+Context: three defects found while reviewing what a `security_auditor` actually sees. (1) The
+beneficiary list was an unfiltered cross-party enumeration issued automatically on page load.
+(2) The government identity document was stored twice, and the surfaces the auditor used rendered
+the deprecated, unsearchable copy. (3) Four different mask/reveal mechanisms coexisted, so the eye
+icon meant something different on each page and the auditor had *less* friction than the operations
+officer on identical QE:none fields.
+
+### ADR-048: search-first, no enumeration for oversight roles
+
+**Decision.** Worker roles reach counterparty data through an identifier-constrained search and a
+party/case drill-down, never through a standing unfiltered list. The rule lives in the domain
+service (`assertBeneficiaryPredicate`), not in the controller and not in the page, so a future caller
+cannot bypass it. A cross-party read additionally requires a capability that first-line triage does
+not hold.
+
+**Reuse over catalog growth.** `ACTIONS` is a deliberately static four-tuple mirrored in the backend
+catalog, the frontend mirror, the action labels, the E2E permission stub, the role-matrix editor and
+the help pages. Rather than adding a fifth action, the existing `investigate` action is reused on the
+`beneficiaries` resource: `view` is drill-down for a known owner, `investigate` is cross-party
+search. Only role grants changed; the catalog did not.
+
+**Rationale.** PCI DSS v4.0.1 7.2.6 ("allowed actions based on user roles"), 7.3.1 (need to know),
+7.3.3 (deny all by default), 10.2.2 (the log names the affected data); GDPR Art. 5(1)(c) and
+Art. 25(2) (purpose-necessary *by default*); EBA/GL/2019/04 §31(a), whose stated objective is to
+"prevent unjustified access to a large set of data"; ISO/IEC 27001:2022 A.8.3; NIST SP 800-53 AC-6.
+Precedent: Garante v. Intesa Sanpaolo, EUR 31.8m, 30 March 2026, where the finding was an operational
+model that let operators query the entire customer base. Homologous design: Adyen ships
+"View Payments" as *search pages* by default and keeps PII and export behind separate additive roles.
+
+**Consequence.** Bulk needs are served by aggregate endpoints that return counts with no
+identifiers, plus a per-record disclosure event so the audit trail is per record rather than per
+screen. Honest framing: no single clause forbids a list view; the case is cumulative.
+
+### ADR-049: additive PII and export capabilities
+
+**Decision.** Unmasked counterparty and identity PII, and bulk extract, are separate capabilities and
+are never implied by a read role. The display-safe projection applies to **every** channel, not only
+the OAuth one: the counterparty party reference and the raw lookup value never appear in a list
+response, on any channel. Reading a single record and extracting a population are different acts.
+
+**Rationale.** PCI DSS 7.2.6; ISO 27001 A.8.2; Adyen's separation of *Export Payments* from
+*View Payments*.
+
+### ADR-050: one physical field per logical datum, one projection per aggregate
+
+**Decision.** `customerAgreementGovernmentID` is the single source of truth for the identity
+document. `governmentIdentificationReference` is legacy read-only: never written (removed from the
+generator and from all 56 fixtures, with a `$unset` in the seeder for databases seeded earlier),
+never read, never present in a response. `buildResponse()` remains the only customer projection.
+
+**Rationale.** A displayed value that cannot be searched is both a usability defect and an audit
+defect: the disclosure event named only the deprecated field, so reading the real identity document
+produced no `field_accessed` record (PCI DSS 10.2.1.1 / 10.2.2). Keeping one projection is what makes
+the cross-role visibility matrix mechanically enforceable.
+
+### ADR-051: demo behavior by configuration, default-secure
+
+**Decision.** Demo simplifications are expressed only as documented configuration flags that default
+to the production behavior, may widen *presentation* but never *access*, and announce themselves in
+the UI. `PSP_QE_TEXT_SEARCH` is the reference implementation: it reflects a real cluster capability,
+degrades the three text modes to equality on both the schema and the query side, and tells the
+audience it did so. A kill-switch is not authorization: `PSP_DEMO_RAW_DOCUMENTS` may remove the raw
+document surface but may not be the thing that prevents a cross-party read.
+
+### ADR-052: one reveal contract, tier decides masking and role decides success
+
+**Decision.** A sensitive-tier (QE:none) value belonging to another party never travels in a list or
+detail payload; it is obtained only from a reveal endpoint that emits one compliance event per
+disclosure. Lookup-tier values render directly with their QE mode in the field help, because that is
+the searchable surface the demo exists to show.
+
+Two components, never interchangeable:
+- `SensitiveReveal`: the value is not in the payload; the eye performs a server round-trip that is
+  audited. An access control.
+- `DisplayMask`: the caller already holds the value (own record under GDPR Art. 15, or a lookup-tier
+  attribute). Hiding it is a screen-sharing convenience and its tooltip says so.
+
+Reviewer's rule: if hiding the value is the reason it is safe, `DisplayMask` is the wrong component.
+Raw and debug panels are not disclosure channels: one shared formatter previews ciphertext as hex and
+redacts sensitive-tier keys by name at any depth.
+
+**Rationale.** PCI DSS 10.2.1.1 / 10.2.2; EBA §31(d); ISO 27001 A.8.15; NIST AC-6(9); and the
+principle that a value already in the browser is disclosed regardless of what the UI hides.
+
+### ADR-053: one canonical customer record view, share the composition not the admin route
+
+**Decision.** Customer information is rendered from one shared set of permission-aware record
+primitives (`RecordField`, `RecordGroup`, `IdentityDocumentBlock`), and each role uses the route it
+legitimately owns: `/system/users/[customerId]` for investigation and oversight,
+`/system/admin/modules/kyc/[partyInstanceReference]` for KYC administration. Access level decides how
+many groups a caller receives, never how the record looks.
+
+**Rejected alternative.** Granting investigation roles `modules:view` so they could reuse the admin
+KYC route. That would widen those roles into every other admin module as a side effect, which is a
+least-privilege regression (PCI DSS 7.2.2, EBA §31(a)) introduced for a UI convenience.
+
+*Added 2026-07-29 (v32; doc + code together per repo rules).*

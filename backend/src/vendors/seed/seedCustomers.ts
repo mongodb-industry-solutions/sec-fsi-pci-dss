@@ -55,6 +55,9 @@ export function enrichKyc(record: CustomerAgreementSeed): void {
   const seed = hash(record.customerAgreementInstanceReference);
   const country = COUNTRIES[seed % COUNTRIES.length];
 
+  // governmentIdentificationReference is deprecated since v27 and is never written (ADR-050).
+  delete (record as { governmentIdentificationReference?: unknown }).governmentIdentificationReference;
+
   // Structured government ID (QE:equality type/issuingCountry, QE:suffix number, QE:range expiry).
   const gov: GovernmentIdSeed = record.customerAgreementGovernmentID ?? {};
   if (!gov.type) gov.type = GOV_ID_TYPES[(seed >>> 2) % GOV_ID_TYPES.length];
@@ -127,7 +130,11 @@ export async function seedCustomers(db: Db) {
     enrichKyc(record);
     await db.collection(CUSTOMER_AGREEMENT_COLLECTION).updateOne(
       { customerAgreementInstanceReference: record.customerAgreementInstanceReference },
-      { $set: record },
+      {
+        $set: record,
+        // $set cannot remove a field: unset the deprecated one on databases seeded before v32.
+        $unset: { governmentIdentificationReference: '' },
+      },
       { upsert: true }
     );
   }

@@ -32,10 +32,14 @@ Atlas never sees the plaintext PII.
 | \`level2_investigator\` | Any customer | Yes (address, govt ID, risk notes) |
 | \`security_auditor\` | Any customer (read-only) | Yes |
 
-Sensitive fields (\`customerAgreementResidentialAddress\`, \`governmentIdentificationReference\`,
-\`customerAgreementRiskNotes\`) are stored in the \`customerAgreementSensitive\` collection
-with a separate DEK (Data Encryption Key) as QE:none. They are returned only when the
-caller has the DEK-sensitive key, i.e. \`level2_investigator\` role.`,
+The identity document (\`customerAgreementGovernmentID\`: type, number, issuing country, expiry) and
+\`customerAgreementTaxIDNumber\` are LOOKUP tier (QE:suffix / QE:equality / QE:range / QE:prefix) and are
+returned to every role that can reach the record, so a displayed value is always a searchable value (v32).
+
+Sensitive fields (\`customerAgreementResidentialAddress\`, \`customerAgreementRiskNotes\`) are QE:none with a
+separate DEK, stored inline on the agreement document since v2. They travel in the response only on the
+audited escalation path (a case reference); otherwise the caller receives \`sensitiveAvailable: true\` and must
+use the reveal endpoint, which emits one compliance event per disclosure (PCI DSS Req 10.2.2).`,
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
@@ -57,8 +61,13 @@ caller has the DEK-sensitive key, i.e. \`level2_investigator\` role.`,
       },
       response: {
         200: {
-          description: 'Customer agreement found. The `sensitive` block is present only for `level2_investigator` and `security_auditor` roles.',
+          description: 'Customer agreement found. The `sensitive` block is present only for `level2_investigator` and `security_auditor` roles, and only on the audited escalation path (a case reference); otherwise `sensitiveAvailable: true` signals that the reveal endpoint must be used.',
           type: 'object',
+          // v32 B1: the serializer drops any property not listed, so an under-specified schema
+          // silently strips fields the projection returns (this route was already losing
+          // partyInstanceReference, customerAgreementReference and contactPiiRestricted). The
+          // projection in buildResponse() is the contract; documented properties are illustrative.
+          additionalProperties: true,
           properties: {
             customerAgreementInstanceReference: {
               type: 'string',
@@ -100,10 +109,6 @@ caller has the DEK-sensitive key, i.e. \`level2_investigator\` role.`,
                     postalCode: { type: 'string' },
                     countryCode: { type: 'string', description: 'ISO 3166-1 alpha-2.' },
                   },
-                },
-                governmentIdentificationReference: {
-                  type: 'string',
-                  description: 'National ID or passport reference. QE:none; requires DEK-sensitive to decrypt.',
                 },
                 customerAgreementRiskNotes: {
                   type: 'string',

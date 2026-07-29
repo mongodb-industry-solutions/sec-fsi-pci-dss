@@ -21,7 +21,12 @@ export interface CustomerAgreementControlRecord {
   // QE:none (DEK-sensitive tier) - non-searchable, Level 2+ only
   // Present as decrypted value with L2 QE client; Binary ciphertext with L1 client.
   customerAgreementResidentialAddress?: ResidentialAddress;
-  /** @deprecated v27: replaced by structured customerAgreementGovernmentID. Kept for back-compat; stop writing. */
+  /**
+   * @deprecated v27, removed from every read path and from the seeder in v32 (ADR-050).
+   * Kept only so a database seeded before v32 still parses. NEVER read it, never write it, never
+   * expose it in a response: customerAgreementGovernmentID is the single source of truth for the
+   * identity document, and it is the only one that is searchable (QE:suffix on .number).
+   */
   governmentIdentificationReference?: string;
   /** @deprecated v27: replaced by structured KYC verdict fields. Kept for back-compat; stop writing. */
   customerAgreementRiskNotes?: string;

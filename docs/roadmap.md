@@ -925,3 +925,50 @@ process fans out to providers purely via the event bus; each process is tracked 
 - [x] Version bump to 2.5.0 across all four package.json.
 
 *Added 2026-07-24 (v31). Version 2.5.0.*
+
+
+## v32: Worker-role visibility, defense in depth and identity-document reconciliation
+
+Driver: a review of what `security_auditor` actually sees. Full analysis, decisions and execution log
+in `tmp/dev.v32.plan.md`.
+
+### FR
+
+| Id | Requirement | Acceptance criteria |
+|---|---|---|
+| FR-v32-01 | The beneficiary surface is a search surface, not an enumeration surface | `GET /api/v1/beneficiaries` returns 400 (`PREDICATE_REQUIRED`) for a staff caller with no `ownerRef`, `caseRef` or `q` of at least 3 characters; the rule is enforced in the service, so calling it directly also throws |
+| FR-v32-02 | Cross-party beneficiary search is a distinct capability | `beneficiaries:investigate` is required for a read with no owner; `level1_analyst` holds `view` only and is refused with 403 |
+| FR-v32-03 | The auditor is read-only on beneficiaries | `security_auditor` holds no `beneficiaries:manage`; the UI renders no write control for it |
+| FR-v32-04 | Every disclosed beneficiary record is audited individually | one `beneficiary.record.disclosed` compliance event per record returned, naming the owner party and the predicate used (PCI DSS 10.2.2) |
+| FR-v32-05 | Oversight can size the population without identifying it | `GET /api/v1/beneficiaries/aggregates` returns totals and distributions with no identifiers and emits no disclosure event |
+| FR-v32-06 | The identity document has one physical source of truth | every role that can reach a customer record receives `customerAgreementGovernmentID` and `customerAgreementTaxIDNumber`; `governmentIdentificationReference` appears in no response, no fixture and no generated record |
+| FR-v32-07 | A displayed value is a searchable value | the identity number rendered on `/system/users/[id]` and on the KYC administration page is byte-identical, and a `govIdNumber` suffix search on it matches |
+| FR-v32-08 | Sensitive-tier values are masked for every role | address and risk notes render masked on the users and investigation pages for L1, L2 and the auditor; revealing them issues a server request that emits `kyc.sensitive.revealed` |
+| FR-v32-09 | The reveal capability is named, not hardcoded | `canRevealKycSensitive` grants the Level 2 QE client; no service obtains it by passing a literal role string to `getDbForRole` |
+| FR-v32-10 | Raw and debug panels never disclose | ciphertext is previewed as hex and sensitive-tier keys are redacted by name in every raw panel, including `static` sections |
+| FR-v32-11 | The raw-document endpoint is authorized | staff need `view` on the resource that owns the collection; a customer reaches only records proven to be its own; the demo kill-switch cannot grant access |
+| FR-v32-12 | No orphan information | `/system/users/[id]` links to the KYC record when the session holds `customers:view` and `modules:view` |
+| FR-v32-13 | The KYC list states its population | the surface says it lists parties with a completed KYC record and that `initiated` records are excluded; the party-type filter offers only options that can structurally match (BIAN SD-53) |
+| FR-v32-14 | Every touched page is responsive | no horizontal document scroll at 375, 834 and desktop widths; the reveal control is reachable and a long revealed value does not widen the layout |
+
+### NFR
+
+| Id | Requirement | Acceptance criteria |
+|---|---|---|
+| NFR-v32-01 | No duplication | one field row, one group, one identity-document renderer, one masking helper, one redaction helper; the four page-local field variants are gone |
+| NFR-v32-02 | Defense in depth | every restriction holds at the QE tier, the route guard, the service boundary and the projection; tests call the API directly rather than through the UI |
+| NFR-v32-03 | No standards deviation | no new BIAN collection or field; `BusinessEntityType` gains `beneficiary` (SD-54) only so a disclosure event can name its own control record; EDA and Hexagonal preserved (rules in services, publish-then-project events) |
+| NFR-v32-04 | The five QE search modes keep working | equality, range, prefix, suffix and substring each have an explicit test, and the pre-8.2 degradation path is asserted; predicate hardening reuses the existing per-field minimums and never raises them |
+
+### Definition of Done
+
+- [x] `test:unit` green (543 tests, 67 files).
+- [x] Both type-checks clean.
+- [x] E2E green except two failures that pre-exist on a clean tree (verified by stashing all v32 changes).
+- [x] Responsive spec green on desktop, tablet and mobile projects.
+- [x] `technical-spec.md` sections 1, 6.2, 6.8 and the events section updated with the code.
+- [x] ADR-048 to ADR-053 recorded in `engineering-proposal.md`.
+- [ ] D2 (one field-descriptor catalog served from the search registry) and the remaining
+      card-to-`RecordGroup` conversion on the KYC page: deferred, see the execution log.
+
+*Added 2026-07-29 (v32).*

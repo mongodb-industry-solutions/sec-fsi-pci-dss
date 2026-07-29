@@ -7,9 +7,9 @@ import {
 import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
 import { CUSTOMER_AUTHENTICATION_COLLECTION } from '../../identity/models/customerAuthentication.model';
 import type { UserRole } from '../../../shared/models/identity.model';
-import { getDbForRole } from '../../../vendors/encryption/roleClients';
+import { getDbForRole, getSensitiveTierDb, getEncryptionWriteDb } from '../../../vendors/encryption/roleClients';
 import { phoneDigest } from '../../../vendors/encryption/digest';
-import { canReadSensitive } from '../../../vendors/middleware/rbac';
+import { canReadSensitive, canRevealKycSensitive } from '../../../vendors/middleware/rbac';
 import { validateToken } from '../../../vendors/security/escalationTokens';
 import { appendAuditEvent } from '../../fraud/services/fraudDiagnosis.service';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
@@ -51,6 +51,11 @@ function buildResponse(
     customerAgreementEnrollmentDate:    doc.customerAgreementEnrollmentDate,
     customerAgreementPreferredLanguage: doc.customerAgreementPreferredLanguage,
     customerAgreementKycCheck:          doc.customerAgreementKycCheck ?? null,
+    // Lookup tier (govId .number QE:suffix, .type/.issuingCountry QE:equality, .expiryDate
+    // QE:range, taxId QE:prefix): decrypted by the L1 client, same fields for every role.
+    customerAgreementGovernmentID:      doc.customerAgreementGovernmentID ?? null,
+    customerAgreementTaxIDNumber:       doc.customerAgreementTaxIDNumber ?? null,
+    customerAgreementOccupation:        doc.customerAgreementOccupation ?? null,
     contactPiiRestricted:               !canSeeContactPii,
     bianServiceDomain:                  doc.bianServiceDomain,
     bianControlRecordType:              doc.bianControlRecordType,
@@ -60,12 +65,18 @@ function buildResponse(
   // (auditor, or L2 with a valid escalation token) — never merely because the bytes came
   // back decrypted. This is fail-closed: if the demo DB stores these fields in plaintext
   // (QE not active), an unauthorized role still does NOT receive them. PCI DSS Req 7.
+  // QE:none values travel in the payload only on the audited escalation path (a caseId, which
+  // means maybeAudit emitted field_accessed); otherwise the reveal endpoint is used. ADR-052.
   if (canSeeSensitive && isSensitiveDecrypted(doc.customerAgreementResidentialAddress)) {
-    base.sensitive = {
-      customerAgreementResidentialAddress: doc.customerAgreementResidentialAddress,
-      governmentIdentificationReference:   doc.governmentIdentificationReference,
-      customerAgreementRiskNotes:          doc.customerAgreementRiskNotes,
-    };
+    if (caseId) {
+      base.sensitive = {
+        customerAgreementResidentialAddress: doc.customerAgreementResidentialAddress,
+        customerAgreementRiskNotes:          doc.customerAgreementRiskNotes,
+      };
+    } else {
+      // Obtained through the reveal endpoint instead.
+      base.sensitiveAvailable = true;
+    }
   }
 
   return base;
@@ -97,7 +108,13 @@ async function maybeAudit(db: Db, caseId: string | undefined, role: UserRole, do
   if (!canSeeSensitive) return; // only an actual sensitive disclosure is audited (Req 10)
   if (!isSensitiveDecrypted(doc.customerAgreementResidentialAddress)) return;
   await appendAuditEvent(db, caseId, 'field_accessed', role as 'level2_investigator' | 'security_auditor', {
-    fields: ['customerAgreementResidentialAddress', 'governmentIdentificationReference', 'customerAgreementRiskNotes'],
+    // The fields actually disclosed (PCI DSS Req 10.2.2).
+    fields: [
+      'customerAgreementResidentialAddress',
+      'customerAgreementRiskNotes',
+      'customerAgreementGovernmentID',
+      'customerAgreementTaxIDNumber',
+    ],
     customerAgreementInstanceReference: doc.customerAgreementInstanceReference,
   }, actor);
 }
@@ -211,8 +228,14 @@ export async function revealKycSensitive(
   db: Db,
   partyRef: string,
   actor: { performedByPartyReference?: string; performedByRole?: string },
-): Promise<{ status: 'not_found' } | { status: 'ok'; fields: Record<string, unknown> }> {
-  const roleDb = await getDbForRole('security_auditor', false); // L2 QE client (decrypts QE:none)
+  options: { callerRole?: UserRole; hasValidToken?: boolean } = {},
+): Promise<{ status: 'not_found' } | { status: 'forbidden' } | { status: 'ok'; fields: Record<string, unknown> }> {
+  // Independent service-layer capability check; the route also gates it.
+  const callerRole = options.callerRole;
+  if (callerRole && !canRevealKycSensitive(callerRole, options.hasValidToken ?? false)) {
+    return { status: 'forbidden' };
+  }
+  const roleDb = await getSensitiveTierDb('canRevealKycSensitive'); // L2 QE client (decrypts QE:none)
   const doc = await roleDb.collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
     .findOne({ partyInstanceReference: partyRef });
   if (!doc) return { status: 'not_found' };
@@ -352,7 +375,7 @@ export async function patchKycData(
   if (changedFields.length === 0) return { status: 'invalid', error: 'No editable fields supplied.' };
   set.recordUpdatedDateTime = new Date();
 
-  const roleDb = await getDbForRole('security_auditor', false); // L2 QE client (encrypt on write)
+  const roleDb = await getEncryptionWriteDb('kyc.data.correction'); // full map: encrypt QE:none on write
   const res = await roleDb.collection(CUSTOMER_AGREEMENT_COLLECTION).updateOne({ partyInstanceReference: partyRef }, { $set: set });
   if (res.matchedCount === 0) return { status: 'not_found' };
 
@@ -372,8 +395,9 @@ export async function patchKycData(
 }
 
 export async function getSelfProfile(db: Db, email: string): Promise<Record<string, unknown> | null> {
-  // Self-profile always uses L2 db so the customer can see their own address
-  const roleDb = await getDbForRole('security_auditor', false);
+  // Self-profile: the data subject reads its OWN sensitive record (GDPR Art. 15), so the
+  // sensitive tier is granted by the self-service capability, not by a role string.
+  const roleDb = await getSensitiveTierDb('customer.selfProfile');
   const result = await findPartyAndAgreement(roleDb, { partyEmailAddress: email } as Partial<PartyControlRecord>);
   if (!result) return null;
   const { doc, party } = result;
@@ -400,9 +424,10 @@ export async function getSelfProfile(db: Db, email: string): Promise<Record<stri
     partyNationality:                   party.partyNationality,
     partyPlaceOfBirth:                  party.partyPlaceOfBirth,
     partySex:                           party.partySex,
+    // v32 B2: the deprecated governmentIdentificationReference is gone; the structured
+    // customerAgreementGovernmentID above is the single source of truth (ADR-050).
     sensitive: isSensitiveDecrypted(doc.customerAgreementResidentialAddress) ? {
       customerAgreementResidentialAddress:    doc.customerAgreementResidentialAddress,
-      governmentIdentificationReference:      doc.governmentIdentificationReference,
       customerAgreementSourceOfFunds:         doc.customerAgreementSourceOfFunds,
       customerAgreementPurposeOfRelationship: doc.customerAgreementPurposeOfRelationship,
     } : null,
@@ -419,8 +444,8 @@ export async function updateSelfProfile(
     customerMobilePhoneNumber?: string;
   }
 ): Promise<boolean> {
-  // Write operations always use L2 db so QE:none fields are encrypted on write
-  const roleDb = await getDbForRole('security_auditor', false);
+  // Write: the full map is needed to encrypt QE:none fields (not a disclosure).
+  const roleDb = await getEncryptionWriteDb('customer.selfProfile.update');
   const party = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
     .findOne({ partyEmailAddress: email } as Partial<PartyControlRecord>);
   if (!party) return false;
@@ -604,7 +629,6 @@ export function getKycSearchRegistry() {
     // QE:none fields: returnable only to L2 investigator / auditor, never searchable.
     sensitiveResultFields: [
       'customerAgreementResidentialAddress',
-      'governmentIdentificationReference',
       'customerAgreementRiskNotes',
       'customerAgreementSourceOfFunds',
       'customerAgreementPurposeOfRelationship',
@@ -733,7 +757,8 @@ export async function applyKycScreeningVerdict(
   },
   mode: DecisionMode = 'automated',
 ): Promise<boolean> {
-  const roleDb = await getDbForRole('security_auditor', false);
+  // Write: the full map is needed to encrypt the QE:none screening reference.
+  const roleDb = await getEncryptionWriteDb('kyc.screening.verdict.write');
   // v31 §3.7: derive the BQ:Step status from the verdict with the shared mapper and write it in the SAME
   // atomic update as the verdict fields (no drift between the risk verdict and the lifecycle status).
   const status = deriveKycCheckStatus(

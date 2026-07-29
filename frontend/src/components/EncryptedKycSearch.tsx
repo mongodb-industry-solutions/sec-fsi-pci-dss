@@ -507,8 +507,8 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
                       : <Restricted />}
                   </td>
                   <td className="px-3 py-2 text-gray-700">
-                    {r.sensitive?.governmentIdentificationReference != null
-                      ? renderValue(r.sensitive.governmentIdentificationReference)
+                    {(r.customerAgreementGovernmentID as { number?: unknown } | undefined)?.number != null
+                      ? renderValue((r.customerAgreementGovernmentID as { number?: unknown }).number)
                       : <Restricted />}
                   </td>
                   <td className="px-3 py-2 text-gray-700">
