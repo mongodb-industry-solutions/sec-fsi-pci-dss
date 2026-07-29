@@ -40,6 +40,27 @@ export function stripAnsi(text: string): string {
   return text.replace(ANSI_RE, '');
 }
 
+/**
+ * Parse a response body as JSON without throwing on non-JSON payloads. While the backend
+ * is restarting, the ingress/proxy answers with plain text ("no healthy upstream", HTML
+ * error pages), which would otherwise surface as "Unexpected token 'o' ... is not valid JSON".
+ * Returns the parsed object, or null plus the raw text when it is not JSON.
+ */
+export async function readJsonSafe<T>(res: Response): Promise<{ data: T | null; text: string }> {
+  const text = await res.text().catch(() => '');
+  if (!text) return { data: null, text: '' };
+  try {
+    return { data: JSON.parse(text) as T, text };
+  } catch {
+    return { data: null, text };
+  }
+}
+
+/** True while a proxy/ingress reports no reachable backend (pod restarting, not an app error). */
+export function isUpstreamUnavailable(res: Response): boolean {
+  return res.status === 502 || res.status === 503 || res.status === 504;
+}
+
 export function getAdminToken(): string | null {
   if (typeof window === 'undefined') return null;
   return sessionStorage.getItem(ADMIN_TOKEN_KEY);
