@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect, useSyncExternalStore } from 'react';
 import { API_BASE_URL } from '../../../../lib/constants';
-import { getAdminToken, LogEntry, downloadText } from '../../../../lib/adminHelpers';
+import { getAdminToken, LogEntry, downloadText, readSSE } from '../../../../lib/adminHelpers';
 import { Download, Copy, CheckCheck, Play, Square } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -17,7 +17,14 @@ let _logs: LogEntry[] = (() => {
   try { return JSON.parse(sessionStorage.getItem(LOGS_KEY) ?? '[]'); } catch { return []; }
 })();
 let _streaming = false;
+let _stopped = true;          // user intent: false while the live view should stay connected
 let _controller: AbortController | null = null;
+// Reconnect backoff. Capped so a long backend outage cannot burn the /admin ops rate limit
+// (300 requests / 15 min, i.e. 1 every 3s) and leave the live view permanently 429-ed.
+const RECONNECT_DELAY_MS = 3000;
+const RECONNECT_DELAY_MAX_MS = 30_000;
+// The server heartbeats every 15s, so a longer silence means the stream is gone (dropped by a proxy).
+const IDLE_TIMEOUT_MS = 45_000;
 const _listeners = new Set<() => void>();
 
 function _notify() { _listeners.forEach((fn) => fn()); }
@@ -28,46 +35,47 @@ function _push(entry: LogEntry) {
   _notify();
 }
 
+/**
+ * Keeps the live view connected until the user presses Stop. A dropped stream (proxy idle timeout,
+ * backend restart) is reconnected automatically; the reconnect skips the buffered snapshot so the
+ * already-rendered lines are not duplicated.
+ */
 async function _start() {
-  const token = getAdminToken();
-  if (!token || _streaming) return;
+  if (!getAdminToken() || _streaming) return;
 
-  _controller = new AbortController();
+  _stopped = false;
   _streaming = true;
   _notify();
+  let first = true;
+  let delay = RECONNECT_DELAY_MS;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/admin/logs`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: _controller.signal,
-    });
-    if (!res.ok || !res.body) {
-      _push({ type: 'error', text: `HTTP ${res.status}: ${res.statusText}` });
-      _streaming = false; _controller = null; _notify();
-      return;
-    }
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const lines = buf.split('\n');
-      buf = lines.pop() ?? '';
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        try {
-          const payload = JSON.parse(line.slice(6)) as { text?: string };
-          if (payload.text) _push({ type: 'log', text: payload.text });
-        } catch { /* skip malformed */ }
+    while (!_stopped) {
+      const token = getAdminToken();
+      if (!token) { _push({ type: 'error', text: 'Admin session expired.' }); break; }
+      _controller = new AbortController();
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/v1/admin/logs${first ? '' : '?snapshot=false'}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: _controller.signal,
+        });
+        if (!res.ok || !res.body) {
+          // An HTTP-level rejection (401, 429) will not fix itself; stop instead of hammering.
+          _push({ type: 'error', text: `HTTP ${res.status}: ${res.statusText}` });
+          break;
+        }
+        first = false;
+        delay = RECONNECT_DELAY_MS;   // a successful connection resets the backoff
+        await readSSE(res, (type, text) => _push({ type: type === 'error' ? 'error' : 'log', text }), undefined, IDLE_TIMEOUT_MS);
+        if (_stopped) break;
+        _push({ type: 'error', text: '-- log stream ended, reconnecting... --' });
+      } catch (err: unknown) {
+        if (_stopped || (err instanceof DOMException && err.name === 'AbortError')) break;
+        _push({ type: 'error', text: `-- log stream lost (${(err as Error).message}), reconnecting... --` });
       }
+      await new Promise((r) => setTimeout(r, delay));
+      delay = Math.min(delay * 2, RECONNECT_DELAY_MAX_MS);
     }
-  } catch (err: unknown) {
-    if (err instanceof DOMException && err.name === 'AbortError') { /* expected */ }
-    else _push({ type: 'error', text: String(err) });
   } finally {
     _streaming = false;
     _controller = null;
@@ -76,6 +84,7 @@ async function _start() {
 }
 
 function _stop() {
+  _stopped = true;
   _controller?.abort();
   _controller = null;
   _streaming = false;
