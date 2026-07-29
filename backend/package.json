@@ -44,7 +44,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.6",
     "@types/ms": "^2.1.0",
-    "@types/node": "^20.12.7",
+    "@types/node": "^26.1.2",
     "@types/uuid": "^11.0.0",
     "@types/webidl-conversions": "^7.0.3",
     "ts-node": "^10.9.2",
