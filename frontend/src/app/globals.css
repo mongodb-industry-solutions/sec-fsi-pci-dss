@@ -58,3 +58,30 @@ select:not([multiple]) {
   background: linear-gradient(90deg, transparent, var(--mongodb-green), transparent);
   animation: admin-indeterminate 1.2s ease-in-out infinite;
 }
+
+/* Sign-in screen: the debug toggle is what reveals the demo accounts, and first-time visitors miss
+   it. It pops in, then pulses an expanding amber ring for ~8s and stops on its own. The amber resting
+   state carries the affordance by itself, so the control stays obvious after the motion ends. */
+@keyframes debug-hint-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(217 119 6 / 0); }
+  50%      { box-shadow: 0 0 0 8px rgb(217 119 6 / 0.28); }
+}
+@keyframes debug-hint-pop {
+  0%   { transform: scale(0.6); }
+  60%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.debug-hint-pulse {
+  background-color: rgb(254 243 199);
+  color: rgb(180 83 9);
+  animation:
+    debug-hint-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 1,
+    debug-hint-ring 1.6s ease-in-out 5;
+}
+/* No motion, but keep the highlight: the point is to be found, not to move. */
+@media (prefers-reduced-motion: reduce) {
+  .debug-hint-pulse {
+    animation: none;
+    box-shadow: 0 0 0 4px rgb(217 119 6 / 0.25);
+  }
+}

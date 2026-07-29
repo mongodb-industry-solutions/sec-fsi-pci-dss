@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  Eye, EyeOff, Bug,
+  Eye, EyeOff, Bug, X,
   BriefcaseMedical, CreditCard, Users, BarChart3, ClipboardList, User,
   PlusCircle, Store, ClipboardCheck,
   Plug, LayoutGrid, ShieldCheck,
@@ -16,6 +16,7 @@ import { DEMO_PASSWORD, ROLE_LABELS } from '../../lib/constants';
 import demoRoster from '../../config/demoRoster.json';
 import { Tooltip } from '../../components/Tooltip';
 import { useDebugMode } from '../../lib/debugMode';
+import { useDebugHint } from '../../lib/debugHint';
 import { UserMenu } from '../../components/UserMenu';
 import { NotificationBell } from '../../components/NotificationBell';
 import { DemoSidebar, MobileBottomNav } from '../../components/DemoSidebar';
@@ -122,6 +123,8 @@ const ROLE_ACCENT: Record<string, { iconBg: string; iconText: string; badge: str
 
 function LoginForm({ onLogin }: { onLogin: () => void }) {
   const { debugMode, toggleDebug } = useDebugMode();
+  const { hintVisible, dismissHint } = useDebugHint();
+  const showHint = hintVisible && !debugMode;
   const [users, setUsers]       = useState<AuthUser[]>([]);
   const [domains, setDomains]   = useState<AuthDomain[]>([]);
   const [selectedDomain, setSelectedDomain] = useState('local');
@@ -180,11 +183,30 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
     <div className="min-h-screen bg-[#001E2B] flex items-center justify-center p-6">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         <div className="relative text-center mb-6">
-          <button type="button" onClick={toggleDebug}
-            title={debugMode ? 'Debug mode on - click to disable' : 'Enable debug mode'}
-            className={`absolute top-0 right-0 p-1.5 rounded-lg transition-colors ${debugMode ? 'bg-amber-100 text-amber-600 hover:bg-amber-200' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}>
+          <button type="button" onClick={() => { dismissHint(); toggleDebug(); }}
+            title={debugMode ? 'Debug mode on - click to disable' : 'Enable debug mode to list the demo accounts and auto-fill their credentials'}
+            className={`absolute top-0 right-0 p-1.5 rounded-lg transition-colors ${
+              debugMode ? 'bg-amber-100 text-amber-600 hover:bg-amber-200'
+              : showHint ? 'debug-hint-pulse'
+              : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}>
             <Bug size={14} />
           </button>
+
+          {/* First-visit coach-mark. Matches the Tooltip visual language; not that component, which
+              is hover-only and non-dismissible. */}
+          {showHint && (
+            <div role="status" className="absolute right-8 top-0 z-20 w-44 text-left">
+              <div className="relative rounded-lg bg-[#001E2B] py-2 pl-3 pr-6 text-xs leading-snug text-white shadow-xl">
+                <span className="absolute right-[-4px] top-2.5 h-2.5 w-2.5 rotate-45 bg-[#001E2B]" />
+                <button type="button" onClick={dismissHint} aria-label="Dismiss hint"
+                  className="absolute right-1 top-1 p-0.5 text-gray-400 transition-colors hover:text-white">
+                  <X size={11} />
+                </button>
+                <strong className="block font-semibold text-amber-400">Start here</strong>
+                <span className="block">Debug mode lists the demo accounts.</span>
+              </div>
+            </div>
+          )}
           <div className="text-4xl mb-2"> <img src="/app-icon.png" alt={`${BRAND.full} Icon`} className="w-20 h-20 mx-auto" /> </div>
           <h1 className="text-2xl font-bold">{BRAND.primary} {BRAND.secondary}</h1>
           <p className="text-gray-500 text-sm mt-1">Application Mode: Sign In</p>
