@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Columns2, Rows3, Sparkles } from 'lucide-react';
+import { ArrowLeft, Building2, Columns2, Rows3, Sparkles } from 'lucide-react';
 import { api, type TeamContact } from '../../lib/api';
 import { BRAND } from '../../config/brand';
 import teamConfig from '../../config/team.json';
@@ -12,6 +12,8 @@ type Layout = 'grid' | 'list';
 const LAYOUT_KEY = 'psp.about.layout';
 
 const FALLBACK: TeamContact[] = teamConfig.contacts;
+/** Public IST landing page, shown next to each contact's LinkedIn link. */
+const IST_URL = 'https://www.mongodb.com/solutions/industries';
 
 export default function AboutPage() {
   const [contacts, setContacts] = useState<TeamContact[]>(FALLBACK);
@@ -157,14 +159,25 @@ function ContactCard({ contact, wide }: { contact: TeamContact; wide: boolean })
           <span className="text-gray-500">Ask me about: </span>
           {contact.ask}
         </p>
-        <a
-          href={profileUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-4 inline-flex items-center gap-2 rounded-lg border border-gray-700 bg-white/5 px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-gray-500 hover:bg-white/10 hover:text-white"
-        >
-          <LinkedInIcon /> /in/{contact.linkedin}
-        </a>
+        {/* Wraps on narrow screens so both links stay tappable */}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <a
+            href={profileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-700 bg-white/5 px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-gray-500 hover:bg-white/10 hover:text-white"
+          >
+            <LinkedInIcon /> /in/{contact.linkedin}
+          </a>
+          <a
+            href={IST_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-lg border border-[#00ED64]/30 bg-[#00ED64]/5 px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-[#00ED64]/60 hover:bg-[#00ED64]/10 hover:text-white"
+          >
+            <Building2 size={14} className="text-[#00ED64]" /> MongoDB IST
+          </a>
+        </div>
       </div>
 
       {/* QR: the point of the page at a booth, so it stays visible on phones too */}
