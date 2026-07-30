@@ -53,6 +53,18 @@ export interface AuthUser {
   merchant?: { id: string; name: string; mcc?: string };
 }
 
+/** IST team contact point shown on /about (see config/team.json for the bundled fallback). */
+export interface TeamContact {
+  id: string;
+  name: string;
+  role: string;
+  ask: string;
+  area?: string | null;
+  linkedin: string;
+  avatarUrl: string;
+  qrUrl: string;
+}
+
 /** Declarative filters for the shared demo roster (see config/demoRoster.json). */
 export interface DemoUserFilters {
   featured?: boolean;
@@ -1234,6 +1246,8 @@ export const api = {
       apiFetch<RawDocumentResponse>(
         `/api/v1/system/raw/${collection}/${id}`, {}, token
       ),
+    /** Demo metadata: IST contact points shown on /about (public, no JWT). */
+    team: () => apiFetch<{ contacts: TeamContact[] }>('/api/v1/system/team'),
   },
 
   health: (detail?: 'server' | 'db' | 'all') =>

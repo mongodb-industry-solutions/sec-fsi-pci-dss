@@ -15,6 +15,7 @@ import { PAYMENT_REQUEST_COLLECTION } from '../../modules/gateway/models/payment
 import { PAYMENT_REQUEST_EVENT_COLLECTION } from '../../modules/gateway/models/paymentRequestEvent.model';
 import { QR_REPRESENTATION_COLLECTION } from '../../modules/gateway/models/qrRepresentation.model';
 import { RTP_ALIAS_DIRECTORY_CACHE_COLLECTION } from '../../modules/gateway/models/rtpAliasDirectoryCache.model';
+import { DEMO_TEAM_CONTACT_COLLECTION } from '../../modules/system/models/demoTeamContact.model';
 
 const kmsConfig = getKmsConfig();
 
@@ -259,6 +260,19 @@ export async function createCollections(
     console.log('  created: paymentLinkRecord');
   } else {
     console.log('  skip:    paymentLinkRecord (already exists)');
+  }
+
+  // Demo-only (no BIAN service domain): IST team contact points for the "About us" page.
+  // Plaintext, no CHD and no customer PII. Contents are inserted directly (no seeder).
+  if (!existingNames.has(DEMO_TEAM_CONTACT_COLLECTION) || reset) {
+    if (existingNames.has(DEMO_TEAM_CONTACT_COLLECTION) && reset) {
+      await db.collection(DEMO_TEAM_CONTACT_COLLECTION).drop();
+      console.log(`  dropped: ${DEMO_TEAM_CONTACT_COLLECTION}`);
+    }
+    await db.createCollection(DEMO_TEAM_CONTACT_COLLECTION);
+    console.log(`  created: ${DEMO_TEAM_CONTACT_COLLECTION} (demo metadata, team contacts)`);
+  } else {
+    console.log(`  skip:    ${DEMO_TEAM_CONTACT_COLLECTION} (already exists)`);
   }
 
   // SD-89: Merchant Agreement Events  -  plaintext, append-only lifecycle audit (ADR-025 fix)
