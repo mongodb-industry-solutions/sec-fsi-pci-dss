@@ -567,11 +567,9 @@ export interface KycSearchFieldDef {
   minQueryLength?: number;
   /** QE query window: the longest value the encrypted index can match (strMaxQueryLength). */
   maxQueryLength?: number;
-  /** Longest value the operator may type. Longer than the QE window: the surplus is refined in
-   *  memory over the decrypted value (see buildTextRefiner), so a full document ID also works. */
+  /** Longest value the operator may type; the surplus over the window is refined in memory. */
   inputMaxLength?: number;
-  /** Must mirror the QE index params in encryptedFieldsMaps.ts, so the in-memory refinement
-   *  applies the same matching semantics as the encrypted index. */
+  /** Mirrors the QE index params in encryptedFieldsMaps.ts. */
   caseSensitive?: boolean;
   diacriticSensitive?: boolean;
   rangeMin?: number | string;   // ISO date string or int
@@ -660,13 +658,10 @@ export interface KycSearchRequest {
 const TEXT_MODES = new Set<KycSearchMode>(['substring', 'prefix', 'suffix']);
 
 /**
- * Validate a text query and return the value plus the slice sent to the encrypted index.
- *
- * The QE preview indexes cap the query length (strMaxQueryLength). A longer operator input, e.g.
- * a full government ID, is queried with the longest permitted slice that still cannot lose a
- * match: the last N characters for suffix, the first N for prefix or substring. Every match of
- * the full value is a match of that slice, so the encrypted query returns a superset and
- * buildTextRefiner narrows it to the exact predicate afterwards. Nothing is truncated silently.
+ * Validate a text query and return the value plus the slice sent to the encrypted index. A value
+ * longer than strMaxQueryLength is queried with the longest slice that cannot lose a match (last N
+ * for suffix, first N for prefix/substring), so the encrypted query returns a superset that
+ * buildTextRefiner narrows to the exact predicate.
  */
 function textQueryWindow(def: KycSearchFieldDef, mode: KycSearchMode, raw: string | undefined): { value: string; window: string } {
   const value = (raw ?? '').trim();
@@ -688,10 +683,8 @@ function normalizeForMatch(def: KycSearchFieldDef, s: string): string {
 }
 
 /**
- * Predicate that re-applies the FULL text query over the decrypted field value, for the case where
- * the encrypted query ran on a shorter window. Returns null when the window was the whole value
- * (the encrypted result is already exact). The refinement is server-side, over values the QE driver
- * already decrypted; Atlas still only ever saw ciphertext.
+ * Predicate that re-applies the full text query over the decrypted field value when the encrypted
+ * query ran on a shorter window. Null when the window was the whole value (already exact).
  */
 function buildTextRefiner(
   def: KycSearchFieldDef,
@@ -703,7 +696,7 @@ function buildTextRefiner(
   const needle = normalizeForMatch(def, value);
   return (doc) => {
     const actual = getNestedValue(doc, def.path);
-    if (typeof actual !== 'string') return false;  // still ciphertext for this tier: cannot refine
+    if (typeof actual !== 'string') return false;  // still ciphertext: cannot refine
     const haystack = normalizeForMatch(def, actual);
     if (mode === 'prefix') return haystack.startsWith(needle);
     if (mode === 'suffix') return haystack.endsWith(needle);
@@ -769,8 +762,7 @@ export async function searchKyc(
   if (!def) badRequest(`Unknown or non-searchable field: ${req.field}`);
   const mode = effectiveMode(def);
   const filter = buildKycFilter(def, mode, req);
-  // When the operator typed more than the QE query window, the encrypted query returned a superset:
-  // refine it here against the decrypted value so the full value behaves exactly as typed.
+  // Narrow the superset returned when the value exceeded the QE query window.
   const refine = TEXT_MODES.has(mode)
     ? (() => { const w = textQueryWindow(def, mode, req.value); return buildTextRefiner(def, mode, w.value, w.window); })()
     : null;
@@ -780,8 +772,7 @@ export async function searchKyc(
   const cap = Math.min(Math.max(limit, 1), 100);
 
   const results: Record<string, unknown>[] = [];
-  // Refinement discards candidates, so read a wider window from the encrypted query to still be
-  // able to fill one page. Bounded, because every candidate costs a join and an audit event.
+  // Refinement discards candidates, so read a bounded wider page to still fill one result page.
   const fetch = refine ? Math.min(cap * 5, 200) : cap;
 
   if (def.collection === 'party') {

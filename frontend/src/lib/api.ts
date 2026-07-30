@@ -916,8 +916,7 @@ export const api = {
     // only to L2 (with a valid escalation token) / auditor — the server is the boundary.
     searchFields: (token: string) =>
       apiFetch<KycSearchFieldsResponse>('/api/v1/customer/search/fields', {}, token),
-    // `signal` lets the caller abort a superseded query, so a stale response can never overwrite
-    // the results of the query the operator is actually looking at.
+    // `signal` lets the caller abort a superseded query.
     search: (body: KycSearchBody, token: string, escalationToken?: string, signal?: AbortSignal) =>
       apiFetch<KycSearchResponse>(
         '/api/v1/customer/search',

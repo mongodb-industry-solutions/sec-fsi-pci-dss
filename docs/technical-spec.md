@@ -1310,7 +1310,10 @@ still matches the active one (`committedKey`); otherwise the surface shows the s
 inputs are capped at `inputMaxLength`, never at the QE window, and when the value exceeds the window
 the UI states which slice MongoDB is queried with. Empty results are phrased with the field's mode
 ("No government ID no. ends with …"), because a directional match returning nothing is an answer, not
-a failure.
+a failure. A **Clear filters** action resets the value, the range bounds and the results, and aborts
+the in-flight query. The result list carries only identifying columns (name, government ID, agreement
+reference, status, email), progressively hidden below `lg` / `md`; segment, phone and the `QE:none`
+fields (address, risk notes) belong to the customer detail, where the disclosure is audited.
 
 ```typescript
 // backend/src/vendors/encryption/encryptedFieldsMaps.ts

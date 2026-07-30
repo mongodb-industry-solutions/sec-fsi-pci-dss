@@ -1,5 +1,4 @@
-// Dotted-path access on plain documents. Shared by the provider field mapping (SD-193) and the
-// encrypted-KYC search refinement, which both address nested control-record leaves by path.
+// Dotted-path access on plain documents.
 
 export function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
   const parts = path.split('.');
