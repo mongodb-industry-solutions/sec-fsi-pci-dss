@@ -3,7 +3,8 @@
 // Click-outside + Escape to close; keyboard accessible.
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ChevronDown, CircleUserRound, HelpCircle, LogOut, Store } from 'lucide-react';
+import { ChevronDown, CircleUserRound, ExternalLink, HelpCircle, Home, LayoutDashboard, LogOut, Store } from 'lucide-react';
+import { BRAND } from '@/lib/brand';
 
 export interface ProfileUser {
   name: string;
@@ -11,7 +12,13 @@ export interface ProfileUser {
   merchant: string;
 }
 
-export default function ProfileMenu({ user }: { user: ProfileUser }) {
+/** Browser-facing PSP pages, resolved server-side from ENV (cross-origin, so plain anchors). */
+export interface PspLinks {
+  portal: string;
+  dashboard: string;
+}
+
+export default function ProfileMenu({ user, pspLinks }: { user: ProfileUser; pspLinks: PspLinks }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   // Never render the literal string "undefined": fall back to the email local-part, then "Account".
@@ -68,6 +75,28 @@ export default function ProfileMenu({ user }: { user: ProfileUser }) {
             <Link href="/help" role="menuitem" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-4 py-2 hover:bg-surface-alt">
               <HelpCircle className="h-4 w-4 text-muted" aria-hidden /> Help
             </Link>
+            <a
+              href={pspLinks.dashboard}
+              role="menuitem"
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 border-t border-line px-4 py-2 hover:bg-surface-alt"
+            >
+              <LayoutDashboard className="h-4 w-4 text-muted" aria-hidden /> {BRAND.full} dashboard
+              <ExternalLink className="ml-auto h-3 w-3 text-muted" aria-hidden />
+            </a>
+            <a
+              href={pspLinks.portal}
+              role="menuitem"
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 px-4 py-2 hover:bg-surface-alt"
+            >
+              <Home className="h-4 w-4 text-muted" aria-hidden /> PSP portal
+              <ExternalLink className="ml-auto h-3 w-3 text-muted" aria-hidden />
+            </a>
             <a href="/api/auth/logout" role="menuitem" className="flex items-center gap-2.5 border-t border-line px-4 py-2 text-[var(--err)] hover:bg-[var(--err-bg)]">
               <LogOut className="h-4 w-4" aria-hidden /> Log out
             </a>

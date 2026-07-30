@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation';
 import { Coffee, LogIn, Menu, X, Package, Users, Send, Wallet, ReceiptText, HelpCircle } from 'lucide-react';
 import { Tip } from './ui/Tooltip';
 import { BRAND } from '@/lib/brand';
-import ProfileMenu, { type ProfileUser } from './ProfileMenu';
+import ProfileMenu, { type ProfileUser, type PspLinks } from './ProfileMenu';
 
 export type NavIcon = 'products' | 'beneficiaries' | 'transfers' | 'accounts' | 'history' | 'help';
 export interface NavLink { href: string; label: string; icon: NavIcon; tip: string }
@@ -21,7 +21,15 @@ const ICONS = {
   help: HelpCircle,
 } as const;
 
-export default function NavBar({ links, user }: { links: NavLink[]; user: ProfileUser | null }) {
+export default function NavBar({
+  links,
+  user,
+  pspLinks,
+}: {
+  links: NavLink[];
+  user: ProfileUser | null;
+  pspLinks: PspLinks;
+}) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -65,12 +73,16 @@ export default function NavBar({ links, user }: { links: NavLink[]; user: Profil
 
         <div className="ml-auto flex items-center gap-2">
           {user ? (
-            <ProfileMenu user={user} />
+            <ProfileMenu user={user} pspLinks={pspLinks} />
           ) : (
+            /* The landing hero carries the same CTA, so on a narrow screen the header one would sit
+               right on top of it. */
             <Tip label={`Sign in with your ${BRAND.full} account (OAuth SSO). We never see your card or password.`}>
               <a
                 href="/api/auth/login"
-                className="flex items-center gap-2 rounded-xl bg-leaf px-3.5 py-2 text-sm font-semibold text-leaf-ink transition duration-200 hover:shadow-glow hover:brightness-105 active:scale-[.98]"
+                className={`items-center gap-2 rounded-xl bg-leaf px-3.5 py-2 text-sm font-semibold text-leaf-ink transition duration-200 hover:shadow-glow hover:brightness-105 active:scale-[.98] ${
+                  pathname === '/' ? 'hidden sm:flex' : 'flex'
+                }`}
               >
                 <LogIn className="h-4 w-4" aria-hidden /> Login with {BRAND.full}
               </a>

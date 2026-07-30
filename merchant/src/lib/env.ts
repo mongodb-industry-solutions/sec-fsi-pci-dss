@@ -76,6 +76,15 @@ export const ENV = {
   pspLogoutUrl: () =>
     envVar('PSP_MERCHANT_LOGOUT_URL') ??
     (envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8080/auth/authorize').replace('/auth/authorize', '/auth/logout'),
+  // Browser-facing PSP portal root (same PSP frontend origin as authorize), for the "PSP portal"
+  // link in the merchant UI. Derived from the authorize URL by default.
+  pspPortalUrl: () =>
+    envVar('PSP_MERCHANT_PORTAL_URL') ??
+    (envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8080/auth/authorize').replace('/auth/authorize', '/'),
+  // Browser-facing PSP dashboard (the signed-in PSP app home). Derived from the authorize URL.
+  pspDashboardUrl: () =>
+    envVar('PSP_MERCHANT_DASHBOARD_URL') ??
+    (envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8080/auth/authorize').replace('/auth/authorize', '/system'),
   // Browser-facing PSP simulator hub (same PSP frontend origin as authorize). Lets the merchant demo
   // link back to the simulator. Derived from the authorize URL by default.
   pspSimulatorUrl: () =>
